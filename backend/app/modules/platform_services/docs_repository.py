@@ -1,0 +1,120 @@
+"""SQLAlchemy repository for tenant-scoped document metadata."""
+
+from __future__ import annotations
+
+from sqlalchemy import Select, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, joinedload
+
+from app.modules.core.models import Branch, Mandate, Tenant, TenantSetting
+from app.modules.platform_services.comm_models import OutboundMessage
+from app.modules.platform_services.info_models import Notice
+from app.modules.platform_services.integration_models import ImportExportJob
+from app.modules.platform_services.docs_models import (
+    Document,
+    DocumentLink,
+    DocumentType,
+    DocumentVersion,
+)
+
+
+class SqlAlchemyDocumentRepository:
+    SUPPORTED_OWNER_TYPES = frozenset(
+        {
+            "core.tenant",
+            "core.branch",
+            "core.mandate",
+            "core.tenant_setting",
+            "comm.outbound_message",
+            "info.notice",
+            "integration.import_export_job",
+        }
+    )
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def get_document_type_by_key(self, key: str) -> DocumentType | None:
+        return self.session.scalars(select(DocumentType).where(DocumentType.key == key)).one_or_none()
+
+    def create_document(self, row: Document) -> Document:
+        self.session.add(row)
+        self.session.commit()
+        return self.get_document(row.tenant_id, row.id) or row
+
+    def get_document(self, tenant_id: str, document_id: str) -> Document | None:
+        statement = self._document_query().where(Document.tenant_id == tenant_id, Document.id == document_id)
+        return self.session.scalars(statement).unique().one_or_none()
+
+    def list_document_versions(self, tenant_id: str, document_id: str) -> list[DocumentVersion]:
+        statement = (
+            select(DocumentVersion)
+            .where(DocumentVersion.tenant_id == tenant_id, DocumentVersion.document_id == document_id)
+            .order_by(DocumentVersion.version_no)
+        )
+        return list(self.session.scalars(statement).all())
+
+    def create_document_version(self, document: Document, row: DocumentVersion) -> DocumentVersion:
+        document.current_version_no = row.version_no
+        document.updated_by_user_id = row.uploaded_by_user_id
+        document.version_no += 1
+        self.session.add(row)
+        self.session.add(document)
+        self.session.commit()
+        self.session.refresh(row)
+        return row
+
+    def get_document_version(
+        self,
+        tenant_id: str,
+        document_id: str,
+        version_no: int,
+    ) -> DocumentVersion | None:
+        statement = (
+            select(DocumentVersion)
+            .where(
+                DocumentVersion.tenant_id == tenant_id,
+                DocumentVersion.document_id == document_id,
+                DocumentVersion.version_no == version_no,
+            )
+        )
+        return self.session.scalars(statement).one_or_none()
+
+    def create_document_link(self, row: DocumentLink) -> DocumentLink:
+        self.session.add(row)
+        try:
+            self.session.commit()
+        except IntegrityError:
+            self.session.rollback()
+            raise
+        self.session.refresh(row)
+        return row
+
+    def owner_exists(self, tenant_id: str, owner_type: str, owner_id: str) -> bool:
+        if owner_type not in self.SUPPORTED_OWNER_TYPES:
+            return False
+        model = {
+            "core.tenant": Tenant,
+            "core.branch": Branch,
+            "core.mandate": Mandate,
+            "core.tenant_setting": TenantSetting,
+            "comm.outbound_message": OutboundMessage,
+            "info.notice": Notice,
+            "integration.import_export_job": ImportExportJob,
+        }[owner_type]
+        statement: Select[tuple[object]] = select(model).where(model.id == owner_id)
+        if model is not Tenant:
+            statement = statement.where(model.tenant_id == tenant_id)
+        else:
+            statement = statement.where(Tenant.id == tenant_id)
+        return self.session.scalars(statement).one_or_none() is not None
+
+    @staticmethod
+    def _document_query() -> Select[tuple[Document]]:
+        return (
+            select(Document)
+            .options(joinedload(Document.document_type))
+            .options(joinedload(Document.versions))
+            .options(joinedload(Document.links))
+            .order_by(Document.created_at)
+        )

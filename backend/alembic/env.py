@@ -6,6 +6,15 @@ from os import getenv
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from app.db import Base
+from app.modules.core import models as core_models  # noqa: F401
+from app.modules.iam import models as iam_models  # noqa: F401
+from app.modules.iam import audit_models as audit_models  # noqa: F401
+from app.modules.platform_services import comm_models as comm_models  # noqa: F401
+from app.modules.platform_services import docs_models as docs_models  # noqa: F401
+from app.modules.platform_services import info_models as info_models  # noqa: F401
+from app.modules.platform_services import integration_models as integration_models  # noqa: F401
+
 config = context.config
 
 if config.config_file_name is not None:
@@ -15,7 +24,7 @@ database_url = getenv("SP_ALEMBIC_DATABASE_URL") or getenv("SP_DATABASE_URL")
 if database_url:
     config.set_main_option("sqlalchemy.url", database_url)
 
-target_metadata = None
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:

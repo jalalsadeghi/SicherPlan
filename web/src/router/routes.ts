@@ -8,6 +8,8 @@ export interface AppRouteMeta {
   roles: AppRole[];
   section: "admin" | "portal";
   placeholder?: boolean;
+  permissionKey?: string;
+  actionKeys?: string[];
 }
 
 export type AppRoute = RouteRecordRaw & {
@@ -34,33 +36,33 @@ export const appRoutes: AppRoute[] = [
   {
     path: "/admin/core",
     name: "admin-core",
-    component: () => import("@/views/ModulePlaceholderView.vue"),
+    component: () => import("@/views/CoreAdminView.vue"),
     meta: {
       titleKey: "route.admin.core.title",
       icon: "building",
       roles: ["platform_admin", "tenant_admin"],
       section: "admin",
-      placeholder: true,
-    },
-    props: {
-      titleKey: "route.admin.core.title",
-      descriptionKey: "route.admin.core.description",
+      permissionKey: "core.admin.access",
+      actionKeys: [
+        "core.admin.tenant.read",
+        "core.admin.tenant.write",
+        "core.admin.branch.write",
+        "core.admin.mandate.write",
+        "core.admin.setting.write",
+      ],
     },
   },
   {
     path: "/admin/platform-services",
     name: "admin-platform-services",
-    component: () => import("@/views/ModulePlaceholderView.vue"),
+    component: () => import("@/views/NoticeAdminView.vue"),
     meta: {
       titleKey: "route.admin.platform_services.title",
       icon: "layers",
       roles: ["platform_admin", "tenant_admin", "controller_qm"],
       section: "admin",
-      placeholder: true,
-    },
-    props: {
-      titleKey: "route.admin.platform_services.title",
-      descriptionKey: "route.admin.platform_services.description",
+      permissionKey: "platform.info.write",
+      actionKeys: ["platform.info.read", "platform.info.write"],
     },
   },
   {

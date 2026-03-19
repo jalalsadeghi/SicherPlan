@@ -3,7 +3,13 @@ name = "sicherplan-backend"
 version = "0.1.0"
 description = "SicherPlan FastAPI backend workspace"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "alembic>=1.14",
+    "fastapi>=0.115",
+    "pydantic>=2.10",
+    "psycopg[binary]>=3.2",
+    "sqlalchemy>=2.0",
+]
 
 [tool.ruff]
 line-length = 100
@@ -15,4 +21,3 @@ select = ["E", "F", "I", "B", "UP", "N"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
-

@@ -44,15 +44,26 @@ class AppSettings:
     alembic_database_url: str = _get_str("SP_ALEMBIC_DATABASE_URL")
 
     object_storage_endpoint: str = _get_str("SP_OBJECT_STORAGE_ENDPOINT")
+    object_storage_backend: str = _get_str("SP_OBJECT_STORAGE_BACKEND", "filesystem")
     object_storage_region: str = _get_str("SP_OBJECT_STORAGE_REGION", "eu-central-1")
     object_storage_bucket: str = _get_str("SP_OBJECT_STORAGE_BUCKET", "sicherplan-dev")
     object_storage_access_key: str = _get_str("SP_OBJECT_STORAGE_ACCESS_KEY")
     object_storage_secret_key: str = _get_str("SP_OBJECT_STORAGE_SECRET_KEY")
     object_storage_use_ssl: bool = _get_bool("SP_OBJECT_STORAGE_USE_SSL", False)
+    object_storage_filesystem_root: str = _get_str(
+        "SP_OBJECT_STORAGE_FILESYSTEM_ROOT",
+        "/tmp/sicherplan-object-storage",
+    )
 
-    auth_session_secret: str = _get_str("SP_AUTH_SESSION_SECRET")
+    auth_session_secret: str = _get_str("SP_AUTH_SESSION_SECRET", "change-me")
     auth_access_token_ttl_minutes: int = _get_int("SP_AUTH_ACCESS_TOKEN_TTL_MINUTES", 15)
     auth_refresh_token_ttl_minutes: int = _get_int("SP_AUTH_REFRESH_TOKEN_TTL_MINUTES", 10080)
+    auth_password_reset_token_ttl_minutes: int = _get_int(
+        "SP_AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES",
+        30,
+    )
+    auth_login_max_attempts: int = _get_int("SP_AUTH_LOGIN_MAX_ATTEMPTS", 5)
+    auth_lockout_minutes: int = _get_int("SP_AUTH_LOCKOUT_MINUTES", 15)
     auth_external_idp_enabled: bool = _get_bool("SP_AUTH_EXTERNAL_IDP_ENABLED", False)
     auth_external_idp_discovery_url: str = _get_str("SP_AUTH_EXTERNAL_IDP_DISCOVERY_URL")
     auth_external_idp_client_id: str = _get_str("SP_AUTH_EXTERNAL_IDP_CLIENT_ID")
@@ -64,6 +75,10 @@ class AppSettings:
     message_email_from: str = _get_str("SP_MESSAGE_EMAIL_FROM", "no-reply@example.invalid")
 
     integration_outbox_enabled: bool = _get_bool("SP_INTEGRATION_OUTBOX_ENABLED", True)
+    integration_secret_key: str = _get_str("SP_INTEGRATION_SECRET_KEY", _get_str("SP_AUTH_SESSION_SECRET", "change-me"))
+    integration_outbox_batch_size: int = _get_int("SP_INTEGRATION_OUTBOX_BATCH_SIZE", 25)
+    integration_outbox_retry_delay_seconds: int = _get_int("SP_INTEGRATION_OUTBOX_RETRY_DELAY_SECONDS", 60)
+    integration_outbox_max_attempts: int = _get_int("SP_INTEGRATION_OUTBOX_MAX_ATTEMPTS", 3)
     integration_payroll_export_enabled: bool = _get_bool(
         "SP_INTEGRATION_PAYROLL_EXPORT_ENABLED",
         False,
