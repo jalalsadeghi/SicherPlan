@@ -6,22 +6,22 @@ Mark a checkbox when the corresponding prompt file is written and reviewed.
 ## Sprint 01 — Inception & setup
 
 ### US-1 — Discovery, backlog confirmation, and acceptance traceability
-- [ ] `US-1-T1` — Review proposal, implementation spec, and the three end-to-end workflows. → planned file `docs/prompts/US-1-T1.md`
-- [ ] `US-1-T2` — Define backlog epics, sprint goals, dependencies, and Definition of Ready/Done. → planned file `docs/prompts/US-1-T2.md`
-- [ ] `US-1-T3` — Confirm migration assumptions, external integrations, and non-functional requirements. → planned file `docs/prompts/US-1-T3.md`
-- [ ] `US-1-T4` — Create demo checklist and traceability matrix from story to acceptance criteria. → planned file `docs/prompts/US-1-T4.md`
+- [x] `US-1-T1` — Review proposal, implementation spec, and the three end-to-end workflows. → planned file `docs/prompts/US-1-T1.md`
+- [x] `US-1-T2` — Define backlog epics, sprint goals, dependencies, and Definition of Ready/Done. → planned file `docs/prompts/US-1-T2.md`
+- [x] `US-1-T3` — Confirm migration assumptions, external integrations, and non-functional requirements. → planned file `docs/prompts/US-1-T3.md`
+- [x] `US-1-T4` — Create demo checklist and traceability matrix from story to acceptance criteria. → planned file `docs/prompts/US-1-T4.md`
 
 ### US-2 — Repository, environments, CI/CD, and observability baseline
-- [ ] `US-2-T1` — Create repository structure, branching strategy, and coding conventions across backend, web, and mobile. → planned file `docs/prompts/US-2-T1.md`
-- [ ] `US-2-T2` — Provision development/staging environments, secrets, and config management. → planned file `docs/prompts/US-2-T2.md`
-- [ ] `US-2-T3` — Build CI pipelines for lint, test, migrations, builds, and deployments. → planned file `docs/prompts/US-2-T3.md`
-- [ ] `US-2-T4` — Set up logging, tracing, health checks, and error handling standards. → planned file `docs/prompts/US-2-T4.md`
+- [x] `US-2-T1` — Create repository structure, branching strategy, and coding conventions across backend, web, and mobile. → planned file `docs/prompts/US-2-T1.md`
+- [x] `US-2-T2` — Provision development/staging environments, secrets, and config management. → planned file `docs/prompts/US-2-T2.md`
+- [x] `US-2-T3` — Build CI pipelines for lint, test, migrations, builds, and deployments. → planned file `docs/prompts/US-2-T3.md`
+- [x] `US-2-T4` — Set up logging, tracing, health checks, and error handling standards. → planned file `docs/prompts/US-2-T4.md`
 
 ### US-3 — Vben Admin shell, Prokit mobile shell, theme tokens, and localization
-- [ ] `US-3-T1` — Bootstrap Vben Admin workspace and role-aware navigation shell. → planned file `docs/prompts/US-3-T1.md`
-- [ ] `US-3-T2` — Bootstrap Flutter mobile shell from Prokit reference and define app navigation. → planned file `docs/prompts/US-3-T2.md`
-- [ ] `US-3-T3` — Implement theme tokens using light rgb(40,170,170) and dark rgb(35,200,205) across web/mobile. → planned file `docs/prompts/US-3-T3.md`
-- [ ] `US-3-T4` — Implement DE/EN i18n resource structure and shared localization rules for UI and API messages. → planned file `docs/prompts/US-3-T4.md`
+- [x] `US-3-T1` — Bootstrap Vben Admin workspace and role-aware navigation shell. → planned file `docs/prompts/US-3-T1.md`
+- [x] `US-3-T2` — Bootstrap Flutter mobile shell from Prokit reference and define app navigation. → planned file `docs/prompts/US-3-T2.md`
+- [x] `US-3-T3` — Implement theme tokens using light rgb(40,170,170) and dark rgb(35,200,205) across web/mobile. → planned file `docs/prompts/US-3-T3.md`
+- [x] `US-3-T4` — Implement DE/EN i18n resource structure and shared localization rules for UI and API messages. → planned file `docs/prompts/US-3-T4.md`
 
 ## Sprint 02 — Platform core & backbone
 
