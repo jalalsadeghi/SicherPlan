@@ -1,3 +1,5 @@
+> Sprint 1 prompt files (`US-1-T1` through `US-3-T4`) now include an embedded `## Codex `/review` prompt` section for post-implementation review.
+
 # Task Prompt Index
 
 This file tracks the future task-level prompt files that will be created incrementally.

@@ -77,3 +77,33 @@ Establish a repository structure and engineering conventions that support a modu
 - A summary of key design decisions and assumptions.
 - Verification evidence: build/lint/test commands and notable outputs.
 - Open follow-ups or blockers that should be carried into the next task.
+
+## Codex `/review` prompt
+
+Use this after the implementation for **US-2-T1 — Create repository structure, branching strategy, and coding conventions across backend, web, and mobile** is finished.
+
+```text
+/review Please review the implementation for task US-2-T1 (Create repository structure, branching strategy, and coding conventions across backend, web, and mobile) against this prompt file and the current repository state.
+
+Review goals:
+- Confirm the implementation matches the objective, dependencies, hard constraints, expected outputs, non-goals, and verification checklist in `docs/prompts/US-2-T1.md`.
+- Review only the files that are relevant to this task, but also flag any upstream or downstream contract drift caused by the changes.
+- Identify correctness, data-model, API-contract, migration, authorization, localization, testing, and maintainability issues.
+
+Task-specific review focus:
+- Vben Admin integration follows the agreed shell, navigation, theme, and i18n conventions.
+- Flutter shell or mobile-related changes stay aligned with the Prokit-inspired structure and localization rules.
+- CI/CD and automation changes are minimal, reproducible, and do not weaken quality gates.
+
+Required review output:
+1. Blocking issues
+2. Major issues
+3. Minor issues
+4. Nice-to-have improvements
+5. Final verdict: `approved`, `approved with minor issues`, or `changes required`
+
+Additional instructions:
+- Be strict about tenant isolation, role scoping, auditability, DE default / EN secondary behavior, and traceability to US-2.
+- Call out missing tests, weak assertions, incorrect acceptance coverage, schema drift, or assumptions that are not grounded in the proposal or implementation data model.
+- If no real issue exists, say so clearly and do not invent problems.
+```

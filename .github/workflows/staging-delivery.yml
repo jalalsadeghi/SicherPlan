@@ -1,0 +1,19 @@
+name: Staging Delivery Stub
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - develop
+
+jobs:
+  staging-readiness:
+    name: Staging Readiness
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Summarize staging handoff
+        run: ./infra/scripts/staging_delivery_stub.sh
