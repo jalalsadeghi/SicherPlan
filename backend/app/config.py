@@ -3,7 +3,69 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from os import getenv
+from os import environ, getenv
+from pathlib import Path
+
+
+def _backend_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _strip_quotes(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        return value[1:-1]
+    return value
+
+
+def _parse_env_line(line: str) -> tuple[str, str] | None:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#"):
+        return None
+    if stripped.startswith("export "):
+        stripped = stripped[7:].strip()
+    if "=" not in stripped:
+        return None
+    key, raw_value = stripped.split("=", 1)
+    key = key.strip()
+    if not key:
+        return None
+    return key, _strip_quotes(raw_value.strip())
+
+
+def _candidate_env_files() -> list[Path]:
+    override = getenv("SP_ENV_FILE")
+    if override:
+        env_path = Path(override)
+        if not env_path.is_absolute():
+            env_path = _backend_root() / env_path
+        return [env_path]
+    root = _backend_root()
+    return [root / ".env", root / ".env.local"]
+
+
+def load_env_files(
+    paths: list[Path] | tuple[Path, ...] | None = None,
+    *,
+    override: bool = False,
+) -> tuple[Path, ...]:
+    loaded: list[Path] = []
+    for path in paths or _candidate_env_files():
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            parsed = _parse_env_line(line)
+            if parsed is None:
+                continue
+            key, value = parsed
+            if override:
+                environ[key] = value
+            else:
+                environ.setdefault(key, value)
+        loaded.append(path)
+    return tuple(loaded)
+
+
+LOADED_ENV_FILES = load_env_files()
 
 
 def _get_bool(name: str, default: bool) -> bool:
@@ -39,8 +101,10 @@ class AppSettings:
     db_port: int = _get_int("SP_DB_PORT", 5432)
     db_name: str = _get_str("SP_DB_NAME", "sicherplan")
     db_user: str = _get_str("SP_DB_USER", "sicherplan")
-    db_password: str = _get_str("SP_DB_PASSWORD", "")
+    db_password: str = _get_str("SP_DB_PASSWORD", "change-me")
     db_echo: bool = _get_bool("SP_DB_ECHO", False)
+    db_connect_timeout_seconds: int = _get_int("SP_DB_CONNECT_TIMEOUT_SECONDS", 5)
+    database_url_override: str = _get_str("SP_DATABASE_URL")
     alembic_database_url: str = _get_str("SP_ALEMBIC_DATABASE_URL")
 
     object_storage_endpoint: str = _get_str("SP_OBJECT_STORAGE_ENDPOINT")
@@ -75,7 +139,10 @@ class AppSettings:
     message_email_from: str = _get_str("SP_MESSAGE_EMAIL_FROM", "no-reply@example.invalid")
 
     integration_outbox_enabled: bool = _get_bool("SP_INTEGRATION_OUTBOX_ENABLED", True)
-    integration_secret_key: str = _get_str("SP_INTEGRATION_SECRET_KEY", _get_str("SP_AUTH_SESSION_SECRET", "change-me"))
+    integration_secret_key: str = _get_str(
+        "SP_INTEGRATION_SECRET_KEY",
+        _get_str("SP_AUTH_SESSION_SECRET", "change-me"),
+    )
     integration_outbox_batch_size: int = _get_int("SP_INTEGRATION_OUTBOX_BATCH_SIZE", 25)
     integration_outbox_retry_delay_seconds: int = _get_int("SP_INTEGRATION_OUTBOX_RETRY_DELAY_SECONDS", 60)
     integration_outbox_max_attempts: int = _get_int("SP_INTEGRATION_OUTBOX_MAX_ATTEMPTS", 3)
@@ -87,12 +154,18 @@ class AppSettings:
 
     @property
     def database_url(self) -> str:
+        if self.database_url_override:
+            return self.database_url_override
         if self.alembic_database_url:
             return self.alembic_database_url
         return (
             f"postgresql+psycopg://{self.db_user}:{self.db_password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
+
+    @property
+    def loaded_env_files(self) -> tuple[str, ...]:
+        return tuple(str(path) for path in LOADED_ENV_FILES)
 
 
 settings = AppSettings()

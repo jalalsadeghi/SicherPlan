@@ -47,6 +47,7 @@ class TestLookupSeed(unittest.TestCase):
     def test_domain_governance_has_no_duplicate_domain_names(self) -> None:
         names = [domain.name for domain in ALL_LOOKUP_DOMAINS]
         self.assertEqual(len(names), len(set(names)))
+        self.assertIn("dunning_policy", names)
 
     def test_system_seed_is_idempotent(self) -> None:
         session = _FakeSession()

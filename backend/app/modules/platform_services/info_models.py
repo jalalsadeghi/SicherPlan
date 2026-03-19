@@ -14,7 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import AuditLifecycleMixin, Base, TimestampedMixin, UUIDPrimaryKeyMixin
@@ -23,6 +23,7 @@ from app.db.base import AuditLifecycleMixin, Base, TimestampedMixin, UUIDPrimary
 class Notice(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
     __tablename__ = "notice"
     __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_info_notice_tenant_id_id"),
         Index("ix_info_notice_tenant_status_publish_from", "tenant_id", "status", "publish_from"),
         {"schema": "info"},
     )
@@ -85,7 +86,7 @@ class NoticeAudience(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
     )
 
     tenant_id: Mapped[str] = mapped_column(ForeignKey("core.tenant.id", ondelete="RESTRICT"), nullable=False)
-    notice_id: Mapped[str] = mapped_column(nullable=False)
+    notice_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
     audience_kind: Mapped[str] = mapped_column(String(80), nullable=False)
     target_value: Mapped[str | None] = mapped_column(String(120), nullable=True)
     target_label: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -114,7 +115,7 @@ class NoticeRead(UUIDPrimaryKeyMixin, TimestampedMixin, Base):
     )
 
     tenant_id: Mapped[str] = mapped_column(ForeignKey("core.tenant.id", ondelete="RESTRICT"), nullable=False)
-    notice_id: Mapped[str] = mapped_column(nullable=False)
+    notice_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
     user_account_id: Mapped[str] = mapped_column(ForeignKey("iam.user_account.id", ondelete="RESTRICT"), nullable=False)
     first_opened_at: Mapped[datetime] = mapped_column(
         nullable=False,
@@ -152,7 +153,7 @@ class NoticeLink(UUIDPrimaryKeyMixin, Base):
     )
 
     tenant_id: Mapped[str] = mapped_column(ForeignKey("core.tenant.id", ondelete="RESTRICT"), nullable=False)
-    notice_id: Mapped[str] = mapped_column(nullable=False)
+    notice_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
     label: Mapped[str] = mapped_column(String(255), nullable=False)
     url: Mapped[str] = mapped_column(String(500), nullable=False)
     link_type: Mapped[str] = mapped_column(String(40), nullable=False, default="external", server_default="external")

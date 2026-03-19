@@ -46,6 +46,7 @@ def upgrade() -> None:
         sa.Column("id", postgresql.UUID(as_uuid=False), nullable=False, server_default=sa.text("gen_random_uuid()")),
         sa.ForeignKeyConstraint(["tenant_id"], ["core.tenant.id"], name="fk_notice_tenant_id_tenant", ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id", name="pk_notice"),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_info_notice_tenant_id_id"),
         schema="info",
     )
     op.create_index("ix_info_notice_tenant_status_publish_from", "notice", ["tenant_id", "status", "publish_from"], unique=False, schema="info")

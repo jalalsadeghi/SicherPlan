@@ -1,0 +1,18 @@
+{
+  "admin": {
+    "title": "Administration",
+    "core": "Tenants and core system",
+    "platformServices": "Platform services",
+    "customers": "Customers",
+    "recruiting": "Recruiting",
+    "employees": "Employees"
+  },
+  "portal": {
+    "title": "Portals",
+    "customer": "Customer portal"
+  },
+  "public": {
+    "title": "Public forms",
+    "applicantForm": "Applicant form"
+  }
+}

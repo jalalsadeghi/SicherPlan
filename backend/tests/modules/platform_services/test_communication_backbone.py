@@ -237,6 +237,18 @@ class TestCommunicationMetadata(unittest.TestCase):
             if isinstance(constraint, UniqueConstraint)
         }
         self.assertIn("uq_comm_message_template_tenant_channel_key_language", template_constraints)
+        outbound_constraints = {
+            constraint.name
+            for constraint in OutboundMessage.__table__.constraints
+            if isinstance(constraint, UniqueConstraint)
+        }
+        self.assertIn("uq_comm_outbound_message_tenant_id_id", outbound_constraints)
+        recipient_constraints = {
+            constraint.name
+            for constraint in MessageRecipient.__table__.constraints
+            if isinstance(constraint, UniqueConstraint)
+        }
+        self.assertIn("uq_comm_message_recipient_tenant_id_id", recipient_constraints)
         attempt_columns = {column.name for column in DeliveryAttempt.__table__.columns}
         self.assertNotIn("updated_at", attempt_columns)
         self.assertNotIn("version_no", attempt_columns)

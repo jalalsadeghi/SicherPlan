@@ -16,6 +16,7 @@ from app.modules.iam.audit_service import AuditService
 from app.modules.iam.auth_adapters import DefaultAuthExtensionHooks, LoggingPasswordResetNotifier
 from app.modules.iam.auth_repository import SqlAlchemyAuthRepository
 from app.modules.iam.auth_schemas import (
+    AccessCodesResponse,
     CurrentSessionResponse,
     LoginRequest,
     LoginResponse,
@@ -113,6 +114,13 @@ def current_session(
     service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> CurrentSessionResponse:
     return service.current_session(context)
+
+
+@router.get("/codes", response_model=AccessCodesResponse)
+def access_codes(
+    context: Annotated[AuthenticatedSessionContext, Depends(get_current_auth_context)],
+) -> AccessCodesResponse:
+    return AccessCodesResponse(items=sorted(context.permission_keys))
 
 
 @router.get("/sessions", response_model=SessionListResponse)

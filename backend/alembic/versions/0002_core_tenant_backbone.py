@@ -106,6 +106,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name="pk_mandate"),
         sa.UniqueConstraint("tenant_id", "code", name="uq_core_mandate_tenant_code"),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_core_mandate_tenant_id_id"),
         schema="core",
     )
 

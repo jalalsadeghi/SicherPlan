@@ -14,7 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import AuditLifecycleMixin, Base, UUIDPrimaryKeyMixin
@@ -50,6 +50,7 @@ class MessageTemplate(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
 class OutboundMessage(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
     __tablename__ = "outbound_message"
     __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_comm_outbound_message_tenant_id_id"),
         Index("ix_comm_outbound_message_tenant_status", "tenant_id", "status"),
         {"schema": "comm"},
     )
@@ -95,12 +96,13 @@ class MessageRecipient(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
             name="fk_comm_message_recipient_tenant_message",
             ondelete="RESTRICT",
         ),
+        UniqueConstraint("tenant_id", "id", name="uq_comm_message_recipient_tenant_id_id"),
         Index("ix_comm_message_recipient_tenant_message", "tenant_id", "outbound_message_id"),
         {"schema": "comm"},
     )
 
     tenant_id: Mapped[str] = mapped_column(ForeignKey("core.tenant.id", ondelete="RESTRICT"), nullable=False)
-    outbound_message_id: Mapped[str] = mapped_column(nullable=False)
+    outbound_message_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
     recipient_kind: Mapped[str] = mapped_column(String(10), nullable=False, default="to", server_default="to")
     destination: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -144,8 +146,8 @@ class DeliveryAttempt(UUIDPrimaryKeyMixin, Base):
     )
 
     tenant_id: Mapped[str] = mapped_column(ForeignKey("core.tenant.id", ondelete="RESTRICT"), nullable=False)
-    outbound_message_id: Mapped[str] = mapped_column(nullable=False)
-    recipient_id: Mapped[str] = mapped_column(nullable=False)
+    outbound_message_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
+    recipient_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
     provider_key: Mapped[str] = mapped_column(String(80), nullable=False)
     provider_message_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
     outcome: Mapped[str] = mapped_column(String(40), nullable=False)

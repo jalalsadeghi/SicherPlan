@@ -225,6 +225,11 @@ class TestNoticeMetadata(unittest.TestCase):
         self.assertIn("info.notice_link", Base.metadata.tables)
 
     def test_notice_read_and_audience_constraints_are_stable(self) -> None:
+        notice_constraints = {
+            constraint.name
+            for constraint in Notice.__table__.constraints
+            if isinstance(constraint, UniqueConstraint)
+        }
         audience_constraints = {
             constraint.name
             for constraint in NoticeAudience.__table__.constraints
@@ -235,6 +240,7 @@ class TestNoticeMetadata(unittest.TestCase):
             for constraint in NoticeRead.__table__.constraints
             if isinstance(constraint, UniqueConstraint)
         }
+        self.assertIn("uq_info_notice_tenant_id_id", notice_constraints)
         self.assertIn("uq_info_notice_audience_scope", audience_constraints)
         self.assertIn("uq_info_notice_read_notice_user", read_constraints)
         index_names = {index.name for index in Notice.__table__.indexes if isinstance(index, Index)}

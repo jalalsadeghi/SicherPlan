@@ -73,6 +73,16 @@ SYSTEM_LOOKUP_DOMAINS: tuple[LookupSeedDomain, ...] = (
         ),
     ),
     LookupSeedDomain(
+        name="dunning_policy",
+        ownership="system",
+        description="Customer-facing dunning policy profiles used by CRM commercial configuration.",
+        values=(
+            LookupSeedValue("disabled", "Deaktiviert", "Keine Mahnlogik fuer diesen Kunden anwenden", 10),
+            LookupSeedValue("standard", "Standard", "Standardisierte Mahnlogik mit regulaerer Eskalation", 20),
+            LookupSeedValue("strict", "Streng", "Verkuerzte Fristen mit frueher Eskalation", 30),
+        ),
+    ),
+    LookupSeedDomain(
         name="report_category",
         ownership="system",
         description="Shared reporting categories for operational, finance, and compliance output grouping.",

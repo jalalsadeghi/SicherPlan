@@ -103,3 +103,15 @@ class TestAuthorizationHelpers(unittest.TestCase):
 
         enforce_scope(context, scope="branch", tenant_id="tenant-1", branch_id="branch-1")
         enforce_scope(context, scope="mandate", tenant_id="tenant-1", mandate_id="mandate-1")
+
+    def test_customer_scope_allows_only_matching_customer(self) -> None:
+        context = _context(
+            role_keys=("customer_user",),
+            permission_keys=("portal.customer.access",),
+            scopes=(AuthenticatedRoleScope(role_key="customer_user", scope_type="customer", customer_id="customer-1"),),
+        )
+
+        enforce_scope(context, scope="customer", tenant_id="tenant-1", request_customer_id="customer-1")
+
+        with self.assertRaises(ApiException):
+            enforce_scope(context, scope="customer", tenant_id="tenant-1", request_customer_id="customer-2")

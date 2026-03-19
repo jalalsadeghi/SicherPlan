@@ -49,6 +49,11 @@ class SqlAlchemyIntegrationRepository:
         self.session.commit()
         return self.get_job(job.tenant_id, job.id) or job
 
+    def create_job(self, row: ImportExportJob) -> ImportExportJob:
+        self.session.add(row)
+        self.session.commit()
+        return self.get_job(row.tenant_id, row.id) or row
+
     def save_job(self, row: ImportExportJob) -> ImportExportJob:
         self.session.add(row)
         self.session.commit()

@@ -80,6 +80,8 @@ class TestSeedIamCatalog(unittest.TestCase):
         permission_keys = {permission.key: (permission.module, permission.action) for permission in session.permissions}
         self.assertEqual(permission_keys["core.admin.tenant.write"], ("core_admin", "tenant_write"))
         self.assertEqual(permission_keys["core.admin.branch.read"], ("core_admin", "branch_read"))
+        self.assertEqual(permission_keys["customers.billing.read"], ("customers", "billing_read"))
+        self.assertEqual(permission_keys["employees.private.write"], ("employees", "private_write"))
         self.assertEqual(permission_keys["portal.customer.access"], ("portal_customer", "access"))
 
     def test_role_catalog_includes_internal_and_portal_roles(self) -> None:

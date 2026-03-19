@@ -87,6 +87,10 @@ class CurrentSessionResponse(BaseModel):
     session: SessionListItem
 
 
+class AccessCodesResponse(BaseModel):
+    items: list[str]
+
+
 class SessionListResponse(BaseModel):
     items: list[SessionListItem]
 

@@ -42,6 +42,12 @@ class DocumentRepository(Protocol):
     def owner_exists(self, tenant_id: str, owner_type: str, owner_id: str) -> bool: ...
 
 
+class DocumentActorContext(Protocol):
+    tenant_id: str
+    user_id: str | None
+    is_platform_admin: bool
+
+
 @dataclass(frozen=True, slots=True)
 class DocumentDownload:
     file_name: str
@@ -66,7 +72,7 @@ class DocumentService:
         self,
         tenant_id: str,
         payload: DocumentCreate,
-        actor: RequestAuthorizationContext,
+        actor: DocumentActorContext,
     ) -> DocumentRead:
         self._ensure_tenant_scope(actor, tenant_id)
         if payload.tenant_id != tenant_id:
@@ -97,6 +103,7 @@ class DocumentService:
         return DocumentRead.model_validate(document)
 
     def get_document(self, tenant_id: str, document_id: str, actor: RequestAuthorizationContext) -> DocumentRead:
+        # Existing auth contexts and anonymous public actors share the same tenant-scope attributes.
         document = self._require_document(tenant_id, document_id, actor)
         return DocumentRead.model_validate(document)
 
@@ -105,7 +112,7 @@ class DocumentService:
         tenant_id: str,
         document_id: str,
         payload: DocumentVersionCreate,
-        actor: RequestAuthorizationContext,
+        actor: DocumentActorContext,
     ) -> DocumentVersionRead:
         document = self._require_document(tenant_id, document_id, actor)
         content = self._decode_base64(payload.content_base64)
@@ -159,7 +166,7 @@ class DocumentService:
         tenant_id: str,
         document_id: str,
         payload: DocumentLinkCreate,
-        actor: RequestAuthorizationContext,
+        actor: DocumentActorContext,
     ) -> DocumentLinkRead:
         self._require_document(tenant_id, document_id, actor)
         if payload.owner_type not in self.repository.SUPPORTED_OWNER_TYPES:
@@ -202,7 +209,7 @@ class DocumentService:
         tenant_id: str,
         document_id: str,
         version_no: int,
-        actor: RequestAuthorizationContext,
+        actor: DocumentActorContext,
     ) -> DocumentVersionRead:
         self._require_document(tenant_id, document_id, actor)
         version = self.repository.get_document_version(tenant_id, document_id, version_no)
@@ -215,7 +222,7 @@ class DocumentService:
         tenant_id: str,
         document_id: str,
         version_no: int,
-        actor: RequestAuthorizationContext,
+        actor: DocumentActorContext,
     ) -> DocumentDownload:
         self._require_document(tenant_id, document_id, actor)
         version = self.repository.get_document_version(tenant_id, document_id, version_no)
@@ -237,7 +244,7 @@ class DocumentService:
         self,
         tenant_id: str,
         document_id: str,
-        actor: RequestAuthorizationContext,
+        actor: DocumentActorContext,
     ) -> Document:
         self._ensure_tenant_scope(actor, tenant_id)
         document = self.repository.get_document(tenant_id, document_id)
@@ -246,7 +253,7 @@ class DocumentService:
         return document
 
     @staticmethod
-    def _ensure_tenant_scope(actor: RequestAuthorizationContext, tenant_id: str) -> None:
+    def _ensure_tenant_scope(actor: DocumentActorContext, tenant_id: str) -> None:
         if actor.is_platform_admin or actor.tenant_id == tenant_id:
             return
         raise ApiException(403, "iam.authorization.scope_denied", "errors.iam.authorization.scope_denied")

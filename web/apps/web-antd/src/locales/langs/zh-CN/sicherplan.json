@@ -1,0 +1,12 @@
+{
+  "admin": {
+    "title": "Administration",
+    "core": "Tenants and core system",
+    "platformServices": "Platform services",
+    "customers": "Customers"
+  },
+  "portal": {
+    "title": "Portals",
+    "customer": "Customer portal"
+  }
+}

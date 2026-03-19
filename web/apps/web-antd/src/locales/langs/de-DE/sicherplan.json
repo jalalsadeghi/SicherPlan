@@ -1,0 +1,18 @@
+{
+  "admin": {
+    "title": "Administration",
+    "core": "Mandanten und Kernsystem",
+    "platformServices": "Plattformdienste",
+    "customers": "Kunden",
+    "recruiting": "Recruiting",
+    "employees": "Mitarbeitende"
+  },
+  "portal": {
+    "title": "Portale",
+    "customer": "Kundenportal"
+  },
+  "public": {
+    "title": "Oeffentliche Formulare",
+    "applicantForm": "Bewerbungsformular"
+  }
+}

@@ -20,6 +20,23 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute("CREATE SCHEMA IF NOT EXISTS iam")
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'uq_core_mandate_tenant_id_id'
+                  AND connamespace = 'core'::regnamespace
+            ) THEN
+                ALTER TABLE core.mandate
+                ADD CONSTRAINT uq_core_mandate_tenant_id_id UNIQUE (tenant_id, id);
+            END IF;
+        END
+        $$;
+        """
+    )
 
     op.create_table(
         "role",

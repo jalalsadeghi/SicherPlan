@@ -41,6 +41,7 @@ def upgrade() -> None:
         sa.Column("id", postgresql.UUID(as_uuid=False), nullable=False, server_default=sa.text("gen_random_uuid()")),
         sa.ForeignKeyConstraint(["tenant_id"], ["core.tenant.id"], name="fk_endpoint_tenant_id_tenant", ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id", name="pk_endpoint"),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_integration_endpoint_tenant_id_id"),
         sa.UniqueConstraint("tenant_id", "provider_key", "endpoint_type", name="uq_integration_endpoint_tenant_provider_type"),
         schema="integration",
     )

@@ -1,0 +1,2984 @@
+<template>
+  <section class="customer-admin-page">
+    <section class="module-card customer-admin-hero">
+      <div>
+        <p class="eyebrow">{{ t("customerAdmin.eyebrow") }}</p>
+        <h2>{{ t("customerAdmin.title") }}</h2>
+        <p class="customer-admin-lead">{{ t("customerAdmin.lead") }}</p>
+        <div class="customer-admin-meta">
+          <span class="customer-admin-meta__pill">
+            {{ t("customerAdmin.permission.read") }}: {{ canRead ? "on" : "off" }}
+          </span>
+          <span class="customer-admin-meta__pill">
+            {{ t("customerAdmin.permission.write") }}: {{ canWrite ? "on" : "off" }}
+          </span>
+          <span class="customer-admin-meta__pill">
+            {{ t("customerAdmin.permission.commercialRead") }}: {{ canReadCommercial ? "on" : "off" }}
+          </span>
+          <span class="customer-admin-meta__pill">
+            {{ t("customerAdmin.permission.commercialWrite") }}: {{ canWriteCommercial ? "on" : "off" }}
+          </span>
+        </div>
+      </div>
+
+      <div class="module-card customer-admin-scope">
+        <label class="field-stack">
+          <span>{{ t("customerAdmin.scope.label") }}</span>
+          <input v-model="tenantScopeInput" :placeholder="t('customerAdmin.scope.placeholder')" />
+        </label>
+        <label class="field-stack">
+          <span>{{ t("customerAdmin.token.label") }}</span>
+          <input
+            v-model="accessTokenInput"
+            type="password"
+            :placeholder="t('customerAdmin.token.placeholder')"
+          />
+        </label>
+        <p class="field-help">{{ t("customerAdmin.token.help") }}</p>
+        <div class="cta-row">
+          <button class="cta-button" type="button" @click="rememberScopeAndToken">
+            {{ t("customerAdmin.actions.rememberScope") }}
+          </button>
+          <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshCustomers">
+            {{ t("customerAdmin.actions.refresh") }}
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="feedback.message" class="customer-admin-feedback" :data-tone="feedback.tone">
+      <div>
+        <strong>{{ feedback.title }}</strong>
+        <span>{{ feedback.message }}</span>
+      </div>
+      <button type="button" @click="clearFeedback">{{ t("customerAdmin.actions.clearFeedback") }}</button>
+    </section>
+
+    <section v-if="!tenantScopeId || !accessToken" class="module-card customer-admin-empty">
+      <p class="eyebrow">{{ t("customerAdmin.scope.missingTitle") }}</p>
+      <h3>{{ t("customerAdmin.scope.missingBody") }}</h3>
+    </section>
+
+    <section v-else-if="!canRead" class="module-card customer-admin-empty">
+      <p class="eyebrow">{{ t("customerAdmin.permission.missingTitle") }}</p>
+      <h3>{{ t("customerAdmin.permission.missingBody") }}</h3>
+    </section>
+
+    <div v-else class="customer-admin-grid">
+      <section class="module-card customer-admin-panel">
+        <div class="customer-admin-panel__header">
+          <div>
+            <p class="eyebrow">{{ t("customerAdmin.list.eyebrow") }}</p>
+            <h3>{{ t("customerAdmin.list.title") }}</h3>
+          </div>
+          <StatusBadge :status="loading.list ? 'inactive' : 'active'" />
+        </div>
+
+        <div class="customer-admin-form-grid">
+          <label class="field-stack">
+            <span>{{ t("customerAdmin.filters.search") }}</span>
+            <input v-model="filters.search" :placeholder="t('customerAdmin.filters.searchPlaceholder')" />
+          </label>
+          <label class="field-stack">
+            <span>{{ t("customerAdmin.filters.status") }}</span>
+            <select v-model="filters.lifecycle_status">
+              <option value="">{{ t("customerAdmin.filters.allStatuses") }}</option>
+              <option value="active">{{ t("customerAdmin.status.active") }}</option>
+              <option value="inactive">{{ t("customerAdmin.status.inactive") }}</option>
+              <option value="archived">{{ t("customerAdmin.status.archived") }}</option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ t("customerAdmin.fields.defaultBranchId") }}</span>
+            <input v-model="filters.default_branch_id" />
+          </label>
+          <label class="field-stack">
+            <span>{{ t("customerAdmin.fields.defaultMandateId") }}</span>
+            <input v-model="filters.default_mandate_id" />
+          </label>
+        </div>
+
+        <label class="customer-admin-checkbox">
+          <input v-model="filters.include_archived" type="checkbox" />
+          <span>{{ t("customerAdmin.filters.includeArchived") }}</span>
+        </label>
+
+        <div class="cta-row">
+          <button class="cta-button" type="button" @click="refreshCustomers">
+            {{ t("customerAdmin.actions.search") }}
+          </button>
+          <button
+            class="cta-button cta-secondary"
+            type="button"
+            :disabled="!canRead || !tenantScopeId || !accessToken"
+            @click="runCustomerExport"
+          >
+            {{ t("customerAdmin.actions.exportCustomers") }}
+          </button>
+          <button
+            class="cta-button cta-secondary"
+            type="button"
+            :disabled="!actionState.canCreate"
+            @click="startCreateCustomer"
+          >
+            {{ t("customerAdmin.actions.newCustomer") }}
+          </button>
+        </div>
+
+        <div v-if="customers.length" class="customer-admin-list">
+          <button
+            v-for="customer in customers"
+            :key="customer.id"
+            type="button"
+            class="customer-admin-row"
+            :class="{ selected: customer.id === selectedCustomerId }"
+            @click="selectCustomer(customer.id)"
+          >
+            <div>
+              <strong>{{ customer.name }}</strong>
+              <span>{{ customer.customer_number }}</span>
+            </div>
+            <StatusBadge :status="customer.status" />
+          </button>
+        </div>
+        <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.list.empty") }}</p>
+      </section>
+
+      <section class="module-card customer-admin-panel customer-admin-detail">
+        <div class="customer-admin-panel__header">
+          <div>
+            <p class="eyebrow">{{ t("customerAdmin.detail.eyebrow") }}</p>
+            <h3>{{ isCreatingCustomer ? t("customerAdmin.detail.newTitle") : selectedCustomer?.name || t("customerAdmin.detail.emptyTitle") }}</h3>
+          </div>
+          <StatusBadge v-if="selectedCustomer && !isCreatingCustomer" :status="selectedCustomer.status" />
+        </div>
+
+        <template v-if="isCreatingCustomer || selectedCustomer">
+          <div v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-summary">
+            <article class="customer-admin-summary__card">
+              <span>{{ t("customerAdmin.summary.primaryContact") }}</span>
+              <strong>{{ primaryContactSummary || t("customerAdmin.summary.none") }}</strong>
+            </article>
+            <article class="customer-admin-summary__card">
+              <span>{{ t("customerAdmin.summary.defaultBranch") }}</span>
+              <strong>{{ selectedCustomer.default_branch_id || t("customerAdmin.summary.none") }}</strong>
+            </article>
+            <article class="customer-admin-summary__card">
+              <span>{{ t("customerAdmin.summary.defaultMandate") }}</span>
+              <strong>{{ selectedCustomer.default_mandate_id || t("customerAdmin.summary.none") }}</strong>
+            </article>
+            <article class="customer-admin-summary__card">
+              <span>{{ t("customerAdmin.summary.classification") }}</span>
+              <strong>{{ selectedCustomer.classification_lookup_id || t("customerAdmin.summary.none") }}</strong>
+            </article>
+          </div>
+
+          <div v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-lifecycle">
+            <div>
+              <strong>{{ t("customerAdmin.lifecycle.title") }}</strong>
+              <p class="field-help">{{ t("customerAdmin.lifecycle.help") }}</p>
+            </div>
+            <div class="cta-row">
+              <button
+                v-if="actionState.canDeactivate"
+                class="cta-button"
+                type="button"
+                @click="applyStatus('inactive')"
+              >
+                {{ t("customerAdmin.actions.deactivate") }}
+              </button>
+              <button
+                v-if="actionState.canReactivate"
+                class="cta-button"
+                type="button"
+                @click="applyStatus('active')"
+              >
+                {{ t("customerAdmin.actions.reactivate") }}
+              </button>
+              <button
+                v-if="actionState.canArchive"
+                class="cta-button cta-secondary"
+                type="button"
+                @click="applyStatus('archived')"
+              >
+                {{ t("customerAdmin.actions.archive") }}
+              </button>
+            </div>
+          </div>
+
+          <form class="customer-admin-form" @submit.prevent="submitCustomer">
+            <div class="customer-admin-panel__header">
+              <div>
+                <p class="eyebrow">{{ t("customerAdmin.form.generalEyebrow") }}</p>
+                <h3>{{ t("customerAdmin.form.generalTitle") }}</h3>
+              </div>
+            </div>
+
+            <div class="customer-admin-form-grid">
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.customerNumber") }}</span>
+                <input v-model="customerDraft.customer_number" required />
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.name") }}</span>
+                <input v-model="customerDraft.name" required />
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.legalName") }}</span>
+                <input v-model="customerDraft.legal_name" />
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.externalRef") }}</span>
+                <input v-model="customerDraft.external_ref" />
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.legalFormLookupId") }}</span>
+                <input v-model="customerDraft.legal_form_lookup_id" />
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.classificationLookupId") }}</span>
+                <input v-model="customerDraft.classification_lookup_id" />
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.rankingLookupId") }}</span>
+                <input v-model="customerDraft.ranking_lookup_id" />
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.customerStatusLookupId") }}</span>
+                <input v-model="customerDraft.customer_status_lookup_id" />
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.defaultBranchId") }}</span>
+                <input v-model="customerDraft.default_branch_id" />
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.defaultMandateId") }}</span>
+                <input v-model="customerDraft.default_mandate_id" />
+              </label>
+              <label class="field-stack field-stack--wide">
+                <span>{{ t("customerAdmin.fields.notes") }}</span>
+                <textarea v-model="customerDraft.notes" rows="4" />
+              </label>
+            </div>
+
+            <div class="cta-row">
+              <button class="cta-button" type="submit" :disabled="!actionState.canCreate && !actionState.canEdit">
+                {{ isCreatingCustomer ? t("customerAdmin.actions.createCustomer") : t("customerAdmin.actions.saveCustomer") }}
+              </button>
+              <button class="cta-button cta-secondary" type="button" @click="cancelCustomerEdit">
+                {{ t("customerAdmin.actions.cancel") }}
+              </button>
+            </div>
+          </form>
+
+          <section v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-section">
+            <div class="customer-admin-panel__header">
+              <div>
+                <p class="eyebrow">{{ t("customerAdmin.contacts.eyebrow") }}</p>
+                <h3>{{ t("customerAdmin.contacts.title") }}</h3>
+              </div>
+              <button
+                class="cta-button cta-secondary"
+                type="button"
+                :disabled="!actionState.canManageContacts"
+                @click="startCreateContact"
+              >
+                {{ t("customerAdmin.actions.addContact") }}
+              </button>
+            </div>
+
+            <div v-if="selectedCustomer.contacts.length" class="customer-admin-record-list">
+              <article v-for="contact in selectedCustomer.contacts" :key="contact.id" class="customer-admin-record">
+                <div>
+                  <strong>{{ contact.full_name }}</strong>
+                  <p>{{ [contact.email, contact.phone].filter(Boolean).join(" · ") || t("customerAdmin.summary.none") }}</p>
+                  <span class="customer-admin-record__meta">
+                    {{ contact.is_primary_contact ? t("customerAdmin.contacts.primaryBadge") : t("customerAdmin.contacts.standardBadge") }}
+                  </span>
+                </div>
+                <div class="customer-admin-record__actions">
+                  <StatusBadge :status="contact.status" />
+                  <button type="button" :disabled="!canRead" @click="downloadContactVCard(contact)">
+                    {{ t("customerAdmin.actions.exportVCard") }}
+                  </button>
+                  <button type="button" @click="editContact(contact)">{{ t("customerAdmin.actions.edit") }}</button>
+                  <button
+                    v-if="contact.status !== 'archived'"
+                    type="button"
+                    :disabled="!actionState.canManageContacts"
+                    @click="archiveContact(contact)"
+                  >
+                    {{ t("customerAdmin.actions.archive") }}
+                  </button>
+                </div>
+              </article>
+            </div>
+            <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.contacts.empty") }}</p>
+
+            <form class="customer-admin-form" @submit.prevent="submitContact">
+              <div class="customer-admin-form-grid">
+                <label class="field-stack">
+                  <span>{{ t("customerAdmin.fields.fullName") }}</span>
+                  <input v-model="contactDraft.full_name" required />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("customerAdmin.fields.contactTitle") }}</span>
+                  <input v-model="contactDraft.title" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("customerAdmin.fields.functionLabel") }}</span>
+                  <input v-model="contactDraft.function_label" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("customerAdmin.fields.email") }}</span>
+                  <input v-model="contactDraft.email" type="email" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("customerAdmin.fields.phone") }}</span>
+                  <input v-model="contactDraft.phone" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("customerAdmin.fields.mobile") }}</span>
+                  <input v-model="contactDraft.mobile" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("customerAdmin.fields.userId") }}</span>
+                  <input v-model="contactDraft.user_id" />
+                </label>
+                <label class="field-stack field-stack--wide">
+                  <span>{{ t("customerAdmin.fields.notes") }}</span>
+                  <textarea v-model="contactDraft.notes" rows="3" />
+                </label>
+              </div>
+
+              <label class="customer-admin-checkbox">
+                <input v-model="contactDraft.is_primary_contact" type="checkbox" />
+                <span>{{ t("customerAdmin.fields.isPrimaryContact") }}</span>
+              </label>
+              <label class="customer-admin-checkbox">
+                <input v-model="contactDraft.is_billing_contact" type="checkbox" />
+                <span>{{ t("customerAdmin.fields.isBillingContact") }}</span>
+              </label>
+
+              <div class="cta-row">
+                <button class="cta-button" type="submit" :disabled="!actionState.canManageContacts">
+                  {{ editingContactId ? t("customerAdmin.actions.saveContact") : t("customerAdmin.actions.createContact") }}
+                </button>
+                <button class="cta-button cta-secondary" type="button" @click="resetContactDraft">
+                  {{ t("customerAdmin.actions.cancel") }}
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <section v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-section">
+            <div class="customer-admin-panel__header">
+              <div>
+                <p class="eyebrow">{{ t("customerAdmin.addresses.eyebrow") }}</p>
+                <h3>{{ t("customerAdmin.addresses.title") }}</h3>
+              </div>
+              <button
+                class="cta-button cta-secondary"
+                type="button"
+                :disabled="!actionState.canManageAddresses"
+                @click="startCreateAddress"
+              >
+                {{ t("customerAdmin.actions.addAddress") }}
+              </button>
+            </div>
+
+            <div v-if="selectedCustomer.addresses.length" class="customer-admin-record-list">
+              <article v-for="address in selectedCustomer.addresses" :key="address.id" class="customer-admin-record">
+                <div>
+                  <strong>{{ t(`customerAdmin.addressType.${address.address_type}`) }}</strong>
+                  <p>
+                    {{
+                      address.address
+                        ? `${address.address.street_line_1}, ${address.address.postal_code} ${address.address.city}`
+                        : address.address_id
+                    }}
+                  </p>
+                  <span class="customer-admin-record__meta">
+                    {{ address.is_default ? t("customerAdmin.addresses.defaultBadge") : t("customerAdmin.addresses.linkBadge") }}
+                  </span>
+                </div>
+                <div class="customer-admin-record__actions">
+                  <StatusBadge :status="address.status" />
+                  <button type="button" @click="editAddress(address)">{{ t("customerAdmin.actions.edit") }}</button>
+                  <button
+                    v-if="address.status !== 'archived'"
+                    type="button"
+                    :disabled="!actionState.canManageAddresses"
+                    @click="archiveAddress(address)"
+                  >
+                    {{ t("customerAdmin.actions.archive") }}
+                  </button>
+                </div>
+              </article>
+            </div>
+            <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.addresses.empty") }}</p>
+
+            <form class="customer-admin-form" @submit.prevent="submitAddress">
+              <div class="customer-admin-form-grid">
+                <label class="field-stack">
+                  <span>{{ t("customerAdmin.fields.addressId") }}</span>
+                  <input v-model="addressDraft.address_id" required />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("customerAdmin.fields.addressType") }}</span>
+                  <select v-model="addressDraft.address_type">
+                    <option value="registered">{{ t("customerAdmin.addressType.registered") }}</option>
+                    <option value="billing">{{ t("customerAdmin.addressType.billing") }}</option>
+                    <option value="mailing">{{ t("customerAdmin.addressType.mailing") }}</option>
+                    <option value="service">{{ t("customerAdmin.addressType.service") }}</option>
+                  </select>
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("customerAdmin.fields.label") }}</span>
+                  <input v-model="addressDraft.label" />
+                </label>
+              </div>
+
+              <label class="customer-admin-checkbox">
+                <input v-model="addressDraft.is_default" type="checkbox" />
+                <span>{{ t("customerAdmin.fields.isDefault") }}</span>
+              </label>
+
+              <div class="cta-row">
+                <button class="cta-button" type="submit" :disabled="!actionState.canManageAddresses">
+                  {{ editingAddressId ? t("customerAdmin.actions.saveAddress") : t("customerAdmin.actions.createAddress") }}
+                </button>
+                <button class="cta-button cta-secondary" type="button" @click="resetAddressDraft">
+                  {{ t("customerAdmin.actions.cancel") }}
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <section v-if="selectedCustomer && !isCreatingCustomer && canReadCommercial" class="customer-admin-section">
+            <div class="customer-admin-panel__header">
+              <div>
+                <p class="eyebrow">{{ t("customerAdmin.commercial.eyebrow") }}</p>
+                <h3>{{ t("customerAdmin.commercial.title") }}</h3>
+                <p class="field-help">{{ t("customerAdmin.commercial.lead") }}</p>
+              </div>
+              <div class="cta-row">
+                <button class="cta-button cta-secondary" type="button" @click="refreshCommercialProfile">
+                  {{ t("customerAdmin.actions.refreshCommercial") }}
+                </button>
+              </div>
+            </div>
+
+            <div class="customer-admin-summary">
+              <article class="customer-admin-summary__card">
+                <span>{{ t("customerAdmin.commercial.summary.billingProfile") }}</span>
+                <strong>
+                  {{
+                    commercialProfile?.billing_profile
+                      ? commercialProfile.billing_profile.invoice_email || t("customerAdmin.summary.none")
+                      : t("customerAdmin.commercial.summary.missing")
+                  }}
+                </strong>
+              </article>
+              <article class="customer-admin-summary__card">
+                <span>{{ t("customerAdmin.commercial.summary.invoiceParties") }}</span>
+                <strong>{{ commercialProfile?.invoice_parties.length ?? 0 }}</strong>
+              </article>
+              <article class="customer-admin-summary__card">
+                <span>{{ t("customerAdmin.commercial.summary.rateCards") }}</span>
+                <strong>{{ commercialProfile?.rate_cards.length ?? 0 }}</strong>
+              </article>
+              <article class="customer-admin-summary__card">
+                <span>{{ t("customerAdmin.commercial.summary.selectedRateCard") }}</span>
+                <strong>{{ selectedRateCard?.rate_kind || t("customerAdmin.summary.none") }}</strong>
+              </article>
+            </div>
+
+            <section class="customer-admin-section">
+              <div class="customer-admin-panel__header">
+                <div>
+                  <p class="eyebrow">{{ t("customerAdmin.commercial.billingEyebrow") }}</p>
+                  <h3>{{ t("customerAdmin.commercial.billingTitle") }}</h3>
+                </div>
+                <StatusBadge :status="commercialProfile?.billing_profile?.status || 'inactive'" />
+              </div>
+
+              <form class="customer-admin-form" @submit.prevent="submitBillingProfile">
+                <div class="customer-admin-form-grid">
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.invoiceEmail") }}</span>
+                    <input v-model="billingProfileDraft.invoice_email" :disabled="!commercialActionState.canManageBillingProfile" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.paymentTermsDays") }}</span>
+                    <input v-model.number="billingProfileDraft.payment_terms_days" type="number" :disabled="!commercialActionState.canManageBillingProfile" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.paymentTermsNote") }}</span>
+                    <input v-model="billingProfileDraft.payment_terms_note" :disabled="!commercialActionState.canManageBillingProfile" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.taxNumber") }}</span>
+                    <input v-model="billingProfileDraft.tax_number" :disabled="!commercialActionState.canManageBillingProfile" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.vatId") }}</span>
+                    <input v-model="billingProfileDraft.vat_id" :disabled="!commercialActionState.canManageBillingProfile" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.contractReference") }}</span>
+                    <input v-model="billingProfileDraft.contract_reference" :disabled="!commercialActionState.canManageBillingProfile" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.debtorNumber") }}</span>
+                    <input v-model="billingProfileDraft.debtor_number" :disabled="!commercialActionState.canManageBillingProfile" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.bankAccountHolder") }}</span>
+                    <input v-model="billingProfileDraft.bank_account_holder" :disabled="!commercialActionState.canManageBillingProfile" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.bankIban") }}</span>
+                    <input v-model="billingProfileDraft.bank_iban" :disabled="!commercialActionState.canManageBillingProfile" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.bankBic") }}</span>
+                    <input v-model="billingProfileDraft.bank_bic" :disabled="!commercialActionState.canManageBillingProfile" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.bankName") }}</span>
+                    <input v-model="billingProfileDraft.bank_name" :disabled="!commercialActionState.canManageBillingProfile" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.invoiceLayoutCode") }}</span>
+                    <select v-model="billingProfileDraft.invoice_layout_code" :disabled="!commercialActionState.canManageBillingProfile">
+                      <option v-for="option in INVOICE_LAYOUT_OPTIONS" :key="option" :value="option">
+                        {{ t(`customerAdmin.option.invoiceLayout.${option}`) }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.shippingMethodCode") }}</span>
+                    <select v-model="billingProfileDraft.shipping_method_code" :disabled="!commercialActionState.canManageBillingProfile">
+                      <option v-for="option in SHIPPING_METHOD_OPTIONS" :key="option" :value="option">
+                        {{ t(`customerAdmin.option.shippingMethod.${option}`) }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.dunningPolicyCode") }}</span>
+                    <select v-model="billingProfileDraft.dunning_policy_code" :disabled="!commercialActionState.canManageBillingProfile">
+                      <option v-for="option in DUNNING_POLICY_OPTIONS" :key="option" :value="option">
+                        {{ t(`customerAdmin.option.dunningPolicy.${option}`) }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.leitwegId") }}</span>
+                    <input v-model="billingProfileDraft.leitweg_id" :disabled="!commercialActionState.canManageBillingProfile" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("customerAdmin.fields.billingNote") }}</span>
+                    <textarea v-model="billingProfileDraft.billing_note" rows="3" :disabled="!commercialActionState.canManageBillingProfile" />
+                  </label>
+                </div>
+
+                <label class="customer-admin-checkbox">
+                  <input v-model="billingProfileDraft.e_invoice_enabled" type="checkbox" :disabled="!commercialActionState.canManageBillingProfile" />
+                  <span>{{ t("customerAdmin.fields.eInvoiceEnabled") }}</span>
+                </label>
+                <label class="customer-admin-checkbox">
+                  <input v-model="billingProfileDraft.tax_exempt" type="checkbox" :disabled="!commercialActionState.canManageBillingProfile" />
+                  <span>{{ t("customerAdmin.fields.taxExempt") }}</span>
+                </label>
+                <label class="field-stack field-stack--wide">
+                  <span>{{ t("customerAdmin.fields.taxExemptionReason") }}</span>
+                  <input v-model="billingProfileDraft.tax_exemption_reason" :disabled="!commercialActionState.canManageBillingProfile" />
+                </label>
+
+                <div class="cta-row" v-if="commercialActionState.canManageBillingProfile">
+                  <button class="cta-button" type="submit" :disabled="loading.commercial">
+                    {{ t("customerAdmin.actions.saveBillingProfile") }}
+                  </button>
+                </div>
+              </form>
+            </section>
+
+            <section class="customer-admin-section">
+              <div class="customer-admin-panel__header">
+                <div>
+                  <p class="eyebrow">{{ t("customerAdmin.commercial.invoiceEyebrow") }}</p>
+                  <h3>{{ t("customerAdmin.commercial.invoiceTitle") }}</h3>
+                </div>
+                <button
+                  class="cta-button cta-secondary"
+                  type="button"
+                  :disabled="!commercialActionState.canManageInvoiceParties"
+                  @click="startCreateInvoiceParty"
+                >
+                  {{ t("customerAdmin.actions.addInvoiceParty") }}
+                </button>
+              </div>
+
+              <div v-if="commercialProfile?.invoice_parties.length" class="customer-admin-record-list">
+                <article v-for="invoiceParty in commercialProfile.invoice_parties" :key="invoiceParty.id" class="customer-admin-record">
+                  <div>
+                    <strong>{{ invoiceParty.company_name }}</strong>
+                    <p>{{ invoiceParty.invoice_email || invoiceParty.address_id }}</p>
+                    <span class="customer-admin-record__meta">
+                      {{ invoiceParty.is_default ? t("customerAdmin.commercial.defaultInvoiceParty") : t("customerAdmin.commercial.additionalInvoiceParty") }}
+                    </span>
+                  </div>
+                  <div class="customer-admin-record__actions">
+                    <StatusBadge :status="invoiceParty.status" />
+                    <button type="button" :disabled="!commercialActionState.canManageInvoiceParties" @click="editInvoiceParty(invoiceParty)">
+                      {{ t("customerAdmin.actions.edit") }}
+                    </button>
+                  </div>
+                </article>
+              </div>
+              <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.invoiceEmpty") }}</p>
+
+              <form class="customer-admin-form" @submit.prevent="submitInvoiceParty">
+                <div class="customer-admin-form-grid">
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.companyName") }}</span>
+                    <input v-model="invoicePartyDraft.company_name" :disabled="!commercialActionState.canManageInvoiceParties" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.contactName") }}</span>
+                    <input v-model="invoicePartyDraft.contact_name" :disabled="!commercialActionState.canManageInvoiceParties" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.addressId") }}</span>
+                    <input v-model="invoicePartyDraft.address_id" :disabled="!commercialActionState.canManageInvoiceParties" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.invoiceEmail") }}</span>
+                    <input v-model="invoicePartyDraft.invoice_email" :disabled="!commercialActionState.canManageInvoiceParties" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.invoiceLayoutLookupId") }}</span>
+                    <input v-model="invoicePartyDraft.invoice_layout_lookup_id" :disabled="!commercialActionState.canManageInvoiceParties" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.externalRef") }}</span>
+                    <input v-model="invoicePartyDraft.external_ref" :disabled="!commercialActionState.canManageInvoiceParties" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("customerAdmin.fields.note") }}</span>
+                    <textarea v-model="invoicePartyDraft.note" rows="3" :disabled="!commercialActionState.canManageInvoiceParties" />
+                  </label>
+                </div>
+                <label class="customer-admin-checkbox">
+                  <input v-model="invoicePartyDraft.is_default" type="checkbox" :disabled="!commercialActionState.canManageInvoiceParties" />
+                  <span>{{ t("customerAdmin.fields.isDefaultInvoiceParty") }}</span>
+                </label>
+
+                <div class="cta-row" v-if="commercialActionState.canManageInvoiceParties">
+                  <button class="cta-button" type="submit" :disabled="loading.commercial">
+                    {{ editingInvoicePartyId ? t("customerAdmin.actions.saveInvoiceParty") : t("customerAdmin.actions.createInvoiceParty") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetInvoicePartyDraft">
+                    {{ t("customerAdmin.actions.cancel") }}
+                  </button>
+                </div>
+              </form>
+            </section>
+
+            <section class="customer-admin-section">
+              <div class="customer-admin-panel__header">
+                <div>
+                  <p class="eyebrow">{{ t("customerAdmin.commercial.rateCardsEyebrow") }}</p>
+                  <h3>{{ t("customerAdmin.commercial.rateCardsTitle") }}</h3>
+                </div>
+                <button
+                  class="cta-button cta-secondary"
+                  type="button"
+                  :disabled="!commercialActionState.canManageRateCards"
+                  @click="startCreateRateCard"
+                >
+                  {{ t("customerAdmin.actions.addRateCard") }}
+                </button>
+              </div>
+
+              <div v-if="commercialProfile?.rate_cards.length" class="customer-admin-list">
+                <button
+                  v-for="rateCard in commercialProfile.rate_cards"
+                  :key="rateCard.id"
+                  type="button"
+                  class="customer-admin-row"
+                  :class="{ selected: rateCard.id === selectedRateCardId }"
+                  @click="selectedRateCardId = rateCard.id"
+                >
+                  <div>
+                    <strong>{{ rateCard.rate_kind }}</strong>
+                    <span>{{ rateCard.effective_from }}{{ rateCard.effective_to ? ` → ${rateCard.effective_to}` : "" }}</span>
+                  </div>
+                  <StatusBadge :status="rateCard.status" />
+                </button>
+              </div>
+              <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.rateCardsEmpty") }}</p>
+
+              <form class="customer-admin-form" @submit.prevent="submitRateCard">
+                <div class="customer-admin-form-grid">
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.rateKind") }}</span>
+                    <input v-model="rateCardDraft.rate_kind" :disabled="!commercialActionState.canManageRateCards" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.currencyCode") }}</span>
+                    <input v-model="rateCardDraft.currency_code" :disabled="!commercialActionState.canManageRateCards" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
+                    <input v-model="rateCardDraft.effective_from" type="date" :disabled="!commercialActionState.canManageRateCards" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
+                    <input v-model="rateCardDraft.effective_to" type="date" :disabled="!commercialActionState.canManageRateCards" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("customerAdmin.fields.notes") }}</span>
+                    <textarea v-model="rateCardDraft.notes" rows="3" :disabled="!commercialActionState.canManageRateCards" />
+                  </label>
+                </div>
+                <div class="cta-row" v-if="commercialActionState.canManageRateCards">
+                  <button class="cta-button" type="submit" :disabled="loading.commercial">
+                    {{ editingRateCardId ? t("customerAdmin.actions.saveRateCard") : t("customerAdmin.actions.createRateCard") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetRateCardDraft">
+                    {{ t("customerAdmin.actions.cancel") }}
+                  </button>
+                </div>
+              </form>
+
+              <div v-if="selectedRateCard" class="customer-admin-subgrid">
+                <section class="customer-admin-section">
+                  <div class="customer-admin-panel__header">
+                    <div>
+                      <p class="eyebrow">{{ t("customerAdmin.commercial.rateLinesEyebrow") }}</p>
+                      <h3>{{ t("customerAdmin.commercial.rateLinesTitle") }}</h3>
+                    </div>
+                    <button
+                      class="cta-button cta-secondary"
+                      type="button"
+                      :disabled="!commercialActionState.canManageRateLines"
+                      @click="startCreateRateLine"
+                    >
+                      {{ t("customerAdmin.actions.addRateLine") }}
+                    </button>
+                  </div>
+
+                  <div v-if="selectedRateCard.rate_lines.length" class="customer-admin-record-list">
+                    <article v-for="rateLine in selectedRateCard.rate_lines" :key="rateLine.id" class="customer-admin-record">
+                      <div>
+                        <strong>{{ rateLine.line_kind }} · {{ rateLine.billing_unit }}</strong>
+                        <p>{{ rateLine.unit_price }} {{ selectedRateCard.currency_code }}</p>
+                        <span class="customer-admin-record__meta">
+                          {{ [rateLine.function_type_id, rateLine.qualification_type_id, rateLine.planning_mode_code].filter(Boolean).join(" · ") || t("customerAdmin.summary.none") }}
+                        </span>
+                      </div>
+                      <div class="customer-admin-record__actions">
+                        <StatusBadge :status="rateLine.status" />
+                        <button type="button" :disabled="!commercialActionState.canManageRateLines" @click="editRateLine(rateLine)">
+                          {{ t("customerAdmin.actions.edit") }}
+                        </button>
+                      </div>
+                    </article>
+                  </div>
+                  <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.rateLinesEmpty") }}</p>
+
+                  <form class="customer-admin-form" @submit.prevent="submitRateLine">
+                    <div class="customer-admin-form-grid">
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.lineKind") }}</span>
+                        <input v-model="rateLineDraft.line_kind" :disabled="!commercialActionState.canManageRateLines" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.billingUnit") }}</span>
+                        <input v-model="rateLineDraft.billing_unit" :disabled="!commercialActionState.canManageRateLines" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.unitPrice") }}</span>
+                        <input v-model="rateLineDraft.unit_price" :disabled="!commercialActionState.canManageRateLines" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.minimumQuantity") }}</span>
+                        <input v-model="rateLineDraft.minimum_quantity" :disabled="!commercialActionState.canManageRateLines" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.functionTypeId") }}</span>
+                        <input v-model="rateLineDraft.function_type_id" :disabled="!commercialActionState.canManageRateLines" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.qualificationTypeId") }}</span>
+                        <input v-model="rateLineDraft.qualification_type_id" :disabled="!commercialActionState.canManageRateLines" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.planningModeCode") }}</span>
+                        <input v-model="rateLineDraft.planning_mode_code" :disabled="!commercialActionState.canManageRateLines" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.sortOrder") }}</span>
+                        <input v-model.number="rateLineDraft.sort_order" type="number" :disabled="!commercialActionState.canManageRateLines" />
+                      </label>
+                      <label class="field-stack field-stack--wide">
+                        <span>{{ t("customerAdmin.fields.notes") }}</span>
+                        <textarea v-model="rateLineDraft.notes" rows="3" :disabled="!commercialActionState.canManageRateLines" />
+                      </label>
+                    </div>
+                    <div class="cta-row" v-if="commercialActionState.canManageRateLines">
+                      <button class="cta-button" type="submit" :disabled="loading.rateLine">
+                        {{ editingRateLineId ? t("customerAdmin.actions.saveRateLine") : t("customerAdmin.actions.createRateLine") }}
+                      </button>
+                      <button class="cta-button cta-secondary" type="button" @click="resetRateLineDraft">
+                        {{ t("customerAdmin.actions.cancel") }}
+                      </button>
+                    </div>
+                  </form>
+                </section>
+
+                <section class="customer-admin-section">
+                  <div class="customer-admin-panel__header">
+                    <div>
+                      <p class="eyebrow">{{ t("customerAdmin.commercial.surchargesEyebrow") }}</p>
+                      <h3>{{ t("customerAdmin.commercial.surchargesTitle") }}</h3>
+                    </div>
+                    <button
+                      class="cta-button cta-secondary"
+                      type="button"
+                      :disabled="!commercialActionState.canManageSurchargeRules"
+                      @click="startCreateSurchargeRule"
+                    >
+                      {{ t("customerAdmin.actions.addSurchargeRule") }}
+                    </button>
+                  </div>
+
+                  <div v-if="selectedRateCard.surcharge_rules.length" class="customer-admin-record-list">
+                    <article v-for="rule in selectedRateCard.surcharge_rules" :key="rule.id" class="customer-admin-record">
+                      <div>
+                        <strong>{{ rule.surcharge_type }}</strong>
+                        <p>
+                          {{ rule.percent_value ? `${rule.percent_value}%` : `${rule.fixed_amount} ${rule.currency_code}` }}
+                        </p>
+                        <span class="customer-admin-record__meta">
+                          {{ [rule.weekday_mask, rule.region_code].filter(Boolean).join(" · ") || t("customerAdmin.summary.none") }}
+                        </span>
+                      </div>
+                      <div class="customer-admin-record__actions">
+                        <StatusBadge :status="rule.status" />
+                        <button type="button" :disabled="!commercialActionState.canManageSurchargeRules" @click="editSurchargeRule(rule)">
+                          {{ t("customerAdmin.actions.edit") }}
+                        </button>
+                      </div>
+                    </article>
+                  </div>
+                  <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.surchargesEmpty") }}</p>
+
+                  <form class="customer-admin-form" @submit.prevent="submitSurchargeRule">
+                    <div class="customer-admin-form-grid">
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.surchargeType") }}</span>
+                        <input v-model="surchargeRuleDraft.surcharge_type" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
+                        <input v-model="surchargeRuleDraft.effective_from" type="date" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
+                        <input v-model="surchargeRuleDraft.effective_to" type="date" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.weekdayMask") }}</span>
+                        <input v-model="surchargeRuleDraft.weekday_mask" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.timeFromMinute") }}</span>
+                        <input v-model.number="surchargeRuleDraft.time_from_minute" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.timeToMinute") }}</span>
+                        <input v-model.number="surchargeRuleDraft.time_to_minute" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.regionCode") }}</span>
+                        <input v-model="surchargeRuleDraft.region_code" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.percentValue") }}</span>
+                        <input v-model="surchargeRuleDraft.percent_value" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.fixedAmount") }}</span>
+                        <input v-model="surchargeRuleDraft.fixed_amount" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.currencyCode") }}</span>
+                        <input v-model="surchargeRuleDraft.currency_code" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      </label>
+                      <label class="field-stack">
+                        <span>{{ t("customerAdmin.fields.sortOrder") }}</span>
+                        <input v-model.number="surchargeRuleDraft.sort_order" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      </label>
+                      <label class="field-stack field-stack--wide">
+                        <span>{{ t("customerAdmin.fields.notes") }}</span>
+                        <textarea v-model="surchargeRuleDraft.notes" rows="3" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      </label>
+                    </div>
+                    <div class="cta-row" v-if="commercialActionState.canManageSurchargeRules">
+                      <button class="cta-button" type="submit" :disabled="loading.surchargeRule">
+                        {{ editingSurchargeRuleId ? t("customerAdmin.actions.saveSurchargeRule") : t("customerAdmin.actions.createSurchargeRule") }}
+                      </button>
+                      <button class="cta-button cta-secondary" type="button" @click="resetSurchargeRuleDraft">
+                        {{ t("customerAdmin.actions.cancel") }}
+                      </button>
+                    </div>
+                  </form>
+                </section>
+              </div>
+            </section>
+          </section>
+
+          <section v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-section">
+            <div class="customer-admin-panel__header">
+              <div>
+                <p class="eyebrow">{{ t("customerAdmin.privacy.eyebrow") }}</p>
+                <h3>{{ t("customerAdmin.privacy.title") }}</h3>
+                <p class="field-help">{{ t("customerAdmin.privacy.help") }}</p>
+              </div>
+              <StatusBadge :status="portalPrivacy?.person_names_released ? 'active' : 'inactive'" />
+            </div>
+
+            <div class="customer-admin-summary">
+              <article class="customer-admin-summary__card">
+                <span>{{ t("customerAdmin.fields.personNamesReleased") }}</span>
+                <strong>
+                  {{
+                    portalPrivacy?.person_names_released
+                      ? t("customerAdmin.status.active")
+                      : t("customerAdmin.status.inactive")
+                  }}
+                </strong>
+              </article>
+              <article class="customer-admin-summary__card">
+                <span>{{ t("customerAdmin.privacy.lastReleasedAt") }}</span>
+                <strong>{{ formatOptionalDateTime(portalPrivacy?.person_names_released_at) }}</strong>
+              </article>
+              <article class="customer-admin-summary__card">
+                <span>{{ t("customerAdmin.privacy.lastReleasedBy") }}</span>
+                <strong>{{ portalPrivacy?.person_names_released_by_user_id || t("customerAdmin.summary.none") }}</strong>
+              </article>
+            </div>
+
+            <label class="customer-admin-checkbox">
+              <input v-model="portalPrivacyDraft.person_names_released" type="checkbox" :disabled="!canWrite" />
+              <span>{{ t("customerAdmin.fields.personNamesReleased") }}</span>
+            </label>
+
+            <div class="cta-row">
+              <button
+                class="cta-button cta-secondary"
+                type="button"
+                :disabled="!canRead"
+                @click="refreshPortalPrivacy"
+              >
+                {{ t("customerAdmin.actions.refreshPortalPrivacy") }}
+              </button>
+              <button
+                class="cta-button"
+                type="button"
+                :disabled="!canWrite || loading.portalPrivacy"
+                @click="submitPortalPrivacy"
+              >
+                {{ t("customerAdmin.actions.savePortalPrivacy") }}
+              </button>
+            </div>
+          </section>
+
+          <section v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-section">
+            <div class="customer-admin-panel__header">
+              <div>
+                <p class="eyebrow">{{ t("customerAdmin.history.eyebrow") }}</p>
+                <h3>{{ t("customerAdmin.history.title") }}</h3>
+              </div>
+              <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshHistory">
+                {{ t("customerAdmin.actions.refreshHistory") }}
+              </button>
+            </div>
+
+            <div v-if="customerHistory.length" class="customer-admin-record-list">
+              <article
+                v-for="entry in customerHistory"
+                :key="entry.id"
+                class="customer-admin-record customer-admin-record--stacked"
+              >
+                <div>
+                  <strong>{{ entry.title }}</strong>
+                  <p>{{ entry.summary }}</p>
+                  <span class="customer-admin-record__meta">{{ formatHistoryMeta(entry) }}</span>
+                  <ul v-if="entry.attachments.length" class="customer-admin-inline-list">
+                    <li v-for="attachment in entry.attachments" :key="attachment.document_id">
+                      {{ attachment.title }}
+                    </li>
+                  </ul>
+                </div>
+              </article>
+            </div>
+            <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.history.empty") }}</p>
+
+            <form class="customer-admin-inline-form" @submit.prevent="submitHistoryAttachmentLink">
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.historyEntry") }}</span>
+                <select v-model="historyAttachmentDraft.history_entry_id">
+                  <option v-for="entry in customerHistory" :key="entry.id" :value="entry.id">
+                    {{ entry.title }}
+                  </option>
+                </select>
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.documentId") }}</span>
+                <input v-model="historyAttachmentDraft.document_id" :disabled="!canWrite" />
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.label") }}</span>
+                <input v-model="historyAttachmentDraft.label" :disabled="!canWrite" />
+              </label>
+              <div class="cta-row">
+                <button class="cta-button cta-secondary" type="submit" :disabled="!canWrite || loading.historyAttachment">
+                  {{ t("customerAdmin.actions.linkHistoryAttachment") }}
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <section v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-section">
+            <div class="customer-admin-panel__header">
+              <div>
+                <p class="eyebrow">{{ t("customerAdmin.loginHistory.eyebrow") }}</p>
+                <h3>{{ t("customerAdmin.loginHistory.title") }}</h3>
+              </div>
+              <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshCustomerPortalLoginHistory">
+                {{ t("customerAdmin.actions.refreshLoginHistory") }}
+              </button>
+            </div>
+            <div v-if="customerPortalLoginHistory.length" class="customer-admin-record-list">
+              <article
+                v-for="entry in customerPortalLoginHistory"
+                :key="entry.id"
+                class="customer-admin-record customer-admin-record--stacked"
+              >
+                <div>
+                  <strong>{{ entry.identifier }}</strong>
+                  <span class="customer-admin-record__meta">{{ formatLoginHistoryMeta(entry) }}</span>
+                </div>
+              </article>
+            </div>
+            <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.loginHistory.empty") }}</p>
+          </section>
+
+          <section v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-section">
+            <div class="customer-admin-panel__header">
+              <div>
+                <p class="eyebrow">{{ t("customerAdmin.employeeBlocks.eyebrow") }}</p>
+                <h3>{{ t("customerAdmin.employeeBlocks.title") }}</h3>
+                <p class="customer-admin-record__meta">
+                  {{
+                    employeeBlockCapability?.message_key
+                      ? t(employeeBlockCapability.message_key)
+                      : t("customerAdmin.employeeBlocks.capability.pendingEmployees")
+                  }}
+                </p>
+              </div>
+              <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshEmployeeBlocks">
+                {{ t("customerAdmin.actions.refreshEmployeeBlocks") }}
+              </button>
+            </div>
+
+            <div v-if="customerEmployeeBlocks.length" class="customer-admin-record-list">
+              <article
+                v-for="block in customerEmployeeBlocks"
+                :key="block.id"
+                class="customer-admin-record customer-admin-record--stacked"
+              >
+                <div>
+                  <strong>{{ block.employee_id }}</strong>
+                  <p>{{ block.reason }}</p>
+                  <span class="customer-admin-record__meta">
+                    {{ block.effective_from }}{{ block.effective_to ? ` - ${block.effective_to}` : "" }}
+                  </span>
+                </div>
+                <button class="cta-button cta-secondary" type="button" :disabled="!canWrite" @click="editEmployeeBlock(block)">
+                  {{ t("customerAdmin.actions.edit") }}
+                </button>
+              </article>
+            </div>
+            <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.employeeBlocks.empty") }}</p>
+
+            <form class="customer-admin-inline-form" @submit.prevent="submitEmployeeBlock">
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.employeeId") }}</span>
+                <input v-model="employeeBlockDraft.employee_id" :disabled="!canWrite" />
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.reason") }}</span>
+                <input v-model="employeeBlockDraft.reason" :disabled="!canWrite" />
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
+                <input v-model="employeeBlockDraft.effective_from" type="date" :disabled="!canWrite" />
+              </label>
+              <label class="field-stack">
+                <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
+                <input v-model="employeeBlockDraft.effective_to" type="date" :disabled="!canWrite" />
+              </label>
+              <div class="cta-row">
+                <button class="cta-button" type="submit" :disabled="!canWrite || loading.employeeBlock">
+                  {{ editingEmployeeBlockId ? t("customerAdmin.actions.saveEmployeeBlock") : t("customerAdmin.actions.createEmployeeBlock") }}
+                </button>
+                <button class="cta-button cta-secondary" type="button" @click="resetEmployeeBlockDraft">
+                  {{ t("customerAdmin.actions.cancel") }}
+                </button>
+              </div>
+            </form>
+          </section>
+        </template>
+
+        <section v-else class="customer-admin-empty">
+          <p class="eyebrow">{{ t("customerAdmin.detail.emptyTitle") }}</p>
+          <h3>{{ t("customerAdmin.detail.emptyBody") }}</h3>
+        </section>
+      </section>
+    </div>
+  </section>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, reactive, ref } from "vue";
+
+import {
+  createCustomerEmployeeBlock,
+  createCustomer,
+  createCustomerAddress,
+  createCustomerInvoiceParty,
+  createCustomerContact,
+  createCustomerRateCard,
+  createCustomerRateLine,
+  createCustomerSurchargeRule,
+  CustomerAdminApiError,
+  exportCustomers,
+  exportCustomerVCard,
+  getCustomer,
+  getCustomerCommercialProfile,
+  getCustomerPortalPrivacy,
+  linkCustomerHistoryAttachment,
+  listCustomerEmployeeBlocks,
+  listCustomerHistory,
+  listCustomerPortalLoginHistory,
+  listCustomers,
+  type CustomerBillingProfilePayload,
+  type CustomerBillingProfileRead,
+  type CustomerAddressPayload,
+  type CustomerAddressRead,
+  type CustomerContactPayload,
+  type CustomerContactRead,
+  type CustomerCommercialProfileRead,
+  type CustomerCreatePayload,
+  type CustomerEmployeeBlockCollectionRead,
+  type CustomerEmployeeBlockPayload,
+  type CustomerEmployeeBlockRead,
+  type CustomerEmployeeBlockUpdatePayload,
+  type CustomerFilterParams,
+  type CustomerHistoryEntryRead,
+  type CustomerLoginHistoryEntryRead,
+  type CustomerInvoicePartyPayload,
+  type CustomerInvoicePartyRead,
+  type CustomerListItem,
+  type CustomerPortalPrivacyRead,
+  type CustomerRateCardPayload,
+  type CustomerRateCardRead,
+  type CustomerRateLinePayload,
+  type CustomerRateLineRead,
+  type CustomerRead,
+  type CustomerSurchargeRulePayload,
+  type CustomerSurchargeRuleRead,
+  updateCustomerBillingProfile,
+  updateCustomer,
+  updateCustomerAddress,
+  updateCustomerContact,
+  updateCustomerInvoiceParty,
+  updateCustomerPortalPrivacy,
+  updateCustomerEmployeeBlock,
+  updateCustomerRateCard,
+  updateCustomerRateLine,
+  updateCustomerSurchargeRule,
+  upsertCustomerBillingProfile,
+} from "@/api/customers";
+import StatusBadge from "@/components/StatusBadge.vue";
+import {
+  buildCommercialConfirmationKey,
+  deriveCustomerCommercialActionState,
+  mapCustomerCommercialApiMessage,
+  validateBillingProfileDraft,
+  validateRateCardDraft,
+  validateRateLineDraft,
+  validateSurchargeRuleDraft,
+} from "@/features/customers/customerCommercial.helpers.js";
+import {
+  buildLifecyclePayload,
+  deriveCustomerActionState,
+  formatPrimaryContactSummary,
+  mapCustomerApiMessage,
+} from "@/features/customers/customerAdmin.helpers.js";
+import { useI18n } from "@/i18n";
+import { useAuthStore } from "@/stores/auth";
+
+const ACCESS_TOKEN_STORAGE_KEY = "sicherplan-access-token";
+const INVOICE_LAYOUT_OPTIONS = ["standard", "compact", "detailed_timesheet"] as const;
+const SHIPPING_METHOD_OPTIONS = ["email_pdf", "portal_download", "postal_print", "e_invoice"] as const;
+const DUNNING_POLICY_OPTIONS = ["disabled", "standard", "strict"] as const;
+
+const { t } = useI18n();
+const authStore = useAuthStore();
+
+const customers = ref<CustomerListItem[]>([]);
+const customerHistory = ref<CustomerHistoryEntryRead[]>([]);
+const customerPortalLoginHistory = ref<CustomerLoginHistoryEntryRead[]>([]);
+const customerEmployeeBlocks = ref<CustomerEmployeeBlockRead[]>([]);
+const employeeBlockCapability = ref<CustomerEmployeeBlockCollectionRead["capability"] | null>(null);
+const commercialProfile = ref<CustomerCommercialProfileRead | null>(null);
+const portalPrivacy = ref<CustomerPortalPrivacyRead | null>(null);
+const selectedCustomer = ref<CustomerRead | null>(null);
+const selectedCustomerId = ref("");
+const isCreatingCustomer = ref(false);
+const editingContactId = ref("");
+const editingAddressId = ref("");
+const editingInvoicePartyId = ref("");
+const editingRateCardId = ref("");
+const selectedRateCardId = ref("");
+const editingRateLineId = ref("");
+const editingSurchargeRuleId = ref("");
+const editingEmployeeBlockId = ref("");
+const tenantScopeInput = ref(authStore.tenantScopeId);
+const tenantScopeId = ref(authStore.tenantScopeId);
+const accessTokenInput = ref(readStoredAccessToken());
+const accessToken = ref(readStoredAccessToken());
+const loading = reactive({
+  list: false,
+  detail: false,
+  customer: false,
+  contact: false,
+  address: false,
+  commercial: false,
+  rateLine: false,
+  surchargeRule: false,
+  historyAttachment: false,
+  loginHistory: false,
+  employeeBlock: false,
+  portalPrivacy: false,
+});
+const feedback = reactive({
+  tone: "info",
+  title: "",
+  message: "",
+});
+const filters = reactive<CustomerFilterParams>({
+  search: "",
+  lifecycle_status: "",
+  include_archived: false,
+});
+const customerDraft = reactive<CustomerCreatePayload>({
+  tenant_id: "",
+  customer_number: "",
+  name: "",
+  legal_name: "",
+  external_ref: "",
+  legal_form_lookup_id: "",
+  classification_lookup_id: "",
+  ranking_lookup_id: "",
+  customer_status_lookup_id: "",
+  default_branch_id: "",
+  default_mandate_id: "",
+  notes: "",
+});
+const contactDraft = reactive<CustomerContactPayload>({
+  tenant_id: "",
+  customer_id: "",
+  full_name: "",
+  title: "",
+  function_label: "",
+  email: "",
+  phone: "",
+  mobile: "",
+  is_primary_contact: false,
+  is_billing_contact: false,
+  user_id: "",
+  notes: "",
+});
+const addressDraft = reactive<CustomerAddressPayload>({
+  tenant_id: "",
+  customer_id: "",
+  address_id: "",
+  address_type: "billing",
+  label: "",
+  is_default: false,
+});
+const billingProfileDraft = reactive<CustomerBillingProfilePayload>({
+  tenant_id: "",
+  customer_id: "",
+  invoice_email: "",
+  payment_terms_days: null,
+  payment_terms_note: "",
+  tax_number: "",
+  vat_id: "",
+  tax_exempt: false,
+  tax_exemption_reason: "",
+  bank_account_holder: "",
+  bank_iban: "",
+  bank_bic: "",
+  bank_name: "",
+  contract_reference: "",
+  debtor_number: "",
+  e_invoice_enabled: false,
+  leitweg_id: "",
+  invoice_layout_code: "standard",
+  shipping_method_code: "email_pdf",
+  dunning_policy_code: "standard",
+  billing_note: "",
+});
+const invoicePartyDraft = reactive<CustomerInvoicePartyPayload>({
+  tenant_id: "",
+  customer_id: "",
+  company_name: "",
+  contact_name: "",
+  address_id: "",
+  invoice_email: "",
+  invoice_layout_lookup_id: "",
+  external_ref: "",
+  is_default: false,
+  note: "",
+});
+const rateCardDraft = reactive<CustomerRateCardPayload>({
+  tenant_id: "",
+  customer_id: "",
+  rate_kind: "",
+  currency_code: "EUR",
+  effective_from: "",
+  effective_to: "",
+  notes: "",
+});
+const rateLineDraft = reactive<CustomerRateLinePayload>({
+  tenant_id: "",
+  rate_card_id: "",
+  line_kind: "",
+  function_type_id: "",
+  qualification_type_id: "",
+  planning_mode_code: "",
+  billing_unit: "",
+  unit_price: "",
+  minimum_quantity: "",
+  sort_order: 100,
+  notes: "",
+});
+const surchargeRuleDraft = reactive<CustomerSurchargeRulePayload>({
+  tenant_id: "",
+  rate_card_id: "",
+  surcharge_type: "",
+  effective_from: "",
+  effective_to: "",
+  weekday_mask: "",
+  time_from_minute: null,
+  time_to_minute: null,
+  region_code: "",
+  percent_value: "",
+  fixed_amount: "",
+  currency_code: "",
+  sort_order: 100,
+  notes: "",
+});
+const historyAttachmentDraft = reactive({
+  history_entry_id: "",
+  document_id: "",
+  label: "",
+});
+const employeeBlockDraft = reactive<CustomerEmployeeBlockPayload>({
+  tenant_id: "",
+  customer_id: "",
+  employee_id: "",
+  reason: "",
+  effective_from: "",
+  effective_to: "",
+});
+const portalPrivacyDraft = reactive({
+  person_names_released: false,
+});
+
+const actionState = computed(() => deriveCustomerActionState(authStore.activeRole, selectedCustomer.value));
+const commercialActionState = computed(() => deriveCustomerCommercialActionState(authStore.activeRole));
+const canRead = computed(() => actionState.value.canRead);
+const canWrite = computed(() => actionState.value.canCreate);
+const canReadCommercial = computed(() => commercialActionState.value.canReadCommercial);
+const canWriteCommercial = computed(() => commercialActionState.value.canWriteCommercial);
+const primaryContactSummary = computed(() => formatPrimaryContactSummary(selectedCustomer.value));
+const selectedRateCard = computed(() =>
+  commercialProfile.value?.rate_cards.find((row) => row.id === selectedRateCardId.value) ?? null,
+);
+
+function readStoredAccessToken() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) ?? "";
+}
+
+function rememberScopeAndToken() {
+  authStore.setTenantScopeId(tenantScopeInput.value);
+  tenantScopeId.value = authStore.tenantScopeId;
+  accessToken.value = accessTokenInput.value.trim();
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken.value);
+  }
+  setFeedback("info", t("customerAdmin.feedback.scopeSaved"), t("customerAdmin.feedback.tokenSaved"));
+  void refreshCustomers();
+}
+
+function clearFeedback() {
+  feedback.tone = "info";
+  feedback.title = "";
+  feedback.message = "";
+}
+
+function setFeedback(tone: "info" | "success" | "error", title: string, message: string) {
+  feedback.tone = tone;
+  feedback.title = title;
+  feedback.message = message;
+}
+
+function resetCustomerDraft() {
+  customerDraft.tenant_id = tenantScopeId.value;
+  customerDraft.customer_number = "";
+  customerDraft.name = "";
+  customerDraft.legal_name = "";
+  customerDraft.external_ref = "";
+  customerDraft.legal_form_lookup_id = "";
+  customerDraft.classification_lookup_id = "";
+  customerDraft.ranking_lookup_id = "";
+  customerDraft.customer_status_lookup_id = "";
+  customerDraft.default_branch_id = "";
+  customerDraft.default_mandate_id = "";
+  customerDraft.notes = "";
+}
+
+function resetContactDraft() {
+  contactDraft.tenant_id = tenantScopeId.value;
+  contactDraft.customer_id = selectedCustomerId.value;
+  contactDraft.full_name = "";
+  contactDraft.title = "";
+  contactDraft.function_label = "";
+  contactDraft.email = "";
+  contactDraft.phone = "";
+  contactDraft.mobile = "";
+  contactDraft.is_primary_contact = false;
+  contactDraft.is_billing_contact = false;
+  contactDraft.user_id = "";
+  contactDraft.notes = "";
+  editingContactId.value = "";
+}
+
+function resetAddressDraft() {
+  addressDraft.tenant_id = tenantScopeId.value;
+  addressDraft.customer_id = selectedCustomerId.value;
+  addressDraft.address_id = "";
+  addressDraft.address_type = "billing";
+  addressDraft.label = "";
+  addressDraft.is_default = false;
+  editingAddressId.value = "";
+}
+
+function resetBillingProfileDraft() {
+  billingProfileDraft.tenant_id = tenantScopeId.value;
+  billingProfileDraft.customer_id = selectedCustomerId.value;
+  billingProfileDraft.invoice_email = "";
+  billingProfileDraft.payment_terms_days = null;
+  billingProfileDraft.payment_terms_note = "";
+  billingProfileDraft.tax_number = "";
+  billingProfileDraft.vat_id = "";
+  billingProfileDraft.tax_exempt = false;
+  billingProfileDraft.tax_exemption_reason = "";
+  billingProfileDraft.bank_account_holder = "";
+  billingProfileDraft.bank_iban = "";
+  billingProfileDraft.bank_bic = "";
+  billingProfileDraft.bank_name = "";
+  billingProfileDraft.contract_reference = "";
+  billingProfileDraft.debtor_number = "";
+  billingProfileDraft.e_invoice_enabled = false;
+  billingProfileDraft.leitweg_id = "";
+  billingProfileDraft.invoice_layout_code = "standard";
+  billingProfileDraft.shipping_method_code = "email_pdf";
+  billingProfileDraft.dunning_policy_code = "standard";
+  billingProfileDraft.billing_note = "";
+}
+
+function resetInvoicePartyDraft() {
+  invoicePartyDraft.tenant_id = tenantScopeId.value;
+  invoicePartyDraft.customer_id = selectedCustomerId.value;
+  invoicePartyDraft.company_name = "";
+  invoicePartyDraft.contact_name = "";
+  invoicePartyDraft.address_id = "";
+  invoicePartyDraft.invoice_email = "";
+  invoicePartyDraft.invoice_layout_lookup_id = "";
+  invoicePartyDraft.external_ref = "";
+  invoicePartyDraft.is_default = false;
+  invoicePartyDraft.note = "";
+  editingInvoicePartyId.value = "";
+}
+
+function resetRateCardDraft() {
+  rateCardDraft.tenant_id = tenantScopeId.value;
+  rateCardDraft.customer_id = selectedCustomerId.value;
+  rateCardDraft.rate_kind = "";
+  rateCardDraft.currency_code = "EUR";
+  rateCardDraft.effective_from = "";
+  rateCardDraft.effective_to = "";
+  rateCardDraft.notes = "";
+  editingRateCardId.value = "";
+}
+
+function resetRateLineDraft() {
+  rateLineDraft.tenant_id = tenantScopeId.value;
+  rateLineDraft.rate_card_id = selectedRateCardId.value;
+  rateLineDraft.line_kind = "";
+  rateLineDraft.function_type_id = "";
+  rateLineDraft.qualification_type_id = "";
+  rateLineDraft.planning_mode_code = "";
+  rateLineDraft.billing_unit = "";
+  rateLineDraft.unit_price = "";
+  rateLineDraft.minimum_quantity = "";
+  rateLineDraft.sort_order = 100;
+  rateLineDraft.notes = "";
+  editingRateLineId.value = "";
+}
+
+function resetSurchargeRuleDraft() {
+  surchargeRuleDraft.tenant_id = tenantScopeId.value;
+  surchargeRuleDraft.rate_card_id = selectedRateCardId.value;
+  surchargeRuleDraft.surcharge_type = "";
+  surchargeRuleDraft.effective_from = "";
+  surchargeRuleDraft.effective_to = "";
+  surchargeRuleDraft.weekday_mask = "";
+  surchargeRuleDraft.time_from_minute = null;
+  surchargeRuleDraft.time_to_minute = null;
+  surchargeRuleDraft.region_code = "";
+  surchargeRuleDraft.percent_value = "";
+  surchargeRuleDraft.fixed_amount = "";
+  surchargeRuleDraft.currency_code = "";
+  surchargeRuleDraft.sort_order = 100;
+  surchargeRuleDraft.notes = "";
+  editingSurchargeRuleId.value = "";
+}
+
+function resetHistoryAttachmentDraft() {
+  historyAttachmentDraft.history_entry_id = customerHistory.value[0]?.id ?? "";
+  historyAttachmentDraft.document_id = "";
+  historyAttachmentDraft.label = "";
+}
+
+function resetEmployeeBlockDraft() {
+  employeeBlockDraft.tenant_id = tenantScopeId.value;
+  employeeBlockDraft.customer_id = selectedCustomerId.value;
+  employeeBlockDraft.employee_id = "";
+  employeeBlockDraft.reason = "";
+  employeeBlockDraft.effective_from = "";
+  employeeBlockDraft.effective_to = "";
+  editingEmployeeBlockId.value = "";
+}
+
+function resetPortalPrivacyDraft() {
+  portalPrivacyDraft.person_names_released = !!portalPrivacy.value?.person_names_released;
+}
+
+function populateCustomerDraft(customer: CustomerRead) {
+  customerDraft.tenant_id = customer.tenant_id;
+  customerDraft.customer_number = customer.customer_number;
+  customerDraft.name = customer.name;
+  customerDraft.legal_name = customer.legal_name ?? "";
+  customerDraft.external_ref = customer.external_ref ?? "";
+  customerDraft.legal_form_lookup_id = customer.legal_form_lookup_id ?? "";
+  customerDraft.classification_lookup_id = customer.classification_lookup_id ?? "";
+  customerDraft.ranking_lookup_id = customer.ranking_lookup_id ?? "";
+  customerDraft.customer_status_lookup_id = customer.customer_status_lookup_id ?? "";
+  customerDraft.default_branch_id = customer.default_branch_id ?? "";
+  customerDraft.default_mandate_id = customer.default_mandate_id ?? "";
+  customerDraft.notes = customer.notes ?? "";
+}
+
+function populateBillingProfileDraft(profile: CustomerBillingProfileRead | null) {
+  resetBillingProfileDraft();
+  if (!profile) {
+    return;
+  }
+  billingProfileDraft.tenant_id = profile.tenant_id;
+  billingProfileDraft.customer_id = profile.customer_id;
+  billingProfileDraft.invoice_email = profile.invoice_email ?? "";
+  billingProfileDraft.payment_terms_days = profile.payment_terms_days;
+  billingProfileDraft.payment_terms_note = profile.payment_terms_note ?? "";
+  billingProfileDraft.tax_number = profile.tax_number ?? "";
+  billingProfileDraft.vat_id = profile.vat_id ?? "";
+  billingProfileDraft.tax_exempt = profile.tax_exempt;
+  billingProfileDraft.tax_exemption_reason = profile.tax_exemption_reason ?? "";
+  billingProfileDraft.bank_account_holder = profile.bank_account_holder ?? "";
+  billingProfileDraft.bank_iban = profile.bank_iban ?? "";
+  billingProfileDraft.bank_bic = profile.bank_bic ?? "";
+  billingProfileDraft.bank_name = profile.bank_name ?? "";
+  billingProfileDraft.contract_reference = profile.contract_reference ?? "";
+  billingProfileDraft.debtor_number = profile.debtor_number ?? "";
+  billingProfileDraft.e_invoice_enabled = profile.e_invoice_enabled;
+  billingProfileDraft.leitweg_id = profile.leitweg_id ?? "";
+  billingProfileDraft.invoice_layout_code = profile.invoice_layout_code ?? "standard";
+  billingProfileDraft.shipping_method_code = profile.shipping_method_code ?? "email_pdf";
+  billingProfileDraft.dunning_policy_code = profile.dunning_policy_code ?? "standard";
+  billingProfileDraft.billing_note = profile.billing_note ?? "";
+}
+
+function editContact(contact: CustomerContactRead) {
+  contactDraft.tenant_id = contact.tenant_id;
+  contactDraft.customer_id = contact.customer_id;
+  contactDraft.full_name = contact.full_name;
+  contactDraft.title = contact.title ?? "";
+  contactDraft.function_label = contact.function_label ?? "";
+  contactDraft.email = contact.email ?? "";
+  contactDraft.phone = contact.phone ?? "";
+  contactDraft.mobile = contact.mobile ?? "";
+  contactDraft.is_primary_contact = contact.is_primary_contact;
+  contactDraft.is_billing_contact = contact.is_billing_contact;
+  contactDraft.user_id = contact.user_id ?? "";
+  contactDraft.notes = contact.notes ?? "";
+  editingContactId.value = contact.id;
+}
+
+function editAddress(address: CustomerAddressRead) {
+  addressDraft.tenant_id = address.tenant_id;
+  addressDraft.customer_id = address.customer_id;
+  addressDraft.address_id = address.address_id;
+  addressDraft.address_type = address.address_type;
+  addressDraft.label = address.label ?? "";
+  addressDraft.is_default = address.is_default;
+  editingAddressId.value = address.id;
+}
+
+function editInvoiceParty(invoiceParty: CustomerInvoicePartyRead) {
+  invoicePartyDraft.tenant_id = invoiceParty.tenant_id;
+  invoicePartyDraft.customer_id = invoiceParty.customer_id;
+  invoicePartyDraft.company_name = invoiceParty.company_name;
+  invoicePartyDraft.contact_name = invoiceParty.contact_name ?? "";
+  invoicePartyDraft.address_id = invoiceParty.address_id;
+  invoicePartyDraft.invoice_email = invoiceParty.invoice_email ?? "";
+  invoicePartyDraft.invoice_layout_lookup_id = invoiceParty.invoice_layout_lookup_id ?? "";
+  invoicePartyDraft.external_ref = invoiceParty.external_ref ?? "";
+  invoicePartyDraft.is_default = invoiceParty.is_default;
+  invoicePartyDraft.note = invoiceParty.note ?? "";
+  editingInvoicePartyId.value = invoiceParty.id;
+}
+
+function editRateCard(rateCard: CustomerRateCardRead) {
+  rateCardDraft.tenant_id = rateCard.tenant_id;
+  rateCardDraft.customer_id = rateCard.customer_id;
+  rateCardDraft.rate_kind = rateCard.rate_kind;
+  rateCardDraft.currency_code = rateCard.currency_code;
+  rateCardDraft.effective_from = rateCard.effective_from;
+  rateCardDraft.effective_to = rateCard.effective_to ?? "";
+  rateCardDraft.notes = rateCard.notes ?? "";
+  editingRateCardId.value = rateCard.id;
+  selectedRateCardId.value = rateCard.id;
+  resetRateLineDraft();
+  resetSurchargeRuleDraft();
+}
+
+function editRateLine(rateLine: CustomerRateLineRead) {
+  rateLineDraft.tenant_id = rateLine.tenant_id;
+  rateLineDraft.rate_card_id = rateLine.rate_card_id;
+  rateLineDraft.line_kind = rateLine.line_kind;
+  rateLineDraft.function_type_id = rateLine.function_type_id ?? "";
+  rateLineDraft.qualification_type_id = rateLine.qualification_type_id ?? "";
+  rateLineDraft.planning_mode_code = rateLine.planning_mode_code ?? "";
+  rateLineDraft.billing_unit = rateLine.billing_unit;
+  rateLineDraft.unit_price = rateLine.unit_price;
+  rateLineDraft.minimum_quantity = rateLine.minimum_quantity ?? "";
+  rateLineDraft.sort_order = rateLine.sort_order;
+  rateLineDraft.notes = rateLine.notes ?? "";
+  editingRateLineId.value = rateLine.id;
+}
+
+function editSurchargeRule(rule: CustomerSurchargeRuleRead) {
+  surchargeRuleDraft.tenant_id = rule.tenant_id;
+  surchargeRuleDraft.rate_card_id = rule.rate_card_id;
+  surchargeRuleDraft.surcharge_type = rule.surcharge_type;
+  surchargeRuleDraft.effective_from = rule.effective_from;
+  surchargeRuleDraft.effective_to = rule.effective_to ?? "";
+  surchargeRuleDraft.weekday_mask = rule.weekday_mask ?? "";
+  surchargeRuleDraft.time_from_minute = rule.time_from_minute;
+  surchargeRuleDraft.time_to_minute = rule.time_to_minute;
+  surchargeRuleDraft.region_code = rule.region_code ?? "";
+  surchargeRuleDraft.percent_value = rule.percent_value ?? "";
+  surchargeRuleDraft.fixed_amount = rule.fixed_amount ?? "";
+  surchargeRuleDraft.currency_code = rule.currency_code ?? "";
+  surchargeRuleDraft.sort_order = rule.sort_order;
+  surchargeRuleDraft.notes = rule.notes ?? "";
+  editingSurchargeRuleId.value = rule.id;
+}
+
+function editEmployeeBlock(block: CustomerEmployeeBlockRead) {
+  employeeBlockDraft.tenant_id = block.tenant_id;
+  employeeBlockDraft.customer_id = block.customer_id;
+  employeeBlockDraft.employee_id = block.employee_id;
+  employeeBlockDraft.reason = block.reason;
+  employeeBlockDraft.effective_from = block.effective_from;
+  employeeBlockDraft.effective_to = block.effective_to ?? "";
+  editingEmployeeBlockId.value = block.id;
+}
+
+function startCreateCustomer() {
+  isCreatingCustomer.value = true;
+  selectedCustomerId.value = "";
+  selectedCustomer.value = null;
+  customerHistory.value = [];
+  customerPortalLoginHistory.value = [];
+  customerEmployeeBlocks.value = [];
+  employeeBlockCapability.value = null;
+  portalPrivacy.value = null;
+  resetPortalPrivacyDraft();
+  resetCustomerDraft();
+  resetContactDraft();
+  resetAddressDraft();
+  resetHistoryAttachmentDraft();
+  resetEmployeeBlockDraft();
+}
+
+function startCreateContact() {
+  resetContactDraft();
+}
+
+function startCreateAddress() {
+  resetAddressDraft();
+}
+
+function startCreateInvoiceParty() {
+  resetInvoicePartyDraft();
+}
+
+function startCreateRateCard() {
+  resetRateCardDraft();
+}
+
+function startCreateRateLine() {
+  resetRateLineDraft();
+}
+
+function startCreateSurchargeRule() {
+  resetSurchargeRuleDraft();
+}
+
+function cancelCustomerEdit() {
+  if (selectedCustomer.value) {
+    populateCustomerDraft(selectedCustomer.value);
+    isCreatingCustomer.value = false;
+    return;
+  }
+  startCreateCustomer();
+}
+
+async function refreshCustomers() {
+  if (!tenantScopeId.value || !accessToken.value || !canRead.value) {
+    customers.value = [];
+    selectedCustomer.value = null;
+    customerHistory.value = [];
+    customerPortalLoginHistory.value = [];
+    customerEmployeeBlocks.value = [];
+    employeeBlockCapability.value = null;
+    portalPrivacy.value = null;
+    resetPortalPrivacyDraft();
+    return;
+  }
+
+  loading.list = true;
+  try {
+    customers.value = await listCustomers(tenantScopeId.value, accessToken.value, filters);
+    if (selectedCustomerId.value) {
+      const stillExists = customers.value.some((row) => row.id === selectedCustomerId.value);
+      if (stillExists) {
+        await selectCustomer(selectedCustomerId.value);
+      } else if (customers.value[0]) {
+        await selectCustomer(customers.value[0].id);
+      } else {
+        selectedCustomer.value = null;
+        customerHistory.value = [];
+        customerPortalLoginHistory.value = [];
+        customerEmployeeBlocks.value = [];
+        employeeBlockCapability.value = null;
+        portalPrivacy.value = null;
+        resetPortalPrivacyDraft();
+      }
+    } else if (customers.value[0] && !isCreatingCustomer.value) {
+      await selectCustomer(customers.value[0].id);
+    }
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.list = false;
+  }
+}
+
+async function selectCustomer(customerId: string) {
+  if (!tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+
+  loading.detail = true;
+  try {
+    selectedCustomerId.value = customerId;
+    selectedCustomer.value = await getCustomer(tenantScopeId.value, customerId, accessToken.value);
+    if (selectedCustomer.value) {
+      populateCustomerDraft(selectedCustomer.value);
+      resetContactDraft();
+      resetAddressDraft();
+      commercialProfile.value = null;
+      resetBillingProfileDraft();
+      resetInvoicePartyDraft();
+      resetRateCardDraft();
+      resetRateLineDraft();
+      resetSurchargeRuleDraft();
+      resetHistoryAttachmentDraft();
+      resetEmployeeBlockDraft();
+      portalPrivacy.value = null;
+      resetPortalPrivacyDraft();
+      isCreatingCustomer.value = false;
+      if (canReadCommercial.value) {
+        await refreshCommercialProfile();
+      }
+      await refreshHistory();
+      await refreshCustomerPortalLoginHistory();
+      await refreshEmployeeBlocks();
+      await refreshPortalPrivacy();
+    }
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.detail = false;
+  }
+}
+
+async function refreshCommercialProfile() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || !canReadCommercial.value) {
+    commercialProfile.value = null;
+    return;
+  }
+
+  loading.commercial = true;
+  try {
+    commercialProfile.value = await getCustomerCommercialProfile(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      accessToken.value,
+    );
+    populateBillingProfileDraft(commercialProfile.value.billing_profile);
+    if (commercialProfile.value.rate_cards.length) {
+      if (!commercialProfile.value.rate_cards.some((row) => row.id === selectedRateCardId.value)) {
+        selectedRateCardId.value = commercialProfile.value.rate_cards[0].id;
+      }
+    } else {
+      selectedRateCardId.value = "";
+    }
+    resetRateLineDraft();
+    resetSurchargeRuleDraft();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.commercial = false;
+  }
+}
+
+async function submitCustomer() {
+  if (!tenantScopeId.value || !accessToken.value) {
+    setFeedback("error", t("customerAdmin.feedback.validation"), t("customerAdmin.scope.missingBody"));
+    return;
+  }
+  if (!customerDraft.customer_number.trim() || !customerDraft.name.trim()) {
+    setFeedback("error", t("customerAdmin.feedback.validation"), t("customerAdmin.feedback.customerRequired"));
+    return;
+  }
+
+  loading.customer = true;
+  try {
+    const payload = normalizeCustomerDraft();
+    if (isCreatingCustomer.value || !selectedCustomer.value) {
+      const created = await createCustomer(tenantScopeId.value, accessToken.value, payload);
+      setFeedback("success", t("customerAdmin.feedback.created"), created.name);
+      await refreshCustomers();
+      await selectCustomer(created.id);
+      isCreatingCustomer.value = false;
+    } else {
+      const updated = await updateCustomer(tenantScopeId.value, selectedCustomer.value.id, accessToken.value, {
+        ...payload,
+        version_no: selectedCustomer.value.version_no,
+      });
+      setFeedback("success", t("customerAdmin.feedback.saved"), updated.name);
+      await refreshCustomers();
+      await selectCustomer(updated.id);
+    }
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.customer = false;
+  }
+}
+
+async function applyStatus(nextStatus: "active" | "inactive" | "archived") {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+
+  const confirmationMap = {
+    active: "customerAdmin.confirm.reactivate",
+    inactive: "customerAdmin.confirm.deactivate",
+    archived: "customerAdmin.confirm.archive",
+  } as const;
+
+  if (!window.confirm(t(confirmationMap[nextStatus]))) {
+    return;
+  }
+
+  try {
+    const updated = await updateCustomer(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      accessToken.value,
+      buildLifecyclePayload(selectedCustomer.value, nextStatus),
+    );
+    const feedbackKey =
+      nextStatus === "active"
+        ? "customerAdmin.feedback.reactivated"
+        : nextStatus === "inactive"
+          ? "customerAdmin.feedback.deactivated"
+          : "customerAdmin.feedback.archived";
+    setFeedback("success", t(feedbackKey), updated.name);
+    await refreshCustomers();
+    await selectCustomer(updated.id);
+  } catch (error) {
+    handleApiError(error);
+  }
+}
+
+async function submitContact() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+  if (!contactDraft.full_name.trim()) {
+    setFeedback("error", t("customerAdmin.feedback.validation"), t("customerAdmin.feedback.contactRequired"));
+    return;
+  }
+
+  loading.contact = true;
+  try {
+    if (editingContactId.value) {
+      await updateCustomerContact(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        editingContactId.value,
+        accessToken.value,
+        {
+          ...normalizeContactDraft(),
+          version_no: currentContactVersion(editingContactId.value),
+        },
+      );
+    } else {
+      await createCustomerContact(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        accessToken.value,
+        normalizeContactDraft(),
+      );
+    }
+    setFeedback("success", t("customerAdmin.feedback.contactSaved"), contactDraft.full_name);
+    resetContactDraft();
+    await selectCustomer(selectedCustomer.value.id);
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.contact = false;
+  }
+}
+
+async function archiveContact(contact: CustomerContactRead) {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+  if (!window.confirm(t("customerAdmin.confirm.contactArchive"))) {
+    return;
+  }
+  try {
+    await updateCustomerContact(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      contact.id,
+      accessToken.value,
+      {
+        status: "archived",
+        archived_at: new Date().toISOString(),
+        version_no: contact.version_no,
+      },
+    );
+    setFeedback("success", t("customerAdmin.feedback.contactSaved"), contact.full_name);
+    await selectCustomer(selectedCustomer.value.id);
+  } catch (error) {
+    handleApiError(error);
+  }
+}
+
+async function submitAddress() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+  if (!addressDraft.address_id.trim()) {
+    setFeedback("error", t("customerAdmin.feedback.validation"), t("customerAdmin.feedback.addressRequired"));
+    return;
+  }
+
+  loading.address = true;
+  try {
+    if (editingAddressId.value) {
+      await updateCustomerAddress(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        editingAddressId.value,
+        accessToken.value,
+        {
+          ...normalizeAddressDraft(),
+          version_no: currentAddressVersion(editingAddressId.value),
+        },
+      );
+    } else {
+      await createCustomerAddress(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        accessToken.value,
+        normalizeAddressDraft(),
+      );
+    }
+    setFeedback("success", t("customerAdmin.feedback.addressSaved"), addressDraft.address_type);
+    resetAddressDraft();
+    await selectCustomer(selectedCustomer.value.id);
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.address = false;
+  }
+}
+
+async function submitBillingProfile() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+  const validationKey = validateBillingProfileDraft({
+    ...billingProfileDraft,
+    payment_terms_days:
+      billingProfileDraft.payment_terms_days === null ? "" : String(billingProfileDraft.payment_terms_days),
+  });
+  if (validationKey) {
+    setFeedback("error", t("customerAdmin.feedback.validation"), t(validationKey as never));
+    return;
+  }
+
+  const existingProfile = commercialProfile.value?.billing_profile ?? null;
+  const confirmationKey = buildCommercialConfirmationKey("billingProfile", !!existingProfile);
+  if (confirmationKey && !window.confirm(t(confirmationKey as never))) {
+    return;
+  }
+
+  loading.commercial = true;
+  try {
+    if (existingProfile) {
+      await updateCustomerBillingProfile(tenantScopeId.value, selectedCustomer.value.id, accessToken.value, {
+        ...normalizeBillingProfileDraft(),
+        version_no: existingProfile.version_no,
+      });
+    } else {
+      await upsertCustomerBillingProfile(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        accessToken.value,
+        normalizeBillingProfileDraft(),
+      );
+    }
+    setFeedback("success", t("customerAdmin.feedback.commercialSaved"), t("customerAdmin.commercial.billingTitle"));
+    await refreshCommercialProfile();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.commercial = false;
+  }
+}
+
+async function submitInvoiceParty() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+  if (!invoicePartyDraft.company_name.trim() || !invoicePartyDraft.address_id.trim()) {
+    setFeedback("error", t("customerAdmin.feedback.validation"), t("customerAdmin.feedback.invoicePartyRequired"));
+    return;
+  }
+  const confirmationKey = buildCommercialConfirmationKey("invoiceParty", !!invoicePartyDraft.is_default);
+  if (confirmationKey && !window.confirm(t(confirmationKey as never))) {
+    return;
+  }
+
+  loading.commercial = true;
+  try {
+    if (editingInvoicePartyId.value) {
+      const currentVersion =
+        commercialProfile.value?.invoice_parties.find((row) => row.id === editingInvoicePartyId.value)?.version_no ?? 1;
+      await updateCustomerInvoiceParty(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        editingInvoicePartyId.value,
+        accessToken.value,
+        {
+          ...normalizeInvoicePartyDraft(),
+          version_no: currentVersion,
+        },
+      );
+    } else {
+      await createCustomerInvoiceParty(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        accessToken.value,
+        normalizeInvoicePartyDraft(),
+      );
+    }
+    setFeedback("success", t("customerAdmin.feedback.commercialSaved"), invoicePartyDraft.company_name);
+    resetInvoicePartyDraft();
+    await refreshCommercialProfile();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.commercial = false;
+  }
+}
+
+async function submitRateCard() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+  const validationKey = validateRateCardDraft(rateCardDraft);
+  if (validationKey) {
+    setFeedback("error", t("customerAdmin.feedback.validation"), t(validationKey as never));
+    return;
+  }
+  const confirmationKey = buildCommercialConfirmationKey("rateCard", !!editingRateCardId.value);
+  if (confirmationKey && !window.confirm(t(confirmationKey as never))) {
+    return;
+  }
+
+  loading.commercial = true;
+  try {
+    if (editingRateCardId.value) {
+      const currentVersion =
+        commercialProfile.value?.rate_cards.find((row) => row.id === editingRateCardId.value)?.version_no ?? 1;
+      const updated = await updateCustomerRateCard(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        editingRateCardId.value,
+        accessToken.value,
+        {
+          ...normalizeRateCardDraft(),
+          version_no: currentVersion,
+        },
+      );
+      selectedRateCardId.value = updated.id;
+    } else {
+      const created = await createCustomerRateCard(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        accessToken.value,
+        normalizeRateCardDraft(),
+      );
+      selectedRateCardId.value = created.id;
+    }
+    setFeedback("success", t("customerAdmin.feedback.commercialSaved"), t("customerAdmin.commercial.rateCardsTitle"));
+    resetRateCardDraft();
+    await refreshCommercialProfile();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.commercial = false;
+  }
+}
+
+async function submitRateLine() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || !selectedRateCard.value) {
+    return;
+  }
+  const validationKey = validateRateLineDraft(rateLineDraft);
+  if (validationKey) {
+    setFeedback("error", t("customerAdmin.feedback.validation"), t(validationKey as never));
+    return;
+  }
+  const confirmationKey = buildCommercialConfirmationKey("rateLine", !!editingRateLineId.value);
+  if (confirmationKey && !window.confirm(t(confirmationKey as never))) {
+    return;
+  }
+
+  loading.rateLine = true;
+  try {
+    if (editingRateLineId.value) {
+      const currentVersion = selectedRateCard.value.rate_lines.find((row) => row.id === editingRateLineId.value)?.version_no ?? 1;
+      await updateCustomerRateLine(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        selectedRateCard.value.id,
+        editingRateLineId.value,
+        accessToken.value,
+        {
+          ...normalizeRateLineDraft(),
+          version_no: currentVersion,
+        },
+      );
+    } else {
+      await createCustomerRateLine(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        selectedRateCard.value.id,
+        accessToken.value,
+        normalizeRateLineDraft(),
+      );
+    }
+    setFeedback("success", t("customerAdmin.feedback.commercialSaved"), t("customerAdmin.commercial.rateLinesTitle"));
+    resetRateLineDraft();
+    await refreshCommercialProfile();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.rateLine = false;
+  }
+}
+
+async function submitSurchargeRule() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || !selectedRateCard.value) {
+    return;
+  }
+  const validationKey = validateSurchargeRuleDraft(surchargeRuleDraft);
+  if (validationKey) {
+    setFeedback("error", t("customerAdmin.feedback.validation"), t(validationKey as never));
+    return;
+  }
+  const confirmationKey = buildCommercialConfirmationKey("surchargeRule", !!editingSurchargeRuleId.value);
+  if (confirmationKey && !window.confirm(t(confirmationKey as never))) {
+    return;
+  }
+
+  loading.surchargeRule = true;
+  try {
+    if (editingSurchargeRuleId.value) {
+      const currentVersion =
+        selectedRateCard.value.surcharge_rules.find((row) => row.id === editingSurchargeRuleId.value)?.version_no ?? 1;
+      await updateCustomerSurchargeRule(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        selectedRateCard.value.id,
+        editingSurchargeRuleId.value,
+        accessToken.value,
+        {
+          ...normalizeSurchargeRuleDraft(),
+          version_no: currentVersion,
+        },
+      );
+    } else {
+      await createCustomerSurchargeRule(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        selectedRateCard.value.id,
+        accessToken.value,
+        normalizeSurchargeRuleDraft(),
+      );
+    }
+    setFeedback("success", t("customerAdmin.feedback.commercialSaved"), t("customerAdmin.commercial.surchargesTitle"));
+    resetSurchargeRuleDraft();
+    await refreshCommercialProfile();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.surchargeRule = false;
+  }
+}
+
+async function archiveAddress(address: CustomerAddressRead) {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+  if (!window.confirm(t("customerAdmin.confirm.addressArchive"))) {
+    return;
+  }
+  try {
+    await updateCustomerAddress(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      address.id,
+      accessToken.value,
+      {
+        status: "archived",
+        archived_at: new Date().toISOString(),
+        version_no: address.version_no,
+      },
+    );
+    setFeedback("success", t("customerAdmin.feedback.addressSaved"), address.address_type);
+    await selectCustomer(selectedCustomer.value.id);
+  } catch (error) {
+    handleApiError(error);
+  }
+}
+
+function currentContactVersion(contactId: string) {
+  return selectedCustomer.value?.contacts.find((row) => row.id === contactId)?.version_no ?? 1;
+}
+
+function currentAddressVersion(addressId: string) {
+  return selectedCustomer.value?.addresses.find((row) => row.id === addressId)?.version_no ?? 1;
+}
+
+function normalizeCustomerDraft(): CustomerCreatePayload {
+  return {
+    tenant_id: tenantScopeId.value,
+    customer_number: customerDraft.customer_number.trim(),
+    name: customerDraft.name.trim(),
+    legal_name: emptyToNull(customerDraft.legal_name),
+    external_ref: emptyToNull(customerDraft.external_ref),
+    legal_form_lookup_id: emptyToNull(customerDraft.legal_form_lookup_id),
+    classification_lookup_id: emptyToNull(customerDraft.classification_lookup_id),
+    ranking_lookup_id: emptyToNull(customerDraft.ranking_lookup_id),
+    customer_status_lookup_id: emptyToNull(customerDraft.customer_status_lookup_id),
+    default_branch_id: emptyToNull(customerDraft.default_branch_id),
+    default_mandate_id: emptyToNull(customerDraft.default_mandate_id),
+    notes: emptyToNull(customerDraft.notes),
+  };
+}
+
+function normalizeContactDraft(): CustomerContactPayload {
+  return {
+    tenant_id: tenantScopeId.value,
+    customer_id: selectedCustomerId.value,
+    full_name: contactDraft.full_name.trim(),
+    title: emptyToNull(contactDraft.title),
+    function_label: emptyToNull(contactDraft.function_label),
+    email: emptyToNull(contactDraft.email),
+    phone: emptyToNull(contactDraft.phone),
+    mobile: emptyToNull(contactDraft.mobile),
+    is_primary_contact: !!contactDraft.is_primary_contact,
+    is_billing_contact: !!contactDraft.is_billing_contact,
+    user_id: emptyToNull(contactDraft.user_id),
+    notes: emptyToNull(contactDraft.notes),
+  };
+}
+
+function normalizeAddressDraft(): CustomerAddressPayload {
+  return {
+    tenant_id: tenantScopeId.value,
+    customer_id: selectedCustomerId.value,
+    address_id: addressDraft.address_id.trim(),
+    address_type: addressDraft.address_type,
+    label: emptyToNull(addressDraft.label),
+    is_default: !!addressDraft.is_default,
+  };
+}
+
+function normalizeBillingProfileDraft(): CustomerBillingProfilePayload {
+  return {
+    tenant_id: tenantScopeId.value,
+    customer_id: selectedCustomerId.value,
+    invoice_email: emptyToNull(billingProfileDraft.invoice_email),
+    payment_terms_days:
+      billingProfileDraft.payment_terms_days === null || billingProfileDraft.payment_terms_days === undefined
+        ? null
+        : Number(billingProfileDraft.payment_terms_days),
+    payment_terms_note: emptyToNull(billingProfileDraft.payment_terms_note),
+    tax_number: emptyToNull(billingProfileDraft.tax_number),
+    vat_id: emptyToNull(billingProfileDraft.vat_id),
+    tax_exempt: !!billingProfileDraft.tax_exempt,
+    tax_exemption_reason: emptyToNull(billingProfileDraft.tax_exemption_reason),
+    bank_account_holder: emptyToNull(billingProfileDraft.bank_account_holder),
+    bank_iban: emptyToNull(billingProfileDraft.bank_iban),
+    bank_bic: emptyToNull(billingProfileDraft.bank_bic),
+    bank_name: emptyToNull(billingProfileDraft.bank_name),
+    contract_reference: emptyToNull(billingProfileDraft.contract_reference),
+    debtor_number: emptyToNull(billingProfileDraft.debtor_number),
+    e_invoice_enabled: !!billingProfileDraft.e_invoice_enabled,
+    leitweg_id: emptyToNull(billingProfileDraft.leitweg_id),
+    invoice_layout_code: emptyToNull(billingProfileDraft.invoice_layout_code),
+    shipping_method_code: emptyToNull(billingProfileDraft.shipping_method_code),
+    dunning_policy_code: emptyToNull(billingProfileDraft.dunning_policy_code),
+    billing_note: emptyToNull(billingProfileDraft.billing_note),
+  };
+}
+
+function normalizeInvoicePartyDraft(): CustomerInvoicePartyPayload {
+  return {
+    tenant_id: tenantScopeId.value,
+    customer_id: selectedCustomerId.value,
+    company_name: invoicePartyDraft.company_name.trim(),
+    contact_name: emptyToNull(invoicePartyDraft.contact_name),
+    address_id: invoicePartyDraft.address_id.trim(),
+    invoice_email: emptyToNull(invoicePartyDraft.invoice_email),
+    invoice_layout_lookup_id: emptyToNull(invoicePartyDraft.invoice_layout_lookup_id),
+    external_ref: emptyToNull(invoicePartyDraft.external_ref),
+    is_default: !!invoicePartyDraft.is_default,
+    note: emptyToNull(invoicePartyDraft.note),
+  };
+}
+
+function normalizeRateCardDraft(): CustomerRateCardPayload {
+  return {
+    tenant_id: tenantScopeId.value,
+    customer_id: selectedCustomerId.value,
+    rate_kind: rateCardDraft.rate_kind.trim(),
+    currency_code: rateCardDraft.currency_code.trim().toUpperCase(),
+    effective_from: rateCardDraft.effective_from,
+    effective_to: emptyToNull(rateCardDraft.effective_to),
+    notes: emptyToNull(rateCardDraft.notes),
+  };
+}
+
+function normalizeRateLineDraft(): CustomerRateLinePayload {
+  return {
+    tenant_id: tenantScopeId.value,
+    rate_card_id: selectedRateCardId.value,
+    line_kind: rateLineDraft.line_kind.trim(),
+    function_type_id: emptyToNull(rateLineDraft.function_type_id),
+    qualification_type_id: emptyToNull(rateLineDraft.qualification_type_id),
+    planning_mode_code: emptyToNull(rateLineDraft.planning_mode_code),
+    billing_unit: rateLineDraft.billing_unit.trim(),
+    unit_price: `${rateLineDraft.unit_price}`.trim(),
+    minimum_quantity: emptyToNull(rateLineDraft.minimum_quantity),
+    sort_order: Number(rateLineDraft.sort_order ?? 100),
+    notes: emptyToNull(rateLineDraft.notes),
+  };
+}
+
+function normalizeSurchargeRuleDraft(): CustomerSurchargeRulePayload {
+  return {
+    tenant_id: tenantScopeId.value,
+    rate_card_id: selectedRateCardId.value,
+    surcharge_type: surchargeRuleDraft.surcharge_type.trim(),
+    effective_from: surchargeRuleDraft.effective_from,
+    effective_to: emptyToNull(surchargeRuleDraft.effective_to),
+    weekday_mask: emptyToNull(surchargeRuleDraft.weekday_mask),
+    time_from_minute:
+      surchargeRuleDraft.time_from_minute === null || surchargeRuleDraft.time_from_minute === undefined
+        ? null
+        : Number(surchargeRuleDraft.time_from_minute),
+    time_to_minute:
+      surchargeRuleDraft.time_to_minute === null || surchargeRuleDraft.time_to_minute === undefined
+        ? null
+        : Number(surchargeRuleDraft.time_to_minute),
+    region_code: emptyToNull(surchargeRuleDraft.region_code),
+    percent_value: emptyToNull(surchargeRuleDraft.percent_value),
+    fixed_amount: emptyToNull(surchargeRuleDraft.fixed_amount),
+    currency_code: emptyToNull(surchargeRuleDraft.currency_code)?.toUpperCase() ?? null,
+    sort_order: Number(surchargeRuleDraft.sort_order ?? 100),
+    notes: emptyToNull(surchargeRuleDraft.notes),
+  };
+}
+
+async function refreshHistory() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || !canRead.value) {
+    customerHistory.value = [];
+    return;
+  }
+
+  try {
+    customerHistory.value = await listCustomerHistory(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      accessToken.value,
+    );
+    resetHistoryAttachmentDraft();
+  } catch (error) {
+    handleApiError(error);
+  }
+}
+
+async function refreshCustomerPortalLoginHistory() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || !canRead.value) {
+    customerPortalLoginHistory.value = [];
+    return;
+  }
+
+  loading.loginHistory = true;
+  try {
+    customerPortalLoginHistory.value = await listCustomerPortalLoginHistory(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      accessToken.value,
+    );
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.loginHistory = false;
+  }
+}
+
+async function refreshEmployeeBlocks() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || !canRead.value) {
+    customerEmployeeBlocks.value = [];
+    employeeBlockCapability.value = null;
+    return;
+  }
+
+  loading.employeeBlock = true;
+  try {
+    const response = await listCustomerEmployeeBlocks(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      accessToken.value,
+    );
+    customerEmployeeBlocks.value = response.items;
+    employeeBlockCapability.value = response.capability;
+    resetEmployeeBlockDraft();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.employeeBlock = false;
+  }
+}
+
+async function refreshPortalPrivacy() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || !canRead.value) {
+    portalPrivacy.value = null;
+    resetPortalPrivacyDraft();
+    return;
+  }
+
+  loading.portalPrivacy = true;
+  try {
+    portalPrivacy.value = await getCustomerPortalPrivacy(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      accessToken.value,
+    );
+    resetPortalPrivacyDraft();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.portalPrivacy = false;
+  }
+}
+
+async function submitPortalPrivacy() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+
+  loading.portalPrivacy = true;
+  try {
+    portalPrivacy.value = await updateCustomerPortalPrivacy(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      accessToken.value,
+      {
+        person_names_released: !!portalPrivacyDraft.person_names_released,
+      },
+    );
+    if (selectedCustomer.value) {
+      selectedCustomer.value = {
+        ...selectedCustomer.value,
+        portal_person_names_released: portalPrivacy.value.person_names_released,
+        portal_person_names_released_at: portalPrivacy.value.person_names_released_at,
+        portal_person_names_released_by_user_id: portalPrivacy.value.person_names_released_by_user_id,
+      };
+    }
+    resetPortalPrivacyDraft();
+    setFeedback("success", t("customerAdmin.feedback.portalPrivacySaved"), t("customerAdmin.privacy.title"));
+    await refreshHistory();
+    await refreshCustomerPortalLoginHistory();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.portalPrivacy = false;
+  }
+}
+
+async function submitHistoryAttachmentLink() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || !historyAttachmentDraft.history_entry_id) {
+    return;
+  }
+
+  loading.historyAttachment = true;
+  try {
+    const attachments = await linkCustomerHistoryAttachment(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      historyAttachmentDraft.history_entry_id,
+      accessToken.value,
+      {
+        document_id: historyAttachmentDraft.document_id.trim(),
+        label: emptyToNull(historyAttachmentDraft.label),
+      },
+    );
+    customerHistory.value = customerHistory.value.map((entry) =>
+      entry.id === historyAttachmentDraft.history_entry_id ? { ...entry, attachments } : entry,
+    );
+    resetHistoryAttachmentDraft();
+    setFeedback("success", t("customerAdmin.feedback.historyAttachmentLinked"), t("customerAdmin.feedback.documentLinked"));
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.historyAttachment = false;
+  }
+}
+
+async function submitEmployeeBlock() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+
+  loading.employeeBlock = true;
+  try {
+    if (editingEmployeeBlockId.value) {
+      await updateCustomerEmployeeBlock(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        editingEmployeeBlockId.value,
+        accessToken.value,
+        {
+          tenant_id: tenantScopeId.value,
+          customer_id: selectedCustomer.value.id,
+          employee_id: employeeBlockDraft.employee_id.trim(),
+          reason: employeeBlockDraft.reason.trim(),
+          effective_from: employeeBlockDraft.effective_from,
+          effective_to: emptyToNull(employeeBlockDraft.effective_to),
+          version_no: customerEmployeeBlocks.value.find((row) => row.id === editingEmployeeBlockId.value)?.version_no ?? 1,
+        },
+      );
+    } else {
+      await createCustomerEmployeeBlock(
+        tenantScopeId.value,
+        selectedCustomer.value.id,
+        accessToken.value,
+        {
+          tenant_id: tenantScopeId.value,
+          customer_id: selectedCustomer.value.id,
+          employee_id: employeeBlockDraft.employee_id.trim(),
+          reason: employeeBlockDraft.reason.trim(),
+          effective_from: employeeBlockDraft.effective_from,
+          effective_to: emptyToNull(employeeBlockDraft.effective_to),
+        },
+      );
+    }
+    await refreshEmployeeBlocks();
+    setFeedback("success", t("customerAdmin.feedback.employeeBlockSaved"), t("customerAdmin.feedback.employeeBlockSavedBody"));
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.employeeBlock = false;
+  }
+}
+
+async function runCustomerExport() {
+  if (!tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+
+  try {
+    const result = await exportCustomers(tenantScopeId.value, accessToken.value, {
+      tenant_id: tenantScopeId.value,
+      include_archived: !!filters.include_archived,
+      search: emptyToNull(filters.search),
+    });
+    setFeedback(
+      "success",
+      t("customerAdmin.feedback.exportReady"),
+      `${result.file_name} · ${t("customerAdmin.feedback.documentId")}: ${result.document_id}`,
+    );
+  } catch (error) {
+    handleApiError(error);
+  }
+}
+
+async function downloadContactVCard(contact: CustomerContactRead) {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+
+  try {
+    const result = await exportCustomerVCard(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      contact.id,
+      accessToken.value,
+    );
+    downloadBase64File(result.file_name, result.content_type, result.content_base64);
+    setFeedback("success", t("customerAdmin.feedback.vcardReady"), contact.full_name);
+  } catch (error) {
+    handleApiError(error);
+  }
+}
+
+function downloadBase64File(fileName: string, contentType: string, contentBase64: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const binary = window.atob(contentBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  const blob = new Blob([bytes], { type: contentType });
+  const url = window.URL.createObjectURL(blob);
+  const anchor = window.document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  window.URL.revokeObjectURL(url);
+}
+
+function formatHistoryMeta(entry: CustomerHistoryEntryRead) {
+  return `${new Date(entry.created_at).toLocaleString()} · ${entry.entry_type}`;
+}
+
+function formatLoginHistoryMeta(entry: CustomerLoginHistoryEntryRead) {
+  const contactLabel = entry.contact_name ? ` · ${entry.contact_name}` : "";
+  const failure = entry.failure_reason ? ` · ${entry.failure_reason}` : "";
+  return `${new Date(entry.created_at).toLocaleString()} · ${entry.outcome}${contactLabel}${failure}`;
+}
+
+function formatOptionalDateTime(value: null | string | undefined) {
+  if (!value) {
+    return t("customerAdmin.summary.none");
+  }
+  return new Date(value).toLocaleString();
+}
+
+function handleApiError(error: unknown) {
+  if (error instanceof CustomerAdminApiError) {
+    const feedbackKey =
+      mapCustomerCommercialApiMessage(error.messageKey) !== "customerAdmin.feedback.error"
+        ? mapCustomerCommercialApiMessage(error.messageKey)
+        : mapCustomerApiMessage(error.messageKey);
+    setFeedback("error", t("customerAdmin.feedback.error"), t(feedbackKey as never));
+    return;
+  }
+
+  setFeedback("error", t("customerAdmin.feedback.error"), t("customerAdmin.feedback.error"));
+}
+
+function emptyToNull(value: string | null | undefined) {
+  const normalized = value?.trim() ?? "";
+  return normalized ? normalized : null;
+}
+
+onMounted(() => {
+  resetCustomerDraft();
+  resetContactDraft();
+  resetAddressDraft();
+  resetBillingProfileDraft();
+  resetInvoicePartyDraft();
+  resetRateCardDraft();
+  resetRateLineDraft();
+  resetSurchargeRuleDraft();
+  resetPortalPrivacyDraft();
+  void refreshCustomers();
+});
+</script>
+
+<style scoped>
+.customer-admin-page,
+.customer-admin-grid,
+.customer-admin-form,
+.customer-admin-form-grid,
+.customer-admin-list,
+.customer-admin-record-list,
+.customer-admin-inline-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.customer-admin-grid {
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.customer-admin-subgrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.customer-admin-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+}
+
+.customer-admin-scope {
+  min-width: min(100%, 360px);
+  display: grid;
+  gap: 1rem;
+}
+
+.customer-admin-lead {
+  margin: 0.35rem 0 0;
+  color: var(--sp-color-text-secondary);
+}
+
+.customer-admin-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.customer-admin-meta__pill {
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  background: var(--sp-color-surface-page);
+  border: 1px solid var(--sp-color-border-soft);
+  color: var(--sp-color-text-secondary);
+}
+
+.customer-admin-feedback {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  background: var(--sp-color-primary-muted);
+  color: var(--sp-color-primary-strong);
+}
+
+.customer-admin-feedback[data-tone="error"] {
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 45%, #ffb4a6);
+  color: color-mix(in srgb, var(--sp-color-primary-strong) 60%, #6a1d00);
+}
+
+.customer-admin-empty {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.customer-admin-panel,
+.customer-admin-section {
+  display: grid;
+  gap: 1rem;
+}
+
+.customer-admin-panel__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+}
+
+.customer-admin-row,
+.customer-admin-record {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-page);
+}
+
+.customer-admin-row {
+  cursor: pointer;
+  text-align: left;
+}
+
+.customer-admin-row.selected {
+  border-color: var(--sp-color-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 40%, transparent);
+}
+
+.customer-admin-row span,
+.customer-admin-record p,
+.customer-admin-list-empty,
+.customer-admin-record__meta {
+  color: var(--sp-color-text-secondary);
+  margin: 0.35rem 0 0;
+}
+
+.customer-admin-record__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: end;
+}
+
+.customer-admin-inline-form {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+}
+
+.customer-admin-inline-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.customer-admin-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.customer-admin-summary__card {
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: var(--sp-color-surface-page);
+  border: 1px solid var(--sp-color-border-soft);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.customer-admin-summary__card span {
+  color: var(--sp-color-text-secondary);
+  font-size: 0.85rem;
+}
+
+.customer-admin-lifecycle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--sp-color-surface-page), transparent);
+  border: 1px solid var(--sp-color-border-soft);
+}
+
+.customer-admin-checkbox {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.field-stack--wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 960px) {
+  .customer-admin-hero,
+  .customer-admin-lifecycle {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .customer-admin-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

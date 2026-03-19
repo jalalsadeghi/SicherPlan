@@ -112,6 +112,26 @@ These services are sufficient for Sprint 1 and Sprint 2 foundations without comm
 3. Point backend, web, and mobile local configs at the local service endpoints.
 4. Use staging-specific injected variables in deployment or CI/CD, not committed files.
 
+### Backend local run
+
+For local backend development, copy [backend/.env.example](/home/jey/Projects/SicherPlan/backend/.env.example) to `backend/.env`.
+
+The backend now auto-loads `backend/.env` and `backend/.env.local` at import time. Local defaults align with the dev compose stack:
+
+- PostgreSQL host: `localhost`
+- PostgreSQL database: `sicherplan`
+- PostgreSQL user: `sicherplan`
+- PostgreSQL password: `change-me`
+
+Typical local flow:
+
+1. `docker compose -f infra/docker-compose.dev.yml up -d postgres`
+2. `cd backend`
+3. `cp .env.example .env`
+4. `PYTHONPATH=. ../.venv-backend-test/bin/alembic upgrade head`
+5. `PYTHONPATH=. ../.venv-backend-test/bin/python scripts/bootstrap_system_admin.py`
+6. `PYTHONPATH=. ../.venv-backend-test/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+
 ## Secret handling rules
 
 - Never commit passwords, tokens, signing keys, or provider credentials.

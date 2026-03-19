@@ -68,6 +68,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["template_id"], ["comm.message_template.id"], name="fk_outbound_message_template_id_message_template", ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["tenant_id"], ["core.tenant.id"], name="fk_outbound_message_tenant_id_tenant", ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id", name="pk_outbound_message"),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_comm_outbound_message_tenant_id_id"),
         schema="comm",
     )
     op.create_index("ix_comm_outbound_message_tenant_status", "outbound_message", ["tenant_id", "status"], unique=False, schema="comm")
@@ -94,6 +95,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_account_id"], ["iam.user_account.id"], name="fk_message_recipient_user_account_id_user_account", ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["tenant_id", "outbound_message_id"], ["comm.outbound_message.tenant_id", "comm.outbound_message.id"], name="fk_comm_message_recipient_tenant_message", ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id", name="pk_message_recipient"),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_comm_message_recipient_tenant_id_id"),
         schema="comm",
     )
     op.create_index("ix_comm_message_recipient_tenant_message", "message_recipient", ["tenant_id", "outbound_message_id"], unique=False, schema="comm")

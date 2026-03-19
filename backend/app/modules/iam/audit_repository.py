@@ -31,6 +31,23 @@ class SqlAlchemyAuditRepository:
         rows = self.session.scalars(select(LoginEvent).order_by(LoginEvent.created_at)).all()
         return [LoginEventRead.model_validate(row) for row in rows]
 
+    def list_login_events_for_users(
+        self,
+        tenant_id: str,
+        user_ids: list[str],
+    ) -> list[LoginEventRead]:
+        if not user_ids:
+            return []
+        rows = self.session.scalars(
+            select(LoginEvent)
+            .where(
+                LoginEvent.tenant_id == tenant_id,
+                LoginEvent.user_account_id.in_(user_ids),
+            )
+            .order_by(LoginEvent.created_at.desc())
+        ).all()
+        return [LoginEventRead.model_validate(row) for row in rows]
+
     def list_audit_events(self) -> list[AuditEventRead]:
         rows = self.session.scalars(select(AuditEvent).order_by(AuditEvent.created_at)).all()
         return [AuditEventRead.model_validate(row) for row in rows]

@@ -12,7 +12,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import AuditLifecycleMixin, Base, UUIDPrimaryKeyMixin
@@ -91,6 +91,7 @@ class Mandate(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
             name="fk_core_mandate_tenant_branch",
         ),
         UniqueConstraint("tenant_id", "code", name="uq_core_mandate_tenant_code"),
+        UniqueConstraint("tenant_id", "id", name="uq_core_mandate_tenant_id_id"),
         {"schema": "core"},
     )
 
@@ -98,7 +99,7 @@ class Mandate(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
         ForeignKey("core.tenant.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    branch_id: Mapped[str] = mapped_column(nullable=False)
+    branch_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
     code: Mapped[str] = mapped_column(String(50), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     external_ref: Mapped[str | None] = mapped_column(String(120), nullable=True)

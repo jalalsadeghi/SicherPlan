@@ -6,17 +6,18 @@ from typing import Any
 
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import settings
+from app.db.session import build_engine
 
 router = APIRouter(tags=["health"])
 
 
 def _database_readiness() -> dict[str, Any]:
     try:
-        engine = create_engine(settings.database_url, future=True)
+        engine = build_engine(settings.database_url)
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
         engine.dispose()

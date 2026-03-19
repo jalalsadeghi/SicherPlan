@@ -230,6 +230,7 @@ class TestIntegrationMetadata(unittest.TestCase):
             if isinstance(constraint, UniqueConstraint)
         }
         outbox_indexes = {index.name for index in OutboxEvent.__table__.indexes if isinstance(index, Index)}
+        self.assertIn("uq_integration_endpoint_tenant_id_id", endpoint_constraints)
         self.assertIn("uq_integration_endpoint_tenant_provider_type", endpoint_constraints)
         self.assertIn("ix_integration_outbox_event_status_next_attempt", outbox_indexes)
 

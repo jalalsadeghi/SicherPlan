@@ -7,6 +7,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.modules.core.models import Branch, Mandate, Tenant, TenantSetting
+from app.modules.customers.models import Customer, CustomerContact, CustomerHistoryEntry
+from app.modules.employees.models import Employee, EmployeeQualification
+from app.modules.recruiting.models import Applicant
 from app.modules.platform_services.comm_models import OutboundMessage
 from app.modules.platform_services.info_models import Notice
 from app.modules.platform_services.integration_models import ImportExportJob
@@ -25,6 +28,12 @@ class SqlAlchemyDocumentRepository:
             "core.branch",
             "core.mandate",
             "core.tenant_setting",
+            "crm.customer",
+            "crm.customer_contact",
+            "crm.customer_history_entry",
+            "hr.applicant",
+            "hr.employee",
+            "hr.employee_qualification",
             "comm.outbound_message",
             "info.notice",
             "integration.import_export_job",
@@ -98,6 +107,12 @@ class SqlAlchemyDocumentRepository:
             "core.branch": Branch,
             "core.mandate": Mandate,
             "core.tenant_setting": TenantSetting,
+            "crm.customer": Customer,
+            "crm.customer_contact": CustomerContact,
+            "crm.customer_history_entry": CustomerHistoryEntry,
+            "hr.applicant": Applicant,
+            "hr.employee": Employee,
+            "hr.employee_qualification": EmployeeQualification,
             "comm.outbound_message": OutboundMessage,
             "info.notice": Notice,
             "integration.import_export_job": ImportExportJob,
@@ -108,6 +123,24 @@ class SqlAlchemyDocumentRepository:
         else:
             statement = statement.where(Tenant.id == tenant_id)
         return self.session.scalars(statement).one_or_none() is not None
+
+    def list_documents_for_owner(
+        self,
+        tenant_id: str,
+        owner_type: str,
+        owner_id: str,
+    ) -> list[Document]:
+        statement = (
+            self._document_query()
+            .join(DocumentLink, DocumentLink.document_id == Document.id)
+            .where(
+                Document.tenant_id == tenant_id,
+                DocumentLink.tenant_id == tenant_id,
+                DocumentLink.owner_type == owner_type,
+                DocumentLink.owner_id == owner_id,
+            )
+        )
+        return list(self.session.scalars(statement).unique().all())
 
     @staticmethod
     def _document_query() -> Select[tuple[Document]]:

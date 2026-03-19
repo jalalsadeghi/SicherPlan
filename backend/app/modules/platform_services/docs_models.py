@@ -14,7 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import AuditLifecycleMixin, Base, UUIDPrimaryKeyMixin
@@ -88,7 +88,7 @@ class DocumentVersion(UUIDPrimaryKeyMixin, Base):
     )
 
     tenant_id: Mapped[str] = mapped_column(ForeignKey("core.tenant.id", ondelete="RESTRICT"), nullable=False)
-    document_id: Mapped[str] = mapped_column(nullable=False)
+    document_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
     version_no: Mapped[int] = mapped_column(Integer, nullable=False)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     content_type: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -142,7 +142,7 @@ class DocumentLink(UUIDPrimaryKeyMixin, Base):
     )
 
     tenant_id: Mapped[str] = mapped_column(ForeignKey("core.tenant.id", ondelete="RESTRICT"), nullable=False)
-    document_id: Mapped[str] = mapped_column(nullable=False)
+    document_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
     owner_type: Mapped[str] = mapped_column(String(120), nullable=False)
     owner_id: Mapped[str] = mapped_column(String(36), nullable=False)
     relation_type: Mapped[str] = mapped_column(String(80), nullable=False, default="attachment", server_default="attachment")

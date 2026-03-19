@@ -28,6 +28,8 @@ class TestTenantBackboneMetadata(unittest.TestCase):
         foreign_keys = {fk.constraint.name: tuple(fk.parent.name for fk in fk.constraint.elements) for fk in Mandate.__table__.foreign_keys}
         self.assertIn("fk_core_mandate_tenant_branch", foreign_keys)
         self.assertEqual(foreign_keys["fk_core_mandate_tenant_branch"], ("tenant_id", "branch_id"))
+        names = {constraint.name for constraint in Mandate.__table__.constraints if isinstance(constraint, UniqueConstraint)}
+        self.assertIn("uq_core_mandate_tenant_id_id", names)
 
     def test_tenant_setting_key_is_unique_per_tenant(self) -> None:
         names = {constraint.name for constraint in TenantSetting.__table__.constraints if isinstance(constraint, UniqueConstraint)}
@@ -49,6 +51,7 @@ class TestTenantBackboneMetadata(unittest.TestCase):
         ddl = str(CreateTable(Mandate.__table__).compile(dialect=dialect()))
         self.assertIn("CREATE TABLE core.mandate", ddl)
         self.assertIn("CONSTRAINT uq_core_mandate_tenant_code", ddl)
+        self.assertIn("CONSTRAINT uq_core_mandate_tenant_id_id", ddl)
         self.assertIn("CONSTRAINT fk_core_mandate_tenant_branch", ddl)
 
 

@@ -14,7 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import AuditLifecycleMixin, Base, TimestampedMixin, UUIDPrimaryKeyMixin
@@ -198,10 +198,10 @@ class UserRoleAssignment(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
         nullable=False,
     )
     scope_type: Mapped[str] = mapped_column(String(40), nullable=False, default="tenant", server_default="tenant")
-    branch_id: Mapped[str | None] = mapped_column(nullable=True)
-    mandate_id: Mapped[str | None] = mapped_column(nullable=True)
-    customer_id: Mapped[str | None] = mapped_column(nullable=True)
-    subcontractor_id: Mapped[str | None] = mapped_column(nullable=True)
+    branch_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), nullable=True)
+    mandate_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), nullable=True)
+    customer_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), nullable=True)
+    subcontractor_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), nullable=True)
     valid_from: Mapped[datetime | None] = mapped_column(nullable=True)
     valid_until: Mapped[datetime | None] = mapped_column(nullable=True)
 

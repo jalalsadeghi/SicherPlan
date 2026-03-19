@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import ForeignKey, ForeignKeyConstraint, Index, String, Text, UniqueConstraint, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import AuditLifecycleMixin, Base, TimestampedMixin, UUIDPrimaryKeyMixin
@@ -14,6 +14,7 @@ from app.db.base import AuditLifecycleMixin, Base, TimestampedMixin, UUIDPrimary
 class IntegrationEndpoint(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
     __tablename__ = "endpoint"
     __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_integration_endpoint_tenant_id_id"),
         UniqueConstraint("tenant_id", "provider_key", "endpoint_type", name="uq_integration_endpoint_tenant_provider_type"),
         {"schema": "integration"},
     )
@@ -47,7 +48,7 @@ class ImportExportJob(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
     )
 
     tenant_id: Mapped[str] = mapped_column(ForeignKey("core.tenant.id", ondelete="RESTRICT"), nullable=False)
-    endpoint_id: Mapped[str | None] = mapped_column(nullable=True)
+    endpoint_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), nullable=True)
     job_direction: Mapped[str] = mapped_column(String(20), nullable=False)
     job_type: Mapped[str] = mapped_column(String(120), nullable=False)
     request_payload_json: Mapped[dict[str, object]] = mapped_column(

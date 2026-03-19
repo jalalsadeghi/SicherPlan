@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import OperationalError
 
 from app.logging_utils import request_id_context
 
@@ -58,7 +59,13 @@ async def api_exception_handler(_: Request, exc: ApiException) -> JSONResponse:
     )
 
 
-async def unhandled_exception_handler(_: Request, __: Exception) -> JSONResponse:
+async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONResponse:
+    if isinstance(exc, OperationalError):
+        return build_error_response(
+            status_code=503,
+            code="platform.database_unavailable",
+            message_key="errors.platform.database_unavailable",
+        )
     return build_error_response(
         status_code=500,
         code="platform.internal_error",

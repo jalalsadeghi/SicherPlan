@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from app.modules.iam.auth_adapters import AuthExtensionHooks, PasswordResetDelivery, PasswordResetNotifier
 from app.modules.iam.auth_router import (
+    access_codes,
     confirm_password_reset,
     current_session,
     list_sessions,
@@ -16,6 +17,7 @@ from app.modules.iam.auth_router import (
     request_password_reset as request_password_reset_endpoint,
 )
 from app.modules.iam.auth_schemas import (
+    AccessCodesResponse,
     AuthenticatedRoleScope,
     AuthenticatedUser,
     CurrentSessionResponse,
@@ -417,6 +419,10 @@ class TestAuthRouterFunctions(unittest.TestCase):
 
         sessions = list_sessions(context, self.service)
         self.assertEqual(len(sessions.items), 1)
+
+        codes = access_codes(context)
+        self.assertIsInstance(codes, AccessCodesResponse)
+        self.assertIn("core.admin.access", codes.items)
 
         refreshed = refresh_endpoint(
             RefreshRequest(refresh_token=login_response.session.refresh_token),
