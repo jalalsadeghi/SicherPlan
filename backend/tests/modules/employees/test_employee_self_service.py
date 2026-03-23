@@ -141,6 +141,21 @@ class EmployeeSelfServiceTest(unittest.TestCase):
         self.assertEqual(missing_employee.exception.status_code, 404)
         self.assertEqual(missing_employee.exception.message_key, "errors.employees.self_service.employee_not_found")
 
+    def test_mobile_context_rejects_inactive_employee_link(self) -> None:
+        self.repository.employees["employee-1"].status = "inactive"
+        with self.assertRaises(ApiException) as raised:
+            self.service.get_mobile_context(_employee_self_service_context("portal.employee.access"))
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(raised.exception.message_key, "errors.employees.self_service.employee_inactive")
+
+    def test_mobile_context_returns_operational_fields_only(self) -> None:
+        mobile_context = self.service.get_mobile_context(_employee_self_service_context("portal.employee.access"))
+        self.assertEqual(mobile_context.employee_id, "employee-1")
+        self.assertEqual(mobile_context.personnel_no, "EMP-1001")
+        self.assertEqual(mobile_context.work_email, "anna@example.com")
+        self.assertIn("employee_user", mobile_context.role_keys)
+        self.assertFalse(hasattr(mobile_context, "tax_id"))
+
     def test_update_profile_only_changes_whitelisted_operational_fields(self) -> None:
         employee = self.repository.employees["employee-1"]
         before_first_name = employee.first_name

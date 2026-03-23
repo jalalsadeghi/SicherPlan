@@ -106,6 +106,8 @@ class AppSettings:
     db_connect_timeout_seconds: int = _get_int("SP_DB_CONNECT_TIMEOUT_SECONDS", 5)
     database_url_override: str = _get_str("SP_DATABASE_URL")
     alembic_database_url: str = _get_str("SP_ALEMBIC_DATABASE_URL")
+    db_rls_enabled: bool = _get_bool("SP_DB_RLS_ENABLED", False)
+    db_rls_default_mode: str = _get_str("SP_DB_RLS_DEFAULT_MODE", "off")
 
     object_storage_endpoint: str = _get_str("SP_OBJECT_STORAGE_ENDPOINT")
     object_storage_backend: str = _get_str("SP_OBJECT_STORAGE_BACKEND", "filesystem")
@@ -151,6 +153,22 @@ class AppSettings:
         False,
     )
     integration_maps_enabled: bool = _get_bool("SP_INTEGRATION_MAPS_ENABLED", False)
+    security_rate_limit_enabled: bool = _get_bool("SP_SECURITY_RATE_LIMIT_ENABLED", True)
+    security_rate_limit_window_seconds: int = _get_int("SP_SECURITY_RATE_LIMIT_WINDOW_SECONDS", 300)
+    security_rate_limit_auth_refresh_max: int = _get_int("SP_SECURITY_RATE_LIMIT_AUTH_REFRESH_MAX", 30)
+    security_rate_limit_document_download_max: int = _get_int(
+        "SP_SECURITY_RATE_LIMIT_DOCUMENT_DOWNLOAD_MAX",
+        60,
+    )
+    security_rate_limit_report_export_max: int = _get_int("SP_SECURITY_RATE_LIMIT_REPORT_EXPORT_MAX", 20)
+
+    @property
+    def allowed_origins_list(self) -> tuple[str, ...]:
+        return tuple(
+            origin.strip()
+            for origin in self.allowed_origins.split(",")
+            if origin.strip()
+        )
 
     @property
     def database_url(self) -> str:

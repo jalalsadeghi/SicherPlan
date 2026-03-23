@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.errors import ApiException
+from app.modules.core.config_seed import seed_default_tenant_settings
 from app.modules.core.lookup_seed import seed_lookup_values
 from app.modules.core.models import Branch, Mandate, Tenant, TenantSetting
 from app.modules.core.schemas import (
@@ -84,6 +85,13 @@ class SqlAlchemyCoreAdminRepository:
                 )
             )
         self.session.add_all(settings)
+        self.session.flush()
+
+        seed_default_tenant_settings(
+            self.session,
+            tenant_id=tenant.id,
+            actor_user_id=actor_user_id,
+        )
 
         seed_lookup_values(
             self.session,

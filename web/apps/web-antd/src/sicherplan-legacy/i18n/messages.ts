@@ -61,6 +61,127 @@ export type MessageKey =
   | "route.portal.customer.description"
   | "route.portal.subcontractor.title"
   | "route.portal.subcontractor.description"
+  | "portalSubcontractor.eyebrow"
+  | "portalSubcontractor.title"
+  | "portalSubcontractor.lead"
+  | "portalSubcontractor.login.tenantCode"
+  | "portalSubcontractor.login.identifier"
+  | "portalSubcontractor.login.password"
+  | "portalSubcontractor.login.deviceLabel"
+  | "portalSubcontractor.actions.login"
+  | "portalSubcontractor.actions.refresh"
+  | "portalSubcontractor.actions.logout"
+  | "portalSubcontractor.loading.title"
+  | "portalSubcontractor.loading.body"
+  | "portalSubcontractor.empty.title"
+  | "portalSubcontractor.empty.body"
+  | "portalSubcontractor.unauthorized.title"
+  | "portalSubcontractor.unauthorized.body"
+  | "portalSubcontractor.deactivated.title"
+  | "portalSubcontractor.deactivated.body"
+  | "portalSubcontractor.summary.title"
+  | "portalSubcontractor.summary.companyNumber"
+  | "portalSubcontractor.summary.companyName"
+  | "portalSubcontractor.summary.contact"
+  | "portalSubcontractor.summary.email"
+  | "portalSubcontractor.summary.function"
+  | "portalSubcontractor.summary.scope"
+  | "portalSubcontractor.readOnly.title"
+  | "portalSubcontractor.readOnly.body"
+  | "portalSubcontractor.meta.releasedOnly"
+  | "portalSubcontractor.meta.subcontractorScoped"
+  | "portalSubcontractor.meta.noFakeData"
+  | "portalSubcontractor.meta.sourceModule"
+  | "portalSubcontractor.states.loading"
+  | "portalSubcontractor.states.empty"
+  | "portalSubcontractor.states.ready"
+  | "portalSubcontractor.states.pending"
+  | "portalSubcontractor.datasets.positions.eyebrow"
+  | "portalSubcontractor.datasets.positions.title"
+  | "portalSubcontractor.datasets.positions.lead"
+  | "portalSubcontractor.datasets.positions.pending"
+  | "portalSubcontractor.datasets.schedules.eyebrow"
+  | "portalSubcontractor.datasets.schedules.title"
+  | "portalSubcontractor.datasets.schedules.lead"
+  | "portalSubcontractor.datasets.schedules.pending"
+  | "portalSubcontractor.datasets.actuals.eyebrow"
+  | "portalSubcontractor.datasets.actuals.title"
+  | "portalSubcontractor.datasets.actuals.lead"
+  | "portalSubcontractor.datasets.actuals.pending"
+  | "portalSubcontractor.datasets.attendance.eyebrow"
+  | "portalSubcontractor.datasets.attendance.title"
+  | "portalSubcontractor.datasets.attendance.lead"
+  | "portalSubcontractor.datasets.attendance.pending"
+  | "portalSubcontractor.datasets.invoiceChecks.eyebrow"
+  | "portalSubcontractor.datasets.invoiceChecks.title"
+  | "portalSubcontractor.datasets.invoiceChecks.lead"
+  | "portalSubcontractor.datasets.invoiceChecks.pending"
+  | "portalSubcontractor.datasets.watchbooks.eyebrow"
+  | "portalSubcontractor.datasets.watchbooks.title"
+  | "portalSubcontractor.datasets.watchbooks.lead"
+  | "portalSubcontractor.datasets.watchbooks.pending"
+  | "portalSubcontractor.watchbooks.fields.watchbook"
+  | "portalSubcontractor.watchbooks.fields.note"
+  | "portalSubcontractor.watchbooks.fields.notePlaceholder"
+  | "portalSubcontractor.watchbooks.actions.submit"
+  | "portalSubcontractor.allocation.eyebrow"
+  | "portalSubcontractor.allocation.title"
+  | "portalSubcontractor.allocation.lead"
+  | "portalSubcontractor.allocation.position"
+  | "portalSubcontractor.allocation.worker"
+  | "portalSubcontractor.allocation.action"
+  | "portalSubcontractor.allocation.preview"
+  | "portalSubcontractor.allocation.submit"
+  | "portalSubcontractor.allocation.noPositions"
+  | "portalSubcontractor.allocation.noWorkers"
+  | "portalSubcontractor.allocation.pendingPlanning"
+  | "portalSubcontractor.allocation.validationTitle"
+  | "portalSubcontractor.allocation.resultTitle"
+  | "portalSubcontractor.allocation.command.assign"
+  | "portalSubcontractor.allocation.command.confirm"
+  | "portalSubcontractor.allocation.command.reassign"
+  | "portalSubcontractor.allocation.command.unassign"
+  | "portalSubcontractor.allocation.readiness.ready"
+  | "portalSubcontractor.allocation.readiness.ready_with_warnings"
+  | "portalSubcontractor.allocation.readiness.not_ready"
+  | "portalSubcontractor.allocation.status.ready_for_submit"
+  | "portalSubcontractor.allocation.status.confirmed"
+  | "portalSubcontractor.allocation.status.blocked_by_validation"
+  | "portalSubcontractor.allocation.status.planning_contract_unavailable"
+  | "portalSubcontractor.workforce.lead"
+  | "portalSubcontractor.workforce.boundary"
+  | "portalSubcontractor.workforce.workerList"
+  | "portalSubcontractor.workforce.empty"
+  | "portalSubcontractor.workforce.editTitle"
+  | "portalSubcontractor.workforce.saveWorker"
+  | "portalSubcontractor.workforce.qualificationsTitle"
+  | "portalSubcontractor.workforce.noQualifications"
+  | "portalSubcontractor.workforce.qualificationEditor"
+  | "portalSubcontractor.workforce.qualificationType"
+  | "portalSubcontractor.workforce.saveQualification"
+  | "portalSubcontractor.workforce.proofsTitle"
+  | "portalSubcontractor.workforce.noProofs"
+  | "portalSubcontractor.workforce.uploadProof"
+  | "portalSubcontractor.feedback.authRequired"
+  | "portalSubcontractor.feedback.invalidCredentials"
+  | "portalSubcontractor.feedback.permissionDenied"
+  | "portalSubcontractor.feedback.scopeNotResolved"
+  | "portalSubcontractor.feedback.contactNotLinked"
+  | "portalSubcontractor.feedback.contactPortalDisabled"
+  | "portalSubcontractor.feedback.contactInactive"
+  | "portalSubcontractor.feedback.companyInactive"
+  | "portalSubcontractor.feedback.invoiceCheckNotFound"
+  | "portalSubcontractor.feedback.sessionReady"
+  | "portalSubcontractor.feedback.loggedOut"
+  | "portalSubcontractor.feedback.watchbookEntrySubmitted"
+  | "portalSubcontractor.feedback.watchbookWriteDenied"
+  | "portalSubcontractor.feedback.watchbookClosed"
+  | "portalSubcontractor.feedback.allocationPositionNotFound"
+  | "portalSubcontractor.feedback.allocationWorkerNotFound"
+  | "portalSubcontractor.feedback.allocationPlanningUnavailable"
+  | "portalSubcontractor.feedback.allocationBlocked"
+  | "portalSubcontractor.feedback.allocationSubmitted"
+  | "portalSubcontractor.feedback.error"
   | "portalCustomer.eyebrow"
   | "portalCustomer.title"
   | "portalCustomer.lead"
@@ -114,10 +235,19 @@ export type MessageKey =
   | "portalCustomer.datasets.watchbooks.title"
   | "portalCustomer.datasets.watchbooks.lead"
   | "portalCustomer.datasets.watchbooks.pending"
+  | "portalCustomer.watchbooks.fields.watchbook"
+  | "portalCustomer.watchbooks.fields.note"
+  | "portalCustomer.watchbooks.fields.notePlaceholder"
+  | "portalCustomer.watchbooks.actions.submit"
   | "portalCustomer.datasets.timesheets.eyebrow"
   | "portalCustomer.datasets.timesheets.title"
   | "portalCustomer.datasets.timesheets.lead"
   | "portalCustomer.datasets.timesheets.pending"
+  | "portalCustomer.datasets.invoices.eyebrow"
+  | "portalCustomer.datasets.invoices.title"
+  | "portalCustomer.datasets.invoices.lead"
+  | "portalCustomer.datasets.invoices.pending"
+  | "portalCustomer.actions.download"
   | "portalCustomer.datasets.reports.eyebrow"
   | "portalCustomer.datasets.reports.title"
   | "portalCustomer.datasets.reports.lead"
@@ -131,6 +261,10 @@ export type MessageKey =
   | "portalCustomer.feedback.customerInactive"
   | "portalCustomer.feedback.sessionReady"
   | "portalCustomer.feedback.loggedOut"
+  | "portalCustomer.feedback.watchbookEntrySubmitted"
+  | "portalCustomer.feedback.watchbookWriteDenied"
+  | "portalCustomer.feedback.watchbookClosed"
+  | "portalCustomer.feedback.financeDocumentDenied"
   | "portalCustomer.feedback.error"
   | "recruitingApplicant.eyebrow"
   | "recruitingApplicant.title"
@@ -300,6 +434,21 @@ export type MessageKey =
   | "employeeAdmin.detail.emptyTitle"
   | "employeeAdmin.detail.emptyEyebrow"
   | "employeeAdmin.detail.emptyBody"
+  | "employeeAdmin.form.eyebrow"
+  | "employeeAdmin.form.title"
+  | "employeeAdmin.form.lead"
+  | "employeeAdmin.form.identityEyebrow"
+  | "employeeAdmin.form.identityTitle"
+  | "employeeAdmin.form.contactEyebrow"
+  | "employeeAdmin.form.contactTitle"
+  | "employeeAdmin.form.assignmentEyebrow"
+  | "employeeAdmin.form.assignmentTitle"
+  | "employeeAdmin.form.accessEyebrow"
+  | "employeeAdmin.form.accessTitle"
+  | "employeeAdmin.form.notesEyebrow"
+  | "employeeAdmin.form.notesTitle"
+  | "employeeAdmin.form.actionsEyebrow"
+  | "employeeAdmin.form.actionsTitle"
   | "employeeAdmin.filters.search"
   | "employeeAdmin.filters.searchPlaceholder"
   | "employeeAdmin.filters.status"
@@ -939,6 +1088,170 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "route.portal.subcontractor.title": "Subunternehmerportal",
     "route.portal.subcontractor.description":
       "Freigegebene Einsaetze, Mitarbeitende und Rueckmeldungen im freigegebenen Umfang.",
+    "portalSubcontractor.eyebrow": "Partnerzugang",
+    "portalSubcontractor.title": "Subunternehmerportal und Scope-Pruefung",
+    "portalSubcontractor.lead":
+      "Dieser Einstieg nutzt die gemeinsame IAM-Sitzung und loest den Partnerkontext ausschliesslich ueber Rollen-Scope und den verknuepften Subunternehmerkontakt auf.",
+    "portalSubcontractor.login.tenantCode": "Mandantencode",
+    "portalSubcontractor.login.identifier": "Benutzername oder E-Mail",
+    "portalSubcontractor.login.password": "Passwort",
+    "portalSubcontractor.login.deviceLabel": "Geraetebezeichnung",
+    "portalSubcontractor.actions.login": "Im Portal anmelden",
+    "portalSubcontractor.actions.refresh": "Portalstatus neu laden",
+    "portalSubcontractor.actions.logout": "Abmelden",
+    "portalSubcontractor.loading.title": "Portalzugriff wird geprueft",
+    "portalSubcontractor.loading.body":
+      "Die Sitzung und der zugeordnete Subunternehmerkontext werden gegen die gemeinsame IAM- und Partnerverknuepfung verifiziert.",
+    "portalSubcontractor.empty.title": "Kein freigegebener Partnerkontext",
+    "portalSubcontractor.empty.body":
+      "Dem aktuellen Portalkonto ist kein nutzbarer Subunternehmer-Scope zugeordnet oder die Verknuepfung ist unvollstaendig.",
+    "portalSubcontractor.unauthorized.title": "Portalzugriff nicht erlaubt",
+    "portalSubcontractor.unauthorized.body":
+      "Dieses Konto darf das Subunternehmerportal nicht verwenden oder besitzt aktuell nicht die noetigen Berechtigungen.",
+    "portalSubcontractor.deactivated.title": "Portalzugriff deaktiviert",
+    "portalSubcontractor.deactivated.body":
+      "Der verknuepfte Subunternehmerkontakt oder das zugeordnete Partnerunternehmen ist deaktiviert bzw. nicht fuer das Portal freigegeben.",
+    "portalSubcontractor.summary.title": "Aufgeloester Partnerkontext",
+    "portalSubcontractor.summary.companyNumber": "Partnernummer",
+    "portalSubcontractor.summary.companyName": "Unternehmen",
+    "portalSubcontractor.summary.contact": "Portal-Kontakt",
+    "portalSubcontractor.summary.email": "E-Mail",
+    "portalSubcontractor.summary.function": "Funktion",
+    "portalSubcontractor.summary.scope": "Erlaubter Partner-Scope",
+    "portalSubcontractor.readOnly.title": "Nur freigegebene Partneransichten",
+    "portalSubcontractor.readOnly.body":
+      "Dieses Portal zeigt nur freigegebene, partnerbezogene Ansichten. Noch nicht umgesetzte Quellmodule bleiben als explizite Leerstelle sichtbar.",
+    "portalSubcontractor.meta.releasedOnly": "Es werden nur freigegebene Inhalte angezeigt.",
+    "portalSubcontractor.meta.subcontractorScoped": "Jede Abfrage bleibt auf den aktuellen Subunternehmer-Scope begrenzt.",
+    "portalSubcontractor.meta.noFakeData":
+      "Nicht implementierte Freigaben werden als ehrlicher Pending-Zustand gezeigt, nicht als Mock-Daten.",
+    "portalSubcontractor.meta.sourceModule": "Quellmodul",
+    "portalSubcontractor.states.loading": "Laden",
+    "portalSubcontractor.states.empty": "Leer",
+    "portalSubcontractor.states.ready": "Freigegeben",
+    "portalSubcontractor.states.pending": "Ausstehend",
+    "portalSubcontractor.datasets.positions.eyebrow": "Positionen",
+    "portalSubcontractor.datasets.positions.title": "Freigegebene Positionen und Abrufe",
+    "portalSubcontractor.datasets.positions.lead":
+      "Nur explizit freigegebene Positionen oder Abrufe fuer den aktuellen Partner-Scope erscheinen hier.",
+    "portalSubcontractor.datasets.positions.pending":
+      "Es sind noch keine freigegebenen Positionsdaten aus der Planung angebunden.",
+    "portalSubcontractor.datasets.schedules.eyebrow": "Plaene",
+    "portalSubcontractor.datasets.schedules.title": "Freigegebene Einsatzplaene",
+    "portalSubcontractor.datasets.schedules.lead":
+      "Freigegebene Zeitfenster und Schichtplaene fuer den Partner werden hier als Lesesicht angezeigt.",
+    "portalSubcontractor.datasets.schedules.pending":
+      "Es sind noch keine freigegebenen Einsatzplaene fuer dieses Portal verfuegbar.",
+    "portalSubcontractor.datasets.actuals.eyebrow": "Ist-Status",
+    "portalSubcontractor.datasets.actuals.title": "Ist-Stunden und Statuszusammenfassungen",
+    "portalSubcontractor.datasets.actuals.lead":
+      "Bestaetigte Zeiten und partnerrelevante Ist-Statusdaten werden hier angezeigt, sobald die Finance-Leseschicht verfuegbar ist.",
+    "portalSubcontractor.datasets.actuals.pending":
+      "Es sind noch keine freigegebenen Ist-Zusammenfassungen aus Finance verfuegbar.",
+    "portalSubcontractor.datasets.attendance.eyebrow": "Anwesenheit",
+    "portalSubcontractor.datasets.attendance.title": "Anwesenheits- und Rueckmeldestatus",
+    "portalSubcontractor.datasets.attendance.lead":
+      "Partnerrelevante Anwesenheits- und Rueckmeldedaten werden hier nur nach Freigabe der operativen Lesemodelle sichtbar.",
+    "portalSubcontractor.datasets.attendance.pending":
+      "Es sind noch keine freigegebenen Anwesenheitsdaten fuer das Portal verfuegbar.",
+    "portalSubcontractor.datasets.invoiceChecks.eyebrow": "Rechnungspruefung",
+    "portalSubcontractor.datasets.invoiceChecks.title": "Status der Rechnungspruefung",
+    "portalSubcontractor.datasets.invoiceChecks.lead":
+      "Partnerrelevante Rechnungspruefstaende und Differenzhinweise werden hier spaeter aus Finance eingeblendet.",
+    "portalSubcontractor.datasets.invoiceChecks.pending":
+      "Es sind noch keine freigegebenen Rechnungspruefstaende fuer das Portal verfuegbar.",
+    "portalSubcontractor.datasets.watchbooks.eyebrow": "Wachbuch",
+    "portalSubcontractor.datasets.watchbooks.title": "Freigegebene Wachbuecher",
+    "portalSubcontractor.datasets.watchbooks.lead":
+      "Freigegebene Wachbuchauszuege bleiben auf den aktuellen Nachunternehmerkontext eingeschraenkt und erlauben nur opt-in Beteiligung.",
+    "portalSubcontractor.datasets.watchbooks.pending":
+      "Es sind noch keine freigegebenen Wachbuecher fuer dieses Nachunternehmerportal verfuegbar.",
+    "portalSubcontractor.watchbooks.fields.watchbook": "Wachbuch",
+    "portalSubcontractor.watchbooks.fields.note": "Eintrag",
+    "portalSubcontractor.watchbooks.fields.notePlaceholder":
+      "Kurze Rueckmeldung oder ergaenzende Notiz fuer das freigegebene Wachbuch erfassen.",
+    "portalSubcontractor.watchbooks.actions.submit": "Eintrag speichern",
+    "portalSubcontractor.allocation.eyebrow": "Selbstdisposition",
+    "portalSubcontractor.allocation.title": "Eigene Mitarbeitende auf freigegebene Positionen disponieren",
+    "portalSubcontractor.allocation.lead":
+      "Die Auswahl bleibt auf eigene Partner-Mitarbeitende begrenzt. Solange die Planungsfreigabe noch nicht angebunden ist, zeigt das Portal nur Vorschau und ehrliche Validierungsgruende.",
+    "portalSubcontractor.allocation.position": "Freigegebene Position",
+    "portalSubcontractor.allocation.worker": "Eigener Mitarbeitender",
+    "portalSubcontractor.allocation.action": "Aktion",
+    "portalSubcontractor.allocation.preview": "Validierung pruefen",
+    "portalSubcontractor.allocation.submit": "Disposition bestaetigen",
+    "portalSubcontractor.allocation.noPositions":
+      "Es gibt noch keine freigegebenen Positionen fuer die Selbstdisposition in diesem Portal.",
+    "portalSubcontractor.allocation.noWorkers":
+      "Es sind keine aktiven eigenen Mitarbeitenden fuer die Selbstdisposition verfuegbar.",
+    "portalSubcontractor.allocation.pendingPlanning":
+      "Die Planungsfreigabe fuer echte Zuweisungen ist in diesem Branch noch nicht angebunden. Vorschau und Ergebnis bleiben deshalb explizit unverbindlich.",
+    "portalSubcontractor.allocation.validationTitle": "Validierungsfeedback",
+    "portalSubcontractor.allocation.resultTitle": "Letztes Kommandergebnis",
+    "portalSubcontractor.allocation.command.assign": "Zuweisen",
+    "portalSubcontractor.allocation.command.confirm": "Teilnahme bestaetigen",
+    "portalSubcontractor.allocation.command.reassign": "Umbesetzen",
+    "portalSubcontractor.allocation.command.unassign": "Zuweisung loesen",
+    "portalSubcontractor.allocation.readiness.ready": "bereit",
+    "portalSubcontractor.allocation.readiness.ready_with_warnings": "bereit mit Hinweisen",
+    "portalSubcontractor.allocation.readiness.not_ready": "nicht bereit",
+    "portalSubcontractor.allocation.status.ready_for_submit": "bereit zur Uebernahme",
+    "portalSubcontractor.allocation.status.confirmed": "Disposition bestaetigt",
+    "portalSubcontractor.allocation.status.blocked_by_validation": "durch Validierung blockiert",
+    "portalSubcontractor.allocation.status.planning_contract_unavailable": "Planungsschnittstelle noch nicht verfuegbar",
+    "portalSubcontractor.workforce.lead":
+      "Portalnutzende pflegen nur eigene Mitarbeitende und deren Nachweise. Interne Finanz-, Audit- und Admin-Felder bleiben ausgeblendet.",
+    "portalSubcontractor.workforce.boundary":
+      "Diese Selbstbedienungsansicht ist strikt auf den verknuepften Subunternehmer und dessen eigene Mitarbeitende begrenzt.",
+    "portalSubcontractor.workforce.workerList": "Eigene Mitarbeitende",
+    "portalSubcontractor.workforce.empty": "Es sind noch keine eigenen Mitarbeitenden im Portal erfasst.",
+    "portalSubcontractor.workforce.editTitle": "Mitarbeitendenstammdaten bearbeiten",
+    "portalSubcontractor.workforce.saveWorker": "Mitarbeitenden speichern",
+    "portalSubcontractor.workforce.qualificationsTitle": "Qualifikationen und Nachweise",
+    "portalSubcontractor.workforce.noQualifications": "Es sind noch keine Qualifikationen fuer diesen Mitarbeitenden hinterlegt.",
+    "portalSubcontractor.workforce.qualificationEditor": "Qualifikation pflegen",
+    "portalSubcontractor.workforce.qualificationType": "Qualifikationstyp",
+    "portalSubcontractor.workforce.saveQualification": "Qualifikation speichern",
+    "portalSubcontractor.workforce.proofsTitle": "Nachweise",
+    "portalSubcontractor.workforce.noProofs": "Es sind noch keine Nachweise fuer diese Qualifikation hinterlegt.",
+    "portalSubcontractor.workforce.uploadProof": "Nachweis hochladen",
+    "portalSubcontractor.feedback.authRequired": "Bitte melden Sie sich zuerst mit einem gueltigen Portalkonto an.",
+    "portalSubcontractor.feedback.invalidCredentials": "Die Anmeldedaten sind ungueltig.",
+    "portalSubcontractor.feedback.permissionDenied":
+      "Das aktuelle Konto besitzt keinen erlaubten Zugriff auf das Subunternehmerportal.",
+    "portalSubcontractor.feedback.scopeNotResolved":
+      "Der Partner-Scope dieses Portalkontos konnte nicht eindeutig aufgeloest werden.",
+    "portalSubcontractor.feedback.contactNotLinked":
+      "Dem aktuellen Portalkonto ist kein aktiver Subunternehmerkontakt zugeordnet.",
+    "portalSubcontractor.feedback.contactPortalDisabled":
+      "Der verknuepfte Subunternehmerkontakt ist nicht fuer das Portal freigegeben.",
+    "portalSubcontractor.feedback.contactInactive":
+      "Der verknuepfte Subunternehmerkontakt ist nicht mehr aktiv.",
+    "portalSubcontractor.feedback.companyInactive":
+      "Das verknuepfte Partnerunternehmen ist nicht mehr aktiv.",
+    "portalSubcontractor.feedback.invoiceCheckNotFound":
+      "Die freigegebene Partner-Rechnungspruefung konnte nicht gefunden werden.",
+    "portalSubcontractor.feedback.sessionReady":
+      "Die Portalsitzung wurde erfolgreich geladen und auf den Partnerkontext eingegrenzt.",
+    "portalSubcontractor.feedback.loggedOut": "Die Portalsitzung wurde abgemeldet.",
+    "portalSubcontractor.feedback.watchbookEntrySubmitted":
+      "Der Wachbucheintrag wurde im freigegebenen Nachunternehmerkontext gespeichert.",
+    "portalSubcontractor.feedback.watchbookWriteDenied":
+      "Fuer dieses Wachbuch ist keine Nachunternehmerbeteiligung freigegeben.",
+    "portalSubcontractor.feedback.watchbookClosed":
+      "Das ausgewaehlte Wachbuch ist bereits geschlossen.",
+    "portalSubcontractor.feedback.allocationPositionNotFound":
+      "Die freigegebene Position konnte fuer diesen Partner-Scope nicht gefunden werden.",
+    "portalSubcontractor.feedback.allocationWorkerNotFound":
+      "Der ausgewaehlte Mitarbeitende gehoert nicht zum aktuellen Partner-Scope.",
+    "portalSubcontractor.feedback.allocationPlanningUnavailable":
+      "Die Planungsfreigabe fuer echte Dispositionen ist noch nicht angebunden.",
+    "portalSubcontractor.feedback.allocationBlocked":
+      "Die Disposition ist durch Validierungsfehler blockiert.",
+    "portalSubcontractor.feedback.allocationSubmitted":
+      "Die Disposition wurde ueber die Planungsschnittstelle bestaetigt.",
+    "portalSubcontractor.feedback.error":
+      "Der Zugriff auf das Subunternehmerportal konnte nicht geladen werden.",
     "portalCustomer.eyebrow": "Kundenzugang",
     "portalCustomer.title": "Kundenportal und Scope-Pruefung",
     "portalCustomer.lead":
@@ -1006,12 +1319,24 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Wachbuch- und Einsatzereignisse erscheinen erst nach Umsetzung des Feldeinsatz-Backbones im freigegebenen Umfang.",
     "portalCustomer.datasets.watchbooks.pending":
       "Es sind noch keine freigegebenen Wachbuchereignisse fuer das Kundenportal verfuegbar.",
+    "portalCustomer.watchbooks.fields.watchbook": "Wachbuch",
+    "portalCustomer.watchbooks.fields.note": "Rueckmeldung",
+    "portalCustomer.watchbooks.fields.notePlaceholder":
+      "Rueckmeldung oder Kundenhinweis fuer das freigegebene Wachbuch erfassen.",
+    "portalCustomer.watchbooks.actions.submit": "Rueckmeldung speichern",
     "portalCustomer.datasets.timesheets.eyebrow": "Zeiten",
     "portalCustomer.datasets.timesheets.title": "Freigegebene Stundennachweise",
     "portalCustomer.datasets.timesheets.lead":
       "Stundennachweise bleiben dokumentzentriert und werden spaeter ueber die Finanzbruecke und den Dokumentdienst veroeffentlicht.",
     "portalCustomer.datasets.timesheets.pending":
       "Freigegebene Stundennachweise sind noch nicht an das Portal angebunden.",
+    "portalCustomer.datasets.invoices.eyebrow": "Rechnungen",
+    "portalCustomer.datasets.invoices.title": "Freigegebene Kundenrechnungen",
+    "portalCustomer.datasets.invoices.lead":
+      "Kundenrechnungen erscheinen nur nach Freigabe, mit begrenztem Status, Faelligkeit und dokumentzentriertem Download.",
+    "portalCustomer.datasets.invoices.pending":
+      "Freigegebene Kundenrechnungen sind noch nicht an das Portal angebunden.",
+    "portalCustomer.actions.download": "Dokument laden",
     "portalCustomer.datasets.reports.eyebrow": "Berichte",
     "portalCustomer.datasets.reports.title": "Freigegebene Berichts- und Ergebnispakete",
     "portalCustomer.datasets.reports.lead":
@@ -1033,6 +1358,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalCustomer.feedback.sessionReady":
       "Die Portalsitzung wurde erfolgreich geladen und auf den Kundenkontext eingeschraenkt.",
     "portalCustomer.feedback.loggedOut": "Die Portalsitzung wurde beendet.",
+    "portalCustomer.feedback.watchbookEntrySubmitted":
+      "Die Rueckmeldung wurde dem freigegebenen Wachbuch hinzugefuegt.",
+    "portalCustomer.feedback.watchbookWriteDenied":
+      "Fuer dieses Wachbuch ist keine Kundenbeteiligung freigegeben.",
+    "portalCustomer.feedback.watchbookClosed":
+      "Das ausgewaehlte Wachbuch ist bereits geschlossen.",
+    "portalCustomer.feedback.financeDocumentDenied":
+      "Das angeforderte Finanzdokument ist fuer dieses Portal-Konto nicht freigegeben.",
     "portalCustomer.feedback.error":
       "Der Kundenportalzugriff konnte nicht geladen werden.",
     "recruitingApplicant.eyebrow": "Bewerbung",
@@ -1251,6 +1584,22 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.detail.emptyEyebrow": "Detailansicht",
     "employeeAdmin.detail.emptyBody":
       "Waehlen Sie links eine Mitarbeitendenakte aus oder legen Sie eine neue an.",
+    "employeeAdmin.form.eyebrow": "Datei",
+    "employeeAdmin.form.title": "Strukturierte Mitarbeitendenakte",
+    "employeeAdmin.form.lead":
+      "Die Mitarbeitendenakte ist in klare Pflegebereiche gegliedert, damit Stammdaten, Zuordnung und Zugangskopplung schneller erfasst werden koennen.",
+    "employeeAdmin.form.identityEyebrow": "Grunddaten",
+    "employeeAdmin.form.identityTitle": "Identitaet und Personalnummer",
+    "employeeAdmin.form.contactEyebrow": "Kontakt",
+    "employeeAdmin.form.contactTitle": "Dienstliche Kontaktwege",
+    "employeeAdmin.form.assignmentEyebrow": "Zuordnung",
+    "employeeAdmin.form.assignmentTitle": "Niederlassung, Mandat und Beschaeftigungsdaten",
+    "employeeAdmin.form.accessEyebrow": "Verknuepfung",
+    "employeeAdmin.form.accessTitle": "App- und Benutzerkonto-Zuordnung",
+    "employeeAdmin.form.notesEyebrow": "Notizen",
+    "employeeAdmin.form.notesTitle": "Operative Hinweise",
+    "employeeAdmin.form.actionsEyebrow": "Aktion",
+    "employeeAdmin.form.actionsTitle": "Akte speichern oder zuruecksetzen",
     "employeeAdmin.filters.search": "Suche",
     "employeeAdmin.filters.searchPlaceholder": "Personalnummer, Name oder E-Mail",
     "employeeAdmin.filters.status": "Status",
@@ -1961,6 +2310,171 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "route.portal.subcontractor.title": "Subcontractor portal",
     "route.portal.subcontractor.description":
       "Released assignments, workers, and feedback within released scope.",
+    "portalSubcontractor.eyebrow": "Partner access",
+    "portalSubcontractor.title": "Subcontractor portal and scope validation",
+    "portalSubcontractor.lead":
+      "This entry point uses the shared IAM session and resolves partner context only from role scopes and the linked subcontractor contact.",
+    "portalSubcontractor.login.tenantCode": "Tenant code",
+    "portalSubcontractor.login.identifier": "Username or email",
+    "portalSubcontractor.login.password": "Password",
+    "portalSubcontractor.login.deviceLabel": "Device label",
+    "portalSubcontractor.actions.login": "Sign in to portal",
+    "portalSubcontractor.actions.refresh": "Reload portal status",
+    "portalSubcontractor.actions.logout": "Sign out",
+    "portalSubcontractor.loading.title": "Validating portal access",
+    "portalSubcontractor.loading.body":
+      "The session and linked subcontractor context are being verified against the shared IAM and partner linkage.",
+    "portalSubcontractor.empty.title": "No released partner context",
+    "portalSubcontractor.empty.body":
+      "The current portal account has no usable subcontractor scope or the linkage is incomplete.",
+    "portalSubcontractor.unauthorized.title": "Portal access is not allowed",
+    "portalSubcontractor.unauthorized.body":
+      "This account is not allowed to use the subcontractor portal or does not currently hold the required permissions.",
+    "portalSubcontractor.deactivated.title": "Portal access is deactivated",
+    "portalSubcontractor.deactivated.body":
+      "The linked subcontractor contact or company is inactive or no longer released for portal use.",
+    "portalSubcontractor.summary.title": "Resolved partner context",
+    "portalSubcontractor.summary.companyNumber": "Partner number",
+    "portalSubcontractor.summary.companyName": "Company",
+    "portalSubcontractor.summary.contact": "Portal contact",
+    "portalSubcontractor.summary.email": "Email",
+    "portalSubcontractor.summary.function": "Function",
+    "portalSubcontractor.summary.scope": "Allowed partner scope",
+    "portalSubcontractor.readOnly.title": "Released partner views only",
+    "portalSubcontractor.readOnly.body":
+      "This portal shows only released subcontractor-scoped views. Source modules that are not implemented yet stay visible as explicit pending states.",
+    "portalSubcontractor.meta.releasedOnly": "Only released content is shown.",
+    "portalSubcontractor.meta.subcontractorScoped":
+      "Every query remains restricted to the current subcontractor scope.",
+    "portalSubcontractor.meta.noFakeData":
+      "Unimplemented released views stay visible as honest pending states instead of mock data.",
+    "portalSubcontractor.meta.sourceModule": "Source module",
+    "portalSubcontractor.states.loading": "Loading",
+    "portalSubcontractor.states.empty": "Empty",
+    "portalSubcontractor.states.ready": "Released",
+    "portalSubcontractor.states.pending": "Pending",
+    "portalSubcontractor.datasets.positions.eyebrow": "Positions",
+    "portalSubcontractor.datasets.positions.title": "Released positions and call-offs",
+    "portalSubcontractor.datasets.positions.lead":
+      "Only positions or call-offs explicitly released to the current partner scope appear here.",
+    "portalSubcontractor.datasets.positions.pending":
+      "No released position data from planning is connected yet.",
+    "portalSubcontractor.datasets.schedules.eyebrow": "Schedules",
+    "portalSubcontractor.datasets.schedules.title": "Released work schedules",
+    "portalSubcontractor.datasets.schedules.lead":
+      "Released time windows and shift schedules for the partner appear here as a read-only view.",
+    "portalSubcontractor.datasets.schedules.pending":
+      "No released schedules are available for this portal yet.",
+    "portalSubcontractor.datasets.actuals.eyebrow": "Actuals",
+    "portalSubcontractor.datasets.actuals.title": "Actual hours and status summaries",
+    "portalSubcontractor.datasets.actuals.lead":
+      "Confirmed time and partner-relevant actual-status data will appear here once the finance read layer exists.",
+    "portalSubcontractor.datasets.actuals.pending":
+      "No released actual summaries from finance are available yet.",
+    "portalSubcontractor.datasets.attendance.eyebrow": "Attendance",
+    "portalSubcontractor.datasets.attendance.title": "Attendance and response status",
+    "portalSubcontractor.datasets.attendance.lead":
+      "Partner-visible attendance and response data appear here only after the operational read models are released.",
+    "portalSubcontractor.datasets.attendance.pending":
+      "No released attendance data is available for the portal yet.",
+    "portalSubcontractor.datasets.invoiceChecks.eyebrow": "Invoice checks",
+    "portalSubcontractor.datasets.invoiceChecks.title": "Invoice-check status",
+    "portalSubcontractor.datasets.invoiceChecks.lead":
+      "Partner-visible invoice-check states and variance hints will appear here later from finance.",
+    "portalSubcontractor.datasets.invoiceChecks.pending":
+      "No released invoice-check states are available for the portal yet.",
+    "portalSubcontractor.datasets.watchbooks.eyebrow": "Watchbook",
+    "portalSubcontractor.datasets.watchbooks.title": "Released watchbooks",
+    "portalSubcontractor.datasets.watchbooks.lead":
+      "Released watchbook excerpts stay restricted to the current subcontractor context and allow opt-in participation only.",
+    "portalSubcontractor.datasets.watchbooks.pending":
+      "No released watchbooks are available for this subcontractor portal yet.",
+    "portalSubcontractor.watchbooks.fields.watchbook": "Watchbook",
+    "portalSubcontractor.watchbooks.fields.note": "Entry",
+    "portalSubcontractor.watchbooks.fields.notePlaceholder":
+      "Add a short response or supplemental note for the released watchbook.",
+    "portalSubcontractor.watchbooks.actions.submit": "Save entry",
+    "portalSubcontractor.allocation.eyebrow": "Self-allocation",
+    "portalSubcontractor.allocation.title": "Allocate own workers to released positions",
+    "portalSubcontractor.allocation.lead":
+      "Selection stays limited to own partner workers. Until the planning release contract is wired, the portal shows preview feedback and explicit non-binding results only.",
+    "portalSubcontractor.allocation.position": "Released position",
+    "portalSubcontractor.allocation.worker": "Own worker",
+    "portalSubcontractor.allocation.action": "Action",
+    "portalSubcontractor.allocation.preview": "Check validation",
+    "portalSubcontractor.allocation.submit": "Confirm allocation",
+    "portalSubcontractor.allocation.noPositions":
+      "There are no released positions available for self-allocation in this portal yet.",
+    "portalSubcontractor.allocation.noWorkers":
+      "There are no active own workers available for self-allocation.",
+    "portalSubcontractor.allocation.pendingPlanning":
+      "The planning release contract for real assignments is not wired on this branch yet. Preview and submit therefore remain explicitly non-binding.",
+    "portalSubcontractor.allocation.validationTitle": "Validation feedback",
+    "portalSubcontractor.allocation.resultTitle": "Latest command result",
+    "portalSubcontractor.allocation.command.assign": "Assign",
+    "portalSubcontractor.allocation.command.confirm": "Confirm participation",
+    "portalSubcontractor.allocation.command.reassign": "Reassign",
+    "portalSubcontractor.allocation.command.unassign": "Unassign",
+    "portalSubcontractor.allocation.readiness.ready": "ready",
+    "portalSubcontractor.allocation.readiness.ready_with_warnings": "ready with warnings",
+    "portalSubcontractor.allocation.readiness.not_ready": "not ready",
+    "portalSubcontractor.allocation.status.ready_for_submit": "ready for submission",
+    "portalSubcontractor.allocation.status.confirmed": "allocation confirmed",
+    "portalSubcontractor.allocation.status.blocked_by_validation": "blocked by validation",
+    "portalSubcontractor.allocation.status.planning_contract_unavailable": "planning contract unavailable",
+    "portalSubcontractor.workforce.lead":
+      "Portal users maintain only their own workers and proof documents. Internal finance, audit, and admin-only fields stay hidden.",
+    "portalSubcontractor.workforce.boundary":
+      "This self-service view is strictly limited to the linked subcontractor and its own workers.",
+    "portalSubcontractor.workforce.workerList": "Own workers",
+    "portalSubcontractor.workforce.empty": "No own workers have been registered in the portal yet.",
+    "portalSubcontractor.workforce.editTitle": "Edit worker master data",
+    "portalSubcontractor.workforce.saveWorker": "Save worker",
+    "portalSubcontractor.workforce.qualificationsTitle": "Qualifications and proofs",
+    "portalSubcontractor.workforce.noQualifications": "No qualifications have been stored for this worker yet.",
+    "portalSubcontractor.workforce.qualificationEditor": "Maintain qualification",
+    "portalSubcontractor.workforce.qualificationType": "Qualification type",
+    "portalSubcontractor.workforce.saveQualification": "Save qualification",
+    "portalSubcontractor.workforce.proofsTitle": "Proof documents",
+    "portalSubcontractor.workforce.noProofs": "No proof documents have been stored for this qualification yet.",
+    "portalSubcontractor.workforce.uploadProof": "Upload proof",
+    "portalSubcontractor.feedback.authRequired": "Sign in with a valid portal account first.",
+    "portalSubcontractor.feedback.invalidCredentials": "The login credentials are invalid.",
+    "portalSubcontractor.feedback.permissionDenied":
+      "The current account does not have permitted subcontractor-portal access.",
+    "portalSubcontractor.feedback.scopeNotResolved":
+      "The partner scope for this portal account could not be resolved unambiguously.",
+    "portalSubcontractor.feedback.contactNotLinked":
+      "No active subcontractor contact is linked to the current portal account.",
+    "portalSubcontractor.feedback.contactPortalDisabled":
+      "The linked subcontractor contact is not released for portal access.",
+    "portalSubcontractor.feedback.contactInactive":
+      "The linked subcontractor contact is no longer active.",
+    "portalSubcontractor.feedback.companyInactive":
+      "The linked subcontractor company is no longer active.",
+    "portalSubcontractor.feedback.invoiceCheckNotFound":
+      "The released subcontractor invoice check could not be found.",
+    "portalSubcontractor.feedback.sessionReady":
+      "The portal session was loaded successfully and narrowed to the subcontractor context.",
+    "portalSubcontractor.feedback.loggedOut": "The portal session has been signed out.",
+    "portalSubcontractor.feedback.watchbookEntrySubmitted":
+      "The watchbook entry was stored in the released subcontractor context.",
+    "portalSubcontractor.feedback.watchbookWriteDenied":
+      "Subcontractor participation is not released for this watchbook.",
+    "portalSubcontractor.feedback.watchbookClosed":
+      "The selected watchbook is already closed.",
+    "portalSubcontractor.feedback.allocationPositionNotFound":
+      "The released position could not be found for this partner scope.",
+    "portalSubcontractor.feedback.allocationWorkerNotFound":
+      "The selected worker does not belong to the current partner scope.",
+    "portalSubcontractor.feedback.allocationPlanningUnavailable":
+      "The planning release contract for real allocations is not wired yet.",
+    "portalSubcontractor.feedback.allocationBlocked":
+      "The allocation is blocked by validation issues.",
+    "portalSubcontractor.feedback.allocationSubmitted":
+      "The allocation was confirmed through the planning boundary.",
+    "portalSubcontractor.feedback.error":
+      "Subcontractor portal access could not be loaded.",
     "portalCustomer.eyebrow": "Customer access",
     "portalCustomer.title": "Customer portal and scope validation",
     "portalCustomer.lead":
@@ -2028,12 +2542,24 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Watchbook and field events will appear only after the field-execution backbone provides released customer views.",
     "portalCustomer.datasets.watchbooks.pending":
       "No released watchbook events are available for the customer portal yet.",
+    "portalCustomer.watchbooks.fields.watchbook": "Watchbook",
+    "portalCustomer.watchbooks.fields.note": "Feedback",
+    "portalCustomer.watchbooks.fields.notePlaceholder":
+      "Capture feedback or a customer note for the released watchbook.",
+    "portalCustomer.watchbooks.actions.submit": "Save feedback",
     "portalCustomer.datasets.timesheets.eyebrow": "Timesheets",
     "portalCustomer.datasets.timesheets.title": "Released timesheets",
     "portalCustomer.datasets.timesheets.lead":
       "Timesheets remain document-backed and will later be published through the finance bridge and docs service.",
     "portalCustomer.datasets.timesheets.pending":
       "Released timesheets are not connected to the portal yet.",
+    "portalCustomer.datasets.invoices.eyebrow": "Invoices",
+    "portalCustomer.datasets.invoices.title": "Released customer invoices",
+    "portalCustomer.datasets.invoices.lead":
+      "Customer invoices appear only after release, with limited status, due-date context, and document-backed downloads.",
+    "portalCustomer.datasets.invoices.pending":
+      "Released customer invoices are not connected to the portal yet.",
+    "portalCustomer.actions.download": "Download document",
     "portalCustomer.datasets.reports.eyebrow": "Reports",
     "portalCustomer.datasets.reports.title": "Released report and result packages",
     "portalCustomer.datasets.reports.lead":
@@ -2055,6 +2581,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalCustomer.feedback.sessionReady":
       "The portal session was loaded successfully and narrowed to the customer context.",
     "portalCustomer.feedback.loggedOut": "The portal session has been signed out.",
+    "portalCustomer.feedback.watchbookEntrySubmitted":
+      "The feedback was added to the released watchbook.",
+    "portalCustomer.feedback.watchbookWriteDenied":
+      "Customer participation is not released for this watchbook.",
+    "portalCustomer.feedback.watchbookClosed":
+      "The selected watchbook is already closed.",
+    "portalCustomer.feedback.financeDocumentDenied":
+      "The requested finance document is not released for this portal account.",
     "portalCustomer.feedback.error":
       "Customer portal access could not be loaded.",
     "recruitingApplicant.eyebrow": "Application",
@@ -2273,6 +2807,22 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.detail.emptyEyebrow": "Detail view",
     "employeeAdmin.detail.emptyBody":
       "Select an employee file on the left or create a new one.",
+    "employeeAdmin.form.eyebrow": "File",
+    "employeeAdmin.form.title": "Structured employee file",
+    "employeeAdmin.form.lead":
+      "The employee file is split into clear editing groups so master data, assignment, and account linkage can be maintained faster.",
+    "employeeAdmin.form.identityEyebrow": "Identity",
+    "employeeAdmin.form.identityTitle": "Identity and personnel number",
+    "employeeAdmin.form.contactEyebrow": "Contact",
+    "employeeAdmin.form.contactTitle": "Work contact channels",
+    "employeeAdmin.form.assignmentEyebrow": "Assignment",
+    "employeeAdmin.form.assignmentTitle": "Branch, mandate, and employment dates",
+    "employeeAdmin.form.accessEyebrow": "Linkage",
+    "employeeAdmin.form.accessTitle": "App and user-account linkage",
+    "employeeAdmin.form.notesEyebrow": "Notes",
+    "employeeAdmin.form.notesTitle": "Operational notes",
+    "employeeAdmin.form.actionsEyebrow": "Action",
+    "employeeAdmin.form.actionsTitle": "Save or reset the file",
     "employeeAdmin.filters.search": "Search",
     "employeeAdmin.filters.searchPlaceholder": "Personnel number, name, or email",
     "employeeAdmin.filters.status": "Status",

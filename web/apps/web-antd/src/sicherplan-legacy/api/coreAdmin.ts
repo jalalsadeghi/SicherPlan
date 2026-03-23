@@ -215,6 +215,7 @@ async function request<T>(
   options: {
     method?: string;
     body?: unknown;
+    accessToken: string;
     role: AppRole;
     tenantId?: string | null;
     requestId?: string;
@@ -222,7 +223,10 @@ async function request<T>(
 ): Promise<T> {
   const response = await fetch(`${webAppConfig.apiBaseUrl}${path}`, {
     method: options.method ?? "GET",
-    headers: buildHeaders(options.role, options.tenantId, options.requestId ?? generateRequestId()),
+    headers: {
+      ...buildHeaders(options.role, options.tenantId, options.requestId ?? generateRequestId()),
+      Authorization: `Bearer ${options.accessToken}`,
+    },
     body: options.body == null ? undefined : JSON.stringify(options.body),
   });
 
@@ -244,21 +248,22 @@ async function request<T>(
   return (await response.json()) as T;
 }
 
-export function listTenants(role: AppRole, tenantId?: string | null) {
-  return request<TenantListItem[]>("/api/core/admin/tenants", { role, tenantId });
+export function listTenants(accessToken: string, role: AppRole, tenantId?: string | null) {
+  return request<TenantListItem[]>("/api/core/admin/tenants", { accessToken, role, tenantId });
 }
 
-export function getTenant(tenantId: string, role: AppRole, actorTenantId?: string | null) {
-  return request<TenantRead>(`/api/core/admin/tenants/${tenantId}`, { role, tenantId: actorTenantId });
+export function getTenant(accessToken: string, tenantId: string, role: AppRole, actorTenantId?: string | null) {
+  return request<TenantRead>(`/api/core/admin/tenants/${tenantId}`, { accessToken, role, tenantId: actorTenantId });
 }
 
-export function onboardTenant(payload: TenantOnboardingPayload, role: AppRole) {
+export function onboardTenant(accessToken: string, payload: TenantOnboardingPayload, role: AppRole) {
   return request<{
     tenant: TenantRead;
     initial_branch: BranchRead;
     initial_mandate: MandateRead;
     initial_settings: TenantSettingRead[];
   }>("/api/core/admin/tenants/onboard", {
+    accessToken,
     method: "POST",
     body: payload,
     role,
@@ -266,12 +271,14 @@ export function onboardTenant(payload: TenantOnboardingPayload, role: AppRole) {
 }
 
 export function updateTenant(
+  accessToken: string,
   tenantId: string,
   payload: TenantUpdatePayload,
   role: AppRole,
   actorTenantId?: string | null,
 ) {
   return request<TenantRead>(`/api/core/admin/tenants/${tenantId}`, {
+    accessToken,
     method: "PATCH",
     body: payload,
     role,
@@ -280,12 +287,14 @@ export function updateTenant(
 }
 
 export function transitionTenantStatus(
+  accessToken: string,
   tenantId: string,
   status: string,
   role: AppRole,
   actorTenantId?: string | null,
 ) {
   return request<TenantRead>(`/api/core/admin/tenants/${tenantId}/lifecycle`, {
+    accessToken,
     method: "POST",
     body: { status },
     role,
@@ -293,20 +302,23 @@ export function transitionTenantStatus(
   });
 }
 
-export function listBranches(tenantId: string, role: AppRole, actorTenantId?: string | null) {
+export function listBranches(accessToken: string, tenantId: string, role: AppRole, actorTenantId?: string | null) {
   return request<BranchRead[]>(`/api/core/admin/tenants/${tenantId}/branches`, {
+    accessToken,
     role,
     tenantId: actorTenantId,
   });
 }
 
 export function createBranch(
+  accessToken: string,
   tenantId: string,
   payload: BranchCreatePayload,
   role: AppRole,
   actorTenantId?: string | null,
 ) {
   return request<BranchRead>(`/api/core/admin/tenants/${tenantId}/branches`, {
+    accessToken,
     method: "POST",
     body: payload,
     role,
@@ -315,6 +327,7 @@ export function createBranch(
 }
 
 export function updateBranch(
+  accessToken: string,
   tenantId: string,
   branchId: string,
   payload: BranchUpdatePayload,
@@ -322,6 +335,7 @@ export function updateBranch(
   actorTenantId?: string | null,
 ) {
   return request<BranchRead>(`/api/core/admin/tenants/${tenantId}/branches/${branchId}`, {
+    accessToken,
     method: "PATCH",
     body: payload,
     role,
@@ -329,20 +343,23 @@ export function updateBranch(
   });
 }
 
-export function listMandates(tenantId: string, role: AppRole, actorTenantId?: string | null) {
+export function listMandates(accessToken: string, tenantId: string, role: AppRole, actorTenantId?: string | null) {
   return request<MandateRead[]>(`/api/core/admin/tenants/${tenantId}/mandates`, {
+    accessToken,
     role,
     tenantId: actorTenantId,
   });
 }
 
 export function createMandate(
+  accessToken: string,
   tenantId: string,
   payload: MandateCreatePayload,
   role: AppRole,
   actorTenantId?: string | null,
 ) {
   return request<MandateRead>(`/api/core/admin/tenants/${tenantId}/mandates`, {
+    accessToken,
     method: "POST",
     body: payload,
     role,
@@ -351,6 +368,7 @@ export function createMandate(
 }
 
 export function updateMandate(
+  accessToken: string,
   tenantId: string,
   mandateId: string,
   payload: MandateUpdatePayload,
@@ -358,6 +376,7 @@ export function updateMandate(
   actorTenantId?: string | null,
 ) {
   return request<MandateRead>(`/api/core/admin/tenants/${tenantId}/mandates/${mandateId}`, {
+    accessToken,
     method: "PATCH",
     body: payload,
     role,
@@ -365,20 +384,23 @@ export function updateMandate(
   });
 }
 
-export function listSettings(tenantId: string, role: AppRole, actorTenantId?: string | null) {
+export function listSettings(accessToken: string, tenantId: string, role: AppRole, actorTenantId?: string | null) {
   return request<TenantSettingRead[]>(`/api/core/admin/tenants/${tenantId}/settings`, {
+    accessToken,
     role,
     tenantId: actorTenantId,
   });
 }
 
 export function createSetting(
+  accessToken: string,
   tenantId: string,
   payload: TenantSettingCreatePayload,
   role: AppRole,
   actorTenantId?: string | null,
 ) {
   return request<TenantSettingRead>(`/api/core/admin/tenants/${tenantId}/settings`, {
+    accessToken,
     method: "POST",
     body: payload,
     role,
@@ -387,6 +409,7 @@ export function createSetting(
 }
 
 export function updateSetting(
+  accessToken: string,
   tenantId: string,
   settingId: string,
   payload: TenantSettingUpdatePayload,
@@ -394,6 +417,7 @@ export function updateSetting(
   actorTenantId?: string | null,
 ) {
   return request<TenantSettingRead>(`/api/core/admin/tenants/${tenantId}/settings/${settingId}`, {
+    accessToken,
     method: "PUT",
     body: payload,
     role,

@@ -19,7 +19,8 @@ describe('sicherplan auth mappers', () => {
 
   it('maps customer users to the portal home path', () => {
     expect(resolveHomePath(['customer_user'])).toBe('/portal/customer');
-    expect(resolveHomePath(['platform_admin'])).toBe('/admin/core');
+    expect(resolveHomePath(['subcontractor_user'])).toBe('/portal/subcontractor');
+    expect(resolveHomePath(['platform_admin'])).toBe('/admin/dashboard');
   });
 
   it('maps current session payloads into Vben user info', () => {
@@ -38,7 +39,7 @@ describe('sicherplan auth mappers', () => {
 
     expect(mapped.realName).toBe('System Administrator');
     expect(mapped.roles).toEqual(['platform_admin']);
-    expect(mapped.homePath).toBe('/admin/core');
+    expect(mapped.homePath).toBe('/admin/dashboard');
     expect(mapped.token).toBe('token-1');
   });
 });

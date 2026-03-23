@@ -11,13 +11,17 @@ from app.db.alembic_versioning import configure_alembic_version_table_impl
 from app.modules.core import models as core_models  # noqa: F401
 from app.modules.customers import models as customer_models  # noqa: F401
 from app.modules.employees import models as employee_models  # noqa: F401
+from app.modules.finance import models as finance_models  # noqa: F401
+from app.modules.field_execution import models as field_execution_models  # noqa: F401
 from app.modules.iam import models as iam_models  # noqa: F401
 from app.modules.iam import audit_models as audit_models  # noqa: F401
 from app.modules.platform_services import comm_models as comm_models  # noqa: F401
 from app.modules.platform_services import docs_models as docs_models  # noqa: F401
 from app.modules.platform_services import info_models as info_models  # noqa: F401
 from app.modules.platform_services import integration_models as integration_models  # noqa: F401
+from app.modules.planning import models as planning_models  # noqa: F401
 from app.modules.recruiting import models as recruiting_models  # noqa: F401
+from app.modules.subcontractors import models as subcontractor_models  # noqa: F401
 
 config = context.config
 

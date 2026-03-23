@@ -23,6 +23,7 @@ from app.modules.employees.schemas import (
     EmployeeEventApplicationFilter,
     EmployeeEventApplicationRead,
     EmployeeEventApplicationUpdate,
+    EmployeeMobileContextRead,
     EmployeeSelfServiceAddressUpdate,
     EmployeeSelfServiceAvailabilityRuleCreate,
     EmployeeSelfServiceAvailabilityRuleUpdate,
@@ -79,6 +80,32 @@ class EmployeeSelfService:
             work_email=employee_context.employee.work_email,
             mobile_phone=employee_context.employee.mobile_phone,
             active_home_address=AddressRead.model_validate(home_address.address) if home_address and home_address.address else None,
+        )
+
+    def get_mobile_context(self, context: RequestAuthorizationContext) -> EmployeeMobileContextRead:
+        employee_context = self._resolve_employee(context)
+        employee = employee_context.employee
+        return EmployeeMobileContextRead(
+            tenant_id=employee.tenant_id,
+            user_id=context.user_id,
+            employee_id=employee.id,
+            personnel_no=employee.personnel_no,
+            full_name=f"{employee.first_name} {employee.last_name}".strip(),
+            preferred_name=employee.preferred_name,
+            work_email=employee.work_email,
+            mobile_phone=employee.mobile_phone,
+            default_branch_id=employee.default_branch_id,
+            default_mandate_id=employee.default_mandate_id,
+            locale="de",
+            timezone="Europe/Berlin",
+            app_role="employee",
+            role_keys=sorted(context.role_keys),
+            has_schedule_access=True,
+            has_document_access=True,
+            has_notice_access="platform.info.read" in context.permission_keys,
+            has_time_capture_access=True,
+            has_watchbook_access=True,
+            has_patrol_access=True,
         )
 
     def update_profile(
@@ -307,6 +334,12 @@ class EmployeeSelfService:
                 404,
                 "employees.self_service.employee_not_found",
                 "errors.employees.self_service.employee_not_found",
+            )
+        if employee.archived_at is not None or employee.status != "active":
+            raise ApiException(
+                409,
+                "employees.self_service.employee_inactive",
+                "errors.employees.self_service.employee_inactive",
             )
         return SelfServiceEmployeeContext(employee=employee)
 

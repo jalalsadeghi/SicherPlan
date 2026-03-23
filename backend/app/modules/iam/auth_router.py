@@ -1,7 +1,5 @@
 """HTTP router for IAM authentication flows."""
 
-from __future__ import annotations
-
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Request
@@ -30,6 +28,7 @@ from app.modules.iam.auth_schemas import (
     SessionListResponse,
 )
 from app.modules.iam.auth_service import AuthService, AuthThrottle, AuthenticatedSessionContext
+from app.rate_limit import AUTH_REFRESH_RULE, rate_limiter
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -95,8 +94,13 @@ def login(
 @router.post("/refresh", response_model=RefreshResponse)
 def refresh(
     payload: RefreshRequest,
+    request: Request,
     service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> RefreshResponse:
+    rate_limiter.assert_allowed(
+        AUTH_REFRESH_RULE,
+        principal=request.client.host if request.client else "anonymous",
+    )
     return service.refresh_session(payload)
 
 

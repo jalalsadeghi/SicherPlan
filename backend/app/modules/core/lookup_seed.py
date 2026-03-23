@@ -83,6 +83,16 @@ SYSTEM_LOOKUP_DOMAINS: tuple[LookupSeedDomain, ...] = (
         ),
     ),
     LookupSeedDomain(
+        name="subcontractor_status",
+        ownership="system",
+        description="Partner-facing subcontractor lifecycle/status catalog for master-data and portal readiness.",
+        values=(
+            LookupSeedValue("active", "Aktiv", "Aktiver Subunternehmer im operativen Einsatz", 10),
+            LookupSeedValue("onboarding", "In Onboarding", "Subunternehmer befindet sich noch im Onboarding", 20),
+            LookupSeedValue("blocked", "Gesperrt", "Subunternehmer darf derzeit nicht disponiert werden", 30),
+        ),
+    ),
+    LookupSeedDomain(
         name="report_category",
         ownership="system",
         description="Shared reporting categories for operational, finance, and compliance output grouping.",
@@ -91,6 +101,16 @@ SYSTEM_LOOKUP_DOMAINS: tuple[LookupSeedDomain, ...] = (
             LookupSeedValue("finance", "Finanzen", "Kaufmaennische und abrechnungsbezogene Reports", 20),
             LookupSeedValue("compliance", "Compliance", "Qualitaets- und Nachweisberichte", 30),
             LookupSeedValue("management", "Management", "Mandanten- und Bereichsuebersichten", 40),
+        ),
+    ),
+    LookupSeedDomain(
+        name="subcontractor_invoice_status_mode",
+        ownership="system",
+        description="Partner-facing invoice-check modes used for subcontractor settlement preparation.",
+        values=(
+            LookupSeedValue("manual_check", "Manuelle Pruefung", "Rechnungen werden manuell gegen Leistungen geprueft", 10),
+            LookupSeedValue("portal_confirmation", "Portal-Bestaetigung", "Rechnungsstatus haengt von Portal-Bestaetigungen ab", 20),
+            LookupSeedValue("automatic_match", "Automatischer Abgleich", "Status wird spaeter aus automatischem Leistungsabgleich abgeleitet", 30),
         ),
     ),
     LookupSeedDomain(

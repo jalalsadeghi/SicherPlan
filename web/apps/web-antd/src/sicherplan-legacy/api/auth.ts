@@ -94,6 +94,38 @@ export interface CustomerPortalContextRead {
   }>;
 }
 
+export interface SubcontractorPortalContextRead {
+  tenant_id: string;
+  user_id: string;
+  subcontractor_id: string;
+  contact_id: string;
+  company: {
+    id: string;
+    tenant_id: string;
+    subcontractor_number: string;
+    legal_name: string;
+    display_name: string | null;
+    status: string;
+  };
+  contact: {
+    id: string;
+    tenant_id: string;
+    subcontractor_id: string;
+    full_name: string;
+    function_label: string | null;
+    email: string | null;
+    phone: string | null;
+    mobile: string | null;
+    portal_enabled: boolean;
+    status: string;
+  };
+  scopes: Array<{
+    role_key: string;
+    scope_type: string;
+    subcontractor_id: string;
+  }>;
+}
+
 interface ApiErrorEnvelope {
   error: {
     code: string;
@@ -195,4 +227,8 @@ export function logout(accessToken: string) {
 
 export function getCustomerPortalContext(accessToken: string) {
   return request<CustomerPortalContextRead>("/api/portal/customer/context", { accessToken });
+}
+
+export function getSubcontractorPortalContext(accessToken: string) {
+  return request<SubcontractorPortalContextRead>("/api/portal/subcontractor/context", { accessToken });
 }

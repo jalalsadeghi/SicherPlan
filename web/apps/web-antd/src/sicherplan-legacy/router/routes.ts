@@ -196,17 +196,14 @@ export const appRoutes: AppRoute[] = [
   {
     path: "/portal/subcontractor",
     name: "portal-subcontractor",
-    component: () => import("@/views/ModulePlaceholderView.vue"),
+    component: () => import("@/views/SubcontractorPortalAccessView.vue"),
     meta: {
       titleKey: "route.portal.subcontractor.title",
       icon: "briefcase",
       roles: ["subcontractor_user"],
       section: "portal",
-      placeholder: true,
-    },
-    props: {
-      titleKey: "route.portal.subcontractor.title",
-      descriptionKey: "route.portal.subcontractor.description",
+      allowGuest: true,
+      permissionKey: "portal.subcontractor.access",
     },
   },
 ];

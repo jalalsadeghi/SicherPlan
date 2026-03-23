@@ -1,5 +1,21 @@
 import { webAppConfig } from "@/config/env";
-import type { AppRole } from "@/types/roles";
+
+import { AuthApiError } from "@/api/auth";
+
+export interface NoticeAttachmentRead {
+  document_id: string;
+  title: string;
+  file_name: string | null;
+  content_type: string | null;
+  current_version_no: number | null;
+}
+
+export interface NoticeLinkRead {
+  id: string;
+  label: string;
+  url: string;
+  link_type: string;
+}
 
 export interface NoticeListItem {
   id: string;
@@ -12,11 +28,21 @@ export interface NoticeListItem {
   published_at: string | null;
   status: string;
   acknowledged_at: string | null;
+  opened_at: string | null;
   attachment_document_ids: string[];
+  attachments: NoticeAttachmentRead[];
+  links: NoticeLinkRead[];
 }
 
 export interface NoticeRead extends NoticeListItem {
   body: string;
+}
+
+export interface NoticeFeedStatusRead {
+  total_count: number;
+  unread_count: number;
+  mandatory_unacknowledged_count: number;
+  blocking_required: boolean;
 }
 
 interface ApiErrorEnvelope {
@@ -32,50 +58,72 @@ function generateRequestId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
-  return `sp-${Date.now()}`;
-}
-
-function buildHeaders(role: AppRole, tenantId?: string | null): HeadersInit {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    "X-Actor-Role": role,
-    "X-Request-Id": generateRequestId(),
-  };
-  if (tenantId) {
-    headers["X-Tenant-Id"] = tenantId;
-  }
-  return headers;
+  return `sp-notice-${Date.now()}`;
 }
 
 function isApiErrorEnvelope(value: unknown): value is ApiErrorEnvelope {
-  if (!value || typeof value !== "object") return false;
+  if (!value || typeof value !== "object") {
+    return false;
+  }
   const error = (value as Record<string, unknown>).error;
   return !!error && typeof error === "object" && typeof (error as Record<string, unknown>).message_key === "string";
 }
 
-async function request<T>(path: string, role: AppRole, tenantId: string | null, method = "GET", body?: unknown): Promise<T> {
+async function request<T>(
+  path: string,
+  accessToken: string,
+  options?: {
+    method?: string;
+    body?: unknown;
+    responseType?: "json" | "blob";
+  },
+): Promise<T> {
   const response = await fetch(`${webAppConfig.apiBaseUrl}${path}`, {
-    method,
-    headers: buildHeaders(role, tenantId),
-    body: body == null ? undefined : JSON.stringify(body),
+    method: options?.method ?? "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "X-Request-Id": generateRequestId(),
+    },
+    body: options?.body == null ? undefined : JSON.stringify(options.body),
   });
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as unknown;
     if (isApiErrorEnvelope(payload)) {
-      throw new Error((payload as ApiErrorEnvelope).error.message_key);
+      throw new AuthApiError(response.status, payload.error);
     }
-    throw new Error("errors.platform.internal");
+    throw new AuthApiError(response.status, {
+      code: "platform.internal",
+      message_key: "errors.platform.internal",
+      request_id: "",
+      details: {},
+    });
+  }
+  if (options?.responseType === "blob") {
+    return (await response.blob()) as T;
   }
   return (await response.json()) as T;
 }
 
-export function listAdminNotices(tenantId: string, role: AppRole) {
-  return request<NoticeListItem[]>(`/api/platform/tenants/${tenantId}/info/notices`, role, tenantId);
+export function listAdminNotices(tenantId: string, accessToken: string) {
+  return request<NoticeListItem[]>(`/api/platform/tenants/${tenantId}/info/notices`, accessToken);
+}
+
+export function listMyNoticeFeed(tenantId: string, accessToken: string) {
+  return request<NoticeListItem[]>(`/api/platform/tenants/${tenantId}/info/notices/my/feed`, accessToken);
+}
+
+export function getMyNoticeFeedStatus(tenantId: string, accessToken: string) {
+  return request<NoticeFeedStatusRead>(`/api/platform/tenants/${tenantId}/info/notices/my/feed/status`, accessToken);
+}
+
+export function getVisibleNotice(tenantId: string, noticeId: string, accessToken: string) {
+  return request<NoticeRead>(`/api/platform/tenants/${tenantId}/info/notices/my/feed/${noticeId}`, accessToken);
 }
 
 export function createNotice(
   tenantId: string,
-  role: AppRole,
+  accessToken: string,
   payload: {
     tenant_id: string;
     title: string;
@@ -88,29 +136,37 @@ export function createNotice(
     attachment_document_ids: string[];
   },
 ) {
-  return request<NoticeRead>(`/api/platform/tenants/${tenantId}/info/notices`, role, tenantId, "POST", payload);
+  return request<NoticeRead>(`/api/platform/tenants/${tenantId}/info/notices`, accessToken, {
+    method: "POST",
+    body: payload,
+  });
 }
 
-export function publishNotice(tenantId: string, noticeId: string, role: AppRole) {
-  return request<NoticeRead>(
-    `/api/platform/tenants/${tenantId}/info/notices/${noticeId}/publish`,
-    role,
-    tenantId,
-    "POST",
-    {},
-  );
+export function publishNotice(tenantId: string, noticeId: string, accessToken: string) {
+  return request<NoticeRead>(`/api/platform/tenants/${tenantId}/info/notices/${noticeId}/publish`, accessToken, {
+    method: "POST",
+    body: {},
+  });
 }
 
-export function listMyNoticeFeed(tenantId: string, role: AppRole) {
-  return request<NoticeListItem[]>(`/api/platform/tenants/${tenantId}/info/notices/my/feed`, role, tenantId);
+export function acknowledgeNotice(tenantId: string, noticeId: string, accessToken: string, acknowledgementText?: string) {
+  return request(`/api/platform/tenants/${tenantId}/info/notices/${noticeId}/acknowledge`, accessToken, {
+    method: "POST",
+    body: { acknowledgement_text: acknowledgementText ?? null },
+  });
 }
 
-export function acknowledgeNotice(tenantId: string, noticeId: string, role: AppRole) {
-  return request(
-    `/api/platform/tenants/${tenantId}/info/notices/${noticeId}/acknowledge`,
-    role,
-    tenantId,
-    "POST",
-    {},
+export function openNotice(tenantId: string, noticeId: string, accessToken: string) {
+  return request(`/api/platform/tenants/${tenantId}/info/notices/${noticeId}/open`, accessToken, {
+    method: "POST",
+    body: {},
+  });
+}
+
+export function downloadNoticeAttachment(tenantId: string, documentId: string, versionNo: number, accessToken: string) {
+  return request<Blob>(
+    `/api/platform/tenants/${tenantId}/documents/${documentId}/versions/${versionNo}/download`,
+    accessToken,
+    { responseType: "blob" },
   );
 }

@@ -8,20 +8,21 @@ import { computed, onMounted, ref } from 'vue';
 import { ProfileBaseSetting } from '@vben/common-ui';
 
 import { getUserInfoApi } from '#/api';
+import { $t } from '#/locales';
 
 const profileBaseSettingRef = ref();
 
 const MOCK_ROLES_OPTIONS: BasicOption[] = [
   {
-    label: '管理员',
+    label: $t('page.profile.roles.admin'),
     value: 'super',
   },
   {
-    label: '用户',
+    label: $t('page.profile.roles.user'),
     value: 'user',
   },
   {
-    label: '测试',
+    label: $t('page.profile.roles.test'),
     value: 'test',
   },
 ];
@@ -31,12 +32,12 @@ const formSchema = computed((): VbenFormSchema[] => {
     {
       fieldName: 'realName',
       component: 'Input',
-      label: '姓名',
+      label: $t('page.profile.fields.realName'),
     },
     {
       fieldName: 'username',
       component: 'Input',
-      label: '用户名',
+      label: $t('page.profile.fields.username'),
     },
     {
       fieldName: 'roles',
@@ -45,12 +46,12 @@ const formSchema = computed((): VbenFormSchema[] => {
         mode: 'tags',
         options: MOCK_ROLES_OPTIONS,
       },
-      label: '角色',
+      label: $t('page.profile.fields.roles'),
     },
     {
       fieldName: 'introduction',
       component: 'Textarea',
-      label: '个人简介',
+      label: $t('page.profile.fields.introduction'),
     },
   ];
 });

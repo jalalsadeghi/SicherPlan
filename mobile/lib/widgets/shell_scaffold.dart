@@ -32,7 +32,7 @@ class ShellScaffold extends StatelessWidget {
                   subtitle,
                   style: Theme.of(
                     context,
-                  ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                  ).textTheme.bodySmall,
                 ),
               ],
             ),

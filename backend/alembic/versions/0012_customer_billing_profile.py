@@ -49,6 +49,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_customer_billing_profile")),
         sa.UniqueConstraint("tenant_id", "customer_id", name="uq_crm_customer_billing_profile_customer"),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_crm_customer_billing_profile_tenant_id_id"),
         schema="crm",
     )
 

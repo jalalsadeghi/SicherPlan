@@ -253,6 +253,52 @@ class UserRoleAssignmentFilter(BaseModel):
     scope_type: RoleScopeType | None = None
 
 
+class TenantAdminUserCreate(BaseModel):
+    tenant_id: str
+    username: str
+    email: str
+    full_name: str
+    locale: str = "de"
+    timezone: str = "Europe/Berlin"
+    status: str = "active"
+    temporary_password: str | None = None
+
+
+class TenantAdminUserListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    tenant_id: str
+    username: str
+    email: str
+    full_name: str
+    locale: str
+    timezone: str
+    status: str
+    is_password_login_enabled: bool
+    last_login_at: datetime | None
+    role_assignment_id: str
+    role_assignment_status: str
+    role_key: str
+    scope_type: RoleScopeType
+    created_at: datetime
+    updated_at: datetime
+    version_no: int
+
+
+class TenantAdminUserStatusUpdate(BaseModel):
+    status: Literal["active", "inactive"]
+
+
+class TenantAdminPasswordResetRequest(BaseModel):
+    temporary_password: str | None = None
+
+
+class TenantAdminPasswordResetResponse(BaseModel):
+    message_key: str
+    temporary_password: str
+
+
 class UserSessionCreate(BaseModel):
     tenant_id: str
     user_account_id: str
@@ -304,4 +350,3 @@ class UserSessionFilter(BaseModel):
     tenant_id: str | None = None
     user_account_id: str | None = None
     status: str | None = None
-

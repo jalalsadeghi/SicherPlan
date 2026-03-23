@@ -93,6 +93,14 @@ class NoticeReadEvidenceRead(BaseModel):
     updated_at: datetime
 
 
+class NoticeAttachmentRead(BaseModel):
+    document_id: str
+    title: str
+    file_name: str | None = None
+    content_type: str | None = None
+    current_version_no: int | None = None
+
+
 class NoticeRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -118,6 +126,7 @@ class NoticeRead(BaseModel):
     reads: list[NoticeReadEvidenceRead] = Field(default_factory=list)
     links: list[NoticeLinkRead] = Field(default_factory=list)
     attachment_document_ids: list[str] = Field(default_factory=list)
+    attachments: list[NoticeAttachmentRead] = Field(default_factory=list)
 
 
 class NoticeListItem(BaseModel):
@@ -131,6 +140,15 @@ class NoticeListItem(BaseModel):
     published_at: datetime | None
     status: str
     acknowledged_at: datetime | None = None
+    opened_at: datetime | None = None
     audiences: list[NoticeAudienceRead] = Field(default_factory=list)
     links: list[NoticeLinkRead] = Field(default_factory=list)
     attachment_document_ids: list[str] = Field(default_factory=list)
+    attachments: list[NoticeAttachmentRead] = Field(default_factory=list)
+
+
+class NoticeFeedStatusRead(BaseModel):
+    total_count: int
+    unread_count: int
+    mandatory_unacknowledged_count: int
+    blocking_required: bool = False

@@ -2,9 +2,78 @@ import { useAccessStore } from '@vben/stores';
 
 import type { SicherPlanCurrentSessionResponse } from './auth.mappers';
 
+interface ApiErrorPayload {
+  error?: {
+    code?: string;
+    message_key?: string;
+  };
+}
+
+export class AuthApiError extends Error {
+  code: string;
+  messageKey: string;
+  status: number;
+
+  constructor(
+    status: number,
+    code: string,
+    messageKey: string,
+  ) {
+    super(messageKey);
+    this.name = 'AuthApiError';
+    this.status = status;
+    this.code = code;
+    this.messageKey = messageKey;
+  }
+}
 
 function getApiBaseUrl() {
   return import.meta.env.VITE_GLOB_API_URL || '/api';
+}
+
+async function readApiErrorPayload(response: Response): Promise<ApiErrorPayload> {
+  return (await response.json().catch(() => null)) as ApiErrorPayload;
+}
+
+function buildAuthApiError(
+  status: number,
+  payload?: ApiErrorPayload | null,
+) {
+  return new AuthApiError(
+    status,
+    payload?.error?.code || `HTTP_${status}`,
+    payload?.error?.message_key || 'errors.platform.internal',
+  );
+}
+
+export function resolveLoginErrorMessageKey(error: unknown) {
+  if (error instanceof AuthApiError) {
+    switch (error.messageKey) {
+      case 'errors.iam.auth.invalid_credentials': {
+        return 'sicherplan.auth.loginErrors.invalidCredentials';
+      }
+      case 'errors.iam.auth.rate_limited': {
+        return 'sicherplan.auth.loginErrors.rateLimited';
+      }
+      case 'errors.platform.database_unavailable': {
+        return 'sicherplan.auth.loginErrors.serverUnavailable';
+      }
+      default: {
+        if (error.status === 401) {
+          return 'sicherplan.auth.loginErrors.invalidCredentials';
+        }
+        if (error.status >= 500) {
+          return 'sicherplan.auth.loginErrors.serverUnavailable';
+        }
+      }
+    }
+  }
+
+  if (error instanceof TypeError) {
+    return 'sicherplan.auth.loginErrors.serverUnavailable';
+  }
+
+  return 'sicherplan.auth.loginErrors.generic';
 }
 
 async function sicherPlanRequest<T>(
@@ -15,22 +84,32 @@ async function sicherPlanRequest<T>(
     method?: string;
   },
 ): Promise<T> {
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    method: options?.method ?? 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options?.accessToken
-        ? { Authorization: `Bearer ${options.accessToken}` }
-        : {}),
-    },
-    body: options?.body == null ? undefined : JSON.stringify(options.body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
+      method: options?.method ?? 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options?.accessToken
+          ? { Authorization: `Bearer ${options.accessToken}` }
+          : {}),
+      },
+      body: options?.body == null ? undefined : JSON.stringify(options.body),
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new AuthApiError(
+      0,
+      'platform.network_unavailable',
+      'errors.platform.network_unavailable',
+    );
+  }
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as
-      | null
-      | { error?: { message_key?: string } };
-    throw new Error(payload?.error?.message_key || `HTTP_${response.status}`);
+    const payload = await readApiErrorPayload(response);
+    throw buildAuthApiError(response.status, payload);
   }
 
   if (response.status === 204) {

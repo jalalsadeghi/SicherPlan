@@ -95,7 +95,8 @@ def main() -> None:
     print(f"tenant_created={summary.tenant_created}")
     print(f"user_created={summary.user_created}")
     print(f"user_updated={summary.user_updated}")
-    print(f"role_assignment_created={summary.role_assignment_created}")
+    print(f"platform_role_assignment_created={summary.platform_role_assignment_created}")
+    print(f"tenant_role_assignment_created={summary.tenant_role_assignment_created}")
 
 
 if __name__ == "__main__":

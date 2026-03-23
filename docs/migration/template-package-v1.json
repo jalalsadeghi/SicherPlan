@@ -1,0 +1,83 @@
+{
+  "package_version": "v1",
+  "load_order": [
+    "customers",
+    "employees",
+    "subcontractors",
+    "orders",
+    "documents"
+  ],
+  "matching_rules": {
+    "create": "Business-Key existiert im Zielsystem nicht und match_action ist upsert oder create_only.",
+    "update": "Business-Key existiert im Zielsystem und match_action ist upsert oder update_only.",
+    "conflict": "Business-Key-/Lookup-/Referenzregel ist verletzt oder match_action passt nicht zum Zielzustand."
+  },
+  "sheets": [
+    {
+      "sheet_key": "customers",
+      "business_key_field": "customer_number",
+      "match_actions": ["upsert", "create_only", "update_only"],
+      "required_fields": ["match_action", "customer_number", "name"],
+      "lookup_rules": {
+        "legal_form_code": "legal_form"
+      }
+    },
+    {
+      "sheet_key": "employees",
+      "business_key_field": "personnel_no",
+      "match_actions": ["upsert", "create_only", "update_only"],
+      "required_fields": ["match_action", "personnel_no", "first_name", "last_name"]
+    },
+    {
+      "sheet_key": "subcontractors",
+      "business_key_field": "subcontractor_number",
+      "match_actions": ["upsert", "create_only", "update_only"],
+      "required_fields": ["match_action", "subcontractor_number", "legal_name"],
+      "lookup_rules": {
+        "legal_form_code": "legal_form",
+        "subcontractor_status_code": "subcontractor_status"
+      }
+    },
+    {
+      "sheet_key": "orders",
+      "business_key_field": "order_no",
+      "match_actions": ["upsert", "create_only", "update_only"],
+      "required_fields": [
+        "match_action",
+        "order_no",
+        "customer_number",
+        "requirement_type_code",
+        "title",
+        "service_category_code",
+        "service_from",
+        "service_to"
+      ],
+      "foreign_keys": {
+        "customer_number": "customers.customer_number"
+      }
+    },
+    {
+      "sheet_key": "documents",
+      "business_key_field": "manifest_row_key",
+      "match_actions": ["import_only"],
+      "required_fields": [
+        "manifest_row_key",
+        "source_system",
+        "legacy_document_id",
+        "source_file_name",
+        "title",
+        "owner_sheet",
+        "owner_business_key",
+        "relation_type",
+        "checksum_sha256",
+        "content_base64"
+      ],
+      "manifest_rules": {
+        "owner_sheet": "customers|employees|subcontractors|orders",
+        "owner_resolution": "owner_business_key against referenced sheet business key or already imported system owner",
+        "document_type_key": "docs.document_type.key",
+        "storage_model": "docs.document + docs.document_version + docs.document_link"
+      }
+    }
+  ]
+}

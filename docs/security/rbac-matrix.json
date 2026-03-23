@@ -1,0 +1,132 @@
+{
+  "generated_from": [
+    "AGENTS.md",
+    "docs/engineering/authorization-and-scope-rules.md",
+    "docs/engineering/authentication-and-session-flows.md",
+    "docs/sprint/sprint-02-platform-core-and-backbone.md",
+    "docs/prompts/US-5-T1.md",
+    "docs/prompts/US-35-T2.md"
+  ],
+  "implemented_role_keys": [
+    "platform_admin",
+    "tenant_admin",
+    "dispatcher",
+    "accounting",
+    "controller_qm",
+    "customer_user",
+    "subcontractor_user",
+    "employee_user"
+  ],
+  "documented_roles": [
+    {
+      "documented_name": "Platform Administrator",
+      "implemented_key": "platform_admin",
+      "status": "implemented",
+      "scope_kind": "platform",
+      "notes": [
+        "Current permission set is broader than the documented least-privilege intent.",
+        "Can operate tenant modules beyond pure platform administration."
+      ]
+    },
+    {
+      "documented_name": "Tenant Administrator",
+      "implemented_key": "tenant_admin",
+      "status": "implemented",
+      "scope_kind": "tenant",
+      "notes": [
+        "Current seed grants finance payroll and signoff permissions.",
+        "Should be narrowed over time."
+      ]
+    },
+    {
+      "documented_name": "Tenant Operator / Dispatcher",
+      "implemented_key": "dispatcher",
+      "status": "implemented",
+      "scope_kind": "tenant",
+      "notes": [
+        "Object-level limits exist in some finance and planning services.",
+        "Still participates in some finance write paths."
+      ]
+    },
+    {
+      "documented_name": "Tenant Accounting",
+      "implemented_key": "accounting",
+      "status": "implemented",
+      "scope_kind": "tenant",
+      "notes": [
+        "Finance-heavy role with no distinct frontend route-guard parity yet."
+      ]
+    },
+    {
+      "documented_name": "Tenant Controller / QM",
+      "implemented_key": "controller_qm",
+      "status": "implemented",
+      "scope_kind": "tenant",
+      "notes": [
+        "Reporting/compliance role is partial and not fully represented in UI routes."
+      ]
+    },
+    {
+      "documented_name": "Customer User",
+      "implemented_key": "customer_user",
+      "status": "implemented",
+      "scope_kind": "customer",
+      "notes": [
+        "Portal scope is enforced primarily in service context resolution."
+      ]
+    },
+    {
+      "documented_name": "Subcontractor Administrator",
+      "implemented_key": "subcontractor_user",
+      "status": "partial_mapping",
+      "scope_kind": "subcontractor",
+      "notes": [
+        "No separate subcontractor admin versus planner/operator split."
+      ]
+    },
+    {
+      "documented_name": "Subcontractor Planner / Operator",
+      "implemented_key": null,
+      "status": "missing_distinct_role",
+      "scope_kind": "subcontractor",
+      "notes": [
+        "Currently collapses into subcontractor_user behavior."
+      ]
+    },
+    {
+      "documented_name": "Field Supervisor / Object or Event Lead",
+      "implemented_key": null,
+      "status": "missing_distinct_role",
+      "scope_kind": "local_operational",
+      "notes": [
+        "Current code relies on dispatcher or employee_user in places instead."
+      ]
+    },
+    {
+      "documented_name": "Employee / Guard",
+      "implemented_key": "employee_user",
+      "status": "implemented",
+      "scope_kind": "employee_self",
+      "notes": [
+        "Self-scope exists in services, but route and app-shell parity is incomplete."
+      ]
+    }
+  ],
+  "critical_findings": [
+    {
+      "severity": "P1",
+      "key": "frontend_admin_routes_ignore_access",
+      "summary": "Current Vben SicherPlan admin routes all use ignoreAccess: true, so the shell does not enforce role-based route access."
+    },
+    {
+      "severity": "P2",
+      "key": "missing_documented_role_splits",
+      "summary": "Documented subcontractor and field-supervisor role splits are not yet represented as distinct IAM role keys."
+    },
+    {
+      "severity": "P2",
+      "key": "over_broad_admin_roles",
+      "summary": "platform_admin and tenant_admin have broad operational and finance permissions beyond the documented least-privilege intent."
+    }
+  ]
+}

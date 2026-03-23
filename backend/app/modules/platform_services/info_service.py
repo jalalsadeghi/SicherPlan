@@ -15,8 +15,10 @@ from app.modules.platform_services.docs_service import DocumentService
 from app.modules.platform_services.info_models import Notice, NoticeAudience, NoticeLink, NoticeRead
 from app.modules.platform_services.info_schemas import (
     NoticeAcknowledgeRequest,
+    NoticeAttachmentRead,
     NoticeAudienceRead,
     NoticeCreate,
+    NoticeFeedStatusRead,
     NoticeLinkCreate as CuratedNoticeLinkCreate,
     NoticeLinkRead,
     NoticeListItem,
@@ -169,16 +171,16 @@ class NoticeService:
         )
         for document_id in payload.attachment_document_ids:
             self._attach_document(tenant_id, notice.id, document_id, actor)
-        return self._to_notice_read(notice)
+        return self._to_notice_read(notice, actor)
 
     def list_admin_notices(self, tenant_id: str, actor: RequestAuthorizationContext) -> list[NoticeListItem]:
         self._ensure_write_scope(actor, tenant_id)
-        return [self._to_notice_list_item(notice, actor.user_id) for notice in self.repository.list_notices(tenant_id)]
+        return [self._to_notice_list_item(notice, actor) for notice in self.repository.list_notices(tenant_id)]
 
     def get_notice_admin(self, tenant_id: str, notice_id: str, actor: RequestAuthorizationContext) -> NoticeReadSchema:
         self._ensure_write_scope(actor, tenant_id)
         notice = self._require_notice(tenant_id, notice_id)
-        return self._to_notice_read(notice)
+        return self._to_notice_read(notice, actor)
 
     def publish_notice(
         self,
@@ -204,7 +206,7 @@ class NoticeService:
         notice.updated_by_user_id = actor.user_id
         notice.version_no += 1
         saved = self.repository.save_notice(notice)
-        return self._to_notice_read(saved)
+        return self._to_notice_read(saved, actor)
 
     def unpublish_notice(self, tenant_id: str, notice_id: str, actor: RequestAuthorizationContext) -> NoticeReadSchema:
         self._ensure_write_scope(actor, tenant_id)
@@ -214,15 +216,31 @@ class NoticeService:
         notice.updated_by_user_id = actor.user_id
         notice.version_no += 1
         saved = self.repository.save_notice(notice)
-        return self._to_notice_read(saved)
+        return self._to_notice_read(saved, actor)
 
     def list_visible_notices(self, tenant_id: str, actor: RequestAuthorizationContext) -> list[NoticeListItem]:
         self._ensure_read_scope(actor, tenant_id)
         visible = []
         for notice in self.repository.list_notices(tenant_id):
             if self._is_published_now(notice) and self.audience_resolver.is_visible(notice, actor):
-                visible.append(self._to_notice_list_item(notice, actor.user_id))
+                visible.append(self._to_notice_list_item(notice, actor))
         return visible
+
+    def get_visible_notice(self, tenant_id: str, notice_id: str, actor: RequestAuthorizationContext) -> NoticeReadSchema:
+        self._ensure_read_scope(actor, tenant_id)
+        notice = self._require_visible_notice(tenant_id, notice_id, actor)
+        return self._to_notice_read(notice, actor)
+
+    def get_feed_status(self, tenant_id: str, actor: RequestAuthorizationContext) -> NoticeFeedStatusRead:
+        items = self.list_visible_notices(tenant_id, actor)
+        return NoticeFeedStatusRead(
+            total_count=len(items),
+            unread_count=sum(1 for item in items if item.opened_at is None),
+            mandatory_unacknowledged_count=sum(
+                1 for item in items if item.mandatory_acknowledgement and item.acknowledged_at is None
+            ),
+            blocking_required=False,
+        )
 
     def open_notice(self, tenant_id: str, notice_id: str, actor: RequestAuthorizationContext) -> NoticeReadEvidenceRead:
         self._ensure_read_scope(actor, tenant_id)
@@ -352,13 +370,18 @@ class NoticeService:
             return
         raise ApiException(403, "iam.authorization.scope_denied", "errors.iam.authorization.scope_denied")
 
-    def _to_notice_read(self, notice: Notice) -> NoticeReadSchema:
+    def _to_notice_read(self, notice: Notice, actor: RequestAuthorizationContext) -> NoticeReadSchema:
         attachment_ids = [link.document_id for link in self.repository.list_document_links_for_notice(notice.tenant_id, notice.id)]
         schema = NoticeReadSchema.model_validate(notice)
-        return schema.model_copy(update={"attachment_document_ids": attachment_ids})
+        return schema.model_copy(
+            update={
+                "attachment_document_ids": attachment_ids,
+                "attachments": self._attachment_refs(notice.tenant_id, notice.id, actor),
+            }
+        )
 
-    def _to_notice_list_item(self, notice: Notice, user_account_id: str) -> NoticeListItem:
-        evidence = next((row for row in notice.reads if row.user_account_id == user_account_id), None)
+    def _to_notice_list_item(self, notice: Notice, actor: RequestAuthorizationContext) -> NoticeListItem:
+        evidence = next((row for row in notice.reads if row.user_account_id == actor.user_id), None)
         attachment_ids = [link.document_id for link in self.repository.list_document_links_for_notice(notice.tenant_id, notice.id)]
         return NoticeListItem(
             id=notice.id,
@@ -371,7 +394,30 @@ class NoticeService:
             published_at=notice.published_at,
             status=notice.status,
             acknowledged_at=evidence.acknowledged_at if evidence is not None else None,
+            opened_at=evidence.last_opened_at if evidence is not None else None,
             audiences=[NoticeAudienceRead.model_validate(audience) for audience in notice.audiences],
             links=[NoticeLinkRead.model_validate(link) for link in notice.links],
             attachment_document_ids=attachment_ids,
+            attachments=self._attachment_refs(notice.tenant_id, notice.id, actor),
         )
+
+    def _attachment_refs(
+        self,
+        tenant_id: str,
+        notice_id: str,
+        actor: RequestAuthorizationContext,
+    ) -> list[NoticeAttachmentRead]:
+        items: list[NoticeAttachmentRead] = []
+        for link in self.repository.list_document_links_for_notice(tenant_id, notice_id):
+            document = self.document_service.get_document(tenant_id, link.document_id, actor)
+            version = next((row for row in document.versions if row.version_no == document.current_version_no), None)
+            items.append(
+                NoticeAttachmentRead(
+                    document_id=document.id,
+                    title=document.title,
+                    file_name=version.file_name if version is not None else None,
+                    content_type=version.content_type if version is not None else None,
+                    current_version_no=document.current_version_no,
+                )
+            )
+        return items

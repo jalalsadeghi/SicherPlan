@@ -44,7 +44,8 @@ class SqlAlchemyIntegrationRepository:
     ) -> ImportExportJob:
         self.session.add(job)
         self.session.flush()
-        outbox_event.aggregate_id = job.id
+        if not outbox_event.aggregate_id:
+            outbox_event.aggregate_id = job.id
         self.session.add(outbox_event)
         self.session.commit()
         return self.get_job(job.tenant_id, job.id) or job

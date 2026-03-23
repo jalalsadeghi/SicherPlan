@@ -14,8 +14,13 @@ import type { AppLocale } from "@/i18n/messages";
 
 const { locale, setLocale, t } = useI18n();
 
-function onChange(event: Event) {
+async function onChange(event: Event) {
   const target = event.target as HTMLSelectElement;
-  setLocale(target.value as AppLocale);
+  const nextLocale = target.value as AppLocale;
+  if (nextLocale === locale.value) {
+    return;
+  }
+
+  await setLocale(nextLocale);
 }
 </script>

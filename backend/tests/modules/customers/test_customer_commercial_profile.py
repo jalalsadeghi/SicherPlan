@@ -251,6 +251,7 @@ class TestCustomerCommercialMetadata(unittest.TestCase):
         }
 
         self.assertIn("uq_crm_customer_billing_profile_customer", profile_constraints)
+        self.assertIn("uq_crm_customer_billing_profile_tenant_id_id", profile_constraints)
         self.assertIn("uq_crm_customer_invoice_party_default_per_customer", invoice_indexes)
 
 

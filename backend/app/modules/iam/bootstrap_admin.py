@@ -27,7 +27,8 @@ class SystemAdminBootstrapSummary:
     tenant_created: bool
     user_created: bool
     user_updated: bool
-    role_assignment_created: bool
+    platform_role_assignment_created: bool
+    tenant_role_assignment_created: bool
     tenant_code: str
     username: str
     email: str
@@ -45,6 +46,8 @@ class SystemAdminBootstrapRepository(Protocol):
 
 
 class SystemAdminBootstrapper:
+    _SYSTEM_ADMIN_ROLE_KEYS: tuple[str, str] = ("platform_admin", "tenant_admin")
+
     def __init__(self, repository: SystemAdminBootstrapRepository) -> None:
         self.repository = repository
 
@@ -65,9 +68,12 @@ class SystemAdminBootstrapper:
                 )
             )
 
-        role = self.repository.get_role_by_key("platform_admin")
-        if role is None:
-            raise RuntimeError("platform_admin role is missing. Run IAM catalog seeding first.")
+        roles_by_key: dict[str, Role] = {}
+        for role_key in self._SYSTEM_ADMIN_ROLE_KEYS:
+            role = self.repository.get_role_by_key(role_key)
+            if role is None:
+                raise RuntimeError(f"{role_key} role is missing. Run IAM catalog seeding first.")
+            roles_by_key[role_key] = role
 
         user = self.repository.find_user_for_tenant(
             tenant.id,
@@ -109,32 +115,35 @@ class SystemAdminBootstrapper:
                     setattr(user, field_name, value)
                     changed = True
             if changed:
-                user.version_no += 1
+                user.version_no = (user.version_no or 0) + 1
                 user = self.repository.save_user(user)
                 user_updated = True
 
-        assignment = self.repository.get_role_assignment(user.id, role.id, tenant.id)
-        role_assignment_created = assignment is None
-        if assignment is None:
-            self.repository.save_role_assignment(
-                UserRoleAssignment(
-                    tenant_id=tenant.id,
-                    user_account_id=user.id,
-                    role_id=role.id,
-                    scope_type="tenant",
+        assignment_created_by_key: dict[str, bool] = {}
+        for role_key, role in roles_by_key.items():
+            assignment = self.repository.get_role_assignment(user.id, role.id, tenant.id)
+            assignment_created_by_key[role_key] = assignment is None
+            if assignment is None:
+                self.repository.save_role_assignment(
+                    UserRoleAssignment(
+                        tenant_id=tenant.id,
+                        user_account_id=user.id,
+                        role_id=role.id,
+                        scope_type="tenant",
+                    )
                 )
-            )
-        elif assignment.status != "active" or assignment.archived_at is not None:
-            assignment.status = "active"
-            assignment.archived_at = None
-            assignment.version_no = (assignment.version_no or 0) + 1
-            self.repository.save_role_assignment(assignment)
+            elif assignment.status != "active" or assignment.archived_at is not None:
+                assignment.status = "active"
+                assignment.archived_at = None
+                assignment.version_no = (assignment.version_no or 0) + 1
+                self.repository.save_role_assignment(assignment)
 
         return SystemAdminBootstrapSummary(
             tenant_created=tenant_created,
             user_created=user_created,
             user_updated=user_updated,
-            role_assignment_created=role_assignment_created,
+            platform_role_assignment_created=assignment_created_by_key["platform_admin"],
+            tenant_role_assignment_created=assignment_created_by_key["tenant_admin"],
             tenant_code=config.tenant_code,
             username=config.username,
             email=config.email,

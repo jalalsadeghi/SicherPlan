@@ -1,21 +1,33 @@
 <template>
   <section class="notice-page">
-    <div class="module-card notice-hero">
-      <div>
-        <p class="eyebrow">{{ t("noticeAdmin.eyebrow") }}</p>
-        <h2>{{ t("noticeAdmin.title") }}</h2>
-        <p class="notice-lead">{{ t("noticeAdmin.lead") }}</p>
-      </div>
-      <div class="notice-scope">
-        <label class="field-stack">
-          <span>{{ t("noticeAdmin.scope.label") }}</span>
-          <input v-model="tenantScopeInput" :placeholder="t('noticeAdmin.scope.placeholder')" />
-        </label>
-        <button class="cta-button" type="button" @click="rememberScope">
-          {{ t("noticeAdmin.scope.action") }}
-        </button>
-      </div>
-    </div>
+    <AdminPageShell
+      v-if="!embedded"
+      :eyebrow="t('noticeAdmin.eyebrow')"
+      :title="t('noticeAdmin.title')"
+      :lead="t('noticeAdmin.lead')"
+    >
+      <template #actions>
+        <div class="module-card notice-scope">
+          <label class="field-stack">
+            <span>{{ t("noticeAdmin.scope.label") }}</span>
+            <input v-model="tenantScopeInput" :placeholder="t('noticeAdmin.scope.placeholder')" />
+          </label>
+          <button class="cta-button" type="button" @click="rememberScope">
+            {{ t("noticeAdmin.scope.action") }}
+          </button>
+        </div>
+      </template>
+    </AdminPageShell>
+
+    <section v-else class="module-card notice-scope notice-scope--embedded">
+      <label class="field-stack">
+        <span>{{ t("noticeAdmin.scope.label") }}</span>
+        <input v-model="tenantScopeInput" :placeholder="t('noticeAdmin.scope.placeholder')" />
+      </label>
+      <button class="cta-button" type="button" @click="rememberScope">
+        {{ t("noticeAdmin.scope.action") }}
+      </button>
+    </section>
 
     <section v-if="feedback" class="notice-feedback">{{ feedback }}</section>
 
@@ -90,21 +102,52 @@
             <div>
               <strong>{{ notice.title }}</strong>
               <p>{{ notice.summary || notice.status }}</p>
+              <p v-if="notice.attachments.length || notice.links.length" class="notice-meta">
+                {{ notice.attachments.length }} / {{ notice.links.length }}
+              </p>
             </div>
-            <button
-              v-if="notice.mandatory_acknowledgement && !notice.acknowledged_at"
-              class="cta-button"
-              type="button"
-              @click="acknowledge(notice.id)"
-            >
-              {{ t("noticeAdmin.actions.acknowledge") }}
-            </button>
-            <span v-else class="notice-pill">
-              {{ notice.acknowledged_at ? t("noticeAdmin.feed.acknowledged") : notice.status }}
-            </span>
+            <div class="cta-row">
+              <button class="cta-button cta-secondary" type="button" @click="openFeedNotice(notice.id)">
+                {{ t("noticeAdmin.actions.refresh") }}
+              </button>
+              <button
+                v-if="notice.mandatory_acknowledgement && !notice.acknowledged_at"
+                class="cta-button"
+                type="button"
+                @click="acknowledge(notice.id)"
+              >
+                {{ t("noticeAdmin.actions.acknowledge") }}
+              </button>
+              <span v-else class="notice-pill">
+                {{ notice.acknowledged_at ? t("noticeAdmin.feed.acknowledged") : notice.status }}
+              </span>
+            </div>
           </article>
         </div>
         <p v-else>{{ t("noticeAdmin.feed.empty") }}</p>
+      </section>
+
+      <section v-if="selectedFeedNotice" class="module-card">
+        <p class="eyebrow">{{ t("noticeAdmin.feed.eyebrow") }}</p>
+        <h3>{{ selectedFeedNotice.title }}</h3>
+        <p class="notice-lead">{{ selectedFeedNotice.body }}</p>
+        <ul v-if="selectedFeedNotice.links.length" class="notice-list-inline">
+          <li v-for="link in selectedFeedNotice.links" :key="link.id">
+            <a :href="link.url" target="_blank" rel="noreferrer">{{ link.label }}</a>
+          </li>
+        </ul>
+        <ul v-if="selectedFeedNotice.attachments.length" class="notice-list-inline">
+          <li v-for="attachment in selectedFeedNotice.attachments" :key="attachment.document_id">
+            <button
+              class="secondary-button"
+              type="button"
+              :disabled="!attachment.current_version_no"
+              @click="downloadAttachment(attachment.document_id, attachment.current_version_no || 1, attachment.file_name || attachment.title)"
+            >
+              {{ attachment.file_name || attachment.title }}
+            </button>
+          </li>
+        </ul>
       </section>
     </div>
   </section>
@@ -113,9 +156,25 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
 
-import { acknowledgeNotice, createNotice, listAdminNotices, listMyNoticeFeed, publishNotice, type NoticeListItem } from "@/api/notices";
+import AdminPageShell from "@/components/AdminPageShell.vue";
+import {
+  acknowledgeNotice,
+  createNotice,
+  downloadNoticeAttachment,
+  getVisibleNotice,
+  listAdminNotices,
+  listMyNoticeFeed,
+  openNotice,
+  publishNotice,
+  type NoticeListItem,
+  type NoticeRead,
+} from "@/api/notices";
 import { useI18n } from "@/i18n";
 import { useAuthStore } from "@/stores/auth";
+
+withDefaults(defineProps<{ embedded?: boolean }>(), {
+  embedded: false,
+});
 
 const { t } = useI18n();
 const authStore = useAuthStore();
@@ -126,6 +185,7 @@ const feedback = ref("");
 const loading = ref(false);
 const adminNotices = ref<NoticeListItem[]>([]);
 const myFeed = ref<NoticeListItem[]>([]);
+const selectedFeedNotice = ref<NoticeRead | null>(null);
 const draft = reactive({
   title: "",
   summary: "",
@@ -141,14 +201,15 @@ function rememberScope() {
 }
 
 async function refreshLists() {
-  if (!tenantScopeId.value) {
+  const accessToken = authStore.accessToken;
+  if (!tenantScopeId.value || !accessToken) {
     adminNotices.value = [];
     myFeed.value = [];
     return;
   }
   try {
-    adminNotices.value = await listAdminNotices(tenantScopeId.value, authStore.activeRole);
-    myFeed.value = await listMyNoticeFeed(tenantScopeId.value, authStore.activeRole);
+    adminNotices.value = await listAdminNotices(tenantScopeId.value, accessToken);
+    myFeed.value = await listMyNoticeFeed(tenantScopeId.value, accessToken);
   } catch {
     feedback.value = t("noticeAdmin.feedback.error");
   }
@@ -161,7 +222,7 @@ async function submitNotice() {
   }
   loading.value = true;
   try {
-    const created = await createNotice(tenantScopeId.value, authStore.activeRole, {
+    const created = await createNotice(tenantScopeId.value, authStore.accessToken, {
       tenant_id: tenantScopeId.value,
       title: draft.title,
       summary: draft.summary || null,
@@ -188,7 +249,7 @@ async function submitNotice() {
 async function publishDraft(noticeId: string) {
   if (!tenantScopeId.value) return;
   try {
-    await publishNotice(tenantScopeId.value, noticeId, authStore.activeRole);
+    await publishNotice(tenantScopeId.value, noticeId, authStore.accessToken);
     feedback.value = t("noticeAdmin.feedback.published");
     await refreshLists();
   } catch {
@@ -199,7 +260,7 @@ async function publishDraft(noticeId: string) {
 async function acknowledge(noticeId: string) {
   if (!tenantScopeId.value) return;
   try {
-    await acknowledgeNotice(tenantScopeId.value, noticeId, authStore.activeRole);
+    await acknowledgeNotice(tenantScopeId.value, noticeId, authStore.accessToken);
     feedback.value = t("noticeAdmin.feedback.acknowledged");
     await refreshLists();
   } catch {
@@ -207,7 +268,38 @@ async function acknowledge(noticeId: string) {
   }
 }
 
+async function openFeedNotice(noticeId: string) {
+  if (!tenantScopeId.value) return;
+  try {
+    await openNotice(tenantScopeId.value, noticeId, authStore.accessToken);
+    selectedFeedNotice.value = await getVisibleNotice(tenantScopeId.value, noticeId, authStore.accessToken);
+    await refreshLists();
+  } catch {
+    feedback.value = t("noticeAdmin.feedback.error");
+  }
+}
+
+async function downloadAttachment(documentId: string, versionNo: number, fileName: string) {
+  if (!tenantScopeId.value) return;
+  try {
+    const blob = await downloadNoticeAttachment(tenantScopeId.value, documentId, versionNo, authStore.accessToken);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    feedback.value = t("noticeAdmin.feedback.error");
+  }
+}
+
 onMounted(() => {
+  if (!tenantScopeId.value && authStore.sessionUser?.tenant_id) {
+    authStore.setTenantScopeId(authStore.sessionUser.tenant_id);
+    tenantScopeId.value = authStore.tenantScopeId;
+    tenantScopeInput.value = authStore.tenantScopeId;
+  }
   void refreshLists();
 });
 </script>
@@ -240,6 +332,10 @@ onMounted(() => {
   color: var(--sp-color-primary-strong);
 }
 
+.notice-scope--embedded {
+  margin-bottom: 0.25rem;
+}
+
 .notice-row {
   display: flex;
   justify-content: space-between;
@@ -263,6 +359,12 @@ onMounted(() => {
   background: var(--sp-color-primary-muted);
   color: var(--sp-color-primary-strong);
   font-size: 0.85rem;
+}
+
+.notice-meta,
+.notice-list-inline {
+  margin: 0.35rem 0 0;
+  color: var(--sp-color-text-secondary);
 }
 
 .notice-checkbox {

@@ -115,3 +115,21 @@ class TestAuthorizationHelpers(unittest.TestCase):
 
         with self.assertRaises(ApiException):
             enforce_scope(context, scope="customer", tenant_id="tenant-1", request_customer_id="customer-2")
+
+    def test_subcontractor_scope_allows_only_matching_subcontractor(self) -> None:
+        context = _context(
+            role_keys=("subcontractor_user",),
+            permission_keys=("portal.subcontractor.access",),
+            scopes=(
+                AuthenticatedRoleScope(
+                    role_key="subcontractor_user",
+                    scope_type="subcontractor",
+                    subcontractor_id="subcontractor-1",
+                ),
+            ),
+        )
+
+        enforce_scope(context, scope="subcontractor", tenant_id="tenant-1", subcontractor_id="subcontractor-1")
+
+        with self.assertRaises(ApiException):
+            enforce_scope(context, scope="subcontractor", tenant_id="tenant-1", subcontractor_id="subcontractor-2")

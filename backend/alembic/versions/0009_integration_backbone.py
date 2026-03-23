@@ -70,6 +70,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["tenant_id"], ["core.tenant.id"], name="fk_import_export_job_tenant_id_tenant", ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["tenant_id", "endpoint_id"], ["integration.endpoint.tenant_id", "integration.endpoint.id"], name="fk_integration_job_tenant_endpoint", ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id", name="pk_import_export_job"),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_integration_import_export_job_tenant_id_id"),
         schema="integration",
     )
     op.create_index("ix_integration_job_tenant_status", "import_export_job", ["tenant_id", "status"], unique=False, schema="integration")

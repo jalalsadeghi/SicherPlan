@@ -1,6 +1,6 @@
 <template>
   <div class="core-admin-page">
-    <section class="core-admin-hero">
+    <section v-if="!embedded" class="core-admin-hero">
       <div class="core-admin-copy">
         <p class="core-admin-breadcrumb">{{ t("coreAdmin.breadcrumb") }}</p>
         <p class="eyebrow">{{ t("coreAdmin.eyebrow") }}</p>
@@ -15,52 +15,52 @@
           </span>
         </div>
       </div>
-
-      <div class="module-card core-admin-scope-card">
-        <div class="core-admin-panel__header">
-          <div>
-            <p class="eyebrow">{{ t("coreAdmin.scope.label") }}</p>
-            <h3>{{ t("coreAdmin.permission.ready") }}</h3>
-          </div>
-          <StatusBadge :status="authStore.activeRole === 'platform_admin' ? 'active' : 'inactive'" />
-        </div>
-
-        <label class="field-stack">
-          <span>{{ t("coreAdmin.scope.label") }}</span>
-          <input
-            v-model="tenantScopeInput"
-            :placeholder="t('coreAdmin.scope.placeholder')"
-            :disabled="authStore.activeRole === 'platform_admin'"
-          />
-        </label>
-        <p class="field-help">
-          {{
-            authStore.activeRole === "platform_admin"
-              ? t("coreAdmin.scope.platformHint")
-              : t("coreAdmin.scope.help")
-          }}
-        </p>
-        <div class="cta-row">
-          <button
-            class="cta-button"
-            type="button"
-            :disabled="authStore.activeRole !== 'tenant_admin'"
-            :data-action-key="ACTION_KEYS.scopeLoad"
-            @click="loadScopedTenant"
-          >
-            {{ t("coreAdmin.actions.loadScopedTenant") }}
-          </button>
-          <button
-            class="cta-button cta-secondary"
-            type="button"
-            :disabled="loading.refresh"
-            @click="refreshAll"
-          >
-            {{ t("coreAdmin.actions.refresh") }}
-          </button>
-        </div>
-      </div>
     </section>
+
+    <div class="module-card core-admin-scope-card" :class="{ 'core-admin-scope-card--embedded': embedded }">
+      <div class="core-admin-panel__header">
+        <div>
+          <p class="eyebrow">{{ t("coreAdmin.scope.label") }}</p>
+          <h3>{{ t("coreAdmin.permission.ready") }}</h3>
+        </div>
+        <StatusBadge :status="effectiveRole === 'platform_admin' ? 'active' : 'inactive'" />
+      </div>
+
+      <label class="field-stack">
+        <span>{{ t("coreAdmin.scope.label") }}</span>
+        <input
+          v-model="tenantScopeInput"
+          :placeholder="t('coreAdmin.scope.placeholder')"
+          :disabled="effectiveRole === 'platform_admin'"
+        />
+      </label>
+      <p class="field-help">
+        {{
+          effectiveRole === "platform_admin"
+            ? t("coreAdmin.scope.platformHint")
+            : t("coreAdmin.scope.help")
+        }}
+      </p>
+      <div class="cta-row">
+        <button
+          class="cta-button"
+          type="button"
+          :disabled="effectiveRole !== 'tenant_admin'"
+          :data-action-key="ACTION_KEYS.scopeLoad"
+          @click="loadScopedTenant"
+        >
+          {{ t("coreAdmin.actions.loadScopedTenant") }}
+        </button>
+        <button
+          class="cta-button cta-secondary"
+          type="button"
+          :disabled="loading.refresh"
+          @click="refreshAll"
+        >
+          {{ t("coreAdmin.actions.refresh") }}
+        </button>
+      </div>
+    </div>
 
     <section v-if="feedback.message" class="core-admin-feedback" :data-tone="feedback.tone">
       <div>
@@ -73,7 +73,7 @@
     </section>
 
     <section
-      v-if="authStore.activeRole === 'tenant_admin' && !actorTenantId"
+      v-if="effectiveRole === 'tenant_admin' && !actorTenantId"
       class="module-card core-admin-empty-state"
     >
       <p class="eyebrow">{{ t("coreAdmin.scope.emptyTitle") }}</p>
@@ -113,14 +113,14 @@
         </div>
         <p v-else class="core-admin-list-empty">
           {{
-            authStore.activeRole === "tenant_admin"
+            effectiveRole === "tenant_admin"
               ? t("coreAdmin.tenants.scopeOnly")
               : t("coreAdmin.tenants.empty")
           }}
         </p>
 
         <form
-          v-if="authStore.activeRole === 'platform_admin'"
+          v-if="effectiveRole === 'platform_admin'"
           class="core-admin-form"
           @submit.prevent="submitOnboarding"
         >
@@ -618,6 +618,10 @@ import {
 import { useI18n } from "@/i18n";
 import { useAuthStore } from "@/stores/auth";
 
+withDefaults(defineProps<{ embedded?: boolean }>(), {
+  embedded: false,
+});
+
 const ACTION_KEYS = {
   scopeLoad: "core.admin.scope.load",
   tenantCreate: "core.admin.tenant.create",
@@ -748,8 +752,11 @@ const settingDraft = reactive({
   valueJsonText: "{\"mode\":\"light\"}",
 });
 
+const effectiveRole = computed(() => authStore.effectiveRole);
+const effectiveAccessToken = computed(() => authStore.effectiveAccessToken);
+
 const actorTenantId = computed(() => {
-  if (authStore.activeRole !== "tenant_admin") {
+  if (effectiveRole.value !== "tenant_admin") {
     return null;
   }
 
@@ -800,7 +807,7 @@ function syncRouteState() {
     filter: tenantFilter.value || undefined,
     tenant: selectedTenantId.value || undefined,
     scope:
-      authStore.activeRole === "tenant_admin" && tenantScopeInput.value.trim()
+      effectiveRole.value === "tenant_admin" && tenantScopeInput.value.trim()
         ? tenantScopeInput.value.trim()
         : undefined,
   };
@@ -850,7 +857,9 @@ function selectTenant(tenantId: string) {
 }
 
 async function refreshAll() {
-  if (authStore.activeRole === "tenant_admin" && !actorTenantId.value) {
+  authStore.syncFromPrimarySession();
+
+  if (effectiveRole.value === "tenant_admin" && !actorTenantId.value) {
     tenants.value = [];
     selectedTenant.value = null;
     branches.value = [];
@@ -865,7 +874,7 @@ async function refreshAll() {
   try {
     await loadTenants();
     const tenantIdToLoad =
-      selectedTenantId.value || (authStore.activeRole === "tenant_admin" ? actorTenantId.value : null);
+      selectedTenantId.value || (effectiveRole.value === "tenant_admin" ? actorTenantId.value : null);
 
     if (tenantIdToLoad) {
       selectedTenantId.value = tenantIdToLoad;
@@ -893,10 +902,10 @@ async function loadTenants() {
   loading.tenants = true;
 
   try {
-    tenants.value = await listTenants(authStore.activeRole, actorTenantId.value);
+    tenants.value = await listTenants(effectiveAccessToken.value, effectiveRole.value, actorTenantId.value);
 
     if (tenants.value.length === 0) {
-      selectedTenantId.value = authStore.activeRole === "tenant_admin" ? actorTenantId.value ?? "" : "";
+      selectedTenantId.value = effectiveRole.value === "tenant_admin" ? actorTenantId.value ?? "" : "";
       return;
     }
 
@@ -916,10 +925,10 @@ async function loadTenantContext(tenantId: string) {
 
   try {
     const [tenantRecord, branchRecords, mandateRecords, settingRecords] = await Promise.all([
-      getTenant(tenantId, authStore.activeRole, actorTenantId.value),
-      listBranches(tenantId, authStore.activeRole, actorTenantId.value),
-      listMandates(tenantId, authStore.activeRole, actorTenantId.value),
-      listSettings(tenantId, authStore.activeRole, actorTenantId.value),
+      getTenant(effectiveAccessToken.value, tenantId, effectiveRole.value, actorTenantId.value),
+      listBranches(effectiveAccessToken.value, tenantId, effectiveRole.value, actorTenantId.value),
+      listMandates(effectiveAccessToken.value, tenantId, effectiveRole.value, actorTenantId.value),
+      listSettings(effectiveAccessToken.value, tenantId, effectiveRole.value, actorTenantId.value),
     ]);
 
     selectedTenant.value = tenantRecord;
@@ -927,7 +936,7 @@ async function loadTenantContext(tenantId: string) {
     mandates.value = mandateRecords;
     settings.value = settingRecords;
     authStore.setTenantScopeId(tenantRecord.id);
-    tenantScopeInput.value = authStore.activeRole === "tenant_admin" ? tenantRecord.id : tenantScopeInput.value;
+    tenantScopeInput.value = effectiveRole.value === "tenant_admin" ? tenantRecord.id : tenantScopeInput.value;
     hydrateTenantDraft();
     resetMandateDraft();
   } catch (error) {
@@ -943,6 +952,7 @@ async function submitOnboarding() {
   try {
     const tenantIdPlaceholder = "00000000-0000-0000-0000-000000000000";
     const result = await onboardTenant(
+      effectiveAccessToken.value,
       {
         tenant: {
           code: onboarding.tenant.code,
@@ -977,7 +987,7 @@ async function submitOnboarding() {
             ]
           : [],
       },
-      authStore.activeRole,
+      effectiveRole.value,
     );
 
     setFeedback("success", t("coreAdmin.feedback.success"), t("coreAdmin.feedback.tenantCreated"));
@@ -1000,6 +1010,7 @@ async function submitTenantUpdate() {
 
   try {
     selectedTenant.value = await updateTenant(
+      effectiveAccessToken.value,
       selectedTenant.value.id,
       {
         name: tenantDraft.name,
@@ -1008,7 +1019,7 @@ async function submitTenantUpdate() {
         default_currency: tenantDraft.default_currency,
         timezone: tenantDraft.timezone,
       },
-      authStore.activeRole,
+      effectiveRole.value,
       actorTenantId.value,
     );
 
@@ -1030,9 +1041,10 @@ async function setTenantStatus(status: LifecycleStatus) {
 
   try {
     selectedTenant.value = await transitionTenantStatus(
+      effectiveAccessToken.value,
       selectedTenant.value.id,
       status,
-      authStore.activeRole,
+      effectiveRole.value,
       actorTenantId.value,
     );
     syncTenantListItem(selectedTenant.value);
@@ -1053,12 +1065,13 @@ async function archiveTenant() {
 
   try {
     selectedTenant.value = await updateTenant(
+      effectiveAccessToken.value,
       selectedTenant.value.id,
       {
         status: "archived",
         archived_at: new Date().toISOString(),
       },
-      authStore.activeRole,
+      effectiveRole.value,
       actorTenantId.value,
     );
     syncTenantListItem(selectedTenant.value);
@@ -1080,6 +1093,7 @@ async function submitBranch() {
   try {
     if (branchDraft.id) {
       await updateBranch(
+        effectiveAccessToken.value,
         selectedTenant.value.id,
         branchDraft.id,
         {
@@ -1087,11 +1101,12 @@ async function submitBranch() {
           contact_email: branchDraft.contact_email || null,
           contact_phone: branchDraft.contact_phone || null,
         },
-        authStore.activeRole,
+        effectiveRole.value,
         actorTenantId.value,
       );
     } else {
       await createBranch(
+        effectiveAccessToken.value,
         selectedTenant.value.id,
         {
           tenant_id: selectedTenant.value.id,
@@ -1101,7 +1116,7 @@ async function submitBranch() {
           contact_email: branchDraft.contact_email || null,
           contact_phone: branchDraft.contact_phone || null,
         },
-        authStore.activeRole,
+        effectiveRole.value,
         actorTenantId.value,
       );
     }
@@ -1125,13 +1140,14 @@ async function setBranchStatus(branch: BranchRead, status: LifecycleStatus) {
 
   try {
     await updateBranch(
+      effectiveAccessToken.value,
       selectedTenant.value.id,
       branch.id,
       {
         status,
         archived_at: status === "archived" ? new Date().toISOString() : null,
       },
-      authStore.activeRole,
+      effectiveRole.value,
       actorTenantId.value,
     );
 
@@ -1154,6 +1170,7 @@ async function submitMandate() {
   try {
     if (mandateDraft.id) {
       await updateMandate(
+        effectiveAccessToken.value,
         selectedTenant.value.id,
         mandateDraft.id,
         {
@@ -1161,11 +1178,12 @@ async function submitMandate() {
           external_ref: mandateDraft.external_ref || null,
           notes: mandateDraft.notes || null,
         },
-        authStore.activeRole,
+        effectiveRole.value,
         actorTenantId.value,
       );
     } else {
       await createMandate(
+        effectiveAccessToken.value,
         selectedTenant.value.id,
         {
           tenant_id: selectedTenant.value.id,
@@ -1175,7 +1193,7 @@ async function submitMandate() {
           external_ref: mandateDraft.external_ref || null,
           notes: mandateDraft.notes || null,
         },
-        authStore.activeRole,
+        effectiveRole.value,
         actorTenantId.value,
       );
     }
@@ -1199,13 +1217,14 @@ async function setMandateStatus(mandate: MandateRead, status: LifecycleStatus) {
 
   try {
     await updateMandate(
+      effectiveAccessToken.value,
       selectedTenant.value.id,
       mandate.id,
       {
         status,
         archived_at: status === "archived" ? new Date().toISOString() : null,
       },
-      authStore.activeRole,
+      effectiveRole.value,
       actorTenantId.value,
     );
 
@@ -1228,24 +1247,26 @@ async function submitSetting() {
   try {
     if (settingDraft.id) {
       await updateSetting(
+        effectiveAccessToken.value,
         selectedTenant.value.id,
         settingDraft.id,
         {
           value_json: parseJsonObject(settingDraft.valueJsonText),
           version_no: settingDraft.version_no,
         },
-        authStore.activeRole,
+        effectiveRole.value,
         actorTenantId.value,
       );
     } else {
       await createSetting(
+        effectiveAccessToken.value,
         selectedTenant.value.id,
         {
           tenant_id: selectedTenant.value.id,
           key: settingDraft.key,
           value_json: parseJsonObject(settingDraft.valueJsonText),
         },
-        authStore.activeRole,
+        effectiveRole.value,
         actorTenantId.value,
       );
     }
@@ -1269,6 +1290,7 @@ async function setSettingStatus(setting: TenantSettingRead, status: LifecycleSta
 
   try {
     await updateSetting(
+      effectiveAccessToken.value,
       selectedTenant.value.id,
       setting.id,
       {
@@ -1277,7 +1299,7 @@ async function setSettingStatus(setting: TenantSettingRead, status: LifecycleSta
         status,
         archived_at: status === "archived" ? new Date().toISOString() : null,
       },
-      authStore.activeRole,
+      effectiveRole.value,
       actorTenantId.value,
     );
 
@@ -1365,11 +1387,11 @@ function handleError(error: unknown) {
 }
 
 watch(
-  [tenantFilter, selectedTenantId, tenantScopeInput, () => authStore.activeRole],
+  [tenantFilter, selectedTenantId, tenantScopeInput, () => effectiveRole.value],
   () => {
     syncRouteState();
 
-    if (authStore.activeRole === "tenant_admin") {
+    if (effectiveRole.value === "tenant_admin") {
       authStore.setTenantScopeId(tenantScopeInput.value);
     }
   },
@@ -1387,22 +1409,23 @@ watch(
 );
 
 watch(
-  () => authStore.activeRole,
+  () => effectiveRole.value,
   async () => {
     clearFeedback();
-    if (authStore.activeRole !== "tenant_admin") {
+    if (effectiveRole.value !== "tenant_admin") {
       tenantScopeInput.value = "";
     } else if (!tenantScopeInput.value && authStore.tenantScopeId) {
       tenantScopeInput.value = authStore.tenantScopeId;
     }
 
     selectedTenantId.value =
-      authStore.activeRole === "tenant_admin" ? actorTenantId.value ?? "" : selectedTenantId.value;
+      effectiveRole.value === "tenant_admin" ? actorTenantId.value ?? "" : selectedTenantId.value;
     await refreshAll();
   },
 );
 
 onMounted(async () => {
+  authStore.syncFromPrimarySession();
   resetBranchDraft();
   resetMandateDraft();
   resetSettingDraft();
@@ -1414,6 +1437,7 @@ onMounted(async () => {
 .core-admin-page {
   display: grid;
   gap: 1.25rem;
+  min-width: 0;
 }
 
 .core-admin-hero {
@@ -1426,6 +1450,7 @@ onMounted(async () => {
 .core-admin-scope-card,
 .core-admin-panel,
 .core-admin-empty-state {
+  min-width: 0;
   background: var(--sp-color-surface-panel);
   border: 1px solid var(--sp-color-border-soft);
   border-radius: 24px;
@@ -1466,11 +1491,16 @@ onMounted(async () => {
   padding: 1.25rem;
 }
 
+.core-admin-scope-card--embedded {
+  margin-bottom: 0.25rem;
+}
+
 .core-admin-grid {
   display: grid;
   grid-template-columns: minmax(320px, 0.85fr) minmax(0, 1.35fr);
   gap: 1.25rem;
   align-items: start;
+  min-width: 0;
 }
 
 .core-admin-detail {
@@ -1481,22 +1511,27 @@ onMounted(async () => {
 .core-admin-section {
   display: grid;
   gap: 1rem;
+  min-width: 0;
 }
 
 .core-admin-panel__header,
 .core-admin-record,
 .core-admin-lifecycle {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  min-width: 0;
 }
 
 .core-admin-feedback {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  min-width: 0;
   padding: 1rem 1.2rem;
   border-radius: 20px;
   border: 1px solid var(--sp-color-border-soft);
@@ -1536,10 +1571,12 @@ onMounted(async () => {
 .core-admin-list {
   display: grid;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .core-admin-row,
 .core-admin-record {
+  min-width: 0;
   padding: 0.9rem 1rem;
   border-radius: 18px;
   border: 1px solid var(--sp-color-border-soft);
@@ -1547,6 +1584,7 @@ onMounted(async () => {
 }
 
 .core-admin-row {
+  width: 100%;
   text-align: left;
   cursor: pointer;
   transition:
@@ -1565,6 +1603,7 @@ onMounted(async () => {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.55rem;
+  min-width: 0;
 }
 
 .core-admin-version {
@@ -1576,18 +1615,21 @@ onMounted(async () => {
   display: grid;
   gap: 1rem;
   padding-top: 0.25rem;
+  min-width: 0;
 }
 
 .core-admin-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.9rem;
+  min-width: 0;
 }
 
 .field-stack {
   display: grid;
   gap: 0.42rem;
   font-size: 0.9rem;
+  min-width: 0;
 }
 
 .field-stack--wide {
@@ -1598,6 +1640,9 @@ onMounted(async () => {
 .field-stack select,
 .field-stack textarea {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border-radius: 14px;
   border: 1px solid var(--sp-color-border-soft);
   background: var(--sp-color-surface-card);

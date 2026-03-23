@@ -85,6 +85,14 @@ test("portal api errors are mapped to localized feedback keys", () => {
     mapPortalApiMessage("errors.customers.portal.contact_not_linked"),
     "portalCustomer.feedback.contactNotLinked",
   );
+  assert.equal(
+    mapPortalApiMessage("errors.field.watchbook.portal_write_denied"),
+    "portalCustomer.feedback.watchbookWriteDenied",
+  );
+  assert.equal(
+    mapPortalApiMessage("errors.finance.invoice.not_found"),
+    "portalCustomer.feedback.financeDocumentDenied",
+  );
   assert.equal(mapPortalApiMessage("errors.platform.internal"), "portalCustomer.feedback.error");
 });
 

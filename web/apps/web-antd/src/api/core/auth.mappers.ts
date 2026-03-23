@@ -24,7 +24,10 @@ function resolveHomePath(roleKeys: string[]): string {
   if (roleKeys.includes('customer_user')) {
     return '/portal/customer';
   }
-  return '/admin/core';
+  if (roleKeys.includes('subcontractor_user')) {
+    return '/portal/subcontractor';
+  }
+  return '/admin/dashboard';
 }
 
 function mapSicherPlanUserToVbenUser(

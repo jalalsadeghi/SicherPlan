@@ -426,6 +426,7 @@ class TestAuthRouterFunctions(unittest.TestCase):
 
         refreshed = refresh_endpoint(
             RefreshRequest(refresh_token=login_response.session.refresh_token),
+            _FakeRequest(),
             self.service,
         )
         self.assertNotEqual(refreshed.session.refresh_token, login_response.session.refresh_token)

@@ -9,10 +9,19 @@ from sqlalchemy.orm import Session, joinedload
 from app.modules.core.models import Branch, Mandate, Tenant, TenantSetting
 from app.modules.customers.models import Customer, CustomerContact, CustomerHistoryEntry
 from app.modules.employees.models import Employee, EmployeeQualification
+from app.modules.field_execution.models import PatrolRound, PatrolRoundEvent, Watchbook, WatchbookEntry
+from app.modules.finance.models import CustomerInvoice, PayrollExportBatch, PayrollPayslipArchive, Timesheet
 from app.modules.recruiting.models import Applicant
+from app.modules.subcontractors.models import (
+    Subcontractor,
+    SubcontractorHistoryEntry,
+    SubcontractorWorker,
+    SubcontractorWorkerQualification,
+)
 from app.modules.platform_services.comm_models import OutboundMessage
 from app.modules.platform_services.info_models import Notice
 from app.modules.platform_services.integration_models import ImportExportJob
+from app.modules.planning.models import CustomerOrder, PlanningRecord, Shift
 from app.modules.platform_services.docs_models import (
     Document,
     DocumentLink,
@@ -34,9 +43,24 @@ class SqlAlchemyDocumentRepository:
             "hr.applicant",
             "hr.employee",
             "hr.employee_qualification",
+            "partner.subcontractor",
+            "partner.subcontractor_history_entry",
+            "partner.subcontractor_worker",
+            "partner.subcontractor_worker_qualification",
             "comm.outbound_message",
             "info.notice",
             "integration.import_export_job",
+            "ops.customer_order",
+            "ops.planning_record",
+            "ops.shift",
+            "finance.payroll_export_batch",
+            "finance.payroll_payslip_archive",
+            "finance.timesheet",
+            "finance.customer_invoice",
+            "field.watchbook",
+            "field.watchbook_entry",
+            "field.patrol_round",
+            "field.patrol_round_event",
         }
     )
 
@@ -53,6 +77,20 @@ class SqlAlchemyDocumentRepository:
 
     def get_document(self, tenant_id: str, document_id: str) -> Document | None:
         statement = self._document_query().where(Document.tenant_id == tenant_id, Document.id == document_id)
+        return self.session.scalars(statement).unique().one_or_none()
+
+    def find_document_by_source_reference(
+        self,
+        tenant_id: str,
+        *,
+        source_module: str,
+        source_label: str,
+    ) -> Document | None:
+        statement = self._document_query().where(
+            Document.tenant_id == tenant_id,
+            Document.source_module == source_module,
+            Document.source_label == source_label,
+        )
         return self.session.scalars(statement).unique().one_or_none()
 
     def list_document_versions(self, tenant_id: str, document_id: str) -> list[DocumentVersion]:
@@ -113,9 +151,24 @@ class SqlAlchemyDocumentRepository:
             "hr.applicant": Applicant,
             "hr.employee": Employee,
             "hr.employee_qualification": EmployeeQualification,
+            "partner.subcontractor": Subcontractor,
+            "partner.subcontractor_history_entry": SubcontractorHistoryEntry,
+            "partner.subcontractor_worker": SubcontractorWorker,
+            "partner.subcontractor_worker_qualification": SubcontractorWorkerQualification,
             "comm.outbound_message": OutboundMessage,
             "info.notice": Notice,
             "integration.import_export_job": ImportExportJob,
+            "ops.customer_order": CustomerOrder,
+            "ops.planning_record": PlanningRecord,
+            "ops.shift": Shift,
+            "finance.payroll_export_batch": PayrollExportBatch,
+            "finance.payroll_payslip_archive": PayrollPayslipArchive,
+            "finance.timesheet": Timesheet,
+            "finance.customer_invoice": CustomerInvoice,
+            "field.watchbook": Watchbook,
+            "field.watchbook_entry": WatchbookEntry,
+            "field.patrol_round": PatrolRound,
+            "field.patrol_round_event": PatrolRoundEvent,
         }[owner_type]
         statement: Select[tuple[object]] = select(model).where(model.id == owner_id)
         if model is not Tenant:

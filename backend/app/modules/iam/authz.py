@@ -1,7 +1,5 @@
 """Reusable RBAC and scope enforcement helpers."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
@@ -13,7 +11,7 @@ from app.modules.iam.auth_schemas import AuthenticatedRoleScope
 from app.modules.iam.auth_service import AuthenticatedSessionContext
 
 
-AuthorizationScope = Literal["platform", "tenant", "branch", "mandate", "customer"]
+AuthorizationScope = Literal["platform", "tenant", "branch", "mandate", "customer", "subcontractor"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +67,18 @@ class RequestAuthorizationContext:
             return True
         return any(scope.scope_type == "customer" and scope.customer_id == customer_id for scope in self.scopes)
 
+    def allows_subcontractor(self, tenant_id: str, subcontractor_id: str) -> bool:
+        if self.is_platform_admin:
+            return True
+        if self.tenant_id != tenant_id:
+            return False
+        if any(scope.scope_type == "tenant" for scope in self.scopes):
+            return True
+        return any(
+            scope.scope_type == "subcontractor" and scope.subcontractor_id == subcontractor_id
+            for scope in self.scopes
+        )
+
     @classmethod
     def from_authenticated_context(cls, context: AuthenticatedSessionContext) -> "RequestAuthorizationContext":
         return cls(
@@ -107,6 +117,16 @@ def enforce_permission(context: RequestAuthorizationContext, permission_key: str
         )
 
 
+def require_permission_only(permission_key: str):
+    def dependency(
+        context: Annotated[RequestAuthorizationContext, Depends(get_request_authorization_context)],
+    ) -> RequestAuthorizationContext:
+        enforce_permission(context, permission_key)
+        return context
+
+    return dependency
+
+
 def enforce_scope(
     context: RequestAuthorizationContext,
     *,
@@ -115,6 +135,7 @@ def enforce_scope(
     branch_id: str | None = None,
     mandate_id: str | None = None,
     request_customer_id: str | None = None,
+    subcontractor_id: str | None = None,
 ) -> None:
     if scope == "platform":
         if not context.is_platform_admin:
@@ -167,6 +188,16 @@ def enforce_scope(
             )
         return
 
+    if scope == "subcontractor":
+        if tenant_id is None or subcontractor_id is None or not context.allows_subcontractor(tenant_id, subcontractor_id):
+            raise ApiException(
+                403,
+                "iam.authorization.scope_denied",
+                "errors.iam.authorization.scope_denied",
+                {"scope": scope, "tenant_id": tenant_id, "subcontractor_id": subcontractor_id},
+            )
+        return
+
 
 def require_authorization(
     permission_key: str,
@@ -176,6 +207,7 @@ def require_authorization(
     branch_param: str = "branch_id",
     mandate_param: str = "mandate_id",
     customer_param: str = "customer_id",
+    subcontractor_param: str = "subcontractor_id",
 ):
     def dependency(
         request: Request,
@@ -189,6 +221,7 @@ def require_authorization(
             branch_id=request.path_params.get(branch_param),
             mandate_id=request.path_params.get(mandate_param),
             request_customer_id=request.path_params.get(customer_param),
+            subcontractor_id=request.path_params.get(subcontractor_param),
         )
         return context
 

@@ -1028,3 +1028,104 @@ class EmployeeSelfServiceEventApplicationCreate(BaseModel):
 class EmployeeSelfServiceEventApplicationCancel(BaseModel):
     decision_note: str | None = None
     version_no: int | None = None
+
+
+class EmployeeMobileContextRead(BaseModel):
+    tenant_id: str
+    user_id: str
+    employee_id: str
+    personnel_no: str
+    full_name: str
+    preferred_name: str | None = None
+    work_email: str | None = None
+    mobile_phone: str | None = None
+    default_branch_id: str | None = None
+    default_mandate_id: str | None = None
+    locale: str = "de"
+    timezone: str = "Europe/Berlin"
+    app_role: str = "employee"
+    role_keys: list[str] = Field(default_factory=list)
+    has_schedule_access: bool = True
+    has_document_access: bool = True
+    has_notice_access: bool = True
+    has_time_capture_access: bool = True
+    has_watchbook_access: bool = True
+    has_patrol_access: bool = True
+
+
+class EmployeeReleasedScheduleDocumentRead(BaseModel):
+    document_id: str
+    title: str
+    file_name: str | None = None
+    content_type: str | None = None
+    current_version_no: int | None = None
+    relation_type: str = "deployment_output"
+
+
+class EmployeeReleasedScheduleRead(BaseModel):
+    id: str
+    employee_id: str
+    shift_id: str
+    planning_record_id: str | None = None
+    order_id: str | None = None
+    site_id: str | None = None
+    schedule_date: date
+    shift_label: str
+    work_start: datetime
+    work_end: datetime
+    location_label: str | None = None
+    meeting_point: str | None = None
+    assignment_status: str
+    confirmation_status: str
+    documents: list[EmployeeReleasedScheduleDocumentRead] = Field(default_factory=list)
+
+
+class EmployeeReleasedScheduleCollectionRead(BaseModel):
+    employee_id: str
+    tenant_id: str
+    released_only: bool = True
+    items: list[EmployeeReleasedScheduleRead] = Field(default_factory=list)
+
+
+class EmployeeReleasedScheduleResponseRequest(BaseModel):
+    response_code: str = Field(min_length=1, max_length=20)
+    note: str | None = Field(default=None, max_length=1000)
+    version_no: int | None = None
+
+
+class EmployeeMobileDocumentRead(BaseModel):
+    document_id: str
+    owner_type: str
+    owner_id: str
+    relation_type: str
+    title: str
+    file_name: str | None = None
+    content_type: str | None = None
+    current_version_no: int | None = None
+    linked_at: datetime | None = None
+    schedule_date: date | None = None
+    shift_id: str | None = None
+
+
+class EmployeeMobileDocumentCollectionRead(BaseModel):
+    employee_id: str
+    tenant_id: str
+    items: list[EmployeeMobileDocumentRead] = Field(default_factory=list)
+
+
+class EmployeeMobileCredentialRead(BaseModel):
+    credential_id: str
+    credential_no: str
+    credential_type: str
+    encoded_value: str
+    valid_from: date
+    valid_until: date | None = None
+    status: str
+    badge_document_id: str | None = None
+    badge_file_name: str | None = None
+
+
+class EmployeeMobileCredentialCollectionRead(BaseModel):
+    employee_id: str
+    tenant_id: str
+    items: list[EmployeeMobileCredentialRead] = Field(default_factory=list)

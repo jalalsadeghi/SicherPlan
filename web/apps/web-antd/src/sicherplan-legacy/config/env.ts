@@ -25,7 +25,7 @@ export const webAppConfig: WebAppConfig = {
   appTitle: import.meta.env.VITE_SP_APP_TITLE ?? "SicherPlan",
   apiBaseUrl: import.meta.env.VITE_SP_API_BASE_URL ?? "http://localhost:8000",
   defaultLocale: (import.meta.env.VITE_SP_DEFAULT_LOCALE ?? "de") as "de" | "en",
-  fallbackLocale: (import.meta.env.VITE_SP_FALLBACK_LOCALE ?? "en") as "de" | "en",
+  fallbackLocale: (import.meta.env.VITE_SP_FALLBACK_LOCALE ?? "de") as "de" | "en",
   lightPrimary: `rgb(${import.meta.env.VITE_SP_LIGHT_PRIMARY ?? "40,170,170"})`,
   darkPrimary: `rgb(${import.meta.env.VITE_SP_DARK_PRIMARY ?? "35,200,205"})`,
   enableMockAuth: readBool(import.meta.env.VITE_SP_ENABLE_MOCK_AUTH, true),

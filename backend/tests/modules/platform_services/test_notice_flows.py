@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from uuid import uuid4
 
 from sqlalchemy import Index, UniqueConstraint
@@ -98,7 +99,12 @@ class FakeDocumentService:
     def get_document(self, tenant_id: str, document_id: str, actor):  # noqa: ANN001
         if document_id not in self.document_ids:
             raise ApiException(404, "docs.document.not_found", "errors.docs.document.not_found")
-        return {"id": document_id}
+        return SimpleNamespace(
+            id=document_id,
+            title="Attachment",
+            current_version_no=1,
+            versions=[SimpleNamespace(version_no=1, file_name="attachment.pdf", content_type="application/pdf")],
+        )
 
     def add_document_link(self, tenant_id: str, document_id: str, payload, actor):  # noqa: ANN001
         self.attachments.append((tenant_id, document_id, payload.owner_id))
@@ -330,6 +336,26 @@ class TestNoticeService(unittest.TestCase):
         self.assertEqual(opened.notice_id, created.id)
         self.assertIsNotNone(acknowledged.acknowledged_at)
         self.assertEqual(len(self.repository.notices[created.id].reads), 1)
+        self.assertEqual(self.service.get_feed_status("tenant-1", _actor("dispatcher")).mandatory_unacknowledged_count, 0)
+
+    def test_visible_notice_detail_includes_attachments_and_links(self) -> None:
+        created = self.service.create_notice(
+            "tenant-1",
+            NoticeCreate(
+                tenant_id="tenant-1",
+                title="Mit Anlage",
+                body="Bitte lesen",
+                audiences=[NoticeAudienceCreate(audience_kind="role", target_value="dispatcher")],
+                curated_links=[NoticeLinkCreate(label="Portal", url="https://example.invalid")],
+                attachment_document_ids=["doc-1"],
+            ),
+            _actor("tenant_admin"),
+        )
+        self.repository.document_links[created.id] = [SimpleNamespace(document_id="doc-1")]
+        self.service.publish_notice("tenant-1", created.id, NoticePublishRequest(), _actor("tenant_admin"))
+        detail = self.service.get_visible_notice("tenant-1", created.id, _actor("dispatcher"))
+        self.assertEqual(len(detail.attachments), 1)
+        self.assertEqual(detail.links[0].label, "Portal")
 
     def test_future_audience_kinds_are_persisted_without_cross_module_writes(self) -> None:
         created = self.service.create_notice(

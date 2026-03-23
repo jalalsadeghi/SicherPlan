@@ -4,6 +4,8 @@ import unittest
 from dataclasses import dataclass
 from uuid import uuid4
 
+from fastapi.testclient import TestClient
+
 from app.errors import ApiException
 from app.main import create_app
 from app.modules.core.admin_router import (
@@ -325,3 +327,20 @@ class TestTenantAdminApi(unittest.TestCase):
         self.assertIn("/api/core/admin/tenants/{tenant_id}/branches", paths)
         self.assertIn("/api/core/admin/tenants/{tenant_id}/mandates", paths)
         self.assertIn("/api/core/admin/tenants/{tenant_id}/settings/{setting_id}", paths)
+
+    def test_core_admin_tenant_list_supports_cors_preflight(self) -> None:
+        app = create_app()
+        client = TestClient(app)
+
+        response = client.options(
+            "/api/core/admin/tenants",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "authorization,content-type,x-request-id",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("access-control-allow-origin"), "http://localhost:5173")
+        self.assertIn("GET", response.headers.get("access-control-allow-methods", ""))

@@ -58,7 +58,10 @@ class FakeAssignment:
 class FakeBootstrapRepository:
     def __init__(self) -> None:
         self.tenants: dict[str, FakeTenant] = {}
-        self.role = FakeRole(id=str(uuid4()), key="platform_admin")
+        self.roles: dict[str, FakeRole] = {
+            "platform_admin": FakeRole(id=str(uuid4()), key="platform_admin"),
+            "tenant_admin": FakeRole(id=str(uuid4()), key="tenant_admin"),
+        }
         self.users: dict[str, FakeUser] = {}
         self.assignments: dict[tuple[str, str, str], FakeAssignment] = {}
 
@@ -78,9 +81,7 @@ class FakeBootstrapRepository:
         return fake
 
     def get_role_by_key(self, key: str):
-        if key == self.role.key:
-            return self.role
-        return None
+        return self.roles.get(key)
 
     def find_user_for_tenant(self, tenant_id: str, *, username: str, email: str):
         for user in self.users.values():
@@ -113,9 +114,11 @@ class TestBootstrapSystemAdmin(unittest.TestCase):
 
         self.assertTrue(summary.tenant_created)
         self.assertTrue(summary.user_created)
-        self.assertTrue(summary.role_assignment_created)
+        self.assertTrue(summary.platform_role_assignment_created)
+        self.assertTrue(summary.tenant_role_assignment_created)
         self.assertEqual(summary.tenant_code, "system")
         self.assertEqual(summary.username, "sysadmin")
+        self.assertEqual(len(repository.assignments), 2)
 
     def test_bootstrap_is_idempotent_and_reactivates_existing_user(self) -> None:
         repository = FakeBootstrapRepository()
@@ -136,9 +139,34 @@ class TestBootstrapSystemAdmin(unittest.TestCase):
         self.assertFalse(second.tenant_created)
         self.assertFalse(second.user_created)
         self.assertTrue(second.user_updated)
+        self.assertFalse(second.platform_role_assignment_created)
+        self.assertFalse(second.tenant_role_assignment_created)
         self.assertEqual(user.status, "active")
         self.assertIsNone(user.archived_at)
         self.assertTrue(user.is_platform_user)
+
+    def test_bootstrap_reactivates_missing_or_archived_tenant_admin_assignment(self) -> None:
+        repository = FakeBootstrapRepository()
+        config = SystemAdminBootstrapConfig(password="Secret123!")
+        SystemAdminBootstrapper(repository).bootstrap(config)
+
+        tenant = repository.get_tenant_by_code(config.tenant_code)
+        assert tenant is not None
+        user = repository.find_user_for_tenant(tenant.id, username=config.username, email=config.email)
+        assert user is not None
+        tenant_admin_role = repository.get_role_by_key("tenant_admin")
+        assert tenant_admin_role is not None
+        assignment = repository.get_role_assignment(user.id, tenant_admin_role.id, tenant.id)
+        assert assignment is not None
+        assignment.status = "inactive"
+        assignment.archived_at = "2025-01-01T00:00:00Z"
+        assignment.version_no = 4
+
+        summary = SystemAdminBootstrapper(repository).bootstrap(config)
+        self.assertFalse(summary.platform_role_assignment_created)
+        self.assertFalse(summary.tenant_role_assignment_created)
+        self.assertEqual(assignment.status, "active")
+        self.assertIsNone(assignment.archived_at)
 
 
 if __name__ == "__main__":

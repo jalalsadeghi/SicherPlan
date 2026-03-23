@@ -2,6 +2,27 @@ import { initPreferences } from '@vben/preferences';
 import { unmountGlobalLoading } from '@vben/utils';
 
 import { overridesPreferences } from './preferences';
+import { APP_LOCALE_STORAGE_KEY } from './sicherplan-legacy/stores/locale';
+
+const defaultLocale = overridesPreferences.app?.locale ?? 'de-DE';
+
+function resolveBootstrapLocale() {
+  if (typeof window === 'undefined') {
+    return defaultLocale;
+  }
+
+  const storedLocale = window.localStorage.getItem(APP_LOCALE_STORAGE_KEY);
+  switch (storedLocale) {
+    case 'en':
+    case 'en-US':
+      return 'en-US';
+    case 'de':
+    case 'de-DE':
+      return 'de-DE';
+    default:
+      return defaultLocale;
+  }
+}
 
 /**
  * 应用初始化完成之后再进行页面加载渲染
@@ -16,7 +37,13 @@ async function initApplication() {
   // app偏好设置初始化
   await initPreferences({
     namespace,
-    overrides: overridesPreferences,
+    overrides: {
+      ...overridesPreferences,
+      app: {
+        ...overridesPreferences.app,
+        locale: resolveBootstrapLocale(),
+      },
+    },
   });
 
   // 启动应用并挂载

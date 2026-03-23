@@ -1,16 +1,21 @@
 <script lang="ts" setup>
 import type { VbenFormSchema } from '@vben/common-ui';
+import type { Recordable } from '@vben/types';
 
-import { computed, markRaw } from 'vue';
+import { computed, markRaw, onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
 
 import { AuthenticationLogin, SliderCaptcha, z } from '@vben/common-ui';
 import { $t } from '@vben/locales';
+
+import { Alert } from 'ant-design-vue';
 
 import { useAuthStore } from '#/store';
 
 defineOptions({ name: 'Login' });
 
 const authStore = useAuthStore();
+const loginRef =
+  useTemplateRef<InstanceType<typeof AuthenticationLogin>>('loginRef');
 
 const formSchema = computed((): VbenFormSchema[] => {
   return [
@@ -50,12 +55,40 @@ const formSchema = computed((): VbenFormSchema[] => {
     },
   ];
 });
+
+async function onSubmit(params: Recordable<any>) {
+  authStore.authLogin(params).catch(() => {
+    const formApi = loginRef.value?.getFormApi();
+    formApi?.setFieldValue('captcha', false, false);
+    formApi
+      ?.getFieldComponentRef<InstanceType<typeof SliderCaptcha>>('captcha')
+      ?.resume();
+  });
+}
+
+onMounted(() => {
+  authStore.clearLoginError();
+});
+
+onBeforeUnmount(() => {
+  authStore.clearLoginError();
+});
 </script>
 
 <template>
-  <AuthenticationLogin
-    :form-schema="formSchema"
-    :loading="authStore.loginLoading"
-    @submit="authStore.authLogin"
-  />
+  <div>
+    <Alert
+      v-if="authStore.loginErrorMessageKey"
+      class="mb-4"
+      show-icon
+      type="error"
+      :message="$t(authStore.loginErrorMessageKey)"
+    />
+    <AuthenticationLogin
+      ref="loginRef"
+      :form-schema="formSchema"
+      :loading="authStore.loginLoading"
+      @submit="onSubmit"
+    />
+  </div>
 </template>

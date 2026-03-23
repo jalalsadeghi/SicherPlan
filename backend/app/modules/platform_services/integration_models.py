@@ -43,6 +43,7 @@ class ImportExportJob(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
             name="fk_integration_job_tenant_endpoint",
             ondelete="RESTRICT",
         ),
+        UniqueConstraint("tenant_id", "id", name="uq_integration_import_export_job_tenant_id_id"),
         Index("ix_integration_job_tenant_status", "tenant_id", "status"),
         {"schema": "integration"},
     )

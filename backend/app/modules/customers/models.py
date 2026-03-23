@@ -214,6 +214,7 @@ class CustomerBillingProfile(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
             ondelete="RESTRICT",
         ),
         UniqueConstraint("tenant_id", "customer_id", name="uq_crm_customer_billing_profile_customer"),
+        UniqueConstraint("tenant_id", "id", name="uq_crm_customer_billing_profile_tenant_id_id"),
         {"schema": "crm"},
     )
 

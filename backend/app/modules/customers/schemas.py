@@ -264,15 +264,19 @@ class CustomerPortalScheduleListItemRead(BaseModel):
     site_label: str | None = None
     released_at: datetime
     status: str
+    documents: list[CustomerPortalDocumentRefRead] = Field(default_factory=list)
 
 
 class CustomerPortalWatchbookEntryRead(BaseModel):
     id: str
     customer_id: str
+    log_date: date | None = None
     occurred_at: datetime
+    entry_type_code: str | None = None
     summary: str
     status: str
     personal_names_released: bool = False
+    pdf_document_id: str | None = None
 
 
 class CustomerPortalTimesheetRead(BaseModel):
@@ -283,6 +287,19 @@ class CustomerPortalTimesheetRead(BaseModel):
     released_at: datetime
     status: str
     total_minutes: int | None = None
+    documents: list[CustomerPortalDocumentRefRead] = Field(default_factory=list)
+
+
+class CustomerPortalInvoiceRead(BaseModel):
+    id: str
+    customer_id: str
+    invoice_no: str
+    issue_date: date
+    due_date: date
+    released_at: datetime | None = None
+    status: str
+    currency_code: str
+    total_amount: Decimal
     documents: list[CustomerPortalDocumentRefRead] = Field(default_factory=list)
 
 
@@ -318,6 +335,12 @@ class CustomerPortalTimesheetCollectionRead(BaseModel):
     customer_id: str
     source: CustomerPortalCollectionSourceRead
     items: list[CustomerPortalTimesheetRead] = Field(default_factory=list)
+
+
+class CustomerPortalInvoiceCollectionRead(BaseModel):
+    customer_id: str
+    source: CustomerPortalCollectionSourceRead
+    items: list[CustomerPortalInvoiceRead] = Field(default_factory=list)
 
 
 class CustomerPortalReportPackageCollectionRead(BaseModel):

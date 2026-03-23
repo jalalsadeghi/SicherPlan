@@ -1,7 +1,6 @@
 import type { Recordable, UserInfo } from '@vben/types';
 
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
 
 import { LOGIN_PATH } from '@vben/constants';
 import { preferences } from '@vben/preferences';
@@ -10,15 +9,43 @@ import { resetAllStores, useAccessStore, useUserStore } from '@vben/stores';
 import { notification } from 'ant-design-vue';
 import { defineStore } from 'pinia';
 
-import { getAccessCodesApi, getUserInfoApi, loginApi, logoutApi } from '#/api';
+import {
+  getAccessCodesApi,
+  getUserInfoApi,
+  loginApi,
+  logoutApi,
+} from '#/api';
 import { $t } from '#/locales';
+import { resolveLoginErrorMessageKey } from '#/api/core/auth';
+
+import { buildLoginLocation } from './auth-bootstrap';
 
 export const useAuthStore = defineStore('auth', () => {
   const accessStore = useAccessStore();
   const userStore = useUserStore();
-  const router = useRouter();
 
   const loginLoading = ref(false);
+  const loginErrorMessageKey = ref<null | string>(null);
+
+  async function resolveRouter() {
+    const { router } = await import('#/router');
+    return router;
+  }
+
+  function clearSessionState() {
+    accessStore.setAccessToken(null);
+    accessStore.setRefreshToken(null);
+    accessStore.setAccessCodes([]);
+    accessStore.setAccessMenus([]);
+    accessStore.setAccessRoutes([]);
+    accessStore.setIsAccessChecked(false);
+    accessStore.setLoginExpired(false);
+    userStore.setUserInfo(null);
+  }
+
+  function clearLoginError() {
+    loginErrorMessageKey.value = null;
+  }
 
   /**
    * 异步处理登录操作
@@ -32,6 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
     // 异步处理用户登录操作并获取 accessToken
     let userInfo: null | UserInfo = null;
     try {
+      clearLoginError();
       loginLoading.value = true;
       const { accessToken } = await loginApi(params);
 
@@ -53,6 +81,7 @@ export const useAuthStore = defineStore('auth', () => {
         if (accessStore.loginExpired) {
           accessStore.setLoginExpired(false);
         } else {
+          const router = await resolveRouter();
           onSuccess
             ? await onSuccess?.()
             : await router.push(
@@ -68,6 +97,13 @@ export const useAuthStore = defineStore('auth', () => {
           });
         }
       }
+    } catch (error) {
+      loginErrorMessageKey.value = resolveLoginErrorMessageKey(error);
+      notification.error({
+        description: $t(loginErrorMessageKey.value),
+        message: $t('page.auth.login'),
+      });
+      throw error;
     } finally {
       loginLoading.value = false;
     }
@@ -84,17 +120,17 @@ export const useAuthStore = defineStore('auth', () => {
       // 不做任何处理
     }
     resetAllStores();
-    accessStore.setLoginExpired(false);
+    clearSessionState();
 
-    // 回登录页带上当前路由地址
-    await router.replace({
-      path: LOGIN_PATH,
-      query: redirect
-        ? {
-            redirect: encodeURIComponent(router.currentRoute.value.fullPath),
-          }
-        : {},
-    });
+    const router = await resolveRouter();
+    await router.replace(
+      buildLoginLocation(
+        LOGIN_PATH,
+        preferences.app.defaultHomePath,
+        router.currentRoute.value.fullPath,
+        redirect,
+      ),
+    );
   }
 
   async function fetchUserInfo() {
@@ -103,15 +139,32 @@ export const useAuthStore = defineStore('auth', () => {
     return userInfo;
   }
 
+  async function redirectToLogin(redirectPath?: string) {
+    const router = await resolveRouter();
+    await router.replace(
+      buildLoginLocation(
+        LOGIN_PATH,
+        preferences.app.defaultHomePath,
+        redirectPath,
+        true,
+      ),
+    );
+  }
+
   function $reset() {
     loginLoading.value = false;
+    clearLoginError();
   }
 
   return {
     $reset,
     authLogin,
+    clearLoginError,
+    clearSessionState,
     fetchUserInfo,
+    loginErrorMessageKey,
     loginLoading,
     logout,
+    redirectToLogin,
   };
 });

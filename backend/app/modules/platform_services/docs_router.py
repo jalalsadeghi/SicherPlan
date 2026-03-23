@@ -1,16 +1,19 @@
 """HTTP API for tenant-scoped logical documents and immutable versions."""
 
-from __future__ import annotations
-
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.db.rls import rls_session_context
 from app.db.session import get_db_session
-from app.modules.iam.authz import RequestAuthorizationContext, require_authorization
+from app.modules.iam.authz import (
+    RequestAuthorizationContext,
+    get_request_authorization_context,
+    require_authorization,
+)
 from app.modules.platform_services.docs_repository import SqlAlchemyDocumentRepository
 from app.modules.platform_services.docs_schemas import (
     DocumentCreate,
@@ -22,6 +25,7 @@ from app.modules.platform_services.docs_schemas import (
 )
 from app.modules.platform_services.docs_service import DocumentService
 from app.modules.platform_services.storage import build_object_storage_adapter
+from app.rate_limit import DOCUMENT_DOWNLOAD_RULE, rate_limiter
 
 
 router = APIRouter(prefix="/api/platform/tenants/{tenant_id}/documents", tags=["platform-docs"])
@@ -29,12 +33,14 @@ router = APIRouter(prefix="/api/platform/tenants/{tenant_id}/documents", tags=["
 
 def get_document_service(
     session: Annotated[Session, Depends(get_db_session)],
+    actor: Annotated[RequestAuthorizationContext, Depends(get_request_authorization_context)],
 ) -> DocumentService:
-    return DocumentService(
-        SqlAlchemyDocumentRepository(session),
-        storage=build_object_storage_adapter(settings),
-        bucket_name=settings.object_storage_bucket,
-    )
+    with rls_session_context(session, tenant_id=actor.tenant_id, bypass=actor.is_platform_admin):
+        yield DocumentService(
+            SqlAlchemyDocumentRepository(session),
+            storage=build_object_storage_adapter(settings),
+            bucket_name=settings.object_storage_bucket,
+        )
 
 
 @router.post("", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
@@ -96,12 +102,17 @@ def download_document_version(
     tenant_id: UUID,
     document_id: UUID,
     version_no: int,
+    request: Request,
     context: Annotated[
         RequestAuthorizationContext,
         Depends(require_authorization("platform.docs.read", scope="tenant")),
     ],
     service: Annotated[DocumentService, Depends(get_document_service)],
 ) -> Response:
+    rate_limiter.assert_allowed(
+        DOCUMENT_DOWNLOAD_RULE,
+        principal=f"{context.tenant_id}:{context.user_id or (request.client.host if request.client else 'anonymous')}",
+    )
     download = service.download_document_version(str(tenant_id), str(document_id), version_no, context)
     headers = {"Content-Disposition": f'attachment; filename="{download.file_name}"'}
     return Response(content=download.content, media_type=download.content_type, headers=headers)

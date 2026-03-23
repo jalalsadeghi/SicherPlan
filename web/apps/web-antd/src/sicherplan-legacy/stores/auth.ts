@@ -1,15 +1,18 @@
 import { defineStore } from "pinia";
+import { useAccessStore, useUserStore } from "@vben/stores";
 
 import {
   AuthApiError,
   getCurrentSession,
   getCustomerPortalContext,
+  getSubcontractorPortalContext,
   login,
   logout,
   type AuthenticatedUser,
   type CustomerPortalContextRead,
   type LoginPayload,
   type LoginResponse,
+  type SubcontractorPortalContextRead,
 } from "@/api/auth";
 import type { AppRole } from "@/types/roles";
 
@@ -20,8 +23,50 @@ const REFRESH_TOKEN_STORAGE_KEY = "sicherplan-refresh-token";
 const SESSION_USER_STORAGE_KEY = "sicherplan-session-user";
 const SESSION_ID_STORAGE_KEY = "sicherplan-session-id";
 const PORTAL_CUSTOMER_CONTEXT_STORAGE_KEY = "sicherplan-portal-customer-context";
+const PORTAL_SUBCONTRACTOR_CONTEXT_STORAGE_KEY = "sicherplan-portal-subcontractor-context";
+
+function readPrimaryAccessToken(): string {
+  try {
+    return useAccessStore().accessToken ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function readPrimaryRoleKeys(): string[] {
+  try {
+    const roles = useUserStore().userInfo?.roles;
+    return Array.isArray(roles) ? roles.filter((role): role is string => typeof role === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function pickRoleFromKeys(roleKeys: string[]): AppRole | null {
+  const roleSet = new Set(roleKeys);
+  for (const roleKey of [
+    "platform_admin",
+    "tenant_admin",
+    "dispatcher",
+    "accounting",
+    "controller_qm",
+    "customer_user",
+    "subcontractor_user",
+  ] as const) {
+    if (roleSet.has(roleKey)) {
+      return roleKey;
+    }
+  }
+
+  return null;
+}
 
 function readStoredRole(): AppRole {
+  const primaryRole = pickRoleFromKeys(readPrimaryRoleKeys());
+  if (primaryRole) {
+    return primaryRole;
+  }
+
   if (typeof window === "undefined") {
     return "tenant_admin";
   }
@@ -105,18 +150,18 @@ function pickSessionRole(user: AuthenticatedUser | null): AppRole | null {
     return null;
   }
 
-  for (const role of user.roles) {
-    switch (role.role_key) {
-      case "platform_admin":
-      case "tenant_admin":
-      case "dispatcher":
-      case "accounting":
-      case "controller_qm":
-      case "customer_user":
-      case "subcontractor_user":
-        return role.role_key;
-      default:
-        break;
+  const roleKeys = new Set(user.roles.map((role) => role.role_key));
+  for (const roleKey of [
+    "platform_admin",
+    "tenant_admin",
+    "dispatcher",
+    "accounting",
+    "controller_qm",
+    "customer_user",
+    "subcontractor_user",
+  ] as const) {
+    if (roleKeys.has(roleKey)) {
+      return roleKey;
     }
   }
 
@@ -127,7 +172,7 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
   state: () => ({
     activeRole: readStoredRole() as AppRole,
     tenantScopeId: readStoredTenantScopeId(),
-    accessToken: readStoredString(ACCESS_TOKEN_STORAGE_KEY),
+    accessToken: readStoredString(ACCESS_TOKEN_STORAGE_KEY) || readPrimaryAccessToken(),
     refreshToken: readStoredString(REFRESH_TOKEN_STORAGE_KEY),
     sessionId: readStoredString(SESSION_ID_STORAGE_KEY),
     sessionUser: readStoredJson<AuthenticatedUser | null>(SESSION_USER_STORAGE_KEY, null),
@@ -135,13 +180,20 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       PORTAL_CUSTOMER_CONTEXT_STORAGE_KEY,
       null,
     ),
+    portalSubcontractorContext: readStoredJson<SubcontractorPortalContextRead | null>(
+      PORTAL_SUBCONTRACTOR_CONTEXT_STORAGE_KEY,
+      null,
+    ),
   }),
   getters: {
     effectiveRole(state): AppRole {
-      return pickSessionRole(state.sessionUser) ?? state.activeRole;
+      return pickRoleFromKeys(readPrimaryRoleKeys()) ?? pickSessionRole(state.sessionUser) ?? state.activeRole;
+    },
+    effectiveAccessToken(state): string {
+      return state.accessToken || readPrimaryAccessToken();
     },
     hasSession(state): boolean {
-      return Boolean(state.accessToken && state.sessionUser);
+      return Boolean((state.accessToken || readPrimaryAccessToken()) && (state.sessionUser || readPrimaryRoleKeys().length));
     },
     isAuthenticated(): boolean {
       return true;
@@ -151,6 +203,22 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
     },
   },
   actions: {
+    syncFromPrimarySession() {
+      const primaryAccessToken = readPrimaryAccessToken();
+      const primaryRole = pickRoleFromKeys(readPrimaryRoleKeys());
+
+      if (primaryAccessToken && primaryAccessToken !== this.accessToken) {
+        this.accessToken = primaryAccessToken;
+        persistString(ACCESS_TOKEN_STORAGE_KEY, this.accessToken);
+      }
+
+      if (primaryRole && primaryRole !== this.activeRole) {
+        this.activeRole = primaryRole;
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(ROLE_STORAGE_KEY, this.activeRole);
+        }
+      }
+    },
     setRole(role: AppRole) {
       this.activeRole = role;
 
@@ -185,12 +253,17 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       this.portalCustomerContext = null;
       persistJson(PORTAL_CUSTOMER_CONTEXT_STORAGE_KEY, null);
     },
+    clearPortalSubcontractorContext() {
+      this.portalSubcontractorContext = null;
+      persistJson(PORTAL_SUBCONTRACTOR_CONTEXT_STORAGE_KEY, null);
+    },
     clearSession() {
       this.accessToken = "";
       this.refreshToken = "";
       this.sessionId = "";
       this.sessionUser = null;
       this.clearPortalCustomerContext();
+      this.clearPortalSubcontractorContext();
       persistString(ACCESS_TOKEN_STORAGE_KEY, "");
       persistString(REFRESH_TOKEN_STORAGE_KEY, "");
       persistString(SESSION_ID_STORAGE_KEY, "");
@@ -202,17 +275,24 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       return response;
     },
     async loadCurrentSession() {
-      if (!this.accessToken) {
+      this.syncFromPrimarySession();
+
+      if (!this.effectiveAccessToken) {
         this.clearSession();
         return null;
       }
 
       try {
-        const response = await getCurrentSession(this.accessToken);
+        const response = await getCurrentSession(this.effectiveAccessToken);
+        this.accessToken = this.effectiveAccessToken;
         this.sessionUser = response.user;
         this.sessionId = response.session.id;
+        this.activeRole = pickSessionRole(response.user) ?? this.activeRole;
         persistJson(SESSION_USER_STORAGE_KEY, this.sessionUser);
         persistString(SESSION_ID_STORAGE_KEY, this.sessionId);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(ROLE_STORAGE_KEY, this.activeRole);
+        }
         return response;
       } catch (error) {
         if (error instanceof AuthApiError && error.statusCode === 401) {
@@ -222,13 +302,15 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       }
     },
     async loadCustomerPortalContext() {
-      if (!this.accessToken) {
+      this.syncFromPrimarySession();
+
+      if (!this.effectiveAccessToken) {
         this.clearPortalCustomerContext();
         return null;
       }
 
       try {
-        const context = await getCustomerPortalContext(this.accessToken);
+        const context = await getCustomerPortalContext(this.effectiveAccessToken);
         this.portalCustomerContext = context;
         persistJson(PORTAL_CUSTOMER_CONTEXT_STORAGE_KEY, context);
         return context;
@@ -240,10 +322,32 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
         throw error;
       }
     },
+    async loadSubcontractorPortalContext() {
+      this.syncFromPrimarySession();
+
+      if (!this.effectiveAccessToken) {
+        this.clearPortalSubcontractorContext();
+        return null;
+      }
+
+      try {
+        const context = await getSubcontractorPortalContext(this.effectiveAccessToken);
+        this.portalSubcontractorContext = context;
+        persistJson(PORTAL_SUBCONTRACTOR_CONTEXT_STORAGE_KEY, context);
+        return context;
+      } catch (error) {
+        this.clearPortalSubcontractorContext();
+        if (error instanceof AuthApiError && error.statusCode === 401) {
+          this.clearSession();
+        }
+        throw error;
+      }
+    },
     async logoutSession() {
       try {
-        if (this.accessToken) {
-          await logout(this.accessToken);
+        this.syncFromPrimarySession();
+        if (this.effectiveAccessToken) {
+          await logout(this.effectiveAccessToken);
         }
       } finally {
         this.clearSession();

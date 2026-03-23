@@ -208,9 +208,42 @@
           </p>
           <ul v-if="watchbooks?.items.length" class="portal-list">
             <li v-for="item in watchbooks.items" :key="item.id">
-              <strong>{{ formatDateTime(item.occurred_at) }}</strong> · {{ item.summary }}
+              <strong>{{ formatDate(item.log_date) }}</strong> · {{ item.summary }}
+              <span class="dataset-meta">
+                {{ formatDateTime(item.occurred_at) }} · {{ item.entry_type_code || "-" }}
+                <template v-if="item.pdf_document_id"> · PDF {{ item.pdf_document_id }}</template>
+              </span>
             </li>
           </ul>
+          <div v-if="watchbooks?.items.length" class="portal-watchbook-entry-form">
+            <div class="field">
+              <label for="customer-watchbook-select">{{ t("portalCustomer.watchbooks.fields.watchbook") }}</label>
+              <select id="customer-watchbook-select" v-model="selectedWatchbookId">
+                <option v-for="item in watchbooks.items" :key="item.id" :value="item.id">
+                  {{ formatDate(item.log_date) }} · {{ item.summary }}
+                </option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="customer-watchbook-note">{{ t("portalCustomer.watchbooks.fields.note") }}</label>
+              <textarea
+                id="customer-watchbook-note"
+                v-model.trim="watchbookNarrative"
+                rows="4"
+                :placeholder="t('portalCustomer.watchbooks.fields.notePlaceholder')"
+              />
+            </div>
+            <div class="portal-login-actions">
+              <button
+                class="cta-button"
+                type="button"
+                :disabled="loading || !selectedWatchbookId || !watchbookNarrative"
+                @click="submitWatchbookEntry"
+              >
+                {{ t("portalCustomer.watchbooks.actions.submit") }}
+              </button>
+            </div>
+          </div>
         </article>
 
         <article class="portal-dataset-card">
@@ -234,6 +267,57 @@
           <ul v-if="timesheets?.items.length" class="portal-list">
             <li v-for="item in timesheets.items" :key="item.id">
               <strong>{{ formatDate(item.period_start) }} - {{ formatDate(item.period_end) }}</strong>
+              <span class="dataset-meta">{{ item.total_minutes || 0 }} min · {{ formatDateTime(item.released_at) }}</span>
+              <div v-if="item.documents.length" class="portal-inline-actions">
+                <button
+                  v-for="document in item.documents"
+                  :key="document.document_id"
+                  class="secondary-button"
+                  type="button"
+                  @click="downloadTimesheetDocument(item.id, document.document_id, document.current_version_no)"
+                >
+                  {{ t("portalCustomer.actions.download") }} · {{ document.title }}
+                </button>
+              </div>
+            </li>
+          </ul>
+        </article>
+
+        <article class="portal-dataset-card">
+          <div class="portal-dataset-header">
+            <div>
+              <p class="eyebrow">{{ t("portalCustomer.datasets.invoices.eyebrow") }}</p>
+              <h3>{{ t("portalCustomer.datasets.invoices.title") }}</h3>
+              <p>{{ t("portalCustomer.datasets.invoices.lead") }}</p>
+            </div>
+            <span class="status-badge" :data-state="invoicesState">
+              {{ t(collectionStateKey(invoicesState)) }}
+            </span>
+          </div>
+          <p class="dataset-meta">
+            {{ t(collectionMessageKey(invoices?.source.message_key, "portalCustomer.datasets.invoices.pending")) }}
+          </p>
+          <p class="dataset-meta">
+            {{ t("portalCustomer.meta.sourceModule") }}: {{ invoices?.source.source_module_key || "finance" }}
+          </p>
+          <p class="dataset-meta">{{ t("portalCustomer.meta.docsBacked") }}</p>
+          <ul v-if="invoices?.items.length" class="portal-list">
+            <li v-for="item in invoices.items" :key="item.id">
+              <strong>{{ item.invoice_no }}</strong>
+              <span class="dataset-meta">
+                {{ formatDate(item.issue_date) }} · {{ formatDate(item.due_date) }} · {{ item.total_amount }} {{ item.currency_code }}
+              </span>
+              <div v-if="item.documents.length" class="portal-inline-actions">
+                <button
+                  v-for="document in item.documents"
+                  :key="document.document_id"
+                  class="secondary-button"
+                  type="button"
+                  @click="downloadInvoiceDocument(item.id, document.document_id, document.current_version_no)"
+                >
+                  {{ t("portalCustomer.actions.download") }} · {{ document.title }}
+                </button>
+              </div>
             </li>
           </ul>
         </article>
@@ -272,12 +356,17 @@ import { computed, onMounted, ref } from "vue";
 
 import { AuthApiError } from "@/api/auth";
 import {
+  createCustomerPortalWatchbookEntry,
+  downloadCustomerPortalInvoiceDocument,
+  downloadCustomerPortalTimesheetDocument,
   getCustomerPortalOrders,
   getCustomerPortalHistory,
+  getCustomerPortalInvoices,
   getCustomerPortalReports,
   getCustomerPortalSchedules,
   getCustomerPortalTimesheets,
   getCustomerPortalWatchbooks,
+  type CustomerPortalInvoiceCollectionRead,
   type CustomerPortalOrderCollectionRead,
   type CustomerPortalHistoryCollectionRead,
   type CustomerPortalReportPackageCollectionRead,
@@ -310,8 +399,11 @@ const orders = ref<CustomerPortalOrderCollectionRead | null>(null);
 const schedules = ref<CustomerPortalScheduleCollectionRead | null>(null);
 const watchbooks = ref<CustomerPortalWatchbookCollectionRead | null>(null);
 const timesheets = ref<CustomerPortalTimesheetCollectionRead | null>(null);
+const invoices = ref<CustomerPortalInvoiceCollectionRead | null>(null);
 const reports = ref<CustomerPortalReportPackageCollectionRead | null>(null);
 const portalHistory = ref<CustomerPortalHistoryCollectionRead | null>(null);
+const selectedWatchbookId = ref("");
+const watchbookNarrative = ref("");
 
 const portalContext = computed(() => authStore.portalCustomerContext);
 const accessState = computed(() =>
@@ -329,6 +421,7 @@ const ordersState = computed(() => derivePortalCollectionState(orders.value));
 const schedulesState = computed(() => derivePortalCollectionState(schedules.value));
 const watchbooksState = computed(() => derivePortalCollectionState(watchbooks.value));
 const timesheetsState = computed(() => derivePortalCollectionState(timesheets.value));
+const invoicesState = computed(() => derivePortalCollectionState(invoices.value));
 const reportsState = computed(() => derivePortalCollectionState(reports.value));
 
 function setFeedback(messageKey: MessageKey, tone: "info" | "success" | "error") {
@@ -345,8 +438,11 @@ function clearPortalCollections() {
   schedules.value = null;
   watchbooks.value = null;
   timesheets.value = null;
+  invoices.value = null;
   reports.value = null;
   portalHistory.value = null;
+  selectedWatchbookId.value = "";
+  watchbookNarrative.value = "";
 }
 
 function collectionStateKey(state: string): MessageKey {
@@ -393,11 +489,12 @@ async function loadPortalCollections() {
     return;
   }
 
-  const [nextOrders, nextSchedules, nextWatchbooks, nextTimesheets, nextReports, nextHistory] = await Promise.all([
+  const [nextOrders, nextSchedules, nextWatchbooks, nextTimesheets, nextInvoices, nextReports, nextHistory] = await Promise.all([
     getCustomerPortalOrders(authStore.accessToken),
     getCustomerPortalSchedules(authStore.accessToken),
     getCustomerPortalWatchbooks(authStore.accessToken),
     getCustomerPortalTimesheets(authStore.accessToken),
+    getCustomerPortalInvoices(authStore.accessToken),
     getCustomerPortalReports(authStore.accessToken),
     getCustomerPortalHistory(authStore.accessToken),
   ]);
@@ -405,9 +502,84 @@ async function loadPortalCollections() {
   orders.value = nextOrders;
   schedules.value = nextSchedules;
   watchbooks.value = nextWatchbooks;
+  selectedWatchbookId.value = nextWatchbooks.items[0]?.id ?? "";
   timesheets.value = nextTimesheets;
+  invoices.value = nextInvoices;
   reports.value = nextReports;
   portalHistory.value = nextHistory;
+}
+
+function triggerBrowserDownload(fileName: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function downloadTimesheetDocument(timesheetId: string, documentId: string, versionNo: number | null) {
+  if (!authStore.accessToken || versionNo == null) {
+    return;
+  }
+
+  loading.value = true;
+  clearFeedback();
+  try {
+    const download = await downloadCustomerPortalTimesheetDocument(authStore.accessToken, timesheetId, documentId, versionNo);
+    triggerBrowserDownload(download.fileName, download.blob);
+  } catch (error) {
+    const messageKey = error instanceof AuthApiError ? error.messageKey : "errors.platform.internal";
+    lastErrorKey.value = messageKey;
+    setFeedback(mapPortalApiMessage(messageKey), "error");
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function downloadInvoiceDocument(invoiceId: string, documentId: string, versionNo: number | null) {
+  if (!authStore.accessToken || versionNo == null) {
+    return;
+  }
+
+  loading.value = true;
+  clearFeedback();
+  try {
+    const download = await downloadCustomerPortalInvoiceDocument(authStore.accessToken, invoiceId, documentId, versionNo);
+    triggerBrowserDownload(download.fileName, download.blob);
+  } catch (error) {
+    const messageKey = error instanceof AuthApiError ? error.messageKey : "errors.platform.internal";
+    lastErrorKey.value = messageKey;
+    setFeedback(mapPortalApiMessage(messageKey), "error");
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function submitWatchbookEntry() {
+  if (!authStore.accessToken || !selectedWatchbookId.value || !watchbookNarrative.value) {
+    return;
+  }
+
+  loading.value = true;
+  clearFeedback();
+  try {
+    await createCustomerPortalWatchbookEntry(authStore.accessToken, selectedWatchbookId.value, {
+      entry_type_code: "customer_note",
+      narrative: watchbookNarrative.value,
+    });
+    watchbookNarrative.value = "";
+    await loadPortalCollections();
+    setFeedback("portalCustomer.feedback.watchbookEntrySubmitted", "success");
+  } catch (error) {
+    const messageKey = error instanceof AuthApiError ? error.messageKey : "errors.platform.internal";
+    lastErrorKey.value = messageKey;
+    setFeedback(mapPortalApiMessage(messageKey), "error");
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function bootstrapPortalContext() {
@@ -519,6 +691,12 @@ onMounted(async () => {
   background: color-mix(in srgb, var(--sp-primary) 18%, var(--sp-surface-muted));
 }
 
+.portal-watchbook-entry-form {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
 .portal-login-grid,
 .portal-summary-grid,
 .portal-dataset-grid,
@@ -538,6 +716,15 @@ onMounted(async () => {
 }
 
 .field input {
+  border: 1px solid var(--sp-border);
+  border-radius: 0.85rem;
+  padding: 0.85rem 0.95rem;
+  background: var(--sp-surface-elevated);
+  color: var(--sp-text-strong);
+}
+
+.field textarea,
+.field select {
   border: 1px solid var(--sp-border);
   border-radius: 0.85rem;
   padding: 0.85rem 0.95rem;
@@ -615,6 +802,13 @@ onMounted(async () => {
   padding-left: 1.1rem;
   display: grid;
   gap: 0.45rem;
+}
+
+.portal-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 dl {

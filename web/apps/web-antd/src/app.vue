@@ -18,6 +18,9 @@ const { isDark } = usePreferences();
 const { tokens } = useAntdDesignTokens();
 const legacyThemeStore = useThemeStore();
 const legacyLocaleStore = useLocaleStore();
+const normalizedLocale = computed(() =>
+  preferences.app.locale === 'en-US' ? 'en' : 'de',
+);
 
 const tokenTheme = computed(() => {
   const algorithm = isDark.value
@@ -37,10 +40,20 @@ const tokenTheme = computed(() => {
 
 watchEffect(() => {
   const root = document.documentElement;
-  const legacyTokens = themeTokens[legacyThemeStore.mode];
+  const mode = isDark.value ? 'dark' : 'light';
+  const activeLocale = normalizedLocale.value;
+  const legacyTokens = themeTokens[mode];
+
+  if (legacyThemeStore.mode !== mode) {
+    legacyThemeStore.$patch({ mode });
+  }
+
+  if (legacyLocaleStore.locale !== activeLocale) {
+    legacyLocaleStore.$patch({ locale: activeLocale });
+  }
 
   root.dataset.theme = legacyTokens.mode;
-  root.lang = legacyLocaleStore.locale;
+  root.lang = preferences.app.locale;
   root.style.setProperty('--sp-color-primary', legacyTokens.primary);
   root.style.setProperty('--sp-color-primary-strong', legacyTokens.primaryStrong);
   root.style.setProperty('--sp-color-primary-muted', legacyTokens.primaryMuted);

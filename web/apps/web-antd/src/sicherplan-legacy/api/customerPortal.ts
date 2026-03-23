@@ -60,10 +60,18 @@ export interface CustomerPortalScheduleListItemRead {
 export interface CustomerPortalWatchbookEntryRead {
   id: string;
   customer_id: string;
+  log_date: string;
   occurred_at: string;
+  entry_type_code: string | null;
   summary: string;
   status: string;
   personal_names_released: boolean;
+  pdf_document_id: string | null;
+}
+
+export interface CustomerPortalWatchbookEntryCreate {
+  entry_type_code: "customer_note";
+  narrative: string;
 }
 
 export interface CustomerPortalTimesheetRead {
@@ -74,6 +82,19 @@ export interface CustomerPortalTimesheetRead {
   released_at: string;
   status: string;
   total_minutes: number | null;
+  documents: CustomerPortalDocumentRefRead[];
+}
+
+export interface CustomerPortalInvoiceRead {
+  id: string;
+  customer_id: string;
+  invoice_no: string;
+  issue_date: string;
+  due_date: string;
+  released_at: string | null;
+  status: string;
+  currency_code: string;
+  total_amount: number;
   documents: CustomerPortalDocumentRefRead[];
 }
 
@@ -111,6 +132,12 @@ export interface CustomerPortalTimesheetCollectionRead {
   items: CustomerPortalTimesheetRead[];
 }
 
+export interface CustomerPortalInvoiceCollectionRead {
+  customer_id: string;
+  source: CustomerPortalCollectionSourceRead;
+  items: CustomerPortalInvoiceRead[];
+}
+
 export interface CustomerPortalReportPackageCollectionRead {
   customer_id: string;
   source: CustomerPortalCollectionSourceRead;
@@ -143,14 +170,16 @@ function isApiErrorEnvelope(value: unknown): value is ApiErrorEnvelope {
   return !!error && typeof error === "object" && typeof (error as Record<string, unknown>).message_key === "string";
 }
 
-async function request<T>(path: string, accessToken: string): Promise<T> {
+async function request<T>(path: string, accessToken: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${webAppConfig.apiBaseUrl}${path}`, {
-    method: "GET",
+    method: init?.method ?? "GET",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
       "X-Request-Id": generateRequestId(),
+      ...(init?.headers ?? {}),
     },
+    body: init?.body,
   });
 
   if (!response.ok) {
@@ -185,10 +214,71 @@ export function getCustomerPortalTimesheets(accessToken: string) {
   return request<CustomerPortalTimesheetCollectionRead>("/api/portal/customer/timesheets", accessToken);
 }
 
+export function getCustomerPortalInvoices(accessToken: string) {
+  return request<CustomerPortalInvoiceCollectionRead>("/api/portal/customer/invoices", accessToken);
+}
+
 export function getCustomerPortalReports(accessToken: string) {
   return request<CustomerPortalReportPackageCollectionRead>("/api/portal/customer/reports", accessToken);
 }
 
 export function getCustomerPortalHistory(accessToken: string) {
   return request<CustomerPortalHistoryCollectionRead>("/api/portal/customer/history", accessToken);
+}
+
+async function download(path: string, accessToken: string) {
+  const response = await fetch(`${webAppConfig.apiBaseUrl}${path}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "X-Request-Id": generateRequestId(),
+    },
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as unknown;
+    if (isApiErrorEnvelope(payload)) {
+      throw new AuthApiError(response.status, payload.error);
+    }
+    throw new AuthApiError(response.status, {
+      code: "platform.internal",
+      message_key: "errors.platform.internal",
+      request_id: "",
+      details: {},
+    });
+  }
+
+  return {
+    blob: await response.blob(),
+    fileName: response.headers.get("content-disposition")?.match(/filename=\"?([^"]+)\"?/)?.[1] ?? "document.pdf",
+  };
+}
+
+export function downloadCustomerPortalTimesheetDocument(
+  accessToken: string,
+  timesheetId: string,
+  documentId: string,
+  versionNo: number,
+) {
+  return download(`/api/portal/customer/timesheets/${timesheetId}/documents/${documentId}/versions/${versionNo}/download`, accessToken);
+}
+
+export function downloadCustomerPortalInvoiceDocument(
+  accessToken: string,
+  invoiceId: string,
+  documentId: string,
+  versionNo: number,
+) {
+  return download(`/api/portal/customer/invoices/${invoiceId}/documents/${documentId}/versions/${versionNo}/download`, accessToken);
+}
+
+export function createCustomerPortalWatchbookEntry(
+  accessToken: string,
+  watchbookId: string,
+  payload: CustomerPortalWatchbookEntryCreate,
+) {
+  return request(`/api/portal/customer/watchbooks/${watchbookId}/entries`, accessToken, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }

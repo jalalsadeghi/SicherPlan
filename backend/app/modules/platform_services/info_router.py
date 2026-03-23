@@ -17,6 +17,7 @@ from app.modules.platform_services.info_repository import SqlAlchemyNoticeReposi
 from app.modules.platform_services.info_schemas import (
     NoticeAcknowledgeRequest,
     NoticeCreate,
+    NoticeFeedStatusRead,
     NoticeListItem,
     NoticePublishRequest,
     NoticeRead,
@@ -75,6 +76,31 @@ def list_visible_notices(
     service: Annotated[NoticeService, Depends(get_notice_service)],
 ) -> list[NoticeListItem]:
     return service.list_visible_notices(str(tenant_id), context)
+
+
+@router.get("/my/feed/status", response_model=NoticeFeedStatusRead)
+def get_notice_feed_status(
+    tenant_id: UUID,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("platform.info.read", scope="tenant")),
+    ],
+    service: Annotated[NoticeService, Depends(get_notice_service)],
+) -> NoticeFeedStatusRead:
+    return service.get_feed_status(str(tenant_id), context)
+
+
+@router.get("/my/feed/{notice_id}", response_model=NoticeRead)
+def get_visible_notice(
+    tenant_id: UUID,
+    notice_id: UUID,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("platform.info.read", scope="tenant")),
+    ],
+    service: Annotated[NoticeService, Depends(get_notice_service)],
+) -> NoticeRead:
+    return service.get_visible_notice(str(tenant_id), str(notice_id), context)
 
 
 @router.get("/{notice_id}", response_model=NoticeRead)

@@ -6,42 +6,43 @@ import { computed } from 'vue';
 import { ProfilePasswordSetting, z } from '@vben/common-ui';
 
 import { message } from 'ant-design-vue';
+import { $t } from '#/locales';
 
 const formSchema = computed((): VbenFormSchema[] => {
   return [
     {
       fieldName: 'oldPassword',
-      label: '旧密码',
+      label: $t('page.profile.password.oldPassword'),
       component: 'VbenInputPassword',
       componentProps: {
-        placeholder: '请输入旧密码',
+        placeholder: $t('page.profile.password.oldPasswordPlaceholder'),
       },
     },
     {
       fieldName: 'newPassword',
-      label: '新密码',
+      label: $t('page.profile.password.newPassword'),
       component: 'VbenInputPassword',
       componentProps: {
         passwordStrength: true,
-        placeholder: '请输入新密码',
+        placeholder: $t('page.profile.password.newPasswordPlaceholder'),
       },
     },
     {
       fieldName: 'confirmPassword',
-      label: '确认密码',
+      label: $t('page.profile.password.confirmPassword'),
       component: 'VbenInputPassword',
       componentProps: {
         passwordStrength: true,
-        placeholder: '请再次输入新密码',
+        placeholder: $t('page.profile.password.confirmPasswordPlaceholder'),
       },
       dependencies: {
         rules(values) {
           const { newPassword } = values;
           return z
-            .string({ required_error: '请再次输入新密码' })
-            .min(1, { message: '请再次输入新密码' })
+            .string({ required_error: $t('page.profile.password.confirmPasswordRequired') })
+            .min(1, { message: $t('page.profile.password.confirmPasswordRequired') })
             .refine((value) => value === newPassword, {
-              message: '两次输入的密码不一致',
+              message: $t('page.profile.password.passwordMismatch'),
             });
         },
         triggerFields: ['newPassword'],
@@ -51,7 +52,7 @@ const formSchema = computed((): VbenFormSchema[] => {
 });
 
 function handleSubmit() {
-  message.success('密码修改成功');
+  message.success($t('page.profile.password.success'));
 }
 </script>
 <template>

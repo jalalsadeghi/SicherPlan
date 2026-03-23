@@ -1,6 +1,6 @@
 <template>
   <section class="employee-admin-page">
-    <section class="module-card employee-admin-hero">
+    <section v-if="!embedded" class="module-card employee-admin-hero">
       <div>
         <p class="eyebrow">{{ t("employeeAdmin.eyebrow") }}</p>
         <h2>{{ t("employeeAdmin.title") }}</h2>
@@ -11,23 +11,23 @@
           <span class="employee-admin-meta__pill">{{ t("employeeAdmin.permission.privateRead") }}: {{ canReadPrivate ? "on" : "off" }}</span>
         </div>
       </div>
-
-      <div class="module-card employee-admin-scope">
-        <label class="field-stack">
-          <span>{{ t("employeeAdmin.scope.label") }}</span>
-          <input v-model="tenantScopeInput" :disabled="!isPlatformAdmin" :placeholder="t('employeeAdmin.scope.placeholder')" />
-        </label>
-        <p class="field-help">{{ t("employeeAdmin.scope.help") }}</p>
-        <div class="cta-row">
-          <button class="cta-button" type="button" @click="rememberScope">
-            {{ t("employeeAdmin.actions.rememberScope") }}
-          </button>
-          <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshEmployees">
-            {{ t("employeeAdmin.actions.refresh") }}
-          </button>
-        </div>
-      </div>
     </section>
+
+    <div class="module-card employee-admin-scope" :class="{ 'employee-admin-scope--embedded': embedded }">
+      <label class="field-stack">
+        <span>{{ t("employeeAdmin.scope.label") }}</span>
+        <input v-model="tenantScopeInput" :disabled="!isPlatformAdmin" :placeholder="t('employeeAdmin.scope.placeholder')" />
+      </label>
+      <p class="field-help">{{ t("employeeAdmin.scope.help") }}</p>
+      <div class="cta-row">
+        <button class="cta-button" type="button" @click="rememberScope">
+          {{ t("employeeAdmin.actions.rememberScope") }}
+        </button>
+        <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshEmployees">
+          {{ t("employeeAdmin.actions.refresh") }}
+        </button>
+      </div>
+    </div>
 
     <section v-if="feedback.message" class="employee-admin-feedback" :data-tone="feedback.tone">
       <div>
@@ -187,69 +187,125 @@
             </article>
           </div>
 
-          <form class="employee-admin-form" @submit.prevent="submitEmployee">
-            <div class="employee-admin-form-grid">
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.personnelNo") }}</span>
-                <input v-model="employeeDraft.personnel_no" required />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.firstName") }}</span>
-                <input v-model="employeeDraft.first_name" required />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.lastName") }}</span>
-                <input v-model="employeeDraft.last_name" required />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.preferredName") }}</span>
-                <input v-model="employeeDraft.preferred_name" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.workEmail") }}</span>
-                <input v-model="employeeDraft.work_email" type="email" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.workPhone") }}</span>
-                <input v-model="employeeDraft.work_phone" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.mobilePhone") }}</span>
-                <input v-model="employeeDraft.mobile_phone" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.defaultBranchId") }}</span>
-                <input v-model="employeeDraft.default_branch_id" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.defaultMandateId") }}</span>
-                <input v-model="employeeDraft.default_mandate_id" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.hireDate") }}</span>
-                <input v-model="employeeDraft.hire_date" type="date" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.terminationDate") }}</span>
-                <input v-model="employeeDraft.termination_date" type="date" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.userId") }}</span>
-                <input v-model="employeeDraft.user_id" />
-              </label>
-              <label class="field-stack field-stack--wide">
-                <span>{{ t("employeeAdmin.fields.notes") }}</span>
-                <textarea v-model="employeeDraft.notes" rows="4" />
-              </label>
-            </div>
+          <form class="employee-admin-form employee-admin-form--structured" @submit.prevent="submitEmployee">
+            <section class="employee-admin-editor-intro">
+              <div>
+                <p class="eyebrow">{{ t("employeeAdmin.form.eyebrow") }}</p>
+                <h4>{{ t("employeeAdmin.form.title") }}</h4>
+              </div>
+              <p class="field-help">{{ t("employeeAdmin.form.lead") }}</p>
+            </section>
 
-            <div class="cta-row">
-              <button class="cta-button" type="submit" :disabled="!actionState.canEdit && !isCreatingEmployee">
-                {{ isCreatingEmployee ? t("employeeAdmin.actions.createEmployee") : t("employeeAdmin.actions.saveEmployee") }}
-              </button>
-              <button class="cta-button cta-secondary" type="button" @click="resetEmployeeDraft">
-                {{ t("employeeAdmin.actions.reset") }}
-              </button>
+            <section class="employee-admin-form-section">
+              <div class="employee-admin-form-section__header">
+                <p class="eyebrow">{{ t("employeeAdmin.form.identityEyebrow") }}</p>
+                <h4>{{ t("employeeAdmin.form.identityTitle") }}</h4>
+              </div>
+              <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.personnelNo") }}</span>
+                  <input v-model="employeeDraft.personnel_no" required />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.preferredName") }}</span>
+                  <input v-model="employeeDraft.preferred_name" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.firstName") }}</span>
+                  <input v-model="employeeDraft.first_name" required />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.lastName") }}</span>
+                  <input v-model="employeeDraft.last_name" required />
+                </label>
+              </div>
+            </section>
+
+            <section class="employee-admin-form-section">
+              <div class="employee-admin-form-section__header">
+                <p class="eyebrow">{{ t("employeeAdmin.form.contactEyebrow") }}</p>
+                <h4>{{ t("employeeAdmin.form.contactTitle") }}</h4>
+              </div>
+              <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.workEmail") }}</span>
+                  <input v-model="employeeDraft.work_email" type="email" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.workPhone") }}</span>
+                  <input v-model="employeeDraft.work_phone" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.mobilePhone") }}</span>
+                  <input v-model="employeeDraft.mobile_phone" />
+                </label>
+              </div>
+            </section>
+
+            <section class="employee-admin-form-section">
+              <div class="employee-admin-form-section__header">
+                <p class="eyebrow">{{ t("employeeAdmin.form.assignmentEyebrow") }}</p>
+                <h4>{{ t("employeeAdmin.form.assignmentTitle") }}</h4>
+              </div>
+              <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.defaultBranchId") }}</span>
+                  <input v-model="employeeDraft.default_branch_id" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.defaultMandateId") }}</span>
+                  <input v-model="employeeDraft.default_mandate_id" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.hireDate") }}</span>
+                  <input v-model="employeeDraft.hire_date" type="date" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.terminationDate") }}</span>
+                  <input v-model="employeeDraft.termination_date" type="date" />
+                </label>
+              </div>
+            </section>
+
+            <section class="employee-admin-form-section">
+              <div class="employee-admin-form-section__header">
+                <p class="eyebrow">{{ t("employeeAdmin.form.accessEyebrow") }}</p>
+                <h4>{{ t("employeeAdmin.form.accessTitle") }}</h4>
+              </div>
+              <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.userId") }}</span>
+                  <input v-model="employeeDraft.user_id" />
+                </label>
+              </div>
+            </section>
+
+            <section class="employee-admin-form-section">
+              <div class="employee-admin-form-section__header">
+                <p class="eyebrow">{{ t("employeeAdmin.form.notesEyebrow") }}</p>
+                <h4>{{ t("employeeAdmin.form.notesTitle") }}</h4>
+              </div>
+              <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                <label class="field-stack field-stack--wide">
+                  <span>{{ t("employeeAdmin.fields.notes") }}</span>
+                  <textarea v-model="employeeDraft.notes" rows="4" />
+                </label>
+              </div>
+            </section>
+
+            <div class="employee-admin-form-actions">
+              <div>
+                <p class="eyebrow">{{ t("employeeAdmin.form.actionsEyebrow") }}</p>
+                <strong>{{ t("employeeAdmin.form.actionsTitle") }}</strong>
+              </div>
+              <div class="cta-row">
+                <button class="cta-button" type="submit" :disabled="!actionState.canEdit && !isCreatingEmployee">
+                  {{ isCreatingEmployee ? t("employeeAdmin.actions.createEmployee") : t("employeeAdmin.actions.saveEmployee") }}
+                </button>
+                <button class="cta-button cta-secondary" type="button" @click="resetEmployeeDraft">
+                  {{ t("employeeAdmin.actions.reset") }}
+                </button>
+              </div>
             </div>
           </form>
 
@@ -367,7 +423,7 @@
               >
                 <div>
                   <strong>{{ note.title }}</strong>
-                  <span>{{ t(`employeeAdmin.noteType.${note.note_type}`) }} · {{ note.reminder_at || t("employeeAdmin.summary.none") }}</span>
+                  <span>{{ t(`employeeAdmin.noteType.${note.note_type}` as never) }} · {{ note.reminder_at || t("employeeAdmin.summary.none") }}</span>
                 </div>
                 <StatusBadge :status="note.completed_at ? 'active' : note.status" />
               </button>
@@ -600,6 +656,10 @@ import {
   summarizeCurrentAddress,
 } from "@/features/employees/employeeAdmin.helpers.js";
 import { useAuthStore } from "@/stores/auth";
+
+withDefaults(defineProps<{ embedded?: boolean }>(), {
+  embedded: false,
+});
 
 const { t } = useI18n();
 const authStore = useAuthStore();
@@ -860,7 +920,10 @@ async function refreshEmployees() {
         selectedEmployee.value = null;
       }
     } else if (employees.value.length && !isCreatingEmployee.value) {
-      await selectEmployee(employees.value[0].id);
+      const [firstEmployee] = employees.value;
+      if (firstEmployee) {
+        await selectEmployee(firstEmployee.id);
+      }
     }
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -1346,6 +1409,7 @@ onBeforeUnmount(() => {
 .employee-admin-record-list {
   display: grid;
   gap: 1rem;
+  min-width: 0;
 }
 
 .employee-admin-grid {
@@ -1355,9 +1419,11 @@ onBeforeUnmount(() => {
 
 .employee-admin-hero {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 1rem;
   align-items: start;
+  min-width: 0;
 }
 
 .employee-admin-panel,
@@ -1366,6 +1432,11 @@ onBeforeUnmount(() => {
 .employee-admin-scope {
   display: grid;
   gap: 1rem;
+  min-width: 0;
+}
+
+.employee-admin-scope--embedded {
+  margin-bottom: 0.25rem;
 }
 
 .employee-admin-meta,
@@ -1375,6 +1446,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .employee-admin-meta__pill,
@@ -1389,9 +1461,11 @@ onBeforeUnmount(() => {
 .employee-admin-row,
 .employee-admin-record {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 0.75rem;
   align-items: center;
+  min-width: 0;
   border: 0;
   text-align: left;
   cursor: pointer;
@@ -1408,9 +1482,11 @@ onBeforeUnmount(() => {
 
 .employee-admin-panel__header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 1rem;
   align-items: start;
+  min-width: 0;
 }
 
 .employee-admin-detail,
@@ -1418,13 +1494,133 @@ onBeforeUnmount(() => {
 .employee-admin-inline-form {
   display: grid;
   gap: 1rem;
+  min-width: 0;
+}
+
+.employee-admin-form--structured {
+  gap: 1.1rem;
+}
+
+.employee-admin-editor-intro,
+.employee-admin-form-section,
+.employee-admin-form-actions {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--sp-color-surface-page) 76%, white 24%);
+  min-width: 0;
+}
+
+.employee-admin-editor-intro h4,
+.employee-admin-form-section__header h4,
+.employee-admin-form-actions strong {
+  margin: 0;
+  color: var(--sp-color-text-primary);
+}
+
+.employee-admin-editor-intro .field-help {
+  margin: 0;
+}
+
+.employee-admin-form-section__header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.employee-admin-form-grid--editor {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+}
+
+.field-stack {
+  display: grid;
+  gap: 0.42rem;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.field-stack--wide {
+  grid-column: 1 / -1;
+}
+
+.field-stack input,
+.field-stack select,
+.field-stack textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-card);
+  color: var(--sp-color-text-primary);
+  padding: 0.78rem 0.9rem;
+  font: inherit;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.field-stack textarea {
+  min-height: 6.5rem;
+  resize: vertical;
+}
+
+.field-stack input:focus,
+.field-stack select:focus,
+.field-stack textarea:focus {
+  outline: none;
+  border-color: rgb(40 170 170 / 55%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
+.field-stack input:disabled,
+.field-stack select:disabled,
+.field-stack textarea:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.field-help {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.employee-admin-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  color: var(--sp-color-text-secondary);
+}
+
+.employee-admin-checkbox input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--sp-color-primary);
+}
+
+.employee-admin-form-actions {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
 }
 
 .employee-admin-photo__preview {
+  max-width: 100%;
   min-width: 160px;
   min-height: 160px;
   display: grid;
   place-items: center;
+}
+
+.employee-admin-form-grid > *,
+.employee-admin-record-list > *,
+.employee-admin-list > * {
+  min-width: 0;
 }
 
 .employee-admin-photo__preview img {
@@ -1440,6 +1636,13 @@ onBeforeUnmount(() => {
   .employee-admin-photo {
     grid-template-columns: 1fr;
     display: grid;
+  }
+}
+
+@media (max-width: 820px) {
+  .employee-admin-form-grid--editor,
+  .employee-admin-form-actions {
+    grid-template-columns: 1fr;
   }
 }
 </style>
