@@ -3,6 +3,7 @@ set -euo pipefail
 
 test -f web/Dockerfile.stage
 test -f web/nginx.stage.conf
+test -f web/apps/web-antd/.env.production
 test -f web/apps/web-antd/dist/index.html
 
 grep -q 'COPY web/apps/web-antd/dist /usr/share/nginx/html' web/Dockerfile.stage
@@ -12,6 +13,9 @@ grep -q 'location = /_app.config.js' web/nginx.stage.conf
 grep -q 'location ^~ /js/' web/nginx.stage.conf
 grep -q 'location ^~ /jse/' web/nginx.stage.conf
 grep -q 'try_files \$uri \$uri/ /index.html;' web/nginx.stage.conf
+grep -q '^VITE_SP_ENV=staging$' web/apps/web-antd/.env.production
+grep -q '^VITE_SP_API_BASE_URL=/api$' web/apps/web-antd/.env.production
+grep -q 'return env === "development" ? "http://localhost:8000" : "/api";' web/apps/web-antd/src/sicherplan-legacy/config/env.ts
 
 if rg -n 'mock-napi\.vben\.pro' web/apps/web-antd/dist; then
   echo "web/apps/web-antd/dist still contains mock-napi.vben.pro runtime references." >&2
