@@ -30,7 +30,10 @@ function resolveAppEnv(value: string | undefined): AppEnv {
 function resolveApiBaseUrl(env: AppEnv, value: string | undefined): string {
   const normalized = value?.trim();
   if (normalized) {
-    return normalized;
+    if (env === "development") {
+      return normalized.replace(/\/$/, "");
+    }
+    return normalized.replace(/\/api\/?$/, "").replace(/\/$/, "");
   }
   return env === "development" ? "http://localhost:8000" : "/api";
 }
