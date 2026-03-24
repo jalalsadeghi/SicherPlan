@@ -1,0 +1,167 @@
+name: Stage Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+# Keep deployments serialized so two pushes do not race on the same stage host.
+concurrency:
+  group: stage-deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  DEPLOY_ROOT: /opt/sicherplan-stage
+  STAGE_ENV_FILE: /opt/sicherplan-stage/config/stage.env
+  BACKEND_ENV_FILE: /opt/sicherplan-stage/config/backend.stage.env
+
+jobs:
+  build_backend:
+    name: Build Backend Stage Image
+    runs-on: ubuntu-latest
+    steps:
+      # Each image build is isolated so backend and web can fail independently.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Normalize image namespace for GHCR
+        id: image_namespace
+        run: echo "value=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      # Buildx gives deterministic container builds and works well with GHCR pushes.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build and push backend stage image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile.stage
+          push: true
+          tags: |
+            ghcr.io/${{ steps.image_namespace.outputs.value }}/sicherplan-backend:main
+            ghcr.io/${{ steps.image_namespace.outputs.value }}/sicherplan-backend:${{ github.sha }}
+
+  build_web:
+    name: Build Web Stage Image
+    runs-on: ubuntu-latest
+    steps:
+      # The web image is built separately so stage can roll backend/web independently if needed.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Normalize image namespace for GHCR
+        id: image_namespace
+        run: echo "value=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build and push web stage image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: web/Dockerfile.stage
+          push: true
+          tags: |
+            ghcr.io/${{ steps.image_namespace.outputs.value }}/sicherplan-web:main
+            ghcr.io/${{ steps.image_namespace.outputs.value }}/sicherplan-web:${{ github.sha }}
+
+  deploy_stage:
+    name: Deploy Stage
+    runs-on: ubuntu-latest
+    needs:
+      - build_backend
+      - build_web
+    steps:
+      # Checkout is needed only to collect the current compose file and remote deploy script.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Package the exact deployment artifacts that must overwrite the server copy on each deploy.
+      - name: Prepare deployment bundle
+        run: |
+          rm -rf /tmp/sicherplan-stage-deploy
+          mkdir -p /tmp/sicherplan-stage-deploy
+          cp infra/docker-compose.stage.yml /tmp/sicherplan-stage-deploy/docker-compose.stage.yml
+          cp infra/scripts/deploy_stage_remote.sh /tmp/sicherplan-stage-deploy/deploy_stage_remote.sh
+
+      # Use SSH key auth only; the known_hosts secret pins the server host key.
+      - name: Configure SSH key and known hosts
+        env:
+          STAGE_SSH_KEY: ${{ secrets.STAGE_SSH_KEY }}
+          STAGE_KNOWN_HOSTS: ${{ secrets.STAGE_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$STAGE_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$STAGE_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      # The server never needs a git clone. It only needs the deploy directory and config files.
+      - name: Ensure remote deployment directory exists
+        env:
+          STAGE_HOST: ${{ secrets.STAGE_HOST }}
+          STAGE_PORT: ${{ secrets.STAGE_PORT }}
+          STAGE_USER: ${{ secrets.STAGE_USER }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -p "$STAGE_PORT" "$STAGE_USER@$STAGE_HOST" \
+            "install -d '$DEPLOY_ROOT/deploy'"
+
+      # Copy the current compose and deploy script so the server always runs the repo's latest deploy logic.
+      - name: Copy compose and deploy script to the server
+        env:
+          STAGE_HOST: ${{ secrets.STAGE_HOST }}
+          STAGE_PORT: ${{ secrets.STAGE_PORT }}
+          STAGE_USER: ${{ secrets.STAGE_USER }}
+        run: |
+          scp -i ~/.ssh/id_ed25519 -P "$STAGE_PORT" \
+            /tmp/sicherplan-stage-deploy/docker-compose.stage.yml \
+            "$STAGE_USER@$STAGE_HOST:$DEPLOY_ROOT/deploy/docker-compose.stage.yml"
+          scp -i ~/.ssh/id_ed25519 -P "$STAGE_PORT" \
+            /tmp/sicherplan-stage-deploy/deploy_stage_remote.sh \
+            "$STAGE_USER@$STAGE_HOST:$DEPLOY_ROOT/deploy/deploy_stage_remote.sh"
+
+      # Run the remote deployment with the required runtime paths and GHCR credentials injected at execution time.
+      - name: Run remote stage deployment
+        env:
+          STAGE_HOST: ${{ secrets.STAGE_HOST }}
+          STAGE_PORT: ${{ secrets.STAGE_PORT }}
+          STAGE_USER: ${{ secrets.STAGE_USER }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          DEPLOY_ROOT_Q=$(printf '%q' "$DEPLOY_ROOT")
+          STAGE_ENV_FILE_Q=$(printf '%q' "$STAGE_ENV_FILE")
+          BACKEND_ENV_FILE_Q=$(printf '%q' "$BACKEND_ENV_FILE")
+          GHCR_USERNAME_Q=$(printf '%q' "$GHCR_USERNAME")
+          GHCR_TOKEN_Q=$(printf '%q' "$GHCR_TOKEN")
+          ssh -i ~/.ssh/id_ed25519 -p "$STAGE_PORT" "$STAGE_USER@$STAGE_HOST" \
+            "set -euo pipefail; \
+             export DEPLOY_ROOT=$DEPLOY_ROOT_Q; \
+             export STAGE_ENV_FILE=$STAGE_ENV_FILE_Q; \
+             export BACKEND_ENV_FILE=$BACKEND_ENV_FILE_Q; \
+             export GHCR_USERNAME=$GHCR_USERNAME_Q; \
+             export GHCR_TOKEN=$GHCR_TOKEN_Q; \
+             chmod +x \"\$DEPLOY_ROOT/deploy/deploy_stage_remote.sh\"; \
+             bash \"\$DEPLOY_ROOT/deploy/deploy_stage_remote.sh\""

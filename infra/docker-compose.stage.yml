@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - stage_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: ${BACKEND_IMAGE:?set BACKEND_IMAGE in the stage env file}
+    restart: unless-stopped
+    env_file:
+      - ${BACKEND_ENV_FILE:?set BACKEND_ENV_FILE to the server-side backend env file}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - stage_object_storage:/var/lib/sicherplan/object-storage
+
+  web:
+    image: ${WEB_IMAGE:?set WEB_IMAGE in the stage env file}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  stage_postgres_data:
+  stage_object_storage:
