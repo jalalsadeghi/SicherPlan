@@ -35,7 +35,7 @@ function resolveApiBaseUrl(env: AppEnv, value: string | undefined): string {
     }
     return normalized.replace(/\/api\/?$/, "").replace(/\/$/, "");
   }
-  return env === "development" ? "http://localhost:8000" : "/api";
+  return env === "development" ? "http://localhost:8000" : "";
 }
 
 const appEnv = resolveAppEnv(import.meta.env.VITE_SP_ENV);

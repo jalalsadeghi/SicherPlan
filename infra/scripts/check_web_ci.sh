@@ -23,7 +23,7 @@ grep -q '^VITE_SP_ENV=staging$' web/apps/web-antd/.env.production
 grep -q '^VITE_SP_API_BASE_URL=$' web/apps/web-antd/.env.production
 grep -Fq 'function resolveApiBaseUrl' web/apps/web-antd/src/sicherplan-legacy/config/env.ts
 grep -Fq 'replace(/\/api\/?$/, "")' web/apps/web-antd/src/sicherplan-legacy/config/env.ts
-grep -Fq 'return env === "development" ? "http://localhost:8000" : "/api"' web/apps/web-antd/src/sicherplan-legacy/config/env.ts
+grep -Fq 'return env === "development" ? "http://localhost:8000" : ""' web/apps/web-antd/src/sicherplan-legacy/config/env.ts
 
 if rg -n 'mock-napi\.vben\.pro' web/apps/web-antd/dist; then
   echo "web/apps/web-antd/dist still contains mock-napi.vben.pro runtime references." >&2
