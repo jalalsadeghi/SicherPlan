@@ -1,39 +1,31 @@
-Please fix the SicherPlan web production Docker image so the deployed frontend includes the correct built assets.
+Please investigate and fix the SicherPlan web production artifact mismatch problem.
 
 Problem:
-- The deployed domain serves /index.html, but the JS bundles referenced by index.html are missing.
-- Browser errors show 404s for files like:
-  - /jse/index-index-*.js
-  - /js/env-*.js
-- Inside the running web container, /usr/share/nginx/html currently contains index.html but not the referenced bundle files.
-- This means the production web image is copying the wrong build output or an incomplete build output.
+- The deployed frontend index.html references hashed assets that do not exist in the final web container.
+- Example:
+  - index.html references /jse/index-index-_VBnAfr8.js and /js/env-CzAGrQv8.js
+  - but those files are missing from /usr/share/nginx/html
+- As a result, the browser gets 404 on startup assets and the app never bootstraps.
 
-Relevant file:
-- web/scripts/deploy/Dockerfile
-
-Important code fact:
-- The current production stage copies:
-  COPY --from=builder /app/playground/dist /usr/share/nginx/html
-- But the deployed app is the SicherPlan web-antd application, not the playground app.
-- The correct built output likely lives under:
-  /app/apps/web-antd/dist
+Context:
+- Backend is healthy.
+- The issue is in the frontend build/deploy artifact consistency.
+- The deployed web app is the web-antd app.
+- In the checked project copy, web/apps/web-antd/dist.zip contains different asset hashes than the deployed container, which suggests the deployed image is not built from a clean, matching artifact set.
 
 Tasks:
-1. Inspect the monorepo build outputs after the build step.
-2. Confirm which app is the actual deployed SicherPlan frontend.
-3. Update the Dockerfile production COPY step so it copies the correct dist directory for the deployed app.
-4. Verify that the final nginx image contains:
-   - /usr/share/nginx/html/index.html
-   - /usr/share/nginx/html/jse/...
-   - /usr/share/nginx/html/js/...
-5. Do not break local development.
-6. Summarize:
+1. Inspect the frontend build pipeline and Docker image build inputs.
+2. Ensure the production image is built from one clean web-antd dist output only.
+3. Add a verification step in the build/deploy process:
+   - parse index.html
+   - verify every referenced /js/... and /jse/... asset actually exists in the final image
+4. Prevent mixed or stale assets from older builds.
+5. Summarize:
+   - root cause
    - touched files
-   - exact path changes
-   - rebuild/redeploy steps
-   - cache purge note for browser/CDN
+   - exact build/deploy changes
+   - verification command to run on the server after deployment
 
 Important:
-- Keep the fix minimal.
-- Do not redesign nginx unless necessary.
-- Focus on the production image contents.
+- Do not modify unrelated business logic.
+- Focus on build artifact consistency and production image correctness.

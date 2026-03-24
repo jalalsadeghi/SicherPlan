@@ -15,6 +15,7 @@ COPY . /app
 
 # 安装依赖
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN rm -rf /app/apps/web-antd/dist
 RUN pnpm run build --filter=\!./docs
 
 RUN echo "Builder Success 🎉"
@@ -27,7 +28,11 @@ RUN echo "types { application/javascript js mjs; }" > /etc/nginx/conf.d/mjs.conf
 
 # 复制构建产物
 # COPY --from=builder /app/playground/dist /usr/share/nginx/html
+RUN rm -rf /usr/share/nginx/html/*
 COPY --from=builder /app/apps/web-antd/dist /usr/share/nginx/html
+COPY --from=builder /app/scripts/deploy/verify-dist-assets.sh /usr/local/bin/verify-web-dist
+RUN chmod +x /usr/local/bin/verify-web-dist \
+    && /usr/local/bin/verify-web-dist /usr/share/nginx/html
 
 # 复制 nginx 配置
 COPY --from=builder /app/scripts/deploy/nginx.conf /etc/nginx/nginx.conf
