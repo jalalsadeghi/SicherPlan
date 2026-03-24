@@ -5,9 +5,38 @@ test -f web/Dockerfile.stage
 test -f web/nginx.stage.conf
 test -f web/apps/web-antd/dist/index.html
 
-# The current stage image serves committed dist directly, so the smoke check should
-# validate the exact inputs that Docker stage deployment depends on right now.
 grep -q 'COPY web/apps/web-antd/dist /usr/share/nginx/html' web/Dockerfile.stage
-grep -q 'Stage web image requires committed web/apps/web-antd/dist/index.html' web/Dockerfile.stage
+grep -q 'Current stage frontend image expects committed dist assets' web/Dockerfile.stage
 grep -q 'proxy_pass http://backend:8000/api/' web/nginx.stage.conf
+grep -q 'location = /_app.config.js' web/nginx.stage.conf
+grep -q 'location ^~ /js/' web/nginx.stage.conf
+grep -q 'location ^~ /jse/' web/nginx.stage.conf
 grep -q 'try_files \$uri \$uri/ /index.html;' web/nginx.stage.conf
+
+if rg -n 'mock-napi\.vben\.pro' web/apps/web-antd/dist; then
+  echo "web/apps/web-antd/dist still contains mock-napi.vben.pro runtime references." >&2
+  exit 1
+fi
+
+python3 - <<'PY'
+from pathlib import Path
+import re
+import sys
+
+dist_root = Path("web/apps/web-antd/dist")
+index_html = (dist_root / "index.html").read_text(encoding="utf-8")
+refs = re.findall(r'(?:src|href)="(/[^"]+)"', index_html)
+missing = []
+for ref in refs:
+    if ref.startswith("http"):
+        continue
+    rel = ref.lstrip("/").split("?", 1)[0]
+    if not (dist_root / rel).exists():
+        missing.append(ref)
+
+if missing:
+    print("index.html references missing dist assets:", file=sys.stderr)
+    for ref in missing:
+        print(f"  - {ref}", file=sys.stderr)
+    raise SystemExit(1)
+PY

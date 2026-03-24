@@ -30,7 +30,7 @@ build/
 .env
 .env.*
 !.env.example
+!web/apps/web-antd/.env.production
 
 # Tooling
 coverage/
-
