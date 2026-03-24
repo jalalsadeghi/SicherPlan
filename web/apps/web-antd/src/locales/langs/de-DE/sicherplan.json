@@ -704,7 +704,9 @@
     },
     "modal": {
       "createTitle": "Tenant-Admin anlegen",
-      "passwordTitle": "Passwort zurücksetzen"
+      "passwordTitle": "Passwort zurücksetzen",
+      "selectedTenantTitle": "Konto anlegen für",
+      "selectedTenantBody": "{name} ({code})"
     },
     "messages": {
       "created": "Tenant-Admin wurde angelegt.",
@@ -724,6 +726,12 @@
     },
     "values": {
       "never": "Noch kein Login"
+    },
+    "empty": {
+      "title": "Es gibt noch keinen Tenant-Admin",
+      "body": "Legen Sie jetzt das erste tenant-scoped Administrationskonto für den ausgewählten Mandanten an, damit die lokale Verwaltung starten kann.",
+      "table": "Für den ausgewählten Mandanten existiert noch kein tenant_admin-Konto.",
+      "cta": "Tenant-Admin anlegen"
     },
     "points": [
       "Benutzer werden immer tenant-scoped und mit genau einer tenant_admin-Zuweisung angelegt.",

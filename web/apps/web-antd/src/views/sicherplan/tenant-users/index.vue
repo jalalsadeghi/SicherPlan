@@ -5,6 +5,7 @@ import {
   Alert,
   Button,
   Card,
+  Empty,
   Form,
   Input,
   Modal,
@@ -84,6 +85,11 @@ const stats = computed(() => [
   },
 ]);
 
+const hasSelectedTenant = computed(() => !!selectedTenant.value);
+const showEmptyState = computed(
+  () => !!selectedTenant.value && !loadingUsers.value && users.value.length === 0,
+);
+
 async function loadTenants() {
   loadingTenants.value = true;
   try {
@@ -123,6 +129,13 @@ function resetCreateForm() {
   createForm.status = 'active';
   createForm.temporary_password = '';
   createForm.timezone = 'Europe/Berlin';
+}
+
+function openCreateModal() {
+  if (!selectedTenant.value) {
+    return;
+  }
+  modalOpen.value = true;
 }
 
 async function submitCreate() {
@@ -214,29 +227,27 @@ onMounted(async () => {
     :stats="stats"
     :title="$t('sicherplan.admin.tenantUsers')"
   >
-    <template #actions>
-      <Card :bordered="false">
-        <SectionHeader
-          :description="$t('sicherplan.tenantUsers.actionsDescription')"
-          :title="$t('sicherplan.tenantUsers.actionsTitle')"
-        />
-        <Space wrap>
-          <Button type="primary" @click="modalOpen = true">
-            {{ $t('sicherplan.tenantUsers.actions.create') }}
-          </Button>
-          <Button :loading="loadingUsers" @click="loadUsers">
-            {{ $t('sicherplan.tenantUsers.actions.refresh') }}
-          </Button>
-        </Space>
-      </Card>
-    </template>
-
     <template #main>
       <Card :bordered="false">
         <SectionHeader
           :description="$t('sicherplan.tenantUsers.filtersDescription')"
           :title="$t('sicherplan.tenantUsers.filtersTitle')"
-        />
+        >
+          <template #action>
+            <Space wrap>
+              <Button
+                type="primary"
+                :disabled="!hasSelectedTenant"
+                @click="openCreateModal"
+              >
+                {{ $t('sicherplan.tenantUsers.actions.create') }}
+              </Button>
+              <Button :disabled="!hasSelectedTenant" :loading="loadingUsers" @click="loadUsers">
+                {{ $t('sicherplan.tenantUsers.actions.refresh') }}
+              </Button>
+            </Space>
+          </template>
+        </SectionHeader>
         <div class="sp-tenant-users__filters">
           <Input
             v-model:value="tenantSearch"
@@ -309,6 +320,20 @@ onMounted(async () => {
           :description="$t('sicherplan.tenantUsers.currentScope.infoBody')"
         />
         <Card :bordered="false">
+          <Alert
+            v-if="showEmptyState"
+            class="sp-tenant-users__empty-hint"
+            type="info"
+            show-icon
+            :message="$t('sicherplan.tenantUsers.empty.title')"
+            :description="$t('sicherplan.tenantUsers.empty.body')"
+          >
+            <template #action>
+              <Button type="primary" size="small" @click="openCreateModal">
+                {{ $t('sicherplan.tenantUsers.empty.cta') }}
+              </Button>
+            </template>
+          </Alert>
           <Table
             :columns="[
               { title: $t('sicherplan.tenantUsers.columns.username'), dataIndex: 'username', key: 'username' },
@@ -324,6 +349,16 @@ onMounted(async () => {
             row-key="id"
             size="middle"
           >
+            <template #emptyText>
+              <Empty
+                v-if="showEmptyState"
+                :description="$t('sicherplan.tenantUsers.empty.table')"
+              >
+                <Button type="primary" @click="openCreateModal">
+                  {{ $t('sicherplan.tenantUsers.empty.cta') }}
+                </Button>
+              </Empty>
+            </template>
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'status'">
                 <Tag :color="record.status === 'active' ? 'green' : 'default'">
@@ -364,6 +399,14 @@ onMounted(async () => {
     @ok="submitCreate"
   >
     <Form layout="vertical">
+      <Alert
+        v-if="selectedTenant"
+        class="sp-tenant-users__modal-summary"
+        type="info"
+        show-icon
+        :message="$t('sicherplan.tenantUsers.modal.selectedTenantTitle')"
+        :description="$t('sicherplan.tenantUsers.modal.selectedTenantBody', { name: selectedTenant.name, code: selectedTenant.code })"
+      />
       <Form.Item :label="$t('sicherplan.tenantUsers.columns.username')">
         <Input v-model:value="createForm.username" />
       </Form.Item>
@@ -434,6 +477,11 @@ onMounted(async () => {
 }
 
 .sp-tenant-users__scope-note {
+  margin-bottom: 1rem;
+}
+
+.sp-tenant-users__empty-hint,
+.sp-tenant-users__modal-summary {
   margin-bottom: 1rem;
 }
 

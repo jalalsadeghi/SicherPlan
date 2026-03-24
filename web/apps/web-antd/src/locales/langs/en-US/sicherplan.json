@@ -704,7 +704,9 @@
     },
     "modal": {
       "createTitle": "Create tenant admin",
-      "passwordTitle": "Reset password"
+      "passwordTitle": "Reset password",
+      "selectedTenantTitle": "Creating account for",
+      "selectedTenantBody": "{name} ({code})"
     },
     "messages": {
       "created": "Tenant admin created.",
@@ -724,6 +726,12 @@
     },
     "values": {
       "never": "No login yet"
+    },
+    "empty": {
+      "title": "No tenant admin exists yet",
+      "body": "Create the first tenant-scoped admin account for the selected tenant so local administration can start immediately.",
+      "table": "No tenant_admin account exists for the selected tenant yet.",
+      "cta": "Create tenant admin"
     },
     "points": [
       "Users are always created tenant-scoped with exactly one tenant_admin assignment.",
