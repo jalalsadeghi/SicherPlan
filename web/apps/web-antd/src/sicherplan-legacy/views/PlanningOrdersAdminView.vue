@@ -991,8 +991,54 @@ async function refreshAll() {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.field-stack {
+  display: grid;
+  gap: 0.42rem;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
 .field-stack--wide {
   grid-column: 1 / -1;
+}
+
+.field-stack input,
+.field-stack select,
+.field-stack textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-card);
+  color: var(--sp-color-text-primary);
+  padding: 0.78rem 0.9rem;
+  font: inherit;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.field-stack textarea {
+  min-height: 6.5rem;
+  resize: vertical;
+}
+
+.field-stack input:focus,
+.field-stack select:focus,
+.field-stack textarea:focus {
+  outline: none;
+  border-color: rgb(40 170 170 / 55%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
+.field-stack input:disabled,
+.field-stack select:disabled,
+.field-stack textarea:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
 }
 
 .planning-orders-detail {
@@ -1018,6 +1064,15 @@ async function refreshAll() {
   align-items: center;
   display: flex;
   gap: 0.5rem;
+  min-width: 0;
+  color: var(--sp-color-text-secondary);
+}
+
+.planning-orders-checkbox input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--sp-color-primary);
 }
 
 .planning-orders-lead,

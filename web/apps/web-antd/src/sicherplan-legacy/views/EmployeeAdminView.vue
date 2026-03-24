@@ -13,7 +13,7 @@
       </div>
     </section>
 
-    <div class="module-card employee-admin-scope" :class="{ 'employee-admin-scope--embedded': embedded }">
+    <div v-if="!embedded" class="module-card employee-admin-scope" :class="{ 'employee-admin-scope--embedded': embedded }">
       <label class="field-stack">
         <span>{{ t("employeeAdmin.scope.label") }}</span>
         <input v-model="tenantScopeInput" :disabled="!isPlatformAdmin" :placeholder="t('employeeAdmin.scope.placeholder')" />
@@ -47,8 +47,8 @@
       <h3>{{ t("employeeAdmin.permission.missingBody") }}</h3>
     </section>
 
-    <div v-else class="employee-admin-grid">
-      <section class="module-card employee-admin-panel">
+    <div v-else class="employee-admin-grid" data-testid="employee-master-detail-layout">
+      <section class="module-card employee-admin-panel employee-admin-list-panel" data-testid="employee-list-section">
         <div class="employee-admin-panel__header">
           <div>
             <p class="eyebrow">{{ t("employeeAdmin.list.eyebrow") }}</p>
@@ -73,11 +73,21 @@
           </label>
           <label class="field-stack">
             <span>{{ t("employeeAdmin.fields.defaultBranchId") }}</span>
-            <input v-model="filters.default_branch_id" />
+            <select v-model="filters.default_branch_id">
+              <option value="">{{ t("employeeAdmin.summary.none") }}</option>
+              <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
+                {{ formatStructureLabel(branch) }}
+              </option>
+            </select>
           </label>
           <label class="field-stack">
             <span>{{ t("employeeAdmin.fields.defaultMandateId") }}</span>
-            <input v-model="filters.default_mandate_id" />
+            <select v-model="filters.default_mandate_id">
+              <option value="">{{ t("employeeAdmin.summary.none") }}</option>
+              <option v-for="mandate in filterMandateOptions(filters.default_branch_id)" :key="mandate.id" :value="mandate.id">
+                {{ formatStructureLabel(mandate) }}
+              </option>
+            </select>
           </label>
         </div>
 
@@ -148,9 +158,9 @@
             :class="{ selected: employee.id === selectedEmployeeId }"
             @click="selectEmployee(employee.id)"
           >
-            <div>
-              <strong>{{ employee.personnel_no }} · {{ employee.first_name }} {{ employee.last_name }}</strong>
-              <span>{{ employee.work_email || employee.mobile_phone || t("employeeAdmin.summary.none") }}</span>
+            <div class="employee-admin-row__text">
+              <strong class="employee-admin-row__title">{{ employee.personnel_no }} · {{ employee.first_name }} {{ employee.last_name }}</strong>
+              <span class="employee-admin-row__meta">{{ employee.work_email || employee.mobile_phone || t("employeeAdmin.summary.none") }}</span>
             </div>
             <StatusBadge :status="employee.status" />
           </button>
@@ -158,7 +168,7 @@
         <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.list.empty") }}</p>
       </section>
 
-      <section class="module-card employee-admin-panel employee-admin-detail">
+      <section class="module-card employee-admin-panel employee-admin-detail" data-testid="employee-detail-workspace">
         <div class="employee-admin-panel__header">
           <div>
             <p class="eyebrow">{{ t("employeeAdmin.detail.eyebrow") }}</p>
@@ -168,14 +178,33 @@
         </div>
 
         <template v-if="isCreatingEmployee || selectedEmployee">
+          <nav class="employee-admin-tabs" data-testid="employee-detail-tabs" aria-label="Employee detail sections">
+            <button
+              v-for="tab in employeeDetailTabs"
+              :key="tab.id"
+              type="button"
+              class="employee-admin-tab"
+              :class="{ active: tab.id === activeDetailTab }"
+              :data-testid="`employee-tab-${tab.id}`"
+              @click="activeDetailTab = tab.id"
+            >
+              {{ tab.label }}
+            </button>
+          </nav>
+
+          <section
+            v-if="activeDetailTab === 'overview'"
+            class="employee-admin-section employee-admin-tab-panel"
+            data-testid="employee-tab-panel-overview"
+          >
           <div v-if="selectedEmployee && !isCreatingEmployee" class="employee-admin-summary">
             <article class="employee-admin-summary__card">
               <span>{{ t("employeeAdmin.summary.branch") }}</span>
-              <strong>{{ selectedEmployee.default_branch_id || t("employeeAdmin.summary.none") }}</strong>
+              <strong>{{ selectedEmployeeBranchLabel || t("employeeAdmin.summary.none") }}</strong>
             </article>
             <article class="employee-admin-summary__card">
               <span>{{ t("employeeAdmin.summary.mandate") }}</span>
-              <strong>{{ selectedEmployee.default_mandate_id || t("employeeAdmin.summary.none") }}</strong>
+              <strong>{{ selectedEmployeeMandateLabel || t("employeeAdmin.summary.none") }}</strong>
             </article>
             <article class="employee-admin-summary__card">
               <span>{{ t("employeeAdmin.summary.currentAddress") }}</span>
@@ -250,11 +279,25 @@
               <div class="employee-admin-form-grid employee-admin-form-grid--editor">
                 <label class="field-stack">
                   <span>{{ t("employeeAdmin.fields.defaultBranchId") }}</span>
-                  <input v-model="employeeDraft.default_branch_id" />
+                  <select v-model="employeeDraft.default_branch_id">
+                    <option value="">{{ t("employeeAdmin.summary.none") }}</option>
+                    <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
+                      {{ formatStructureLabel(branch) }}
+                    </option>
+                  </select>
                 </label>
                 <label class="field-stack">
                   <span>{{ t("employeeAdmin.fields.defaultMandateId") }}</span>
-                  <input v-model="employeeDraft.default_mandate_id" />
+                  <select v-model="employeeDraft.default_mandate_id">
+                    <option value="">{{ t("employeeAdmin.summary.none") }}</option>
+                    <option
+                      v-for="mandate in filteredEmployeeMandates"
+                      :key="mandate.id"
+                      :value="mandate.id"
+                    >
+                      {{ formatStructureLabel(mandate) }}
+                    </option>
+                  </select>
                 </label>
                 <label class="field-stack">
                   <span>{{ t("employeeAdmin.fields.hireDate") }}</span>
@@ -272,12 +315,10 @@
                 <p class="eyebrow">{{ t("employeeAdmin.form.accessEyebrow") }}</p>
                 <h4>{{ t("employeeAdmin.form.accessTitle") }}</h4>
               </div>
-              <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                <label class="field-stack">
-                  <span>{{ t("employeeAdmin.fields.userId") }}</span>
-                  <input v-model="employeeDraft.user_id" />
-                </label>
-              </div>
+              <p class="field-help">{{ t("employeeAdmin.form.accessLead") }}</p>
+              <p v-if="!isCreatingEmployee && employeeDraft.user_id" class="field-help">
+                {{ t("employeeAdmin.form.accessCurrent") }}: {{ employeeDraft.user_id }}
+              </p>
             </section>
 
             <section class="employee-admin-form-section">
@@ -308,14 +349,13 @@
               </div>
             </div>
           </form>
+          </section>
 
-          <section v-if="selectedEmployee && !isCreatingEmployee" class="employee-admin-section">
-            <div class="employee-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("employeeAdmin.access.eyebrow") }}</p>
-                <h3>{{ t("employeeAdmin.access.title") }}</h3>
-              </div>
-            </div>
+          <section
+            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'app_access'"
+            class="employee-admin-section employee-admin-tab-panel"
+            data-testid="employee-tab-panel-app-access"
+          >
             <div class="employee-admin-summary">
               <article class="employee-admin-summary__card">
                 <span>{{ t("employeeAdmin.access.user") }}</span>
@@ -330,267 +370,389 @@
                 <strong>{{ accessLink?.app_access_enabled ? t("employeeAdmin.access.enabledYes") : t("employeeAdmin.access.enabledNo") }}</strong>
               </article>
             </div>
-            <div class="employee-admin-form-grid">
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.access.createUsername") }}</span>
-                <input v-model="accessCreateDraft.username" :disabled="!actionState.canManageAccess" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.access.createEmail") }}</span>
-                <input v-model="accessCreateDraft.email" :disabled="!actionState.canManageAccess" type="email" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.access.createPassword") }}</span>
-                <input v-model="accessCreateDraft.password" :disabled="!actionState.canManageAccess" type="password" />
-              </label>
-            </div>
-            <div class="cta-row">
-              <button class="cta-button" type="button" :disabled="!actionState.canManageAccess" @click="createAccessUser">
-                {{ t("employeeAdmin.actions.createAccessUser") }}
-              </button>
-              <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess" @click="reconcileAccessUser">
-                {{ t("employeeAdmin.actions.reconcileAccessUser") }}
-              </button>
-              <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess || !accessLink?.user_id" @click="detachAccessUser">
-                {{ t("employeeAdmin.actions.detachAccessUser") }}
-              </button>
-            </div>
-            <div class="employee-admin-form-grid">
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.access.attachUserId") }}</span>
-                <input v-model="accessAttachDraft.user_id" :disabled="!actionState.canManageAccess" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.access.attachUsername") }}</span>
-                <input v-model="accessAttachDraft.username" :disabled="!actionState.canManageAccess" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.access.attachEmail") }}</span>
-                <input v-model="accessAttachDraft.email" :disabled="!actionState.canManageAccess" type="email" />
-              </label>
-            </div>
-            <div class="cta-row">
-              <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess" @click="attachAccessUser">
-                {{ t("employeeAdmin.actions.attachAccessUser") }}
-              </button>
-            </div>
-          </section>
+            <div class="employee-admin-form employee-admin-form--structured">
+              <section class="employee-admin-editor-intro">
+                <div>
+                  <p class="eyebrow">{{ t("employeeAdmin.access.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.access.title") }}</h4>
+                </div>
+                <p class="field-help">{{ t("employeeAdmin.access.lead") }}</p>
+              </section>
 
-          <section v-if="selectedEmployee && !isCreatingEmployee" class="employee-admin-section">
-            <div class="employee-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("employeeAdmin.photo.eyebrow") }}</p>
-                <h3>{{ t("employeeAdmin.photo.title") }}</h3>
-              </div>
-            </div>
-
-            <div class="employee-admin-photo">
-              <div class="employee-admin-photo__preview">
-                <img v-if="photoPreviewUrl" :src="photoPreviewUrl" :alt="t('employeeAdmin.photo.alt')" />
-                <span v-else>{{ t("employeeAdmin.photo.empty") }}</span>
-              </div>
-              <div class="employee-admin-photo__controls">
-                <p class="field-help">{{ currentPhoto?.file_name || t("employeeAdmin.photo.help") }}</p>
-                <input :disabled="!actionState.canManagePhoto" type="file" accept="image/*" @change="onPhotoSelected" />
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.access.createEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.access.createTitle") }}</h4>
+                  <p class="field-help">{{ t("employeeAdmin.access.createLead") }}</p>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.access.createUsername") }}</span>
+                    <input v-model="accessCreateDraft.username" :disabled="!actionState.canManageAccess" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.access.createEmail") }}</span>
+                    <input v-model="accessCreateDraft.email" :disabled="!actionState.canManageAccess" type="email" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.access.createPassword") }}</span>
+                    <input v-model="accessCreateDraft.password" :disabled="!actionState.canManageAccess" type="password" />
+                  </label>
+                </div>
                 <div class="cta-row">
-                  <button class="cta-button" type="button" :disabled="!pendingPhotoFile || !actionState.canManagePhoto" @click="submitPhoto">
-                    {{ t("employeeAdmin.actions.uploadPhoto") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" :disabled="!currentPhoto?.current_version_no" @click="downloadDocument(currentPhoto)">
-                    {{ t("employeeAdmin.actions.downloadPhoto") }}
+                  <button class="cta-button" type="button" :disabled="!actionState.canManageAccess" @click="createAccessUser">
+                    {{ t("employeeAdmin.actions.createAccessUser") }}
                   </button>
                 </div>
-              </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.access.reconcileEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.access.reconcileTitle") }}</h4>
+                  <p class="field-help">{{ t("employeeAdmin.access.reconcileLead") }}</p>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess" @click="reconcileAccessUser">
+                    {{ t("employeeAdmin.actions.reconcileAccessUser") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess || !accessLink?.user_id" @click="detachAccessUser">
+                    {{ t("employeeAdmin.actions.detachAccessUser") }}
+                  </button>
+                </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.access.attachEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.access.attachTitle") }}</h4>
+                  <p class="field-help">{{ t("employeeAdmin.access.attachLead") }}</p>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.access.attachUserId") }}</span>
+                    <input v-model="accessAttachDraft.user_id" :disabled="!actionState.canManageAccess" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.access.attachUsername") }}</span>
+                    <input v-model="accessAttachDraft.username" :disabled="!actionState.canManageAccess" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.access.attachEmail") }}</span>
+                    <input v-model="accessAttachDraft.email" :disabled="!actionState.canManageAccess" type="email" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess" @click="attachAccessUser">
+                    {{ t("employeeAdmin.actions.attachAccessUser") }}
+                  </button>
+                </div>
+              </section>
             </div>
           </section>
 
-          <section v-if="selectedEmployee && !isCreatingEmployee" class="employee-admin-section">
-            <div class="employee-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("employeeAdmin.notes.eyebrow") }}</p>
-                <h3>{{ t("employeeAdmin.notes.title") }}</h3>
-              </div>
-            </div>
-
-            <div v-if="employeeNotes.length" class="employee-admin-record-list">
-              <button
-                v-for="note in employeeNotes"
-                :key="note.id"
-                type="button"
-                class="employee-admin-record"
-                :class="{ selected: note.id === editingNoteId }"
-                @click="editNote(note)"
-              >
+          <section
+            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'profile_photo'"
+            class="employee-admin-section employee-admin-tab-panel"
+            data-testid="employee-tab-panel-profile-photo"
+          >
+            <div class="employee-admin-form employee-admin-form--structured">
+              <section class="employee-admin-editor-intro">
                 <div>
-                  <strong>{{ note.title }}</strong>
-                  <span>{{ t(`employeeAdmin.noteType.${note.note_type}` as never) }} · {{ note.reminder_at || t("employeeAdmin.summary.none") }}</span>
+                  <p class="eyebrow">{{ t("employeeAdmin.photo.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.photo.title") }}</h4>
                 </div>
-                <StatusBadge :status="note.completed_at ? 'active' : note.status" />
-              </button>
-            </div>
-            <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.notes.empty") }}</p>
+                <p class="field-help">{{ t("employeeAdmin.photo.help") }}</p>
+              </section>
 
-            <form class="employee-admin-inline-form" @submit.prevent="submitNote">
-              <div class="employee-admin-form-grid">
-                <label class="field-stack">
-                  <span>{{ t("employeeAdmin.fields.noteType") }}</span>
-                  <select v-model="noteDraft.note_type" :disabled="!actionState.canManageNotes">
-                    <option value="operational_note">{{ t("employeeAdmin.noteType.operational_note") }}</option>
-                    <option value="positive_activity">{{ t("employeeAdmin.noteType.positive_activity") }}</option>
-                    <option value="reminder">{{ t("employeeAdmin.noteType.reminder") }}</option>
-                  </select>
-                </label>
-                <label class="field-stack">
-                  <span>{{ t("employeeAdmin.fields.noteTitle") }}</span>
-                  <input v-model="noteDraft.title" :disabled="!actionState.canManageNotes" required />
-                </label>
-                <label class="field-stack">
-                  <span>{{ t("employeeAdmin.fields.reminderAt") }}</span>
-                  <input v-model="noteDraft.reminder_at" :disabled="!actionState.canManageNotes" type="date" />
-                </label>
-                <label class="field-stack">
-                  <span>{{ t("employeeAdmin.fields.completedAt") }}</span>
-                  <input v-model="noteDraft.completed_at" :disabled="!actionState.canManageNotes" type="date" />
-                </label>
-                <label class="field-stack field-stack--wide">
-                  <span>{{ t("employeeAdmin.fields.noteBody") }}</span>
-                  <textarea v-model="noteDraft.body" :disabled="!actionState.canManageNotes" rows="3" />
-                </label>
-              </div>
-              <div class="cta-row">
-                <button class="cta-button" type="submit" :disabled="!actionState.canManageNotes">
-                  {{ editingNoteId ? t("employeeAdmin.actions.saveNote") : t("employeeAdmin.actions.createNote") }}
-                </button>
-                <button class="cta-button cta-secondary" type="button" @click="resetNoteDraft">
-                  {{ t("employeeAdmin.actions.resetNote") }}
-                </button>
-              </div>
-            </form>
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.photo.manageEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.photo.manageTitle") }}</h4>
+                  <p class="field-help">{{ currentPhoto?.file_name || t("employeeAdmin.photo.empty") }}</p>
+                </div>
+
+                <div class="employee-admin-photo">
+                  <div class="employee-admin-photo__preview">
+                    <img v-if="photoPreviewUrl" :src="photoPreviewUrl" :alt="t('employeeAdmin.photo.alt')" />
+                    <span v-else>{{ t("employeeAdmin.photo.empty") }}</span>
+                  </div>
+                  <div class="employee-admin-photo__controls">
+                    <label class="field-stack field-stack--wide">
+                      <span>{{ t("employeeAdmin.photo.fileLabel") }}</span>
+                      <input :disabled="!actionState.canManagePhoto" type="file" accept="image/*" @change="onPhotoSelected" />
+                    </label>
+                    <div class="cta-row">
+                      <button class="cta-button" type="button" :disabled="!pendingPhotoFile || !actionState.canManagePhoto" @click="submitPhoto">
+                        {{ t("employeeAdmin.actions.uploadPhoto") }}
+                      </button>
+                      <button class="cta-button cta-secondary" type="button" :disabled="!currentPhoto?.current_version_no" @click="downloadDocument(currentPhoto)">
+                        {{ t("employeeAdmin.actions.downloadPhoto") }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
           </section>
 
-          <section v-if="selectedEmployee && !isCreatingEmployee" class="employee-admin-section">
-            <div class="employee-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("employeeAdmin.groups.eyebrow") }}</p>
-                <h3>{{ t("employeeAdmin.groups.title") }}</h3>
-              </div>
-            </div>
-
-            <div class="employee-admin-form-grid">
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.groupCode") }}</span>
-                <input v-model="groupDraft.code" :disabled="!actionState.canManageGroups" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.groupName") }}</span>
-                <input v-model="groupDraft.name" :disabled="!actionState.canManageGroups" />
-              </label>
-              <label class="field-stack field-stack--wide">
-                <span>{{ t("employeeAdmin.fields.groupDescription") }}</span>
-                <input v-model="groupDraft.description" :disabled="!actionState.canManageGroups" />
-              </label>
-            </div>
-            <div class="cta-row">
-              <button class="cta-button" type="button" :disabled="!actionState.canManageGroups" @click="submitGroup">
-                {{ editingGroupId ? t("employeeAdmin.actions.saveGroup") : t("employeeAdmin.actions.createGroup") }}
-              </button>
-              <button class="cta-button cta-secondary" type="button" @click="resetGroupDraft">
-                {{ t("employeeAdmin.actions.resetGroup") }}
-              </button>
-            </div>
-
-            <div class="employee-admin-form-grid">
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.assignGroup") }}</span>
-                <select v-model="membershipDraft.group_id" :disabled="!actionState.canManageGroups">
-                  <option value="">{{ t("employeeAdmin.groups.selectPlaceholder") }}</option>
-                  <option v-for="group in employeeGroups" :key="group.id" :value="group.id">{{ group.code }} · {{ group.name }}</option>
-                </select>
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.validFrom") }}</span>
-                <input v-model="membershipDraft.valid_from" :disabled="!actionState.canManageGroups" type="date" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
-                <input v-model="membershipDraft.valid_until" :disabled="!actionState.canManageGroups" type="date" />
-              </label>
-              <label class="field-stack field-stack--wide">
-                <span>{{ t("employeeAdmin.fields.membershipNotes") }}</span>
-                <input v-model="membershipDraft.notes" :disabled="!actionState.canManageGroups" />
-              </label>
-            </div>
-            <div class="cta-row">
-              <button class="cta-button" type="button" :disabled="!actionState.canManageGroups || !membershipDraft.group_id" @click="submitMembership">
-                {{ editingMembershipId ? t("employeeAdmin.actions.saveMembership") : t("employeeAdmin.actions.assignGroup") }}
-              </button>
-              <button class="cta-button cta-secondary" type="button" @click="resetMembershipDraft">
-                {{ t("employeeAdmin.actions.resetMembership") }}
-              </button>
-            </div>
-
-            <div v-if="selectedEmployee?.group_memberships.length" class="employee-admin-record-list">
-              <button
-                v-for="membership in selectedEmployee.group_memberships"
-                :key="membership.id"
-                type="button"
-                class="employee-admin-record"
-                :class="{ selected: membership.id === editingMembershipId }"
-                @click="editMembership(membership)"
-              >
+          <section
+            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'notes'"
+            class="employee-admin-section employee-admin-tab-panel"
+            data-testid="employee-tab-panel-notes"
+          >
+            <div class="employee-admin-form employee-admin-form--structured">
+              <section class="employee-admin-editor-intro">
                 <div>
-                  <strong>{{ membership.group?.name || membership.group_id }}</strong>
-                  <span>{{ membership.valid_from }} · {{ membership.valid_until || t("employeeAdmin.summary.none") }}</span>
+                  <p class="eyebrow">{{ t("employeeAdmin.notes.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.notes.title") }}</h4>
                 </div>
-                <StatusBadge :status="membership.status" />
-              </button>
+                <p class="field-help">{{ t("employeeAdmin.notes.lead") }}</p>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.notes.registerEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.notes.registerTitle") }}</h4>
+                </div>
+
+                <div v-if="employeeNotes.length" class="employee-admin-record-list">
+                  <button
+                    v-for="note in employeeNotes"
+                    :key="note.id"
+                    type="button"
+                    class="employee-admin-record"
+                    :class="{ selected: note.id === editingNoteId }"
+                    @click="editNote(note)"
+                  >
+                    <div class="employee-admin-record__body">
+                      <strong>{{ note.title }}</strong>
+                      <span class="employee-admin-record__meta">{{ t(`employeeAdmin.noteType.${note.note_type}` as never) }} · {{ note.reminder_at || t("employeeAdmin.summary.none") }}</span>
+                    </div>
+                    <StatusBadge :status="note.completed_at ? 'active' : note.status" />
+                  </button>
+                </div>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.notes.empty") }}</p>
+              </section>
+
+              <form class="employee-admin-form-section employee-admin-inline-form" @submit.prevent="submitNote">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.notes.editorEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.notes.editorTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.noteType") }}</span>
+                    <select v-model="noteDraft.note_type" :disabled="!actionState.canManageNotes">
+                      <option value="operational_note">{{ t("employeeAdmin.noteType.operational_note") }}</option>
+                      <option value="positive_activity">{{ t("employeeAdmin.noteType.positive_activity") }}</option>
+                      <option value="reminder">{{ t("employeeAdmin.noteType.reminder") }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.noteTitle") }}</span>
+                    <input v-model="noteDraft.title" :disabled="!actionState.canManageNotes" required />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.reminderAt") }}</span>
+                    <input v-model="noteDraft.reminder_at" :disabled="!actionState.canManageNotes" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.completedAt") }}</span>
+                    <input v-model="noteDraft.completed_at" :disabled="!actionState.canManageNotes" type="date" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.noteBody") }}</span>
+                    <textarea v-model="noteDraft.body" :disabled="!actionState.canManageNotes" rows="3" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageNotes">
+                    {{ editingNoteId ? t("employeeAdmin.actions.saveNote") : t("employeeAdmin.actions.createNote") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetNoteDraft">
+                    {{ t("employeeAdmin.actions.resetNote") }}
+                  </button>
+                </div>
+              </form>
             </div>
-            <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.groups.empty") }}</p>
           </section>
 
-          <section v-if="selectedEmployee && !isCreatingEmployee && canReadPrivate" class="employee-admin-section">
-            <div class="employee-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("employeeAdmin.addresses.eyebrow") }}</p>
-                <h3>{{ t("employeeAdmin.addresses.title") }}</h3>
-              </div>
-            </div>
-
-            <div v-if="employeeAddresses.length" class="employee-admin-record-list">
-              <article v-for="addressRow in employeeAddresses" :key="addressRow.id" class="employee-admin-record employee-admin-record--static">
+          <section
+            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'groups'"
+            class="employee-admin-section employee-admin-tab-panel"
+            data-testid="employee-tab-panel-groups"
+          >
+            <div class="employee-admin-form employee-admin-form--structured">
+              <section class="employee-admin-editor-intro">
                 <div>
-                  <strong>{{ addressRow.address?.street_line_1 || addressRow.address_id }}</strong>
-                  <span>{{ addressRow.valid_from }} · {{ addressRow.valid_to || t("employeeAdmin.summary.none") }}</span>
+                  <p class="eyebrow">{{ t("employeeAdmin.groups.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.groups.title") }}</h4>
                 </div>
-                <StatusBadge :status="addressRow.status" />
-              </article>
+                <p class="field-help">{{ t("employeeAdmin.groups.lead") }}</p>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.groups.catalogEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.groups.catalogTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.groupCode") }}</span>
+                    <input v-model="groupDraft.code" :disabled="!actionState.canManageGroups" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.groupName") }}</span>
+                    <input v-model="groupDraft.name" :disabled="!actionState.canManageGroups" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.groupDescription") }}</span>
+                    <input v-model="groupDraft.description" :disabled="!actionState.canManageGroups" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" :disabled="!actionState.canManageGroups" @click="submitGroup">
+                    {{ editingGroupId ? t("employeeAdmin.actions.saveGroup") : t("employeeAdmin.actions.createGroup") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetGroupDraft">
+                    {{ t("employeeAdmin.actions.resetGroup") }}
+                  </button>
+                </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.groups.assignEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.groups.assignTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.assignGroup") }}</span>
+                    <select v-model="membershipDraft.group_id" :disabled="!actionState.canManageGroups">
+                      <option value="">{{ t("employeeAdmin.groups.selectPlaceholder") }}</option>
+                      <option v-for="group in employeeGroups" :key="group.id" :value="group.id">{{ group.code }} · {{ group.name }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validFrom") }}</span>
+                    <input v-model="membershipDraft.valid_from" :disabled="!actionState.canManageGroups" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
+                    <input v-model="membershipDraft.valid_until" :disabled="!actionState.canManageGroups" type="date" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.membershipNotes") }}</span>
+                    <input v-model="membershipDraft.notes" :disabled="!actionState.canManageGroups" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" :disabled="!actionState.canManageGroups || !membershipDraft.group_id" @click="submitMembership">
+                    {{ editingMembershipId ? t("employeeAdmin.actions.saveMembership") : t("employeeAdmin.actions.assignGroup") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetMembershipDraft">
+                    {{ t("employeeAdmin.actions.resetMembership") }}
+                  </button>
+                </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.groups.currentEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.groups.currentTitle") }}</h4>
+                </div>
+                <div v-if="selectedEmployee?.group_memberships.length" class="employee-admin-record-list">
+                  <button
+                    v-for="membership in selectedEmployee.group_memberships"
+                    :key="membership.id"
+                    type="button"
+                    class="employee-admin-record"
+                    :class="{ selected: membership.id === editingMembershipId }"
+                    @click="editMembership(membership)"
+                  >
+                    <div class="employee-admin-record__body">
+                      <strong>{{ membership.group?.name || membership.group_id }}</strong>
+                      <span class="employee-admin-record__meta">{{ membership.valid_from }} · {{ membership.valid_until || t("employeeAdmin.summary.none") }}</span>
+                    </div>
+                    <StatusBadge :status="membership.status" />
+                  </button>
+                </div>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.groups.empty") }}</p>
+              </section>
             </div>
-            <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.addresses.empty") }}</p>
           </section>
 
-          <section v-if="selectedEmployee && !isCreatingEmployee" class="employee-admin-section">
-            <div class="employee-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("employeeAdmin.documents.eyebrow") }}</p>
-                <h3>{{ t("employeeAdmin.documents.title") }}</h3>
-              </div>
-            </div>
-            <div v-if="employeeDocuments.length" class="employee-admin-record-list">
-              <button
-                v-for="document in employeeDocuments"
-                :key="document.document_id"
-                type="button"
-                class="employee-admin-record"
-                @click="downloadDocument(document)"
-              >
+          <section
+            v-if="selectedEmployee && !isCreatingEmployee && canReadPrivate && activeDetailTab === 'addresses'"
+            class="employee-admin-section employee-admin-tab-panel"
+            data-testid="employee-tab-panel-addresses"
+          >
+            <div class="employee-admin-form employee-admin-form--structured">
+              <section class="employee-admin-editor-intro">
                 <div>
-                  <strong>{{ document.title }}</strong>
-                  <span>{{ document.file_name || t("employeeAdmin.summary.none") }} · {{ document.relation_type }}</span>
+                  <p class="eyebrow">{{ t("employeeAdmin.addresses.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.addresses.title") }}</h4>
                 </div>
-                <StatusBadge :status="document.current_version_no ? 'active' : 'inactive'" />
-              </button>
+                <p class="field-help">{{ t("employeeAdmin.addresses.lead") }}</p>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.addresses.historyEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.addresses.historyTitle") }}</h4>
+                </div>
+                <div v-if="employeeAddresses.length" class="employee-admin-record-list">
+                  <article v-for="addressRow in employeeAddresses" :key="addressRow.id" class="employee-admin-record employee-admin-record--static">
+                    <div class="employee-admin-record__body">
+                      <strong>{{ addressRow.address?.street_line_1 || addressRow.address_id }}</strong>
+                      <span class="employee-admin-record__meta">{{ addressRow.valid_from }} · {{ addressRow.valid_to || t("employeeAdmin.summary.none") }}</span>
+                    </div>
+                    <StatusBadge :status="addressRow.status" />
+                  </article>
+                </div>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.addresses.empty") }}</p>
+              </section>
             </div>
-            <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.documents.empty") }}</p>
+          </section>
+
+          <section
+            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'documents'"
+            class="employee-admin-section employee-admin-tab-panel"
+            data-testid="employee-tab-panel-documents"
+          >
+            <div class="employee-admin-form employee-admin-form--structured">
+              <section class="employee-admin-editor-intro">
+                <div>
+                  <p class="eyebrow">{{ t("employeeAdmin.documents.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.documents.title") }}</h4>
+                </div>
+                <p class="field-help">{{ t("employeeAdmin.documents.lead") }}</p>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.documents.libraryEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.documents.libraryTitle") }}</h4>
+                </div>
+                <div v-if="employeeDocuments.length" class="employee-admin-record-list">
+                  <button
+                    v-for="document in employeeDocuments"
+                    :key="document.document_id"
+                    type="button"
+                    class="employee-admin-record"
+                    @click="downloadDocument(document)"
+                  >
+                    <div class="employee-admin-record__body">
+                      <strong>{{ document.title }}</strong>
+                      <span class="employee-admin-record__meta">{{ document.file_name || t("employeeAdmin.summary.none") }} · {{ document.relation_type }}</span>
+                    </div>
+                    <StatusBadge :status="document.current_version_no ? 'active' : 'inactive'" />
+                  </button>
+                </div>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.documents.empty") }}</p>
+              </section>
+            </div>
           </section>
         </template>
 
@@ -605,8 +767,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 
+import { listBranches, listMandates, type BranchRead, type MandateRead } from "@/api/coreAdmin";
 import {
   attachEmployeeAccessUser,
   createEmployeeAccessUser,
@@ -651,7 +814,10 @@ import StatusBadge from "@/components/StatusBadge.vue";
 import { useI18n } from "@/i18n";
 import {
   buildEmployeeImportTemplateRows,
+  buildEmployeeOperationalPayload,
   deriveEmployeeActionState,
+  filterMandatesForBranch,
+  formatEmployeeStructureLabel,
   mapEmployeeApiMessage,
   summarizeCurrentAddress,
 } from "@/features/employees/employeeAdmin.helpers.js";
@@ -739,7 +905,9 @@ const accessAttachDraft = reactive({
   email: "",
 });
 
-const tenantScopeInput = ref(authStore.tenantScopeId || authStore.sessionUser?.tenant_id || "");
+const tenantScopeInput = ref(authStore.effectiveTenantScopeId || authStore.tenantScopeId || "");
+const branches = ref<BranchRead[]>([]);
+const mandates = ref<MandateRead[]>([]);
 const employees = ref<EmployeeListItem[]>([]);
 const selectedEmployeeId = ref("");
 const selectedEmployee = ref<EmployeeOperationalRead | null>(null);
@@ -756,6 +924,7 @@ const photoPreviewUrl = ref("");
 const pendingPhotoFile = ref<File | null>(null);
 const pendingImportFile = ref<File | null>(null);
 const isCreatingEmployee = ref(false);
+const activeDetailTab = ref("overview");
 const editingNoteId = ref("");
 const editingGroupId = ref("");
 const editingMembershipId = ref("");
@@ -766,15 +935,50 @@ const actionState = computed(() => deriveEmployeeActionState(effectiveRole.value
 const canRead = computed(() => actionState.value.canRead);
 const canWrite = computed(() => actionState.value.canWrite);
 const canReadPrivate = computed(() => actionState.value.canReadPrivate);
-const resolvedTenantScopeId = computed(() =>
-  isPlatformAdmin.value ? authStore.tenantScopeId : (authStore.sessionUser?.tenant_id ?? authStore.tenantScopeId),
-);
+const resolvedTenantScopeId = computed(() => authStore.effectiveTenantScopeId);
 const selectedEmployeeLabel = computed(() =>
   selectedEmployee.value
     ? `${selectedEmployee.value.personnel_no} · ${selectedEmployee.value.first_name} ${selectedEmployee.value.last_name}`
     : t("employeeAdmin.detail.emptyTitle"),
 );
 const currentAddressSummary = computed(() => summarizeCurrentAddress(employeeAddresses.value));
+const branchOptions = computed(() => branches.value.filter((branch) => branch.archived_at == null));
+const mandateOptions = computed(() => mandates.value.filter((mandate) => mandate.archived_at == null));
+const filteredEmployeeMandates = computed(() => filterMandateOptions(employeeDraft.default_branch_id));
+const branchLabelMap = computed(() => new Map(branchOptions.value.map((branch) => [branch.id, formatStructureLabel(branch)])));
+const mandateLabelMap = computed(() => new Map(mandateOptions.value.map((mandate) => [mandate.id, formatStructureLabel(mandate)])));
+const selectedEmployeeBranchLabel = computed(() => {
+  const branchId = selectedEmployee.value?.default_branch_id;
+  return branchId ? branchLabelMap.value.get(branchId) ?? branchId : "";
+});
+const selectedEmployeeMandateLabel = computed(() => {
+  const mandateId = selectedEmployee.value?.default_mandate_id;
+  return mandateId ? mandateLabelMap.value.get(mandateId) ?? mandateId : "";
+});
+const employeeDetailTabs = computed(() => {
+  const tabs = [
+    { id: "overview", label: t("employeeAdmin.tabs.overview") },
+    { id: "app_access", label: t("employeeAdmin.tabs.appAccess") },
+    { id: "profile_photo", label: t("employeeAdmin.tabs.profilePhoto") },
+    { id: "notes", label: t("employeeAdmin.tabs.notes") },
+    { id: "groups", label: t("employeeAdmin.tabs.groups") },
+    { id: "documents", label: t("employeeAdmin.tabs.documents") },
+  ];
+
+  if (canReadPrivate.value) {
+    tabs.splice(5, 0, { id: "addresses", label: t("employeeAdmin.tabs.addresses") });
+  }
+
+  return isCreatingEmployee.value ? tabs.filter((tab) => tab.id === "overview") : tabs;
+});
+
+function formatStructureLabel(record: BranchRead | MandateRead) {
+  return formatEmployeeStructureLabel(record);
+}
+
+function filterMandateOptions(branchId: string) {
+  return filterMandatesForBranch(mandateOptions.value, branchId) as MandateRead[];
+}
 
 function setFeedback(tone: "error" | "neutral" | "success", title: string, message: string) {
   feedback.tone = tone;
@@ -791,6 +995,23 @@ function clearFeedback() {
 function rememberScope() {
   authStore.setTenantScopeId(tenantScopeInput.value);
   void refreshEmployees();
+}
+
+async function loadTenantStructure() {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !canRead.value) {
+    branches.value = [];
+    mandates.value = [];
+    return;
+  }
+
+  const actorTenantId = resolvedTenantScopeId.value;
+  const [branchRecords, mandateRecords] = await Promise.all([
+    listBranches(authStore.accessToken, resolvedTenantScopeId.value, effectiveRole.value, actorTenantId),
+    listMandates(authStore.accessToken, resolvedTenantScopeId.value, effectiveRole.value, actorTenantId),
+  ]);
+
+  branches.value = branchRecords;
+  mandates.value = mandateRecords;
 }
 
 function resetEmployeeDraft() {
@@ -879,6 +1100,7 @@ function editMembership(membership: EmployeeGroupMembershipRead) {
 
 function startCreateEmployee() {
   isCreatingEmployee.value = true;
+  activeDetailTab.value = "overview";
   selectedEmployeeId.value = "";
   selectedEmployee.value = null;
   employeeAddresses.value = [];
@@ -902,6 +1124,8 @@ function clearPhotoPreview() {
 
 async function refreshEmployees() {
   if (!resolvedTenantScopeId.value || !authStore.accessToken || !canRead.value) {
+    branches.value = [];
+    mandates.value = [];
     employees.value = [];
     selectedEmployee.value = null;
     return;
@@ -909,6 +1133,7 @@ async function refreshEmployees() {
 
   loading.list = true;
   try {
+    await loadTenantStructure();
     employees.value = await listEmployees(resolvedTenantScopeId.value, authStore.accessToken, filters);
     await listSupplementalGroups();
     if (selectedEmployeeId.value) {
@@ -946,6 +1171,7 @@ async function selectEmployee(employeeId: string) {
     return;
   }
   isCreatingEmployee.value = false;
+  activeDetailTab.value = "overview";
   selectedEmployeeId.value = employeeId;
   loading.detail = true;
   try {
@@ -1005,26 +1231,34 @@ async function submitEmployee() {
 
   loading.action = true;
   try {
-    const payload = {
-      tenant_id: resolvedTenantScopeId.value,
-      personnel_no: employeeDraft.personnel_no.trim(),
-      first_name: employeeDraft.first_name.trim(),
-      last_name: employeeDraft.last_name.trim(),
-      preferred_name: emptyToNull(employeeDraft.preferred_name),
-      work_email: emptyToNull(employeeDraft.work_email),
-      work_phone: emptyToNull(employeeDraft.work_phone),
-      mobile_phone: emptyToNull(employeeDraft.mobile_phone),
-      default_branch_id: emptyToNull(employeeDraft.default_branch_id),
-      default_mandate_id: emptyToNull(employeeDraft.default_mandate_id),
-      hire_date: emptyToNull(employeeDraft.hire_date),
-      termination_date: emptyToNull(employeeDraft.termination_date),
-      user_id: emptyToNull(employeeDraft.user_id),
-      notes: emptyToNull(employeeDraft.notes),
-    };
+    const payload = buildEmployeeOperationalPayload(
+      {
+        tenant_id: resolvedTenantScopeId.value,
+        personnel_no: employeeDraft.personnel_no,
+        first_name: employeeDraft.first_name,
+        last_name: employeeDraft.last_name,
+        preferred_name: employeeDraft.preferred_name,
+        work_email: employeeDraft.work_email,
+        work_phone: employeeDraft.work_phone,
+        mobile_phone: employeeDraft.mobile_phone,
+        default_branch_id: employeeDraft.default_branch_id,
+        default_mandate_id: employeeDraft.default_mandate_id,
+        hire_date: employeeDraft.hire_date,
+        termination_date: employeeDraft.termination_date,
+        user_id: employeeDraft.user_id,
+        notes: employeeDraft.notes,
+      },
+      {
+        deferUserLink: isCreatingEmployee.value,
+        allowedBranchIds: branchOptions.value.map((branch) => branch.id),
+        allowedMandateIds: filteredEmployeeMandates.value.map((mandate) => mandate.id),
+      } as any,
+    );
     const employee = isCreatingEmployee.value
       ? await createEmployee(resolvedTenantScopeId.value, authStore.accessToken, payload)
       : await updateEmployee(resolvedTenantScopeId.value, selectedEmployeeId.value, authStore.accessToken, {
           ...payload,
+          user_id: emptyToNull(employeeDraft.user_id),
           version_no: selectedEmployee.value?.version_no,
         });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.employeeSaved"));
@@ -1369,6 +1603,43 @@ function emptyToNull(value: string) {
   return trimmed || null;
 }
 
+watch(
+  () => [isCreatingEmployee.value, !!selectedEmployee.value, canReadPrivate.value],
+  () => {
+    const allowedTabs = employeeDetailTabs.value.map((tab) => tab.id);
+    if (!allowedTabs.includes(activeDetailTab.value)) {
+      activeDetailTab.value = "overview";
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => employeeDraft.default_branch_id,
+  (branchId) => {
+    if (!employeeDraft.default_mandate_id) {
+      return;
+    }
+    const mandateStillValid = filterMandateOptions(branchId).some((mandate) => mandate.id === employeeDraft.default_mandate_id);
+    if (!mandateStillValid) {
+      employeeDraft.default_mandate_id = "";
+    }
+  },
+);
+
+watch(
+  () => filters.default_branch_id,
+  (branchId) => {
+    if (!filters.default_mandate_id) {
+      return;
+    }
+    const mandateStillValid = filterMandateOptions(branchId).some((mandate) => mandate.id === filters.default_mandate_id);
+    if (!mandateStillValid) {
+      filters.default_mandate_id = "";
+    }
+  },
+);
+
 function fileToBase64(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -1390,7 +1661,7 @@ onMounted(async () => {
     }
   }
   if (!isPlatformAdmin.value) {
-    tenantScopeInput.value = authStore.sessionUser?.tenant_id ?? authStore.tenantScopeId;
+    tenantScopeInput.value = authStore.effectiveTenantScopeId || authStore.tenantScopeId;
   }
   resetEmployeeDraft();
   await refreshEmployees();
@@ -1403,7 +1674,6 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .employee-admin-page,
-.employee-admin-grid,
 .employee-admin-list,
 .employee-admin-form-grid,
 .employee-admin-record-list {
@@ -1413,8 +1683,15 @@ onBeforeUnmount(() => {
 }
 
 .employee-admin-grid {
-  grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.3fr);
+  display: grid;
+  gap: var(--sp-page-gap, 1.25rem);
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
   align-items: start;
+}
+
+.employee-admin-list-panel {
+  position: sticky;
+  top: 0;
 }
 
 .employee-admin-hero {
@@ -1428,6 +1705,7 @@ onBeforeUnmount(() => {
 
 .employee-admin-panel,
 .employee-admin-section,
+.employee-admin-tab-panel,
 .employee-admin-empty,
 .employee-admin-scope {
   display: grid;
@@ -1441,11 +1719,18 @@ onBeforeUnmount(() => {
 
 .employee-admin-meta,
 .employee-admin-summary,
-.employee-admin-photo,
 .employee-admin-photo__controls {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  min-width: 0;
+}
+
+.employee-admin-photo {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  align-items: start;
   min-width: 0;
 }
 
@@ -1463,21 +1748,83 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 1rem;
   align-items: center;
   min-width: 0;
-  border: 0;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-page);
   text-align: left;
   cursor: pointer;
 }
 
+.employee-admin-summary__card {
+  display: grid;
+  gap: 0.35rem;
+  min-width: min(100%, 180px);
+  flex: 1 1 180px;
+}
+
+.employee-admin-summary__card span,
+.employee-admin-record__meta,
+.employee-admin-list-empty {
+  color: var(--sp-color-text-secondary);
+}
+
+.employee-admin-summary__card strong,
+.employee-admin-record__body strong {
+  color: var(--sp-color-text-primary);
+}
+
+.employee-admin-row {
+  appearance: none;
+}
+
+.employee-admin-row > *,
+.employee-admin-record > * {
+  min-width: 0;
+}
+
+.employee-admin-row__text {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.employee-admin-row__title,
+.employee-admin-row__meta {
+  display: block;
+}
+
+.employee-admin-row__title {
+  color: var(--sp-color-text-primary);
+}
+
+.employee-admin-row__meta {
+  color: var(--sp-color-text-secondary);
+}
+
 .employee-admin-row.selected,
 .employee-admin-record.selected {
-  outline: 2px solid var(--sp-color-primary);
+  border-color: var(--sp-color-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 40%, transparent);
 }
 
 .employee-admin-record--static {
   cursor: default;
+}
+
+.employee-admin-record__body {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.employee-admin-record__meta {
+  margin: 0;
 }
 
 .employee-admin-panel__header {
@@ -1487,6 +1834,34 @@ onBeforeUnmount(() => {
   gap: 1rem;
   align-items: start;
   min-width: 0;
+}
+
+.employee-admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.employee-admin-tab {
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-page);
+  color: var(--sp-color-text-secondary);
+  border-radius: 999px;
+  padding: 0.6rem 1rem;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.employee-admin-tab.active {
+  border-color: var(--sp-color-primary);
+  color: var(--sp-color-primary-strong);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 70%, white);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 28%, transparent);
 }
 
 .employee-admin-detail,
@@ -1636,6 +2011,10 @@ onBeforeUnmount(() => {
   .employee-admin-photo {
     grid-template-columns: 1fr;
     display: grid;
+  }
+
+  .employee-admin-list-panel {
+    position: static;
   }
 }
 

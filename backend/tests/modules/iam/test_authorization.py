@@ -53,6 +53,15 @@ class TestAuthorizationHelpers(unittest.TestCase):
 
         self.assertEqual(raised.exception.code, "iam.authorization.scope_denied")
 
+    def test_tenant_admin_same_tenant_is_allowed_without_explicit_scope_tuple(self) -> None:
+        context = _context(
+            role_keys=("tenant_admin",),
+            permission_keys=("employees.employee.write",),
+            scopes=(),
+        )
+
+        enforce_scope(context, scope="tenant", tenant_id="tenant-1")
+
     def test_platform_scope_requires_platform_admin_role(self) -> None:
         tenant_context = _context(
             role_keys=("tenant_admin",),

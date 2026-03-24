@@ -1,4 +1,8 @@
 import { webAppConfig } from "@/config/env";
+import { useAccessStore } from "@vben/stores";
+
+import { refreshTokenApi } from "#/api/core/auth";
+import { useAuthStore as useLegacyAuthStore } from "@/stores/auth";
 
 export interface EmployeeListItem {
   id: string;
@@ -210,15 +214,7 @@ async function request<T>(
     body?: unknown;
   },
 ): Promise<T> {
-  const response = await fetch(`${webAppConfig.apiBaseUrl}${path}`, {
-    method: options?.method ?? "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-      "X-Request-Id": generateRequestId(),
-    },
-    body: options?.body == null ? undefined : JSON.stringify(options.body),
-  });
+  const response = await performAuthorizedRequest(path, accessToken, options);
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as unknown;
@@ -240,6 +236,76 @@ async function request<T>(
   }
 
   return (await response.json()) as T;
+}
+
+function resolvePrimaryAccessToken() {
+  try {
+    return useAccessStore().accessToken ?? "";
+  } catch {
+    return "";
+  }
+}
+
+async function performAuthorizedRequest(
+  path: string,
+  accessToken: string,
+  options?: {
+    method?: string;
+    body?: unknown;
+  },
+) {
+  const initialToken = resolvePrimaryAccessToken() || accessToken;
+  let response = await performRawRequest(path, initialToken, options);
+
+  if (response.status !== 401) {
+    return response;
+  }
+
+  const refreshedToken = await refreshLegacyEmployeeToken().catch(() => "");
+  if (!refreshedToken || refreshedToken === initialToken) {
+    return response;
+  }
+
+  response = await performRawRequest(path, refreshedToken, options);
+  return response;
+}
+
+async function performRawRequest(
+  path: string,
+  accessToken: string,
+  options?: {
+    method?: string;
+    body?: unknown;
+  },
+) {
+  return fetch(`${webAppConfig.apiBaseUrl}${path}`, {
+    method: options?.method ?? "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+      "X-Request-Id": generateRequestId(),
+    },
+    body: options?.body == null ? undefined : JSON.stringify(options.body),
+  });
+}
+
+async function refreshLegacyEmployeeToken() {
+  const accessStore = useAccessStore();
+  if (!accessStore.refreshToken) {
+    return "";
+  }
+
+  const refreshed = await refreshTokenApi();
+  accessStore.setAccessToken(refreshed.accessToken);
+  accessStore.setRefreshToken(refreshed.refreshToken);
+
+  try {
+    useLegacyAuthStore().syncFromPrimarySession();
+  } catch {
+    // The legacy store may not be initialized in tests or non-legacy entry points.
+  }
+
+  return refreshed.accessToken;
 }
 
 function buildQuery(params: EmployeeListFilters) {

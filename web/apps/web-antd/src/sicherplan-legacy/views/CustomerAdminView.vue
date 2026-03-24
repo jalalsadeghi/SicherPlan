@@ -1,6 +1,6 @@
 <template>
   <section class="customer-admin-page">
-    <section class="module-card customer-admin-hero">
+    <section v-if="sectionVisibility.showGovernanceHero" class="module-card customer-admin-hero">
       <div>
         <p class="eyebrow">{{ t("customerAdmin.eyebrow") }}</p>
         <h2>{{ t("customerAdmin.title") }}</h2>
@@ -64,8 +64,8 @@
       <h3>{{ t("customerAdmin.permission.missingBody") }}</h3>
     </section>
 
-    <div v-else class="customer-admin-grid">
-      <section class="module-card customer-admin-panel">
+    <div v-else class="customer-admin-grid" data-testid="customer-master-detail-layout">
+      <section class="module-card customer-admin-panel customer-admin-list-panel" data-testid="customer-list-section">
         <div class="customer-admin-panel__header">
           <div>
             <p class="eyebrow">{{ t("customerAdmin.list.eyebrow") }}</p>
@@ -90,11 +90,25 @@
           </label>
           <label class="field-stack">
             <span>{{ t("customerAdmin.fields.defaultBranchId") }}</span>
-            <input v-model="filters.default_branch_id" />
+            <select v-model="filters.default_branch_id">
+              <option value="">{{ t("customerAdmin.summary.none") }}</option>
+              <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
+                {{ formatReferenceLabel(branch) }}
+              </option>
+            </select>
           </label>
           <label class="field-stack">
             <span>{{ t("customerAdmin.fields.defaultMandateId") }}</span>
-            <input v-model="filters.default_mandate_id" />
+            <select v-model="filters.default_mandate_id">
+              <option value="">{{ t("customerAdmin.summary.none") }}</option>
+              <option
+                v-for="mandate in filterMandateOptions(filters.default_branch_id)"
+                :key="mandate.id"
+                :value="mandate.id"
+              >
+                {{ formatReferenceLabel(mandate) }}
+              </option>
+            </select>
           </label>
         </div>
 
@@ -144,204 +158,275 @@
         <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.list.empty") }}</p>
       </section>
 
-      <section class="module-card customer-admin-panel customer-admin-detail">
+      <section class="module-card customer-admin-panel customer-admin-detail" data-testid="customer-detail-workspace">
         <div class="customer-admin-panel__header">
           <div>
             <p class="eyebrow">{{ t("customerAdmin.detail.eyebrow") }}</p>
-            <h3>{{ isCreatingCustomer ? t("customerAdmin.detail.newTitle") : selectedCustomer?.name || t("customerAdmin.detail.emptyTitle") }}</h3>
+            <h3>{{ isCreatingCustomer ? t("customerAdmin.detail.newTitle") : selectedCustomer?.name || t("customerAdmin.detail.workspaceTitle") }}</h3>
+            <p v-if="hasDetailWorkspace" class="field-help">{{ t("customerAdmin.detail.workspaceLead") }}</p>
           </div>
           <StatusBadge v-if="selectedCustomer && !isCreatingCustomer" :status="selectedCustomer.status" />
         </div>
 
-        <template v-if="isCreatingCustomer || selectedCustomer">
-          <div v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-summary">
+        <template v-if="hasDetailWorkspace">
+          <nav
+            v-if="customerDetailTabs.length"
+            class="customer-admin-tabs"
+            aria-label="Customer detail sections"
+            data-testid="customer-detail-tabs"
+          >
+            <button
+              v-for="tab in customerDetailTabs"
+              :key="tab.id"
+              type="button"
+              class="customer-admin-tab"
+              :class="{ active: tab.id === activeDetailTab }"
+              :data-testid="`customer-tab-${tab.id}`"
+              @click="activeDetailTab = tab.id"
+            >
+              {{ tab.label }}
+            </button>
+          </nav>
+
+          <section v-if="activeDetailTab === 'overview'" class="customer-admin-tab-panel" data-testid="customer-tab-panel-overview">
+            <div v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-summary">
             <article class="customer-admin-summary__card">
               <span>{{ t("customerAdmin.summary.primaryContact") }}</span>
               <strong>{{ primaryContactSummary || t("customerAdmin.summary.none") }}</strong>
             </article>
             <article class="customer-admin-summary__card">
               <span>{{ t("customerAdmin.summary.defaultBranch") }}</span>
-              <strong>{{ selectedCustomer.default_branch_id || t("customerAdmin.summary.none") }}</strong>
+              <strong>{{ selectedCustomerBranchLabel || t("customerAdmin.summary.none") }}</strong>
             </article>
             <article class="customer-admin-summary__card">
               <span>{{ t("customerAdmin.summary.defaultMandate") }}</span>
-              <strong>{{ selectedCustomer.default_mandate_id || t("customerAdmin.summary.none") }}</strong>
+              <strong>{{ selectedCustomerMandateLabel || t("customerAdmin.summary.none") }}</strong>
             </article>
             <article class="customer-admin-summary__card">
               <span>{{ t("customerAdmin.summary.classification") }}</span>
-              <strong>{{ selectedCustomer.classification_lookup_id || t("customerAdmin.summary.none") }}</strong>
+              <strong>{{ selectedCustomerClassificationLabel || t("customerAdmin.summary.none") }}</strong>
             </article>
-          </div>
-
-          <div v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-lifecycle">
-            <div>
-              <strong>{{ t("customerAdmin.lifecycle.title") }}</strong>
-              <p class="field-help">{{ t("customerAdmin.lifecycle.help") }}</p>
+            <article class="customer-admin-summary__card">
+              <span>{{ t("customerAdmin.summary.ranking") }}</span>
+              <strong>{{ selectedCustomerRankingLabel || t("customerAdmin.summary.none") }}</strong>
+            </article>
+            <article class="customer-admin-summary__card">
+              <span>{{ t("customerAdmin.summary.customerStatus") }}</span>
+              <strong>{{ selectedCustomerStatusLabel || t("customerAdmin.summary.none") }}</strong>
+            </article>
             </div>
-            <div class="cta-row">
-              <button
-                v-if="actionState.canDeactivate"
-                class="cta-button"
-                type="button"
-                @click="applyStatus('inactive')"
-              >
-                {{ t("customerAdmin.actions.deactivate") }}
-              </button>
-              <button
-                v-if="actionState.canReactivate"
-                class="cta-button"
-                type="button"
-                @click="applyStatus('active')"
-              >
-                {{ t("customerAdmin.actions.reactivate") }}
-              </button>
-              <button
-                v-if="actionState.canArchive"
-                class="cta-button cta-secondary"
-                type="button"
-                @click="applyStatus('archived')"
-              >
-                {{ t("customerAdmin.actions.archive") }}
-              </button>
-            </div>
-          </div>
 
-          <form class="customer-admin-form" @submit.prevent="submitCustomer">
-            <div class="customer-admin-panel__header">
+            <div v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-lifecycle">
               <div>
-                <p class="eyebrow">{{ t("customerAdmin.form.generalEyebrow") }}</p>
-                <h3>{{ t("customerAdmin.form.generalTitle") }}</h3>
+                <strong>{{ t("customerAdmin.lifecycle.title") }}</strong>
+                <p class="field-help">{{ t("customerAdmin.lifecycle.help") }}</p>
+              </div>
+              <div class="cta-row">
+                <button
+                  v-if="actionState.canDeactivate"
+                  class="cta-button"
+                  type="button"
+                  @click="applyStatus('inactive')"
+                >
+                  {{ t("customerAdmin.actions.deactivate") }}
+                </button>
+                <button
+                  v-if="actionState.canReactivate"
+                  class="cta-button"
+                  type="button"
+                  @click="applyStatus('active')"
+                >
+                  {{ t("customerAdmin.actions.reactivate") }}
+                </button>
+                <button
+                  v-if="actionState.canArchive"
+                  class="cta-button cta-secondary"
+                  type="button"
+                  @click="applyStatus('archived')"
+                >
+                  {{ t("customerAdmin.actions.archive") }}
+                </button>
               </div>
             </div>
 
-            <div class="customer-admin-form-grid">
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.customerNumber") }}</span>
-                <input v-model="customerDraft.customer_number" required />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.name") }}</span>
-                <input v-model="customerDraft.name" required />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.legalName") }}</span>
-                <input v-model="customerDraft.legal_name" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.externalRef") }}</span>
-                <input v-model="customerDraft.external_ref" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.legalFormLookupId") }}</span>
-                <input v-model="customerDraft.legal_form_lookup_id" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.classificationLookupId") }}</span>
-                <input v-model="customerDraft.classification_lookup_id" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.rankingLookupId") }}</span>
-                <input v-model="customerDraft.ranking_lookup_id" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.customerStatusLookupId") }}</span>
-                <input v-model="customerDraft.customer_status_lookup_id" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.defaultBranchId") }}</span>
-                <input v-model="customerDraft.default_branch_id" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.defaultMandateId") }}</span>
-                <input v-model="customerDraft.default_mandate_id" />
-              </label>
-              <label class="field-stack field-stack--wide">
-                <span>{{ t("customerAdmin.fields.notes") }}</span>
-                <textarea v-model="customerDraft.notes" rows="4" />
-              </label>
-            </div>
-
-            <div class="cta-row">
-              <button class="cta-button" type="submit" :disabled="!actionState.canCreate && !actionState.canEdit">
-                {{ isCreatingCustomer ? t("customerAdmin.actions.createCustomer") : t("customerAdmin.actions.saveCustomer") }}
-              </button>
-              <button class="cta-button cta-secondary" type="button" @click="cancelCustomerEdit">
-                {{ t("customerAdmin.actions.cancel") }}
-              </button>
-            </div>
-          </form>
-
-          <section v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-section">
-            <div class="customer-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("customerAdmin.contacts.eyebrow") }}</p>
-                <h3>{{ t("customerAdmin.contacts.title") }}</h3>
-              </div>
-              <button
-                class="cta-button cta-secondary"
-                type="button"
-                :disabled="!actionState.canManageContacts"
-                @click="startCreateContact"
-              >
-                {{ t("customerAdmin.actions.addContact") }}
-              </button>
-            </div>
-
-            <div v-if="selectedCustomer.contacts.length" class="customer-admin-record-list">
-              <article v-for="contact in selectedCustomer.contacts" :key="contact.id" class="customer-admin-record">
+            <form class="customer-admin-form" @submit.prevent="submitCustomer">
+              <div class="customer-admin-panel__header">
                 <div>
-                  <strong>{{ contact.full_name }}</strong>
-                  <p>{{ [contact.email, contact.phone].filter(Boolean).join(" · ") || t("customerAdmin.summary.none") }}</p>
-                  <span class="customer-admin-record__meta">
-                    {{ contact.is_primary_contact ? t("customerAdmin.contacts.primaryBadge") : t("customerAdmin.contacts.standardBadge") }}
-                  </span>
+                  <p class="eyebrow">{{ t("customerAdmin.form.generalEyebrow") }}</p>
+                  <h3>{{ t("customerAdmin.form.generalTitle") }}</h3>
                 </div>
-                <div class="customer-admin-record__actions">
-                  <StatusBadge :status="contact.status" />
-                  <button type="button" :disabled="!canRead" @click="downloadContactVCard(contact)">
-                    {{ t("customerAdmin.actions.exportVCard") }}
-                  </button>
-                  <button type="button" @click="editContact(contact)">{{ t("customerAdmin.actions.edit") }}</button>
-                  <button
-                    v-if="contact.status !== 'archived'"
-                    type="button"
-                    :disabled="!actionState.canManageContacts"
-                    @click="archiveContact(contact)"
-                  >
-                    {{ t("customerAdmin.actions.archive") }}
-                  </button>
-                </div>
-              </article>
-            </div>
-            <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.contacts.empty") }}</p>
+              </div>
 
-            <form class="customer-admin-form" @submit.prevent="submitContact">
-              <div class="customer-admin-form-grid">
-                <label class="field-stack">
+              <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                <label class="field-stack field-stack--half">
+                  <span>{{ t("customerAdmin.fields.lifecycleStatus") }}</span>
+                  <select v-model="customerDraft.status">
+                    <option value="active">{{ t("customerAdmin.status.active") }}</option>
+                    <option value="inactive">{{ t("customerAdmin.status.inactive") }}</option>
+                  </select>
+                </label>
+                <label class="field-stack field-stack--half">
+                  <span>{{ t("customerAdmin.fields.customerNumber") }}</span>
+                  <input v-model="customerDraft.customer_number" required />
+                </label>
+                <label class="field-stack field-stack--half">
+                  <span>{{ t("customerAdmin.fields.name") }}</span>
+                  <input v-model="customerDraft.name" required />
+                </label>
+                <label class="field-stack field-stack--half">
+                  <span>{{ t("customerAdmin.fields.legalName") }}</span>
+                  <input v-model="customerDraft.legal_name" />
+                </label>
+                <label class="field-stack field-stack--half">
+                  <span>{{ t("customerAdmin.fields.externalRef") }}</span>
+                  <input v-model="customerDraft.external_ref" />
+                </label>
+                <label class="field-stack field-stack--third">
+                  <span>{{ t("customerAdmin.fields.legalFormLookupId") }}</span>
+                  <select v-model="customerDraft.legal_form_lookup_id">
+                    <option value="">{{ t("customerAdmin.summary.none") }}</option>
+                    <option v-for="option in referenceData?.legal_forms || []" :key="option.id" :value="option.id">
+                      {{ formatReferenceLabel(option) }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack field-stack--third">
+                  <span>{{ t("customerAdmin.fields.classificationLookupId") }}</span>
+                  <select v-model="customerDraft.classification_lookup_id">
+                    <option value="">{{ t("customerAdmin.summary.none") }}</option>
+                    <option v-for="option in referenceData?.classifications || []" :key="option.id" :value="option.id">
+                      {{ formatReferenceLabel(option) }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack field-stack--third">
+                  <span>{{ t("customerAdmin.fields.rankingLookupId") }}</span>
+                  <select v-model="customerDraft.ranking_lookup_id">
+                    <option value="">{{ t("customerAdmin.summary.none") }}</option>
+                    <option v-for="option in referenceData?.rankings || []" :key="option.id" :value="option.id">
+                      {{ formatReferenceLabel(option) }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack field-stack--third">
+                  <span>{{ t("customerAdmin.fields.customerStatusLookupId") }}</span>
+                  <select v-model="customerDraft.customer_status_lookup_id">
+                    <option value="">{{ t("customerAdmin.summary.none") }}</option>
+                    <option v-for="option in referenceData?.customer_statuses || []" :key="option.id" :value="option.id">
+                      {{ formatReferenceLabel(option) }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack field-stack--half">
+                  <span>{{ t("customerAdmin.fields.defaultBranchId") }}</span>
+                  <select v-model="customerDraft.default_branch_id">
+                    <option value="">{{ t("customerAdmin.summary.none") }}</option>
+                    <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
+                      {{ formatReferenceLabel(branch) }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack field-stack--half">
+                  <span>{{ t("customerAdmin.fields.defaultMandateId") }}</span>
+                  <select v-model="customerDraft.default_mandate_id">
+                    <option value="">{{ t("customerAdmin.summary.none") }}</option>
+                    <option v-for="mandate in filteredCustomerMandates" :key="mandate.id" :value="mandate.id">
+                      {{ formatReferenceLabel(mandate) }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack field-stack--wide">
+                  <span>{{ t("customerAdmin.fields.notes") }}</span>
+                  <textarea v-model="customerDraft.notes" rows="4" />
+                </label>
+              </div>
+
+              <div class="cta-row">
+                <button class="cta-button" type="submit" :disabled="!actionState.canCreate && !actionState.canEdit">
+                  {{ isCreatingCustomer ? t("customerAdmin.actions.createCustomer") : t("customerAdmin.actions.saveCustomer") }}
+                </button>
+                <button class="cta-button cta-secondary" type="button" @click="cancelCustomerEdit">
+                  {{ t("customerAdmin.actions.cancel") }}
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <section v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'contacts'" class="customer-admin-section" data-testid="customer-tab-panel-contacts">
+            <div class="customer-admin-form customer-admin-form--structured">
+              <section class="customer-admin-editor-intro">
+                <div>
+                  <p class="eyebrow">{{ t("customerAdmin.contacts.eyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.contacts.title") }}</h4>
+                </div>
+                <p class="field-help">{{ t("customerAdmin.contacts.lead") }}</p>
+              </section>
+
+              <section class="customer-admin-form-section">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.contacts.registerEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.contacts.registerTitle") }}</h4>
+                </div>
+                <div v-if="selectedCustomer.contacts.length" class="customer-admin-record-list">
+                  <article v-for="contact in selectedCustomer.contacts" :key="contact.id" class="customer-admin-record">
+                    <div class="customer-admin-record__body">
+                      <strong>{{ contact.full_name }}</strong>
+                      <p>{{ [contact.email, contact.phone].filter(Boolean).join(" · ") || t("customerAdmin.summary.none") }}</p>
+                      <span class="customer-admin-record__meta">
+                        {{ contact.is_primary_contact ? t("customerAdmin.contacts.primaryBadge") : t("customerAdmin.contacts.standardBadge") }}
+                      </span>
+                    </div>
+                    <div class="customer-admin-record__actions">
+                      <StatusBadge :status="contact.status" />
+                      <button type="button" :disabled="!canRead" @click="downloadContactVCard(contact)">
+                        {{ t("customerAdmin.actions.exportVCard") }}
+                      </button>
+                      <button type="button" @click="editContact(contact)">{{ t("customerAdmin.actions.edit") }}</button>
+                      <button
+                        v-if="contact.status !== 'archived'"
+                        type="button"
+                        :disabled="!actionState.canManageContacts"
+                        @click="archiveContact(contact)"
+                      >
+                        {{ t("customerAdmin.actions.archive") }}
+                      </button>
+                    </div>
+                  </article>
+                </div>
+                <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.contacts.empty") }}</p>
+              </section>
+
+              <form class="customer-admin-form-section" @submit.prevent="submitContact">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.contacts.editorEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.contacts.editorTitle") }}</h4>
+                </div>
+                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("customerAdmin.fields.fullName") }}</span>
                   <input v-model="contactDraft.full_name" required />
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--third">
                   <span>{{ t("customerAdmin.fields.contactTitle") }}</span>
                   <input v-model="contactDraft.title" />
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--third">
                   <span>{{ t("customerAdmin.fields.functionLabel") }}</span>
                   <input v-model="contactDraft.function_label" />
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("customerAdmin.fields.email") }}</span>
                   <input v-model="contactDraft.email" type="email" />
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--third">
                   <span>{{ t("customerAdmin.fields.phone") }}</span>
                   <input v-model="contactDraft.phone" />
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--third">
                   <span>{{ t("customerAdmin.fields.mobile") }}</span>
                   <input v-model="contactDraft.mobile" />
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("customerAdmin.fields.userId") }}</span>
                   <input v-model="contactDraft.user_id" />
                 </label>
@@ -349,82 +434,92 @@
                   <span>{{ t("customerAdmin.fields.notes") }}</span>
                   <textarea v-model="contactDraft.notes" rows="3" />
                 </label>
-              </div>
-
-              <label class="customer-admin-checkbox">
-                <input v-model="contactDraft.is_primary_contact" type="checkbox" />
-                <span>{{ t("customerAdmin.fields.isPrimaryContact") }}</span>
-              </label>
-              <label class="customer-admin-checkbox">
-                <input v-model="contactDraft.is_billing_contact" type="checkbox" />
-                <span>{{ t("customerAdmin.fields.isBillingContact") }}</span>
-              </label>
-
-              <div class="cta-row">
-                <button class="cta-button" type="submit" :disabled="!actionState.canManageContacts">
-                  {{ editingContactId ? t("customerAdmin.actions.saveContact") : t("customerAdmin.actions.createContact") }}
-                </button>
-                <button class="cta-button cta-secondary" type="button" @click="resetContactDraft">
-                  {{ t("customerAdmin.actions.cancel") }}
-                </button>
-              </div>
-            </form>
-          </section>
-
-          <section v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-section">
-            <div class="customer-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("customerAdmin.addresses.eyebrow") }}</p>
-                <h3>{{ t("customerAdmin.addresses.title") }}</h3>
-              </div>
-              <button
-                class="cta-button cta-secondary"
-                type="button"
-                :disabled="!actionState.canManageAddresses"
-                @click="startCreateAddress"
-              >
-                {{ t("customerAdmin.actions.addAddress") }}
-              </button>
-            </div>
-
-            <div v-if="selectedCustomer.addresses.length" class="customer-admin-record-list">
-              <article v-for="address in selectedCustomer.addresses" :key="address.id" class="customer-admin-record">
-                <div>
-                  <strong>{{ t(`customerAdmin.addressType.${address.address_type}`) }}</strong>
-                  <p>
-                    {{
-                      address.address
-                        ? `${address.address.street_line_1}, ${address.address.postal_code} ${address.address.city}`
-                        : address.address_id
-                    }}
-                  </p>
-                  <span class="customer-admin-record__meta">
-                    {{ address.is_default ? t("customerAdmin.addresses.defaultBadge") : t("customerAdmin.addresses.linkBadge") }}
-                  </span>
                 </div>
-                <div class="customer-admin-record__actions">
-                  <StatusBadge :status="address.status" />
-                  <button type="button" @click="editAddress(address)">{{ t("customerAdmin.actions.edit") }}</button>
-                  <button
-                    v-if="address.status !== 'archived'"
-                    type="button"
-                    :disabled="!actionState.canManageAddresses"
-                    @click="archiveAddress(address)"
-                  >
-                    {{ t("customerAdmin.actions.archive") }}
+
+                <div class="customer-admin-checkbox-group">
+                  <label class="customer-admin-checkbox">
+                    <input v-model="contactDraft.is_primary_contact" type="checkbox" />
+                    <span>{{ t("customerAdmin.fields.isPrimaryContact") }}</span>
+                  </label>
+                  <label class="customer-admin-checkbox">
+                    <input v-model="contactDraft.is_billing_contact" type="checkbox" />
+                    <span>{{ t("customerAdmin.fields.isBillingContact") }}</span>
+                  </label>
+                </div>
+
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageContacts" @click="startCreateContact">
+                    {{ t("customerAdmin.actions.addContact") }}
+                  </button>
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageContacts">
+                    {{ editingContactId ? t("customerAdmin.actions.saveContact") : t("customerAdmin.actions.createContact") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetContactDraft">
+                    {{ t("customerAdmin.actions.cancel") }}
                   </button>
                 </div>
-              </article>
+              </form>
             </div>
-            <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.addresses.empty") }}</p>
+          </section>
 
-            <form class="customer-admin-form" @submit.prevent="submitAddress">
-              <div class="customer-admin-form-grid">
-                <label class="field-stack">
+          <section v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'addresses'" class="customer-admin-section" data-testid="customer-tab-panel-addresses">
+            <div class="customer-admin-form customer-admin-form--structured">
+              <section class="customer-admin-editor-intro">
+                <div>
+                  <p class="eyebrow">{{ t("customerAdmin.addresses.eyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.addresses.title") }}</h4>
+                </div>
+                <p class="field-help">{{ t("customerAdmin.addresses.lead") }}</p>
+              </section>
+
+              <section class="customer-admin-form-section">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.addresses.registerEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.addresses.registerTitle") }}</h4>
+                </div>
+                <div v-if="selectedCustomer.addresses.length" class="customer-admin-record-list">
+                  <article v-for="address in selectedCustomer.addresses" :key="address.id" class="customer-admin-record">
+                    <div class="customer-admin-record__body">
+                      <strong>{{ t(`customerAdmin.addressType.${address.address_type}`) }}</strong>
+                      <p>
+                        {{
+                          address.address
+                            ? `${address.address.street_line_1}, ${address.address.postal_code} ${address.address.city}`
+                            : address.address_id
+                        }}
+                      </p>
+                      <span class="customer-admin-record__meta">
+                        {{ address.is_default ? t("customerAdmin.addresses.defaultBadge") : t("customerAdmin.addresses.linkBadge") }}
+                      </span>
+                    </div>
+                    <div class="customer-admin-record__actions">
+                      <StatusBadge :status="address.status" />
+                      <button type="button" @click="editAddress(address)">{{ t("customerAdmin.actions.edit") }}</button>
+                      <button
+                        v-if="address.status !== 'archived'"
+                        type="button"
+                        :disabled="!actionState.canManageAddresses"
+                        @click="archiveAddress(address)"
+                      >
+                        {{ t("customerAdmin.actions.archive") }}
+                      </button>
+                    </div>
+                  </article>
+                </div>
+                <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.addresses.empty") }}</p>
+              </section>
+
+              <form class="customer-admin-form-section" @submit.prevent="submitAddress">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.addresses.editorEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.addresses.editorTitle") }}</h4>
+                </div>
+                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("customerAdmin.fields.addressId") }}</span>
                   <input v-model="addressDraft.address_id" required />
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--third">
                   <span>{{ t("customerAdmin.fields.addressType") }}</span>
                   <select v-model="addressDraft.address_type">
                     <option value="registered">{{ t("customerAdmin.addressType.registered") }}</option>
@@ -433,41 +528,47 @@
                     <option value="service">{{ t("customerAdmin.addressType.service") }}</option>
                   </select>
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("customerAdmin.fields.label") }}</span>
                   <input v-model="addressDraft.label" />
                 </label>
-              </div>
+                </div>
 
-              <label class="customer-admin-checkbox">
-                <input v-model="addressDraft.is_default" type="checkbox" />
-                <span>{{ t("customerAdmin.fields.isDefault") }}</span>
-              </label>
+                <div class="customer-admin-checkbox-group">
+                  <label class="customer-admin-checkbox">
+                    <input v-model="addressDraft.is_default" type="checkbox" />
+                    <span>{{ t("customerAdmin.fields.isDefault") }}</span>
+                  </label>
+                </div>
 
-              <div class="cta-row">
-                <button class="cta-button" type="submit" :disabled="!actionState.canManageAddresses">
-                  {{ editingAddressId ? t("customerAdmin.actions.saveAddress") : t("customerAdmin.actions.createAddress") }}
-                </button>
-                <button class="cta-button cta-secondary" type="button" @click="resetAddressDraft">
-                  {{ t("customerAdmin.actions.cancel") }}
-                </button>
-              </div>
-            </form>
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="startCreateAddress">
+                    {{ t("customerAdmin.actions.addAddress") }}
+                  </button>
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageAddresses">
+                    {{ editingAddressId ? t("customerAdmin.actions.saveAddress") : t("customerAdmin.actions.createAddress") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetAddressDraft">
+                    {{ t("customerAdmin.actions.cancel") }}
+                  </button>
+                </div>
+              </form>
+            </div>
           </section>
 
-          <section v-if="selectedCustomer && !isCreatingCustomer && canReadCommercial" class="customer-admin-section">
-            <div class="customer-admin-panel__header">
+          <section
+            v-if="selectedCustomer && !isCreatingCustomer && canReadCommercial && activeDetailTab === 'commercial'"
+            class="customer-admin-section"
+            data-testid="customer-tab-panel-commercial"
+          >
+            <div class="customer-admin-form customer-admin-form--structured">
+            <section class="customer-admin-editor-intro">
               <div>
                 <p class="eyebrow">{{ t("customerAdmin.commercial.eyebrow") }}</p>
-                <h3>{{ t("customerAdmin.commercial.title") }}</h3>
-                <p class="field-help">{{ t("customerAdmin.commercial.lead") }}</p>
+                <h4>{{ t("customerAdmin.commercial.title") }}</h4>
               </div>
-              <div class="cta-row">
-                <button class="cta-button cta-secondary" type="button" @click="refreshCommercialProfile">
-                  {{ t("customerAdmin.actions.refreshCommercial") }}
-                </button>
-              </div>
-            </div>
+              <p class="field-help">{{ t("customerAdmin.commercial.lead") }}</p>
+            </section>
 
             <div class="customer-admin-summary">
               <article class="customer-admin-summary__card">
@@ -494,8 +595,26 @@
               </article>
             </div>
 
-            <section class="customer-admin-section">
-              <div class="customer-admin-panel__header">
+            <nav class="customer-admin-tabs customer-admin-tabs--sub" aria-label="Commercial detail sections" data-testid="customer-commercial-tabs">
+              <button
+                v-for="tab in commercialTabs"
+                :key="tab.id"
+                type="button"
+                class="customer-admin-tab customer-admin-tab--sub"
+                :class="{ active: tab.id === activeCommercialTab }"
+                :data-testid="`customer-commercial-tab-${tab.id}`"
+                @click="activeCommercialTab = tab.id"
+              >
+                {{ tab.label }}
+              </button>
+            </nav>
+
+            <section
+              v-if="activeCommercialTab === 'billing_profile'"
+              class="customer-admin-section"
+              data-testid="customer-commercial-panel-billing-profile"
+            >
+              <div class="customer-admin-form-section__header">
                 <div>
                   <p class="eyebrow">{{ t("customerAdmin.commercial.billingEyebrow") }}</p>
                   <h3>{{ t("customerAdmin.commercial.billingTitle") }}</h3>
@@ -503,53 +622,53 @@
                 <StatusBadge :status="commercialProfile?.billing_profile?.status || 'inactive'" />
               </div>
 
-              <form class="customer-admin-form" @submit.prevent="submitBillingProfile">
-                <div class="customer-admin-form-grid">
-                  <label class="field-stack">
+              <form class="customer-admin-form-section" @submit.prevent="submitBillingProfile">
+                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.invoiceEmail") }}</span>
                     <input v-model="billingProfileDraft.invoice_email" :disabled="!commercialActionState.canManageBillingProfile" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--third">
                     <span>{{ t("customerAdmin.fields.paymentTermsDays") }}</span>
                     <input v-model.number="billingProfileDraft.payment_terms_days" type="number" :disabled="!commercialActionState.canManageBillingProfile" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.paymentTermsNote") }}</span>
                     <input v-model="billingProfileDraft.payment_terms_note" :disabled="!commercialActionState.canManageBillingProfile" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--third">
                     <span>{{ t("customerAdmin.fields.taxNumber") }}</span>
                     <input v-model="billingProfileDraft.tax_number" :disabled="!commercialActionState.canManageBillingProfile" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--third">
                     <span>{{ t("customerAdmin.fields.vatId") }}</span>
                     <input v-model="billingProfileDraft.vat_id" :disabled="!commercialActionState.canManageBillingProfile" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.contractReference") }}</span>
                     <input v-model="billingProfileDraft.contract_reference" :disabled="!commercialActionState.canManageBillingProfile" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.debtorNumber") }}</span>
                     <input v-model="billingProfileDraft.debtor_number" :disabled="!commercialActionState.canManageBillingProfile" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.bankAccountHolder") }}</span>
                     <input v-model="billingProfileDraft.bank_account_holder" :disabled="!commercialActionState.canManageBillingProfile" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.bankIban") }}</span>
                     <input v-model="billingProfileDraft.bank_iban" :disabled="!commercialActionState.canManageBillingProfile" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.bankBic") }}</span>
                     <input v-model="billingProfileDraft.bank_bic" :disabled="!commercialActionState.canManageBillingProfile" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.bankName") }}</span>
                     <input v-model="billingProfileDraft.bank_name" :disabled="!commercialActionState.canManageBillingProfile" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--third">
                     <span>{{ t("customerAdmin.fields.invoiceLayoutCode") }}</span>
                     <select v-model="billingProfileDraft.invoice_layout_code" :disabled="!commercialActionState.canManageBillingProfile">
                       <option v-for="option in INVOICE_LAYOUT_OPTIONS" :key="option" :value="option">
@@ -557,7 +676,7 @@
                       </option>
                     </select>
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--third">
                     <span>{{ t("customerAdmin.fields.shippingMethodCode") }}</span>
                     <select v-model="billingProfileDraft.shipping_method_code" :disabled="!commercialActionState.canManageBillingProfile">
                       <option v-for="option in SHIPPING_METHOD_OPTIONS" :key="option" :value="option">
@@ -565,7 +684,7 @@
                       </option>
                     </select>
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--third">
                     <span>{{ t("customerAdmin.fields.dunningPolicyCode") }}</span>
                     <select v-model="billingProfileDraft.dunning_policy_code" :disabled="!commercialActionState.canManageBillingProfile">
                       <option v-for="option in DUNNING_POLICY_OPTIONS" :key="option" :value="option">
@@ -573,7 +692,7 @@
                       </option>
                     </select>
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.leitwegId") }}</span>
                     <input v-model="billingProfileDraft.leitweg_id" :disabled="!commercialActionState.canManageBillingProfile" />
                   </label>
@@ -597,6 +716,9 @@
                 </label>
 
                 <div class="cta-row" v-if="commercialActionState.canManageBillingProfile">
+                  <button class="cta-button cta-secondary" type="button" @click="refreshCommercialProfile">
+                    {{ t("customerAdmin.actions.refreshCommercial") }}
+                  </button>
                   <button class="cta-button" type="submit" :disabled="loading.commercial">
                     {{ t("customerAdmin.actions.saveBillingProfile") }}
                   </button>
@@ -604,8 +726,12 @@
               </form>
             </section>
 
-            <section class="customer-admin-section">
-              <div class="customer-admin-panel__header">
+            <section
+              v-if="activeCommercialTab === 'invoice_parties'"
+              class="customer-admin-section"
+              data-testid="customer-commercial-panel-invoice-parties"
+            >
+              <div class="customer-admin-form-section__header">
                 <div>
                   <p class="eyebrow">{{ t("customerAdmin.commercial.invoiceEyebrow") }}</p>
                   <h3>{{ t("customerAdmin.commercial.invoiceTitle") }}</h3>
@@ -639,29 +765,29 @@
               </div>
               <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.invoiceEmpty") }}</p>
 
-              <form class="customer-admin-form" @submit.prevent="submitInvoiceParty">
-                <div class="customer-admin-form-grid">
-                  <label class="field-stack">
+              <form class="customer-admin-form-section" @submit.prevent="submitInvoiceParty">
+                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.companyName") }}</span>
                     <input v-model="invoicePartyDraft.company_name" :disabled="!commercialActionState.canManageInvoiceParties" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.contactName") }}</span>
                     <input v-model="invoicePartyDraft.contact_name" :disabled="!commercialActionState.canManageInvoiceParties" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.addressId") }}</span>
                     <input v-model="invoicePartyDraft.address_id" :disabled="!commercialActionState.canManageInvoiceParties" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.invoiceEmail") }}</span>
                     <input v-model="invoicePartyDraft.invoice_email" :disabled="!commercialActionState.canManageInvoiceParties" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.invoiceLayoutLookupId") }}</span>
                     <input v-model="invoicePartyDraft.invoice_layout_lookup_id" :disabled="!commercialActionState.canManageInvoiceParties" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.externalRef") }}</span>
                     <input v-model="invoicePartyDraft.external_ref" :disabled="!commercialActionState.canManageInvoiceParties" />
                   </label>
@@ -686,7 +812,11 @@
               </form>
             </section>
 
-            <section class="customer-admin-section">
+            <section
+              v-if="activeCommercialTab === 'pricing_rules'"
+              class="customer-admin-section"
+              data-testid="customer-commercial-panel-pricing-rules"
+            >
               <div class="customer-admin-panel__header">
                 <div>
                   <p class="eyebrow">{{ t("customerAdmin.commercial.rateCardsEyebrow") }}</p>
@@ -721,20 +851,20 @@
               <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.rateCardsEmpty") }}</p>
 
               <form class="customer-admin-form" @submit.prevent="submitRateCard">
-                <div class="customer-admin-form-grid">
-                  <label class="field-stack">
+                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.rateKind") }}</span>
                     <input v-model="rateCardDraft.rate_kind" :disabled="!commercialActionState.canManageRateCards" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--third">
                     <span>{{ t("customerAdmin.fields.currencyCode") }}</span>
                     <input v-model="rateCardDraft.currency_code" :disabled="!commercialActionState.canManageRateCards" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
                     <input v-model="rateCardDraft.effective_from" type="date" :disabled="!commercialActionState.canManageRateCards" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
                     <input v-model="rateCardDraft.effective_to" type="date" :disabled="!commercialActionState.canManageRateCards" />
                   </label>
@@ -790,36 +920,36 @@
                   <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.rateLinesEmpty") }}</p>
 
                   <form class="customer-admin-form" @submit.prevent="submitRateLine">
-                    <div class="customer-admin-form-grid">
-                      <label class="field-stack">
+                    <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.lineKind") }}</span>
                         <input v-model="rateLineDraft.line_kind" :disabled="!commercialActionState.canManageRateLines" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.billingUnit") }}</span>
                         <input v-model="rateLineDraft.billing_unit" :disabled="!commercialActionState.canManageRateLines" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.unitPrice") }}</span>
                         <input v-model="rateLineDraft.unit_price" :disabled="!commercialActionState.canManageRateLines" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.minimumQuantity") }}</span>
                         <input v-model="rateLineDraft.minimum_quantity" :disabled="!commercialActionState.canManageRateLines" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.functionTypeId") }}</span>
                         <input v-model="rateLineDraft.function_type_id" :disabled="!commercialActionState.canManageRateLines" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.qualificationTypeId") }}</span>
                         <input v-model="rateLineDraft.qualification_type_id" :disabled="!commercialActionState.canManageRateLines" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--half">
                         <span>{{ t("customerAdmin.fields.planningModeCode") }}</span>
                         <input v-model="rateLineDraft.planning_mode_code" :disabled="!commercialActionState.canManageRateLines" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.sortOrder") }}</span>
                         <input v-model.number="rateLineDraft.sort_order" type="number" :disabled="!commercialActionState.canManageRateLines" />
                       </label>
@@ -877,48 +1007,48 @@
                   <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.surchargesEmpty") }}</p>
 
                   <form class="customer-admin-form" @submit.prevent="submitSurchargeRule">
-                    <div class="customer-admin-form-grid">
-                      <label class="field-stack">
+                    <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.surchargeType") }}</span>
                         <input v-model="surchargeRuleDraft.surcharge_type" :disabled="!commercialActionState.canManageSurchargeRules" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--half">
                         <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
                         <input v-model="surchargeRuleDraft.effective_from" type="date" :disabled="!commercialActionState.canManageSurchargeRules" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--half">
                         <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
                         <input v-model="surchargeRuleDraft.effective_to" type="date" :disabled="!commercialActionState.canManageSurchargeRules" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--half">
                         <span>{{ t("customerAdmin.fields.weekdayMask") }}</span>
                         <input v-model="surchargeRuleDraft.weekday_mask" :disabled="!commercialActionState.canManageSurchargeRules" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.timeFromMinute") }}</span>
                         <input v-model.number="surchargeRuleDraft.time_from_minute" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.timeToMinute") }}</span>
                         <input v-model.number="surchargeRuleDraft.time_to_minute" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--half">
                         <span>{{ t("customerAdmin.fields.regionCode") }}</span>
                         <input v-model="surchargeRuleDraft.region_code" :disabled="!commercialActionState.canManageSurchargeRules" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.percentValue") }}</span>
                         <input v-model="surchargeRuleDraft.percent_value" :disabled="!commercialActionState.canManageSurchargeRules" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.fixedAmount") }}</span>
                         <input v-model="surchargeRuleDraft.fixed_amount" :disabled="!commercialActionState.canManageSurchargeRules" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.currencyCode") }}</span>
                         <input v-model="surchargeRuleDraft.currency_code" :disabled="!commercialActionState.canManageSurchargeRules" />
                       </label>
-                      <label class="field-stack">
+                      <label class="field-stack field-stack--third">
                         <span>{{ t("customerAdmin.fields.sortOrder") }}</span>
                         <input v-model.number="surchargeRuleDraft.sort_order" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
                       </label>
@@ -939,209 +1069,252 @@
                 </section>
               </div>
             </section>
-          </section>
-
-          <section v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-section">
-            <div class="customer-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("customerAdmin.privacy.eyebrow") }}</p>
-                <h3>{{ t("customerAdmin.privacy.title") }}</h3>
-                <p class="field-help">{{ t("customerAdmin.privacy.help") }}</p>
-              </div>
-              <StatusBadge :status="portalPrivacy?.person_names_released ? 'active' : 'inactive'" />
-            </div>
-
-            <div class="customer-admin-summary">
-              <article class="customer-admin-summary__card">
-                <span>{{ t("customerAdmin.fields.personNamesReleased") }}</span>
-                <strong>
-                  {{
-                    portalPrivacy?.person_names_released
-                      ? t("customerAdmin.status.active")
-                      : t("customerAdmin.status.inactive")
-                  }}
-                </strong>
-              </article>
-              <article class="customer-admin-summary__card">
-                <span>{{ t("customerAdmin.privacy.lastReleasedAt") }}</span>
-                <strong>{{ formatOptionalDateTime(portalPrivacy?.person_names_released_at) }}</strong>
-              </article>
-              <article class="customer-admin-summary__card">
-                <span>{{ t("customerAdmin.privacy.lastReleasedBy") }}</span>
-                <strong>{{ portalPrivacy?.person_names_released_by_user_id || t("customerAdmin.summary.none") }}</strong>
-              </article>
-            </div>
-
-            <label class="customer-admin-checkbox">
-              <input v-model="portalPrivacyDraft.person_names_released" type="checkbox" :disabled="!canWrite" />
-              <span>{{ t("customerAdmin.fields.personNamesReleased") }}</span>
-            </label>
-
-            <div class="cta-row">
-              <button
-                class="cta-button cta-secondary"
-                type="button"
-                :disabled="!canRead"
-                @click="refreshPortalPrivacy"
-              >
-                {{ t("customerAdmin.actions.refreshPortalPrivacy") }}
-              </button>
-              <button
-                class="cta-button"
-                type="button"
-                :disabled="!canWrite || loading.portalPrivacy"
-                @click="submitPortalPrivacy"
-              >
-                {{ t("customerAdmin.actions.savePortalPrivacy") }}
-              </button>
             </div>
           </section>
 
-          <section v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-section">
-            <div class="customer-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("customerAdmin.history.eyebrow") }}</p>
-                <h3>{{ t("customerAdmin.history.title") }}</h3>
-              </div>
-              <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshHistory">
-                {{ t("customerAdmin.actions.refreshHistory") }}
-              </button>
-            </div>
-
-            <div v-if="customerHistory.length" class="customer-admin-record-list">
-              <article
-                v-for="entry in customerHistory"
-                :key="entry.id"
-                class="customer-admin-record customer-admin-record--stacked"
-              >
+          <section
+            v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'portal'"
+            class="customer-admin-section"
+            data-testid="customer-tab-panel-portal"
+          >
+            <div class="customer-admin-form customer-admin-form--structured">
+              <section class="customer-admin-editor-intro">
                 <div>
-                  <strong>{{ entry.title }}</strong>
-                  <p>{{ entry.summary }}</p>
-                  <span class="customer-admin-record__meta">{{ formatHistoryMeta(entry) }}</span>
-                  <ul v-if="entry.attachments.length" class="customer-admin-inline-list">
-                    <li v-for="attachment in entry.attachments" :key="attachment.document_id">
-                      {{ attachment.title }}
-                    </li>
-                  </ul>
+                  <p class="eyebrow">{{ t("customerAdmin.loginHistory.eyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.portal.title") }}</h4>
                 </div>
-              </article>
-            </div>
-            <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.history.empty") }}</p>
+                <p class="field-help">{{ t("customerAdmin.portal.lead") }}</p>
+              </section>
 
-            <form class="customer-admin-inline-form" @submit.prevent="submitHistoryAttachmentLink">
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.historyEntry") }}</span>
-                <select v-model="historyAttachmentDraft.history_entry_id">
-                  <option v-for="entry in customerHistory" :key="entry.id" :value="entry.id">
-                    {{ entry.title }}
-                  </option>
-                </select>
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.documentId") }}</span>
-                <input v-model="historyAttachmentDraft.document_id" :disabled="!canWrite" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.label") }}</span>
-                <input v-model="historyAttachmentDraft.label" :disabled="!canWrite" />
-              </label>
-              <div class="cta-row">
-                <button class="cta-button cta-secondary" type="submit" :disabled="!canWrite || loading.historyAttachment">
-                  {{ t("customerAdmin.actions.linkHistoryAttachment") }}
-                </button>
-              </div>
-            </form>
+              <section class="customer-admin-form-section">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.privacy.eyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.privacy.title") }}</h4>
+                </div>
+                <div class="customer-admin-summary">
+                  <article class="customer-admin-summary__card">
+                    <span>{{ t("customerAdmin.fields.personNamesReleased") }}</span>
+                    <strong>
+                      {{
+                        portalPrivacy?.person_names_released
+                          ? t("customerAdmin.status.active")
+                          : t("customerAdmin.status.inactive")
+                      }}
+                    </strong>
+                  </article>
+                  <article class="customer-admin-summary__card">
+                    <span>{{ t("customerAdmin.privacy.lastReleasedAt") }}</span>
+                    <strong>{{ formatOptionalDateTime(portalPrivacy?.person_names_released_at) }}</strong>
+                  </article>
+                  <article class="customer-admin-summary__card">
+                    <span>{{ t("customerAdmin.privacy.lastReleasedBy") }}</span>
+                    <strong>{{ portalPrivacy?.person_names_released_by_user_id || t("customerAdmin.summary.none") }}</strong>
+                  </article>
+                </div>
+                <div class="customer-admin-checkbox-group">
+                  <label class="customer-admin-checkbox">
+                    <input v-model="portalPrivacyDraft.person_names_released" type="checkbox" :disabled="!canWrite" />
+                    <span>{{ t("customerAdmin.fields.personNamesReleased") }}</span>
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshPortalPrivacy">
+                    {{ t("customerAdmin.actions.refreshPortalPrivacy") }}
+                  </button>
+                  <button class="cta-button" type="button" :disabled="!canWrite || loading.portalPrivacy" @click="submitPortalPrivacy">
+                    {{ t("customerAdmin.actions.savePortalPrivacy") }}
+                  </button>
+                </div>
+              </section>
+
+              <section class="customer-admin-form-section">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.loginHistory.eyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.loginHistory.title") }}</h4>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshCustomerPortalLoginHistory">
+                    {{ t("customerAdmin.actions.refreshLoginHistory") }}
+                  </button>
+                </div>
+                <div v-if="customerPortalLoginHistory.length" class="customer-admin-record-list">
+                  <article
+                    v-for="entry in customerPortalLoginHistory"
+                    :key="entry.id"
+                    class="customer-admin-record customer-admin-record--stacked"
+                  >
+                    <div class="customer-admin-record__body">
+                      <strong>{{ entry.identifier }}</strong>
+                      <span class="customer-admin-record__meta">{{ formatLoginHistoryMeta(entry) }}</span>
+                    </div>
+                  </article>
+                </div>
+                <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.loginHistory.empty") }}</p>
+              </section>
+            </div>
           </section>
 
-          <section v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-section">
-            <div class="customer-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("customerAdmin.loginHistory.eyebrow") }}</p>
-                <h3>{{ t("customerAdmin.loginHistory.title") }}</h3>
-              </div>
-              <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshCustomerPortalLoginHistory">
-                {{ t("customerAdmin.actions.refreshLoginHistory") }}
-              </button>
-            </div>
-            <div v-if="customerPortalLoginHistory.length" class="customer-admin-record-list">
-              <article
-                v-for="entry in customerPortalLoginHistory"
-                :key="entry.id"
-                class="customer-admin-record customer-admin-record--stacked"
-              >
+          <section
+            v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'history'"
+            class="customer-admin-section"
+            data-testid="customer-tab-panel-history"
+          >
+            <div class="customer-admin-form customer-admin-form--structured">
+              <section class="customer-admin-editor-intro">
                 <div>
-                  <strong>{{ entry.identifier }}</strong>
-                  <span class="customer-admin-record__meta">{{ formatLoginHistoryMeta(entry) }}</span>
+                  <p class="eyebrow">{{ t("customerAdmin.history.eyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.history.title") }}</h4>
                 </div>
-              </article>
+                <p class="field-help">{{ t("customerAdmin.history.lead") }}</p>
+              </section>
+
+              <section class="customer-admin-form-section">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.history.registerEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.history.registerTitle") }}</h4>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshHistory">
+                    {{ t("customerAdmin.actions.refreshHistory") }}
+                  </button>
+                </div>
+                <div v-if="customerHistory.length" class="customer-admin-record-list">
+                  <article
+                    v-for="entry in customerHistory"
+                    :key="entry.id"
+                    class="customer-admin-record customer-admin-record--stacked"
+                  >
+                    <div class="customer-admin-record__body">
+                      <strong>{{ entry.title }}</strong>
+                      <p>{{ entry.summary }}</p>
+                      <span class="customer-admin-record__meta">{{ formatHistoryMeta(entry) }}</span>
+                      <ul v-if="entry.attachments.length" class="customer-admin-inline-list">
+                        <li v-for="attachment in entry.attachments" :key="attachment.document_id">
+                          {{ attachment.title }}
+                        </li>
+                      </ul>
+                    </div>
+                  </article>
+                </div>
+                <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.history.empty") }}</p>
+              </section>
+
+              <form class="customer-admin-form-section" @submit.prevent="submitHistoryAttachmentLink">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.history.attachmentEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.history.attachmentTitle") }}</h4>
+                </div>
+                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.fields.historyEntry") }}</span>
+                    <select v-model="historyAttachmentDraft.history_entry_id">
+                      <option v-for="entry in customerHistory" :key="entry.id" :value="entry.id">
+                        {{ entry.title }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.fields.documentId") }}</span>
+                    <input v-model="historyAttachmentDraft.document_id" :disabled="!canWrite" />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.fields.label") }}</span>
+                    <input v-model="historyAttachmentDraft.label" :disabled="!canWrite" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="submit" :disabled="!canWrite || loading.historyAttachment">
+                    {{ t("customerAdmin.actions.linkHistoryAttachment") }}
+                  </button>
+                </div>
+              </form>
             </div>
-            <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.loginHistory.empty") }}</p>
           </section>
 
-          <section v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-section">
-            <div class="customer-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("customerAdmin.employeeBlocks.eyebrow") }}</p>
-                <h3>{{ t("customerAdmin.employeeBlocks.title") }}</h3>
-                <p class="customer-admin-record__meta">
+          <section
+            v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'employee_blocks'"
+            class="customer-admin-section"
+            data-testid="customer-tab-panel-employee-blocks"
+          >
+            <div class="customer-admin-form customer-admin-form--structured">
+              <section class="customer-admin-editor-intro">
+                <div>
+                  <p class="eyebrow">{{ t("customerAdmin.employeeBlocks.eyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.employeeBlocks.title") }}</h4>
+                </div>
+                <p class="field-help">
                   {{
                     employeeBlockCapability?.message_key
-                      ? t(employeeBlockCapability.message_key)
+                      ? t(employeeBlockCapability.message_key as never)
                       : t("customerAdmin.employeeBlocks.capability.pendingEmployees")
                   }}
                 </p>
-              </div>
-              <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshEmployeeBlocks">
-                {{ t("customerAdmin.actions.refreshEmployeeBlocks") }}
-              </button>
-            </div>
+              </section>
 
-            <div v-if="customerEmployeeBlocks.length" class="customer-admin-record-list">
-              <article
-                v-for="block in customerEmployeeBlocks"
-                :key="block.id"
-                class="customer-admin-record customer-admin-record--stacked"
-              >
-                <div>
-                  <strong>{{ block.employee_id }}</strong>
-                  <p>{{ block.reason }}</p>
-                  <span class="customer-admin-record__meta">
-                    {{ block.effective_from }}{{ block.effective_to ? ` - ${block.effective_to}` : "" }}
-                  </span>
+              <section class="customer-admin-form-section">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.employeeBlocks.registerEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.employeeBlocks.registerTitle") }}</h4>
                 </div>
-                <button class="cta-button cta-secondary" type="button" :disabled="!canWrite" @click="editEmployeeBlock(block)">
-                  {{ t("customerAdmin.actions.edit") }}
-                </button>
-              </article>
-            </div>
-            <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.employeeBlocks.empty") }}</p>
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshEmployeeBlocks">
+                    {{ t("customerAdmin.actions.refreshEmployeeBlocks") }}
+                  </button>
+                </div>
+                <div v-if="customerEmployeeBlocks.length" class="customer-admin-record-list">
+                  <article
+                    v-for="block in customerEmployeeBlocks"
+                    :key="block.id"
+                    class="customer-admin-record customer-admin-record--stacked"
+                  >
+                    <div class="customer-admin-record__body">
+                      <strong>{{ block.employee_id }}</strong>
+                      <p>{{ block.reason }}</p>
+                      <span class="customer-admin-record__meta">
+                        {{ block.effective_from }}{{ block.effective_to ? ` - ${block.effective_to}` : "" }}
+                      </span>
+                    </div>
+                    <button class="cta-button cta-secondary" type="button" :disabled="!canWrite" @click="editEmployeeBlock(block)">
+                      {{ t("customerAdmin.actions.edit") }}
+                    </button>
+                  </article>
+                </div>
+                <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.employeeBlocks.empty") }}</p>
+              </section>
 
-            <form class="customer-admin-inline-form" @submit.prevent="submitEmployeeBlock">
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.employeeId") }}</span>
-                <input v-model="employeeBlockDraft.employee_id" :disabled="!canWrite" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.reason") }}</span>
-                <input v-model="employeeBlockDraft.reason" :disabled="!canWrite" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
-                <input v-model="employeeBlockDraft.effective_from" type="date" :disabled="!canWrite" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
-                <input v-model="employeeBlockDraft.effective_to" type="date" :disabled="!canWrite" />
-              </label>
-              <div class="cta-row">
-                <button class="cta-button" type="submit" :disabled="!canWrite || loading.employeeBlock">
-                  {{ editingEmployeeBlockId ? t("customerAdmin.actions.saveEmployeeBlock") : t("customerAdmin.actions.createEmployeeBlock") }}
-                </button>
-                <button class="cta-button cta-secondary" type="button" @click="resetEmployeeBlockDraft">
-                  {{ t("customerAdmin.actions.cancel") }}
-                </button>
-              </div>
-            </form>
+              <form class="customer-admin-form-section" @submit.prevent="submitEmployeeBlock">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.employeeBlocks.editorEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.employeeBlocks.editorTitle") }}</h4>
+                </div>
+                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.fields.employeeId") }}</span>
+                    <input v-model="employeeBlockDraft.employee_id" :disabled="!canWrite" />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.fields.reason") }}</span>
+                    <input v-model="employeeBlockDraft.reason" :disabled="!canWrite" />
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
+                    <input v-model="employeeBlockDraft.effective_from" type="date" :disabled="!canWrite" />
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
+                    <input v-model="employeeBlockDraft.effective_to" type="date" :disabled="!canWrite" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!canWrite || loading.employeeBlock">
+                    {{ editingEmployeeBlockId ? t("customerAdmin.actions.saveEmployeeBlock") : t("customerAdmin.actions.createEmployeeBlock") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetEmployeeBlockDraft">
+                    {{ t("customerAdmin.actions.cancel") }}
+                  </button>
+                </div>
+              </form>
+            </div>
           </section>
         </template>
 
@@ -1155,7 +1328,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 
 import {
   createCustomerEmployeeBlock,
@@ -1171,6 +1344,7 @@ import {
   exportCustomerVCard,
   getCustomer,
   getCustomerCommercialProfile,
+  getCustomerReferenceData,
   getCustomerPortalPrivacy,
   linkCustomerHistoryAttachment,
   listCustomerEmployeeBlocks,
@@ -1200,6 +1374,7 @@ import {
   type CustomerRateCardRead,
   type CustomerRateLinePayload,
   type CustomerRateLineRead,
+  type CustomerReferenceDataRead,
   type CustomerRead,
   type CustomerSurchargeRulePayload,
   type CustomerSurchargeRuleRead,
@@ -1226,13 +1401,28 @@ import {
   validateSurchargeRuleDraft,
 } from "@/features/customers/customerCommercial.helpers.js";
 import {
+  CUSTOMER_COMMERCIAL_TAB_ORDER,
+  buildCustomerDetailTabs,
+  buildCustomerDraftPayload,
+  buildCustomerReferenceMaps,
   buildLifecyclePayload,
   deriveCustomerActionState,
+  filterCustomerMandatesByBranch,
+  formatCustomerReferenceLabel,
   formatPrimaryContactSummary,
   mapCustomerApiMessage,
+  normalizeCustomerCommercialTab,
+  normalizeCustomerDetailTab,
+  resolveCustomerAdminSectionVisibility,
+  resolveCustomerAdminSessionScope,
+  resolveCustomerCancelSelection,
 } from "@/features/customers/customerAdmin.helpers.js";
 import { useI18n } from "@/i18n";
 import { useAuthStore } from "@/stores/auth";
+
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
+  embedded: false,
+});
 
 const ACCESS_TOKEN_STORAGE_KEY = "sicherplan-access-token";
 const INVOICE_LAYOUT_OPTIONS = ["standard", "compact", "detailed_timesheet"] as const;
@@ -1249,9 +1439,13 @@ const customerEmployeeBlocks = ref<CustomerEmployeeBlockRead[]>([]);
 const employeeBlockCapability = ref<CustomerEmployeeBlockCollectionRead["capability"] | null>(null);
 const commercialProfile = ref<CustomerCommercialProfileRead | null>(null);
 const portalPrivacy = ref<CustomerPortalPrivacyRead | null>(null);
+const referenceData = ref<CustomerReferenceDataRead | null>(null);
 const selectedCustomer = ref<CustomerRead | null>(null);
 const selectedCustomerId = ref("");
+const previousSelectedCustomer = ref<CustomerRead | null>(null);
 const isCreatingCustomer = ref(false);
+const activeDetailTab = ref("");
+const activeCommercialTab = ref("billing_profile");
 const editingContactId = ref("");
 const editingAddressId = ref("");
 const editingInvoicePartyId = ref("");
@@ -1286,12 +1480,15 @@ const feedback = reactive({
 const filters = reactive<CustomerFilterParams>({
   search: "",
   lifecycle_status: "",
+  default_branch_id: "",
+  default_mandate_id: "",
   include_archived: false,
 });
 const customerDraft = reactive<CustomerCreatePayload>({
   tenant_id: "",
   customer_number: "",
   name: "",
+  status: "active",
   legal_name: "",
   external_ref: "",
   legal_form_lookup_id: "",
@@ -1420,10 +1617,82 @@ const canRead = computed(() => actionState.value.canRead);
 const canWrite = computed(() => actionState.value.canCreate);
 const canReadCommercial = computed(() => commercialActionState.value.canReadCommercial);
 const canWriteCommercial = computed(() => commercialActionState.value.canWriteCommercial);
+const hasDetailWorkspace = computed(() => isCreatingCustomer.value || !!selectedCustomer.value);
+const detailTabLabelKeys = {
+  overview: "customerAdmin.tabs.overview",
+  contacts: "customerAdmin.tabs.contacts",
+  addresses: "customerAdmin.tabs.addresses",
+  commercial: "customerAdmin.tabs.commercial",
+  portal: "customerAdmin.tabs.portal",
+  history: "customerAdmin.tabs.history",
+  employee_blocks: "customerAdmin.tabs.employeeBlocks",
+} as const;
+const customerDetailTabs = computed(() =>
+  buildCustomerDetailTabs({
+    canReadCommercial: canReadCommercial.value,
+    hasSelectedCustomer: !!selectedCustomer.value,
+    isCreatingCustomer: isCreatingCustomer.value,
+  }).map((tabId) => ({
+    id: tabId,
+    label: t(detailTabLabelKeys[tabId as keyof typeof detailTabLabelKeys] as never),
+  })),
+);
+const commercialTabLabelKeys = {
+  billing_profile: "customerAdmin.commercial.tabs.billingProfile",
+  invoice_parties: "customerAdmin.commercial.tabs.invoiceParties",
+  pricing_rules: "customerAdmin.commercial.tabs.pricingRules",
+} as const;
+const commercialTabs = computed(() =>
+  CUSTOMER_COMMERCIAL_TAB_ORDER.map((tabId) => ({
+    id: tabId,
+    label: t(commercialTabLabelKeys[tabId as keyof typeof commercialTabLabelKeys] as never),
+  })),
+);
 const primaryContactSummary = computed(() => formatPrimaryContactSummary(selectedCustomer.value));
+const referenceMaps = computed(() => buildCustomerReferenceMaps(referenceData.value));
+const branchOptions = computed(() => referenceData.value?.branches ?? []);
+const filteredCustomerMandates = computed(() =>
+  filterMandateOptions(customerDraft.default_branch_id),
+);
+const selectedCustomerBranchLabel = computed(() => {
+  const branchId = selectedCustomer.value?.default_branch_id;
+  return branchId ? referenceMaps.value.branches.get(branchId) ?? branchId : "";
+});
+const selectedCustomerMandateLabel = computed(() => {
+  const mandateId = selectedCustomer.value?.default_mandate_id;
+  return mandateId ? referenceMaps.value.mandates.get(mandateId) ?? mandateId : "";
+});
+const selectedCustomerClassificationLabel = computed(() => {
+  const lookupId = selectedCustomer.value?.classification_lookup_id;
+  return lookupId ? referenceMaps.value.classifications.get(lookupId) ?? lookupId : "";
+});
+const selectedCustomerRankingLabel = computed(() => {
+  const lookupId = selectedCustomer.value?.ranking_lookup_id;
+  return lookupId ? referenceMaps.value.rankings.get(lookupId) ?? lookupId : "";
+});
+const selectedCustomerStatusLabel = computed(() => {
+  const lookupId = selectedCustomer.value?.customer_status_lookup_id;
+  return lookupId ? referenceMaps.value.customerStatuses.get(lookupId) ?? lookupId : "";
+});
 const selectedRateCard = computed(() =>
   commercialProfile.value?.rate_cards.find((row) => row.id === selectedRateCardId.value) ?? null,
 );
+const sectionVisibility = computed(() =>
+  resolveCustomerAdminSectionVisibility({
+    effectiveRole: authStore.effectiveRole,
+    embedded: props.embedded,
+  }),
+);
+
+function formatReferenceLabel(
+  record: { code: string; label?: string | null; name?: string | null },
+) {
+  return formatCustomerReferenceLabel(record);
+}
+
+function filterMandateOptions(branchId: null | string | undefined) {
+  return filterCustomerMandatesByBranch(referenceData.value?.mandates ?? [], branchId);
+}
 
 function readStoredAccessToken() {
   if (typeof window === "undefined") {
@@ -1431,6 +1700,20 @@ function readStoredAccessToken() {
   }
 
   return window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) ?? "";
+}
+
+function syncTenantAdminSessionState() {
+  const sessionScope = resolveCustomerAdminSessionScope({
+    effectiveRole: authStore.effectiveRole,
+    effectiveTenantScopeId: authStore.effectiveTenantScopeId,
+    effectiveAccessToken: authStore.effectiveAccessToken,
+    storedAccessToken: accessTokenInput.value,
+  });
+
+  tenantScopeInput.value = sessionScope.tenantScopeId;
+  tenantScopeId.value = sessionScope.tenantScopeId;
+  accessTokenInput.value = sessionScope.accessToken;
+  accessToken.value = sessionScope.accessToken;
 }
 
 function rememberScopeAndToken() {
@@ -1442,6 +1725,14 @@ function rememberScopeAndToken() {
   }
   setFeedback("info", t("customerAdmin.feedback.scopeSaved"), t("customerAdmin.feedback.tokenSaved"));
   void refreshCustomers();
+}
+
+async function loadReferenceData() {
+  if (!tenantScopeId.value || !accessToken.value || !canRead.value) {
+    referenceData.value = null;
+    return;
+  }
+  referenceData.value = await getCustomerReferenceData(tenantScopeId.value, accessToken.value);
 }
 
 function clearFeedback() {
@@ -1460,6 +1751,7 @@ function resetCustomerDraft() {
   customerDraft.tenant_id = tenantScopeId.value;
   customerDraft.customer_number = "";
   customerDraft.name = "";
+  customerDraft.status = "active";
   customerDraft.legal_name = "";
   customerDraft.external_ref = "";
   customerDraft.legal_form_lookup_id = "";
@@ -1603,6 +1895,7 @@ function populateCustomerDraft(customer: CustomerRead) {
   customerDraft.tenant_id = customer.tenant_id;
   customerDraft.customer_number = customer.customer_number;
   customerDraft.name = customer.name;
+  customerDraft.status = customer.status;
   customerDraft.legal_name = customer.legal_name ?? "";
   customerDraft.external_ref = customer.external_ref ?? "";
   customerDraft.legal_form_lookup_id = customer.legal_form_lookup_id ?? "";
@@ -1740,7 +2033,10 @@ function editEmployeeBlock(block: CustomerEmployeeBlockRead) {
 }
 
 function startCreateCustomer() {
+  previousSelectedCustomer.value = selectedCustomer.value;
   isCreatingCustomer.value = true;
+  activeDetailTab.value = "overview";
+  activeCommercialTab.value = "billing_profile";
   selectedCustomerId.value = "";
   selectedCustomer.value = null;
   customerHistory.value = [];
@@ -1765,32 +2061,50 @@ function startCreateAddress() {
 }
 
 function startCreateInvoiceParty() {
+  activeCommercialTab.value = "invoice_parties";
   resetInvoicePartyDraft();
 }
 
 function startCreateRateCard() {
+  activeCommercialTab.value = "pricing_rules";
   resetRateCardDraft();
 }
 
 function startCreateRateLine() {
+  activeCommercialTab.value = "pricing_rules";
   resetRateLineDraft();
 }
 
 function startCreateSurchargeRule() {
+  activeCommercialTab.value = "pricing_rules";
   resetSurchargeRuleDraft();
 }
 
 function cancelCustomerEdit() {
-  if (selectedCustomer.value) {
+  if (!isCreatingCustomer.value && selectedCustomer.value) {
     populateCustomerDraft(selectedCustomer.value);
-    isCreatingCustomer.value = false;
     return;
   }
-  startCreateCustomer();
+  const nextState = resolveCustomerCancelSelection(previousSelectedCustomer.value);
+  isCreatingCustomer.value = nextState.isCreatingCustomer;
+  selectedCustomerId.value = nextState.selectedCustomerId;
+  selectedCustomer.value = nextState.selectedCustomer;
+  if (selectedCustomer.value) {
+    populateCustomerDraft(selectedCustomer.value);
+  } else {
+    resetCustomerDraft();
+    customerHistory.value = [];
+    customerPortalLoginHistory.value = [];
+    customerEmployeeBlocks.value = [];
+    employeeBlockCapability.value = null;
+    portalPrivacy.value = null;
+    resetPortalPrivacyDraft();
+  }
 }
 
 async function refreshCustomers() {
   if (!tenantScopeId.value || !accessToken.value || !canRead.value) {
+    referenceData.value = null;
     customers.value = [];
     selectedCustomer.value = null;
     customerHistory.value = [];
@@ -1804,6 +2118,7 @@ async function refreshCustomers() {
 
   loading.list = true;
   try {
+    await loadReferenceData();
     customers.value = await listCustomers(tenantScopeId.value, accessToken.value, filters);
     if (selectedCustomerId.value) {
       const stillExists = customers.value.some((row) => row.id === selectedCustomerId.value);
@@ -1838,6 +2153,8 @@ async function selectCustomer(customerId: string) {
   loading.detail = true;
   try {
     selectedCustomerId.value = customerId;
+    activeDetailTab.value = "overview";
+    activeCommercialTab.value = "billing_profile";
     selectedCustomer.value = await getCustomer(tenantScopeId.value, customerId, accessToken.value);
     if (selectedCustomer.value) {
       populateCustomerDraft(selectedCustomer.value);
@@ -1885,7 +2202,8 @@ async function refreshCommercialProfile() {
     populateBillingProfileDraft(commercialProfile.value.billing_profile);
     if (commercialProfile.value.rate_cards.length) {
       if (!commercialProfile.value.rate_cards.some((row) => row.id === selectedRateCardId.value)) {
-        selectedRateCardId.value = commercialProfile.value.rate_cards[0].id;
+        const firstRateCard = commercialProfile.value.rate_cards[0];
+        selectedRateCardId.value = firstRateCard ? firstRateCard.id : "";
       }
     } else {
       selectedRateCardId.value = "";
@@ -1914,9 +2232,10 @@ async function submitCustomer() {
     const payload = normalizeCustomerDraft();
     if (isCreatingCustomer.value || !selectedCustomer.value) {
       const created = await createCustomer(tenantScopeId.value, accessToken.value, payload);
-      setFeedback("success", t("customerAdmin.feedback.created"), created.name);
+      setFeedback("success", t("customerAdmin.feedback.created"), t("customerAdmin.feedback.createdNextStep"));
       await refreshCustomers();
       await selectCustomer(created.id);
+      previousSelectedCustomer.value = selectedCustomer.value;
       isCreatingCustomer.value = false;
     } else {
       const updated = await updateCustomer(tenantScopeId.value, selectedCustomer.value.id, accessToken.value, {
@@ -2347,20 +2666,10 @@ function currentAddressVersion(addressId: string) {
 }
 
 function normalizeCustomerDraft(): CustomerCreatePayload {
-  return {
-    tenant_id: tenantScopeId.value,
-    customer_number: customerDraft.customer_number.trim(),
-    name: customerDraft.name.trim(),
-    legal_name: emptyToNull(customerDraft.legal_name),
-    external_ref: emptyToNull(customerDraft.external_ref),
-    legal_form_lookup_id: emptyToNull(customerDraft.legal_form_lookup_id),
-    classification_lookup_id: emptyToNull(customerDraft.classification_lookup_id),
-    ranking_lookup_id: emptyToNull(customerDraft.ranking_lookup_id),
-    customer_status_lookup_id: emptyToNull(customerDraft.customer_status_lookup_id),
-    default_branch_id: emptyToNull(customerDraft.default_branch_id),
-    default_mandate_id: emptyToNull(customerDraft.default_mandate_id),
-    notes: emptyToNull(customerDraft.notes),
-  };
+  return buildCustomerDraftPayload(customerDraft, {
+    allowedBranchIds: branchOptions.value.map((branch) => branch.id),
+    allowedMandateIds: filteredCustomerMandates.value.map((mandate) => mandate.id),
+  } as any);
 }
 
 function normalizeContactDraft(): CustomerContactPayload {
@@ -2776,7 +3085,65 @@ function emptyToNull(value: string | null | undefined) {
   return normalized ? normalized : null;
 }
 
+watch(
+  () => [selectedCustomer.value?.id ?? "", isCreatingCustomer.value, canReadCommercial.value],
+  () => {
+    activeDetailTab.value = normalizeCustomerDetailTab(activeDetailTab.value, {
+      canReadCommercial: canReadCommercial.value,
+      hasSelectedCustomer: !!selectedCustomer.value,
+      isCreatingCustomer: isCreatingCustomer.value,
+    });
+  },
+  { immediate: true },
+);
+
+watch(
+  () => activeDetailTab.value,
+  (tabId) => {
+    if (tabId === "commercial") {
+      activeCommercialTab.value = normalizeCustomerCommercialTab(activeCommercialTab.value);
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => customerDraft.default_branch_id,
+  (branchId) => {
+    if (!customerDraft.default_mandate_id) {
+      return;
+    }
+    const mandateStillValid = filterMandateOptions(branchId).some((mandate) => mandate.id === customerDraft.default_mandate_id);
+    if (!mandateStillValid) {
+      customerDraft.default_mandate_id = "";
+    }
+  },
+);
+
+watch(
+  () => filters.default_branch_id,
+  (branchId) => {
+    if (!filters.default_mandate_id) {
+      return;
+    }
+    const mandateStillValid = filterMandateOptions(branchId).some((mandate) => mandate.id === filters.default_mandate_id);
+    if (!mandateStillValid) {
+      filters.default_mandate_id = "";
+    }
+  },
+);
+
+watch(
+  () => [authStore.effectiveRole, authStore.effectiveTenantScopeId, authStore.effectiveAccessToken],
+  () => {
+    if (authStore.effectiveRole === "tenant_admin") {
+      syncTenantAdminSessionState();
+    }
+  },
+);
+
 onMounted(() => {
+  authStore.syncFromPrimarySession();
   resetCustomerDraft();
   resetContactDraft();
   resetAddressDraft();
@@ -2786,25 +3153,49 @@ onMounted(() => {
   resetRateLineDraft();
   resetSurchargeRuleDraft();
   resetPortalPrivacyDraft();
-  void refreshCustomers();
+  void (async () => {
+    if (
+      authStore.effectiveRole === "tenant_admin" &&
+      authStore.effectiveAccessToken &&
+      !authStore.sessionUser
+    ) {
+      try {
+        await authStore.loadCurrentSession();
+      } catch {
+        // Keep the page usable with whatever session state is already available.
+      }
+    }
+    syncTenantAdminSessionState();
+
+    await refreshCustomers();
+  })();
 });
 </script>
 
 <style scoped>
-.customer-admin-page,
-.customer-admin-grid,
+.customer-admin-page {
+  display: grid;
+  gap: var(--sp-page-gap, 1.25rem);
+}
+
 .customer-admin-form,
 .customer-admin-form-grid,
 .customer-admin-list,
-.customer-admin-record-list,
-.customer-admin-inline-form {
+.customer-admin-record-list {
   display: grid;
   gap: 1rem;
 }
 
 .customer-admin-grid {
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  display: grid;
+  gap: var(--sp-page-gap, 1.25rem);
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
   align-items: start;
+}
+
+.customer-admin-list-panel {
+  position: sticky;
+  top: 0;
 }
 
 .customer-admin-subgrid {
@@ -2868,9 +3259,80 @@ onMounted(() => {
 }
 
 .customer-admin-panel,
-.customer-admin-section {
+.customer-admin-section,
+.customer-admin-tab-panel,
+.customer-admin-form,
+.customer-admin-form--structured,
+.customer-admin-form-section,
+.customer-admin-editor-intro {
   display: grid;
   gap: 1rem;
+}
+
+.customer-admin-form--structured {
+  gap: 1.1rem;
+}
+
+.customer-admin-editor-intro,
+.customer-admin-form-section {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--sp-color-surface-page) 76%, white 24%);
+  min-width: 0;
+}
+
+.customer-admin-editor-intro h4,
+.customer-admin-form-section__header h4 {
+  margin: 0;
+  color: var(--sp-color-text-primary);
+}
+
+.customer-admin-form-section__header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.customer-admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.customer-admin-tab {
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-page);
+  color: var(--sp-color-text-secondary);
+  border-radius: 999px;
+  padding: 0.6rem 1rem;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.customer-admin-tab.active {
+  border-color: var(--sp-color-primary);
+  color: var(--sp-color-primary-strong);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 70%, white);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 28%, transparent);
+}
+
+.customer-admin-tab:focus-visible {
+  outline: none;
+  border-color: var(--sp-color-primary);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
+.customer-admin-tabs--sub {
+  margin-top: 0.25rem;
+}
+
+.customer-admin-tab--sub {
+  padding: 0.52rem 0.9rem;
 }
 
 .customer-admin-panel__header {
@@ -2917,9 +3379,17 @@ onMounted(() => {
   justify-content: end;
 }
 
-.customer-admin-inline-form {
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  align-items: end;
+.customer-admin-record__body {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.customer-admin-checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
 }
 
 .customer-admin-inline-list {
@@ -2964,6 +3434,77 @@ onMounted(() => {
   display: flex;
   gap: 0.7rem;
   align-items: center;
+  min-width: 0;
+  color: var(--sp-color-text-secondary);
+}
+
+.customer-admin-checkbox input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--sp-color-primary);
+}
+
+.field-stack {
+  display: grid;
+  gap: 0.42rem;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.customer-admin-form-grid--detail {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.customer-admin-form-grid--detail > .field-stack {
+  grid-column: span 3;
+}
+
+.customer-admin-form-grid--detail > .field-stack--half {
+  grid-column: span 3;
+}
+
+.customer-admin-form-grid--detail > .field-stack--third {
+  grid-column: span 2;
+}
+
+.field-stack input,
+.field-stack select,
+.field-stack textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-card);
+  color: var(--sp-color-text-primary);
+  padding: 0.78rem 0.9rem;
+  font: inherit;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.field-stack textarea {
+  min-height: 6.5rem;
+  resize: vertical;
+}
+
+.field-stack input:focus,
+.field-stack select:focus,
+.field-stack textarea:focus {
+  outline: none;
+  border-color: rgb(40 170 170 / 55%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
+.field-stack input:disabled,
+.field-stack select:disabled,
+.field-stack textarea:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
 }
 
 .field-stack--wide {
@@ -2980,5 +3521,21 @@ onMounted(() => {
   .customer-admin-grid {
     grid-template-columns: 1fr;
   }
+
+  .customer-admin-list-panel {
+    position: static;
+  }
+
+  .customer-admin-form-grid--detail {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-admin-form-grid--detail > .field-stack,
+  .customer-admin-form-grid--detail > .field-stack--half,
+  .customer-admin-form-grid--detail > .field-stack--third,
+  .customer-admin-form-grid--detail > .field-stack--wide {
+    grid-column: 1 / -1;
+  }
+
 }
 </style>

@@ -19,7 +19,7 @@
       </template>
     </AdminPageShell>
 
-    <section v-else class="module-card notice-scope notice-scope--embedded">
+    <section v-else-if="showEmbeddedScopeCard" class="module-card notice-scope notice-scope--embedded">
       <label class="field-stack">
         <span>{{ t("noticeAdmin.scope.label") }}</span>
         <input v-model="tenantScopeInput" :placeholder="t('noticeAdmin.scope.placeholder')" />
@@ -186,6 +186,7 @@ const loading = ref(false);
 const adminNotices = ref<NoticeListItem[]>([]);
 const myFeed = ref<NoticeListItem[]>([]);
 const selectedFeedNotice = ref<NoticeRead | null>(null);
+const showEmbeddedScopeCard = false;
 const draft = reactive({
   title: "",
   summary: "",
@@ -336,6 +337,52 @@ onMounted(() => {
   margin-bottom: 0.25rem;
 }
 
+.field-stack {
+  display: grid;
+  gap: 0.42rem;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.field-stack input,
+.field-stack select,
+.field-stack textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-card);
+  color: var(--sp-color-text-primary);
+  padding: 0.78rem 0.9rem;
+  font: inherit;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.field-stack textarea {
+  min-height: 8.5rem;
+  resize: vertical;
+}
+
+.field-stack input:focus,
+.field-stack select:focus,
+.field-stack textarea:focus {
+  outline: none;
+  border-color: rgb(40 170 170 / 55%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
+.field-stack input:disabled,
+.field-stack select:disabled,
+.field-stack textarea:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
 .notice-row {
   display: flex;
   justify-content: space-between;
@@ -371,5 +418,14 @@ onMounted(() => {
   display: flex;
   gap: 0.65rem;
   align-items: center;
+  min-width: 0;
+  color: var(--sp-color-text-secondary);
+}
+
+.notice-checkbox input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--sp-color-primary);
 }
 </style>

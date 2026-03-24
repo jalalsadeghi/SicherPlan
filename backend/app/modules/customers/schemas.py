@@ -22,6 +22,7 @@ class CustomerCreate(BaseModel):
     tenant_id: str
     customer_number: str
     name: str
+    status: str | None = None
     legal_name: str | None = None
     external_ref: str | None = None
     legal_form_lookup_id: str | None = None
@@ -182,6 +183,42 @@ class CustomerRead(CustomerListItem):
     archived_at: datetime | None
     contacts: list[CustomerContactRead] = Field(default_factory=list)
     addresses: list[CustomerAddressRead] = Field(default_factory=list)
+
+
+class CustomerReferenceOptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    code: str
+    label: str
+    description: str | None = None
+    sort_order: int = 100
+
+
+class CustomerBranchOptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    code: str
+    name: str
+
+
+class CustomerMandateOptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    branch_id: str
+    code: str
+    name: str
+
+
+class CustomerReferenceDataRead(BaseModel):
+    legal_forms: list[CustomerReferenceOptionRead] = Field(default_factory=list)
+    classifications: list[CustomerReferenceOptionRead] = Field(default_factory=list)
+    rankings: list[CustomerReferenceOptionRead] = Field(default_factory=list)
+    customer_statuses: list[CustomerReferenceOptionRead] = Field(default_factory=list)
+    branches: list[CustomerBranchOptionRead] = Field(default_factory=list)
+    mandates: list[CustomerMandateOptionRead] = Field(default_factory=list)
 
 
 class CustomerPortalCustomerRead(BaseModel):

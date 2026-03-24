@@ -64,6 +64,60 @@ export function mapEmployeeApiMessage(messageKey) {
   return messageMap[messageKey] ?? "employeeAdmin.feedback.error";
 }
 
+export function formatEmployeeStructureLabel(record) {
+  if (!record) {
+    return "";
+  }
+
+  return [record.code, record.name].filter(Boolean).join(" - ");
+}
+
+export function filterMandatesForBranch(mandates, branchId) {
+  const normalizedBranchId = typeof branchId === "string" ? branchId.trim() : "";
+  if (!normalizedBranchId) {
+    return [...(mandates ?? [])];
+  }
+
+  return (mandates ?? []).filter((mandate) => mandate.branch_id === normalizedBranchId);
+}
+
+export function buildEmployeeOperationalPayload(draft, { deferUserLink = false, allowedBranchIds = null, allowedMandateIds = null } = {}) {
+  const emptyToNull = (value) => {
+    if (typeof value !== "string") {
+      return value ?? null;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  };
+  const normalizeReference = (value, allowedIds) => {
+    const normalized = emptyToNull(value);
+    if (normalized == null) {
+      return null;
+    }
+    if (Array.isArray(allowedIds)) {
+      return allowedIds.includes(normalized) ? normalized : null;
+    }
+    return normalized;
+  };
+
+  return {
+    tenant_id: draft.tenant_id,
+    personnel_no: draft.personnel_no.trim(),
+    first_name: draft.first_name.trim(),
+    last_name: draft.last_name.trim(),
+    preferred_name: emptyToNull(draft.preferred_name),
+    work_email: emptyToNull(draft.work_email),
+    work_phone: emptyToNull(draft.work_phone),
+    mobile_phone: emptyToNull(draft.mobile_phone),
+    default_branch_id: normalizeReference(draft.default_branch_id, allowedBranchIds),
+    default_mandate_id: normalizeReference(draft.default_mandate_id, allowedMandateIds),
+    hire_date: emptyToNull(draft.hire_date),
+    termination_date: emptyToNull(draft.termination_date),
+    user_id: deferUserLink ? null : emptyToNull(draft.user_id),
+    notes: emptyToNull(draft.notes),
+  };
+}
+
 export function summarizeCurrentAddress(addressRows) {
   const currentPrimary = [...(addressRows ?? [])]
     .filter((row) => !row.archived_at && row.is_primary)

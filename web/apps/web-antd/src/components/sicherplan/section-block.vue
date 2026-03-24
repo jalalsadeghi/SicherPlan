@@ -3,6 +3,7 @@ import SectionHeader from './section-header.vue';
 
 defineProps<{
   description?: string;
+  showHeader?: boolean;
   title: string;
 }>();
 </script>
@@ -10,6 +11,7 @@ defineProps<{
 <template>
   <section class="sp-section-block">
     <SectionHeader
+      v-if="showHeader !== false"
       :description="description"
       :title="title"
     />

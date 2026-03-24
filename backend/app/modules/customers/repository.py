@@ -186,6 +186,7 @@ class SqlAlchemyCustomerRepository:
             tenant_id=tenant_id,
             customer_number=payload.customer_number,
             name=payload.name,
+            status=payload.status or "active",
             legal_name=payload.legal_name,
             external_ref=payload.external_ref,
             legal_form_lookup_id=payload.legal_form_lookup_id,
@@ -896,6 +897,18 @@ class SqlAlchemyCustomerRepository:
     def get_lookup_value(self, lookup_id: str) -> LookupValue | None:
         return self.session.get(LookupValue, lookup_id)
 
+    def list_lookup_values(self, tenant_id: str, domain: str) -> list[LookupValue]:
+        statement = (
+            select(LookupValue)
+            .where(
+                LookupValue.domain == domain,
+                LookupValue.archived_at.is_(None),
+                or_(LookupValue.tenant_id.is_(None), LookupValue.tenant_id == tenant_id),
+            )
+            .order_by(LookupValue.sort_order.asc(), LookupValue.label.asc())
+        )
+        return list(self.session.scalars(statement).all())
+
     def find_lookup_by_domain_code(
         self,
         tenant_id: str | None,
@@ -922,9 +935,25 @@ class SqlAlchemyCustomerRepository:
         statement = select(Branch).where(Branch.tenant_id == tenant_id, Branch.id == branch_id)
         return self.session.scalars(statement).one_or_none()
 
+    def list_branches(self, tenant_id: str) -> list[Branch]:
+        statement = (
+            select(Branch)
+            .where(Branch.tenant_id == tenant_id, Branch.archived_at.is_(None), Branch.status == "active")
+            .order_by(Branch.code.asc(), Branch.name.asc())
+        )
+        return list(self.session.scalars(statement).all())
+
     def get_mandate(self, tenant_id: str, mandate_id: str) -> Mandate | None:
         statement = select(Mandate).where(Mandate.tenant_id == tenant_id, Mandate.id == mandate_id)
         return self.session.scalars(statement).one_or_none()
+
+    def list_mandates(self, tenant_id: str) -> list[Mandate]:
+        statement = (
+            select(Mandate)
+            .where(Mandate.tenant_id == tenant_id, Mandate.archived_at.is_(None), Mandate.status == "active")
+            .order_by(Mandate.code.asc(), Mandate.name.asc())
+        )
+        return list(self.session.scalars(statement).all())
 
     def get_user_account(self, tenant_id: str, user_id: str) -> UserAccount | None:
         statement = select(UserAccount).where(UserAccount.tenant_id == tenant_id, UserAccount.id == user_id)

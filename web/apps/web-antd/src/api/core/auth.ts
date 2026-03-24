@@ -122,21 +122,31 @@ async function sicherPlanRequest<T>(
 export namespace AuthApi {
   /** 登录接口参数 */
   export interface LoginParams {
+    deviceId?: string;
+    deviceLabel?: string;
     identifier?: string;
     password?: string;
+    rememberMe?: boolean;
     tenantCode?: string;
   }
 
   /** 登录接口返回值 */
   export interface LoginResult {
     accessToken: string;
+    accessTokenExpiresAt: string;
+    refreshToken: string;
+    refreshTokenExpiresAt: string;
+    sessionId: string;
   }
 
   export interface CurrentSessionResult extends SicherPlanCurrentSessionResponse {}
 
   export interface RefreshTokenResult {
-    data: string;
-    status: number;
+    accessToken: string;
+    accessTokenExpiresAt: string;
+    refreshToken: string;
+    refreshTokenExpiresAt: string;
+    sessionId: string;
   }
 }
 
@@ -145,24 +155,71 @@ export namespace AuthApi {
  */
 export async function loginApi(data: AuthApi.LoginParams) {
   const response = await sicherPlanRequest<{
-    session: { access_token: string };
+    session: {
+      access_token: string;
+      access_token_expires_at: string;
+      refresh_token: string;
+      refresh_token_expires_at: string;
+      session_id: string;
+    };
   }>('/auth/login', {
     body: {
+      device_id: data.deviceId,
+      device_label: data.deviceLabel,
       identifier: data.identifier,
       password: data.password,
+      remember_me: data.rememberMe ?? false,
       tenant_code: data.tenantCode,
     },
     method: 'POST',
   });
 
-  return { accessToken: response.session.access_token };
+  return {
+    accessToken: response.session.access_token,
+    accessTokenExpiresAt: response.session.access_token_expires_at,
+    refreshToken: response.session.refresh_token,
+    refreshTokenExpiresAt: response.session.refresh_token_expires_at,
+    sessionId: response.session.session_id,
+  };
 }
 
 /**
  * 刷新accessToken
  */
 export async function refreshTokenApi() {
-  throw new Error('SicherPlan refresh-token flow is not wired into the Vben shell yet.');
+  const accessStore = useAccessStore();
+  const refreshToken = accessStore.refreshToken;
+
+  if (!refreshToken) {
+    throw new AuthApiError(
+      401,
+      'iam.auth.invalid_refresh_token',
+      'errors.iam.auth.invalid_refresh_token',
+    );
+  }
+
+  const response = await sicherPlanRequest<{
+    session: {
+      access_token: string;
+      access_token_expires_at: string;
+      refresh_token: string;
+      refresh_token_expires_at: string;
+      session_id: string;
+    };
+  }>('/auth/refresh', {
+    body: {
+      refresh_token: refreshToken,
+    },
+    method: 'POST',
+  });
+
+  return {
+    accessToken: response.session.access_token,
+    accessTokenExpiresAt: response.session.access_token_expires_at,
+    refreshToken: response.session.refresh_token,
+    refreshTokenExpiresAt: response.session.refresh_token_expires_at,
+    sessionId: response.session.session_id,
+  };
 }
 
 /**

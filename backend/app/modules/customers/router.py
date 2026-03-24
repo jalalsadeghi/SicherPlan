@@ -63,6 +63,7 @@ from app.modules.customers.schemas import (
     CustomerEmployeeBlockCreate,
     CustomerEmployeeBlockRead,
     CustomerEmployeeBlockUpdate,
+    CustomerReferenceDataRead,
     CustomerVCardResult,
 )
 from app.modules.customers.service import CustomerService
@@ -151,6 +152,18 @@ def list_customers(
         include_archived=include_archived,
     )
     return service.list_customers(str(tenant_id), filters, context)
+
+
+@router.get("/reference-data", response_model=CustomerReferenceDataRead)
+def get_customer_reference_data(
+    tenant_id: UUID,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("customers.customer.read", scope="tenant")),
+    ],
+    service: Annotated[CustomerService, Depends(get_customer_service)],
+) -> CustomerReferenceDataRead:
+    return service.get_reference_data(str(tenant_id), context)
 
 
 @router.post("", response_model=CustomerRead, status_code=status.HTTP_201_CREATED)

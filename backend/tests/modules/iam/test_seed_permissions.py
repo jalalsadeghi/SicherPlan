@@ -93,6 +93,22 @@ class TestSeedIamCatalog(unittest.TestCase):
         self.assertTrue(roles["customer_user"].is_portal_role)
         self.assertIn("employee_user", roles)
 
+    def test_tenant_admin_seed_includes_employee_write_permission(self) -> None:
+        session = _FakeSession()
+        seed_iam_catalog(session)
+
+        roles = {role.key: role for role in session.roles}
+        permissions = {permission.key: permission for permission in session.permissions}
+        tenant_admin = roles["tenant_admin"]
+        employee_write = permissions["employees.employee.write"]
+
+        self.assertTrue(
+            any(
+                row.role_id == tenant_admin.id and row.permission_id == employee_write.id
+                for row in session.role_permissions
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,7 @@ import { $t } from '@vben/locales';
 import { Alert } from 'ant-design-vue';
 
 import { useAuthStore } from '#/store';
+import { readRememberedLoginValues } from '#/store/auth-session';
 
 defineOptions({ name: 'Login' });
 
@@ -47,6 +48,13 @@ const formSchema = computed((): VbenFormSchema[] => {
       rules: z.string().min(1, { message: $t('authentication.passwordTip') }),
     },
     {
+      component: 'VbenCheckbox',
+      fieldName: 'rememberMe',
+      renderComponentContent: () => ({
+        default: () => $t('authentication.rememberMe'),
+      }),
+    },
+    {
       component: markRaw(SliderCaptcha),
       fieldName: 'captcha',
       rules: z.boolean().refine((value) => value, {
@@ -68,6 +76,11 @@ async function onSubmit(params: Recordable<any>) {
 
 onMounted(() => {
   authStore.clearLoginError();
+  const formApi = loginRef.value?.getFormApi();
+  const remembered = readRememberedLoginValues();
+  formApi?.setFieldValue('tenantCode', remembered.tenantCode, false);
+  formApi?.setFieldValue('identifier', remembered.identifier, false);
+  formApi?.setFieldValue('rememberMe', remembered.rememberMe, false);
 });
 
 onBeforeUnmount(() => {
@@ -88,6 +101,7 @@ onBeforeUnmount(() => {
       ref="loginRef"
       :form-schema="formSchema"
       :loading="authStore.loginLoading"
+      :show-remember-me="false"
       @submit="onSubmit"
     />
   </div>

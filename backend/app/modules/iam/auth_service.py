@@ -205,7 +205,10 @@ class AuthService:
                 device_id=payload.device_id,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                metadata_json={"mfa_required": self.extension_hooks.mfa_required(user_account.id)},
+                metadata_json={
+                    "mfa_required": self.extension_hooks.mfa_required(user_account.id),
+                    "remember_me": payload.remember_me,
+                },
             )
         )
         roles = self._build_roles(user_account.id, now)

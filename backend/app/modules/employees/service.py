@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import UTC, date, datetime
 from typing import Protocol
+from uuid import UUID
 
 from app.errors import ApiException
 from app.modules.core.models import Address, Branch, Mandate
@@ -186,9 +187,11 @@ class EmployeeService:
         next_work_email = self._effective_optional(payload.work_email, row.work_email)
         next_work_phone = self._effective_optional(payload.work_phone, row.work_phone)
         next_mobile_phone = self._effective_optional(payload.mobile_phone, row.mobile_phone)
-        next_user_id = payload.user_id if payload.user_id is not None else row.user_id
-        next_branch_id = payload.default_branch_id if payload.default_branch_id is not None else row.default_branch_id
-        next_mandate_id = payload.default_mandate_id if payload.default_mandate_id is not None else row.default_mandate_id
+        next_user_id = self._normalize_user_id(payload.user_id) if payload.user_id is not None else row.user_id
+        next_branch_id = self._normalize_branch_id(payload.default_branch_id) if payload.default_branch_id is not None else row.default_branch_id
+        next_mandate_id = (
+            self._normalize_mandate_id(payload.default_mandate_id) if payload.default_mandate_id is not None else row.default_mandate_id
+        )
         next_hire_date = payload.hire_date if payload.hire_date is not None else row.hire_date
         next_termination_date = payload.termination_date if payload.termination_date is not None else row.termination_date
         next_notes = self._effective_optional(payload.notes, row.notes)
@@ -951,11 +954,11 @@ class EmployeeService:
             work_email=self._normalize_optional(payload.work_email),
             work_phone=self._normalize_optional(payload.work_phone),
             mobile_phone=self._normalize_optional(payload.mobile_phone),
-            default_branch_id=payload.default_branch_id,
-            default_mandate_id=payload.default_mandate_id,
+            default_branch_id=self._normalize_branch_id(payload.default_branch_id),
+            default_mandate_id=self._normalize_mandate_id(payload.default_mandate_id),
             hire_date=payload.hire_date,
             termination_date=payload.termination_date,
-            user_id=payload.user_id,
+            user_id=self._normalize_user_id(payload.user_id),
             notes=self._normalize_optional(payload.notes),
         )
 
@@ -963,6 +966,42 @@ class EmployeeService:
         if candidate is None:
             return current
         return self._normalize_optional(candidate)
+
+    def _normalize_user_id(self, user_id: str | None) -> str | None:
+        return self._normalize_uuid_reference(
+            user_id,
+            error_code="employees.user.invalid_id_format",
+            error_message_key="errors.employees.user.invalid_id_format",
+        )
+
+    def _normalize_branch_id(self, branch_id: str | None) -> str | None:
+        return self._normalize_uuid_reference(
+            branch_id,
+            error_code="employees.employee.invalid_branch_id_format",
+            error_message_key="errors.employees.employee.invalid_branch_id_format",
+        )
+
+    def _normalize_mandate_id(self, mandate_id: str | None) -> str | None:
+        return self._normalize_uuid_reference(
+            mandate_id,
+            error_code="employees.employee.invalid_mandate_id_format",
+            error_message_key="errors.employees.employee.invalid_mandate_id_format",
+        )
+
+    def _normalize_uuid_reference(
+        self,
+        value: str | None,
+        *,
+        error_code: str,
+        error_message_key: str,
+    ) -> str | None:
+        normalized = self._normalize_optional(value)
+        if normalized is None:
+            return None
+        try:
+            return str(UUID(normalized))
+        except ValueError as exc:
+            raise ApiException(422, error_code, error_message_key) from exc
 
     def _effective_text(self, candidate: str | None, current: str) -> str:
         if candidate is None:

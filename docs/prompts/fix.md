@@ -1,205 +1,124 @@
-# Task: Reorganize the dashboard into two rows and correct the card styling
+You are working in the SicherPlan monorepo.
 
-## Objective
-Fix the dashboard layout so it follows this exact structure:
+Task: fix the German UI copy everywhere so proper German umlauts and orthography are used consistently.
 
-### Row 1
-- **Daily Control for SicherPlan**
-- **Quick Actions**
+Problem:
+The app supports German and English, but many German texts are currently written with ASCII transliterations instead of real umlauts/orthography.
 
-### Row 2
-- **Date**
-- **Tenants**
-- **Active Tenants**
-- **Admin Surfaces**
+Examples of the current problem visible in the UI:
+- "MANDANTENFAEHIGE ..." should use "MANDANTENFÄHIGE ..."
+- "Mandantenuebersicht" should use "Mandantenübersicht"
+- "Standard-Waehrung" should use "Standard-Währung"
+- "Planung oeffnen" should use "Planung öffnen"
+- "Admin-Flaechen" should use "Admin-Flächen"
+- any similar ae/oe/ue spellings in German-facing UI copy should be corrected where proper German orthography requires umlauts
 
-The current layout is incorrect and must be restructured.
+Important:
+This is a UI copy/i18n cleanup task.
+Do NOT change route paths, slugs, API fields, database values, code identifiers, test ids, file names, CSS classes, or internal keys unless absolutely necessary.
+Only change user-facing German text and the supporting i18n plumbing needed to render it correctly.
 
----
+What to fix:
+Apply this cleanup across the entire German UI surface, including but not limited to:
+1. page titles
+2. module headers / hero text
+3. sidebar labels
+4. breadcrumbs
+5. tabs
+6. cards / section headings
+7. buttons
+8. placeholders
+9. helper text / descriptions
+10. empty-state messages
+11. badges / quick actions / dashboard labels
+12. dialogs / confirmations / toasts if German text exists
+13. aria labels / accessibility labels if they are user-facing German strings
 
-## Required Layout
+What NOT to change:
+1. URLs like `/admin/customers`, `/admin/core`, etc.
+2. route names used internally
+3. data-testid values
+4. internal enum values
+5. API payload field names
+6. code identifiers / variable names
+7. backend translation-independent business data unless it is explicitly seeded as user-facing German copy
 
-### First row
-The first row must contain exactly **2 cards**:
-1. `Daily Control for SicherPlan`
-2. `Quick Actions`
+What to inspect first:
+- all i18n/message resource files for German
+- any hardcoded German strings in Vue/TS components
+- shared module registry / sidebar labels / dashboard quick actions / admin shell labels
+- form labels and helper text in legacy admin views
+- any seed/default UI-copy sources that provide German labels
 
-These two cards should sit side by side on large screens.
+Likely areas:
+- German locale/messages files
+- module registry definitions
+- sidebar/nav configuration
+- dashboard page strings
+- admin module view strings
+- customer/employee/core/platform-services UI strings
+- any shared UI components with baked-in German text
 
-### Second row
-The second row must contain exactly **4 cards**:
-1. `Date`
-2. `Tenants`
-3. `Active Tenants`
-4. `Admin Surfaces`
+Required implementation:
 
-These four cards should appear in one row on large screens.
+A. Correct German orthography
+1. Replace ASCII transliterations with proper German umlauts where correct:
+   - ae -> ä
+   - oe -> ö
+   - ue -> ü
+   but only when the correct German word actually requires it.
+2. Also correct uppercase umlauts where appropriate:
+   - Ä, Ö, Ü
+3. Preserve correct German spelling beyond umlauts if you encounter related copy issues.
 
-### Responsive behavior
-- large screens: 2 cards in row 1, 4 cards in row 2
-- medium screens: wrap cleanly without broken spacing
-- small screens: stack naturally
+B. Scope of replacement
+1. Fix all visible German UI strings consistently, not just the examples seen in the screenshots.
+2. Review the full German UI surface and normalize wording across modules.
+3. Make sure the same concept is translated consistently everywhere:
+   - e.g. “Übersicht”, “Währung”, “öffnen”, “Flächen”, etc.
 
----
+C. Do not do unsafe blind replacements
+1. Do NOT mass-replace every `ae/oe/ue` mechanically in source code.
+2. Only update true user-facing German text.
+3. Avoid corrupting names, IDs, routes, slugs, or technical tokens.
+4. Review each affected string in context.
 
-## Required Visual Style
+D. Ensure rendering support
+1. Verify the frontend renders these characters correctly in the browser.
+2. Make sure files are saved/handled as UTF-8.
+3. Verify there is no encoding issue in locale files or build output.
+4. No font-file changes; just ensure the current UI properly displays umlauts.
 
-### Plain background cards
-The following cards must use a **plain background**:
-- `Daily Control for SicherPlan`
-- `Quick Actions`
-- `Tenants`
-- `Active Tenants`
-- `Admin Surfaces`
+E. Keep English unchanged
+1. Do not alter English locale strings unless they are accidentally affected by the implementation.
+2. This task is focused on German copy correctness.
 
-Plain background means:
-- no strong gradient
-- no tinted feature-panel style
-- no decorative background waves
-- use the normal card style already available in the project
+F. Prefer centralized fixes
+1. If a string comes from i18n resources, fix it there.
+2. If a label comes from a shared registry/config, fix it there once rather than patching many components individually.
+3. Only touch component-local strings where they are truly hardcoded.
 
-### Date card
-The `Date` card must use the platform’s **primary built-in color** as its background.
+G. Verification
+1. Review representative pages in German mode, including at least:
+   - Dashboard
+   - Customers
+   - Employees
+   - Tenants/Core
+   - any sidebar/navigation labels
+2. Confirm the corrected strings display with proper umlauts in the actual browser UI.
+3. Confirm no broken encoding appears (e.g. mojibake or replacement characters).
+4. Confirm routes and internal behavior remain unchanged.
 
-Rules:
-- do not invent a new color outside the existing design system
-- use the project’s current primary theme color
-- keep text readable on top of that background
-- the Date card should be visually stronger than the other cards
+Acceptance criteria:
+- German UI text uses proper umlauts and spelling where required
+- Visible labels no longer show incorrect ASCII transliterations like `ae/oe/ue` in normal German words
+- English remains unchanged
+- Routes, slugs, API fields, and technical identifiers remain unchanged
+- The browser displays umlauts correctly across the app
 
----
-
-## Card Content Rules
-
-### Daily Control for SicherPlan
-- plain card background
-- title and short descriptive text
-- optional small status chips/badges if already supported
-- no gradient hero style
-- should feel like a high-level summary card, not a promotional banner
-
-### Quick Actions
-- plain card background
-- title + short description
-- action buttons/links inside the card
-- should sit next to “Daily Control for SicherPlan” in row 1
-- buttons should remain inside the existing design system
-
-### Date
-- prominent date presentation
-- uses primary built-in background color
-- includes date-related information such as:
-  - day
-  - month/year
-  - optional weekday
-- may include small supporting actions like `Today` / `Overview` if already present
-
-### Tenants
-- plain card background
-- number/value
-- short subtitle
-- icon in top-right corner
-
-### Active Tenants
-- plain card background
-- number/value
-- short subtitle
-- icon in top-right corner
-
-### Admin Surfaces
-- plain card background
-- number/value
-- short subtitle
-- icon in top-right corner
-
----
-
-## Icon Requirement
-Each card in the **second row** must display a relevant icon in its **top-right corner**.
-
-This applies to:
-- Date
-- Tenants
-- Active Tenants
-- Admin Surfaces
-
-Rules:
-- use existing icon system already used in the project
-- keep icon styling consistent with the dashboard
-- icon should be visually balanced and not oversized
-- if existing dashboard stat-card pattern has icon badges, reuse that pattern
-
----
-
-## Implementation Requirements
-
-### Reuse existing project styles
-Reuse:
-- current card components
-- existing spacing system
-- existing icon system
-- existing button styles
-- current theme tokens
-- current dashboard/page wrapper styles
-
-### Do not modify global styles
-Do **not** modify:
-- base CSS
-- global CSS
-- root theme files
-- shared global card styles
-- core theme configuration
-
-If additional styling is needed, keep it:
-- dashboard-local
-- component-scoped
-- minimal
-
-### Do not create a second dashboard system
-This must be an update to the existing dashboard implementation, not a parallel custom page.
-
----
-
-## Suggested Technical Direction
-Please inspect the current dashboard component and:
-
-1. remove the incorrect current top-card arrangement
-2. create a clean two-row card grid
-3. move `Quick Actions` into row 1
-4. move `Date`, `Tenants`, `Active Tenants`, and `Admin Surfaces` into row 2
-5. replace the current gradient/feature styling of `Daily Control for SicherPlan` with a plain card style
-6. apply the platform primary built-in background only to the `Date` card
-7. add top-right icons to all second-row cards
-
----
-
-## Deliverables
-Please provide:
-
-1. short summary of the layout changes
-2. short summary of the styling changes
-3. files changed
-4. confirmation that no global/base/theme files were modified
-
-Then apply the changes directly in the repository.
-
----
-
-## Acceptance Criteria
-This task is complete only if:
-
-1. the dashboard has exactly two main rows of cards
-2. row 1 contains only:
-   - Daily Control for SicherPlan
-   - Quick Actions
-3. row 2 contains only:
-   - Date
-   - Tenants
-   - Active Tenants
-   - Admin Surfaces
-4. Daily Control for SicherPlan uses a plain card background
-5. Quick Actions uses a plain card background
-6. Date uses the platform’s primary built-in background color
-7. each second-row card has a relevant top-right icon
-8. the layout is responsive and visually clean
-9. no global/base/theme styles were modified
+Output format:
+1. Audit summary of where the bad German copy lived
+2. Files changed
+3. Examples of corrected strings
+4. Verification performed
+5. Confirmation that only user-facing German text was changed

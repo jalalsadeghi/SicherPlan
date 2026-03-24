@@ -288,6 +288,12 @@ onMounted(async () => {
         :message="$t('sicherplan.tenantUsers.generatedPasswordTitle')"
         :description="generatedPassword"
       />
+      <Alert
+        type="warning"
+        show-icon
+        :message="$t('sicherplan.tenantUsers.currentScope.title')"
+        :description="$t('sicherplan.tenantUsers.currentScope.body')"
+      />
     </template>
 
     <template #workspace>
@@ -295,6 +301,13 @@ onMounted(async () => {
         :description="$t('sicherplan.tenantUsers.tableDescription')"
         :title="$t('sicherplan.tenantUsers.tableTitle')"
       >
+        <Alert
+          class="sp-tenant-users__scope-note"
+          type="info"
+          show-icon
+          :message="$t('sicherplan.tenantUsers.currentScope.infoTitle')"
+          :description="$t('sicherplan.tenantUsers.currentScope.infoBody')"
+        />
         <Card :bordered="false">
           <Table
             :columns="[
@@ -418,6 +431,10 @@ onMounted(async () => {
   margin: 0;
   color: var(--sp-color-text-secondary);
   line-height: 1.6;
+}
+
+.sp-tenant-users__scope-note {
+  margin-bottom: 1rem;
 }
 
 @media (max-width: 960px) {

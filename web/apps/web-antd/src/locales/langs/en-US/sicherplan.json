@@ -716,6 +716,12 @@
       "users": "Tenant admins",
       "active": "Active accounts"
     },
+    "currentScope": {
+      "title": "Current IAM scope",
+      "body": "This page only manages tenant_admin accounts. A web UI for role catalog management, permission assignment management, or audit review is not present in the current implementation.",
+      "infoTitle": "Documentation is ahead of the current web surface",
+      "infoBody": "The repository already contains role, permission, and audit building blocks at the model, seed, and service level. There is currently no already-implemented but hidden web page for role management, permission-scope administration, or audit-event review that only needed exposure here."
+    },
     "values": {
       "never": "No login yet"
     },

@@ -1,10 +1,30 @@
 // @vitest-environment happy-dom
 
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AuthApiError, resolveLoginErrorMessageKey } from './auth';
+const accessStoreState = {
+  accessToken: null as null | string,
+  refreshToken: null as null | string,
+};
+
+vi.mock('@vben/stores', () => ({
+  useAccessStore: () => accessStoreState,
+}));
+
+import {
+  AuthApiError,
+  loginApi,
+  refreshTokenApi,
+  resolveLoginErrorMessageKey,
+} from './auth';
 
 describe('login error message mapping', () => {
+  beforeEach(() => {
+    accessStoreState.accessToken = null;
+    accessStoreState.refreshToken = null;
+    vi.restoreAllMocks();
+  });
+
   it('maps invalid-credential responses to the auth-specific message', () => {
     expect(
       resolveLoginErrorMessageKey(
@@ -48,5 +68,94 @@ describe('login error message mapping', () => {
     expect(resolveLoginErrorMessageKey(new Error('unexpected'))).toBe(
       'sicherplan.auth.loginErrors.generic',
     );
+  });
+
+  it('sends remember_me on login and maps the full token payload', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            session: {
+              access_token: 'access-1',
+              access_token_expires_at: '2026-03-23T10:00:00Z',
+              refresh_token: 'refresh-1',
+              refresh_token_expires_at: '2026-03-30T10:00:00Z',
+              session_id: 'session-1',
+            },
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
+      );
+
+    await expect(
+      loginApi({
+        identifier: 'sysadmin',
+        password: 'secret',
+        rememberMe: true,
+        tenantCode: 'system',
+      }),
+    ).resolves.toEqual({
+      accessToken: 'access-1',
+      accessTokenExpiresAt: '2026-03-23T10:00:00Z',
+      refreshToken: 'refresh-1',
+      refreshTokenExpiresAt: '2026-03-30T10:00:00Z',
+      sessionId: 'session-1',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/auth/login'),
+      expect.objectContaining({
+        body: JSON.stringify({
+          device_id: undefined,
+          device_label: undefined,
+          identifier: 'sysadmin',
+          password: 'secret',
+          remember_me: true,
+          tenant_code: 'system',
+        }),
+        method: 'POST',
+      }),
+    );
+  });
+
+  it('refreshes with the stored refresh token and maps the rotated pair', async () => {
+    accessStoreState.refreshToken = 'refresh-current';
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          session: {
+            access_token: 'access-2',
+            access_token_expires_at: '2026-03-23T10:15:00Z',
+            refresh_token: 'refresh-2',
+            refresh_token_expires_at: '2026-03-30T10:15:00Z',
+            session_id: 'session-1',
+          },
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    );
+
+    await expect(refreshTokenApi()).resolves.toEqual({
+      accessToken: 'access-2',
+      accessTokenExpiresAt: '2026-03-23T10:15:00Z',
+      refreshToken: 'refresh-2',
+      refreshTokenExpiresAt: '2026-03-30T10:15:00Z',
+      sessionId: 'session-1',
+    });
+  });
+
+  it('fails refresh immediately when no refresh token is stored', async () => {
+    await expect(refreshTokenApi()).rejects.toMatchObject({
+      code: 'iam.auth.invalid_refresh_token',
+      messageKey: 'errors.iam.auth.invalid_refresh_token',
+      status: 401,
+    });
   });
 });

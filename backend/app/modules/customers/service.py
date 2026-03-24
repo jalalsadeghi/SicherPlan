@@ -25,6 +25,10 @@ from app.modules.customers.schemas import (
     CustomerCreate,
     CustomerFilter,
     CustomerHistoryEntryRead,
+    CustomerReferenceDataRead,
+    CustomerReferenceOptionRead,
+    CustomerBranchOptionRead,
+    CustomerMandateOptionRead,
     CustomerListItem,
     CustomerRead,
     CustomerUpdate,
@@ -130,8 +134,11 @@ class CustomerRepository(Protocol):
     def list_history_entries(self, tenant_id: str, customer_id: str) -> list[CustomerHistoryEntry]: ...
     def create_history_entry(self, row: CustomerHistoryEntry) -> CustomerHistoryEntry: ...
     def get_lookup_value(self, lookup_id: str): ...  # noqa: ANN001
+    def list_lookup_values(self, tenant_id: str, domain: str): ...  # noqa: ANN001
     def get_branch(self, tenant_id: str, branch_id: str): ...  # noqa: ANN001
+    def list_branches(self, tenant_id: str): ...  # noqa: ANN001
     def get_mandate(self, tenant_id: str, mandate_id: str): ...  # noqa: ANN001
+    def list_mandates(self, tenant_id: str): ...  # noqa: ANN001
     def get_user_account(self, tenant_id: str, user_id: str): ...  # noqa: ANN001
     def get_address(self, address_id: str): ...  # noqa: ANN001
 
@@ -161,6 +168,35 @@ class CustomerService:
         customer = self._require_customer(tenant_id, customer_id, actor)
         return CustomerRead.model_validate(customer)
 
+    def get_reference_data(self, tenant_id: str, actor: RequestAuthorizationContext) -> CustomerReferenceDataRead:
+        self._ensure_tenant_scope(actor, tenant_id)
+        return CustomerReferenceDataRead(
+            legal_forms=[
+                CustomerReferenceOptionRead.model_validate(lookup)
+                for lookup in self.repository.list_lookup_values(tenant_id, "legal_form")
+            ],
+            classifications=[
+                CustomerReferenceOptionRead.model_validate(lookup)
+                for lookup in self.repository.list_lookup_values(tenant_id, "customer_category")
+            ],
+            rankings=[
+                CustomerReferenceOptionRead.model_validate(lookup)
+                for lookup in self.repository.list_lookup_values(tenant_id, "customer_ranking")
+            ],
+            customer_statuses=[
+                CustomerReferenceOptionRead.model_validate(lookup)
+                for lookup in self.repository.list_lookup_values(tenant_id, "customer_status")
+            ],
+            branches=[
+                CustomerBranchOptionRead.model_validate(branch)
+                for branch in self.repository.list_branches(tenant_id)
+            ],
+            mandates=[
+                CustomerMandateOptionRead.model_validate(mandate)
+                for mandate in self.repository.list_mandates(tenant_id)
+            ],
+        )
+
     def create_customer(
         self,
         tenant_id: str,
@@ -175,10 +211,11 @@ class CustomerService:
                 "errors.customers.customer.tenant_mismatch",
                 {"tenant_id": tenant_id},
             )
-        self._validate_customer_payload(tenant_id, payload)
-        if self.repository.find_customer_by_number(tenant_id, payload.customer_number) is not None:
+        normalized_payload = self._normalize_customer_create(payload)
+        self._validate_customer_payload(tenant_id, normalized_payload)
+        if self.repository.find_customer_by_number(tenant_id, normalized_payload.customer_number) is not None:
             raise ApiException(409, "customers.conflict.customer_number", "errors.customers.customer.duplicate_number")
-        customer = self.repository.create_customer(tenant_id, payload, actor.user_id)
+        customer = self.repository.create_customer(tenant_id, normalized_payload, actor.user_id)
         after_json = self._customer_snapshot(customer)
         self._record_history(
             tenant_id,
@@ -474,6 +511,12 @@ class CustomerService:
         ]
 
     def _validate_customer_payload(self, tenant_id: str, payload: CustomerCreate) -> None:
+        if payload.status not in (None, "active", "inactive"):
+            raise ApiException(
+                400,
+                "customers.validation.initial_status",
+                "errors.customers.customer.invalid_initial_status",
+            )
         for field_name, expected_domain in self.LOOKUP_DOMAINS.items():
             lookup_id = getattr(payload, field_name)
             if lookup_id is None:
@@ -522,6 +565,25 @@ class CustomerService:
                     "customers.validation.mandate_branch_scope",
                     "errors.customers.customer.mandate_branch_mismatch",
                 )
+
+    @staticmethod
+    def _normalize_customer_create(payload: CustomerCreate) -> CustomerCreate:
+        status = payload.status.strip() if isinstance(payload.status, str) else payload.status
+        return CustomerCreate(
+            tenant_id=payload.tenant_id,
+            customer_number=payload.customer_number.strip(),
+            name=payload.name.strip(),
+            status=status or "active",
+            legal_name=payload.legal_name.strip() if isinstance(payload.legal_name, str) and payload.legal_name.strip() else None,
+            external_ref=payload.external_ref.strip() if isinstance(payload.external_ref, str) and payload.external_ref.strip() else None,
+            legal_form_lookup_id=payload.legal_form_lookup_id.strip() if isinstance(payload.legal_form_lookup_id, str) and payload.legal_form_lookup_id.strip() else None,
+            classification_lookup_id=payload.classification_lookup_id.strip() if isinstance(payload.classification_lookup_id, str) and payload.classification_lookup_id.strip() else None,
+            ranking_lookup_id=payload.ranking_lookup_id.strip() if isinstance(payload.ranking_lookup_id, str) and payload.ranking_lookup_id.strip() else None,
+            customer_status_lookup_id=payload.customer_status_lookup_id.strip() if isinstance(payload.customer_status_lookup_id, str) and payload.customer_status_lookup_id.strip() else None,
+            default_branch_id=payload.default_branch_id.strip() if isinstance(payload.default_branch_id, str) and payload.default_branch_id.strip() else None,
+            default_mandate_id=payload.default_mandate_id.strip() if isinstance(payload.default_mandate_id, str) and payload.default_mandate_id.strip() else None,
+            notes=payload.notes.strip() if isinstance(payload.notes, str) and payload.notes.strip() else None,
+        )
 
     def _validate_contact_constraints(
         self,

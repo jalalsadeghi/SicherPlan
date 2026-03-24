@@ -24,6 +24,8 @@ import {
   type SubcontractorListItem,
 } from '#/sicherplan-legacy/api/subcontractors';
 
+import { buildDashboardQuickActions } from './helpers';
+
 defineOptions({ name: 'SicherPlanDashboard' });
 
 interface CalendarCell {
@@ -206,41 +208,10 @@ const metricCards = computed(() => {
 });
 
 const quickActions = computed(() =>
-  isPlatformAdmin.value
-    ? [
-        {
-          label: $t('sicherplan.admin.core'),
-          to: '/admin/core',
-          type: 'primary' as const,
-        },
-        {
-          label: $t('sicherplan.admin.tenantUsers'),
-          to: '/admin/iam/users',
-          type: 'default' as const,
-        },
-        {
-          label: $t('sicherplan.admin.health'),
-          to: '/admin/health',
-          type: 'default' as const,
-        },
-      ]
-    : [
-        {
-          label: $t('sicherplan.admin.customers'),
-          to: '/admin/customers',
-          type: 'primary' as const,
-        },
-        {
-          label: $t('sicherplan.admin.planningShifts'),
-          to: '/admin/planning-shifts',
-          type: 'default' as const,
-        },
-        {
-          label: $t('sicherplan.admin.reporting'),
-          to: '/admin/reporting',
-          type: 'default' as const,
-        },
-      ],
+  buildDashboardQuickActions({
+    isPlatformAdmin: isPlatformAdmin.value,
+    t: $t,
+  }),
 );
 
 const operationsItems = computed(() =>

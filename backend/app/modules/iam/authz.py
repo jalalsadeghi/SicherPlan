@@ -38,7 +38,14 @@ class RequestAuthorizationContext:
     def allows_tenant(self, tenant_id: str) -> bool:
         if self.is_platform_admin:
             return True
-        return self.tenant_id == tenant_id and any(scope.scope_type == "tenant" for scope in self.scopes)
+        if self.tenant_id != tenant_id:
+            return False
+        if any(scope.scope_type == "tenant" for scope in self.scopes):
+            return True
+        # Tenant administrators are tenant-bound internal actors by definition.
+        # Some legacy sessions can materialize the role key without the explicit
+        # tenant scope tuple, so keep same-tenant admin access working.
+        return self.is_tenant_admin
 
     def allows_branch(self, tenant_id: str, branch_id: str) -> bool:
         if self.is_platform_admin:

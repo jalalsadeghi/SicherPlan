@@ -386,6 +386,7 @@ export interface CustomerCreatePayload {
   tenant_id: string;
   customer_number: string;
   name: string;
+  status?: LifecycleStatus | string | null;
   legal_name?: string | null;
   external_ref?: string | null;
   legal_form_lookup_id?: string | null;
@@ -437,6 +438,36 @@ export interface CustomerAddressUpdatePayload extends Partial<CustomerAddressPay
   status?: LifecycleStatus | string | null;
   archived_at?: string | null;
   version_no: number;
+}
+
+export interface CustomerReferenceOptionRead {
+  id: string;
+  code: string;
+  label: string;
+  description: string | null;
+  sort_order: number;
+}
+
+export interface CustomerBranchOptionRead {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface CustomerMandateOptionRead {
+  id: string;
+  branch_id: string;
+  code: string;
+  name: string;
+}
+
+export interface CustomerReferenceDataRead {
+  legal_forms: CustomerReferenceOptionRead[];
+  classifications: CustomerReferenceOptionRead[];
+  rankings: CustomerReferenceOptionRead[];
+  customer_statuses: CustomerReferenceOptionRead[];
+  branches: CustomerBranchOptionRead[];
+  mandates: CustomerMandateOptionRead[];
 }
 
 export interface CustomerHistoryAttachmentLinkPayload {
@@ -581,6 +612,13 @@ export function listCustomers(tenantId: string, accessToken: string, params: Cus
 
 export function getCustomer(tenantId: string, customerId: string, accessToken: string) {
   return request<CustomerRead>(`/api/customers/tenants/${tenantId}/customers/${customerId}`, accessToken);
+}
+
+export function getCustomerReferenceData(tenantId: string, accessToken: string) {
+  return request<CustomerReferenceDataRead>(
+    `/api/customers/tenants/${tenantId}/customers/reference-data`,
+    accessToken,
+  );
 }
 
 export function createCustomer(tenantId: string, accessToken: string, payload: CustomerCreatePayload) {

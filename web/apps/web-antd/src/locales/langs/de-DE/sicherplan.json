@@ -6,13 +6,13 @@
     "platformServices": "Plattformdienste",
     "customers": "Kunden",
     "planning": "Planung",
-    "planningOrders": "Auftraege & Planung",
+    "planningOrders": "Aufträge & Planung",
     "planningShifts": "Schichtplanung",
     "planningStaffing": "Staffing-Coverage",
     "financeActuals": "Actual-Freigaben",
     "financePayroll": "Payroll & Export",
     "financeBilling": "Billing & Rechnungen",
-    "financeSubcontractorChecks": "Partner-Rechnungspruefung",
+    "financeSubcontractorChecks": "Partner-Rechnungsprüfung",
     "reporting": "Reporting",
     "recruiting": "Recruiting",
     "employees": "Mitarbeitende",
@@ -42,22 +42,22 @@
     "subcontractor": "Subunternehmerportal"
   },
   "public": {
-    "title": "Oeffentliche Formulare",
+    "title": "Öffentliche Formulare",
     "applicantForm": "Bewerbungsformular"
   },
   "ui": {
     "shellTagline": "Security Operations Platform",
-    "shellRibbon": "Mandantenfaehige Security Operations",
+    "shellRibbon": "Mandantenfähige Security Operations",
     "moduleEyebrow": "Modulsteuerung",
     "workspaceTitle": "Arbeitsbereich",
     "quickLinksTitle": "Schnelle Navigation",
-    "quickLinksDescription": "Wechseln Sie ohne Menuebruch in benachbarte Fachmodule.",
-    "overviewTitle": "Modulueberblick",
+    "quickLinksDescription": "Wechseln Sie ohne Menübruch in benachbarte Fachmodule.",
+    "overviewTitle": "Modulüberblick",
     "overviewDescription": "Diese Zusammenfassung setzt die Rolle des Moduls im Produktkontext.",
     "guardrailsTitle": "Umsetzungsregeln",
-    "guardrailsDescription": "Diese Prinzipien muessen auch bei den naechsten Sprints stabil bleiben.",
+    "guardrailsDescription": "Diese Prinzipien müssen auch bei den nächsten Sprints stabil bleiben.",
     "deliveryTitle": "Auslieferungsfokus",
-    "deliveryDescription": "Neue UI-Arbeit soll den spaeteren Ausbau vorbereiten und bestehende Flows nicht destabilisieren.",
+    "deliveryDescription": "Neue UI-Arbeit soll den späteren Ausbau vorbereiten und bestehende Flows nicht destabilisieren.",
     "stats": {
       "scope": "Scope",
       "visibility": "Sichtbarkeit",
@@ -75,158 +75,158 @@
       "documentLinked": "Dokumentbezogen",
       "auditSafe": "Audit-sicher",
       "appendOnly": "Append-only",
-      "traceableChain": "Durchgaengig nachvollziehbar",
-      "releasedOperations": "Freigegebene Einsaetze",
+      "traceableChain": "Durchgängig nachvollziehbar",
+      "releasedOperations": "Freigegebene Einsätze",
       "operationalViews": "Operative Sicht",
       "dispatchReady": "Dispositionstauglich",
-      "financeBridge": "Actual-Record-Bruecke",
+      "financeBridge": "Actual-Record-Brücke",
       "financeControlled": "Finanzkontrolliert",
       "reproducibleViews": "Reproduzierbare Views"
     },
     "guardrails": {
-      "tenantIsolation": "Tenant-Isolation, lokale Sichtbarkeit und Rollenlogik duerfen durch neue Screens nicht aufgeweicht werden.",
-      "roleScope": "Portale, interne Administration und Partnerzugriffe muessen dieselben Berechtigungskanten respektieren.",
-      "documents": "Dokumente, Exporte und generierte Outputs bleiben rueckverknuepfbar und auditierbar."
+      "tenantIsolation": "Tenant-Isolation, lokale Sichtbarkeit und Rollenlogik dürfen durch neue Screens nicht aufgeweicht werden.",
+      "roleScope": "Portale, interne Administration und Partnerzugriffe müssen dieselben Berechtigungskanten respektieren.",
+      "documents": "Dokumente, Exporte und generierte Outputs bleiben rückverknüpfbar und auditierbar."
     },
     "deliveryPoints": {
-      "ownership": "Neue Module werden ueber Route-Metadaten und ein zentrales Registry-Muster eingehangen.",
-      "i18n": "Neue Labels, Beschreibungen und Ueberschriften werden immer parallel fuer DE und EN gepflegt.",
-      "outputs": "Arbeitsbereiche bleiben eingebettet, bis sie in spaeteren Sprints vollstaendig nativer Vben-UI weichen."
+      "ownership": "Neue Module werden über Route-Metadaten und ein zentrales Registry-Muster eingehangen.",
+      "i18n": "Neue Labels, Beschreibungen und Überschriften werden immer parallel für DE und EN gepflegt.",
+      "outputs": "Arbeitsbereiche bleiben eingebettet, bis sie in späteren Sprints vollständig nativer Vben-UI weichen."
     },
     "profiles": {
       "administration": [
-        "Administration haelt Mandanten-, Kern- und Plattformkonfiguration in klaren Systemgrenzen zusammen.",
-        "Das Modul ist der Einstieg fuer Onboarding, Scope-Steuerung und produktweite Grundkonfigurationen.",
-        "Aenderungen muessen spaetere Erweiterungen tragen, ohne Tenant-Isolation oder Rollenmodell umzubauen."
+        "Administration hält Mandanten-, Kern- und Plattformkonfiguration in klaren Systemgrenzen zusammen.",
+        "Das Modul ist der Einstieg für Onboarding, Scope-Steuerung und produktweite Grundkonfigurationen.",
+        "Änderungen müssen spätere Erweiterungen tragen, ohne Tenant-Isolation oder Rollenmodell umzubauen."
       ],
       "platform": [
         "Plattformdienste kapseln geteilte Querschnittsfunktionen wie Hinweise, Dokumentbezug und Integrationsgrenzen.",
-        "Direkte Provider-Seiteneffekte gehoeren nicht in dieselbe Domain-Transaktion wie fachliche Schreibvorgaenge.",
+        "Direkte Provider-Seiteneffekte gehören nicht in dieselbe Domain-Transaktion wie fachliche Schreibvorgaenge.",
         "Die UI muss produktiv wirken, ohne Demo-Artefakte oder generische Beispieltexte mitzuschleppen."
       ],
       "masterData": [
         "Stammdatenmodule organisieren Listen-, Detail- und Freigabeprozesse mit stabiler Tenant- und Rollensemantik.",
-        "Kaufmaennische und operative Informationen bleiben sauber gruppiert und bleiben fuer Folgeprozesse referenzierbar.",
-        "Portalfreigaben, Dokumentbezug und Statuswechsel duerfen keine verdeckten Seiteneffekte erzeugen."
+        "Kaufmännische und operative Informationen bleiben sauber gruppiert und bleiben für Folgeprozesse referenzierbar.",
+        "Portalfreigaben, Dokumentbezug und Statuswechsel dürfen keine verdeckten Seiteneffekte erzeugen."
       ],
       "workforce": [
-        "Belegschafts- und Recruiting-Module trennen private Daten, operative Verfuegbarkeit und administrative Steuerung.",
-        "Import-, Dokument- und Lifecycle-Flows muessen auch auf spaeteren Mobil- und Portalstrecken konsistent bleiben.",
-        "Rollen mit eingeschraenktem Scope sehen nur die Ausschnitte, die fuer ihren Prozess benoetigt werden."
+        "Belegschafts- und Recruiting-Module trennen private Daten, operative Verfügbarkeit und administrative Steuerung.",
+        "Import-, Dokument- und Lifecycle-Flows müssen auch auf späteren Mobil- und Portalstrecken konsistent bleiben.",
+        "Rollen mit eingeschränktem Scope sehen nur die Ausschnitte, die für ihren Prozess benötigt werden."
       ],
       "partner": [
-        "Partnerdaten bleiben in ihrer eigenen Wahrheit, waehrend Planung und Finance nur referenzierte Freigaben nutzen.",
-        "Scope, Workforce und kaufmaennische Einstellungen muessen nachvollziehbar und dokumentiert bleiben.",
+        "Partnerdaten bleiben in ihrer eigenen Wahrheit, während Planung und Finance nur referenzierte Freigaben nutzen.",
+        "Scope, Workforce und kaufmännische Einstellungen müssen nachvollziehbar und dokumentiert bleiben.",
         "Portalfunktionen bauen auf derselben Sichtbarkeitslogik wie die interne Administration auf."
       ],
       "operations": [
         "Operative Module verbinden Kundenbedarf, Auftragskontext und freigegebene Einsatzsteuerung in einer Kette.",
-        "Planung darf nur lesen, wo andere Kontexte Masterdaten halten; verdeckte Rueckschreibungen sind unzulaessig.",
-        "Die UI muss Filter, Ergebnisse und Detailarbeit als zusammengehoerige Arbeitsflaeche praesentieren."
+        "Planung darf nur lesen, wo andere Kontexte Masterdaten halten; verdeckte Rückschreibungen sind unzulässig.",
+        "Die UI muss Filter, Ergebnisse und Detailarbeit als zusammengehörige Arbeitsfläche präsentieren."
       ],
       "planning": [
         "Schicht- und Staffing-Ansichten fokussieren auf Disposition, Qualifikation und Freigabestatus statt auf Rohstammdaten.",
-        "Planungsresultate sind die vorgelagerte Wahrheit fuer Field Execution, Actuals und nachgelagerte Finance-Prozesse.",
-        "Kalender-, Coverage- und Listenmuster werden ueber die Shell konsistent gruppiert statt lose im Content verteilt."
+        "Planungsresultate sind die vorgelagerte Wahrheit für Field Execution, Actuals und nachgelagerte Finance-Prozesse.",
+        "Kalender-, Coverage- und Listenmuster werden über die Shell konsistent gruppiert statt lose im Content verteilt."
       ],
       "finance": [
-        "Finance-Module arbeiten immer auf Basis des finance.actual_record als Bruecke zwischen Planung, Ist-Daten und Ausgaben.",
-        "Rohbelege und originale Nachweise bleiben erhalten; Korrekturen werden kontrolliert abgeleitet statt ueberschrieben.",
-        "Exports, Rechnungen und Pruefungen muessen als dokumentierte Outputs im System rueckverfolgbar bleiben."
+        "Finance-Module arbeiten immer auf Basis des finance.actual_record als Brücke zwischen Planung, Ist-Daten und Ausgaben.",
+        "Rohbelege und originale Nachweise bleiben erhalten; Korrekturen werden kontrolliert abgeleitet statt überschrieben.",
+        "Exports, Rechnungen und Prüfungen müssen als dokumentierte Outputs im System rückverfolgbar bleiben."
       ],
       "reporting": [
         "Reporting startet als reproduzierbare Sicht auf die transaktionale Backbone-Struktur, nicht als zweite Write-Side.",
-        "Dashboards und Lieferungen muessen dieselben Rollen- und Sichtbarkeitsregeln wie das operative Produkt respektieren.",
-        "KPIs, Filter und Exporte werden in einer konsistenten Arbeitsflaeche gruppiert statt als Demo-Dashboard behandelt."
+        "Dashboards und Lieferungen müssen dieselben Rollen- und Sichtbarkeitsregeln wie das operative Produkt respektieren.",
+        "KPIs, Filter und Exporte werden in einer konsistenten Arbeitsfläche gruppiert statt als Demo-Dashboard behandelt."
       ]
     },
     "dashboard": {
       "eyebrow": "Admin Shell",
       "title": "SicherPlan auf Vben neu gebootstrapped",
-      "description": "Die Navigation ist jetzt nach Geschaeftsfaehigkeiten gruppiert, die Shell folgt Vben-Mustern, und die bestehenden Arbeitsbereiche werden ueber ein konsistentes Modulsystem eingebettet.",
+      "description": "Die Navigation ist jetzt nach Geschäftsfähigkeiten gruppiert, die Shell folgt Vben-Mustern, und die bestehenden Arbeitsbereiche werden über ein konsistentes Modulsystem eingebettet.",
       "actionTitle": "Schnellstart",
-      "actionDescription": "Direkter Einstieg in die Bereiche, die die kommende Sprintarbeit am staerksten tragen.",
+      "actionDescription": "Direkter Einstieg in die Bereiche, die die kommende Sprintarbeit am stärksten tragen.",
       "moduleTitle": "Kernmodule",
-      "moduleDescription": "Diese Bereiche bilden das Rueckgrat fuer Administration, Planung und Reporting.",
+      "moduleDescription": "Diese Bereiche bilden das Rückgrat für Administration, Planung und Reporting.",
       "guardrailsTitle": "Produktleitplanken",
       "guardrailsDescription": "Diese Regeln rahmen die weitere UI- und Domainerweiterung.",
       "readinessTitle": "Umsetzungsbereitschaft",
-      "readinessDescription": "Die neue Struktur macht spaetere Codex-Aufgaben enger, lokalisierter und besser erweiterbar.",
+      "readinessDescription": "Die neue Struktur macht spätere Codex-Aufgaben enger, lokalisierter und besser erweiterbar.",
       "stats": {
-        "scopeHint": "Tenant-Isolation bleibt der erste Sortierschluessel.",
+        "scopeHint": "Tenant-Isolation bleibt der erste Sortierschlüssel.",
         "visibilityHint": "Admin-, Portal- und Partnerzugriffe bleiben entlang derselben Rollenlogik lesbar.",
         "evidenceHint": "Von Stammdaten bis Reporting bleibt die Prozesskette nachvollziehbar."
       }
     },
     "moduleMissing": {
       "title": "Modulkonfiguration fehlt",
-      "description": "Fuer diese Route ist noch kein SicherPlan-Arbeitsbereich registriert."
+      "description": "Für diese Route ist noch kein SicherPlan-Arbeitsbereich registriert."
     },
     "modules": {
       "core": {
-        "description": "Mandanten, Startkonfiguration und Kernsystem werden als sauberer Admin-Einstieg gebuendelt.",
+        "description": "Mandanten, Startkonfiguration und Kernsystem werden als sauberer Admin-Einstieg gebündelt.",
         "workspace": "Der bestehende Kernsystem-Workspace bleibt aktiv, wird aber jetzt in eine einheitliche Modulseite eingebettet."
       },
       "platformServices": {
-        "description": "Plattformdienste fassen Hinweise, Dokumentbezug und weitere gemeinsame Services unter einer konsistenten Admin-Huelle zusammen.",
-        "workspace": "Der Plattform-Workspace bleibt unveraendert erreichbar und sitzt jetzt unter derselben Seitenarchitektur wie die Fachmodule."
+        "description": "Plattformdienste fassen Hinweise, Dokumentbezug und weitere gemeinsame Services unter einer konsistenten Admin-Hülle zusammen.",
+        "workspace": "Der Plattform-Workspace bleibt unverändert erreichbar und sitzt jetzt unter derselben Seitenarchitektur wie die Fachmodule."
       },
       "customers": {
-        "description": "Kundenverwaltung, kaufmaennische Einstellungen und Sichtbarkeitsfreigaben sind als Kundenmodul klar verortet.",
-        "workspace": "Die Kundenarbeitsflaeche bleibt operativ nutzbar und ist nun ueber dieselbe Intro-, Stats- und Governance-Struktur eingebettet."
+        "description": "Kundenverwaltung, kaufmännische Einstellungen und Sichtbarkeitsfreigaben sind als Kundenmodul klar verortet.",
+        "workspace": "Die Kundenarbeitsfläche bleibt operativ nutzbar und ist nun über dieselbe Intro-, Stats- und Governance-Struktur eingebettet."
       },
       "employees": {
         "description": "Mitarbeitendenverwaltung trennt private HR-Anteile, operative Daten und Importprozesse sauber innerhalb einer Workforce-Struktur.",
         "workspace": "Der bestehende Mitarbeitenden-Workspace bleibt erhalten und ist in das neue Seitenraster eingepasst."
       },
       "recruiting": {
-        "description": "Recruiting ist als Workforce-Eingangsmodul fuer Bewerbungen, Sichtung und Dokumente klar abgegrenzt.",
+        "description": "Recruiting ist als Workforce-Eingangsmodul für Bewerbungen, Sichtung und Dokumente klar abgegrenzt.",
         "workspace": "Der vorhandene Recruiting-Workspace bleibt verlinkt und folgt nun derselben Seitensprache wie die anderen Module."
       },
       "subcontractors": {
         "description": "Subunternehmerverwaltung ist als Partner- und Portalfreigabemodul in die Workforce-Struktur eingeordnet.",
-        "workspace": "Die Partnerarbeitsflaeche bleibt funktional erhalten und wird durch die neue Shell konsistent gerahmt."
+        "workspace": "Die Partnerarbeitsfläche bleibt funktional erhalten und wird durch die neue Shell konsistent gerahmt."
       },
       "planning": {
-        "description": "Operations bildet den Einstieg fuer Einsatz- und Planungssteuerung mit sauberer Trennung zu HR- und Partnerstammdaten.",
+        "description": "Operations bildet den Einstieg für Einsatz- und Planungssteuerung mit sauberer Trennung zu HR- und Partnerstammdaten.",
         "workspace": "Der operative Planungs-Workspace bleibt direkt nutzbar und sitzt jetzt unter einer stabilen Modulseite."
       },
       "planningOrders": {
-        "description": "Auftraege und operative Planung werden als eigener Arbeitsbereich zwischen Kundenkontext und Ausfuehrung gruppiert.",
-        "workspace": "Die bestehende Auftragsarbeitsflaeche bleibt unveraendert erreichbar und wird von der neuen Modulhuelle getragen."
+        "description": "Aufträge und operative Planung werden als eigener Arbeitsbereich zwischen Kundenkontext und Ausführung gruppiert.",
+        "workspace": "Die bestehende Auftragsarbeitsfläche bleibt unverändert erreichbar und wird von der neuen Modulhülle getragen."
       },
       "planningShifts": {
-        "description": "Schichtplanung arbeitet als klarer Planungsbereich mit Fokus auf Templates, Einsaetze und Freigaben.",
+        "description": "Schichtplanung arbeitet als klarer Planungsbereich mit Fokus auf Templates, Einsätze und Freigaben.",
         "workspace": "Der Schichtplanungs-Workspace bleibt eingebettet, statt als lose Einzelseite im Shell-Content zu stehen."
       },
       "planningStaffing": {
-        "description": "Staffing und Coverage lesen Verfuegbarkeit und Qualifikation, ohne fremde Masterdaten direkt zu mutieren.",
+        "description": "Staffing und Coverage lesen Verfügbarkeit und Qualifikation, ohne fremde Masterdaten direkt zu mutieren.",
         "workspace": "Der Coverage-Workspace bleibt erhalten und folgt jetzt derselben Seitenarchitektur wie Administration und Finance."
       },
       "financeActuals": {
-        "description": "Actual-Freigaben verbinden Planung, Nachweise und die finance.actual_record-Bruecke in einer kontrollierten Finance-Stufe.",
+        "description": "Actual-Freigaben verbinden Planung, Nachweise und die finance.actual_record-Brücke in einer kontrollierten Finance-Stufe.",
         "workspace": "Der vorhandene Actuals-Workspace bleibt operativ nutzbar und ist in das neue Shell-Muster eingebunden."
       },
       "financePayroll": {
         "description": "Payroll und Export bauen auf freigegebenen Ist-Daten auf und bleiben als Finance-Modul klar von Planung getrennt.",
-        "workspace": "Der bestehende Payroll-Workspace bleibt erhalten und wird ueber die neue Modulseite sauber gefasst."
+        "workspace": "Der bestehende Payroll-Workspace bleibt erhalten und wird über die neue Modulseite sauber gefasst."
       },
       "financeBilling": {
-        "description": "Billing und Rechnungsoutput bleiben als Finance-eigene Arbeitsflaeche mit dokumentierter Rueckverfolgbarkeit organisiert.",
+        "description": "Billing und Rechnungsoutput bleiben als Finance-eigene Arbeitsfläche mit dokumentierter Rückverfolgbarkeit organisiert.",
         "workspace": "Der Billing-Workspace bleibt bedienbar und ist jetzt in eine Vben-orientierte Seitenkomposition eingebettet."
       },
       "financeSubcontractorChecks": {
-        "description": "Partnerrechnungspruefung ist als eigener Finance-Arbeitsbereich zwischen Partnerdaten, Actuals und Abrechnung verortet.",
-        "workspace": "Die bestehende Pruefmaske bleibt erreichbar und ist nun Teil derselben strukturierten Modulseite wie die uebrigen Finance-Flows."
+        "description": "Partnerrechnungsprüfung ist als eigener Finance-Arbeitsbereich zwischen Partnerdaten, Actuals und Abrechnung verortet.",
+        "workspace": "Die bestehende Prüfmaske bleibt erreichbar und ist nun Teil derselben strukturierten Modulseite wie die übrigen Finance-Flows."
       },
       "reporting": {
-        "description": "Reporting ist vom Demo-Dashboard entkoppelt und als SicherPlan-Modul fuer reproduzierbare, rollengebundene Auswertungen aufgesetzt.",
-        "workspace": "Der Reporting-Workspace bleibt aktiv und wird ueber dieselbe Seitenarchitektur wie die operativen Module eingebettet."
+        "description": "Reporting ist vom Demo-Dashboard entkoppelt und als SicherPlan-Modul für reproduzierbare, rollengebundene Auswertungen aufgesetzt.",
+        "workspace": "Der Reporting-Workspace bleibt aktiv und wird über dieselbe Seitenarchitektur wie die operativen Module eingebettet."
       }
     }
   },
   "health": {
-    "description": "Pruefen Sie die Plattformsignale fuer Live-, Ready- und Versionsstatus sowie die wichtigsten Support-Checks.",
+    "description": "Prüfen Sie die Plattformsignale für Live-, Ready- und Versionsstatus sowie die wichtigsten Support-Checks.",
     "actionsTitle": "Diagnose aktualisieren",
     "actionsDescription": "Die Abfrage liest die aktuellen Health-Signale direkt aus dem Backend.",
     "refresh": "Status neu laden",
@@ -243,16 +243,16 @@
   },
   "dashboardView": {
     "eyebrow": "Operations Dashboard",
-    "title": "Tagessteuerung fuer SicherPlan",
-    "description": "Das Dashboard fasst echte Mandanten-, Planungs-, Partner- und Plattformsignale in einer kompakten Arbeitsflaeche zusammen und verweist direkt in die produktiven Module.",
+    "title": "Tagessteuerung für SicherPlan",
+    "description": "Das Dashboard fasst echte Mandanten-, Planungs-, Partner- und Plattformsignale in einer kompakten Arbeitsfläche zusammen und verweist direkt in die produktiven Module.",
     "todayCard": {
       "label": "Heute",
-      "primaryAction": "Planung oeffnen",
-      "secondaryAction": "Uebersicht"
+      "primaryAction": "Planung öffnen",
+      "secondaryAction": "Übersicht"
     },
     "actions": {
       "title": "Schnellaktionen",
-      "description": "Direkte Einstiege in die wichtigsten Admin-Flaechen fuer den aktuellen Rollenscope.",
+      "description": "Direkte Einstiege in die wichtigsten Admin-Flächen für den aktuellen Rollenscope.",
       "more": "Mehr",
       "morePlatform": "Plattformdienste",
       "moreUsers": "Benutzerverwaltung",
@@ -261,38 +261,38 @@
     "metrics": {
       "tenants": "Mandanten",
       "activeTenants": "Aktive Mandanten",
-      "adminSurfaces": "Admin-Flaechen",
+      "adminSurfaces": "Admin-Flächen",
       "customers": "Kunden",
       "employees": "Mitarbeitende",
       "subcontractors": "Subunternehmer",
       "shifts": "Schichten",
-      "orders": "Auftraege",
+      "orders": "Aufträge",
       "notices": "Hinweise"
     },
     "metricHints": {
       "tenants": "Plattformweite Bestandszahl",
       "activeTenants": "Mandanten im aktiven Status",
-      "adminSurfaces": "Kernflaechen im Admin-Scope",
-      "customers": "Aktuelle Kundenstammsaetze",
-      "employees": "Verfuegbare Mitarbeiterprofile",
+      "adminSurfaces": "Kernflächen im Admin-Scope",
+      "customers": "Aktuelle Kundenstammsätze",
+      "employees": "Verfügbare Mitarbeiterprofile",
       "subcontractors": "Partnerunternehmen im Scope"
     },
     "operations": {
-      "title": "Aktuelle Einsatzauftraege",
-      "description": "Freigaberelevante Auftraege und operative Arbeitspakete aus der Planung.",
-      "platformTitle": "Mandantenueberblick",
+      "title": "Aktuelle Einsatzaufträge",
+      "description": "Freigaberelevante Aufträge und operative Arbeitspakete aus der Planung.",
+      "platformTitle": "Mandantenüberblick",
       "platformDescription": "Der aktuelle Plattformstatus konzentriert sich auf Mandantensteuerung und Onboarding."
     },
     "partners": {
       "title": "Partnerunternehmen",
       "description": "Subunternehmer und Partnerprofile mit direktem Sprung in Scope, Workforce und Finance.",
       "platformTitle": "Plattformsignale",
-      "platformDescription": "Interne Hinweise und Plattformoberflaechen fuer Betrieb, IAM und Support."
+      "platformDescription": "Interne Hinweise und Plattformoberflächen für Betrieb, IAM und Support."
     },
     "calendar": {
       "title": "Planungskalender",
-      "description": "Monatsansicht fuer Schicht- und Auftragsverdichtung auf Basis der aktuellen Planungsdaten.",
-      "previous": "Zurueck",
+      "description": "Monatsansicht für Schicht- und Auftragsverdichtung auf Basis der aktuellen Planungsdaten.",
+      "previous": "Zurück",
       "next": "Weiter",
       "openPlanning": "Schichtplanung",
       "monthHint": "Schichten und Auftragsdaten werden pro Kalendertag zusammengefasst.",
@@ -300,9 +300,9 @@
       "orderShort": "Auftrag"
     },
     "empty": {
-      "operationsTitle": "Keine operativen Eintraege verfuegbar",
-      "operationsBody": "Sobald Auftraege oder Mandantenlisten verfuegbar sind, erscheinen sie hier als kompakte Arbeitsliste.",
-      "partnersTitle": "Keine Partner- oder Plattformsignale verfuegbar",
+      "operationsTitle": "Keine operativen Einträge verfügbar",
+      "operationsBody": "Sobald Aufträge oder Mandantenlisten verfügbar sind, erscheinen sie hier als kompakte Arbeitsliste.",
+      "partnersTitle": "Keine Partner- oder Plattformsignale verfügbar",
       "partnersBody": "Diese Karte zeigt reale Partnerdaten oder Plattformhinweise, sobald der aktuelle Scope Ergebnisse liefert."
     },
     "labels": {
@@ -317,16 +317,16 @@
   },
   "auth": {
     "loginErrors": {
-      "invalidCredentials": "Anmeldung fehlgeschlagen. Benutzername, E-Mail oder Passwort sind ungueltig.",
+      "invalidCredentials": "Anmeldung fehlgeschlagen. Benutzername, E-Mail oder Passwort sind ungültig.",
       "rateLimited": "Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
-      "serverUnavailable": "Anmeldung derzeit nicht moeglich. Server oder Netzwerk sind momentan nicht verfuegbar.",
+      "serverUnavailable": "Anmeldung derzeit nicht möglich. Server oder Netzwerk sind momentan nicht verfügbar.",
       "generic": "Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut."
     }
   },
   "subcontractors": {
     "eyebrow": "Partnerstamm",
     "title": "Subunternehmerverwaltung",
-    "lead": "Verwalten Sie Firmenstammdaten, Kontakte, Scope-Freigaben und kaufmaennische Einstellungen fuer Partnerunternehmen.",
+    "lead": "Verwalten Sie Firmenstammdaten, Kontakte, Scope-Freigaben und kaufmännische Einstellungen für Partnerunternehmen.",
     "permission": {
       "read": "Lesen",
       "write": "Schreiben",
@@ -340,7 +340,7 @@
       "placeholder": "Mandanten-ID eingeben",
       "help": "Plattformadministration kann den Zielmandanten wechseln. Tenant-Admins arbeiten im eigenen Scope.",
       "missingTitle": "Mandantenscope fehlt",
-      "missingBody": "Bitte zuerst einen gueltigen Mandantenscope setzen."
+      "missingBody": "Bitte zuerst einen gültigen Mandantenscope setzen."
     },
     "list": {
       "eyebrow": "Partnerliste",
@@ -350,16 +350,16 @@
     "detail": {
       "eyebrow": "Detailansicht",
       "newTitle": "Neuen Subunternehmer anlegen",
-      "emptyTitle": "Kein Subunternehmer ausgewaehlt",
+      "emptyTitle": "Kein Subunternehmer ausgewählt",
       "emptyEyebrow": "Details",
-      "emptyBody": "Waehlen Sie links einen Subunternehmer aus oder legen Sie einen neuen Datensatz an."
+      "emptyBody": "Wählen Sie links einen Subunternehmer aus oder legen Sie einen neuen Datensatz an."
     },
     "filters": {
       "search": "Suche",
       "searchPlaceholder": "Nummer, Firmenname, Anzeigename",
       "status": "Status",
       "allStatuses": "Alle Status",
-      "includeArchived": "Archivierte Datensaetze einbeziehen"
+      "includeArchived": "Archivierte Datensätze einbeziehen"
     },
     "status": {
       "active": "Aktiv",
@@ -372,10 +372,10 @@
       "displayName": "Anzeigename",
       "legalFormLookupId": "Lookup-ID Rechtsform",
       "statusLookupId": "Lookup-ID Partnerstatus",
-      "managingDirectorName": "Geschaeftsfuehrung",
+      "managingDirectorName": "Geschäftsführung",
       "addressId": "Adress-ID",
       "latitude": "Breitengrad",
-      "longitude": "Laengengrad",
+      "longitude": "Längengrad",
       "notes": "Notizen",
       "contactName": "Kontaktname",
       "contactTitle": "Titel",
@@ -385,12 +385,12 @@
       "contactMobile": "Mobil",
       "contactUserId": "Benutzerkonto-ID",
       "contactNotes": "Kontaktnotiz",
-      "primaryContact": "Primaerkontakt",
+      "primaryContact": "Primärkontakt",
       "portalEnabled": "Portalzugang aktivieren",
       "branchId": "Niederlassungs-ID",
       "mandateId": "Mandats-ID",
-      "validFrom": "Gueltig ab",
-      "validTo": "Gueltig bis",
+      "validFrom": "Gültig ab",
+      "validTo": "Gültig bis",
       "scopeNotes": "Scope-Notiz",
       "invoiceEmail": "Rechnungs-E-Mail",
       "paymentTermsDays": "Zahlungsziel in Tagen",
@@ -406,14 +406,14 @@
       "billingNote": "Abrechnungshinweis",
       "historyType": "Historientyp",
       "historyOccurredAt": "Ereignet am",
-      "historyRelatedContact": "Verknuepfter Kontakt",
+      "historyRelatedContact": "Verknüpfter Kontakt",
       "historyTitle": "Titel",
       "historyBody": "Beschreibung",
       "attachmentLabel": "Anlagenlabel",
       "attachmentFile": "Datei"
     },
     "summary": {
-      "primaryContact": "Primaerkontakt",
+      "primaryContact": "Primärkontakt",
       "scope": "Freigegebener Scope",
       "portal": "Portalstatus",
       "coordinates": "Koordinaten",
@@ -434,16 +434,16 @@
       "eyebrow": "Einsatzscope",
       "title": "Niederlassungs- und Mandatsfreigaben",
       "empty": "Noch keine Scope-Zeilen vorhanden.",
-      "futureSiteNote": "Objekt-/Standortfreigaben folgen spaeter. Diese UI erfindet bewusst keine vorgezogenen Site-Selektoren."
+      "futureSiteNote": "Objekt-/Standortfreigaben folgen später. Diese UI erfindet bewusst keine vorgezogenen Site-Selektoren."
     },
     "finance": {
       "eyebrow": "Finanzprofil",
-      "title": "Kaufmaennische und abrechnungsbezogene Einstellungen"
+      "title": "Kaufmännische und abrechnungsbezogene Einstellungen"
     },
     "history": {
       "eyebrow": "Timeline",
       "title": "Prozessverlauf und Anlagen",
-      "empty": "Noch keine Historieneintraege vorhanden.",
+      "empty": "Noch keine Historieneinträge vorhanden.",
       "noRelatedContact": "Kein Kontaktbezug",
       "types": {
         "processing_note": "Bearbeitungsnotiz",
@@ -461,19 +461,19 @@
       "newSubcontractor": "Neuer Subunternehmer",
       "createSubcontractor": "Subunternehmer anlegen",
       "saveSubcontractor": "Subunternehmer speichern",
-      "reset": "Firmenformular zuruecksetzen",
+      "reset": "Firmenformular zurücksetzen",
       "createContact": "Kontakt anlegen",
       "saveContact": "Kontakt speichern",
-      "resetContact": "Kontaktformular zuruecksetzen",
+      "resetContact": "Kontaktformular zurücksetzen",
       "createScope": "Scope-Zeile anlegen",
       "saveScope": "Scope-Zeile speichern",
-      "resetScope": "Scope-Formular zuruecksetzen",
+      "resetScope": "Scope-Formular zurücksetzen",
       "createFinance": "Finanzprofil anlegen",
       "saveFinance": "Finanzprofil speichern",
-      "resetFinance": "Finanzformular zuruecksetzen",
+      "resetFinance": "Finanzformular zurücksetzen",
       "createHistoryEntry": "Historieneintrag anlegen",
-      "attachHistoryDocument": "Anlage verknuepfen",
-      "resetHistory": "Historienformular zuruecksetzen",
+      "attachHistoryDocument": "Anlage verknüpfen",
+      "resetHistory": "Historienformular zurücksetzen",
       "archive": "Archivieren",
       "reactivate": "Reaktivieren"
     },
@@ -487,8 +487,8 @@
       "lead": "Pflegen Sie die freigegebenen Mitarbeitendenakten des Subunternehmers inklusive CSV-Import, Nachweisen und Ausweisen.",
       "detailEyebrow": "Mitarbeitendenakte",
       "newTitle": "Neue Mitarbeitendenakte",
-      "empty": "Fuer diesen Subunternehmer sind noch keine Mitarbeitenden vorhanden.",
-      "emptyDetail": "Waehlen Sie links einen Mitarbeitenden oder legen Sie einen neuen Datensatz an.",
+      "empty": "Für diesen Subunternehmer sind noch keine Mitarbeitenden vorhanden.",
+      "emptyDetail": "Wählen Sie links einen Mitarbeitenden oder legen Sie einen neuen Datensatz an.",
       "filters": {
         "search": "Suche",
         "searchPlaceholder": "Nummer, Vorname oder Nachname",
@@ -517,13 +517,13 @@
         "qualificationTypeId": "Qualifikationstyp-ID",
         "certificateNo": "Zertifikatsnummer",
         "issuedAt": "Ausgestellt am",
-        "validUntil": "Gueltig bis",
+        "validUntil": "Gültig bis",
         "issuingAuthority": "Ausstellende Stelle",
         "credentialNo": "Ausweisnummer",
         "credentialType": "Ausweistyp",
         "encodedValue": "Kodierter Wert",
-        "validFrom": "Gueltig ab",
-        "linkDocumentId": "Dokument-ID verknuepfen",
+        "validFrom": "Gültig ab",
+        "linkDocumentId": "Dokument-ID verknüpfen",
         "linkLabel": "Bezeichnung"
       },
       "actions": {
@@ -535,24 +535,24 @@
         "createCredential": "Ausweis anlegen",
         "saveCredential": "Ausweis speichern",
         "uploadProof": "Nachweis hochladen",
-        "linkProof": "Dokument verknuepfen",
+        "linkProof": "Dokument verknüpfen",
         "exportWorkers": "Export starten",
         "downloadTemplate": "Vorlage laden",
         "loadImportFile": "Datei in CSV-Feld laden",
-        "importDryRun": "Import pruefen",
-        "importExecute": "Import ausfuehren"
+        "importDryRun": "Import prüfen",
+        "importExecute": "Import ausführen"
       },
       "lifecycle": {
         "title": "Lifecycle",
-        "help": "Archivierte Mitarbeitende bleiben nachweisbar und koennen spaeter wieder aktiviert werden."
+        "help": "Archivierte Mitarbeitende bleiben nachweisbar und können später wieder aktiviert werden."
       },
       "readiness": {
         "eyebrow": "Einsatzfreigabe",
         "title": "Bereitschaft und Compliance",
         "detailTitle": "Abgeleitete Einsatzbereitschaft",
-        "checkedAt": "Geprueft am: {checkedAt}",
+        "checkedAt": "Geprüft am: {checkedAt}",
         "issueSummary": "{blocking} blockierend, {warning} Warnungen",
-        "dueOn": "Faellig bis {dueOn}",
+        "dueOn": "Fällig bis {dueOn}",
         "noIssues": "Keine offenen Bereitschaftsprobleme.",
         "status": {
           "ready": "Einsatzbereit",
@@ -577,10 +577,10 @@
       },
       "import": {
         "eyebrow": "Import / Export",
-        "title": "CSV-Austausch fuer Mitarbeitendenstammdaten",
+        "title": "CSV-Austausch für Mitarbeitendenstammdaten",
         "csvLabel": "CSV-Inhalt",
         "continueOnError": "Bei Fehlern mit den restlichen Zeilen fortfahren",
-        "dryRunSummary": "Pruefung abgeschlossen: {total} Zeilen, {invalid} ungueltig.",
+        "dryRunSummary": "Prüfung abgeschlossen: {total} Zeilen, {invalid} ungültig.",
         "executeSummary": "Import abgeschlossen: {total} Zeilen, {created} angelegt, {updated} aktualisiert.",
         "exportSummary": "Export bereit: {rows} Zeilen, Dokument {documentId}.",
         "row": {
@@ -589,8 +589,8 @@
           "missingWorkerNo": "Mitarbeitendennummer fehlt",
           "missingFirstName": "Vorname fehlt",
           "missingLastName": "Nachname fehlt",
-          "invalidBirthDate": "Geburtsdatum ist ungueltig",
-          "invalidStatus": "Status ist ungueltig"
+          "invalidBirthDate": "Geburtsdatum ist ungültig",
+          "invalidStatus": "Status ist ungültig"
         }
       },
       "qualifications": {
@@ -600,7 +600,7 @@
       },
       "proofs": {
         "title": "Nachweise",
-        "empty": "Noch keine Nachweisdokumente verknuepft."
+        "empty": "Noch keine Nachweisdokumente verknüpft."
       },
       "credentials": {
         "eyebrow": "Ausweise",
@@ -612,80 +612,80 @@
         "qualificationSaved": "Qualifikation gespeichert.",
         "credentialSaved": "Ausweis gespeichert.",
         "proofSaved": "Nachweisdokument gespeichert.",
-        "proofLinked": "Nachweisdokument verknuepft.",
-        "importDryRunReady": "Die Importpruefung ist abgeschlossen.",
-        "importExecuted": "Der Mitarbeitendenimport wurde ausgefuehrt.",
+        "proofLinked": "Nachweisdokument verknüpft.",
+        "importDryRunReady": "Die Importprüfung ist abgeschlossen.",
+        "importExecuted": "Der Mitarbeitendenimport wurde ausgeführt.",
         "exportReady": "Der Mitarbeitendenexport wurde erstellt."
       }
     },
     "feedback": {
       "titleSuccess": "Erfolg",
       "titleError": "Fehler",
-      "authRequired": "Bitte melden Sie sich zuerst mit einem gueltigen Zugriffstoken an.",
-      "permissionDenied": "Ihre Rolle darf diese Subunternehmeraktion nicht ausfuehren.",
+      "authRequired": "Bitte melden Sie sich zuerst mit einem gültigen Zugriffstoken an.",
+      "permissionDenied": "Ihre Rolle darf diese Subunternehmeraktion nicht ausführen.",
       "notFound": "Der angeforderte Subunternehmerdatensatz wurde nicht gefunden.",
       "duplicateNumber": "Diese Subunternehmernummer ist im Mandanten bereits vergeben.",
-      "primaryConflict": "Es darf nur einen Primaerkontakt pro Subunternehmer geben.",
+      "primaryConflict": "Es darf nur einen Primärkontakt pro Subunternehmer geben.",
       "duplicateUserLink": "Dieses Benutzerkonto ist bereits einem anderen Subunternehmerkontakt zugeordnet.",
-      "portalUserRequired": "Portalaktivierung benoetigt ein verknuepftes Benutzerkonto.",
-      "scopeOverlap": "Die Scope-Zeile ueberschneidet sich mit einer bestehenden Freigabe.",
-      "scopeBranchMismatch": "Das angegebene Mandat gehoert nicht zur gewaehlten Niederlassung.",
-      "staleVersion": "Der Datensatz wurde zwischenzeitlich geaendert. Bitte neu laden und erneut speichern.",
+      "portalUserRequired": "Portalaktivierung benötigt ein verknüpftes Benutzerkonto.",
+      "scopeOverlap": "Die Scope-Zeile überschneidet sich mit einer bestehenden Freigabe.",
+      "scopeBranchMismatch": "Das angegebene Mandat gehört nicht zur gewählten Niederlassung.",
+      "staleVersion": "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden und erneut speichern.",
       "saved": "Subunternehmerstammdaten gespeichert.",
       "contactSaved": "Kontakt gespeichert.",
       "scopeSaved": "Scope-Zeile gespeichert.",
       "financeSaved": "Finanzprofil gespeichert.",
       "historySaved": "Historieneintrag gespeichert.",
-      "historyAttachmentSaved": "Historienanlage verknuepft.",
+      "historyAttachmentSaved": "Historienanlage verknüpft.",
       "historyNotFound": "Der angeforderte Historieneintrag wurde nicht gefunden.",
-      "historyTypeInvalid": "Der gewaehlte Historientyp ist ungueltig.",
+      "historyTypeInvalid": "Der gewählte Historientyp ist ungültig.",
       "historyContactMissing": "Der referenzierte Kontakt konnte nicht gefunden werden.",
       "workerNotFound": "Die angeforderte Mitarbeitendenakte wurde nicht gefunden.",
-      "workerDuplicateNumber": "Diese Mitarbeitendennummer ist fuer den Subunternehmer bereits vergeben.",
+      "workerDuplicateNumber": "Diese Mitarbeitendennummer ist für den Subunternehmer bereits vergeben.",
       "workerQualificationNotFound": "Die angeforderte Qualifikation wurde nicht gefunden.",
       "workerQualificationTypeMissing": "Der angegebene Qualifikationstyp wurde nicht gefunden oder ist inaktiv.",
-      "workerQualificationInvalidWindow": "Das Gueltigkeitsfenster der Qualifikation ist ungueltig.",
-      "workerQualificationExpiryRequired": "Fuer diesen Qualifikationstyp ist ein Ablaufdatum erforderlich.",
+      "workerQualificationInvalidWindow": "Das Gültigkeitsfenster der Qualifikation ist ungültig.",
+      "workerQualificationExpiryRequired": "Für diesen Qualifikationstyp ist ein Ablaufdatum erforderlich.",
       "workerCredentialNotFound": "Der angeforderte Ausweis wurde nicht gefunden.",
-      "workerCredentialInvalidType": "Der Ausweistyp ist ungueltig.",
-      "workerCredentialInvalidStatus": "Der Ausweisstatus ist ungueltig.",
-      "workerCredentialInvalidWindow": "Das Gueltigkeitsfenster des Ausweises ist ungueltig.",
+      "workerCredentialInvalidType": "Der Ausweistyp ist ungültig.",
+      "workerCredentialInvalidStatus": "Der Ausweisstatus ist ungültig.",
+      "workerCredentialInvalidWindow": "Das Gültigkeitsfenster des Ausweises ist ungültig.",
       "workerCredentialDuplicateNo": "Diese Ausweisnummer ist bereits vergeben.",
       "workerCredentialDuplicateEncodedValue": "Dieser kodierte Ausweiswert ist bereits vergeben.",
       "workerImportInvalidCsv": "Die CSV-Datei konnte nicht gelesen werden.",
       "workerImportInvalidHeaders": "Die Kopfzeile der CSV-Datei entspricht nicht der erwarteten Vorlage.",
-      "lifecycleDenied": "Die Lifecycle-Aktion ist fuer den aktuellen Status nicht erlaubt.",
-      "lifecycleSaved": "Lifecycle-Aenderung gespeichert.",
-      "statusSaved": "Lifecycle-Aenderung gespeichert.",
+      "lifecycleDenied": "Die Lifecycle-Aktion ist für den aktuellen Status nicht erlaubt.",
+      "lifecycleSaved": "Lifecycle-Änderung gespeichert.",
+      "statusSaved": "Lifecycle-Änderung gespeichert.",
       "error": "Die Subunternehmerverwaltung konnte nicht abgeschlossen werden."
     }
   }
   ,
   "tenantUsers": {
     "description": "Plattformadministration erstellt und pflegt Tenant-Admin-Konten pro Mandant mit sauberem Tenant-Scope und auditierbaren Sicherheitsaktionen.",
-    "workspace": "Die Seite kombiniert Tenant-Auswahl, Benutzerliste, Statussteuerung und Passwortaktionen in einem eigenstaendigen IAM-Arbeitsbereich.",
+    "workspace": "Die Seite kombiniert Tenant-Auswahl, Benutzerliste, Statussteuerung und Passwortaktionen in einem eigenständigen IAM-Arbeitsbereich.",
     "actionsTitle": "Benutzeraktionen",
-    "actionsDescription": "Erstellen Sie neue Tenant-Admins oder aktualisieren Sie die aktuelle Liste des gewaehlten Mandanten.",
+    "actionsDescription": "Erstellen Sie neue Tenant-Admins oder aktualisieren Sie die aktuelle Liste des gewählten Mandanten.",
     "filtersTitle": "Mandant und Filter",
-    "filtersDescription": "Waehlen Sie zuerst den Zielmandanten aus. Die Liste zeigt nur tenant_admin-Konten fuer diesen Scope.",
+    "filtersDescription": "Wählen Sie zuerst den Zielmandanten aus. Die Liste zeigt nur tenant_admin-Konten für diesen Scope.",
     "tableTitle": "Tenant-Admin-Benutzer",
     "tableDescription": "Alle gelisteten Konten haben die tenant_admin-Rolle mit tenant-weitem Scope.",
     "scopeTitle": "Berechtigungsrahmen",
-    "scopeDescription": "Nur Plattformadministration legt den ersten Tenant-Admin an und verwaltet sicherheitsrelevante Kontozustaende.",
+    "scopeDescription": "Nur Plattformadministration legt den ersten Tenant-Admin an und verwaltet sicherheitsrelevante Kontozustände.",
     "workspaceTitle": "Rollen- und Scope-Zusammenfassung",
     "workspaceHint": "Der Flow bleibt bewusst eng: pro Zeile ein Benutzerkonto, eine tenant_admin-Zuweisung und ein Mandantenscope.",
-    "workspaceBody": "Neue Tenant-Admins erhalten genau eine tenant_admin-Zuweisung im ausgewaehlten Mandanten. Statuswechsel und Passwortaktionen werden auditierbar ueber den IAM-Admin-Service ausgefuehrt.",
-    "generatedPasswordTitle": "Temporaeres Passwort",
+    "workspaceBody": "Neue Tenant-Admins erhalten genau eine tenant_admin-Zuweisung im ausgewählten Mandanten. Statuswechsel und Passwortaktionen werden auditierbar über den IAM-Admin-Service ausgeführt.",
+    "generatedPasswordTitle": "Temporäres Passwort",
     "actions": {
       "create": "Tenant-Admin anlegen",
       "refresh": "Liste aktualisieren",
       "activate": "Aktivieren",
       "deactivate": "Deaktivieren",
-      "resetPassword": "Passwort zuruecksetzen"
+      "resetPassword": "Passwort zurücksetzen"
     },
     "filter": {
       "searchPlaceholder": "Mandant nach Code oder Name suchen",
-      "tenantPlaceholder": "Mandant auswaehlen"
+      "tenantPlaceholder": "Mandant auswählen"
     },
     "summary": {
       "title": "Aktiver Zielmandant"
@@ -700,11 +700,11 @@
       "actions": "Aktionen"
     },
     "form": {
-      "password": "Temporaeres Passwort"
+      "password": "Temporäres Passwort"
     },
     "modal": {
       "createTitle": "Tenant-Admin anlegen",
-      "passwordTitle": "Passwort zuruecksetzen"
+      "passwordTitle": "Passwort zurücksetzen"
     },
     "messages": {
       "created": "Tenant-Admin wurde angelegt.",
@@ -715,6 +715,12 @@
       "tenants": "Mandanten",
       "users": "Tenant-Admins",
       "active": "Aktive Konten"
+    },
+    "currentScope": {
+      "title": "Aktueller IAM-Umfang",
+      "body": "Diese Seite verwaltet nur tenant_admin-Konten. Eine Weboberfläche für Rollen-Katalog, Berechtigungszuordnungen oder Audit-Review ist im aktuellen Projektstand noch nicht vorhanden.",
+      "infoTitle": "Dokumentation ist weiter als die aktuelle Weboberfläche",
+      "infoBody": "Im Repository existieren Rollen-, Berechtigungs- und Audit-Bausteine auf Modell-, Seed- und Service-Ebene. Es gibt derzeit aber keine bereits implementierte, nur versteckte Webseite für Rollenverwaltung, Berechtigungs-Scope-Verwaltung oder Audit-Ereignis-Review, die hier nur freigeschaltet werden musste."
     },
     "values": {
       "never": "Noch kein Login"

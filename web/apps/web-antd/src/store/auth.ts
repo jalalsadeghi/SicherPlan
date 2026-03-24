@@ -17,8 +17,10 @@ import {
 } from '#/api';
 import { $t } from '#/locales';
 import { resolveLoginErrorMessageKey } from '#/api/core/auth';
+import { useAuthStore as useLegacyAuthStore } from '#/sicherplan-legacy/stores/auth';
 
 import { buildLoginLocation } from './auth-bootstrap';
+import { persistRememberedLoginValues } from './auth-session';
 
 export const useAuthStore = defineStore('auth', () => {
   const accessStore = useAccessStore();
@@ -40,7 +42,13 @@ export const useAuthStore = defineStore('auth', () => {
     accessStore.setAccessRoutes([]);
     accessStore.setIsAccessChecked(false);
     accessStore.setLoginExpired(false);
+    accessStore.setRememberMe(false);
     userStore.setUserInfo(null);
+    try {
+      useLegacyAuthStore().clearSession();
+    } catch {
+      // Ignore legacy store cleanup when Pinia is not active.
+    }
   }
 
   function clearLoginError() {
@@ -61,11 +69,14 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       clearLoginError();
       loginLoading.value = true;
-      const { accessToken } = await loginApi(params);
+      accessStore.setRememberMe(Boolean(params.rememberMe));
+      persistRememberedLoginValues(params);
+      const { accessToken, refreshToken } = await loginApi(params);
 
       // 如果成功获取到 accessToken
       if (accessToken) {
         accessStore.setAccessToken(accessToken);
+        accessStore.setRefreshToken(refreshToken);
 
         // 获取用户信息并存储到 accessStore 中
         const [fetchUserInfoResult, accessCodes] = await Promise.all([
@@ -98,6 +109,8 @@ export const useAuthStore = defineStore('auth', () => {
         }
       }
     } catch (error) {
+      accessStore.setAccessToken(null);
+      accessStore.setRefreshToken(null);
       loginErrorMessageKey.value = resolveLoginErrorMessageKey(error);
       notification.error({
         description: $t(loginErrorMessageKey.value),

@@ -1,15 +1,58 @@
 export const CUSTOMER_PERMISSION_MATRIX = {
   platform_admin: ["customers.customer.read", "customers.customer.write"],
   tenant_admin: ["customers.customer.read", "customers.customer.write"],
-  dispatcher: [],
+  dispatcher: ["customers.customer.read"],
   accounting: ["customers.customer.read"],
-  controller_qm: [],
+  controller_qm: ["customers.customer.read"],
   customer_user: [],
   subcontractor_user: [],
 };
 
+export const CUSTOMER_DETAIL_TAB_ORDER = [
+  "overview",
+  "contacts",
+  "addresses",
+  "commercial",
+  "portal",
+  "history",
+  "employee_blocks",
+];
+
+export const CUSTOMER_COMMERCIAL_TAB_ORDER = [
+  "billing_profile",
+  "invoice_parties",
+  "pricing_rules",
+];
+
 export function hasCustomerPermission(role, permissionKey) {
   return (CUSTOMER_PERMISSION_MATRIX[role] ?? []).includes(permissionKey);
+}
+
+export function resolveCustomerAdminSectionVisibility({ effectiveRole, embedded = false }) {
+  const isTenantAdminEmbedded = embedded && effectiveRole === "tenant_admin";
+
+  return {
+    showGovernanceHero: !isTenantAdminEmbedded,
+  };
+}
+
+export function resolveCustomerAdminSessionScope({
+  effectiveAccessToken,
+  effectiveRole,
+  effectiveTenantScopeId,
+  storedAccessToken,
+}) {
+  if (effectiveRole === "tenant_admin") {
+    return {
+      accessToken: typeof effectiveAccessToken === "string" ? effectiveAccessToken.trim() : "",
+      tenantScopeId: typeof effectiveTenantScopeId === "string" ? effectiveTenantScopeId.trim() : "",
+    };
+  }
+
+  return {
+    accessToken: typeof storedAccessToken === "string" ? storedAccessToken.trim() : "",
+    tenantScopeId: typeof effectiveTenantScopeId === "string" ? effectiveTenantScopeId.trim() : "",
+  };
 }
 
 export function deriveCustomerActionState(role, selectedCustomer) {
@@ -49,6 +92,106 @@ export function formatPrimaryContactSummary(customer) {
   return [primaryContact.full_name, primaryContact.email].filter(Boolean).join(" · ");
 }
 
+export function formatCustomerReferenceLabel(record) {
+  if (!record) {
+    return "";
+  }
+
+  if ("name" in record && record.name) {
+    return [record.code, record.name].filter(Boolean).join(" - ");
+  }
+
+  return [record.code, record.label].filter(Boolean).join(" - ");
+}
+
+export function filterCustomerMandatesByBranch(mandates, branchId) {
+  const normalizedBranchId = typeof branchId === "string" ? branchId.trim() : "";
+  if (!normalizedBranchId) {
+    return [...(mandates ?? [])];
+  }
+  return (mandates ?? []).filter((mandate) => mandate.branch_id === normalizedBranchId);
+}
+
+export function buildCustomerReferenceMaps(referenceData) {
+  const buildMap = (items) => new Map((items ?? []).map((item) => [item.id, formatCustomerReferenceLabel(item)]));
+
+  return {
+    legalForms: buildMap(referenceData?.legal_forms),
+    classifications: buildMap(referenceData?.classifications),
+    rankings: buildMap(referenceData?.rankings),
+    customerStatuses: buildMap(referenceData?.customer_statuses),
+    branches: buildMap(referenceData?.branches),
+    mandates: buildMap(referenceData?.mandates),
+  };
+}
+
+export function buildCustomerDraftPayload(draft, { allowedBranchIds = null, allowedMandateIds = null } = {}) {
+  const emptyToNull = (value) => {
+    if (typeof value !== "string") {
+      return value ?? null;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  };
+  const normalizeReference = (value, allowedIds) => {
+    const normalized = emptyToNull(value);
+    if (normalized == null) {
+      return null;
+    }
+    if (Array.isArray(allowedIds)) {
+      return allowedIds.includes(normalized) ? normalized : null;
+    }
+    return normalized;
+  };
+
+  return {
+    tenant_id: draft.tenant_id,
+    customer_number: draft.customer_number.trim(),
+    name: draft.name.trim(),
+    status: emptyToNull(draft.status) ?? "active",
+    legal_name: emptyToNull(draft.legal_name),
+    external_ref: emptyToNull(draft.external_ref),
+    legal_form_lookup_id: emptyToNull(draft.legal_form_lookup_id),
+    classification_lookup_id: emptyToNull(draft.classification_lookup_id),
+    ranking_lookup_id: emptyToNull(draft.ranking_lookup_id),
+    customer_status_lookup_id: emptyToNull(draft.customer_status_lookup_id),
+    default_branch_id: normalizeReference(draft.default_branch_id, allowedBranchIds),
+    default_mandate_id: normalizeReference(draft.default_mandate_id, allowedMandateIds),
+    notes: emptyToNull(draft.notes),
+  };
+}
+
+export function resolveCustomerCancelSelection(previousSelectedCustomer) {
+  return previousSelectedCustomer
+    ? { isCreatingCustomer: false, selectedCustomerId: previousSelectedCustomer.id, selectedCustomer: previousSelectedCustomer }
+    : { isCreatingCustomer: false, selectedCustomerId: "", selectedCustomer: null };
+}
+
+export function buildCustomerDetailTabs({ canReadCommercial, hasSelectedCustomer, isCreatingCustomer }) {
+  if (isCreatingCustomer) {
+    return ["overview"];
+  }
+
+  if (!hasSelectedCustomer) {
+    return [];
+  }
+
+  return CUSTOMER_DETAIL_TAB_ORDER.filter((tabId) => tabId !== "commercial" || !!canReadCommercial);
+}
+
+export function normalizeCustomerDetailTab(activeTab, options) {
+  const tabs = buildCustomerDetailTabs(options);
+  if (!tabs.length) {
+    return "";
+  }
+
+  return tabs.includes(activeTab) ? activeTab : "overview";
+}
+
+export function normalizeCustomerCommercialTab(activeTab) {
+  return CUSTOMER_COMMERCIAL_TAB_ORDER.includes(activeTab) ? activeTab : "billing_profile";
+}
+
 export function mapCustomerApiMessage(messageKey) {
   const messageMap = {
     "errors.iam.auth.invalid_access_token": "customerAdmin.feedback.authRequired",
@@ -61,6 +204,10 @@ export function mapCustomerApiMessage(messageKey) {
     "errors.customers.employee_block.not_found": "customerAdmin.feedback.notFound",
     "errors.customers.customer.duplicate_number": "customerAdmin.feedback.duplicateNumber",
     "errors.customers.customer.stale_version": "customerAdmin.feedback.staleVersion",
+    "errors.customers.customer.invalid_initial_status": "customerAdmin.feedback.invalidInitialStatus",
+    "errors.customers.customer.invalid_branch_scope": "customerAdmin.feedback.invalidBranchScope",
+    "errors.customers.customer.invalid_mandate_scope": "customerAdmin.feedback.invalidMandateScope",
+    "errors.customers.customer.mandate_branch_mismatch": "customerAdmin.feedback.mandateBranchMismatch",
     "errors.customers.contact.stale_version": "customerAdmin.feedback.staleVersion",
     "errors.customers.address_link.stale_version": "customerAdmin.feedback.staleVersion",
     "errors.customers.employee_block.stale_version": "customerAdmin.feedback.staleVersion",

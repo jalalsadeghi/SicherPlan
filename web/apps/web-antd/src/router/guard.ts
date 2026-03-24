@@ -8,6 +8,7 @@ import { startProgress, stopProgress } from '@vben/utils';
 import { accessRoutes, coreRouteNames } from '#/router/routes';
 import { useAuthStore } from '#/store';
 import { buildLoginLocation } from '#/store/auth-bootstrap';
+import { useAuthStore as useLegacyAuthStore } from '#/sicherplan-legacy/stores/auth';
 
 import { generateAccess } from './access';
 
@@ -56,6 +57,7 @@ function setupAccessGuard(router: Router) {
     const accessStore = useAccessStore();
     const userStore = useUserStore();
     const authStore = useAuthStore();
+    const legacyAuthStore = useLegacyAuthStore();
 
     // 基本路由，这些路由不需要进入权限拦截
     if (coreRouteNames.includes(to.name as string)) {
@@ -111,7 +113,7 @@ function setupAccessGuard(router: Router) {
       // 生成路由表
       // 当前登录用户拥有的角色标识列表
       const userInfo = userStore.userInfo || (await authStore.fetchUserInfo());
-      const userRoles = userInfo.roles ?? [];
+      const userRoles = legacyAuthStore.accessRoles;
 
       // 生成菜单和路由
       const { accessibleMenus, accessibleRoutes } = await generateAccess({

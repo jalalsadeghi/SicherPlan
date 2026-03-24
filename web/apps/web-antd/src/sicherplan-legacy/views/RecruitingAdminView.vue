@@ -421,7 +421,7 @@ const filters = reactive({
   source_channel: "",
 });
 
-const tenantScopeInput = ref(authStore.tenantScopeId || authStore.sessionUser?.tenant_id || "");
+const tenantScopeInput = ref(authStore.effectiveTenantScopeId || authStore.tenantScopeId || "");
 const applicants = ref<ApplicantListItem[]>([]);
 const selectedApplicantId = ref("");
 const selectedDetail = ref<ApplicantDetailRead | null>(null);
@@ -446,9 +446,7 @@ const canRead = computed(() => hasRecruitingPermission(effectiveRole.value, "rec
 const canWrite = computed(() => hasRecruitingPermission(effectiveRole.value, "recruiting.applicant.write"));
 const canReadDocs = computed(() => hasRecruitingPermission(effectiveRole.value, "platform.docs.read"));
 const canAccess = computed(() => canAccessRecruitingAdmin(effectiveRole.value, authStore.hasSession));
-const resolvedTenantScopeId = computed(() =>
-  isPlatformAdmin.value ? authStore.tenantScopeId : (authStore.sessionUser?.tenant_id ?? authStore.tenantScopeId),
-);
+const resolvedTenantScopeId = computed(() => authStore.effectiveTenantScopeId);
 const nextActions = computed(() => deriveNextActionDescriptors(selectedDetail.value?.next_allowed_statuses ?? []));
 const requiresDecisionReason = computed(
   () => transitionDraft.to_status === "accepted" || transitionDraft.to_status === "rejected",
@@ -709,7 +707,7 @@ onMounted(async () => {
     }
   }
   if (!isPlatformAdmin.value) {
-    tenantScopeInput.value = authStore.sessionUser?.tenant_id ?? authStore.tenantScopeId;
+    tenantScopeInput.value = authStore.effectiveTenantScopeId || authStore.tenantScopeId;
   }
   await refreshApplicants();
 });
@@ -818,6 +816,61 @@ onMounted(async () => {
 .recruiting-feedback[data-tone="success"] {
   background: color-mix(in srgb, #2f8f67 18%, var(--sp-color-surface-panel));
   color: #17674a;
+}
+
+.field-stack {
+  display: grid;
+  gap: 0.42rem;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.field-stack--wide {
+  grid-column: 1 / -1;
+}
+
+.field-stack input,
+.field-stack select,
+.field-stack textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-card);
+  color: var(--sp-color-text-primary);
+  padding: 0.78rem 0.9rem;
+  font: inherit;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.field-stack textarea {
+  min-height: 6.5rem;
+  resize: vertical;
+}
+
+.field-stack input:focus,
+.field-stack select:focus,
+.field-stack textarea:focus {
+  outline: none;
+  border-color: rgb(40 170 170 / 55%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
+.field-stack input:disabled,
+.field-stack select:disabled,
+.field-stack textarea:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.field-help {
+  margin: 0;
+  font-size: 0.85rem;
 }
 
 .recruiting-lead,

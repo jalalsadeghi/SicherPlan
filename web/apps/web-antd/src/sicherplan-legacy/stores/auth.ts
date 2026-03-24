@@ -13,7 +13,7 @@ import {
   type LoginPayload,
   type LoginResponse,
   type SubcontractorPortalContextRead,
-} from "@/api/auth";
+} from "../api/auth";
 import type { AppRole } from "@/types/roles";
 
 const ROLE_STORAGE_KEY = "sicherplan-role";
@@ -168,6 +168,18 @@ function pickSessionRole(user: AuthenticatedUser | null): AppRole | null {
   return null;
 }
 
+function resolveTenantScopeIdForRole(
+  role: AppRole,
+  sessionUser: AuthenticatedUser | null,
+  rememberedTenantScopeId: string,
+): string {
+  if (role === "platform_admin") {
+    return rememberedTenantScopeId;
+  }
+
+  return sessionUser?.tenant_id ?? "";
+}
+
 export const useAuthStore = defineStore("sicherplan-legacy-auth", {
   state: () => ({
     activeRole: readStoredRole() as AppRole,
@@ -189,6 +201,16 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
     effectiveRole(state): AppRole {
       return pickRoleFromKeys(readPrimaryRoleKeys()) ?? pickSessionRole(state.sessionUser) ?? state.activeRole;
     },
+    accessRoles(): string[] {
+      return [this.effectiveRole];
+    },
+    effectiveTenantScopeId(state): string {
+      return resolveTenantScopeIdForRole(
+        this.effectiveRole,
+        state.sessionUser,
+        state.tenantScopeId,
+      );
+    },
     effectiveAccessToken(state): string {
       return state.accessToken || readPrimaryAccessToken();
     },
@@ -209,7 +231,13 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
 
       if (primaryAccessToken && primaryAccessToken !== this.accessToken) {
         this.accessToken = primaryAccessToken;
+        this.sessionId = "";
+        this.sessionUser = null;
+        this.clearPortalCustomerContext();
+        this.clearPortalSubcontractorContext();
         persistString(ACCESS_TOKEN_STORAGE_KEY, this.accessToken);
+        persistString(SESSION_ID_STORAGE_KEY, "");
+        persistJson(SESSION_USER_STORAGE_KEY, null);
       }
 
       if (primaryRole && primaryRole !== this.activeRole) {
@@ -227,7 +255,13 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       }
     },
     setTenantScopeId(tenantId: string) {
-      this.tenantScopeId = tenantId.trim();
+      const requestedTenantId = tenantId.trim();
+      const sessionTenantId = this.sessionUser?.tenant_id?.trim() ?? "";
+
+      this.tenantScopeId =
+        this.effectiveRole === "platform_admin"
+          ? requestedTenantId
+          : sessionTenantId || this.tenantScopeId || requestedTenantId;
 
       if (typeof window !== "undefined") {
         window.localStorage.setItem(TENANT_SCOPE_STORAGE_KEY, this.tenantScopeId);
@@ -239,11 +273,17 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       this.sessionId = payload.session.session_id;
       this.sessionUser = payload.user;
       this.activeRole = pickSessionRole(payload.user) ?? this.activeRole;
+      this.tenantScopeId = resolveTenantScopeIdForRole(
+        this.activeRole,
+        payload.user,
+        this.tenantScopeId,
+      );
 
       persistString(ACCESS_TOKEN_STORAGE_KEY, this.accessToken);
       persistString(REFRESH_TOKEN_STORAGE_KEY, this.refreshToken);
       persistString(SESSION_ID_STORAGE_KEY, this.sessionId);
       persistJson(SESSION_USER_STORAGE_KEY, this.sessionUser);
+      persistString(TENANT_SCOPE_STORAGE_KEY, this.tenantScopeId);
 
       if (typeof window !== "undefined") {
         window.localStorage.setItem(ROLE_STORAGE_KEY, this.activeRole);
@@ -261,12 +301,14 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       this.accessToken = "";
       this.refreshToken = "";
       this.sessionId = "";
+      this.tenantScopeId = "";
       this.sessionUser = null;
       this.clearPortalCustomerContext();
       this.clearPortalSubcontractorContext();
       persistString(ACCESS_TOKEN_STORAGE_KEY, "");
       persistString(REFRESH_TOKEN_STORAGE_KEY, "");
       persistString(SESSION_ID_STORAGE_KEY, "");
+      persistString(TENANT_SCOPE_STORAGE_KEY, "");
       persistJson(SESSION_USER_STORAGE_KEY, null);
     },
     async loginCustomerPortal(payload: LoginPayload) {
@@ -288,8 +330,14 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
         this.sessionUser = response.user;
         this.sessionId = response.session.id;
         this.activeRole = pickSessionRole(response.user) ?? this.activeRole;
+        this.tenantScopeId = resolveTenantScopeIdForRole(
+          this.activeRole,
+          response.user,
+          this.tenantScopeId,
+        );
         persistJson(SESSION_USER_STORAGE_KEY, this.sessionUser);
         persistString(SESSION_ID_STORAGE_KEY, this.sessionId);
+        persistString(TENANT_SCOPE_STORAGE_KEY, this.tenantScopeId);
         if (typeof window !== "undefined") {
           window.localStorage.setItem(ROLE_STORAGE_KEY, this.activeRole);
         }
@@ -355,3 +403,5 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
     },
   },
 });
+
+export { resolveTenantScopeIdForRole };

@@ -307,6 +307,7 @@ class TestAuthFlows(unittest.TestCase):
                 tenant_code="nord",
                 identifier="nina",
                 password="CorrectHorseBattery",
+                remember_me=True,
                 device_label="Browser",
             ),
             ip_address="127.0.0.1",
@@ -314,6 +315,9 @@ class TestAuthFlows(unittest.TestCase):
         )
         self.assertEqual(login.user.username, "nina")
         self.assertEqual(login.session.sso_hints, ["oidc-ready"])
+        self.assertTrue(
+            self.repository.sessions[login.session.session_id].metadata_json["remember_me"]
+        )
 
         context = self.service.authenticate_access_token(login.session.access_token)
         current = self.service.current_session(context)

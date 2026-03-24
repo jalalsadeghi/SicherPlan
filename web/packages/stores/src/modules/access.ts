@@ -5,6 +5,49 @@ import type { MenuRecordRaw } from '@vben-core/typings';
 import { acceptHMRUpdate, defineStore } from 'pinia';
 
 type AccessToken = null | string;
+type StorageLike = Pick<Storage, 'getItem' | 'removeItem' | 'setItem'>;
+
+const noopStorage: StorageLike = {
+  getItem() {
+    return null;
+  },
+  removeItem() {},
+  setItem() {},
+};
+
+function resolveBrowserStorage(kind: 'local' | 'session'): StorageLike {
+  if (typeof window === 'undefined') {
+    return noopStorage;
+  }
+
+  return kind === 'local' ? window.localStorage : window.sessionStorage;
+}
+
+const accessStateStorage: StorageLike = {
+  getItem(key) {
+    return resolveBrowserStorage('local').getItem(key)
+      ?? resolveBrowserStorage('session').getItem(key);
+  },
+  removeItem(key) {
+    resolveBrowserStorage('local').removeItem(key);
+    resolveBrowserStorage('session').removeItem(key);
+  },
+  setItem(key, value) {
+    let rememberMe = false;
+
+    try {
+      rememberMe = JSON.parse(value).rememberMe === true;
+    } catch {
+      rememberMe = false;
+    }
+
+    const nextStorage = resolveBrowserStorage(rememberMe ? 'local' : 'session');
+    const staleStorage = resolveBrowserStorage(rememberMe ? 'session' : 'local');
+
+    staleStorage.removeItem(key);
+    nextStorage.setItem(key, value);
+  },
+};
 
 interface AccessState {
   /**
@@ -43,6 +86,10 @@ interface AccessState {
    * 登录 accessToken
    */
   refreshToken: AccessToken;
+  /**
+   * 是否持久化当前登录会话
+   */
+  rememberMe: boolean;
 }
 
 /**
@@ -91,6 +138,9 @@ export const useAccessStore = defineStore('core-access', {
     setLoginExpired(loginExpired: boolean) {
       this.loginExpired = loginExpired;
     },
+    setRememberMe(rememberMe: boolean) {
+      this.rememberMe = rememberMe;
+    },
     setRefreshToken(token: AccessToken) {
       this.refreshToken = token;
     },
@@ -100,13 +150,14 @@ export const useAccessStore = defineStore('core-access', {
     },
   },
   persist: {
-    // 持久化
+    storage: accessStateStorage,
     pick: [
       'accessToken',
       'refreshToken',
       'accessCodes',
       'isLockScreen',
       'lockScreenPassword',
+      'rememberMe',
     ],
   },
   state: (): AccessState => ({
@@ -118,6 +169,7 @@ export const useAccessStore = defineStore('core-access', {
     isLockScreen: false,
     lockScreenPassword: undefined,
     loginExpired: false,
+    rememberMe: false,
     refreshToken: null,
   }),
 });

@@ -51,9 +51,9 @@ def _context(*permissions: str, tenant_id: str = "tenant-1") -> RequestAuthoriza
 @dataclass
 class FakeEmployeeRepository:
     tenant_id: str = "tenant-1"
-    branch_id: str = "branch-1"
-    mandate_id: str = "mandate-1"
-    user_id: str = "user-1"
+    branch_id: str = "22222222-2222-2222-2222-222222222222"
+    mandate_id: str = "33333333-3333-3333-3333-333333333333"
+    user_id: str = "11111111-1111-1111-1111-111111111111"
     address_id: str = "address-1"
     employees: dict[str, Employee] = field(default_factory=dict)
     private_profiles: dict[str, EmployeePrivateProfile] = field(default_factory=dict)
@@ -62,6 +62,8 @@ class FakeEmployeeRepository:
     group_members: dict[str, EmployeeGroupMember] = field(default_factory=dict)
     notes: dict[str, list[EmployeeNote]] = field(default_factory=dict)
     role_assignments: dict[str, UserRoleAssignment] = field(default_factory=dict)
+    branches: dict[str, Branch] = field(default_factory=dict)
+    mandates: dict[str, Mandate] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.branch = Branch(
@@ -116,6 +118,8 @@ class FakeEmployeeRepository:
             city="Berlin",
             country_code="DE",
         )
+        self.branches[self.branch_id] = self.branch
+        self.mandates[self.mandate_id] = self.mandate
 
     def list_employees(self, tenant_id: str, filters=None) -> list[Employee]:  # noqa: ANN001
         rows = [row for row in self.employees.values() if row.tenant_id == tenant_id]
@@ -312,14 +316,16 @@ class FakeEmployeeRepository:
         return row
 
     def get_branch(self, tenant_id: str, branch_id: str) -> Branch | None:
-        if tenant_id == self.tenant_id and branch_id == self.branch_id:
-            return self.branch
-        return None
+        branch = self.branches.get(branch_id)
+        if branch is None or tenant_id != self.tenant_id:
+            return None
+        return branch
 
     def get_mandate(self, tenant_id: str, mandate_id: str) -> Mandate | None:
-        if tenant_id == self.tenant_id and mandate_id == self.mandate_id:
-            return self.mandate
-        return None
+        mandate = self.mandates.get(mandate_id)
+        if mandate is None or tenant_id != self.tenant_id:
+            return None
+        return mandate
 
     def get_address(self, address_id: str) -> Address | None:
         if address_id == self.address_id:
@@ -383,9 +389,9 @@ class TestEmployeeService(unittest.TestCase):
                 personnel_no="EMP-1001",
                 first_name="Anna",
                 last_name="Schmidt",
-                default_branch_id="branch-1",
-                default_mandate_id="mandate-1",
-                user_id="user-1",
+                default_branch_id=self.repository.branch_id,
+                default_mandate_id=self.repository.mandate_id,
+                user_id=self.repository.user_id,
             ),
             _context("employees.employee.write"),
         )
@@ -494,7 +500,7 @@ class TestEmployeeService(unittest.TestCase):
                 personnel_no="EMP-1004",
                 first_name="Dora",
                 last_name="Becker",
-                user_id="user-1",
+                user_id=self.repository.user_id,
             ),
             _context("employees.employee.write"),
         )
@@ -507,12 +513,207 @@ class TestEmployeeService(unittest.TestCase):
                     personnel_no="EMP-1005",
                     first_name="Eva",
                     last_name="Lorenz",
-                    user_id="user-1",
+                    user_id=self.repository.user_id,
                 ),
                 _context("employees.employee.write"),
             )
 
         self.assertEqual(ctx.exception.message_key, "errors.employees.employee.duplicate_user_link")
+
+    def test_create_employee_allows_empty_user_id(self) -> None:
+        employee = self.service.create_employee(
+            "tenant-1",
+            EmployeeOperationalCreate(
+                tenant_id="tenant-1",
+                personnel_no="EMP-1005A",
+                first_name="Jana",
+                last_name="Klein",
+                user_id="   ",
+            ),
+            _context("employees.employee.write"),
+        )
+
+        self.assertIsNone(employee.user_id)
+
+    def test_create_employee_rejects_non_uuid_user_id(self) -> None:
+        with self.assertRaises(ApiException) as ctx:
+            self.service.create_employee(
+                "tenant-1",
+                EmployeeOperationalCreate(
+                    tenant_id="tenant-1",
+                    personnel_no="EMP-1005B",
+                    first_name="Lars",
+                    last_name="Winter",
+                    user_id="usr-emp-0042",
+                ),
+                _context("employees.employee.write"),
+            )
+
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.message_key, "errors.employees.user.invalid_id_format")
+
+    def test_create_employee_rejects_missing_valid_uuid_user_account(self) -> None:
+        missing_user_id = str(uuid4())
+
+        with self.assertRaises(ApiException) as ctx:
+            self.service.create_employee(
+                "tenant-1",
+                EmployeeOperationalCreate(
+                    tenant_id="tenant-1",
+                    personnel_no="EMP-1005C",
+                    first_name="Mila",
+                    last_name="Brandt",
+                    user_id=missing_user_id,
+                ),
+                _context("employees.employee.write"),
+            )
+
+        self.assertEqual(ctx.exception.status_code, 404)
+        self.assertEqual(ctx.exception.message_key, "errors.employees.user.not_found")
+
+    def test_create_employee_accepts_existing_valid_uuid_user_id(self) -> None:
+        employee = self.service.create_employee(
+            "tenant-1",
+            EmployeeOperationalCreate(
+                tenant_id="tenant-1",
+                personnel_no="EMP-1005D",
+                first_name="Nina",
+                last_name="Voss",
+                user_id=self.repository.user_id,
+            ),
+            _context("employees.employee.write"),
+        )
+
+        self.assertEqual(employee.user_id, self.repository.user_id)
+
+    def test_create_employee_rejects_non_uuid_default_branch_id(self) -> None:
+        with self.assertRaises(ApiException) as ctx:
+            self.service.create_employee(
+                "tenant-1",
+                EmployeeOperationalCreate(
+                    tenant_id="tenant-1",
+                    personnel_no="EMP-1005E",
+                    first_name="Nora",
+                    last_name="Weiss",
+                    default_branch_id="Cologne HQ",
+                ),
+                _context("employees.employee.write"),
+            )
+
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.message_key, "errors.employees.employee.invalid_branch_id_format")
+
+    def test_create_employee_rejects_non_uuid_default_mandate_id(self) -> None:
+        with self.assertRaises(ApiException) as ctx:
+            self.service.create_employee(
+                "tenant-1",
+                EmployeeOperationalCreate(
+                    tenant_id="tenant-1",
+                    personnel_no="EMP-1005F",
+                    first_name="Omar",
+                    last_name="Jung",
+                    default_mandate_id="Night Shift",
+                ),
+                _context("employees.employee.write"),
+            )
+
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.message_key, "errors.employees.employee.invalid_mandate_id_format")
+
+    def test_create_employee_accepts_existing_branch_and_mandate(self) -> None:
+        employee = self.service.create_employee(
+            "tenant-1",
+            EmployeeOperationalCreate(
+                tenant_id="tenant-1",
+                personnel_no="EMP-1005G",
+                first_name="Paul",
+                last_name="Kurz",
+                default_branch_id=self.repository.branch_id,
+                default_mandate_id=self.repository.mandate_id,
+            ),
+            _context("employees.employee.write"),
+        )
+
+        self.assertEqual(employee.default_branch_id, self.repository.branch_id)
+        self.assertEqual(employee.default_mandate_id, self.repository.mandate_id)
+
+    def test_create_employee_rejects_missing_branch_and_mandate_records(self) -> None:
+        missing_branch_id = str(uuid4())
+        missing_mandate_id = str(uuid4())
+
+        with self.assertRaises(ApiException) as branch_ctx:
+            self.service.create_employee(
+                "tenant-1",
+                EmployeeOperationalCreate(
+                    tenant_id="tenant-1",
+                    personnel_no="EMP-1005H",
+                    first_name="Ria",
+                    last_name="Koch",
+                    default_branch_id=missing_branch_id,
+                ),
+                _context("employees.employee.write"),
+            )
+
+        self.assertEqual(branch_ctx.exception.status_code, 404)
+        self.assertEqual(branch_ctx.exception.message_key, "errors.employees.employee.branch_not_found")
+
+        with self.assertRaises(ApiException) as mandate_ctx:
+            self.service.create_employee(
+                "tenant-1",
+                EmployeeOperationalCreate(
+                    tenant_id="tenant-1",
+                    personnel_no="EMP-1005I",
+                    first_name="Sara",
+                    last_name="Graf",
+                    default_mandate_id=missing_mandate_id,
+                ),
+                _context("employees.employee.write"),
+            )
+
+        self.assertEqual(mandate_ctx.exception.status_code, 404)
+        self.assertEqual(mandate_ctx.exception.message_key, "errors.employees.employee.mandate_not_found")
+
+    def test_create_employee_rejects_branch_mandate_mismatch(self) -> None:
+        other_branch = Branch(
+            id="44444444-4444-4444-4444-444444444444",
+            tenant_id=self.repository.tenant_id,
+            code="CGN",
+            name="Cologne",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            version_no=1,
+            status="active",
+        )
+        other_mandate = Mandate(
+            id="55555555-5555-5555-5555-555555555555",
+            tenant_id=self.repository.tenant_id,
+            branch_id=other_branch.id,
+            code="M-002",
+            name="Cologne Mandate",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            version_no=1,
+            status="active",
+        )
+        self.repository.branches[other_branch.id] = other_branch
+        self.repository.mandates[other_mandate.id] = other_mandate
+
+        with self.assertRaises(ApiException) as ctx:
+            self.service.create_employee(
+                "tenant-1",
+                EmployeeOperationalCreate(
+                    tenant_id="tenant-1",
+                    personnel_no="EMP-1005J",
+                    first_name="Timo",
+                    last_name="Kern",
+                    default_branch_id=self.repository.branch_id,
+                    default_mandate_id=other_mandate.id,
+                ),
+                _context("employees.employee.write"),
+            )
+
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(ctx.exception.message_key, "errors.employees.employee.mandate_branch_mismatch")
 
     def test_archive_reactivate_is_non_destructive_and_hidden_by_default(self) -> None:
         employee = self.service.create_employee(
@@ -522,14 +723,14 @@ class TestEmployeeService(unittest.TestCase):
                 personnel_no="EMP-2001",
                 first_name="Eva",
                 last_name="Kurz",
-                user_id="user-1",
+                user_id=self.repository.user_id,
             ),
             _context("employees.employee.write"),
         )
         assignment = UserRoleAssignment(
             id="assignment-1",
             tenant_id="tenant-1",
-            user_account_id="user-1",
+            user_account_id=self.repository.user_id,
             role_id=self.repository.employee_role.id,
             scope_type="tenant",
             status="active",
@@ -537,7 +738,8 @@ class TestEmployeeService(unittest.TestCase):
             updated_at=datetime.now(UTC),
             version_no=1,
         )
-        self.repository.role_assignments["tenant-1:user-1:employee_user"] = assignment
+        assignment_key = f"tenant-1:{self.repository.user_id}:employee_user"
+        self.repository.role_assignments[assignment_key] = assignment
 
         archived = self.service.archive_employee(
             "tenant-1",
@@ -545,7 +747,7 @@ class TestEmployeeService(unittest.TestCase):
             EmployeeLifecycleTransitionRequest(version_no=employee.version_no),
             _context("employees.employee.write"),
         )
-        self.assertEqual(self.repository.role_assignments["tenant-1:user-1:employee_user"].status, "inactive")
+        self.assertEqual(self.repository.role_assignments[assignment_key].status, "inactive")
         visible_default = self.service.list_operational_employees("tenant-1", _context("employees.employee.read"))
         visible_all = self.service.list_operational_employees(
             "tenant-1",
@@ -563,7 +765,7 @@ class TestEmployeeService(unittest.TestCase):
         self.assertIsNotNone(archived.archived_at)
         self.assertEqual(len([row for row in visible_default if row.id == employee.id]), 0)
         self.assertEqual(len([row for row in visible_all if row.id == employee.id]), 1)
-        self.assertEqual(self.repository.role_assignments["tenant-1:user-1:employee_user"].status, "active")
+        self.assertEqual(self.repository.role_assignments[assignment_key].status, "active")
         self.assertIsNone(reactivated.archived_at)
         self.assertEqual(reactivated.status, "active")
 

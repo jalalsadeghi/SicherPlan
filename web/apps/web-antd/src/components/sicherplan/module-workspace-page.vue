@@ -16,6 +16,7 @@ withDefaults(
     badges?: Array<{ key: string; tone?: 'default' | 'success' | 'warning' }>;
     description: string;
     eyebrow?: string;
+    showIntro?: boolean;
     stats?: StatItem[];
     title: string;
   }>(),
@@ -24,33 +25,36 @@ withDefaults(
 </script>
 
 <template>
-  <Page content-class="sp-module-page">
-    <PageIntro
-      :badges="badges"
-      :description="description"
-      :eyebrow="eyebrow"
-      :title="title"
-    >
-      <template v-if="$slots.actions" #actions>
-        <slot name="actions" />
-      </template>
-    </PageIntro>
+  <Page content-class="p-0">
+    <div class="sp-module-page">
+      <PageIntro
+        v-if="showIntro !== false"
+        :badges="badges"
+        :description="description"
+        :eyebrow="eyebrow"
+        :title="title"
+      >
+        <template v-if="$slots.actions" #actions>
+          <slot name="actions" />
+        </template>
+      </PageIntro>
 
-    <StatsRow v-if="stats?.length" :stats="stats" />
+      <StatsRow v-if="stats?.length" :stats="stats" />
 
-    <SplitViewLayout v-if="$slots.main || $slots.aside">
-      <template #main>
-        <slot name="main" />
-      </template>
-      <template #aside>
-        <slot name="aside" />
-      </template>
-    </SplitViewLayout>
+      <SplitViewLayout v-if="$slots.main || $slots.aside">
+        <template #main>
+          <slot name="main" />
+        </template>
+        <template #aside>
+          <slot name="aside" />
+        </template>
+      </SplitViewLayout>
 
-    <slot
-      v-if="$slots.workspace"
-      name="workspace"
-    />
+      <slot
+        v-if="$slots.workspace"
+        name="workspace"
+      />
+    </div>
   </Page>
 </template>
 

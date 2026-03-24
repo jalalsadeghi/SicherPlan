@@ -3,13 +3,16 @@ import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { $t } from '#/locales';
+import { useAuthStore } from '#/sicherplan-legacy/stores/auth';
 import EmptyState from '#/components/sicherplan/empty-state.vue';
 import ModuleWorkspacePage from '#/components/sicherplan/module-workspace-page.vue';
 import SectionBlock from '#/components/sicherplan/section-block.vue';
+import ForbiddenView from '#/views/_core/fallback/forbidden.vue';
 
 import { moduleRegistry } from './module-registry';
 
 const route = useRoute();
+const authStore = useAuthStore();
 
 const config = computed(() => {
   const moduleKey = route.meta?.moduleKey;
@@ -27,6 +30,20 @@ const badges = computed(() =>
       }))
     : [],
 );
+
+const showPageIntro = computed(() => config.value?.showPageIntro !== false);
+const isModuleAllowedForRole = computed(() => {
+  const allowedRoles = config.value?.allowedRoles;
+  if (!allowedRoles?.length) {
+    return true;
+  }
+  return allowedRoles.includes(authStore.effectiveRole);
+});
+const showWorkspaceSectionHeader = computed(
+  () =>
+    config.value?.showWorkspaceSectionHeader !== false &&
+    !config.value?.hideWorkspaceSectionHeaderForRoles?.includes(authStore.effectiveRole),
+);
 </script>
 
 <template>
@@ -36,16 +53,20 @@ const badges = computed(() =>
     :title="$t('sicherplan.ui.moduleMissing.title')"
   />
 
+  <ForbiddenView v-else-if="!isModuleAllowedForRole" />
+
   <ModuleWorkspacePage
     v-else
     :badges="badges"
-    :description="$t(config.descriptionKey)"
-    :eyebrow="$t('sicherplan.ui.moduleEyebrow')"
-    :title="$t(config.titleKey)"
+    :show-intro="showPageIntro"
+    :description="showPageIntro ? $t(config.descriptionKey) : ''"
+    :eyebrow="showPageIntro ? $t('sicherplan.ui.moduleEyebrow') : ''"
+    :title="showPageIntro ? $t(config.titleKey) : ''"
   >
     <template #workspace>
       <SectionBlock
-        :description="$t(config.workspaceDescriptionKey)"
+        :description="showWorkspaceSectionHeader ? $t(config.workspaceDescriptionKey) : undefined"
+        :show-header="showWorkspaceSectionHeader"
         :title="$t('sicherplan.ui.workspaceTitle')"
       >
         <div class="sp-module-workspace">

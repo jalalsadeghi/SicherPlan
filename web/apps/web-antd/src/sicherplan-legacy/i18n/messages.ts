@@ -434,6 +434,13 @@ export type MessageKey =
   | "employeeAdmin.detail.emptyTitle"
   | "employeeAdmin.detail.emptyEyebrow"
   | "employeeAdmin.detail.emptyBody"
+  | "employeeAdmin.tabs.overview"
+  | "employeeAdmin.tabs.appAccess"
+  | "employeeAdmin.tabs.profilePhoto"
+  | "employeeAdmin.tabs.notes"
+  | "employeeAdmin.tabs.groups"
+  | "employeeAdmin.tabs.addresses"
+  | "employeeAdmin.tabs.documents"
   | "employeeAdmin.form.eyebrow"
   | "employeeAdmin.form.title"
   | "employeeAdmin.form.lead"
@@ -445,6 +452,8 @@ export type MessageKey =
   | "employeeAdmin.form.assignmentTitle"
   | "employeeAdmin.form.accessEyebrow"
   | "employeeAdmin.form.accessTitle"
+  | "employeeAdmin.form.accessLead"
+  | "employeeAdmin.form.accessCurrent"
   | "employeeAdmin.form.notesEyebrow"
   | "employeeAdmin.form.notesTitle"
   | "employeeAdmin.form.actionsEyebrow"
@@ -492,18 +501,39 @@ export type MessageKey =
   | "employeeAdmin.photo.alt"
   | "employeeAdmin.photo.empty"
   | "employeeAdmin.photo.help"
+  | "employeeAdmin.photo.manageEyebrow"
+  | "employeeAdmin.photo.manageTitle"
+  | "employeeAdmin.photo.fileLabel"
   | "employeeAdmin.notes.eyebrow"
   | "employeeAdmin.notes.title"
+  | "employeeAdmin.notes.lead"
+  | "employeeAdmin.notes.registerEyebrow"
+  | "employeeAdmin.notes.registerTitle"
+  | "employeeAdmin.notes.editorEyebrow"
+  | "employeeAdmin.notes.editorTitle"
   | "employeeAdmin.notes.empty"
   | "employeeAdmin.groups.eyebrow"
   | "employeeAdmin.groups.title"
+  | "employeeAdmin.groups.lead"
+  | "employeeAdmin.groups.catalogEyebrow"
+  | "employeeAdmin.groups.catalogTitle"
+  | "employeeAdmin.groups.assignEyebrow"
+  | "employeeAdmin.groups.assignTitle"
+  | "employeeAdmin.groups.currentEyebrow"
+  | "employeeAdmin.groups.currentTitle"
   | "employeeAdmin.groups.empty"
   | "employeeAdmin.groups.selectPlaceholder"
   | "employeeAdmin.addresses.eyebrow"
   | "employeeAdmin.addresses.title"
+  | "employeeAdmin.addresses.lead"
+  | "employeeAdmin.addresses.historyEyebrow"
+  | "employeeAdmin.addresses.historyTitle"
   | "employeeAdmin.addresses.empty"
   | "employeeAdmin.documents.eyebrow"
   | "employeeAdmin.documents.title"
+  | "employeeAdmin.documents.lead"
+  | "employeeAdmin.documents.libraryEyebrow"
+  | "employeeAdmin.documents.libraryTitle"
   | "employeeAdmin.documents.empty"
   | "employeeAdmin.noteType.operational_note"
   | "employeeAdmin.noteType.positive_activity"
@@ -550,6 +580,16 @@ export type MessageKey =
   | "employeeAdmin.access.enabled"
   | "employeeAdmin.access.enabledYes"
   | "employeeAdmin.access.enabledNo"
+  | "employeeAdmin.access.lead"
+  | "employeeAdmin.access.createEyebrow"
+  | "employeeAdmin.access.createTitle"
+  | "employeeAdmin.access.createLead"
+  | "employeeAdmin.access.reconcileEyebrow"
+  | "employeeAdmin.access.reconcileTitle"
+  | "employeeAdmin.access.reconcileLead"
+  | "employeeAdmin.access.attachEyebrow"
+  | "employeeAdmin.access.attachTitle"
+  | "employeeAdmin.access.attachLead"
   | "employeeAdmin.access.createUsername"
   | "employeeAdmin.access.createEmail"
   | "employeeAdmin.access.createPassword"
@@ -597,6 +637,7 @@ export type MessageKey =
   | "coreAdmin.scope.placeholder"
   | "coreAdmin.scope.help"
   | "coreAdmin.scope.platformHint"
+  | "coreAdmin.scope.sessionHint"
   | "coreAdmin.scope.emptyTitle"
   | "coreAdmin.scope.emptyBody"
   | "coreAdmin.scope.remembered"
@@ -741,6 +782,18 @@ export type MessageKey =
   | "customerAdmin.detail.emptyTitle"
   | "customerAdmin.detail.emptyBody"
   | "customerAdmin.detail.newTitle"
+  | "customerAdmin.detail.workspaceTitle"
+  | "customerAdmin.detail.workspaceLead"
+  | "customerAdmin.tabs.overview"
+  | "customerAdmin.tabs.contacts"
+  | "customerAdmin.tabs.addresses"
+  | "customerAdmin.tabs.commercial"
+  | "customerAdmin.tabs.portal"
+  | "customerAdmin.tabs.history"
+  | "customerAdmin.tabs.employeeBlocks"
+  | "customerAdmin.commercial.tabs.billingProfile"
+  | "customerAdmin.commercial.tabs.invoiceParties"
+  | "customerAdmin.commercial.tabs.pricingRules"
   | "customerAdmin.form.generalEyebrow"
   | "customerAdmin.form.generalTitle"
   | "customerAdmin.filters.search"
@@ -754,14 +807,26 @@ export type MessageKey =
   | "customerAdmin.summary.defaultBranch"
   | "customerAdmin.summary.defaultMandate"
   | "customerAdmin.summary.classification"
+  | "customerAdmin.summary.ranking"
+  | "customerAdmin.summary.customerStatus"
   | "customerAdmin.summary.none"
   | "customerAdmin.contacts.eyebrow"
   | "customerAdmin.contacts.title"
+  | "customerAdmin.contacts.lead"
+  | "customerAdmin.contacts.registerEyebrow"
+  | "customerAdmin.contacts.registerTitle"
+  | "customerAdmin.contacts.editorEyebrow"
+  | "customerAdmin.contacts.editorTitle"
   | "customerAdmin.contacts.empty"
   | "customerAdmin.contacts.primaryBadge"
   | "customerAdmin.contacts.standardBadge"
   | "customerAdmin.history.eyebrow"
   | "customerAdmin.history.title"
+  | "customerAdmin.history.lead"
+  | "customerAdmin.history.registerEyebrow"
+  | "customerAdmin.history.registerTitle"
+  | "customerAdmin.history.attachmentEyebrow"
+  | "customerAdmin.history.attachmentTitle"
   | "customerAdmin.history.empty"
   | "customerAdmin.loginHistory.eyebrow"
   | "customerAdmin.loginHistory.title"
@@ -773,19 +838,31 @@ export type MessageKey =
   | "customerAdmin.privacy.lastReleasedBy"
   | "customerAdmin.employeeBlocks.eyebrow"
   | "customerAdmin.employeeBlocks.title"
+  | "customerAdmin.employeeBlocks.registerEyebrow"
+  | "customerAdmin.employeeBlocks.registerTitle"
+  | "customerAdmin.employeeBlocks.editorEyebrow"
+  | "customerAdmin.employeeBlocks.editorTitle"
   | "customerAdmin.employeeBlocks.empty"
   | "customerAdmin.employeeBlocks.capability.pendingEmployees"
   | "customerAdmin.addresses.eyebrow"
   | "customerAdmin.addresses.title"
+  | "customerAdmin.addresses.lead"
+  | "customerAdmin.addresses.registerEyebrow"
+  | "customerAdmin.addresses.registerTitle"
+  | "customerAdmin.addresses.editorEyebrow"
+  | "customerAdmin.addresses.editorTitle"
   | "customerAdmin.addresses.empty"
   | "customerAdmin.addresses.defaultBadge"
   | "customerAdmin.addresses.linkBadge"
+  | "customerAdmin.portal.title"
+  | "customerAdmin.portal.lead"
   | "customerAdmin.addressType.registered"
   | "customerAdmin.addressType.billing"
   | "customerAdmin.addressType.mailing"
   | "customerAdmin.addressType.service"
   | "customerAdmin.fields.customerNumber"
   | "customerAdmin.fields.name"
+  | "customerAdmin.fields.lifecycleStatus"
   | "customerAdmin.fields.legalName"
   | "customerAdmin.fields.externalRef"
   | "customerAdmin.fields.legalFormLookupId"
@@ -850,6 +927,7 @@ export type MessageKey =
   | "customerAdmin.confirm.contactArchive"
   | "customerAdmin.confirm.addressArchive"
   | "customerAdmin.feedback.created"
+  | "customerAdmin.feedback.createdNextStep"
   | "customerAdmin.feedback.saved"
   | "customerAdmin.feedback.archived"
   | "customerAdmin.feedback.deactivated"
@@ -876,6 +954,10 @@ export type MessageKey =
   | "customerAdmin.feedback.notFound"
   | "customerAdmin.feedback.duplicateNumber"
   | "customerAdmin.feedback.staleVersion"
+  | "customerAdmin.feedback.invalidInitialStatus"
+  | "customerAdmin.feedback.invalidBranchScope"
+  | "customerAdmin.feedback.invalidMandateScope"
+  | "customerAdmin.feedback.mandateBranchMismatch"
   | "customerAdmin.feedback.duplicateEmail"
   | "customerAdmin.feedback.primaryConflict"
   | "customerAdmin.feedback.defaultAddressConflict"
@@ -1034,9 +1116,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "role.customer_user": "Kundenportal",
     "role.subcontractor_user": "Subunternehmerportal",
     "shell.eyebrow": "SicherPlan Shell",
-    "shell.title": "Rollenbasierte Steuerung fuer Security Operations",
+    "shell.title": "Rollenbasierte Steuerung für Security Operations",
     "shell.lead":
-      "Diese Startseite zeigt die erste webbasierte Shell mit Admin- und Portalpfaden, jetzt mit zentralen Light/Dark-Token und DE/EN-Lokalisierung fuer spaetere IAM-Arbeit.",
+      "Diese Startseite zeigt die erste webbasierte Shell mit Admin- und Portalpfaden, jetzt mit zentralen Light/Dark-Token und DE/EN-Lokalisierung für spätere IAM-Arbeit.",
     "shell.cta.admin": "Zum Adminbereich",
     "shell.cta.portal": "Zum Portalbereich",
     "shell.stat.roles": "Rollen",
@@ -1046,12 +1128,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "module.note.navigation":
       "Navigation und Rollenfreigaben sind bereits im Shell-Register hinterlegt.",
     "module.note.future":
-      "CRUD-Ansichten, Formulare und Reportings folgen in spaeteren Aufgaben.",
+      "CRUD-Ansichten, Formulare und Reportings folgen in späteren Aufgaben.",
     "module.note.compatibility":
-      "Die Shell bleibt kompatibel mit spaeterer RBAC-, Theme- und i18n-Erweiterung.",
+      "Die Shell bleibt kompatibel mit späterer RBAC-, Theme- und i18n-Erweiterung.",
     "route.admin.dashboard.title": "Dashboard",
     "route.admin.dashboard.description":
-      "Startpunkt fuer interne Rollen mit Schnellzugriff auf Kernmodule.",
+      "Startpunkt für interne Rollen mit Schnellzugriff auf Kernmodule.",
     "route.admin.core.title": "Kernsystem",
     "route.admin.core.description":
       "Mandanten, Niederlassungen, Nummernkreise und zentrale Einstellungen.",
@@ -1063,55 +1145,55 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Stammdaten, Kontakte, Abrechnungsvorgaben und Portalfreigaben.",
     "route.admin.recruiting.title": "Recruiting",
     "route.admin.recruiting.description":
-      "Bewerbungen pruefen, Interviewschritte dokumentieren und Entscheidungen nachvollziehbar steuern.",
+      "Bewerbungen prüfen, Interviewschritte dokumentieren und Entscheidungen nachvollziehbar steuern.",
     "route.admin.employees.title": "Mitarbeitende",
     "route.admin.employees.description":
-      "Recruiting, Personalakte, Verfuegbarkeit und Qualifikationen.",
+      "Recruiting, Personalakte, Verfügbarkeit und Qualifikationen.",
     "route.admin.subcontractors.title": "Subunternehmer",
     "route.admin.subcontractors.description":
       "Partnerfirmen, Einsatzfreigaben und Compliance-Status.",
     "route.admin.planning.title": "Planung",
     "route.admin.planning.description":
-      "Objekte, Auftraege, Schichtplaene, Validierung und Freigaben.",
+      "Objekte, Aufträge, Schichtpläne, Validierung und Freigaben.",
     "route.admin.field_execution.title": "Feldeinsatz",
     "route.admin.field_execution.description":
-      "Wachbuch, Streifengaenge, Zeiterfassung und mobile Rueckmeldungen.",
+      "Wachbuch, Streifengänge, Zeiterfassung und mobile Rückmeldungen.",
     "route.admin.finance.title": "Finanzen",
     "route.admin.finance.description":
-      "Actuals, Lohnexporte, Rechnungen und Partnerpruefungen.",
+      "Actuals, Lohnexporte, Rechnungen und Partnerprüfungen.",
     "route.admin.reporting.title": "Reporting",
     "route.admin.reporting.description":
-      "Operative, kaufmaennische und Compliance-Auswertungen.",
+      "Operative, kaufmännische und Compliance-Auswertungen.",
     "route.portal.customer.title": "Kundenportal",
     "route.portal.customer.description":
-      "Freigegebene Auftraege, Berichte, Zeiten und Dokumente.",
+      "Freigegebene Aufträge, Berichte, Zeiten und Dokumente.",
     "route.portal.subcontractor.title": "Subunternehmerportal",
     "route.portal.subcontractor.description":
-      "Freigegebene Einsaetze, Mitarbeitende und Rueckmeldungen im freigegebenen Umfang.",
+      "Freigegebene Einsätze, Mitarbeitende und Rückmeldungen im freigegebenen Umfang.",
     "portalSubcontractor.eyebrow": "Partnerzugang",
-    "portalSubcontractor.title": "Subunternehmerportal und Scope-Pruefung",
+    "portalSubcontractor.title": "Subunternehmerportal und Scope-Prüfung",
     "portalSubcontractor.lead":
-      "Dieser Einstieg nutzt die gemeinsame IAM-Sitzung und loest den Partnerkontext ausschliesslich ueber Rollen-Scope und den verknuepften Subunternehmerkontakt auf.",
+      "Dieser Einstieg nutzt die gemeinsame IAM-Sitzung und löst den Partnerkontext ausschließlich über Rollen-Scope und den verknüpften Subunternehmerkontakt auf.",
     "portalSubcontractor.login.tenantCode": "Mandantencode",
     "portalSubcontractor.login.identifier": "Benutzername oder E-Mail",
     "portalSubcontractor.login.password": "Passwort",
-    "portalSubcontractor.login.deviceLabel": "Geraetebezeichnung",
+    "portalSubcontractor.login.deviceLabel": "Gerätebezeichnung",
     "portalSubcontractor.actions.login": "Im Portal anmelden",
     "portalSubcontractor.actions.refresh": "Portalstatus neu laden",
     "portalSubcontractor.actions.logout": "Abmelden",
-    "portalSubcontractor.loading.title": "Portalzugriff wird geprueft",
+    "portalSubcontractor.loading.title": "Portalzugriff wird geprüft",
     "portalSubcontractor.loading.body":
-      "Die Sitzung und der zugeordnete Subunternehmerkontext werden gegen die gemeinsame IAM- und Partnerverknuepfung verifiziert.",
+      "Die Sitzung und der zugeordnete Subunternehmerkontext werden gegen die gemeinsame IAM- und Partnerverknüpfung verifiziert.",
     "portalSubcontractor.empty.title": "Kein freigegebener Partnerkontext",
     "portalSubcontractor.empty.body":
-      "Dem aktuellen Portalkonto ist kein nutzbarer Subunternehmer-Scope zugeordnet oder die Verknuepfung ist unvollstaendig.",
+      "Dem aktuellen Portalkonto ist kein nutzbarer Subunternehmer-Scope zugeordnet oder die Verknüpfung ist unvollständig.",
     "portalSubcontractor.unauthorized.title": "Portalzugriff nicht erlaubt",
     "portalSubcontractor.unauthorized.body":
-      "Dieses Konto darf das Subunternehmerportal nicht verwenden oder besitzt aktuell nicht die noetigen Berechtigungen.",
+      "Dieses Konto darf das Subunternehmerportal nicht verwenden oder besitzt aktuell nicht die nötigen Berechtigungen.",
     "portalSubcontractor.deactivated.title": "Portalzugriff deaktiviert",
     "portalSubcontractor.deactivated.body":
-      "Der verknuepfte Subunternehmerkontakt oder das zugeordnete Partnerunternehmen ist deaktiviert bzw. nicht fuer das Portal freigegeben.",
-    "portalSubcontractor.summary.title": "Aufgeloester Partnerkontext",
+      "Der verknüpfte Subunternehmerkontakt oder das zugeordnete Partnerunternehmen ist deaktiviert bzw. nicht für das Portal freigegeben.",
+    "portalSubcontractor.summary.title": "Aufgelöster Partnerkontext",
     "portalSubcontractor.summary.companyNumber": "Partnernummer",
     "portalSubcontractor.summary.companyName": "Unternehmen",
     "portalSubcontractor.summary.contact": "Portal-Kontakt",
@@ -1133,149 +1215,149 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalSubcontractor.datasets.positions.eyebrow": "Positionen",
     "portalSubcontractor.datasets.positions.title": "Freigegebene Positionen und Abrufe",
     "portalSubcontractor.datasets.positions.lead":
-      "Nur explizit freigegebene Positionen oder Abrufe fuer den aktuellen Partner-Scope erscheinen hier.",
+      "Nur explizit freigegebene Positionen oder Abrufe für den aktuellen Partner-Scope erscheinen hier.",
     "portalSubcontractor.datasets.positions.pending":
       "Es sind noch keine freigegebenen Positionsdaten aus der Planung angebunden.",
-    "portalSubcontractor.datasets.schedules.eyebrow": "Plaene",
-    "portalSubcontractor.datasets.schedules.title": "Freigegebene Einsatzplaene",
+    "portalSubcontractor.datasets.schedules.eyebrow": "Pläne",
+    "portalSubcontractor.datasets.schedules.title": "Freigegebene Einsatzpläne",
     "portalSubcontractor.datasets.schedules.lead":
-      "Freigegebene Zeitfenster und Schichtplaene fuer den Partner werden hier als Lesesicht angezeigt.",
+      "Freigegebene Zeitfenster und Schichtpläne für den Partner werden hier als Lesesicht angezeigt.",
     "portalSubcontractor.datasets.schedules.pending":
-      "Es sind noch keine freigegebenen Einsatzplaene fuer dieses Portal verfuegbar.",
+      "Es sind noch keine freigegebenen Einsatzpläne für dieses Portal verfügbar.",
     "portalSubcontractor.datasets.actuals.eyebrow": "Ist-Status",
     "portalSubcontractor.datasets.actuals.title": "Ist-Stunden und Statuszusammenfassungen",
     "portalSubcontractor.datasets.actuals.lead":
-      "Bestaetigte Zeiten und partnerrelevante Ist-Statusdaten werden hier angezeigt, sobald die Finance-Leseschicht verfuegbar ist.",
+      "Bestätigte Zeiten und partnerrelevante Ist-Statusdaten werden hier angezeigt, sobald die Finance-Leseschicht verfügbar ist.",
     "portalSubcontractor.datasets.actuals.pending":
-      "Es sind noch keine freigegebenen Ist-Zusammenfassungen aus Finance verfuegbar.",
+      "Es sind noch keine freigegebenen Ist-Zusammenfassungen aus Finance verfügbar.",
     "portalSubcontractor.datasets.attendance.eyebrow": "Anwesenheit",
-    "portalSubcontractor.datasets.attendance.title": "Anwesenheits- und Rueckmeldestatus",
+    "portalSubcontractor.datasets.attendance.title": "Anwesenheits- und Rückmeldestatus",
     "portalSubcontractor.datasets.attendance.lead":
-      "Partnerrelevante Anwesenheits- und Rueckmeldedaten werden hier nur nach Freigabe der operativen Lesemodelle sichtbar.",
+      "Partnerrelevante Anwesenheits- und Rückmeldedaten werden hier nur nach Freigabe der operativen Lesemodelle sichtbar.",
     "portalSubcontractor.datasets.attendance.pending":
-      "Es sind noch keine freigegebenen Anwesenheitsdaten fuer das Portal verfuegbar.",
-    "portalSubcontractor.datasets.invoiceChecks.eyebrow": "Rechnungspruefung",
-    "portalSubcontractor.datasets.invoiceChecks.title": "Status der Rechnungspruefung",
+      "Es sind noch keine freigegebenen Anwesenheitsdaten für das Portal verfügbar.",
+    "portalSubcontractor.datasets.invoiceChecks.eyebrow": "Rechnungsprüfung",
+    "portalSubcontractor.datasets.invoiceChecks.title": "Status der Rechnungsprüfung",
     "portalSubcontractor.datasets.invoiceChecks.lead":
-      "Partnerrelevante Rechnungspruefstaende und Differenzhinweise werden hier spaeter aus Finance eingeblendet.",
+      "Partnerrelevante Rechnungsprüfstaende und Differenzhinweise werden hier später aus Finance eingeblendet.",
     "portalSubcontractor.datasets.invoiceChecks.pending":
-      "Es sind noch keine freigegebenen Rechnungspruefstaende fuer das Portal verfuegbar.",
+      "Es sind noch keine freigegebenen Rechnungsprüfstaende für das Portal verfügbar.",
     "portalSubcontractor.datasets.watchbooks.eyebrow": "Wachbuch",
-    "portalSubcontractor.datasets.watchbooks.title": "Freigegebene Wachbuecher",
+    "portalSubcontractor.datasets.watchbooks.title": "Freigegebene Wachbücher",
     "portalSubcontractor.datasets.watchbooks.lead":
-      "Freigegebene Wachbuchauszuege bleiben auf den aktuellen Nachunternehmerkontext eingeschraenkt und erlauben nur opt-in Beteiligung.",
+      "Freigegebene Wachbuchauszüge bleiben auf den aktuellen Nachunternehmerkontext eingeschränkt und erlauben nur opt-in Beteiligung.",
     "portalSubcontractor.datasets.watchbooks.pending":
-      "Es sind noch keine freigegebenen Wachbuecher fuer dieses Nachunternehmerportal verfuegbar.",
+      "Es sind noch keine freigegebenen Wachbücher für dieses Nachunternehmerportal verfügbar.",
     "portalSubcontractor.watchbooks.fields.watchbook": "Wachbuch",
     "portalSubcontractor.watchbooks.fields.note": "Eintrag",
     "portalSubcontractor.watchbooks.fields.notePlaceholder":
-      "Kurze Rueckmeldung oder ergaenzende Notiz fuer das freigegebene Wachbuch erfassen.",
+      "Kurze Rückmeldung oder ergänzende Notiz für das freigegebene Wachbuch erfassen.",
     "portalSubcontractor.watchbooks.actions.submit": "Eintrag speichern",
     "portalSubcontractor.allocation.eyebrow": "Selbstdisposition",
     "portalSubcontractor.allocation.title": "Eigene Mitarbeitende auf freigegebene Positionen disponieren",
     "portalSubcontractor.allocation.lead":
-      "Die Auswahl bleibt auf eigene Partner-Mitarbeitende begrenzt. Solange die Planungsfreigabe noch nicht angebunden ist, zeigt das Portal nur Vorschau und ehrliche Validierungsgruende.",
+      "Die Auswahl bleibt auf eigene Partner-Mitarbeitende begrenzt. Solange die Planungsfreigabe noch nicht angebunden ist, zeigt das Portal nur Vorschau und ehrliche Validierungsgründe.",
     "portalSubcontractor.allocation.position": "Freigegebene Position",
     "portalSubcontractor.allocation.worker": "Eigener Mitarbeitender",
     "portalSubcontractor.allocation.action": "Aktion",
-    "portalSubcontractor.allocation.preview": "Validierung pruefen",
-    "portalSubcontractor.allocation.submit": "Disposition bestaetigen",
+    "portalSubcontractor.allocation.preview": "Validierung prüfen",
+    "portalSubcontractor.allocation.submit": "Disposition bestätigen",
     "portalSubcontractor.allocation.noPositions":
-      "Es gibt noch keine freigegebenen Positionen fuer die Selbstdisposition in diesem Portal.",
+      "Es gibt noch keine freigegebenen Positionen für die Selbstdisposition in diesem Portal.",
     "portalSubcontractor.allocation.noWorkers":
-      "Es sind keine aktiven eigenen Mitarbeitenden fuer die Selbstdisposition verfuegbar.",
+      "Es sind keine aktiven eigenen Mitarbeitenden für die Selbstdisposition verfügbar.",
     "portalSubcontractor.allocation.pendingPlanning":
-      "Die Planungsfreigabe fuer echte Zuweisungen ist in diesem Branch noch nicht angebunden. Vorschau und Ergebnis bleiben deshalb explizit unverbindlich.",
+      "Die Planungsfreigabe für echte Zuweisungen ist in diesem Branch noch nicht angebunden. Vorschau und Ergebnis bleiben deshalb explizit unverbindlich.",
     "portalSubcontractor.allocation.validationTitle": "Validierungsfeedback",
     "portalSubcontractor.allocation.resultTitle": "Letztes Kommandergebnis",
     "portalSubcontractor.allocation.command.assign": "Zuweisen",
-    "portalSubcontractor.allocation.command.confirm": "Teilnahme bestaetigen",
+    "portalSubcontractor.allocation.command.confirm": "Teilnahme bestätigen",
     "portalSubcontractor.allocation.command.reassign": "Umbesetzen",
-    "portalSubcontractor.allocation.command.unassign": "Zuweisung loesen",
+    "portalSubcontractor.allocation.command.unassign": "Zuweisung lösen",
     "portalSubcontractor.allocation.readiness.ready": "bereit",
     "portalSubcontractor.allocation.readiness.ready_with_warnings": "bereit mit Hinweisen",
     "portalSubcontractor.allocation.readiness.not_ready": "nicht bereit",
-    "portalSubcontractor.allocation.status.ready_for_submit": "bereit zur Uebernahme",
-    "portalSubcontractor.allocation.status.confirmed": "Disposition bestaetigt",
+    "portalSubcontractor.allocation.status.ready_for_submit": "bereit zur Übernahme",
+    "portalSubcontractor.allocation.status.confirmed": "Disposition bestätigt",
     "portalSubcontractor.allocation.status.blocked_by_validation": "durch Validierung blockiert",
-    "portalSubcontractor.allocation.status.planning_contract_unavailable": "Planungsschnittstelle noch nicht verfuegbar",
+    "portalSubcontractor.allocation.status.planning_contract_unavailable": "Planungsschnittstelle noch nicht verfügbar",
     "portalSubcontractor.workforce.lead":
       "Portalnutzende pflegen nur eigene Mitarbeitende und deren Nachweise. Interne Finanz-, Audit- und Admin-Felder bleiben ausgeblendet.",
     "portalSubcontractor.workforce.boundary":
-      "Diese Selbstbedienungsansicht ist strikt auf den verknuepften Subunternehmer und dessen eigene Mitarbeitende begrenzt.",
+      "Diese Selbstbedienungsansicht ist strikt auf den verknüpften Subunternehmer und dessen eigene Mitarbeitende begrenzt.",
     "portalSubcontractor.workforce.workerList": "Eigene Mitarbeitende",
     "portalSubcontractor.workforce.empty": "Es sind noch keine eigenen Mitarbeitenden im Portal erfasst.",
     "portalSubcontractor.workforce.editTitle": "Mitarbeitendenstammdaten bearbeiten",
     "portalSubcontractor.workforce.saveWorker": "Mitarbeitenden speichern",
     "portalSubcontractor.workforce.qualificationsTitle": "Qualifikationen und Nachweise",
-    "portalSubcontractor.workforce.noQualifications": "Es sind noch keine Qualifikationen fuer diesen Mitarbeitenden hinterlegt.",
+    "portalSubcontractor.workforce.noQualifications": "Es sind noch keine Qualifikationen für diesen Mitarbeitenden hinterlegt.",
     "portalSubcontractor.workforce.qualificationEditor": "Qualifikation pflegen",
     "portalSubcontractor.workforce.qualificationType": "Qualifikationstyp",
     "portalSubcontractor.workforce.saveQualification": "Qualifikation speichern",
     "portalSubcontractor.workforce.proofsTitle": "Nachweise",
-    "portalSubcontractor.workforce.noProofs": "Es sind noch keine Nachweise fuer diese Qualifikation hinterlegt.",
+    "portalSubcontractor.workforce.noProofs": "Es sind noch keine Nachweise für diese Qualifikation hinterlegt.",
     "portalSubcontractor.workforce.uploadProof": "Nachweis hochladen",
-    "portalSubcontractor.feedback.authRequired": "Bitte melden Sie sich zuerst mit einem gueltigen Portalkonto an.",
-    "portalSubcontractor.feedback.invalidCredentials": "Die Anmeldedaten sind ungueltig.",
+    "portalSubcontractor.feedback.authRequired": "Bitte melden Sie sich zuerst mit einem gültigen Portalkonto an.",
+    "portalSubcontractor.feedback.invalidCredentials": "Die Anmeldedaten sind ungültig.",
     "portalSubcontractor.feedback.permissionDenied":
       "Das aktuelle Konto besitzt keinen erlaubten Zugriff auf das Subunternehmerportal.",
     "portalSubcontractor.feedback.scopeNotResolved":
-      "Der Partner-Scope dieses Portalkontos konnte nicht eindeutig aufgeloest werden.",
+      "Der Partner-Scope dieses Portalkontos konnte nicht eindeutig aufgelöst werden.",
     "portalSubcontractor.feedback.contactNotLinked":
       "Dem aktuellen Portalkonto ist kein aktiver Subunternehmerkontakt zugeordnet.",
     "portalSubcontractor.feedback.contactPortalDisabled":
-      "Der verknuepfte Subunternehmerkontakt ist nicht fuer das Portal freigegeben.",
+      "Der verknüpfte Subunternehmerkontakt ist nicht für das Portal freigegeben.",
     "portalSubcontractor.feedback.contactInactive":
-      "Der verknuepfte Subunternehmerkontakt ist nicht mehr aktiv.",
+      "Der verknüpfte Subunternehmerkontakt ist nicht mehr aktiv.",
     "portalSubcontractor.feedback.companyInactive":
-      "Das verknuepfte Partnerunternehmen ist nicht mehr aktiv.",
+      "Das verknüpfte Partnerunternehmen ist nicht mehr aktiv.",
     "portalSubcontractor.feedback.invoiceCheckNotFound":
-      "Die freigegebene Partner-Rechnungspruefung konnte nicht gefunden werden.",
+      "Die freigegebene Partner-Rechnungsprüfung konnte nicht gefunden werden.",
     "portalSubcontractor.feedback.sessionReady":
       "Die Portalsitzung wurde erfolgreich geladen und auf den Partnerkontext eingegrenzt.",
     "portalSubcontractor.feedback.loggedOut": "Die Portalsitzung wurde abgemeldet.",
     "portalSubcontractor.feedback.watchbookEntrySubmitted":
       "Der Wachbucheintrag wurde im freigegebenen Nachunternehmerkontext gespeichert.",
     "portalSubcontractor.feedback.watchbookWriteDenied":
-      "Fuer dieses Wachbuch ist keine Nachunternehmerbeteiligung freigegeben.",
+      "Für dieses Wachbuch ist keine Nachunternehmerbeteiligung freigegeben.",
     "portalSubcontractor.feedback.watchbookClosed":
-      "Das ausgewaehlte Wachbuch ist bereits geschlossen.",
+      "Das ausgewählte Wachbuch ist bereits geschlossen.",
     "portalSubcontractor.feedback.allocationPositionNotFound":
-      "Die freigegebene Position konnte fuer diesen Partner-Scope nicht gefunden werden.",
+      "Die freigegebene Position konnte für diesen Partner-Scope nicht gefunden werden.",
     "portalSubcontractor.feedback.allocationWorkerNotFound":
-      "Der ausgewaehlte Mitarbeitende gehoert nicht zum aktuellen Partner-Scope.",
+      "Der ausgewählte Mitarbeitende gehört nicht zum aktuellen Partner-Scope.",
     "portalSubcontractor.feedback.allocationPlanningUnavailable":
-      "Die Planungsfreigabe fuer echte Dispositionen ist noch nicht angebunden.",
+      "Die Planungsfreigabe für echte Dispositionen ist noch nicht angebunden.",
     "portalSubcontractor.feedback.allocationBlocked":
       "Die Disposition ist durch Validierungsfehler blockiert.",
     "portalSubcontractor.feedback.allocationSubmitted":
-      "Die Disposition wurde ueber die Planungsschnittstelle bestaetigt.",
+      "Die Disposition wurde über die Planungsschnittstelle bestätigt.",
     "portalSubcontractor.feedback.error":
       "Der Zugriff auf das Subunternehmerportal konnte nicht geladen werden.",
     "portalCustomer.eyebrow": "Kundenzugang",
-    "portalCustomer.title": "Kundenportal und Scope-Pruefung",
+    "portalCustomer.title": "Kundenportal und Scope-Prüfung",
     "portalCustomer.lead":
-      "Dieser Einstieg nutzt die gemeinsame IAM-Sitzung und loest den Kundenkontext ausschliesslich ueber Rollen-Scope und den verknuepften Kundenkontakt auf.",
+      "Dieser Einstieg nutzt die gemeinsame IAM-Sitzung und löst den Kundenkontext ausschließlich über Rollen-Scope und den verknüpften Kundenkontakt auf.",
     "portalCustomer.login.tenantCode": "Mandantencode",
     "portalCustomer.login.identifier": "Benutzername oder E-Mail",
     "portalCustomer.login.password": "Passwort",
-    "portalCustomer.login.deviceLabel": "Geraetebezeichnung",
+    "portalCustomer.login.deviceLabel": "Gerätebezeichnung",
     "portalCustomer.actions.login": "Im Portal anmelden",
     "portalCustomer.actions.refresh": "Portalstatus neu laden",
     "portalCustomer.actions.logout": "Abmelden",
-    "portalCustomer.loading.title": "Portalzugriff wird geprueft",
+    "portalCustomer.loading.title": "Portalzugriff wird geprüft",
     "portalCustomer.loading.body":
-      "Die Sitzung und der zugeordnete Kundenkontext werden gegen die gemeinsame IAM- und CRM-Verknuepfung verifiziert.",
+      "Die Sitzung und der zugeordnete Kundenkontext werden gegen die gemeinsame IAM- und CRM-Verknüpfung verifiziert.",
     "portalCustomer.empty.title": "Kein freigegebener Kundenkontext",
     "portalCustomer.empty.body":
-      "Dem aktuellen Portal-Konto ist kein nutzbarer Kunden-Scope zugeordnet oder die Verknuepfung ist unvollstaendig.",
+      "Dem aktuellen Portal-Konto ist kein nutzbarer Kunden-Scope zugeordnet oder die Verknüpfung ist unvollständig.",
     "portalCustomer.unauthorized.title": "Portalzugriff nicht erlaubt",
     "portalCustomer.unauthorized.body":
-      "Dieses Konto darf das Kundenportal nicht verwenden oder besitzt aktuell nicht die noetigen Berechtigungen.",
+      "Dieses Konto darf das Kundenportal nicht verwenden oder besitzt aktuell nicht die nötigen Berechtigungen.",
     "portalCustomer.deactivated.title": "Portalzugriff deaktiviert",
     "portalCustomer.deactivated.body":
-      "Der verknuepfte Kundenkontakt oder der zugeordnete Kunde ist deaktiviert bzw. archiviert.",
-    "portalCustomer.summary.title": "Aufgeloester Kundenkontext",
+      "Der verknüpfte Kundenkontakt oder der zugeordnete Kunde ist deaktiviert bzw. archiviert.",
+    "portalCustomer.summary.title": "Aufgelöster Kundenkontext",
     "portalCustomer.summary.customerNumber": "Kundennummer",
     "portalCustomer.summary.customerName": "Kundenname",
     "portalCustomer.summary.contact": "Portal-Kontakt",
@@ -1285,184 +1367,184 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalCustomer.summary.scope": "Erlaubter Kunden-Scope",
     "portalCustomer.readOnly.title": "Nur freigegebene Portalansichten",
     "portalCustomer.readOnly.body":
-      "Dieses Portal zeigt nur kundenbezogene, freigegebene und schreibgeschuetzte Ausgaben. Nicht umgesetzte Quellmodule bleiben als explizite Leerstelle sichtbar.",
+      "Dieses Portal zeigt nur kundenbezogene, freigegebene und schreibgeschützte Ausgaben. Nicht umgesetzte Quellmodule bleiben als explizite Leerstelle sichtbar.",
     "portalCustomer.history.eyebrow": "Kundenhistorie",
-    "portalCustomer.history.title": "Freigegebene Historie und Anhaenge",
+    "portalCustomer.history.title": "Freigegebene Historie und Anhänge",
     "portalCustomer.history.lead":
-      "Die Portalhistorie zeigt nur kundenbezogene Verlaufsereignisse mit docs-gestuetzten Anhaengen aus dem CRM.",
-    "portalCustomer.history.empty": "Fuer diesen Kunden sind noch keine freigegebenen Historieneintraege vorhanden.",
+      "Die Portalhistorie zeigt nur kundenbezogene Verlaufsereignisse mit docs-gestützten Anhängen aus dem CRM.",
+    "portalCustomer.history.empty": "Für diesen Kunden sind noch keine freigegebenen Historieneinträge vorhanden.",
     "portalCustomer.meta.releasedOnly": "Nur freigegebene Inhalte werden angezeigt.",
-    "portalCustomer.meta.customerScoped": "Jede Abfrage bleibt auf den aktuellen Kunden-Scope eingeschraenkt.",
+    "portalCustomer.meta.customerScoped": "Jede Abfrage bleibt auf den aktuellen Kunden-Scope eingeschränkt.",
     "portalCustomer.meta.personalNamesRestricted":
-      "Personennamen bleiben standardmaessig ausgeblendet, bis spaetere Freigaberegeln aktiv sind.",
+      "Personennamen bleiben standardmäßig ausgeblendet, bis spätere Freigaberegeln aktiv sind.",
     "portalCustomer.meta.sourceModule": "Quellmodul",
-    "portalCustomer.meta.docsBacked": "Ausgaben werden spaeter ueber den zentralen Dokumentdienst bereitgestellt.",
-    "portalCustomer.states.loading": "Laedt",
+    "portalCustomer.meta.docsBacked": "Ausgaben werden später über den zentralen Dokumentdienst bereitgestellt.",
+    "portalCustomer.states.loading": "Lädt",
     "portalCustomer.states.pending": "Ausstehend",
     "portalCustomer.states.empty": "Leer",
     "portalCustomer.states.ready": "Freigegeben",
-    "portalCustomer.datasets.orders.eyebrow": "Auftraege",
-    "portalCustomer.datasets.orders.title": "Freigegebene Auftraege",
+    "portalCustomer.datasets.orders.eyebrow": "Aufträge",
+    "portalCustomer.datasets.orders.title": "Freigegebene Aufträge",
     "portalCustomer.datasets.orders.lead":
-      "Kundenauftraege werden erst angezeigt, wenn das Planungsmodul freigegebene Portallesemodelle liefert.",
+      "Kundenaufträge werden erst angezeigt, wenn das Planungsmodul freigegebene Portallesemodelle liefert.",
     "portalCustomer.datasets.orders.pending":
       "Es liegen noch keine freigegebenen Auftragsdaten aus dem Planungsmodul vor.",
-    "portalCustomer.datasets.schedules.eyebrow": "Einsatzplaene",
-    "portalCustomer.datasets.schedules.title": "Freigegebene Einsatzplaene",
+    "portalCustomer.datasets.schedules.eyebrow": "Einsatzpläne",
+    "portalCustomer.datasets.schedules.title": "Freigegebene Einsatzpläne",
     "portalCustomer.datasets.schedules.lead":
-      "Nur veroeffentlichte Kundenplaene werden hier sichtbar, sobald die Planungsquelle verfuegbar ist.",
+      "Nur veröffentlichte Kundenpläne werden hier sichtbar, sobald die Planungsquelle verfügbar ist.",
     "portalCustomer.datasets.schedules.pending":
-      "Die Kundenansicht fuer freigegebene Einsatzplaene ist vorbereitet, aber das Quellmodul ist noch nicht angeschlossen.",
+      "Die Kundenansicht für freigegebene Einsatzpläne ist vorbereitet, aber das Quellmodul ist noch nicht angeschlossen.",
     "portalCustomer.datasets.watchbooks.eyebrow": "Wachbuch",
-    "portalCustomer.datasets.watchbooks.title": "Freigegebene Wachbuchauszuege",
+    "portalCustomer.datasets.watchbooks.title": "Freigegebene Wachbuchauszüge",
     "portalCustomer.datasets.watchbooks.lead":
       "Wachbuch- und Einsatzereignisse erscheinen erst nach Umsetzung des Feldeinsatz-Backbones im freigegebenen Umfang.",
     "portalCustomer.datasets.watchbooks.pending":
-      "Es sind noch keine freigegebenen Wachbuchereignisse fuer das Kundenportal verfuegbar.",
+      "Es sind noch keine freigegebenen Wachbuchereignisse für das Kundenportal verfügbar.",
     "portalCustomer.watchbooks.fields.watchbook": "Wachbuch",
-    "portalCustomer.watchbooks.fields.note": "Rueckmeldung",
+    "portalCustomer.watchbooks.fields.note": "Rückmeldung",
     "portalCustomer.watchbooks.fields.notePlaceholder":
-      "Rueckmeldung oder Kundenhinweis fuer das freigegebene Wachbuch erfassen.",
-    "portalCustomer.watchbooks.actions.submit": "Rueckmeldung speichern",
+      "Rückmeldung oder Kundenhinweis für das freigegebene Wachbuch erfassen.",
+    "portalCustomer.watchbooks.actions.submit": "Rückmeldung speichern",
     "portalCustomer.datasets.timesheets.eyebrow": "Zeiten",
     "portalCustomer.datasets.timesheets.title": "Freigegebene Stundennachweise",
     "portalCustomer.datasets.timesheets.lead":
-      "Stundennachweise bleiben dokumentzentriert und werden spaeter ueber die Finanzbruecke und den Dokumentdienst veroeffentlicht.",
+      "Stundennachweise bleiben dokumentzentriert und werden später über die Finanzbrücke und den Dokumentdienst veröffentlicht.",
     "portalCustomer.datasets.timesheets.pending":
       "Freigegebene Stundennachweise sind noch nicht an das Portal angebunden.",
     "portalCustomer.datasets.invoices.eyebrow": "Rechnungen",
     "portalCustomer.datasets.invoices.title": "Freigegebene Kundenrechnungen",
     "portalCustomer.datasets.invoices.lead":
-      "Kundenrechnungen erscheinen nur nach Freigabe, mit begrenztem Status, Faelligkeit und dokumentzentriertem Download.",
+      "Kundenrechnungen erscheinen nur nach Freigabe, mit begrenztem Status, Fälligkeit und dokumentzentriertem Download.",
     "portalCustomer.datasets.invoices.pending":
       "Freigegebene Kundenrechnungen sind noch nicht an das Portal angebunden.",
     "portalCustomer.actions.download": "Dokument laden",
     "portalCustomer.datasets.reports.eyebrow": "Berichte",
     "portalCustomer.datasets.reports.title": "Freigegebene Berichts- und Ergebnispakete",
     "portalCustomer.datasets.reports.lead":
-      "Berichte und Ergebnisdokumente werden als freigegebene Pakete ueber Reporting und Dokumentdienst eingebunden.",
+      "Berichte und Ergebnisdokumente werden als freigegebene Pakete über Reporting und Dokumentdienst eingebunden.",
     "portalCustomer.datasets.reports.pending":
-      "Es sind noch keine freigegebenen Berichtspakete fuer diesen Kunden veroeffentlicht.",
-    "portalCustomer.feedback.authRequired": "Bitte zuerst mit einem gueltigen Portal-Konto anmelden.",
-    "portalCustomer.feedback.invalidCredentials": "Die Anmeldedaten sind ungueltig.",
+      "Es sind noch keine freigegebenen Berichtspakete für diesen Kunden veröffentlicht.",
+    "portalCustomer.feedback.authRequired": "Bitte zuerst mit einem gültigen Portal-Konto anmelden.",
+    "portalCustomer.feedback.invalidCredentials": "Die Anmeldedaten sind ungültig.",
     "portalCustomer.feedback.permissionDenied":
-      "Das aktuelle Konto besitzt keinen zulaessigen Kundenportalzugriff.",
+      "Das aktuelle Konto besitzt keinen zulässigen Kundenportalzugriff.",
     "portalCustomer.feedback.scopeNotResolved":
       "Der Kunden-Scope dieses Portal-Kontos konnte nicht eindeutig bestimmt werden.",
     "portalCustomer.feedback.contactNotLinked":
       "Dem aktuellen Portal-Konto ist kein aktiver Kundenkontakt zugeordnet.",
     "portalCustomer.feedback.contactInactive":
-      "Der verknuepfte Kundenkontakt ist nicht mehr aktiv.",
+      "Der verknüpfte Kundenkontakt ist nicht mehr aktiv.",
     "portalCustomer.feedback.customerInactive":
-      "Der verknuepfte Kunde ist nicht mehr aktiv.",
+      "Der verknüpfte Kunde ist nicht mehr aktiv.",
     "portalCustomer.feedback.sessionReady":
-      "Die Portalsitzung wurde erfolgreich geladen und auf den Kundenkontext eingeschraenkt.",
+      "Die Portalsitzung wurde erfolgreich geladen und auf den Kundenkontext eingeschränkt.",
     "portalCustomer.feedback.loggedOut": "Die Portalsitzung wurde beendet.",
     "portalCustomer.feedback.watchbookEntrySubmitted":
-      "Die Rueckmeldung wurde dem freigegebenen Wachbuch hinzugefuegt.",
+      "Die Rückmeldung wurde dem freigegebenen Wachbuch hinzugefügt.",
     "portalCustomer.feedback.watchbookWriteDenied":
-      "Fuer dieses Wachbuch ist keine Kundenbeteiligung freigegeben.",
+      "Für dieses Wachbuch ist keine Kundenbeteiligung freigegeben.",
     "portalCustomer.feedback.watchbookClosed":
-      "Das ausgewaehlte Wachbuch ist bereits geschlossen.",
+      "Das ausgewählte Wachbuch ist bereits geschlossen.",
     "portalCustomer.feedback.financeDocumentDenied":
-      "Das angeforderte Finanzdokument ist fuer dieses Portal-Konto nicht freigegeben.",
+      "Das angeforderte Finanzdokument ist für dieses Portal-Konto nicht freigegeben.",
     "portalCustomer.feedback.error":
       "Der Kundenportalzugriff konnte nicht geladen werden.",
     "recruitingApplicant.eyebrow": "Bewerbung",
-    "recruitingApplicant.title": "Oeffentliches Bewerbungsformular",
+    "recruitingApplicant.title": "Öffentliches Bewerbungsformular",
     "recruitingApplicant.lead":
-      "Dieses Formular laeuft mandantenspezifisch, iframe-tauglich und speichert Anlagen ueber den zentralen Dokumentdienst.",
+      "Dieses Formular laeuft mandantenspezifisch, iframe-tauglich und speichert Anlagen über den zentralen Dokumentdienst.",
     "recruitingApplicant.embed.embedded": "Eingebettete Darstellung aktiv",
     "recruitingApplicant.embed.standalone": "Standalone-Darstellung aktiv",
     "recruitingApplicant.loading.title": "Formular wird geladen",
     "recruitingApplicant.loading.body":
       "Die mandantenspezifische Formular-Konfiguration wird geladen.",
-    "recruitingApplicant.error.title": "Bewerbungsformular nicht verfuegbar",
-    "recruitingApplicant.success.eyebrow": "Eingang bestaetigt",
-    "recruitingApplicant.success.title": "Bewerbung uebermittelt",
+    "recruitingApplicant.error.title": "Bewerbungsformular nicht verfügbar",
+    "recruitingApplicant.success.eyebrow": "Eingang bestätigt",
+    "recruitingApplicant.success.title": "Bewerbung übermittelt",
     "recruitingApplicant.success.body":
       "Die Bewerbung wurde gespeichert und mit einer Vorgangsnummer versehen.",
-    "recruitingApplicant.fields.selectPlaceholder": "Bitte waehlen",
+    "recruitingApplicant.fields.selectPlaceholder": "Bitte wählen",
     "recruitingApplicant.fields.attachments": "Anlagen",
     "recruitingApplicant.fields.attachmentsHelp":
-      "Maximal {count} Datei(en), jeweils bis ca. {sizeMb} MB. Zulaessige Typen werden vom Mandanten vorgegeben.",
+      "Maximal {count} Datei(en), jeweils bis ca. {sizeMb} MB. Zulässige Typen werden vom Mandanten vorgegeben.",
     "recruitingApplicant.fields.consent":
-      "Ich bestaetige die Datenschutz-Einwilligung fuer diese Bewerbung.",
+      "Ich bestätige die Datenschutz-Einwilligung für diese Bewerbung.",
     "recruitingApplicant.fields.policyLink": "Datenschutzhinweis",
     "recruitingApplicant.fields.policyVersion": "Angezeigte Version: {version}",
     "recruitingApplicant.actions.submit": "Bewerbung absenden",
-    "recruitingApplicant.actions.submitting": "Bewerbung wird uebermittelt",
+    "recruitingApplicant.actions.submitting": "Bewerbung wird übermittelt",
     "recruitingApplicant.actions.clearFeedback": "Hinweis schliessen",
-    "recruitingApplicant.feedback.submitted": "Bewerbung erfolgreich uebermittelt",
+    "recruitingApplicant.feedback.submitted": "Bewerbung erfolgreich übermittelt",
     "recruitingApplicant.feedback.tenantNotFound":
-      "Fuer diesen Mandanten ist kein Bewerbungsformular verfuegbar.",
+      "Für diesen Mandanten ist kein Bewerbungsformular verfügbar.",
     "recruitingApplicant.feedback.formDisabled":
       "Das Bewerbungsformular ist aktuell deaktiviert.",
     "recruitingApplicant.feedback.originDenied":
-      "Diese Einbettungsherkunft ist fuer das Formular nicht freigegeben.",
+      "Diese Einbettungsherkunft ist für das Formular nicht freigegeben.",
     "recruitingApplicant.feedback.rateLimited":
-      "Zu viele Bewerbungen aus dieser Quelle. Bitte spaeter erneut versuchen.",
+      "Zu viele Bewerbungen aus dieser Quelle. Bitte später erneut versuchen.",
     "recruitingApplicant.feedback.consentRequired":
-      "Die Datenschutz-Einwilligung muss bestaetigt werden.",
+      "Die Datenschutz-Einwilligung muss bestätigt werden.",
     "recruitingApplicant.feedback.policyMismatch":
       "Die Formularversion ist veraltet. Bitte laden Sie die Seite neu.",
     "recruitingApplicant.feedback.fieldRequired":
-      "Bitte fuellen Sie alle Pflichtfelder aus.",
+      "Bitte füllen Sie alle Pflichtfelder aus.",
     "recruitingApplicant.feedback.invalidEmail":
-      "Bitte geben Sie eine gueltige E-Mail-Adresse an.",
+      "Bitte geben Sie eine gültige E-Mail-Adresse an.",
     "recruitingApplicant.feedback.invalidFieldOption":
-      "Eine ausgewaehlte Formularoption ist ungueltig.",
+      "Eine ausgewählte Formularoption ist ungültig.",
     "recruitingApplicant.feedback.tooManyAttachments":
-      "Es wurden zu viele Anlagen ausgewaehlt.",
+      "Es wurden zu viele Anlagen ausgewählt.",
     "recruitingApplicant.feedback.attachmentTypeNotAllowed":
-      "Mindestens ein Dateityp ist fuer dieses Formular nicht erlaubt.",
+      "Mindestens ein Dateityp ist für dieses Formular nicht erlaubt.",
     "recruitingApplicant.feedback.attachmentTooLarge":
-      "Mindestens eine Datei ist zu gross fuer dieses Formular.",
+      "Mindestens eine Datei ist zu groß für dieses Formular.",
     "recruitingApplicant.feedback.duplicateSubmission":
-      "Diese Bewerbung wurde bereits uebermittelt.",
+      "Diese Bewerbung wurde bereits übermittelt.",
     "recruitingApplicant.feedback.error":
       "Das Bewerbungsformular konnte nicht abgesendet werden.",
     "recruitingAdmin.eyebrow": "Recruiting",
     "recruitingAdmin.title": "Bewerberverwaltung und Entscheidungsfluss",
     "recruitingAdmin.lead":
-      "Diese Recruiting-Seite bindet direkt an die freigegebenen Bewerbungs- und Workflow-APIs an und zeigt Status, Einwilligung, Anlagen und Aktivitaetshistorie ohne lokale Mock-Wahrheit.",
+      "Diese Recruiting-Seite bindet direkt an die freigegebenen Bewerbungs- und Workflow-APIs an und zeigt Status, Einwilligung, Anlagen und Aktivitätshistorie ohne lokale Mock-Wahrheit.",
     "recruitingAdmin.permission.read": "Leserecht",
     "recruitingAdmin.permission.write": "Schreibrecht",
     "recruitingAdmin.permission.docs": "Dokumentzugriff",
     "recruitingAdmin.permission.missingTitle": "Recruiting-Berechtigung fehlt",
     "recruitingAdmin.permission.missingBody":
-      "Diese Admin-Seite ist nur fuer Rollen mit Recruiting-Leserechten verfuegbar.",
+      "Diese Admin-Seite ist nur für Rollen mit Recruiting-Leserechten verfügbar.",
     "recruitingAdmin.auth.missingTitle": "Anmeldung erforderlich",
     "recruitingAdmin.auth.missingBody":
-      "Melden Sie sich zuerst ueber die Systemanmeldung an, bevor Bewerbungen geladen werden koennen.",
+      "Melden Sie sich zuerst über die Systemanmeldung an, bevor Bewerbungen geladen werden können.",
     "recruitingAdmin.scope.label": "Mandanten-Scope",
-    "recruitingAdmin.scope.placeholder": "Tenant-UUID fuer Plattform-Admin-Modus",
+    "recruitingAdmin.scope.placeholder": "Tenant-UUID für Plattform-Admin-Modus",
     "recruitingAdmin.scope.platformHelp":
-      "Plattformadmins waehlen den Recruiting-Mandanten explizit und speichern ihn fuer weitere Aufrufe.",
+      "Plattformadmins wählen den Recruiting-Mandanten explizit und speichern ihn für weitere Aufrufe.",
     "recruitingAdmin.scope.sessionHelp":
       "Tenant-Admins arbeiten immer im Mandantenkontext der aktuellen Sitzung.",
     "recruitingAdmin.scope.missingTitle": "Mandanten-Scope fehlt",
     "recruitingAdmin.scope.missingBody":
-      "Waehlen Sie zuerst einen Recruiting-Mandanten, bevor Bewerbungen geladen werden.",
+      "Wählen Sie zuerst einen Recruiting-Mandanten, bevor Bewerbungen geladen werden.",
     "recruitingAdmin.list.eyebrow": "Eingang",
     "recruitingAdmin.list.title": "Bewerbungsliste",
-    "recruitingAdmin.list.empty": "Keine Bewerbungen fuer die aktuellen Filter gefunden.",
+    "recruitingAdmin.list.empty": "Keine Bewerbungen für die aktuellen Filter gefunden.",
     "recruitingAdmin.detail.eyebrow": "Detail",
-    "recruitingAdmin.detail.emptyTitle": "Keine Bewerbung ausgewaehlt",
+    "recruitingAdmin.detail.emptyTitle": "Keine Bewerbung ausgewählt",
     "recruitingAdmin.detail.emptyEyebrow": "Detailansicht",
     "recruitingAdmin.detail.emptyBody":
-      "Waehlen Sie links eine Bewerbung aus, um Einwilligung, Anlagen und Verlauf zu pruefen.",
+      "Wählen Sie links eine Bewerbung aus, um Einwilligung, Anlagen und Verlauf zu prüfen.",
     "recruitingAdmin.detail.submissionEyebrow": "Einreichung",
     "recruitingAdmin.detail.submissionTitle": "Bewerbungsdaten",
     "recruitingAdmin.summary.applicationNo": "Bewerbungsnummer",
-    "recruitingAdmin.summary.desiredRole": "Gewuenschte Position",
-    "recruitingAdmin.summary.availability": "Verfuegbar ab",
+    "recruitingAdmin.summary.desiredRole": "Gewünschte Position",
+    "recruitingAdmin.summary.availability": "Verfügbar ab",
     "recruitingAdmin.summary.source": "Quelle",
     "recruitingAdmin.summary.employeeFile": "Mitarbeitendenakte",
     "recruitingAdmin.summary.none": "keine Angabe",
     "recruitingAdmin.consent.eyebrow": "Datenschutz",
     "recruitingAdmin.consent.title": "Einwilligungsnachweis",
-    "recruitingAdmin.consent.granted": "Einwilligung bestaetigt",
+    "recruitingAdmin.consent.granted": "Einwilligung bestätigt",
     "recruitingAdmin.consent.timestamp": "Zeitpunkt",
     "recruitingAdmin.consent.policyRef": "Policy-Referenz",
     "recruitingAdmin.consent.policyVersion": "Policy-Version",
@@ -1470,7 +1552,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "recruitingAdmin.consent.ip": "IP-Adresse",
     "recruitingAdmin.attachments.eyebrow": "Anlagen",
     "recruitingAdmin.attachments.title": "Bewerbungsdokumente",
-    "recruitingAdmin.attachments.empty": "Zu dieser Bewerbung sind keine Anlagen verknuepft.",
+    "recruitingAdmin.attachments.empty": "Zu dieser Bewerbung sind keine Anlagen verknüpft.",
     "recruitingAdmin.notes.eyebrow": "Notizen",
     "recruitingAdmin.notes.title": "Review- und Interviewnotizen",
     "recruitingAdmin.timeline.eyebrow": "Verlauf",
@@ -1483,16 +1565,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "recruitingAdmin.actions.previewAttachment": "Vorschau",
     "recruitingAdmin.actions.downloadAttachment": "Download",
     "recruitingAdmin.actions.transitionEyebrow": "Statuswechsel",
-    "recruitingAdmin.actions.transitionTitle": "Naechsten Schritt ausfuehren",
-    "recruitingAdmin.actions.applyTransition": "Status uebernehmen",
+    "recruitingAdmin.actions.transitionTitle": "Nächsten Schritt ausführen",
+    "recruitingAdmin.actions.applyTransition": "Status übernehmen",
     "recruitingAdmin.actions.addNote": "Notiz speichern",
     "recruitingAdmin.fields.fullName": "Name",
     "recruitingAdmin.fields.email": "E-Mail",
     "recruitingAdmin.fields.phone": "Telefon",
     "recruitingAdmin.fields.locale": "Sprache",
     "recruitingAdmin.fields.message": "Nachricht",
-    "recruitingAdmin.fields.activityType": "Aktivitaetstyp",
-    "recruitingAdmin.fields.nextStatus": "Naechster Status",
+    "recruitingAdmin.fields.activityType": "Aktivitätstyp",
+    "recruitingAdmin.fields.nextStatus": "Nächster Status",
     "recruitingAdmin.fields.note": "Notiz",
     "recruitingAdmin.fields.decisionReason": "Entscheidungsgrund",
     "recruitingAdmin.fields.interviewScheduledAt": "Interviewtermin",
@@ -1504,44 +1586,44 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "recruitingAdmin.filters.allStatuses": "Alle Status",
     "recruitingAdmin.filters.allSources": "Alle Quellen",
     "recruitingAdmin.status.submitted": "Eingegangen",
-    "recruitingAdmin.status.in_review": "In Pruefung",
+    "recruitingAdmin.status.in_review": "In Prüfung",
     "recruitingAdmin.status.interview_scheduled": "Interview terminiert",
     "recruitingAdmin.status.accepted": "Angenommen",
     "recruitingAdmin.status.rejected": "Abgelehnt",
-    "recruitingAdmin.status.ready_for_conversion": "Bereit fuer Uebernahme",
-    "recruitingAdmin.source.public_form": "Oeffentliches Formular",
+    "recruitingAdmin.status.ready_for_conversion": "Bereit für Übernahme",
+    "recruitingAdmin.source.public_form": "Öffentliches Formular",
     "recruitingAdmin.activity.recruiterNote": "Review-Notiz",
     "recruitingAdmin.activity.interviewNote": "Interviewnotiz",
     "recruitingAdmin.event.status_transition": "Statuswechsel",
     "recruitingAdmin.event.interview_scheduled": "Interview geplant",
     "recruitingAdmin.event.decision": "Entscheidung",
-    "recruitingAdmin.event.reopened": "Wiederoeffnet",
-    "recruitingAdmin.event.ready_for_conversion": "Bereit fuer Uebernahme",
-    "recruitingAdmin.event.converted": "In Mitarbeitendenakte uebernommen",
+    "recruitingAdmin.event.reopened": "Wiederöffnet",
+    "recruitingAdmin.event.ready_for_conversion": "Bereit für Übernahme",
+    "recruitingAdmin.event.converted": "In Mitarbeitendenakte übernommen",
     "recruitingAdmin.event.recruiter_note": "Review-Notiz",
     "recruitingAdmin.event.interview_note": "Interviewnotiz",
     "recruitingAdmin.feedback.titleSuccess": "Aktion erfolgreich",
     "recruitingAdmin.feedback.titleError": "Aktion fehlgeschlagen",
     "recruitingAdmin.feedback.authRequired":
-      "Die Recruiting-Seite braucht eine gueltige Sitzung.",
+      "Die Recruiting-Seite braucht eine gültige Sitzung.",
     "recruitingAdmin.feedback.permissionDenied":
-      "Die aktuelle Rolle darf diese Recruiting-Aktion nicht ausfuehren.",
+      "Die aktuelle Rolle darf diese Recruiting-Aktion nicht ausführen.",
     "recruitingAdmin.feedback.notFound":
       "Die angeforderte Bewerbung oder Anlage wurde nicht gefunden.",
     "recruitingAdmin.feedback.invalidStatus":
-      "Der angeforderte Bewerbungsstatus ist ungueltig.",
+      "Der angeforderte Bewerbungsstatus ist ungültig.",
     "recruitingAdmin.feedback.transitionNotAllowed":
-      "Dieser Schritt ist fuer den aktuellen Bewerbungsstatus nicht erlaubt.",
+      "Dieser Schritt ist für den aktuellen Bewerbungsstatus nicht erlaubt.",
     "recruitingAdmin.feedback.interviewTimeRequired":
-      "Fuer den Interviewstatus muss ein Termin angegeben werden.",
+      "Für den Interviewstatus muss ein Termin angegeben werden.",
     "recruitingAdmin.feedback.decisionReasonRequired":
-      "Fuer diese Entscheidung ist eine Begruendung erforderlich.",
+      "Für diese Entscheidung ist eine Begründung erforderlich.",
     "recruitingAdmin.feedback.reopenNoteRequired":
-      "Zum Wiederoeffnen ist eine Notiz erforderlich.",
+      "Zum Wiederöffnen ist eine Notiz erforderlich.",
     "recruitingAdmin.feedback.hiringTargetRequired":
-      "Fuer die Uebergabe an die Uebernahme ist ein Einstellungsdatum erforderlich.",
+      "Für die Übergabe an die Übernahme ist ein Einstellungsdatum erforderlich.",
     "recruitingAdmin.feedback.noteRequired":
-      "Fuer diese Notizaktion ist ein Inhalt erforderlich.",
+      "Für diese Notizaktion ist ein Inhalt erforderlich.",
     "recruitingAdmin.feedback.conversionMissing":
       "Die zugeordnete Mitarbeitendenakte konnte nicht geladen werden.",
     "recruitingAdmin.feedback.documentNotFound":
@@ -1561,50 +1643,60 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.eyebrow": "Mitarbeitende",
     "employeeAdmin.title": "Mitarbeitendenakte und operative Pflege",
     "employeeAdmin.lead":
-      "Diese Mitarbeitendenansicht arbeitet direkt gegen die operative HR-API, haelt private Bereiche getrennt und nutzt den zentralen Dokumentendienst fuer Profilfoto und Dateinachweise.",
+      "Diese Mitarbeitendenansicht arbeitet direkt gegen die operative HR-API, hält private Bereiche getrennt und nutzt den zentralen Dokumentendienst für Profilfoto und Dateinachweise.",
     "employeeAdmin.permission.read": "Leserecht",
     "employeeAdmin.permission.write": "Schreibrecht",
     "employeeAdmin.permission.privateRead": "HR-Privat lesen",
     "employeeAdmin.permission.missingTitle": "Mitarbeitenden-Berechtigung fehlt",
     "employeeAdmin.permission.missingBody":
-      "Diese Verwaltungsseite ist nur fuer Rollen mit Mitarbeitenden-Leserecht verfuegbar.",
+      "Diese Verwaltungsseite ist nur für Rollen mit Mitarbeitenden-Leserecht verfügbar.",
     "employeeAdmin.scope.label": "Mandanten-Scope",
-    "employeeAdmin.scope.placeholder": "Tenant-UUID fuer Plattform-Admin-Modus",
+    "employeeAdmin.scope.placeholder": "Tenant-UUID für Plattform-Admin-Modus",
     "employeeAdmin.scope.help":
-      "Plattformadmins koennen den aktiven Mandanten wechseln; Tenant-Admins bleiben im Sitzungskontext.",
+      "Plattformadmins können den aktiven Mandanten wechseln; Tenant-Admins bleiben im Sitzungskontext.",
     "employeeAdmin.scope.missingTitle": "Mandanten-Scope fehlt",
     "employeeAdmin.scope.missingBody":
-      "Waehlen Sie zuerst einen Mandanten, bevor Mitarbeitende geladen werden.",
+      "Wählen Sie zuerst einen Mandanten, bevor Mitarbeitende geladen werden.",
     "employeeAdmin.list.eyebrow": "Liste",
     "employeeAdmin.list.title": "Mitarbeitende",
-    "employeeAdmin.list.empty": "Keine Mitarbeitenden fuer die aktuellen Filter gefunden.",
+    "employeeAdmin.list.empty": "Keine Mitarbeitenden für die aktuellen Filter gefunden.",
     "employeeAdmin.detail.eyebrow": "Akte",
     "employeeAdmin.detail.newTitle": "Neue Mitarbeitendenakte",
-    "employeeAdmin.detail.emptyTitle": "Keine Mitarbeitendenakte ausgewaehlt",
+    "employeeAdmin.detail.emptyTitle": "Keine Mitarbeitendenakte ausgewählt",
     "employeeAdmin.detail.emptyEyebrow": "Detailansicht",
     "employeeAdmin.detail.emptyBody":
-      "Waehlen Sie links eine Mitarbeitendenakte aus oder legen Sie eine neue an.",
+      "Wählen Sie links eine Mitarbeitendenakte aus oder legen Sie eine neue an.",
+    "employeeAdmin.tabs.overview": "Überblick",
+    "employeeAdmin.tabs.appAccess": "App-Zugang",
+    "employeeAdmin.tabs.profilePhoto": "Profilfoto",
+    "employeeAdmin.tabs.notes": "Notizen",
+    "employeeAdmin.tabs.groups": "Gruppen",
+    "employeeAdmin.tabs.addresses": "Adressen",
+    "employeeAdmin.tabs.documents": "Dateien",
     "employeeAdmin.form.eyebrow": "Datei",
     "employeeAdmin.form.title": "Strukturierte Mitarbeitendenakte",
     "employeeAdmin.form.lead":
-      "Die Mitarbeitendenakte ist in klare Pflegebereiche gegliedert, damit Stammdaten, Zuordnung und Zugangskopplung schneller erfasst werden koennen.",
+      "Die Mitarbeitendenakte ist in klare Pflegebereiche gegliedert, damit Stammdaten, Zuordnung und Zugangskopplung schneller erfasst werden können.",
     "employeeAdmin.form.identityEyebrow": "Grunddaten",
-    "employeeAdmin.form.identityTitle": "Identitaet und Personalnummer",
+    "employeeAdmin.form.identityTitle": "Identität und Personalnummer",
     "employeeAdmin.form.contactEyebrow": "Kontakt",
     "employeeAdmin.form.contactTitle": "Dienstliche Kontaktwege",
     "employeeAdmin.form.assignmentEyebrow": "Zuordnung",
-    "employeeAdmin.form.assignmentTitle": "Niederlassung, Mandat und Beschaeftigungsdaten",
-    "employeeAdmin.form.accessEyebrow": "Verknuepfung",
+    "employeeAdmin.form.assignmentTitle": "Niederlassung, Mandat und Beschäftigungsdaten",
+    "employeeAdmin.form.accessEyebrow": "Verknüpfung",
     "employeeAdmin.form.accessTitle": "App- und Benutzerkonto-Zuordnung",
+    "employeeAdmin.form.accessLead":
+      "Die Grundakte wird zuerst ohne freie Benutzerkonto-Eingabe gespeichert. App-Zugang und Verknüpfung laufen danach im Bereich App-Zugang.",
+    "employeeAdmin.form.accessCurrent": "Aktuell verknüpfte Benutzerkonto-ID",
     "employeeAdmin.form.notesEyebrow": "Notizen",
     "employeeAdmin.form.notesTitle": "Operative Hinweise",
     "employeeAdmin.form.actionsEyebrow": "Aktion",
-    "employeeAdmin.form.actionsTitle": "Akte speichern oder zuruecksetzen",
+    "employeeAdmin.form.actionsTitle": "Akte speichern oder zurücksetzen",
     "employeeAdmin.filters.search": "Suche",
     "employeeAdmin.filters.searchPlaceholder": "Personalnummer, Name oder E-Mail",
     "employeeAdmin.filters.status": "Status",
     "employeeAdmin.filters.allStatuses": "Alle Status",
-    "employeeAdmin.filters.includeArchived": "Archivierte Datensaetze einschliessen",
+    "employeeAdmin.filters.includeArchived": "Archivierte Datensätze einschliessen",
     "employeeAdmin.status.active": "Aktiv",
     "employeeAdmin.status.inactive": "Inaktiv",
     "employeeAdmin.status.archived": "Archiviert",
@@ -1630,8 +1722,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.fields.groupName": "Gruppenname",
     "employeeAdmin.fields.groupDescription": "Gruppenbeschreibung",
     "employeeAdmin.fields.assignGroup": "Gruppe zuordnen",
-    "employeeAdmin.fields.validFrom": "Gueltig ab",
-    "employeeAdmin.fields.validUntil": "Gueltig bis",
+    "employeeAdmin.fields.validFrom": "Gültig ab",
+    "employeeAdmin.fields.validUntil": "Gültig bis",
     "employeeAdmin.fields.membershipNotes": "Zuordnungsnotiz",
     "employeeAdmin.summary.branch": "Niederlassung",
     "employeeAdmin.summary.mandate": "Mandat",
@@ -1642,22 +1734,43 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.photo.title": "Foto und Vorschau",
     "employeeAdmin.photo.alt": "Profilfoto der mitarbeitenden Person",
     "employeeAdmin.photo.empty": "Noch kein Profilfoto hinterlegt",
-    "employeeAdmin.photo.help": "Das Foto wird ueber den zentralen Dokumentendienst versioniert.",
+    "employeeAdmin.photo.help": "Das Foto wird über den zentralen Dokumentendienst versioniert.",
+    "employeeAdmin.photo.manageEyebrow": "Medien",
+    "employeeAdmin.photo.manageTitle": "Vorschau und Upload steuern",
+    "employeeAdmin.photo.fileLabel": "Neue Bilddatei",
     "employeeAdmin.notes.eyebrow": "Notizen",
-    "employeeAdmin.notes.title": "Erinnerungen und positive Aktivitaet",
+    "employeeAdmin.notes.title": "Erinnerungen und positive Aktivität",
+    "employeeAdmin.notes.lead": "Operative Hinweise, Erinnerungen und positive Rückmeldungen bleiben in einer sauberen Registeransicht gebündelt.",
+    "employeeAdmin.notes.registerEyebrow": "Verlauf",
+    "employeeAdmin.notes.registerTitle": "Bestehende Notizen",
+    "employeeAdmin.notes.editorEyebrow": "Bearbeitung",
+    "employeeAdmin.notes.editorTitle": "Neue Notiz oder Anpassung erfassen",
     "employeeAdmin.notes.empty": "Noch keine operativen Notizen vorhanden.",
     "employeeAdmin.groups.eyebrow": "Gruppen",
     "employeeAdmin.groups.title": "Gruppen und Zuordnungen",
+    "employeeAdmin.groups.lead": "Gruppenkatalog und Mitarbeitenden-Zuordnung bleiben getrennt, damit Pflege und Einsatzsteuerung nicht vermischt werden.",
+    "employeeAdmin.groups.catalogEyebrow": "Katalog",
+    "employeeAdmin.groups.catalogTitle": "Gruppe anlegen oder pflegen",
+    "employeeAdmin.groups.assignEyebrow": "Zuordnung",
+    "employeeAdmin.groups.assignTitle": "Mitarbeitenden-Gruppe zuweisen",
+    "employeeAdmin.groups.currentEyebrow": "Bestand",
+    "employeeAdmin.groups.currentTitle": "Aktive Gruppenzuordnungen",
     "employeeAdmin.groups.empty": "Noch keine Gruppenzuordnungen vorhanden.",
-    "employeeAdmin.groups.selectPlaceholder": "Gruppe auswaehlen",
+    "employeeAdmin.groups.selectPlaceholder": "Gruppe auswählen",
     "employeeAdmin.addresses.eyebrow": "Adressen",
     "employeeAdmin.addresses.title": "Aktuelle Adresshistorie",
+    "employeeAdmin.addresses.lead": "Freigegebene Adressstammsätze werden als nachvollziehbare Historie dargestellt.",
+    "employeeAdmin.addresses.historyEyebrow": "Historie",
+    "employeeAdmin.addresses.historyTitle": "Freigegebene Adressverläufe",
     "employeeAdmin.addresses.empty": "Keine freigegebene Adresshistorie vorhanden.",
     "employeeAdmin.documents.eyebrow": "Dateien",
     "employeeAdmin.documents.title": "Dokumente und Nachweise",
+    "employeeAdmin.documents.lead": "Dokumente und Nachweise bleiben als geordnete Liste mit direktem Download verfügbar.",
+    "employeeAdmin.documents.libraryEyebrow": "Ablage",
+    "employeeAdmin.documents.libraryTitle": "Verknüpfte Dokumente",
     "employeeAdmin.documents.empty": "Keine mitarbeitendenbezogenen Dokumente vorhanden.",
     "employeeAdmin.noteType.operational_note": "Operative Notiz",
-    "employeeAdmin.noteType.positive_activity": "Positive Aktivitaet",
+    "employeeAdmin.noteType.positive_activity": "Positive Aktivität",
     "employeeAdmin.noteType.reminder": "Erinnerung",
     "employeeAdmin.actions.rememberScope": "Scope merken",
     "employeeAdmin.actions.refresh": "Neu laden",
@@ -1666,7 +1779,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.newEmployee": "Mitarbeitendenakte anlegen",
     "employeeAdmin.actions.createEmployee": "Mitarbeitende anlegen",
     "employeeAdmin.actions.saveEmployee": "Akte speichern",
-    "employeeAdmin.actions.reset": "Formular zuruecksetzen",
+    "employeeAdmin.actions.reset": "Formular zurücksetzen",
     "employeeAdmin.actions.uploadPhoto": "Foto hochladen",
     "employeeAdmin.actions.downloadPhoto": "Foto herunterladen",
     "employeeAdmin.actions.createNote": "Notiz anlegen",
@@ -1681,26 +1794,36 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.exportEmployees": "Export starten",
     "employeeAdmin.actions.loadImportFile": "CSV laden",
     "employeeAdmin.actions.resetImportTemplate": "Vorlage einsetzen",
-    "employeeAdmin.actions.importDryRun": "Import pruefen",
-    "employeeAdmin.actions.importExecute": "Import ausfuehren",
+    "employeeAdmin.actions.importDryRun": "Import prüfen",
+    "employeeAdmin.actions.importExecute": "Import ausführen",
     "employeeAdmin.actions.createAccessUser": "App-Benutzer anlegen",
-    "employeeAdmin.actions.attachAccessUser": "Bestehenden Benutzer verknuepfen",
+    "employeeAdmin.actions.attachAccessUser": "Bestehenden Benutzer verknüpfen",
     "employeeAdmin.actions.detachAccessUser": "Zugang trennen",
     "employeeAdmin.actions.reconcileAccessUser": "Zugang abgleichen",
     "employeeAdmin.import.eyebrow": "Import / Export",
     "employeeAdmin.import.title": "Bulk-Onboarding und operative Exporte",
     "employeeAdmin.import.csvLabel": "CSV-Inhalt",
-    "employeeAdmin.import.continueOnError": "Bei Fehlern mit den naechsten Zeilen fortfahren",
-    "employeeAdmin.import.dryRunSummary": "Pruefung abgeschlossen: {total} Zeilen, {invalid} ungueltig.",
+    "employeeAdmin.import.continueOnError": "Bei Fehlern mit den nächsten Zeilen fortfahren",
+    "employeeAdmin.import.dryRunSummary": "Prüfung abgeschlossen: {total} Zeilen, {invalid} ungültig.",
     "employeeAdmin.import.executeSummary": "Import abgeschlossen: {total} Zeilen, {created} angelegt, {updated} aktualisiert.",
     "employeeAdmin.import.exportSummary": "Export bereit: {rows} Zeilen, Dokument {documentId}.",
     "employeeAdmin.access.eyebrow": "App-Zugang",
-    "employeeAdmin.access.title": "IAM-Verknuepfung fuer Mitarbeitenden-App",
+    "employeeAdmin.access.title": "IAM-Verknüpfung für Mitarbeitenden-App",
     "employeeAdmin.access.user": "Benutzername",
     "employeeAdmin.access.email": "E-Mail",
     "employeeAdmin.access.enabled": "Zugang aktiv",
     "employeeAdmin.access.enabledYes": "Ja",
     "employeeAdmin.access.enabledNo": "Nein",
+    "employeeAdmin.access.lead": "Benutzerkonto, Neuanlage und spätere Verknüpfung folgen derselben gegliederten Aktenlogik wie die Stammdaten.",
+    "employeeAdmin.access.createEyebrow": "Neuanlage",
+    "employeeAdmin.access.createTitle": "Neuen App-Benutzer vorbereiten",
+    "employeeAdmin.access.createLead": "Benutzername, E-Mail und Startpasswort werden gemeinsam gepflegt, bevor der Zugang angelegt wird.",
+    "employeeAdmin.access.reconcileEyebrow": "Abgleich",
+    "employeeAdmin.access.reconcileTitle": "Bestehenden Zugang prüfen oder trennen",
+    "employeeAdmin.access.reconcileLead": "Nutze den Abgleich für bestehende Verknüpfungen oder trenne den Zugang kontrolliert vom Mitarbeitendenprofil.",
+    "employeeAdmin.access.attachEyebrow": "Bestehender Benutzer",
+    "employeeAdmin.access.attachTitle": "Vorhandenen IAM-Benutzer anbinden",
+    "employeeAdmin.access.attachLead": "Wenn bereits ein Konto existiert, kann es über ID, Benutzername oder E-Mail sauber verknüpft werden.",
     "employeeAdmin.access.createUsername": "Neuer Benutzername",
     "employeeAdmin.access.createEmail": "Neue E-Mail",
     "employeeAdmin.access.createPassword": "Startpasswort",
@@ -1709,9 +1832,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.access.attachEmail": "Vorhandene E-Mail",
     "employeeAdmin.feedback.titleError": "Aktion fehlgeschlagen",
     "employeeAdmin.feedback.titleSuccess": "Aktion erfolgreich",
-    "employeeAdmin.feedback.authRequired": "Die Mitarbeitendenverwaltung benoetigt eine gueltige Sitzung.",
+    "employeeAdmin.feedback.authRequired": "Die Mitarbeitendenverwaltung benötigt eine gültige Sitzung.",
     "employeeAdmin.feedback.permissionDenied":
-      "Die aktuelle Rolle darf diese Mitarbeitendenaktion nicht ausfuehren.",
+      "Die aktuelle Rolle darf diese Mitarbeitendenaktion nicht ausführen.",
     "employeeAdmin.feedback.notFound":
       "Die angeforderte Mitarbeitendenakte oder Zuordnung wurde nicht gefunden.",
     "employeeAdmin.feedback.duplicatePersonnelNo":
@@ -1719,13 +1842,13 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.feedback.duplicateGroupCode":
       "Dieser Gruppencode ist im Mandanten bereits vergeben.",
     "employeeAdmin.feedback.staleVersion":
-      "Der Datensatz wurde zwischenzeitlich geaendert. Bitte neu laden und erneut versuchen.",
+      "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden und erneut versuchen.",
     "employeeAdmin.feedback.addressOverlap":
-      "Die Adresshistorie enthaelt ein ueberlappendes Zeitfenster.",
+      "Die Adresshistorie enthält ein überlappendes Zeitfenster.",
     "employeeAdmin.feedback.reminderDateRequired":
-      "Fuer Erinnerungen muss ein Erinnerungsdatum gesetzt werden.",
+      "Für Erinnerungen muss ein Erinnerungsdatum gesetzt werden.",
     "employeeAdmin.feedback.invalidNoteType":
-      "Der gewaehlt Notiztyp ist nicht zulaessig.",
+      "Der gewählt Notiztyp ist nicht zulässig.",
     "employeeAdmin.feedback.photoUploadFailed":
       "Das Profilfoto konnte nicht gespeichert werden.",
     "employeeAdmin.feedback.invalidImportCsv":
@@ -1737,9 +1860,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.feedback.accessEmailTaken":
       "Die E-Mail-Adresse ist im aktuellen Mandanten bereits vergeben.",
     "employeeAdmin.feedback.accessAmbiguousMatch":
-      "Zum Verknuepfen muss genau ein Benutzer-Suchfeld gefuellt werden.",
+      "Zum Verknüpfen muss genau ein Benutzer-Suchfeld gefüllt werden.",
     "employeeAdmin.feedback.accessRoleMissing":
-      "Die Rolle fuer Mitarbeitendenzugang fehlt im IAM-Katalog.",
+      "Die Rolle für Mitarbeitendenzugang fehlt im IAM-Katalog.",
     "employeeAdmin.feedback.employeeSaved":
       "Die Mitarbeitendenakte wurde gespeichert.",
     "employeeAdmin.feedback.noteSaved":
@@ -1753,15 +1876,15 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.feedback.importDryRunReady":
       "Die Importvorschau wurde erzeugt.",
     "employeeAdmin.feedback.importExecuted":
-      "Der Mitarbeitendenimport wurde ausgefuehrt.",
+      "Der Mitarbeitendenimport wurde ausgeführt.",
     "employeeAdmin.feedback.exportReady":
       "Der Mitarbeitendenexport wurde erzeugt.",
     "employeeAdmin.feedback.accessLinked":
-      "Der Mitarbeitendenzugang wurde verknuepft.",
+      "Der Mitarbeitendenzugang wurde verknüpft.",
     "employeeAdmin.feedback.accessDetached":
       "Der Mitarbeitendenzugang wurde getrennt.",
     "employeeAdmin.feedback.accessReconciled":
-      "Die IAM-Verknuepfung wurde abgeglichen.",
+      "Die IAM-Verknüpfung wurde abgeglichen.",
     "employeeAdmin.feedback.error":
       "Die Mitarbeitendenaktion konnte nicht abgeschlossen werden.",
     "api.errors.platform.internal":
@@ -1770,18 +1893,20 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.eyebrow": "Core Administration",
     "coreAdmin.title": "Mandantenstruktur und Kernsteuerung",
     "coreAdmin.lead":
-      "Diese Verwaltungsseite bindet direkt an die Core-Admin-APIs an und fuehrt Mandanten, Niederlassungen, Mandate und Einstellungen ohne lokale Mock-Wahrheit.",
+      "Diese Verwaltungsseite bindet direkt an die Core-Admin-APIs an und führt Mandanten, Niederlassungen, Mandate und Einstellungen ohne lokale Mock-Wahrheit.",
     "coreAdmin.permission.ready": "RBAC-bereite Route",
-    "coreAdmin.permission.label": "Berechtigungsschluessel",
+    "coreAdmin.permission.label": "Berechtigungsschlüssel",
     "coreAdmin.scope.label": "Mandanten-Scope",
-    "coreAdmin.scope.placeholder": "Tenant-UUID fuer Tenant-Admin-Modus",
+    "coreAdmin.scope.placeholder": "Tenant-UUID für Plattformadmin-Scope",
     "coreAdmin.scope.help":
-      "Im temporaren Mock-Auth-Modus wird diese UUID als X-Tenant-Id an das Backend uebergeben.",
+      "Im temporaren Mock-Auth-Modus wird diese UUID als X-Tenant-Id an das Backend übergeben.",
     "coreAdmin.scope.platformHint":
-      "Plattformadmins sehen die tenant-uebergreifende Liste. Der Scope wird fuer spaeteres Tenant-Admin-Switching gemerkt.",
+      "Plattformadmins sehen die tenant-übergreifende Liste. Der Scope wird für späteres Tenant-Admin-Switching gemerkt.",
+    "coreAdmin.scope.sessionHint":
+      "Mandantenadmins arbeiten immer im Mandanten ihrer aktuellen Sitzung. Der Scope ist schreibgeschützt und wird automatisch geladen.",
     "coreAdmin.scope.emptyTitle": "Tenant-Scope fehlt",
     "coreAdmin.scope.emptyBody":
-      "Mandantenadmins brauchen eine gespeicherte Tenant-UUID, bevor Listen- und Detailaufrufe geladen werden koennen.",
+      "Mandantenadmins brauchen eine gespeicherte Tenant-UUID, bevor Listen- und Detailaufrufe geladen werden können.",
     "coreAdmin.scope.remembered": "Gemerkter Scope",
     "coreAdmin.scope.none": "keiner",
     "coreAdmin.actions.refresh": "Neu laden",
@@ -1801,7 +1926,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.actions.saveMandate": "Mandat speichern",
     "coreAdmin.actions.createSetting": "Einstellung anlegen",
     "coreAdmin.actions.saveSetting": "Einstellung speichern",
-    "coreAdmin.tenants.eyebrow": "Mandantenuebersicht",
+    "coreAdmin.tenants.eyebrow": "Mandantenübersicht",
     "coreAdmin.tenants.title": "Mandanten",
     "coreAdmin.tenants.filterPlaceholder": "Nach Code oder Name filtern",
     "coreAdmin.tenants.empty": "Noch keine Mandanten vorhanden.",
@@ -1810,12 +1935,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.onboarding.eyebrow": "Onboarding",
     "coreAdmin.onboarding.title": "Neuen Mandanten mit Basissatz anlegen",
     "coreAdmin.detail.eyebrow": "Detail und Pflege",
-    "coreAdmin.detail.emptyTitle": "Kein Mandant ausgewaehlt",
+    "coreAdmin.detail.emptyTitle": "Kein Mandant ausgewählt",
     "coreAdmin.detail.emptyState":
-      "Waehlen Sie links einen Mandanten aus, um Stammdaten, Niederlassungen, Mandate und Einstellungen zu pflegen.",
+      "Wählen Sie links einen Mandanten aus, um Stammdaten, Niederlassungen, Mandate und Einstellungen zu pflegen.",
     "coreAdmin.lifecycle.title": "Lifecycle und Archivstatus",
     "coreAdmin.lifecycle.archivedHint":
-      "Archivierte Mandanten bleiben explizit erhalten und koennen ueber den aktuellen Backend-Contract nicht wieder aktiviert werden.",
+      "Archivierte Mandanten bleiben explizit erhalten und können über den aktuellen Backend-Contract nicht wieder aktiviert werden.",
     "coreAdmin.branches.eyebrow": "Niederlassungen",
     "coreAdmin.branches.title": "Niederlassungsverwaltung",
     "coreAdmin.branches.empty": "Es sind noch keine Niederlassungen vorhanden.",
@@ -1830,10 +1955,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.fields.tenantName": "Mandantenname",
     "coreAdmin.fields.legalName": "Rechtlicher Name",
     "coreAdmin.fields.defaultLocale": "Standard-Sprache",
-    "coreAdmin.fields.defaultCurrency": "Standard-Waehrung",
+    "coreAdmin.fields.defaultCurrency": "Standard-Währung",
     "coreAdmin.fields.timezone": "Zeitzone",
     "coreAdmin.fields.branch": "Niederlassung",
-    "coreAdmin.fields.branchPlaceholder": "Niederlassung waehlen",
+    "coreAdmin.fields.branchPlaceholder": "Niederlassung wählen",
     "coreAdmin.fields.branchCode": "Niederlassungscode",
     "coreAdmin.fields.branchName": "Niederlassungsname",
     "coreAdmin.fields.branchEmail": "Kontakt-E-Mail",
@@ -1842,7 +1967,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.fields.mandateName": "Mandatsname",
     "coreAdmin.fields.externalRef": "Externe Referenz",
     "coreAdmin.fields.notes": "Notizen",
-    "coreAdmin.fields.settingKey": "Einstellungsschluessel",
+    "coreAdmin.fields.settingKey": "Einstellungsschlüssel",
     "coreAdmin.fields.settingValue": "Initialer Einstellungswert (JSON)",
     "coreAdmin.fields.settingValueJson": "JSON-Wert",
     "coreAdmin.status.active": "Aktiv",
@@ -1854,7 +1979,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.feedback.unexpected":
       "Die Core-Administration konnte die Aktion nicht abschliessen.",
     "coreAdmin.feedback.invalidJson":
-      "Bitte geben Sie ein gueltiges JSON-Objekt fuer Einstellungen an.",
+      "Bitte geben Sie ein gültiges JSON-Objekt für Einstellungen an.",
     "coreAdmin.feedback.tenantCreated": "Mandant und Basissatz wurden angelegt.",
     "coreAdmin.feedback.tenantSaved": "Mandantenstammdaten wurden gespeichert.",
     "coreAdmin.feedback.tenantStatusSaved": "Mandantenstatus wurde aktualisiert.",
@@ -1864,9 +1989,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.feedback.mandateStatusSaved": "Mandatsstatus wurde aktualisiert.",
     "coreAdmin.feedback.settingSaved": "Einstellung wurde gespeichert.",
     "coreAdmin.feedback.settingStatusSaved": "Einstellungsstatus wurde aktualisiert.",
-    "coreAdmin.feedback.scopeRemembered": "Der Tenant-Scope wurde fuer den Tenant-Admin-Modus gemerkt.",
+    "coreAdmin.feedback.scopeRemembered": "Der Tenant-Scope wurde für den Tenant-Admin-Modus gemerkt.",
     "coreAdmin.api.errors.authorization.forbidden":
-      "Diese Rolle darf die angeforderte Core-Administration nicht ausfuehren.",
+      "Diese Rolle darf die angeforderte Core-Administration nicht ausführen.",
     "coreAdmin.api.errors.tenant.not_found": "Mandant nicht gefunden.",
     "coreAdmin.api.errors.branch.not_found": "Niederlassung nicht gefunden.",
     "coreAdmin.api.errors.mandate.not_found": "Mandat nicht gefunden.",
@@ -1878,51 +2003,51 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.api.errors.mandate.duplicate_code":
       "Der Mandatscode existiert in diesem Mandanten bereits.",
     "coreAdmin.api.errors.setting.duplicate_key":
-      "Dieser Einstellungsschluessel existiert bereits.",
+      "Dieser Einstellungsschlüssel existiert bereits.",
     "coreAdmin.api.errors.setting.stale_version":
-      "Die Einstellung wurde zwischenzeitlich geaendert. Bitte neu laden und erneut speichern.",
+      "Die Einstellung wurde zwischenzeitlich geändert. Bitte neu laden und erneut speichern.",
     "coreAdmin.api.errors.mandate.invalid_branch_scope":
-      "Die gewaehlte Niederlassung gehoert nicht zu diesem Mandanten.",
+      "Die gewählte Niederlassung gehört nicht zu diesem Mandanten.",
     "coreAdmin.api.errors.lifecycle.archived_record":
-      "Archivierte Datensaetze bleiben archiviert und koennen nicht ueber diesen Pfad reaktiviert werden.",
+      "Archivierte Datensätze bleiben archiviert und können nicht über diesen Pfad reaktiviert werden.",
     "coreAdmin.api.errors.conflict.integrity":
-      "Die Aenderung verletzt eine Integritaetsregel im Core-Backbone.",
+      "Die Änderung verletzt eine Integritaetsregel im Core-Backbone.",
     "noticeAdmin.eyebrow": "Plattformdienste / Hinweise",
-    "noticeAdmin.title": "Hinweise, Zielgruppen und Bestaetigungen",
+    "noticeAdmin.title": "Hinweise, Zielgruppen und Bestätigungen",
     "noticeAdmin.lead":
-      "Diese Minimalansicht bindet an die Notice-APIs an: Entwurf anlegen, veroeffentlichen und die eigene Feed-Sicht pruefen.",
+      "Diese Minimalansicht bindet an die Notice-APIs an: Entwurf anlegen, veröffentlichen und die eigene Feed-Sicht prüfen.",
     "noticeAdmin.scope.label": "Mandanten-Scope",
-    "noticeAdmin.scope.placeholder": "Tenant-UUID fuer Notice-APIs",
+    "noticeAdmin.scope.placeholder": "Tenant-UUID für Notice-APIs",
     "noticeAdmin.scope.action": "Scope merken",
     "noticeAdmin.scope.missingTitle": "Mandanten-Scope fehlt",
     "noticeAdmin.scope.missingBody":
-      "Fuer die Hinweisfluesse wird eine Tenant-UUID benoetigt, damit Admin- und Feed-Aufrufe tenant-sicher bleiben.",
+      "Für die Hinweisflüsse wird eine Tenant-UUID benötigt, damit Admin- und Feed-Aufrufe tenant-sicher bleiben.",
     "noticeAdmin.form.eyebrow": "Hinweisentwurf",
     "noticeAdmin.form.title": "Neuen Hinweis anlegen",
     "noticeAdmin.list.eyebrow": "Adminliste",
-    "noticeAdmin.list.title": "Entwuerfe und veroeffentlichte Hinweise",
-    "noticeAdmin.list.empty": "Noch keine Hinweise fuer diesen Tenant vorhanden.",
+    "noticeAdmin.list.title": "Entwürfe und veröffentlichte Hinweise",
+    "noticeAdmin.list.empty": "Noch keine Hinweise für diesen Tenant vorhanden.",
     "noticeAdmin.feed.eyebrow": "Meine Feed-Sicht",
-    "noticeAdmin.feed.title": "Sichtbare Hinweise fuer die aktuelle Rolle",
-    "noticeAdmin.feed.empty": "Aktuell ist fuer die Rolle kein Hinweis sichtbar.",
-    "noticeAdmin.feed.acknowledged": "Bestaetigt",
+    "noticeAdmin.feed.title": "Sichtbare Hinweise für die aktuelle Rolle",
+    "noticeAdmin.feed.empty": "Aktuell ist für die Rolle kein Hinweis sichtbar.",
+    "noticeAdmin.feed.acknowledged": "Bestätigt",
     "noticeAdmin.fields.title": "Titel",
     "noticeAdmin.fields.summary": "Kurztext",
     "noticeAdmin.fields.body": "Inhalt",
     "noticeAdmin.fields.audienceRole": "Rollen-Zielgruppe",
-    "noticeAdmin.fields.mandatory": "Bestaetigung erforderlich",
+    "noticeAdmin.fields.mandatory": "Bestätigung erforderlich",
     "noticeAdmin.actions.create": "Entwurf speichern",
-    "noticeAdmin.actions.publish": "Veroeffentlichen",
+    "noticeAdmin.actions.publish": "Veröffentlichen",
     "noticeAdmin.actions.refresh": "Neu laden",
-    "noticeAdmin.actions.acknowledge": "Bestaetigen",
+    "noticeAdmin.actions.acknowledge": "Bestätigen",
     "noticeAdmin.feedback.created": "Hinweis angelegt",
-    "noticeAdmin.feedback.published": "Hinweis veroeffentlicht",
-    "noticeAdmin.feedback.acknowledged": "Hinweis bestaetigt",
+    "noticeAdmin.feedback.published": "Hinweis veröffentlicht",
+    "noticeAdmin.feedback.acknowledged": "Hinweis bestätigt",
     "noticeAdmin.feedback.error": "Notice-Aktion fehlgeschlagen.",
     "customerAdmin.eyebrow": "Kundenverwaltung",
     "customerAdmin.title": "Kundenstamm, Kontakte und Adresslinks",
     "customerAdmin.lead":
-      "Diese erste CRM-Ansicht folgt dem Vben-Admin-Muster mit Listen-, Detail- und Pflegebereichen fuer Kunden, Kontakte und wiederverwendete Adressen.",
+      "Diese erste CRM-Ansicht folgt dem Vben-Admin-Muster mit Listen-, Detail- und Pflegebereichen für Kunden, Kontakte und wiederverwendete Adressen.",
     "customerAdmin.permission.read": "Leserechte",
     "customerAdmin.permission.write": "Schreibrechte",
     "customerAdmin.permission.missingTitle": "Keine CRM-Berechtigung",
@@ -1932,18 +2057,30 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.scope.placeholder": "Tenant UUID eingeben",
     "customerAdmin.scope.missingTitle": "Scope oder Sitzung fehlt",
     "customerAdmin.scope.missingBody":
-      "Fuer die Kunden-API werden ein Mandantenscope und ein gueltiges Bearer-Token benoetigt.",
+      "Für die Kunden-API werden ein Mandantenscope und ein gültiges Bearer-Token benötigt.",
     "customerAdmin.token.label": "Bearer-Token",
-    "customerAdmin.token.placeholder": "Access Token fuer die Backend-API",
+    "customerAdmin.token.placeholder": "Access Token für die Backend-API",
     "customerAdmin.token.help":
       "Die Shell hat noch keinen Login-Bildschirm. Bis `US-9-T1` bleibt das Token eine Entwickler-/Admin-Eingabe.",
     "customerAdmin.list.eyebrow": "Kundenliste",
     "customerAdmin.list.title": "Suche und Auswahl",
-    "customerAdmin.list.empty": "Keine Kunden fuer die aktuellen Filter gefunden.",
+    "customerAdmin.list.empty": "Keine Kunden für die aktuellen Filter gefunden.",
     "customerAdmin.detail.eyebrow": "Kundendetail",
-    "customerAdmin.detail.emptyTitle": "Noch kein Kunde ausgewaehlt",
-    "customerAdmin.detail.emptyBody": "Waehle links einen Kunden aus oder starte einen neuen Datensatz.",
+    "customerAdmin.detail.emptyTitle": "Noch kein Kunde ausgewählt",
+    "customerAdmin.detail.emptyBody": "Wähle oben einen Kunden aus der Liste aus oder starte einen neuen Datensatz.",
     "customerAdmin.detail.newTitle": "Neuen Kunden anlegen",
+    "customerAdmin.detail.workspaceTitle": "Kundenarbeitsbereich",
+    "customerAdmin.detail.workspaceLead": "Die Fachbereiche sind in Tabs getrennt, damit nur der gerade bearbeitete Bereich sichtbar bleibt.",
+    "customerAdmin.tabs.overview": "Überblick",
+    "customerAdmin.tabs.contacts": "Kontakte",
+    "customerAdmin.tabs.addresses": "Adressen",
+    "customerAdmin.tabs.commercial": "Commercial",
+    "customerAdmin.tabs.portal": "Portal",
+    "customerAdmin.tabs.history": "Historie",
+    "customerAdmin.tabs.employeeBlocks": "Mitarbeitendensperren",
+    "customerAdmin.commercial.tabs.billingProfile": "Abrechnungsprofil",
+    "customerAdmin.commercial.tabs.invoiceParties": "Rechnungsparteien",
+    "customerAdmin.commercial.tabs.pricingRules": "Preisregeln",
     "customerAdmin.form.generalEyebrow": "Stammdaten",
     "customerAdmin.form.generalTitle": "Allgemeine Kundendaten",
     "customerAdmin.filters.search": "Suche",
@@ -1952,62 +2089,86 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.filters.allStatuses": "Alle Status",
     "customerAdmin.filters.includeArchived": "Archivierte Kunden einbeziehen",
     "customerAdmin.lifecycle.title": "Statussteuerung",
-    "customerAdmin.lifecycle.help": "Archivierte Kunden bleiben erhalten und koennen derzeit nicht reaktiviert werden.",
-    "customerAdmin.summary.primaryContact": "Primaerkontakt",
+    "customerAdmin.lifecycle.help": "Archivierte Kunden bleiben erhalten und können derzeit nicht reaktiviert werden.",
+    "customerAdmin.summary.primaryContact": "Primärkontakt",
     "customerAdmin.summary.defaultBranch": "Standardniederlassung",
     "customerAdmin.summary.defaultMandate": "Standardmandat",
     "customerAdmin.summary.classification": "Klassifikation",
+    "customerAdmin.summary.ranking": "Ranking",
+    "customerAdmin.summary.customerStatus": "Kundenstatus",
     "customerAdmin.summary.none": "Nicht gesetzt",
     "customerAdmin.contacts.eyebrow": "Kontakte",
     "customerAdmin.contacts.title": "Kontaktpflege",
+    "customerAdmin.contacts.lead": "Kontaktregister und Bearbeitung bleiben in einer strukturierten Kundenakte mit klarer Feldlogik getrennt.",
+    "customerAdmin.contacts.registerEyebrow": "Register",
+    "customerAdmin.contacts.registerTitle": "Bestehende Kontakte",
+    "customerAdmin.contacts.editorEyebrow": "Bearbeitung",
+    "customerAdmin.contacts.editorTitle": "Kontakt erfassen oder anpassen",
     "customerAdmin.contacts.empty": "Noch keine Kontakte hinterlegt.",
-    "customerAdmin.contacts.primaryBadge": "Primaerkontakt",
+    "customerAdmin.contacts.primaryBadge": "Primärkontakt",
     "customerAdmin.contacts.standardBadge": "Kontakt",
     "customerAdmin.history.eyebrow": "Historie",
-    "customerAdmin.history.title": "Lesbare Aenderungshistorie",
-    "customerAdmin.history.empty": "Noch keine fachliche Historie fuer diesen Kunden vorhanden.",
+    "customerAdmin.history.title": "Lesbare Änderungshistorie",
+    "customerAdmin.history.lead": "Historieneinträge und Anhangsverknüpfungen bleiben als sauber getrennte Arbeitsbereiche sichtbar.",
+    "customerAdmin.history.registerEyebrow": "Historienlog",
+    "customerAdmin.history.registerTitle": "Vorhandene Einträge",
+    "customerAdmin.history.attachmentEyebrow": "Anhänge",
+    "customerAdmin.history.attachmentTitle": "Dokumente mit Einträgen verknüpfen",
+    "customerAdmin.history.empty": "Noch keine fachliche Historie für diesen Kunden vorhanden.",
     "customerAdmin.loginHistory.eyebrow": "Portal-Logins",
     "customerAdmin.loginHistory.title": "Gefilterte Kunden-Loginhistorie",
-    "customerAdmin.loginHistory.empty": "Noch keine sichtbaren Portal-Logins fuer diesen Kunden vorhanden.",
+    "customerAdmin.loginHistory.empty": "Noch keine sichtbaren Portal-Logins für diesen Kunden vorhanden.",
     "customerAdmin.privacy.eyebrow": "Portal-Datenschutz",
     "customerAdmin.privacy.title": "Freigabe personenbezogener Namen",
     "customerAdmin.privacy.help":
-      "Personennamen bleiben im Kundenportal standardmaessig verborgen. Eine Freigabe ist eng begrenzt, kundenspezifisch und wird auditiert.",
+      "Personennamen bleiben im Kundenportal standardmäßig verborgen. Eine Freigabe ist eng begrenzt, kundenspezifisch und wird auditiert.",
     "customerAdmin.privacy.lastReleasedAt": "Zuletzt freigegeben am",
     "customerAdmin.privacy.lastReleasedBy": "Zuletzt freigegeben durch",
     "customerAdmin.employeeBlocks.eyebrow": "Mitarbeitendensperren",
     "customerAdmin.employeeBlocks.title": "Kundenspezifische Mitarbeitendensperren",
-    "customerAdmin.employeeBlocks.empty": "Noch keine Kundensperren fuer Mitarbeitende erfasst.",
+    "customerAdmin.employeeBlocks.registerEyebrow": "Sperrregister",
+    "customerAdmin.employeeBlocks.registerTitle": "Aktive und geplante Sperren",
+    "customerAdmin.employeeBlocks.editorEyebrow": "Sperrpflege",
+    "customerAdmin.employeeBlocks.editorTitle": "Sperre erfassen oder aktualisieren",
+    "customerAdmin.employeeBlocks.empty": "Noch keine Kundensperren für Mitarbeitende erfasst.",
     "customerAdmin.employeeBlocks.capability.pendingEmployees":
       "Das Mitarbeitendenverzeichnis folgt erst in Sprint 4. Bis dahin bleibt die Sperre auf eine direkte Employee-ID-Referenz begrenzt.",
     "customerAdmin.addresses.eyebrow": "Adressen",
     "customerAdmin.addresses.title": "Adresslinks",
-    "customerAdmin.addresses.empty": "Noch keine Adressen verknuepft.",
+    "customerAdmin.addresses.lead": "Adressverknüpfungen und ihre Pflege folgen derselben gegliederten Detailstruktur wie die Stammdaten.",
+    "customerAdmin.addresses.registerEyebrow": "Adressregister",
+    "customerAdmin.addresses.registerTitle": "Verknüpfte Adressen",
+    "customerAdmin.addresses.editorEyebrow": "Verknüpfung",
+    "customerAdmin.addresses.editorTitle": "Adresslink anlegen oder anpassen",
+    "customerAdmin.addresses.empty": "Noch keine Adressen verknüpft.",
     "customerAdmin.addresses.defaultBadge": "Standardadresse",
     "customerAdmin.addresses.linkBadge": "Adresslink",
+    "customerAdmin.portal.title": "Portalsteuerung und Freigaben",
+    "customerAdmin.portal.lead": "Datenschutzfreigabe und Loginhistorie bleiben als getrennte Abschnitte in derselben Portal-Arbeitsfläche sichtbar.",
     "customerAdmin.addressType.registered": "Firmensitz",
     "customerAdmin.addressType.billing": "Rechnung",
     "customerAdmin.addressType.mailing": "Post",
     "customerAdmin.addressType.service": "Leistungsort",
     "customerAdmin.fields.customerNumber": "Kundennummer",
     "customerAdmin.fields.name": "Anzeigename",
+    "customerAdmin.fields.lifecycleStatus": "Lifecycle-Status",
     "customerAdmin.fields.legalName": "Rechtlicher Name",
     "customerAdmin.fields.externalRef": "Externe Referenz",
-    "customerAdmin.fields.legalFormLookupId": "Lookup-ID Rechtsform",
-    "customerAdmin.fields.classificationLookupId": "Lookup-ID Klassifikation",
-    "customerAdmin.fields.rankingLookupId": "Lookup-ID Ranking",
-    "customerAdmin.fields.customerStatusLookupId": "Lookup-ID Kundenstatus",
-    "customerAdmin.fields.defaultBranchId": "Standardniederlassung-ID",
-    "customerAdmin.fields.defaultMandateId": "Standardmandat-ID",
+    "customerAdmin.fields.legalFormLookupId": "Rechtsform",
+    "customerAdmin.fields.classificationLookupId": "Klassifikation",
+    "customerAdmin.fields.rankingLookupId": "Ranking",
+    "customerAdmin.fields.customerStatusLookupId": "Kundenstatus-Metadaten",
+    "customerAdmin.fields.defaultBranchId": "Standardniederlassung",
+    "customerAdmin.fields.defaultMandateId": "Standardmandat",
     "customerAdmin.fields.notes": "Notizen",
-    "customerAdmin.fields.fullName": "Vollstaendiger Name",
+    "customerAdmin.fields.fullName": "Vollständiger Name",
     "customerAdmin.fields.contactTitle": "Titel",
     "customerAdmin.fields.functionLabel": "Funktion",
     "customerAdmin.fields.email": "E-Mail",
     "customerAdmin.fields.phone": "Telefon",
     "customerAdmin.fields.mobile": "Mobil",
     "customerAdmin.fields.userId": "Portal-Benutzer-ID",
-    "customerAdmin.fields.isPrimaryContact": "Als Primaerkontakt markieren",
+    "customerAdmin.fields.isPrimaryContact": "Als Primärkontakt markieren",
     "customerAdmin.fields.isBillingContact": "Als Rechnungskontakt markieren",
     "customerAdmin.fields.addressId": "Adress-ID",
     "customerAdmin.fields.addressType": "Adresstyp",
@@ -2015,7 +2176,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.documentId": "Dokument-ID",
     "customerAdmin.fields.personNamesReleased": "Personennamen im Portal freigeben",
     "customerAdmin.fields.employeeId": "Mitarbeitenden-ID",
-    "customerAdmin.fields.reason": "Begruendung",
+    "customerAdmin.fields.reason": "Begründung",
     "customerAdmin.fields.label": "Bezeichnung",
     "customerAdmin.fields.isDefault": "Als Standardadresse markieren",
     "customerAdmin.actions.rememberScope": "Scope speichern",
@@ -2035,12 +2196,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.exportVCard": "vCard",
     "customerAdmin.actions.createContact": "Kontakt anlegen",
     "customerAdmin.actions.saveContact": "Kontakt speichern",
-    "customerAdmin.actions.addAddress": "Adresse verknuepfen",
+    "customerAdmin.actions.addAddress": "Adresse verknüpfen",
     "customerAdmin.actions.createAddress": "Adresslink anlegen",
     "customerAdmin.actions.saveAddress": "Adresslink speichern",
     "customerAdmin.actions.refreshHistory": "Historie neu laden",
     "customerAdmin.actions.refreshPortalPrivacy": "Freigabestatus neu laden",
-    "customerAdmin.actions.linkHistoryAttachment": "Anhang verknuepfen",
+    "customerAdmin.actions.linkHistoryAttachment": "Anhang verknüpfen",
     "customerAdmin.actions.refreshLoginHistory": "Loginhistorie neu laden",
     "customerAdmin.actions.refreshEmployeeBlocks": "Sperren neu laden",
     "customerAdmin.actions.createEmployeeBlock": "Sperre anlegen",
@@ -2055,6 +2216,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.confirm.contactArchive": "Diesen Kontakt archivieren?",
     "customerAdmin.confirm.addressArchive": "Diesen Adresslink archivieren?",
     "customerAdmin.feedback.created": "Kunde angelegt",
+    "customerAdmin.feedback.createdNextStep": "Kunde angelegt. Als nächsten Schritt Primärkontakt und Register-/Rechnungsadresse pflegen.",
     "customerAdmin.feedback.saved": "Kunde gespeichert",
     "customerAdmin.feedback.archived": "Kunde archiviert",
     "customerAdmin.feedback.deactivated": "Kunde deaktiviert",
@@ -2066,32 +2228,36 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.documentId": "Dokument-ID",
     "customerAdmin.feedback.scopeSaved": "Mandantenscope gespeichert",
     "customerAdmin.feedback.tokenSaved": "Token aktualisiert und Liste neu geladen.",
-    "customerAdmin.feedback.historyAttachmentLinked": "Historienanhang verknuepft",
+    "customerAdmin.feedback.historyAttachmentLinked": "Historienanhang verknüpft",
     "customerAdmin.feedback.documentLinked": "Das Dokument wurde dem Historieneintrag zugeordnet.",
     "customerAdmin.feedback.employeeBlockSaved": "Mitarbeitendensperre gespeichert",
-    "customerAdmin.feedback.employeeBlockSavedBody": "Die kundenspezifische Sperre wurde uebernommen.",
+    "customerAdmin.feedback.employeeBlockSavedBody": "Die kundenspezifische Sperre wurde übernommen.",
     "customerAdmin.feedback.portalPrivacySaved": "Portal-Datenschutz aktualisiert",
-    "customerAdmin.feedback.validation": "Eingaben pruefen",
+    "customerAdmin.feedback.validation": "Eingaben prüfen",
     "customerAdmin.feedback.customerRequired": "Kundennummer und Anzeigename sind Pflichtfelder.",
-    "customerAdmin.feedback.contactRequired": "Fuer einen Kontakt wird mindestens der Name benoetigt.",
-    "customerAdmin.feedback.addressRequired": "Fuer einen Adresslink wird eine Adress-ID benoetigt.",
+    "customerAdmin.feedback.contactRequired": "Für einen Kontakt wird mindestens der Name benötigt.",
+    "customerAdmin.feedback.addressRequired": "Für einen Adresslink wird eine Adress-ID benötigt.",
     "customerAdmin.feedback.error": "Der Kundenvorgang ist fehlgeschlagen.",
-    "customerAdmin.feedback.authRequired": "Bitte ein gueltiges Bearer-Token fuer die Kunden-API hinterlegen.",
-    "customerAdmin.feedback.permissionDenied": "Die aktuelle Sitzung darf diese Aktion nicht ausfuehren.",
+    "customerAdmin.feedback.authRequired": "Bitte ein gültiges Bearer-Token für die Kunden-API hinterlegen.",
+    "customerAdmin.feedback.permissionDenied": "Die aktuelle Sitzung darf diese Aktion nicht ausführen.",
     "customerAdmin.feedback.notFound": "Der angeforderte Kundendatensatz wurde nicht gefunden.",
     "customerAdmin.feedback.duplicateNumber": "Diese Kundennummer existiert bereits.",
-    "customerAdmin.feedback.staleVersion": "Der Datensatz wurde zwischenzeitlich geaendert. Bitte neu laden.",
-    "customerAdmin.feedback.duplicateEmail": "Die Kontakt-E-Mail existiert fuer diesen Kunden bereits.",
-    "customerAdmin.feedback.primaryConflict": "Es gibt bereits einen Primaerkontakt fuer diesen Kunden.",
-    "customerAdmin.feedback.defaultAddressConflict": "Es gibt bereits eine Standardadresse fuer diesen Typ.",
+    "customerAdmin.feedback.staleVersion": "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden.",
+    "customerAdmin.feedback.invalidInitialStatus": "Der Lifecycle-Status darf nur aktiv oder inaktiv sein.",
+    "customerAdmin.feedback.invalidBranchScope": "Die gewählte Standardniederlassung ist in diesem Mandanten nicht gültig.",
+    "customerAdmin.feedback.invalidMandateScope": "Das gewählte Standardmandat ist in diesem Mandanten nicht gültig.",
+    "customerAdmin.feedback.mandateBranchMismatch": "Das Standardmandat passt nicht zur ausgewählten Standardniederlassung.",
+    "customerAdmin.feedback.duplicateEmail": "Die Kontakt-E-Mail existiert für diesen Kunden bereits.",
+    "customerAdmin.feedback.primaryConflict": "Es gibt bereits einen Primärkontakt für diesen Kunden.",
+    "customerAdmin.feedback.defaultAddressConflict": "Es gibt bereits eine Standardadresse für diesen Typ.",
     "customerAdmin.feedback.invalidPortalUser":
-      "Die verknuepfte Portal-Benutzer-ID gehoert nicht zum aktuellen Mandanten.",
+      "Die verknüpfte Portal-Benutzer-ID gehört nicht zum aktuellen Mandanten.",
     "customerAdmin.permission.commercialRead": "Commercial lesen",
     "customerAdmin.permission.commercialWrite": "Commercial pflegen",
     "customerAdmin.commercial.eyebrow": "Commercial Settings",
     "customerAdmin.commercial.title": "Abrechnung, Rechnungsparteien und Preisregeln",
     "customerAdmin.commercial.lead":
-      "Diese Bereiche binden direkt an die CRM-Commercial-APIs an und bleiben die finance-lesbare Quelle fuer Preise und Zuschlaege.",
+      "Diese Bereiche binden direkt an die CRM-Commercial-APIs an und bleiben die finance-lesbare Quelle für Preise und Zuschläge.",
     "customerAdmin.commercial.summary.billingProfile": "Abrechnungsprofil",
     "customerAdmin.commercial.summary.invoiceParties": "Rechnungsparteien",
     "customerAdmin.commercial.summary.rateCards": "Preiskarten",
@@ -2100,19 +2266,19 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.commercial.billingEyebrow": "Abrechnungsprofil",
     "customerAdmin.commercial.billingTitle": "Zahlung, Steuer und Bankdaten",
     "customerAdmin.commercial.invoiceEyebrow": "Rechnungsparteien",
-    "customerAdmin.commercial.invoiceTitle": "Alternative Rechnungsempfaenger",
+    "customerAdmin.commercial.invoiceTitle": "Alternative Rechnungsempfänger",
     "customerAdmin.commercial.invoiceEmpty": "Noch keine Rechnungsparteien hinterlegt.",
     "customerAdmin.commercial.defaultInvoiceParty": "Standard-Rechnungspartei",
-    "customerAdmin.commercial.additionalInvoiceParty": "Zusaetzliche Rechnungspartei",
+    "customerAdmin.commercial.additionalInvoiceParty": "Zusätzliche Rechnungspartei",
     "customerAdmin.commercial.rateCardsEyebrow": "Preiskarten",
     "customerAdmin.commercial.rateCardsTitle": "Versionierte Preisfenster",
     "customerAdmin.commercial.rateCardsEmpty": "Noch keine Preiskarten hinterlegt.",
     "customerAdmin.commercial.rateLinesEyebrow": "Preiszeilen",
     "customerAdmin.commercial.rateLinesTitle": "Leistungs- und Funktionspreise",
-    "customerAdmin.commercial.rateLinesEmpty": "Noch keine Preiszeilen fuer diese Preiskarte vorhanden.",
-    "customerAdmin.commercial.surchargesEyebrow": "Zuschlaege",
-    "customerAdmin.commercial.surchargesTitle": "Zeit-, Wochen- und Regionszuschlaege",
-    "customerAdmin.commercial.surchargesEmpty": "Noch keine Zuschlagsregeln fuer diese Preiskarte vorhanden.",
+    "customerAdmin.commercial.rateLinesEmpty": "Noch keine Preiszeilen für diese Preiskarte vorhanden.",
+    "customerAdmin.commercial.surchargesEyebrow": "Zuschläge",
+    "customerAdmin.commercial.surchargesTitle": "Zeit-, Wochen- und Regionszuschläge",
+    "customerAdmin.commercial.surchargesEmpty": "Noch keine Zuschlagsregeln für diese Preiskarte vorhanden.",
     "customerAdmin.fields.invoiceEmail": "Rechnungs-E-Mail",
     "customerAdmin.fields.paymentTermsDays": "Zahlungsziel in Tagen",
     "customerAdmin.fields.paymentTermsNote": "Zahlungsbedingung",
@@ -2131,16 +2297,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.shippingMethodCode": "Versandweg",
     "customerAdmin.fields.dunningPolicyCode": "Mahnprofil",
     "customerAdmin.fields.taxExempt": "Steuerbefreit",
-    "customerAdmin.fields.taxExemptionReason": "Grund fuer Steuerbefreiung",
+    "customerAdmin.fields.taxExemptionReason": "Grund für Steuerbefreiung",
     "customerAdmin.fields.companyName": "Firmenname",
     "customerAdmin.fields.contactName": "Ansprechpartner",
     "customerAdmin.fields.invoiceLayoutLookupId": "Layout-Lookup-ID",
     "customerAdmin.fields.note": "Hinweis",
     "customerAdmin.fields.isDefaultInvoiceParty": "Als Standard-Rechnungspartei markieren",
     "customerAdmin.fields.rateKind": "Preisart",
-    "customerAdmin.fields.currencyCode": "Waehrung",
-    "customerAdmin.fields.effectiveFrom": "Gueltig ab",
-    "customerAdmin.fields.effectiveTo": "Gueltig bis",
+    "customerAdmin.fields.currencyCode": "Währung",
+    "customerAdmin.fields.effectiveFrom": "Gültig ab",
+    "customerAdmin.fields.effectiveTo": "Gültig bis",
     "customerAdmin.fields.lineKind": "Zeilenart",
     "customerAdmin.fields.billingUnit": "Abrechnungseinheit",
     "customerAdmin.fields.unitPrice": "Einzelpreis",
@@ -2171,14 +2337,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.createSurchargeRule": "Zuschlagsregel speichern",
     "customerAdmin.actions.saveSurchargeRule": "Zuschlagsregel aktualisieren",
     "customerAdmin.confirm.activeCommercialChange":
-      "Diese Aenderung betrifft aktive Commercial-Daten. Wirklich fortfahren?",
+      "Diese Änderung betrifft aktive Commercial-Daten. Wirklich fortfahren?",
     "customerAdmin.confirm.defaultInvoicePartyChange":
       "Diese Rechnungspartei wird als Standard markiert. Wirklich fortfahren?",
     "customerAdmin.feedback.commercialSaved": "Commercial-Einstellung gespeichert",
     "customerAdmin.feedback.invoicePartyRequired":
-      "Fuer eine Rechnungspartei werden mindestens Firmenname und Adress-ID benoetigt.",
-    "customerAdmin.feedback.invalidInvoiceEmail": "Die angegebene Rechnungs-E-Mail ist ungueltig.",
-    "customerAdmin.feedback.invalidPaymentTerms": "Das Zahlungsziel ist ungueltig.",
+      "Für eine Rechnungspartei werden mindestens Firmenname und Adress-ID benötigt.",
+    "customerAdmin.feedback.invalidInvoiceEmail": "Die angegebene Rechnungs-E-Mail ist ungültig.",
+    "customerAdmin.feedback.invalidPaymentTerms": "Das Zahlungsziel ist ungültig.",
     "customerAdmin.feedback.taxExemptionReasonRequired":
       "Bei Steuerbefreiung ist ein Grund erforderlich.",
     "customerAdmin.feedback.taxExemptionReasonForbidden":
@@ -2186,41 +2352,41 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.bankAccountHolderRequired":
       "Bei Bankdaten ist ein Kontoinhaber erforderlich.",
     "customerAdmin.feedback.bankIbanRequired": "Bei Bankdaten ist eine IBAN erforderlich.",
-    "customerAdmin.feedback.eInvoiceRequired": "Fuer E-Rechnungsversand muss E-Rechnung aktiviert sein.",
+    "customerAdmin.feedback.eInvoiceRequired": "Für E-Rechnungsversand muss E-Rechnung aktiviert sein.",
     "customerAdmin.feedback.eInvoiceDispatchMismatch":
-      "Aktive E-Rechnung ist nur mit dem Versandweg E-Rechnung zulaessig.",
+      "Aktive E-Rechnung ist nur mit dem Versandweg E-Rechnung zulässig.",
     "customerAdmin.feedback.leitwegRequired":
-      "Fuer E-Rechnungsversand ist eine Leitweg-/Routing-ID erforderlich.",
+      "Für E-Rechnungsversand ist eine Leitweg-/Routing-ID erforderlich.",
     "customerAdmin.feedback.leitwegForbidden":
       "Eine Leitweg-/Routing-ID darf nur bei aktiver E-Rechnung gesetzt werden.",
     "customerAdmin.feedback.dispatchEmailRequired":
-      "Fuer E-Mail-PDF-Versand ist eine Rechnungs-E-Mail erforderlich.",
+      "Für E-Mail-PDF-Versand ist eine Rechnungs-E-Mail erforderlich.",
     "customerAdmin.feedback.invoiceLayoutIncompatible":
-      "Das gewaehlte Rechnungslayout ist mit dem Versandweg nicht kompatibel.",
+      "Das gewählte Rechnungslayout ist mit dem Versandweg nicht kompatibel.",
     "customerAdmin.feedback.defaultInvoicePartyConflict":
-      "Es gibt bereits eine Standard-Rechnungspartei fuer diesen Kunden.",
-    "customerAdmin.feedback.rateKindRequired": "Fuer eine Preiskarte ist eine Preisart erforderlich.",
-    "customerAdmin.feedback.invalidCurrency": "Der Waehrungscode ist ungueltig.",
-    "customerAdmin.feedback.rateCardEffectiveFromRequired": "Fuer eine Preiskarte ist ein Startdatum erforderlich.",
-    "customerAdmin.feedback.invalidEffectiveWindow": "Das Gueltigkeitsfenster ist ungueltig.",
+      "Es gibt bereits eine Standard-Rechnungspartei für diesen Kunden.",
+    "customerAdmin.feedback.rateKindRequired": "Für eine Preiskarte ist eine Preisart erforderlich.",
+    "customerAdmin.feedback.invalidCurrency": "Der Währungscode ist ungültig.",
+    "customerAdmin.feedback.rateCardEffectiveFromRequired": "Für eine Preiskarte ist ein Startdatum erforderlich.",
+    "customerAdmin.feedback.invalidEffectiveWindow": "Das Gültigkeitsfenster ist ungültig.",
     "customerAdmin.feedback.rateCardOverlap":
-      "Dieses Preisfenster ueberschneidet sich mit einer bestehenden aktiven Preiskarte.",
-    "customerAdmin.feedback.rateLineKindRequired": "Fuer eine Preiszeile ist eine Zeilenart erforderlich.",
-    "customerAdmin.feedback.invalidBillingUnit": "Die Abrechnungseinheit ist ungueltig.",
-    "customerAdmin.feedback.invalidUnitPrice": "Der Einzelpreis ist ungueltig.",
-    "customerAdmin.feedback.invalidMinimumQuantity": "Die Mindestmenge ist ungueltig.",
+      "Dieses Preisfenster überschneidet sich mit einer bestehenden aktiven Preiskarte.",
+    "customerAdmin.feedback.rateLineKindRequired": "Für eine Preiszeile ist eine Zeilenart erforderlich.",
+    "customerAdmin.feedback.invalidBillingUnit": "Die Abrechnungseinheit ist ungültig.",
+    "customerAdmin.feedback.invalidUnitPrice": "Der Einzelpreis ist ungültig.",
+    "customerAdmin.feedback.invalidMinimumQuantity": "Die Mindestmenge ist ungültig.",
     "customerAdmin.feedback.duplicateRateDimension":
-      "Diese Preisdimension existiert bereits auf der gewaehlten Preiskarte.",
-    "customerAdmin.feedback.surchargeTypeRequired": "Fuer einen Zuschlag ist ein Typ erforderlich.",
+      "Diese Preisdimension existiert bereits auf der gewählten Preiskarte.",
+    "customerAdmin.feedback.surchargeTypeRequired": "Für einen Zuschlag ist ein Typ erforderlich.",
     "customerAdmin.feedback.surchargeEffectiveFromRequired":
-      "Fuer einen Zuschlag ist ein Startdatum erforderlich.",
+      "Für einen Zuschlag ist ein Startdatum erforderlich.",
     "customerAdmin.feedback.invalidWeekdayMask":
       "Die Wochentagsmaske muss aus sieben Zeichen mit 0 oder 1 bestehen.",
-    "customerAdmin.feedback.invalidTimeRange": "Das Zeitfenster des Zuschlags ist ungueltig.",
+    "customerAdmin.feedback.invalidTimeRange": "Das Zeitfenster des Zuschlags ist ungültig.",
     "customerAdmin.feedback.invalidAmountCombination":
       "Es muss genau ein Prozentwert oder ein Fixbetrag gesetzt sein.",
     "customerAdmin.feedback.surchargeOutsideRateCardWindow":
-      "Der Zuschlag muss innerhalb des Gueltigkeitsfensters der Preiskarte liegen.",
+      "Der Zuschlag muss innerhalb des Gültigkeitsfensters der Preiskarte liegen.",
     "customerAdmin.option.invoiceLayout.standard": "Standard",
     "customerAdmin.option.invoiceLayout.compact": "Kompakt",
     "customerAdmin.option.invoiceLayout.detailed_timesheet": "Mit Leistungsnachweis",
@@ -2807,6 +2973,13 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.detail.emptyEyebrow": "Detail view",
     "employeeAdmin.detail.emptyBody":
       "Select an employee file on the left or create a new one.",
+    "employeeAdmin.tabs.overview": "Overview",
+    "employeeAdmin.tabs.appAccess": "App access",
+    "employeeAdmin.tabs.profilePhoto": "Profile photo",
+    "employeeAdmin.tabs.notes": "Notes",
+    "employeeAdmin.tabs.groups": "Groups",
+    "employeeAdmin.tabs.addresses": "Addresses",
+    "employeeAdmin.tabs.documents": "Documents",
     "employeeAdmin.form.eyebrow": "File",
     "employeeAdmin.form.title": "Structured employee file",
     "employeeAdmin.form.lead":
@@ -2819,6 +2992,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.form.assignmentTitle": "Branch, mandate, and employment dates",
     "employeeAdmin.form.accessEyebrow": "Linkage",
     "employeeAdmin.form.accessTitle": "App and user-account linkage",
+    "employeeAdmin.form.accessLead":
+      "Save the base employee file first. App access and account linkage stay in the App access section instead of free-text entry here.",
+    "employeeAdmin.form.accessCurrent": "Currently linked user account ID",
     "employeeAdmin.form.notesEyebrow": "Notes",
     "employeeAdmin.form.notesTitle": "Operational notes",
     "employeeAdmin.form.actionsEyebrow": "Action",
@@ -2866,18 +3042,39 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.photo.alt": "Profile photo of the employee",
     "employeeAdmin.photo.empty": "No profile photo is stored yet",
     "employeeAdmin.photo.help": "The photo is versioned through the shared document service.",
+    "employeeAdmin.photo.manageEyebrow": "Media",
+    "employeeAdmin.photo.manageTitle": "Manage preview and upload",
+    "employeeAdmin.photo.fileLabel": "New image file",
     "employeeAdmin.notes.eyebrow": "Notes",
     "employeeAdmin.notes.title": "Reminders and positive activity",
+    "employeeAdmin.notes.lead": "Operational notes, reminders, and positive feedback stay grouped in one clean register view.",
+    "employeeAdmin.notes.registerEyebrow": "Register",
+    "employeeAdmin.notes.registerTitle": "Existing notes",
+    "employeeAdmin.notes.editorEyebrow": "Editor",
+    "employeeAdmin.notes.editorTitle": "Create or update a note",
     "employeeAdmin.notes.empty": "No operational notes are stored yet.",
     "employeeAdmin.groups.eyebrow": "Groups",
     "employeeAdmin.groups.title": "Groups and assignments",
+    "employeeAdmin.groups.lead": "Keep group maintenance and employee assignment separate so catalog work and operational assignment do not blur together.",
+    "employeeAdmin.groups.catalogEyebrow": "Catalog",
+    "employeeAdmin.groups.catalogTitle": "Create or maintain a group",
+    "employeeAdmin.groups.assignEyebrow": "Assignment",
+    "employeeAdmin.groups.assignTitle": "Assign a group to the employee",
+    "employeeAdmin.groups.currentEyebrow": "Current state",
+    "employeeAdmin.groups.currentTitle": "Active group assignments",
     "employeeAdmin.groups.empty": "No group assignments exist yet.",
     "employeeAdmin.groups.selectPlaceholder": "Select a group",
     "employeeAdmin.addresses.eyebrow": "Addresses",
     "employeeAdmin.addresses.title": "Current address history",
+    "employeeAdmin.addresses.lead": "Released address master records are presented as a clear timeline.",
+    "employeeAdmin.addresses.historyEyebrow": "History",
+    "employeeAdmin.addresses.historyTitle": "Released address timeline",
     "employeeAdmin.addresses.empty": "No released address history is available.",
     "employeeAdmin.documents.eyebrow": "Documents",
     "employeeAdmin.documents.title": "Files and evidence",
+    "employeeAdmin.documents.lead": "Files and evidence stay available as an ordered list with direct download access.",
+    "employeeAdmin.documents.libraryEyebrow": "Library",
+    "employeeAdmin.documents.libraryTitle": "Linked documents",
     "employeeAdmin.documents.empty": "No employee-linked documents are available.",
     "employeeAdmin.noteType.operational_note": "Operational note",
     "employeeAdmin.noteType.positive_activity": "Positive activity",
@@ -2924,6 +3121,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.access.enabled": "Access enabled",
     "employeeAdmin.access.enabledYes": "Yes",
     "employeeAdmin.access.enabledNo": "No",
+    "employeeAdmin.access.lead": "User linkage, account creation, and later attachment now follow the same structured file rhythm as the overview tab.",
+    "employeeAdmin.access.createEyebrow": "Creation",
+    "employeeAdmin.access.createTitle": "Prepare a new app user",
+    "employeeAdmin.access.createLead": "Keep username, email, and initial password together before creating the access account.",
+    "employeeAdmin.access.reconcileEyebrow": "Reconcile",
+    "employeeAdmin.access.reconcileTitle": "Check or detach existing access",
+    "employeeAdmin.access.reconcileLead": "Use reconciliation for existing links or detach access from the employee profile in a controlled way.",
+    "employeeAdmin.access.attachEyebrow": "Existing user",
+    "employeeAdmin.access.attachTitle": "Attach an existing IAM user",
+    "employeeAdmin.access.attachLead": "If an account already exists, link it cleanly by ID, username, or email.",
     "employeeAdmin.access.createUsername": "New username",
     "employeeAdmin.access.createEmail": "New email",
     "employeeAdmin.access.createPassword": "Initial password",
@@ -2998,11 +3205,13 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.permission.ready": "RBAC-ready route",
     "coreAdmin.permission.label": "Permission key",
     "coreAdmin.scope.label": "Tenant scope",
-    "coreAdmin.scope.placeholder": "Tenant UUID for tenant-admin mode",
+    "coreAdmin.scope.placeholder": "Tenant UUID for platform-admin scope",
     "coreAdmin.scope.help":
       "In the temporary mock-auth mode this UUID is sent to the backend as X-Tenant-Id.",
     "coreAdmin.scope.platformHint":
       "Platform admins see the cross-tenant list. The current tenant scope is remembered for later tenant-admin switching.",
+    "coreAdmin.scope.sessionHint":
+      "Tenant admins always operate inside the tenant from their current session. The scope is read-only and loads automatically.",
     "coreAdmin.scope.emptyTitle": "Tenant scope missing",
     "coreAdmin.scope.emptyBody":
       "Tenant admins need a remembered tenant UUID before list and detail requests can load.",
@@ -3167,8 +3376,20 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.list.empty": "No customers match the current filters.",
     "customerAdmin.detail.eyebrow": "Customer detail",
     "customerAdmin.detail.emptyTitle": "No customer selected yet",
-    "customerAdmin.detail.emptyBody": "Select a customer from the left or start a new record.",
+    "customerAdmin.detail.emptyBody": "Select a customer from the list above or start a new record.",
     "customerAdmin.detail.newTitle": "Create a new customer",
+    "customerAdmin.detail.workspaceTitle": "Customer workspace",
+    "customerAdmin.detail.workspaceLead": "Each business area is isolated behind tabs so only the active workspace stays visible at a time.",
+    "customerAdmin.tabs.overview": "Overview",
+    "customerAdmin.tabs.contacts": "Contacts",
+    "customerAdmin.tabs.addresses": "Addresses",
+    "customerAdmin.tabs.commercial": "Commercial",
+    "customerAdmin.tabs.portal": "Portal",
+    "customerAdmin.tabs.history": "History",
+    "customerAdmin.tabs.employeeBlocks": "Employee blocks",
+    "customerAdmin.commercial.tabs.billingProfile": "Billing profile",
+    "customerAdmin.commercial.tabs.invoiceParties": "Invoice parties",
+    "customerAdmin.commercial.tabs.pricingRules": "Pricing rules",
     "customerAdmin.form.generalEyebrow": "Master data",
     "customerAdmin.form.generalTitle": "General customer data",
     "customerAdmin.filters.search": "Search",
@@ -3182,14 +3403,26 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.summary.defaultBranch": "Default branch",
     "customerAdmin.summary.defaultMandate": "Default mandate",
     "customerAdmin.summary.classification": "Classification",
+    "customerAdmin.summary.ranking": "Ranking",
+    "customerAdmin.summary.customerStatus": "Customer status",
     "customerAdmin.summary.none": "Not set",
     "customerAdmin.contacts.eyebrow": "Contacts",
     "customerAdmin.contacts.title": "Contact maintenance",
+    "customerAdmin.contacts.lead": "Keep the contact register and the editor separate inside one structured customer file layout.",
+    "customerAdmin.contacts.registerEyebrow": "Register",
+    "customerAdmin.contacts.registerTitle": "Existing contacts",
+    "customerAdmin.contacts.editorEyebrow": "Editor",
+    "customerAdmin.contacts.editorTitle": "Create or update a contact",
     "customerAdmin.contacts.empty": "No contacts have been added yet.",
     "customerAdmin.contacts.primaryBadge": "Primary contact",
     "customerAdmin.contacts.standardBadge": "Contact",
     "customerAdmin.history.eyebrow": "History",
     "customerAdmin.history.title": "Readable change history",
+    "customerAdmin.history.lead": "History entries and attachment linking stay visible as separate working sections.",
+    "customerAdmin.history.registerEyebrow": "History log",
+    "customerAdmin.history.registerTitle": "Existing entries",
+    "customerAdmin.history.attachmentEyebrow": "Attachments",
+    "customerAdmin.history.attachmentTitle": "Link documents to history entries",
     "customerAdmin.history.empty": "No business-readable history exists for this customer yet.",
     "customerAdmin.loginHistory.eyebrow": "Portal logins",
     "customerAdmin.loginHistory.title": "Filtered customer login history",
@@ -3202,28 +3435,40 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.privacy.lastReleasedBy": "Last released by",
     "customerAdmin.employeeBlocks.eyebrow": "Employee blocks",
     "customerAdmin.employeeBlocks.title": "Customer-specific employee blocks",
+    "customerAdmin.employeeBlocks.registerEyebrow": "Block register",
+    "customerAdmin.employeeBlocks.registerTitle": "Active and planned blocks",
+    "customerAdmin.employeeBlocks.editorEyebrow": "Block editor",
+    "customerAdmin.employeeBlocks.editorTitle": "Create or update a block",
     "customerAdmin.employeeBlocks.empty": "No customer employee blocks have been recorded yet.",
     "customerAdmin.employeeBlocks.capability.pendingEmployees":
       "The employee directory arrives in Sprint 4. Until then this control remains limited to direct employee-ID references.",
     "customerAdmin.addresses.eyebrow": "Addresses",
     "customerAdmin.addresses.title": "Address links",
+    "customerAdmin.addresses.lead": "Address links and their maintenance now follow the same structured detail rhythm as the overview data.",
+    "customerAdmin.addresses.registerEyebrow": "Address register",
+    "customerAdmin.addresses.registerTitle": "Linked addresses",
+    "customerAdmin.addresses.editorEyebrow": "Link editor",
+    "customerAdmin.addresses.editorTitle": "Create or update an address link",
     "customerAdmin.addresses.empty": "No addresses linked yet.",
     "customerAdmin.addresses.defaultBadge": "Default address",
     "customerAdmin.addresses.linkBadge": "Address link",
+    "customerAdmin.portal.title": "Portal controls and releases",
+    "customerAdmin.portal.lead": "Privacy release and login history stay separated as clear sections inside one portal workspace.",
     "customerAdmin.addressType.registered": "Registered office",
     "customerAdmin.addressType.billing": "Billing",
     "customerAdmin.addressType.mailing": "Mailing",
     "customerAdmin.addressType.service": "Service location",
     "customerAdmin.fields.customerNumber": "Customer number",
     "customerAdmin.fields.name": "Display name",
+    "customerAdmin.fields.lifecycleStatus": "Lifecycle status",
     "customerAdmin.fields.legalName": "Legal name",
     "customerAdmin.fields.externalRef": "External reference",
-    "customerAdmin.fields.legalFormLookupId": "Legal-form lookup ID",
-    "customerAdmin.fields.classificationLookupId": "Classification lookup ID",
-    "customerAdmin.fields.rankingLookupId": "Ranking lookup ID",
-    "customerAdmin.fields.customerStatusLookupId": "Customer-status lookup ID",
-    "customerAdmin.fields.defaultBranchId": "Default branch ID",
-    "customerAdmin.fields.defaultMandateId": "Default mandate ID",
+    "customerAdmin.fields.legalFormLookupId": "Legal form",
+    "customerAdmin.fields.classificationLookupId": "Classification",
+    "customerAdmin.fields.rankingLookupId": "Ranking",
+    "customerAdmin.fields.customerStatusLookupId": "Customer status metadata",
+    "customerAdmin.fields.defaultBranchId": "Default branch",
+    "customerAdmin.fields.defaultMandateId": "Default mandate",
     "customerAdmin.fields.notes": "Notes",
     "customerAdmin.fields.fullName": "Full name",
     "customerAdmin.fields.contactTitle": "Title",
@@ -3280,6 +3525,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.confirm.contactArchive": "Archive this contact?",
     "customerAdmin.confirm.addressArchive": "Archive this address link?",
     "customerAdmin.feedback.created": "Customer created",
+    "customerAdmin.feedback.createdNextStep": "Customer created. Next, add a primary contact and the registered or billing address.",
     "customerAdmin.feedback.saved": "Customer saved",
     "customerAdmin.feedback.archived": "Customer archived",
     "customerAdmin.feedback.deactivated": "Customer deactivated",
@@ -3306,6 +3552,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.notFound": "The requested customer record was not found.",
     "customerAdmin.feedback.duplicateNumber": "This customer number already exists.",
     "customerAdmin.feedback.staleVersion": "The record changed in the meantime. Please reload.",
+    "customerAdmin.feedback.invalidInitialStatus": "The lifecycle status must be either active or inactive.",
+    "customerAdmin.feedback.invalidBranchScope": "The selected default branch is not valid in this tenant.",
+    "customerAdmin.feedback.invalidMandateScope": "The selected default mandate is not valid in this tenant.",
+    "customerAdmin.feedback.mandateBranchMismatch": "The default mandate does not belong to the selected default branch.",
     "customerAdmin.feedback.duplicateEmail": "That contact email already exists for this customer.",
     "customerAdmin.feedback.primaryConflict": "A primary contact already exists for this customer.",
     "customerAdmin.feedback.defaultAddressConflict": "A default address already exists for this type.",

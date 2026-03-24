@@ -132,7 +132,31 @@ TENANT_EXTENSIBLE_LOOKUP_DOMAINS: tuple[LookupSeedDomain, ...] = (
         name="customer_category",
         ownership="tenant_extensible",
         description="Tenant-maintained CRM categorization for customer portfolio segmentation.",
-        values=(),
+        values=(
+            LookupSeedValue("standard", "Standardkunde", "Regulaerer Bestandskunde", 10),
+            LookupSeedValue("key_account", "Schluesselkunde", "Strategisch wichtiger Kunde mit erhoehter Betreuung", 20),
+            LookupSeedValue("prospect", "Interessent", "Lead oder Kunde im Anbahnungsstatus", 30),
+        ),
+    ),
+    LookupSeedDomain(
+        name="customer_ranking",
+        ownership="tenant_extensible",
+        description="Tenant-maintained CRM ranking labels for customer priority and portfolio weighting.",
+        values=(
+            LookupSeedValue("a", "A-Kunde", "Hohe Prioritaet und strategische Relevanz", 10),
+            LookupSeedValue("b", "B-Kunde", "Mittlere Prioritaet im aktiven Portfolio", 20),
+            LookupSeedValue("c", "C-Kunde", "Niedrigere Prioritaet oder sporadische Zusammenarbeit", 30),
+        ),
+    ),
+    LookupSeedDomain(
+        name="customer_status",
+        ownership="tenant_extensible",
+        description="Tenant-maintained business-status catalog for CRM customer metadata apart from lifecycle state.",
+        values=(
+            LookupSeedValue("qualified", "Qualifiziert", "Aktiver Kunde mit freigegebener Zusammenarbeit", 10),
+            LookupSeedValue("on_hold", "Pausiert", "Kunde bleibt bekannt, Zusammenarbeit ist derzeit pausiert", 20),
+            LookupSeedValue("blocked", "Gesperrt", "Kunde darf vorlaeufig nicht operativ disponiert werden", 30),
+        ),
     ),
     LookupSeedDomain(
         name="employee_group",

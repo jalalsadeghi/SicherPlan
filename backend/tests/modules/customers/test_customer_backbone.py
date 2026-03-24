@@ -32,6 +32,9 @@ class FakeLookup:
     id: str
     domain: str
     code: str | None = None
+    label: str | None = None
+    description: str | None = None
+    sort_order: int = 100
     tenant_id: str | None = None
     archived_at: datetime | None = None
 
@@ -40,6 +43,8 @@ class FakeLookup:
 class FakeBranch:
     id: str
     tenant_id: str
+    code: str = "BER"
+    name: str = "Berlin"
 
 
 @dataclass
@@ -47,6 +52,8 @@ class FakeMandate:
     id: str
     tenant_id: str
     branch_id: str
+    code: str = "M-1"
+    name: str = "Nord"
 
 
 @dataclass
@@ -181,9 +188,10 @@ class FakeCustomerEmployeeBlock:
 class FakeCustomerRepository:
     def __init__(self) -> None:
         self.lookups = {
-            "lookup-legal": FakeLookup("lookup-legal", "legal_form"),
-            "lookup-category": FakeLookup("lookup-category", "customer_category", "tenant-1"),
-            "lookup-status": FakeLookup("lookup-status", "customer_status"),
+            "lookup-legal": FakeLookup("lookup-legal", "legal_form", "gmbh", "GmbH"),
+            "lookup-category": FakeLookup("lookup-category", "customer_category", "standard", "Standardkunde", tenant_id="tenant-1"),
+            "lookup-ranking": FakeLookup("lookup-ranking", "customer_ranking", "a", "A-Kunde", tenant_id="tenant-1"),
+            "lookup-status": FakeLookup("lookup-status", "customer_status", "qualified", "Qualifiziert"),
         }
         self.branches = {"branch-1": FakeBranch("branch-1", "tenant-1")}
         self.mandates = {"mandate-1": FakeMandate("mandate-1", "tenant-1", "branch-1")}
@@ -333,6 +341,7 @@ class FakeCustomerRepository:
             tenant_id=tenant_id,
             customer_number=payload.customer_number,
             name=payload.name,
+            status=payload.status or "active",
             legal_name=payload.legal_name,
             external_ref=payload.external_ref,
             legal_form_lookup_id=payload.legal_form_lookup_id,
@@ -493,17 +502,30 @@ class FakeCustomerRepository:
     def get_lookup_value(self, lookup_id: str):
         return self.lookups.get(lookup_id)
 
+    def list_lookup_values(self, tenant_id: str, domain: str):
+        return [
+            row
+            for row in self.lookups.values()
+            if row.domain == domain and row.archived_at is None and row.tenant_id in (None, tenant_id)
+        ]
+
     def get_branch(self, tenant_id: str, branch_id: str):
         row = self.branches.get(branch_id)
         if row and row.tenant_id == tenant_id:
             return row
         return None
 
+    def list_branches(self, tenant_id: str):
+        return [row for row in self.branches.values() if row.tenant_id == tenant_id]
+
     def get_mandate(self, tenant_id: str, mandate_id: str):
         row = self.mandates.get(mandate_id)
         if row and row.tenant_id == tenant_id:
             return row
         return None
+
+    def list_mandates(self, tenant_id: str):
+        return [row for row in self.mandates.values() if row.tenant_id == tenant_id]
 
     def get_user_account(self, tenant_id: str, user_id: str):
         row = self.users.get(user_id)
@@ -583,6 +605,45 @@ class TestCustomerService(unittest.TestCase):
         self.assertEqual(updated.name, "Nord Security AG")
         self.assertEqual(len(listed), 1)
         self.assertEqual(listed[0].customer_number, "K-1000")
+
+    def test_customer_reference_data_returns_lookup_and_structure_options(self) -> None:
+        reference_data = self.service.get_reference_data("tenant-1", _actor())
+
+        self.assertTrue(any(item.id == "lookup-legal" for item in reference_data.legal_forms))
+        self.assertTrue(any(item.id == "lookup-category" for item in reference_data.classifications))
+        self.assertTrue(any(item.id == "lookup-ranking" for item in reference_data.rankings))
+        self.assertTrue(any(item.id == "lookup-status" for item in reference_data.customer_statuses))
+        self.assertEqual(reference_data.branches[0].id, "branch-1")
+        self.assertEqual(reference_data.mandates[0].branch_id, "branch-1")
+
+    def test_customer_create_accepts_explicit_initial_status(self) -> None:
+        customer = self.service.create_customer(
+            "tenant-1",
+            CustomerCreate(
+                tenant_id="tenant-1",
+                customer_number="K-1001",
+                name="Musterkunde",
+                status="inactive",
+            ),
+            _actor(),
+        )
+
+        self.assertEqual(customer.status, "inactive")
+
+    def test_customer_create_rejects_invalid_initial_status(self) -> None:
+        with self.assertRaises(ApiException) as context:
+            self.service.create_customer(
+                "tenant-1",
+                CustomerCreate(
+                    tenant_id="tenant-1",
+                    customer_number="K-1002",
+                    name="Fehlstatus GmbH",
+                    status="archived",
+                ),
+                _actor(),
+            )
+
+        self.assertEqual(context.exception.code, "customers.validation.initial_status")
 
     def test_contact_and_address_link_can_be_added_with_portal_user(self) -> None:
         contact = self.service.create_contact(
@@ -735,6 +796,25 @@ class TestCustomerService(unittest.TestCase):
 
         self.assertEqual(scope_context.exception.code, "iam.authorization.scope_denied")
         self.assertEqual(version_context.exception.code, "customers.conflict.stale_customer_version")
+
+    def test_invalid_mandate_for_branch_is_rejected(self) -> None:
+        self.repository.branches["branch-2"] = FakeBranch("branch-2", "tenant-1")
+        self.repository.mandates["mandate-2"] = FakeMandate("mandate-2", "tenant-1", "branch-2")
+
+        with self.assertRaises(ApiException) as context:
+            self.service.create_customer(
+                "tenant-1",
+                CustomerCreate(
+                    tenant_id="tenant-1",
+                    customer_number="K-1003",
+                    name="Scopefehler AG",
+                    default_branch_id="branch-1",
+                    default_mandate_id="mandate-2",
+                ),
+                _actor(),
+            )
+
+        self.assertEqual(context.exception.code, "customers.validation.mandate_branch_scope")
 
     def test_meaningful_history_entries_are_created(self) -> None:
         created_titles = [row.title for row in self.repository.list_history_entries("tenant-1", self.customer.id)]

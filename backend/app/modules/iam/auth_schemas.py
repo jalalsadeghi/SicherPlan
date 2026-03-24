@@ -11,6 +11,7 @@ class LoginRequest(BaseModel):
     tenant_code: str
     identifier: str
     password: str
+    remember_me: bool = False
     device_label: str | None = None
     device_id: str | None = None
 

@@ -65,9 +65,11 @@ class TestLookupSeed(unittest.TestCase):
 
         result = seed_lookup_values(session, tenant_id="tenant-1")
 
-        self.assertEqual(result, {"inserted": 0, "updated": 0})
-        self.assertEqual(len(session.rows), 0)
-        self.assertTrue(all(domain.values == () for domain in TENANT_EXTENSIBLE_LOOKUP_DOMAINS))
+        expected = sum(len(domain.values) for domain in TENANT_EXTENSIBLE_LOOKUP_DOMAINS)
+        self.assertEqual(result, {"inserted": expected, "updated": 0})
+        self.assertEqual(len(session.rows), expected)
+        self.assertTrue(any(row.domain == "customer_ranking" for row in session.rows))
+        self.assertTrue(any(row.domain == "customer_status" for row in session.rows))
 
     def test_seed_updates_existing_labels_without_duplication(self) -> None:
         session = _FakeSession()

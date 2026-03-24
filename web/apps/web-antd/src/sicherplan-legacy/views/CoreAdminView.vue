@@ -1,51 +1,27 @@
 <template>
   <div class="core-admin-page">
-    <section v-if="!embedded" class="core-admin-hero">
-      <div class="core-admin-copy">
-        <p class="core-admin-breadcrumb">{{ t("coreAdmin.breadcrumb") }}</p>
-        <p class="eyebrow">{{ t("coreAdmin.eyebrow") }}</p>
-        <h2>{{ t("coreAdmin.title") }}</h2>
-        <p class="lead">{{ t("coreAdmin.lead") }}</p>
-        <div class="core-admin-meta">
-          <span class="core-admin-meta__pill">
-            {{ t("coreAdmin.permission.label") }}: {{ routePermissionKey }}
-          </span>
-          <span class="core-admin-meta__pill">
-            {{ t("coreAdmin.scope.remembered") }}: {{ rememberedScopeLabel }}
-          </span>
-        </div>
+    <div
+      v-if="chromeVisibility.showTenantScopeCard"
+      class="module-card core-admin-scope-card"
+      :class="{ 'core-admin-scope-card--embedded': embedded }"
+    >
+      <div class="core-admin-scope-card__row">
+        <label class="field-stack">
+          <span>{{ t("coreAdmin.scope.label") }}</span>
+          <input
+            v-model="tenantScopeInput"
+            :placeholder="t('coreAdmin.scope.placeholder')"
+            :disabled="scopeState.scopeFieldDisabled"
+          />
+        </label>
+        <StatusBadge :status="scopeState.scopeBadgeStatus" />
       </div>
-    </section>
-
-    <div class="module-card core-admin-scope-card" :class="{ 'core-admin-scope-card--embedded': embedded }">
-      <div class="core-admin-panel__header">
-        <div>
-          <p class="eyebrow">{{ t("coreAdmin.scope.label") }}</p>
-          <h3>{{ t("coreAdmin.permission.ready") }}</h3>
-        </div>
-        <StatusBadge :status="effectiveRole === 'platform_admin' ? 'active' : 'inactive'" />
-      </div>
-
-      <label class="field-stack">
-        <span>{{ t("coreAdmin.scope.label") }}</span>
-        <input
-          v-model="tenantScopeInput"
-          :placeholder="t('coreAdmin.scope.placeholder')"
-          :disabled="effectiveRole === 'platform_admin'"
-        />
-      </label>
-      <p class="field-help">
-        {{
-          effectiveRole === "platform_admin"
-            ? t("coreAdmin.scope.platformHint")
-            : t("coreAdmin.scope.help")
-        }}
-      </p>
       <div class="cta-row">
         <button
+          v-if="scopeState.canLoadScopedTenant"
           class="cta-button"
           type="button"
-          :disabled="effectiveRole !== 'tenant_admin'"
+          :disabled="loading.refresh"
           :data-action-key="ACTION_KEYS.scopeLoad"
           @click="loadScopedTenant"
         >
@@ -73,7 +49,7 @@
     </section>
 
     <section
-      v-if="effectiveRole === 'tenant_admin' && !actorTenantId"
+      v-if="effectiveRole === 'tenant_admin' && !scopeState.actorTenantId"
       class="module-card core-admin-empty-state"
     >
       <p class="eyebrow">{{ t("coreAdmin.scope.emptyTitle") }}</p>
@@ -615,6 +591,11 @@ import {
   type TenantRead,
   type TenantSettingRead,
 } from "@/api/coreAdmin";
+import {
+  resolveCoreAdminChromeVisibility,
+  resolveCoreAdminScopeState,
+  resolveCoreAdminTenantIdToLoad,
+} from "@/features/core/coreAdmin.helpers.js";
 import { useI18n } from "@/i18n";
 import { useAuthStore } from "@/stores/auth";
 
@@ -754,15 +735,16 @@ const settingDraft = reactive({
 
 const effectiveRole = computed(() => authStore.effectiveRole);
 const effectiveAccessToken = computed(() => authStore.effectiveAccessToken);
-
-const actorTenantId = computed(() => {
-  if (effectiveRole.value !== "tenant_admin") {
-    return null;
-  }
-
-  const candidate = tenantScopeInput.value.trim() || authStore.tenantScopeId;
-  return candidate || null;
-});
+const chromeVisibility = computed(() => resolveCoreAdminChromeVisibility(effectiveRole.value));
+const scopeState = computed(() =>
+  resolveCoreAdminScopeState({
+    effectiveRole: effectiveRole.value,
+    tenantScopeInput: tenantScopeInput.value,
+    rememberedTenantScopeId: authStore.tenantScopeId,
+    sessionTenantId: authStore.sessionUser?.tenant_id ?? authStore.effectiveTenantScopeId,
+  }),
+);
+const actorTenantId = computed(() => scopeState.value.actorTenantId);
 
 const filteredTenants = computed(() => {
   const filterValue = tenantFilter.value.trim().toLowerCase();
@@ -774,13 +756,6 @@ const filteredTenants = computed(() => {
     [tenant.code, tenant.name].some((value) => value.toLowerCase().includes(filterValue)),
   );
 });
-
-const rememberedScopeLabel = computed(() =>
-  authStore.tenantScopeId || t("coreAdmin.scope.none"),
-);
-const routePermissionKey = computed(
-  () => String((route.meta.permissionKey as string | undefined) ?? "core.admin.access"),
-);
 
 function readQueryValue(value: unknown) {
   return typeof value === "string" ? value : null;
@@ -806,10 +781,7 @@ function syncRouteState() {
     ...route.query,
     filter: tenantFilter.value || undefined,
     tenant: selectedTenantId.value || undefined,
-    scope:
-      effectiveRole.value === "tenant_admin" && tenantScopeInput.value.trim()
-        ? tenantScopeInput.value.trim()
-        : undefined,
+    scope: scopeState.value.scopeQueryValue,
   };
 
   void router.replace({ query });
@@ -873,8 +845,11 @@ async function refreshAll() {
 
   try {
     await loadTenants();
-    const tenantIdToLoad =
-      selectedTenantId.value || (effectiveRole.value === "tenant_admin" ? actorTenantId.value : null);
+    const tenantIdToLoad = resolveCoreAdminTenantIdToLoad(
+      selectedTenantId.value,
+      effectiveRole.value,
+      actorTenantId.value,
+    );
 
     if (tenantIdToLoad) {
       selectedTenantId.value = tenantIdToLoad;
@@ -886,6 +861,10 @@ async function refreshAll() {
 }
 
 async function loadScopedTenant() {
+  if (effectiveRole.value === "tenant_admin") {
+    return;
+  }
+
   const scopedTenantId = tenantScopeInput.value.trim();
   if (!scopedTenantId) {
     setFeedback("info", t("coreAdmin.feedback.info"), t("coreAdmin.scope.emptyBody"));
@@ -1392,7 +1371,7 @@ watch(
     syncRouteState();
 
     if (effectiveRole.value === "tenant_admin") {
-      authStore.setTenantScopeId(tenantScopeInput.value);
+      tenantScopeInput.value = scopeState.value.scopeFieldValue;
     }
   },
 );
@@ -1412,11 +1391,7 @@ watch(
   () => effectiveRole.value,
   async () => {
     clearFeedback();
-    if (effectiveRole.value !== "tenant_admin") {
-      tenantScopeInput.value = "";
-    } else if (!tenantScopeInput.value && authStore.tenantScopeId) {
-      tenantScopeInput.value = authStore.tenantScopeId;
-    }
+    tenantScopeInput.value = scopeState.value.scopeFieldValue;
 
     selectedTenantId.value =
       effectiveRole.value === "tenant_admin" ? actorTenantId.value ?? "" : selectedTenantId.value;
@@ -1426,6 +1401,14 @@ watch(
 
 onMounted(async () => {
   authStore.syncFromPrimarySession();
+  if (effectiveRole.value === "tenant_admin" && effectiveAccessToken.value && !authStore.sessionUser) {
+    try {
+      await authStore.loadCurrentSession();
+    } catch {
+      // keep current empty-state feedback path
+    }
+  }
+  tenantScopeInput.value = scopeState.value.scopeFieldValue;
   resetBranchDraft();
   resetMandateDraft();
   resetSettingDraft();
@@ -1440,13 +1423,6 @@ onMounted(async () => {
   min-width: 0;
 }
 
-.core-admin-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(320px, 0.9fr);
-  gap: 1.25rem;
-}
-
-.core-admin-copy,
 .core-admin-scope-card,
 .core-admin-panel,
 .core-admin-empty-state {
@@ -1457,38 +1433,21 @@ onMounted(async () => {
   box-shadow: var(--sp-shadow-card);
 }
 
-.core-admin-copy {
-  padding: 1.5rem;
-}
-
-.core-admin-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.core-admin-breadcrumb {
-  margin: 0 0 0.45rem;
-  color: var(--sp-color-text-secondary);
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.core-admin-meta__pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.45rem 0.8rem;
-  border-radius: 999px;
-  background: var(--sp-color-primary-muted);
-  color: var(--sp-color-primary-strong);
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
 .core-admin-scope-card,
 .core-admin-panel {
   padding: 1.25rem;
+}
+
+.core-admin-scope-card__row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.core-admin-scope-card__row > .field-stack {
+  flex: 1 1 18rem;
 }
 
 .core-admin-scope-card--embedded {
@@ -1666,7 +1625,6 @@ onMounted(async () => {
 }
 
 @media (max-width: 1180px) {
-  .core-admin-hero,
   .core-admin-grid {
     grid-template-columns: 1fr;
   }
@@ -1678,6 +1636,7 @@ onMounted(async () => {
   }
 
   .core-admin-panel__header,
+  .core-admin-scope-card__row,
   .core-admin-record,
   .core-admin-lifecycle,
   .core-admin-feedback {

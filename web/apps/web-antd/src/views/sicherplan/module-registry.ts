@@ -1,11 +1,15 @@
 import { defineAsyncComponent } from 'vue';
 
 export interface ModuleConfig {
+  allowedRoles?: string[];
   badges: Array<{ key: string; tone?: 'default' | 'success' | 'warning' }>;
   component: ReturnType<typeof defineAsyncComponent>;
   descriptionKey: string;
   highlightKeys: string[];
+  hideWorkspaceSectionHeaderForRoles?: string[];
   quickLinks: Array<{ authority?: string[]; labelKey: string; to: string }>;
+  showPageIntro?: boolean;
+  showWorkspaceSectionHeader?: boolean;
   stats: Array<{ hintKey?: string; labelKey: string; valueKey: string }>;
   titleKey: string;
   workspaceDescriptionKey: string;
@@ -37,6 +41,8 @@ export const moduleRegistry: Record<string, ModuleConfig> = {
       { labelKey: 'sicherplan.ui.stats.visibility', valueKey: 'sicherplan.ui.values.roleScoped' },
       { labelKey: 'sicherplan.ui.stats.evidence', valueKey: 'sicherplan.ui.values.auditSafe' },
     ],
+    showPageIntro: false,
+    showWorkspaceSectionHeader: false,
     titleKey: 'sicherplan.admin.core',
     workspaceDescriptionKey: 'sicherplan.ui.modules.core.workspace',
   },
@@ -65,10 +71,12 @@ export const moduleRegistry: Record<string, ModuleConfig> = {
       { labelKey: 'sicherplan.ui.stats.visibility', valueKey: 'sicherplan.ui.values.internalAudiences' },
       { labelKey: 'sicherplan.ui.stats.evidence', valueKey: 'sicherplan.ui.values.documentLinked' },
     ],
+    showWorkspaceSectionHeader: false,
     titleKey: 'sicherplan.admin.platformServices',
     workspaceDescriptionKey: 'sicherplan.ui.modules.platformServices.workspace',
   },
   customers: {
+    allowedRoles: ['tenant_admin', 'dispatcher', 'accounting', 'controller_qm'],
     badges: [
       { key: 'Master Data', tone: 'success' },
       { key: 'Commercial Scope', tone: 'default' },
@@ -91,6 +99,7 @@ export const moduleRegistry: Record<string, ModuleConfig> = {
       { labelKey: 'sicherplan.ui.stats.visibility', valueKey: 'sicherplan.ui.values.leastPrivilege' },
       { labelKey: 'sicherplan.ui.stats.evidence', valueKey: 'sicherplan.ui.values.documentLinked' },
     ],
+    hideWorkspaceSectionHeaderForRoles: ['tenant_admin'],
     titleKey: 'sicherplan.admin.customers',
     workspaceDescriptionKey: 'sicherplan.ui.modules.customers.workspace',
   },
@@ -117,6 +126,7 @@ export const moduleRegistry: Record<string, ModuleConfig> = {
       { labelKey: 'sicherplan.ui.stats.visibility', valueKey: 'sicherplan.ui.values.hrLeastPrivilege' },
       { labelKey: 'sicherplan.ui.stats.evidence', valueKey: 'sicherplan.ui.values.auditSafe' },
     ],
+    showWorkspaceSectionHeader: false,
     titleKey: 'sicherplan.admin.employees',
     workspaceDescriptionKey: 'sicherplan.ui.modules.employees.workspace',
   },

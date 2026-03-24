@@ -28,6 +28,7 @@ from app.modules.iam.auth_schemas import (
     SessionListResponse,
 )
 from app.modules.iam.auth_service import AuthService, AuthThrottle, AuthenticatedSessionContext
+from app.modules.iam.seed_permissions import seed_iam_catalog
 from app.rate_limit import AUTH_REFRESH_RULE, rate_limiter
 
 
@@ -42,6 +43,7 @@ auth_throttle = AuthThrottle(
 def get_auth_service(
     session: Annotated[Session, Depends(get_db_session)],
 ) -> AuthService:
+    seed_iam_catalog(session)
     return AuthService(
         SqlAlchemyAuthRepository(session),
         auth_secret=settings.auth_session_secret,

@@ -76,7 +76,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     meta: {
-      authority: ['tenant_admin', 'accounting'],
+      authority: ['tenant_admin', 'dispatcher', 'accounting', 'controller_qm'],
       icon: 'lucide:users',
       order: -8,
       title: $t('sicherplan.navigation.customers'),
@@ -91,7 +91,7 @@ const routes: RouteRecordRaw[] = [
         path: '/admin/customers',
         component: AdminModuleView,
         meta: {
-          authority: ['tenant_admin', 'accounting'],
+          authority: ['tenant_admin', 'dispatcher', 'accounting', 'controller_qm'],
           icon: 'lucide:users',
           moduleKey: 'customers',
           title: $t('sicherplan.admin.customers'),
