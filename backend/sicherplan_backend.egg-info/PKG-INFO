@@ -1,0 +1,5 @@
+Metadata-Version: 2.1
+Name: sicherplan-backend
+Version: 0.1.0
+Summary: SicherPlan FastAPI backend workspace
+Requires-Python: >=3.12

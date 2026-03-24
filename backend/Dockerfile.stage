@@ -11,7 +11,7 @@ RUN apt-get update \
 
 COPY backend /app/backend
 
-RUN pip install --no-cache-dir . uvicorn
+RUN pip install --no-cache-dir /app/backend uvicorn
 
 EXPOSE 8000
 

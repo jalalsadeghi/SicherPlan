@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "sicherplan-backend"
 version = "0.1.0"
@@ -10,6 +14,11 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "sqlalchemy>=2.0",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+exclude = ["alembic*", "tests*", "scripts*"]
 
 [tool.ruff]
 line-length = 100

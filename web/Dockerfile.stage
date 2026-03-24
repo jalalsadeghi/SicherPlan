@@ -1,26 +1,15 @@
-FROM node:22-slim AS builder
-
-ENV PNPM_HOME="/pnpm" \
-    PATH="/pnpm:$PATH" \
-    NODE_OPTIONS="--max-old-space-size=8192"
-
-RUN npm install --global corepack@latest
-
-WORKDIR /app
-
-COPY web /app
-
-RUN --mount=type=cache,id=pnpm-stage,target=/pnpm/store \
-    pnpm install --frozen-lockfile
-
-RUN pnpm --filter @vben/web-antd build
-
 FROM nginx:stable-alpine
 
 RUN rm -f /etc/nginx/conf.d/default.conf
 
+# Temporary stage strategy: serve the checked-in web-antd dist directly because
+# this repo snapshot's stage path must not depend on a deterministic workspace
+# install/build step to succeed.
+COPY web/apps/web-antd/dist /usr/share/nginx/html
 COPY web/nginx.stage.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/apps/web-antd/dist /usr/share/nginx/html
+
+RUN test -f /usr/share/nginx/html/index.html || \
+    (echo "Stage web image requires committed web/apps/web-antd/dist/index.html. Commit dist or switch stage builds back to a full workspace build after a deterministic lockfile-based setup is restored." >&2 && exit 1)
 
 EXPOSE 80
 

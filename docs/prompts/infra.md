@@ -1,68 +1,66 @@
-Now add GitHub Actions based automatic staging deployment for the SicherPlan repository.
+Please inspect the current SicherPlan repository carefully and fix the two failing GitHub Actions stage image builds with the smallest safe changes necessary.
 
-Requirements:
-- Deployment target is a single Linux server reachable via SSH.
-- On every push to main, build and push stage images to GHCR, then deploy to the server.
-- Also support workflow_dispatch.
-- The server should not need a git clone of the full repository for deployment.
-- The workflow should copy the current docker-compose.stage.yml and remote deploy script to the server on each deployment.
-- Use GitHub secrets for all sensitive data.
-- Do not use password-based SSH login. Assume SSH private key secret is provided.
-- Keep backend and web as separate images.
+Current failures:
+1) backend image build fails on:
+   pip install --no-cache-dir . uvicorn
+   because setuptools discovers multiple top-level packages in backend: app and alembic
 
-Implement:
+2) web image build fails on:
+   pnpm install --frozen-lockfile
+   because the current repo snapshot does not contain web/pnpm-lock.yaml
 
-1) .github/workflows/stage-deploy.yml
-- Trigger on:
-  - push to main
-  - workflow_dispatch
-- Job build_backend:
-  - checkout
-  - login to ghcr.io
-  - build and push backend/Dockerfile.stage
-  - push tags:
-    - ghcr.io/<owner-or-org>/sicherplan-backend:main
-    - ghcr.io/<owner-or-org>/sicherplan-backend:${{ github.sha }}
-- Job build_web:
-  - checkout
-  - login to ghcr.io
-  - build and push web/Dockerfile.stage
-  - push tags:
-    - ghcr.io/<owner-or-org>/sicherplan-web:main
-    - ghcr.io/<owner-or-org>/sicherplan-web:${{ github.sha }}
-- Job deploy_stage:
-  - needs build_backend and build_web
-  - checkout
-  - create /tmp deployment bundle if useful
-  - copy these files to the server:
-    - infra/docker-compose.stage.yml -> /opt/sicherplan-stage/deploy/docker-compose.stage.yml
-    - infra/scripts/deploy_stage_remote.sh -> /opt/sicherplan-stage/deploy/deploy_stage_remote.sh
-  - ssh into server and run deploy_stage_remote.sh
+Important repository facts you must respect:
+- The backend lives in /backend and runs from app.main:app
+- Alembic exists in /backend/alembic but it must NOT be treated as an installable package
+- The backend runtime should still support Alembic migrations from the container
+- The deployed frontend for stage is /web/apps/web-antd
+- In the current repository snapshot, /web/apps/web-antd/dist already exists and contains a built frontend
+- We want the fastest reliable path to get stage deployment green
+- Do not redesign the monorepo
+- Do not add Kubernetes
+- Do not touch mobile
+- Do not change business logic
+- Keep the result compatible with the existing GitHub Actions stage-deploy workflow
 
-2) The workflow must use these secret names:
-- STAGE_HOST
-- STAGE_PORT
-- STAGE_USER
-- STAGE_SSH_KEY
-- STAGE_KNOWN_HOSTS
-- GHCR_USERNAME
-- GHCR_TOKEN
+Please implement the following:
 
-3) Pass these environment values to the remote script:
-- DEPLOY_ROOT=/opt/sicherplan-stage
-- STAGE_ENV_FILE=/opt/sicherplan-stage/config/stage.env
-- BACKEND_ENV_FILE=/opt/sicherplan-stage/config/backend.stage.env
-- GHCR_USERNAME from secrets
-- GHCR_TOKEN from secrets
+1) Fix backend packaging so `pip install .` succeeds
+- Update backend/pyproject.toml
+- Add an explicit [build-system]
+- Configure setuptools package discovery so only the Python package under backend/app is installable
+- Exclude alembic, tests, scripts, and any other non-runtime folders from package discovery
+- Keep dependencies intact
+- Make the backend buildable in Docker with pip install .
 
-4) Add clear comments in the workflow so it is easy to maintain.
+2) Fix backend/Dockerfile.stage if needed
+- Keep it minimal and stable
+- Use Python 3.12 slim
+- Install the backend package and uvicorn
+- Ensure the final container can run:
+  uvicorn app.main:app --host 0.0.0.0 --port 8000
+- Ensure Alembic files remain available in the image for migration commands
 
-5) Add a short section to infra/stage-deployment.md listing the GitHub secrets and the exact server-side files expected before the first automated deployment.
+3) Fix the web stage image build in the most reliable way for the current repository snapshot
+- Since pnpm-lock.yaml is currently absent, do NOT rely on `pnpm install --frozen-lockfile`
+- Since web/apps/web-antd/dist already exists in the repo, change the stage web image to serve the committed dist directly with nginx
+- The web stage image should:
+  - copy web/apps/web-antd/dist into nginx html root
+  - use the existing stage nginx config
+  - not run pnpm install
+  - not run a frontend build step
+- Add a clear comment in the Dockerfile explaining that this temporary stage strategy intentionally serves the checked-in dist because the current repo snapshot lacks a lockfile for deterministic workspace builds
 
-Rules:
-- Do not add any production workflow.
-- Do not deploy mobile.
-- Do not add registry credentials into committed files.
-- Do not require the server to have the repo checked out.
-- Keep the workflow simple and deterministic.
-- At the end, summarize the workflow logic and the expected first-run sequence.
+4) Add a lightweight safety check
+- In the web Dockerfile, fail clearly if web/apps/web-antd/dist/index.html is missing
+- The error message should explain that either dist must be committed or the stage build strategy must be changed later to a full workspace build once a lockfile is committed
+
+5) Do not modify the GitHub Actions workflow unless absolutely necessary
+- The goal is that the existing workflow works after these repo fixes
+
+6) At the end, summarize:
+- exactly which files you changed
+- why backend packaging was failing
+- why the web frozen-lockfile build was failing
+- why serving checked-in dist is the safest current stage approach
+
+Make only the minimum necessary changes to get both stage image builds green.
