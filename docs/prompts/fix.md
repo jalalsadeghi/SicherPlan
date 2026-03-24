@@ -1,41 +1,39 @@
-Please fix the production API base/path duplication bug in SicherPlan web-antd without breaking localhost development.
+Please fix the SicherPlan web production Docker image so the deployed frontend includes the correct built assets.
 
 Problem:
-- On the deployed domain, Core Admin requests are going to:
-  /api/api/core/admin/tenants
-- Backend logs confirm:
-  GET /api/api/core/admin/tenants -> 404
-- The correct route should be:
-  /api/core/admin/tenants
-- Authentication works, so the backend is up. The issue is frontend URL construction in production.
+- The deployed domain serves /index.html, but the JS bundles referenced by index.html are missing.
+- Browser errors show 404s for files like:
+  - /jse/index-index-*.js
+  - /js/env-*.js
+- Inside the running web container, /usr/share/nginx/html currently contains index.html but not the referenced bundle files.
+- This means the production web image is copying the wrong build output or an incomplete build output.
 
-Likely cause:
-- apiBaseUrl in production is set to "/api"
-- legacy API paths in sicherplan-legacy still already start with "/api/..."
-- final URL becomes "/api/api/..."
+Relevant file:
+- web/scripts/deploy/Dockerfile
+
+Important code fact:
+- The current production stage copies:
+  COPY --from=builder /app/playground/dist /usr/share/nginx/html
+- But the deployed app is the SicherPlan web-antd application, not the playground app.
+- The correct built output likely lives under:
+  /app/apps/web-antd/dist
 
 Tasks:
-1. Inspect:
-   - web/apps/web-antd/src/sicherplan-legacy/config/env.ts
-   - web/apps/web-antd/src/sicherplan-legacy/api/coreAdmin.ts
-   - any related legacy API clients using fetch(`${webAppConfig.apiBaseUrl}${path}`)
-2. Make production URL construction consistent so "/api" is not duplicated.
-3. Keep localhost dev unchanged:
-   - local dev should still work with http://localhost:8000
-4. Prefer the minimal, low-risk fix:
-   - either keep legacy paths as "/api/..." and ensure production apiBaseUrl does NOT include "/api"
-   - or add a safe URL join/normalization helper that prevents duplicate "/api"
-5. Do not break auth or other legacy API modules.
-6. Document the exact required values for:
-   - VITE_SP_API_BASE_URL in development
-   - VITE_SP_API_BASE_URL in production
-7. Summarize:
+1. Inspect the monorepo build outputs after the build step.
+2. Confirm which app is the actual deployed SicherPlan frontend.
+3. Update the Dockerfile production COPY step so it copies the correct dist directory for the deployed app.
+4. Verify that the final nginx image contains:
+   - /usr/share/nginx/html/index.html
+   - /usr/share/nginx/html/jse/...
+   - /usr/share/nginx/html/js/...
+5. Do not break local development.
+6. Summarize:
    - touched files
-   - exact fix
-   - rebuild/redeploy requirement
-   - cache invalidation note
+   - exact path changes
+   - rebuild/redeploy steps
+   - cache purge note for browser/CDN
 
 Important:
-- Do not break localhost.
 - Keep the fix minimal.
-- Do not redesign unrelated routing.
+- Do not redesign nginx unless necessary.
+- Focus on the production image contents.
