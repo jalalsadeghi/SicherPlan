@@ -1,1 +1,0 @@
-var e=`/auth/login`,t=[{label:`Deutsch`,value:`de-DE`},{label:`English`,value:`en-US`}];export{t as n,e as t};

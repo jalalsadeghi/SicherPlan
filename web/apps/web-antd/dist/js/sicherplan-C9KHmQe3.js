@@ -1,1 +1,0 @@
-var e={title:`Administration`,core:`Tenants and core system`,platformServices:`Platform services`,customers:`Customers`},t={title:`Portals`,customer:`Customer portal`},n={admin:e,portal:t};export{e as admin,n as default,t as portal};
