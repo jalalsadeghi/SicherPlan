@@ -42,8 +42,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push backend stage image
         uses: docker/build-push-action@v6
@@ -74,8 +74,18 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The current stage image serves committed dist assets directly, so fail here
+      # with a clear message before Docker starts if the checked-in dist is absent.
+      - name: Verify committed web dist exists for stage build
+        run: |
+          test -f web/apps/web-antd/dist/index.html || {
+            echo "Current stage frontend build expects committed dist assets at web/apps/web-antd/dist/index.html in the checked-out repository." >&2
+            echo "Commit dist for the current stage strategy, or later switch stage back to a full workspace build once that path is intentionally restored." >&2
+            exit 1
+          }
 
       - name: Build and push web stage image
         uses: docker/build-push-action@v6

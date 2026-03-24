@@ -16,7 +16,7 @@ venv/
 
 # Node / web
 node_modules/
-dist/
+# dist/
 .pnpm-store/
 
 # Flutter / Dart
