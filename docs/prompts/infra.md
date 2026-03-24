@@ -1,66 +1,75 @@
-Please inspect the current SicherPlan repository carefully and fix the two failing GitHub Actions stage image builds with the smallest safe changes necessary.
+Please inspect the current SicherPlan repository and the GitHub Actions workflows carefully, then fix the current CI failures with the smallest safe changes.
 
-Current failures:
-1) backend image build fails on:
-   pip install --no-cache-dir . uvicorn
-   because setuptools discovers multiple top-level packages in backend: app and alembic
+Context:
+- We already changed backend packaging and stage Dockerfiles to address the earlier image build failures:
+  - backend pyproject now uses setuptools build metadata and limits package discovery to app*
+  - web stage Dockerfile now serves committed web/apps/web-antd/dist directly via nginx
+- Current failing GitHub Actions jobs are now:
+  1) Backend Lint And Smoke
+  2) Migration Check
+  3) Web Config Smoke
+- The Node.js 20 deprecation messages are warnings only and are NOT the main failure cause.
+- Do not disable checks blindly.
+- Do not weaken coverage or remove meaningful validation just to get green checks.
+- Do not touch mobile unless a workflow truly requires a tiny compatibility fix.
 
-2) web image build fails on:
-   pnpm install --frozen-lockfile
-   because the current repo snapshot does not contain web/pnpm-lock.yaml
+Your tasks:
 
-Important repository facts you must respect:
-- The backend lives in /backend and runs from app.main:app
-- Alembic exists in /backend/alembic but it must NOT be treated as an installable package
-- The backend runtime should still support Alembic migrations from the container
-- The deployed frontend for stage is /web/apps/web-antd
-- In the current repository snapshot, /web/apps/web-antd/dist already exists and contains a built frontend
-- We want the fastest reliable path to get stage deployment green
-- Do not redesign the monorepo
-- Do not add Kubernetes
-- Do not touch mobile
-- Do not change business logic
-- Keep the result compatible with the existing GitHub Actions stage-deploy workflow
+1) Inspect all GitHub workflow files under .github/workflows
+- Identify which workflow contains:
+  - Backend Lint And Smoke
+  - Migration Check
+  - Web Config Smoke
+- Read the exact commands those jobs run.
 
-Please implement the following:
+2) Fix Backend Lint And Smoke with minimal safe changes
+- Ensure backend packaging works consistently in CI, not just in Docker.
+- If CI installs the backend as a package, keep using the explicit setuptools package discovery that only includes app*.
+- If CI expects lint tools not present in the runtime dependency list, add them in the appropriate safe place:
+  - preferably optional dev dependencies or CI install commands,
+  - not as unnecessary runtime dependencies.
+- Make sure importing app.main works in CI after installation.
+- Do not remove linting.
 
-1) Fix backend packaging so `pip install .` succeeds
-- Update backend/pyproject.toml
-- Add an explicit [build-system]
-- Configure setuptools package discovery so only the Python package under backend/app is installable
-- Exclude alembic, tests, scripts, and any other non-runtime folders from package discovery
-- Keep dependencies intact
-- Make the backend buildable in Docker with pip install .
+3) Fix Migration Check with minimal safe changes
+- Determine whether the failure is caused by:
+  - missing backend installation metadata,
+  - missing environment variables,
+  - missing database service in CI,
+  - incorrect working directory,
+  - or Alembic import/runtime assumptions.
+- Keep migration validation meaningful.
+- If the workflow truly needs a PostgreSQL service, add a minimal PostgreSQL service container to that workflow/job and wire the required env vars.
+- If the issue is path/install related, fix the path/install problem instead.
+- Do not simply skip migration checks.
 
-2) Fix backend/Dockerfile.stage if needed
-- Keep it minimal and stable
-- Use Python 3.12 slim
-- Install the backend package and uvicorn
-- Ensure the final container can run:
-  uvicorn app.main:app --host 0.0.0.0 --port 8000
-- Ensure Alembic files remain available in the image for migration commands
+4) Fix Web Config Smoke with minimal safe changes
+- Inspect what this job validates.
+- If it still assumes a full pnpm workspace install/build, adapt only the smoke check to the current repository reality:
+  - the current stage strategy serves committed web/apps/web-antd/dist directly,
+  - the current snapshot does not rely on pnpm install in the stage image path.
+- Keep the smoke check meaningful:
+  - for example, validate that web/apps/web-antd/dist/index.html exists,
+  - validate that nginx stage config exists and references the backend proxy path correctly,
+  - or validate the exact files that the stage image actually depends on.
+- Do not fake success.
 
-3) Fix the web stage image build in the most reliable way for the current repository snapshot
-- Since pnpm-lock.yaml is currently absent, do NOT rely on `pnpm install --frozen-lockfile`
-- Since web/apps/web-antd/dist already exists in the repo, change the stage web image to serve the committed dist directly with nginx
-- The web stage image should:
-  - copy web/apps/web-antd/dist into nginx html root
-  - use the existing stage nginx config
-  - not run pnpm install
-  - not run a frontend build step
-- Add a clear comment in the Dockerfile explaining that this temporary stage strategy intentionally serves the checked-in dist because the current repo snapshot lacks a lockfile for deterministic workspace builds
+5) Keep separation of concerns
+- Stage deployment workflow should remain focused on build/push/deploy.
+- General smoke/lint/migration workflows should validate the current repo honestly.
+- Do not mix unrelated responsibilities.
 
-4) Add a lightweight safety check
-- In the web Dockerfile, fail clearly if web/apps/web-antd/dist/index.html is missing
-- The error message should explain that either dist must be committed or the stage build strategy must be changed later to a full workspace build once a lockfile is committed
+6) Add clear comments where needed
+- Only where they improve maintainability.
 
-5) Do not modify the GitHub Actions workflow unless absolutely necessary
-- The goal is that the existing workflow works after these repo fixes
+7) At the end, summarize:
+- which workflows/jobs were failing,
+- the exact root cause of each,
+- which files you changed,
+- and why the new behavior is correct for the current repo snapshot.
 
-6) At the end, summarize:
-- exactly which files you changed
-- why backend packaging was failing
-- why the web frozen-lockfile build was failing
-- why serving checked-in dist is the safest current stage approach
-
-Make only the minimum necessary changes to get both stage image builds green.
+Important constraints:
+- No Kubernetes
+- No production workflow changes unless required by the failing CI jobs
+- Do not remove or disable jobs unless they are truly obsolete and replaced by an equivalent meaningful check
+- Prefer minimal, targeted fixes

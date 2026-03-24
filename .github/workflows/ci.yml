@@ -24,7 +24,9 @@ jobs:
       - name: Install backend tooling
         run: |
           python -m pip install --upgrade pip
-          python -m pip install ruff alembic sqlalchemy psycopg[binary] fastapi pydantic httpx
+          # Install the backend package itself so CI validates the same import/package path
+          # used by Docker and Alembic, while keeping lint/test-only tools out of runtime deps.
+          python -m pip install ./backend ruff httpx
 
       - name: Run backend checks
         run: ./infra/scripts/check_backend_ci.sh
@@ -61,7 +63,9 @@ jobs:
       - name: Install migration tooling
         run: |
           python -m pip install --upgrade pip
-          python -m pip install alembic sqlalchemy psycopg[binary]
+          # Migration smoke must run against the installed backend package because Alembic
+          # imports app models/settings from the package, not from an implicit PYTHONPATH.
+          python -m pip install ./backend
 
       - name: Run migration smoke
         run: ./infra/scripts/check_migration_ci.sh
