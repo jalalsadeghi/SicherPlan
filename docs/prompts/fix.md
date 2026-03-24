@@ -1,31 +1,33 @@
-Please investigate and fix the SicherPlan web production artifact mismatch problem.
+Please fix the duplicate /api production URL bug in SicherPlan web-antd without breaking localhost development.
 
 Problem:
-- The deployed frontend index.html references hashed assets that do not exist in the final web container.
-- Example:
-  - index.html references /jse/index-index-_VBnAfr8.js and /js/env-CzAGrQv8.js
-  - but those files are missing from /usr/share/nginx/html
-- As a result, the browser gets 404 on startup assets and the app never bootstraps.
-
-Context:
-- Backend is healthy.
-- The issue is in the frontend build/deploy artifact consistency.
-- The deployed web app is the web-antd app.
-- In the checked project copy, web/apps/web-antd/dist.zip contains different asset hashes than the deployed container, which suggests the deployed image is not built from a clean, matching artifact set.
+- In production, Core Admin requests are sent to:
+  /api/api/core/admin/tenants
+- The correct URL should be:
+  /api/core/admin/tenants
+- Backend returns 404 because the current route is wrong.
+- Browser confirms the failing request comes from the built frontend chunk:
+  coreAdmin-*.js
+- Backend health is fine; this is a frontend production URL construction bug.
 
 Tasks:
-1. Inspect the frontend build pipeline and Docker image build inputs.
-2. Ensure the production image is built from one clean web-antd dist output only.
-3. Add a verification step in the build/deploy process:
-   - parse index.html
-   - verify every referenced /js/... and /jse/... asset actually exists in the final image
-4. Prevent mixed or stale assets from older builds.
-5. Summarize:
-   - root cause
+1. Inspect:
+   - web/apps/web-antd/src/sicherplan-legacy/config/env.ts
+   - web/apps/web-antd/src/sicherplan-legacy/api/coreAdmin.ts
+   - any shared fetch/http helper used by the legacy SicherPlan API layer
+2. Find where apiBaseUrl is joined with paths that already begin with /api/.
+3. Apply the minimal fix so production no longer generates /api/api/...
+4. Keep localhost dev unchanged:
+   - local dev should still use http://localhost:8000
+5. Ensure production config does NOT require VITE_SP_API_BASE_URL=/api if paths already include /api.
+6. Summarize:
    - touched files
-   - exact build/deploy changes
-   - verification command to run on the server after deployment
+   - exact logic change
+   - required production env value
+   - required dev env value
+   - rebuild/redeploy steps
 
 Important:
-- Do not modify unrelated business logic.
-- Focus on build artifact consistency and production image correctness.
+- Do not redesign unrelated routing.
+- Do not break local dev.
+- Keep the fix minimal and production-safe.
