@@ -1,10 +1,18 @@
-import { initPreferences } from '@vben/preferences';
+import { initPreferences, preferences, updatePreferences } from '@vben/preferences';
 import { unmountGlobalLoading } from '@vben/utils';
 
 import { overridesPreferences } from './preferences';
 import { APP_LOCALE_STORAGE_KEY } from './sicherplan-legacy/stores/locale';
 
 const defaultLocale = overridesPreferences.app?.locale ?? 'de-DE';
+const DEFAULT_VBEN_LOGO_SOURCE =
+  'https://unpkg.com/@vbenjs/static-source@0.1.7/source/logo-v1.webp';
+const SICHERPLAN_LIGHT_LOGO_SOURCE =
+  overridesPreferences.logo?.source || '/branding/sicherplan-logo-512.png';
+const SICHERPLAN_DARK_LOGO_SOURCE =
+  overridesPreferences.logo?.sourceDark ||
+  overridesPreferences.logo?.source ||
+  '/branding/sicherplan-logo-dark-512.png';
 
 function resolveBootstrapLocale() {
   if (typeof window === 'undefined') {
@@ -22,6 +30,29 @@ function resolveBootstrapLocale() {
     default:
       return defaultLocale;
   }
+}
+
+function migrateLogoPreferences() {
+  const currentSource = preferences.logo.source?.trim() ?? '';
+  const currentSourceDark = preferences.logo.sourceDark?.trim() ?? '';
+  const shouldRepairLogo =
+    !currentSource ||
+    currentSource === DEFAULT_VBEN_LOGO_SOURCE ||
+    !currentSourceDark ||
+    currentSourceDark === DEFAULT_VBEN_LOGO_SOURCE ||
+    currentSourceDark === SICHERPLAN_LIGHT_LOGO_SOURCE;
+
+  if (!shouldRepairLogo) {
+    return;
+  }
+
+  updatePreferences({
+    logo: {
+      fit: 'contain',
+      source: SICHERPLAN_LIGHT_LOGO_SOURCE,
+      sourceDark: SICHERPLAN_DARK_LOGO_SOURCE,
+    },
+  });
 }
 
 /**
@@ -45,6 +76,8 @@ async function initApplication() {
       },
     },
   });
+
+  migrateLogoPreferences();
 
   // 启动应用并挂载
   // vue应用主要逻辑及视图

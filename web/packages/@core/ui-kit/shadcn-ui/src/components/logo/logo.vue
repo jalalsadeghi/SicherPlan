@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import type { CSSProperties } from 'vue';
 
-import { VbenAvatar } from '../avatar';
+import { computed } from 'vue';
 
 interface Props {
   /**
@@ -63,6 +63,19 @@ const logoSrc = computed(() => {
   // 否则使用默认的 src
   return props.src;
 });
+
+const logoStyle = computed<CSSProperties>(() => {
+  const size = props.logoSize;
+
+  if (!size || size <= 0) {
+    return {};
+  }
+
+  return {
+    height: `${size}px`,
+    width: `${size}px`,
+  };
+});
 </script>
 
 <template>
@@ -72,14 +85,19 @@ const logoSrc = computed(() => {
       :href="href"
       class="flex h-full items-center gap-2 overflow-hidden px-3 text-lg leading-normal transition-all duration-500"
     >
-      <VbenAvatar
+      <span
         v-if="logoSrc"
-        :alt="text"
-        :src="logoSrc"
-        :size="logoSize"
-        :fit="fit"
-        class="relative rounded-none bg-transparent"
-      />
+        :style="logoStyle"
+        class="flex shrink-0 items-center justify-center overflow-hidden"
+      >
+        <img
+          :key="logoSrc"
+          :alt="text"
+          :src="logoSrc"
+          :style="{ objectFit: fit }"
+          class="block size-full object-contain"
+        />
+      </span>
       <template v-if="!collapsed">
         <slot name="text">
           <span class="text-foreground truncate font-semibold text-nowrap">

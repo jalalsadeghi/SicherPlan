@@ -28,8 +28,9 @@ export const overridesPreferences = defineOverridesPreferences({
   },
   logo: {
     enable: true,
-    source: '',
-    sourceDark: '',
+    fit: 'contain',
+    source: '/branding/sicherplan-logo-512.png',
+    sourceDark: '/branding/sicherplan-logo-dark-512.png',
   },
   navigation: {
     accordion: true,

@@ -1,0 +1,14 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+	quotepath = false
+[remote "origin"]
+	url = https://github.com/jalalsadeghi/SicherPlan.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "main"]
+	remote = origin
+	merge = refs/heads/main
+[advice]
+	addIgnoredFile = false
