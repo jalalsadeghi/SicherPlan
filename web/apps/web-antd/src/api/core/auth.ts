@@ -246,7 +246,27 @@ export async function getAccessCodesApi() {
 
 export async function getCurrentSessionApi() {
   const accessStore = useAccessStore();
-  return sicherPlanRequest<AuthApi.CurrentSessionResult>('/auth/me', {
-    accessToken: accessStore.accessToken,
-  });
+
+  try {
+    return await sicherPlanRequest<AuthApi.CurrentSessionResult>('/auth/me', {
+      accessToken: accessStore.accessToken,
+    });
+  } catch (error) {
+    const canRetryWithRefresh =
+      error instanceof AuthApiError
+      && error.status === 401
+      && Boolean(accessStore.refreshToken);
+
+    if (!canRetryWithRefresh) {
+      throw error;
+    }
+
+    const refreshed = await refreshTokenApi();
+    accessStore.setAccessToken(refreshed.accessToken);
+    accessStore.setRefreshToken(refreshed.refreshToken);
+
+    return sicherPlanRequest<AuthApi.CurrentSessionResult>('/auth/me', {
+      accessToken: refreshed.accessToken,
+    });
+  }
 }

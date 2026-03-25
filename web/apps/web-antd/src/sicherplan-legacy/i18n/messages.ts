@@ -669,6 +669,10 @@ export type MessageKey =
   | "coreAdmin.detail.eyebrow"
   | "coreAdmin.detail.emptyTitle"
   | "coreAdmin.detail.emptyState"
+  | "coreAdmin.tabs.overview"
+  | "coreAdmin.tabs.branches"
+  | "coreAdmin.tabs.mandates"
+  | "coreAdmin.tabs.settings"
   | "coreAdmin.lifecycle.title"
   | "coreAdmin.lifecycle.archivedHint"
   | "coreAdmin.branches.eyebrow"
@@ -1938,6 +1942,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.detail.emptyTitle": "Kein Mandant ausgewählt",
     "coreAdmin.detail.emptyState":
       "Wählen Sie links einen Mandanten aus, um Stammdaten, Niederlassungen, Mandate und Einstellungen zu pflegen.",
+    "coreAdmin.tabs.overview": "Überblick",
+    "coreAdmin.tabs.branches": "Niederlassungen",
+    "coreAdmin.tabs.mandates": "Mandate",
+    "coreAdmin.tabs.settings": "Einstellungen",
     "coreAdmin.lifecycle.title": "Lifecycle und Archivstatus",
     "coreAdmin.lifecycle.archivedHint":
       "Archivierte Mandanten bleiben explizit erhalten und können über den aktuellen Backend-Contract nicht wieder aktiviert werden.",
@@ -3246,6 +3254,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.detail.emptyTitle": "No tenant selected",
     "coreAdmin.detail.emptyState":
       "Select a tenant on the left to maintain tenant data, branches, mandates, and settings.",
+    "coreAdmin.tabs.overview": "Overview",
+    "coreAdmin.tabs.branches": "Branches",
+    "coreAdmin.tabs.mandates": "Mandates",
+    "coreAdmin.tabs.settings": "Settings",
     "coreAdmin.lifecycle.title": "Lifecycle and archive state",
     "coreAdmin.lifecycle.archivedHint":
       "Archived tenants remain explicit historical records and cannot be reactivated through the current backend contract.",

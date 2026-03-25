@@ -5,6 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const accessStoreState = {
   accessToken: null as null | string,
   refreshToken: null as null | string,
+  setAccessToken(token: null | string) {
+    this.accessToken = token;
+  },
+  setRefreshToken(token: null | string) {
+    this.refreshToken = token;
+  },
 };
 
 vi.mock('@vben/stores', () => ({
@@ -13,6 +19,7 @@ vi.mock('@vben/stores', () => ({
 
 import {
   AuthApiError,
+  getCurrentSessionApi,
   loginApi,
   refreshTokenApi,
   resolveLoginErrorMessageKey,
@@ -153,6 +160,146 @@ describe('login error message mapping', () => {
 
   it('fails refresh immediately when no refresh token is stored', async () => {
     await expect(refreshTokenApi()).rejects.toMatchObject({
+      code: 'iam.auth.invalid_refresh_token',
+      messageKey: 'errors.iam.auth.invalid_refresh_token',
+      status: 401,
+    });
+  });
+
+  it('restores the current session by refreshing once when startup hits an expired access token', async () => {
+    accessStoreState.accessToken = 'expired-access';
+    accessStoreState.refreshToken = 'refresh-current';
+
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: 'iam.auth.access_token_expired',
+              message_key: 'errors.iam.auth.access_token_expired',
+            },
+          }),
+          {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            session: {
+              access_token: 'access-2',
+              access_token_expires_at: '2026-03-23T10:15:00Z',
+              refresh_token: 'refresh-2',
+              refresh_token_expires_at: '2026-03-30T10:15:00Z',
+              session_id: 'session-1',
+            },
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            session_id: 'session-1',
+            tenant_id: 'tenant-1',
+            tenant_code: 'system',
+            user: {
+              id: 'user-1',
+              username: 'sysadmin',
+              email: 'sysadmin@example.invalid',
+              display_name: 'System Admin',
+              locale: 'de',
+              timezone: 'Europe/Berlin',
+              status: 'active',
+            },
+            roles: [],
+            permissions: ['core.admin.access'],
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
+      );
+
+    await expect(getCurrentSessionApi()).resolves.toMatchObject({
+      session_id: 'session-1',
+      tenant_code: 'system',
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('/auth/me'),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer expired-access',
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('/auth/refresh'),
+      expect.objectContaining({
+        body: JSON.stringify({
+          refresh_token: 'refresh-current',
+        }),
+        method: 'POST',
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('/auth/me'),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer access-2',
+        }),
+      }),
+    );
+    expect(accessStoreState.accessToken).toBe('access-2');
+    expect(accessStoreState.refreshToken).toBe('refresh-2');
+  });
+
+  it('fails cleanly when the remembered refresh session is no longer valid', async () => {
+    accessStoreState.accessToken = 'expired-access';
+    accessStoreState.refreshToken = 'refresh-current';
+
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: 'iam.auth.access_token_expired',
+              message_key: 'errors.iam.auth.access_token_expired',
+            },
+          }),
+          {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: 'iam.auth.invalid_refresh_token',
+              message_key: 'errors.iam.auth.invalid_refresh_token',
+            },
+          }),
+          {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
+      );
+
+    await expect(getCurrentSessionApi()).rejects.toMatchObject({
       code: 'iam.auth.invalid_refresh_token',
       messageKey: 'errors.iam.auth.invalid_refresh_token',
       status: 401,

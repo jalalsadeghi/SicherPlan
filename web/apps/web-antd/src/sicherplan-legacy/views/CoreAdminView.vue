@@ -1,5 +1,21 @@
 <template>
   <div class="core-admin-page">
+    <section class="module-card core-admin-hero">
+      <div>
+        <p class="eyebrow">{{ t("coreAdmin.eyebrow") }}</p>
+        <h2>{{ t("coreAdmin.title") }}</h2>
+        <p class="core-admin-lead">{{ t("coreAdmin.lead") }}</p>
+        <div class="core-admin-meta">
+          <span class="core-admin-meta__pill">
+            {{ t("coreAdmin.permission.ready") }}
+          </span>
+          <span class="core-admin-meta__pill">
+            {{ t("coreAdmin.permission.label") }}: <code>core.admin.*</code>
+          </span>
+        </div>
+      </div>
+    </section>
+
     <div
       v-if="chromeVisibility.showTenantScopeCard"
       class="module-card core-admin-scope-card"
@@ -56,8 +72,8 @@
       <h3>{{ t("coreAdmin.scope.emptyBody") }}</h3>
     </section>
 
-    <div v-else class="core-admin-grid">
-      <section class="module-card core-admin-panel">
+    <div v-else class="core-admin-grid" data-testid="core-master-detail-layout">
+      <section class="module-card core-admin-panel" data-testid="core-list-section">
         <div class="core-admin-panel__header">
           <div>
             <p class="eyebrow">{{ t("coreAdmin.tenants.eyebrow") }}</p>
@@ -179,7 +195,7 @@
         </form>
       </section>
 
-      <section class="module-card core-admin-panel core-admin-detail">
+      <section class="module-card core-admin-panel core-admin-detail" data-testid="core-detail-workspace">
         <div class="core-admin-panel__header">
           <div>
             <p class="eyebrow">{{ t("coreAdmin.detail.eyebrow") }}</p>
@@ -189,85 +205,100 @@
         </div>
 
         <template v-if="selectedTenant">
-          <div class="core-admin-lifecycle">
-            <div>
-              <strong>{{ t("coreAdmin.lifecycle.title") }}</strong>
-              <p class="field-help" v-if="selectedTenant.archived_at">
-                {{ t("coreAdmin.lifecycle.archivedHint") }}
-              </p>
-            </div>
-            <div class="cta-row">
-              <button
-                v-if="selectedTenant.status === 'inactive'"
-                class="cta-button"
-                type="button"
-                :data-action-key="ACTION_KEYS.tenantActivate"
-                @click="setTenantStatus('active')"
-              >
-                {{ t("coreAdmin.actions.reactivate") }}
-              </button>
-              <button
-                v-if="selectedTenant.status === 'active'"
-                class="cta-button"
-                type="button"
-                :data-action-key="ACTION_KEYS.tenantDeactivate"
-                @click="setTenantStatus('inactive')"
-              >
-                {{ t("coreAdmin.actions.deactivate") }}
-              </button>
-              <button
-                v-if="!selectedTenant.archived_at"
-                class="cta-button cta-secondary"
-                type="button"
-                :data-action-key="ACTION_KEYS.tenantArchive"
-                @click="archiveTenant"
-              >
-                {{ t("coreAdmin.actions.archive") }}
-              </button>
-            </div>
-          </div>
+          <nav class="core-admin-tabs" aria-label="Core admin detail sections" data-testid="core-detail-tabs">
+            <button
+              v-for="tab in coreDetailTabs"
+              :key="tab.id"
+              type="button"
+              class="core-admin-tab"
+              :class="{ active: tab.id === activeDetailTab }"
+              @click="activeDetailTab = tab.id"
+            >
+              {{ tab.label }}
+            </button>
+          </nav>
 
-          <form class="core-admin-form" @submit.prevent="submitTenantUpdate">
-            <div class="core-admin-form-grid">
-              <label class="field-stack">
-                <span>{{ t("coreAdmin.fields.tenantCode") }}</span>
-                <input :value="selectedTenant.code" disabled />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("coreAdmin.fields.tenantName") }}</span>
-                <input v-model="tenantDraft.name" required />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("coreAdmin.fields.legalName") }}</span>
-                <input v-model="tenantDraft.legal_name" />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("coreAdmin.fields.defaultLocale") }}</span>
-                <input v-model="tenantDraft.default_locale" required />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("coreAdmin.fields.defaultCurrency") }}</span>
-                <input v-model="tenantDraft.default_currency" required />
-              </label>
-              <label class="field-stack">
-                <span>{{ t("coreAdmin.fields.timezone") }}</span>
-                <input v-model="tenantDraft.timezone" required />
-              </label>
+          <section v-if="activeDetailTab === 'overview'" class="core-admin-tab-panel" data-testid="core-tab-panel-overview">
+            <div class="core-admin-lifecycle">
+              <div>
+                <strong>{{ t("coreAdmin.lifecycle.title") }}</strong>
+                <p class="field-help" v-if="selectedTenant.archived_at">
+                  {{ t("coreAdmin.lifecycle.archivedHint") }}
+                </p>
+              </div>
+              <div class="cta-row">
+                <button
+                  v-if="selectedTenant.status === 'inactive'"
+                  class="cta-button"
+                  type="button"
+                  :data-action-key="ACTION_KEYS.tenantActivate"
+                  @click="setTenantStatus('active')"
+                >
+                  {{ t("coreAdmin.actions.reactivate") }}
+                </button>
+                <button
+                  v-if="selectedTenant.status === 'active'"
+                  class="cta-button"
+                  type="button"
+                  :data-action-key="ACTION_KEYS.tenantDeactivate"
+                  @click="setTenantStatus('inactive')"
+                >
+                  {{ t("coreAdmin.actions.deactivate") }}
+                </button>
+                <button
+                  v-if="!selectedTenant.archived_at"
+                  class="cta-button cta-secondary"
+                  type="button"
+                  :data-action-key="ACTION_KEYS.tenantArchive"
+                  @click="archiveTenant"
+                >
+                  {{ t("coreAdmin.actions.archive") }}
+                </button>
+              </div>
             </div>
 
-            <div class="cta-row">
-              <button
-                class="cta-button"
-                type="submit"
-                :data-action-key="ACTION_KEYS.tenantSave"
-                :disabled="loading.tenant"
-              >
-                {{ t("coreAdmin.actions.saveTenant") }}
-              </button>
-            </div>
-          </form>
+            <form class="core-admin-form core-admin-form--detail" @submit.prevent="submitTenantUpdate">
+              <div class="core-admin-form-grid core-admin-form-grid--detail">
+                <label class="field-stack field-stack--half">
+                  <span>{{ t("coreAdmin.fields.tenantCode") }}</span>
+                  <input :value="selectedTenant.code" disabled />
+                </label>
+                <label class="field-stack field-stack--half">
+                  <span>{{ t("coreAdmin.fields.tenantName") }}</span>
+                  <input v-model="tenantDraft.name" required />
+                </label>
+                <label class="field-stack field-stack--half">
+                  <span>{{ t("coreAdmin.fields.legalName") }}</span>
+                  <input v-model="tenantDraft.legal_name" />
+                </label>
+                <label class="field-stack field-stack--third">
+                  <span>{{ t("coreAdmin.fields.defaultLocale") }}</span>
+                  <input v-model="tenantDraft.default_locale" required />
+                </label>
+                <label class="field-stack field-stack--third">
+                  <span>{{ t("coreAdmin.fields.defaultCurrency") }}</span>
+                  <input v-model="tenantDraft.default_currency" required />
+                </label>
+                <label class="field-stack field-stack--third">
+                  <span>{{ t("coreAdmin.fields.timezone") }}</span>
+                  <input v-model="tenantDraft.timezone" required />
+                </label>
+              </div>
 
-          <section class="core-admin-section">
+              <div class="cta-row">
+                <button
+                  class="cta-button"
+                  type="submit"
+                  :data-action-key="ACTION_KEYS.tenantSave"
+                  :disabled="loading.tenant"
+                >
+                  {{ t("coreAdmin.actions.saveTenant") }}
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <section v-if="activeDetailTab === 'branches'" class="core-admin-section core-admin-tab-panel" data-testid="core-tab-panel-branches">
             <div class="core-admin-panel__header">
               <div>
                 <p class="eyebrow">{{ t("coreAdmin.branches.eyebrow") }}</p>
@@ -316,21 +347,21 @@
             </div>
             <p v-else class="core-admin-list-empty">{{ t("coreAdmin.branches.empty") }}</p>
 
-            <form class="core-admin-form" @submit.prevent="submitBranch">
-              <div class="core-admin-form-grid">
-                <label class="field-stack">
+            <form class="core-admin-form core-admin-form--detail" @submit.prevent="submitBranch">
+              <div class="core-admin-form-grid core-admin-form-grid--detail">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("coreAdmin.fields.branchCode") }}</span>
                   <input v-model="branchDraft.code" :disabled="Boolean(branchDraft.id)" required />
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("coreAdmin.fields.branchName") }}</span>
                   <input v-model="branchDraft.name" required />
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("coreAdmin.fields.branchEmail") }}</span>
                   <input v-model="branchDraft.contact_email" />
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("coreAdmin.fields.branchPhone") }}</span>
                   <input v-model="branchDraft.contact_phone" />
                 </label>
@@ -361,7 +392,7 @@
             </form>
           </section>
 
-          <section class="core-admin-section">
+          <section v-if="activeDetailTab === 'mandates'" class="core-admin-section core-admin-tab-panel" data-testid="core-tab-panel-mandates">
             <div class="core-admin-panel__header">
               <div>
                 <p class="eyebrow">{{ t("coreAdmin.mandates.eyebrow") }}</p>
@@ -410,9 +441,9 @@
             </div>
             <p v-else class="core-admin-list-empty">{{ t("coreAdmin.mandates.empty") }}</p>
 
-            <form class="core-admin-form" @submit.prevent="submitMandate">
-              <div class="core-admin-form-grid">
-                <label class="field-stack">
+            <form class="core-admin-form core-admin-form--detail" @submit.prevent="submitMandate">
+              <div class="core-admin-form-grid core-admin-form-grid--detail">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("coreAdmin.fields.branch") }}</span>
                   <select v-model="mandateDraft.branch_id" required>
                     <option value="" disabled>{{ t("coreAdmin.fields.branchPlaceholder") }}</option>
@@ -421,15 +452,15 @@
                     </option>
                   </select>
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("coreAdmin.fields.mandateCode") }}</span>
                   <input v-model="mandateDraft.code" :disabled="Boolean(mandateDraft.id)" required />
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("coreAdmin.fields.mandateName") }}</span>
                   <input v-model="mandateDraft.name" required />
                 </label>
-                <label class="field-stack">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("coreAdmin.fields.externalRef") }}</span>
                   <input v-model="mandateDraft.external_ref" />
                 </label>
@@ -464,7 +495,7 @@
             </form>
           </section>
 
-          <section class="core-admin-section">
+          <section v-if="activeDetailTab === 'settings'" class="core-admin-section core-admin-tab-panel" data-testid="core-tab-panel-settings">
             <div class="core-admin-panel__header">
               <div>
                 <p class="eyebrow">{{ t("coreAdmin.settings.eyebrow") }}</p>
@@ -516,9 +547,9 @@
             </div>
             <p v-else class="core-admin-list-empty">{{ t("coreAdmin.settings.empty") }}</p>
 
-            <form class="core-admin-form" @submit.prevent="submitSetting">
-              <div class="core-admin-form-grid">
-                <label class="field-stack">
+            <form class="core-admin-form core-admin-form--detail" @submit.prevent="submitSetting">
+              <div class="core-admin-form-grid core-admin-form-grid--detail">
+                <label class="field-stack field-stack--half">
                   <span>{{ t("coreAdmin.fields.settingKey") }}</span>
                   <input v-model="settingDraft.key" :disabled="Boolean(settingDraft.id)" required />
                 </label>
@@ -655,6 +686,7 @@ const selectedTenant = ref<TenantRead | null>(null);
 const branches = ref<BranchRead[]>([]);
 const mandates = ref<MandateRead[]>([]);
 const settings = ref<TenantSettingRead[]>([]);
+const activeDetailTab = ref<"branches" | "mandates" | "overview" | "settings">("overview");
 
 const tenantFilter = ref(readQueryValue(route.query.filter) ?? "");
 const tenantScopeInput = ref(readQueryValue(route.query.scope) ?? authStore.tenantScopeId);
@@ -757,6 +789,13 @@ const filteredTenants = computed(() => {
   );
 });
 
+const coreDetailTabs = computed(() => [
+  { id: "overview", label: t("coreAdmin.tabs.overview") },
+  { id: "branches", label: t("coreAdmin.tabs.branches") },
+  { id: "mandates", label: t("coreAdmin.tabs.mandates") },
+  { id: "settings", label: t("coreAdmin.tabs.settings") },
+] as const);
+
 function readQueryValue(value: unknown) {
   return typeof value === "string" ? value : null;
 }
@@ -825,6 +864,7 @@ function resetSettingDraft() {
 
 function selectTenant(tenantId: string) {
   selectedTenantId.value = tenantId;
+  activeDetailTab.value = "overview";
   authStore.setTenantScopeId(tenantId);
 }
 
@@ -1433,6 +1473,46 @@ onMounted(async () => {
   box-shadow: var(--sp-shadow-card);
 }
 
+.core-admin-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+}
+
+.core-admin-hero h2 {
+  margin: 0;
+  color: var(--sp-color-text-primary);
+  font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+  line-height: 1.1;
+}
+
+.core-admin-lead {
+  margin: 0.35rem 0 0;
+  color: var(--sp-color-text-secondary);
+  max-width: 68ch;
+}
+
+.core-admin-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.core-admin-meta__pill {
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  background: var(--sp-color-surface-page);
+  border: 1px solid var(--sp-color-border-soft);
+  color: var(--sp-color-text-secondary);
+}
+
+.core-admin-meta__pill code {
+  font: inherit;
+  color: var(--sp-color-text-primary);
+}
+
 .core-admin-scope-card,
 .core-admin-panel {
   padding: 1.25rem;
@@ -1471,6 +1551,12 @@ onMounted(async () => {
   display: grid;
   gap: 1rem;
   min-width: 0;
+}
+
+.core-admin-tab-panel,
+.core-admin-form--detail {
+  display: grid;
+  gap: 1rem;
 }
 
 .core-admin-panel__header,
@@ -1584,6 +1670,56 @@ onMounted(async () => {
   min-width: 0;
 }
 
+.core-admin-form-grid--detail {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.core-admin-form-grid--detail > .field-stack {
+  grid-column: span 2;
+}
+
+.core-admin-form-grid--detail > .field-stack--half {
+  grid-column: span 3;
+}
+
+.core-admin-form-grid--detail > .field-stack--third {
+  grid-column: span 2;
+}
+
+.core-admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.core-admin-tab {
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-page);
+  color: var(--sp-color-text-secondary);
+  border-radius: 999px;
+  padding: 0.6rem 1rem;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.core-admin-tab.active {
+  border-color: var(--sp-color-primary);
+  color: var(--sp-color-primary-strong);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 70%, white);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 28%, transparent);
+}
+
+.core-admin-tab:focus-visible {
+  outline: none;
+  border-color: var(--sp-color-primary);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
 .field-stack {
   display: grid;
   gap: 0.42rem;
@@ -1633,6 +1769,13 @@ onMounted(async () => {
 @media (max-width: 720px) {
   .core-admin-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .core-admin-form-grid--detail > .field-stack,
+  .core-admin-form-grid--detail > .field-stack--half,
+  .core-admin-form-grid--detail > .field-stack--third,
+  .core-admin-form-grid--detail > .field-stack--wide {
+    grid-column: auto;
   }
 
   .core-admin-panel__header,
