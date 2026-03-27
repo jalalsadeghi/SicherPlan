@@ -165,6 +165,27 @@ test("portal capability state reflects backend capability metadata", () => {
       availability_status: "ready",
       interaction_mode: "write_optional",
       can_download_documents: false,
+      can_view: true,
+      can_write: false,
+    }),
+    "available",
+  );
+  assert.equal(
+    derivePortalCapabilityState({
+      availability_status: "ready",
+      interaction_mode: "write_optional",
+      can_download_documents: false,
+      can_view: false,
+      can_write: false,
+    }),
+    "not_enabled",
+  );
+  assert.equal(
+    derivePortalCapabilityState({
+      availability_status: "ready",
+      interaction_mode: "write_optional",
+      can_download_documents: false,
+      can_view: false,
       can_write: true,
     }),
     "enabled",
@@ -209,5 +230,15 @@ test("portal dataset message distinguishes pending integrations from empty relea
       "portal.empty",
     ),
     "portal.empty",
+  );
+  assert.equal(
+    derivePortalDatasetMessage(
+      {
+        items: [{ id: "row-1" }],
+        source: { availability_status: "ready", message_key: "portal.source" },
+      },
+      "portal.empty",
+    ),
+    null,
   );
 });

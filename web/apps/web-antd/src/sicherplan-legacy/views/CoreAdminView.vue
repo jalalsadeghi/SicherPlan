@@ -504,6 +504,37 @@
               <StatusBadge :status="settings.length > 0 ? 'active' : 'inactive'" />
             </div>
 
+            <article class="core-admin-record core-admin-record--policy" data-testid="core-customer-portal-policy">
+              <div>
+                <p class="eyebrow">{{ t("coreAdmin.settings.customerPortalPolicyEyebrow") }}</p>
+                <strong>{{ t("coreAdmin.settings.customerPortalPolicyTitle") }}</strong>
+                <span>{{ t("coreAdmin.settings.customerPortalPolicyBody") }}</span>
+                <span>{{ CUSTOMER_PORTAL_POLICY_KEY }}</span>
+              </div>
+              <div class="core-admin-record__actions">
+                <StatusBadge :status="customerWatchbookEntriesEnabled ? 'active' : 'inactive'" />
+                <span>
+                  {{
+                    customerWatchbookEntriesEnabled
+                      ? t("coreAdmin.settings.customerPortalPolicyEnabled")
+                      : t("coreAdmin.settings.customerPortalPolicyDisabled")
+                  }}
+                </span>
+                <button
+                  type="button"
+                  :data-action-key="ACTION_KEYS.settingSave"
+                  :disabled="loading.setting"
+                  @click="setCustomerPortalWatchbookEntriesEnabled(!customerWatchbookEntriesEnabled)"
+                >
+                  {{
+                    customerWatchbookEntriesEnabled
+                      ? t("coreAdmin.settings.disableCustomerWatchbookFeedback")
+                      : t("coreAdmin.settings.enableCustomerWatchbookFeedback")
+                  }}
+                </button>
+              </div>
+            </article>
+
             <div v-if="settings.length > 0" class="core-admin-list">
               <article v-for="setting in settings" :key="setting.id" class="core-admin-record">
                 <div>
@@ -657,6 +688,7 @@ const ACTION_KEYS = {
   settingDeactivate: "core.admin.setting.deactivate",
   settingArchive: "core.admin.setting.archive",
 } as const;
+const CUSTOMER_PORTAL_POLICY_KEY = "customer_portal.policy";
 
 const API_ERROR_KEYS = {
   "errors.core.authorization.forbidden": "coreAdmin.api.errors.authorization.forbidden",
@@ -787,6 +819,13 @@ const filteredTenants = computed(() => {
   return tenants.value.filter((tenant) =>
     [tenant.code, tenant.name].some((value) => value.toLowerCase().includes(filterValue)),
   );
+});
+const customerPortalPolicySetting = computed(
+  () => settings.value.find((setting) => setting.key === CUSTOMER_PORTAL_POLICY_KEY) ?? null,
+);
+const customerWatchbookEntriesEnabled = computed(() => {
+  const value = customerPortalPolicySetting.value?.value_json?.customer_watchbook_entries_enabled;
+  return value === true;
 });
 
 const coreDetailTabs = computed(() => [
@@ -1324,6 +1363,58 @@ async function setSettingStatus(setting: TenantSettingRead, status: LifecycleSta
 
     await loadTenantContext(selectedTenant.value.id);
     setFeedback("success", t("coreAdmin.feedback.success"), t("coreAdmin.feedback.settingStatusSaved"));
+  } catch (error) {
+    handleError(error);
+  } finally {
+    loading.setting = false;
+  }
+}
+
+async function setCustomerPortalWatchbookEntriesEnabled(enabled: boolean) {
+  if (!selectedTenant.value) {
+    return;
+  }
+
+  loading.setting = true;
+
+  try {
+    const current = customerPortalPolicySetting.value;
+    const valueJson = {
+      version: "v1",
+      ...(current?.value_json ?? {}),
+      customer_watchbook_entries_enabled: enabled,
+    };
+
+    if (current) {
+      await updateSetting(
+        effectiveAccessToken.value,
+        selectedTenant.value.id,
+        current.id,
+        {
+          value_json: valueJson,
+          version_no: current.version_no,
+          status: "active",
+          archived_at: null,
+        },
+        effectiveRole.value,
+        actorTenantId.value,
+      );
+    } else {
+      await createSetting(
+        effectiveAccessToken.value,
+        selectedTenant.value.id,
+        {
+          tenant_id: selectedTenant.value.id,
+          key: CUSTOMER_PORTAL_POLICY_KEY,
+          value_json: valueJson,
+        },
+        effectiveRole.value,
+        actorTenantId.value,
+      );
+    }
+
+    await loadTenantContext(selectedTenant.value.id);
+    setFeedback("success", t("coreAdmin.feedback.success"), t("coreAdmin.feedback.settingSaved"));
   } catch (error) {
     handleError(error);
   } finally {

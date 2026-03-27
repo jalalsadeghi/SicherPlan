@@ -26,4 +26,25 @@ describe('sicherplan route authority', () => {
       'controller_qm',
     ]);
   });
+
+  it('splits the customer portal into explicit child routes', () => {
+    const portalSection = sicherplanRoutes.find(
+      (route) => route.name === 'SicherPlanPortal',
+    );
+    const customerPortalSection = portalSection?.children?.find(
+      (route) => route.name === 'SicherPlanCustomerPortalSection',
+    );
+
+    expect(customerPortalSection?.redirect).toBe('/portal/customer/overview');
+    expect(customerPortalSection?.children?.map((route) => route.path)).toEqual([
+      '/portal/customer/overview',
+      '/portal/customer/orders',
+      '/portal/customer/schedules',
+      '/portal/customer/watchbooks',
+      '/portal/customer/timesheets',
+      '/portal/customer/invoices',
+      '/portal/customer/reports',
+      '/portal/customer/history',
+    ]);
+  });
 });

@@ -30,3 +30,9 @@ test("core admin detail tabs preserve existing forms and section handlers", () =
   assert.match(viewSource, /core-tab-panel-mandates[\s\S]*submitMandate[\s\S]*ACTION_KEYS\.mandateCreate/);
   assert.match(viewSource, /core-tab-panel-settings[\s\S]*submitSetting[\s\S]*ACTION_KEYS\.settingCreate/);
 });
+
+test("core admin settings expose the customer portal policy toggle", () => {
+  assert.match(viewSource, /data-testid="core-customer-portal-policy"/);
+  assert.match(viewSource, /CUSTOMER_PORTAL_POLICY_KEY = "customer_portal\.policy"/);
+  assert.match(viewSource, /setCustomerPortalWatchbookEntriesEnabled\(!customerWatchbookEntriesEnabled\)/);
+});

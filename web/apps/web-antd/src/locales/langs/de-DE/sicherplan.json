@@ -39,6 +39,14 @@
   "portal": {
     "title": "Portale",
     "customer": "Kundenportal",
+    "customerOverview": "Übersicht",
+    "customerOrders": "Aufträge",
+    "customerSchedules": "Einsatzpläne",
+    "customerWatchbooks": "Wachbücher",
+    "customerTimesheets": "Stundennachweise",
+    "customerInvoices": "Rechnungen",
+    "customerReports": "Berichte",
+    "customerHistory": "Historie",
     "subcontractor": "Subunternehmerportal"
   },
   "public": {

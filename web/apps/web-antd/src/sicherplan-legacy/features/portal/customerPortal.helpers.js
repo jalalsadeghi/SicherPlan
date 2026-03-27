@@ -86,7 +86,11 @@ export function derivePortalCapabilityState(capability) {
   }
 
   if (capability.interaction_mode === "write_optional") {
-    return capability.can_write ? "enabled" : "not_enabled";
+    if (capability.can_write) {
+      return "enabled";
+    }
+
+    return capability.can_view === false ? "not_enabled" : "available";
   }
 
   if (capability.interaction_mode === "download") {
@@ -109,5 +113,5 @@ export function derivePortalDatasetMessage(collection, emptyMessageKey) {
     return emptyMessageKey;
   }
 
-  return collection.source.message_key;
+  return null;
 }

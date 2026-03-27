@@ -317,14 +317,102 @@ const routes: RouteRecordRaw[] = [
     path: '/portal',
     children: [
       {
-        name: 'SicherPlanCustomerPortal',
+        name: 'SicherPlanCustomerPortalSection',
         path: '/portal/customer',
-        component: () => import('@/views/CustomerPortalAccessView.vue'),
+        component: RouteSectionView,
+        redirect: '/portal/customer/overview',
         meta: {
           authority: ['customer_user'],
           icon: 'lucide:user-round-search',
           title: $t('sicherplan.portal.customer'),
         },
+        children: [
+          {
+            name: 'SicherPlanCustomerPortalOverview',
+            path: '/portal/customer/overview',
+            component: () => import('@/views/CustomerPortalAccessView.vue'),
+            meta: {
+              authority: ['customer_user'],
+              icon: 'lucide:layout-dashboard',
+              title: $t('sicherplan.portal.customerOverview'),
+            },
+          },
+          {
+            name: 'SicherPlanCustomerPortalOrders',
+            path: '/portal/customer/orders',
+            component: () => import('@/views/customer-portal/CustomerPortalReadonlyDatasetView.vue'),
+            props: { domain: 'orders' },
+            meta: {
+              authority: ['customer_user'],
+              icon: 'lucide:clipboard-list',
+              title: $t('sicherplan.portal.customerOrders'),
+            },
+          },
+          {
+            name: 'SicherPlanCustomerPortalSchedules',
+            path: '/portal/customer/schedules',
+            component: () => import('@/views/customer-portal/CustomerPortalReadonlyDatasetView.vue'),
+            props: { domain: 'schedules' },
+            meta: {
+              authority: ['customer_user'],
+              icon: 'lucide:calendar-range',
+              title: $t('sicherplan.portal.customerSchedules'),
+            },
+          },
+          {
+            name: 'SicherPlanCustomerPortalWatchbooks',
+            path: '/portal/customer/watchbooks',
+            component: () => import('@/views/customer-portal/CustomerPortalWatchbooksView.vue'),
+            meta: {
+              authority: ['customer_user'],
+              icon: 'lucide:notebook-pen',
+              title: $t('sicherplan.portal.customerWatchbooks'),
+            },
+          },
+          {
+            name: 'SicherPlanCustomerPortalTimesheets',
+            path: '/portal/customer/timesheets',
+            component: () => import('@/views/customer-portal/CustomerPortalDocumentDatasetView.vue'),
+            props: { domain: 'timesheets' },
+            meta: {
+              authority: ['customer_user'],
+              icon: 'lucide:file-clock',
+              title: $t('sicherplan.portal.customerTimesheets'),
+            },
+          },
+          {
+            name: 'SicherPlanCustomerPortalInvoices',
+            path: '/portal/customer/invoices',
+            component: () => import('@/views/customer-portal/CustomerPortalDocumentDatasetView.vue'),
+            props: { domain: 'invoices' },
+            meta: {
+              authority: ['customer_user'],
+              icon: 'lucide:file-text',
+              title: $t('sicherplan.portal.customerInvoices'),
+            },
+          },
+          {
+            name: 'SicherPlanCustomerPortalReports',
+            path: '/portal/customer/reports',
+            component: () => import('@/views/customer-portal/CustomerPortalReadonlyDatasetView.vue'),
+            props: { domain: 'reports' },
+            meta: {
+              authority: ['customer_user'],
+              icon: 'lucide:bar-chart-3',
+              title: $t('sicherplan.portal.customerReports'),
+            },
+          },
+          {
+            name: 'SicherPlanCustomerPortalHistory',
+            path: '/portal/customer/history',
+            component: () => import('@/views/customer-portal/CustomerPortalHistoryView.vue'),
+            meta: {
+              authority: ['customer_user'],
+              icon: 'lucide:history',
+              title: $t('sicherplan.portal.customerHistory'),
+            },
+          },
+        ],
       },
       {
         name: 'SicherPlanSubcontractorPortal',

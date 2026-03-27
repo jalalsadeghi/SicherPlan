@@ -59,6 +59,14 @@ export type MessageKey =
   | "route.admin.reporting.description"
   | "route.portal.customer.title"
   | "route.portal.customer.description"
+  | "route.portal.customerOverview.title"
+  | "route.portal.customerOrders.title"
+  | "route.portal.customerSchedules.title"
+  | "route.portal.customerWatchbooks.title"
+  | "route.portal.customerTimesheets.title"
+  | "route.portal.customerInvoices.title"
+  | "route.portal.customerReports.title"
+  | "route.portal.customerHistory.title"
   | "route.portal.subcontractor.title"
   | "route.portal.subcontractor.description"
   | "portalSubcontractor.eyebrow"
@@ -220,11 +228,15 @@ export type MessageKey =
   | "portalCustomer.access.eyebrow"
   | "portalCustomer.access.title"
   | "portalCustomer.access.body"
+  | "portalCustomer.access.base.label"
+  | "portalCustomer.access.base.body"
   | "portalCustomer.access.states.available"
   | "portalCustomer.access.states.readOnly"
   | "portalCustomer.access.states.enabled"
   | "portalCustomer.access.states.notEnabled"
   | "portalCustomer.access.states.pendingIntegration"
+  | "portalCustomer.pages.readOnlyNotice"
+  | "portalCustomer.pages.downloadNotice"
   | "portalCustomer.readOnly.title"
   | "portalCustomer.readOnly.body"
   | "portalCustomer.history.eyebrow"
@@ -767,6 +779,13 @@ export type MessageKey =
   | "coreAdmin.settings.title"
   | "coreAdmin.settings.empty"
   | "coreAdmin.settings.version"
+  | "coreAdmin.settings.customerPortalPolicyEyebrow"
+  | "coreAdmin.settings.customerPortalPolicyTitle"
+  | "coreAdmin.settings.customerPortalPolicyBody"
+  | "coreAdmin.settings.customerPortalPolicyEnabled"
+  | "coreAdmin.settings.customerPortalPolicyDisabled"
+  | "coreAdmin.settings.enableCustomerWatchbookFeedback"
+  | "coreAdmin.settings.disableCustomerWatchbookFeedback"
   | "coreAdmin.fields.tenantCode"
   | "coreAdmin.fields.tenantName"
   | "coreAdmin.fields.legalName"
@@ -1287,6 +1306,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "route.portal.customer.title": "Kundenportal",
     "route.portal.customer.description":
       "Freigegebene Aufträge, Berichte, Zeiten und Dokumente.",
+    "route.portal.customerOverview.title": "Übersicht",
+    "route.portal.customerOrders.title": "Aufträge",
+    "route.portal.customerSchedules.title": "Einsatzpläne",
+    "route.portal.customerWatchbooks.title": "Wachbücher",
+    "route.portal.customerTimesheets.title": "Stundennachweise",
+    "route.portal.customerInvoices.title": "Rechnungen",
+    "route.portal.customerReports.title": "Berichte",
+    "route.portal.customerHistory.title": "Historie",
     "route.portal.subcontractor.title": "Subunternehmerportal",
     "route.portal.subcontractor.description":
       "Freigegebene Einsätze, Mitarbeitende und Rückmeldungen im freigegebenen Umfang.",
@@ -1502,11 +1529,18 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalCustomer.access.title": "Was Sie hier sehen und tun können",
     "portalCustomer.access.body":
       "Diese Übersicht zeigt Ihre freigegebenen Portalrechte klar an: nur kundenspezifische, freigegebene Ausgaben, ohne interne Dispositionsdetails.",
+    "portalCustomer.access.base.label": "Basiszugang zum Kundenportal",
+    "portalCustomer.access.base.body":
+      "Anmeldung, Kunden-Scope und Kontaktzuordnung sind bereits wirksam, sobald die Portalbereitstellung erfolgreich abgeschlossen wurde.",
     "portalCustomer.access.states.available": "Verfügbar",
     "portalCustomer.access.states.readOnly": "Nur lesen",
     "portalCustomer.access.states.enabled": "Aktiv",
     "portalCustomer.access.states.notEnabled": "Nicht aktiviert",
     "portalCustomer.access.states.pendingIntegration": "Anbindung ausstehend",
+    "portalCustomer.pages.readOnlyNotice":
+      "Diese Seite ist aktuell rein lesend. Eine Auftragserfassung aus dem Kundenportal ist in diesem Ausbau noch nicht verfügbar.",
+    "portalCustomer.pages.downloadNotice":
+      "Diese Seite ist dokumentgestützt und freigegeben. Sie können vorhandene Dateien herunterladen, aber keine neuen Finanzbelege erzeugen.",
     "portalCustomer.readOnly.title": "Nur freigegebene Portalansichten",
     "portalCustomer.readOnly.body":
       "Dieses Portal zeigt nur kundenbezogene, freigegebene und schreibgeschützte Ausgaben. Nicht umgesetzte Quellmodule bleiben als explizite Leerstelle sichtbar.",
@@ -2189,6 +2223,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.settings.title": "Sichere Einstellungen",
     "coreAdmin.settings.empty": "Es sind noch keine Einstellungen vorhanden.",
     "coreAdmin.settings.version": "Version",
+    "coreAdmin.settings.customerPortalPolicyEyebrow": "Kundenportal",
+    "coreAdmin.settings.customerPortalPolicyTitle": "Mandantenrichtlinie für Wachbuch-Rückmeldungen",
+    "coreAdmin.settings.customerPortalPolicyBody":
+      "Steuert, ob freigegebene Kundenportal-Nutzer zusätzlich zu ihrer Lesesicht auch Rückmeldungen in freigegebenen Wachbüchern erfassen dürfen.",
+    "coreAdmin.settings.customerPortalPolicyEnabled": "Kundenrückmeldungen aktiviert",
+    "coreAdmin.settings.customerPortalPolicyDisabled": "Kundenrückmeldungen deaktiviert",
+    "coreAdmin.settings.enableCustomerWatchbookFeedback": "Kundenrückmeldungen aktivieren",
+    "coreAdmin.settings.disableCustomerWatchbookFeedback": "Kundenrückmeldungen deaktivieren",
     "coreAdmin.fields.tenantCode": "Mandantencode",
     "coreAdmin.fields.tenantName": "Mandantenname",
     "coreAdmin.fields.legalName": "Rechtlicher Name",
@@ -2746,6 +2788,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "route.portal.customer.title": "Customer portal",
     "route.portal.customer.description":
       "Released orders, reports, times, and documents.",
+    "route.portal.customerOverview.title": "Overview",
+    "route.portal.customerOrders.title": "Orders",
+    "route.portal.customerSchedules.title": "Schedules",
+    "route.portal.customerWatchbooks.title": "Watchbooks",
+    "route.portal.customerTimesheets.title": "Timesheets",
+    "route.portal.customerInvoices.title": "Invoices",
+    "route.portal.customerReports.title": "Reports",
+    "route.portal.customerHistory.title": "History",
     "route.portal.subcontractor.title": "Subcontractor portal",
     "route.portal.subcontractor.description":
       "Released assignments, workers, and feedback within released scope.",
@@ -2962,11 +3012,18 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalCustomer.access.title": "What you can view and do here",
     "portalCustomer.access.body":
       "This overview makes your released portal rights explicit: only customer-scoped released outputs, without internal staffing detail.",
+    "portalCustomer.access.base.label": "Base customer portal access",
+    "portalCustomer.access.base.body":
+      "Login, customer scope resolution, and linked contact access are already active once portal provisioning has completed successfully.",
     "portalCustomer.access.states.available": "Available",
     "portalCustomer.access.states.readOnly": "Read-only",
     "portalCustomer.access.states.enabled": "Enabled",
     "portalCustomer.access.states.notEnabled": "Not enabled",
     "portalCustomer.access.states.pendingIntegration": "Pending integration",
+    "portalCustomer.pages.readOnlyNotice":
+      "This page is currently read-only. Customer order creation is not available in the portal yet.",
+    "portalCustomer.pages.downloadNotice":
+      "This page is document-backed and released. You can download existing files here, but you cannot create new finance documents.",
     "portalCustomer.readOnly.title": "Released portal views only",
     "portalCustomer.readOnly.body":
       "This portal shows only customer-scoped, released, read-only outputs. Source modules that are not implemented yet stay visible as explicit empty-state contracts.",
@@ -3650,6 +3707,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.settings.title": "Safe settings editor",
     "coreAdmin.settings.empty": "No settings exist yet.",
     "coreAdmin.settings.version": "Version",
+    "coreAdmin.settings.customerPortalPolicyEyebrow": "Customer portal",
+    "coreAdmin.settings.customerPortalPolicyTitle": "Tenant watchbook feedback policy",
+    "coreAdmin.settings.customerPortalPolicyBody":
+      "Controls whether provisioned customer portal users may add feedback to released watchbooks in addition to their base read access.",
+    "coreAdmin.settings.customerPortalPolicyEnabled": "Customer feedback enabled",
+    "coreAdmin.settings.customerPortalPolicyDisabled": "Customer feedback disabled",
+    "coreAdmin.settings.enableCustomerWatchbookFeedback": "Enable customer feedback",
+    "coreAdmin.settings.disableCustomerWatchbookFeedback": "Disable customer feedback",
     "coreAdmin.fields.tenantCode": "Tenant code",
     "coreAdmin.fields.tenantName": "Tenant name",
     "coreAdmin.fields.legalName": "Legal name",

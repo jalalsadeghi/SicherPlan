@@ -39,6 +39,14 @@
   "portal": {
     "title": "Portals",
     "customer": "Customer portal",
+    "customerOverview": "Overview",
+    "customerOrders": "Orders",
+    "customerSchedules": "Schedules",
+    "customerWatchbooks": "Watchbooks",
+    "customerTimesheets": "Timesheets",
+    "customerInvoices": "Invoices",
+    "customerReports": "Reports",
+    "customerHistory": "History",
     "subcontractor": "Subcontractor portal"
   },
   "public": {
