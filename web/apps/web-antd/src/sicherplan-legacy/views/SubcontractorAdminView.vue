@@ -1,6 +1,6 @@
 <template>
   <section class="subcontractor-admin-page">
-    <section class="module-card subcontractor-admin-hero">
+    <section v-if="!props.embedded" class="module-card subcontractor-admin-hero">
       <div>
         <p class="eyebrow">{{ t("sicherplan.subcontractors.eyebrow") }}</p>
         <h2>{{ t("sicherplan.subcontractors.title") }}</h2>
@@ -47,7 +47,7 @@
     </section>
 
     <div v-else class="subcontractor-admin-grid">
-      <section class="module-card subcontractor-admin-panel">
+      <section class="module-card subcontractor-admin-panel subcontractor-admin-list-panel" data-testid="subcontractor-list-section">
         <div class="subcontractor-admin-panel__header">
           <div>
             <p class="eyebrow">{{ t("sicherplan.subcontractors.list.eyebrow") }}</p>
@@ -111,7 +111,7 @@
         <p v-else class="subcontractor-admin-list-empty">{{ t("sicherplan.subcontractors.list.empty") }}</p>
       </section>
 
-      <section class="module-card subcontractor-admin-panel subcontractor-admin-detail">
+      <section class="module-card subcontractor-admin-panel subcontractor-admin-detail" data-testid="subcontractor-detail-workspace">
         <div class="subcontractor-admin-panel__header">
           <div>
             <p class="eyebrow">{{ t("sicherplan.subcontractors.detail.eyebrow") }}</p>
@@ -119,14 +119,30 @@
               {{
                 isCreatingSubcontractor
                   ? t("sicherplan.subcontractors.detail.newTitle")
-                  : selectedSubcontractor?.display_name || selectedSubcontractor?.legal_name || t("sicherplan.subcontractors.detail.emptyTitle")
+                  : selectedSubcontractor?.display_name || selectedSubcontractor?.legal_name || t("sicherplan.subcontractors.detail.workspaceTitle")
               }}
             </h3>
+            <p class="field-help">{{ t("sicherplan.subcontractors.detail.workspaceLead") }}</p>
           </div>
           <StatusBadge v-if="selectedSubcontractor && !isCreatingSubcontractor" :status="selectedSubcontractor.status" />
         </div>
 
-        <template v-if="isCreatingSubcontractor || selectedSubcontractor">
+        <nav class="subcontractor-admin-tabs" aria-label="Subcontractor detail sections" data-testid="subcontractor-detail-tabs">
+          <button
+            v-for="tab in subcontractorDetailTabs"
+            :key="tab.id"
+            type="button"
+            class="subcontractor-admin-tab"
+            :class="{ active: tab.id === activeDetailTab }"
+            :data-testid="`subcontractor-tab-${tab.id}`"
+            @click="activeDetailTab = tab.id"
+          >
+            {{ tab.label }}
+          </button>
+        </nav>
+
+        <template v-if="hasDetailWorkspace">
+          <section v-if="activeDetailTab === 'overview'" class="subcontractor-admin-tab-panel" data-testid="subcontractor-tab-panel-overview">
           <div v-if="selectedSubcontractor && !isCreatingSubcontractor" class="subcontractor-admin-summary">
             <article class="subcontractor-admin-summary__card">
               <span>{{ t("sicherplan.subcontractors.summary.primaryContact") }}</span>
@@ -214,8 +230,13 @@
               </button>
             </div>
           </form>
+          </section>
 
-          <section v-if="selectedSubcontractor && !isCreatingSubcontractor" class="subcontractor-admin-section">
+          <section
+            v-if="selectedSubcontractor && !isCreatingSubcontractor && activeDetailTab === 'contacts'"
+            class="subcontractor-admin-section"
+            data-testid="subcontractor-tab-panel-contacts"
+          >
             <div class="subcontractor-admin-panel__header">
               <div>
                 <p class="eyebrow">{{ t("sicherplan.subcontractors.contacts.eyebrow") }}</p>
@@ -298,7 +319,43 @@
             </form>
           </section>
 
-          <section v-if="selectedSubcontractor && !isCreatingSubcontractor" class="subcontractor-admin-section">
+          <section
+            v-if="selectedSubcontractor && !isCreatingSubcontractor && activeDetailTab === 'addresses'"
+            class="subcontractor-admin-section subcontractor-admin-section--placeholder"
+            data-testid="subcontractor-tab-panel-addresses"
+          >
+            <div class="subcontractor-admin-panel__header">
+              <div>
+                <p class="eyebrow">{{ t("sicherplan.subcontractors.placeholders.addresses.eyebrow") }}</p>
+                <h3>{{ t("sicherplan.subcontractors.placeholders.addresses.title") }}</h3>
+              </div>
+            </div>
+            <div class="subcontractor-admin-empty-state">
+              <p>{{ t("sicherplan.subcontractors.placeholders.addresses.body") }}</p>
+            </div>
+          </section>
+
+          <section
+            v-if="selectedSubcontractor && !isCreatingSubcontractor && activeDetailTab === 'commercial'"
+            class="subcontractor-admin-section subcontractor-admin-section--placeholder"
+            data-testid="subcontractor-tab-panel-commercial"
+          >
+            <div class="subcontractor-admin-panel__header">
+              <div>
+                <p class="eyebrow">{{ t("sicherplan.subcontractors.placeholders.commercial.eyebrow") }}</p>
+                <h3>{{ t("sicherplan.subcontractors.placeholders.commercial.title") }}</h3>
+              </div>
+            </div>
+            <div class="subcontractor-admin-empty-state">
+              <p>{{ t("sicherplan.subcontractors.placeholders.commercial.body") }}</p>
+            </div>
+          </section>
+
+          <section
+            v-if="selectedSubcontractor && !isCreatingSubcontractor && activeDetailTab === 'scope_release'"
+            class="subcontractor-admin-section"
+            data-testid="subcontractor-tab-panel-scope-release"
+          >
             <div class="subcontractor-admin-panel__header">
               <div>
                 <p class="eyebrow">{{ t("sicherplan.subcontractors.scopeSection.eyebrow") }}</p>
@@ -359,7 +416,11 @@
             </form>
           </section>
 
-          <section v-if="selectedSubcontractor && !isCreatingSubcontractor && canReadFinance" class="subcontractor-admin-section">
+          <section
+            v-if="selectedSubcontractor && !isCreatingSubcontractor && activeDetailTab === 'billing'"
+            class="subcontractor-admin-section"
+            data-testid="subcontractor-tab-panel-billing"
+          >
             <div class="subcontractor-admin-panel__header">
               <div>
                 <p class="eyebrow">{{ t("sicherplan.subcontractors.finance.eyebrow") }}</p>
@@ -367,7 +428,11 @@
               </div>
             </div>
 
-            <form class="subcontractor-admin-form" @submit.prevent="submitFinanceProfile">
+            <div v-if="!canReadFinance" class="subcontractor-admin-empty-state">
+              <p>{{ t("sicherplan.subcontractors.permission.missingBody") }}</p>
+            </div>
+
+            <form v-else class="subcontractor-admin-form" @submit.prevent="submitFinanceProfile">
               <div class="subcontractor-admin-form-grid">
                 <label class="field-stack">
                   <span>{{ t("sicherplan.subcontractors.fields.invoiceEmail") }}</span>
@@ -430,7 +495,11 @@
             </form>
           </section>
 
-          <section v-if="selectedSubcontractor && !isCreatingSubcontractor" class="subcontractor-admin-section">
+          <section
+            v-if="selectedSubcontractor && !isCreatingSubcontractor && activeDetailTab === 'history'"
+            class="subcontractor-admin-section"
+            data-testid="subcontractor-tab-panel-history"
+          >
             <div class="subcontractor-admin-panel__header">
               <div>
                 <p class="eyebrow">{{ t("sicherplan.subcontractors.history.eyebrow") }}</p>
@@ -542,7 +611,7 @@
           </section>
 
           <SubcontractorWorkforcePanel
-            v-if="selectedSubcontractor && !isCreatingSubcontractor && resolvedTenantScopeId && accessToken"
+            v-if="selectedSubcontractor && !isCreatingSubcontractor && activeDetailTab === 'workforce' && resolvedTenantScopeId && accessToken"
             :tenant-id="resolvedTenantScopeId"
             :subcontractor-id="selectedSubcontractor.id"
             :access-token="accessToken"
@@ -551,7 +620,7 @@
           />
         </template>
 
-        <section v-else class="subcontractor-admin-empty">
+        <section v-else class="subcontractor-admin-empty-state">
           <p class="eyebrow">{{ t("sicherplan.subcontractors.detail.emptyEyebrow") }}</p>
           <h3>{{ t("sicherplan.subcontractors.detail.emptyBody") }}</h3>
         </section>
@@ -612,6 +681,14 @@ import {
 
 const { t } = useI18n();
 const authStore = useAuthStore();
+const props = withDefaults(
+  defineProps<{
+    embedded?: boolean;
+  }>(),
+  {
+    embedded: false,
+  },
+);
 
 const filters = reactive({
   search: "",
@@ -643,6 +720,7 @@ const selectedContactId = ref("");
 const selectedScopeId = ref("");
 const selectedHistoryEntryId = ref("");
 const isCreatingSubcontractor = ref(false);
+const activeDetailTab = ref("overview");
 const tenantScopeInput = ref(authStore.tenantScopeId);
 const historyAttachmentFile = ref<File | null>(null);
 
@@ -728,6 +806,23 @@ const canWrite = computed(() => hasSubcontractorPermission(activeRole.value, "su
 const canReadFinance = computed(() => hasSubcontractorPermission(activeRole.value, "subcontractors.finance.read"));
 const canWriteFinance = computed(() => hasSubcontractorPermission(activeRole.value, "subcontractors.finance.write"));
 const actionState = computed(() => deriveSubcontractorActionState(activeRole.value, selectedSubcontractor.value));
+const hasDetailWorkspace = computed(() => isCreatingSubcontractor.value || !!selectedSubcontractor.value);
+const detailTabLabelKeys = {
+  overview: "sicherplan.subcontractors.tabs.overview",
+  contacts: "sicherplan.subcontractors.tabs.contacts",
+  addresses: "sicherplan.subcontractors.tabs.addresses",
+  commercial: "sicherplan.subcontractors.tabs.commercial",
+  scope_release: "sicherplan.subcontractors.tabs.scopeRelease",
+  billing: "sicherplan.subcontractors.tabs.billing",
+  history: "sicherplan.subcontractors.tabs.history",
+  workforce: "sicherplan.subcontractors.tabs.workforce",
+} as const;
+const subcontractorDetailTabs = computed(() =>
+  Object.entries(detailTabLabelKeys).map(([id, labelKey]) => ({
+    id,
+    label: t(labelKey as never),
+  })),
+);
 const selectedHistoryEntry = computed(() =>
   historyEntries.value.find((entry) => entry.id === selectedHistoryEntryId.value) ?? null,
 );
@@ -927,6 +1022,7 @@ async function loadSelectedSubcontractor(subcontractorId: string) {
 
 async function selectSubcontractor(subcontractorId: string) {
   isCreatingSubcontractor.value = false;
+  activeDetailTab.value = "overview";
   selectedSubcontractorId.value = subcontractorId;
   selectedContactId.value = "";
   selectedScopeId.value = "";
@@ -935,6 +1031,7 @@ async function selectSubcontractor(subcontractorId: string) {
 
 function startCreateSubcontractor() {
   isCreatingSubcontractor.value = true;
+  activeDetailTab.value = "overview";
   selectedSubcontractorId.value = "";
   selectedSubcontractor.value = null;
   contacts.value = [];
@@ -1304,9 +1401,17 @@ onMounted(async () => {
   gap: 1rem;
 }
 
+.subcontractor-admin-page {
+  gap: var(--sp-page-gap, 1.25rem);
+}
+
 .subcontractor-admin-grid {
-  grid-template-columns: minmax(320px, 0.95fr) minmax(420px, 1.25fr);
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
   align-items: start;
+}
+
+.subcontractor-admin-list-panel {
+  align-self: start;
 }
 
 .subcontractor-admin-hero,
@@ -1329,8 +1434,8 @@ onMounted(async () => {
 .subcontractor-admin-meta__pill,
 .subcontractor-admin-summary__card,
 .subcontractor-admin-row {
-  padding: 0.8rem 1rem;
-  border-radius: 16px;
+  padding: 1rem;
+  border-radius: 18px;
   border: 1px solid var(--sp-color-border-soft);
   background: var(--sp-color-surface-page);
 }
@@ -1350,6 +1455,45 @@ onMounted(async () => {
   display: grid;
   gap: 0.85rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.subcontractor-admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.subcontractor-admin-tab {
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-page);
+  color: var(--sp-color-text-secondary);
+  border-radius: 999px;
+  padding: 0.6rem 1rem;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.subcontractor-admin-tab.active {
+  border-color: var(--sp-color-primary);
+  color: var(--sp-color-primary-strong);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 70%, white);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 28%, transparent);
+}
+
+.subcontractor-admin-tab:focus-visible {
+  outline: none;
+  border-color: var(--sp-color-primary);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
+.subcontractor-admin-tab-panel {
+  display: grid;
+  gap: 1rem;
 }
 
 .field-stack {
@@ -1434,6 +1578,15 @@ onMounted(async () => {
 .subcontractor-admin-empty {
   display: grid;
   gap: 1rem;
+}
+
+.subcontractor-admin-empty-state {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-page);
 }
 
 .subcontractor-admin-feedback {

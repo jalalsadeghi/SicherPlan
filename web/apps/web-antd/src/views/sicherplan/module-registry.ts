@@ -179,6 +179,7 @@ export const moduleRegistry: Record<string, ModuleConfig> = {
       { labelKey: 'sicherplan.ui.stats.visibility', valueKey: 'sicherplan.ui.values.leastPrivilege' },
       { labelKey: 'sicherplan.ui.stats.evidence', valueKey: 'sicherplan.ui.values.documentLinked' },
     ],
+    showWorkspaceSectionHeader: false,
     titleKey: 'sicherplan.admin.subcontractors',
     workspaceDescriptionKey: 'sicherplan.ui.modules.subcontractors.workspace',
   },

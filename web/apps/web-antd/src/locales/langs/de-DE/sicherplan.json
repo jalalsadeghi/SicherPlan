@@ -350,9 +350,21 @@
     "detail": {
       "eyebrow": "Detailansicht",
       "newTitle": "Neuen Subunternehmer anlegen",
+      "workspaceTitle": "Subunternehmerakte",
+      "workspaceLead": "Pflegen Sie Stammdaten, Freigaben und Historie des ausgewählten Partnerunternehmens in einer zusammenhängenden Arbeitsfläche.",
       "emptyTitle": "Kein Subunternehmer ausgewählt",
       "emptyEyebrow": "Details",
       "emptyBody": "Wählen Sie links einen Subunternehmer aus oder legen Sie einen neuen Datensatz an."
+    },
+    "tabs": {
+      "overview": "Übersicht",
+      "contacts": "Kontakte",
+      "addresses": "Adressen",
+      "commercial": "Kaufmännisch",
+      "scopeRelease": "Scope-Freigabe",
+      "billing": "Abrechnung",
+      "history": "Historie",
+      "workforce": "Belegschaft"
     },
     "filters": {
       "search": "Suche",
@@ -451,6 +463,18 @@
         "manual_commentary": "Freier Kommentar",
         "portal_enablement_note": "Portalhinweis",
         "lifecycle_event": "Lifecycle-Ereignis"
+      }
+    },
+    "placeholders": {
+      "addresses": {
+        "eyebrow": "Adressverwaltung",
+        "title": "Adresspflege folgt im selben Detailrahmen",
+        "body": "Die Adressbearbeitung wird in einer kommenden Ausbaustufe in diese Detailfläche integriert. Die bestehende Backend-Logik bleibt unverändert."
+      },
+      "commercial": {
+        "eyebrow": "Kaufmännischer Rahmen",
+        "title": "Weitere kaufmännische Bereiche folgen modular",
+        "body": "Zusätzliche kaufmännische Subunternehmerbereiche werden später in diese Registeransicht eingebettet. Die aktuelle Finanz- und Historienfunktion bleibt unverändert verfügbar."
       }
     },
     "actions": {

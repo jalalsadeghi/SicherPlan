@@ -350,9 +350,21 @@
     "detail": {
       "eyebrow": "Detail view",
       "newTitle": "Create a subcontractor",
+      "workspaceTitle": "Subcontractor detail",
+      "workspaceLead": "Maintain the selected partner company across master data, releases, and history in one consistent workspace.",
       "emptyTitle": "No subcontractor selected",
       "emptyEyebrow": "Details",
       "emptyBody": "Select a subcontractor on the left or create a new record."
+    },
+    "tabs": {
+      "overview": "Overview",
+      "contacts": "Contacts",
+      "addresses": "Addresses",
+      "commercial": "Commercial",
+      "scopeRelease": "Scope Release",
+      "billing": "Billing",
+      "history": "History",
+      "workforce": "Workforce"
     },
     "filters": {
       "search": "Search",
@@ -451,6 +463,18 @@
         "manual_commentary": "Manual commentary",
         "portal_enablement_note": "Portal note",
         "lifecycle_event": "Lifecycle event"
+      }
+    },
+    "placeholders": {
+      "addresses": {
+        "eyebrow": "Address management",
+        "title": "Address maintenance will land in this detail shell",
+        "body": "Address editing will be integrated into this workspace in a later frontend step. Existing backend behavior remains unchanged."
+      },
+      "commercial": {
+        "eyebrow": "Commercial frame",
+        "title": "Additional commercial sections will follow modularly",
+        "body": "Further commercial subcontractor sections will be added into this tabbed workspace later. Current finance and history behavior remains available."
       }
     },
     "actions": {
