@@ -1,6 +1,11 @@
 export const CUSTOMER_PERMISSION_MATRIX = {
   platform_admin: ["customers.customer.read", "customers.customer.write"],
-  tenant_admin: ["customers.customer.read", "customers.customer.write"],
+  tenant_admin: [
+    "customers.customer.read",
+    "customers.customer.write",
+    "customers.portal_access.read",
+    "customers.portal_access.write",
+  ],
   dispatcher: ["customers.customer.read"],
   accounting: ["customers.customer.read"],
   controller_qm: ["customers.customer.read"],
@@ -214,7 +219,12 @@ export function mapCustomerApiMessage(messageKey) {
     "errors.customers.contact.duplicate_email": "customerAdmin.feedback.duplicateEmail",
     "errors.customers.contact.primary_conflict": "customerAdmin.feedback.primaryConflict",
     "errors.customers.customer_address.default_conflict": "customerAdmin.feedback.defaultAddressConflict",
+    "errors.customers.contact.invalid_user_id_format": "customerAdmin.feedback.invalidPortalUserFormat",
     "errors.customers.contact.invalid_user_scope": "customerAdmin.feedback.invalidPortalUser",
+    "errors.customers.portal_access.contact_already_linked": "customerAdmin.feedback.portalAccessAlreadyLinked",
+    "errors.customers.portal_access.contact_customer_mismatch": "customerAdmin.feedback.portalAccessContactMismatch",
+    "errors.customers.portal.contact_inactive": "customerAdmin.feedback.portalAccessContactInactive",
+    "errors.customers.portal.customer_inactive": "customerAdmin.feedback.portalAccessCustomerInactive",
   };
 
   return messageMap[messageKey] ?? "customerAdmin.feedback.error";

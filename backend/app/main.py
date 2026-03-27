@@ -15,6 +15,7 @@ from app.logging_utils import configure_logging
 from app.middleware import RequestContextMiddleware
 from app.modules.core.admin_router import router as core_admin_router
 from app.modules.customers.router import router as customers_router
+from app.modules.customers.portal_access_router import router as customer_portal_access_router
 from app.modules.customers.portal_router import router as customer_portal_router
 from app.modules.employees.router import router as employees_router
 from app.modules.employees.self_service_router import router as employee_self_service_router
@@ -77,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(core_admin_router)
     app.include_router(customers_router)
+    app.include_router(customer_portal_access_router)
     app.include_router(customer_portal_router)
     app.include_router(employees_router)
     app.include_router(employee_self_service_router)

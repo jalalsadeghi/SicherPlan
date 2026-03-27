@@ -758,6 +758,53 @@ class CustomerPortalPrivacyUpdate(BaseModel):
     person_names_released: bool
 
 
+class CustomerPortalAccessListItemRead(BaseModel):
+    user_id: str
+    contact_id: str
+    contact_name: str
+    username: str
+    email: str
+    full_name: str
+    locale: str
+    role_key: str
+    status: str
+    role_assignment_status: str
+    is_password_login_enabled: bool
+    last_login_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CustomerPortalAccessCreate(BaseModel):
+    tenant_id: str
+    customer_id: str
+    contact_id: str
+    username: str
+    email: str
+    full_name: str
+    locale: str = "de"
+    timezone: str = "Europe/Berlin"
+    status: str = "active"
+    temporary_password: str | None = None
+
+
+class CustomerPortalAccessStatusUpdate(BaseModel):
+    status: str = Field(pattern="^(active|inactive)$")
+
+
+class CustomerPortalAccessPasswordResetRequest(BaseModel):
+    temporary_password: str | None = None
+
+
+class CustomerPortalAccessPasswordResetResponse(BaseModel):
+    message_key: str
+    temporary_password: str
+
+
+class CustomerPortalAccessUnlinkResponse(BaseModel):
+    message_key: str
+
+
 class CustomerLoginHistoryEntryRead(BaseModel):
     id: str
     user_account_id: str | None = None

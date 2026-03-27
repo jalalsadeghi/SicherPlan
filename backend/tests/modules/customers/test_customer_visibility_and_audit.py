@@ -19,7 +19,7 @@ from app.modules.iam.audit_service import AuditService
 from app.modules.iam.auth_schemas import AuthenticatedRoleScope
 from app.modules.iam.authz import RequestAuthorizationContext
 from app.modules.platform_services.integration_models import ImportExportJob
-from tests.modules.customers.test_customer_backbone import FakeCustomerRepository
+from tests.modules.customers.test_customer_backbone import PORTAL_USER_ID, FakeCustomerRepository
 from tests.modules.customers.test_customer_ops import FakeDocumentService, FakeIntegrationRepository, _csv_base64
 
 
@@ -104,10 +104,10 @@ class TestCustomerVisibilityAndAudit(unittest.TestCase):
             document_service=self.document_service,
             audit_service=self.audit_service,
         )
-        self.repository.users["portal-user"] = type(
+        self.repository.users[PORTAL_USER_ID] = type(
             "FakeUser",
             (),
-            {"id": "portal-user", "tenant_id": "tenant-1", "archived_at": None},
+            {"id": PORTAL_USER_ID, "tenant_id": "tenant-1", "archived_at": None},
         )()
         self.actor = _internal_actor()
         self.customer = self.service.create_customer(
@@ -155,7 +155,7 @@ class TestCustomerVisibilityAndAudit(unittest.TestCase):
             "tenant-1",
             self.customer.id,
             contact.id,
-            CustomerContactUpdate(user_id="portal-user", version_no=contact.version_no),
+            CustomerContactUpdate(user_id=PORTAL_USER_ID, version_no=contact.version_no),
             self.actor,
         )
 

@@ -26,6 +26,9 @@ from app.modules.customers.service import CustomerService
 from app.modules.iam.auth_schemas import AuthenticatedRoleScope
 from app.modules.iam.authz import RequestAuthorizationContext
 
+PORTAL_USER_ID = "11111111-1111-4111-8111-111111111111"
+FOREIGN_PORTAL_USER_ID = "22222222-2222-4222-8222-222222222222"
+
 
 @dataclass
 class FakeLookup:
@@ -195,7 +198,7 @@ class FakeCustomerRepository:
         }
         self.branches = {"branch-1": FakeBranch("branch-1", "tenant-1")}
         self.mandates = {"mandate-1": FakeMandate("mandate-1", "tenant-1", "branch-1")}
-        self.users = {"user-portal": FakeUser("user-portal", "tenant-1")}
+        self.users = {PORTAL_USER_ID: FakeUser(PORTAL_USER_ID, "tenant-1")}
         self.addresses = {"address-1": FakeAddress("address-1")}
         self.customers: dict[str, FakeCustomer] = {}
 
@@ -655,7 +658,7 @@ class TestCustomerService(unittest.TestCase):
                 full_name="Alex Kunde",
                 email="alex@example.invalid",
                 is_primary_contact=True,
-                user_id="user-portal",
+                user_id=PORTAL_USER_ID,
             ),
             _actor(),
         )
@@ -673,10 +676,69 @@ class TestCustomerService(unittest.TestCase):
         )
         detail = self.service.get_customer("tenant-1", self.customer.id, _actor())
 
-        self.assertEqual(contact.user_id, "user-portal")
+        self.assertEqual(contact.user_id, PORTAL_USER_ID)
         self.assertTrue(address.is_default)
         self.assertEqual(len(detail.contacts), 1)
         self.assertEqual(len(detail.addresses), 1)
+
+    def test_contact_create_without_portal_user_id_succeeds(self) -> None:
+        contact = self.service.create_contact(
+            "tenant-1",
+            self.customer.id,
+            CustomerContactCreate(
+                tenant_id="tenant-1",
+                customer_id=self.customer.id,
+                full_name="Kontakt Ohne Portal",
+                email="kontakt@example.invalid",
+            ),
+            _actor(),
+        )
+
+        self.assertIsNone(contact.user_id)
+
+    def test_non_uuid_portal_user_id_is_rejected_on_create(self) -> None:
+        with self.assertRaises(ApiException) as context:
+            self.service.create_contact(
+                "tenant-1",
+                self.customer.id,
+                CustomerContactCreate(
+                    tenant_id="tenant-1",
+                    customer_id=self.customer.id,
+                    full_name="Ungueltige Verknuepfung",
+                    user_id="Customer001",
+                ),
+                _actor(),
+            )
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertEqual(context.exception.code, "customers.validation.portal_user_id_format")
+        self.assertEqual(context.exception.message_key, "errors.customers.contact.invalid_user_id_format")
+
+    def test_non_uuid_portal_user_id_is_rejected_on_update(self) -> None:
+        contact = self.service.create_contact(
+            "tenant-1",
+            self.customer.id,
+            CustomerContactCreate(
+                tenant_id="tenant-1",
+                customer_id=self.customer.id,
+                full_name="Bestehender Kontakt",
+                user_id=PORTAL_USER_ID,
+            ),
+            _actor(),
+        )
+
+        with self.assertRaises(ApiException) as context:
+            self.service.update_contact(
+                "tenant-1",
+                self.customer.id,
+                contact.id,
+                CustomerContactUpdate(user_id="Customer001", version_no=contact.version_no),
+                _actor(),
+            )
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertEqual(context.exception.code, "customers.validation.portal_user_id_format")
+        self.assertEqual(context.exception.message_key, "errors.customers.contact.invalid_user_id_format")
 
     def test_duplicate_customer_number_is_rejected(self) -> None:
         with self.assertRaises(ApiException) as context:
@@ -766,7 +828,7 @@ class TestCustomerService(unittest.TestCase):
         self.assertEqual(context.exception.code, "customers.conflict.default_address")
 
     def test_portal_user_link_must_match_tenant_scope(self) -> None:
-        self.repository.users["user-foreign"] = FakeUser("user-foreign", "tenant-2")
+        self.repository.users[FOREIGN_PORTAL_USER_ID] = FakeUser(FOREIGN_PORTAL_USER_ID, "tenant-2")
 
         with self.assertRaises(ApiException) as context:
             self.service.create_contact(
@@ -776,7 +838,7 @@ class TestCustomerService(unittest.TestCase):
                     tenant_id="tenant-1",
                     customer_id=self.customer.id,
                     full_name="Fremd Nutzer",
-                    user_id="user-foreign",
+                    user_id=FOREIGN_PORTAL_USER_ID,
                 ),
                 _actor(),
             )

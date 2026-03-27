@@ -23,6 +23,7 @@ import {
 test("tenant admin has read and write permissions", () => {
   assert.equal(hasCustomerPermission("tenant_admin", "customers.customer.read"), true);
   assert.equal(hasCustomerPermission("tenant_admin", "customers.customer.write"), true);
+  assert.equal(hasCustomerPermission("tenant_admin", "customers.portal_access.write"), true);
   assert.equal(hasCustomerPermission("accounting", "customers.customer.read"), true);
   assert.equal(hasCustomerPermission("dispatcher", "customers.customer.read"), true);
   assert.equal(hasCustomerPermission("controller_qm", "customers.customer.read"), true);
@@ -89,6 +90,14 @@ test("api message keys are mapped to customer-admin feedback keys", () => {
   assert.equal(
     mapCustomerApiMessage("errors.customers.customer.duplicate_number"),
     "customerAdmin.feedback.duplicateNumber",
+  );
+  assert.equal(
+    mapCustomerApiMessage("errors.customers.contact.invalid_user_id_format"),
+    "customerAdmin.feedback.invalidPortalUserFormat",
+  );
+  assert.equal(
+    mapCustomerApiMessage("errors.customers.portal_access.contact_already_linked"),
+    "customerAdmin.feedback.portalAccessAlreadyLinked",
   );
   assert.equal(mapCustomerApiMessage("errors.platform.internal"), "customerAdmin.feedback.error");
 });

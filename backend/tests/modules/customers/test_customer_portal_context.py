@@ -8,7 +8,7 @@ from app.modules.customers.schemas import CustomerContactCreate, CustomerCreate,
 from app.modules.customers.service import CustomerService
 from app.modules.iam.auth_schemas import AuthenticatedRoleScope
 from app.modules.iam.authz import RequestAuthorizationContext
-from tests.modules.customers.test_customer_backbone import FakeCustomerRepository
+from tests.modules.customers.test_customer_backbone import PORTAL_USER_ID, FakeCustomerRepository
 
 
 def _internal_actor() -> RequestAuthorizationContext:
@@ -25,7 +25,7 @@ def _internal_actor() -> RequestAuthorizationContext:
 
 def _portal_actor(
     *,
-    user_id: str = "user-portal",
+    user_id: str = PORTAL_USER_ID,
     customer_id: str,
     permission_keys: tuple[str, ...] = ("portal.customer.access",),
 ) -> RequestAuthorizationContext:
@@ -58,7 +58,7 @@ class TestCustomerPortalContext(unittest.TestCase):
                 customer_id=self.customer.id,
                 full_name="Alex Kunde",
                 email="alex@example.invalid",
-                user_id="user-portal",
+                user_id=PORTAL_USER_ID,
                 is_primary_contact=True,
             ),
             _internal_actor(),
@@ -76,7 +76,7 @@ class TestCustomerPortalContext(unittest.TestCase):
     def test_missing_customer_scope_is_rejected(self) -> None:
         actor = RequestAuthorizationContext(
             session_id="session-customer",
-            user_id="user-portal",
+            user_id=PORTAL_USER_ID,
             tenant_id="tenant-1",
             role_keys=frozenset({"customer_user"}),
             permission_keys=frozenset({"portal.customer.access"}),

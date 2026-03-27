@@ -6,7 +6,7 @@ from app.modules.customers.portal_read_service import CustomerPortalReadService
 from app.modules.customers.portal_service import CustomerPortalService
 from app.modules.customers.schemas import CustomerContactCreate, CustomerCreate
 from app.modules.customers.service import CustomerService
-from tests.modules.customers.test_customer_backbone import FakeCustomerRepository
+from tests.modules.customers.test_customer_backbone import PORTAL_USER_ID, FakeCustomerRepository
 from tests.modules.customers.test_customer_portal_context import _internal_actor, _portal_actor
 
 
@@ -29,7 +29,7 @@ class TestCustomerPortalReadModels(unittest.TestCase):
                 customer_id=self.customer.id,
                 full_name="Riley Portal",
                 email="portal@example.invalid",
-                user_id="user-portal",
+                user_id=PORTAL_USER_ID,
                 is_primary_contact=True,
             ),
             _internal_actor(),

@@ -426,10 +426,11 @@
                   <span>{{ t("customerAdmin.fields.mobile") }}</span>
                   <input v-model="contactDraft.mobile" />
                 </label>
-                <label class="field-stack field-stack--half">
-                  <span>{{ t("customerAdmin.fields.userId") }}</span>
-                  <input v-model="contactDraft.user_id" />
-                </label>
+                <div class="field-stack field-stack--half">
+                  <span>{{ t("customerAdmin.contacts.portalAccessLabel") }}</span>
+                  <strong>{{ contactPortalAccessSummary }}</strong>
+                  <p class="field-help">{{ t("customerAdmin.contacts.portalAccessHelp") }}</p>
+                </div>
                 <label class="field-stack field-stack--wide">
                   <span>{{ t("customerAdmin.fields.notes") }}</span>
                   <textarea v-model="contactDraft.notes" rows="3" />
@@ -1127,6 +1128,110 @@
                 </div>
               </section>
 
+              <section
+                v-if="canManagePortalAccess"
+                class="customer-admin-form-section"
+                data-testid="customer-portal-access-section"
+              >
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.portalAccess.eyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.portalAccess.title") }}</h4>
+                </div>
+                <p class="field-help">{{ t("customerAdmin.portalAccess.lead") }}</p>
+                <div
+                  v-if="portalAccessGeneratedPassword"
+                  class="customer-admin-feedback customer-admin-feedback--success"
+                  data-tone="success"
+                >
+                  <div>
+                    <strong>{{ t("customerAdmin.portalAccess.generatedPasswordTitle") }}</strong>
+                    <span>{{ portalAccessGeneratedPassword }}</span>
+                  </div>
+                  <button type="button" @click="portalAccessGeneratedPassword = ''">
+                    {{ t("customerAdmin.actions.clearFeedback") }}
+                  </button>
+                </div>
+                <div class="cta-row">
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    :disabled="!canManagePortalAccess"
+                    @click="refreshCustomerPortalAccess"
+                  >
+                    {{ t("customerAdmin.actions.refreshPortalAccess") }}
+                  </button>
+                  <button
+                    class="cta-button"
+                    type="button"
+                    :disabled="loading.portalAccess || !portalAccessAvailableContacts.length"
+                    @click="openPortalAccessCreateModal"
+                  >
+                    {{ t("customerAdmin.actions.createPortalAccess") }}
+                  </button>
+                </div>
+                <p v-if="!portalAccessAvailableContacts.length" class="customer-admin-list-empty">
+                  {{ t("customerAdmin.portalAccess.noContactsHint") }}
+                </p>
+                <div
+                  v-else-if="customerPortalAccessAccounts.length"
+                  class="customer-admin-record-list"
+                  data-testid="customer-portal-access-list"
+                >
+                  <article
+                    v-for="account in customerPortalAccessAccounts"
+                    :key="account.user_id"
+                    class="customer-admin-record customer-admin-record--stacked"
+                  >
+                    <div class="customer-admin-record__body">
+                      <strong>{{ account.contact_name }} · {{ account.username }}</strong>
+                      <span class="customer-admin-record__meta">
+                        {{ [account.email, formatOptionalDateTime(account.last_login_at)].filter(Boolean).join(" · ") }}
+                      </span>
+                    </div>
+                    <div class="customer-admin-record__actions">
+                      <StatusBadge :status="account.status" />
+                      <button
+                        class="cta-button cta-secondary"
+                        type="button"
+                        :disabled="loading.portalAccess"
+                        @click="openPortalAccessPasswordReset(account)"
+                      >
+                        {{ t("customerAdmin.actions.resetPortalAccessPassword") }}
+                      </button>
+                      <button
+                        v-if="account.status === 'active'"
+                        class="cta-button cta-secondary"
+                        type="button"
+                        :disabled="loading.portalAccess"
+                        @click="setCustomerPortalAccessStatus(account, 'inactive')"
+                      >
+                        {{ t("customerAdmin.actions.deactivatePortalAccess") }}
+                      </button>
+                      <button
+                        v-else
+                        class="cta-button cta-secondary"
+                        type="button"
+                        :disabled="loading.portalAccess"
+                        @click="setCustomerPortalAccessStatus(account, 'active')"
+                      >
+                        {{ t("customerAdmin.actions.activatePortalAccess") }}
+                      </button>
+                      <button
+                        class="cta-button cta-secondary"
+                        type="button"
+                        :disabled="loading.portalAccess"
+                        @click="unlinkCustomerPortalAccount(account)"
+                      >
+                        {{ t("customerAdmin.actions.unlinkPortalAccess") }}
+                      </button>
+                    </div>
+                  </article>
+                </div>
+                <p v-else class="customer-admin-list-empty">
+                  {{ t("customerAdmin.portalAccess.empty") }}
+                </p>
+              </section>
+
               <section class="customer-admin-form-section">
                 <div class="customer-admin-form-section__header">
                   <p class="eyebrow">{{ t("customerAdmin.loginHistory.eyebrow") }}</p>
@@ -1150,6 +1255,108 @@
                   </article>
                 </div>
                 <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.loginHistory.empty") }}</p>
+              </section>
+            </div>
+
+            <div
+              v-if="portalAccessModalOpen"
+              class="customer-admin-modal-backdrop"
+              data-testid="customer-portal-access-create-modal"
+            >
+              <section class="module-card customer-admin-modal">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.portalAccess.modalEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.portalAccess.modalTitle") }}</h4>
+                </div>
+                <p class="field-help">{{ selectedCustomer?.name }}</p>
+                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.portalAccess.contactLabel") }}</span>
+                    <select v-model="portalAccessDraft.contact_id">
+                      <option value="">{{ t("customerAdmin.portalAccess.contactPlaceholder") }}</option>
+                      <option
+                        v-for="contact in portalAccessAvailableContacts"
+                        :key="contact.id"
+                        :value="contact.id"
+                      >
+                        {{ contact.full_name }}{{ contact.email ? ` · ${contact.email}` : "" }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.fields.username") }}</span>
+                    <input v-model="portalAccessDraft.username" />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.fields.email") }}</span>
+                    <input v-model="portalAccessDraft.email" />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.fields.fullName") }}</span>
+                    <input v-model="portalAccessDraft.full_name" />
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.locale") }}</span>
+                    <select v-model="portalAccessDraft.locale">
+                      <option value="de">de</option>
+                      <option value="en">en</option>
+                    </select>
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.lifecycleStatus") }}</span>
+                    <select v-model="portalAccessDraft.status">
+                      <option value="active">{{ t("customerAdmin.status.active") }}</option>
+                      <option value="inactive">{{ t("customerAdmin.status.inactive") }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.temporaryPassword") }}</span>
+                    <input v-model="portalAccessDraft.temporary_password" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" :disabled="loading.portalAccess" @click="submitCustomerPortalAccess">
+                    {{ t("customerAdmin.actions.createPortalAccess") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="closePortalAccessCreateModal">
+                    {{ t("customerAdmin.actions.cancel") }}
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <div
+              v-if="portalAccessPasswordTarget"
+              class="customer-admin-modal-backdrop"
+              data-testid="customer-portal-access-password-modal"
+            >
+              <section class="module-card customer-admin-modal">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.portalAccess.passwordResetEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.portalAccess.passwordResetTitle") }}</h4>
+                </div>
+                <p class="field-help">
+                  {{ portalAccessPasswordTarget.contact_name }} · {{ portalAccessPasswordTarget.username }}
+                </p>
+                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("customerAdmin.fields.temporaryPassword") }}</span>
+                    <input v-model="portalAccessPasswordDraft.temporary_password" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button
+                    class="cta-button"
+                    type="button"
+                    :disabled="loading.portalAccess"
+                    @click="submitCustomerPortalAccessPasswordReset"
+                  >
+                    {{ t("customerAdmin.actions.resetPortalAccessPassword") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="closePortalAccessPasswordReset">
+                    {{ t("customerAdmin.actions.cancel") }}
+                  </button>
+                </div>
               </section>
             </div>
           </section>
@@ -1410,6 +1617,7 @@ import {
   filterCustomerMandatesByBranch,
   formatCustomerReferenceLabel,
   formatPrimaryContactSummary,
+  hasCustomerPermission,
   mapCustomerApiMessage,
   normalizeCustomerCommercialTab,
   normalizeCustomerDetailTab,
@@ -1417,6 +1625,15 @@ import {
   resolveCustomerAdminSessionScope,
   resolveCustomerCancelSelection,
 } from "@/features/customers/customerAdmin.helpers.js";
+import {
+  createCustomerPortalAccess,
+  listCustomerPortalAccess,
+  resetCustomerPortalAccessPassword,
+  type CustomerPortalAccessCreatePayload,
+  type CustomerPortalAccessListItem,
+  unlinkCustomerPortalAccess,
+  updateCustomerPortalAccessStatus,
+} from "#/api/sicherplan/customer-portal-access";
 import { useI18n } from "@/i18n";
 import { useAuthStore } from "@/stores/auth";
 
@@ -1435,6 +1652,7 @@ const authStore = useAuthStore();
 const customers = ref<CustomerListItem[]>([]);
 const customerHistory = ref<CustomerHistoryEntryRead[]>([]);
 const customerPortalLoginHistory = ref<CustomerLoginHistoryEntryRead[]>([]);
+const customerPortalAccessAccounts = ref<CustomerPortalAccessListItem[]>([]);
 const customerEmployeeBlocks = ref<CustomerEmployeeBlockRead[]>([]);
 const employeeBlockCapability = ref<CustomerEmployeeBlockCollectionRead["capability"] | null>(null);
 const commercialProfile = ref<CustomerCommercialProfileRead | null>(null);
@@ -1458,6 +1676,9 @@ const tenantScopeInput = ref(authStore.tenantScopeId);
 const tenantScopeId = ref(authStore.tenantScopeId);
 const accessTokenInput = ref(readStoredAccessToken());
 const accessToken = ref(readStoredAccessToken());
+const portalAccessGeneratedPassword = ref("");
+const portalAccessModalOpen = ref(false);
+const portalAccessPasswordTarget = ref<CustomerPortalAccessListItem | null>(null);
 const loading = reactive({
   list: false,
   detail: false,
@@ -1469,6 +1690,7 @@ const loading = reactive({
   surchargeRule: false,
   historyAttachment: false,
   loginHistory: false,
+  portalAccess: false,
   employeeBlock: false,
   portalPrivacy: false,
 });
@@ -1610,6 +1832,21 @@ const employeeBlockDraft = reactive<CustomerEmployeeBlockPayload>({
 const portalPrivacyDraft = reactive({
   person_names_released: false,
 });
+const portalAccessDraft = reactive<CustomerPortalAccessCreatePayload>({
+  tenant_id: "",
+  customer_id: "",
+  contact_id: "",
+  username: "",
+  email: "",
+  full_name: "",
+  locale: "de",
+  timezone: "Europe/Berlin",
+  status: "active",
+  temporary_password: "",
+});
+const portalAccessPasswordDraft = reactive({
+  temporary_password: "",
+});
 
 const actionState = computed(() => deriveCustomerActionState(authStore.activeRole, selectedCustomer.value));
 const commercialActionState = computed(() => deriveCustomerCommercialActionState(authStore.activeRole));
@@ -1617,6 +1854,9 @@ const canRead = computed(() => actionState.value.canRead);
 const canWrite = computed(() => actionState.value.canCreate);
 const canReadCommercial = computed(() => commercialActionState.value.canReadCommercial);
 const canWriteCommercial = computed(() => commercialActionState.value.canWriteCommercial);
+const canManagePortalAccess = computed(() =>
+  hasCustomerPermission(authStore.activeRole, "customers.portal_access.write"),
+);
 const hasDetailWorkspace = computed(() => isCreatingCustomer.value || !!selectedCustomer.value);
 const detailTabLabelKeys = {
   overview: "customerAdmin.tabs.overview",
@@ -1673,6 +1913,28 @@ const selectedCustomerRankingLabel = computed(() => {
 const selectedCustomerStatusLabel = computed(() => {
   const lookupId = selectedCustomer.value?.customer_status_lookup_id;
   return lookupId ? referenceMaps.value.customerStatuses.get(lookupId) ?? lookupId : "";
+});
+const portalAccessAvailableContacts = computed(() =>
+  (selectedCustomer.value?.contacts ?? []).filter(
+    (contact) => contact.archived_at == null && contact.status === "active",
+  ),
+);
+const selectedPortalAccessContact = computed(() =>
+  portalAccessAvailableContacts.value.find((contact) => contact.id === portalAccessDraft.contact_id) ?? null,
+);
+const linkedContactPortalAccessAccount = computed(() =>
+  customerPortalAccessAccounts.value.find(
+    (account) =>
+      (!!editingContactId.value && account.contact_id === editingContactId.value) ||
+      (!!contactDraft.user_id && account.user_id === contactDraft.user_id),
+  ) ?? null,
+);
+const contactPortalAccessSummary = computed(() => {
+  const account = linkedContactPortalAccessAccount.value;
+  if (account) {
+    return [account.username, account.email].filter(Boolean).join(" · ");
+  }
+  return contactDraft.user_id || t("customerAdmin.contacts.portalAccessNone");
 });
 const selectedRateCard = computed(() =>
   commercialProfile.value?.rate_cards.find((row) => row.id === selectedRateCardId.value) ?? null,
@@ -1891,6 +2153,53 @@ function resetPortalPrivacyDraft() {
   portalPrivacyDraft.person_names_released = !!portalPrivacy.value?.person_names_released;
 }
 
+function resetPortalAccessDraft() {
+  portalAccessDraft.tenant_id = tenantScopeId.value;
+  portalAccessDraft.customer_id = selectedCustomerId.value;
+  portalAccessDraft.contact_id = "";
+  portalAccessDraft.username = "";
+  portalAccessDraft.email = "";
+  portalAccessDraft.full_name = "";
+  portalAccessDraft.locale = "de";
+  portalAccessDraft.timezone = "Europe/Berlin";
+  portalAccessDraft.status = "active";
+  portalAccessDraft.temporary_password = "";
+}
+
+function applyPortalAccessContactDefaults(contactId: string) {
+  const contact = portalAccessAvailableContacts.value.find((row) => row.id === contactId);
+  if (!contact) {
+    return;
+  }
+  portalAccessDraft.contact_id = contact.id;
+  portalAccessDraft.email = contact.email ?? portalAccessDraft.email;
+  portalAccessDraft.full_name = contact.full_name || portalAccessDraft.full_name;
+  if (!portalAccessDraft.username.trim()) {
+    const usernameSeed = (contact.email ?? contact.full_name).toLowerCase().replace(/[^a-z0-9._-]+/g, ".");
+    portalAccessDraft.username = usernameSeed.replace(/(^[._-]+|[._-]+$)/g, "");
+  }
+}
+
+function openPortalAccessCreateModal() {
+  resetPortalAccessDraft();
+  portalAccessGeneratedPassword.value = "";
+  portalAccessModalOpen.value = true;
+}
+
+function closePortalAccessCreateModal() {
+  portalAccessModalOpen.value = false;
+}
+
+function openPortalAccessPasswordReset(account: CustomerPortalAccessListItem) {
+  portalAccessPasswordTarget.value = account;
+  portalAccessPasswordDraft.temporary_password = "";
+}
+
+function closePortalAccessPasswordReset() {
+  portalAccessPasswordTarget.value = null;
+  portalAccessPasswordDraft.temporary_password = "";
+}
+
 function populateCustomerDraft(customer: CustomerRead) {
   customerDraft.tenant_id = customer.tenant_id;
   customerDraft.customer_number = customer.customer_number;
@@ -2041,10 +2350,15 @@ function startCreateCustomer() {
   selectedCustomer.value = null;
   customerHistory.value = [];
   customerPortalLoginHistory.value = [];
+  customerPortalAccessAccounts.value = [];
   customerEmployeeBlocks.value = [];
   employeeBlockCapability.value = null;
   portalPrivacy.value = null;
+  portalAccessGeneratedPassword.value = "";
+  closePortalAccessCreateModal();
+  closePortalAccessPasswordReset();
   resetPortalPrivacyDraft();
+  resetPortalAccessDraft();
   resetCustomerDraft();
   resetContactDraft();
   resetAddressDraft();
@@ -2095,10 +2409,15 @@ function cancelCustomerEdit() {
     resetCustomerDraft();
     customerHistory.value = [];
     customerPortalLoginHistory.value = [];
+    customerPortalAccessAccounts.value = [];
     customerEmployeeBlocks.value = [];
     employeeBlockCapability.value = null;
     portalPrivacy.value = null;
+    portalAccessGeneratedPassword.value = "";
+    closePortalAccessCreateModal();
+    closePortalAccessPasswordReset();
     resetPortalPrivacyDraft();
+    resetPortalAccessDraft();
   }
 }
 
@@ -2109,10 +2428,15 @@ async function refreshCustomers() {
     selectedCustomer.value = null;
     customerHistory.value = [];
     customerPortalLoginHistory.value = [];
+    customerPortalAccessAccounts.value = [];
     customerEmployeeBlocks.value = [];
     employeeBlockCapability.value = null;
     portalPrivacy.value = null;
+    portalAccessGeneratedPassword.value = "";
+    closePortalAccessCreateModal();
+    closePortalAccessPasswordReset();
     resetPortalPrivacyDraft();
+    resetPortalAccessDraft();
     return;
   }
 
@@ -2130,10 +2454,15 @@ async function refreshCustomers() {
         selectedCustomer.value = null;
         customerHistory.value = [];
         customerPortalLoginHistory.value = [];
+        customerPortalAccessAccounts.value = [];
         customerEmployeeBlocks.value = [];
         employeeBlockCapability.value = null;
         portalPrivacy.value = null;
+        portalAccessGeneratedPassword.value = "";
+        closePortalAccessCreateModal();
+        closePortalAccessPasswordReset();
         resetPortalPrivacyDraft();
+        resetPortalAccessDraft();
       }
     } else if (customers.value[0] && !isCreatingCustomer.value) {
       await selectCustomer(customers.value[0].id);
@@ -2169,7 +2498,12 @@ async function selectCustomer(customerId: string) {
       resetHistoryAttachmentDraft();
       resetEmployeeBlockDraft();
       portalPrivacy.value = null;
+      customerPortalAccessAccounts.value = [];
+      portalAccessGeneratedPassword.value = "";
+      closePortalAccessCreateModal();
+      closePortalAccessPasswordReset();
       resetPortalPrivacyDraft();
+      resetPortalAccessDraft();
       isCreatingCustomer.value = false;
       if (canReadCommercial.value) {
         await refreshCommercialProfile();
@@ -2178,6 +2512,7 @@ async function selectCustomer(customerId: string) {
       await refreshCustomerPortalLoginHistory();
       await refreshEmployeeBlocks();
       await refreshPortalPrivacy();
+      await refreshCustomerPortalAccess();
     }
   } catch (error) {
     handleApiError(error);
@@ -2684,7 +3019,6 @@ function normalizeContactDraft(): CustomerContactPayload {
     mobile: emptyToNull(contactDraft.mobile),
     is_primary_contact: !!contactDraft.is_primary_contact,
     is_billing_contact: !!contactDraft.is_billing_contact,
-    user_id: emptyToNull(contactDraft.user_id),
     notes: emptyToNull(contactDraft.notes),
   };
 }
@@ -2881,6 +3215,26 @@ async function refreshPortalPrivacy() {
   }
 }
 
+async function refreshCustomerPortalAccess() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || !canManagePortalAccess.value) {
+    customerPortalAccessAccounts.value = [];
+    return;
+  }
+
+  loading.portalAccess = true;
+  try {
+    customerPortalAccessAccounts.value = await listCustomerPortalAccess(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      accessToken.value,
+    );
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.portalAccess = false;
+  }
+}
+
 async function submitPortalPrivacy() {
   if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
     return;
@@ -2912,6 +3266,124 @@ async function submitPortalPrivacy() {
     handleApiError(error);
   } finally {
     loading.portalPrivacy = false;
+  }
+}
+
+async function submitCustomerPortalAccess() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || !canManagePortalAccess.value) {
+    return;
+  }
+
+  loading.portalAccess = true;
+  try {
+    const response = await createCustomerPortalAccess(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      accessToken.value,
+      {
+        ...portalAccessDraft,
+        temporary_password: emptyToNull(portalAccessDraft.temporary_password),
+      },
+    );
+    portalAccessGeneratedPassword.value = response.temporary_password;
+    closePortalAccessCreateModal();
+    resetPortalAccessDraft();
+    await refreshCustomerPortalAccess();
+    await selectCustomer(selectedCustomer.value.id);
+    setFeedback(
+      "success",
+      t("customerAdmin.feedback.portalAccessCreated"),
+      t("customerAdmin.feedback.portalAccessCreatedBody"),
+    );
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.portalAccess = false;
+  }
+}
+
+async function submitCustomerPortalAccessPasswordReset() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || !portalAccessPasswordTarget.value) {
+    return;
+  }
+
+  loading.portalAccess = true;
+  try {
+    const response = await resetCustomerPortalAccessPassword(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      portalAccessPasswordTarget.value.user_id,
+      accessToken.value,
+      { temporary_password: emptyToNull(portalAccessPasswordDraft.temporary_password) },
+    );
+    portalAccessGeneratedPassword.value = response.temporary_password;
+    closePortalAccessPasswordReset();
+    await refreshCustomerPortalAccess();
+    setFeedback(
+      "success",
+      t("customerAdmin.feedback.portalAccessPasswordReset"),
+      t("customerAdmin.feedback.portalAccessPasswordResetBody"),
+    );
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.portalAccess = false;
+  }
+}
+
+async function setCustomerPortalAccessStatus(account: CustomerPortalAccessListItem, status: "active" | "inactive") {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || !canManagePortalAccess.value) {
+    return;
+  }
+
+  loading.portalAccess = true;
+  try {
+    await updateCustomerPortalAccessStatus(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      account.user_id,
+      accessToken.value,
+      { status },
+    );
+    await refreshCustomerPortalAccess();
+    setFeedback(
+      "success",
+      t("customerAdmin.feedback.portalAccessStatusSaved"),
+      t("customerAdmin.feedback.portalAccessStatusSavedBody"),
+    );
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.portalAccess = false;
+  }
+}
+
+async function unlinkCustomerPortalAccount(account: CustomerPortalAccessListItem) {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || !canManagePortalAccess.value) {
+    return;
+  }
+
+  loading.portalAccess = true;
+  try {
+    await unlinkCustomerPortalAccess(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      account.user_id,
+      accessToken.value,
+    );
+    portalAccessGeneratedPassword.value = "";
+    closePortalAccessPasswordReset();
+    await refreshCustomerPortalAccess();
+    await selectCustomer(selectedCustomer.value.id);
+    setFeedback(
+      "success",
+      t("customerAdmin.feedback.portalAccessUnlinked"),
+      t("customerAdmin.feedback.portalAccessUnlinkedBody"),
+    );
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.portalAccess = false;
   }
 }
 
@@ -3134,6 +3606,16 @@ watch(
 );
 
 watch(
+  () => portalAccessDraft.contact_id,
+  (contactId) => {
+    if (!contactId) {
+      return;
+    }
+    applyPortalAccessContactDefaults(contactId);
+  },
+);
+
+watch(
   () => [authStore.effectiveRole, authStore.effectiveTenantScopeId, authStore.effectiveAccessToken],
   () => {
     if (authStore.effectiveRole === "tenant_admin") {
@@ -3251,6 +3733,11 @@ onMounted(() => {
 .customer-admin-feedback[data-tone="error"] {
   background: color-mix(in srgb, var(--sp-color-primary-muted) 45%, #ffb4a6);
   color: color-mix(in srgb, var(--sp-color-primary-strong) 60%, #6a1d00);
+}
+
+.customer-admin-feedback[data-tone="success"] {
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 32%, #dcfce7);
+  color: color-mix(in srgb, var(--sp-color-primary-strong) 65%, #14532d);
 }
 
 .customer-admin-empty {
@@ -3417,6 +3904,22 @@ onMounted(() => {
 .customer-admin-summary__card span {
   color: var(--sp-color-text-secondary);
   font-size: 0.85rem;
+}
+
+.customer-admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgb(15 23 42 / 38%);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.customer-admin-modal {
+  width: min(100%, 720px);
+  display: grid;
+  gap: 1rem;
 }
 
 .customer-admin-lifecycle {

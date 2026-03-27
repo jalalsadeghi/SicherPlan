@@ -822,6 +822,9 @@ export type MessageKey =
   | "customerAdmin.contacts.editorEyebrow"
   | "customerAdmin.contacts.editorTitle"
   | "customerAdmin.contacts.empty"
+  | "customerAdmin.contacts.portalAccessLabel"
+  | "customerAdmin.contacts.portalAccessNone"
+  | "customerAdmin.contacts.portalAccessHelp"
   | "customerAdmin.contacts.primaryBadge"
   | "customerAdmin.contacts.standardBadge"
   | "customerAdmin.history.eyebrow"
@@ -860,6 +863,18 @@ export type MessageKey =
   | "customerAdmin.addresses.linkBadge"
   | "customerAdmin.portal.title"
   | "customerAdmin.portal.lead"
+  | "customerAdmin.portalAccess.eyebrow"
+  | "customerAdmin.portalAccess.title"
+  | "customerAdmin.portalAccess.lead"
+  | "customerAdmin.portalAccess.empty"
+  | "customerAdmin.portalAccess.noContactsHint"
+  | "customerAdmin.portalAccess.generatedPasswordTitle"
+  | "customerAdmin.portalAccess.modalEyebrow"
+  | "customerAdmin.portalAccess.modalTitle"
+  | "customerAdmin.portalAccess.contactLabel"
+  | "customerAdmin.portalAccess.contactPlaceholder"
+  | "customerAdmin.portalAccess.passwordResetEyebrow"
+  | "customerAdmin.portalAccess.passwordResetTitle"
   | "customerAdmin.addressType.registered"
   | "customerAdmin.addressType.billing"
   | "customerAdmin.addressType.mailing"
@@ -883,6 +898,9 @@ export type MessageKey =
   | "customerAdmin.fields.phone"
   | "customerAdmin.fields.mobile"
   | "customerAdmin.fields.userId"
+  | "customerAdmin.fields.username"
+  | "customerAdmin.fields.locale"
+  | "customerAdmin.fields.temporaryPassword"
   | "customerAdmin.fields.isPrimaryContact"
   | "customerAdmin.fields.isBillingContact"
   | "customerAdmin.fields.addressId"
@@ -916,12 +934,18 @@ export type MessageKey =
   | "customerAdmin.actions.saveAddress"
   | "customerAdmin.actions.refreshHistory"
   | "customerAdmin.actions.refreshPortalPrivacy"
+  | "customerAdmin.actions.refreshPortalAccess"
   | "customerAdmin.actions.linkHistoryAttachment"
   | "customerAdmin.actions.refreshLoginHistory"
   | "customerAdmin.actions.refreshEmployeeBlocks"
   | "customerAdmin.actions.createEmployeeBlock"
   | "customerAdmin.actions.saveEmployeeBlock"
   | "customerAdmin.actions.savePortalPrivacy"
+  | "customerAdmin.actions.createPortalAccess"
+  | "customerAdmin.actions.resetPortalAccessPassword"
+  | "customerAdmin.actions.deactivatePortalAccess"
+  | "customerAdmin.actions.activatePortalAccess"
+  | "customerAdmin.actions.unlinkPortalAccess"
   | "customerAdmin.status.active"
   | "customerAdmin.status.inactive"
   | "customerAdmin.status.archived"
@@ -948,6 +972,14 @@ export type MessageKey =
   | "customerAdmin.feedback.employeeBlockSaved"
   | "customerAdmin.feedback.employeeBlockSavedBody"
   | "customerAdmin.feedback.portalPrivacySaved"
+  | "customerAdmin.feedback.portalAccessCreated"
+  | "customerAdmin.feedback.portalAccessCreatedBody"
+  | "customerAdmin.feedback.portalAccessPasswordReset"
+  | "customerAdmin.feedback.portalAccessPasswordResetBody"
+  | "customerAdmin.feedback.portalAccessStatusSaved"
+  | "customerAdmin.feedback.portalAccessStatusSavedBody"
+  | "customerAdmin.feedback.portalAccessUnlinked"
+  | "customerAdmin.feedback.portalAccessUnlinkedBody"
   | "customerAdmin.feedback.validation"
   | "customerAdmin.feedback.customerRequired"
   | "customerAdmin.feedback.contactRequired"
@@ -965,7 +997,12 @@ export type MessageKey =
   | "customerAdmin.feedback.duplicateEmail"
   | "customerAdmin.feedback.primaryConflict"
   | "customerAdmin.feedback.defaultAddressConflict"
+  | "customerAdmin.feedback.invalidPortalUserFormat"
   | "customerAdmin.feedback.invalidPortalUser"
+  | "customerAdmin.feedback.portalAccessAlreadyLinked"
+  | "customerAdmin.feedback.portalAccessContactMismatch"
+  | "customerAdmin.feedback.portalAccessContactInactive"
+  | "customerAdmin.feedback.portalAccessCustomerInactive"
   | "customerAdmin.permission.commercialRead"
   | "customerAdmin.permission.commercialWrite"
   | "customerAdmin.commercial.eyebrow"
@@ -2113,6 +2150,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.contacts.editorEyebrow": "Bearbeitung",
     "customerAdmin.contacts.editorTitle": "Kontakt erfassen oder anpassen",
     "customerAdmin.contacts.empty": "Noch keine Kontakte hinterlegt.",
+    "customerAdmin.contacts.portalAccessLabel": "Verknüpfter Portalzugang",
+    "customerAdmin.contacts.portalAccessNone": "Noch kein Portalzugang verknüpft.",
+    "customerAdmin.contacts.portalAccessHelp":
+      "Portalzugänge und Passwörter werden im Tab Portal verwaltet. Diese Verknüpfung ist hier nur lesbar.",
     "customerAdmin.contacts.primaryBadge": "Primärkontakt",
     "customerAdmin.contacts.standardBadge": "Kontakt",
     "customerAdmin.history.eyebrow": "Historie",
@@ -2153,6 +2194,18 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.addresses.linkBadge": "Adresslink",
     "customerAdmin.portal.title": "Portalsteuerung und Freigaben",
     "customerAdmin.portal.lead": "Datenschutzfreigabe und Loginhistorie bleiben als getrennte Abschnitte in derselben Portal-Arbeitsfläche sichtbar.",
+    "customerAdmin.portalAccess.eyebrow": "Portalzugang",
+    "customerAdmin.portalAccess.title": "Zugangsdaten und Loginfreigabe",
+    "customerAdmin.portalAccess.lead": "Mandantenadmins erstellen hier Kundenportal-Zugänge direkt auf Basis eines bestehenden Kundenkontakts.",
+    "customerAdmin.portalAccess.empty": "Für diesen Kunden sind noch keine Portalzugänge verknüpft.",
+    "customerAdmin.portalAccess.noContactsHint": "Lege zuerst mindestens einen aktiven Kundenkontakt an, bevor Portalzugänge erstellt werden.",
+    "customerAdmin.portalAccess.generatedPasswordTitle": "Temporäres Passwort",
+    "customerAdmin.portalAccess.modalEyebrow": "Neuer Portalzugang",
+    "customerAdmin.portalAccess.modalTitle": "Kundenportal-Zugang anlegen",
+    "customerAdmin.portalAccess.contactLabel": "Kontakt",
+    "customerAdmin.portalAccess.contactPlaceholder": "Kontakt auswählen",
+    "customerAdmin.portalAccess.passwordResetEyebrow": "Passwort zurücksetzen",
+    "customerAdmin.portalAccess.passwordResetTitle": "Temporäres Passwort neu vergeben",
     "customerAdmin.addressType.registered": "Firmensitz",
     "customerAdmin.addressType.billing": "Rechnung",
     "customerAdmin.addressType.mailing": "Post",
@@ -2176,6 +2229,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.phone": "Telefon",
     "customerAdmin.fields.mobile": "Mobil",
     "customerAdmin.fields.userId": "Portal-Benutzer-ID",
+    "customerAdmin.fields.username": "Benutzername",
+    "customerAdmin.fields.locale": "Sprache",
+    "customerAdmin.fields.temporaryPassword": "Temporäres Passwort",
     "customerAdmin.fields.isPrimaryContact": "Als Primärkontakt markieren",
     "customerAdmin.fields.isBillingContact": "Als Rechnungskontakt markieren",
     "customerAdmin.fields.addressId": "Adress-ID",
@@ -2209,12 +2265,18 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.saveAddress": "Adresslink speichern",
     "customerAdmin.actions.refreshHistory": "Historie neu laden",
     "customerAdmin.actions.refreshPortalPrivacy": "Freigabestatus neu laden",
+    "customerAdmin.actions.refreshPortalAccess": "Portalzugänge neu laden",
     "customerAdmin.actions.linkHistoryAttachment": "Anhang verknüpfen",
     "customerAdmin.actions.refreshLoginHistory": "Loginhistorie neu laden",
     "customerAdmin.actions.refreshEmployeeBlocks": "Sperren neu laden",
     "customerAdmin.actions.createEmployeeBlock": "Sperre anlegen",
     "customerAdmin.actions.saveEmployeeBlock": "Sperre speichern",
     "customerAdmin.actions.savePortalPrivacy": "Namensfreigabe speichern",
+    "customerAdmin.actions.createPortalAccess": "Portalzugang anlegen",
+    "customerAdmin.actions.resetPortalAccessPassword": "Passwort zurücksetzen",
+    "customerAdmin.actions.deactivatePortalAccess": "Zugang deaktivieren",
+    "customerAdmin.actions.activatePortalAccess": "Zugang aktivieren",
+    "customerAdmin.actions.unlinkPortalAccess": "Zugang entkoppeln",
     "customerAdmin.status.active": "Aktiv",
     "customerAdmin.status.inactive": "Inaktiv",
     "customerAdmin.status.archived": "Archiviert",
@@ -2241,6 +2303,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.employeeBlockSaved": "Mitarbeitendensperre gespeichert",
     "customerAdmin.feedback.employeeBlockSavedBody": "Die kundenspezifische Sperre wurde übernommen.",
     "customerAdmin.feedback.portalPrivacySaved": "Portal-Datenschutz aktualisiert",
+    "customerAdmin.feedback.portalAccessCreated": "Portalzugang angelegt",
+    "customerAdmin.feedback.portalAccessCreatedBody": "Der Kundenkontakt kann sich mit dem neuen Portalzugang anmelden.",
+    "customerAdmin.feedback.portalAccessPasswordReset": "Portalpasswort zurückgesetzt",
+    "customerAdmin.feedback.portalAccessPasswordResetBody": "Das neue temporäre Passwort wurde einmalig angezeigt.",
+    "customerAdmin.feedback.portalAccessStatusSaved": "Portalzugang aktualisiert",
+    "customerAdmin.feedback.portalAccessStatusSavedBody": "Status und Zugriff wurden konsistent übernommen.",
+    "customerAdmin.feedback.portalAccessUnlinked": "Portalzugang entkoppelt",
+    "customerAdmin.feedback.portalAccessUnlinkedBody": "Der Kundenkontakt wurde vom Portalbenutzer getrennt und der Zugriff deaktiviert.",
     "customerAdmin.feedback.validation": "Eingaben prüfen",
     "customerAdmin.feedback.customerRequired": "Kundennummer und Anzeigename sind Pflichtfelder.",
     "customerAdmin.feedback.contactRequired": "Für einen Kontakt wird mindestens der Name benötigt.",
@@ -2258,8 +2328,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.duplicateEmail": "Die Kontakt-E-Mail existiert für diesen Kunden bereits.",
     "customerAdmin.feedback.primaryConflict": "Es gibt bereits einen Primärkontakt für diesen Kunden.",
     "customerAdmin.feedback.defaultAddressConflict": "Es gibt bereits eine Standardadresse für diesen Typ.",
+    "customerAdmin.feedback.invalidPortalUserFormat":
+      "Die verknüpfte Portal-Benutzer-ID ist nicht im erwarteten UUID-Format.",
     "customerAdmin.feedback.invalidPortalUser":
       "Die verknüpfte Portal-Benutzer-ID gehört nicht zum aktuellen Mandanten.",
+    "customerAdmin.feedback.portalAccessAlreadyLinked": "Dieser Kundenkontakt ist bereits mit einem Portalzugang verknüpft.",
+    "customerAdmin.feedback.portalAccessContactMismatch": "Der ausgewählte Kontakt gehört nicht zu diesem Kunden.",
+    "customerAdmin.feedback.portalAccessContactInactive": "Für inaktive oder archivierte Kontakte kann kein Portalzugang angelegt werden.",
+    "customerAdmin.feedback.portalAccessCustomerInactive": "Für inaktive oder archivierte Kunden kann kein Portalzugang angelegt werden.",
     "customerAdmin.permission.commercialRead": "Commercial lesen",
     "customerAdmin.permission.commercialWrite": "Commercial pflegen",
     "customerAdmin.commercial.eyebrow": "Commercial Settings",
@@ -3426,6 +3502,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.contacts.editorEyebrow": "Editor",
     "customerAdmin.contacts.editorTitle": "Create or update a contact",
     "customerAdmin.contacts.empty": "No contacts have been added yet.",
+    "customerAdmin.contacts.portalAccessLabel": "Linked portal access",
+    "customerAdmin.contacts.portalAccessNone": "No portal access is linked yet.",
+    "customerAdmin.contacts.portalAccessHelp":
+      "Portal credentials and passwords are managed from the Portal tab. This linkage is read-only here.",
     "customerAdmin.contacts.primaryBadge": "Primary contact",
     "customerAdmin.contacts.standardBadge": "Contact",
     "customerAdmin.history.eyebrow": "History",
@@ -3466,6 +3546,18 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.addresses.linkBadge": "Address link",
     "customerAdmin.portal.title": "Portal controls and releases",
     "customerAdmin.portal.lead": "Privacy release and login history stay separated as clear sections inside one portal workspace.",
+    "customerAdmin.portalAccess.eyebrow": "Portal access",
+    "customerAdmin.portalAccess.title": "Credentials and login enablement",
+    "customerAdmin.portalAccess.lead": "Tenant admins manage customer portal credentials here directly from the selected customer contact register.",
+    "customerAdmin.portalAccess.empty": "No portal credentials are linked to this customer yet.",
+    "customerAdmin.portalAccess.noContactsHint": "Create at least one active customer contact before provisioning portal access.",
+    "customerAdmin.portalAccess.generatedPasswordTitle": "Temporary password",
+    "customerAdmin.portalAccess.modalEyebrow": "New portal access",
+    "customerAdmin.portalAccess.modalTitle": "Create customer portal access",
+    "customerAdmin.portalAccess.contactLabel": "Contact",
+    "customerAdmin.portalAccess.contactPlaceholder": "Select a contact",
+    "customerAdmin.portalAccess.passwordResetEyebrow": "Password reset",
+    "customerAdmin.portalAccess.passwordResetTitle": "Issue a new temporary password",
     "customerAdmin.addressType.registered": "Registered office",
     "customerAdmin.addressType.billing": "Billing",
     "customerAdmin.addressType.mailing": "Mailing",
@@ -3489,6 +3581,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.phone": "Phone",
     "customerAdmin.fields.mobile": "Mobile",
     "customerAdmin.fields.userId": "Portal user ID",
+    "customerAdmin.fields.username": "Username",
+    "customerAdmin.fields.locale": "Locale",
+    "customerAdmin.fields.temporaryPassword": "Temporary password",
     "customerAdmin.fields.isPrimaryContact": "Mark as primary contact",
     "customerAdmin.fields.isBillingContact": "Mark as billing contact",
     "customerAdmin.fields.addressId": "Address ID",
@@ -3522,12 +3617,18 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.saveAddress": "Save address link",
     "customerAdmin.actions.refreshHistory": "Reload history",
     "customerAdmin.actions.refreshPortalPrivacy": "Reload privacy release",
+    "customerAdmin.actions.refreshPortalAccess": "Reload portal access",
     "customerAdmin.actions.linkHistoryAttachment": "Link attachment",
     "customerAdmin.actions.refreshLoginHistory": "Reload login history",
     "customerAdmin.actions.refreshEmployeeBlocks": "Reload blocks",
     "customerAdmin.actions.createEmployeeBlock": "Create block",
     "customerAdmin.actions.saveEmployeeBlock": "Save block",
     "customerAdmin.actions.savePortalPrivacy": "Save name release",
+    "customerAdmin.actions.createPortalAccess": "Create portal access",
+    "customerAdmin.actions.resetPortalAccessPassword": "Reset password",
+    "customerAdmin.actions.deactivatePortalAccess": "Deactivate access",
+    "customerAdmin.actions.activatePortalAccess": "Activate access",
+    "customerAdmin.actions.unlinkPortalAccess": "Unlink access",
     "customerAdmin.status.active": "Active",
     "customerAdmin.status.inactive": "Inactive",
     "customerAdmin.status.archived": "Archived",
@@ -3554,6 +3655,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.employeeBlockSaved": "Employee block saved",
     "customerAdmin.feedback.employeeBlockSavedBody": "The customer-specific employee block was stored.",
     "customerAdmin.feedback.portalPrivacySaved": "Portal privacy updated",
+    "customerAdmin.feedback.portalAccessCreated": "Portal access created",
+    "customerAdmin.feedback.portalAccessCreatedBody": "The selected customer contact can now sign in with the new portal credentials.",
+    "customerAdmin.feedback.portalAccessPasswordReset": "Portal password reset",
+    "customerAdmin.feedback.portalAccessPasswordResetBody": "The new temporary password was shown once.",
+    "customerAdmin.feedback.portalAccessStatusSaved": "Portal access updated",
+    "customerAdmin.feedback.portalAccessStatusSavedBody": "Account status and scoped access were updated consistently.",
+    "customerAdmin.feedback.portalAccessUnlinked": "Portal access unlinked",
+    "customerAdmin.feedback.portalAccessUnlinkedBody": "The customer contact was detached from the portal user and access was deactivated.",
     "customerAdmin.feedback.validation": "Check input",
     "customerAdmin.feedback.customerRequired": "Customer number and display name are required.",
     "customerAdmin.feedback.contactRequired": "A contact needs at least a name.",
@@ -3571,8 +3680,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.duplicateEmail": "That contact email already exists for this customer.",
     "customerAdmin.feedback.primaryConflict": "A primary contact already exists for this customer.",
     "customerAdmin.feedback.defaultAddressConflict": "A default address already exists for this type.",
+    "customerAdmin.feedback.invalidPortalUserFormat":
+      "The linked portal user ID is not in the expected UUID format.",
     "customerAdmin.feedback.invalidPortalUser":
       "The linked portal user ID does not belong to the current tenant.",
+    "customerAdmin.feedback.portalAccessAlreadyLinked": "This customer contact is already linked to a portal user.",
+    "customerAdmin.feedback.portalAccessContactMismatch": "The selected contact does not belong to this customer.",
+    "customerAdmin.feedback.portalAccessContactInactive": "Portal access cannot be provisioned for inactive or archived contacts.",
+    "customerAdmin.feedback.portalAccessCustomerInactive": "Portal access cannot be provisioned for inactive or archived customers.",
     "customerAdmin.permission.commercialRead": "Commercial read",
     "customerAdmin.permission.commercialWrite": "Commercial write",
     "customerAdmin.commercial.eyebrow": "Commercial settings",

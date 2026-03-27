@@ -17,7 +17,7 @@ from app.modules.customers.service import CustomerService
 from app.modules.iam.audit_schemas import LoginEventRead
 from app.modules.iam.auth_schemas import AuthenticatedRoleScope
 from app.modules.iam.authz import RequestAuthorizationContext
-from tests.modules.customers.test_customer_backbone import FakeCustomerRepository
+from tests.modules.customers.test_customer_backbone import PORTAL_USER_ID, FakeCustomerRepository
 from tests.modules.customers.test_customer_portal_context import _internal_actor
 
 
@@ -93,7 +93,7 @@ class TestCustomerCollaborationService(unittest.TestCase):
                 customer_id=self.customer.id,
                 full_name="Jamie Admin",
                 email="jamie@example.invalid",
-                user_id="user-portal",
+                user_id=PORTAL_USER_ID,
                 is_primary_contact=True,
             ),
             _internal_actor(),
@@ -162,7 +162,7 @@ class TestCustomerCollaborationService(unittest.TestCase):
             LoginEventRead(
                 id="login-privacy",
                 tenant_id="tenant-1",
-                user_account_id="user-portal",
+                user_account_id=PORTAL_USER_ID,
                 session_id="session-1",
                 tenant_code="tenant-1",
                 identifier="jamie.admin@example.invalid",
@@ -203,7 +203,7 @@ class TestCustomerCollaborationService(unittest.TestCase):
             LoginEventRead(
                 id="login-1",
                 tenant_id="tenant-1",
-                user_account_id="user-portal",
+                user_account_id=PORTAL_USER_ID,
                 session_id="session-1",
                 tenant_code="tenant-1",
                 identifier="jamie@example.invalid",

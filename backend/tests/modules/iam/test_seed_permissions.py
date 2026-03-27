@@ -81,6 +81,7 @@ class TestSeedIamCatalog(unittest.TestCase):
         self.assertEqual(permission_keys["core.admin.tenant.write"], ("core_admin", "tenant_write"))
         self.assertEqual(permission_keys["core.admin.branch.read"], ("core_admin", "branch_read"))
         self.assertEqual(permission_keys["customers.billing.read"], ("customers", "billing_read"))
+        self.assertEqual(permission_keys["customers.portal_access.read"], ("customers", "portal_access_read"))
         self.assertEqual(permission_keys["employees.private.write"], ("employees", "private_write"))
         self.assertEqual(permission_keys["portal.customer.access"], ("portal_customer", "access"))
 
@@ -105,6 +106,29 @@ class TestSeedIamCatalog(unittest.TestCase):
         self.assertTrue(
             any(
                 row.role_id == tenant_admin.id and row.permission_id == employee_write.id
+                for row in session.role_permissions
+            )
+        )
+
+    def test_tenant_admin_seed_includes_customer_portal_access_permissions(self) -> None:
+        session = _FakeSession()
+        seed_iam_catalog(session)
+
+        roles = {role.key: role for role in session.roles}
+        permissions = {permission.key: permission for permission in session.permissions}
+        tenant_admin = roles["tenant_admin"]
+        portal_access_read = permissions["customers.portal_access.read"]
+        portal_access_write = permissions["customers.portal_access.write"]
+
+        self.assertTrue(
+            any(
+                row.role_id == tenant_admin.id and row.permission_id == portal_access_read.id
+                for row in session.role_permissions
+            )
+        )
+        self.assertTrue(
+            any(
+                row.role_id == tenant_admin.id and row.permission_id == portal_access_write.id
                 for row in session.role_permissions
             )
         )

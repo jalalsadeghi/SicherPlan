@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
+from uuid import UUID
 
 from app.errors import ApiException
 from app.modules.customers.models import (
@@ -617,13 +618,25 @@ class CustomerService:
                 "errors.customers.contact.primary_conflict",
             )
         if payload.user_id is not None:
-            user = self.repository.get_user_account(tenant_id, payload.user_id)
+            user_id = self._normalize_portal_user_id(payload.user_id)
+            user = self.repository.get_user_account(tenant_id, user_id)
             if user is None or user.archived_at is not None:
                 raise ApiException(
                     400,
                     "customers.validation.portal_user_scope",
                     "errors.customers.contact.invalid_user_scope",
                 )
+
+    @staticmethod
+    def _normalize_portal_user_id(user_id: str) -> str:
+        try:
+            return str(UUID(str(user_id).strip()))
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise ApiException(
+                400,
+                "customers.validation.portal_user_id_format",
+                "errors.customers.contact.invalid_user_id_format",
+            ) from exc
 
     def _validate_address_constraints(
         self,
