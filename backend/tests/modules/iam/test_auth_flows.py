@@ -124,6 +124,17 @@ class FakeAuthRepository:
         self.role_scopes = [
             AuthenticatedRoleScope(role_key="tenant_admin", scope_type="tenant"),
         ]
+        self.permission_keys = [
+            "core.admin.access",
+            "core.admin.tenant.read",
+            "core.admin.tenant.write",
+            "core.admin.branch.read",
+            "core.admin.branch.write",
+            "core.admin.mandate.read",
+            "core.admin.mandate.write",
+            "core.admin.setting.read",
+            "core.admin.setting.write",
+        ]
 
     def find_user_by_tenant_and_identifier(self, tenant_code: str, identifier: str):
         if tenant_code == self.tenant.code and identifier in {self.user.username, self.user.email}:
@@ -157,17 +168,7 @@ class FakeAuthRepository:
     def list_permission_keys_for_user(self, user_account_id: str, at_time: datetime | None = None):
         if user_account_id != self.user.id:
             return []
-        return [
-            "core.admin.access",
-            "core.admin.tenant.read",
-            "core.admin.tenant.write",
-            "core.admin.branch.read",
-            "core.admin.branch.write",
-            "core.admin.mandate.read",
-            "core.admin.mandate.write",
-            "core.admin.setting.read",
-            "core.admin.setting.write",
-        ]
+        return list(self.permission_keys)
 
     def create_session(self, session_row):
         fake_session = FakeSession(
@@ -377,6 +378,35 @@ class TestAuthFlows(unittest.TestCase):
             self.service.confirm_password_reset(
                 PasswordResetConfirmRequest(token=raw_token, new_password="AnotherPassword123"),
             )
+
+    def test_customer_portal_login_materializes_customer_scope_and_permission(self) -> None:
+        self.repository.role_scopes = [
+            AuthenticatedRoleScope(
+                role_key="customer_user",
+                scope_type="customer",
+                customer_id="customer-1",
+            ),
+        ]
+        self.repository.permission_keys = ["portal.customer.access"]
+
+        login = self.service.login(
+            LoginRequest(
+                tenant_code="nord",
+                identifier="nina",
+                password="CorrectHorseBattery",
+            ),
+            ip_address="127.0.0.1",
+            user_agent="UnitTest",
+        )
+
+        self.assertEqual(login.user.roles[0].role_key, "customer_user")
+        self.assertEqual(login.user.roles[0].scope_type, "customer")
+        self.assertEqual(login.user.roles[0].customer_id, "customer-1")
+
+        context = self.service.authenticate_access_token(login.session.access_token)
+        self.assertIn("portal.customer.access", context.permission_keys)
+        self.assertEqual(context.roles[0].role_key, "customer_user")
+        self.assertEqual(context.roles[0].customer_id, "customer-1")
 
 
 class _FakeRequest:

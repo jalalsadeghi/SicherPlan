@@ -54,19 +54,9 @@
       <p>{{ t("portalCustomer.loading.body") }}</p>
     </div>
 
-    <div v-else-if="accessState === 'empty'" class="portal-state-card">
-      <h3>{{ t("portalCustomer.empty.title") }}</h3>
-      <p>{{ t("portalCustomer.empty.body") }}</p>
-    </div>
-
-    <div v-else-if="accessState === 'deactivated'" class="portal-state-card">
-      <h3>{{ t("portalCustomer.deactivated.title") }}</h3>
-      <p>{{ t("portalCustomer.deactivated.body") }}</p>
-    </div>
-
-    <div v-else-if="accessState === 'unauthorized'" class="portal-state-card">
-      <h3>{{ t("portalCustomer.unauthorized.title") }}</h3>
-      <p>{{ t("portalCustomer.unauthorized.body") }}</p>
+    <div v-else-if="portalDiagnosticTitleKey && portalDiagnosticBodyKey" class="portal-state-card">
+      <h3>{{ t(portalDiagnosticTitleKey) }}</h3>
+      <p>{{ t(portalDiagnosticBodyKey) }}</p>
     </div>
 
     <div v-else-if="portalContext" class="portal-stack">
@@ -94,15 +84,37 @@
               <dt>{{ t("portalCustomer.summary.function") }}</dt>
               <dd>{{ portalContext.contact.function_label || "-" }}</dd>
             </div>
-            <div>
-              <dt>{{ t("portalCustomer.summary.tenant") }}</dt>
-              <dd>{{ portalContext.tenant_id }}</dd>
-            </div>
-            <div>
-              <dt>{{ t("portalCustomer.summary.scope") }}</dt>
-              <dd>{{ portalScopeSummary }}</dd>
-            </div>
           </dl>
+          <details class="portal-advanced-details">
+            <summary>{{ t("portalCustomer.summary.advanced") }}</summary>
+            <dl class="portal-advanced-grid">
+              <div>
+                <dt>{{ t("portalCustomer.summary.tenant") }}</dt>
+                <dd>{{ portalContext.tenant_id }}</dd>
+              </div>
+              <div>
+                <dt>{{ t("portalCustomer.summary.scope") }}</dt>
+                <dd>{{ portalScopeSummary }}</dd>
+              </div>
+            </dl>
+          </details>
+        </article>
+
+        <article class="portal-summary-card">
+          <p class="eyebrow">{{ t("portalCustomer.access.eyebrow") }}</p>
+          <h3>{{ t("portalCustomer.access.title") }}</h3>
+          <p>{{ t("portalCustomer.access.body") }}</p>
+          <ul class="portal-capability-list">
+            <li v-for="item in capabilitySummaryRows" :key="item.labelKey" class="portal-capability-item">
+              <div>
+                <strong>{{ t(item.labelKey) }}</strong>
+                <p>{{ t(item.bodyKey) }}</p>
+              </div>
+              <span class="status-badge" :data-state="item.state">
+                {{ t(capabilityStateKey(item.state)) }}
+              </span>
+            </li>
+          </ul>
         </article>
 
         <article class="portal-summary-card">
@@ -111,7 +123,15 @@
           <ul class="portal-flags">
             <li>{{ t("portalCustomer.meta.releasedOnly") }}</li>
             <li>{{ t("portalCustomer.meta.customerScoped") }}</li>
-            <li>{{ t("portalCustomer.meta.personalNamesRestricted") }}</li>
+            <li>
+              {{
+                t(
+                  portalContext.capabilities.personal_names_visible
+                    ? "portalCustomer.meta.personalNamesVisible"
+                    : "portalCustomer.meta.personalNamesRestricted",
+                )
+              }}
+            </li>
           </ul>
         </article>
       </div>
@@ -152,7 +172,7 @@
             </span>
           </div>
           <p class="dataset-meta">
-            {{ t(collectionMessageKey(orders?.source.message_key, "portalCustomer.datasets.orders.pending")) }}
+            {{ t(datasetMessageKey(orders, "portalCustomer.datasets.orders.empty")) }}
           </p>
           <p class="dataset-meta">
             {{ t("portalCustomer.meta.sourceModule") }}: {{ orders?.source.source_module_key || "planning" }}
@@ -176,7 +196,7 @@
             </span>
           </div>
           <p class="dataset-meta">
-            {{ t(collectionMessageKey(schedules?.source.message_key, "portalCustomer.datasets.schedules.pending")) }}
+            {{ t(datasetMessageKey(schedules, "portalCustomer.datasets.schedules.empty")) }}
           </p>
           <p class="dataset-meta">
             {{ t("portalCustomer.meta.sourceModule") }}: {{ schedules?.source.source_module_key || "planning" }}
@@ -200,7 +220,7 @@
             </span>
           </div>
           <p class="dataset-meta">
-            {{ t(collectionMessageKey(watchbooks?.source.message_key, "portalCustomer.datasets.watchbooks.pending")) }}
+            {{ t(datasetMessageKey(watchbooks, "portalCustomer.datasets.watchbooks.empty")) }}
           </p>
           <p class="dataset-meta">
             {{ t("portalCustomer.meta.sourceModule") }}:
@@ -215,7 +235,7 @@
               </span>
             </li>
           </ul>
-          <div v-if="watchbooks?.items.length" class="portal-watchbook-entry-form">
+          <div v-if="watchbooks?.items.length && portalContext.capabilities.can_add_watchbook_entries" class="portal-watchbook-entry-form">
             <div class="field">
               <label for="customer-watchbook-select">{{ t("portalCustomer.watchbooks.fields.watchbook") }}</label>
               <select id="customer-watchbook-select" v-model="selectedWatchbookId">
@@ -244,6 +264,13 @@
               </button>
             </div>
           </div>
+          <div
+            v-else-if="watchbooks?.items.length && !portalContext.capabilities.can_add_watchbook_entries"
+            class="portal-watchbook-disabled"
+          >
+            <strong>{{ t("portalCustomer.watchbooks.disabledTitle") }}</strong>
+            <p>{{ t("portalCustomer.watchbooks.disabledBody") }}</p>
+          </div>
         </article>
 
         <article class="portal-dataset-card">
@@ -258,7 +285,7 @@
             </span>
           </div>
           <p class="dataset-meta">
-            {{ t(collectionMessageKey(timesheets?.source.message_key, "portalCustomer.datasets.timesheets.pending")) }}
+            {{ t(datasetMessageKey(timesheets, "portalCustomer.datasets.timesheets.empty")) }}
           </p>
           <p class="dataset-meta">
             {{ t("portalCustomer.meta.sourceModule") }}: {{ timesheets?.source.source_module_key || "finance" }}
@@ -295,7 +322,7 @@
             </span>
           </div>
           <p class="dataset-meta">
-            {{ t(collectionMessageKey(invoices?.source.message_key, "portalCustomer.datasets.invoices.pending")) }}
+            {{ t(datasetMessageKey(invoices, "portalCustomer.datasets.invoices.empty")) }}
           </p>
           <p class="dataset-meta">
             {{ t("portalCustomer.meta.sourceModule") }}: {{ invoices?.source.source_module_key || "finance" }}
@@ -334,7 +361,7 @@
             </span>
           </div>
           <p class="dataset-meta">
-            {{ t(collectionMessageKey(reports?.source.message_key, "portalCustomer.datasets.reports.pending")) }}
+            {{ t(datasetMessageKey(reports, "portalCustomer.datasets.reports.empty")) }}
           </p>
           <p class="dataset-meta">
             {{ t("portalCustomer.meta.sourceModule") }}: {{ reports?.source.source_module_key || "reporting" }}
@@ -375,8 +402,10 @@ import {
   type CustomerPortalWatchbookCollectionRead,
 } from "@/api/customerPortal";
 import {
+  derivePortalCapabilityState,
   derivePortalCollectionState,
   derivePortalCustomerAccessState,
+  derivePortalDatasetMessage,
   mapPortalApiMessage,
 } from "@/features/portal/customerPortal.helpers.js";
 import { useI18n } from "@/i18n";
@@ -414,8 +443,47 @@ const accessState = computed(() =>
     lastErrorKey: lastErrorKey.value,
   }),
 );
+const portalDiagnosticTitleKey = computed<MessageKey | null>(() => {
+  switch (accessState.value) {
+    case "missing_permission":
+      return "portalCustomer.permissionDenied.title";
+    case "missing_scope":
+      return "portalCustomer.scopeMissing.title";
+    case "contact_not_linked":
+      return "portalCustomer.contactNotLinked.title";
+    case "contact_inactive":
+      return "portalCustomer.contactInactive.title";
+    case "customer_inactive":
+      return "portalCustomer.customerInactive.title";
+    case "error":
+      return "portalCustomer.error.title";
+    default:
+      return null;
+  }
+});
+const portalDiagnosticBodyKey = computed<MessageKey | null>(() => {
+  switch (accessState.value) {
+    case "missing_permission":
+      return "portalCustomer.permissionDenied.body";
+    case "missing_scope":
+      return "portalCustomer.scopeMissing.body";
+    case "contact_not_linked":
+      return "portalCustomer.contactNotLinked.body";
+    case "contact_inactive":
+      return "portalCustomer.contactInactive.body";
+    case "customer_inactive":
+      return "portalCustomer.customerInactive.body";
+    case "error":
+      return "portalCustomer.error.body";
+    default:
+      return null;
+  }
+});
 const portalScopeSummary = computed(() =>
   portalContext.value?.scopes.map((scope) => scope.customer_id).join(", ") ?? "-",
+);
+const portalDatasetCapabilities = computed(() =>
+  new Map((portalContext.value?.capabilities.datasets ?? []).map((item) => [item.domain_key, item])),
 );
 const ordersState = computed(() => derivePortalCollectionState(orders.value));
 const schedulesState = computed(() => derivePortalCollectionState(schedules.value));
@@ -423,6 +491,61 @@ const watchbooksState = computed(() => derivePortalCollectionState(watchbooks.va
 const timesheetsState = computed(() => derivePortalCollectionState(timesheets.value));
 const invoicesState = computed(() => derivePortalCollectionState(invoices.value));
 const reportsState = computed(() => derivePortalCollectionState(reports.value));
+type CapabilitySummaryRow = {
+  labelKey: MessageKey;
+  bodyKey: MessageKey;
+  state: "available" | "enabled" | "not_enabled" | "pending_integration" | "read_only";
+};
+
+const capabilitySummaryRows = computed(() => {
+  const capabilities = portalContext.value?.capabilities;
+  if (!capabilities) {
+    return [] as CapabilitySummaryRow[];
+  }
+
+  return [
+    {
+      labelKey: "portalCustomer.capabilities.orders.label",
+      bodyKey: "portalCustomer.capabilities.orders.body",
+      state: derivePortalCapabilityState(portalDatasetCapabilities.value.get("orders")),
+    },
+    {
+      labelKey: "portalCustomer.capabilities.schedules.label",
+      bodyKey: "portalCustomer.capabilities.schedules.body",
+      state: derivePortalCapabilityState(portalDatasetCapabilities.value.get("schedules")),
+    },
+    {
+      labelKey: "portalCustomer.capabilities.watchbooks.label",
+      bodyKey: "portalCustomer.capabilities.watchbooks.body",
+      state: derivePortalCapabilityState(portalDatasetCapabilities.value.get("watchbooks")),
+    },
+    {
+      labelKey: "portalCustomer.capabilities.watchbookWrite.label",
+      bodyKey: "portalCustomer.capabilities.watchbookWrite.body",
+      state: capabilities.can_add_watchbook_entries ? "enabled" : "not_enabled",
+    },
+    {
+      labelKey: "portalCustomer.capabilities.timesheets.label",
+      bodyKey: "portalCustomer.capabilities.timesheets.body",
+      state: capabilities.can_download_timesheet_documents ? "available" : "not_enabled",
+    },
+    {
+      labelKey: "portalCustomer.capabilities.invoices.label",
+      bodyKey: "portalCustomer.capabilities.invoices.body",
+      state: capabilities.can_download_invoice_documents ? "available" : "not_enabled",
+    },
+    {
+      labelKey: "portalCustomer.capabilities.reports.label",
+      bodyKey: "portalCustomer.capabilities.reports.body",
+      state: derivePortalCapabilityState(portalDatasetCapabilities.value.get("reports")),
+    },
+    {
+      labelKey: "portalCustomer.capabilities.history.label",
+      bodyKey: "portalCustomer.capabilities.history.body",
+      state: capabilities.can_view_history ? "read_only" : "not_enabled",
+    },
+  ] satisfies CapabilitySummaryRow[];
+});
 
 function setFeedback(messageKey: MessageKey, tone: "info" | "success" | "error") {
   feedbackKey.value = messageKey;
@@ -458,10 +581,6 @@ function collectionStateKey(state: string): MessageKey {
   }
 }
 
-function collectionMessageKey(messageKey: string | undefined, fallback: MessageKey): MessageKey {
-  return (messageKey as MessageKey | undefined) ?? fallback;
-}
-
 function formatDate(value: string | null) {
   if (!value) {
     return "-";
@@ -470,6 +589,36 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat(locale.value === "de" ? "de-DE" : "en-US", {
     dateStyle: "medium",
   }).format(new Date(value));
+}
+
+function capabilityStateKey(state: string): MessageKey {
+  switch (state) {
+    case "available":
+      return "portalCustomer.access.states.available";
+    case "enabled":
+      return "portalCustomer.access.states.enabled";
+    case "not_enabled":
+      return "portalCustomer.access.states.notEnabled";
+    case "pending_integration":
+      return "portalCustomer.access.states.pendingIntegration";
+    case "read_only":
+    default:
+      return "portalCustomer.access.states.readOnly";
+  }
+}
+
+function datasetMessageKey(
+  collection:
+    | CustomerPortalInvoiceCollectionRead
+    | CustomerPortalOrderCollectionRead
+    | CustomerPortalReportPackageCollectionRead
+    | CustomerPortalScheduleCollectionRead
+    | CustomerPortalTimesheetCollectionRead
+    | CustomerPortalWatchbookCollectionRead
+    | null,
+  emptyMessageKey: MessageKey,
+): MessageKey {
+  return (derivePortalDatasetMessage(collection, emptyMessageKey) as MessageKey | null) ?? emptyMessageKey;
 }
 
 function formatDateTime(value: string | null) {
@@ -697,6 +846,15 @@ onMounted(async () => {
   gap: 0.85rem;
 }
 
+.portal-watchbook-disabled {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.85rem;
+  background: var(--sp-surface-muted);
+}
+
 .portal-login-grid,
 .portal-summary-grid,
 .portal-dataset-grid,
@@ -751,6 +909,41 @@ onMounted(async () => {
   gap: 0.75rem;
 }
 
+.portal-capability-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.portal-capability-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--sp-border);
+}
+
+.portal-capability-item:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.portal-capability-item p {
+  margin: 0.35rem 0 0;
+  color: var(--sp-text-muted);
+}
+
+.portal-advanced-details {
+  margin-top: 1rem;
+}
+
+.portal-advanced-grid {
+  margin-top: 0.85rem;
+}
+
 .portal-history-list {
   display: grid;
   gap: 0.85rem;
@@ -789,6 +982,23 @@ onMounted(async () => {
 
 .status-badge[data-state="ready"] {
   background: color-mix(in srgb, var(--sp-primary) 18%, var(--sp-surface-muted));
+}
+
+.status-badge[data-state="available"],
+.status-badge[data-state="enabled"] {
+  background: color-mix(in srgb, var(--sp-primary) 18%, var(--sp-surface-muted));
+}
+
+.status-badge[data-state="not_enabled"] {
+  background: color-mix(in srgb, #d94f4f 14%, var(--sp-surface-muted));
+}
+
+.status-badge[data-state="pending_integration"] {
+  background: color-mix(in srgb, #d8a846 18%, var(--sp-surface-muted));
+}
+
+.status-badge[data-state="read_only"] {
+  background: color-mix(in srgb, #4a80d9 16%, var(--sp-surface-muted));
 }
 
 .dataset-meta {
@@ -831,7 +1041,8 @@ dd {
 
 @media (max-width: 720px) {
   .portal-customer-header,
-  .portal-dataset-header {
+  .portal-dataset-header,
+  .portal-capability-item {
     flex-direction: column;
   }
 }

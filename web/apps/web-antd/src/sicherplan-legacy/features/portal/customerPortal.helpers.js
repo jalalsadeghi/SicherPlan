@@ -1,13 +1,3 @@
-const EMPTY_STATE_ERRORS = new Set([
-  "errors.customers.portal.scope_not_resolved",
-  "errors.customers.portal.contact_not_linked",
-]);
-
-const DEACTIVATED_STATE_ERRORS = new Set([
-  "errors.customers.portal.contact_inactive",
-  "errors.customers.portal.customer_inactive",
-]);
-
 export function canAccessAppRoute({ allowedRoles, allowGuest = false, role, isAuthenticated }) {
   if (allowGuest) {
     return true;
@@ -37,15 +27,21 @@ export function derivePortalCustomerAccessState({ isLoading, hasSession, hasCont
     return "login";
   }
 
-  if (DEACTIVATED_STATE_ERRORS.has(lastErrorKey)) {
-    return "deactivated";
+  switch (lastErrorKey) {
+    case "errors.iam.authorization.permission_denied":
+    case "errors.iam.authorization.scope_denied":
+      return "missing_permission";
+    case "errors.customers.portal.scope_not_resolved":
+      return "missing_scope";
+    case "errors.customers.portal.contact_not_linked":
+      return "contact_not_linked";
+    case "errors.customers.portal.contact_inactive":
+      return "contact_inactive";
+    case "errors.customers.portal.customer_inactive":
+      return "customer_inactive";
+    default:
+      return "error";
   }
-
-  if (EMPTY_STATE_ERRORS.has(lastErrorKey)) {
-    return "empty";
-  }
-
-  return "unauthorized";
 }
 
 export function mapPortalApiMessage(messageKey) {
@@ -78,4 +74,40 @@ export function derivePortalCollectionState(collection) {
   }
 
   return collection.source.availability_status === "pending_source_module" ? "pending" : "empty";
+}
+
+export function derivePortalCapabilityState(capability) {
+  if (!capability) {
+    return "not_enabled";
+  }
+
+  if (capability.availability_status === "pending_source_module") {
+    return "pending_integration";
+  }
+
+  if (capability.interaction_mode === "write_optional") {
+    return capability.can_write ? "enabled" : "not_enabled";
+  }
+
+  if (capability.interaction_mode === "download") {
+    return capability.can_download_documents ? "available" : "not_enabled";
+  }
+
+  return "read_only";
+}
+
+export function derivePortalDatasetMessage(collection, emptyMessageKey) {
+  if (!collection) {
+    return null;
+  }
+
+  if (collection.source.availability_status === "pending_source_module") {
+    return collection.source.message_key;
+  }
+
+  if (collection.items.length === 0) {
+    return emptyMessageKey;
+  }
+
+  return collection.source.message_key;
 }

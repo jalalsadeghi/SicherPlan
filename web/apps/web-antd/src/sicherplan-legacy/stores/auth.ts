@@ -168,6 +168,10 @@ function pickSessionRole(user: AuthenticatedUser | null): AppRole | null {
   return null;
 }
 
+function isPortalSessionRole(role: AppRole | null): boolean {
+  return role === "customer_user" || role === "subcontractor_user";
+}
+
 function resolveTenantScopeIdForRole(
   role: AppRole,
   sessionUser: AuthenticatedUser | null,
@@ -199,7 +203,7 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
   }),
   getters: {
     effectiveRole(state): AppRole {
-      return pickRoleFromKeys(readPrimaryRoleKeys()) ?? pickSessionRole(state.sessionUser) ?? state.activeRole;
+      return pickSessionRole(state.sessionUser) ?? pickRoleFromKeys(readPrimaryRoleKeys()) ?? state.activeRole;
     },
     accessRoles(): string[] {
       return [this.effectiveRole];
@@ -228,8 +232,14 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
     syncFromPrimarySession() {
       const primaryAccessToken = readPrimaryAccessToken();
       const primaryRole = pickRoleFromKeys(readPrimaryRoleKeys());
+      const sessionRole = pickSessionRole(this.sessionUser);
+      const preservePortalSession =
+        Boolean(this.accessToken && this.sessionUser)
+        && isPortalSessionRole(sessionRole)
+        && Boolean(primaryAccessToken)
+        && primaryAccessToken !== this.accessToken;
 
-      if (primaryAccessToken && primaryAccessToken !== this.accessToken) {
+      if (primaryAccessToken && primaryAccessToken !== this.accessToken && !preservePortalSession) {
         this.accessToken = primaryAccessToken;
         this.sessionId = "";
         this.sessionUser = null;

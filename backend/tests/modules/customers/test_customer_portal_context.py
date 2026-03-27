@@ -4,7 +4,7 @@ import unittest
 
 from app.errors import ApiException
 from app.modules.customers.portal_service import CustomerPortalService
-from app.modules.customers.schemas import CustomerContactCreate, CustomerCreate, CustomerUpdate
+from app.modules.customers.schemas import CustomerContactCreate, CustomerContactUpdate, CustomerCreate, CustomerUpdate
 from app.modules.customers.service import CustomerService
 from app.modules.iam.auth_schemas import AuthenticatedRoleScope
 from app.modules.iam.authz import RequestAuthorizationContext
@@ -72,6 +72,28 @@ class TestCustomerPortalContext(unittest.TestCase):
         self.assertEqual(context.customer.customer_number, "K-1000")
         self.assertEqual(context.contact.full_name, "Alex Kunde")
         self.assertEqual(context.scopes[0].customer_id, self.customer.id)
+        self.assertTrue(context.capabilities.can_view_watchbooks)
+        self.assertFalse(context.capabilities.can_add_watchbook_entries)
+        self.assertFalse(context.capabilities.personal_names_visible)
+        self.assertEqual(
+            {item.domain_key: item.availability_status for item in context.capabilities.datasets},
+            {
+                "orders": "pending_source_module",
+                "schedules": "pending_source_module",
+                "watchbooks": "ready",
+                "timesheets": "ready",
+                "invoices": "ready",
+                "reports": "pending_source_module",
+                "history": "ready",
+            },
+        )
+
+    def test_watchbook_entry_capability_is_enabled_only_when_tenant_policy_allows_it(self) -> None:
+        self.repository.customer_portal_policy["customer_watchbook_entries_enabled"] = True
+
+        context = self.portal_service.get_context(_portal_actor(customer_id=self.customer.id))
+
+        self.assertTrue(context.capabilities.can_add_watchbook_entries)
 
     def test_missing_customer_scope_is_rejected(self) -> None:
         actor = RequestAuthorizationContext(
@@ -95,11 +117,33 @@ class TestCustomerPortalContext(unittest.TestCase):
 
         self.assertEqual(raised.exception.code, "customers.portal.contact_not_linked")
 
+    def test_missing_portal_permission_is_rejected(self) -> None:
+        with self.assertRaises(ApiException) as raised:
+            self.portal_service.get_context(
+                _portal_actor(customer_id=self.customer.id, permission_keys=()),
+            )
+
+        self.assertEqual(raised.exception.code, "iam.authorization.permission_denied")
+
     def test_cross_customer_scope_mismatch_is_rejected(self) -> None:
         with self.assertRaises(ApiException) as raised:
             self.portal_service.get_context(_portal_actor(customer_id="customer-2"))
 
         self.assertEqual(raised.exception.code, "customers.portal.scope_not_resolved")
+
+    def test_inactive_contact_is_rejected(self) -> None:
+        self.customer_service.update_contact(
+            "tenant-1",
+            self.customer.id,
+            self.contact.id,
+            CustomerContactUpdate(status="inactive", version_no=self.contact.version_no),
+            _internal_actor(),
+        )
+
+        with self.assertRaises(ApiException) as raised:
+            self.portal_service.get_context(_portal_actor(customer_id=self.customer.id))
+
+        self.assertEqual(raised.exception.code, "customers.portal.contact_inactive")
 
     def test_inactive_customer_is_rejected(self) -> None:
         self.customer_service.update_customer(

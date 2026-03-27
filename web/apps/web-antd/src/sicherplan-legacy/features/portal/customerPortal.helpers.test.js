@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 
 import {
   canAccessAppRoute,
+  derivePortalCapabilityState,
   derivePortalCollectionState,
   derivePortalCustomerAccessState,
+  derivePortalDatasetMessage,
   mapPortalApiMessage,
 } from "./customerPortal.helpers.js";
 
@@ -41,7 +43,7 @@ test("protected routes require an authenticated matching role", () => {
   );
 });
 
-test("portal access state distinguishes login, ready, deactivated, and empty states", () => {
+test("portal access state distinguishes exact customer portal denial reasons", () => {
   assert.equal(
     derivePortalCustomerAccessState({
       isLoading: false,
@@ -65,9 +67,9 @@ test("portal access state distinguishes login, ready, deactivated, and empty sta
       isLoading: false,
       hasSession: true,
       hasContext: false,
-      lastErrorKey: "errors.customers.portal.customer_inactive",
+      lastErrorKey: "errors.iam.authorization.permission_denied",
     }),
-    "deactivated",
+    "missing_permission",
   );
   assert.equal(
     derivePortalCustomerAccessState({
@@ -76,7 +78,34 @@ test("portal access state distinguishes login, ready, deactivated, and empty sta
       hasContext: false,
       lastErrorKey: "errors.customers.portal.scope_not_resolved",
     }),
-    "empty",
+    "missing_scope",
+  );
+  assert.equal(
+    derivePortalCustomerAccessState({
+      isLoading: false,
+      hasSession: true,
+      hasContext: false,
+      lastErrorKey: "errors.customers.portal.contact_not_linked",
+    }),
+    "contact_not_linked",
+  );
+  assert.equal(
+    derivePortalCustomerAccessState({
+      isLoading: false,
+      hasSession: true,
+      hasContext: false,
+      lastErrorKey: "errors.customers.portal.contact_inactive",
+    }),
+    "contact_inactive",
+  );
+  assert.equal(
+    derivePortalCustomerAccessState({
+      isLoading: false,
+      hasSession: true,
+      hasContext: false,
+      lastErrorKey: "errors.customers.portal.customer_inactive",
+    }),
+    "customer_inactive",
   );
 });
 
@@ -118,5 +147,67 @@ test("portal collection state distinguishes pending, empty, and ready data", () 
       source: { availability_status: "ready" },
     }),
     "ready",
+  );
+});
+
+test("portal capability state reflects backend capability metadata", () => {
+  assert.equal(
+    derivePortalCapabilityState({
+      availability_status: "pending_source_module",
+      interaction_mode: "read_only",
+      can_download_documents: false,
+      can_write: false,
+    }),
+    "pending_integration",
+  );
+  assert.equal(
+    derivePortalCapabilityState({
+      availability_status: "ready",
+      interaction_mode: "write_optional",
+      can_download_documents: false,
+      can_write: true,
+    }),
+    "enabled",
+  );
+  assert.equal(
+    derivePortalCapabilityState({
+      availability_status: "ready",
+      interaction_mode: "download",
+      can_download_documents: true,
+      can_write: false,
+    }),
+    "available",
+  );
+  assert.equal(
+    derivePortalCapabilityState({
+      availability_status: "ready",
+      interaction_mode: "read_only",
+      can_download_documents: false,
+      can_write: false,
+    }),
+    "read_only",
+  );
+});
+
+test("portal dataset message distinguishes pending integrations from empty released datasets", () => {
+  assert.equal(
+    derivePortalDatasetMessage(
+      {
+        items: [],
+        source: { availability_status: "pending_source_module", message_key: "portal.pending" },
+      },
+      "portal.empty",
+    ),
+    "portal.pending",
+  );
+  assert.equal(
+    derivePortalDatasetMessage(
+      {
+        items: [],
+        source: { availability_status: "ready", message_key: "portal.source" },
+      },
+      "portal.empty",
+    ),
+    "portal.empty",
   );
 });

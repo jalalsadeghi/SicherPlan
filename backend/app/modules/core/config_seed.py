@@ -13,6 +13,7 @@ from app.modules.core.models import TenantSetting
 
 NUMBERING_RULES_SETTING_KEY = "numbering.rules"
 PRINT_TEMPLATES_SETTING_KEY = "print_templates.catalog"
+CUSTOMER_PORTAL_POLICY_SETTING_KEY = "customer_portal.policy"
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +89,13 @@ DEFAULT_TENANT_SETTINGS: tuple[TenantSettingSeed, ...] = (
     TenantSettingSeed(
         key=PRINT_TEMPLATES_SETTING_KEY,
         value_json={"version": "v1", "templates": DEFAULT_PRINT_TEMPLATES},
+    ),
+    TenantSettingSeed(
+        key=CUSTOMER_PORTAL_POLICY_SETTING_KEY,
+        value_json={
+            "version": "v1",
+            "customer_watchbook_entries_enabled": False,
+        },
     ),
 )
 

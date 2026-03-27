@@ -92,6 +92,30 @@ export interface CustomerPortalContextRead {
     scope_type: string;
     customer_id: string;
   }>;
+  capabilities: {
+    can_view_orders: boolean;
+    can_view_schedules: boolean;
+    can_view_watchbooks: boolean;
+    can_add_watchbook_entries: boolean;
+    can_view_timesheets: boolean;
+    can_download_timesheet_documents: boolean;
+    can_view_invoices: boolean;
+    can_download_invoice_documents: boolean;
+    can_view_reports: boolean;
+    can_view_history: boolean;
+    personal_names_visible: boolean;
+    released_only: boolean;
+    customer_scoped_only: boolean;
+    datasets: Array<{
+      domain_key: string;
+      availability_status: string;
+      reason_message_key: string;
+      interaction_mode: string;
+      can_view: boolean;
+      can_download_documents: boolean;
+      can_write: boolean;
+    }>;
+  };
 }
 
 export interface SubcontractorPortalContextRead {

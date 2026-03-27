@@ -23,6 +23,7 @@ class FakeCustomer:
     customer_number: str
     name: str
     status: str = "active"
+    portal_person_names_released: bool = False
     archived_at: datetime | None = None
 
 
@@ -80,6 +81,10 @@ class FakeAssignment:
 class FakeCustomerPortalAccessRepository:
     def __init__(self) -> None:
         self.tenants = {"tenant-1", "tenant-2"}
+        self.customer_portal_policy = {
+            "version": "v1",
+            "customer_watchbook_entries_enabled": False,
+        }
         self.customers = {
             "customer-1": FakeCustomer("customer-1", "tenant-1", "K-1000", "Nord Security GmbH"),
             "customer-2": FakeCustomer("customer-2", "tenant-1", "K-1001", "Atlas Objekt GmbH"),
@@ -107,6 +112,9 @@ class FakeCustomerPortalAccessRepository:
 
     def tenant_exists(self, tenant_id: str) -> bool:
         return tenant_id in self.tenants
+
+    def get_customer_portal_policy(self, tenant_id: str) -> dict[str, object]:
+        return dict(self.customer_portal_policy)
 
     def get_customer(self, tenant_id: str, customer_id: str) -> FakeCustomer | None:
         customer = self.customers.get(customer_id)

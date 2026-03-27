@@ -201,6 +201,10 @@ class FakeCustomerRepository:
         self.users = {PORTAL_USER_ID: FakeUser(PORTAL_USER_ID, "tenant-1")}
         self.addresses = {"address-1": FakeAddress("address-1")}
         self.customers: dict[str, FakeCustomer] = {}
+        self.customer_portal_policy = {
+            "version": "v1",
+            "customer_watchbook_entries_enabled": False,
+        }
 
     def list_customers(self, tenant_id: str, filters: CustomerFilter) -> list[FakeCustomer]:
         rows = [row for row in self.customers.values() if row.tenant_id == tenant_id]
@@ -216,6 +220,9 @@ class FakeCustomerRepository:
         if customer is None or customer.tenant_id != tenant_id:
             return None
         return customer
+
+    def get_customer_portal_policy(self, tenant_id: str) -> dict[str, object]:
+        return dict(self.customer_portal_policy)
 
     def get_portal_contact_for_user(self, tenant_id: str, user_id: str):
         for customer in self.customers.values():

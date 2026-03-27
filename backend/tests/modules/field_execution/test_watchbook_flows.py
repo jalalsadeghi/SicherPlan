@@ -39,6 +39,22 @@ def _customer_context() -> CustomerPortalContextRead:
         customer={"id": "customer-1", "tenant_id": "tenant-1", "customer_number": "C1", "name": "Customer", "status": "active"},
         contact={"id": "contact-1", "tenant_id": "tenant-1", "customer_id": "customer-1", "full_name": "Customer Contact", "function_label": None, "email": None, "phone": None, "mobile": None, "status": "active"},
         scopes=[{"role_key": "customer_user", "scope_type": "customer", "customer_id": "customer-1"}],
+        capabilities={
+            "can_view_orders": True,
+            "can_view_schedules": True,
+            "can_view_watchbooks": True,
+            "can_add_watchbook_entries": False,
+            "can_view_timesheets": True,
+            "can_download_timesheet_documents": True,
+            "can_view_invoices": True,
+            "can_download_invoice_documents": True,
+            "can_view_reports": True,
+            "can_view_history": True,
+            "personal_names_visible": False,
+            "released_only": True,
+            "customer_scoped_only": True,
+            "datasets": [],
+        },
     )
 
 
@@ -309,12 +325,33 @@ class WatchbookServiceTests(unittest.TestCase):
             _actor("controller_qm"),
         )
         entry = self.service.add_customer_portal_entry(
-            _customer_context(),
+            _customer_context().model_copy(update={"capabilities": _customer_context().capabilities.model_copy(update={"can_add_watchbook_entries": True})}),
             opened.id,
             WatchbookEntryCreate(entry_type_code="customer_note", narrative="Need update"),
             _actor("customer_user"),
         )
         self.assertEqual(entry.author_actor_type, "customer")
+
+    def test_customer_portal_entry_stays_blocked_when_tenant_capability_is_disabled_even_if_watchbook_is_released(self) -> None:
+        opened = self.service.open_or_create_watchbook(
+            "tenant-1",
+            WatchbookOpenRequest(tenant_id="tenant-1", context_type="site", site_id="site-1", log_date=date(2026, 4, 2)),
+            _actor("dispatcher"),
+        )
+        self.service.update_visibility(
+            "tenant-1",
+            opened.id,
+            WatchbookVisibilityUpdate(customer_visibility_released=True, customer_participation_enabled=True),
+            _actor("controller_qm"),
+        )
+
+        with self.assertRaises(ApiException):
+            self.service.add_customer_portal_entry(
+                _customer_context(),
+                opened.id,
+                WatchbookEntryCreate(entry_type_code="customer_note", narrative="Need update"),
+                _actor("customer_user"),
+            )
 
     def test_watchbook_metadata_exposes_composite_tenant_unique_key(self) -> None:
         constraints = {constraint.name for constraint in Watchbook.__table__.constraints}

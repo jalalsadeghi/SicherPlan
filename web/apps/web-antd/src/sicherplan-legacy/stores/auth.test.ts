@@ -34,6 +34,30 @@ vi.mock('../api/auth', () => ({
   logout: vi.fn(),
 }));
 
+function makeSessionTokenPair(accessToken: string, refreshToken: string, sessionId: string) {
+  return {
+    access_token: accessToken,
+    access_token_type: 'Bearer',
+    access_token_expires_at: '2026-01-01T00:15:00Z',
+    refresh_token: refreshToken,
+    refresh_token_expires_at: '2026-01-01T01:00:00Z',
+    session_id: sessionId,
+    mfa_required: false,
+    sso_hints: [],
+  };
+}
+
+function makeRoleScope(roleKey: string, scopeType: string, customerId: null | string = null) {
+  return {
+    role_key: roleKey,
+    scope_type: scopeType,
+    branch_id: null,
+    mandate_id: null,
+    customer_id: customerId,
+    subcontractor_id: null,
+  };
+}
+
 describe('legacy auth tenant scope resolution', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -57,7 +81,7 @@ describe('legacy auth tenant scope resolution', () => {
         locale: 'de',
         timezone: 'Europe/Berlin',
         is_platform_user: false,
-        roles: [{ role_key: 'tenant_admin', scope_type: 'tenant' }],
+        roles: [makeRoleScope('tenant_admin', 'tenant')],
       },
       session: { id: 'session-1' },
     });
@@ -76,11 +100,7 @@ describe('legacy auth tenant scope resolution', () => {
     const store = useAuthStore();
 
     store.setSession({
-      session: {
-        access_token: 'token-1',
-        refresh_token: 'refresh-1',
-        session_id: 'session-1',
-      },
+      session: makeSessionTokenPair('token-1', 'refresh-1', 'session-1'),
       user: {
         id: 'user-1',
         tenant_id: 'tenant-1',
@@ -90,7 +110,7 @@ describe('legacy auth tenant scope resolution', () => {
         locale: 'de',
         timezone: 'Europe/Berlin',
         is_platform_user: false,
-        roles: [{ role_key: 'tenant_admin', scope_type: 'tenant' }],
+        roles: [makeRoleScope('tenant_admin', 'tenant')],
       },
     });
 
@@ -102,7 +122,7 @@ describe('legacy auth tenant scope resolution', () => {
     window.localStorage.setItem('sicherplan-session-user', JSON.stringify({
       id: 'old-user',
       tenant_id: 'c867d853-4148-44be-9f50-35e151f9778c',
-      roles: [{ role_key: 'platform_admin', scope_type: 'tenant' }],
+      roles: [makeRoleScope('platform_admin', 'tenant')],
     }));
     window.localStorage.setItem('sicherplan-session-id', 'old-session');
     window.localStorage.setItem('sicherplan-tenant-scope', 'c867d853-4148-44be-9f50-35e151f9778c');
@@ -121,6 +141,35 @@ describe('legacy auth tenant scope resolution', () => {
     expect(store.effectiveTenantScopeId).toBe('');
   });
 
+  it('preserves an explicit customer portal session when a stale primary token still exists', async () => {
+    primaryAccessState.accessToken = 'stale-admin-token';
+    primaryUserState.userInfo = { roles: ['tenant_admin'] };
+
+    const { useAuthStore } = await import('./auth');
+    const store = useAuthStore();
+
+    store.setSession({
+      session: makeSessionTokenPair('portal-token', 'portal-refresh', 'portal-session'),
+      user: {
+        id: 'portal-user-1',
+        tenant_id: 'tenant-portal',
+        username: 'customer.portal',
+        email: 'customer.portal@example.invalid',
+        full_name: 'Customer Portal',
+        locale: 'de',
+        timezone: 'Europe/Berlin',
+        is_platform_user: false,
+        roles: [makeRoleScope('customer_user', 'customer', 'customer-1')],
+      },
+    });
+
+    store.syncFromPrimarySession();
+
+    expect(store.accessToken).toBe('portal-token');
+    expect(store.sessionUser?.id).toBe('portal-user-1');
+    expect(store.effectiveRole).toBe('customer_user');
+  });
+
   it('platform admin still uses the remembered tenant scope', async () => {
     const { resolveTenantScopeIdForRole } = await import('./auth');
 
@@ -136,7 +185,7 @@ describe('legacy auth tenant scope resolution', () => {
           locale: 'de',
           timezone: 'Europe/Berlin',
           is_platform_user: true,
-          roles: [{ role_key: 'platform_admin', scope_type: 'tenant' }],
+          roles: [makeRoleScope('platform_admin', 'tenant')],
         },
         'c867d853-4148-44be-9f50-35e151f9778c',
       ),
@@ -148,11 +197,7 @@ describe('legacy auth tenant scope resolution', () => {
     const store = useAuthStore();
 
     store.setSession({
-      session: {
-        access_token: 'token-1',
-        refresh_token: 'refresh-1',
-        session_id: 'session-1',
-      },
+      session: makeSessionTokenPair('token-1', 'refresh-1', 'session-1'),
       user: {
         id: 'user-1',
         tenant_id: 'tenant-1',
@@ -163,8 +208,8 @@ describe('legacy auth tenant scope resolution', () => {
         timezone: 'Europe/Berlin',
         is_platform_user: true,
         roles: [
-          { role_key: 'platform_admin', scope_type: 'tenant' },
-          { role_key: 'tenant_admin', scope_type: 'tenant' },
+          makeRoleScope('platform_admin', 'tenant'),
+          makeRoleScope('tenant_admin', 'tenant'),
         ],
       },
     });
@@ -178,11 +223,7 @@ describe('legacy auth tenant scope resolution', () => {
     const store = useAuthStore();
 
     store.setSession({
-      session: {
-        access_token: 'token-1',
-        refresh_token: 'refresh-1',
-        session_id: 'session-1',
-      },
+      session: makeSessionTokenPair('token-1', 'refresh-1', 'session-1'),
       user: {
         id: 'user-1',
         tenant_id: 'tenant-1',
@@ -192,7 +233,7 @@ describe('legacy auth tenant scope resolution', () => {
         locale: 'de',
         timezone: 'Europe/Berlin',
         is_platform_user: false,
-        roles: [{ role_key: 'tenant_admin', scope_type: 'tenant' }],
+        roles: [makeRoleScope('tenant_admin', 'tenant')],
       },
     });
 

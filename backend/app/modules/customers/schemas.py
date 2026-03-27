@@ -251,6 +251,33 @@ class CustomerPortalScopeRead(BaseModel):
     customer_id: str
 
 
+class CustomerPortalDatasetCapabilityRead(BaseModel):
+    domain_key: str
+    availability_status: str
+    reason_message_key: str
+    interaction_mode: str
+    can_view: bool = True
+    can_download_documents: bool = False
+    can_write: bool = False
+
+
+class CustomerPortalCapabilitiesRead(BaseModel):
+    can_view_orders: bool
+    can_view_schedules: bool
+    can_view_watchbooks: bool
+    can_add_watchbook_entries: bool
+    can_view_timesheets: bool
+    can_download_timesheet_documents: bool
+    can_view_invoices: bool
+    can_download_invoice_documents: bool
+    can_view_reports: bool
+    can_view_history: bool
+    personal_names_visible: bool
+    released_only: bool
+    customer_scoped_only: bool
+    datasets: list[CustomerPortalDatasetCapabilityRead] = Field(default_factory=list)
+
+
 class CustomerPortalContextRead(BaseModel):
     tenant_id: str
     user_id: str
@@ -259,6 +286,7 @@ class CustomerPortalContextRead(BaseModel):
     customer: CustomerPortalCustomerRead
     contact: CustomerPortalContactRead
     scopes: list[CustomerPortalScopeRead] = Field(default_factory=list)
+    capabilities: CustomerPortalCapabilitiesRead
 
 
 class CustomerPortalCollectionSourceRead(BaseModel):

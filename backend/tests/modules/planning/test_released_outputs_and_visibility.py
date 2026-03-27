@@ -435,6 +435,22 @@ class ReleasedOutputsAndVisibilityTests(unittest.TestCase):
                     status="active",
                 ),
                 scopes=[],
+                capabilities={
+                    "can_view_orders": True,
+                    "can_view_schedules": True,
+                    "can_view_watchbooks": True,
+                    "can_add_watchbook_entries": False,
+                    "can_view_timesheets": True,
+                    "can_download_timesheet_documents": True,
+                    "can_view_invoices": True,
+                    "can_download_invoice_documents": True,
+                    "can_view_reports": True,
+                    "can_view_history": True,
+                    "personal_names_visible": False,
+                    "released_only": True,
+                    "customer_scoped_only": True,
+                    "datasets": [],
+                },
             )
         )
         self.assertEqual(len(customer_rows.items), 1)

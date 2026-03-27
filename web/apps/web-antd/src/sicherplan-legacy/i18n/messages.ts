@@ -196,10 +196,18 @@ export type MessageKey =
   | "portalCustomer.loading.body"
   | "portalCustomer.empty.title"
   | "portalCustomer.empty.body"
-  | "portalCustomer.unauthorized.title"
-  | "portalCustomer.unauthorized.body"
-  | "portalCustomer.deactivated.title"
-  | "portalCustomer.deactivated.body"
+  | "portalCustomer.permissionDenied.title"
+  | "portalCustomer.permissionDenied.body"
+  | "portalCustomer.scopeMissing.title"
+  | "portalCustomer.scopeMissing.body"
+  | "portalCustomer.contactNotLinked.title"
+  | "portalCustomer.contactNotLinked.body"
+  | "portalCustomer.contactInactive.title"
+  | "portalCustomer.contactInactive.body"
+  | "portalCustomer.customerInactive.title"
+  | "portalCustomer.customerInactive.body"
+  | "portalCustomer.error.title"
+  | "portalCustomer.error.body"
   | "portalCustomer.summary.title"
   | "portalCustomer.summary.customerNumber"
   | "portalCustomer.summary.customerName"
@@ -208,6 +216,15 @@ export type MessageKey =
   | "portalCustomer.summary.function"
   | "portalCustomer.summary.tenant"
   | "portalCustomer.summary.scope"
+  | "portalCustomer.summary.advanced"
+  | "portalCustomer.access.eyebrow"
+  | "portalCustomer.access.title"
+  | "portalCustomer.access.body"
+  | "portalCustomer.access.states.available"
+  | "portalCustomer.access.states.readOnly"
+  | "portalCustomer.access.states.enabled"
+  | "portalCustomer.access.states.notEnabled"
+  | "portalCustomer.access.states.pendingIntegration"
   | "portalCustomer.readOnly.title"
   | "portalCustomer.readOnly.body"
   | "portalCustomer.history.eyebrow"
@@ -217,8 +234,30 @@ export type MessageKey =
   | "portalCustomer.meta.releasedOnly"
   | "portalCustomer.meta.customerScoped"
   | "portalCustomer.meta.personalNamesRestricted"
+  | "portalCustomer.meta.personalNamesVisible"
   | "portalCustomer.meta.sourceModule"
   | "portalCustomer.meta.docsBacked"
+  | "portalCustomer.capabilities.orders.label"
+  | "portalCustomer.capabilities.orders.body"
+  | "portalCustomer.capabilities.schedules.label"
+  | "portalCustomer.capabilities.schedules.body"
+  | "portalCustomer.capabilities.watchbooks.label"
+  | "portalCustomer.capabilities.watchbooks.body"
+  | "portalCustomer.capabilities.watchbooks.writeEnabled"
+  | "portalCustomer.capabilities.watchbooks.writeDisabled"
+  | "portalCustomer.capabilities.watchbookWrite.label"
+  | "portalCustomer.capabilities.watchbookWrite.body"
+  | "portalCustomer.capabilities.timesheets.label"
+  | "portalCustomer.capabilities.timesheets.body"
+  | "portalCustomer.capabilities.timesheets.download"
+  | "portalCustomer.capabilities.invoices.label"
+  | "portalCustomer.capabilities.invoices.body"
+  | "portalCustomer.capabilities.invoices.download"
+  | "portalCustomer.capabilities.reports.label"
+  | "portalCustomer.capabilities.reports.body"
+  | "portalCustomer.capabilities.history.label"
+  | "portalCustomer.capabilities.history.body"
+  | "portalCustomer.capabilities.history.visible"
   | "portalCustomer.states.loading"
   | "portalCustomer.states.pending"
   | "portalCustomer.states.empty"
@@ -227,14 +266,19 @@ export type MessageKey =
   | "portalCustomer.datasets.orders.title"
   | "portalCustomer.datasets.orders.lead"
   | "portalCustomer.datasets.orders.pending"
+  | "portalCustomer.datasets.orders.empty"
   | "portalCustomer.datasets.schedules.eyebrow"
   | "portalCustomer.datasets.schedules.title"
   | "portalCustomer.datasets.schedules.lead"
   | "portalCustomer.datasets.schedules.pending"
+  | "portalCustomer.datasets.schedules.empty"
   | "portalCustomer.datasets.watchbooks.eyebrow"
   | "portalCustomer.datasets.watchbooks.title"
   | "portalCustomer.datasets.watchbooks.lead"
   | "portalCustomer.datasets.watchbooks.pending"
+  | "portalCustomer.datasets.watchbooks.empty"
+  | "portalCustomer.watchbooks.disabledTitle"
+  | "portalCustomer.watchbooks.disabledBody"
   | "portalCustomer.watchbooks.fields.watchbook"
   | "portalCustomer.watchbooks.fields.note"
   | "portalCustomer.watchbooks.fields.notePlaceholder"
@@ -243,15 +287,18 @@ export type MessageKey =
   | "portalCustomer.datasets.timesheets.title"
   | "portalCustomer.datasets.timesheets.lead"
   | "portalCustomer.datasets.timesheets.pending"
+  | "portalCustomer.datasets.timesheets.empty"
   | "portalCustomer.datasets.invoices.eyebrow"
   | "portalCustomer.datasets.invoices.title"
   | "portalCustomer.datasets.invoices.lead"
   | "portalCustomer.datasets.invoices.pending"
+  | "portalCustomer.datasets.invoices.empty"
   | "portalCustomer.actions.download"
   | "portalCustomer.datasets.reports.eyebrow"
   | "portalCustomer.datasets.reports.title"
   | "portalCustomer.datasets.reports.lead"
   | "portalCustomer.datasets.reports.pending"
+  | "portalCustomer.datasets.reports.empty"
   | "portalCustomer.feedback.authRequired"
   | "portalCustomer.feedback.invalidCredentials"
   | "portalCustomer.feedback.permissionDenied"
@@ -1424,12 +1471,24 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalCustomer.empty.title": "Kein freigegebener Kundenkontext",
     "portalCustomer.empty.body":
       "Dem aktuellen Portal-Konto ist kein nutzbarer Kunden-Scope zugeordnet oder die Verknüpfung ist unvollständig.",
-    "portalCustomer.unauthorized.title": "Portalzugriff nicht erlaubt",
-    "portalCustomer.unauthorized.body":
-      "Dieses Konto darf das Kundenportal nicht verwenden oder besitzt aktuell nicht die nötigen Berechtigungen.",
-    "portalCustomer.deactivated.title": "Portalzugriff deaktiviert",
-    "portalCustomer.deactivated.body":
-      "Der verknüpfte Kundenkontakt oder der zugeordnete Kunde ist deaktiviert bzw. archiviert.",
+    "portalCustomer.permissionDenied.title": "Kundenportal nicht freigegeben",
+    "portalCustomer.permissionDenied.body":
+      "Dieses Login besitzt nicht die Berechtigung \"portal.customer.access\" oder verwendet noch eine andere Sitzung.",
+    "portalCustomer.scopeMissing.title": "Kein aktiver Kunden-Scope",
+    "portalCustomer.scopeMissing.body":
+      "Diesem Portal-Konto ist kein aktiver Kunden-Scope zugeordnet. Prüfen Sie die Rollen-Zuordnung customer_user mit scope_type=customer.",
+    "portalCustomer.contactNotLinked.title": "Kein Kundenkontakt verknüpft",
+    "portalCustomer.contactNotLinked.body":
+      "Dieses Login ist nicht mit einem Kundenkontakt verknüpft. Prüfen Sie crm.customer_contact.user_id für den ausgewählten Portalnutzer.",
+    "portalCustomer.contactInactive.title": "Kundenkontakt inaktiv",
+    "portalCustomer.contactInactive.body":
+      "Der verknüpfte Kundenkontakt ist inaktiv oder archiviert und kann deshalb nicht im Portal verwendet werden.",
+    "portalCustomer.customerInactive.title": "Kundenstammsatz inaktiv",
+    "portalCustomer.customerInactive.body":
+      "Der zugeordnete Kunde ist inaktiv oder archiviert. Aktivieren Sie den Kundenstammsatz wieder, um das Portal zu nutzen.",
+    "portalCustomer.error.title": "Kundenportal konnte nicht aufgelöst werden",
+    "portalCustomer.error.body":
+      "Die Portalsitzung konnte nicht eindeutig geprüft werden. Laden Sie den Status neu oder prüfen Sie die Backend-Fehlermeldung für /api/portal/customer/context.",
     "portalCustomer.summary.title": "Aufgelöster Kundenkontext",
     "portalCustomer.summary.customerNumber": "Kundennummer",
     "portalCustomer.summary.customerName": "Kundenname",
@@ -1438,6 +1497,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalCustomer.summary.function": "Funktion",
     "portalCustomer.summary.tenant": "Mandant",
     "portalCustomer.summary.scope": "Erlaubter Kunden-Scope",
+    "portalCustomer.summary.advanced": "Technische Details anzeigen",
+    "portalCustomer.access.eyebrow": "Ihr Portalzugriff",
+    "portalCustomer.access.title": "Was Sie hier sehen und tun können",
+    "portalCustomer.access.body":
+      "Diese Übersicht zeigt Ihre freigegebenen Portalrechte klar an: nur kundenspezifische, freigegebene Ausgaben, ohne interne Dispositionsdetails.",
+    "portalCustomer.access.states.available": "Verfügbar",
+    "portalCustomer.access.states.readOnly": "Nur lesen",
+    "portalCustomer.access.states.enabled": "Aktiv",
+    "portalCustomer.access.states.notEnabled": "Nicht aktiviert",
+    "portalCustomer.access.states.pendingIntegration": "Anbindung ausstehend",
     "portalCustomer.readOnly.title": "Nur freigegebene Portalansichten",
     "portalCustomer.readOnly.body":
       "Dieses Portal zeigt nur kundenbezogene, freigegebene und schreibgeschützte Ausgaben. Nicht umgesetzte Quellmodule bleiben als explizite Leerstelle sichtbar.",
@@ -1450,8 +1519,44 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalCustomer.meta.customerScoped": "Jede Abfrage bleibt auf den aktuellen Kunden-Scope eingeschränkt.",
     "portalCustomer.meta.personalNamesRestricted":
       "Personennamen bleiben standardmäßig ausgeblendet, bis spätere Freigaberegeln aktiv sind.",
+    "portalCustomer.meta.personalNamesVisible":
+      "Personennamen wurden für diesen Kunden explizit zur Portalansicht freigegeben.",
     "portalCustomer.meta.sourceModule": "Quellmodul",
     "portalCustomer.meta.docsBacked": "Ausgaben werden später über den zentralen Dokumentdienst bereitgestellt.",
+    "portalCustomer.capabilities.orders.label": "Freigegebene Aufträge ansehen",
+    "portalCustomer.capabilities.orders.body":
+      "Aufträge erscheinen hier erst, wenn das Planungsmodul seine Kunden-Portallesemodelle freigibt.",
+    "portalCustomer.capabilities.schedules.label": "Freigegebene Einsatzpläne ansehen",
+    "portalCustomer.capabilities.schedules.body":
+      "Einsatzpläne bleiben kundenbezogen und freigegeben, sind aber im aktuellen Stand noch nicht vollständig angebunden.",
+    "portalCustomer.capabilities.watchbooks.label": "Freigegebene Wachbücher ansehen",
+    "portalCustomer.capabilities.watchbooks.body":
+      "Freigegebene Wachbuchauszüge sind nur für Ihren Kunden sichtbar und bleiben standardmäßig ohne Personennamen.",
+    "portalCustomer.capabilities.watchbooks.writeEnabled":
+      "Kundenrückmeldungen im Wachbuch sind für diesen Mandanten aktiviert.",
+    "portalCustomer.capabilities.watchbooks.writeDisabled":
+      "Kundenrückmeldungen im Wachbuch sind für diesen Mandanten nicht aktiviert.",
+    "portalCustomer.capabilities.watchbookWrite.label": "Wachbuch-Rückmeldungen erfassen",
+    "portalCustomer.capabilities.watchbookWrite.body":
+      "Eine Rückmeldung ist nur möglich, wenn der Mandant diese Beteiligung erlaubt und das einzelne Wachbuch dafür freigegeben wurde.",
+    "portalCustomer.capabilities.timesheets.label": "Freigegebene Leistungsnachweise laden",
+    "portalCustomer.capabilities.timesheets.body":
+      "Stundennachweise bleiben dokumentzentriert und können als freigegebene Portal-Dokumente geladen werden.",
+    "portalCustomer.capabilities.timesheets.download":
+      "Dokumenten-Download für freigegebene Leistungsnachweise ist verfügbar.",
+    "portalCustomer.capabilities.invoices.label": "Freigegebene Rechnungen laden",
+    "portalCustomer.capabilities.invoices.body":
+      "Rechnungen bleiben dokumentzentriert und können geladen werden, sobald sie für Ihren Kunden freigegeben wurden.",
+    "portalCustomer.capabilities.invoices.download":
+      "Dokumenten-Download für freigegebene Rechnungen ist verfügbar.",
+    "portalCustomer.capabilities.reports.label": "Freigegebene Berichte ansehen",
+    "portalCustomer.capabilities.reports.body":
+      "Berichtspakete bleiben kundenbezogen, sind aber im aktuellen Stand noch nicht vollständig angebunden.",
+    "portalCustomer.capabilities.history.label": "Kundensichtbare Historie prüfen",
+    "portalCustomer.capabilities.history.body":
+      "Die Historie zeigt nur kundenfreigegebene CRM-Ereignisse und Dokumentanhänge für Ihren Kunden.",
+    "portalCustomer.capabilities.history.visible":
+      "Kundensichtbare Historie ist für Ihr Portal verfügbar.",
     "portalCustomer.states.loading": "Lädt",
     "portalCustomer.states.pending": "Ausstehend",
     "portalCustomer.states.empty": "Leer",
@@ -1462,18 +1567,27 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Kundenaufträge werden erst angezeigt, wenn das Planungsmodul freigegebene Portallesemodelle liefert.",
     "portalCustomer.datasets.orders.pending":
       "Es liegen noch keine freigegebenen Auftragsdaten aus dem Planungsmodul vor.",
+    "portalCustomer.datasets.orders.empty":
+      "Für Ihren Kunden liegen aktuell noch keine freigegebenen Aufträge im Portal vor.",
     "portalCustomer.datasets.schedules.eyebrow": "Einsatzpläne",
     "portalCustomer.datasets.schedules.title": "Freigegebene Einsatzpläne",
     "portalCustomer.datasets.schedules.lead":
       "Nur veröffentlichte Kundenpläne werden hier sichtbar, sobald die Planungsquelle verfügbar ist.",
     "portalCustomer.datasets.schedules.pending":
       "Die Kundenansicht für freigegebene Einsatzpläne ist vorbereitet, aber das Quellmodul ist noch nicht angeschlossen.",
+    "portalCustomer.datasets.schedules.empty":
+      "Für Ihren Kunden liegen aktuell noch keine freigegebenen Einsatzpläne im Portal vor.",
     "portalCustomer.datasets.watchbooks.eyebrow": "Wachbuch",
     "portalCustomer.datasets.watchbooks.title": "Freigegebene Wachbuchauszüge",
     "portalCustomer.datasets.watchbooks.lead":
       "Wachbuch- und Einsatzereignisse erscheinen erst nach Umsetzung des Feldeinsatz-Backbones im freigegebenen Umfang.",
     "portalCustomer.datasets.watchbooks.pending":
       "Es sind noch keine freigegebenen Wachbuchereignisse für das Kundenportal verfügbar.",
+    "portalCustomer.datasets.watchbooks.empty":
+      "Für Ihren Kunden sind aktuell noch keine freigegebenen Wachbuchauszüge vorhanden.",
+    "portalCustomer.watchbooks.disabledTitle": "Wachbuch-Rückmeldungen sind nicht aktiviert",
+    "portalCustomer.watchbooks.disabledBody":
+      "Sie können freigegebene Wachbücher lesen, aber in diesem Mandanten derzeit keine Kundenrückmeldungen hinzufügen.",
     "portalCustomer.watchbooks.fields.watchbook": "Wachbuch",
     "portalCustomer.watchbooks.fields.note": "Rückmeldung",
     "portalCustomer.watchbooks.fields.notePlaceholder":
@@ -1485,12 +1599,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Stundennachweise bleiben dokumentzentriert und werden später über die Finanzbrücke und den Dokumentdienst veröffentlicht.",
     "portalCustomer.datasets.timesheets.pending":
       "Freigegebene Stundennachweise sind noch nicht an das Portal angebunden.",
+    "portalCustomer.datasets.timesheets.empty":
+      "Für Ihren Kunden liegen aktuell noch keine freigegebenen Leistungsnachweise vor.",
     "portalCustomer.datasets.invoices.eyebrow": "Rechnungen",
     "portalCustomer.datasets.invoices.title": "Freigegebene Kundenrechnungen",
     "portalCustomer.datasets.invoices.lead":
       "Kundenrechnungen erscheinen nur nach Freigabe, mit begrenztem Status, Fälligkeit und dokumentzentriertem Download.",
     "portalCustomer.datasets.invoices.pending":
       "Freigegebene Kundenrechnungen sind noch nicht an das Portal angebunden.",
+    "portalCustomer.datasets.invoices.empty":
+      "Für Ihren Kunden liegen aktuell noch keine freigegebenen Rechnungen vor.",
     "portalCustomer.actions.download": "Dokument laden",
     "portalCustomer.datasets.reports.eyebrow": "Berichte",
     "portalCustomer.datasets.reports.title": "Freigegebene Berichts- und Ergebnispakete",
@@ -1498,6 +1616,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Berichte und Ergebnisdokumente werden als freigegebene Pakete über Reporting und Dokumentdienst eingebunden.",
     "portalCustomer.datasets.reports.pending":
       "Es sind noch keine freigegebenen Berichtspakete für diesen Kunden veröffentlicht.",
+    "portalCustomer.datasets.reports.empty":
+      "Für Ihren Kunden liegen aktuell noch keine freigegebenen Berichtspakete vor.",
     "portalCustomer.feedback.authRequired": "Bitte zuerst mit einem gültigen Portal-Konto anmelden.",
     "portalCustomer.feedback.invalidCredentials": "Die Anmeldedaten sind ungültig.",
     "portalCustomer.feedback.permissionDenied":
@@ -2811,12 +2931,24 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalCustomer.empty.title": "No released customer context",
     "portalCustomer.empty.body":
       "The current portal account has no usable customer scope or the linkage is incomplete.",
-    "portalCustomer.unauthorized.title": "Portal access is not allowed",
-    "portalCustomer.unauthorized.body":
-      "This account is not allowed to use the customer portal or does not currently hold the required permissions.",
-    "portalCustomer.deactivated.title": "Portal access is deactivated",
-    "portalCustomer.deactivated.body":
-      "The linked customer contact or customer record is inactive or archived.",
+    "portalCustomer.permissionDenied.title": "Customer portal access is not granted",
+    "portalCustomer.permissionDenied.body":
+      "This login does not currently hold the \"portal.customer.access\" permission or is still using a different persisted session.",
+    "portalCustomer.scopeMissing.title": "No active customer scope",
+    "portalCustomer.scopeMissing.body":
+      "This portal account does not have an active customer scope. Check the customer_user role assignment with scope_type=customer.",
+    "portalCustomer.contactNotLinked.title": "No linked customer contact",
+    "portalCustomer.contactNotLinked.body":
+      "This login is not linked to a customer contact. Check crm.customer_contact.user_id for the selected portal user.",
+    "portalCustomer.contactInactive.title": "Customer contact is inactive",
+    "portalCustomer.contactInactive.body":
+      "The linked customer contact is inactive or archived and cannot be used for portal access.",
+    "portalCustomer.customerInactive.title": "Customer record is inactive",
+    "portalCustomer.customerInactive.body":
+      "The linked customer record is inactive or archived. Reactivate the customer record to restore portal access.",
+    "portalCustomer.error.title": "Customer portal context could not be resolved",
+    "portalCustomer.error.body":
+      "The portal session could not be verified cleanly. Reload the status or inspect the backend error returned by /api/portal/customer/context.",
     "portalCustomer.summary.title": "Resolved customer context",
     "portalCustomer.summary.customerNumber": "Customer number",
     "portalCustomer.summary.customerName": "Customer name",
@@ -2825,6 +2957,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalCustomer.summary.function": "Function",
     "portalCustomer.summary.tenant": "Tenant",
     "portalCustomer.summary.scope": "Allowed customer scope",
+    "portalCustomer.summary.advanced": "Show technical details",
+    "portalCustomer.access.eyebrow": "Your portal access",
+    "portalCustomer.access.title": "What you can view and do here",
+    "portalCustomer.access.body":
+      "This overview makes your released portal rights explicit: only customer-scoped released outputs, without internal staffing detail.",
+    "portalCustomer.access.states.available": "Available",
+    "portalCustomer.access.states.readOnly": "Read-only",
+    "portalCustomer.access.states.enabled": "Enabled",
+    "portalCustomer.access.states.notEnabled": "Not enabled",
+    "portalCustomer.access.states.pendingIntegration": "Pending integration",
     "portalCustomer.readOnly.title": "Released portal views only",
     "portalCustomer.readOnly.body":
       "This portal shows only customer-scoped, released, read-only outputs. Source modules that are not implemented yet stay visible as explicit empty-state contracts.",
@@ -2837,8 +2979,44 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalCustomer.meta.customerScoped": "Every query remains restricted to the current customer scope.",
     "portalCustomer.meta.personalNamesRestricted":
       "Personal names stay hidden by default until later release rules are implemented.",
+    "portalCustomer.meta.personalNamesVisible":
+      "Personal names were explicitly released for this customer portal context.",
     "portalCustomer.meta.sourceModule": "Source module",
     "portalCustomer.meta.docsBacked": "Published outputs will be delivered through the central document service.",
+    "portalCustomer.capabilities.orders.label": "View released orders",
+    "portalCustomer.capabilities.orders.body":
+      "Orders will appear here once the planning module exposes customer-facing released read models.",
+    "portalCustomer.capabilities.schedules.label": "View released schedules",
+    "portalCustomer.capabilities.schedules.body":
+      "Schedules remain customer-scoped and released, but the integration is not complete yet.",
+    "portalCustomer.capabilities.watchbooks.label": "View released watchbooks",
+    "portalCustomer.capabilities.watchbooks.body":
+      "Released watchbook excerpts are limited to your customer and keep personal names hidden by default.",
+    "portalCustomer.capabilities.watchbooks.writeEnabled":
+      "Customer watchbook feedback is enabled for this tenant.",
+    "portalCustomer.capabilities.watchbooks.writeDisabled":
+      "Customer watchbook feedback is not enabled for this tenant.",
+    "portalCustomer.capabilities.watchbookWrite.label": "Add watchbook feedback",
+    "portalCustomer.capabilities.watchbookWrite.body":
+      "Feedback is only possible when the tenant allows it and the individual watchbook was explicitly released for customer participation.",
+    "portalCustomer.capabilities.timesheets.label": "Download released timesheets",
+    "portalCustomer.capabilities.timesheets.body":
+      "Timesheets stay document-backed and can be downloaded when they were released for your portal account.",
+    "portalCustomer.capabilities.timesheets.download":
+      "Document download for released timesheets is available.",
+    "portalCustomer.capabilities.invoices.label": "Download released invoices",
+    "portalCustomer.capabilities.invoices.body":
+      "Invoices stay document-backed and can be downloaded once they were released for your customer portal.",
+    "portalCustomer.capabilities.invoices.download":
+      "Document download for released invoices is available.",
+    "portalCustomer.capabilities.reports.label": "View released reports",
+    "portalCustomer.capabilities.reports.body":
+      "Report packages remain customer-scoped, but the current integration is not complete yet.",
+    "portalCustomer.capabilities.history.label": "Review customer-visible history",
+    "portalCustomer.capabilities.history.body":
+      "History shows only customer-visible CRM events and document attachments for your customer.",
+    "portalCustomer.capabilities.history.visible":
+      "Customer-visible history is available in this portal.",
     "portalCustomer.states.loading": "Loading",
     "portalCustomer.states.pending": "Pending",
     "portalCustomer.states.empty": "Empty",
@@ -2849,18 +3027,27 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Customer orders appear here once the planning module exposes released portal read models.",
     "portalCustomer.datasets.orders.pending":
       "No released order data is available from the planning module yet.",
+    "portalCustomer.datasets.orders.empty":
+      "There are currently no released orders available for your customer in the portal.",
     "portalCustomer.datasets.schedules.eyebrow": "Schedules",
     "portalCustomer.datasets.schedules.title": "Released schedules",
     "portalCustomer.datasets.schedules.lead":
       "Only published customer schedules will appear here once the planning source is connected.",
     "portalCustomer.datasets.schedules.pending":
       "The released schedule portal contract is ready, but the source module is not connected yet.",
+    "portalCustomer.datasets.schedules.empty":
+      "There are currently no released schedules available for your customer in the portal.",
     "portalCustomer.datasets.watchbooks.eyebrow": "Watchbook",
     "portalCustomer.datasets.watchbooks.title": "Released watchbook excerpts",
     "portalCustomer.datasets.watchbooks.lead":
       "Watchbook and field events will appear only after the field-execution backbone provides released customer views.",
     "portalCustomer.datasets.watchbooks.pending":
       "No released watchbook events are available for the customer portal yet.",
+    "portalCustomer.datasets.watchbooks.empty":
+      "There are currently no released watchbook excerpts available for your customer.",
+    "portalCustomer.watchbooks.disabledTitle": "Watchbook feedback is not enabled",
+    "portalCustomer.watchbooks.disabledBody":
+      "You can read released watchbooks, but customer-side watchbook feedback is not currently enabled for this tenant.",
     "portalCustomer.watchbooks.fields.watchbook": "Watchbook",
     "portalCustomer.watchbooks.fields.note": "Feedback",
     "portalCustomer.watchbooks.fields.notePlaceholder":
@@ -2872,12 +3059,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Timesheets remain document-backed and will later be published through the finance bridge and docs service.",
     "portalCustomer.datasets.timesheets.pending":
       "Released timesheets are not connected to the portal yet.",
+    "portalCustomer.datasets.timesheets.empty":
+      "There are currently no released timesheets available for your customer.",
     "portalCustomer.datasets.invoices.eyebrow": "Invoices",
     "portalCustomer.datasets.invoices.title": "Released customer invoices",
     "portalCustomer.datasets.invoices.lead":
       "Customer invoices appear only after release, with limited status, due-date context, and document-backed downloads.",
     "portalCustomer.datasets.invoices.pending":
       "Released customer invoices are not connected to the portal yet.",
+    "portalCustomer.datasets.invoices.empty":
+      "There are currently no released invoices available for your customer.",
     "portalCustomer.actions.download": "Download document",
     "portalCustomer.datasets.reports.eyebrow": "Reports",
     "portalCustomer.datasets.reports.title": "Released report and result packages",
@@ -2885,6 +3076,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Reports and result documents will be exposed as released packages through reporting and the docs service.",
     "portalCustomer.datasets.reports.pending":
       "No released report packages have been published for this customer yet.",
+    "portalCustomer.datasets.reports.empty":
+      "There are currently no released report packages available for your customer.",
     "portalCustomer.feedback.authRequired": "Sign in with a valid portal account first.",
     "portalCustomer.feedback.invalidCredentials": "The login credentials are invalid.",
     "portalCustomer.feedback.permissionDenied":

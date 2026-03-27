@@ -262,6 +262,8 @@ class WatchbookService:
         payload: WatchbookEntryCreate,
         actor: RequestAuthorizationContext,
     ) -> WatchbookEntryRead:
+        if not context.capabilities.can_add_watchbook_entries:
+            raise ApiException(403, "field.watchbook.portal_write_denied", "errors.field.watchbook.portal_write_denied")
         row = self._require_watchbook(context.tenant_id, watchbook_id)
         if row.customer_id != context.customer_id or not row.customer_visibility_released or not row.customer_participation_enabled:
             raise ApiException(403, "field.watchbook.portal_write_denied", "errors.field.watchbook.portal_write_denied")

@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.errors import ApiException
 from app.modules.core.models import Address, Branch, LookupValue, Mandate
+from app.modules.core.config_seed import CUSTOMER_PORTAL_POLICY_SETTING_KEY
+from app.modules.core.models import TenantSetting
 from app.modules.customers.models import (
     Customer,
     CustomerAddressLink,
@@ -958,6 +960,18 @@ class SqlAlchemyCustomerRepository:
     def get_user_account(self, tenant_id: str, user_id: str) -> UserAccount | None:
         statement = select(UserAccount).where(UserAccount.tenant_id == tenant_id, UserAccount.id == user_id)
         return self.session.scalars(statement).one_or_none()
+
+    def get_customer_portal_policy(self, tenant_id: str) -> dict[str, object]:
+        statement = select(TenantSetting).where(
+            TenantSetting.tenant_id == tenant_id,
+            TenantSetting.key == CUSTOMER_PORTAL_POLICY_SETTING_KEY,
+            TenantSetting.archived_at.is_(None),
+            TenantSetting.status == "active",
+        )
+        setting = self.session.scalars(statement).one_or_none()
+        if setting is None:
+            return {"version": "v1", "customer_watchbook_entries_enabled": False}
+        return setting.value_json or {"version": "v1", "customer_watchbook_entries_enabled": False}
 
     def get_address(self, address_id: str) -> Address | None:
         return self.session.get(Address, address_id)
