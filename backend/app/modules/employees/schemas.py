@@ -401,6 +401,18 @@ class EmployeeAccessAttachExistingRequest(BaseModel):
     email: str | None = Field(default=None, max_length=255)
 
 
+class EmployeeAccessUpdateUserRequest(BaseModel):
+    tenant_id: str
+    username: str = Field(min_length=1, max_length=120)
+    email: str = Field(min_length=1, max_length=255)
+    full_name: str = Field(min_length=1, max_length=255)
+
+
+class EmployeeAccessResetPasswordRequest(BaseModel):
+    tenant_id: str
+    password: str = Field(min_length=10, max_length=255)
+
+
 class EmployeeAccessDetachRequest(BaseModel):
     tenant_id: str
 

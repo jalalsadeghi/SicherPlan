@@ -14,6 +14,8 @@ from app.modules.employees.schemas import (
     EmployeeAccessAttachExistingRequest,
     EmployeeAccessCreateUserRequest,
     EmployeeAccessDetachRequest,
+    EmployeeAccessResetPasswordRequest,
+    EmployeeAccessUpdateUserRequest,
     EmployeeExportRequest,
     EmployeeFilter,
     EmployeeImportDryRunRequest,
@@ -185,6 +187,7 @@ class FakeEmployeeRepository:
     )
     assignments: list[UserRoleAssignment] = field(default_factory=list)
     jobs: list[ImportExportJob] = field(default_factory=list)
+    revoked_session_events: list[tuple[str, str]] = field(default_factory=list)
 
     def list_employees(self, tenant_id: str, filters: EmployeeFilter | None = None) -> list[Employee]:
         rows = [row for row in self.employees if row.tenant_id == tenant_id]
@@ -236,6 +239,9 @@ class FakeEmployeeRepository:
         row.updated_at = datetime.now(UTC)
         row.version_no += 1
         return row
+
+    def revoke_active_sessions_for_user(self, user_id: str, *, reason: str, at_time: datetime) -> None:
+        self.revoked_session_events.append((user_id, reason))
 
     def get_role_by_key(self, role_key: str) -> Role | None:
         return next((row for row in self.roles if row.key == role_key), None)
@@ -466,6 +472,102 @@ class EmployeeOpsServiceTest(unittest.TestCase):
         self.assertEqual(self.repository.employees[0].user_id, "user-3")
         self.assertEqual(len(self.repository.assignments), 1)
         self.assertIn("employees.access.user_created_and_linked", [event.event_type for event in self.audit_repo.audit_events])
+
+    def test_create_access_user_rejects_second_link_for_same_employee(self) -> None:
+        self.repository.employees[0].user_id = "user-existing"
+
+        with self.assertRaises(ApiException) as raised:
+            self.service.create_access_user(
+                "tenant-1",
+                "employee-1",
+                EmployeeAccessCreateUserRequest(
+                    tenant_id="tenant-1",
+                    username="employee.anna",
+                    email="employee.anna@example.com",
+                    password="SicherPasswort!123",
+                ),
+                _context("employees.employee.write"),
+            )
+
+        self.assertEqual(raised.exception.code, "employees.access.already_linked")
+
+    def test_update_access_user_changes_username_email_and_full_name(self) -> None:
+        self.repository.employees[0].user_id = "user-existing"
+
+        result = self.service.update_access_user(
+            "tenant-1",
+            "employee-1",
+            EmployeeAccessUpdateUserRequest(
+                tenant_id="tenant-1",
+                username="anna.updated",
+                email="anna.updated@example.com",
+                full_name="Anna Updated",
+            ),
+            _context("employees.employee.write"),
+        )
+
+        self.assertEqual(result.username, "anna.updated")
+        self.assertEqual(result.email, "anna.updated@example.com")
+        self.assertEqual(result.full_name, "Anna Updated")
+        self.assertIn("employees.access.user_updated", [event.event_type for event in self.audit_repo.audit_events])
+
+    def test_update_access_user_rejects_duplicate_username(self) -> None:
+        self.repository.employees[0].user_id = "user-existing"
+        self.repository.users.append(
+            UserAccount(
+                id="user-third",
+                tenant_id="tenant-1",
+                username="taken.name",
+                email="taken@example.com",
+                full_name="Taken Name",
+                password_hash="hash",
+                locale="de",
+                timezone="Europe/Berlin",
+                is_platform_user=False,
+                is_password_login_enabled=True,
+                status="active",
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+                version_no=1,
+            )
+        )
+
+        with self.assertRaises(ApiException) as raised:
+            self.service.update_access_user(
+                "tenant-1",
+                "employee-1",
+                EmployeeAccessUpdateUserRequest(
+                    tenant_id="tenant-1",
+                    username="taken.name",
+                    email="anna.updated@example.com",
+                    full_name="Anna Updated",
+                ),
+                _context("employees.employee.write"),
+            )
+
+        self.assertEqual(raised.exception.code, "employees.access.username_taken")
+
+    def test_reset_access_user_password_updates_hash_and_revokes_sessions(self) -> None:
+        self.repository.employees[0].user_id = "user-existing"
+        previous_hash = self.repository.users[0].password_hash
+
+        result = self.service.reset_access_user_password(
+            "tenant-1",
+            "employee-1",
+            EmployeeAccessResetPasswordRequest(
+                tenant_id="tenant-1",
+                password="NeuesSicherPasswort!123",
+            ),
+            _context("employees.employee.write"),
+        )
+
+        self.assertEqual(result.user_id, "user-existing")
+        self.assertNotEqual(self.repository.users[0].password_hash, previous_hash)
+        self.assertEqual(
+            self.repository.revoked_session_events,
+            [("user-existing", "employee_access_password_reset")],
+        )
+        self.assertIn("employees.access.password_reset", [event.event_type for event in self.audit_repo.audit_events])
 
     def test_detach_access_user_clears_link_and_disables_assignment(self) -> None:
         self.repository.employees[0].user_id = "user-existing"

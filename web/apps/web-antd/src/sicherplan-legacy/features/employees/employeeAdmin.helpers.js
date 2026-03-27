@@ -57,7 +57,10 @@ export function mapEmployeeApiMessage(messageKey) {
     "errors.employees.import.invalid_headers": "employeeAdmin.feedback.invalidImportHeaders",
     "errors.employees.access.username_taken": "employeeAdmin.feedback.accessUsernameTaken",
     "errors.employees.access.email_taken": "employeeAdmin.feedback.accessEmailTaken",
+    "errors.employees.access.already_linked": "employeeAdmin.feedback.accessAlreadyLinked",
     "errors.employees.access.ambiguous_match": "employeeAdmin.feedback.accessAmbiguousMatch",
+    "errors.employees.access.not_linked": "employeeAdmin.feedback.accessNotLinked",
+    "errors.employees.access.full_name_required": "employeeAdmin.feedback.accessFullNameRequired",
     "errors.employees.access.role_missing": "employeeAdmin.feedback.accessRoleMissing",
   };
 

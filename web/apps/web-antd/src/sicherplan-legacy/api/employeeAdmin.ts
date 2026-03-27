@@ -157,6 +157,18 @@ export interface EmployeeAccessLinkRead {
   role_assignment_active: boolean;
 }
 
+export interface EmployeeAccessUpdateUserRequest {
+  tenant_id: string;
+  username: string;
+  email: string;
+  full_name: string;
+}
+
+export interface EmployeeAccessResetPasswordRequest {
+  tenant_id: string;
+  password: string;
+}
+
 export interface EmployeeListFilters {
   search?: string;
   status?: string;
@@ -453,6 +465,38 @@ export function getEmployeeAccessLink(tenantId: string, employeeId: string, acce
 export function createEmployeeAccessUser(tenantId: string, employeeId: string, accessToken: string, payload: Record<string, unknown>) {
   return request<EmployeeAccessLinkRead>(
     `/api/employees/tenants/${tenantId}/employees/${employeeId}/access-link/create-user`,
+    accessToken,
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
+}
+
+export function updateEmployeeAccessUser(
+  tenantId: string,
+  employeeId: string,
+  accessToken: string,
+  payload: EmployeeAccessUpdateUserRequest,
+) {
+  return request<EmployeeAccessLinkRead>(
+    `/api/employees/tenants/${tenantId}/employees/${employeeId}/access-link/user`,
+    accessToken,
+    {
+      method: "PATCH",
+      body: payload,
+    },
+  );
+}
+
+export function resetEmployeeAccessUserPassword(
+  tenantId: string,
+  employeeId: string,
+  accessToken: string,
+  payload: EmployeeAccessResetPasswordRequest,
+) {
+  return request<EmployeeAccessLinkRead>(
+    `/api/employees/tenants/${tenantId}/employees/${employeeId}/access-link/reset-password`,
     accessToken,
     {
       method: "POST",

@@ -668,7 +668,10 @@ MESSAGES: Mapping[str, Mapping[str, str]] = {
         "errors.employees.import.invalid_headers": "Die Importdatei verwendet ein ungueltiges Spaltenlayout.",
         "errors.employees.access.username_taken": "Der Benutzername ist in diesem Mandanten bereits vergeben.",
         "errors.employees.access.email_taken": "Die E-Mail-Adresse ist in diesem Mandanten bereits vergeben.",
+        "errors.employees.access.already_linked": "Fuer diese Mitarbeitendenakte ist bereits ein App-Zugang verknuepft.",
         "errors.employees.access.ambiguous_match": "Fuer die Benutzerverknuepfung muss genau ein Suchkriterium angegeben werden.",
+        "errors.employees.access.not_linked": "Fuer diese Mitarbeitendenakte ist noch kein App-Zugang verknuepft.",
+        "errors.employees.access.full_name_required": "Der vollstaendige Anzeigename fuer den App-Zugang ist erforderlich.",
         "errors.employees.access.role_missing": "Die Rolle fuer Mitarbeitendenzugang ist nicht im IAM-Katalog verfuegbar.",
         "messages.iam.auth.logout_success": "Die Sitzung wurde erfolgreich beendet.",
         "messages.iam.auth.password_reset_requested":
@@ -1336,7 +1339,10 @@ MESSAGES: Mapping[str, Mapping[str, str]] = {
         "errors.employees.import.invalid_headers": "The import file uses an invalid column layout.",
         "errors.employees.access.username_taken": "The username is already used in this tenant.",
         "errors.employees.access.email_taken": "The email address is already used in this tenant.",
+        "errors.employees.access.already_linked": "This employee file already has a linked app-access account.",
         "errors.employees.access.ambiguous_match": "Exactly one user lookup field must be provided for employee access linkage.",
+        "errors.employees.access.not_linked": "This employee file does not have a linked app-access account yet.",
+        "errors.employees.access.full_name_required": "A full display name is required for the linked app-access account.",
         "errors.employees.access.role_missing": "The employee access role is not available in the IAM catalog.",
         "messages.iam.auth.logout_success": "The session has been terminated successfully.",
         "messages.iam.auth.password_reset_requested":

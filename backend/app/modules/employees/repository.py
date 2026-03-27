@@ -39,7 +39,7 @@ from app.modules.employees.schemas import (
     EmployeeQualificationFilter,
     EmployeeTimeAccountFilter,
 )
-from app.modules.iam.models import Role, UserAccount, UserRoleAssignment
+from app.modules.iam.models import Role, UserAccount, UserRoleAssignment, UserSession
 from app.modules.platform_services.integration_models import ImportExportJob
 
 
@@ -803,6 +803,24 @@ class SqlAlchemyEmployeeRepository:
         self.session.add(row)
         self._commit()
         return self.get_user_account(row.tenant_id, row.id) or row
+
+    def revoke_active_sessions_for_user(self, user_id: str, *, reason: str, at_time) -> None:  # noqa: ANN001
+        sessions = self.session.scalars(
+            select(UserSession).where(
+                UserSession.user_account_id == user_id,
+                UserSession.revoked_at.is_(None),
+            )
+        ).all()
+        changed = False
+        for session_row in sessions:
+            session_row.status = "revoked"
+            session_row.revoked_at = at_time
+            session_row.revoked_reason = reason
+            session_row.last_seen_at = at_time
+            self.session.add(session_row)
+            changed = True
+        if changed:
+            self._commit()
 
     def get_role_by_key(self, role_key: str) -> Role | None:
         statement = select(Role).where(Role.key == role_key)

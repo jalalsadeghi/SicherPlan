@@ -42,6 +42,10 @@ test("api message keys map to localized employee feedback keys", () => {
     mapEmployeeApiMessage("errors.employees.access.email_taken"),
     "employeeAdmin.feedback.accessEmailTaken",
   );
+  assert.equal(
+    mapEmployeeApiMessage("errors.employees.access.already_linked"),
+    "employeeAdmin.feedback.accessAlreadyLinked",
+  );
 });
 
 test("current address summary uses latest active primary address", () => {

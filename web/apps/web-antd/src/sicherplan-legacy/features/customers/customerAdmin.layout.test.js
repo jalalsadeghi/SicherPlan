@@ -30,7 +30,7 @@ test("detail forms use the denser detail-grid span classes", () => {
 });
 
 test("non-overview customer tabs reuse the structured section pattern", () => {
-  assert.match(source, /customer-tab-panel-contacts[\s\S]*customer-admin-form customer-admin-form--structured[\s\S]*customerAdmin\.contacts\.registerEyebrow[\s\S]*customerAdmin\.contacts\.editorEyebrow[\s\S]*customerAdmin\.contacts\.portalAccessLabel[\s\S]*customerAdmin\.contacts\.portalAccessHelp/);
+  assert.match(source, /customer-tab-panel-contacts[\s\S]*customer-admin-form customer-admin-form--structured[\s\S]*customerAdmin\.contacts\.registerEyebrow[\s\S]*customerAdmin\.contacts\.editorEyebrow[\s\S]*customerAdmin\.fields\.notes/);
   assert.match(source, /customer-tab-panel-addresses[\s\S]*customerAdmin\.addresses\.registerEyebrow[\s\S]*customerAdmin\.addresses\.editorEyebrow/);
   assert.match(source, /customer-tab-panel-commercial[\s\S]*customer-admin-editor-intro[\s\S]*customer-commercial-panel-billing-profile/);
   assert.match(source, /customer-tab-panel-portal[\s\S]*customerAdmin\.portal\.lead[\s\S]*customer-portal-access-section[\s\S]*customerAdmin\.portalAccess\.title[\s\S]*customerAdmin\.loginHistory\.title/);
@@ -42,6 +42,8 @@ test("full tab editors no longer use legacy inline-form layout", () => {
   assert.doesNotMatch(source, /customer-admin-inline-form/);
   assert.doesNotMatch(source, /v-model="contactDraft\.user_id"/);
   assert.doesNotMatch(source, /user_id:\s*emptyToNull\(contactDraft\.user_id\)/);
+  assert.doesNotMatch(source, /customerAdmin\.contacts\.portalAccessLabel/);
+  assert.doesNotMatch(source, /customerAdmin\.contacts\.portalAccessHelp/);
   assert.match(source, /submitHistoryAttachmentLink[\s\S]*customer-admin-form-grid customer-admin-form-grid--detail/);
   assert.match(source, /submitEmployeeBlock[\s\S]*customer-admin-form-grid customer-admin-form-grid--detail/);
 });

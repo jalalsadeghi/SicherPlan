@@ -22,6 +22,8 @@ from app.modules.employees.schemas import (
     EmployeeAccessCreateUserRequest,
     EmployeeAccessDetachRequest,
     EmployeeAccessLinkRead,
+    EmployeeAccessResetPasswordRequest,
+    EmployeeAccessUpdateUserRequest,
     EmployeeAdvanceCreate,
     EmployeeAdvanceFilter,
     EmployeeAdvanceRead,
@@ -234,6 +236,72 @@ def create_employee(
     return service.create_employee(str(tenant_id), payload, context)
 
 
+@router.get("/groups/catalog", response_model=list[EmployeeGroupRead])
+def list_groups(
+    tenant_id: UUID,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.employee.read", scope="tenant")),
+    ] = None,
+    service: Annotated[EmployeeService, Depends(get_employee_service)] = None,
+) -> list[EmployeeGroupRead]:
+    return service.list_groups(str(tenant_id), context)
+
+
+@router.post("/groups/catalog", response_model=EmployeeGroupRead, status_code=status.HTTP_201_CREATED)
+def create_group(
+    tenant_id: UUID,
+    payload: EmployeeGroupCreate,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.employee.write", scope="tenant")),
+    ],
+    service: Annotated[EmployeeService, Depends(get_employee_service)],
+) -> EmployeeGroupRead:
+    return service.create_group(str(tenant_id), payload, context)
+
+
+@router.patch("/groups/catalog/{group_id}", response_model=EmployeeGroupRead)
+def update_group(
+    tenant_id: UUID,
+    group_id: UUID,
+    payload: EmployeeGroupUpdate,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.employee.write", scope="tenant")),
+    ],
+    service: Annotated[EmployeeService, Depends(get_employee_service)],
+) -> EmployeeGroupRead:
+    return service.update_group(str(tenant_id), str(group_id), payload, context)
+
+
+@router.post("/groups/memberships", response_model=EmployeeGroupMemberRead, status_code=status.HTTP_201_CREATED)
+def add_group_membership(
+    tenant_id: UUID,
+    payload: EmployeeGroupMemberCreate,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.employee.write", scope="tenant")),
+    ],
+    service: Annotated[EmployeeService, Depends(get_employee_service)],
+) -> EmployeeGroupMemberRead:
+    return service.add_group_member(str(tenant_id), payload, context)
+
+
+@router.patch("/groups/memberships/{member_id}", response_model=EmployeeGroupMemberRead)
+def update_group_membership(
+    tenant_id: UUID,
+    member_id: UUID,
+    payload: EmployeeGroupMemberUpdate,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.employee.write", scope="tenant")),
+    ],
+    service: Annotated[EmployeeService, Depends(get_employee_service)],
+) -> EmployeeGroupMemberRead:
+    return service.update_group_member(str(tenant_id), str(member_id), payload, context)
+
+
 @router.get("/{employee_id}", response_model=EmployeeOperationalRead)
 def get_employee(
     tenant_id: UUID,
@@ -329,72 +397,6 @@ def update_employee_address(
     service: Annotated[EmployeeService, Depends(get_employee_service)],
 ) -> EmployeeAddressHistoryRead:
     return service.update_address_history(str(tenant_id), str(employee_id), str(history_id), payload, context)
-
-
-@router.get("/groups/catalog", response_model=list[EmployeeGroupRead])
-def list_groups(
-    tenant_id: UUID,
-    context: Annotated[
-        RequestAuthorizationContext,
-        Depends(require_authorization("employees.employee.read", scope="tenant")),
-    ] = None,
-    service: Annotated[EmployeeService, Depends(get_employee_service)] = None,
-) -> list[EmployeeGroupRead]:
-    return service.list_groups(str(tenant_id), context)
-
-
-@router.post("/groups/catalog", response_model=EmployeeGroupRead, status_code=status.HTTP_201_CREATED)
-def create_group(
-    tenant_id: UUID,
-    payload: EmployeeGroupCreate,
-    context: Annotated[
-        RequestAuthorizationContext,
-        Depends(require_authorization("employees.employee.write", scope="tenant")),
-    ],
-    service: Annotated[EmployeeService, Depends(get_employee_service)],
-) -> EmployeeGroupRead:
-    return service.create_group(str(tenant_id), payload, context)
-
-
-@router.patch("/groups/catalog/{group_id}", response_model=EmployeeGroupRead)
-def update_group(
-    tenant_id: UUID,
-    group_id: UUID,
-    payload: EmployeeGroupUpdate,
-    context: Annotated[
-        RequestAuthorizationContext,
-        Depends(require_authorization("employees.employee.write", scope="tenant")),
-    ],
-    service: Annotated[EmployeeService, Depends(get_employee_service)],
-) -> EmployeeGroupRead:
-    return service.update_group(str(tenant_id), str(group_id), payload, context)
-
-
-@router.post("/groups/memberships", response_model=EmployeeGroupMemberRead, status_code=status.HTTP_201_CREATED)
-def add_group_membership(
-    tenant_id: UUID,
-    payload: EmployeeGroupMemberCreate,
-    context: Annotated[
-        RequestAuthorizationContext,
-        Depends(require_authorization("employees.employee.write", scope="tenant")),
-    ],
-    service: Annotated[EmployeeService, Depends(get_employee_service)],
-) -> EmployeeGroupMemberRead:
-    return service.add_group_member(str(tenant_id), payload, context)
-
-
-@router.patch("/groups/memberships/{member_id}", response_model=EmployeeGroupMemberRead)
-def update_group_membership(
-    tenant_id: UUID,
-    member_id: UUID,
-    payload: EmployeeGroupMemberUpdate,
-    context: Annotated[
-        RequestAuthorizationContext,
-        Depends(require_authorization("employees.employee.write", scope="tenant")),
-    ],
-    service: Annotated[EmployeeService, Depends(get_employee_service)],
-) -> EmployeeGroupMemberRead:
-    return service.update_group_member(str(tenant_id), str(member_id), payload, context)
 
 
 @router.get("/availability-rules", response_model=list[EmployeeAvailabilityRuleRead])
@@ -1163,6 +1165,34 @@ def create_employee_access_user(
     service: Annotated[EmployeeOpsService, Depends(get_employee_ops_service)],
 ) -> EmployeeAccessLinkRead:
     return service.create_access_user(str(tenant_id), str(employee_id), payload, context)
+
+
+@router.patch("/{employee_id}/access-link/user", response_model=EmployeeAccessLinkRead)
+def update_employee_access_user(
+    tenant_id: UUID,
+    employee_id: UUID,
+    payload: EmployeeAccessUpdateUserRequest,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.employee.write", scope="tenant")),
+    ],
+    service: Annotated[EmployeeOpsService, Depends(get_employee_ops_service)],
+) -> EmployeeAccessLinkRead:
+    return service.update_access_user(str(tenant_id), str(employee_id), payload, context)
+
+
+@router.post("/{employee_id}/access-link/reset-password", response_model=EmployeeAccessLinkRead)
+def reset_employee_access_user_password(
+    tenant_id: UUID,
+    employee_id: UUID,
+    payload: EmployeeAccessResetPasswordRequest,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.employee.write", scope="tenant")),
+    ],
+    service: Annotated[EmployeeOpsService, Depends(get_employee_ops_service)],
+) -> EmployeeAccessLinkRead:
+    return service.reset_access_user_password(str(tenant_id), str(employee_id), payload, context)
 
 
 @router.post("/{employee_id}/access-link/attach", response_model=EmployeeAccessLinkRead)

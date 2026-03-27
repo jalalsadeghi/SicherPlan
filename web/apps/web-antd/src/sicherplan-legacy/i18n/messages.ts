@@ -563,6 +563,8 @@ export type MessageKey =
   | "employeeAdmin.actions.importDryRun"
   | "employeeAdmin.actions.importExecute"
   | "employeeAdmin.actions.createAccessUser"
+  | "employeeAdmin.actions.updateAccessUser"
+  | "employeeAdmin.actions.resetAccessPassword"
   | "employeeAdmin.actions.attachAccessUser"
   | "employeeAdmin.actions.detachAccessUser"
   | "employeeAdmin.actions.reconcileAccessUser"
@@ -580,19 +582,46 @@ export type MessageKey =
   | "employeeAdmin.access.enabled"
   | "employeeAdmin.access.enabledYes"
   | "employeeAdmin.access.enabledNo"
+  | "employeeAdmin.access.roleAssignment"
+  | "employeeAdmin.access.roleAssignmentYes"
+  | "employeeAdmin.access.roleAssignmentNo"
   | "employeeAdmin.access.lead"
+  | "employeeAdmin.access.stateCreateEyebrow"
+  | "employeeAdmin.access.stateCreateTitle"
+  | "employeeAdmin.access.stateCreateLead"
+  | "employeeAdmin.access.stateLinkedEyebrow"
+  | "employeeAdmin.access.stateLinkedTitle"
+  | "employeeAdmin.access.stateLinkedLead"
   | "employeeAdmin.access.createEyebrow"
   | "employeeAdmin.access.createTitle"
   | "employeeAdmin.access.createLead"
+  | "employeeAdmin.access.createHint"
   | "employeeAdmin.access.reconcileEyebrow"
   | "employeeAdmin.access.reconcileTitle"
   | "employeeAdmin.access.reconcileLead"
   | "employeeAdmin.access.attachEyebrow"
   | "employeeAdmin.access.attachTitle"
   | "employeeAdmin.access.attachLead"
+  | "employeeAdmin.access.manageEyebrow"
+  | "employeeAdmin.access.manageTitle"
+  | "employeeAdmin.access.manageLead"
+  | "employeeAdmin.access.resetEyebrow"
+  | "employeeAdmin.access.resetTitle"
+  | "employeeAdmin.access.resetLead"
+  | "employeeAdmin.access.detachEyebrow"
+  | "employeeAdmin.access.detachTitle"
+  | "employeeAdmin.access.detachLead"
+  | "employeeAdmin.access.advancedEyebrow"
+  | "employeeAdmin.access.advancedTitle"
+  | "employeeAdmin.access.advancedLead"
+  | "employeeAdmin.access.advancedSummary"
   | "employeeAdmin.access.createUsername"
   | "employeeAdmin.access.createEmail"
   | "employeeAdmin.access.createPassword"
+  | "employeeAdmin.access.manageUsername"
+  | "employeeAdmin.access.manageEmail"
+  | "employeeAdmin.access.manageFullName"
+  | "employeeAdmin.access.resetPassword"
   | "employeeAdmin.access.attachUserId"
   | "employeeAdmin.access.attachUsername"
   | "employeeAdmin.access.attachEmail"
@@ -612,7 +641,10 @@ export type MessageKey =
   | "employeeAdmin.feedback.invalidImportHeaders"
   | "employeeAdmin.feedback.accessUsernameTaken"
   | "employeeAdmin.feedback.accessEmailTaken"
+  | "employeeAdmin.feedback.accessAlreadyLinked"
   | "employeeAdmin.feedback.accessAmbiguousMatch"
+  | "employeeAdmin.feedback.accessNotLinked"
+  | "employeeAdmin.feedback.accessFullNameRequired"
   | "employeeAdmin.feedback.accessRoleMissing"
   | "employeeAdmin.feedback.employeeSaved"
   | "employeeAdmin.feedback.noteSaved"
@@ -623,8 +655,11 @@ export type MessageKey =
   | "employeeAdmin.feedback.importExecuted"
   | "employeeAdmin.feedback.exportReady"
   | "employeeAdmin.feedback.accessLinked"
+  | "employeeAdmin.feedback.accessUpdated"
+  | "employeeAdmin.feedback.accessPasswordReset"
   | "employeeAdmin.feedback.accessDetached"
   | "employeeAdmin.feedback.accessReconciled"
+  | "employeeAdmin.feedback.catalogPartial"
   | "employeeAdmin.feedback.error"
   | "api.errors.platform.internal"
   | "coreAdmin.eyebrow"
@@ -822,9 +857,6 @@ export type MessageKey =
   | "customerAdmin.contacts.editorEyebrow"
   | "customerAdmin.contacts.editorTitle"
   | "customerAdmin.contacts.empty"
-  | "customerAdmin.contacts.portalAccessLabel"
-  | "customerAdmin.contacts.portalAccessNone"
-  | "customerAdmin.contacts.portalAccessHelp"
   | "customerAdmin.contacts.primaryBadge"
   | "customerAdmin.contacts.standardBadge"
   | "customerAdmin.history.eyebrow"
@@ -1838,6 +1870,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.importDryRun": "Import prüfen",
     "employeeAdmin.actions.importExecute": "Import ausführen",
     "employeeAdmin.actions.createAccessUser": "App-Benutzer anlegen",
+    "employeeAdmin.actions.updateAccessUser": "Zugangsdaten aktualisieren",
+    "employeeAdmin.actions.resetAccessPassword": "Passwort zurücksetzen",
     "employeeAdmin.actions.attachAccessUser": "Bestehenden Benutzer verknüpfen",
     "employeeAdmin.actions.detachAccessUser": "Zugang trennen",
     "employeeAdmin.actions.reconcileAccessUser": "Zugang abgleichen",
@@ -1855,19 +1889,46 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.access.enabled": "Zugang aktiv",
     "employeeAdmin.access.enabledYes": "Ja",
     "employeeAdmin.access.enabledNo": "Nein",
-    "employeeAdmin.access.lead": "Benutzerkonto, Neuanlage und spätere Verknüpfung folgen derselben gegliederten Aktenlogik wie die Stammdaten.",
+    "employeeAdmin.access.roleAssignment": "Rollenverknüpfung aktiv",
+    "employeeAdmin.access.roleAssignmentYes": "Ja",
+    "employeeAdmin.access.roleAssignmentNo": "Nein",
+    "employeeAdmin.access.lead": "Jede Mitarbeitendenakte darf genau einen verknüpften App-Zugang haben. Die Oberfläche folgt diesem Ein-Benutzer-Modell jetzt explizit.",
+    "employeeAdmin.access.stateCreateEyebrow": "Kein verknüpfter Zugang",
+    "employeeAdmin.access.stateCreateTitle": "App-Zugang neu anlegen",
+    "employeeAdmin.access.stateCreateLead": "Lege den einen Login für diese Mitarbeitendenakte an. Sobald ein Zugang verknüpft ist, wechselt der Bereich in den Verwaltungsmodus.",
+    "employeeAdmin.access.stateLinkedEyebrow": "Verknüpfter Zugang",
+    "employeeAdmin.access.stateLinkedTitle": "Bestehenden App-Zugang verwalten",
+    "employeeAdmin.access.stateLinkedLead": "Für diese Mitarbeitendenakte ist bereits genau ein IAM-Konto verknüpft. Neue Zugangsanlage ist in diesem Zustand bewusst ausgeblendet.",
     "employeeAdmin.access.createEyebrow": "Neuanlage",
-    "employeeAdmin.access.createTitle": "Neuen App-Benutzer vorbereiten",
-    "employeeAdmin.access.createLead": "Benutzername, E-Mail und Startpasswort werden gemeinsam gepflegt, bevor der Zugang angelegt wird.",
+    "employeeAdmin.access.createTitle": "App-Zugang anlegen",
+    "employeeAdmin.access.createLead": "Benutzername, E-Mail und Startpasswort werden gemeinsam gepflegt, bevor der einzelne App-Zugang angelegt wird.",
+    "employeeAdmin.access.createHint": "Dieser Zugang wird der einzige Login für diese Mitarbeitendenakte.",
     "employeeAdmin.access.reconcileEyebrow": "Abgleich",
-    "employeeAdmin.access.reconcileTitle": "Bestehenden Zugang prüfen oder trennen",
-    "employeeAdmin.access.reconcileLead": "Nutze den Abgleich für bestehende Verknüpfungen oder trenne den Zugang kontrolliert vom Mitarbeitendenprofil.",
+    "employeeAdmin.access.reconcileTitle": "Verknüpfung abgleichen",
+    "employeeAdmin.access.reconcileLead": "Nur für Reparaturfälle: prüft die bestehende IAM-Verknüpfung und stellt die Mitarbeiterrolle kontrolliert wieder her.",
     "employeeAdmin.access.attachEyebrow": "Bestehender Benutzer",
-    "employeeAdmin.access.attachTitle": "Vorhandenen IAM-Benutzer anbinden",
-    "employeeAdmin.access.attachLead": "Wenn bereits ein Konto existiert, kann es über ID, Benutzername oder E-Mail sauber verknüpft werden.",
+    "employeeAdmin.access.attachTitle": "Bereits existierendes IAM-Konto verknüpfen",
+    "employeeAdmin.access.attachLead": "Nur für Migration, Recovery oder Bereinigung. Genau eines von Benutzer-ID, Benutzername oder E-Mail muss angegeben werden.",
+    "employeeAdmin.access.manageEyebrow": "Verwaltung",
+    "employeeAdmin.access.manageTitle": "Verknüpften App-Zugang bearbeiten",
+    "employeeAdmin.access.manageLead": "Benutzername, E-Mail und Anzeigename des bereits verknüpften IAM-Kontos können hier direkt gepflegt werden.",
+    "employeeAdmin.access.resetEyebrow": "Sicherheit",
+    "employeeAdmin.access.resetTitle": "Passwort neu setzen",
+    "employeeAdmin.access.resetLead": "Setzt ein neues Passwort für den verknüpften Zugang und beendet bestehende Sitzungen kontrolliert.",
+    "employeeAdmin.access.detachEyebrow": "Trennen",
+    "employeeAdmin.access.detachTitle": "Verknüpften Zugang lösen",
+    "employeeAdmin.access.detachLead": "Nutze diese Aktion, wenn das Konto nicht mehr zu dieser Mitarbeitendenakte gehören soll. Für normales Stilllegen ist dies die unterstützte Deaktivierung.",
+    "employeeAdmin.access.advancedEyebrow": "Erweitert",
+    "employeeAdmin.access.advancedTitle": "Erweiterte Reparatur- und Migrationswerkzeuge",
+    "employeeAdmin.access.advancedLead": "Diese Werkzeuge sind nicht der normale Tagesablauf. Sie sind nur für bestehende Konten, Datenmigration und Reparaturszenarien gedacht.",
+    "employeeAdmin.access.advancedSummary": "Bereits existierendes IAM-Konto verknüpfen oder Verknüpfung abgleichen",
     "employeeAdmin.access.createUsername": "Neuer Benutzername",
     "employeeAdmin.access.createEmail": "Neue E-Mail",
     "employeeAdmin.access.createPassword": "Startpasswort",
+    "employeeAdmin.access.manageUsername": "Benutzername",
+    "employeeAdmin.access.manageEmail": "E-Mail",
+    "employeeAdmin.access.manageFullName": "Anzeigename",
+    "employeeAdmin.access.resetPassword": "Neues Passwort",
     "employeeAdmin.access.attachUserId": "Vorhandene Benutzer-ID",
     "employeeAdmin.access.attachUsername": "Vorhandener Benutzername",
     "employeeAdmin.access.attachEmail": "Vorhandene E-Mail",
@@ -1900,8 +1961,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Der Benutzername ist im aktuellen Mandanten bereits vergeben.",
     "employeeAdmin.feedback.accessEmailTaken":
       "Die E-Mail-Adresse ist im aktuellen Mandanten bereits vergeben.",
+    "employeeAdmin.feedback.accessAlreadyLinked":
+      "Für diese Mitarbeitendenakte ist bereits ein App-Zugang verknüpft.",
     "employeeAdmin.feedback.accessAmbiguousMatch":
       "Zum Verknüpfen muss genau ein Benutzer-Suchfeld gefüllt werden.",
+    "employeeAdmin.feedback.accessNotLinked":
+      "Für diese Mitarbeitendenakte ist noch kein App-Zugang verknüpft.",
+    "employeeAdmin.feedback.accessFullNameRequired":
+      "Für den verknüpften App-Zugang ist ein Anzeigename erforderlich.",
     "employeeAdmin.feedback.accessRoleMissing":
       "Die Rolle für Mitarbeitendenzugang fehlt im IAM-Katalog.",
     "employeeAdmin.feedback.employeeSaved":
@@ -1922,10 +1989,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Der Mitarbeitendenexport wurde erzeugt.",
     "employeeAdmin.feedback.accessLinked":
       "Der Mitarbeitendenzugang wurde verknüpft.",
+    "employeeAdmin.feedback.accessUpdated":
+      "Die Zugangsdaten des verknüpften IAM-Kontos wurden aktualisiert.",
+    "employeeAdmin.feedback.accessPasswordReset":
+      "Das Passwort des verknüpften App-Zugangs wurde neu gesetzt.",
     "employeeAdmin.feedback.accessDetached":
       "Der Mitarbeitendenzugang wurde getrennt.",
     "employeeAdmin.feedback.accessReconciled":
       "Die IAM-Verknüpfung wurde abgeglichen.",
+    "employeeAdmin.feedback.catalogPartial":
+      "Die Mitarbeitendenliste wurde geladen, aber ergänzende Katalogdaten konnten nicht vollständig aktualisiert werden.",
     "employeeAdmin.feedback.error":
       "Die Mitarbeitendenaktion konnte nicht abgeschlossen werden.",
     "api.errors.platform.internal":
@@ -2150,10 +2223,6 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.contacts.editorEyebrow": "Bearbeitung",
     "customerAdmin.contacts.editorTitle": "Kontakt erfassen oder anpassen",
     "customerAdmin.contacts.empty": "Noch keine Kontakte hinterlegt.",
-    "customerAdmin.contacts.portalAccessLabel": "Verknüpfter Portalzugang",
-    "customerAdmin.contacts.portalAccessNone": "Noch kein Portalzugang verknüpft.",
-    "customerAdmin.contacts.portalAccessHelp":
-      "Portalzugänge und Passwörter werden im Tab Portal verwaltet. Diese Verknüpfung ist hier nur lesbar.",
     "customerAdmin.contacts.primaryBadge": "Primärkontakt",
     "customerAdmin.contacts.standardBadge": "Kontakt",
     "customerAdmin.history.eyebrow": "Historie",
@@ -3188,6 +3257,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.importDryRun": "Validate import",
     "employeeAdmin.actions.importExecute": "Run import",
     "employeeAdmin.actions.createAccessUser": "Create app user",
+    "employeeAdmin.actions.updateAccessUser": "Update linked access",
+    "employeeAdmin.actions.resetAccessPassword": "Reset password",
     "employeeAdmin.actions.attachAccessUser": "Attach existing user",
     "employeeAdmin.actions.detachAccessUser": "Detach access",
     "employeeAdmin.actions.reconcileAccessUser": "Reconcile access",
@@ -3205,19 +3276,46 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.access.enabled": "Access enabled",
     "employeeAdmin.access.enabledYes": "Yes",
     "employeeAdmin.access.enabledNo": "No",
-    "employeeAdmin.access.lead": "User linkage, account creation, and later attachment now follow the same structured file rhythm as the overview tab.",
+    "employeeAdmin.access.roleAssignment": "Role assignment active",
+    "employeeAdmin.access.roleAssignmentYes": "Yes",
+    "employeeAdmin.access.roleAssignmentNo": "No",
+    "employeeAdmin.access.lead": "Each employee file can have exactly one linked app-access account. This tab now follows that one-user-per-employee rule explicitly.",
+    "employeeAdmin.access.stateCreateEyebrow": "No linked account",
+    "employeeAdmin.access.stateCreateTitle": "Create app access",
+    "employeeAdmin.access.stateCreateLead": "Create the single login for this employee file. Once a link exists, this area switches into management mode.",
+    "employeeAdmin.access.stateLinkedEyebrow": "Linked account",
+    "employeeAdmin.access.stateLinkedTitle": "Manage existing app access",
+    "employeeAdmin.access.stateLinkedLead": "This employee file already has exactly one linked IAM account. Duplicate creation is intentionally hidden in this state.",
     "employeeAdmin.access.createEyebrow": "Creation",
-    "employeeAdmin.access.createTitle": "Prepare a new app user",
-    "employeeAdmin.access.createLead": "Keep username, email, and initial password together before creating the access account.",
+    "employeeAdmin.access.createTitle": "Create app access",
+    "employeeAdmin.access.createLead": "Keep username, email, and the initial password together before creating the single app-access account.",
+    "employeeAdmin.access.createHint": "This creates the only login for this employee file.",
     "employeeAdmin.access.reconcileEyebrow": "Reconcile",
-    "employeeAdmin.access.reconcileTitle": "Check or detach existing access",
-    "employeeAdmin.access.reconcileLead": "Use reconciliation for existing links or detach access from the employee profile in a controlled way.",
+    "employeeAdmin.access.reconcileTitle": "Reconcile linked access",
+    "employeeAdmin.access.reconcileLead": "Repair-only action: checks the current IAM linkage and restores the employee role assignment when needed.",
     "employeeAdmin.access.attachEyebrow": "Existing user",
-    "employeeAdmin.access.attachTitle": "Attach an existing IAM user",
-    "employeeAdmin.access.attachLead": "If an account already exists, link it cleanly by ID, username, or email.",
+    "employeeAdmin.access.attachTitle": "Link already-existing IAM account",
+    "employeeAdmin.access.attachLead": "Use this only for migration, recovery, or reconciliation. Exactly one of user ID, username, or email must be provided.",
+    "employeeAdmin.access.manageEyebrow": "Management",
+    "employeeAdmin.access.manageTitle": "Update linked app account",
+    "employeeAdmin.access.manageLead": "Maintain username, email, and display name for the already-linked IAM account directly from this employee file.",
+    "employeeAdmin.access.resetEyebrow": "Security",
+    "employeeAdmin.access.resetTitle": "Reset password",
+    "employeeAdmin.access.resetLead": "Sets a new password for the linked account and revokes existing sessions in a controlled way.",
+    "employeeAdmin.access.detachEyebrow": "Detach",
+    "employeeAdmin.access.detachTitle": "Detach linked account",
+    "employeeAdmin.access.detachLead": "Use this when the account should no longer belong to this employee file. Detach is the supported deactivation path in this workspace.",
+    "employeeAdmin.access.advancedEyebrow": "Advanced",
+    "employeeAdmin.access.advancedTitle": "Advanced repair and migration tools",
+    "employeeAdmin.access.advancedLead": "These actions are not the normal happy path. Use them only for already-existing accounts, data migration, and repair scenarios.",
+    "employeeAdmin.access.advancedSummary": "Link already-existing IAM account or reconcile the current link",
     "employeeAdmin.access.createUsername": "New username",
     "employeeAdmin.access.createEmail": "New email",
     "employeeAdmin.access.createPassword": "Initial password",
+    "employeeAdmin.access.manageUsername": "Username",
+    "employeeAdmin.access.manageEmail": "Email",
+    "employeeAdmin.access.manageFullName": "Full name",
+    "employeeAdmin.access.resetPassword": "New password",
     "employeeAdmin.access.attachUserId": "Existing user ID",
     "employeeAdmin.access.attachUsername": "Existing username",
     "employeeAdmin.access.attachEmail": "Existing email",
@@ -3251,8 +3349,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "The username is already taken in the current tenant.",
     "employeeAdmin.feedback.accessEmailTaken":
       "The email address is already taken in the current tenant.",
+    "employeeAdmin.feedback.accessAlreadyLinked":
+      "This employee file already has linked app access.",
     "employeeAdmin.feedback.accessAmbiguousMatch":
       "Exactly one user lookup field must be filled for attachment.",
+    "employeeAdmin.feedback.accessNotLinked":
+      "This employee file does not have linked app access yet.",
+    "employeeAdmin.feedback.accessFullNameRequired":
+      "A full display name is required for the linked app account.",
     "employeeAdmin.feedback.accessRoleMissing":
       "The employee access role is missing from the IAM catalog.",
     "employeeAdmin.feedback.employeeSaved":
@@ -3273,10 +3377,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "The employee export was generated.",
     "employeeAdmin.feedback.accessLinked":
       "Employee app access was linked.",
+    "employeeAdmin.feedback.accessUpdated":
+      "The linked IAM account details were updated.",
+    "employeeAdmin.feedback.accessPasswordReset":
+      "The linked app-access password was reset.",
     "employeeAdmin.feedback.accessDetached":
       "Employee app access was detached.",
     "employeeAdmin.feedback.accessReconciled":
       "The IAM link was reconciled.",
+    "employeeAdmin.feedback.catalogPartial":
+      "The employee list loaded, but supplemental catalog data could not be refreshed completely.",
     "employeeAdmin.feedback.error":
       "The employee action could not be completed.",
     "api.errors.platform.internal":
@@ -3502,10 +3612,6 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.contacts.editorEyebrow": "Editor",
     "customerAdmin.contacts.editorTitle": "Create or update a contact",
     "customerAdmin.contacts.empty": "No contacts have been added yet.",
-    "customerAdmin.contacts.portalAccessLabel": "Linked portal access",
-    "customerAdmin.contacts.portalAccessNone": "No portal access is linked yet.",
-    "customerAdmin.contacts.portalAccessHelp":
-      "Portal credentials and passwords are managed from the Portal tab. This linkage is read-only here.",
     "customerAdmin.contacts.primaryBadge": "Primary contact",
     "customerAdmin.contacts.standardBadge": "Contact",
     "customerAdmin.history.eyebrow": "History",

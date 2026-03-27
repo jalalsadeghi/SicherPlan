@@ -369,6 +369,14 @@
                 <span>{{ t("employeeAdmin.access.enabled") }}</span>
                 <strong>{{ accessLink?.app_access_enabled ? t("employeeAdmin.access.enabledYes") : t("employeeAdmin.access.enabledNo") }}</strong>
               </article>
+              <article class="employee-admin-summary__card">
+                <span>{{ t("employeeAdmin.access.roleAssignment") }}</span>
+                <strong>{{ accessLink?.role_assignment_active ? t("employeeAdmin.access.roleAssignmentYes") : t("employeeAdmin.access.roleAssignmentNo") }}</strong>
+              </article>
+              <article class="employee-admin-summary__card">
+                <span>{{ t("employeeAdmin.access.manageFullName") }}</span>
+                <strong>{{ accessLink?.full_name || t("employeeAdmin.summary.none") }}</strong>
+              </article>
             </div>
             <div class="employee-admin-form employee-admin-form--structured">
               <section class="employee-admin-editor-intro">
@@ -379,75 +387,155 @@
                 <p class="field-help">{{ t("employeeAdmin.access.lead") }}</p>
               </section>
 
-              <section class="employee-admin-form-section">
+              <section v-if="!hasLinkedAccess" class="employee-admin-form-section">
                 <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.access.createEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.access.createTitle") }}</h4>
-                  <p class="field-help">{{ t("employeeAdmin.access.createLead") }}</p>
+                  <p class="eyebrow">{{ t("employeeAdmin.access.stateCreateEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.access.stateCreateTitle") }}</h4>
+                  <p class="field-help">{{ t("employeeAdmin.access.stateCreateLead") }}</p>
                 </div>
-                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.access.createUsername") }}</span>
-                    <input v-model="accessCreateDraft.username" :disabled="!actionState.canManageAccess" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.access.createEmail") }}</span>
-                    <input v-model="accessCreateDraft.email" :disabled="!actionState.canManageAccess" type="email" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.access.createPassword") }}</span>
-                    <input v-model="accessCreateDraft.password" :disabled="!actionState.canManageAccess" type="password" />
-                  </label>
-                </div>
-                <div class="cta-row">
-                  <button class="cta-button" type="button" :disabled="!actionState.canManageAccess" @click="createAccessUser">
-                    {{ t("employeeAdmin.actions.createAccessUser") }}
-                  </button>
+                <div class="employee-admin-form-section employee-admin-form-section--nested">
+                  <div class="employee-admin-form-section__header">
+                    <p class="eyebrow">{{ t("employeeAdmin.access.createEyebrow") }}</p>
+                    <h4>{{ t("employeeAdmin.access.createTitle") }}</h4>
+                    <p class="field-help">{{ t("employeeAdmin.access.createLead") }}</p>
+                  </div>
+                  <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.access.createUsername") }}</span>
+                      <input v-model="accessCreateDraft.username" :disabled="!actionState.canManageAccess" />
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.access.createEmail") }}</span>
+                      <input v-model="accessCreateDraft.email" :disabled="!actionState.canManageAccess" type="email" />
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.access.createPassword") }}</span>
+                      <input v-model="accessCreateDraft.password" :disabled="!actionState.canManageAccess" type="password" />
+                    </label>
+                  </div>
+                  <p class="field-help">{{ t("employeeAdmin.access.createHint") }}</p>
+                  <div class="cta-row">
+                    <button class="cta-button" type="button" :disabled="!actionState.canManageAccess" @click="createAccessUser">
+                      {{ t("employeeAdmin.actions.createAccessUser") }}
+                    </button>
+                  </div>
                 </div>
               </section>
 
-              <section class="employee-admin-form-section">
+              <section v-else class="employee-admin-form-section">
                 <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.access.reconcileEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.access.reconcileTitle") }}</h4>
-                  <p class="field-help">{{ t("employeeAdmin.access.reconcileLead") }}</p>
+                  <p class="eyebrow">{{ t("employeeAdmin.access.stateLinkedEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.access.stateLinkedTitle") }}</h4>
+                  <p class="field-help">{{ t("employeeAdmin.access.stateLinkedLead") }}</p>
                 </div>
-                <div class="cta-row">
-                  <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess" @click="reconcileAccessUser">
-                    {{ t("employeeAdmin.actions.reconcileAccessUser") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess || !accessLink?.user_id" @click="detachAccessUser">
-                    {{ t("employeeAdmin.actions.detachAccessUser") }}
-                  </button>
+
+                <div class="employee-admin-form-section employee-admin-form-section--nested">
+                  <div class="employee-admin-form-section__header">
+                    <p class="eyebrow">{{ t("employeeAdmin.access.manageEyebrow") }}</p>
+                    <h4>{{ t("employeeAdmin.access.manageTitle") }}</h4>
+                    <p class="field-help">{{ t("employeeAdmin.access.manageLead") }}</p>
+                  </div>
+                  <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.access.manageUsername") }}</span>
+                      <input v-model="accessManageDraft.username" :disabled="!actionState.canManageAccess" />
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.access.manageEmail") }}</span>
+                      <input v-model="accessManageDraft.email" :disabled="!actionState.canManageAccess" type="email" />
+                    </label>
+                    <label class="field-stack field-stack--wide">
+                      <span>{{ t("employeeAdmin.access.manageFullName") }}</span>
+                      <input v-model="accessManageDraft.full_name" :disabled="!actionState.canManageAccess" />
+                    </label>
+                  </div>
+                  <div class="cta-row">
+                    <button class="cta-button" type="button" :disabled="!actionState.canManageAccess" @click="updateAccessUser">
+                      {{ t("employeeAdmin.actions.updateAccessUser") }}
+                    </button>
+                  </div>
+                </div>
+
+                <div class="employee-admin-form-section employee-admin-form-section--nested">
+                  <div class="employee-admin-form-section__header">
+                    <p class="eyebrow">{{ t("employeeAdmin.access.resetEyebrow") }}</p>
+                    <h4>{{ t("employeeAdmin.access.resetTitle") }}</h4>
+                    <p class="field-help">{{ t("employeeAdmin.access.resetLead") }}</p>
+                  </div>
+                  <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.access.resetPassword") }}</span>
+                      <input v-model="accessResetDraft.password" :disabled="!actionState.canManageAccess" type="password" />
+                    </label>
+                  </div>
+                  <div class="cta-row">
+                    <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess" @click="resetAccessPassword">
+                      {{ t("employeeAdmin.actions.resetAccessPassword") }}
+                    </button>
+                  </div>
+                </div>
+
+                <div class="employee-admin-form-section employee-admin-form-section--nested">
+                  <div class="employee-admin-form-section__header">
+                    <p class="eyebrow">{{ t("employeeAdmin.access.detachEyebrow") }}</p>
+                    <h4>{{ t("employeeAdmin.access.detachTitle") }}</h4>
+                    <p class="field-help">{{ t("employeeAdmin.access.detachLead") }}</p>
+                  </div>
+                  <div class="cta-row">
+                    <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess || !accessLink?.user_id" @click="detachAccessUser">
+                      {{ t("employeeAdmin.actions.detachAccessUser") }}
+                    </button>
+                  </div>
                 </div>
               </section>
 
-              <section class="employee-admin-form-section">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.access.attachEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.access.attachTitle") }}</h4>
-                  <p class="field-help">{{ t("employeeAdmin.access.attachLead") }}</p>
-                </div>
-                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.access.attachUserId") }}</span>
-                    <input v-model="accessAttachDraft.user_id" :disabled="!actionState.canManageAccess" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.access.attachUsername") }}</span>
-                    <input v-model="accessAttachDraft.username" :disabled="!actionState.canManageAccess" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.access.attachEmail") }}</span>
-                    <input v-model="accessAttachDraft.email" :disabled="!actionState.canManageAccess" type="email" />
-                  </label>
-                </div>
-                <div class="cta-row">
-                  <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess" @click="attachAccessUser">
-                    {{ t("employeeAdmin.actions.attachAccessUser") }}
-                  </button>
-                </div>
-              </section>
+              <details class="employee-admin-advanced-access">
+                <summary>
+                  <span class="eyebrow">{{ t("employeeAdmin.access.advancedEyebrow") }}</span>
+                  <strong>{{ t("employeeAdmin.access.advancedSummary") }}</strong>
+                </summary>
+                <p class="field-help">{{ t("employeeAdmin.access.advancedLead") }}</p>
+
+                <section class="employee-admin-form-section employee-admin-form-section--nested">
+                  <div class="employee-admin-form-section__header">
+                    <p class="eyebrow">{{ t("employeeAdmin.access.attachEyebrow") }}</p>
+                    <h4>{{ t("employeeAdmin.access.attachTitle") }}</h4>
+                    <p class="field-help">{{ t("employeeAdmin.access.attachLead") }}</p>
+                  </div>
+                  <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.access.attachUserId") }}</span>
+                      <input v-model="accessAttachDraft.user_id" :disabled="!actionState.canManageAccess" />
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.access.attachUsername") }}</span>
+                      <input v-model="accessAttachDraft.username" :disabled="!actionState.canManageAccess" />
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.access.attachEmail") }}</span>
+                      <input v-model="accessAttachDraft.email" :disabled="!actionState.canManageAccess" type="email" />
+                    </label>
+                  </div>
+                  <div class="cta-row">
+                    <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess" @click="attachAccessUser">
+                      {{ t("employeeAdmin.actions.attachAccessUser") }}
+                    </button>
+                  </div>
+                </section>
+
+                <section class="employee-admin-form-section employee-admin-form-section--nested">
+                  <div class="employee-admin-form-section__header">
+                    <p class="eyebrow">{{ t("employeeAdmin.access.reconcileEyebrow") }}</p>
+                    <h4>{{ t("employeeAdmin.access.reconcileTitle") }}</h4>
+                    <p class="field-help">{{ t("employeeAdmin.access.reconcileLead") }}</p>
+                  </div>
+                  <div class="cta-row">
+                    <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess || !accessLink?.user_id" @click="reconcileAccessUser">
+                      {{ t("employeeAdmin.actions.reconcileAccessUser") }}
+                    </button>
+                  </div>
+                </section>
+              </details>
             </div>
           </section>
 
@@ -792,12 +880,16 @@ import {
   listEmployeeNotes,
   listEmployees,
   reconcileEmployeeAccessUser,
+  resetEmployeeAccessUserPassword,
   updateEmployee,
+  updateEmployeeAccessUser,
   updateEmployeeGroup,
   updateEmployeeGroupMembership,
   updateEmployeeNote,
   uploadEmployeePhoto,
   type EmployeeAccessLinkRead,
+    type EmployeeAccessResetPasswordRequest,
+    type EmployeeAccessUpdateUserRequest,
     type EmployeeAddressHistoryRead,
     type EmployeeDocumentListItemRead,
     type EmployeeExportResult,
@@ -899,6 +991,18 @@ const accessCreateDraft = reactive({
   password: "",
 });
 
+const accessManageDraft = reactive<EmployeeAccessUpdateUserRequest>({
+  tenant_id: "",
+  username: "",
+  email: "",
+  full_name: "",
+});
+
+const accessResetDraft = reactive<EmployeeAccessResetPasswordRequest>({
+  tenant_id: "",
+  password: "",
+});
+
 const accessAttachDraft = reactive({
   user_id: "",
   username: "",
@@ -936,6 +1040,7 @@ const canRead = computed(() => actionState.value.canRead);
 const canWrite = computed(() => actionState.value.canWrite);
 const canReadPrivate = computed(() => actionState.value.canReadPrivate);
 const resolvedTenantScopeId = computed(() => authStore.effectiveTenantScopeId);
+const hasLinkedAccess = computed(() => !!accessLink.value?.user_id);
 const selectedEmployeeLabel = computed(() =>
   selectedEmployee.value
     ? `${selectedEmployee.value.personnel_no} · ${selectedEmployee.value.first_name} ${selectedEmployee.value.last_name}`
@@ -990,6 +1095,63 @@ function clearFeedback() {
   feedback.tone = "neutral";
   feedback.title = "";
   feedback.message = "";
+}
+
+function normalizeAccessToken(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, ".");
+}
+
+function buildSuggestedAccessUsername(employee: EmployeeOperationalRead | null) {
+  if (!employee) {
+    return "";
+  }
+  const personnelNo = normalizeAccessToken(employee.personnel_no || "");
+  if (personnelNo) {
+    return personnelNo;
+  }
+  const firstName = normalizeAccessToken(employee.first_name || "");
+  const lastName = normalizeAccessToken(employee.last_name || "");
+  return [firstName, lastName].filter(Boolean).join(".").replace(/\.+/g, ".");
+}
+
+function syncAccessCreateDraft(force = false) {
+  if (!selectedEmployee.value || hasLinkedAccess.value) {
+    return;
+  }
+  const suggestedUsername = buildSuggestedAccessUsername(selectedEmployee.value);
+  const suggestedEmail = selectedEmployee.value.work_email || "";
+  if (force || !accessCreateDraft.username.trim()) {
+    accessCreateDraft.username = suggestedUsername;
+  }
+  if (force || !accessCreateDraft.email.trim()) {
+    accessCreateDraft.email = suggestedEmail;
+  }
+}
+
+function syncAccessManageDraft() {
+  accessManageDraft.tenant_id = resolvedTenantScopeId.value || "";
+  accessResetDraft.tenant_id = resolvedTenantScopeId.value || "";
+  accessResetDraft.password = "";
+  if (!accessLink.value?.user_id) {
+    accessManageDraft.username = "";
+    accessManageDraft.email = "";
+    accessManageDraft.full_name = "";
+    return;
+  }
+  accessManageDraft.username = accessLink.value.username || "";
+  accessManageDraft.email = accessLink.value.email || "";
+  accessManageDraft.full_name = accessLink.value.full_name || "";
+}
+
+function setCatalogRefreshWarning() {
+  setFeedback(
+    "neutral",
+    t("employeeAdmin.feedback.titleError"),
+    t("employeeAdmin.feedback.catalogPartial"),
+  );
 }
 
 function rememberScope() {
@@ -1085,9 +1247,17 @@ function resetAccessDrafts() {
   accessCreateDraft.username = "";
   accessCreateDraft.email = "";
   accessCreateDraft.password = "";
+  accessManageDraft.tenant_id = resolvedTenantScopeId.value || "";
+  accessManageDraft.username = "";
+  accessManageDraft.email = "";
+  accessManageDraft.full_name = "";
+  accessResetDraft.tenant_id = resolvedTenantScopeId.value || "";
+  accessResetDraft.password = "";
   accessAttachDraft.user_id = "";
   accessAttachDraft.username = "";
   accessAttachDraft.email = "";
+  syncAccessCreateDraft(true);
+  syncAccessManageDraft();
 }
 
 function editMembership(membership: EmployeeGroupMembershipRead) {
@@ -1133,9 +1303,7 @@ async function refreshEmployees() {
 
   loading.list = true;
   try {
-    await loadTenantStructure();
     employees.value = await listEmployees(resolvedTenantScopeId.value, authStore.accessToken, filters);
-    await listSupplementalGroups();
     if (selectedEmployeeId.value) {
       const stillSelected = employees.value.some((row) => row.id === selectedEmployeeId.value);
       if (stillSelected) {
@@ -1153,8 +1321,30 @@ async function refreshEmployees() {
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
     setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+    loading.list = false;
+    return;
+  }
+
+  let catalogRefreshFailed = false;
+  try {
+    await loadTenantStructure();
+  } catch {
+    branches.value = [];
+    mandates.value = [];
+    catalogRefreshFailed = true;
+  }
+
+  try {
+    await listSupplementalGroups();
+  } catch {
+    employeeGroups.value = [];
+    catalogRefreshFailed = true;
   } finally {
     loading.list = false;
+  }
+
+  if (catalogRefreshFailed) {
+    setCatalogRefreshWarning();
   }
 }
 
@@ -1505,6 +1695,58 @@ async function createAccessUser() {
   }
 }
 
+async function updateAccessUser() {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !selectedEmployeeId.value || !hasLinkedAccess.value) {
+    return;
+  }
+  loading.action = true;
+  try {
+    accessLink.value = await updateEmployeeAccessUser(
+      resolvedTenantScopeId.value,
+      selectedEmployeeId.value,
+      authStore.accessToken,
+      {
+        tenant_id: resolvedTenantScopeId.value,
+        username: accessManageDraft.username.trim(),
+        email: accessManageDraft.email.trim(),
+        full_name: accessManageDraft.full_name.trim(),
+      },
+    );
+    await selectEmployee(selectedEmployeeId.value);
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.accessUpdated"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
+async function resetAccessPassword() {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !selectedEmployeeId.value || !hasLinkedAccess.value) {
+    return;
+  }
+  loading.action = true;
+  try {
+    accessLink.value = await resetEmployeeAccessUserPassword(
+      resolvedTenantScopeId.value,
+      selectedEmployeeId.value,
+      authStore.accessToken,
+      {
+        tenant_id: resolvedTenantScopeId.value,
+        password: accessResetDraft.password,
+      },
+    );
+    await selectEmployee(selectedEmployeeId.value);
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.accessPasswordReset"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
 async function attachAccessUser() {
   if (!resolvedTenantScopeId.value || !authStore.accessToken || !selectedEmployeeId.value) {
     return;
@@ -1610,6 +1852,26 @@ watch(
     if (!allowedTabs.includes(activeDetailTab.value)) {
       activeDetailTab.value = "overview";
     }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [
+    selectedEmployee.value?.id,
+    selectedEmployee.value?.personnel_no,
+    selectedEmployee.value?.first_name,
+    selectedEmployee.value?.last_name,
+    selectedEmployee.value?.work_email,
+    accessLink.value?.user_id,
+    accessLink.value?.username,
+    accessLink.value?.email,
+    accessLink.value?.full_name,
+    resolvedTenantScopeId.value,
+  ],
+  () => {
+    syncAccessCreateDraft();
+    syncAccessManageDraft();
   },
   { immediate: true },
 );
@@ -1902,6 +2164,31 @@ onBeforeUnmount(() => {
 .employee-admin-form-section__header {
   display: grid;
   gap: 0.25rem;
+}
+
+.employee-admin-form-section--nested {
+  padding: 0.9rem 1rem;
+  background: var(--sp-color-surface-card);
+}
+
+.employee-admin-advanced-access {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+  border: 1px dashed var(--sp-color-border-soft);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--sp-color-surface-page) 84%, white 16%);
+}
+
+.employee-admin-advanced-access summary {
+  display: grid;
+  gap: 0.2rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.employee-admin-advanced-access summary::-webkit-details-marker {
+  display: none;
 }
 
 .employee-admin-form-grid--editor {

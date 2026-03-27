@@ -426,11 +426,6 @@
                   <span>{{ t("customerAdmin.fields.mobile") }}</span>
                   <input v-model="contactDraft.mobile" />
                 </label>
-                <div class="field-stack field-stack--half">
-                  <span>{{ t("customerAdmin.contacts.portalAccessLabel") }}</span>
-                  <strong>{{ contactPortalAccessSummary }}</strong>
-                  <p class="field-help">{{ t("customerAdmin.contacts.portalAccessHelp") }}</p>
-                </div>
                 <label class="field-stack field-stack--wide">
                   <span>{{ t("customerAdmin.fields.notes") }}</span>
                   <textarea v-model="contactDraft.notes" rows="3" />
@@ -1922,20 +1917,6 @@ const portalAccessAvailableContacts = computed(() =>
 const selectedPortalAccessContact = computed(() =>
   portalAccessAvailableContacts.value.find((contact) => contact.id === portalAccessDraft.contact_id) ?? null,
 );
-const linkedContactPortalAccessAccount = computed(() =>
-  customerPortalAccessAccounts.value.find(
-    (account) =>
-      (!!editingContactId.value && account.contact_id === editingContactId.value) ||
-      (!!contactDraft.user_id && account.user_id === contactDraft.user_id),
-  ) ?? null,
-);
-const contactPortalAccessSummary = computed(() => {
-  const account = linkedContactPortalAccessAccount.value;
-  if (account) {
-    return [account.username, account.email].filter(Boolean).join(" · ");
-  }
-  return contactDraft.user_id || t("customerAdmin.contacts.portalAccessNone");
-});
 const selectedRateCard = computed(() =>
   commercialProfile.value?.rate_cards.find((row) => row.id === selectedRateCardId.value) ?? null,
 );

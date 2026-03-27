@@ -45,7 +45,10 @@ test("employee list rows use structured text stack markup and card row styling",
 });
 
 test("non-overview employee tabs reuse the structured section pattern", () => {
-  assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*employee-admin-form employee-admin-form--structured[\s\S]*employeeAdmin\.access\.createEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*employee-admin-form employee-admin-form--structured[\s\S]*employeeAdmin\.access\.stateCreateEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*v-if="!hasLinkedAccess"[\s\S]*employeeAdmin\.access\.createEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*v-else[\s\S]*employeeAdmin\.access\.manageEyebrow[\s\S]*employeeAdmin\.access\.resetEyebrow[\s\S]*employeeAdmin\.access\.detachEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*employee-admin-advanced-access[\s\S]*employeeAdmin\.access\.attachEyebrow[\s\S]*employeeAdmin\.access\.reconcileEyebrow/);
   assert.match(viewSource, /employee-tab-panel-profile-photo[\s\S]*employee-admin-editor-intro[\s\S]*employeeAdmin\.photo\.manageEyebrow/);
   assert.match(viewSource, /employee-tab-panel-notes[\s\S]*employeeAdmin\.notes\.registerEyebrow[\s\S]*employeeAdmin\.notes\.editorEyebrow/);
   assert.match(viewSource, /employee-tab-panel-groups[\s\S]*employeeAdmin\.groups\.catalogEyebrow[\s\S]*employeeAdmin\.groups\.assignEyebrow[\s\S]*employeeAdmin\.groups\.currentEyebrow/);

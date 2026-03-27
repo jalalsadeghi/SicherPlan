@@ -39,7 +39,7 @@ vi.mock('@/stores/auth', () => ({
   }),
 }));
 
-import { createEmployee } from './employeeAdmin';
+import { createEmployee, listEmployees } from './employeeAdmin';
 
 describe('employee admin auth recovery', () => {
   beforeEach(() => {
@@ -133,5 +133,50 @@ describe('employee admin auth recovery', () => {
         }),
       }),
     );
+  });
+
+  it('omits empty employee list filters from the query string', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    await listEmployees('tenant-1', 'access-1', {
+      search: '',
+      status: '',
+      default_branch_id: '',
+      default_mandate_id: '',
+      include_archived: false,
+    });
+
+    const [requestedUrl] = fetchMock.mock.calls[0] ?? [];
+    expect(String(requestedUrl)).toMatch(/\/api\/employees\/tenants\/tenant-1\/employees$/);
+  });
+
+  it('includes only active employee list filters that are actually set', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    await listEmployees('tenant-1', 'access-1', {
+      search: 'nina',
+      status: 'active',
+      default_branch_id: 'branch-1',
+      default_mandate_id: '',
+      include_archived: true,
+    });
+
+    const [requestedUrl] = fetchMock.mock.calls[0] ?? [];
+    expect(String(requestedUrl)).toContain('/api/employees/tenants/tenant-1/employees?');
+    expect(String(requestedUrl)).toContain('search=nina');
+    expect(String(requestedUrl)).toContain('status=active');
+    expect(String(requestedUrl)).toContain('default_branch_id=branch-1');
+    expect(String(requestedUrl)).toContain('include_archived=true');
+    expect(String(requestedUrl)).not.toContain('default_mandate_id=');
   });
 });

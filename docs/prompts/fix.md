@@ -1,97 +1,172 @@
 You are working in the SicherPlan monorepo.
 
-Bug:
-Creating a customer contact crashes in the backend with:
-
-sqlalchemy.exc.DataError: (psycopg.errors.InvalidTextRepresentation)
-invalid input syntax for type uuid: "Customer001"
-
-Context:
-- In the Contacts form inside:
-  web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
-  there is a field labeled "Portal user ID".
-- The frontend currently allows arbitrary free-text input there.
-- But backend/app/modules/customers/service.py validates payload.user_id by calling repository.get_user_account(tenant_id, payload.user_id).
-- backend/app/modules/customers/repository.py then queries iam.user_account.id == user_id.
-- iam.user_account.id is UUID-backed, and crm.customer_contact.user_id is a FK to iam.user_account.id.
-- Therefore typing a value like "Customer001" causes PostgreSQL UUID parsing failure before the app can return a proper validation error.
-
 Goal:
-Fix this in the most correct and maintainable way.
+Redesign the Employees > App access tab so it behaves professionally, clearly, and consistently with the real one-user-per-employee domain model.
 
-Required solution principles:
-1. Do NOT allow arbitrary free-text portal user IDs in the customer contact editor.
-2. Portal user linkage must be managed by the dedicated portal-access provisioning flow, not by manual free-text entry in Contacts.
-3. Backend must still be defensive and never leak a raw SQLAlchemy/psycopg DataError for invalid UUID input.
-4. Keep backward compatibility where reasonable, but prefer a safe domain model.
+Important context from current code:
+- Frontend file:
+  web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
+- Backend router:
+  backend/app/modules/employees/router.py
+- Backend service:
+  backend/app/modules/employees/ops_service.py
+- Backend service:
+  backend/app/modules/employees/service.py
+- Backend repository:
+  backend/app/modules/employees/repository.py
 
-Implement the fix in two layers:
+Current behavior problems:
+1. The UI shows a “Create app user” form even when the employee is already linked to an app user.
+2. But backend create_access_user() returns the existing link immediately when employee.user_id already exists, so the create form becomes misleading instead of useful.
+3. The UI shows current username/email at the top, but there is no way to properly edit the linked IAM user’s username/email or reset the password.
+4. The “Existing user” box is technically valid but confusing for normal users. It is really an advanced attach/reconcile tool, not the main happy path.
+5. The App access tab should enforce and communicate the rule:
+   one employee = at most one linked app user.
 
-A. Frontend fix
-1. In:
-   web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
+Business intent to preserve:
+- Each employee can have at most one linked app-access user.
+- The main workflow should be:
+  a) create access user if none is linked
+  b) manage the linked user if one is already linked
+- Existing-user attachment should remain possible, but only as an advanced/admin scenario.
+- The tab must feel explicit, safe, and hard to misuse.
 
-2. Remove or disable manual editing of the "Portal user ID" input in the Contacts create/update editor.
-   Preferred behavior:
-   - Do not show an editable free-text field for user_id during contact creation.
-   - If the contact already has a linked portal user, show it as a read-only info field or small status summary.
-   - Add helper text that portal access is managed from the Portal tab, not from Contacts.
+Required redesign:
 
-3. Ensure normalizeContactDraft() does not send arbitrary user_id text from the contact editor.
-   Preferred:
-   - On create: omit user_id entirely or send null.
-   - On update from contact editor: preserve existing linkage unless there is a deliberate unlink flow elsewhere.
-   - Do not silently overwrite an existing valid user_id with junk.
+A. UX / Information Architecture
+1. Split the tab into two clear states:
+   State A: no linked app user
+   State B: linked app user exists
 
-4. Update any labels/help text accordingly.
-   For example:
-   - rename “Portal user ID” display to “Linked portal user”
-   - add help text like “Portal credentials are managed in the Portal tab.”
+2. State A (no linked user):
+   - Show a primary section:
+     “Create app access”
+   - Include fields:
+     - username
+     - email
+     - initial password
+   - Prefill email from employee.work_email when available.
+   - Suggest username intelligently if possible from personnel_no / name, but keep it editable.
+   - Show one concise sentence that this creates the single login for this employee.
+   - Hide all edit/manage actions that only make sense after a link exists.
 
-B. Backend hardening
-1. In:
-   backend/app/modules/customers/service.py
-   and, if helpful,
-   backend/app/modules/customers/repository.py
+3. State B (linked user exists):
+   - Replace the create form with a read-only summary card showing:
+     - username
+     - email
+     - full name
+     - access enabled
+     - role assignment active
+   - Add a primary “Manage linked access” section with explicit actions:
+     - Update username/email/full_name
+     - Reset password
+     - Enable/disable access if relevant
+     - Detach access (danger action)
+   - Do NOT show the create form in this state.
+   - Make it impossible in the normal UI to think a second user can be created.
 
-2. Make _validate_contact_constraints() robust:
-   - If payload.user_id is provided, first validate that it is a syntactically valid UUID before querying the database.
-   - If it is not a valid UUID, raise a clean ApiException 400 with a customer-contact-specific message key, e.g.:
-     - code: customers.validation.portal_user_id_format
-     - message_key: errors.customers.contact.invalid_user_id_format
+4. “Existing user” section:
+   - Keep the functionality, but move it into an advanced/collapsible section.
+   - Rename it clearly, for example:
+     “Link already-existing IAM account”
+   - Add helper text explaining when it should be used:
+     migration, recovery, or reconciling an existing account.
+   - Make it collapsed by default.
+   - Keep the rule that exactly one of:
+     user_id / username / email
+     must be provided.
 
-3. Do not rely on the database cast error for validation.
+5. “Reconcile” section:
+   - Keep it only if it has real value.
+   - If kept, rewrite the copy so users understand what it does.
+   - If it is mostly for repair scenarios, move it next to the advanced section.
+   - Do not present it as a normal day-to-day action.
 
-4. Ensure repository.get_user_account() is only called with validated UUID values, or defensively handle invalid UUID there too.
-   Prefer validation in the service layer.
+B. Backend capability gap to fix
+The current backend supports:
+- get_access_link
+- create_access_user
+- attach_existing_user
+- detach_access_user
+- reconcile_access_user
 
-5. Preserve the existing semantic validation:
-   - if UUID format is valid but no matching user exists in this tenant, return the existing invalid scope/not found style business error.
+But it does NOT support proper management of an already linked user.
 
-C. Behavioral intent
-1. Contacts are customer master data.
-2. Portal account creation/linking belongs to the Portal tab / portal-access workflow.
-3. The Contacts screen should not be a second, confusing provisioning path.
+Implement backend support for professional access management:
+1. Add an endpoint to update the linked access user fields:
+   - username
+   - email
+   - full_name
+   Prefer something like:
+   PATCH /api/employees/tenants/{tenant_id}/employees/{employee_id}/access-link/user
 
-D. Tests
-Add or update tests to cover at least:
-1. creating a contact with no user_id succeeds
-2. creating a contact with a non-UUID user_id returns a clean 400 ApiException, not a raw DataError
-3. updating a contact with invalid non-UUID user_id returns a clean 400
-4. existing linked contact remains displayable after frontend changes
-5. portal-access flow still owns linking behavior
+2. Add an endpoint to reset/set a new password for the linked access user.
+   Prefer something like:
+   POST /api/employees/tenants/{tenant_id}/employees/{employee_id}/access-link/reset-password
 
-E. Output format
-Before changing code, summarize:
-- exact root cause
-- frontend files to change
-- backend files to change
-- chosen UX behavior for the contact form
-- validation strategy
+3. If access enable/disable should be controlled separately from detach, add an endpoint for that as well.
+   Only do this if the current domain model supports it cleanly.
+   Otherwise clarify in UI that detach/remove is the supported deactivation path.
 
-Then implement the fix.
-After implementation, verify:
-- contact creation no longer crashes when the field is filled incorrectly
-- no raw SQLAlchemy DataError leaks to the UI
-- portal access creation remains in the Portal tab
-- frontend builds successfully
+4. Enforce uniqueness properly:
+   - username unique per tenant
+   - email unique per tenant
+   - one employee cannot get a second linked user
+   - one user cannot be linked to multiple employees
+
+5. For update/reset flows, add clear business errors and avoid silent no-op behavior.
+
+C. Frontend behavior changes
+In EmployeeAdminView.vue:
+1. Use accessLink existence to switch between “Create” state and “Manage existing access” state.
+2. Do not render the Create form when accessLink.user_id exists.
+3. Add a dedicated edit form for the linked user.
+4. Add a reset-password form or action.
+5. Keep detach as a clearly marked destructive action.
+6. Move Existing user attach into an advanced collapsible block.
+7. Improve labels and explanatory text for all sections.
+
+D. Copy and labels
+Use clear operator-facing language.
+Examples:
+- “Create app access”
+- “Linked app account”
+- “Reset password”
+- “Link already-existing IAM account”
+- “Detach linked account”
+- “Advanced repair and migration tools”
+
+Avoid vague labels like:
+- “Creation”
+- “Existing user”
+- “Reconcile”
+unless they are accompanied by precise explanations.
+
+E. Validation and UX details
+1. When linked access already exists, prevent duplicate-creation paths in the UI.
+2. After successful create/update/reset/detach/attach, reload accessLink and employee detail.
+3. Show explicit success and error messages.
+4. If email is invalid or already taken, surface the exact backend message.
+5. Keep the layout visually consistent with the rest of the employee detail tabs.
+
+F. Tests
+Add/adjust tests for:
+1. employee with no linked user -> create form visible
+2. employee with linked user -> manage form visible, create form hidden
+3. update linked username/email/full_name
+4. reset password for linked user
+5. cannot create second linked user for same employee
+6. attach-existing flow works only when one identifier is provided
+7. duplicate username/email conflicts are handled cleanly
+8. detach removes link and UI returns to create state
+
+Output format before coding:
+1. summarize current root UX problems
+2. list backend endpoints to add/change
+3. list frontend sections to remove/replace
+4. describe final UX for:
+   - no linked user
+   - linked user exists
+   - advanced attach/reconcile
+
+Then implement the full redesign.

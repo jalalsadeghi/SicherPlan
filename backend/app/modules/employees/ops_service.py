@@ -16,6 +16,8 @@ from app.modules.employees.schemas import (
     EmployeeAccessCreateUserRequest,
     EmployeeAccessDetachRequest,
     EmployeeAccessLinkRead,
+    EmployeeAccessResetPasswordRequest,
+    EmployeeAccessUpdateUserRequest,
     EmployeeExportRequest,
     EmployeeExportResult,
     EmployeeFilter,
@@ -77,6 +79,7 @@ class EmployeeOpsRepository(Protocol):
     def find_user_account_by_email(self, tenant_id: str, email: str) -> UserAccount | None: ...
     def create_user_account(self, row: UserAccount) -> UserAccount: ...
     def update_user_account(self, row: UserAccount) -> UserAccount: ...
+    def revoke_active_sessions_for_user(self, user_id: str, *, reason: str, at_time: datetime) -> None: ...
     def get_role_by_key(self, role_key: str) -> Role | None: ...
     def find_role_assignment(self, tenant_id: str, user_id: str, role_key: str) -> UserRoleAssignment | None: ...
     def create_role_assignment(self, row: UserRoleAssignment) -> UserRoleAssignment: ...
@@ -301,7 +304,7 @@ class EmployeeOpsService:
         self._ensure_payload_tenant(tenant_id, payload.tenant_id)
         employee = self._require_employee(tenant_id, employee_id)
         if employee.user_id:
-            return self._build_access_link_read(employee)
+            raise ApiException(409, "employees.access.already_linked", "errors.employees.access.already_linked")
         username = payload.username.strip()
         email = payload.email.strip().lower()
         if self.repository.find_user_account_by_username(tenant_id, username) is not None:
@@ -334,6 +337,86 @@ class EmployeeOpsService:
             after_json={"user_id": linked.user_id, "username": linked.username, "app_access_enabled": linked.app_access_enabled},
         )
         return linked
+
+    def update_access_user(
+        self,
+        tenant_id: str,
+        employee_id: str,
+        payload: EmployeeAccessUpdateUserRequest,
+        actor: RequestAuthorizationContext,
+    ) -> EmployeeAccessLinkRead:
+        self._require_write_access(actor, tenant_id)
+        self._ensure_payload_tenant(tenant_id, payload.tenant_id)
+        employee = self._require_employee(tenant_id, employee_id)
+        user = self._require_linked_user(employee)
+        username = payload.username.strip()
+        email = payload.email.strip().lower()
+        full_name = payload.full_name.strip()
+        if not full_name:
+            raise ApiException(400, "employees.access.full_name_required", "errors.employees.access.full_name_required")
+        username_owner = self.repository.find_user_account_by_username(tenant_id, username)
+        if username_owner is not None and username_owner.id != user.id:
+            raise ApiException(409, "employees.access.username_taken", "errors.employees.access.username_taken")
+        email_owner = self.repository.find_user_account_by_email(tenant_id, email)
+        if email_owner is not None and email_owner.id != user.id:
+            raise ApiException(409, "employees.access.email_taken", "errors.employees.access.email_taken")
+        before = self._build_access_link_read(employee)
+        user.username = username
+        user.email = email
+        user.full_name = full_name
+        user.updated_by_user_id = actor.user_id
+        updated_user = self.repository.update_user_account(user)
+        result = self._build_access_link_read(self._require_employee(tenant_id, employee_id))
+        self._record_event(
+            actor,
+            event_type="employees.access.user_updated",
+            entity_type="hr.employee",
+            entity_id=employee_id,
+            tenant_id=tenant_id,
+            before_json={
+                "user_id": before.user_id,
+                "username": before.username,
+                "email": before.email,
+                "full_name": before.full_name,
+            },
+            after_json={
+                "user_id": updated_user.id,
+                "username": updated_user.username,
+                "email": updated_user.email,
+                "full_name": updated_user.full_name,
+            },
+        )
+        return result
+
+    def reset_access_user_password(
+        self,
+        tenant_id: str,
+        employee_id: str,
+        payload: EmployeeAccessResetPasswordRequest,
+        actor: RequestAuthorizationContext,
+    ) -> EmployeeAccessLinkRead:
+        self._require_write_access(actor, tenant_id)
+        self._ensure_payload_tenant(tenant_id, payload.tenant_id)
+        employee = self._require_employee(tenant_id, employee_id)
+        user = self._require_linked_user(employee)
+        user.password_hash = hash_password(payload.password)
+        user.updated_by_user_id = actor.user_id
+        self.repository.update_user_account(user)
+        self.repository.revoke_active_sessions_for_user(
+            user.id,
+            reason="employee_access_password_reset",
+            at_time=datetime.now(UTC),
+        )
+        result = self._build_access_link_read(self._require_employee(tenant_id, employee_id))
+        self._record_event(
+            actor,
+            event_type="employees.access.password_reset",
+            entity_type="hr.employee",
+            entity_id=employee_id,
+            tenant_id=tenant_id,
+            after_json={"user_id": result.user_id, "username": result.username},
+        )
+        return result
 
     def attach_existing_user(
         self,
@@ -630,12 +713,22 @@ class EmployeeOpsService:
             raise ApiException(404, "employees.user.not_found", "errors.employees.user.not_found")
         return user
 
+    def _require_linked_user(self, employee: Employee) -> UserAccount:
+        if not employee.user_id:
+            raise ApiException(409, "employees.access.not_linked", "errors.employees.access.not_linked")
+        user = self.repository.get_user_account(employee.tenant_id, employee.user_id)
+        if user is None:
+            raise ApiException(404, "employees.user.not_found", "errors.employees.user.not_found")
+        return user
+
     def _link_user_to_employee(
         self,
         employee: Employee,
         user: UserAccount,
         actor: RequestAuthorizationContext,
     ) -> EmployeeAccessLinkRead:
+        if employee.user_id and employee.user_id != user.id:
+            raise ApiException(409, "employees.access.already_linked", "errors.employees.access.already_linked")
         duplicate = self.repository.find_employee_by_user_id(employee.tenant_id, user.id, exclude_id=employee.id)
         if duplicate is not None:
             raise ApiException(409, "employees.employee.duplicate_user_link", "errors.employees.employee.duplicate_user_link")
