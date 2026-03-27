@@ -689,6 +689,13 @@ export function createCustomerAddress(
   );
 }
 
+export function listCustomerAddresses(tenantId: string, customerId: string, accessToken: string) {
+  return request<CustomerAddressRead[]>(
+    `/api/customers/tenants/${tenantId}/customers/${customerId}/addresses`,
+    accessToken,
+  );
+}
+
 export function updateCustomerAddress(
   tenantId: string,
   customerId: string,

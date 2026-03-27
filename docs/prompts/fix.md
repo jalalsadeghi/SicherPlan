@@ -1,145 +1,153 @@
-You are fixing a specific bug in the /admin/planning map picker dialog.
+You are fixing 2 failing backend pytest tests in the SicherPlan monorepo.
 
-Current observed bug
-- When the user clicks "Pick on map", the dialog still opens at 0,0 / ocean.
-- The dialog text says something like:
-  "Start point: existing record coordinates"
-  and shows:
-  Latitude 0.000000
-  Longitude 0.000000
-- This means the bug is NOT only a Leaflet centering issue.
-- The real problem is that empty form values are being coerced into numeric zero before the initial map-center resolution runs.
+Current failing command
+python -m pytest -q
 
-Your goal
-Fix the initialization pipeline so blank/unset coordinates are NOT treated as existing coordinates.
+Current failures
 
-Critical diagnosis to verify in code
-Inspect the real implementation and find where latitude/longitude are normalized before the map dialog opens.
-Look specifically for patterns such as:
-- Number(value)
-- +value
-- value || 0
-- value ?? 0
-- parseFloat(value) with zero fallback
-- helper functions returning 0 for invalid input
-- ref(0), shallowRef(0), reactive({ lat: 0, lng: 0 })
-- computed/derived values that convert empty strings to 0
-- "hasCoordinates" or "existing record coordinates" checks that run after coercion
+1)
+FAILED backend/tests/modules/core/test_config_seed.py::TestConfigSeed::test_tenant_setting_seed_is_idempotent
 
-This bug is likely caused by one of these flows:
-1) the form stores lat/lng as empty strings, but Number('') becomes 0
-2) a parse helper returns 0 instead of null for empty/invalid values
-3) the dialog state initializes with 0/0 before the resolver decides which source should be used
-4) the source-priority logic incorrectly treats 0/0 as a valid existing coordinate set
+Observed failure:
+expected:
+{"inserted": 2, "updated": 0}
+actual:
+{"inserted": 3, "updated": 0}
 
-Required behavior
-Implement the initial map center resolution with this exact priority:
+2)
+FAILED backend/tests/modules/subcontractors/test_subcontractor_readiness.py::SubcontractorReadinessServiceTest::test_missing_proof_and_expired_compliance_qualification_block_worker
 
-1. Use current form latitude/longitude only if BOTH values are truly present and valid.
-   - "truly present" means they came from non-empty existing form values
-   - empty string, null, undefined, NaN must NOT become 0
-2. Otherwise use the selected customer's saved exact coordinates, if available.
-3. Otherwise geocode the selected customer's saved address/city and center there.
-4. Otherwise fall back to:
-   latitude: 51.662973
-   longitude: 8.174013
+Observed failure:
+expected:
+blocking_issue_count >= 2
+actual:
+blocking_issue_count == 1
 
-Important rule
-- Blank values must stay "unset", not 0.
-- Do not use numeric zero as the default for missing coordinates.
-- Preserve the distinction between:
-  - no coordinate
-  - valid coordinate 0
-- However, for this page's initial-center logic, only treat coordinates as "existing record coordinates" when they were explicitly present in the form data source, not manufactured from empty state.
+Your job
+Diagnose the real root cause of both failures and fix them correctly.
+Do NOT make superficial changes just to satisfy the assertions.
+Do NOT weaken the tests unless the test expectation is truly outdated and you can justify it from the codebase behavior and domain rules.
 
-Implement a robust parser
-Create or refactor a small helper, e.g. parseOptionalCoordinate(value), with this behavior:
+Work process
 
-- input: '', '   ', null, undefined -> return null
-- input: NaN / invalid number string -> return null
-- input: number or numeric string -> return parsed number
-- must not default missing values to 0
+1) Inspect the exact implementation and tests for both failing areas:
+- backend/tests/modules/core/test_config_seed.py
+- backend/tests/modules/subcontractors/test_subcontractor_readiness.py
 
-Then create a helper like resolveInitialMapCenter(...) that returns:
-- lat
-- lng
-- source: 'existing-record' | 'customer-coordinates' | 'customer-geocode' | 'fallback'
+And inspect the production code they cover, especially:
+- the function that seeds default tenant settings
+- the seed definitions/source of truth for tenant settings
+- the subcontractor readiness service
+- the logic that calculates readiness_status
+- the logic that builds blocking issues / blocking_issue_count
+- any helper methods used for compliance proof checks and qualification expiry checks
 
-Validation rules
-- Only use existing form coordinates if BOTH lat and lng are non-null valid numbers.
-- If only one side exists, treat the pair as incomplete and move to the next source.
-- If geocoding fails, fall back cleanly to 51.662973 / 8.174013.
-- Never open the map at 0,0 unless the user truly and explicitly stored 0,0 as both coordinates.
-- The marker, the map center, and the visible coordinate preview in the dialog must all initialize from the SAME resolved source.
+2) For the config seed failure, determine which of these is true:
+- the seed implementation now intentionally has 3 default tenant settings and the test is stale
+OR
+- the seed implementation is incorrectly inserting an extra setting
+OR
+- idempotence is broken in a way that only appears as an inserted-count mismatch
 
-UI text behavior
-- The source label in the dialog must be truthful.
-- For example:
-  - "Start point: existing record coordinates"
-  - "Start point: customer coordinates"
-  - "Start point: customer address"
-  - "Start point: default Germany fallback"
-- In the current bug, it incorrectly claims "existing record coordinates" while using coerced 0/0. Fix that.
+Important:
+- preserve idempotence
+- do not allow duplicate tenant settings for the same tenant/key
+- the second call must not insert duplicates
+- keep the returned inserted/updated counts semantically correct
 
-Leaflet/map behavior
-- Ensure center order is [latitude, longitude], not [longitude, latitude].
-- After the dialog opens, make sure the map uses the resolved center for:
-  - map.setView(...)
-  - marker position
-  - coordinate preview state
-- If needed, call invalidateSize after the modal becomes visible, but do not confuse this with the main bug.
+3) For the subcontractor readiness failure, determine why only 1 blocking issue is being counted instead of at least 2.
+Specifically verify whether both of these conditions are supposed to independently contribute blocking issues:
+- missing proof
+- expired compliance qualification
 
-What to inspect in code
-Find the actual files/components/functions responsible for:
-- the planning detail form latitude/longitude state
-- the "Pick on map" button click handler
-- map dialog props/state initialization
-- any computed current coordinates
-- any customer address / customer coordinate resolution
-- any geocoding helper
-- any source-label text such as "existing record coordinates"
+Check for mistakes such as:
+- one issue overwriting another
+- de-duplication collapsing distinct blockers incorrectly
+- only the final blocker being retained
+- filtering logic that excludes one blocker
+- mismatch between readiness_status logic and blocking_issue_count logic
+- qualification/proof issues being combined into one generic blocker when the test/domain expects separate blocking issues
 
-Search for keywords like:
-- Pick on map
-- existing record coordinates
-- latitude
-- longitude
-- map dialog
-- center
-- marker
-- geocode
-- customer location
-- Number(
-- || 0
-- ?? 0
+Important:
+- preserve domain correctness
+- if two independent blocking conditions exist, they should both be represented in blocking_issue_count unless the codebase intentionally aggregates them into one issue and the tests are outdated
+- do not inflate counts artificially
+
+4) Add or adjust tests only when justified
+- If the production code is correct and the test is outdated, update the test with a short code comment or clear rationale in the implementation/report
+- Otherwise fix the implementation and keep the tests meaningful
+- Add focused regression coverage if useful for:
+  - tenant setting seed idempotence and count behavior
+  - subcontractor readiness counting multiple simultaneous blockers
 
 Constraints
-- Do not do a broad UI refactor.
-- Fix the bug at the state-resolution level.
-- Keep current UX and modal structure intact unless a tiny cleanup is needed.
-- Preserve tenant scoping.
-- Do not hardcode customer-specific data except the fallback coordinates:
-  51.662973, 8.174013
+- Keep changes minimal and maintainable
+- Do not refactor unrelated modules
+- Do not change public API semantics unless clearly necessary
+- Do not hide failures by loosening assertions without understanding the domain logic
+- Prefer fixing root cause over patching test data
 
 Definition of done
-- For a new record with empty lat/lng, the map opens centered on 51.662973 / 8.174013 unless customer location/address provides a better center.
-- The dialog no longer shows 0.000000 / 0.000000 for empty records.
-- The dialog no longer claims "existing record coordinates" for empty records.
-- Existing valid form coordinates still win when they are actually present.
-- Selected customer coordinates/address correctly override the fallback when available.
-- Marker, preview text, and map center are always in sync.
-- No 0/0 ocean fallback remains.
+- Both failing tests pass
+- Full test suite passes with:
+  python -m pytest -q
+- Tenant setting seeding remains idempotent
+- Blocking issue count in subcontractor readiness accurately reflects simultaneous blockers
+- No unrelated regressions
 
 Before coding
-Briefly state:
-1) which files own the current initialization flow
-2) where the false 0/0 values are being introduced
-3) which helper you will refactor or add
+Briefly report:
+1) which files you will inspect/change
+2) your preliminary hypothesis for each of the 2 failures
 
 After coding
 Report:
-1) root cause of the bug
-2) exact code path that converted empty values to 0
+1) root cause of failure #1
+2) root cause of failure #2
 3) changed files
-4) which source was used for initial centering in your final implementation
-5) whether you added/updated tests for the resolver
+4) whether you changed production code, tests, or both, and why
+5) results of:
+   - python -m pytest backend/tests/modules/core/test_config_seed.py -q
+   - python -m pytest backend/tests/modules/subcontractors/test_subcontractor_readiness.py -q
+   - python -m pytest -q
+
+
+Those errors are:
+(.venv-backend-test) jey@DESKTOP-M16IUT4:~/Projects/SicherPlan$ python -m pytest -q
+.....F............................................................................................................................................................................................................... [ 46%]
+.................................................................................................................................................................................................................................... [ 95%]
+......F..............                                                                                                                                                                                                                [100%]
+================================================================================================================= FAILURES =================================================================================================================
+__________________________________________________________________________________________ TestConfigSeed.test_tenant_setting_seed_is_idempotent ___________________________________________________________________________________________
+
+self = <tests.modules.core.test_config_seed.TestConfigSeed testMethod=test_tenant_setting_seed_is_idempotent>
+
+    def test_tenant_setting_seed_is_idempotent(self) -> None:
+        session = _FakeSession()
+        first = seed_default_tenant_settings(session, tenant_id="tenant-1")
+        second = seed_default_tenant_settings(session, tenant_id="tenant-1")
+>       self.assertEqual(first, {"inserted": 2, "updated": 0})
+E       AssertionError: {'inserted': 3, 'updated': 0} != {'inserted': 2, 'updated': 0}
+E       - {'inserted': 3, 'updated': 0}
+E       ?              ^
+E
+E       + {'inserted': 2, 'updated': 0}
+E       ?              ^
+
+backend/tests/modules/core/test_config_seed.py:60: AssertionError
+__________________________________________________________________ SubcontractorReadinessServiceTest.test_missing_proof_and_expired_compliance_qualification_block_worker __________________________________________________________________
+
+self = <tests.modules.subcontractors.test_subcontractor_readiness.SubcontractorReadinessServiceTest testMethod=test_missing_proof_and_expired_compliance_qualification_block_worker>
+
+    def test_missing_proof_and_expired_compliance_qualification_block_worker(self) -> None:
+        result = self.service.get_worker_readiness("tenant-1", "subcontractor-1", "worker-blocked", self.context)
+
+        self.assertEqual(result.readiness_status, "not_ready")
+>       self.assertGreaterEqual(result.blocking_issue_count, 2)
+E       AssertionError: 1 not greater than or equal to 2
+
+backend/tests/modules/subcontractors/test_subcontractor_readiness.py:308: AssertionError
+========================================================================================================= short test summary info ==========================================================================================================
+FAILED backend/tests/modules/core/test_config_seed.py::TestConfigSeed::test_tenant_setting_seed_is_idempotent - AssertionError: {'inserted': 3, 'updated': 0} != {'inserted': 2, 'updated': 0}
+FAILED backend/tests/modules/subcontractors/test_subcontractor_readiness.py::SubcontractorReadinessServiceTest::test_missing_proof_and_expired_compliance_qualification_block_worker - AssertionError: 1 not greater than or equal to 2
+2 failed, 460 passed, 15 subtests passed in 8.45s

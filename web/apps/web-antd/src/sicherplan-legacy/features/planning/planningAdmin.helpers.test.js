@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildPlanningImportTemplate,
   derivePlanningActionState,
+  formatPlanningAddressOption,
   filterPlanningCustomerOptions,
   formatPlanningCustomerOption,
   mapPlanningApiMessage,
@@ -50,6 +51,21 @@ test("filterPlanningCustomerOptions matches across the combined customer label",
 
   assert.deepEqual(filterPlanningCustomerOptions(customers, "nord"), [customers[1]]);
   assert.deepEqual(filterPlanningCustomerOptions(customers, "cus-100"), [customers[0]]);
+});
+
+test("formatPlanningAddressOption renders a readable postal label", () => {
+  assert.equal(
+    formatPlanningAddressOption({
+      address_id: "address-1",
+      address: {
+        street_line_1: "Musterstrasse 12",
+        postal_code: "50667",
+        city: "Koeln",
+        country_code: "DE",
+      },
+    }),
+    "Musterstrasse 12 · 50667 Koeln · DE",
+  );
 });
 
 test("parseOptionalCoordinate keeps blank values unset instead of coercing to zero", () => {

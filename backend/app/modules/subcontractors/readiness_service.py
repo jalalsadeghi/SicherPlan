@@ -195,7 +195,10 @@ class SubcontractorReadinessService:
 
     def _evaluate_worker(self, worker: SubcontractorWorker) -> _DerivedWorkerReadiness:
         checked_at = datetime.now(UTC)
-        today = checked_at.date()
+        # Qualification and credential validity are date-only facts. Use the
+        # process/business day directly so records do not flip between
+        # "expired" and "expiring" around UTC midnight.
+        today = date.today()
         warning_threshold = today + timedelta(days=WARNING_WINDOW_DAYS)
         issues: list[SubcontractorWorkerReadinessIssueRead] = []
 

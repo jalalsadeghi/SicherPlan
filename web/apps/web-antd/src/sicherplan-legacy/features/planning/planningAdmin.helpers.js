@@ -94,6 +94,25 @@ export function formatPlanningCustomerOption(customer) {
   return [customerNumber, name].filter(Boolean).join(" — ") || "";
 }
 
+export function formatPlanningAddressOption(addressLink) {
+  if (!addressLink || typeof addressLink !== "object") {
+    return "";
+  }
+
+  const address = addressLink.address;
+  if (!address || typeof address !== "object") {
+    return addressLink.address_id || "";
+  }
+
+  const parts = [
+    address.street_line_1,
+    [address.postal_code, address.city].filter(Boolean).join(" "),
+    address.country_code,
+  ].filter(Boolean);
+
+  return parts.join(" · ") || addressLink.address_id || "";
+}
+
 export function filterPlanningCustomerOptions(customers, query) {
   const normalizedQuery = typeof query === "string" ? query.trim().toLocaleLowerCase() : "";
   if (!normalizedQuery) {

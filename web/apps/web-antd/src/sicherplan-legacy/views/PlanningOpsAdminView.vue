@@ -44,13 +44,7 @@
         </div>
 
         <section class="planning-admin-form-section">
-          <div class="planning-admin-form-section__header">
-            <p class="eyebrow">{{ tp("filtersTitle") }}</p>
-            <h4>{{ tp("filtersTitle") }}</h4>
-            <p class="field-help">{{ tp("filtersLead") }}</p>
-          </div>
-
-          <div class="planning-admin-filter-stack">
+          <div class="planning-admin-shared-context">
             <label class="field-stack">
               <span>{{ tp("entityLabel") }}</span>
               <select v-model="entityKey" @change="changeEntity">
@@ -59,133 +53,159 @@
                 </option>
               </select>
             </label>
-
-            <label class="field-stack">
-              <span>{{ tp("search") }}</span>
-              <input v-model="filters.search" :placeholder="tp('searchPlaceholder')" />
-            </label>
-
-            <PlanningCustomerSelect
-              v-model="filters.customer_id"
-              :label="tp('fieldsCustomer')"
-              :options="customerOptions"
-              :loading="customerLookupLoading"
-              :disabled="loading.list"
-              :error="customerLookupError"
-              :search-placeholder="tp('customerSearchPlaceholder')"
-              :empty-option-label="tp('allCustomers')"
-              :loading-text="tp('customerLoading')"
-              :empty-text="tp('customerEmpty')"
-              :no-match-text="tp('customerNoMatch')"
-            />
-
-            <label class="field-stack">
-              <span>{{ tp("status") }}</span>
-              <select v-model="filters.lifecycle_status">
-                <option value="">{{ tp("allStatuses") }}</option>
-                <option value="active">{{ tp("statusActive") }}</option>
-                <option value="inactive">{{ tp("statusInactive") }}</option>
-                <option value="archived">{{ tp("statusArchived") }}</option>
-              </select>
-            </label>
+            <p class="field-help">{{ tp("browseTabsLead") }}</p>
           </div>
 
-          <label class="planning-admin-checkbox">
-            <input v-model="filters.include_archived" type="checkbox" />
-            <span>{{ tp("includeArchived") }}</span>
-          </label>
-
-          <div class="cta-row">
-            <button class="cta-button" type="button" @click="refreshRecords">
-              {{ tp("actionsSearch") }}
-            </button>
-            <button
-              class="cta-button cta-secondary"
-              type="button"
-              :disabled="!actionState.canCreate"
-              @click="startCreateRecord"
-            >
-              {{ tp("actionsNewRecord") }}
-            </button>
-          </div>
-        </section>
-
-        <section class="planning-admin-form-section planning-admin-import">
-          <div class="planning-admin-form-section__header">
-            <p class="eyebrow">{{ tp("importTitle") }}</p>
-            <h4>{{ tp("importTitle") }}</h4>
-            <p class="field-help">{{ tp("importLead") }}</p>
-          </div>
-
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            :disabled="!actionState.canImport"
-            @change="onImportSelected"
+          <InternalCardTabs
+            v-model="browsePanelTab"
+            aria-label="Browse record tools"
+            panel-id-prefix="planning-browse-panel"
+            tab-id-prefix="planning-browse-tab"
+            test-id="planning-browse-tabs"
+            :tabs="browsePanelTabs"
           />
 
-          <div class="cta-row">
-            <button
-              class="cta-button cta-secondary"
-              type="button"
-              :disabled="!pendingImportFile || !actionState.canImport"
-              @click="loadImportFile"
-            >
-              {{ tp("actionsLoadImportFile") }}
-            </button>
-            <button
-              class="cta-button cta-secondary"
-              type="button"
-              :disabled="!actionState.canImport"
-              @click="resetImportTemplate"
-            >
-              {{ tp("actionsResetImportTemplate") }}
-            </button>
-          </div>
+          <section
+            id="planning-browse-panel-filters"
+            role="tabpanel"
+            aria-labelledby="planning-browse-tab-filters"
+            class="planning-admin-tab-panel"
+            :aria-hidden="browsePanelTab !== 'filters'"
+            v-show="browsePanelTab === 'filters'"
+          >
+            <p class="field-help">{{ tp("filtersLead") }}</p>
 
-          <label class="field-stack field-stack--wide">
-            <span>{{ tp("importCsvLabel") }}</span>
-            <textarea
-              v-model="importDraft.csv_text"
-              rows="6"
-              :disabled="!actionState.canImport"
-            />
-          </label>
+            <div class="planning-admin-filter-stack">
+              <label class="field-stack">
+                <span>{{ tp("search") }}</span>
+                <input v-model="filters.search" :placeholder="tp('searchPlaceholder')" />
+              </label>
 
-          <label class="planning-admin-checkbox">
+              <PlanningCustomerSelect
+                v-model="filters.customer_id"
+                :label="tp('fieldsCustomer')"
+                :options="customerOptions"
+                :loading="customerLookupLoading"
+                :disabled="loading.list"
+                :error="customerLookupError"
+                :search-placeholder="tp('customerSearchPlaceholder')"
+                :empty-option-label="tp('allCustomers')"
+                :loading-text="tp('customerLoading')"
+                :empty-text="tp('customerEmpty')"
+                :no-match-text="tp('customerNoMatch')"
+              />
+
+              <label class="field-stack">
+                <span>{{ tp("status") }}</span>
+                <select v-model="filters.lifecycle_status">
+                  <option value="">{{ tp("allStatuses") }}</option>
+                  <option value="active">{{ tp("statusActive") }}</option>
+                  <option value="inactive">{{ tp("statusInactive") }}</option>
+                  <option value="archived">{{ tp("statusArchived") }}</option>
+                </select>
+              </label>
+            </div>
+
+            <label class="planning-admin-checkbox">
+              <input v-model="filters.include_archived" type="checkbox" />
+              <span>{{ tp("includeArchived") }}</span>
+            </label>
+
+            <div class="cta-row">
+              <button class="cta-button" type="button" @click="refreshRecords">
+                {{ tp("actionsSearch") }}
+              </button>
+              <button
+                class="cta-button cta-secondary"
+                type="button"
+                :disabled="!actionState.canCreate"
+                @click="startCreateRecord"
+              >
+                {{ tp("actionsNewRecord") }}
+              </button>
+            </div>
+          </section>
+
+          <section
+            id="planning-browse-panel-import"
+            role="tabpanel"
+            aria-labelledby="planning-browse-tab-import"
+            class="planning-admin-tab-panel"
+            :aria-hidden="browsePanelTab !== 'import'"
+            v-show="browsePanelTab === 'import'"
+          >
+            <p class="field-help">{{ tp("importLead") }}</p>
+
             <input
-              v-model="importDraft.continue_on_error"
-              type="checkbox"
+              type="file"
+              accept=".csv,text/csv"
               :disabled="!actionState.canImport"
+              @change="onImportSelected"
             />
-            <span>{{ tp("importContinueOnError") }}</span>
-          </label>
 
-          <div class="cta-row">
-            <button
-              class="cta-button"
-              type="button"
-              :disabled="!actionState.canImport"
-              @click="runImportDryRun"
-            >
-              {{ tp("actionsImportDryRun") }}
-            </button>
-            <button
-              class="cta-button cta-secondary"
-              type="button"
-              :disabled="!actionState.canImport"
-              @click="runImportExecute"
-            >
-              {{ tp("actionsImportExecute") }}
-            </button>
-          </div>
+            <div class="cta-row">
+              <button
+                class="cta-button cta-secondary"
+                type="button"
+                :disabled="!pendingImportFile || !actionState.canImport"
+                @click="loadImportFile"
+              >
+                {{ tp("actionsLoadImportFile") }}
+              </button>
+              <button
+                class="cta-button cta-secondary"
+                type="button"
+                :disabled="!actionState.canImport"
+                @click="resetImportTemplate"
+              >
+                {{ tp("actionsResetImportTemplate") }}
+              </button>
+            </div>
 
-          <p v-if="importDryRunResult" class="field-help">
-            {{ tp("importDryRunSummary", { total: importDryRunResult.total_rows, invalid: importDryRunResult.invalid_rows }) }}
-          </p>
-          <p v-if="lastImportResult" class="field-help">
-            {{ tp("importExecuteSummary", { total: lastImportResult.total_rows, created: lastImportResult.created_rows, updated: lastImportResult.updated_rows }) }}
-          </p>
+            <label class="field-stack field-stack--wide">
+              <span>{{ tp("importCsvLabel") }}</span>
+              <textarea
+                v-model="importDraft.csv_text"
+                rows="6"
+                :disabled="!actionState.canImport"
+              />
+            </label>
+
+            <label class="planning-admin-checkbox">
+              <input
+                v-model="importDraft.continue_on_error"
+                type="checkbox"
+                :disabled="!actionState.canImport"
+              />
+              <span>{{ tp("importContinueOnError") }}</span>
+            </label>
+
+            <div class="cta-row">
+              <button
+                class="cta-button"
+                type="button"
+                :disabled="!actionState.canImport"
+                @click="runImportDryRun"
+              >
+                {{ tp("actionsImportDryRun") }}
+              </button>
+              <button
+                class="cta-button cta-secondary"
+                type="button"
+                :disabled="!actionState.canImport"
+                @click="runImportExecute"
+              >
+                {{ tp("actionsImportExecute") }}
+              </button>
+            </div>
+
+            <p v-if="importDryRunResult" class="field-help">
+              {{ tp("importDryRunSummary", { total: importDryRunResult.total_rows, invalid: importDryRunResult.invalid_rows }) }}
+            </p>
+            <p v-if="lastImportResult" class="field-help">
+              {{ tp("importExecuteSummary", { total: lastImportResult.total_rows, created: lastImportResult.created_rows, updated: lastImportResult.updated_rows }) }}
+            </p>
+          </section>
         </section>
 
         <div v-if="records.length" class="planning-admin-list">
@@ -280,9 +300,23 @@
                 </template>
 
                 <template v-if="entityKey === 'site'">
-                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsSiteNo") }}</span><input v-model="draft.site_no" required /></label>
-                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
-                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsAddressId") }}</span><input v-model="draft.address_id" /></label>
+                  <label class="planning-admin-site-primary-field field-stack field-stack--half"><span>{{ tp("fieldsSiteNo") }}</span><input v-model="draft.site_no" required /></label>
+                  <label class="planning-admin-site-primary-field field-stack field-stack--half"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
+                  <PlanningAddressSelect
+                    v-model="draft.address_id"
+                    wrapper-class="field-stack--half"
+                    :customer-id="draft.customer_id"
+                    :label="tp('fieldsAddressId')"
+                    :options="siteAddressOptions"
+                    :loading="siteAddressLookupLoading"
+                    :disabled="loading.action"
+                    :error="siteAddressLookupError"
+                    :search-placeholder="tp('fieldsAddressSearchPlaceholder')"
+                    :loading-text="tp('fieldsAddressLoading')"
+                    :empty-text="tp('fieldsAddressEmpty')"
+                    :customer-required-text="tp('fieldsAddressCustomerRequired')"
+                    :no-match-text="tp('fieldsAddressNoMatch')"
+                  />
                   <label class="field-stack field-stack--third">
                     <span>{{ tp("fieldsTimezone") }}</span>
                     <Select
@@ -309,7 +343,11 @@
                 <template v-if="entityKey === 'event_venue'">
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsVenueNo") }}</span><input v-model="draft.venue_no" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
-                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsAddressId") }}</span><input v-model="draft.address_id" /></label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ tp("fieldsAddressId") }}</span>
+                    <input v-model="draft.address_id" />
+                    <small class="field-help">{{ tp("fieldsAddressIdHelp") }}</small>
+                  </label>
                   <label class="field-stack field-stack--third">
                     <span>{{ tp("fieldsTimezone") }}</span>
                     <Select
@@ -336,7 +374,11 @@
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsFairNo") }}</span><input v-model="draft.fair_no" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsVenueId") }}</span><input v-model="draft.venue_id" /></label>
-                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsAddressId") }}</span><input v-model="draft.address_id" /></label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ tp("fieldsAddressId") }}</span>
+                    <input v-model="draft.address_id" />
+                    <small class="field-help">{{ tp("fieldsAddressIdHelp") }}</small>
+                  </label>
                   <label class="field-stack field-stack--third">
                     <span>{{ tp("fieldsTimezone") }}</span>
                     <Select
@@ -505,9 +547,11 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { Select } from "ant-design-vue";
 
 import StatusBadge from "@/components/StatusBadge.vue";
+import PlanningAddressSelect from "@/components/planning/PlanningAddressSelect.vue";
 import PlanningCustomerSelect from "@/components/planning/PlanningCustomerSelect.vue";
 import PlanningLocationPickerModal from "@/components/planning/PlanningLocationPickerModal.vue";
-import { getCustomer, listCustomers } from "@/api/customers";
+import InternalCardTabs from "@/components/shared/InternalCardTabs.vue";
+import { getCustomer, listCustomerAddresses, listCustomers } from "@/api/customers";
 import {
   createPatrolCheckpoint,
   createPlanningRecord,
@@ -554,6 +598,7 @@ const entityKey = ref("site");
 const records = ref([]);
 const selectedRecordId = ref("");
 const selectedRecord = ref(null);
+const browsePanelTab = ref("filters");
 const tradeFairZones = ref([]);
 const patrolCheckpoints = ref([]);
 const isCreatingRecord = ref(false);
@@ -565,6 +610,9 @@ const lastImportResult = ref(null);
 const customerOptions = ref([]);
 const customerLookupLoading = ref(false);
 const customerLookupError = ref("");
+const siteAddressOptions = ref([]);
+const siteAddressLookupLoading = ref(false);
+const siteAddressLookupError = ref("");
 const locationPickerOpen = ref(false);
 const locationPickerStartPoint = ref({
   lat: 51.662973,
@@ -626,6 +674,10 @@ const actionState = computed(() => derivePlanningActionState(effectiveRole.value
 const canRead = computed(() => actionState.value.canRead);
 const currentLocale = computed(() => (localeStore.locale === "en" ? "en" : "de"));
 const entityLabel = computed(() => entityName(entityKey.value));
+const browsePanelTabs = computed(() => [
+  { id: "filters", label: tp("filtersTitle") },
+  { id: "import", label: tp("importTitle") },
+]);
 const timezoneOptions = computed(() =>
   getSupportedTimezones().map((timezone) => ({
     label: timezone,
@@ -657,6 +709,10 @@ function entityName(key) {
 function resolveCustomerLabel(customerId) {
   const customer = customerOptions.value.find((option) => option.id === customerId);
   return customer ? formatPlanningCustomerOption(customer) : customerId || tp("none");
+}
+
+function isSiteEntityActive() {
+  return entityKey.value === "site";
 }
 
 function getSupportedTimezones() {
@@ -981,6 +1037,52 @@ async function refreshCustomerOptions() {
   }
 }
 
+async function refreshSiteAddressOptions() {
+  if (!isSiteEntityActive()) {
+    siteAddressOptions.value = [];
+    siteAddressLookupError.value = "";
+    siteAddressLookupLoading.value = false;
+    return;
+  }
+
+  if (!resolvedTenantScopeId.value || !accessToken.value || !draft.customer_id) {
+    siteAddressOptions.value = [];
+    siteAddressLookupError.value = "";
+    siteAddressLookupLoading.value = false;
+    draft.address_id = "";
+    return;
+  }
+
+  const requestedCustomerId = draft.customer_id;
+  siteAddressLookupLoading.value = true;
+  siteAddressLookupError.value = "";
+  try {
+    const addressLinks = await listCustomerAddresses(
+      resolvedTenantScopeId.value,
+      requestedCustomerId,
+      accessToken.value,
+    );
+    if (draft.customer_id !== requestedCustomerId || !isSiteEntityActive()) {
+      return;
+    }
+    siteAddressOptions.value = addressLinks.filter((entry) => entry.status !== "archived");
+    if (draft.address_id && !siteAddressOptions.value.some((entry) => entry.address_id === draft.address_id)) {
+      draft.address_id = "";
+    }
+  } catch {
+    if (draft.customer_id !== requestedCustomerId || !isSiteEntityActive()) {
+      return;
+    }
+    siteAddressOptions.value = [];
+    siteAddressLookupError.value = tp("addressLoadError");
+    draft.address_id = "";
+  } finally {
+    if (draft.customer_id === requestedCustomerId && isSiteEntityActive()) {
+      siteAddressLookupLoading.value = false;
+    }
+  }
+}
+
 async function refreshRecords() {
   if (!resolvedTenantScopeId.value || !accessToken.value || !canRead.value) {
     records.value = [];
@@ -1259,6 +1361,19 @@ watch(
   },
 );
 
+watch(
+  () => [entityKey.value, draft.customer_id],
+  async ([nextEntityKey]) => {
+    if (nextEntityKey !== "site") {
+      siteAddressOptions.value = [];
+      siteAddressLookupError.value = "";
+      siteAddressLookupLoading.value = false;
+      return;
+    }
+    await refreshSiteAddressOptions();
+  },
+);
+
 onMounted(async () => {
   resetImportTemplate();
   await refreshCustomerOptions();
@@ -1274,7 +1389,9 @@ onMounted(async () => {
 .planning-admin-form--structured,
 .planning-admin-form-section,
 .planning-admin-editor-intro,
+.planning-admin-shared-context,
 .planning-admin-filter-stack,
+.planning-admin-tab-panel,
 .planning-admin-list,
 .planning-admin-feedback {
   display: grid;
@@ -1308,6 +1425,10 @@ onMounted(async () => {
 .planning-admin-form-section__header {
   display: grid;
   gap: 0.25rem;
+}
+
+.planning-admin-shared-context {
+  gap: 0.75rem;
 }
 
 .planning-admin-panel__header {
@@ -1345,6 +1466,10 @@ onMounted(async () => {
   min-width: 0;
 }
 
+.planning-admin-tab-panel {
+  min-width: 0;
+}
+
 .planning-admin-row {
   display: flex;
   justify-content: space-between;
@@ -1377,21 +1502,31 @@ onMounted(async () => {
   color: var(--sp-color-text-secondary);
 }
 
-.planning-admin-feedback,
 .planning-admin-checkbox {
   border: 1px solid var(--sp-color-border-soft);
   border-radius: 12px;
   padding: 0.75rem 1rem;
 }
 
+.planning-admin-feedback {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  background: var(--sp-color-primary-muted);
+  color: var(--sp-color-primary-strong);
+}
+
 .planning-admin-feedback[data-tone="error"] {
-  border-color: color-mix(in srgb, #dc2626 35%, var(--sp-color-border-soft));
-  background: color-mix(in srgb, #fee2e2 74%, white 26%);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 45%, #ffb4a6);
+  color: color-mix(in srgb, var(--sp-color-primary-strong) 60%, #6a1d00);
 }
 
 .planning-admin-feedback[data-tone="success"] {
-  border-color: color-mix(in srgb, #16a34a 35%, var(--sp-color-border-soft));
-  background: color-mix(in srgb, #dcfce7 74%, white 26%);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 32%, #dcfce7);
+  color: color-mix(in srgb, var(--sp-color-primary-strong) 65%, #14532d);
 }
 
 .planning-admin-form-grid--detail {
@@ -1412,6 +1547,10 @@ onMounted(async () => {
 
 .planning-admin-form-grid--detail > .field-stack--third {
   grid-column: span 2;
+}
+
+.planning-admin-site-primary-field {
+  align-content: start;
 }
 
 .field-stack {

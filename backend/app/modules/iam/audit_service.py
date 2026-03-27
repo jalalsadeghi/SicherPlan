@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime, time
+from decimal import Decimal
+from enum import Enum
 from typing import Protocol
+from uuid import UUID
 
 from app.modules.iam.audit_schemas import AuditEventRead, AuditEventWrite, LoginEventRead, LoginEventWrite
 
@@ -72,6 +76,18 @@ class AuditService:
             return sanitized
         if isinstance(value, list):
             return [cls._sanitize_json(item) for item in value]
+        if isinstance(value, tuple):
+            return [cls._sanitize_json(item) for item in value]
+        if isinstance(value, set):
+            return [cls._sanitize_json(item) for item in sorted(value, key=repr)]
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, UUID):
+            return str(value)
+        if isinstance(value, datetime | date | time):
+            return value.isoformat()
+        if isinstance(value, Enum):
+            return cls._sanitize_json(value.value)
         return value
 
     @staticmethod

@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import unittest
 from dataclasses import dataclass
+from datetime import UTC, date, datetime, time
+from decimal import Decimal
+from enum import Enum
 from uuid import uuid4
 
 from app.modules.iam.audit_models import AuditEvent, LoginEvent
@@ -134,6 +137,48 @@ class FakeTenantSettingRead:
 
 
 class TestAuditAndLoginEvents(unittest.TestCase):
+    def test_business_audit_normalizes_decimal_uuid_datetime_enum_and_nested_values(self) -> None:
+        class ExampleEnum(str, Enum):
+            ACTIVE = "active"
+
+        audit_repo = RecordingAuditRepository()
+        audit_service = AuditService(audit_repo)
+        entity_id = str(uuid4())
+        nested_uuid = uuid4()
+        occurred_at = datetime(2026, 3, 28, 10, 15, tzinfo=UTC)
+
+        audit_service.record_business_event(
+            actor=AuditActor(tenant_id="tenant-1", user_id="user-1", session_id="session-1", request_id="req-1"),
+            event_type="planning.site.created",
+            entity_type="ops.site",
+            entity_id=entity_id,
+            after_json={
+                "entity_id": nested_uuid,
+                "latitude": Decimal("51.662973"),
+                "longitude": Decimal("8.174013"),
+                "created_at": occurred_at,
+                "service_date": date(2026, 3, 28),
+                "service_time": time(10, 15),
+                "status": ExampleEnum.ACTIVE,
+                "nested": {
+                    "coordinates": [Decimal("1.25"), Decimal("2.50")],
+                    "uuids": {uuid4()},
+                },
+            },
+        )
+
+        event = audit_repo.audit_events[0]
+        self.assertEqual(event.after_json["entity_id"], str(nested_uuid))
+        self.assertEqual(event.after_json["latitude"], "51.662973")
+        self.assertEqual(event.after_json["longitude"], "8.174013")
+        self.assertEqual(event.after_json["created_at"], occurred_at.isoformat())
+        self.assertEqual(event.after_json["service_date"], "2026-03-28")
+        self.assertEqual(event.after_json["service_time"], "10:15:00")
+        self.assertEqual(event.after_json["status"], "active")
+        self.assertEqual(event.after_json["nested"]["coordinates"], ["1.25", "2.50"])
+        self.assertEqual(len(event.after_json["nested"]["uuids"]), 1)
+        self.assertIsInstance(event.after_json["nested"]["uuids"][0], str)
+
     def test_login_attempts_create_success_and_failure_events(self) -> None:
         user = FakeUser(
             id=str(uuid4()),

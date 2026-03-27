@@ -523,6 +523,27 @@ class PlanningOpsMasterFoundationTests(unittest.TestCase):
         self.assertEqual(row.address_id, "address-1")
         self.assertTrue(row.watchbook_enabled)
 
+    def test_create_site_records_audit_event_with_decimal_coordinates_serialized_safely(self) -> None:
+        payload = SiteCreate(
+            tenant_id="tenant-1",
+            customer_id="customer-1",
+            site_no="S-002",
+            name="Objekt B",
+            latitude=Decimal("51.662973"),
+            longitude=Decimal("8.174013"),
+        )
+
+        row = self.service.create_site("tenant-1", payload, self.context)
+
+        self.assertEqual(row.site_no, "S-002")
+        self.assertEqual(len(self.audit_repository.audit_events), 1)
+        event = self.audit_repository.audit_events[0]
+        self.assertEqual(event.event_type, "planning.site.created")
+        self.assertEqual(event.after_json["latitude"], "51.662973")
+        self.assertEqual(event.after_json["longitude"], "8.174013")
+        self.assertEqual(event.after_json["id"], row.id)
+        self.assertIsInstance(event.after_json["created_at"], str)
+
     def test_trade_fair_rejects_invalid_date_window(self) -> None:
         payload = TradeFairCreate(
             tenant_id="tenant-1",

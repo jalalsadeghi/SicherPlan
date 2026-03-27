@@ -4,6 +4,7 @@ import unittest
 from datetime import date
 
 from app.modules.core.config_seed import (
+    CUSTOMER_PORTAL_POLICY_SETTING_KEY,
     DEFAULT_NUMBERING_RULES,
     NUMBERING_RULES_SETTING_KEY,
     PRINT_TEMPLATES_SETTING_KEY,
@@ -57,9 +58,16 @@ class TestConfigSeed(unittest.TestCase):
         session = _FakeSession()
         first = seed_default_tenant_settings(session, tenant_id="tenant-1")
         second = seed_default_tenant_settings(session, tenant_id="tenant-1")
-        self.assertEqual(first, {"inserted": 2, "updated": 0})
+        self.assertEqual(first, {"inserted": 3, "updated": 0})
         self.assertEqual(second, {"inserted": 0, "updated": 0})
-        self.assertEqual({row.key for row in session.settings}, {NUMBERING_RULES_SETTING_KEY, PRINT_TEMPLATES_SETTING_KEY})
+        self.assertEqual(
+            {row.key for row in session.settings},
+            {
+                NUMBERING_RULES_SETTING_KEY,
+                PRINT_TEMPLATES_SETTING_KEY,
+                CUSTOMER_PORTAL_POLICY_SETTING_KEY,
+            },
+        )
 
     def test_number_preview_uses_reset_policy(self) -> None:
         preview = preview_number(DEFAULT_NUMBERING_RULES["invoice_no"], 42, at_date=date(2026, 3, 20))
