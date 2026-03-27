@@ -206,6 +206,7 @@ export const moduleRegistry: Record<string, ModuleConfig> = {
       { labelKey: 'sicherplan.ui.stats.visibility', valueKey: 'sicherplan.ui.values.roleScoped' },
       { labelKey: 'sicherplan.ui.stats.evidence', valueKey: 'sicherplan.ui.values.traceableChain' },
     ],
+    showWorkspaceSectionHeader: false,
     titleKey: 'sicherplan.admin.planning',
     workspaceDescriptionKey: 'sicherplan.ui.modules.planning.workspace',
   },

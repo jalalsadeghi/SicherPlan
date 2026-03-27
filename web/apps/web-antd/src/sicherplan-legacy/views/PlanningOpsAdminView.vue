@@ -1,32 +1,10 @@
 <template>
   <section class="planning-admin-page">
-    <section class="module-card planning-admin-hero">
-      <div>
-        <p class="eyebrow">{{ tp("eyebrow") }}</p>
-        <h2>{{ tp("title") }}</h2>
-        <p class="planning-admin-lead">{{ tp("lead") }}</p>
-        <div class="planning-admin-meta">
-          <span class="planning-admin-meta__pill">{{ tp("read") }}: {{ canRead ? "on" : "off" }}</span>
-          <span class="planning-admin-meta__pill">{{ tp("write") }}: {{ canWrite ? "on" : "off" }}</span>
-        </div>
-      </div>
-
-      <div class="module-card planning-admin-scope">
-        <label class="field-stack">
-          <span>{{ tp("scopeLabel") }}</span>
-          <input v-model="tenantScopeInput" :disabled="!isPlatformAdmin" :placeholder="tp('scopePlaceholder')" />
-        </label>
-        <p class="field-help">{{ tp("scopeHelp") }}</p>
-        <div class="cta-row">
-          <button class="cta-button" type="button" @click="rememberScope">{{ tp("actionsRememberScope") }}</button>
-          <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshRecords">
-            {{ tp("actionsRefresh") }}
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <section v-if="feedback.message" class="planning-admin-feedback" :data-tone="feedback.tone">
+    <section
+      v-if="feedback.message"
+      class="planning-admin-feedback"
+      :data-tone="feedback.tone"
+    >
       <div>
         <strong>{{ feedback.title }}</strong>
         <span>{{ feedback.message }}</span>
@@ -34,94 +12,180 @@
       <button type="button" @click="clearFeedback">{{ tp("actionsClearFeedback") }}</button>
     </section>
 
-    <section v-if="!resolvedTenantScopeId" class="module-card planning-admin-empty">
+    <section
+      v-if="!resolvedTenantScopeId || !accessToken"
+      class="module-card planning-admin-empty"
+    >
       <p class="eyebrow">{{ tp("scopeMissingTitle") }}</p>
       <h3>{{ tp("scopeMissingBody") }}</h3>
     </section>
 
-    <section v-else-if="!canRead" class="module-card planning-admin-empty">
+    <section
+      v-else-if="!canRead"
+      class="module-card planning-admin-empty"
+    >
       <p class="eyebrow">{{ tp("permissionMissingTitle") }}</p>
       <h3>{{ tp("permissionMissingBody") }}</h3>
     </section>
 
-    <div v-else class="planning-admin-grid">
-      <section class="module-card planning-admin-panel">
+    <div
+      v-else
+      class="planning-admin-grid"
+      data-testid="planning-master-detail-layout"
+    >
+      <section class="module-card planning-admin-panel planning-admin-list-panel">
         <div class="planning-admin-panel__header">
           <div>
             <p class="eyebrow">{{ tp("listTitle") }}</p>
             <h3>{{ entityLabel }}</h3>
+            <p class="field-help">{{ tp("listLead") }}</p>
           </div>
           <StatusBadge :status="loading.list ? 'inactive' : 'active'" />
         </div>
 
-        <div class="planning-admin-form-grid">
-          <label class="field-stack">
-            <span>{{ tp("entityLabel") }}</span>
-            <select v-model="entityKey" @change="changeEntity">
-              <option v-for="option in entityOptions" :key="option" :value="option">{{ entityName(option) }}</option>
-            </select>
-          </label>
-          <label class="field-stack">
-            <span>{{ tp("search") }}</span>
-            <input v-model="filters.search" :placeholder="tp('searchPlaceholder')" />
-          </label>
-          <label class="field-stack">
-            <span>{{ tp("customerId") }}</span>
-            <input v-model="filters.customer_id" />
-          </label>
-          <label class="field-stack">
-            <span>{{ tp("status") }}</span>
-            <select v-model="filters.lifecycle_status">
-              <option value="">{{ tp("allStatuses") }}</option>
-              <option value="active">{{ tp("statusActive") }}</option>
-              <option value="inactive">{{ tp("statusInactive") }}</option>
-              <option value="archived">{{ tp("statusArchived") }}</option>
-            </select>
-          </label>
-        </div>
-
-        <label class="planning-admin-checkbox">
-          <input v-model="filters.include_archived" type="checkbox" />
-          <span>{{ tp("includeArchived") }}</span>
-        </label>
-
-        <div class="cta-row">
-          <button class="cta-button" type="button" @click="refreshRecords">{{ tp("actionsSearch") }}</button>
-          <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreate" @click="startCreateRecord">
-            {{ tp("actionsNewRecord") }}
-          </button>
-        </div>
-
-        <section class="planning-admin-import">
-          <div class="planning-admin-panel__header">
-            <div>
-              <p class="eyebrow">{{ tp("importTitle") }}</p>
-              <h3>{{ entityLabel }}</h3>
-            </div>
+        <section class="planning-admin-form-section">
+          <div class="planning-admin-form-section__header">
+            <p class="eyebrow">{{ tp("filtersTitle") }}</p>
+            <h4>{{ tp("filtersTitle") }}</h4>
+            <p class="field-help">{{ tp("filtersLead") }}</p>
           </div>
-          <input type="file" accept=".csv,text/csv" :disabled="!actionState.canImport" @change="onImportSelected" />
+
+          <div class="planning-admin-filter-stack">
+            <label class="field-stack">
+              <span>{{ tp("entityLabel") }}</span>
+              <select v-model="entityKey" @change="changeEntity">
+                <option v-for="option in entityOptions" :key="option" :value="option">
+                  {{ entityName(option) }}
+                </option>
+              </select>
+            </label>
+
+            <label class="field-stack">
+              <span>{{ tp("search") }}</span>
+              <input v-model="filters.search" :placeholder="tp('searchPlaceholder')" />
+            </label>
+
+            <PlanningCustomerSelect
+              v-model="filters.customer_id"
+              :label="tp('fieldsCustomer')"
+              :options="customerOptions"
+              :loading="customerLookupLoading"
+              :disabled="loading.list"
+              :error="customerLookupError"
+              :search-placeholder="tp('customerSearchPlaceholder')"
+              :empty-option-label="tp('allCustomers')"
+              :loading-text="tp('customerLoading')"
+              :empty-text="tp('customerEmpty')"
+              :no-match-text="tp('customerNoMatch')"
+            />
+
+            <label class="field-stack">
+              <span>{{ tp("status") }}</span>
+              <select v-model="filters.lifecycle_status">
+                <option value="">{{ tp("allStatuses") }}</option>
+                <option value="active">{{ tp("statusActive") }}</option>
+                <option value="inactive">{{ tp("statusInactive") }}</option>
+                <option value="archived">{{ tp("statusArchived") }}</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="planning-admin-checkbox">
+            <input v-model="filters.include_archived" type="checkbox" />
+            <span>{{ tp("includeArchived") }}</span>
+          </label>
+
           <div class="cta-row">
-            <button class="cta-button cta-secondary" type="button" :disabled="!pendingImportFile || !actionState.canImport" @click="loadImportFile">
+            <button class="cta-button" type="button" @click="refreshRecords">
+              {{ tp("actionsSearch") }}
+            </button>
+            <button
+              class="cta-button cta-secondary"
+              type="button"
+              :disabled="!actionState.canCreate"
+              @click="startCreateRecord"
+            >
+              {{ tp("actionsNewRecord") }}
+            </button>
+          </div>
+        </section>
+
+        <section class="planning-admin-form-section planning-admin-import">
+          <div class="planning-admin-form-section__header">
+            <p class="eyebrow">{{ tp("importTitle") }}</p>
+            <h4>{{ tp("importTitle") }}</h4>
+            <p class="field-help">{{ tp("importLead") }}</p>
+          </div>
+
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            :disabled="!actionState.canImport"
+            @change="onImportSelected"
+          />
+
+          <div class="cta-row">
+            <button
+              class="cta-button cta-secondary"
+              type="button"
+              :disabled="!pendingImportFile || !actionState.canImport"
+              @click="loadImportFile"
+            >
               {{ tp("actionsLoadImportFile") }}
             </button>
-            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canImport" @click="resetImportTemplate">
+            <button
+              class="cta-button cta-secondary"
+              type="button"
+              :disabled="!actionState.canImport"
+              @click="resetImportTemplate"
+            >
               {{ tp("actionsResetImportTemplate") }}
             </button>
           </div>
-          <label class="field-stack">
+
+          <label class="field-stack field-stack--wide">
             <span>{{ tp("importCsvLabel") }}</span>
-            <textarea v-model="importDraft.csv_text" rows="6" :disabled="!actionState.canImport" />
+            <textarea
+              v-model="importDraft.csv_text"
+              rows="6"
+              :disabled="!actionState.canImport"
+            />
           </label>
+
           <label class="planning-admin-checkbox">
-            <input v-model="importDraft.continue_on_error" type="checkbox" :disabled="!actionState.canImport" />
+            <input
+              v-model="importDraft.continue_on_error"
+              type="checkbox"
+              :disabled="!actionState.canImport"
+            />
             <span>{{ tp("importContinueOnError") }}</span>
           </label>
+
           <div class="cta-row">
-            <button class="cta-button" type="button" :disabled="!actionState.canImport" @click="runImportDryRun">{{ tp("actionsImportDryRun") }}</button>
-            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canImport" @click="runImportExecute">{{ tp("actionsImportExecute") }}</button>
+            <button
+              class="cta-button"
+              type="button"
+              :disabled="!actionState.canImport"
+              @click="runImportDryRun"
+            >
+              {{ tp("actionsImportDryRun") }}
+            </button>
+            <button
+              class="cta-button cta-secondary"
+              type="button"
+              :disabled="!actionState.canImport"
+              @click="runImportExecute"
+            >
+              {{ tp("actionsImportExecute") }}
+            </button>
           </div>
-          <p v-if="importDryRunResult" class="field-help">{{ tp("importDryRunSummary", { total: importDryRunResult.total_rows, invalid: importDryRunResult.invalid_rows }) }}</p>
-          <p v-if="lastImportResult" class="field-help">{{ tp("importExecuteSummary", { total: lastImportResult.total_rows, created: lastImportResult.created_rows, updated: lastImportResult.updated_rows }) }}</p>
+
+          <p v-if="importDryRunResult" class="field-help">
+            {{ tp("importDryRunSummary", { total: importDryRunResult.total_rows, invalid: importDryRunResult.invalid_rows }) }}
+          </p>
+          <p v-if="lastImportResult" class="field-help">
+            {{ tp("importExecuteSummary", { total: lastImportResult.total_rows, created: lastImportResult.created_rows, updated: lastImportResult.updated_rows }) }}
+          </p>
         </section>
 
         <div v-if="records.length" class="planning-admin-list">
@@ -133,9 +197,9 @@
             :class="{ selected: record.id === selectedRecordId }"
             @click="selectRecord(record.id)"
           >
-            <div>
+            <div class="planning-admin-row__body">
               <strong>{{ recordTitle(record) }}</strong>
-              <span>{{ record.customer_id || tp("none") }}</span>
+              <span>{{ recordCustomerSummary(record) }}</span>
             </div>
             <StatusBadge :status="record.status" />
           </button>
@@ -147,123 +211,265 @@
         <div class="planning-admin-panel__header">
           <div>
             <p class="eyebrow">{{ tp("detailTitle") }}</p>
-            <h3>{{ isCreatingRecord ? tp("newTitle") : selectedRecord ? recordTitle(selectedRecord) : tp("detailEmptyTitle") }}</h3>
+            <h3>
+              {{
+                isCreatingRecord
+                  ? tp("newTitle")
+                  : selectedRecord
+                    ? recordTitle(selectedRecord)
+                    : tp("detailEmptyTitle")
+              }}
+            </h3>
+            <p v-if="isCreatingRecord || selectedRecord" class="field-help">{{ tp("detailLead") }}</p>
           </div>
-          <StatusBadge v-if="selectedRecord && !isCreatingRecord" :status="selectedRecord.status" />
+          <StatusBadge
+            v-if="selectedRecord && !isCreatingRecord"
+            :status="selectedRecord.status"
+          />
         </div>
 
         <template v-if="isCreatingRecord || selectedRecord">
-          <form class="planning-admin-form" @submit.prevent="submitRecord">
-            <div class="planning-admin-form-grid">
-              <label class="field-stack">
-                <span>{{ tp("fieldsCustomerId") }}</span>
-                <input v-model="draft.customer_id" required />
-              </label>
+          <form class="planning-admin-form planning-admin-form--structured" @submit.prevent="submitRecord">
+            <section v-if="selectedRecord && !isCreatingRecord" class="planning-admin-editor-intro">
+              <div class="planning-admin-summary">
+                <article class="planning-admin-summary__card">
+                  <span>{{ tp("entityLabel") }}</span>
+                  <strong>{{ entityLabel }}</strong>
+                </article>
+                <article class="planning-admin-summary__card">
+                  <span>{{ tp("fieldsCustomer") }}</span>
+                  <strong>{{ draft.customer_id ? resolveCustomerLabel(draft.customer_id) : tp("none") }}</strong>
+                </article>
+                <article class="planning-admin-summary__card">
+                  <span>{{ tp("status") }}</span>
+                  <strong>{{ selectedRecord.status }}</strong>
+                </article>
+              </div>
+            </section>
 
-              <template v-if="entityKey === 'requirement_type'">
-                <label class="field-stack"><span>{{ tp("fieldsCode") }}</span><input v-model="draft.code" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsLabel") }}</span><input v-model="draft.label" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsDefaultPlanningMode") }}</span><input v-model="draft.default_planning_mode_code" required /></label>
-              </template>
+            <section class="planning-admin-form-section">
+              <p v-if="isCreatingRecord" class="field-help">{{ tp("newRecordLead") }}</p>
 
-              <template v-if="entityKey === 'equipment_item'">
-                <label class="field-stack"><span>{{ tp("fieldsCode") }}</span><input v-model="draft.code" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsLabel") }}</span><input v-model="draft.label" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsUnitOfMeasure") }}</span><input v-model="draft.unit_of_measure_code" required /></label>
-              </template>
+              <div class="planning-admin-form-grid planning-admin-form-grid--detail">
+                <PlanningCustomerSelect
+                  v-model="draft.customer_id"
+                  class="field-stack--half"
+                  :label="tp('fieldsCustomer')"
+                  :options="customerOptions"
+                  :loading="customerLookupLoading"
+                  :disabled="loading.action"
+                  :required="true"
+                  :error="customerLookupError"
+                  :search-placeholder="tp('customerSearchPlaceholder')"
+                  :empty-option-label="tp('customerSelectPlaceholder')"
+                  :loading-text="tp('customerLoading')"
+                  :empty-text="tp('customerEmpty')"
+                  :no-match-text="tp('customerNoMatch')"
+                />
 
-              <template v-if="entityKey === 'site'">
-                <label class="field-stack"><span>{{ tp("fieldsSiteNo") }}</span><input v-model="draft.site_no" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsAddressId") }}</span><input v-model="draft.address_id" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsTimezone") }}</span><input v-model="draft.timezone" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsLatitude") }}</span><input v-model="draft.latitude" type="number" step="0.000001" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsLongitude") }}</span><input v-model="draft.longitude" type="number" step="0.000001" /></label>
-                <label class="planning-admin-checkbox planning-admin-checkbox--inline"><input v-model="draft.watchbook_enabled" type="checkbox" /><span>{{ tp("fieldsWatchbookEnabled") }}</span></label>
-              </template>
+                <template v-if="entityKey === 'requirement_type'">
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsCode") }}</span><input v-model="draft.code" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="draft.label" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsDefaultPlanningMode") }}</span><input v-model="draft.default_planning_mode_code" required /></label>
+                </template>
 
-              <template v-if="entityKey === 'event_venue'">
-                <label class="field-stack"><span>{{ tp("fieldsVenueNo") }}</span><input v-model="draft.venue_no" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsAddressId") }}</span><input v-model="draft.address_id" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsTimezone") }}</span><input v-model="draft.timezone" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsLatitude") }}</span><input v-model="draft.latitude" type="number" step="0.000001" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsLongitude") }}</span><input v-model="draft.longitude" type="number" step="0.000001" /></label>
-              </template>
+                <template v-if="entityKey === 'equipment_item'">
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsCode") }}</span><input v-model="draft.code" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="draft.label" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsUnitOfMeasure") }}</span><input v-model="draft.unit_of_measure_code" required /></label>
+                </template>
 
-              <template v-if="entityKey === 'trade_fair'">
-                <label class="field-stack"><span>{{ tp("fieldsFairNo") }}</span><input v-model="draft.fair_no" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsVenueId") }}</span><input v-model="draft.venue_id" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsAddressId") }}</span><input v-model="draft.address_id" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsTimezone") }}</span><input v-model="draft.timezone" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsLatitude") }}</span><input v-model="draft.latitude" type="number" step="0.000001" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsLongitude") }}</span><input v-model="draft.longitude" type="number" step="0.000001" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsStartDate") }}</span><input v-model="draft.start_date" type="date" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsEndDate") }}</span><input v-model="draft.end_date" type="date" required /></label>
-              </template>
+                <template v-if="entityKey === 'site'">
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsSiteNo") }}</span><input v-model="draft.site_no" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsAddressId") }}</span><input v-model="draft.address_id" /></label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ tp("fieldsTimezone") }}</span>
+                    <Select
+                      v-model:value="draft.timezone"
+                      show-search
+                      allow-clear
+                      class="planning-admin-select"
+                      popup-class-name="planning-admin-select-dropdown"
+                      :options="timezoneOptions"
+                      :filter-option="filterSelectOption"
+                      :placeholder="tp('timezonePlaceholder')"
+                    />
+                  </label>
+                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsLatitude") }}</span><input v-model="draft.latitude" type="number" step="0.000001" /></label>
+                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsLongitude") }}</span><input v-model="draft.longitude" type="number" step="0.000001" /></label>
+                  <div class="planning-admin-map-action field-stack--wide">
+                    <button class="cta-button cta-secondary" type="button" @click="openLocationPicker">
+                      {{ tp("actionsPickOnMap") }}
+                    </button>
+                  </div>
+                  <label class="planning-admin-checkbox planning-admin-checkbox--inline field-stack--wide"><input v-model="draft.watchbook_enabled" type="checkbox" /><span>{{ tp("fieldsWatchbookEnabled") }}</span></label>
+                </template>
 
-              <template v-if="entityKey === 'patrol_route'">
-                <label class="field-stack"><span>{{ tp("fieldsRouteNo") }}</span><input v-model="draft.route_no" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsSiteId") }}</span><input v-model="draft.site_id" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsMeetingAddressId") }}</span><input v-model="draft.meeting_address_id" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsStartPointText") }}</span><input v-model="draft.start_point_text" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsEndPointText") }}</span><input v-model="draft.end_point_text" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsTravelPolicyCode") }}</span><input v-model="draft.travel_policy_code" /></label>
-              </template>
+                <template v-if="entityKey === 'event_venue'">
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsVenueNo") }}</span><input v-model="draft.venue_no" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsAddressId") }}</span><input v-model="draft.address_id" /></label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ tp("fieldsTimezone") }}</span>
+                    <Select
+                      v-model:value="draft.timezone"
+                      show-search
+                      allow-clear
+                      class="planning-admin-select"
+                      popup-class-name="planning-admin-select-dropdown"
+                      :options="timezoneOptions"
+                      :filter-option="filterSelectOption"
+                      :placeholder="tp('timezonePlaceholder')"
+                    />
+                  </label>
+                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsLatitude") }}</span><input v-model="draft.latitude" type="number" step="0.000001" /></label>
+                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsLongitude") }}</span><input v-model="draft.longitude" type="number" step="0.000001" /></label>
+                  <div class="planning-admin-map-action field-stack--wide">
+                    <button class="cta-button cta-secondary" type="button" @click="openLocationPicker">
+                      {{ tp("actionsPickOnMap") }}
+                    </button>
+                  </div>
+                </template>
 
-              <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="draft.notes" rows="4" /></label>
-            </div>
+                <template v-if="entityKey === 'trade_fair'">
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsFairNo") }}</span><input v-model="draft.fair_no" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsVenueId") }}</span><input v-model="draft.venue_id" /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsAddressId") }}</span><input v-model="draft.address_id" /></label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ tp("fieldsTimezone") }}</span>
+                    <Select
+                      v-model:value="draft.timezone"
+                      show-search
+                      allow-clear
+                      class="planning-admin-select"
+                      popup-class-name="planning-admin-select-dropdown"
+                      :options="timezoneOptions"
+                      :filter-option="filterSelectOption"
+                      :placeholder="tp('timezonePlaceholder')"
+                    />
+                  </label>
+                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsLatitude") }}</span><input v-model="draft.latitude" type="number" step="0.000001" /></label>
+                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsLongitude") }}</span><input v-model="draft.longitude" type="number" step="0.000001" /></label>
+                  <div class="planning-admin-map-action field-stack--wide">
+                    <button class="cta-button cta-secondary" type="button" @click="openLocationPicker">
+                      {{ tp("actionsPickOnMap") }}
+                    </button>
+                  </div>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsStartDate") }}</span><input v-model="draft.start_date" type="date" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsEndDate") }}</span><input v-model="draft.end_date" type="date" required /></label>
+                </template>
 
-            <div class="cta-row">
-              <button class="cta-button" type="submit" :disabled="!actionState.canCreate && !actionState.canEdit">{{ tp("actionsSaveRecord") }}</button>
-              <button class="cta-button cta-secondary" type="button" @click="resetDraft">{{ tp("actionsResetRecord") }}</button>
-            </div>
+                <template v-if="entityKey === 'patrol_route'">
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsRouteNo") }}</span><input v-model="draft.route_no" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsSiteId") }}</span><input v-model="draft.site_id" /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsMeetingAddressId") }}</span><input v-model="draft.meeting_address_id" /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsStartPointText") }}</span><input v-model="draft.start_point_text" /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsEndPointText") }}</span><input v-model="draft.end_point_text" /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsTravelPolicyCode") }}</span><input v-model="draft.travel_policy_code" /></label>
+                </template>
+
+                <label class="field-stack field-stack--wide">
+                  <span>{{ tp("fieldsNotes") }}</span>
+                  <textarea v-model="draft.notes" rows="4" />
+                </label>
+
+                <div class="cta-row field-stack--wide planning-admin-form-actions">
+                  <button
+                    class="cta-button"
+                    type="submit"
+                    :disabled="!actionState.canCreate && !actionState.canEdit"
+                  >
+                    {{ tp("actionsSaveRecord") }}
+                  </button>
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    @click="resetDraft"
+                  >
+                    {{ tp("actionsResetRecord") }}
+                  </button>
+                </div>
+              </div>
+            </section>
           </form>
 
-          <section v-if="entityKey === 'trade_fair' && selectedRecord && !isCreatingRecord" class="planning-admin-section">
-            <div class="planning-admin-panel__header"><h3>{{ tp("zonesTitle") }}</h3></div>
+          <section
+            v-if="entityKey === 'trade_fair' && selectedRecord && !isCreatingRecord"
+            class="planning-admin-form-section"
+          >
+            <div class="planning-admin-panel__header">
+              <h4>{{ tp("zonesTitle") }}</h4>
+            </div>
             <div v-if="tradeFairZones.length" class="planning-admin-list">
-              <button v-for="zone in tradeFairZones" :key="zone.id" type="button" class="planning-admin-row" @click="selectZone(zone)">
-                <div><strong>{{ zone.zone_code }} · {{ zone.label }}</strong><span>{{ zone.zone_type_code }}</span></div>
+              <button
+                v-for="zone in tradeFairZones"
+                :key="zone.id"
+                type="button"
+                class="planning-admin-row"
+                @click="selectZone(zone)"
+              >
+                <div class="planning-admin-row__body">
+                  <strong>{{ zone.zone_code }} · {{ zone.label }}</strong>
+                  <span>{{ zone.zone_type_code }}</span>
+                </div>
                 <StatusBadge :status="zone.status" />
               </button>
             </div>
             <p v-else class="planning-admin-list-empty">{{ tp("zonesEmpty") }}</p>
             <form class="planning-admin-form" @submit.prevent="submitZone">
-              <div class="planning-admin-form-grid">
-                <label class="field-stack"><span>{{ tp("fieldsZoneTypeCode") }}</span><input v-model="zoneDraft.zone_type_code" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsZoneCode") }}</span><input v-model="zoneDraft.zone_code" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsLabel") }}</span><input v-model="zoneDraft.label" required /></label>
+              <div class="planning-admin-form-grid planning-admin-form-grid--detail">
+                <label class="field-stack field-stack--third"><span>{{ tp("fieldsZoneTypeCode") }}</span><input v-model="zoneDraft.zone_type_code" required /></label>
+                <label class="field-stack field-stack--third"><span>{{ tp("fieldsZoneCode") }}</span><input v-model="zoneDraft.zone_code" required /></label>
+                <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="zoneDraft.label" required /></label>
                 <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="zoneDraft.notes" rows="3" /></label>
               </div>
-              <button class="cta-button" type="submit" :disabled="!actionState.canManageChildren">{{ tp("actionsAddZone") }}</button>
+              <div class="cta-row">
+                <button class="cta-button" type="submit" :disabled="!actionState.canManageChildren">{{ tp("actionsAddZone") }}</button>
+              </div>
             </form>
           </section>
 
-          <section v-if="entityKey === 'patrol_route' && selectedRecord && !isCreatingRecord" class="planning-admin-section">
-            <div class="planning-admin-panel__header"><h3>{{ tp("checkpointsTitle") }}</h3></div>
+          <section
+            v-if="entityKey === 'patrol_route' && selectedRecord && !isCreatingRecord"
+            class="planning-admin-form-section"
+          >
+            <div class="planning-admin-panel__header">
+              <h4>{{ tp("checkpointsTitle") }}</h4>
+            </div>
             <div v-if="patrolCheckpoints.length" class="planning-admin-list">
-              <button v-for="checkpoint in patrolCheckpoints" :key="checkpoint.id" type="button" class="planning-admin-row" @click="selectCheckpoint(checkpoint)">
-                <div><strong>{{ checkpoint.sequence_no }} · {{ checkpoint.label }}</strong><span>{{ checkpoint.checkpoint_code }}</span></div>
+              <button
+                v-for="checkpoint in patrolCheckpoints"
+                :key="checkpoint.id"
+                type="button"
+                class="planning-admin-row"
+                @click="selectCheckpoint(checkpoint)"
+              >
+                <div class="planning-admin-row__body">
+                  <strong>{{ checkpoint.sequence_no }} · {{ checkpoint.label }}</strong>
+                  <span>{{ checkpoint.checkpoint_code }}</span>
+                </div>
                 <StatusBadge :status="checkpoint.status" />
               </button>
             </div>
             <p v-else class="planning-admin-list-empty">{{ tp("checkpointsEmpty") }}</p>
             <form class="planning-admin-form" @submit.prevent="submitCheckpoint">
-              <div class="planning-admin-form-grid">
-                <label class="field-stack"><span>{{ tp("fieldsSequenceNo") }}</span><input v-model="checkpointDraft.sequence_no" type="number" min="1" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsCheckpointCode") }}</span><input v-model="checkpointDraft.checkpoint_code" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsLabel") }}</span><input v-model="checkpointDraft.label" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsLatitude") }}</span><input v-model="checkpointDraft.latitude" type="number" step="0.000001" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsLongitude") }}</span><input v-model="checkpointDraft.longitude" type="number" step="0.000001" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsScanTypeCode") }}</span><input v-model="checkpointDraft.scan_type_code" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsExpectedTokenValue") }}</span><input v-model="checkpointDraft.expected_token_value" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsMinimumDwellSeconds") }}</span><input v-model="checkpointDraft.minimum_dwell_seconds" type="number" min="0" required /></label>
+              <div class="planning-admin-form-grid planning-admin-form-grid--detail">
+                <label class="field-stack field-stack--third"><span>{{ tp("fieldsSequenceNo") }}</span><input v-model="checkpointDraft.sequence_no" type="number" min="1" required /></label>
+                <label class="field-stack field-stack--third"><span>{{ tp("fieldsCheckpointCode") }}</span><input v-model="checkpointDraft.checkpoint_code" required /></label>
+                <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="checkpointDraft.label" required /></label>
+                <label class="field-stack field-stack--third"><span>{{ tp("fieldsLatitude") }}</span><input v-model="checkpointDraft.latitude" type="number" step="0.000001" required /></label>
+                <label class="field-stack field-stack--third"><span>{{ tp("fieldsLongitude") }}</span><input v-model="checkpointDraft.longitude" type="number" step="0.000001" required /></label>
+                <label class="field-stack field-stack--third"><span>{{ tp("fieldsScanTypeCode") }}</span><input v-model="checkpointDraft.scan_type_code" required /></label>
+                <label class="field-stack field-stack--half"><span>{{ tp("fieldsExpectedTokenValue") }}</span><input v-model="checkpointDraft.expected_token_value" /></label>
+                <label class="field-stack field-stack--half"><span>{{ tp("fieldsMinimumDwellSeconds") }}</span><input v-model="checkpointDraft.minimum_dwell_seconds" type="number" min="0" required /></label>
                 <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="checkpointDraft.notes" rows="3" /></label>
               </div>
-              <button class="cta-button" type="submit" :disabled="!actionState.canManageChildren">{{ tp("actionsAddCheckpoint") }}</button>
+              <div class="cta-row">
+                <button class="cta-button" type="submit" :disabled="!actionState.canManageChildren">{{ tp("actionsAddCheckpoint") }}</button>
+              </div>
             </form>
           </section>
         </template>
@@ -274,14 +480,34 @@
         </section>
       </section>
     </div>
+
+    <PlanningLocationPickerModal
+      v-model:open="locationPickerOpen"
+      :latitude="draft.latitude"
+      :longitude="draft.longitude"
+      :initial-center="locationPickerStartPoint"
+      :start-point-label="locationPickerStartPoint.label"
+      :title="tp('mapPickerTitle')"
+      :confirm-text="tp('actionsApplyMapLocation')"
+      :cancel-text="tp('actionsCancelMapLocation')"
+      :helper-text="tp('mapPickerHelp')"
+      :latitude-label="tp('fieldsLatitude')"
+      :longitude-label="tp('fieldsLongitude')"
+      :load-error-text="tp('mapPickerLoadError')"
+      @confirm="applyPickedLocation"
+    />
   </section>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+
+import { Select } from "ant-design-vue";
 
 import StatusBadge from "@/components/StatusBadge.vue";
-import { useAuthStore } from "@/stores/auth";
+import PlanningCustomerSelect from "@/components/planning/PlanningCustomerSelect.vue";
+import PlanningLocationPickerModal from "@/components/planning/PlanningLocationPickerModal.vue";
+import { getCustomer, listCustomers } from "@/api/customers";
 import {
   createPatrolCheckpoint,
   createPlanningRecord,
@@ -300,11 +526,22 @@ import {
 import {
   buildPlanningImportTemplate,
   derivePlanningActionState,
+  formatPlanningCustomerOption,
   mapPlanningApiMessage,
+  parseOptionalCoordinate,
   PLANNING_ENTITY_OPTIONS,
+  resolveInitialMapCenter,
 } from "@/features/planning/planningAdmin.helpers.js";
 import { planningAdminMessages } from "@/i18n/planningAdmin.messages";
+import { useAuthStore } from "@/stores/auth";
 import { useLocaleStore } from "@/stores/locale";
+
+defineProps({
+  embedded: {
+    type: Boolean,
+    default: false,
+  },
+});
 
 const authStore = useAuthStore();
 const localeStore = useLocaleStore();
@@ -314,7 +551,6 @@ const feedback = reactive({ tone: "neutral", title: "", message: "" });
 const filters = reactive({ search: "", customer_id: "", lifecycle_status: "", include_archived: false });
 const entityOptions = PLANNING_ENTITY_OPTIONS;
 const entityKey = ref("site");
-const tenantScopeInput = ref(authStore.tenantScopeId || authStore.sessionUser?.tenant_id || "");
 const records = ref([]);
 const selectedRecordId = ref("");
 const selectedRecord = ref(null);
@@ -326,6 +562,19 @@ const editingCheckpointId = ref("");
 const pendingImportFile = ref(null);
 const importDryRunResult = ref(null);
 const lastImportResult = ref(null);
+const customerOptions = ref([]);
+const customerLookupLoading = ref(false);
+const customerLookupError = ref("");
+const locationPickerOpen = ref(false);
+const locationPickerStartPoint = ref({
+  lat: 51.662973,
+  lng: 8.174013,
+  zoom: 11,
+  label: "",
+});
+
+const customerLocationCache = new Map();
+const geocodeCache = new Map();
 
 const draft = reactive({
   customer_id: "",
@@ -371,12 +620,18 @@ const checkpointDraft = reactive({
 const importDraft = reactive({ csv_text: buildPlanningImportTemplate(entityKey.value), continue_on_error: true });
 
 const effectiveRole = computed(() => authStore.effectiveRole);
-const isPlatformAdmin = computed(() => effectiveRole.value === "platform_admin");
-const resolvedTenantScopeId = computed(() => isPlatformAdmin.value ? authStore.tenantScopeId : (authStore.sessionUser?.tenant_id ?? authStore.tenantScopeId));
+const resolvedTenantScopeId = computed(() => authStore.effectiveTenantScopeId);
+const accessToken = computed(() => authStore.effectiveAccessToken);
 const actionState = computed(() => derivePlanningActionState(effectiveRole.value, entityKey.value, selectedRecord.value));
 const canRead = computed(() => actionState.value.canRead);
-const canWrite = computed(() => actionState.value.canWrite);
 const currentLocale = computed(() => (localeStore.locale === "en" ? "en" : "de"));
+const entityLabel = computed(() => entityName(entityKey.value));
+const timezoneOptions = computed(() =>
+  getSupportedTimezones().map((timezone) => ({
+    label: timezone,
+    value: timezone,
+  })),
+);
 
 function tp(key, params = {}) {
   let text = planningAdminMessages[currentLocale.value][key] ?? planningAdminMessages.de[key] ?? key;
@@ -385,8 +640,6 @@ function tp(key, params = {}) {
   });
   return text;
 }
-
-const entityLabel = computed(() => entityName(entityKey.value));
 
 function entityName(key) {
   return tp(
@@ -401,6 +654,155 @@ function entityName(key) {
   );
 }
 
+function resolveCustomerLabel(customerId) {
+  const customer = customerOptions.value.find((option) => option.id === customerId);
+  return customer ? formatPlanningCustomerOption(customer) : customerId || tp("none");
+}
+
+function getSupportedTimezones() {
+  if (typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function") {
+    return Intl.supportedValuesOf("timeZone");
+  }
+  return ["Europe/Berlin", "Europe/Vienna", "Europe/Zurich", "UTC"];
+}
+
+function filterSelectOption(input, option) {
+  const label = typeof option?.label === "string" ? option.label : "";
+  return label.toLowerCase().includes(String(input).toLowerCase());
+}
+
+function buildBerlinStartPoint() {
+  return {
+    lat: 51.662973,
+    lng: 8.174013,
+    zoom: 11,
+    label: tp("mapStartBerlin"),
+  };
+}
+
+function selectCustomerAddress(customer) {
+  if (!customer?.addresses?.length) {
+    return null;
+  }
+
+  return (
+    customer.addresses.find((entry) => entry.is_default && entry.address) ??
+    customer.addresses.find((entry) => entry.address_type === "registered" && entry.address) ??
+    customer.addresses.find((entry) => entry.address_type === "service" && entry.address) ??
+    customer.addresses.find((entry) => entry.address)
+  );
+}
+
+function buildCustomerGeocodeQuery(customer) {
+  const addressLink = selectCustomerAddress(customer);
+  const address = addressLink?.address;
+  if (!address) {
+    return null;
+  }
+
+  const fullQuery = [
+    address.street_line_1,
+    address.street_line_2,
+    address.postal_code,
+    address.city,
+    address.country_code,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  const cityQuery = [address.city, address.country_code].filter(Boolean).join(", ");
+
+  return {
+    label: address.city || customer.name,
+    query: fullQuery || cityQuery,
+  };
+}
+
+async function geocodeCustomerLocation(query) {
+  if (!query) {
+    return null;
+  }
+
+  if (geocodeCache.has(query)) {
+    return geocodeCache.get(query);
+  }
+
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`,
+    );
+    if (!response.ok) {
+      geocodeCache.set(query, null);
+      return null;
+    }
+    const payload = await response.json();
+    const [first] = Array.isArray(payload) ? payload : [];
+    const result =
+      first && Number.isFinite(Number(first.lat)) && Number.isFinite(Number(first.lon))
+        ? {
+            lat: Number(Number(first.lat).toFixed(6)),
+            lng: Number(Number(first.lon).toFixed(6)),
+          }
+        : null;
+    geocodeCache.set(query, result);
+    return result;
+  } catch {
+    geocodeCache.set(query, null);
+    return null;
+  }
+}
+
+async function resolveCustomerStartPoint() {
+  if (!draft.customer_id || !resolvedTenantScopeId.value || !accessToken.value) {
+    return null;
+  }
+
+  let customer = customerLocationCache.get(draft.customer_id) ?? null;
+  if (!customer) {
+    try {
+      customer = await getCustomer(resolvedTenantScopeId.value, draft.customer_id, accessToken.value);
+      customerLocationCache.set(draft.customer_id, customer);
+    } catch {
+      customerLocationCache.set(draft.customer_id, null);
+      return null;
+    }
+  }
+
+  const customerCoordinateAddress = selectCustomerAddress(customer);
+  const customerLatitude = parseOptionalCoordinate(customerCoordinateAddress?.address?.latitude);
+  const customerLongitude = parseOptionalCoordinate(customerCoordinateAddress?.address?.longitude);
+  if (customerLatitude != null && customerLongitude != null) {
+    return {
+      lat: Number(customerLatitude.toFixed(6)),
+      lng: Number(customerLongitude.toFixed(6)),
+      zoom: 14,
+      label: tp("mapStartCustomerCoordinates", { customer: customer.name }),
+      source: "customer-coordinates",
+    };
+  }
+
+  const geocodeInput = buildCustomerGeocodeQuery(customer);
+  if (!geocodeInput?.query) {
+    return null;
+  }
+
+  const resolved = await geocodeCustomerLocation(geocodeInput.query);
+  if (!resolved) {
+    return null;
+  }
+
+  return {
+    ...resolved,
+    zoom: 13,
+    label: tp("mapStartCustomerAddress", { customer: geocodeInput.label }),
+    source: "customer-geocode",
+  };
+}
+
+function recordCustomerSummary(record) {
+  return record.customer_id ? resolveCustomerLabel(record.customer_id) : tp("none");
+}
+
 function setFeedback(tone, title, message) {
   feedback.tone = tone;
   feedback.title = title;
@@ -409,11 +811,6 @@ function setFeedback(tone, title, message) {
 
 function clearFeedback() {
   setFeedback("neutral", "", "");
-}
-
-function rememberScope() {
-  authStore.setTenantScopeId(tenantScopeInput.value);
-  void refreshRecords();
 }
 
 function resetDraft() {
@@ -429,7 +826,7 @@ function resetDraft() {
     route_no: "",
     name: "",
     address_id: "",
-    timezone: "",
+    timezone: "Europe/Berlin",
     latitude: "",
     longitude: "",
     watchbook_enabled: false,
@@ -455,7 +852,18 @@ function resetZoneDraft() {
 }
 
 function resetCheckpointDraft() {
-  Object.assign(checkpointDraft, { sequence_no: 1, checkpoint_code: "", label: "", latitude: "", longitude: "", scan_type_code: "", expected_token_value: "", minimum_dwell_seconds: 0, notes: "", version_no: 0 });
+  Object.assign(checkpointDraft, {
+    sequence_no: 1,
+    checkpoint_code: "",
+    label: "",
+    latitude: "",
+    longitude: "",
+    scan_type_code: "",
+    expected_token_value: "",
+    minimum_dwell_seconds: 0,
+    notes: "",
+    version_no: 0,
+  });
   editingCheckpointId.value = "";
 }
 
@@ -494,20 +902,93 @@ function syncDraft(record) {
 }
 
 function buildRecordPayload() {
-  const base = { tenant_id: resolvedTenantScopeId.value, customer_id: draft.customer_id, notes: draft.notes || null };
-  if (entityKey.value === "requirement_type") return { ...base, code: draft.code, label: draft.label, default_planning_mode_code: draft.default_planning_mode_code };
-  if (entityKey.value === "equipment_item") return { ...base, code: draft.code, label: draft.label, unit_of_measure_code: draft.unit_of_measure_code };
-  if (entityKey.value === "site") return { ...base, site_no: draft.site_no, name: draft.name, address_id: draft.address_id || null, timezone: draft.timezone || null, latitude: draft.latitude || null, longitude: draft.longitude || null, watchbook_enabled: draft.watchbook_enabled };
-  if (entityKey.value === "event_venue") return { ...base, venue_no: draft.venue_no, name: draft.name, address_id: draft.address_id || null, timezone: draft.timezone || null, latitude: draft.latitude || null, longitude: draft.longitude || null };
-  if (entityKey.value === "trade_fair") return { ...base, fair_no: draft.fair_no, name: draft.name, venue_id: draft.venue_id || null, address_id: draft.address_id || null, timezone: draft.timezone || null, latitude: draft.latitude || null, longitude: draft.longitude || null, start_date: draft.start_date, end_date: draft.end_date };
-  return { ...base, route_no: draft.route_no, name: draft.name, site_id: draft.site_id || null, meeting_address_id: draft.meeting_address_id || null, start_point_text: draft.start_point_text || null, end_point_text: draft.end_point_text || null, travel_policy_code: draft.travel_policy_code || null };
+  const base = {
+    tenant_id: resolvedTenantScopeId.value,
+    customer_id: draft.customer_id,
+    notes: draft.notes || null,
+  };
+  if (entityKey.value === "requirement_type") {
+    return { ...base, code: draft.code, label: draft.label, default_planning_mode_code: draft.default_planning_mode_code };
+  }
+  if (entityKey.value === "equipment_item") {
+    return { ...base, code: draft.code, label: draft.label, unit_of_measure_code: draft.unit_of_measure_code };
+  }
+  if (entityKey.value === "site") {
+    return {
+      ...base,
+      site_no: draft.site_no,
+      name: draft.name,
+      address_id: draft.address_id || null,
+      timezone: draft.timezone || null,
+      latitude: draft.latitude || null,
+      longitude: draft.longitude || null,
+      watchbook_enabled: draft.watchbook_enabled,
+    };
+  }
+  if (entityKey.value === "event_venue") {
+    return {
+      ...base,
+      venue_no: draft.venue_no,
+      name: draft.name,
+      address_id: draft.address_id || null,
+      timezone: draft.timezone || null,
+      latitude: draft.latitude || null,
+      longitude: draft.longitude || null,
+    };
+  }
+  if (entityKey.value === "trade_fair") {
+    return {
+      ...base,
+      fair_no: draft.fair_no,
+      name: draft.name,
+      venue_id: draft.venue_id || null,
+      address_id: draft.address_id || null,
+      timezone: draft.timezone || null,
+      latitude: draft.latitude || null,
+      longitude: draft.longitude || null,
+      start_date: draft.start_date,
+      end_date: draft.end_date,
+    };
+  }
+  return {
+    ...base,
+    route_no: draft.route_no,
+    name: draft.name,
+    site_id: draft.site_id || null,
+    meeting_address_id: draft.meeting_address_id || null,
+    start_point_text: draft.start_point_text || null,
+    end_point_text: draft.end_point_text || null,
+    travel_policy_code: draft.travel_policy_code || null,
+  };
+}
+
+async function refreshCustomerOptions() {
+  if (!resolvedTenantScopeId.value || !accessToken.value || !canRead.value) {
+    customerOptions.value = [];
+    customerLookupError.value = "";
+    return;
+  }
+
+  customerLookupLoading.value = true;
+  customerLookupError.value = "";
+  try {
+    customerOptions.value = await listCustomers(resolvedTenantScopeId.value, accessToken.value, {});
+  } catch {
+    customerOptions.value = [];
+    customerLookupError.value = tp("customerLoadError");
+  } finally {
+    customerLookupLoading.value = false;
+  }
 }
 
 async function refreshRecords() {
-  if (!resolvedTenantScopeId.value || !authStore.accessToken || !canRead.value) return;
+  if (!resolvedTenantScopeId.value || !accessToken.value || !canRead.value) {
+    records.value = [];
+    return;
+  }
   loading.list = true;
   try {
-    records.value = await listPlanningRecords(entityKey.value, resolvedTenantScopeId.value, authStore.accessToken, filters);
+    records.value = await listPlanningRecords(entityKey.value, resolvedTenantScopeId.value, accessToken.value, filters);
     if (selectedRecordId.value) {
       const stillSelected = records.value.find((record) => record.id === selectedRecordId.value);
       if (!stillSelected) {
@@ -523,15 +1004,19 @@ async function refreshRecords() {
 }
 
 async function selectRecord(recordId) {
-  if (!resolvedTenantScopeId.value || !authStore.accessToken) return;
+  if (!resolvedTenantScopeId.value || !accessToken.value) return;
   loading.detail = true;
   try {
-    selectedRecord.value = await getPlanningRecord(entityKey.value, resolvedTenantScopeId.value, recordId, authStore.accessToken);
+    selectedRecord.value = await getPlanningRecord(entityKey.value, resolvedTenantScopeId.value, recordId, accessToken.value);
     selectedRecordId.value = recordId;
     isCreatingRecord.value = false;
     syncDraft(selectedRecord.value);
-    tradeFairZones.value = entityKey.value === "trade_fair" ? await listTradeFairZones(resolvedTenantScopeId.value, recordId, authStore.accessToken) : [];
-    patrolCheckpoints.value = entityKey.value === "patrol_route" ? await listPatrolCheckpoints(resolvedTenantScopeId.value, recordId, authStore.accessToken) : [];
+    tradeFairZones.value = entityKey.value === "trade_fair"
+      ? await listTradeFairZones(resolvedTenantScopeId.value, recordId, accessToken.value)
+      : [];
+    patrolCheckpoints.value = entityKey.value === "patrol_route"
+      ? await listPatrolCheckpoints(resolvedTenantScopeId.value, recordId, accessToken.value)
+      : [];
     resetZoneDraft();
     resetCheckpointDraft();
   } catch (error) {
@@ -551,20 +1036,61 @@ function startCreateRecord() {
   draft.customer_id = filters.customer_id || "";
 }
 
+async function openLocationPicker() {
+  const customerStartPoint = await resolveCustomerStartPoint();
+  const fallback = buildBerlinStartPoint();
+  const resolvedCenter = resolveInitialMapCenter({
+    currentLatitude: draft.latitude,
+    currentLongitude: draft.longitude,
+    customerCoordinates:
+      customerStartPoint?.source === "customer-coordinates"
+        ? { lat: customerStartPoint.lat, lng: customerStartPoint.lng }
+        : null,
+    customerGeocode:
+      customerStartPoint?.source === "customer-geocode"
+        ? { lat: customerStartPoint.lat, lng: customerStartPoint.lng }
+        : null,
+    fallback,
+  });
+
+  const sourceLabelMap = {
+    "existing-record": tp("mapStartExisting"),
+    "customer-coordinates": customerStartPoint?.label ?? tp("mapStartCustomerCoordinatesFallback"),
+    "customer-geocode": customerStartPoint?.label ?? tp("mapStartCustomerAddressFallback"),
+    fallback: fallback.label,
+  };
+
+  locationPickerStartPoint.value = {
+    lat: resolvedCenter.lat,
+    lng: resolvedCenter.lng,
+    zoom: resolvedCenter.source === "existing-record" ? 14 : (customerStartPoint?.zoom ?? fallback.zoom),
+    label: sourceLabelMap[resolvedCenter.source],
+  };
+  locationPickerOpen.value = true;
+}
+
+function applyPickedLocation(payload) {
+  draft.latitude = payload.latitude;
+  draft.longitude = payload.longitude;
+}
+
 async function submitRecord() {
-  if (!resolvedTenantScopeId.value || !authStore.accessToken) return;
+  if (!resolvedTenantScopeId.value || !accessToken.value) return;
   loading.action = true;
   try {
     const payload = buildRecordPayload();
     if (isCreatingRecord.value || !selectedRecord.value) {
-      selectedRecord.value = await createPlanningRecord(entityKey.value, resolvedTenantScopeId.value, authStore.accessToken, payload);
+      selectedRecord.value = await createPlanningRecord(entityKey.value, resolvedTenantScopeId.value, accessToken.value, payload);
       selectedRecordId.value = selectedRecord.value.id;
       isCreatingRecord.value = false;
     } else {
-      selectedRecord.value = await updatePlanningRecord(entityKey.value, resolvedTenantScopeId.value, selectedRecord.value.id, authStore.accessToken, {
-        ...payload,
-        version_no: selectedRecord.value.version_no,
-      });
+      selectedRecord.value = await updatePlanningRecord(
+        entityKey.value,
+        resolvedTenantScopeId.value,
+        selectedRecord.value.id,
+        accessToken.value,
+        { ...payload, version_no: selectedRecord.value.version_no },
+      );
     }
     syncDraft(selectedRecord.value);
     await refreshRecords();
@@ -578,7 +1104,13 @@ async function submitRecord() {
 
 function selectZone(zone) {
   editingZoneId.value = zone.id;
-  Object.assign(zoneDraft, { zone_type_code: zone.zone_type_code, zone_code: zone.zone_code, label: zone.label, notes: zone.notes || "", version_no: zone.version_no });
+  Object.assign(zoneDraft, {
+    zone_type_code: zone.zone_type_code,
+    zone_code: zone.zone_code,
+    label: zone.label,
+    notes: zone.notes || "",
+    version_no: zone.version_no,
+  });
 }
 
 function selectCheckpoint(checkpoint) {
@@ -598,7 +1130,7 @@ function selectCheckpoint(checkpoint) {
 }
 
 async function submitZone() {
-  if (!resolvedTenantScopeId.value || !authStore.accessToken || !selectedRecord.value) return;
+  if (!resolvedTenantScopeId.value || !accessToken.value || !selectedRecord.value) return;
   try {
     const payload = {
       tenant_id: resolvedTenantScopeId.value,
@@ -609,11 +1141,17 @@ async function submitZone() {
       notes: zoneDraft.notes || null,
     };
     if (editingZoneId.value) {
-      await updateTradeFairZone(resolvedTenantScopeId.value, selectedRecord.value.id, editingZoneId.value, authStore.accessToken, { ...payload, version_no: zoneDraft.version_no });
+      await updateTradeFairZone(
+        resolvedTenantScopeId.value,
+        selectedRecord.value.id,
+        editingZoneId.value,
+        accessToken.value,
+        { ...payload, version_no: zoneDraft.version_no },
+      );
     } else {
-      await createTradeFairZone(resolvedTenantScopeId.value, selectedRecord.value.id, authStore.accessToken, payload);
+      await createTradeFairZone(resolvedTenantScopeId.value, selectedRecord.value.id, accessToken.value, payload);
     }
-    tradeFairZones.value = await listTradeFairZones(resolvedTenantScopeId.value, selectedRecord.value.id, authStore.accessToken);
+    tradeFairZones.value = await listTradeFairZones(resolvedTenantScopeId.value, selectedRecord.value.id, accessToken.value);
     resetZoneDraft();
     setFeedback("success", tp("successTitle"), tp("childSaved"));
   } catch (error) {
@@ -622,7 +1160,7 @@ async function submitZone() {
 }
 
 async function submitCheckpoint() {
-  if (!resolvedTenantScopeId.value || !authStore.accessToken || !selectedRecord.value) return;
+  if (!resolvedTenantScopeId.value || !accessToken.value || !selectedRecord.value) return;
   try {
     const payload = {
       tenant_id: resolvedTenantScopeId.value,
@@ -638,11 +1176,17 @@ async function submitCheckpoint() {
       notes: checkpointDraft.notes || null,
     };
     if (editingCheckpointId.value) {
-      await updatePatrolCheckpoint(resolvedTenantScopeId.value, selectedRecord.value.id, editingCheckpointId.value, authStore.accessToken, { ...payload, version_no: checkpointDraft.version_no });
+      await updatePatrolCheckpoint(
+        resolvedTenantScopeId.value,
+        selectedRecord.value.id,
+        editingCheckpointId.value,
+        accessToken.value,
+        { ...payload, version_no: checkpointDraft.version_no },
+      );
     } else {
-      await createPatrolCheckpoint(resolvedTenantScopeId.value, selectedRecord.value.id, authStore.accessToken, payload);
+      await createPatrolCheckpoint(resolvedTenantScopeId.value, selectedRecord.value.id, accessToken.value, payload);
     }
-    patrolCheckpoints.value = await listPatrolCheckpoints(resolvedTenantScopeId.value, selectedRecord.value.id, authStore.accessToken);
+    patrolCheckpoints.value = await listPatrolCheckpoints(resolvedTenantScopeId.value, selectedRecord.value.id, accessToken.value);
     resetCheckpointDraft();
     setFeedback("success", tp("successTitle"), tp("childSaved"));
   } catch (error) {
@@ -673,9 +1217,9 @@ async function loadImportFile() {
 }
 
 async function runImportDryRun() {
-  if (!resolvedTenantScopeId.value || !authStore.accessToken) return;
+  if (!resolvedTenantScopeId.value || !accessToken.value) return;
   try {
-    importDryRunResult.value = await importPlanningDryRun(resolvedTenantScopeId.value, authStore.accessToken, {
+    importDryRunResult.value = await importPlanningDryRun(resolvedTenantScopeId.value, accessToken.value, {
       tenant_id: resolvedTenantScopeId.value,
       entity_key: entityKey.value,
       csv_content_base64: btoa(unescape(encodeURIComponent(importDraft.csv_text))),
@@ -687,9 +1231,9 @@ async function runImportDryRun() {
 }
 
 async function runImportExecute() {
-  if (!resolvedTenantScopeId.value || !authStore.accessToken) return;
+  if (!resolvedTenantScopeId.value || !accessToken.value) return;
   try {
-    lastImportResult.value = await importPlanningExecute(resolvedTenantScopeId.value, authStore.accessToken, {
+    lastImportResult.value = await importPlanningExecute(resolvedTenantScopeId.value, accessToken.value, {
       tenant_id: resolvedTenantScopeId.value,
       entity_key: entityKey.value,
       csv_content_base64: btoa(unescape(encodeURIComponent(importDraft.csv_text))),
@@ -707,25 +1251,32 @@ function handleError(error) {
   setFeedback("error", tp("errorTitle"), tp(key));
 }
 
-onMounted(() => {
+watch(
+  () => [resolvedTenantScopeId.value, accessToken.value, canRead.value],
+  async () => {
+    await refreshCustomerOptions();
+    await refreshRecords();
+  },
+);
+
+onMounted(async () => {
   resetImportTemplate();
-  void refreshRecords();
+  await refreshCustomerOptions();
+  await refreshRecords();
 });
 </script>
 
 <style scoped>
 .planning-admin-page,
 .planning-admin-grid,
-.planning-admin-form,
-.planning-admin-form-grid,
-.planning-admin-list,
-.planning-admin-row,
-.planning-admin-meta,
-.planning-admin-feedback,
 .planning-admin-panel,
-.planning-admin-panel__header,
-.planning-admin-section,
-.planning-admin-import {
+.planning-admin-form,
+.planning-admin-form--structured,
+.planning-admin-form-section,
+.planning-admin-editor-intro,
+.planning-admin-filter-stack,
+.planning-admin-list,
+.planning-admin-feedback {
   display: grid;
   gap: 1rem;
 }
@@ -734,41 +1285,246 @@ onMounted(() => {
   grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
 }
 
-.planning-admin-hero {
-  grid-template-columns: minmax(0, 1fr) 320px;
+.planning-admin-panel,
+.planning-admin-form-section,
+.planning-admin-editor-intro,
+.planning-admin-empty {
+  min-width: 0;
 }
 
-.planning-admin-form-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.planning-admin-form--structured {
+  gap: 0.9rem;
+  align-content: start;
+}
+
+.planning-admin-editor-intro,
+.planning-admin-form-section {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--sp-color-surface-page) 76%, white 24%);
+}
+
+.planning-admin-form-section__header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.planning-admin-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+}
+
+.planning-admin-detail {
+  align-content: start;
+}
+
+.planning-admin-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.planning-admin-summary__card {
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: var(--sp-color-surface-page);
+  border: 1px solid var(--sp-color-border-soft);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.planning-admin-summary__card span {
+  color: var(--sp-color-text-secondary);
+  font-size: 0.85rem;
+}
+
+.planning-admin-filter-stack > * {
+  min-width: 0;
+}
+
+.planning-admin-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-page);
+  cursor: pointer;
+  text-align: left;
+}
+
+.planning-admin-row.selected {
+  border-color: var(--sp-color-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 40%, transparent);
+}
+
+.planning-admin-row__body {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.planning-admin-row__body span,
+.planning-admin-list-empty,
+.planning-admin-empty,
+.planning-admin-feedback span {
+  color: var(--sp-color-text-secondary);
+}
+
+.planning-admin-feedback,
+.planning-admin-checkbox {
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+}
+
+.planning-admin-feedback[data-tone="error"] {
+  border-color: color-mix(in srgb, #dc2626 35%, var(--sp-color-border-soft));
+  background: color-mix(in srgb, #fee2e2 74%, white 26%);
+}
+
+.planning-admin-feedback[data-tone="success"] {
+  border-color: color-mix(in srgb, #16a34a 35%, var(--sp-color-border-soft));
+  background: color-mix(in srgb, #dcfce7 74%, white 26%);
+}
+
+.planning-admin-form-grid--detail {
+  display: grid;
+  gap: 0.9rem 1rem;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.planning-admin-form-grid--detail > .field-stack,
+.planning-admin-form-grid--detail > .planning-customer-select {
+  grid-column: span 3;
+}
+
+.planning-admin-form-grid--detail > .field-stack--half,
+.planning-admin-form-grid--detail > .planning-customer-select.field-stack--half {
+  grid-column: span 3;
+}
+
+.planning-admin-form-grid--detail > .field-stack--third {
+  grid-column: span 2;
+}
+
+.field-stack {
+  display: grid;
+  gap: 0.42rem;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.field-stack input,
+.field-stack select,
+.field-stack textarea,
+.planning-admin-page :deep(.ant-select-selector) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-card);
+  color: var(--sp-color-text-primary);
+  font: inherit;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.field-stack input,
+.field-stack select,
+.field-stack textarea {
+  padding: 0.78rem 0.9rem;
+}
+
+.planning-admin-page :deep(.ant-select) {
+  width: 100%;
+}
+
+.planning-admin-page :deep(.ant-select-selector) {
+  min-height: 48px;
+  padding: 0.35rem 0.9rem !important;
+  align-items: center;
+}
+
+.planning-admin-page :deep(.ant-select-selection-search-input),
+.planning-admin-page :deep(.ant-select-selection-item),
+.planning-admin-page :deep(.ant-select-selection-placeholder) {
+  font: inherit;
+}
+
+.planning-admin-page :deep(.ant-select-focused .ant-select-selector),
+.planning-admin-page :deep(.ant-select-open .ant-select-selector),
+.planning-admin-page :deep(.planning-admin-select.ant-select-status-error .ant-select-selector) {
+  border-color: rgb(40 170 170 / 55%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
+.field-stack textarea {
+  min-height: 6.5rem;
+  resize: vertical;
+}
+
+.field-stack input:focus,
+.field-stack select:focus,
+.field-stack textarea:focus {
+  outline: none;
+  border-color: rgb(40 170 170 / 55%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
+.field-stack input:disabled,
+.field-stack select:disabled,
+.field-stack textarea:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.planning-admin-page :deep(.ant-select-disabled .ant-select-selector) {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.planning-admin-checkbox {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  min-width: 0;
+  color: var(--sp-color-text-secondary);
+}
+
+.planning-admin-checkbox input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--sp-color-primary);
+}
+
+.planning-admin-checkbox--inline {
+  grid-column: 1 / -1;
 }
 
 .field-stack--wide {
   grid-column: 1 / -1;
 }
 
-.planning-admin-row,
-.planning-admin-meta__pill,
-.planning-admin-feedback,
-.planning-admin-checkbox {
-  border: 1px solid var(--border-color, #d9d9d9);
-  border-radius: 12px;
-  padding: 0.75rem 1rem;
+.planning-admin-map-action,
+.planning-admin-form-actions {
+  margin-top: 0.15rem;
 }
 
-.planning-admin-row {
-  align-items: center;
-  background: var(--card-bg, #fff);
-  grid-template-columns: minmax(0, 1fr) auto;
-  text-align: left;
-}
-
-.planning-admin-row.selected {
-  border-color: var(--primary-color, rgb(40,170,170));
-}
-
-.planning-admin-empty,
-.planning-admin-list-empty {
-  color: var(--text-secondary, #666);
+.planning-admin-map-action {
+  display: flex;
+  justify-content: start;
 }
 
 .cta-row {
@@ -777,46 +1533,46 @@ onMounted(() => {
   gap: 0.75rem;
 }
 
-.field-stack {
-  display: grid;
-  gap: 0.35rem;
-}
-
-input,
-select,
-textarea,
-button {
-  font: inherit;
-}
-
-input,
-select,
-textarea {
-  border: 1px solid var(--border-color, #d9d9d9);
-  border-radius: 10px;
-  padding: 0.7rem 0.85rem;
+:global(.planning-admin-select-dropdown .ant-select-item-option-content) {
+  white-space: normal;
 }
 
 .cta-button {
-  background: var(--primary-color, rgb(40,170,170));
+  background: var(--sp-color-primary);
   border: 0;
   border-radius: 999px;
   color: white;
   cursor: pointer;
   padding: 0.7rem 1rem;
+  font: inherit;
 }
 
 .cta-button.cta-secondary {
   background: transparent;
-  border: 1px solid var(--border-color, #d9d9d9);
-  color: inherit;
+  border: 1px solid var(--sp-color-border-soft);
+  color: var(--sp-color-text-primary);
 }
 
-@media (max-width: 1100px) {
-  .planning-admin-grid,
-  .planning-admin-hero,
-  .planning-admin-form-grid {
+.cta-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+@media (max-width: 960px) {
+  .planning-admin-grid {
     grid-template-columns: 1fr;
+  }
+
+  .planning-admin-form-grid--detail {
+    grid-template-columns: 1fr;
+  }
+
+  .planning-admin-form-grid--detail > .field-stack,
+  .planning-admin-form-grid--detail > .planning-customer-select,
+  .planning-admin-form-grid--detail > .field-stack--half,
+  .planning-admin-form-grid--detail > .field-stack--third,
+  .planning-admin-form-grid--detail > .field-stack--wide {
+    grid-column: 1 / -1;
   }
 }
 </style>

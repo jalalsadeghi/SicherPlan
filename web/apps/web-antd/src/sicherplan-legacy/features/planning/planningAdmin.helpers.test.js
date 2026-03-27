@@ -4,7 +4,11 @@ import assert from "node:assert/strict";
 import {
   buildPlanningImportTemplate,
   derivePlanningActionState,
+  filterPlanningCustomerOptions,
+  formatPlanningCustomerOption,
   mapPlanningApiMessage,
+  parseOptionalCoordinate,
+  resolveInitialMapCenter,
 } from "./planningAdmin.helpers.js";
 
 test("derivePlanningActionState grants dispatcher planning write access", () => {
@@ -29,4 +33,61 @@ test("buildPlanningImportTemplate returns stable CSV headers", () => {
 test("mapPlanningApiMessage maps import and duplicate errors", () => {
   assert.equal(mapPlanningApiMessage("errors.planning.import.invalid_headers"), "invalidImportHeaders");
   assert.equal(mapPlanningApiMessage("errors.planning.patrol_checkpoint.duplicate_sequence"), "duplicateChild");
+});
+
+test("formatPlanningCustomerOption renders customer number and name together", () => {
+  assert.equal(
+    formatPlanningCustomerOption({ customer_number: "CUS-200", name: "Messe Nord" }),
+    "CUS-200 — Messe Nord",
+  );
+});
+
+test("filterPlanningCustomerOptions matches across the combined customer label", () => {
+  const customers = [
+    { customer_number: "CUS-100", name: "Alpha Security" },
+    { customer_number: "CUS-200", name: "Messe Nord" },
+  ];
+
+  assert.deepEqual(filterPlanningCustomerOptions(customers, "nord"), [customers[1]]);
+  assert.deepEqual(filterPlanningCustomerOptions(customers, "cus-100"), [customers[0]]);
+});
+
+test("parseOptionalCoordinate keeps blank values unset instead of coercing to zero", () => {
+  assert.equal(parseOptionalCoordinate(""), null);
+  assert.equal(parseOptionalCoordinate("   "), null);
+  assert.equal(parseOptionalCoordinate(undefined), null);
+  assert.equal(parseOptionalCoordinate(null), null);
+  assert.equal(parseOptionalCoordinate("0"), 0);
+});
+
+test("resolveInitialMapCenter ignores blank form coordinates and falls back truthfully", () => {
+  const center = resolveInitialMapCenter({
+    currentLatitude: "",
+    currentLongitude: "",
+    customerCoordinates: null,
+    customerGeocode: null,
+    fallback: { lat: 51.662973, lng: 8.174013 },
+  });
+
+  assert.deepEqual(center, {
+    lat: 51.662973,
+    lng: 8.174013,
+    source: "fallback",
+  });
+});
+
+test("resolveInitialMapCenter uses existing form coordinates only when both values are present", () => {
+  const center = resolveInitialMapCenter({
+    currentLatitude: "51.5",
+    currentLongitude: "8.1",
+    customerCoordinates: { lat: 52.1, lng: 13.1 },
+    customerGeocode: { lat: 53.1, lng: 9.1 },
+    fallback: { lat: 51.662973, lng: 8.174013 },
+  });
+
+  assert.deepEqual(center, {
+    lat: 51.5,
+    lng: 8.1,
+    source: "existing-record",
+  });
 });

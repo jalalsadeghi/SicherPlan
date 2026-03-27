@@ -84,3 +84,78 @@ export function buildPlanningImportTemplate(entityKey) {
   return (headers[entityKey] ?? []).join(",");
 }
 
+export function formatPlanningCustomerOption(customer) {
+  if (!customer || typeof customer !== "object") {
+    return "";
+  }
+
+  const customerNumber = typeof customer.customer_number === "string" ? customer.customer_number.trim() : "";
+  const name = typeof customer.name === "string" ? customer.name.trim() : "";
+  return [customerNumber, name].filter(Boolean).join(" — ") || "";
+}
+
+export function filterPlanningCustomerOptions(customers, query) {
+  const normalizedQuery = typeof query === "string" ? query.trim().toLocaleLowerCase() : "";
+  if (!normalizedQuery) {
+    return customers;
+  }
+
+  return customers.filter((customer) => {
+    const label = formatPlanningCustomerOption(customer).toLocaleLowerCase();
+    return label.includes(normalizedQuery);
+  });
+}
+
+export function parseOptionalCoordinate(value) {
+  if (value == null) {
+    return null;
+  }
+
+  if (typeof value === "string" && !value.trim()) {
+    return null;
+  }
+
+  const numericValue = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+export function resolveInitialMapCenter({
+  fallback,
+  customerCoordinates = null,
+  customerGeocode = null,
+  currentLatitude,
+  currentLongitude,
+}) {
+  const parsedLatitude = parseOptionalCoordinate(currentLatitude);
+  const parsedLongitude = parseOptionalCoordinate(currentLongitude);
+
+  if (parsedLatitude != null && parsedLongitude != null) {
+    return {
+      lat: Number(parsedLatitude.toFixed(6)),
+      lng: Number(parsedLongitude.toFixed(6)),
+      source: "existing-record",
+    };
+  }
+
+  if (customerCoordinates?.lat != null && customerCoordinates?.lng != null) {
+    return {
+      lat: Number(customerCoordinates.lat.toFixed(6)),
+      lng: Number(customerCoordinates.lng.toFixed(6)),
+      source: "customer-coordinates",
+    };
+  }
+
+  if (customerGeocode?.lat != null && customerGeocode?.lng != null) {
+    return {
+      lat: Number(customerGeocode.lat.toFixed(6)),
+      lng: Number(customerGeocode.lng.toFixed(6)),
+      source: "customer-geocode",
+    };
+  }
+
+  return {
+    lat: Number(fallback.lat.toFixed(6)),
+    lng: Number(fallback.lng.toFixed(6)),
+    source: "fallback",
+  };
+}
