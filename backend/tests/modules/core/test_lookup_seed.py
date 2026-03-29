@@ -60,6 +60,29 @@ class TestLookupSeed(unittest.TestCase):
         self.assertEqual(first["updated"], 0)
         self.assertEqual(second, {"inserted": 0, "updated": 0})
 
+    def test_system_seed_includes_customer_billing_lookup_domains(self) -> None:
+        session = _FakeSession()
+
+        seed_lookup_values(session)
+
+        seeded_codes_by_domain = {
+            domain: {row.code for row in session.rows if row.domain == domain and row.tenant_id is None}
+            for domain in ("invoice_layout", "invoice_delivery_method", "dunning_policy")
+        }
+
+        self.assertEqual(
+            seeded_codes_by_domain["invoice_layout"],
+            {"standard", "compact", "detailed_timesheet"},
+        )
+        self.assertEqual(
+            seeded_codes_by_domain["invoice_delivery_method"],
+            {"email_pdf", "portal_download", "postal_print", "e_invoice"},
+        )
+        self.assertEqual(
+            seeded_codes_by_domain["dunning_policy"],
+            {"disabled", "standard", "strict"},
+        )
+
     def test_tenant_seed_only_applies_tenant_extensible_domains(self) -> None:
         session = _FakeSession()
 

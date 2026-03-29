@@ -8,6 +8,14 @@ Use the existing system lookup seeding first:
 PYTHONPATH=backend .venv-backend-test/bin/python backend/scripts/seed_lookup_values.py
 ```
 
+This step is not optional for the Customer -> Commercial -> Billing profile form. The `Invoice layout`, `Dispatch method`, and `Dunning policy` dropdowns are populated only from system lookup rows, not from customer-specific data. After seeding, the runtime database should contain:
+
+- `invoice_layout`: `standard`, `compact`, `detailed_timesheet`
+- `invoice_delivery_method`: `email_pdf`, `portal_download`, `postal_print`, `e_invoice`
+- `dunning_policy`: `disabled`, `standard`, `strict`
+
+If those three dropdowns are empty and disabled in local/dev, rerun the command above against the database the active backend instance is connected to.
+
 ## Combined go-live seed
 
 For staging, UAT, or a freshly onboarded tenant, use:

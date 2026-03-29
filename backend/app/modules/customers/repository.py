@@ -976,6 +976,24 @@ class SqlAlchemyCustomerRepository:
     def get_address(self, address_id: str) -> Address | None:
         return self.session.get(Address, address_id)
 
+    def list_available_addresses(self, search: str = "", limit: int = 25) -> list[Address]:
+        statement = select(Address)
+        if search.strip():
+            term = f"%{search.strip()}%"
+            statement = statement.where(
+                or_(
+                    Address.street_line_1.ilike(term),
+                    Address.street_line_2.ilike(term),
+                    Address.postal_code.ilike(term),
+                    Address.city.ilike(term),
+                    Address.country_code.ilike(term),
+                )
+            )
+        statement = statement.order_by(Address.street_line_1.asc(), Address.postal_code.asc(), Address.city.asc()).limit(
+            max(1, min(limit, 50))
+        )
+        return list(self.session.scalars(statement).all())
+
     def get_portal_customer_scope_match(
         self,
         tenant_id: str,

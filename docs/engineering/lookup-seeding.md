@@ -35,6 +35,14 @@ Run system seeds:
 PYTHONPATH=backend python backend/scripts/seed_lookup_values.py
 ```
 
+This system seed is required for the Customer -> Commercial -> Billing profile dropdowns. The active customer form loads these lookup-backed fields from `GET /api/customers/tenants/{tenant_id}/customers/reference-data`, which in turn depends on these system domains being present in `core.lookup_value`:
+
+- `invoice_layout`: `standard`, `compact`, `detailed_timesheet`
+- `invoice_delivery_method`: `email_pdf`, `portal_download`, `postal_print`, `e_invoice`
+- `dunning_policy`: `disabled`, `standard`, `strict`
+
+If those three dropdowns render empty and disabled, run the system seed command above against the same database your backend is using, then refresh the customer page.
+
 Run tenant-extensible seeds for one tenant:
 
 ```bash

@@ -8,6 +8,7 @@ from typing import Protocol
 from uuid import UUID
 
 from app.errors import ApiException
+from app.modules.core.schemas import AddressRead
 from app.modules.customers.models import (
     CUSTOMER_ADDRESS_TYPES,
     Customer,
@@ -142,6 +143,7 @@ class CustomerRepository(Protocol):
     def list_mandates(self, tenant_id: str): ...  # noqa: ANN001
     def get_user_account(self, tenant_id: str, user_id: str): ...  # noqa: ANN001
     def get_address(self, address_id: str): ...  # noqa: ANN001
+    def list_available_addresses(self, search: str = "", limit: int = 25): ...  # noqa: ANN001
 
 
 class CustomerService:
@@ -422,6 +424,21 @@ class CustomerService:
             CustomerAddressRead.model_validate(row) for row in self.repository.list_customer_addresses(tenant_id, customer_id)
         ]
 
+    def list_available_addresses(
+        self,
+        tenant_id: str,
+        customer_id: str,
+        actor: RequestAuthorizationContext,
+        *,
+        search: str = "",
+        limit: int = 25,
+    ) -> list[AddressRead]:
+        self._require_customer(tenant_id, customer_id, actor)
+        return [
+            AddressRead.model_validate(row)
+            for row in self.repository.list_available_addresses(search=search, limit=limit)
+        ]
+
     def create_customer_address(
         self,
         tenant_id: str,
@@ -650,6 +667,17 @@ class CustomerService:
                 "errors.customers.contact.invalid_user_id_format",
             ) from exc
 
+    @staticmethod
+    def _normalize_address_id(address_id: str) -> str:
+        try:
+            return str(UUID(str(address_id).strip()))
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise ApiException(
+                400,
+                "customers.validation.address_format",
+                "errors.customers.customer_address.invalid_address_format",
+            ) from exc
+
     def _validate_address_constraints(
         self,
         tenant_id: str,
@@ -664,7 +692,8 @@ class CustomerService:
                 "customers.validation.address_type",
                 "errors.customers.customer_address.invalid_type",
             )
-        if self.repository.get_address(payload.address_id) is None:
+        normalized_address_id = self._normalize_address_id(payload.address_id)
+        if self.repository.get_address(normalized_address_id) is None:
             raise ApiException(
                 400,
                 "customers.validation.address_missing",
@@ -673,7 +702,7 @@ class CustomerService:
         if self.repository.find_duplicate_address_link(
             tenant_id,
             customer_id,
-            payload.address_id,
+            normalized_address_id,
             payload.address_type,
             exclude_id=exclude_link_id,
         ):

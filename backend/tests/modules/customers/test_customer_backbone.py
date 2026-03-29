@@ -28,6 +28,8 @@ from app.modules.iam.authz import RequestAuthorizationContext
 
 PORTAL_USER_ID = "11111111-1111-4111-8111-111111111111"
 FOREIGN_PORTAL_USER_ID = "22222222-2222-4222-8222-222222222222"
+ADDRESS_ID = "33333333-3333-4333-8333-333333333333"
+SECONDARY_ADDRESS_ID = "44444444-4444-4444-8444-444444444444"
 
 
 @dataclass
@@ -202,7 +204,7 @@ class FakeCustomerRepository:
         self.branches = {"branch-1": FakeBranch("branch-1", "tenant-1")}
         self.mandates = {"mandate-1": FakeMandate("mandate-1", "tenant-1", "branch-1")}
         self.users = {PORTAL_USER_ID: FakeUser(PORTAL_USER_ID, "tenant-1")}
-        self.addresses = {"address-1": FakeAddress("address-1")}
+        self.addresses = {ADDRESS_ID: FakeAddress(ADDRESS_ID)}
         self.customers: dict[str, FakeCustomer] = {}
         self.customer_portal_policy = {
             "version": "v1",
@@ -549,6 +551,20 @@ class FakeCustomerRepository:
     def get_address(self, address_id: str):
         return self.addresses.get(address_id)
 
+    def list_available_addresses(self, search: str = "", limit: int = 25):
+        rows = list(self.addresses.values())
+        if search.strip():
+            term = search.strip().lower()
+            rows = [
+                row
+                for row in rows
+                if term in row.street_line_1.lower()
+                or term in row.postal_code.lower()
+                or term in row.city.lower()
+                or term in row.country_code.lower()
+            ]
+        return rows[:limit]
+
 
 def _actor(tenant_id: str = "tenant-1", *, platform: bool = False) -> RequestAuthorizationContext:
     return RequestAuthorizationContext(
@@ -681,7 +697,7 @@ class TestCustomerService(unittest.TestCase):
             CustomerAddressCreate(
                 tenant_id="tenant-1",
                 customer_id=self.customer.id,
-                address_id="address-1",
+                address_id=ADDRESS_ID,
                 address_type="billing",
                 is_default=True,
             ),
@@ -816,13 +832,13 @@ class TestCustomerService(unittest.TestCase):
             CustomerAddressCreate(
                 tenant_id="tenant-1",
                 customer_id=self.customer.id,
-                address_id="address-1",
+                address_id=ADDRESS_ID,
                 address_type="mailing",
                 is_default=True,
             ),
             _actor(),
         )
-        self.repository.addresses["address-2"] = FakeAddress("address-2", street_line_1="Nebenstrasse 2")
+        self.repository.addresses[SECONDARY_ADDRESS_ID] = FakeAddress(SECONDARY_ADDRESS_ID, street_line_1="Nebenstrasse 2")
 
         with self.assertRaises(ApiException) as context:
             self.service.create_customer_address(
@@ -831,7 +847,7 @@ class TestCustomerService(unittest.TestCase):
                 CustomerAddressCreate(
                     tenant_id="tenant-1",
                     customer_id=self.customer.id,
-                    address_id="address-2",
+                    address_id=SECONDARY_ADDRESS_ID,
                     address_type="mailing",
                     is_default=True,
                 ),
@@ -839,6 +855,24 @@ class TestCustomerService(unittest.TestCase):
             )
 
         self.assertEqual(context.exception.code, "customers.conflict.default_address")
+
+    def test_non_uuid_customer_address_id_is_rejected(self) -> None:
+        with self.assertRaises(ApiException) as context:
+            self.service.create_customer_address(
+                "tenant-1",
+                self.customer.id,
+                CustomerAddressCreate(
+                    tenant_id="tenant-1",
+                    customer_id=self.customer.id,
+                    address_id="addr-cu02-billing-001",
+                    address_type="billing",
+                ),
+                _actor(),
+            )
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertEqual(context.exception.code, "customers.validation.address_format")
+        self.assertEqual(context.exception.message_key, "errors.customers.customer_address.invalid_address_format")
 
     def test_portal_user_link_must_match_tenant_scope(self) -> None:
         self.repository.users[FOREIGN_PORTAL_USER_ID] = FakeUser(FOREIGN_PORTAL_USER_ID, "tenant-2")

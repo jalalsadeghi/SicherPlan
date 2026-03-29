@@ -56,9 +56,49 @@ test("billing-profile selects use lookup-backed reference data instead of hardco
   assert.match(source, /billingInvoiceLayoutOptions/);
   assert.match(source, /billingShippingMethodOptions/);
   assert.match(source, /billingDunningPolicyOptions/);
+  assert.match(source, /billingInvoiceLayoutOptions[\s\S]*option\.label/);
+  assert.match(source, /billingShippingMethodOptions[\s\S]*option\.label/);
+  assert.match(source, /billingDunningPolicyOptions[\s\S]*option\.label/);
   assert.doesNotMatch(source, /const INVOICE_LAYOUT_OPTIONS =/);
   assert.doesNotMatch(source, /const SHIPPING_METHOD_OPTIONS =/);
   assert.doesNotMatch(source, /const DUNNING_POLICY_OPTIONS =/);
+});
+
+test("billing-profile rows use explicit layout helpers for bank, lookup, and note alignment", () => {
+  assert.match(source, /bank_iban[\s\S]*customer-admin-billing-row-field/);
+  assert.match(source, /bank_bic[\s\S]*customer-admin-billing-row-field/);
+  assert.match(source, /bank_name[\s\S]*customer-admin-billing-row-field/);
+  assert.match(source, /invoice_layout_code[\s\S]*customer-admin-billing-row-field/);
+  assert.match(source, /shipping_method_code[\s\S]*customer-admin-billing-row-field/);
+  assert.match(source, /dunning_policy_code[\s\S]*customer-admin-billing-row-field/);
+  assert.match(source, /leitweg_id[\s\S]*customer-admin-billing-paired-field customer-admin-billing-paired-field--compact/);
+  assert.match(source, /customer-admin-billing-paired-field customer-admin-billing-paired-field--notes[\s\S]*billing_note/);
+  assert.match(source, /\.customer-admin-billing-paired-field--compact \{/);
+  assert.match(source, /\.customer-admin-billing-paired-field--notes textarea \{/);
+});
+
+test("invoice-party form uses customer address selector and address-tab empty state guidance", () => {
+  assert.match(source, /customerAdmin\.fields\.billingAddress/);
+  assert.match(source, /invoicePartyAddressOptions/);
+  assert.match(source, /invoicePartyAddressPlaceholder/);
+  assert.match(source, /formatInvoicePartyAddressOption/);
+  assert.match(source, /customerAdmin\.commercial\.invoicePartyAddressMissing/);
+  assert.match(source, /customerAdmin\.actions\.openAddressesTab/);
+  assert.match(source, /openCustomerAddressesTab/);
+  assert.doesNotMatch(source, /<input v-model="invoicePartyDraft\.address_id"/);
+});
+
+test("address-link form uses available-address selector instead of raw address uuid input", () => {
+  assert.match(source, /customerAdmin\.addresses\.linkLead/);
+  assert.match(source, /customerAdmin\.fields\.address/);
+  assert.match(source, /availableAddressDirectory/);
+  assert.match(source, /customerAddressLinkOptions/);
+  assert.match(source, /customerAddressLinkPlaceholder/);
+  assert.match(source, /listCustomerAvailableAddresses/);
+  assert.match(source, /refreshAvailableAddresses/);
+  assert.match(source, /formatAddressDirectoryOption/);
+  assert.match(source, /customerAdmin\.addresses\.addressLinkEmpty/);
+  assert.doesNotMatch(source, /<input v-model="addressDraft\.address_id"/);
 });
 
 test("full tab editors no longer use legacy inline-form layout", () => {

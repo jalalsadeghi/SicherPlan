@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db_session
 from app.config import settings
+from app.modules.core.schemas import AddressRead
 from app.modules.platform_services.docs_repository import SqlAlchemyDocumentRepository
 from app.modules.platform_services.docs_service import DocumentService
 from app.modules.platform_services.integration_repository import SqlAlchemyIntegrationRepository
@@ -508,6 +509,27 @@ def list_customer_addresses(
     service: Annotated[CustomerService, Depends(get_customer_service)],
 ) -> list[CustomerAddressRead]:
     return service.list_customer_addresses(str(tenant_id), str(customer_id), context)
+
+
+@router.get("/{customer_id}/address-options", response_model=list[AddressRead])
+def list_customer_available_addresses(
+    tenant_id: UUID,
+    customer_id: UUID,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("customers.customer.read", scope="tenant")),
+    ],
+    service: Annotated[CustomerService, Depends(get_customer_service)],
+    search: str = Query(default="", max_length=120),
+    limit: int = Query(default=25, ge=1, le=50),
+) -> list[AddressRead]:
+    return service.list_available_addresses(
+        str(tenant_id),
+        str(customer_id),
+        context,
+        search=search,
+        limit=limit,
+    )
 
 
 @router.post("/{customer_id}/addresses", response_model=CustomerAddressRead, status_code=status.HTTP_201_CREATED)

@@ -52,6 +52,16 @@ export interface CustomerAddressRead {
   } | null;
 }
 
+export interface CustomerAvailableAddressRead {
+  id: string;
+  street_line_1: string;
+  street_line_2: string | null;
+  postal_code: string;
+  city: string;
+  state: string | null;
+  country_code: string;
+}
+
 export interface CustomerRead extends CustomerListItem {
   legal_name: string | null;
   external_ref: string | null;
@@ -695,6 +705,26 @@ export function createCustomerAddress(
 export function listCustomerAddresses(tenantId: string, customerId: string, accessToken: string) {
   return request<CustomerAddressRead[]>(
     `/api/customers/tenants/${tenantId}/customers/${customerId}/addresses`,
+    accessToken,
+  );
+}
+
+export function listCustomerAvailableAddresses(
+  tenantId: string,
+  customerId: string,
+  accessToken: string,
+  params: { search?: string; limit?: number } = {},
+) {
+  const query = new URLSearchParams();
+  if (params.search?.trim()) {
+    query.set("search", params.search.trim());
+  }
+  if (params.limit) {
+    query.set("limit", String(params.limit));
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<CustomerAvailableAddressRead[]>(
+    `/api/customers/tenants/${tenantId}/customers/${customerId}/address-options${suffix}`,
     accessToken,
   );
 }

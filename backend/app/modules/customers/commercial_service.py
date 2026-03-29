@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 from typing import Protocol
+from uuid import UUID
 
 from app.errors import ApiException
 from app.modules.customers.models import (
@@ -960,6 +961,14 @@ class CustomerCommercialService:
     ) -> None:
         if not payload.company_name.strip():
             raise ApiException(400, "customers.validation.invoice_party_company_name", "errors.customers.invoice_party.company_name_required")
+        try:
+            UUID(payload.address_id)
+        except ValueError as exc:
+            raise ApiException(
+                400,
+                "customers.validation.invoice_party_address_format",
+                "errors.customers.invoice_party.invalid_address_format",
+            ) from exc
         if self.repository.get_address(payload.address_id) is None:
             raise ApiException(400, "customers.validation.invoice_party_address", "errors.customers.invoice_party.address_not_found")
         if payload.invoice_email and "@" not in payload.invoice_email:

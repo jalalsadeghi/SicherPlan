@@ -510,10 +510,22 @@
                   <p class="eyebrow">{{ t("customerAdmin.addresses.editorEyebrow") }}</p>
                   <h4>{{ t("customerAdmin.addresses.editorTitle") }}</h4>
                 </div>
+                <p class="field-help">{{ t("customerAdmin.addresses.linkLead") }}</p>
                 <div class="customer-admin-form-grid customer-admin-form-grid--detail">
                 <label class="field-stack field-stack--half">
-                  <span>{{ t("customerAdmin.fields.addressId") }}</span>
-                  <input v-model="addressDraft.address_id" required />
+                  <span>{{ t("customerAdmin.fields.address") }}</span>
+                  <select
+                    v-model="addressDraft.address_id"
+                    :disabled="!actionState.canManageAddresses || !customerAddressLinkOptions.length"
+                  >
+                    <option value="">{{ customerAddressLinkPlaceholder }}</option>
+                    <option v-for="option in customerAddressLinkOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
+                  <p v-if="!customerAddressLinkOptions.length" class="field-help">
+                    {{ t("customerAdmin.addresses.addressLinkEmpty") }}
+                  </p>
                 </label>
                 <label class="field-stack field-stack--third">
                   <span>{{ t("customerAdmin.fields.addressType") }}</span>
@@ -541,7 +553,7 @@
                   <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="startCreateAddress">
                     {{ t("customerAdmin.actions.addAddress") }}
                   </button>
-                  <button class="cta-button" type="submit" :disabled="!actionState.canManageAddresses">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageAddresses || !customerAddressLinkOptions.length">
                     {{ editingAddressId ? t("customerAdmin.actions.saveAddress") : t("customerAdmin.actions.createAddress") }}
                   </button>
                   <button class="cta-button cta-secondary" type="button" @click="resetAddressDraft">
@@ -667,57 +679,57 @@
                     <input v-model="billingProfileDraft.bank_account_holder" :disabled="!commercialActionState.canManageBillingProfile" @input="clearBillingProfileFieldErrors(['bank_account_holder', 'bank_iban', 'bank_bic', 'bank_name'])" />
                     <p v-if="billingProfileFieldError('bank_account_holder')" class="field-help customer-admin-field-help--error">{{ billingProfileFieldError('bank_account_holder') }}</p>
                   </label>
-                  <label class="field-stack field-stack--half" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('bank_iban') }">
+                  <label class="field-stack field-stack--third customer-admin-billing-row-field" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('bank_iban') }">
                     <span>{{ t("customerAdmin.fields.bankIban") }}</span>
                     <input v-model="billingProfileDraft.bank_iban" :disabled="!commercialActionState.canManageBillingProfile" @input="clearBillingProfileFieldErrors(['bank_iban', 'bank_account_holder', 'bank_bic', 'bank_name'])" />
                     <p v-if="billingProfileFieldError('bank_iban')" class="field-help customer-admin-field-help--error">{{ billingProfileFieldError('bank_iban') }}</p>
                   </label>
-                  <label class="field-stack field-stack--half" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('bank_bic') }">
+                  <label class="field-stack field-stack--third customer-admin-billing-row-field" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('bank_bic') }">
                     <span>{{ t("customerAdmin.fields.bankBic") }}</span>
                     <input v-model="billingProfileDraft.bank_bic" :disabled="!commercialActionState.canManageBillingProfile" @input="clearBillingProfileFieldErrors(['bank_account_holder', 'bank_iban', 'bank_bic', 'bank_name'])" />
                     <p v-if="billingProfileFieldError('bank_bic')" class="field-help customer-admin-field-help--error">{{ billingProfileFieldError('bank_bic') }}</p>
                   </label>
-                  <label class="field-stack field-stack--half" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('bank_name') }">
+                  <label class="field-stack field-stack--third customer-admin-billing-row-field" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('bank_name') }">
                     <span>{{ t("customerAdmin.fields.bankName") }}</span>
                     <input v-model="billingProfileDraft.bank_name" :disabled="!commercialActionState.canManageBillingProfile" @input="clearBillingProfileFieldErrors(['bank_account_holder', 'bank_iban', 'bank_bic', 'bank_name'])" />
                     <p v-if="billingProfileFieldError('bank_name')" class="field-help customer-admin-field-help--error">{{ billingProfileFieldError('bank_name') }}</p>
                   </label>
-                  <label class="field-stack field-stack--third" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('invoice_layout_code') }">
+                  <label class="field-stack field-stack--third customer-admin-billing-row-field" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('invoice_layout_code') }">
                     <span>{{ t("customerAdmin.fields.invoiceLayoutCode") }}</span>
-                    <select v-model="billingProfileDraft.invoice_layout_code" :disabled="!commercialActionState.canManageBillingProfile" @change="clearBillingProfileFieldErrors(['invoice_layout_code', 'shipping_method_code', 'e_invoice_enabled'])">
+                    <select v-model="billingProfileDraft.invoice_layout_code" :disabled="!commercialActionState.canManageBillingProfile || !billingInvoiceLayoutOptions.length" @change="clearBillingProfileFieldErrors(['invoice_layout_code', 'shipping_method_code', 'e_invoice_enabled'])">
                       <option v-for="option in billingInvoiceLayoutOptions" :key="option.id" :value="option.code">
-                        {{ formatReferenceLabel(option) }}
+                        {{ option.label }}
                       </option>
                     </select>
                     <p v-if="billingProfileFieldError('invoice_layout_code')" class="field-help customer-admin-field-help--error">{{ billingProfileFieldError('invoice_layout_code') }}</p>
                     <p v-else-if="!billingInvoiceLayoutOptions.length" class="field-help">{{ t("customerAdmin.feedback.invoiceLayoutUnavailable") }}</p>
                   </label>
-                  <label class="field-stack field-stack--third" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('shipping_method_code') }">
+                  <label class="field-stack field-stack--third customer-admin-billing-row-field" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('shipping_method_code') }">
                     <span>{{ t("customerAdmin.fields.shippingMethodCode") }}</span>
-                    <select v-model="billingProfileDraft.shipping_method_code" :disabled="!commercialActionState.canManageBillingProfile" @change="clearBillingProfileFieldErrors(['shipping_method_code', 'invoice_email', 'leitweg_id', 'e_invoice_enabled', 'invoice_layout_code'])">
+                    <select v-model="billingProfileDraft.shipping_method_code" :disabled="!commercialActionState.canManageBillingProfile || !billingShippingMethodOptions.length" @change="clearBillingProfileFieldErrors(['shipping_method_code', 'invoice_email', 'leitweg_id', 'e_invoice_enabled', 'invoice_layout_code'])">
                       <option v-for="option in billingShippingMethodOptions" :key="option.id" :value="option.code">
-                        {{ formatReferenceLabel(option) }}
+                        {{ option.label }}
                       </option>
                     </select>
                     <p v-if="billingProfileFieldError('shipping_method_code')" class="field-help customer-admin-field-help--error">{{ billingProfileFieldError('shipping_method_code') }}</p>
                     <p v-else-if="!billingShippingMethodOptions.length" class="field-help">{{ t("customerAdmin.feedback.shippingMethodUnavailable") }}</p>
                   </label>
-                  <label class="field-stack field-stack--third" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('dunning_policy_code') }">
+                  <label class="field-stack field-stack--third customer-admin-billing-row-field" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('dunning_policy_code') }">
                     <span>{{ t("customerAdmin.fields.dunningPolicyCode") }}</span>
-                    <select v-model="billingProfileDraft.dunning_policy_code" :disabled="!commercialActionState.canManageBillingProfile" @change="clearBillingProfileFieldErrors(['dunning_policy_code'])">
+                    <select v-model="billingProfileDraft.dunning_policy_code" :disabled="!commercialActionState.canManageBillingProfile || !billingDunningPolicyOptions.length" @change="clearBillingProfileFieldErrors(['dunning_policy_code'])">
                       <option v-for="option in billingDunningPolicyOptions" :key="option.id" :value="option.code">
-                        {{ formatReferenceLabel(option) }}
+                        {{ option.label }}
                       </option>
                     </select>
                     <p v-if="billingProfileFieldError('dunning_policy_code')" class="field-help customer-admin-field-help--error">{{ billingProfileFieldError('dunning_policy_code') }}</p>
                     <p v-else-if="!billingDunningPolicyOptions.length" class="field-help">{{ t("customerAdmin.feedback.dunningPolicyUnavailable") }}</p>
                   </label>
-                  <label class="field-stack field-stack--half" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('leitweg_id') }">
+                  <label class="field-stack field-stack--half customer-admin-billing-paired-field customer-admin-billing-paired-field--compact" :class="{ 'customer-admin-field-stack--error': billingProfileFieldInvalid('leitweg_id') }">
                     <span>{{ t("customerAdmin.fields.leitwegId") }}</span>
                     <input v-model="billingProfileDraft.leitweg_id" :disabled="!commercialActionState.canManageBillingProfile" @input="clearBillingProfileFieldErrors(['leitweg_id', 'shipping_method_code', 'e_invoice_enabled'])" />
                     <p v-if="billingProfileFieldError('leitweg_id')" class="field-help customer-admin-field-help--error">{{ billingProfileFieldError('leitweg_id') }}</p>
                   </label>
-                  <label class="field-stack field-stack--wide">
+                  <label class="field-stack field-stack--half customer-admin-billing-paired-field customer-admin-billing-paired-field--notes">
                     <span>{{ t("customerAdmin.fields.billingNote") }}</span>
                     <textarea v-model="billingProfileDraft.billing_note" rows="3" :disabled="!commercialActionState.canManageBillingProfile" />
                   </label>
@@ -800,8 +812,19 @@
                     <input v-model="invoicePartyDraft.contact_name" :disabled="!commercialActionState.canManageInvoiceParties" />
                   </label>
                   <label class="field-stack field-stack--half">
-                    <span>{{ t("customerAdmin.fields.addressId") }}</span>
-                    <input v-model="invoicePartyDraft.address_id" :disabled="!commercialActionState.canManageInvoiceParties" />
+                    <span>{{ t("customerAdmin.fields.billingAddress") }}</span>
+                    <select
+                      v-model="invoicePartyDraft.address_id"
+                      :disabled="!commercialActionState.canManageInvoiceParties || !invoicePartyAddressOptions.length"
+                    >
+                      <option value="">{{ invoicePartyAddressPlaceholder }}</option>
+                      <option v-for="option in invoicePartyAddressOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                      </option>
+                    </select>
+                    <p v-if="!invoicePartyAddressOptions.length" class="field-help">
+                      {{ t("customerAdmin.commercial.invoicePartyAddressMissing") }}
+                    </p>
                   </label>
                   <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.invoiceEmail") }}</span>
@@ -825,8 +848,14 @@
                   <span>{{ t("customerAdmin.fields.isDefaultInvoiceParty") }}</span>
                 </label>
 
+                <div v-if="!invoicePartyAddressOptions.length" class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" @click="openCustomerAddressesTab">
+                    {{ t("customerAdmin.actions.openAddressesTab") }}
+                  </button>
+                </div>
+
                 <div class="cta-row" v-if="commercialActionState.canManageInvoiceParties">
-                  <button class="cta-button" type="submit" :disabled="loading.commercial">
+                  <button class="cta-button" type="submit" :disabled="loading.commercial || !invoicePartyAddressOptions.length">
                     {{ editingInvoicePartyId ? t("customerAdmin.actions.saveInvoiceParty") : t("customerAdmin.actions.createInvoiceParty") }}
                   </button>
                   <button class="cta-button cta-secondary" type="button" @click="resetInvoicePartyDraft">
@@ -1577,6 +1606,7 @@ import {
   getCustomerReferenceData,
   getCustomerPortalPrivacy,
   linkCustomerHistoryAttachment,
+  listCustomerAvailableAddresses,
   listCustomerEmployeeBlocks,
   listCustomerHistory,
   listCustomerPortalLoginHistory,
@@ -1585,6 +1615,7 @@ import {
   type CustomerBillingProfileRead,
   type CustomerAddressPayload,
   type CustomerAddressRead,
+  type CustomerAvailableAddressRead,
   type CustomerContactPayload,
   type CustomerContactRead,
   type CustomerCommercialProfileRead,
@@ -1682,6 +1713,7 @@ const employeeBlockCapability = ref<CustomerEmployeeBlockCollectionRead["capabil
 const commercialProfile = ref<CustomerCommercialProfileRead | null>(null);
 const portalPrivacy = ref<CustomerPortalPrivacyRead | null>(null);
 const referenceData = ref<CustomerReferenceDataRead | null>(null);
+const availableAddressDirectory = ref<CustomerAvailableAddressRead[]>([]);
 const selectedCustomer = ref<CustomerRead | null>(null);
 const selectedCustomerId = ref("");
 const previousSelectedCustomer = ref<CustomerRead | null>(null);
@@ -1743,6 +1775,7 @@ const filters = reactive<CustomerFilterParams>({
   default_mandate_id: "",
   include_archived: false,
 });
+const addressDirectorySearch = ref("");
 const customerDraft = reactive<CustomerCreatePayload>({
   tenant_id: "",
   customer_number: "",
@@ -1938,6 +1971,37 @@ const selectedCustomerBranchLabel = computed(() => {
 const billingInvoiceLayoutOptions = computed(() => referenceData.value?.invoice_layouts ?? []);
 const billingShippingMethodOptions = computed(() => referenceData.value?.shipping_methods ?? []);
 const billingDunningPolicyOptions = computed(() => referenceData.value?.dunning_policies ?? []);
+const invoicePartyAddressOptions = computed(() =>
+  (selectedCustomer.value?.addresses ?? [])
+    .filter((address) => address.status !== "archived")
+    .map((address) => ({
+      value: address.address_id,
+      label: formatInvoicePartyAddressOption(address),
+    })),
+);
+const invoicePartyAddressPlaceholder = computed(() =>
+  invoicePartyAddressOptions.value.length
+    ? t("customerAdmin.commercial.invoicePartyAddressPlaceholder")
+    : t("customerAdmin.commercial.invoicePartyAddressEmptyPlaceholder"),
+);
+const customerAddressLinkOptions = computed(() => {
+  const linkedAddressIds = new Set(
+    (selectedCustomer.value?.addresses ?? [])
+      .filter((address) => address.id !== editingAddressId.value)
+      .map((address) => address.address_id),
+  );
+  return availableAddressDirectory.value
+    .filter((address) => !linkedAddressIds.has(address.id))
+    .map((address) => ({
+      value: address.id,
+      label: formatAddressDirectoryOption(address),
+    }));
+});
+const customerAddressLinkPlaceholder = computed(() =>
+  customerAddressLinkOptions.value.length
+    ? t("customerAdmin.addresses.addressLinkPlaceholder")
+    : t("customerAdmin.addresses.addressLinkEmptyPlaceholder"),
+);
 const selectedCustomerMandateLabel = computed(() => {
   const mandateId = selectedCustomer.value?.default_mandate_id;
   return mandateId ? referenceMaps.value.mandates.get(mandateId) ?? mandateId : "";
@@ -2369,6 +2433,10 @@ function editInvoiceParty(invoiceParty: CustomerInvoicePartyRead) {
   editingInvoicePartyId.value = invoiceParty.id;
 }
 
+function openCustomerAddressesTab() {
+  activeDetailTab.value = "addresses";
+}
+
 function editRateCard(rateCard: CustomerRateCardRead) {
   rateCardDraft.tenant_id = rateCard.tenant_id;
   rateCardDraft.customer_id = rateCard.customer_id;
@@ -2581,6 +2649,7 @@ async function selectCustomer(customerId: string, preferredTab = "") {
       populateCustomerDraft(selectedCustomer.value);
       resetContactDraft();
       resetAddressDraft();
+      addressDirectorySearch.value = "";
       commercialProfile.value = null;
       resetBillingProfileDraft();
       resetInvoicePartyDraft();
@@ -2596,6 +2665,7 @@ async function selectCustomer(customerId: string, preferredTab = "") {
       closePortalAccessPasswordReset();
       resetPortalPrivacyDraft();
       resetPortalAccessDraft();
+      await refreshAvailableAddresses();
       isCreatingCustomer.value = false;
       if (canReadCommercial.value) {
         await refreshCommercialProfile();
@@ -2795,6 +2865,10 @@ async function submitAddress() {
   if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
     return;
   }
+  if (!customerAddressLinkOptions.value.length) {
+    setFeedback("error", t("customerAdmin.feedback.validation"), t("customerAdmin.addresses.addressLinkEmpty"));
+    return;
+  }
   if (!addressDraft.address_id.trim()) {
     setFeedback("error", t("customerAdmin.feedback.validation"), t("customerAdmin.feedback.addressRequired"));
     return;
@@ -2903,6 +2977,10 @@ async function submitBillingProfile() {
 
 async function submitInvoiceParty() {
   if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+  if (!invoicePartyAddressOptions.value.length) {
+    setFeedback("error", t("customerAdmin.feedback.validation"), t("customerAdmin.commercial.invoicePartyAddressMissing"));
     return;
   }
   if (!invoicePartyDraft.company_name.trim() || !invoicePartyDraft.address_id.trim()) {
@@ -3119,6 +3197,22 @@ async function archiveAddress(address: CustomerAddressRead) {
   }
 }
 
+async function refreshAvailableAddresses() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    availableAddressDirectory.value = [];
+    return;
+  }
+  availableAddressDirectory.value = await listCustomerAvailableAddresses(
+    tenantScopeId.value,
+    selectedCustomer.value.id,
+    accessToken.value,
+    {
+      search: addressDirectorySearch.value,
+      limit: 25,
+    },
+  );
+}
+
 function currentContactVersion(contactId: string) {
   return selectedCustomer.value?.contacts.find((row) => row.id === contactId)?.version_no ?? 1;
 }
@@ -3203,6 +3297,22 @@ function normalizeInvoicePartyDraft(): CustomerInvoicePartyPayload {
     is_default: !!invoicePartyDraft.is_default,
     note: emptyToNull(invoicePartyDraft.note),
   };
+}
+
+function formatInvoicePartyAddressOption(address: CustomerAddressRead) {
+  const typeLabel = t(`customerAdmin.addressType.${address.address_type}` as never);
+  if (!address.address) {
+    return address.label ? `${typeLabel} · ${address.label}` : `${typeLabel} · ${address.address_id}`;
+  }
+  const location = [address.address.street_line_1, `${address.address.postal_code} ${address.address.city}`]
+    .filter(Boolean)
+    .join(", ");
+  return address.label ? `${typeLabel} · ${address.label} · ${location}` : `${typeLabel} · ${location}`;
+}
+
+function formatAddressDirectoryOption(address: CustomerAvailableAddressRead) {
+  const location = [address.street_line_1, `${address.postal_code} ${address.city}`].filter(Boolean).join(", ");
+  return address.street_line_2 ? `${location} · ${address.street_line_2}` : location;
 }
 
 function normalizeRateCardDraft(): CustomerRateCardPayload {
@@ -4140,6 +4250,26 @@ onMounted(() => {
 
 .customer-admin-form-grid--detail > .field-stack--third {
   grid-column: span 2;
+}
+
+.customer-admin-billing-row-field {
+  align-self: start;
+}
+
+.customer-admin-billing-paired-field {
+  align-self: start;
+}
+
+.customer-admin-billing-paired-field--compact {
+  min-height: 8.85rem;
+}
+
+.customer-admin-billing-paired-field--compact input {
+  min-height: 3.1rem;
+}
+
+.customer-admin-billing-paired-field--notes textarea {
+  min-height: 8.85rem;
 }
 
 .field-stack input,

@@ -957,6 +957,10 @@ export type MessageKey =
   | "customerAdmin.addresses.editorEyebrow"
   | "customerAdmin.addresses.editorTitle"
   | "customerAdmin.addresses.empty"
+  | "customerAdmin.addresses.linkLead"
+  | "customerAdmin.addresses.addressLinkEmpty"
+  | "customerAdmin.addresses.addressLinkPlaceholder"
+  | "customerAdmin.addresses.addressLinkEmptyPlaceholder"
   | "customerAdmin.addresses.defaultBadge"
   | "customerAdmin.addresses.linkBadge"
   | "customerAdmin.portal.title"
@@ -1002,6 +1006,7 @@ export type MessageKey =
   | "customerAdmin.fields.isPrimaryContact"
   | "customerAdmin.fields.isBillingContact"
   | "customerAdmin.fields.addressId"
+  | "customerAdmin.fields.address"
   | "customerAdmin.fields.addressType"
   | "customerAdmin.fields.historyEntry"
   | "customerAdmin.fields.documentId"
@@ -1116,6 +1121,9 @@ export type MessageKey =
   | "customerAdmin.commercial.invoiceEyebrow"
   | "customerAdmin.commercial.invoiceTitle"
   | "customerAdmin.commercial.invoiceEmpty"
+  | "customerAdmin.commercial.invoicePartyAddressMissing"
+  | "customerAdmin.commercial.invoicePartyAddressPlaceholder"
+  | "customerAdmin.commercial.invoicePartyAddressEmptyPlaceholder"
   | "customerAdmin.commercial.defaultInvoiceParty"
   | "customerAdmin.commercial.additionalInvoiceParty"
   | "customerAdmin.commercial.rateCardsEyebrow"
@@ -1148,6 +1156,7 @@ export type MessageKey =
   | "customerAdmin.fields.taxExemptionReason"
   | "customerAdmin.fields.companyName"
   | "customerAdmin.fields.contactName"
+  | "customerAdmin.fields.billingAddress"
   | "customerAdmin.fields.invoiceLayoutLookupId"
   | "customerAdmin.fields.note"
   | "customerAdmin.fields.isDefaultInvoiceParty"
@@ -1173,6 +1182,7 @@ export type MessageKey =
   | "customerAdmin.actions.refreshCommercial"
   | "customerAdmin.actions.saveBillingProfile"
   | "customerAdmin.actions.addInvoiceParty"
+  | "customerAdmin.actions.openAddressesTab"
   | "customerAdmin.actions.createInvoiceParty"
   | "customerAdmin.actions.saveInvoiceParty"
   | "customerAdmin.actions.addRateCard"
@@ -2427,6 +2437,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.addresses.editorEyebrow": "Verknüpfung",
     "customerAdmin.addresses.editorTitle": "Adresslink anlegen oder anpassen",
     "customerAdmin.addresses.empty": "Noch keine Adressen verknüpft.",
+    "customerAdmin.addresses.linkLead": "Dieses Formular verknüpft eine bestehende Adresse mit dem Kunden.",
+    "customerAdmin.addresses.addressLinkEmpty":
+      "Keine verfügbaren Adressen zum Verknüpfen vorhanden. Wählen Sie zuerst eine bestehende Adresse aus dem Adressbestand.",
+    "customerAdmin.addresses.addressLinkPlaceholder": "Bestehende Adresse auswählen",
+    "customerAdmin.addresses.addressLinkEmptyPlaceholder": "Keine verknüpfbare Adresse verfügbar",
     "customerAdmin.addresses.defaultBadge": "Standardadresse",
     "customerAdmin.addresses.linkBadge": "Adresslink",
     "customerAdmin.portal.title": "Portalsteuerung und Freigaben",
@@ -2472,6 +2487,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.isPrimaryContact": "Als Primärkontakt markieren",
     "customerAdmin.fields.isBillingContact": "Als Rechnungskontakt markieren",
     "customerAdmin.fields.addressId": "Adress-ID",
+    "customerAdmin.fields.address": "Adresse",
     "customerAdmin.fields.addressType": "Adresstyp",
     "customerAdmin.fields.historyEntry": "Historieneintrag",
     "customerAdmin.fields.documentId": "Dokument-ID",
@@ -2551,7 +2567,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.validation": "Eingaben prüfen",
     "customerAdmin.feedback.customerRequired": "Kundennummer und Anzeigename sind Pflichtfelder.",
     "customerAdmin.feedback.contactRequired": "Für einen Kontakt wird mindestens der Name benötigt.",
-    "customerAdmin.feedback.addressRequired": "Für einen Adresslink wird eine Adress-ID benötigt.",
+    "customerAdmin.feedback.addressRequired": "Für einen Adresslink wird eine Adresse benötigt.",
     "customerAdmin.feedback.error": "Der Kundenvorgang ist fehlgeschlagen.",
     "customerAdmin.feedback.authRequired": "Bitte ein gültiges Bearer-Token für die Kunden-API hinterlegen.",
     "customerAdmin.feedback.permissionDenied": "Die aktuelle Sitzung darf diese Aktion nicht ausführen.",
@@ -2589,6 +2605,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.commercial.invoiceEyebrow": "Rechnungsparteien",
     "customerAdmin.commercial.invoiceTitle": "Alternative Rechnungsempfänger",
     "customerAdmin.commercial.invoiceEmpty": "Noch keine Rechnungsparteien hinterlegt.",
+    "customerAdmin.commercial.invoicePartyAddressMissing":
+      "Keine Kundenadressen verfügbar. Legen Sie zuerst unter Kunden -> [Kunde] -> Adressen eine Adresse an.",
+    "customerAdmin.commercial.invoicePartyAddressPlaceholder": "Adresse aus dem Kundenregister auswählen",
+    "customerAdmin.commercial.invoicePartyAddressEmptyPlaceholder": "Zuerst eine Kundenadresse anlegen",
     "customerAdmin.commercial.defaultInvoiceParty": "Standard-Rechnungspartei",
     "customerAdmin.commercial.additionalInvoiceParty": "Zusätzliche Rechnungspartei",
     "customerAdmin.commercial.rateCardsEyebrow": "Preiskarten",
@@ -2621,6 +2641,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.taxExemptionReason": "Grund für Steuerbefreiung",
     "customerAdmin.fields.companyName": "Firmenname",
     "customerAdmin.fields.contactName": "Ansprechpartner",
+    "customerAdmin.fields.billingAddress": "Rechnungsadresse",
     "customerAdmin.fields.invoiceLayoutLookupId": "Layout-Lookup-ID",
     "customerAdmin.fields.note": "Hinweis",
     "customerAdmin.fields.isDefaultInvoiceParty": "Als Standard-Rechnungspartei markieren",
@@ -2646,6 +2667,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.refreshCommercial": "Commercial neu laden",
     "customerAdmin.actions.saveBillingProfile": "Abrechnungsprofil speichern",
     "customerAdmin.actions.addInvoiceParty": "Rechnungspartei erfassen",
+    "customerAdmin.actions.openAddressesTab": "Zum Reiter Adressen",
     "customerAdmin.actions.createInvoiceParty": "Rechnungspartei anlegen",
     "customerAdmin.actions.saveInvoiceParty": "Rechnungspartei speichern",
     "customerAdmin.actions.addRateCard": "Preiskarte anlegen",
@@ -2669,7 +2691,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.billingProfileUnexpected":
       "Das Abrechnungsprofil konnte wegen eines unerwarteten Fehlers nicht gespeichert werden. Bitte versuchen Sie es erneut oder kontaktieren Sie den Support.",
     "customerAdmin.feedback.invoicePartyRequired":
-      "Für eine Rechnungspartei werden mindestens Firmenname und Adress-ID benötigt.",
+      "Für eine Rechnungspartei werden mindestens Firmenname und Adresse benötigt.",
     "customerAdmin.feedback.invalidInvoiceEmail":
       "Die Rechnungs-E-Mail ist ungültig. Bitte geben Sie eine gültige E-Mail-Adresse ein.",
     "customerAdmin.feedback.invalidPaymentTerms":
@@ -3928,6 +3950,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.addresses.editorEyebrow": "Link editor",
     "customerAdmin.addresses.editorTitle": "Create or update an address link",
     "customerAdmin.addresses.empty": "No addresses linked yet.",
+    "customerAdmin.addresses.linkLead": "This form links an existing address to the customer.",
+    "customerAdmin.addresses.addressLinkEmpty":
+      "No available addresses can be linked right now. Select an existing address from the shared address directory first.",
+    "customerAdmin.addresses.addressLinkPlaceholder": "Select an existing address",
+    "customerAdmin.addresses.addressLinkEmptyPlaceholder": "No linkable address available",
     "customerAdmin.addresses.defaultBadge": "Default address",
     "customerAdmin.addresses.linkBadge": "Address link",
     "customerAdmin.portal.title": "Portal controls and releases",
@@ -3973,6 +4000,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.isPrimaryContact": "Mark as primary contact",
     "customerAdmin.fields.isBillingContact": "Mark as billing contact",
     "customerAdmin.fields.addressId": "Address ID",
+    "customerAdmin.fields.address": "Address",
     "customerAdmin.fields.addressType": "Address type",
     "customerAdmin.fields.historyEntry": "History entry",
     "customerAdmin.fields.documentId": "Document ID",
@@ -4052,7 +4080,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.validation": "Check input",
     "customerAdmin.feedback.customerRequired": "Customer number and display name are required.",
     "customerAdmin.feedback.contactRequired": "A contact needs at least a name.",
-    "customerAdmin.feedback.addressRequired": "An address link needs an address ID.",
+    "customerAdmin.feedback.addressRequired": "An address link needs an address.",
     "customerAdmin.feedback.error": "The customer action failed.",
     "customerAdmin.feedback.authRequired": "Please provide a valid bearer token for the customer API.",
     "customerAdmin.feedback.permissionDenied": "The current session is not allowed to perform this action.",
@@ -4090,6 +4118,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.commercial.invoiceEyebrow": "Invoice parties",
     "customerAdmin.commercial.invoiceTitle": "Alternative invoice recipients",
     "customerAdmin.commercial.invoiceEmpty": "No invoice parties have been added yet.",
+    "customerAdmin.commercial.invoicePartyAddressMissing":
+      "No customer addresses are available. Add an address first in Customers -> [customer] -> Addresses.",
+    "customerAdmin.commercial.invoicePartyAddressPlaceholder": "Select an address from this customer",
+    "customerAdmin.commercial.invoicePartyAddressEmptyPlaceholder": "Add a customer address first",
     "customerAdmin.commercial.defaultInvoiceParty": "Default invoice party",
     "customerAdmin.commercial.additionalInvoiceParty": "Additional invoice party",
     "customerAdmin.commercial.rateCardsEyebrow": "Rate cards",
@@ -4122,6 +4154,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.taxExemptionReason": "Tax-exemption reason",
     "customerAdmin.fields.companyName": "Company name",
     "customerAdmin.fields.contactName": "Contact name",
+    "customerAdmin.fields.billingAddress": "Billing address",
     "customerAdmin.fields.invoiceLayoutLookupId": "Invoice-layout lookup ID",
     "customerAdmin.fields.note": "Note",
     "customerAdmin.fields.isDefaultInvoiceParty": "Mark as default invoice party",
@@ -4147,6 +4180,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.refreshCommercial": "Reload commercial data",
     "customerAdmin.actions.saveBillingProfile": "Save billing profile",
     "customerAdmin.actions.addInvoiceParty": "Add invoice party",
+    "customerAdmin.actions.openAddressesTab": "Open Addresses tab",
     "customerAdmin.actions.createInvoiceParty": "Create invoice party",
     "customerAdmin.actions.saveInvoiceParty": "Save invoice party",
     "customerAdmin.actions.addRateCard": "Add rate card",
@@ -4170,7 +4204,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.billingProfileUnexpected":
       "Billing profile could not be saved due to an unexpected error. Please try again or contact support.",
     "customerAdmin.feedback.invoicePartyRequired":
-      "An invoice party needs at least a company name and an address ID.",
+      "An invoice party needs at least a company name and an address.",
     "customerAdmin.feedback.invalidInvoiceEmail":
       "Invoice email is invalid. Please enter a valid email address.",
     "customerAdmin.feedback.invalidPaymentTerms":
