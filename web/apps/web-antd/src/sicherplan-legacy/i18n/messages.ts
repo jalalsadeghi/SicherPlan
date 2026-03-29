@@ -961,6 +961,11 @@ export type MessageKey =
   | "customerAdmin.addresses.addressLinkEmpty"
   | "customerAdmin.addresses.addressLinkPlaceholder"
   | "customerAdmin.addresses.addressLinkEmptyPlaceholder"
+  | "customerAdmin.addresses.createModalEyebrow"
+  | "customerAdmin.addresses.createModalTitle"
+  | "customerAdmin.addresses.createModalLead"
+  | "customerAdmin.addresses.createValidation"
+  | "customerAdmin.addresses.createSuccess"
   | "customerAdmin.addresses.defaultBadge"
   | "customerAdmin.addresses.linkBadge"
   | "customerAdmin.portal.title"
@@ -1008,6 +1013,12 @@ export type MessageKey =
   | "customerAdmin.fields.addressId"
   | "customerAdmin.fields.address"
   | "customerAdmin.fields.addressType"
+  | "customerAdmin.fields.streetLine1"
+  | "customerAdmin.fields.streetLine2"
+  | "customerAdmin.fields.postalCode"
+  | "customerAdmin.fields.city"
+  | "customerAdmin.fields.state"
+  | "customerAdmin.fields.countryCode"
   | "customerAdmin.fields.historyEntry"
   | "customerAdmin.fields.documentId"
   | "customerAdmin.fields.personNamesReleased"
@@ -1034,6 +1045,7 @@ export type MessageKey =
   | "customerAdmin.actions.saveContact"
   | "customerAdmin.actions.addAddress"
   | "customerAdmin.actions.createAddress"
+  | "customerAdmin.actions.createSharedAddress"
   | "customerAdmin.actions.saveAddress"
   | "customerAdmin.actions.refreshHistory"
   | "customerAdmin.actions.refreshPortalPrivacy"
@@ -2439,9 +2451,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.addresses.empty": "Noch keine Adressen verknüpft.",
     "customerAdmin.addresses.linkLead": "Dieses Formular verknüpft eine bestehende Adresse mit dem Kunden.",
     "customerAdmin.addresses.addressLinkEmpty":
-      "Keine verfügbaren Adressen zum Verknüpfen vorhanden. Wählen Sie zuerst eine bestehende Adresse aus dem Adressbestand.",
+      "Für diesen Kunden und den gewählten Adresstyp ist aktuell keine verknüpfbare Adresse verfügbar. Lege hier zuerst eine neue Adresse an oder nutze eine bereits für diesen Kunden verknüpfte Adresse.",
     "customerAdmin.addresses.addressLinkPlaceholder": "Bestehende Adresse auswählen",
     "customerAdmin.addresses.addressLinkEmptyPlaceholder": "Keine verknüpfbare Adresse verfügbar",
+    "customerAdmin.addresses.createModalEyebrow": "Neue Adresse",
+    "customerAdmin.addresses.createModalTitle": "Gemeinsame Adresse anlegen",
+    "customerAdmin.addresses.createModalLead":
+      "Lege einen neuen Adressstammsatz direkt aus der Kundenansicht an. Danach wird er automatisch für den Adresslink vorausgewählt.",
+    "customerAdmin.addresses.createValidation":
+      "Straße, Postleitzahl, Ort und Ländercode werden zum Anlegen einer gemeinsamen Adresse benötigt.",
+    "customerAdmin.addresses.createSuccess": "Neue Adresse angelegt und für die Verknüpfung vorausgewählt.",
     "customerAdmin.addresses.defaultBadge": "Standardadresse",
     "customerAdmin.addresses.linkBadge": "Adresslink",
     "customerAdmin.portal.title": "Portalsteuerung und Freigaben",
@@ -2489,6 +2508,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.addressId": "Adress-ID",
     "customerAdmin.fields.address": "Adresse",
     "customerAdmin.fields.addressType": "Adresstyp",
+    "customerAdmin.fields.streetLine1": "Straße und Hausnummer",
+    "customerAdmin.fields.streetLine2": "Adresszusatz",
+    "customerAdmin.fields.postalCode": "Postleitzahl",
+    "customerAdmin.fields.city": "Ort",
+    "customerAdmin.fields.state": "Bundesland / Region",
+    "customerAdmin.fields.countryCode": "Ländercode",
     "customerAdmin.fields.historyEntry": "Historieneintrag",
     "customerAdmin.fields.documentId": "Dokument-ID",
     "customerAdmin.fields.personNamesReleased": "Personennamen im Portal freigeben",
@@ -2515,6 +2540,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.saveContact": "Kontakt speichern",
     "customerAdmin.actions.addAddress": "Adresse verknüpfen",
     "customerAdmin.actions.createAddress": "Adresslink anlegen",
+    "customerAdmin.actions.createSharedAddress": "Neue Adresse anlegen",
     "customerAdmin.actions.saveAddress": "Adresslink speichern",
     "customerAdmin.actions.refreshHistory": "Historie neu laden",
     "customerAdmin.actions.refreshPortalPrivacy": "Freigabestatus neu laden",
@@ -3952,9 +3978,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.addresses.empty": "No addresses linked yet.",
     "customerAdmin.addresses.linkLead": "This form links an existing address to the customer.",
     "customerAdmin.addresses.addressLinkEmpty":
-      "No available addresses can be linked right now. Select an existing address from the shared address directory first.",
+      "No linkable address is available right now for this customer and the selected address type. Create a new address here first or reuse one already linked to this customer.",
     "customerAdmin.addresses.addressLinkPlaceholder": "Select an existing address",
     "customerAdmin.addresses.addressLinkEmptyPlaceholder": "No linkable address available",
+    "customerAdmin.addresses.createModalEyebrow": "New address",
+    "customerAdmin.addresses.createModalTitle": "Create shared address",
+    "customerAdmin.addresses.createModalLead":
+      "Create a new address master record directly from the customer view. It will then be preselected automatically for the customer link.",
+    "customerAdmin.addresses.createValidation":
+      "Street, postal code, city, and country code are required to create a shared address.",
+    "customerAdmin.addresses.createSuccess": "New address created and preselected for linking.",
     "customerAdmin.addresses.defaultBadge": "Default address",
     "customerAdmin.addresses.linkBadge": "Address link",
     "customerAdmin.portal.title": "Portal controls and releases",
@@ -4002,6 +4035,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.addressId": "Address ID",
     "customerAdmin.fields.address": "Address",
     "customerAdmin.fields.addressType": "Address type",
+    "customerAdmin.fields.streetLine1": "Street and house number",
+    "customerAdmin.fields.streetLine2": "Address line 2",
+    "customerAdmin.fields.postalCode": "Postal code",
+    "customerAdmin.fields.city": "City",
+    "customerAdmin.fields.state": "State / region",
+    "customerAdmin.fields.countryCode": "Country code",
     "customerAdmin.fields.historyEntry": "History entry",
     "customerAdmin.fields.documentId": "Document ID",
     "customerAdmin.fields.personNamesReleased": "Release personal names in portal",
@@ -4028,6 +4067,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.saveContact": "Save contact",
     "customerAdmin.actions.addAddress": "Link address",
     "customerAdmin.actions.createAddress": "Create address link",
+    "customerAdmin.actions.createSharedAddress": "Create new address",
     "customerAdmin.actions.saveAddress": "Save address link",
     "customerAdmin.actions.refreshHistory": "Reload history",
     "customerAdmin.actions.refreshPortalPrivacy": "Reload privacy release",

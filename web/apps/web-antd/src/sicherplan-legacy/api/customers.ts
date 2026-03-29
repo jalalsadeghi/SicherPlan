@@ -62,6 +62,15 @@ export interface CustomerAvailableAddressRead {
   country_code: string;
 }
 
+export interface CustomerAvailableAddressCreatePayload {
+  street_line_1: string;
+  street_line_2?: null | string;
+  postal_code: string;
+  city: string;
+  state?: null | string;
+  country_code: string;
+}
+
 export interface CustomerRead extends CustomerListItem {
   legal_name: string | null;
   external_ref: string | null;
@@ -726,6 +735,22 @@ export function listCustomerAvailableAddresses(
   return request<CustomerAvailableAddressRead[]>(
     `/api/customers/tenants/${tenantId}/customers/${customerId}/address-options${suffix}`,
     accessToken,
+  );
+}
+
+export function createCustomerAvailableAddress(
+  tenantId: string,
+  customerId: string,
+  accessToken: string,
+  payload: CustomerAvailableAddressCreatePayload,
+) {
+  return request<CustomerAvailableAddressRead>(
+    `/api/customers/tenants/${tenantId}/customers/${customerId}/address-options`,
+    accessToken,
+    {
+      method: "POST",
+      body: payload,
+    },
   );
 }
 

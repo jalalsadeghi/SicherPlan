@@ -8,7 +8,8 @@ from typing import Protocol
 from uuid import UUID
 
 from app.errors import ApiException
-from app.modules.core.schemas import AddressRead
+from app.modules.core.models import Address
+from app.modules.core.schemas import AddressCreate, AddressRead
 from app.modules.customers.models import (
     CUSTOMER_ADDRESS_TYPES,
     Customer,
@@ -143,7 +144,14 @@ class CustomerRepository(Protocol):
     def list_mandates(self, tenant_id: str): ...  # noqa: ANN001
     def get_user_account(self, tenant_id: str, user_id: str): ...  # noqa: ANN001
     def get_address(self, address_id: str): ...  # noqa: ANN001
-    def list_available_addresses(self, search: str = "", limit: int = 25): ...  # noqa: ANN001
+    def list_available_addresses(
+        self,
+        tenant_id: str,
+        customer_id: str,
+        search: str = "",
+        limit: int = 25,
+    ): ...  # noqa: ANN001
+    def create_address(self, row: Address): ...  # noqa: ANN001
 
 
 class CustomerService:
@@ -436,8 +444,50 @@ class CustomerService:
         self._require_customer(tenant_id, customer_id, actor)
         return [
             AddressRead.model_validate(row)
-            for row in self.repository.list_available_addresses(search=search, limit=limit)
+            for row in self.repository.list_available_addresses(
+                tenant_id,
+                customer_id,
+                search=search,
+                limit=limit,
+            )
         ]
+
+    def create_available_address(
+        self,
+        tenant_id: str,
+        customer_id: str,
+        payload: AddressCreate,
+        actor: RequestAuthorizationContext,
+    ) -> AddressRead:
+        self._require_customer(tenant_id, customer_id, actor)
+        normalized = AddressCreate(
+            street_line_1=payload.street_line_1.strip(),
+            street_line_2=payload.street_line_2.strip() if payload.street_line_2 and payload.street_line_2.strip() else None,
+            postal_code=payload.postal_code.strip(),
+            city=payload.city.strip(),
+            state=payload.state.strip() if payload.state and payload.state.strip() else None,
+            country_code=payload.country_code.strip().upper(),
+        )
+        row = self.repository.create_address(
+            Address(
+                street_line_1=normalized.street_line_1,
+                street_line_2=normalized.street_line_2,
+                postal_code=normalized.postal_code,
+                city=normalized.city,
+                state=normalized.state,
+                country_code=normalized.country_code,
+            )
+        )
+        self._record_event(
+            actor,
+            event_type="customers.address_directory.created",
+            entity_type="common.address",
+            entity_id=row.id,
+            tenant_id=tenant_id,
+            after_json=AddressRead.model_validate(row).model_dump(),
+            metadata_json={"customer_id": customer_id},
+        )
+        return AddressRead.model_validate(row)
 
     def create_customer_address(
         self,

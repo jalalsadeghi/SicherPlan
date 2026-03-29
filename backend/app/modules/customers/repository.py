@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -976,8 +976,32 @@ class SqlAlchemyCustomerRepository:
     def get_address(self, address_id: str) -> Address | None:
         return self.session.get(Address, address_id)
 
-    def list_available_addresses(self, search: str = "", limit: int = 25) -> list[Address]:
-        statement = select(Address)
+    def create_address(self, row: Address) -> Address:
+        self.session.add(row)
+        self._commit_or_raise()
+        self.session.refresh(row)
+        return row
+
+    def list_available_addresses(
+        self,
+        tenant_id: str,
+        customer_id: str,
+        search: str = "",
+        limit: int = 25,
+    ) -> list[Address]:
+        statement = (
+            select(Address)
+            .join(
+                CustomerAddressLink,
+                and_(
+                    CustomerAddressLink.address_id == Address.id,
+                    CustomerAddressLink.tenant_id == tenant_id,
+                    CustomerAddressLink.customer_id == customer_id,
+                    CustomerAddressLink.archived_at.is_(None),
+                ),
+            )
+            .distinct()
+        )
         if search.strip():
             term = f"%{search.strip()}%"
             statement = statement.where(

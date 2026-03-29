@@ -92,12 +92,25 @@ test("address-link form uses available-address selector instead of raw address u
   assert.match(source, /customerAdmin\.addresses\.linkLead/);
   assert.match(source, /customerAdmin\.fields\.address/);
   assert.match(source, /availableAddressDirectory/);
+  assert.match(source, /stagedAddressDirectoryByCustomer/);
   assert.match(source, /customerAddressLinkOptions/);
   assert.match(source, /customerAddressLinkPlaceholder/);
   assert.match(source, /listCustomerAvailableAddresses/);
+  assert.match(source, /createCustomerAvailableAddress/);
   assert.match(source, /refreshAvailableAddresses/);
   assert.match(source, /formatAddressDirectoryOption/);
+  assert.match(source, /address\.address_type === addressDraft\.address_type/);
+  assert.match(source, /customer-admin-form-section__header customer-admin-form-section__header--split/);
+  assert.match(source, /\.customer-admin-form-section__header--split \{/);
   assert.match(source, /customerAdmin\.addresses\.addressLinkEmpty/);
+  assert.match(source, /customer-address-directory-create-modal/);
+  assert.match(source, /submitAddressDirectoryEntry/);
+  assert.match(source, /addressDraft\.address_id = created\.id/);
+  assert.match(source, /customerAdmin\.actions\.createSharedAddress/);
+  assert.match(source, /customerAdmin\.fields\.streetLine1/);
+  assert.match(source, /customerAdmin\.fields\.postalCode/);
+  assert.match(source, /customerAdmin\.fields\.city/);
+  assert.match(source, /customerAdmin\.fields\.countryCode/);
   assert.doesNotMatch(source, /<input v-model="addressDraft\.address_id"/);
 });
 

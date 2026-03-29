@@ -506,9 +506,19 @@
               </section>
 
               <form class="customer-admin-form-section" @submit.prevent="submitAddress">
-                <div class="customer-admin-form-section__header">
-                  <p class="eyebrow">{{ t("customerAdmin.addresses.editorEyebrow") }}</p>
-                  <h4>{{ t("customerAdmin.addresses.editorTitle") }}</h4>
+                <div class="customer-admin-form-section__header customer-admin-form-section__header--split">
+                  <div>
+                    <p class="eyebrow">{{ t("customerAdmin.addresses.editorEyebrow") }}</p>
+                    <h4>{{ t("customerAdmin.addresses.editorTitle") }}</h4>
+                  </div>
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    :disabled="!actionState.canManageAddresses"
+                    @click="openAddressDirectoryCreateModal"
+                  >
+                    {{ t("customerAdmin.actions.createSharedAddress") }}
+                  </button>
                 </div>
                 <p class="field-help">{{ t("customerAdmin.addresses.linkLead") }}</p>
                 <div class="customer-admin-form-grid customer-admin-form-grid--detail">
@@ -561,6 +571,59 @@
                   </button>
                 </div>
               </form>
+            </div>
+
+            <div
+              v-if="addressDirectoryModalOpen"
+              class="customer-admin-modal-backdrop"
+              data-testid="customer-address-directory-create-modal"
+            >
+              <section class="module-card customer-admin-modal">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.addresses.createModalEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.addresses.createModalTitle") }}</h4>
+                </div>
+                <p class="field-help">{{ t("customerAdmin.addresses.createModalLead") }}</p>
+                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("customerAdmin.fields.streetLine1") }}</span>
+                    <input v-model="addressDirectoryDraft.street_line_1" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("customerAdmin.fields.streetLine2") }}</span>
+                    <input v-model="addressDirectoryDraft.street_line_2" />
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.postalCode") }}</span>
+                    <input v-model="addressDirectoryDraft.postal_code" />
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.city") }}</span>
+                    <input v-model="addressDirectoryDraft.city" />
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.countryCode") }}</span>
+                    <input v-model="addressDirectoryDraft.country_code" maxlength="2" />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.fields.state") }}</span>
+                    <input v-model="addressDirectoryDraft.state" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button
+                    class="cta-button"
+                    type="button"
+                    :disabled="loading.sharedAddress"
+                    @click="submitAddressDirectoryEntry"
+                  >
+                    {{ t("customerAdmin.actions.createSharedAddress") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeAddressDirectoryCreateModal">
+                    {{ t("customerAdmin.actions.cancel") }}
+                  </button>
+                </div>
+              </section>
             </div>
           </section>
 
@@ -1590,6 +1653,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 
 import {
+  createCustomerAvailableAddress,
   createCustomerEmployeeBlock,
   createCustomer,
   createCustomerAddress,
@@ -1615,6 +1679,7 @@ import {
   type CustomerBillingProfileRead,
   type CustomerAddressPayload,
   type CustomerAddressRead,
+  type CustomerAvailableAddressCreatePayload,
   type CustomerAvailableAddressRead,
   type CustomerContactPayload,
   type CustomerContactRead,
@@ -1714,6 +1779,7 @@ const commercialProfile = ref<CustomerCommercialProfileRead | null>(null);
 const portalPrivacy = ref<CustomerPortalPrivacyRead | null>(null);
 const referenceData = ref<CustomerReferenceDataRead | null>(null);
 const availableAddressDirectory = ref<CustomerAvailableAddressRead[]>([]);
+const stagedAddressDirectoryByCustomer = reactive<Record<string, CustomerAvailableAddressRead[]>>({});
 const selectedCustomer = ref<CustomerRead | null>(null);
 const selectedCustomerId = ref("");
 const previousSelectedCustomer = ref<CustomerRead | null>(null);
@@ -1735,6 +1801,7 @@ const accessToken = ref(readStoredAccessToken());
 const portalAccessGeneratedPassword = ref("");
 const portalAccessModalOpen = ref(false);
 const portalAccessPasswordTarget = ref<CustomerPortalAccessListItem | null>(null);
+const addressDirectoryModalOpen = ref(false);
 const pendingRouteCustomerId = ref("");
 const pendingRouteDetailTab = ref("");
 const billingProfileErrorState = reactive<{
@@ -1762,6 +1829,7 @@ const loading = reactive({
   portalAccess: false,
   employeeBlock: false,
   portalPrivacy: false,
+  sharedAddress: false,
 });
 const feedback = reactive({
   tone: "info",
@@ -1812,6 +1880,14 @@ const addressDraft = reactive<CustomerAddressPayload>({
   address_type: "billing",
   label: "",
   is_default: false,
+});
+const addressDirectoryDraft = reactive<CustomerAvailableAddressCreatePayload>({
+  street_line_1: "",
+  street_line_2: "",
+  postal_code: "",
+  city: "",
+  state: "",
+  country_code: "DE",
 });
 const billingProfileDraft = reactive<CustomerBillingProfilePayload>({
   tenant_id: "",
@@ -1987,7 +2063,12 @@ const invoicePartyAddressPlaceholder = computed(() =>
 const customerAddressLinkOptions = computed(() => {
   const linkedAddressIds = new Set(
     (selectedCustomer.value?.addresses ?? [])
-      .filter((address) => address.id !== editingAddressId.value)
+      .filter(
+        (address) =>
+          address.id !== editingAddressId.value
+          && address.address_type === addressDraft.address_type
+          && address.archived_at == null,
+      )
       .map((address) => address.address_id),
   );
   return availableAddressDirectory.value
@@ -2199,6 +2280,15 @@ function resetAddressDraft() {
   editingAddressId.value = "";
 }
 
+function resetAddressDirectoryDraft() {
+  addressDirectoryDraft.street_line_1 = "";
+  addressDirectoryDraft.street_line_2 = "";
+  addressDirectoryDraft.postal_code = "";
+  addressDirectoryDraft.city = "";
+  addressDirectoryDraft.state = "";
+  addressDirectoryDraft.country_code = "DE";
+}
+
 function resetBillingProfileDraft() {
   clearBillingProfileErrors();
   billingProfileDraft.tenant_id = tenantScopeId.value;
@@ -2337,6 +2427,15 @@ function openPortalAccessCreateModal() {
 
 function closePortalAccessCreateModal() {
   portalAccessModalOpen.value = false;
+}
+
+function openAddressDirectoryCreateModal() {
+  resetAddressDirectoryDraft();
+  addressDirectoryModalOpen.value = true;
+}
+
+function closeAddressDirectoryCreateModal() {
+  addressDirectoryModalOpen.value = false;
 }
 
 function openPortalAccessPasswordReset(account: CustomerPortalAccessListItem) {
@@ -2905,6 +3004,44 @@ async function submitAddress() {
   }
 }
 
+async function submitAddressDirectoryEntry() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+  const payload = normalizeAddressDirectoryDraft();
+  if (
+    !payload.street_line_1
+    || !payload.postal_code
+    || !payload.city
+    || !payload.country_code
+  ) {
+    setFeedback("error", t("customerAdmin.feedback.validation"), t("customerAdmin.addresses.createValidation"));
+    return;
+  }
+
+  loading.sharedAddress = true;
+  try {
+    const created = await createCustomerAvailableAddress(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      accessToken.value,
+      payload,
+    );
+    stagedAddressDirectoryByCustomer[selectedCustomer.value.id] = mergeAvailableAddressDirectory(
+      [],
+      [...(stagedAddressDirectoryByCustomer[selectedCustomer.value.id] ?? []), created],
+    );
+    await refreshAvailableAddresses();
+    addressDraft.address_id = created.id;
+    closeAddressDirectoryCreateModal();
+    setFeedback("success", t("customerAdmin.feedback.addressSaved"), t("customerAdmin.addresses.createSuccess"));
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.sharedAddress = false;
+  }
+}
+
 async function submitBillingProfile() {
   if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
     return;
@@ -3202,7 +3339,7 @@ async function refreshAvailableAddresses() {
     availableAddressDirectory.value = [];
     return;
   }
-  availableAddressDirectory.value = await listCustomerAvailableAddresses(
+  const remote = await listCustomerAvailableAddresses(
     tenantScopeId.value,
     selectedCustomer.value.id,
     accessToken.value,
@@ -3211,6 +3348,19 @@ async function refreshAvailableAddresses() {
       limit: 25,
     },
   );
+  const staged = stagedAddressDirectoryByCustomer[selectedCustomer.value.id] ?? [];
+  availableAddressDirectory.value = mergeAvailableAddressDirectory(remote, staged);
+}
+
+function mergeAvailableAddressDirectory(
+  remote: CustomerAvailableAddressRead[],
+  staged: CustomerAvailableAddressRead[],
+) {
+  const merged = new Map<string, CustomerAvailableAddressRead>();
+  for (const row of [...remote, ...staged]) {
+    merged.set(row.id, row);
+  }
+  return [...merged.values()];
 }
 
 function currentContactVersion(contactId: string) {
@@ -3252,6 +3402,17 @@ function normalizeAddressDraft(): CustomerAddressPayload {
     address_type: addressDraft.address_type,
     label: emptyToNull(addressDraft.label),
     is_default: !!addressDraft.is_default,
+  };
+}
+
+function normalizeAddressDirectoryDraft(): CustomerAvailableAddressCreatePayload {
+  return {
+    street_line_1: addressDirectoryDraft.street_line_1.trim(),
+    street_line_2: emptyToNull(addressDirectoryDraft.street_line_2),
+    postal_code: addressDirectoryDraft.postal_code.trim(),
+    city: addressDirectoryDraft.city.trim(),
+    state: emptyToNull(addressDirectoryDraft.state),
+    country_code: addressDirectoryDraft.country_code.trim().toUpperCase(),
   };
 }
 
@@ -4043,6 +4204,12 @@ onMounted(() => {
 .customer-admin-form-section__header {
   display: grid;
   gap: 0.25rem;
+}
+
+.customer-admin-form-section__header--split {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 1rem;
 }
 
 .customer-admin-tabs {

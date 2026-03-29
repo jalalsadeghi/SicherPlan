@@ -11,7 +11,8 @@ from sqlalchemy.schema import CreateTable
 
 from app.db import Base
 from app.errors import ApiException
-from app.modules.core.schemas import AddressRead
+from app.modules.core.models import Address
+from app.modules.core.schemas import AddressCreate, AddressRead
 from app.modules.customers.models import Customer, CustomerAddressLink, CustomerContact, CustomerHistoryEntry
 from app.modules.customers.schemas import (
     CustomerAddressCreate,
@@ -551,8 +552,10 @@ class FakeCustomerRepository:
     def get_address(self, address_id: str):
         return self.addresses.get(address_id)
 
-    def list_available_addresses(self, search: str = "", limit: int = 25):
-        rows = list(self.addresses.values())
+    def list_available_addresses(self, tenant_id: str, customer_id: str, search: str = "", limit: int = 25):
+        customer = self.get_customer(tenant_id, customer_id)
+        linked_ids = {row.address_id for row in customer.addresses if row.archived_at is None} if customer else set()
+        rows = [row for row_id, row in self.addresses.items() if row_id in linked_ids]
         if search.strip():
             term = search.strip().lower()
             rows = [
@@ -564,6 +567,19 @@ class FakeCustomerRepository:
                 or term in row.country_code.lower()
             ]
         return rows[:limit]
+
+    def create_address(self, row: Address):
+        created = FakeAddress(
+            id=getattr(row, "id", None) or str(uuid4()),
+            street_line_1=row.street_line_1,
+            street_line_2=row.street_line_2,
+            postal_code=row.postal_code,
+            city=row.city,
+            state=row.state,
+            country_code=row.country_code,
+        )
+        self.addresses[created.id] = created
+        return created
 
 
 def _actor(tenant_id: str = "tenant-1", *, platform: bool = False) -> RequestAuthorizationContext:
@@ -709,6 +725,135 @@ class TestCustomerService(unittest.TestCase):
         self.assertTrue(address.is_default)
         self.assertEqual(len(detail.contacts), 1)
         self.assertEqual(len(detail.addresses), 1)
+
+    def test_shared_address_can_be_created_from_customer_flow_and_later_linked(self) -> None:
+        created = self.service.create_available_address(
+            "tenant-1",
+            self.customer.id,
+            AddressCreate(
+                street_line_1="Neue Allee 5",
+                postal_code="10115",
+                city="Berlin",
+                country_code="de",
+            ),
+            _actor(),
+        )
+
+        self.assertEqual(created.street_line_1, "Neue Allee 5")
+        self.assertEqual(created.country_code, "DE")
+        self.assertIn(created.id, self.repository.addresses)
+
+        linked = self.service.create_customer_address(
+            "tenant-1",
+            self.customer.id,
+            CustomerAddressCreate(
+                tenant_id="tenant-1",
+                customer_id=self.customer.id,
+                address_id=created.id,
+                address_type="billing",
+                is_default=True,
+            ),
+            _actor(),
+        )
+
+        self.assertEqual(linked.address_id, created.id)
+        self.assertEqual(linked.address.city, "Berlin")
+
+    def test_same_address_can_be_reused_for_different_customer_address_types(self) -> None:
+        self.service.create_customer_address(
+            "tenant-1",
+            self.customer.id,
+            CustomerAddressCreate(
+                tenant_id="tenant-1",
+                customer_id=self.customer.id,
+                address_id=ADDRESS_ID,
+                address_type="mailing",
+            ),
+            _actor(),
+        )
+
+        second = self.service.create_customer_address(
+            "tenant-1",
+            self.customer.id,
+            CustomerAddressCreate(
+                tenant_id="tenant-1",
+                customer_id=self.customer.id,
+                address_id=ADDRESS_ID,
+                address_type="billing",
+            ),
+            _actor(),
+        )
+
+        self.assertEqual(second.address_id, ADDRESS_ID)
+        self.assertEqual(second.address_type, "billing")
+
+    def test_same_address_same_type_duplicate_is_still_blocked(self) -> None:
+        self.service.create_customer_address(
+            "tenant-1",
+            self.customer.id,
+            CustomerAddressCreate(
+                tenant_id="tenant-1",
+                customer_id=self.customer.id,
+                address_id=ADDRESS_ID,
+                address_type="billing",
+            ),
+            _actor(),
+        )
+
+        with self.assertRaises(ApiException) as context:
+            self.service.create_customer_address(
+                "tenant-1",
+                self.customer.id,
+                CustomerAddressCreate(
+                    tenant_id="tenant-1",
+                    customer_id=self.customer.id,
+                    address_id=ADDRESS_ID,
+                    address_type="billing",
+                ),
+                _actor(),
+            )
+
+        self.assertEqual(context.exception.code, "customers.conflict.customer_address_duplicate")
+
+    def test_available_addresses_are_customer_scoped(self) -> None:
+        other_customer = self.service.create_customer(
+            "tenant-1",
+            CustomerCreate(
+                tenant_id="tenant-1",
+                customer_number="K-2000",
+                name="Other Customer",
+            ),
+            _actor(),
+        )
+        self.repository.addresses[SECONDARY_ADDRESS_ID] = FakeAddress(SECONDARY_ADDRESS_ID, street_line_1="Nebenstrasse 2")
+        self.service.create_customer_address(
+            "tenant-1",
+            self.customer.id,
+            CustomerAddressCreate(
+                tenant_id="tenant-1",
+                customer_id=self.customer.id,
+                address_id=ADDRESS_ID,
+                address_type="billing",
+            ),
+            _actor(),
+        )
+        self.service.create_customer_address(
+            "tenant-1",
+            other_customer.id,
+            CustomerAddressCreate(
+                tenant_id="tenant-1",
+                customer_id=other_customer.id,
+                address_id=SECONDARY_ADDRESS_ID,
+                address_type="billing",
+            ),
+            _actor(),
+        )
+
+        current_options = self.service.list_available_addresses("tenant-1", self.customer.id, _actor())
+        other_options = self.service.list_available_addresses("tenant-1", other_customer.id, _actor())
+
+        self.assertEqual([row.id for row in current_options], [ADDRESS_ID])
+        self.assertEqual([row.id for row in other_options], [SECONDARY_ADDRESS_ID])
 
     def test_contact_create_without_portal_user_id_succeeds(self) -> None:
         contact = self.service.create_contact(
