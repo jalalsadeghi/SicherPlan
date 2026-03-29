@@ -893,9 +893,20 @@
                     <span>{{ t("customerAdmin.fields.invoiceEmail") }}</span>
                     <input v-model="invoicePartyDraft.invoice_email" :disabled="!commercialActionState.canManageInvoiceParties" />
                   </label>
-                  <label class="field-stack field-stack--half">
+                  <label class="field-stack field-stack--half" :class="{ 'customer-admin-field-stack--error': invoicePartyFieldInvalid('invoice_layout_lookup_id') }">
                     <span>{{ t("customerAdmin.fields.invoiceLayoutLookupId") }}</span>
-                    <input v-model="invoicePartyDraft.invoice_layout_lookup_id" :disabled="!commercialActionState.canManageInvoiceParties" />
+                    <select
+                      v-model="invoicePartyDraft.invoice_layout_lookup_id"
+                      :disabled="!commercialActionState.canManageInvoiceParties || !invoicePartyInvoiceLayoutOptions.length"
+                      @change="clearInvoicePartyErrors(['invoice_layout_lookup_id'])"
+                    >
+                      <option value="">{{ invoicePartyInvoiceLayoutPlaceholder }}</option>
+                      <option v-for="option in invoicePartyInvoiceLayoutOptions" :key="option.id" :value="option.id">
+                        {{ option.label }}
+                      </option>
+                    </select>
+                    <p v-if="invoicePartyFieldError('invoice_layout_lookup_id')" class="field-help customer-admin-field-help--error">{{ invoicePartyFieldError('invoice_layout_lookup_id') }}</p>
+                    <p v-else-if="!invoicePartyInvoiceLayoutOptions.length" class="field-help">{{ t("customerAdmin.feedback.invoiceLayoutUnavailable") }}</p>
                   </label>
                   <label class="field-stack field-stack--half">
                     <span>{{ t("customerAdmin.fields.externalRef") }}</span>
@@ -933,257 +944,282 @@
               class="customer-admin-section"
               data-testid="customer-commercial-panel-pricing-rules"
             >
-              <div class="customer-admin-panel__header">
-                <div>
-                  <p class="eyebrow">{{ t("customerAdmin.commercial.rateCardsEyebrow") }}</p>
-                  <h3>{{ t("customerAdmin.commercial.rateCardsTitle") }}</h3>
-                </div>
+              <div class="customer-admin-tabs customer-admin-tabs--sub" data-testid="customer-pricing-rules-tabs">
                 <button
-                  class="cta-button cta-secondary"
+                  v-for="tab in pricingRulesTabs"
+                  :key="tab.id"
                   type="button"
-                  :disabled="!commercialActionState.canManageRateCards"
-                  @click="startCreateRateCard"
+                  class="customer-admin-tab customer-admin-tab--sub"
+                  :class="{ active: tab.id === activePricingRulesTab }"
+                  @click="activePricingRulesTab = tab.id"
                 >
-                  {{ t("customerAdmin.actions.addRateCard") }}
+                  {{ tab.label }}
                 </button>
               </div>
 
-              <div v-if="commercialProfile?.rate_cards.length" class="customer-admin-list">
-                <button
-                  v-for="rateCard in commercialProfile.rate_cards"
-                  :key="rateCard.id"
-                  type="button"
-                  class="customer-admin-row"
-                  :class="{ selected: rateCard.id === selectedRateCardId }"
-                  @click="selectedRateCardId = rateCard.id"
-                >
+              <section
+                v-if="activePricingRulesTab === 'rate_cards'"
+                class="customer-admin-section"
+                data-testid="customer-pricing-rules-panel-rate-cards"
+              >
+                <div class="customer-admin-panel__header">
                   <div>
-                    <strong>{{ rateCard.rate_kind }}</strong>
-                    <span>{{ rateCard.effective_from }}{{ rateCard.effective_to ? ` → ${rateCard.effective_to}` : "" }}</span>
+                    <p class="eyebrow">{{ t("customerAdmin.commercial.rateCardsEyebrow") }}</p>
+                    <h3>{{ t("customerAdmin.commercial.rateCardsTitle") }}</h3>
                   </div>
-                  <StatusBadge :status="rateCard.status" />
-                </button>
-              </div>
-              <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.rateCardsEmpty") }}</p>
-
-              <form class="customer-admin-form" @submit.prevent="submitRateCard">
-                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
-                  <label class="field-stack field-stack--half">
-                    <span>{{ t("customerAdmin.fields.rateKind") }}</span>
-                    <input v-model="rateCardDraft.rate_kind" :disabled="!commercialActionState.canManageRateCards" />
-                  </label>
-                  <label class="field-stack field-stack--third">
-                    <span>{{ t("customerAdmin.fields.currencyCode") }}</span>
-                    <input v-model="rateCardDraft.currency_code" :disabled="!commercialActionState.canManageRateCards" />
-                  </label>
-                  <label class="field-stack field-stack--half">
-                    <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
-                    <input v-model="rateCardDraft.effective_from" type="date" :disabled="!commercialActionState.canManageRateCards" />
-                  </label>
-                  <label class="field-stack field-stack--half">
-                    <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
-                    <input v-model="rateCardDraft.effective_to" type="date" :disabled="!commercialActionState.canManageRateCards" />
-                  </label>
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("customerAdmin.fields.notes") }}</span>
-                    <textarea v-model="rateCardDraft.notes" rows="3" :disabled="!commercialActionState.canManageRateCards" />
-                  </label>
-                </div>
-                <div class="cta-row" v-if="commercialActionState.canManageRateCards">
-                  <button class="cta-button" type="submit" :disabled="loading.commercial">
-                    {{ editingRateCardId ? t("customerAdmin.actions.saveRateCard") : t("customerAdmin.actions.createRateCard") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="resetRateCardDraft">
-                    {{ t("customerAdmin.actions.cancel") }}
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    :disabled="!commercialActionState.canManageRateCards"
+                    @click="startCreateRateCard"
+                  >
+                    {{ t("customerAdmin.actions.addRateCard") }}
                   </button>
                 </div>
-              </form>
 
-              <div v-if="selectedRateCard" class="customer-admin-subgrid">
-                <section class="customer-admin-section">
-                  <div class="customer-admin-panel__header">
+                <div v-if="commercialProfile?.rate_cards.length" class="customer-admin-list">
+                  <button
+                    v-for="rateCard in commercialProfile.rate_cards"
+                    :key="rateCard.id"
+                    type="button"
+                    class="customer-admin-row"
+                    :class="{ selected: rateCard.id === selectedRateCardId }"
+                    @click="selectedRateCardId = rateCard.id"
+                  >
                     <div>
-                      <p class="eyebrow">{{ t("customerAdmin.commercial.rateLinesEyebrow") }}</p>
-                      <h3>{{ t("customerAdmin.commercial.rateLinesTitle") }}</h3>
+                      <strong>{{ rateCard.rate_kind }}</strong>
+                      <span>{{ rateCard.effective_from }}{{ rateCard.effective_to ? ` → ${rateCard.effective_to}` : "" }}</span>
                     </div>
-                    <button
-                      class="cta-button cta-secondary"
-                      type="button"
-                      :disabled="!commercialActionState.canManageRateLines"
-                      @click="startCreateRateLine"
-                    >
-                      {{ t("customerAdmin.actions.addRateLine") }}
+                    <StatusBadge :status="rateCard.status" />
+                  </button>
+                </div>
+                <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.rateCardsEmpty") }}</p>
+
+                <form class="customer-admin-form" @submit.prevent="submitRateCard">
+                  <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                    <label class="field-stack field-stack--half">
+                      <span>{{ t("customerAdmin.fields.rateKind") }}</span>
+                      <input v-model="rateCardDraft.rate_kind" :disabled="!commercialActionState.canManageRateCards" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.currencyCode") }}</span>
+                      <input v-model="rateCardDraft.currency_code" :disabled="!commercialActionState.canManageRateCards" />
+                    </label>
+                    <label class="field-stack field-stack--half">
+                      <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
+                      <input v-model="rateCardDraft.effective_from" type="date" :disabled="!commercialActionState.canManageRateCards" />
+                    </label>
+                    <label class="field-stack field-stack--half">
+                      <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
+                      <input v-model="rateCardDraft.effective_to" type="date" :disabled="!commercialActionState.canManageRateCards" />
+                    </label>
+                    <label class="field-stack field-stack--wide">
+                      <span>{{ t("customerAdmin.fields.notes") }}</span>
+                      <textarea v-model="rateCardDraft.notes" rows="3" :disabled="!commercialActionState.canManageRateCards" />
+                    </label>
+                  </div>
+                  <div class="cta-row" v-if="commercialActionState.canManageRateCards">
+                    <button class="cta-button" type="submit" :disabled="loading.commercial">
+                      {{ editingRateCardId ? t("customerAdmin.actions.saveRateCard") : t("customerAdmin.actions.createRateCard") }}
+                    </button>
+                    <button class="cta-button cta-secondary" type="button" @click="resetRateCardDraft">
+                      {{ t("customerAdmin.actions.cancel") }}
                     </button>
                   </div>
+                </form>
+              </section>
 
-                  <div v-if="selectedRateCard.rate_lines.length" class="customer-admin-record-list">
-                    <article v-for="rateLine in selectedRateCard.rate_lines" :key="rateLine.id" class="customer-admin-record">
-                      <div>
-                        <strong>{{ rateLine.line_kind }} · {{ rateLine.billing_unit }}</strong>
-                        <p>{{ rateLine.unit_price }} {{ selectedRateCard.currency_code }}</p>
-                        <span class="customer-admin-record__meta">
-                          {{ [rateLine.function_type_id, rateLine.qualification_type_id, rateLine.planning_mode_code].filter(Boolean).join(" · ") || t("customerAdmin.summary.none") }}
-                        </span>
-                      </div>
-                      <div class="customer-admin-record__actions">
-                        <StatusBadge :status="rateLine.status" />
-                        <button type="button" :disabled="!commercialActionState.canManageRateLines" @click="editRateLine(rateLine)">
-                          {{ t("customerAdmin.actions.edit") }}
-                        </button>
-                      </div>
-                    </article>
+              <section
+                v-if="activePricingRulesTab === 'rate_lines' && selectedRateCard"
+                class="customer-admin-section"
+                data-testid="customer-pricing-rules-panel-rate-lines"
+              >
+                <div class="customer-admin-panel__header">
+                  <div>
+                    <p class="eyebrow">{{ t("customerAdmin.commercial.rateLinesEyebrow") }}</p>
+                    <h3>{{ t("customerAdmin.commercial.rateLinesTitle") }}</h3>
                   </div>
-                  <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.rateLinesEmpty") }}</p>
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    :disabled="!commercialActionState.canManageRateLines"
+                    @click="startCreateRateLine"
+                  >
+                    {{ t("customerAdmin.actions.addRateLine") }}
+                  </button>
+                </div>
 
-                  <form class="customer-admin-form" @submit.prevent="submitRateLine">
-                    <div class="customer-admin-form-grid customer-admin-form-grid--detail">
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.lineKind") }}</span>
-                        <input v-model="rateLineDraft.line_kind" :disabled="!commercialActionState.canManageRateLines" />
-                      </label>
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.billingUnit") }}</span>
-                        <input v-model="rateLineDraft.billing_unit" :disabled="!commercialActionState.canManageRateLines" />
-                      </label>
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.unitPrice") }}</span>
-                        <input v-model="rateLineDraft.unit_price" :disabled="!commercialActionState.canManageRateLines" />
-                      </label>
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.minimumQuantity") }}</span>
-                        <input v-model="rateLineDraft.minimum_quantity" :disabled="!commercialActionState.canManageRateLines" />
-                      </label>
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.functionTypeId") }}</span>
-                        <input v-model="rateLineDraft.function_type_id" :disabled="!commercialActionState.canManageRateLines" />
-                      </label>
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.qualificationTypeId") }}</span>
-                        <input v-model="rateLineDraft.qualification_type_id" :disabled="!commercialActionState.canManageRateLines" />
-                      </label>
-                      <label class="field-stack field-stack--half">
-                        <span>{{ t("customerAdmin.fields.planningModeCode") }}</span>
-                        <input v-model="rateLineDraft.planning_mode_code" :disabled="!commercialActionState.canManageRateLines" />
-                      </label>
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.sortOrder") }}</span>
-                        <input v-model.number="rateLineDraft.sort_order" type="number" :disabled="!commercialActionState.canManageRateLines" />
-                      </label>
-                      <label class="field-stack field-stack--wide">
-                        <span>{{ t("customerAdmin.fields.notes") }}</span>
-                        <textarea v-model="rateLineDraft.notes" rows="3" :disabled="!commercialActionState.canManageRateLines" />
-                      </label>
-                    </div>
-                    <div class="cta-row" v-if="commercialActionState.canManageRateLines">
-                      <button class="cta-button" type="submit" :disabled="loading.rateLine">
-                        {{ editingRateLineId ? t("customerAdmin.actions.saveRateLine") : t("customerAdmin.actions.createRateLine") }}
-                      </button>
-                      <button class="cta-button cta-secondary" type="button" @click="resetRateLineDraft">
-                        {{ t("customerAdmin.actions.cancel") }}
-                      </button>
-                    </div>
-                  </form>
-                </section>
-
-                <section class="customer-admin-section">
-                  <div class="customer-admin-panel__header">
+                <div v-if="selectedRateCard.rate_lines.length" class="customer-admin-record-list">
+                  <article v-for="rateLine in selectedRateCard.rate_lines" :key="rateLine.id" class="customer-admin-record">
                     <div>
-                      <p class="eyebrow">{{ t("customerAdmin.commercial.surchargesEyebrow") }}</p>
-                      <h3>{{ t("customerAdmin.commercial.surchargesTitle") }}</h3>
+                      <strong>{{ rateLine.line_kind }} · {{ rateLine.billing_unit }}</strong>
+                      <p>{{ rateLine.unit_price }} {{ selectedRateCard.currency_code }}</p>
+                      <span class="customer-admin-record__meta">
+                        {{ [rateLine.function_type_id, rateLine.qualification_type_id, rateLine.planning_mode_code].filter(Boolean).join(" · ") || t("customerAdmin.summary.none") }}
+                      </span>
                     </div>
-                    <button
-                      class="cta-button cta-secondary"
-                      type="button"
-                      :disabled="!commercialActionState.canManageSurchargeRules"
-                      @click="startCreateSurchargeRule"
-                    >
-                      {{ t("customerAdmin.actions.addSurchargeRule") }}
+                    <div class="customer-admin-record__actions">
+                      <StatusBadge :status="rateLine.status" />
+                      <button type="button" :disabled="!commercialActionState.canManageRateLines" @click="editRateLine(rateLine)">
+                        {{ t("customerAdmin.actions.edit") }}
+                      </button>
+                    </div>
+                  </article>
+                </div>
+                <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.rateLinesEmpty") }}</p>
+
+                <form class="customer-admin-form" @submit.prevent="submitRateLine">
+                  <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.lineKind") }}</span>
+                      <input v-model="rateLineDraft.line_kind" :disabled="!commercialActionState.canManageRateLines" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.billingUnit") }}</span>
+                      <input v-model="rateLineDraft.billing_unit" :disabled="!commercialActionState.canManageRateLines" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.unitPrice") }}</span>
+                      <input v-model="rateLineDraft.unit_price" :disabled="!commercialActionState.canManageRateLines" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.minimumQuantity") }}</span>
+                      <input v-model="rateLineDraft.minimum_quantity" :disabled="!commercialActionState.canManageRateLines" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.functionTypeId") }}</span>
+                      <input v-model="rateLineDraft.function_type_id" :disabled="!commercialActionState.canManageRateLines" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.qualificationTypeId") }}</span>
+                      <input v-model="rateLineDraft.qualification_type_id" :disabled="!commercialActionState.canManageRateLines" />
+                    </label>
+                    <label class="field-stack field-stack--half">
+                      <span>{{ t("customerAdmin.fields.planningModeCode") }}</span>
+                      <input v-model="rateLineDraft.planning_mode_code" :disabled="!commercialActionState.canManageRateLines" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.sortOrder") }}</span>
+                      <input v-model.number="rateLineDraft.sort_order" type="number" :disabled="!commercialActionState.canManageRateLines" />
+                    </label>
+                    <label class="field-stack field-stack--wide">
+                      <span>{{ t("customerAdmin.fields.notes") }}</span>
+                      <textarea v-model="rateLineDraft.notes" rows="3" :disabled="!commercialActionState.canManageRateLines" />
+                    </label>
+                  </div>
+                  <div class="cta-row" v-if="commercialActionState.canManageRateLines">
+                    <button class="cta-button" type="submit" :disabled="loading.rateLine">
+                      {{ editingRateLineId ? t("customerAdmin.actions.saveRateLine") : t("customerAdmin.actions.createRateLine") }}
+                    </button>
+                    <button class="cta-button cta-secondary" type="button" @click="resetRateLineDraft">
+                      {{ t("customerAdmin.actions.cancel") }}
                     </button>
                   </div>
+                </form>
+              </section>
 
-                  <div v-if="selectedRateCard.surcharge_rules.length" class="customer-admin-record-list">
-                    <article v-for="rule in selectedRateCard.surcharge_rules" :key="rule.id" class="customer-admin-record">
-                      <div>
-                        <strong>{{ rule.surcharge_type }}</strong>
-                        <p>
-                          {{ rule.percent_value ? `${rule.percent_value}%` : `${rule.fixed_amount} ${rule.currency_code}` }}
-                        </p>
-                        <span class="customer-admin-record__meta">
-                          {{ [rule.weekday_mask, rule.region_code].filter(Boolean).join(" · ") || t("customerAdmin.summary.none") }}
-                        </span>
-                      </div>
-                      <div class="customer-admin-record__actions">
-                        <StatusBadge :status="rule.status" />
-                        <button type="button" :disabled="!commercialActionState.canManageSurchargeRules" @click="editSurchargeRule(rule)">
-                          {{ t("customerAdmin.actions.edit") }}
-                        </button>
-                      </div>
-                    </article>
+              <section
+                v-if="activePricingRulesTab === 'surcharges' && selectedRateCard"
+                class="customer-admin-section"
+                data-testid="customer-pricing-rules-panel-surcharges"
+              >
+                <div class="customer-admin-panel__header">
+                  <div>
+                    <p class="eyebrow">{{ t("customerAdmin.commercial.surchargesEyebrow") }}</p>
+                    <h3>{{ t("customerAdmin.commercial.surchargesTitle") }}</h3>
                   </div>
-                  <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.surchargesEmpty") }}</p>
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    :disabled="!commercialActionState.canManageSurchargeRules"
+                    @click="startCreateSurchargeRule"
+                  >
+                    {{ t("customerAdmin.actions.addSurchargeRule") }}
+                  </button>
+                </div>
 
-                  <form class="customer-admin-form" @submit.prevent="submitSurchargeRule">
-                    <div class="customer-admin-form-grid customer-admin-form-grid--detail">
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.surchargeType") }}</span>
-                        <input v-model="surchargeRuleDraft.surcharge_type" :disabled="!commercialActionState.canManageSurchargeRules" />
-                      </label>
-                      <label class="field-stack field-stack--half">
-                        <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
-                        <input v-model="surchargeRuleDraft.effective_from" type="date" :disabled="!commercialActionState.canManageSurchargeRules" />
-                      </label>
-                      <label class="field-stack field-stack--half">
-                        <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
-                        <input v-model="surchargeRuleDraft.effective_to" type="date" :disabled="!commercialActionState.canManageSurchargeRules" />
-                      </label>
-                      <label class="field-stack field-stack--half">
-                        <span>{{ t("customerAdmin.fields.weekdayMask") }}</span>
-                        <input v-model="surchargeRuleDraft.weekday_mask" :disabled="!commercialActionState.canManageSurchargeRules" />
-                      </label>
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.timeFromMinute") }}</span>
-                        <input v-model.number="surchargeRuleDraft.time_from_minute" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
-                      </label>
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.timeToMinute") }}</span>
-                        <input v-model.number="surchargeRuleDraft.time_to_minute" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
-                      </label>
-                      <label class="field-stack field-stack--half">
-                        <span>{{ t("customerAdmin.fields.regionCode") }}</span>
-                        <input v-model="surchargeRuleDraft.region_code" :disabled="!commercialActionState.canManageSurchargeRules" />
-                      </label>
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.percentValue") }}</span>
-                        <input v-model="surchargeRuleDraft.percent_value" :disabled="!commercialActionState.canManageSurchargeRules" />
-                      </label>
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.fixedAmount") }}</span>
-                        <input v-model="surchargeRuleDraft.fixed_amount" :disabled="!commercialActionState.canManageSurchargeRules" />
-                      </label>
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.currencyCode") }}</span>
-                        <input v-model="surchargeRuleDraft.currency_code" :disabled="!commercialActionState.canManageSurchargeRules" />
-                      </label>
-                      <label class="field-stack field-stack--third">
-                        <span>{{ t("customerAdmin.fields.sortOrder") }}</span>
-                        <input v-model.number="surchargeRuleDraft.sort_order" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
-                      </label>
-                      <label class="field-stack field-stack--wide">
-                        <span>{{ t("customerAdmin.fields.notes") }}</span>
-                        <textarea v-model="surchargeRuleDraft.notes" rows="3" :disabled="!commercialActionState.canManageSurchargeRules" />
-                      </label>
+                <div v-if="selectedRateCard.surcharge_rules.length" class="customer-admin-record-list">
+                  <article v-for="rule in selectedRateCard.surcharge_rules" :key="rule.id" class="customer-admin-record">
+                    <div>
+                      <strong>{{ rule.surcharge_type }}</strong>
+                      <p>
+                        {{ rule.percent_value ? `${rule.percent_value}%` : `${rule.fixed_amount} ${rule.currency_code}` }}
+                      </p>
+                      <span class="customer-admin-record__meta">
+                        {{ [rule.weekday_mask, rule.region_code].filter(Boolean).join(" · ") || t("customerAdmin.summary.none") }}
+                      </span>
                     </div>
-                    <div class="cta-row" v-if="commercialActionState.canManageSurchargeRules">
-                      <button class="cta-button" type="submit" :disabled="loading.surchargeRule">
-                        {{ editingSurchargeRuleId ? t("customerAdmin.actions.saveSurchargeRule") : t("customerAdmin.actions.createSurchargeRule") }}
-                      </button>
-                      <button class="cta-button cta-secondary" type="button" @click="resetSurchargeRuleDraft">
-                        {{ t("customerAdmin.actions.cancel") }}
+                    <div class="customer-admin-record__actions">
+                      <StatusBadge :status="rule.status" />
+                      <button type="button" :disabled="!commercialActionState.canManageSurchargeRules" @click="editSurchargeRule(rule)">
+                        {{ t("customerAdmin.actions.edit") }}
                       </button>
                     </div>
-                  </form>
-                </section>
-              </div>
+                  </article>
+                </div>
+                <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.surchargesEmpty") }}</p>
+
+                <form class="customer-admin-form" @submit.prevent="submitSurchargeRule">
+                  <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.surchargeType") }}</span>
+                      <input v-model="surchargeRuleDraft.surcharge_type" :disabled="!commercialActionState.canManageSurchargeRules" />
+                    </label>
+                    <label class="field-stack field-stack--half">
+                      <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
+                      <input v-model="surchargeRuleDraft.effective_from" type="date" :disabled="!commercialActionState.canManageSurchargeRules" />
+                    </label>
+                    <label class="field-stack field-stack--half">
+                      <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
+                      <input v-model="surchargeRuleDraft.effective_to" type="date" :disabled="!commercialActionState.canManageSurchargeRules" />
+                    </label>
+                    <label class="field-stack field-stack--half">
+                      <span>{{ t("customerAdmin.fields.weekdayMask") }}</span>
+                      <input v-model="surchargeRuleDraft.weekday_mask" :disabled="!commercialActionState.canManageSurchargeRules" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.timeFromMinute") }}</span>
+                      <input v-model.number="surchargeRuleDraft.time_from_minute" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.timeToMinute") }}</span>
+                      <input v-model.number="surchargeRuleDraft.time_to_minute" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
+                    </label>
+                    <label class="field-stack field-stack--half">
+                      <span>{{ t("customerAdmin.fields.regionCode") }}</span>
+                      <input v-model="surchargeRuleDraft.region_code" :disabled="!commercialActionState.canManageSurchargeRules" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.percentValue") }}</span>
+                      <input v-model="surchargeRuleDraft.percent_value" :disabled="!commercialActionState.canManageSurchargeRules" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.fixedAmount") }}</span>
+                      <input v-model="surchargeRuleDraft.fixed_amount" :disabled="!commercialActionState.canManageSurchargeRules" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.currencyCode") }}</span>
+                      <input v-model="surchargeRuleDraft.currency_code" :disabled="!commercialActionState.canManageSurchargeRules" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.sortOrder") }}</span>
+                      <input v-model.number="surchargeRuleDraft.sort_order" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
+                    </label>
+                    <label class="field-stack field-stack--wide">
+                      <span>{{ t("customerAdmin.fields.notes") }}</span>
+                      <textarea v-model="surchargeRuleDraft.notes" rows="3" :disabled="!commercialActionState.canManageSurchargeRules" />
+                    </label>
+                  </div>
+                  <div class="cta-row" v-if="commercialActionState.canManageSurchargeRules">
+                    <button class="cta-button" type="submit" :disabled="loading.surchargeRule">
+                      {{ editingSurchargeRuleId ? t("customerAdmin.actions.saveSurchargeRule") : t("customerAdmin.actions.createSurchargeRule") }}
+                    </button>
+                    <button class="cta-button cta-secondary" type="button" @click="resetSurchargeRuleDraft">
+                      {{ t("customerAdmin.actions.cancel") }}
+                    </button>
+                  </div>
+                </form>
+              </section>
             </section>
             </div>
           </section>
@@ -1723,6 +1759,7 @@ import {
   mapCustomerCommercialApiMessage,
   resolveBillingProfileApiError,
   resolveBillingProfileFeedbackError,
+  resolveInvoicePartyApiError,
   validateBillingProfileDraft,
   validateRateCardDraft,
   validateRateLineDraft,
@@ -1786,6 +1823,7 @@ const previousSelectedCustomer = ref<CustomerRead | null>(null);
 const isCreatingCustomer = ref(false);
 const activeDetailTab = ref("");
 const activeCommercialTab = ref("billing_profile");
+const activePricingRulesTab = ref("rate_cards");
 const editingContactId = ref("");
 const editingAddressId = ref("");
 const editingInvoicePartyId = ref("");
@@ -1813,6 +1851,11 @@ const billingProfileErrorState = reactive<{
   summaryTitle: "",
   summaryBody: "",
   primaryMessage: "",
+  fields: {},
+});
+const invoicePartyErrorState = reactive<{
+  fields: Record<string, string>;
+}>({
   fields: {},
 });
 const loading = reactive({
@@ -2034,6 +2077,11 @@ const commercialTabs = computed(() =>
     label: t(commercialTabLabelKeys[tabId as keyof typeof commercialTabLabelKeys] as never),
   })),
 );
+const pricingRulesTabLabelKeys = {
+  rate_cards: "customerAdmin.commercial.pricingTabs.rateCards",
+  rate_lines: "customerAdmin.commercial.pricingTabs.rateLines",
+  surcharges: "customerAdmin.commercial.pricingTabs.surcharges",
+} as const;
 const primaryContactSummary = computed(() => formatPrimaryContactSummary(selectedCustomer.value));
 const referenceMaps = computed(() => buildCustomerReferenceMaps(referenceData.value));
 const branchOptions = computed(() => referenceData.value?.branches ?? []);
@@ -2047,6 +2095,12 @@ const selectedCustomerBranchLabel = computed(() => {
 const billingInvoiceLayoutOptions = computed(() => referenceData.value?.invoice_layouts ?? []);
 const billingShippingMethodOptions = computed(() => referenceData.value?.shipping_methods ?? []);
 const billingDunningPolicyOptions = computed(() => referenceData.value?.dunning_policies ?? []);
+const invoicePartyInvoiceLayoutOptions = computed(() => referenceData.value?.invoice_layouts ?? []);
+const invoicePartyInvoiceLayoutPlaceholder = computed(() =>
+  invoicePartyInvoiceLayoutOptions.value.length
+    ? t("customerAdmin.commercial.invoicePartyLayoutPlaceholder")
+    : t("customerAdmin.commercial.invoicePartyLayoutEmptyPlaceholder"),
+);
 const invoicePartyAddressOptions = computed(() =>
   (selectedCustomer.value?.addresses ?? [])
     .filter((address) => address.status !== "archived")
@@ -2110,6 +2164,14 @@ const selectedPortalAccessContact = computed(() =>
 const selectedRateCard = computed(() =>
   commercialProfile.value?.rate_cards.find((row) => row.id === selectedRateCardId.value) ?? null,
 );
+const pricingRulesTabs = computed(() => {
+  const hasRateCards = !!commercialProfile.value?.rate_cards.length;
+  const tabIds = hasRateCards ? ["rate_cards", "rate_lines", "surcharges"] : ["rate_cards"];
+  return tabIds.map((tabId) => ({
+    id: tabId,
+    label: t(pricingRulesTabLabelKeys[tabId as keyof typeof pricingRulesTabLabelKeys] as never),
+  }));
+});
 const sectionVisibility = computed(() =>
   resolveCustomerAdminSectionVisibility({
     effectiveRole: authStore.effectiveRole,
@@ -2185,6 +2247,34 @@ function clearBillingProfileErrors() {
   billingProfileErrorState.summaryBody = "";
   billingProfileErrorState.primaryMessage = "";
   billingProfileErrorState.fields = {};
+}
+
+function clearInvoicePartyErrors(fields: string[] = []) {
+  if (!fields.length) {
+    invoicePartyErrorState.fields = {};
+    return;
+  }
+  const nextFieldErrors = { ...invoicePartyErrorState.fields };
+  for (const field of fields) {
+    delete nextFieldErrors[field];
+  }
+  invoicePartyErrorState.fields = nextFieldErrors;
+}
+
+function setInvoicePartyErrors(fields: string[], messageKey: string) {
+  const nextFieldErrors: Record<string, string> = {};
+  for (const field of fields) {
+    nextFieldErrors[field] = t(messageKey as never);
+  }
+  invoicePartyErrorState.fields = nextFieldErrors;
+}
+
+function invoicePartyFieldError(fieldName: string) {
+  return invoicePartyErrorState.fields[fieldName] ?? "";
+}
+
+function invoicePartyFieldInvalid(fieldName: string) {
+  return !!invoicePartyFieldError(fieldName);
 }
 
 function setBillingProfileErrors({
@@ -2315,6 +2405,7 @@ function resetBillingProfileDraft() {
 }
 
 function resetInvoicePartyDraft() {
+  clearInvoicePartyErrors();
   invoicePartyDraft.tenant_id = tenantScopeId.value;
   invoicePartyDraft.customer_id = selectedCustomerId.value;
   invoicePartyDraft.company_name = "";
@@ -2633,16 +2724,19 @@ function startCreateInvoiceParty() {
 
 function startCreateRateCard() {
   activeCommercialTab.value = "pricing_rules";
+  activePricingRulesTab.value = "rate_cards";
   resetRateCardDraft();
 }
 
 function startCreateRateLine() {
   activeCommercialTab.value = "pricing_rules";
+  activePricingRulesTab.value = "rate_lines";
   resetRateLineDraft();
 }
 
 function startCreateSurchargeRule() {
   activeCommercialTab.value = "pricing_rules";
+  activePricingRulesTab.value = "surcharges";
   resetSurchargeRuleDraft();
 }
 
@@ -3116,6 +3210,7 @@ async function submitInvoiceParty() {
   if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
     return;
   }
+  clearInvoicePartyErrors();
   if (!invoicePartyAddressOptions.value.length) {
     setFeedback("error", t("customerAdmin.feedback.validation"), t("customerAdmin.commercial.invoicePartyAddressMissing"));
     return;
@@ -3156,6 +3251,18 @@ async function submitInvoiceParty() {
     resetInvoicePartyDraft();
     await refreshCommercialProfile();
   } catch (error) {
+    if (error instanceof CustomerAdminApiError) {
+      const resolution = resolveInvoicePartyApiError(error.messageKey, error.details, error.code);
+      if (resolution.fields.length && resolution.primaryMessageKey) {
+        setInvoicePartyErrors(resolution.fields, resolution.primaryMessageKey);
+        setFeedback(
+          "error",
+          t(resolution.summaryTitleKey as never),
+          `${t(resolution.summaryBodyKey as never)} ${t(resolution.primaryMessageKey as never)}`,
+        );
+        return;
+      }
+    }
     handleApiError(error);
   } finally {
     loading.commercial = false;
@@ -3996,6 +4103,24 @@ watch(
   (tabId) => {
     if (tabId === "commercial") {
       activeCommercialTab.value = normalizeCustomerCommercialTab(activeCommercialTab.value);
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [activeCommercialTab.value, commercialProfile.value?.rate_cards.length ?? 0] as const,
+  () => {
+    if (activeCommercialTab.value !== "pricing_rules") {
+      return;
+    }
+    const allowedTabs = pricingRulesTabs.value.map((tab) => tab.id);
+    if (!allowedTabs.includes(activePricingRulesTab.value)) {
+      activePricingRulesTab.value = "rate_cards";
+    }
+    if ((activePricingRulesTab.value === "rate_lines" || activePricingRulesTab.value === "surcharges") && !selectedRateCard.value) {
+      const firstRateCard = commercialProfile.value?.rate_cards[0];
+      selectedRateCardId.value = firstRateCard ? firstRateCard.id : "";
     }
   },
   { immediate: true },

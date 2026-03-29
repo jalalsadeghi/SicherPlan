@@ -974,7 +974,15 @@ class CustomerCommercialService:
         if payload.invoice_email and "@" not in payload.invoice_email:
             raise ApiException(400, "customers.validation.invoice_party_email", "errors.customers.invoice_party.invalid_invoice_email")
         if payload.invoice_layout_lookup_id is not None:
-            lookup = self.repository.get_lookup_value(payload.invoice_layout_lookup_id)
+            try:
+                normalized_lookup_id = str(UUID(str(payload.invoice_layout_lookup_id).strip()))
+            except (AttributeError, TypeError, ValueError) as exc:
+                raise ApiException(
+                    400,
+                    "customers.validation.invoice_party_layout_lookup_format",
+                    "errors.customers.invoice_party.invalid_layout_format",
+                ) from exc
+            lookup = self.repository.get_lookup_value(normalized_lookup_id)
             if lookup is None or lookup.archived_at is not None:
                 raise ApiException(400, "customers.validation.invoice_party_layout_lookup", "errors.customers.lookup.not_found")
             if lookup.domain != "invoice_layout":

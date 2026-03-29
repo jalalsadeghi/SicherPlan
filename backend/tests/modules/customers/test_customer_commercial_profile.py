@@ -95,7 +95,8 @@ class FakeCommercialCustomerRepository(FakeCustomerRepository):
         self.secondary_invoice_address_id = "22222222-2222-2222-2222-222222222222"
         primary_address = self.addresses.pop(ADDRESS_ID)
         self.addresses[self.primary_invoice_address_id] = replace(primary_address, id=self.primary_invoice_address_id)
-        self.lookups["lookup-layout"] = FakeLookup("lookup-layout", "invoice_layout", code="standard")
+        self.invoice_layout_lookup_id = "55555555-5555-4555-8555-555555555555"
+        self.lookups[self.invoice_layout_lookup_id] = FakeLookup(self.invoice_layout_lookup_id, "invoice_layout", code="standard")
         self.lookups["lookup-delivery-email"] = FakeLookup(
             "lookup-delivery-email",
             "invoice_delivery_method",
@@ -415,7 +416,7 @@ class TestCustomerCommercialService(unittest.TestCase):
                     customer_id=self.customer.id,
                     company_name="Nord Billing 2 GmbH",
                     address_id=self.repository.secondary_invoice_address_id,
-                    invoice_layout_lookup_id="lookup-layout",
+                    invoice_layout_lookup_id=self.repository.invoice_layout_lookup_id,
                     is_default=False,
                 ),
                 _actor(),
@@ -423,7 +424,24 @@ class TestCustomerCommercialService(unittest.TestCase):
 
         self.assertEqual(first.address.street_line_1, "Hauptstrasse 1")
         self.assertEqual(second.address.street_line_1, "Nebenstrasse 2")
+        self.assertEqual(second.invoice_layout_lookup_id, self.repository.invoice_layout_lookup_id)
         self.assertEqual(conflict.exception.code, "customers.conflict.default_invoice_party")
+
+    def test_invoice_party_allows_empty_invoice_layout_lookup(self) -> None:
+        created = self.service.create_invoice_party(
+            "tenant-1",
+            self.customer.id,
+            CustomerInvoicePartyCreate(
+                tenant_id="tenant-1",
+                customer_id=self.customer.id,
+                company_name="Nord Billing GmbH",
+                address_id=self.repository.primary_invoice_address_id,
+                invoice_layout_lookup_id=None,
+            ),
+            _actor(),
+        )
+
+        self.assertIsNone(created.invoice_layout_lookup_id)
 
     def test_invoice_party_rejects_malformed_address_id(self) -> None:
         with self.assertRaises(ApiException) as context:
@@ -441,6 +459,25 @@ class TestCustomerCommercialService(unittest.TestCase):
 
         self.assertEqual(context.exception.status_code, 400)
         self.assertEqual(context.exception.code, "customers.validation.invoice_party_address_format")
+
+    def test_invoice_party_rejects_malformed_invoice_layout_lookup_id(self) -> None:
+        with self.assertRaises(ApiException) as context:
+            self.service.create_invoice_party(
+                "tenant-1",
+                self.customer.id,
+                CustomerInvoicePartyCreate(
+                    tenant_id="tenant-1",
+                    customer_id=self.customer.id,
+                    company_name="Nord Billing GmbH",
+                    address_id=self.repository.primary_invoice_address_id,
+                    invoice_layout_lookup_id="invoice-layout-standard",
+                ),
+                _actor(),
+            )
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertEqual(context.exception.code, "customers.validation.invoice_party_layout_lookup_format")
+        self.assertEqual(context.exception.message_key, "errors.customers.invoice_party.invalid_layout_format")
 
     def test_finance_read_contract_returns_profile_and_invoice_parties(self) -> None:
         profile = self.service.upsert_billing_profile(

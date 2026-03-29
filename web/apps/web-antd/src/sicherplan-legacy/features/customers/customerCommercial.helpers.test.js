@@ -8,6 +8,7 @@ import {
   mapCustomerCommercialApiMessage,
   resolveBillingProfileFeedbackError,
   resolveBillingProfileApiError,
+  resolveInvoicePartyApiError,
   validateBillingProfileDraft,
   validateRateCardDraft,
   validateRateLineDraft,
@@ -212,6 +213,31 @@ test("billing-profile client validation messages resolve to the same field guida
       summaryBodyKey: "customerAdmin.feedback.billingProfileUnexpected",
       primaryMessageKey: null,
       fields: [],
+    },
+  );
+});
+
+test("invoice-party invoice-layout API errors resolve to field-level guidance", () => {
+  assert.deepEqual(
+    resolveInvoicePartyApiError("errors.customers.invoice_party.invalid_layout_format"),
+    {
+      isKnown: true,
+      summaryTitleKey: "customerAdmin.feedback.invoicePartySaveFailedTitle",
+      summaryBodyKey: "customerAdmin.feedback.invoicePartySaveFailedSummary",
+      primaryMessageKey: "customerAdmin.feedback.invoicePartyInvalidInvoiceLayout",
+      fields: ["invoice_layout_lookup_id"],
+      details: {},
+    },
+  );
+  assert.deepEqual(
+    resolveInvoicePartyApiError("errors.customers.lookup.not_found", {}, "customers.validation.invoice_party_layout_lookup"),
+    {
+      isKnown: true,
+      summaryTitleKey: "customerAdmin.feedback.invoicePartySaveFailedTitle",
+      summaryBodyKey: "customerAdmin.feedback.invoicePartySaveFailedSummary",
+      primaryMessageKey: "customerAdmin.feedback.invoiceLayoutUnavailable",
+      fields: ["invoice_layout_lookup_id"],
+      details: {},
     },
   );
 });

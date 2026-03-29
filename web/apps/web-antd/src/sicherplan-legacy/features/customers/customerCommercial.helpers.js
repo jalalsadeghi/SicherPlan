@@ -327,3 +327,40 @@ export function resolveBillingProfileFeedbackError(messageKey) {
     fields: [],
   };
 }
+
+export function resolveInvoicePartyApiError(messageKey, details = {}, errorCode = "") {
+  if (messageKey === "errors.customers.lookup.not_found" && errorCode === "customers.validation.invoice_party_layout_lookup") {
+    return {
+      isKnown: true,
+      summaryTitleKey: "customerAdmin.feedback.invoicePartySaveFailedTitle",
+      summaryBodyKey: "customerAdmin.feedback.invoicePartySaveFailedSummary",
+      primaryMessageKey: "customerAdmin.feedback.invoiceLayoutUnavailable",
+      fields: ["invoice_layout_lookup_id"],
+      details,
+    };
+  }
+  const directMap = {
+    "errors.customers.invoice_party.invalid_layout_format": "customerAdmin.feedback.invoicePartyInvalidInvoiceLayout",
+    "errors.customers.lookup.invalid_domain": "customerAdmin.feedback.invoicePartyInvalidInvoiceLayout",
+    "errors.customers.lookup.scope_mismatch": "customerAdmin.feedback.invoicePartyInvalidInvoiceLayout",
+  };
+  const resolvedMessage = directMap[messageKey];
+  if (resolvedMessage) {
+    return {
+      isKnown: true,
+      summaryTitleKey: "customerAdmin.feedback.invoicePartySaveFailedTitle",
+      summaryBodyKey: "customerAdmin.feedback.invoicePartySaveFailedSummary",
+      primaryMessageKey: resolvedMessage,
+      fields: ["invoice_layout_lookup_id"],
+      details,
+    };
+  }
+  return {
+    isKnown: false,
+    summaryTitleKey: "customerAdmin.feedback.invoicePartySaveFailedTitle",
+    summaryBodyKey: "customerAdmin.feedback.invoicePartyUnexpected",
+    primaryMessageKey: null,
+    fields: [],
+    details,
+  };
+}

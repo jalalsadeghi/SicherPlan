@@ -22,6 +22,16 @@ test("commercial workspace uses nested sub tabs and isolated panels", () => {
   assert.match(source, /data-testid="customer-commercial-panel-billing-profile"/);
   assert.match(source, /data-testid="customer-commercial-panel-invoice-parties"/);
   assert.match(source, /data-testid="customer-commercial-panel-pricing-rules"/);
+  assert.match(source, /data-testid="customer-pricing-rules-tabs"/);
+  assert.match(source, /data-testid="customer-pricing-rules-panel-rate-cards"/);
+  assert.match(source, /data-testid="customer-pricing-rules-panel-rate-lines"/);
+  assert.match(source, /data-testid="customer-pricing-rules-panel-surcharges"/);
+  assert.match(source, /const activePricingRulesTab = ref\("rate_cards"\)/);
+  assert.match(source, /const pricingRulesTabs = computed/);
+  assert.match(source, /commercialProfile\.value\?\.rate_cards\.length/);
+  assert.match(source, /activePricingRulesTab\.value = "rate_cards"/);
+  assert.match(source, /activePricingRulesTab\.value = "rate_lines"/);
+  assert.match(source, /activePricingRulesTab\.value = "surcharges"/);
 });
 
 test("detail forms use the denser detail-grid span classes", () => {
@@ -82,10 +92,16 @@ test("invoice-party form uses customer address selector and address-tab empty st
   assert.match(source, /invoicePartyAddressOptions/);
   assert.match(source, /invoicePartyAddressPlaceholder/);
   assert.match(source, /formatInvoicePartyAddressOption/);
+  assert.match(source, /invoicePartyInvoiceLayoutOptions/);
+  assert.match(source, /invoicePartyInvoiceLayoutPlaceholder/);
+  assert.match(source, /invoicePartyFieldError\('invoice_layout_lookup_id'\)/);
+  assert.match(source, /clearInvoicePartyErrors\(\['invoice_layout_lookup_id'\]\)/);
+  assert.match(source, /option\.id" :value="option\.id"|option in invoicePartyInvoiceLayoutOptions/);
   assert.match(source, /customerAdmin\.commercial\.invoicePartyAddressMissing/);
   assert.match(source, /customerAdmin\.actions\.openAddressesTab/);
   assert.match(source, /openCustomerAddressesTab/);
   assert.doesNotMatch(source, /<input v-model="invoicePartyDraft\.address_id"/);
+  assert.doesNotMatch(source, /<input v-model="invoicePartyDraft\.invoice_layout_lookup_id"/);
 });
 
 test("address-link form uses available-address selector instead of raw address uuid input", () => {

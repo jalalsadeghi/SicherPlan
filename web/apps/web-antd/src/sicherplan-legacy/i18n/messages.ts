@@ -1136,17 +1136,22 @@ export type MessageKey =
   | "customerAdmin.commercial.invoicePartyAddressMissing"
   | "customerAdmin.commercial.invoicePartyAddressPlaceholder"
   | "customerAdmin.commercial.invoicePartyAddressEmptyPlaceholder"
+  | "customerAdmin.commercial.invoicePartyLayoutPlaceholder"
+  | "customerAdmin.commercial.invoicePartyLayoutEmptyPlaceholder"
   | "customerAdmin.commercial.defaultInvoiceParty"
   | "customerAdmin.commercial.additionalInvoiceParty"
   | "customerAdmin.commercial.rateCardsEyebrow"
   | "customerAdmin.commercial.rateCardsTitle"
   | "customerAdmin.commercial.rateCardsEmpty"
+  | "customerAdmin.commercial.pricingTabs.rateCards"
   | "customerAdmin.commercial.rateLinesEyebrow"
   | "customerAdmin.commercial.rateLinesTitle"
   | "customerAdmin.commercial.rateLinesEmpty"
+  | "customerAdmin.commercial.pricingTabs.rateLines"
   | "customerAdmin.commercial.surchargesEyebrow"
   | "customerAdmin.commercial.surchargesTitle"
   | "customerAdmin.commercial.surchargesEmpty"
+  | "customerAdmin.commercial.pricingTabs.surcharges"
   | "customerAdmin.fields.invoiceEmail"
   | "customerAdmin.fields.paymentTermsDays"
   | "customerAdmin.fields.paymentTermsNote"
@@ -1212,7 +1217,11 @@ export type MessageKey =
   | "customerAdmin.feedback.billingProfileSaveFailedTitle"
   | "customerAdmin.feedback.billingProfileSaveFailedSummary"
   | "customerAdmin.feedback.billingProfileUnexpected"
+  | "customerAdmin.feedback.invoicePartySaveFailedTitle"
+  | "customerAdmin.feedback.invoicePartySaveFailedSummary"
+  | "customerAdmin.feedback.invoicePartyUnexpected"
   | "customerAdmin.feedback.invoicePartyRequired"
+  | "customerAdmin.feedback.invoicePartyInvalidInvoiceLayout"
   | "customerAdmin.feedback.invalidInvoiceEmail"
   | "customerAdmin.feedback.invalidPaymentTerms"
   | "customerAdmin.feedback.taxExemptionReasonRequired"
@@ -2635,17 +2644,22 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Keine Kundenadressen verfügbar. Legen Sie zuerst unter Kunden -> [Kunde] -> Adressen eine Adresse an.",
     "customerAdmin.commercial.invoicePartyAddressPlaceholder": "Adresse aus dem Kundenregister auswählen",
     "customerAdmin.commercial.invoicePartyAddressEmptyPlaceholder": "Zuerst eine Kundenadresse anlegen",
+    "customerAdmin.commercial.invoicePartyLayoutPlaceholder": "Abrechnungsprofil-Standard verwenden",
+    "customerAdmin.commercial.invoicePartyLayoutEmptyPlaceholder": "Kein Rechnungslayout verfügbar",
     "customerAdmin.commercial.defaultInvoiceParty": "Standard-Rechnungspartei",
     "customerAdmin.commercial.additionalInvoiceParty": "Zusätzliche Rechnungspartei",
     "customerAdmin.commercial.rateCardsEyebrow": "Preiskarten",
     "customerAdmin.commercial.rateCardsTitle": "Versionierte Preisfenster",
     "customerAdmin.commercial.rateCardsEmpty": "Noch keine Preiskarten hinterlegt.",
+    "customerAdmin.commercial.pricingTabs.rateCards": "Preiskarten",
     "customerAdmin.commercial.rateLinesEyebrow": "Preiszeilen",
     "customerAdmin.commercial.rateLinesTitle": "Leistungs- und Funktionspreise",
     "customerAdmin.commercial.rateLinesEmpty": "Noch keine Preiszeilen für diese Preiskarte vorhanden.",
+    "customerAdmin.commercial.pricingTabs.rateLines": "Preiszeilen",
     "customerAdmin.commercial.surchargesEyebrow": "Zuschläge",
     "customerAdmin.commercial.surchargesTitle": "Zeit-, Wochen- und Regionszuschläge",
     "customerAdmin.commercial.surchargesEmpty": "Noch keine Zuschlagsregeln für diese Preiskarte vorhanden.",
+    "customerAdmin.commercial.pricingTabs.surcharges": "Zuschläge",
     "customerAdmin.fields.invoiceEmail": "Rechnungs-E-Mail",
     "customerAdmin.fields.paymentTermsDays": "Zahlungsziel in Tagen",
     "customerAdmin.fields.paymentTermsNote": "Zahlungsbedingung",
@@ -2668,7 +2682,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.companyName": "Firmenname",
     "customerAdmin.fields.contactName": "Ansprechpartner",
     "customerAdmin.fields.billingAddress": "Rechnungsadresse",
-    "customerAdmin.fields.invoiceLayoutLookupId": "Layout-Lookup-ID",
+    "customerAdmin.fields.invoiceLayoutLookupId": "Rechnungslayout",
     "customerAdmin.fields.note": "Hinweis",
     "customerAdmin.fields.isDefaultInvoiceParty": "Als Standard-Rechnungspartei markieren",
     "customerAdmin.fields.rateKind": "Preisart",
@@ -2716,8 +2730,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Bitte korrigieren Sie die markierten Commercial-Felder und speichern Sie das Abrechnungsprofil erneut.",
     "customerAdmin.feedback.billingProfileUnexpected":
       "Das Abrechnungsprofil konnte wegen eines unerwarteten Fehlers nicht gespeichert werden. Bitte versuchen Sie es erneut oder kontaktieren Sie den Support.",
+    "customerAdmin.feedback.invoicePartySaveFailedTitle":
+      "Rechnungspartei konnte nicht gespeichert werden",
+    "customerAdmin.feedback.invoicePartySaveFailedSummary":
+      "Bitte korrigieren Sie die markierten Rechnungspartei-Felder und speichern Sie die Rechnungspartei erneut.",
+    "customerAdmin.feedback.invoicePartyUnexpected":
+      "Die Rechnungspartei konnte wegen eines unerwarteten Fehlers nicht gespeichert werden. Bitte versuchen Sie es erneut oder kontaktieren Sie den Support.",
     "customerAdmin.feedback.invoicePartyRequired":
       "Für eine Rechnungspartei werden mindestens Firmenname und Adresse benötigt.",
+    "customerAdmin.feedback.invoicePartyInvalidInvoiceLayout":
+      "Die gewählte Rechnungslayout-Auswahl ist ungültig. Bitte wählen Sie ein gültiges Rechnungslayout aus der Liste.",
     "customerAdmin.feedback.invalidInvoiceEmail":
       "Die Rechnungs-E-Mail ist ungültig. Bitte geben Sie eine gültige E-Mail-Adresse ein.",
     "customerAdmin.feedback.invalidPaymentTerms":
@@ -4162,17 +4184,22 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "No customer addresses are available. Add an address first in Customers -> [customer] -> Addresses.",
     "customerAdmin.commercial.invoicePartyAddressPlaceholder": "Select an address from this customer",
     "customerAdmin.commercial.invoicePartyAddressEmptyPlaceholder": "Add a customer address first",
+    "customerAdmin.commercial.invoicePartyLayoutPlaceholder": "Use billing-profile default",
+    "customerAdmin.commercial.invoicePartyLayoutEmptyPlaceholder": "No invoice layout available",
     "customerAdmin.commercial.defaultInvoiceParty": "Default invoice party",
     "customerAdmin.commercial.additionalInvoiceParty": "Additional invoice party",
     "customerAdmin.commercial.rateCardsEyebrow": "Rate cards",
     "customerAdmin.commercial.rateCardsTitle": "Versioned pricing windows",
     "customerAdmin.commercial.rateCardsEmpty": "No rate cards configured yet.",
+    "customerAdmin.commercial.pricingTabs.rateCards": "Rate cards",
     "customerAdmin.commercial.rateLinesEyebrow": "Rate lines",
     "customerAdmin.commercial.rateLinesTitle": "Service and function-based prices",
     "customerAdmin.commercial.rateLinesEmpty": "No rate lines exist for this rate card yet.",
+    "customerAdmin.commercial.pricingTabs.rateLines": "Rate lines",
     "customerAdmin.commercial.surchargesEyebrow": "Surcharges",
     "customerAdmin.commercial.surchargesTitle": "Time, weekday, and region surcharges",
     "customerAdmin.commercial.surchargesEmpty": "No surcharge rules exist for this rate card yet.",
+    "customerAdmin.commercial.pricingTabs.surcharges": "Surcharges",
     "customerAdmin.fields.invoiceEmail": "Invoice email",
     "customerAdmin.fields.paymentTermsDays": "Payment terms in days",
     "customerAdmin.fields.paymentTermsNote": "Payment note",
@@ -4195,7 +4222,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.companyName": "Company name",
     "customerAdmin.fields.contactName": "Contact name",
     "customerAdmin.fields.billingAddress": "Billing address",
-    "customerAdmin.fields.invoiceLayoutLookupId": "Invoice-layout lookup ID",
+    "customerAdmin.fields.invoiceLayoutLookupId": "Invoice layout",
     "customerAdmin.fields.note": "Note",
     "customerAdmin.fields.isDefaultInvoiceParty": "Mark as default invoice party",
     "customerAdmin.fields.rateKind": "Rate kind",
@@ -4243,8 +4270,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Please correct the highlighted commercial fields and save the billing profile again.",
     "customerAdmin.feedback.billingProfileUnexpected":
       "Billing profile could not be saved due to an unexpected error. Please try again or contact support.",
+    "customerAdmin.feedback.invoicePartySaveFailedTitle":
+      "Invoice party could not be saved",
+    "customerAdmin.feedback.invoicePartySaveFailedSummary":
+      "Please correct the highlighted invoice-party fields and save the invoice party again.",
+    "customerAdmin.feedback.invoicePartyUnexpected":
+      "Invoice party could not be saved due to an unexpected error. Please try again or contact support.",
     "customerAdmin.feedback.invoicePartyRequired":
       "An invoice party needs at least a company name and an address.",
+    "customerAdmin.feedback.invoicePartyInvalidInvoiceLayout":
+      "The selected invoice layout is invalid. Please choose a valid invoice layout from the list.",
     "customerAdmin.feedback.invalidInvoiceEmail":
       "Invoice email is invalid. Please enter a valid email address.",
     "customerAdmin.feedback.invalidPaymentTerms":
