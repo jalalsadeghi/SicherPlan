@@ -33,3 +33,10 @@ test("site number and name use the same explicit field wrapper class", () => {
   assert.match(source, /planning-admin-site-primary-field field-stack field-stack--half"><span>\{\{ tp\("fieldsSiteNo"\) \}\}<\/span><input v-model="draft\.site_no"/);
   assert.match(source, /planning-admin-site-primary-field field-stack field-stack--half"><span>\{\{ tp\("fieldsName"\) \}\}<\/span><input v-model="draft\.name"/);
 });
+
+test("planning setup accepts deep-link entity and customer query context", () => {
+  assert.match(source, /useRoute/);
+  assert.match(source, /resolvePlanningRouteContext\(route\.query\)/);
+  assert.match(source, /filters\.customer_id = customerId/);
+  assert.match(source, /entityKey\.value = entity/);
+});

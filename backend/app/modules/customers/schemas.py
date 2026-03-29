@@ -217,6 +217,9 @@ class CustomerReferenceDataRead(BaseModel):
     classifications: list[CustomerReferenceOptionRead] = Field(default_factory=list)
     rankings: list[CustomerReferenceOptionRead] = Field(default_factory=list)
     customer_statuses: list[CustomerReferenceOptionRead] = Field(default_factory=list)
+    invoice_layouts: list[CustomerReferenceOptionRead] = Field(default_factory=list)
+    shipping_methods: list[CustomerReferenceOptionRead] = Field(default_factory=list)
+    dunning_policies: list[CustomerReferenceOptionRead] = Field(default_factory=list)
     branches: list[CustomerBranchOptionRead] = Field(default_factory=list)
     mandates: list[CustomerMandateOptionRead] = Field(default_factory=list)
 

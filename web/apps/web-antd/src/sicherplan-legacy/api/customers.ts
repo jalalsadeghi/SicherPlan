@@ -466,6 +466,9 @@ export interface CustomerReferenceDataRead {
   classifications: CustomerReferenceOptionRead[];
   rankings: CustomerReferenceOptionRead[];
   customer_statuses: CustomerReferenceOptionRead[];
+  invoice_layouts: CustomerReferenceOptionRead[];
+  shipping_methods: CustomerReferenceOptionRead[];
+  dunning_policies: CustomerReferenceOptionRead[];
   branches: CustomerBranchOptionRead[];
   mandates: CustomerMandateOptionRead[];
 }

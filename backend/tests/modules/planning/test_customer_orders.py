@@ -336,6 +336,43 @@ class CustomerOrderServiceTests(unittest.TestCase):
             )
         self.assertEqual(captured.exception.message_key, "errors.planning.customer_order.invalid_window")
 
+    def test_create_order_rejects_blank_requirement_type_id(self) -> None:
+        with self.assertRaises(ApiException) as captured:
+            self.service.create_order(
+                "tenant-1",
+                CustomerOrderCreate(
+                    tenant_id="tenant-1",
+                    customer_id="customer-1",
+                    requirement_type_id="",
+                    order_no="ORD-BLANK-REQ",
+                    title="Objekt Nord",
+                    service_category_code="site_security",
+                    service_from=date(2026, 6, 1),
+                    service_to=date(2026, 6, 2),
+                ),
+                self.actor,
+            )
+        self.assertEqual(captured.exception.status_code, 400)
+        self.assertEqual(captured.exception.message_key, "errors.planning.customer_order.invalid_requirement_type_id")
+
+    def test_create_order_allows_blank_optional_patrol_route_id(self) -> None:
+        order = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                patrol_route_id="",
+                order_no="ORD-NO-ROUTE",
+                title="Objekt Nord",
+                service_category_code="site_security",
+                service_from=date(2026, 6, 1),
+                service_to=date(2026, 6, 2),
+            ),
+            self.actor,
+        )
+        self.assertIsNone(order.patrol_route_id)
+
     def test_equipment_line_rejects_duplicate_item(self) -> None:
         order = self.service.create_order(
             "tenant-1",

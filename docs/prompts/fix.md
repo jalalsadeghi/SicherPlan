@@ -1,153 +1,85 @@
-You are fixing 2 failing backend pytest tests in the SicherPlan monorepo.
+You are working in the SicherPlan project.
 
-Current failing command
-python -m pytest -q
+Task:
+Investigate and fix the `400 Bad Request` problem when saving the Customer Commercial → Billing profile form, and improve the frontend so the user sees the exact reason instead of a vague generic message.
 
-Current failures
+Observed behavior:
+- Frontend shows:
+  `Billing profile could not be saved due to an unexpected error. Please try again or contact support.`
+- Backend returns:
+  `PUT /api/customers/tenants/{tenant_id}/customers/{customer_id}/billing-profile` -> `400 Bad Request`
 
-1)
-FAILED backend/tests/modules/core/test_config_seed.py::TestConfigSeed::test_tenant_setting_seed_is_idempotent
+Current form values indicate that the issue is likely NOT the previously discussed e-invoice / Leitweg rule.
+Based on the current entered values, the most likely cause is lookup validation for one of these code-backed fields:
+- invoice_layout_code
+- shipping_method_code
+- dunning_policy_code
 
-Observed failure:
-expected:
-{"inserted": 2, "updated": 0}
-actual:
-{"inserted": 3, "updated": 0}
+In backend commercial validation, these fields are validated against lookup domains:
+- `invoice_layout`
+- `invoice_delivery_method`
+- `dunning_policy`
 
-2)
-FAILED backend/tests/modules/subcontractors/test_subcontractor_readiness.py::SubcontractorReadinessServiceTest::test_missing_proof_and_expired_compliance_qualification_block_worker
+Likely current UI values:
+- invoice layout = `standard`
+- dispatch method = `email_pdf`
+- dunning policy = `standard`
 
-Observed failure:
-expected:
-blocking_issue_count >= 2
-actual:
-blocking_issue_count == 1
+Potential root cause:
+The frontend dropdown options are present, but one or more of these codes are not actually available in backend lookup data / database seed data, causing a 400 validation failure.
 
-Your job
-Diagnose the real root cause of both failures and fix them correctly.
-Do NOT make superficial changes just to satisfy the assertions.
-Do NOT weaken the tests unless the test expectation is truly outdated and you can justify it from the codebase behavior and domain rules.
+Required work:
 
-Work process
+1. Investigate the exact backend error
+- Inspect the real response body returned by the billing-profile save endpoint.
+- Identify the actual `message_key` / error payload for this 400.
+- Confirm whether the cause is lookup validation (`errors.customers.lookup.not_found` or related field-specific lookup validation).
 
-1) Inspect the exact implementation and tests for both failing areas:
-- backend/tests/modules/core/test_config_seed.py
-- backend/tests/modules/subcontractors/test_subcontractor_readiness.py
+2. Fix the frontend error handling
+- The frontend must stop collapsing this into a generic unexpected error.
+- Surface the real backend validation message clearly.
+- If the problem is one of the lookup-backed dropdowns, show a user-facing message like:
+  - `The selected Invoice layout is not available in the system configuration.`
+  - `The selected Dispatch method is not available in the system configuration.`
+  - `The selected Dunning policy is not available in the system configuration.`
 
-And inspect the production code they cover, especially:
-- the function that seeds default tenant settings
-- the seed definitions/source of truth for tenant settings
-- the subcontractor readiness service
-- the logic that calculates readiness_status
-- the logic that builds blocking issues / blocking_issue_count
-- any helper methods used for compliance proof checks and qualification expiry checks
+3. Verify the actual source of dropdown options
+- Inspect the active customer commercial form implementation.
+- Determine whether `Invoice layout`, `Dispatch method`, and `Dunning policy` are currently:
+  - hardcoded in the frontend, or
+  - loaded from real backend lookup/reference data.
+- If they are hardcoded but backend requires real lookup-backed values, fix this mismatch.
 
-2) For the config seed failure, determine which of these is true:
-- the seed implementation now intentionally has 3 default tenant settings and the test is stale
-OR
-- the seed implementation is incorrectly inserting an extra setting
-OR
-- idempotence is broken in a way that only appears as an inserted-count mismatch
+4. Preferred fix strategy
+Use the real source of truth.
+- If lookup/reference-data endpoints or existing frontend sources already exist, load those values dynamically.
+- Do not keep static frontend dropdown options if they can drift from backend validation.
+- If the repo expects these lookup values to exist in seed/bootstrap data, add/repair the required seed/setup entries.
+- Do not invent random codes; align exactly with backend-supported lookup codes.
 
-Important:
-- preserve idempotence
-- do not allow duplicate tenant settings for the same tenant/key
-- the second call must not insert duplicates
-- keep the returned inserted/updated counts semantically correct
+5. Keep UX clear
+- If a dropdown has no valid lookup-backed options, the user should be told that system configuration is missing.
+- Do not let the user pick values that backend will reject.
+- Show field-level error state for the affected dropdown.
 
-3) For the subcontractor readiness failure, determine why only 1 blocking issue is being counted instead of at least 2.
-Specifically verify whether both of these conditions are supposed to independently contribute blocking issues:
-- missing proof
-- expired compliance qualification
+6. Acceptance criteria
+- Saving billing profile no longer fails because of frontend/backend lookup mismatch.
+- Known 400 validation errors are shown clearly to the user.
+- Dropdown options for invoice layout / dispatch method / dunning policy are aligned with backend-supported lookup values.
+- No vague “unexpected error” message is shown for known validation failures.
+- No backend business rule is weakened.
 
-Check for mistakes such as:
-- one issue overwriting another
-- de-duplication collapsing distinct blockers incorrectly
-- only the final blocker being retained
-- filtering logic that excludes one blocker
-- mismatch between readiness_status logic and blocking_issue_count logic
-- qualification/proof issues being combined into one generic blocker when the test/domain expects separate blocking issues
-
-Important:
-- preserve domain correctness
-- if two independent blocking conditions exist, they should both be represented in blocking_issue_count unless the codebase intentionally aggregates them into one issue and the tests are outdated
-- do not inflate counts artificially
-
-4) Add or adjust tests only when justified
-- If the production code is correct and the test is outdated, update the test with a short code comment or clear rationale in the implementation/report
-- Otherwise fix the implementation and keep the tests meaningful
-- Add focused regression coverage if useful for:
-  - tenant setting seed idempotence and count behavior
-  - subcontractor readiness counting multiple simultaneous blockers
-
-Constraints
-- Keep changes minimal and maintainable
-- Do not refactor unrelated modules
-- Do not change public API semantics unless clearly necessary
-- Do not hide failures by loosening assertions without understanding the domain logic
-- Prefer fixing root cause over patching test data
-
-Definition of done
-- Both failing tests pass
-- Full test suite passes with:
-  python -m pytest -q
-- Tenant setting seeding remains idempotent
-- Blocking issue count in subcontractor readiness accurately reflects simultaneous blockers
-- No unrelated regressions
-
-Before coding
-Briefly report:
-1) which files you will inspect/change
-2) your preliminary hypothesis for each of the 2 failures
-
-After coding
-Report:
-1) root cause of failure #1
-2) root cause of failure #2
-3) changed files
-4) whether you changed production code, tests, or both, and why
-5) results of:
-   - python -m pytest backend/tests/modules/core/test_config_seed.py -q
-   - python -m pytest backend/tests/modules/subcontractors/test_subcontractor_readiness.py -q
-   - python -m pytest -q
-
-
-Those errors are:
-(.venv-backend-test) jey@DESKTOP-M16IUT4:~/Projects/SicherPlan$ python -m pytest -q
-.....F............................................................................................................................................................................................................... [ 46%]
-.................................................................................................................................................................................................................................... [ 95%]
-......F..............                                                                                                                                                                                                                [100%]
-================================================================================================================= FAILURES =================================================================================================================
-__________________________________________________________________________________________ TestConfigSeed.test_tenant_setting_seed_is_idempotent ___________________________________________________________________________________________
-
-self = <tests.modules.core.test_config_seed.TestConfigSeed testMethod=test_tenant_setting_seed_is_idempotent>
-
-    def test_tenant_setting_seed_is_idempotent(self) -> None:
-        session = _FakeSession()
-        first = seed_default_tenant_settings(session, tenant_id="tenant-1")
-        second = seed_default_tenant_settings(session, tenant_id="tenant-1")
->       self.assertEqual(first, {"inserted": 2, "updated": 0})
-E       AssertionError: {'inserted': 3, 'updated': 0} != {'inserted': 2, 'updated': 0}
-E       - {'inserted': 3, 'updated': 0}
-E       ?              ^
-E
-E       + {'inserted': 2, 'updated': 0}
-E       ?              ^
-
-backend/tests/modules/core/test_config_seed.py:60: AssertionError
-__________________________________________________________________ SubcontractorReadinessServiceTest.test_missing_proof_and_expired_compliance_qualification_block_worker __________________________________________________________________
-
-self = <tests.modules.subcontractors.test_subcontractor_readiness.SubcontractorReadinessServiceTest testMethod=test_missing_proof_and_expired_compliance_qualification_block_worker>
-
-    def test_missing_proof_and_expired_compliance_qualification_block_worker(self) -> None:
-        result = self.service.get_worker_readiness("tenant-1", "subcontractor-1", "worker-blocked", self.context)
-
-        self.assertEqual(result.readiness_status, "not_ready")
->       self.assertGreaterEqual(result.blocking_issue_count, 2)
-E       AssertionError: 1 not greater than or equal to 2
-
-backend/tests/modules/subcontractors/test_subcontractor_readiness.py:308: AssertionError
-========================================================================================================= short test summary info ==========================================================================================================
-FAILED backend/tests/modules/core/test_config_seed.py::TestConfigSeed::test_tenant_setting_seed_is_idempotent - AssertionError: {'inserted': 3, 'updated': 0} != {'inserted': 2, 'updated': 0}
-FAILED backend/tests/modules/subcontractors/test_subcontractor_readiness.py::SubcontractorReadinessServiceTest::test_missing_proof_and_expired_compliance_qualification_block_worker - AssertionError: 1 not greater than or equal to 2
-2 failed, 460 passed, 15 subtests passed in 8.45s
+Work process:
+1. Inspect the active customer commercial form implementation.
+2. Inspect the billing-profile save API response handling.
+3. Inspect lookup-loading or seed data for:
+   - invoice_layout
+   - invoice_delivery_method
+   - dunning_policy
+4. Summarize root cause.
+5. Implement the smallest clean fix.
+6. Report:
+   - files changed
+   - exact root cause
+   - whether the issue was static frontend options, missing lookup data, or both
+   - how the new error message is shown to the user

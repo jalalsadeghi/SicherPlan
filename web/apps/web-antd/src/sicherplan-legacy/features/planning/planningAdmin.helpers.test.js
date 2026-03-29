@@ -9,6 +9,7 @@ import {
   formatPlanningCustomerOption,
   mapPlanningApiMessage,
   parseOptionalCoordinate,
+  resolvePlanningRouteContext,
   resolveInitialMapCenter,
 } from "./planningAdmin.helpers.js";
 
@@ -106,4 +107,15 @@ test("resolveInitialMapCenter uses existing form coordinates only when both valu
     lng: 8.1,
     source: "existing-record",
   });
+});
+
+test("resolvePlanningRouteContext keeps only supported entity and customer query context", () => {
+  assert.deepEqual(
+    resolvePlanningRouteContext({ entity: "requirement_type", customer_id: "customer-1" }),
+    { entity: "requirement_type", customerId: "customer-1" },
+  );
+  assert.deepEqual(
+    resolvePlanningRouteContext({ entity: "unknown", customer_id: 7 }),
+    { entity: null, customerId: "" },
+  );
 });

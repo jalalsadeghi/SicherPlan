@@ -178,3 +178,11 @@ export function resolveInitialMapCenter({
     source: "fallback",
   };
 }
+
+export function resolvePlanningRouteContext(query) {
+  const entity = typeof query?.entity === "string" && PLANNING_ENTITY_OPTIONS.includes(query.entity)
+    ? query.entity
+    : null;
+  const customerId = typeof query?.customer_id === "string" ? query.customer_id : "";
+  return { entity, customerId };
+}

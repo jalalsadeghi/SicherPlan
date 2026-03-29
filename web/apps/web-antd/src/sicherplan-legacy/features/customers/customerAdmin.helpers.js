@@ -197,6 +197,26 @@ export function normalizeCustomerCommercialTab(activeTab) {
   return CUSTOMER_COMMERCIAL_TAB_ORDER.includes(activeTab) ? activeTab : "billing_profile";
 }
 
+export function resolveCustomerAdminRouteContext(query) {
+  const normalizeValue = (value) => (typeof value === "string" ? value.trim() : "");
+
+  return {
+    customerId: normalizeValue(query?.customer_id),
+    detailTab: normalizeValue(query?.tab),
+  };
+}
+
+export function buildCustomerCommercialLocation(customerId = "") {
+  const query = { tab: "commercial" };
+  if (customerId) {
+    query.customer_id = customerId;
+  }
+  return {
+    path: "/admin/customers",
+    query,
+  };
+}
+
 export function mapCustomerApiMessage(messageKey) {
   const messageMap = {
     "errors.iam.auth.invalid_access_token": "customerAdmin.feedback.authRequired",

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildCustomerCommercialLocation,
   CUSTOMER_COMMERCIAL_TAB_ORDER,
   buildCustomerDetailTabs,
   buildLifecyclePayload,
@@ -15,6 +16,7 @@ import {
   mapCustomerApiMessage,
   normalizeCustomerCommercialTab,
   normalizeCustomerDetailTab,
+  resolveCustomerAdminRouteContext,
   resolveCustomerAdminSectionVisibility,
   resolveCustomerAdminSessionScope,
   resolveCustomerCancelSelection,
@@ -250,4 +252,19 @@ test("commercial subtab state falls back to billing profile", () => {
   ]);
   assert.equal(normalizeCustomerCommercialTab("pricing_rules"), "pricing_rules");
   assert.equal(normalizeCustomerCommercialTab("unknown"), "billing_profile");
+});
+
+test("customer admin route context extracts commercial deep-link state", () => {
+  assert.deepEqual(
+    resolveCustomerAdminRouteContext({ customer_id: "customer-1", tab: "commercial" }),
+    { customerId: "customer-1", detailTab: "commercial" },
+  );
+  assert.deepEqual(
+    resolveCustomerAdminRouteContext({ customer_id: ["customer-1"], tab: null }),
+    { customerId: "", detailTab: "" },
+  );
+  assert.deepEqual(
+    buildCustomerCommercialLocation("customer-1"),
+    { path: "/admin/customers", query: { tab: "commercial", customer_id: "customer-1" } },
+  );
 });

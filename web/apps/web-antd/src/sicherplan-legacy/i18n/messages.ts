@@ -1187,6 +1187,9 @@ export type MessageKey =
   | "customerAdmin.confirm.activeCommercialChange"
   | "customerAdmin.confirm.defaultInvoicePartyChange"
   | "customerAdmin.feedback.commercialSaved"
+  | "customerAdmin.feedback.billingProfileSaveFailedTitle"
+  | "customerAdmin.feedback.billingProfileSaveFailedSummary"
+  | "customerAdmin.feedback.billingProfileUnexpected"
   | "customerAdmin.feedback.invoicePartyRequired"
   | "customerAdmin.feedback.invalidInvoiceEmail"
   | "customerAdmin.feedback.invalidPaymentTerms"
@@ -1200,6 +1203,9 @@ export type MessageKey =
   | "customerAdmin.feedback.leitwegForbidden"
   | "customerAdmin.feedback.dispatchEmailRequired"
   | "customerAdmin.feedback.invoiceLayoutIncompatible"
+  | "customerAdmin.feedback.invoiceLayoutUnavailable"
+  | "customerAdmin.feedback.shippingMethodUnavailable"
+  | "customerAdmin.feedback.dunningPolicyUnavailable"
   | "customerAdmin.feedback.defaultInvoicePartyConflict"
   | "customerAdmin.feedback.rateKindRequired"
   | "customerAdmin.feedback.invalidCurrency"
@@ -2656,28 +2662,44 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.confirm.defaultInvoicePartyChange":
       "Diese Rechnungspartei wird als Standard markiert. Wirklich fortfahren?",
     "customerAdmin.feedback.commercialSaved": "Commercial-Einstellung gespeichert",
+    "customerAdmin.feedback.billingProfileSaveFailedTitle":
+      "Abrechnungsprofil konnte nicht gespeichert werden",
+    "customerAdmin.feedback.billingProfileSaveFailedSummary":
+      "Bitte korrigieren Sie die markierten Commercial-Felder und speichern Sie das Abrechnungsprofil erneut.",
+    "customerAdmin.feedback.billingProfileUnexpected":
+      "Das Abrechnungsprofil konnte wegen eines unerwarteten Fehlers nicht gespeichert werden. Bitte versuchen Sie es erneut oder kontaktieren Sie den Support.",
     "customerAdmin.feedback.invoicePartyRequired":
       "Für eine Rechnungspartei werden mindestens Firmenname und Adress-ID benötigt.",
-    "customerAdmin.feedback.invalidInvoiceEmail": "Die angegebene Rechnungs-E-Mail ist ungültig.",
-    "customerAdmin.feedback.invalidPaymentTerms": "Das Zahlungsziel ist ungültig.",
+    "customerAdmin.feedback.invalidInvoiceEmail":
+      "Die Rechnungs-E-Mail ist ungültig. Bitte geben Sie eine gültige E-Mail-Adresse ein.",
+    "customerAdmin.feedback.invalidPaymentTerms":
+      "Zahlungsziel in Tagen muss 0 oder größer sein.",
     "customerAdmin.feedback.taxExemptionReasonRequired":
-      "Bei Steuerbefreiung ist ein Grund erforderlich.",
+      "Ein Steuerbefreiungsgrund ist erforderlich, wenn „Steuerbefreit“ aktiviert ist.",
     "customerAdmin.feedback.taxExemptionReasonForbidden":
-      "Ein Steuerbefreiungsgrund darf nur bei aktiver Steuerbefreiung gesetzt werden.",
+      "Der Steuerbefreiungsgrund muss leer bleiben, solange „Steuerbefreit“ nicht aktiviert ist.",
     "customerAdmin.feedback.bankAccountHolderRequired":
-      "Bei Bankdaten ist ein Kontoinhaber erforderlich.",
-    "customerAdmin.feedback.bankIbanRequired": "Bei Bankdaten ist eine IBAN erforderlich.",
-    "customerAdmin.feedback.eInvoiceRequired": "Für E-Rechnungsversand muss E-Rechnung aktiviert sein.",
+      "Ein Kontoinhaber ist erforderlich, sobald Bankdaten hinterlegt werden.",
+    "customerAdmin.feedback.bankIbanRequired":
+      "Eine IBAN ist erforderlich, sobald Bankdaten hinterlegt werden.",
+    "customerAdmin.feedback.eInvoiceRequired":
+      "Der Versandweg steht auf E-Rechnung. Aktivieren Sie daher „E-Rechnung aktiviert“.",
     "customerAdmin.feedback.eInvoiceDispatchMismatch":
-      "Aktive E-Rechnung ist nur mit dem Versandweg E-Rechnung zulässig.",
+      "Wenn E-Rechnung aktiviert ist, muss der Versandweg auf E-Rechnung stehen.",
     "customerAdmin.feedback.leitwegRequired":
-      "Für E-Rechnungsversand ist eine Leitweg-/Routing-ID erforderlich.",
+      "Eine Leitweg-/Routing-ID ist erforderlich, wenn der Versandweg E-Rechnung ist.",
     "customerAdmin.feedback.leitwegForbidden":
-      "Eine Leitweg-/Routing-ID darf nur bei aktiver E-Rechnung gesetzt werden.",
+      "Die Leitweg-/Routing-ID muss leer bleiben, solange E-Rechnung nicht aktiv ist.",
     "customerAdmin.feedback.dispatchEmailRequired":
-      "Für E-Mail-PDF-Versand ist eine Rechnungs-E-Mail erforderlich.",
+      "Bei Versandweg E-Mail-PDF muss im Abrechnungsprofil oder in der Standard-Rechnungspartei eine Rechnungs-E-Mail hinterlegt sein.",
     "customerAdmin.feedback.invoiceLayoutIncompatible":
-      "Das gewählte Rechnungslayout ist mit dem Versandweg nicht kompatibel.",
+      "Das gewählte Rechnungslayout ist nicht mit dem E-Rechnungsversand kompatibel.",
+    "customerAdmin.feedback.invoiceLayoutUnavailable":
+      "Das gewählte Rechnungslayout ist in der Systemkonfiguration nicht verfügbar.",
+    "customerAdmin.feedback.shippingMethodUnavailable":
+      "Der gewählte Versandweg ist in der Systemkonfiguration nicht verfügbar.",
+    "customerAdmin.feedback.dunningPolicyUnavailable":
+      "Die gewählte Mahnrichtlinie ist in der Systemkonfiguration nicht verfügbar.",
     "customerAdmin.feedback.defaultInvoicePartyConflict":
       "Es gibt bereits eine Standard-Rechnungspartei für diesen Kunden.",
     "customerAdmin.feedback.rateKindRequired": "Für eine Preiskarte ist eine Preisart erforderlich.",
@@ -4141,28 +4163,44 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.confirm.defaultInvoicePartyChange":
       "This invoice party will become the default. Do you want to continue?",
     "customerAdmin.feedback.commercialSaved": "Commercial setting saved",
+    "customerAdmin.feedback.billingProfileSaveFailedTitle":
+      "Billing profile could not be saved",
+    "customerAdmin.feedback.billingProfileSaveFailedSummary":
+      "Please correct the highlighted commercial fields and save the billing profile again.",
+    "customerAdmin.feedback.billingProfileUnexpected":
+      "Billing profile could not be saved due to an unexpected error. Please try again or contact support.",
     "customerAdmin.feedback.invoicePartyRequired":
       "An invoice party needs at least a company name and an address ID.",
-    "customerAdmin.feedback.invalidInvoiceEmail": "The invoice email is invalid.",
-    "customerAdmin.feedback.invalidPaymentTerms": "The payment-term value is invalid.",
+    "customerAdmin.feedback.invalidInvoiceEmail":
+      "Invoice email is invalid. Please enter a valid email address.",
+    "customerAdmin.feedback.invalidPaymentTerms":
+      "Payment terms in days must be 0 or greater.",
     "customerAdmin.feedback.taxExemptionReasonRequired":
-      "A reason is required when tax exemption is enabled.",
+      "Tax-exemption reason is required when “Tax exempt” is enabled.",
     "customerAdmin.feedback.taxExemptionReasonForbidden":
-      "A tax-exemption reason may only be set when tax exemption is enabled.",
+      "Tax-exemption reason must stay empty unless “Tax exempt” is enabled.",
     "customerAdmin.feedback.bankAccountHolderRequired":
-      "An account holder is required when bank data is stored.",
-    "customerAdmin.feedback.bankIbanRequired": "An IBAN is required when bank data is stored.",
-    "customerAdmin.feedback.eInvoiceRequired": "E-invoice dispatch requires e-invoicing to be enabled.",
+      "Account holder is required when bank data is entered.",
+    "customerAdmin.feedback.bankIbanRequired":
+      "IBAN is required when bank data is entered.",
+    "customerAdmin.feedback.eInvoiceRequired":
+      "Dispatch method is set to E-invoice, so E-invoicing must be enabled.",
     "customerAdmin.feedback.eInvoiceDispatchMismatch":
-      "Active e-invoicing is only allowed with the e-invoice dispatch method.",
+      "When E-invoicing is enabled, Dispatch method must be set to E-invoice.",
     "customerAdmin.feedback.leitwegRequired":
-      "E-invoice dispatch requires a Leitweg/routing ID.",
+      "Leitweg/routing ID is required when Dispatch method is E-invoice.",
     "customerAdmin.feedback.leitwegForbidden":
-      "A Leitweg/routing ID may only be set when e-invoicing is enabled.",
+      "Leitweg/routing ID must stay empty unless E-invoicing is enabled.",
     "customerAdmin.feedback.dispatchEmailRequired":
-      "Email-PDF dispatch requires an invoice email address.",
+      "Because Dispatch method is Email PDF, an invoice email must be provided in Billing profile or in the default invoice party.",
     "customerAdmin.feedback.invoiceLayoutIncompatible":
-      "The selected invoice layout is incompatible with the dispatch method.",
+      "The selected invoice layout is not compatible with E-invoice dispatch.",
+    "customerAdmin.feedback.invoiceLayoutUnavailable":
+      "The selected Invoice layout is not available in the system configuration.",
+    "customerAdmin.feedback.shippingMethodUnavailable":
+      "The selected Dispatch method is not available in the system configuration.",
+    "customerAdmin.feedback.dunningPolicyUnavailable":
+      "The selected Dunning policy is not available in the system configuration.",
     "customerAdmin.feedback.defaultInvoicePartyConflict":
       "A default invoice party already exists for this customer.",
     "customerAdmin.feedback.rateKindRequired": "A rate card requires a rate kind.",

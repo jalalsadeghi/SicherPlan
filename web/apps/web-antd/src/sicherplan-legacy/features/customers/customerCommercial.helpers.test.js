@@ -6,6 +6,8 @@ import {
   deriveCustomerCommercialActionState,
   hasCustomerCommercialPermission,
   mapCustomerCommercialApiMessage,
+  resolveBillingProfileFeedbackError,
+  resolveBillingProfileApiError,
   validateBillingProfileDraft,
   validateRateCardDraft,
   validateRateLineDraft,
@@ -138,4 +140,78 @@ test("commercial api message mapping and active-change confirmation are stable",
   );
   assert.equal(buildCommercialConfirmationKey("rateCard", true), "customerAdmin.confirm.activeCommercialChange");
   assert.equal(buildCommercialConfirmationKey("rateCard", false), null);
+});
+
+test("billing-profile api errors resolve to field-aware frontend guidance", () => {
+  assert.deepEqual(
+    resolveBillingProfileApiError("errors.customers.billing_profile.dispatch_email_required"),
+    {
+      isKnown: true,
+      summaryTitleKey: "customerAdmin.feedback.billingProfileSaveFailedTitle",
+      summaryBodyKey: "customerAdmin.feedback.billingProfileSaveFailedSummary",
+      primaryMessageKey: "customerAdmin.feedback.dispatchEmailRequired",
+      fields: ["invoice_email", "shipping_method_code"],
+      details: {},
+    },
+  );
+  assert.deepEqual(
+    resolveBillingProfileApiError("errors.customers.billing_profile.leitweg_required"),
+    {
+      isKnown: true,
+      summaryTitleKey: "customerAdmin.feedback.billingProfileSaveFailedTitle",
+      summaryBodyKey: "customerAdmin.feedback.billingProfileSaveFailedSummary",
+      primaryMessageKey: "customerAdmin.feedback.leitwegRequired",
+      fields: ["leitweg_id", "shipping_method_code", "e_invoice_enabled"],
+      details: {},
+    },
+  );
+  assert.deepEqual(
+    resolveBillingProfileApiError(
+      "errors.customers.lookup.not_found",
+      {},
+      "customers.validation.billing_profile_shipping_method",
+    ),
+    {
+      isKnown: true,
+      summaryTitleKey: "customerAdmin.feedback.billingProfileSaveFailedTitle",
+      summaryBodyKey: "customerAdmin.feedback.billingProfileSaveFailedSummary",
+      primaryMessageKey: "customerAdmin.feedback.shippingMethodUnavailable",
+      fields: ["shipping_method_code"],
+      details: {},
+    },
+  );
+  assert.deepEqual(
+    resolveBillingProfileApiError("errors.customers.billing_profile.unknown_rule"),
+    {
+      isKnown: false,
+      summaryTitleKey: "customerAdmin.feedback.billingProfileSaveFailedTitle",
+      summaryBodyKey: "customerAdmin.feedback.billingProfileUnexpected",
+      primaryMessageKey: null,
+      fields: [],
+      details: {},
+    },
+  );
+});
+
+test("billing-profile client validation messages resolve to the same field guidance", () => {
+  assert.deepEqual(
+    resolveBillingProfileFeedbackError("customerAdmin.feedback.eInvoiceDispatchMismatch"),
+    {
+      isKnown: true,
+      summaryTitleKey: "customerAdmin.feedback.billingProfileSaveFailedTitle",
+      summaryBodyKey: "customerAdmin.feedback.billingProfileSaveFailedSummary",
+      primaryMessageKey: "customerAdmin.feedback.eInvoiceDispatchMismatch",
+      fields: ["shipping_method_code", "e_invoice_enabled"],
+    },
+  );
+  assert.deepEqual(
+    resolveBillingProfileFeedbackError("customerAdmin.feedback.unknown"),
+    {
+      isKnown: false,
+      summaryTitleKey: "customerAdmin.feedback.billingProfileSaveFailedTitle",
+      summaryBodyKey: "customerAdmin.feedback.billingProfileUnexpected",
+      primaryMessageKey: null,
+      fields: [],
+    },
+  );
 });

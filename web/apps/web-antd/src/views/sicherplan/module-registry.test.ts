@@ -31,6 +31,12 @@ describe('module registry wrapper flags', () => {
     expect(planning.showWorkspaceSectionHeader).toBe(false);
   });
 
+  it('keeps the planning-orders page intro while removing the workspace section header', () => {
+    const planningOrders = moduleRegistry['planning-orders']!;
+    expect(planningOrders.showPageIntro).toBeUndefined();
+    expect(planningOrders.showWorkspaceSectionHeader).toBe(false);
+  });
+
   it('keeps customers unavailable to platform admin in the shared module registry', () => {
     const customers = moduleRegistry.customers!;
     expect(customers.allowedRoles).toEqual([

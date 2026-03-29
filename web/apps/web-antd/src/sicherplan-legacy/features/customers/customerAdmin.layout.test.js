@@ -14,6 +14,7 @@ test("customer workspace keeps desktop master detail layout with detail tabs", (
   assert.match(source, /data-testid="customer-list-section"/);
   assert.match(source, /data-testid="customer-detail-workspace"/);
   assert.match(source, /data-testid="customer-detail-tabs"/);
+  assert.match(source, /resolveCustomerAdminRouteContext\(route\.query\)/);
 });
 
 test("commercial workspace uses nested sub tabs and isolated panels", () => {
@@ -36,6 +37,28 @@ test("non-overview customer tabs reuse the structured section pattern", () => {
   assert.match(source, /customer-tab-panel-portal[\s\S]*customerAdmin\.portal\.lead[\s\S]*customer-portal-access-section[\s\S]*customerAdmin\.portalAccess\.title[\s\S]*customerAdmin\.loginHistory\.title/);
   assert.match(source, /customer-tab-panel-history[\s\S]*customerAdmin\.history\.registerEyebrow[\s\S]*customerAdmin\.history\.attachmentEyebrow/);
   assert.match(source, /customer-tab-panel-employee-blocks[\s\S]*customerAdmin\.employeeBlocks\.registerEyebrow[\s\S]*customerAdmin\.employeeBlocks\.editorEyebrow/);
+});
+
+test("billing-profile form surfaces inline validation summary and field-level error hooks", () => {
+  assert.match(source, /data-testid="customer-billing-profile-error-summary"/);
+  assert.match(source, /billingProfileErrorState\.summaryBody/);
+  assert.match(source, /billingProfileFieldError\('invoice_email'\)/);
+  assert.match(source, /billingProfileFieldError\('shipping_method_code'\)/);
+  assert.match(source, /billingProfileFieldError\('dunning_policy_code'\)/);
+  assert.match(source, /billingProfileFieldError\('tax_exemption_reason'\)/);
+  assert.match(source, /billingProfileFieldError\('leitweg_id'\)/);
+  assert.match(source, /clearBillingProfileFieldErrors\(\['invoice_email'\]\)/);
+  assert.match(source, /customer-admin-field-stack--error/);
+  assert.match(source, /customer-admin-checkbox--error/);
+});
+
+test("billing-profile selects use lookup-backed reference data instead of hardcoded option arrays", () => {
+  assert.match(source, /billingInvoiceLayoutOptions/);
+  assert.match(source, /billingShippingMethodOptions/);
+  assert.match(source, /billingDunningPolicyOptions/);
+  assert.doesNotMatch(source, /const INVOICE_LAYOUT_OPTIONS =/);
+  assert.doesNotMatch(source, /const SHIPPING_METHOD_OPTIONS =/);
+  assert.doesNotMatch(source, /const DUNNING_POLICY_OPTIONS =/);
 });
 
 test("full tab editors no longer use legacy inline-form layout", () => {

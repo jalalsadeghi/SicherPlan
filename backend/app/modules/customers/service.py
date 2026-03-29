@@ -188,6 +188,18 @@ class CustomerService:
                 CustomerReferenceOptionRead.model_validate(lookup)
                 for lookup in self.repository.list_lookup_values(tenant_id, "customer_status")
             ],
+            invoice_layouts=[
+                CustomerReferenceOptionRead.model_validate(lookup)
+                for lookup in self.repository.list_lookup_values(None, "invoice_layout")
+            ],
+            shipping_methods=[
+                CustomerReferenceOptionRead.model_validate(lookup)
+                for lookup in self.repository.list_lookup_values(None, "invoice_delivery_method")
+            ],
+            dunning_policies=[
+                CustomerReferenceOptionRead.model_validate(lookup)
+                for lookup in self.repository.list_lookup_values(None, "dunning_policy")
+            ],
             branches=[
                 CustomerBranchOptionRead.model_validate(branch)
                 for branch in self.repository.list_branches(tenant_id)

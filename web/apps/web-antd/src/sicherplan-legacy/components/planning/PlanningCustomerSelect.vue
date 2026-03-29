@@ -10,7 +10,7 @@
       :placeholder="searchPlaceholder"
       :filter-option="filterOption"
       :options="selectOptions"
-      :status="error ? 'error' : undefined"
+      :status="error || invalid ? 'error' : undefined"
       popup-class-name="planning-admin-select-dropdown"
       class="planning-admin-select"
       @change="handleChange"
@@ -61,6 +61,10 @@ const props = defineProps({
   error: {
     type: String,
     default: "",
+  },
+  invalid: {
+    type: Boolean,
+    default: false,
   },
   searchPlaceholder: {
     type: String,

@@ -195,6 +195,9 @@ class FakeCustomerRepository:
             "lookup-category": FakeLookup("lookup-category", "customer_category", "standard", "Standardkunde", tenant_id="tenant-1"),
             "lookup-ranking": FakeLookup("lookup-ranking", "customer_ranking", "a", "A-Kunde", tenant_id="tenant-1"),
             "lookup-status": FakeLookup("lookup-status", "customer_status", "qualified", "Qualifiziert"),
+            "lookup-invoice-layout-standard": FakeLookup("lookup-invoice-layout-standard", "invoice_layout", "standard", "Standard"),
+            "lookup-shipping-method-email": FakeLookup("lookup-shipping-method-email", "invoice_delivery_method", "email_pdf", "E-Mail PDF"),
+            "lookup-dunning-policy-standard": FakeLookup("lookup-dunning-policy-standard", "dunning_policy", "standard", "Standard"),
         }
         self.branches = {"branch-1": FakeBranch("branch-1", "tenant-1")}
         self.mandates = {"mandate-1": FakeMandate("mandate-1", "tenant-1", "branch-1")}
@@ -623,6 +626,9 @@ class TestCustomerService(unittest.TestCase):
         self.assertTrue(any(item.id == "lookup-category" for item in reference_data.classifications))
         self.assertTrue(any(item.id == "lookup-ranking" for item in reference_data.rankings))
         self.assertTrue(any(item.id == "lookup-status" for item in reference_data.customer_statuses))
+        self.assertTrue(any(item.code == "standard" for item in reference_data.invoice_layouts))
+        self.assertTrue(any(item.code == "email_pdf" for item in reference_data.shipping_methods))
+        self.assertTrue(any(item.code == "standard" for item in reference_data.dunning_policies))
         self.assertEqual(reference_data.branches[0].id, "branch-1")
         self.assertEqual(reference_data.mandates[0].branch_id, "branch-1")
 

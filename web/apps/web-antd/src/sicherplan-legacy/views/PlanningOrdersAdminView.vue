@@ -1,35 +1,5 @@
 <template>
   <section class="planning-orders-page">
-    <section class="module-card planning-orders-hero">
-      <div>
-        <p class="eyebrow">{{ tp("eyebrow") }}</p>
-        <h2>{{ tp("title") }}</h2>
-        <p class="planning-orders-lead">{{ tp("lead") }}</p>
-        <div class="planning-orders-meta">
-          <span class="planning-orders-meta__pill">{{ tp("readOrders") }}: {{ actionState.canReadOrders ? "on" : "off" }}</span>
-          <span class="planning-orders-meta__pill">{{ tp("writeOrders") }}: {{ actionState.canWriteOrders ? "on" : "off" }}</span>
-          <span class="planning-orders-meta__pill">{{ tp("readPlanning") }}: {{ actionState.canReadPlanning ? "on" : "off" }}</span>
-          <span class="planning-orders-meta__pill">{{ tp("writePlanning") }}: {{ actionState.canWritePlanning ? "on" : "off" }}</span>
-        </div>
-      </div>
-
-      <div class="module-card planning-orders-scope">
-        <label class="field-stack">
-          <span>{{ tp("scopeLabel") }}</span>
-          <input v-model="tenantScopeInput" :placeholder="tp('scopePlaceholder')" />
-        </label>
-        <label class="field-stack">
-          <span>{{ tp("tokenLabel") }}</span>
-          <input v-model="accessTokenInput" type="password" :placeholder="tp('tokenPlaceholder')" />
-        </label>
-        <p class="field-help">{{ tp("tokenHelp") }}</p>
-        <div class="cta-row">
-          <button class="cta-button" type="button" @click="rememberScopeAndToken">{{ tp("actionsRemember") }}</button>
-          <button class="cta-button cta-secondary" type="button" :disabled="!canReadAnything" @click="refreshAll">{{ tp("actionsRefresh") }}</button>
-        </div>
-      </div>
-    </section>
-
     <section v-if="feedback.message" class="planning-orders-feedback" :data-tone="feedback.tone">
       <div>
         <strong>{{ feedback.title }}</strong>
@@ -48,8 +18,11 @@
       <h3>{{ tp("missingPermissionBody") }}</h3>
     </section>
 
-    <div v-else class="planning-orders-grid">
-      <section class="module-card planning-orders-panel">
+    <div v-else class="planning-orders-grid" data-testid="planning-orders-master-detail-layout">
+      <section
+        class="module-card planning-orders-panel planning-orders-list-panel"
+        data-testid="planning-orders-list-section"
+      >
         <div class="planning-orders-panel__header">
           <div>
             <p class="eyebrow">{{ tp("ordersTitle") }}</p>
@@ -63,10 +36,19 @@
             <span>{{ tp("filtersSearch") }}</span>
             <input v-model="orderFilters.search" />
           </label>
-          <label class="field-stack">
-            <span>{{ tp("filtersCustomerId") }}</span>
-            <input v-model="orderFilters.customer_id" />
-          </label>
+          <PlanningCustomerSelect
+            v-model="orderFilters.customer_id"
+            :label="tp('filtersCustomerId')"
+            :options="customerOptions"
+            :loading="customerLookupLoading"
+            :disabled="!tenantScopeId || !accessToken"
+            :error="customerLookupError"
+            :search-placeholder="tp('customerSearchPlaceholder')"
+            :empty-option-label="tp('filtersCustomerId')"
+            :loading-text="tp('customerLoading')"
+            :empty-text="tp('customerEmpty')"
+            :no-match-text="tp('customerNoMatch')"
+          />
           <label class="field-stack">
             <span>{{ tp("filtersReleaseState") }}</span>
             <select v-model="orderFilters.release_state">
@@ -99,7 +81,7 @@
           >
             <div>
               <strong>{{ order.order_no }} · {{ order.title }}</strong>
-              <span>{{ order.customer_id }}</span>
+              <span>{{ formatOrderCustomerLabel(order.customer_id) }}</span>
             </div>
             <StatusBadge :status="order.release_state" />
           </button>
@@ -107,49 +89,224 @@
         <p v-else class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
       </section>
 
-      <section class="module-card planning-orders-panel planning-orders-detail">
+      <section
+        class="module-card planning-orders-panel planning-orders-detail"
+        data-testid="planning-orders-detail-workspace"
+      >
         <div class="planning-orders-panel__header">
           <div>
             <p class="eyebrow">{{ tp("detailTitle") }}</p>
             <h3>{{ selectedOrder ? `${selectedOrder.order_no} · ${selectedOrder.title}` : tp("noOrderSelected") }}</h3>
+            <p v-if="isCreatingOrder || selectedOrder" class="field-help">{{ tp("lead") }}</p>
           </div>
-          <StatusBadge v-if="selectedOrder" :status="selectedOrder.release_state" />
+          <div class="planning-orders-header-actions">
+            <button
+              v-if="showPlanningSetupCta"
+              class="cta-button cta-secondary"
+              type="button"
+              @click="openPlanningSetup(missingSetupEntity)"
+            >
+              {{ tp("actionsOpenPlanningSetup") }}
+            </button>
+            <StatusBadge v-if="selectedOrder" :status="selectedOrder.release_state" />
+          </div>
         </div>
 
         <template v-if="isCreatingOrder || selectedOrder">
-          <form class="planning-orders-form" @submit.prevent="submitOrder">
-            <div class="planning-orders-form-grid">
-              <label class="field-stack"><span>{{ tp("filtersCustomerId") }}</span><input v-model="orderDraft.customer_id" required /></label>
-              <label class="field-stack"><span>{{ tp("fieldsRequirementTypeId") }}</span><input v-model="orderDraft.requirement_type_id" required /></label>
-              <label class="field-stack"><span>{{ tp("fieldsPatrolRouteId") }}</span><input v-model="orderDraft.patrol_route_id" /></label>
-              <label class="field-stack"><span>{{ tp("fieldsOrderNo") }}</span><input v-model="orderDraft.order_no" required /></label>
-              <label class="field-stack"><span>{{ tp("fieldsTitle") }}</span><input v-model="orderDraft.title" required /></label>
-              <label class="field-stack"><span>{{ tp("fieldsServiceCategory") }}</span><input v-model="orderDraft.service_category_code" required /></label>
-              <label class="field-stack"><span>{{ tp("fieldsServiceFrom") }}</span><input v-model="orderDraft.service_from" type="date" required /></label>
-              <label class="field-stack"><span>{{ tp("fieldsServiceTo") }}</span><input v-model="orderDraft.service_to" type="date" required /></label>
-              <label class="field-stack"><span>{{ tp("fieldsStatus") }}</span><input v-model="orderDraft.status" /></label>
-              <label class="field-stack field-stack--wide"><span>{{ tp("fieldsSecurityConcept") }}</span><textarea v-model="orderDraft.security_concept_text" rows="3" /></label>
-              <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="orderDraft.notes" rows="3" /></label>
-            </div>
+          <nav
+            v-if="orderDetailTabs.length"
+            class="planning-orders-tabs"
+            aria-label="Planning order detail sections"
+            data-testid="planning-orders-detail-tabs"
+          >
+            <button
+              v-for="tab in orderDetailTabs"
+              :key="tab.id"
+              type="button"
+              class="planning-orders-tab"
+              :class="{ active: tab.id === activeDetailTab }"
+              :data-testid="`planning-orders-tab-${tab.id}`"
+              @click="activeDetailTab = tab.id"
+            >
+              {{ tab.label }}
+            </button>
+          </nav>
 
-            <div class="cta-row">
-              <button class="cta-button" type="submit" :disabled="!actionState.canWriteOrders">{{ tp("actionsSave") }}</button>
-              <button class="cta-button cta-secondary" type="button" @click="resetOrderDraft">{{ tp("actionsReset") }}</button>
-            </div>
-          </form>
+          <section v-show="activeDetailTab === 'overview'" class="planning-orders-tab-panel" data-testid="planning-orders-tab-panel-overview">
+            <form class="planning-orders-form" @submit.prevent="submitOrder">
+              <div class="planning-orders-form-grid">
+                <PlanningCustomerSelect
+                  v-model="orderDraft.customer_id"
+                  :label="tp('fieldsCustomer')"
+                  :options="customerOptions"
+                  :loading="customerLookupLoading"
+                  :disabled="loading.action"
+                  :invalid="customerFieldInvalid"
+                  :error="customerLookupError"
+                  :search-placeholder="tp('customerSearchPlaceholder')"
+                  :empty-option-label="tp('filtersCustomerId')"
+                  :loading-text="tp('customerLoading')"
+                  :empty-text="tp('customerEmpty')"
+                  :no-match-text="tp('customerNoMatch')"
+                />
+                <label class="field-stack"><span>{{ tp("fieldsOrderNo") }}</span><input v-model="orderDraft.order_no" required /></label>
+                <label class="field-stack">
+                  <div class="planning-orders-field-header">
+                    <span>{{ tp("fieldsRequirementType") }}</span>
+                    <button
+                      class="cta-button cta-secondary planning-orders-field-action"
+                      type="button"
+                      :disabled="!!setupActionDisabledReason() || loading.action"
+                      :title="setupActionDisabledReason()"
+                      @click="openRequirementTypeModal"
+                    >
+                      {{ tp("actionsAddRequirementType") }}
+                    </button>
+                  </div>
+                  <Select
+                    :value="orderDraft.requirement_type_id || undefined"
+                    show-search
+                    class="planning-admin-select"
+                    popup-class-name="planning-admin-select-dropdown"
+                    :options="requirementTypeSelectOptions"
+                    :loading="requirementTypeLookupLoading"
+                    :disabled="loading.action || !orderDraft.customer_id"
+                    :filter-option="filterSelectOption"
+                    :placeholder="requirementTypePlaceholder"
+                    :status="requirementTypeLookupError || requirementTypeFieldInvalid ? 'error' : undefined"
+                    @change="handleRequirementTypeChange"
+                  />
+                  <p v-if="requirementTypeLookupLoading" class="field-help">{{ tp("requirementTypeLoading") }}</p>
+                  <p v-else-if="requirementTypeLookupError" class="field-help">{{ requirementTypeLookupError }}</p>
+                  <p v-else-if="requirementTypeSetupMissing" class="field-help">
+                    {{ tp("requirementTypeSetupMissing") }}
+                    <button class="planning-orders-inline-link" type="button" @click="openPlanningSetup('requirement_type')">
+                      {{ tp("actionsOpenPlanningSetup") }}
+                    </button>
+                  </p>
+                  <p v-else-if="requirementTypeFieldInvalid" class="field-help">{{ tp("requirementTypeRequired") }}</p>
+                </label>
+                <label class="field-stack">
+                  <div class="planning-orders-field-header">
+                    <span>{{ tp("fieldsPatrolRoute") }}</span>
+                    <button
+                      class="cta-button cta-secondary planning-orders-field-action"
+                      type="button"
+                      :disabled="!!setupActionDisabledReason() || loading.action"
+                      :title="setupActionDisabledReason()"
+                      @click="openPatrolRouteModal"
+                    >
+                      {{ tp("actionsAddPatrolRoute") }}
+                    </button>
+                  </div>
+                  <Select
+                    :value="orderDraft.patrol_route_id || undefined"
+                    show-search
+                    allow-clear
+                    class="planning-admin-select"
+                    popup-class-name="planning-admin-select-dropdown"
+                    :options="patrolRouteSelectOptions"
+                    :loading="patrolRouteLookupLoading"
+                    :disabled="loading.action || !orderDraft.customer_id"
+                    :filter-option="filterSelectOption"
+                    :placeholder="patrolRoutePlaceholder"
+                    :status="patrolRouteLookupError ? 'error' : undefined"
+                    @change="handlePatrolRouteChange"
+                    @clear="handlePatrolRouteClear"
+                  />
+                  <p v-if="patrolRouteLookupLoading" class="field-help">{{ tp("patrolRouteLoading") }}</p>
+                  <p v-else-if="patrolRouteLookupError" class="field-help">{{ patrolRouteLookupError }}</p>
+                  <p v-else-if="patrolRouteSetupMissing" class="field-help">
+                    {{ tp("patrolRouteSetupMissing") }}
+                    <button class="planning-orders-inline-link" type="button" @click="openPlanningSetup('patrol_route')">
+                      {{ tp("actionsOpenPlanningSetup") }}
+                    </button>
+                  </p>
+                </label>
+                <label class="field-stack"><span>{{ tp("fieldsTitle") }}</span><input v-model="orderDraft.title" required /></label>
+                <label class="field-stack">
+                  <span>{{ tp("fieldsServiceCategory") }}</span>
+                  <input v-model="orderDraft.service_category_code" required />
+                  <p class="field-help">{{ tp("serviceCategoryManualHelp") }}</p>
+                </label>
+                <div class="planning-orders-form-row planning-orders-form-row--triple">
+                  <label class="field-stack"><span>{{ tp("fieldsServiceFrom") }}</span><input v-model="orderDraft.service_from" type="date" :max="orderDraft.service_to || undefined" required /></label>
+                  <label class="field-stack"><span>{{ tp("fieldsServiceTo") }}</span><input v-model="orderDraft.service_to" type="date" :min="orderDraft.service_from || undefined" required /></label>
+                  <label class="field-stack">
+                    <span>{{ tp("fieldsReleaseState") }}</span>
+                    <select v-model="orderDraft.release_state" :disabled="!isCreatingOrder">
+                      <option v-for="option in orderReleaseStateOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                      </option>
+                    </select>
+                    <p v-if="!isCreatingOrder" class="field-help">{{ tp("releaseStateManagedSeparately") }}</p>
+                  </label>
+                </div>
+                <label class="field-stack field-stack--wide"><span>{{ tp("fieldsSecurityConcept") }}</span><textarea v-model="orderDraft.security_concept_text" rows="3" /></label>
+                <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="orderDraft.notes" rows="3" /></label>
+              </div>
 
-          <section v-if="selectedOrder" class="planning-orders-section">
-            <div class="planning-orders-panel__header"><h3>{{ tp("sectionCommercial") }}</h3></div>
-            <p :class="selectedOrderCommercial?.is_release_ready ? 'planning-orders-state--good' : 'planning-orders-state--bad'">
-              {{ selectedOrderCommercial?.is_release_ready ? tp("commercialReady") : tp("commercialBlocked") }}
-            </p>
-            <ul v-if="selectedOrderCommercial?.blocking_issues?.length" class="planning-orders-issues">
-              <li v-for="issue in selectedOrderCommercial.blocking_issues" :key="issue.code">{{ issue.code }}</li>
-            </ul>
-            <p v-if="selectedOrderCommercial?.warning_issues?.length" class="planning-orders-state--warn">{{ tp("commercialWarnings") }}</p>
+              <div class="cta-row">
+                <button class="cta-button" type="submit" :disabled="!actionState.canWriteOrders">{{ tp("actionsSave") }}</button>
+                <button class="cta-button cta-secondary" type="button" @click="resetOrderDraft">{{ tp("actionsReset") }}</button>
+              </div>
+            </form>
           </section>
 
-          <section v-if="selectedOrder" class="planning-orders-section">
+          <section
+            v-if="selectedOrder"
+            v-show="activeDetailTab === 'commercial'"
+            class="planning-orders-tab-panel planning-orders-section"
+            data-testid="planning-orders-tab-panel-commercial"
+          >
+            <div class="planning-orders-panel__header"><h3>{{ tp("sectionCommercial") }}</h3></div>
+            <div class="planning-orders-commercial-summary">
+              <p
+                class="planning-orders-commercial-summary__headline"
+                :class="selectedOrderCommercial?.is_release_ready ? 'planning-orders-state--good' : orderCommercialBlockingIssues.length ? 'planning-orders-state--bad' : 'planning-orders-state--warn'"
+              >
+                {{ tp(commercialSummaryKey) }}
+              </p>
+              <p class="field-help">
+                {{ tpf(commercialContextKey, { customerLabel: commercialCustomerLabel }) }}
+              </p>
+              <p class="field-help">
+                {{
+                  selectedOrderCustomerLabel
+                    ? tpf("commercialFixHint", { customerLabel: selectedOrderCustomerLabel })
+                    : tp("commercialFixHintFallback")
+                }}
+              </p>
+              <div class="cta-row">
+                <button class="cta-button cta-secondary" type="button" @click="openCustomerCommercialSettings">
+                  {{ tp("commercialActionOpenCustomerCommercial") }}
+                </button>
+              </div>
+            </div>
+            <div v-if="orderCommercialBlockingIssues.length" class="planning-orders-commercial-block">
+              <strong>{{ tp("commercialBlockingListTitle") }}</strong>
+              <ul class="planning-orders-issues planning-orders-issues--blocking">
+                <li v-for="issue in orderCommercialBlockingIssues" :key="issue.code">
+                  {{ resolveCommercialIssueMessage(issue.code) }}
+                </li>
+              </ul>
+            </div>
+            <div v-if="orderCommercialWarningIssues.length" class="planning-orders-commercial-block">
+              <strong class="planning-orders-state--warn">{{ tp("commercialWarningsListTitle") }}</strong>
+              <ul class="planning-orders-issues planning-orders-issues--warning">
+                <li v-for="issue in orderCommercialWarningIssues" :key="issue.code">
+                  {{ resolveCommercialIssueMessage(issue.code) }}
+                </li>
+              </ul>
+            </div>
+          </section>
+
+          <section
+            v-if="selectedOrder"
+            v-show="activeDetailTab === 'release'"
+            class="planning-orders-tab-panel planning-orders-section"
+            data-testid="planning-orders-tab-panel-release"
+          >
             <div class="planning-orders-panel__header"><h3>{{ tp("sectionOrderRelease") }}</h3></div>
             <div class="cta-row">
               <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canTransitionOrder" @click="transitionOrder('draft')">{{ tp("actionsBackToDraft") }}</button>
@@ -158,7 +315,12 @@
             </div>
           </section>
 
-          <section v-if="selectedOrder" class="planning-orders-section">
+          <section
+            v-if="selectedOrder"
+            v-show="activeDetailTab === 'documents'"
+            class="planning-orders-tab-panel planning-orders-section"
+            data-testid="planning-orders-tab-panel-documents"
+          >
             <div class="planning-orders-panel__header"><h3>{{ tp("sectionOrderDocuments") }}</h3></div>
             <div v-if="orderAttachments.length" class="planning-orders-doc-list">
               <div v-for="document in orderAttachments" :key="document.id" class="planning-orders-doc-row">
@@ -188,7 +350,12 @@
             </form>
           </section>
 
-          <section v-if="selectedOrder" class="planning-orders-section">
+          <section
+            v-if="selectedOrder"
+            v-show="activeDetailTab === 'planning_records'"
+            class="planning-orders-tab-panel planning-orders-section"
+            data-testid="planning-orders-tab-panel-planning-records"
+          >
             <div class="planning-orders-panel__header">
               <div>
                 <p class="eyebrow">{{ tp("sectionPlanningList") }}</p>
@@ -318,13 +485,99 @@
         </section>
       </section>
     </div>
+
+    <Modal
+      v-model:open="requirementTypeModal.open"
+      :confirm-loading="requirementTypeModal.saving"
+      :title="tp('requirementTypeModalTitle')"
+      @ok="submitRequirementTypeModal"
+      @cancel="resetRequirementTypeModal"
+    >
+      <div class="planning-orders-modal-form">
+        <p class="field-help">{{ tp("requirementTypeModalLead") }}</p>
+        <label class="field-stack">
+          <span>{{ tp("fieldsCustomer") }}</span>
+          <input :value="formatOrderCustomerLabel(orderDraft.customer_id)" readonly />
+        </label>
+        <label class="field-stack">
+          <span>{{ tp("fieldsCode") }}</span>
+          <input v-model="requirementTypeModal.code" />
+        </label>
+        <label class="field-stack">
+          <span>{{ tp("fieldsLabelGeneric") }}</span>
+          <input v-model="requirementTypeModal.label" />
+        </label>
+        <label class="field-stack">
+          <span>{{ tp("fieldsDefaultPlanningMode") }}</span>
+          <select v-model="requirementTypeModal.default_planning_mode_code">
+            <option v-for="option in planningModeOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
+        <label class="field-stack">
+          <span>{{ tp("fieldsDescription") }}</span>
+          <textarea v-model="requirementTypeModal.description" rows="3" />
+        </label>
+      </div>
+    </Modal>
+
+    <Modal
+      v-model:open="patrolRouteModal.open"
+      :confirm-loading="patrolRouteModal.saving"
+      :title="tp('patrolRouteModalTitle')"
+      @ok="submitPatrolRouteModal"
+      @cancel="resetPatrolRouteModal"
+    >
+      <div class="planning-orders-modal-form">
+        <p class="field-help">{{ tp("patrolRouteModalLead") }}</p>
+        <label class="field-stack">
+          <span>{{ tp("fieldsCustomer") }}</span>
+          <input :value="formatOrderCustomerLabel(orderDraft.customer_id)" readonly />
+        </label>
+        <label class="field-stack">
+          <span>{{ tp("fieldsRouteNo") }}</span>
+          <input v-model="patrolRouteModal.route_no" />
+        </label>
+        <label class="field-stack">
+          <span>{{ tp("fieldsNameGeneric") }}</span>
+          <input v-model="patrolRouteModal.name" />
+        </label>
+        <label class="field-stack">
+          <span>{{ tp("fieldsStartPointText") }}</span>
+          <input v-model="patrolRouteModal.start_point_text" />
+        </label>
+        <label class="field-stack">
+          <span>{{ tp("fieldsEndPointText") }}</span>
+          <input v-model="patrolRouteModal.end_point_text" />
+        </label>
+        <label class="field-stack">
+          <span>{{ tp("fieldsTravelPolicyCode") }}</span>
+          <input v-model="patrolRouteModal.travel_policy_code" />
+        </label>
+        <label class="field-stack">
+          <span>{{ tp("fieldsNotes") }}</span>
+          <textarea v-model="patrolRouteModal.notes" rows="3" />
+        </label>
+      </div>
+    </Modal>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
+
+import { Modal, Select } from "ant-design-vue";
+import { useRouter } from "vue-router";
 
 import StatusBadge from "@/components/StatusBadge.vue";
+import PlanningCustomerSelect from "@/components/planning/PlanningCustomerSelect.vue";
+import { listCustomers, type CustomerListItem } from "@/api/customers";
+import {
+  createPlanningRecord as createPlanningCatalogRecord,
+  listPlanningRecords as listPlanningCatalogRecords,
+  type PlanningListItem,
+} from "@/api/planningAdmin";
 import {
   createCustomerOrder,
   createOrderAttachment,
@@ -344,30 +597,70 @@ import {
   setPlanningRecordReleaseState,
   updateCustomerOrder,
   updatePlanningRecord,
+  type CustomerOrderListItem,
   type CustomerOrderRead,
   type PlanningCommercialLinkRead,
+  type PlanningRecordListItem,
   type PlanningRecordRead,
   type PlanningDocumentRead,
 } from "@/api/planningOrders";
 import {
+  buildCustomerCommercialLocation,
+  buildPlanningSetupLocation,
   derivePlanningOrderActionState,
+  derivePlanningOrderSubmitBlockReason,
+  filterPlanningOrderOptionsByCustomer,
+  formatPlanningCommercialIssueFallback,
+  formatPlanningOrderReferenceOption,
+  hasPlanningOrderSetupGap,
+  mapPlanningCommercialIssueCode,
   mapPlanningOrderApiMessage,
+  normalizePlanningOrderUuidValue,
   planningModeLabel,
+  validatePlanningOrderDraft,
 } from "@/features/planning/planningOrders.helpers.js";
+import { formatPlanningCustomerOption, hasPlanningPermission } from "@/features/planning/planningAdmin.helpers.js";
 import { planningOrdersMessages } from "@/i18n/planningOrders.messages";
 import { useLocaleStore } from "@/stores/locale";
 import { useAuthStore } from "@/stores/auth";
 
 const authStore = useAuthStore();
 const localeStore = useLocaleStore();
+const router = useRouter();
 
 const feedback = reactive({ tone: "neutral", title: "", message: "" });
 const loading = reactive({ orders: false, orderDetail: false, planning: false, action: false });
 const orderFilters = reactive({ search: "", customer_id: "", release_state: "", include_archived: false });
-const tenantScopeInput = ref(authStore.tenantScopeId || authStore.sessionUser?.tenant_id || "");
-const accessTokenInput = ref(authStore.accessToken || "");
-const orders = ref<CustomerOrderRead[]>([]);
-const planningRecords = ref<PlanningRecordRead[]>([]);
+const customerOptions = ref<CustomerListItem[]>([]);
+const customerLookupLoading = ref(false);
+const customerLookupError = ref("");
+const requirementTypeOptions = ref<PlanningListItem[]>([]);
+const requirementTypeLookupLoading = ref(false);
+const requirementTypeLookupError = ref("");
+const patrolRouteOptions = ref<PlanningListItem[]>([]);
+const patrolRouteLookupLoading = ref(false);
+const patrolRouteLookupError = ref("");
+const orderValidationState = reactive({ attempted: false });
+const requirementTypeModal = reactive({
+  open: false,
+  saving: false,
+  code: "",
+  label: "",
+  default_planning_mode_code: "site",
+  description: "",
+});
+const patrolRouteModal = reactive({
+  open: false,
+  saving: false,
+  route_no: "",
+  name: "",
+  start_point_text: "",
+  end_point_text: "",
+  travel_policy_code: "",
+  notes: "",
+});
+const orders = ref<CustomerOrderListItem[]>([]);
+const planningRecords = ref<PlanningRecordListItem[]>([]);
 const orderAttachments = ref<PlanningDocumentRead[]>([]);
 const planningAttachments = ref<PlanningDocumentRead[]>([]);
 const selectedOrderId = ref("");
@@ -378,6 +671,7 @@ const selectedOrderCommercial = ref<PlanningCommercialLinkRead | null>(null);
 const selectedPlanningCommercial = ref<PlanningCommercialLinkRead | null>(null);
 const isCreatingOrder = ref(false);
 const isCreatingPlanning = ref(false);
+const activeDetailTab = ref("overview");
 
 const orderDraft = reactive({
   customer_id: "",
@@ -390,7 +684,7 @@ const orderDraft = reactive({
   service_to: "",
   security_concept_text: "",
   notes: "",
-  status: "active",
+  release_state: "draft",
 });
 
 const planningDraft = reactive({
@@ -420,10 +714,146 @@ const effectiveRole = computed(() => authStore.effectiveRole);
 const actionState = computed(() =>
   derivePlanningOrderActionState(effectiveRole.value, selectedOrder.value, selectedPlanningRecord.value),
 );
+const canWritePlanningSetup = computed(() => hasPlanningPermission(effectiveRole.value, "planning.ops.write"));
 const canReadAnything = computed(() => actionState.value.canReadOrders || actionState.value.canReadPlanning);
+const planningModeOptions = computed(() => [
+  { label: tp("modeEvent"), value: "event" },
+  { label: tp("modeSite"), value: "site" },
+  { label: tp("modeTradeFair"), value: "trade_fair" },
+  { label: tp("modePatrol"), value: "patrol" },
+]);
+const orderReleaseStateOptions = computed(() => [
+  { label: tp("statusDraft"), value: "draft" },
+  { label: tp("statusReleaseReady"), value: "release_ready" },
+  { label: tp("statusReleased"), value: "released" },
+]);
+const requirementTypeSelectOptions = computed(() =>
+  filterPlanningOrderOptionsByCustomer(requirementTypeOptions.value, orderDraft.customer_id).map((row) => ({
+    label: formatPlanningOrderReferenceOption("requirement_type", row),
+    value: row.id,
+  })),
+);
+const patrolRouteSelectOptions = computed(() =>
+  filterPlanningOrderOptionsByCustomer(patrolRouteOptions.value, orderDraft.customer_id).map((row) => ({
+    label: formatPlanningOrderReferenceOption("patrol_route", row),
+    value: row.id,
+  })),
+);
+const requirementTypePlaceholder = computed(() => {
+  if (!orderDraft.customer_id) {
+    return tp("requirementTypeCustomerRequired");
+  }
+  if (!requirementTypeLookupLoading.value && !requirementTypeLookupError.value && !requirementTypeSelectOptions.value.length) {
+    return tp("requirementTypeEmpty");
+  }
+  return tp("requirementTypeSearchPlaceholder");
+});
+const patrolRoutePlaceholder = computed(() => {
+  if (!orderDraft.customer_id) {
+    return tp("patrolRouteCustomerRequired");
+  }
+  if (!patrolRouteLookupLoading.value && !patrolRouteLookupError.value && !patrolRouteSelectOptions.value.length) {
+    return tp("patrolRouteEmpty");
+  }
+  return tp("patrolRouteSearchPlaceholder");
+});
+const requirementTypeSetupMissing = computed(() =>
+  hasPlanningOrderSetupGap({
+    customerId: orderDraft.customer_id,
+    options: requirementTypeSelectOptions.value,
+    loading: requirementTypeLookupLoading.value,
+    error: requirementTypeLookupError.value,
+  }),
+);
+const patrolRouteSetupMissing = computed(() =>
+  hasPlanningOrderSetupGap({
+    customerId: orderDraft.customer_id,
+    options: patrolRouteSelectOptions.value,
+    loading: patrolRouteLookupLoading.value,
+    error: patrolRouteLookupError.value,
+  }),
+);
+const missingSetupEntity = computed(() => {
+  if (requirementTypeSetupMissing.value) {
+    return "requirement_type";
+  }
+  if (patrolRouteSetupMissing.value) {
+    return "patrol_route";
+  }
+  return "";
+});
+const showPlanningSetupCta = computed(() => Boolean(missingSetupEntity.value));
+const orderHasSavedRecord = computed(() => Boolean(selectedOrder.value && !isCreatingOrder.value));
+const orderDetailTabs = computed(() => {
+  const tabs = [{ id: "overview", label: tp("tabOverview") }];
+  if (!orderHasSavedRecord.value) {
+    return tabs;
+  }
+  return [
+    ...tabs,
+    { id: "commercial", label: tp("tabCommercial") },
+    { id: "release", label: tp("tabRelease") },
+    { id: "documents", label: tp("tabDocuments") },
+    { id: "planning_records", label: tp("tabPlanningRecords") },
+  ];
+});
+const orderValidationErrors = computed(() => validatePlanningOrderDraft(orderDraft));
+const customerFieldInvalid = computed(() => orderValidationState.attempted && orderValidationErrors.value.customer_id);
+const requirementTypeFieldInvalid = computed(
+  () => orderValidationState.attempted && orderValidationErrors.value.requirement_type_id,
+);
+const selectedOrderCustomerLabel = computed(() => {
+  const customerId = selectedOrder.value?.customer_id || orderDraft.customer_id;
+  const matchedCustomer = customerOptions.value.find((row) => row.id === customerId);
+  if (matchedCustomer) {
+    return formatPlanningCustomerOption(matchedCustomer);
+  }
+  return customerId || "";
+});
+const commercialCustomerLabel = computed(
+  () => selectedOrderCustomerLabel.value || tp("commercialContextFallbackCustomer"),
+);
+const orderCommercialBlockingIssues = computed(
+  () => selectedOrderCommercial.value?.blocking_issues ?? [],
+);
+const orderCommercialWarningIssues = computed(
+  () => selectedOrderCommercial.value?.warning_issues ?? [],
+);
+const commercialSummaryKey = computed(() => {
+  if (selectedOrderCommercial.value?.is_release_ready) {
+    return "commercialSummaryReady";
+  }
+  if (orderCommercialBlockingIssues.value.length) {
+    return "commercialSummaryBlocked";
+  }
+  if (orderCommercialWarningIssues.value.length) {
+    return "commercialSummaryWarnings";
+  }
+  return "commercialSummaryBlocked";
+});
+const commercialContextKey = computed(() => {
+  if (selectedOrderCommercial.value?.is_release_ready) {
+    return "commercialContextReady";
+  }
+  if (orderCommercialBlockingIssues.value.length) {
+    return "commercialContextBlocked";
+  }
+  return "commercialContextWarnings";
+});
 
 function tp(key: keyof typeof planningOrdersMessages.de) {
   return planningOrdersMessages[currentLocale.value][key] ?? planningOrdersMessages.de[key] ?? key;
+}
+
+function formatMessage(message: string, values: Record<string, string>) {
+  return Object.entries(values).reduce(
+    (resolved, [token, value]) => resolved.replaceAll(`{${token}}`, value),
+    message,
+  );
+}
+
+function tpf(key: keyof typeof planningOrdersMessages.de, values: Record<string, string>) {
+  return formatMessage(tp(key), values);
 }
 
 function setFeedback(tone: string, title: string, message: string) {
@@ -436,16 +866,32 @@ function clearFeedback() {
   setFeedback("neutral", "", "");
 }
 
-function rememberScopeAndToken() {
-  authStore.setTenantScopeId(tenantScopeInput.value.trim());
-  authStore.accessToken = accessTokenInput.value.trim();
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem("sicherplan-access-token", authStore.accessToken);
-  }
-  void refreshAll();
+function resetRequirementTypeModal() {
+  Object.assign(requirementTypeModal, {
+    open: false,
+    saving: false,
+    code: "",
+    label: "",
+    default_planning_mode_code: "site",
+    description: "",
+  });
+}
+
+function resetPatrolRouteModal() {
+  Object.assign(patrolRouteModal, {
+    open: false,
+    saving: false,
+    route_no: "",
+    name: "",
+    start_point_text: "",
+    end_point_text: "",
+    travel_policy_code: "",
+    notes: "",
+  });
 }
 
 function resetOrderDraft() {
+  orderValidationState.attempted = false;
   Object.assign(orderDraft, {
     customer_id: "",
     requirement_type_id: "",
@@ -457,7 +903,7 @@ function resetOrderDraft() {
     service_to: "",
     security_concept_text: "",
     notes: "",
-    status: "active",
+    release_state: "draft",
   });
 }
 
@@ -479,6 +925,7 @@ function resetPlanningDraft() {
 }
 
 function syncOrderDraft(order: CustomerOrderRead) {
+  orderValidationState.attempted = false;
   Object.assign(orderDraft, {
     customer_id: order.customer_id,
     requirement_type_id: order.requirement_type_id,
@@ -490,7 +937,7 @@ function syncOrderDraft(order: CustomerOrderRead) {
     service_to: order.service_to,
     security_concept_text: order.security_concept_text ?? "",
     notes: order.notes ?? "",
-    status: order.status,
+    release_state: order.release_state,
   });
 }
 
@@ -526,11 +973,14 @@ function syncPlanningDraft(record: PlanningRecordRead) {
 }
 
 function buildOrderPayload(includeVersion = false) {
+  const customerId = normalizePlanningOrderUuidValue(orderDraft.customer_id);
+  const requirementTypeId = normalizePlanningOrderUuidValue(orderDraft.requirement_type_id);
+  const patrolRouteId = normalizePlanningOrderUuidValue(orderDraft.patrol_route_id);
   const payload: Record<string, unknown> = {
     tenant_id: tenantScopeId.value,
-    customer_id: orderDraft.customer_id,
-    requirement_type_id: orderDraft.requirement_type_id,
-    patrol_route_id: orderDraft.patrol_route_id || null,
+    customer_id: customerId,
+    requirement_type_id: requirementTypeId,
+    patrol_route_id: patrolRouteId,
     order_no: orderDraft.order_no,
     title: orderDraft.title,
     service_category_code: orderDraft.service_category_code,
@@ -538,12 +988,245 @@ function buildOrderPayload(includeVersion = false) {
     service_to: orderDraft.service_to,
     security_concept_text: orderDraft.security_concept_text || null,
     notes: orderDraft.notes || null,
-    status: orderDraft.status || "active",
   };
+  if (!includeVersion) {
+    payload.release_state = orderDraft.release_state || "draft";
+  }
   if (includeVersion && selectedOrder.value) {
     payload.version_no = selectedOrder.value.version_no;
   }
   return payload;
+}
+
+function validateOrderDraftSelection() {
+  orderValidationState.attempted = true;
+  const messageKey = derivePlanningOrderSubmitBlockReason(orderDraft, {
+    requirementTypeSetupMissing: requirementTypeSetupMissing.value,
+  });
+  if (!messageKey) {
+    return true;
+  }
+  setFeedback("error", tp("errorTitle"), tp(messageKey));
+  return false;
+}
+
+function setupActionDisabledReason() {
+  if (!orderDraft.customer_id) {
+    return tp("setupActionCustomerRequired");
+  }
+  if (!canWritePlanningSetup.value) {
+    return tp("setupActionPermissionRequired");
+  }
+  return "";
+}
+
+async function openPlanningSetup(entityKey: string) {
+  if (!entityKey) {
+    return;
+  }
+  await router.push(buildPlanningSetupLocation(entityKey, orderDraft.customer_id));
+}
+
+async function openCustomerCommercialSettings() {
+  await router.push(
+    buildCustomerCommercialLocation(selectedOrder.value?.customer_id || orderDraft.customer_id),
+  );
+}
+
+function openRequirementTypeModal() {
+  if (setupActionDisabledReason()) {
+    return;
+  }
+  requirementTypeModal.open = true;
+}
+
+function openPatrolRouteModal() {
+  if (setupActionDisabledReason()) {
+    return;
+  }
+  patrolRouteModal.open = true;
+}
+
+async function submitRequirementTypeModal() {
+  if (!tenantScopeId.value || !accessToken.value || !orderDraft.customer_id) {
+    return;
+  }
+  if (!requirementTypeModal.code.trim() || !requirementTypeModal.label.trim() || !requirementTypeModal.default_planning_mode_code) {
+    setFeedback("error", tp("errorTitle"), tp("requirementTypeModalInvalid"));
+    return;
+  }
+  requirementTypeModal.saving = true;
+  try {
+    const created = await createPlanningCatalogRecord("requirement_type", tenantScopeId.value, accessToken.value, {
+      tenant_id: tenantScopeId.value,
+      customer_id: orderDraft.customer_id,
+      code: requirementTypeModal.code.trim(),
+      label: requirementTypeModal.label.trim(),
+      default_planning_mode_code: requirementTypeModal.default_planning_mode_code,
+      description: requirementTypeModal.description.trim() || null,
+    });
+    await refreshOrderReferenceOptions(orderDraft.customer_id);
+    orderDraft.requirement_type_id = created.id;
+    resetRequirementTypeModal();
+    setFeedback("success", tp("successTitle"), tp("requirementTypeCreated"));
+  } catch (error) {
+    handleError(error);
+  } finally {
+    requirementTypeModal.saving = false;
+  }
+}
+
+async function submitPatrolRouteModal() {
+  if (!tenantScopeId.value || !accessToken.value || !orderDraft.customer_id) {
+    return;
+  }
+  if (!patrolRouteModal.route_no.trim() || !patrolRouteModal.name.trim()) {
+    setFeedback("error", tp("errorTitle"), tp("patrolRouteModalInvalid"));
+    return;
+  }
+  patrolRouteModal.saving = true;
+  try {
+    const created = await createPlanningCatalogRecord("patrol_route", tenantScopeId.value, accessToken.value, {
+      tenant_id: tenantScopeId.value,
+      customer_id: orderDraft.customer_id,
+      route_no: patrolRouteModal.route_no.trim(),
+      name: patrolRouteModal.name.trim(),
+      start_point_text: patrolRouteModal.start_point_text.trim() || null,
+      end_point_text: patrolRouteModal.end_point_text.trim() || null,
+      travel_policy_code: patrolRouteModal.travel_policy_code.trim() || null,
+      notes: patrolRouteModal.notes.trim() || null,
+    });
+    await refreshOrderReferenceOptions(orderDraft.customer_id);
+    orderDraft.patrol_route_id = created.id;
+    resetPatrolRouteModal();
+    setFeedback("success", tp("successTitle"), tp("patrolRouteCreated"));
+  } catch (error) {
+    handleError(error);
+  } finally {
+    patrolRouteModal.saving = false;
+  }
+}
+
+function filterSelectOption(input: string, option: { label?: unknown } | undefined) {
+  if (!input) {
+    return true;
+  }
+  const label = typeof option?.label === "string" ? option.label : "";
+  return label.toLowerCase().includes(input.toLowerCase());
+}
+
+function handleRequirementTypeChange(value: string | number | undefined) {
+  orderDraft.requirement_type_id = typeof value === "string" ? value : "";
+}
+
+function handlePatrolRouteChange(value: string | number | undefined) {
+  orderDraft.patrol_route_id = typeof value === "string" ? value : "";
+}
+
+function handlePatrolRouteClear() {
+  orderDraft.patrol_route_id = "";
+}
+
+function resolveCommercialIssueMessage(issueCode: string) {
+  const mappedKey = mapPlanningCommercialIssueCode(issueCode);
+  if (mappedKey) {
+    return tp(mappedKey);
+  }
+  const fallback = formatPlanningCommercialIssueFallback(issueCode);
+  return fallback ? `${fallback}.` : tp("commercialIssueFallback");
+}
+
+function formatOrderCustomerLabel(customerId: string) {
+  return formatPlanningCustomerOption(
+    customerOptions.value.find((customer) => customer.id === customerId),
+  ) || customerId;
+}
+
+function validateOrderServiceWindow() {
+  if (!orderDraft.service_from || !orderDraft.service_to) {
+    return true;
+  }
+  if (orderDraft.service_to >= orderDraft.service_from) {
+    return true;
+  }
+  setFeedback("error", tp("errorTitle"), tp("invalidServiceWindow"));
+  return false;
+}
+
+async function refreshCustomerOptions() {
+  if (!tenantScopeId.value || !accessToken.value || !actionState.value.canReadOrders) {
+    customerOptions.value = [];
+    customerLookupError.value = "";
+    return;
+  }
+
+  customerLookupLoading.value = true;
+  customerLookupError.value = "";
+  try {
+    customerOptions.value = await listCustomers(tenantScopeId.value, accessToken.value, {});
+  } catch {
+    customerOptions.value = [];
+    customerLookupError.value = tp("customerLoadError");
+  } finally {
+    customerLookupLoading.value = false;
+  }
+}
+
+async function refreshOrderReferenceOptions(customerId: string) {
+  if (!tenantScopeId.value || !accessToken.value || !actionState.value.canReadOrders || !customerId) {
+    requirementTypeOptions.value = [];
+    patrolRouteOptions.value = [];
+    requirementTypeLookupError.value = "";
+    patrolRouteLookupError.value = "";
+    if (orderDraft.requirement_type_id) {
+      orderDraft.requirement_type_id = "";
+    }
+    if (orderDraft.patrol_route_id) {
+      orderDraft.patrol_route_id = "";
+    }
+    return;
+  }
+
+  requirementTypeLookupLoading.value = true;
+  patrolRouteLookupLoading.value = true;
+  requirementTypeLookupError.value = "";
+  patrolRouteLookupError.value = "";
+
+  try {
+    requirementTypeOptions.value = await listPlanningCatalogRecords(
+      "requirement_type",
+      tenantScopeId.value,
+      accessToken.value,
+      { customer_id: customerId },
+    ) as PlanningListItem[];
+    if (!requirementTypeOptions.value.some((row) => row.id === orderDraft.requirement_type_id)) {
+      orderDraft.requirement_type_id = "";
+    }
+  } catch {
+    requirementTypeOptions.value = [];
+    requirementTypeLookupError.value = tp("requirementTypeLoadError");
+    orderDraft.requirement_type_id = "";
+  } finally {
+    requirementTypeLookupLoading.value = false;
+  }
+
+  try {
+    patrolRouteOptions.value = await listPlanningCatalogRecords(
+      "patrol_route",
+      tenantScopeId.value,
+      accessToken.value,
+      { customer_id: customerId },
+    ) as PlanningListItem[];
+    if (!patrolRouteOptions.value.some((row) => row.id === orderDraft.patrol_route_id)) {
+      orderDraft.patrol_route_id = "";
+    }
+  } catch {
+    patrolRouteOptions.value = [];
+    patrolRouteLookupError.value = tp("patrolRouteLoadError");
+    orderDraft.patrol_route_id = "";
+  } finally {
+    patrolRouteLookupLoading.value = false;
+  }
 }
 
 function buildPlanningPayload(includeVersion = false) {
@@ -646,6 +1329,7 @@ async function selectOrder(orderId: string) {
   if (!tenantScopeId.value || !accessToken.value) return;
   loading.orderDetail = true;
   try {
+    activeDetailTab.value = "overview";
     selectedOrderId.value = orderId;
     isCreatingOrder.value = false;
     selectedOrder.value = await getCustomerOrder(tenantScopeId.value, orderId, accessToken.value);
@@ -661,6 +1345,7 @@ async function selectOrder(orderId: string) {
 }
 
 function startCreateOrder() {
+  activeDetailTab.value = "overview";
   isCreatingOrder.value = true;
   selectedOrder.value = null;
   selectedOrderId.value = "";
@@ -676,6 +1361,8 @@ function startCreateOrder() {
 
 async function submitOrder() {
   if (!tenantScopeId.value || !accessToken.value) return;
+  if (!validateOrderDraftSelection()) return;
+  if (!validateOrderServiceWindow()) return;
   loading.action = true;
   try {
     if (isCreatingOrder.value || !selectedOrderId.value) {
@@ -920,75 +1607,161 @@ function handleError(error: unknown) {
   setFeedback("error", tp("errorTitle"), tp(mapPlanningOrderApiMessage(messageKey) as keyof typeof planningOrdersMessages.de));
 }
 
-async function refreshAll() {
-  await refreshOrders();
-  if (selectedOrderId.value) {
-    await selectOrder(selectedOrderId.value);
-  }
-}
+watch(
+  () => [tenantScopeId.value, accessToken.value, actionState.value.canReadOrders] as const,
+  async ([nextTenantScopeId, nextAccessToken, canReadOrders]) => {
+    if (!nextTenantScopeId || !nextAccessToken || !canReadOrders) {
+      customerOptions.value = [];
+      requirementTypeOptions.value = [];
+      patrolRouteOptions.value = [];
+      customerLookupError.value = "";
+      requirementTypeLookupError.value = "";
+      patrolRouteLookupError.value = "";
+      return;
+    }
+    await refreshCustomerOptions();
+  },
+  { immediate: true },
+);
+
+watch(
+  () => orderDraft.customer_id,
+  async (customerId) => {
+    await refreshOrderReferenceOptions(customerId);
+  },
+);
+
+watch(
+  () => orderHasSavedRecord.value,
+  (hasSavedRecord) => {
+    if (!hasSavedRecord && activeDetailTab.value !== "overview") {
+      activeDetailTab.value = "overview";
+    }
+  },
+);
 </script>
 
 <style scoped>
 .planning-orders-page,
-.planning-orders-grid {
+.planning-orders-form,
+.planning-orders-list,
+.planning-orders-doc-list,
+.planning-orders-section,
+.planning-orders-panel,
+.planning-orders-empty,
+.planning-orders-detail,
+.planning-orders-tab-panel {
   display: grid;
   gap: 1rem;
 }
 
-.planning-orders-hero,
-.planning-orders-grid {
-  grid-template-columns: 1.2fr 0.8fr;
-}
-
-.planning-orders-meta,
-.cta-row,
-.planning-orders-doc-list,
-.planning-orders-list,
-.planning-orders-section,
 .planning-orders-page {
+  gap: var(--sp-page-gap, 1.25rem);
+}
+
+.planning-orders-grid {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--sp-page-gap, 1.25rem);
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  align-items: start;
 }
 
-.planning-orders-meta {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.planning-orders-list-panel {
+  position: sticky;
+  top: 0;
 }
 
-.planning-orders-meta__pill,
 .planning-orders-row,
 .planning-orders-doc-row {
-  border: 1px solid var(--vp-c-divider, #d8e0e0);
-  border-radius: 14px;
-  padding: 0.8rem 1rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 18px;
+  padding: 1rem;
+  background: var(--sp-color-surface-page);
 }
 
 .planning-orders-row {
   align-items: center;
-  background: transparent;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
+  gap: 1rem;
   text-align: left;
 }
 
 .planning-orders-row.selected {
-  border-color: rgb(40 170 170 / 70%);
-  box-shadow: 0 0 0 1px rgb(40 170 170 / 30%);
+  border-color: var(--sp-color-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 40%, transparent);
 }
 
-.planning-orders-form,
-.planning-orders-panel,
-.planning-orders-scope,
-.planning-orders-empty,
-.planning-orders-feedback {
-  display: grid;
-  gap: 1rem;
+.planning-orders-row span,
+.planning-orders-doc-row span,
+.planning-orders-list-empty,
+.field-help {
+  color: var(--sp-color-text-secondary);
+  margin: 0.35rem 0 0;
+}
+
+.planning-orders-form {
+  gap: 1.1rem;
+}
+
+.planning-orders-section {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--sp-color-surface-page) 76%, white 24%);
+  min-width: 0;
+}
+
+.planning-orders-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.planning-orders-tab {
+  border: 1px solid color-mix(in srgb, var(--sp-color-border-soft) 80%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sp-color-surface-page) 82%, white 18%);
+  color: var(--sp-color-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.68rem 1rem;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.planning-orders-tab.active {
+  border-color: rgb(40 170 170 / 40%);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 72%, white 28%);
+  color: var(--sp-color-primary-strong);
+  box-shadow: 0 0 0 1px rgb(40 170 170 / 15%);
+}
+
+.planning-orders-tab:focus-visible {
+  outline: 2px solid rgb(40 170 170 / 45%);
+  outline-offset: 2px;
 }
 
 .planning-orders-form-grid {
   display: grid;
-  gap: 0.85rem;
+  gap: 1rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.planning-orders-form-row {
+  display: grid;
+  gap: 1rem;
+  grid-column: 1 / -1;
+}
+
+.planning-orders-form-row--triple {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .field-stack {
@@ -1021,6 +1794,34 @@ async function refreshAll() {
     background-color 0.18s ease;
 }
 
+.planning-orders-page :deep(.planning-admin-select .ant-select-selector) {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-card);
+  box-shadow: none;
+  padding: 0.35rem 0.9rem;
+}
+
+.planning-orders-page :deep(.planning-admin-select .ant-select-selection-search-input),
+.planning-orders-page :deep(.planning-admin-select .ant-select-selection-item),
+.planning-orders-page :deep(.planning-admin-select .ant-select-selection-placeholder) {
+  font: inherit;
+}
+
+.planning-orders-page :deep(.planning-admin-select.ant-select-focused .ant-select-selector),
+.planning-orders-page :deep(.planning-admin-select.ant-select-open .ant-select-selector),
+.planning-orders-page :deep(.planning-admin-select.ant-select-status-error .ant-select-selector) {
+  border-color: rgb(40 170 170 / 55%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
+.planning-orders-page :deep(.planning-admin-select.ant-select-disabled .ant-select-selector) {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
 .field-stack textarea {
   min-height: 6.5rem;
   resize: vertical;
@@ -1041,8 +1842,8 @@ async function refreshAll() {
   cursor: not-allowed;
 }
 
-.planning-orders-detail {
-  align-content: start;
+:global(.planning-admin-select-dropdown .ant-select-item-option-content) {
+  white-space: normal;
 }
 
 .planning-orders-panel__header {
@@ -1052,12 +1853,60 @@ async function refreshAll() {
   gap: 1rem;
 }
 
+.planning-orders-header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.planning-orders-field-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.planning-orders-field-action {
+  font-size: 0.9rem;
+  padding: 0.45rem 0.8rem;
+}
+
+.planning-orders-inline-link {
+  border: 0;
+  background: none;
+  color: var(--sp-color-primary);
+  cursor: pointer;
+  font: inherit;
+  margin-left: 0.35rem;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.planning-orders-modal-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.planning-orders-feedback {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  background: var(--sp-color-primary-muted);
+  color: var(--sp-color-primary-strong);
+}
+
 .planning-orders-feedback[data-tone="error"] {
-  border-left: 4px solid #c0392b;
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 45%, #ffb4a6);
+  color: color-mix(in srgb, var(--sp-color-primary-strong) 60%, #6a1d00);
 }
 
 .planning-orders-feedback[data-tone="success"] {
-  border-left: 4px solid rgb(40 170 170);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 32%, #dcfce7);
+  color: color-mix(in srgb, var(--sp-color-primary-strong) 65%, #14532d);
 }
 
 .planning-orders-checkbox {
@@ -1075,20 +1924,33 @@ async function refreshAll() {
   accent-color: var(--sp-color-primary);
 }
 
-.planning-orders-lead,
-.field-help,
-.planning-orders-list-empty {
-  opacity: 0.8;
-}
-
 .planning-orders-subsection {
   border-top: 1px solid var(--vp-c-divider, #d8e0e0);
   padding-top: 1rem;
 }
 
+.planning-orders-commercial-summary,
+.planning-orders-commercial-block {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.planning-orders-commercial-summary__headline {
+  margin: 0;
+  font-weight: 700;
+}
+
 .planning-orders-issues {
   margin: 0;
   padding-left: 1.2rem;
+}
+
+.planning-orders-issues--blocking li::marker {
+  color: rgb(176 48 48);
+}
+
+.planning-orders-issues--warning li::marker {
+  color: rgb(156 104 16);
 }
 
 .planning-orders-state--good {
@@ -1104,11 +1966,20 @@ async function refreshAll() {
 }
 
 @media (max-width: 1024px) {
-  .planning-orders-hero,
   .planning-orders-grid,
-  .planning-orders-form-grid,
-  .planning-orders-meta {
+  .planning-orders-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .planning-orders-form-row--triple {
+    grid-template-columns: 1fr;
+  }
+
+  .planning-orders-list-panel,
+  .planning-orders-feedback {
+    position: static;
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

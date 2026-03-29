@@ -194,3 +194,136 @@ export function mapCustomerCommercialApiMessage(messageKey) {
 
   return messageMap[messageKey] ?? "customerAdmin.feedback.error";
 }
+
+const BILLING_PROFILE_ERROR_CONFIG = [
+  {
+    apiMessageKey: "errors.customers.billing_profile.invalid_invoice_email",
+    feedbackMessageKey: "customerAdmin.feedback.invalidInvoiceEmail",
+    fields: ["invoice_email"],
+  },
+  {
+    apiMessageKey: "errors.customers.billing_profile.invalid_payment_terms",
+    feedbackMessageKey: "customerAdmin.feedback.invalidPaymentTerms",
+    fields: ["payment_terms_days"],
+  },
+  {
+    apiMessageKey: "errors.customers.billing_profile.tax_exemption_reason_required",
+    feedbackMessageKey: "customerAdmin.feedback.taxExemptionReasonRequired",
+    fields: ["tax_exempt", "tax_exemption_reason"],
+  },
+  {
+    apiMessageKey: "errors.customers.billing_profile.tax_exemption_reason_forbidden",
+    feedbackMessageKey: "customerAdmin.feedback.taxExemptionReasonForbidden",
+    fields: ["tax_exempt", "tax_exemption_reason"],
+  },
+  {
+    apiMessageKey: "errors.customers.billing_profile.bank_account_holder_required",
+    feedbackMessageKey: "customerAdmin.feedback.bankAccountHolderRequired",
+    fields: ["bank_account_holder", "bank_iban", "bank_bic", "bank_name"],
+  },
+  {
+    apiMessageKey: "errors.customers.billing_profile.bank_iban_required",
+    feedbackMessageKey: "customerAdmin.feedback.bankIbanRequired",
+    fields: ["bank_iban", "bank_account_holder", "bank_bic", "bank_name"],
+  },
+  {
+    apiMessageKey: "errors.customers.billing_profile.e_invoice_required",
+    feedbackMessageKey: "customerAdmin.feedback.eInvoiceRequired",
+    fields: ["shipping_method_code", "e_invoice_enabled"],
+  },
+  {
+    apiMessageKey: "errors.customers.billing_profile.e_invoice_dispatch_mismatch",
+    feedbackMessageKey: "customerAdmin.feedback.eInvoiceDispatchMismatch",
+    fields: ["shipping_method_code", "e_invoice_enabled"],
+  },
+  {
+    apiMessageKey: "errors.customers.billing_profile.leitweg_required",
+    feedbackMessageKey: "customerAdmin.feedback.leitwegRequired",
+    fields: ["leitweg_id", "shipping_method_code", "e_invoice_enabled"],
+  },
+  {
+    apiMessageKey: "errors.customers.billing_profile.leitweg_forbidden",
+    feedbackMessageKey: "customerAdmin.feedback.leitwegForbidden",
+    fields: ["leitweg_id", "shipping_method_code", "e_invoice_enabled"],
+  },
+  {
+    apiMessageKey: "errors.customers.billing_profile.dispatch_email_required",
+    feedbackMessageKey: "customerAdmin.feedback.dispatchEmailRequired",
+    fields: ["invoice_email", "shipping_method_code"],
+  },
+  {
+    apiMessageKey: "errors.customers.billing_profile.invoice_layout_incompatible",
+    feedbackMessageKey: "customerAdmin.feedback.invoiceLayoutIncompatible",
+    fields: ["invoice_layout_code", "shipping_method_code", "e_invoice_enabled"],
+  },
+];
+
+export function resolveBillingProfileApiError(messageKey, details = {}, errorCode = "") {
+  if (messageKey === "errors.customers.lookup.not_found") {
+    const lookupErrorMap = {
+      "customers.validation.billing_profile_invoice_layout": {
+        messageKey: "customerAdmin.feedback.invoiceLayoutUnavailable",
+        fields: ["invoice_layout_code"],
+      },
+      "customers.validation.billing_profile_shipping_method": {
+        messageKey: "customerAdmin.feedback.shippingMethodUnavailable",
+        fields: ["shipping_method_code"],
+      },
+      "customers.validation.billing_profile_dunning_policy": {
+        messageKey: "customerAdmin.feedback.dunningPolicyUnavailable",
+        fields: ["dunning_policy_code"],
+      },
+    };
+    const lookupResolution = lookupErrorMap[errorCode];
+    if (lookupResolution) {
+      return {
+        isKnown: true,
+        summaryTitleKey: "customerAdmin.feedback.billingProfileSaveFailedTitle",
+        summaryBodyKey: "customerAdmin.feedback.billingProfileSaveFailedSummary",
+        primaryMessageKey: lookupResolution.messageKey,
+        fields: lookupResolution.fields,
+        details,
+      };
+    }
+  }
+  const resolved = BILLING_PROFILE_ERROR_CONFIG.find((entry) => entry.apiMessageKey === messageKey);
+  if (resolved) {
+    return {
+      isKnown: true,
+      summaryTitleKey: "customerAdmin.feedback.billingProfileSaveFailedTitle",
+      summaryBodyKey: "customerAdmin.feedback.billingProfileSaveFailedSummary",
+      primaryMessageKey: resolved.feedbackMessageKey,
+      fields: resolved.fields,
+      details,
+    };
+  }
+
+  return {
+    isKnown: false,
+    summaryTitleKey: "customerAdmin.feedback.billingProfileSaveFailedTitle",
+    summaryBodyKey: "customerAdmin.feedback.billingProfileUnexpected",
+    primaryMessageKey: null,
+    fields: [],
+    details,
+  };
+}
+
+export function resolveBillingProfileFeedbackError(messageKey) {
+  const resolved = BILLING_PROFILE_ERROR_CONFIG.find((entry) => entry.feedbackMessageKey === messageKey);
+  if (resolved) {
+    return {
+      isKnown: true,
+      summaryTitleKey: "customerAdmin.feedback.billingProfileSaveFailedTitle",
+      summaryBodyKey: "customerAdmin.feedback.billingProfileSaveFailedSummary",
+      primaryMessageKey: resolved.feedbackMessageKey,
+      fields: resolved.fields,
+    };
+  }
+  return {
+    isKnown: false,
+    summaryTitleKey: "customerAdmin.feedback.billingProfileSaveFailedTitle",
+    summaryBodyKey: "customerAdmin.feedback.billingProfileUnexpected",
+    primaryMessageKey: null,
+    fields: [],
+  };
+}

@@ -543,6 +543,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 
 import { Select } from "ant-design-vue";
 
@@ -574,6 +575,7 @@ import {
   mapPlanningApiMessage,
   parseOptionalCoordinate,
   PLANNING_ENTITY_OPTIONS,
+  resolvePlanningRouteContext,
   resolveInitialMapCenter,
 } from "@/features/planning/planningAdmin.helpers.js";
 import { planningAdminMessages } from "@/i18n/planningAdmin.messages";
@@ -589,6 +591,7 @@ defineProps({
 
 const authStore = useAuthStore();
 const localeStore = useLocaleStore();
+const route = useRoute();
 
 const loading = reactive({ list: false, detail: false, action: false });
 const feedback = reactive({ tone: "neutral", title: "", message: "" });
@@ -1353,6 +1356,32 @@ function handleError(error) {
   setFeedback("error", tp("errorTitle"), tp(key));
 }
 
+function applyPlanningRouteContext() {
+  const { entity, customerId } = resolvePlanningRouteContext(route.query);
+  let shouldRefresh = false;
+
+  if (entity && entity !== entityKey.value) {
+    entityKey.value = entity;
+    selectedRecord.value = null;
+    selectedRecordId.value = "";
+    isCreatingRecord.value = false;
+    resetDraft();
+    resetZoneDraft();
+    resetCheckpointDraft();
+    resetImportTemplate();
+    tradeFairZones.value = [];
+    patrolCheckpoints.value = [];
+    shouldRefresh = true;
+  }
+
+  if (customerId && customerId !== filters.customer_id) {
+    filters.customer_id = customerId;
+    shouldRefresh = true;
+  }
+
+  return shouldRefresh;
+}
+
 watch(
   () => [resolvedTenantScopeId.value, accessToken.value, canRead.value],
   async () => {
@@ -1374,9 +1403,19 @@ watch(
   },
 );
 
+watch(
+  () => route.query,
+  async () => {
+    if (applyPlanningRouteContext()) {
+      await refreshRecords();
+    }
+  },
+);
+
 onMounted(async () => {
   resetImportTemplate();
   await refreshCustomerOptions();
+  applyPlanningRouteContext();
   await refreshRecords();
 });
 </script>

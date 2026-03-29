@@ -95,6 +95,21 @@ class CustomerOrderService:
         return self._read(row)
 
     def create_order(self, tenant_id: str, payload: CustomerOrderCreate, actor: RequestAuthorizationContext) -> CustomerOrderRead:
+        payload = payload.model_copy(
+            update={
+                "customer_id": self._normalize_required_order_uuid(
+                    payload.customer_id,
+                    code="planning.customer_order.invalid_customer_id",
+                    message_key="errors.planning.customer_order.invalid_customer_id",
+                ),
+                "requirement_type_id": self._normalize_required_order_uuid(
+                    payload.requirement_type_id,
+                    code="planning.customer_order.invalid_requirement_type_id",
+                    message_key="errors.planning.customer_order.invalid_requirement_type_id",
+                ),
+                "patrol_route_id": self._normalize_optional_order_uuid(payload.patrol_route_id),
+            }
+        )
         self._validate_order_payload(tenant_id, payload.customer_id, payload.requirement_type_id, payload.patrol_route_id, payload.service_from, payload.service_to)
         self._require_release_state(payload.release_state)
         if self.repository.find_customer_order_by_no(tenant_id, payload.order_no) is not None:
@@ -112,12 +127,29 @@ class CustomerOrderService:
     ) -> CustomerOrderRead:
         current = self._require_order(tenant_id, order_id)
         before_json = self._snapshot(current)
-        next_customer_id = self._field_value(payload, "customer_id", current.customer_id)
-        next_requirement_type_id = self._field_value(payload, "requirement_type_id", current.requirement_type_id)
-        next_patrol_route_id = self._field_value(payload, "patrol_route_id", current.patrol_route_id)
+        next_customer_id = self._normalize_required_order_uuid(
+            self._field_value(payload, "customer_id", current.customer_id),
+            code="planning.customer_order.invalid_customer_id",
+            message_key="errors.planning.customer_order.invalid_customer_id",
+        )
+        next_requirement_type_id = self._normalize_required_order_uuid(
+            self._field_value(payload, "requirement_type_id", current.requirement_type_id),
+            code="planning.customer_order.invalid_requirement_type_id",
+            message_key="errors.planning.customer_order.invalid_requirement_type_id",
+        )
+        next_patrol_route_id = self._normalize_optional_order_uuid(self._field_value(payload, "patrol_route_id", current.patrol_route_id))
         next_service_from = self._field_value(payload, "service_from", current.service_from)
         next_service_to = self._field_value(payload, "service_to", current.service_to)
         self._validate_order_payload(tenant_id, next_customer_id, next_requirement_type_id, next_patrol_route_id, next_service_from, next_service_to)
+        payload_updates: dict[str, object | None] = {}
+        if "customer_id" in payload.model_fields_set:
+            payload_updates["customer_id"] = next_customer_id
+        if "requirement_type_id" in payload.model_fields_set:
+            payload_updates["requirement_type_id"] = next_requirement_type_id
+        if "patrol_route_id" in payload.model_fields_set:
+            payload_updates["patrol_route_id"] = next_patrol_route_id
+        if payload_updates:
+            payload = payload.model_copy(update=payload_updates)
         next_order_no = self._field_value(payload, "order_no", current.order_no)
         if self.repository.find_customer_order_by_no(tenant_id, next_order_no, exclude_id=order_id) is not None:
             raise ApiException(409, "planning.customer_order.duplicate_number", "errors.planning.customer_order.duplicate_number")
@@ -398,6 +430,20 @@ class CustomerOrderService:
     def _require_release_state(cls, release_state: str) -> None:
         if release_state not in cls.RELEASE_STATES:
             raise ApiException(400, "planning.customer_order.invalid_release_state", "errors.planning.customer_order.invalid_release_state")
+
+    @staticmethod
+    def _normalize_optional_order_uuid(value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @classmethod
+    def _normalize_required_order_uuid(cls, value: str, *, code: str, message_key: str) -> str:
+        normalized = cls._normalize_optional_order_uuid(value)
+        if normalized is None:
+            raise ApiException(400, code, message_key)
+        return normalized
 
     @staticmethod
     def _field_value(payload, field_name: str, current_value):
