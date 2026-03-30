@@ -1,6 +1,6 @@
 <template>
   <section class="planning-shifts-page">
-    <section class="module-card planning-shifts-hero">
+    <section v-if="!props.embedded" class="module-card planning-shifts-hero">
       <div>
         <p class="eyebrow">{{ tp("eyebrow") }}</p>
         <h2>{{ tp("title") }}</h2>
@@ -41,10 +41,56 @@
       <h3>{{ tp("missingPermissionBody") }}</h3>
     </section>
 
-    <div v-else class="planning-shifts-grid">
-      <section class="module-card planning-shifts-panel">
+    <div v-else class="planning-shifts-workspace" data-testid="planning-shifts-workspace">
+      <section v-if="props.embedded" class="module-card planning-shifts-controls">
+        <div class="planning-shifts-panel__header">
+          <div>
+            <p class="eyebrow">{{ tp("eyebrow") }}</p>
+            <h3>{{ tp("title") }}</h3>
+          </div>
+          <StatusBadge :status="canRead ? 'active' : 'inactive'" />
+        </div>
+        <div class="planning-shifts-form-grid planning-shifts-form-grid--controls">
+          <label class="field-stack">
+            <span>{{ tp("scopeLabel") }}</span>
+            <input v-model="tenantScopeInput" :placeholder="tp('scopePlaceholder')" />
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("tokenLabel") }}</span>
+            <input v-model="accessTokenInput" type="password" :placeholder="tp('tokenPlaceholder')" />
+          </label>
+        </div>
+        <p class="field-help">{{ tp("tokenHelp") }}</p>
+        <div class="cta-row">
+          <button class="cta-button" type="button" @click="rememberScopeAndToken">{{ tp("actionsRemember") }}</button>
+          <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshAll">{{ tp("actionsRefresh") }}</button>
+        </div>
+      </section>
+
+      <nav class="planning-shifts-tabs" data-testid="planning-shifts-tabs">
+        <button
+          v-for="tab in workspaceTabs"
+          :key="tab.id"
+          type="button"
+          class="planning-shifts-tab"
+          :class="{ active: activeWorkspaceTab === tab.id }"
+          :data-testid="`planning-shifts-tab-${tab.id}`"
+          @click="activeWorkspaceTab = tab.id"
+        >
+          {{ tab.label }}
+        </button>
+      </nav>
+
+      <section
+        v-show="activeWorkspaceTab === 'templates'"
+        class="module-card planning-shifts-panel planning-shifts-tab-panel"
+        data-testid="planning-shifts-tab-panel-templates"
+      >
         <div class="planning-orders-panel__header">
-          <h3>{{ tp("templatesTitle") }}</h3>
+          <div>
+            <p class="eyebrow">{{ tp("templatesTitle") }}</p>
+            <h3>{{ tp("templatesTitle") }}</h3>
+          </div>
           <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreateTemplate" @click="startCreateTemplate">{{ tp("actionsCreateTemplate") }}</button>
         </div>
         <div class="planning-orders-list">
@@ -82,9 +128,16 @@
         </form>
       </section>
 
-      <section class="module-card planning-shifts-panel">
+      <section
+        v-show="activeWorkspaceTab === 'plans'"
+        class="module-card planning-shifts-panel planning-shifts-tab-panel"
+        data-testid="planning-shifts-tab-panel-plans"
+      >
         <div class="planning-orders-panel__header">
-          <h3>{{ tp("plansTitle") }}</h3>
+          <div>
+            <p class="eyebrow">{{ tp("plansTitle") }}</p>
+            <h3>{{ tp("plansTitle") }}</h3>
+          </div>
           <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreatePlan" @click="startCreatePlan">{{ tp("actionsCreatePlan") }}</button>
         </div>
         <div class="planning-orders-form-grid">
@@ -132,9 +185,16 @@
         </form>
       </section>
 
-      <section class="module-card planning-shifts-panel">
+      <section
+        v-show="activeWorkspaceTab === 'series'"
+        class="module-card planning-shifts-panel planning-shifts-tab-panel"
+        data-testid="planning-shifts-tab-panel-series"
+      >
         <div class="planning-orders-panel__header">
-          <h3>{{ tp("seriesTitle") }}</h3>
+          <div>
+            <p class="eyebrow">{{ tp("seriesTitle") }}</p>
+            <h3>{{ tp("seriesTitle") }}</h3>
+          </div>
           <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreateSeries" @click="startCreateSeries">{{ tp("actionsCreateSeries") }}</button>
         </div>
         <div class="planning-orders-list">
@@ -188,7 +248,7 @@
             <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canGenerateSeries" @click="generateSelectedSeries">{{ tp("actionsGenerate") }}</button>
           </div>
         </form>
-        <form v-if="selectedSeries" class="planning-orders-form" @submit.prevent="submitException">
+        <form v-if="selectedSeriesId" class="planning-orders-form" @submit.prevent="submitException">
           <div class="planning-orders-form-grid">
             <label class="field-stack"><span>{{ tp("fieldsOccurrenceDate") }}</span><input v-model="exceptionDraft.exception_date" type="date" required /></label>
             <label class="field-stack">
@@ -207,9 +267,16 @@
         </form>
       </section>
 
-      <section class="module-card planning-shifts-panel">
+      <section
+        v-show="activeWorkspaceTab === 'shifts'"
+        class="module-card planning-shifts-panel planning-shifts-tab-panel"
+        data-testid="planning-shifts-tab-panel-shifts"
+      >
         <div class="planning-orders-panel__header">
-          <h3>{{ tp("shiftsTitle") }}</h3>
+          <div>
+            <p class="eyebrow">{{ tp("shiftsTitle") }}</p>
+            <h3>{{ tp("shiftsTitle") }}</h3>
+          </div>
           <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreateShift" @click="startCreateShift">{{ tp("actionsCreateShift") }}</button>
         </div>
         <div class="planning-orders-form-grid">
@@ -264,9 +331,16 @@
         </form>
       </section>
 
-      <section class="module-card planning-shifts-panel planning-shifts-board">
+      <section
+        v-show="activeWorkspaceTab === 'board'"
+        class="module-card planning-shifts-panel planning-shifts-board planning-shifts-tab-panel"
+        data-testid="planning-shifts-tab-panel-board"
+      >
         <div class="planning-orders-panel__header">
-          <h3>{{ tp("boardTitle") }}</h3>
+          <div>
+            <p class="eyebrow">{{ tp("boardTitle") }}</p>
+            <h3>{{ tp("boardTitle") }}</h3>
+          </div>
         </div>
         <div class="planning-orders-form-grid">
           <label class="field-stack"><span>{{ tp("filtersDateFrom") }}</span><input v-model="boardFilters.date_from" type="datetime-local" /></label>
@@ -322,16 +396,21 @@ import {
 import { planningShiftsMessages } from "@/i18n/planningShifts.messages";
 import { useAuthStore } from "@/stores/auth";
 import { useLocaleStore } from "@/stores/locale";
+import StatusBadge from "@/components/StatusBadge.vue";
 import {
   derivePlanningShiftActionState,
   mapPlanningShiftApiMessage,
   recurrenceLabel,
 } from "@/features/planning/planningShifts.helpers";
 
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
+  embedded: false,
+});
+
 const authStore = useAuthStore();
 const localeStore = useLocaleStore();
 const currentLocale = computed(() => (localeStore.locale === "en" ? "en" : "de"));
-const role = computed(() => authStore.role || "tenant_admin");
+const role = computed(() => authStore.effectiveRole || "tenant_admin");
 const tenantScopeInput = ref(authStore.tenantScopeId || "");
 const accessTokenInput = ref(authStore.accessToken || "");
 const tenantScopeId = ref(authStore.tenantScopeId || "");
@@ -347,13 +426,13 @@ const selectedTemplateId = ref("");
 const selectedShiftPlanId = ref("");
 const selectedSeriesId = ref("");
 const selectedShiftId = ref("");
+const planFilters = reactive<any>({ planning_record_id: "" });
 
 const templateDraft = reactive<any>(createEmptyTemplateDraft());
 const shiftPlanDraft = reactive<any>(createEmptyShiftPlanDraft());
 const seriesDraft = reactive<any>(createEmptySeriesDraft());
 const exceptionDraft = reactive<any>(createEmptyExceptionDraft());
 const shiftDraft = reactive<any>(createEmptyShiftDraft());
-const planFilters = reactive<any>({ planning_record_id: "" });
 const shiftFilters = reactive<any>({ date_from: "", date_to: "", visibility_state: "" });
 const boardFilters = reactive<any>({
   date_from: toDateTimeLocal(new Date(Date.UTC(2026, 3, 1, 0, 0))),
@@ -361,6 +440,14 @@ const boardFilters = reactive<any>({
   release_state: "",
 });
 const feedback = reactive({ tone: "info", title: "", message: "" });
+const activeWorkspaceTab = ref("templates");
+const workspaceTabs = computed(() => [
+  { id: "templates", label: tp("templatesTitle") },
+  { id: "plans", label: tp("plansTitle") },
+  { id: "series", label: tp("seriesTitle") },
+  { id: "shifts", label: tp("shiftsTitle") },
+  { id: "board", label: tp("boardTitle") },
+]);
 
 const actionState = computed(() =>
   derivePlanningShiftActionState(
@@ -411,10 +498,10 @@ function createEmptyTemplateDraft() {
   };
 }
 
-function createEmptyShiftPlanDraft() {
+function createEmptyShiftPlanDraft(planningRecordId = "") {
   return {
     tenant_id: tenantScopeId.value || "",
-    planning_record_id: planFilters.planning_record_id || "",
+    planning_record_id: planningRecordId,
     name: "",
     workforce_scope_code: "internal",
     planning_from: "",
@@ -484,7 +571,7 @@ function resetTemplateDraft() {
 }
 
 function resetShiftPlanDraft() {
-  Object.assign(shiftPlanDraft, createEmptyShiftPlanDraft());
+  Object.assign(shiftPlanDraft, createEmptyShiftPlanDraft(planFilters.planning_record_id || ""));
 }
 
 function resetSeriesDraft() {
@@ -729,11 +816,265 @@ function addDays(value: string, delta: number) {
 </script>
 
 <style scoped>
-.planning-shifts-page { display: grid; gap: 1rem; }
-.planning-shifts-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
-.planning-shifts-panel { display: grid; gap: 1rem; }
-.planning-shifts-board { grid-column: 1 / -1; }
-.planning-shifts-lead { max-width: 70ch; }
-.planning-shifts-scope { display: grid; gap: 0.75rem; }
-.planning-orders-row--static { cursor: default; }
+.planning-shifts-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.planning-shifts-workspace {
+  display: grid;
+  gap: 1rem;
+}
+
+.planning-shifts-hero,
+.planning-shifts-controls,
+.planning-shifts-panel,
+.planning-orders-feedback,
+.planning-orders-empty {
+  border-radius: 18px;
+  border: 1px solid var(--sp-color-border);
+  background: color-mix(in srgb, var(--sp-color-surface-card) 94%, white);
+  box-shadow: 0 18px 50px rgb(15 23 42 / 7%);
+}
+
+.planning-shifts-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.25rem;
+  align-items: flex-start;
+}
+
+.planning-shifts-controls,
+.planning-shifts-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.planning-shifts-board {
+  grid-column: 1 / -1;
+}
+
+.planning-shifts-lead {
+  max-width: 70ch;
+}
+
+.planning-shifts-scope {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.planning-shifts-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.planning-shifts-tab {
+  border: 1px solid var(--sp-color-border-soft);
+  background: color-mix(in srgb, var(--sp-color-surface-card) 88%, white);
+  color: var(--sp-color-text-secondary);
+  border-radius: 999px;
+  padding: 0.65rem 1rem;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.planning-shifts-tab.active {
+  border-color: rgb(40 170 170 / 45%);
+  background: color-mix(in srgb, rgb(40 170 170) 12%, white);
+  color: var(--sp-color-text-primary);
+  box-shadow: 0 10px 24px rgb(40 170 170 / 12%);
+}
+
+.planning-shifts-panel__header,
+.planning-orders-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.planning-shifts-panel__header > div,
+.planning-orders-panel__header > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.planning-orders-form {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: color-mix(in srgb, var(--sp-color-surface-card) 92%, white);
+}
+
+.planning-orders-form-grid,
+.planning-shifts-form-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.planning-shifts-form-grid--controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field-stack {
+  display: grid;
+  gap: 0.42rem;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.field-stack--wide {
+  grid-column: 1 / -1;
+}
+
+.field-stack input,
+.field-stack select,
+.field-stack textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-card);
+  color: var(--sp-color-text-primary);
+  padding: 0.78rem 0.9rem;
+  font: inherit;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.field-stack textarea {
+  min-height: 6.5rem;
+  resize: vertical;
+}
+
+.field-stack input:focus,
+.field-stack select:focus,
+.field-stack textarea:focus {
+  outline: none;
+  border-color: rgb(40 170 170 / 55%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
+.field-stack input:disabled,
+.field-stack select:disabled,
+.field-stack textarea:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.planning-orders-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.planning-orders-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.9rem;
+  width: 100%;
+  text-align: left;
+  border-radius: 18px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: color-mix(in srgb, var(--sp-color-surface-card) 90%, white);
+  padding: 1rem;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.planning-orders-row:hover {
+  border-color: rgb(40 170 170 / 28%);
+  box-shadow: 0 14px 34px rgb(15 23 42 / 8%);
+  transform: translateY(-1px);
+}
+
+.planning-orders-row.selected {
+  border-color: rgb(40 170 170 / 44%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 12%);
+}
+
+.planning-orders-row > div {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.planning-orders-row strong {
+  color: var(--sp-color-text-primary);
+}
+
+.planning-orders-row span {
+  color: var(--sp-color-text-secondary);
+}
+
+.planning-orders-row--static {
+  cursor: default;
+}
+
+.planning-orders-row--static:hover {
+  transform: none;
+}
+
+.planning-orders-list-empty {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 16px;
+  border: 1px dashed color-mix(in srgb, var(--sp-color-border) 72%, var(--sp-color-primary));
+  background: color-mix(in srgb, var(--sp-color-surface-weak) 88%, white);
+  color: var(--sp-color-text-secondary);
+}
+
+.planning-orders-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--sp-color-text-secondary);
+}
+
+.planning-orders-feedback,
+.planning-orders-empty {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+@media (max-width: 960px) {
+  .planning-shifts-hero,
+  .planning-shifts-panel__header,
+  .planning-orders-panel__header,
+  .planning-orders-feedback,
+  .planning-orders-empty {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .planning-orders-form-grid,
+  .planning-shifts-form-grid,
+  .planning-shifts-form-grid--controls {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

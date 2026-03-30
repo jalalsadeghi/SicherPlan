@@ -37,6 +37,12 @@ describe('module registry wrapper flags', () => {
     expect(planningOrders.showWorkspaceSectionHeader).toBe(false);
   });
 
+  it('keeps the planning-shifts page intro while removing the workspace section header', () => {
+    const planningShifts = moduleRegistry['planning-shifts']!;
+    expect(planningShifts.showPageIntro).toBeUndefined();
+    expect(planningShifts.showWorkspaceSectionHeader).toBe(false);
+  });
+
   it('keeps customers unavailable to platform admin in the shared module registry', () => {
     const customers = moduleRegistry.customers!;
     expect(customers.allowedRoles).toEqual([

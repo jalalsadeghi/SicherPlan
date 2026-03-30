@@ -260,6 +260,7 @@ export const moduleRegistry: Record<string, ModuleConfig> = {
       { labelKey: 'sicherplan.ui.stats.visibility', valueKey: 'sicherplan.ui.values.dispatchReady' },
       { labelKey: 'sicherplan.ui.stats.evidence', valueKey: 'sicherplan.ui.values.traceableChain' },
     ],
+    showWorkspaceSectionHeader: false,
     titleKey: 'sicherplan.admin.planningShifts',
     workspaceDescriptionKey: 'sicherplan.ui.modules.planningShifts.workspace',
   },
