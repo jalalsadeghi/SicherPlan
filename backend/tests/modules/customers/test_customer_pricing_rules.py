@@ -4,6 +4,7 @@ import unittest
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from pathlib import Path
 from uuid import uuid4
 
 from sqlalchemy import CheckConstraint
@@ -37,6 +38,8 @@ class FakeRateLine:
     unit_price: Decimal
     function_type_id: str | None = None
     qualification_type_id: str | None = None
+    function_type: object | None = None
+    qualification_type: object | None = None
     planning_mode_code: str | None = None
     minimum_quantity: Decimal | None = None
     sort_order: int = 100
@@ -177,6 +180,12 @@ class FakePricingRepository(FakeCustomerRepository):
             line_kind=payload.line_kind,
             function_type_id=payload.function_type_id,
             qualification_type_id=payload.qualification_type_id,
+            function_type=self.get_function_type(tenant_id, payload.function_type_id) if payload.function_type_id else None,
+            qualification_type=(
+                self.get_qualification_type(tenant_id, payload.qualification_type_id)
+                if payload.qualification_type_id
+                else None
+            ),
             planning_mode_code=payload.planning_mode_code,
             billing_unit=payload.billing_unit,
             unit_price=payload.unit_price,
@@ -199,6 +208,16 @@ class FakePricingRepository(FakeCustomerRepository):
         next_row = replace(
             row,
             **updates,
+            function_type=(
+                self.get_function_type(tenant_id, updates["function_type_id"])
+                if "function_type_id" in updates and updates["function_type_id"]
+                else (None if "function_type_id" in updates else row.function_type)
+            ),
+            qualification_type=(
+                self.get_qualification_type(tenant_id, updates["qualification_type_id"])
+                if "qualification_type_id" in updates and updates["qualification_type_id"]
+                else (None if "qualification_type_id" in updates else row.qualification_type)
+            ),
             version_no=row.version_no + 1,
             updated_by_user_id=actor_user_id,
             updated_at=datetime.now(UTC),
@@ -274,7 +293,18 @@ class TestCustomerPricingMetadata(unittest.TestCase):
     def test_pricing_tables_use_uuid_scope_columns(self) -> None:
         for table_name, column_names in (
             ("crm.customer_rate_card", ("tenant_id", "customer_id", "id", "created_by_user_id", "updated_by_user_id")),
-            ("crm.customer_rate_line", ("tenant_id", "rate_card_id", "id", "created_by_user_id", "updated_by_user_id")),
+            (
+                "crm.customer_rate_line",
+                (
+                    "tenant_id",
+                    "rate_card_id",
+                    "function_type_id",
+                    "qualification_type_id",
+                    "id",
+                    "created_by_user_id",
+                    "updated_by_user_id",
+                ),
+            ),
             (
                 "crm.customer_surcharge_rule",
                 ("tenant_id", "rate_card_id", "id", "created_by_user_id", "updated_by_user_id"),
@@ -284,6 +314,11 @@ class TestCustomerPricingMetadata(unittest.TestCase):
             for column_name in column_names:
                 with self.subTest(table=table_name, column=column_name):
                     self.assertIsInstance(table.c[column_name].type, postgresql.UUID)
+
+    def test_rate_line_uses_hr_catalog_foreign_keys(self) -> None:
+        names = {constraint.name for constraint in CustomerRateLine.__table__.constraints if getattr(constraint, "name", None)}
+        self.assertIn("fk_crm_customer_rate_line_tenant_function_type", names)
+        self.assertIn("fk_crm_customer_rate_line_tenant_qualification_type", names)
 
     def test_pricing_tables_have_effective_window_checks(self) -> None:
         names = {
@@ -305,6 +340,8 @@ class TestCustomerPricingService(unittest.TestCase):
             CustomerCreate(tenant_id="tenant-1", customer_number="K-2000", name="Atlas Security GmbH"),
             _actor(),
         )
+        self.function_type_id = "55555555-5555-4555-8555-555555555555"
+        self.qualification_type_id = "66666666-6666-4666-8666-666666666666"
 
     def test_rate_cards_reject_overlapping_windows_for_same_kind(self) -> None:
         self.service.create_rate_card(
@@ -436,6 +473,54 @@ class TestCustomerPricingService(unittest.TestCase):
         self.assertEqual(mask_context.exception.code, "customers.validation.surcharge_rule_weekday_mask")
         self.assertEqual(amount_context.exception.code, "customers.validation.surcharge_rule_amount_combination")
 
+    def test_rate_line_rejects_unknown_function_and_qualification_catalog_ids(self) -> None:
+        rate_card = self.service.create_rate_card(
+            "tenant-1",
+            self.customer.id,
+            CustomerRateCardCreate(
+                tenant_id="tenant-1",
+                customer_id=self.customer.id,
+                rate_kind="guarding",
+                currency_code="EUR",
+                effective_from=date(2026, 1, 1),
+            ),
+            _actor(),
+        )
+
+        with self.assertRaises(ApiException) as function_context:
+            self.service.create_rate_line(
+                "tenant-1",
+                self.customer.id,
+                rate_card.id,
+                CustomerRateLineCreate(
+                    tenant_id="tenant-1",
+                    rate_card_id=rate_card.id,
+                    line_kind="base",
+                    function_type_id=str(uuid4()),
+                    billing_unit="hour",
+                    unit_price=Decimal("25.00"),
+                ),
+                _actor(),
+            )
+        with self.assertRaises(ApiException) as qualification_context:
+            self.service.create_rate_line(
+                "tenant-1",
+                self.customer.id,
+                rate_card.id,
+                CustomerRateLineCreate(
+                    tenant_id="tenant-1",
+                    rate_card_id=rate_card.id,
+                    line_kind="base",
+                    qualification_type_id=str(uuid4()),
+                    billing_unit="hour",
+                    unit_price=Decimal("25.00"),
+                ),
+                _actor(),
+            )
+
+        self.assertEqual(function_context.exception.code, "customers.validation.rate_line_function_type")
+        self.assertEqual(qualification_context.exception.code, "customers.validation.rate_line_qualification_type")
+
     def test_pricing_profile_exposes_finance_read_contract(self) -> None:
         rate_card = self.service.create_rate_card(
             "tenant-1",
@@ -457,8 +542,8 @@ class TestCustomerPricingService(unittest.TestCase):
                 tenant_id="tenant-1",
                 rate_card_id=rate_card.id,
                 line_kind="base",
-                function_type_id="func-security",
-                qualification_type_id=None,
+                function_type_id=self.function_type_id,
+                qualification_type_id=self.qualification_type_id,
                 planning_mode_code="release",
                 billing_unit="hour",
                 unit_price=Decimal("23.40"),
@@ -484,9 +569,21 @@ class TestCustomerPricingService(unittest.TestCase):
         self.assertEqual(pricing.customer_id, self.customer.id)
         self.assertEqual(len(pricing.rate_cards), 1)
         self.assertEqual(pricing.rate_cards[0].currency_code, "EUR")
-        self.assertEqual(pricing.rate_cards[0].rate_lines[0].function_type_id, "func-security")
+        self.assertEqual(pricing.rate_cards[0].rate_lines[0].function_type_id, self.function_type_id)
+        self.assertEqual(pricing.rate_cards[0].rate_lines[0].function_type.code, "SEC_GUARD")
+        self.assertEqual(pricing.rate_cards[0].rate_lines[0].qualification_type.code, "G34A")
         self.assertEqual(pricing.rate_cards[0].surcharge_rules[0].surcharge_type, "night")
         self.assertGreaterEqual(len(self.audit_repo.audit_events), 3)
+
+    def test_migration_normalizes_only_real_hr_catalog_uuid_references(self) -> None:
+        migration_sql = Path("backend/alembic/versions/0058_customer_rate_line_hr_catalog_refs.py").read_text(encoding="utf-8")
+
+        self.assertIn("func-guard", migration_sql)
+        self.assertIn("qualification_type_id_uuid", migration_sql)
+        self.assertIn("function_type_id ~*", migration_sql)
+        self.assertIn("qualification_type_id ~*", migration_sql)
+        self.assertIn("FROM hr.function_type", migration_sql)
+        self.assertIn("FROM hr.qualification_type", migration_sql)
 
 
 if __name__ == "__main__":

@@ -1055,7 +1055,23 @@
                       <strong>{{ rateLine.line_kind }} · {{ rateLine.billing_unit }}</strong>
                       <p>{{ rateLine.unit_price }} {{ selectedRateCard.currency_code }}</p>
                       <span class="customer-admin-record__meta">
-                        {{ [rateLine.function_type_id, rateLine.qualification_type_id, rateLine.planning_mode_code].filter(Boolean).join(" · ") || t("customerAdmin.summary.none") }}
+                        {{
+                          [
+                            resolveRateLineCatalogLabel(
+                              rateLine.function_type_id,
+                              rateLine.function_type,
+                              rateLineFunctionTypeOptions,
+                            ),
+                            resolveRateLineCatalogLabel(
+                              rateLine.qualification_type_id,
+                              rateLine.qualification_type,
+                              rateLineQualificationTypeOptions,
+                            ),
+                            rateLine.planning_mode_code,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || t("customerAdmin.summary.none")
+                        }}
                       </span>
                     </div>
                     <div class="customer-admin-record__actions">
@@ -1072,35 +1088,148 @@
                   <div class="customer-admin-form-grid customer-admin-form-grid--detail">
                     <label class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.lineKind") }}</span>
-                      <input v-model="rateLineDraft.line_kind" :disabled="!commercialActionState.canManageRateLines" />
+                      <select
+                        v-model="rateLineDraft.line_kind"
+                        :disabled="!commercialActionState.canManageRateLines"
+                      >
+                        <option value="">{{ t("customerAdmin.placeholder.select") }}</option>
+                        <option v-for="option in RATE_LINE_KIND_OPTIONS" :key="option.value" :value="option.value">
+                          {{ t(`customerAdmin.option.rateLineKind.${option.value}` as never) }}
+                        </option>
+                      </select>
                     </label>
                     <label class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.billingUnit") }}</span>
-                      <input v-model="rateLineDraft.billing_unit" :disabled="!commercialActionState.canManageRateLines" />
+                      <select
+                        v-model="rateLineDraft.billing_unit"
+                        :disabled="!commercialActionState.canManageRateLines"
+                      >
+                        <option value="">{{ t("customerAdmin.placeholder.select") }}</option>
+                        <option v-for="option in RATE_LINE_BILLING_UNIT_OPTIONS" :key="option.value" :value="option.value">
+                          {{ t(`customerAdmin.option.billingUnit.${option.value}` as never) }}
+                        </option>
+                      </select>
                     </label>
                     <label class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.unitPrice") }}</span>
-                      <input v-model="rateLineDraft.unit_price" :disabled="!commercialActionState.canManageRateLines" />
+                      <input
+                        v-model="rateLineDraft.unit_price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        :disabled="!commercialActionState.canManageRateLines"
+                      />
                     </label>
                     <label class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.minimumQuantity") }}</span>
-                      <input v-model="rateLineDraft.minimum_quantity" :disabled="!commercialActionState.canManageRateLines" />
+                      <input
+                        v-model="rateLineDraft.minimum_quantity"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        :disabled="!commercialActionState.canManageRateLines"
+                      />
                     </label>
                     <label class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.functionTypeId") }}</span>
-                      <input v-model="rateLineDraft.function_type_id" :disabled="!commercialActionState.canManageRateLines" />
+                      <select
+                        v-model="rateLineDraft.function_type_id"
+                        :disabled="!commercialActionState.canManageRateLines || isRateLineFunctionCatalogEmpty"
+                      >
+                        <option value="">{{ t("customerAdmin.commercial.functionTypePlaceholder") }}</option>
+                        <option
+                          v-for="option in rateLineFunctionTypeSelectOptions"
+                          :key="option.id"
+                          :value="option.id"
+                        >
+                          {{ formatCatalogOptionLabel(option) }}
+                        </option>
+                      </select>
+                      <small class="customer-admin-field-help">
+                        {{
+                          rateLineFunctionTypeOptions.length
+                            ? t("customerAdmin.commercial.functionTypeCatalogHint")
+                            : t("customerAdmin.commercial.functionTypeEmptyHint")
+                        }}
+                      </small>
                     </label>
                     <label class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.qualificationTypeId") }}</span>
-                      <input v-model="rateLineDraft.qualification_type_id" :disabled="!commercialActionState.canManageRateLines" />
+                      <select
+                        v-model="rateLineDraft.qualification_type_id"
+                        :disabled="!commercialActionState.canManageRateLines || isRateLineQualificationCatalogEmpty"
+                      >
+                        <option value="">{{ t("customerAdmin.commercial.qualificationTypePlaceholder") }}</option>
+                        <option
+                          v-for="option in rateLineQualificationTypeSelectOptions"
+                          :key="option.id"
+                          :value="option.id"
+                        >
+                          {{ formatCatalogOptionLabel(option) }}
+                        </option>
+                      </select>
+                      <small class="customer-admin-field-help">
+                        {{
+                          rateLineQualificationTypeOptions.length
+                            ? t("customerAdmin.commercial.qualificationTypeCatalogHint")
+                            : t("customerAdmin.commercial.qualificationTypeEmptyHint")
+                        }}
+                      </small>
                     </label>
+                    <div
+                      v-if="isRateLineHrCatalogEmpty"
+                      class="customer-admin-catalog-empty-state field-stack field-stack--wide"
+                    >
+                      <strong>{{ t("customerAdmin.commercial.hrCatalogEmptyTitle") }}</strong>
+                      <p>{{ t(rateLineHrCatalogEmptyMessageKey as never) }}</p>
+                      <div class="cta-row">
+                        <button
+                          v-if="canBootstrapHrCatalogSamples"
+                          class="cta-button cta-secondary"
+                          type="button"
+                          :disabled="loading.hrCatalogBootstrap"
+                          @click="handleBootstrapRateLineHrCatalogs"
+                        >
+                          {{
+                            loading.hrCatalogBootstrap
+                              ? t("customerAdmin.actions.creatingHrCatalogSamples")
+                              : t("customerAdmin.actions.createHrCatalogSamples")
+                          }}
+                        </button>
+                        <button
+                          class="cta-button cta-secondary"
+                          type="button"
+                          @click="openEmployeesAdmin"
+                        >
+                          {{ t("customerAdmin.actions.openEmployeesAdmin") }}
+                        </button>
+                      </div>
+                    </div>
                     <label class="field-stack field-stack--half">
                       <span>{{ t("customerAdmin.fields.planningModeCode") }}</span>
-                      <input v-model="rateLineDraft.planning_mode_code" :disabled="!commercialActionState.canManageRateLines" />
+                      <select
+                        v-model="rateLineDraft.planning_mode_code"
+                        :disabled="!commercialActionState.canManageRateLines"
+                      >
+                        <option value="">{{ t("customerAdmin.placeholder.selectOptional") }}</option>
+                        <option
+                          v-for="option in RATE_LINE_PLANNING_MODE_OPTIONS"
+                          :key="option.value"
+                          :value="option.value"
+                        >
+                          {{ t(`customerAdmin.option.planningMode.${option.value}` as never) }}
+                        </option>
+                      </select>
                     </label>
                     <label class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.sortOrder") }}</span>
-                      <input v-model.number="rateLineDraft.sort_order" type="number" :disabled="!commercialActionState.canManageRateLines" />
+                      <input
+                        v-model.number="rateLineDraft.sort_order"
+                        type="number"
+                        min="0"
+                        step="1"
+                        :disabled="!commercialActionState.canManageRateLines"
+                      />
                     </label>
                     <label class="field-stack field-stack--wide">
                       <span>{{ t("customerAdmin.fields.notes") }}</span>
@@ -1163,7 +1292,15 @@
                   <div class="customer-admin-form-grid customer-admin-form-grid--detail">
                     <label class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.surchargeType") }}</span>
-                      <input v-model="surchargeRuleDraft.surcharge_type" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      <select
+                        v-model="surchargeRuleDraft.surcharge_type"
+                        :disabled="!commercialActionState.canManageSurchargeRules"
+                      >
+                        <option value="">{{ t("customerAdmin.placeholder.select") }}</option>
+                        <option v-for="option in SURCHARGE_TYPE_OPTIONS" :key="option.value" :value="option.value">
+                          {{ t(`customerAdmin.option.surchargeType.${option.value}` as never) }}
+                        </option>
+                      </select>
                     </label>
                     <label class="field-stack field-stack--half">
                       <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
@@ -1173,37 +1310,115 @@
                       <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
                       <input v-model="surchargeRuleDraft.effective_to" type="date" :disabled="!commercialActionState.canManageSurchargeRules" />
                     </label>
-                    <label class="field-stack field-stack--half">
-                      <span>{{ t("customerAdmin.fields.weekdayMask") }}</span>
-                      <input v-model="surchargeRuleDraft.weekday_mask" :disabled="!commercialActionState.canManageSurchargeRules" />
-                    </label>
+                    <div class="field-stack field-stack--wide">
+                      <span>{{ t("customerAdmin.fields.weekdays") }}</span>
+                      <div class="customer-admin-weekday-picker">
+                        <button
+                          v-for="day in surchargeWeekdayOptions"
+                          :key="day.id"
+                          class="customer-admin-tab customer-admin-tab--sub"
+                          :class="{ active: surchargeSelectedWeekdays.includes(day.id) }"
+                          type="button"
+                          :disabled="!commercialActionState.canManageSurchargeRules"
+                          @click="toggleSurchargeWeekday(day.id)"
+                        >
+                          {{ day.label }}
+                        </button>
+                      </div>
+                    </div>
                     <label class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.timeFromMinute") }}</span>
-                      <input v-model.number="surchargeRuleDraft.time_from_minute" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      <input
+                        v-model="surchargeTimeFromInput"
+                        type="time"
+                        :max="surchargeTimeToInput || undefined"
+                        :disabled="!commercialActionState.canManageSurchargeRules"
+                      />
                     </label>
                     <label class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.timeToMinute") }}</span>
-                      <input v-model.number="surchargeRuleDraft.time_to_minute" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      <input
+                        v-model="surchargeTimeToInput"
+                        type="time"
+                        :min="surchargeTimeFromInput || undefined"
+                        :disabled="!commercialActionState.canManageSurchargeRules"
+                      />
+                      <small v-if="hasInvalidSurchargeTimeRange" class="customer-admin-field-help customer-admin-field-help--error">
+                        {{ t("customerAdmin.feedback.invalidTimeRange") }}
+                      </small>
                     </label>
                     <label class="field-stack field-stack--half">
                       <span>{{ t("customerAdmin.fields.regionCode") }}</span>
-                      <input v-model="surchargeRuleDraft.region_code" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      <input
+                        v-model="surchargeRuleDraft.region_code"
+                        :disabled="!commercialActionState.canManageSurchargeRules"
+                        @input="normalizeSurchargeRegionCode"
+                      />
                     </label>
-                    <label class="field-stack field-stack--third">
+                    <div class="field-stack field-stack--wide">
+                      <span>{{ t("customerAdmin.fields.amountMode") }}</span>
+                      <div class="customer-admin-segmented-control">
+                        <button
+                          class="customer-admin-tab customer-admin-tab--sub"
+                          :class="{ active: surchargeAmountMode === 'percent' }"
+                          type="button"
+                          :disabled="!commercialActionState.canManageSurchargeRules"
+                          @click="setSurchargeAmountMode('percent')"
+                        >
+                          {{ t("customerAdmin.amountMode.percent") }}
+                        </button>
+                        <button
+                          class="customer-admin-tab customer-admin-tab--sub"
+                          :class="{ active: surchargeAmountMode === 'fixed' }"
+                          type="button"
+                          :disabled="!commercialActionState.canManageSurchargeRules"
+                          @click="setSurchargeAmountMode('fixed')"
+                        >
+                          {{ t("customerAdmin.amountMode.fixed") }}
+                        </button>
+                      </div>
+                    </div>
+                    <label v-if="surchargeAmountMode === 'percent'" class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.percentValue") }}</span>
-                      <input v-model="surchargeRuleDraft.percent_value" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      <input
+                        v-model="surchargeRuleDraft.percent_value"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        :disabled="!commercialActionState.canManageSurchargeRules"
+                      />
                     </label>
-                    <label class="field-stack field-stack--third">
+                    <label v-if="surchargeAmountMode === 'fixed'" class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.fixedAmount") }}</span>
-                      <input v-model="surchargeRuleDraft.fixed_amount" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      <input
+                        v-model="surchargeRuleDraft.fixed_amount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        :disabled="!commercialActionState.canManageSurchargeRules"
+                      />
                     </label>
-                    <label class="field-stack field-stack--third">
+                    <label v-if="surchargeAmountMode === 'fixed'" class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.currencyCode") }}</span>
-                      <input v-model="surchargeRuleDraft.currency_code" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      <select
+                        v-model="surchargeRuleDraft.currency_code"
+                        :disabled="!commercialActionState.canManageSurchargeRules"
+                      >
+                        <option value="">{{ t("customerAdmin.placeholder.select") }}</option>
+                        <option v-for="option in surchargeCurrencyOptions" :key="option.value" :value="option.value">
+                          {{ option.label }}
+                        </option>
+                      </select>
                     </label>
                     <label class="field-stack field-stack--third">
                       <span>{{ t("customerAdmin.fields.sortOrder") }}</span>
-                      <input v-model.number="surchargeRuleDraft.sort_order" type="number" :disabled="!commercialActionState.canManageSurchargeRules" />
+                      <input
+                        v-model.number="surchargeRuleDraft.sort_order"
+                        type="number"
+                        min="0"
+                        step="1"
+                        :disabled="!commercialActionState.canManageSurchargeRules"
+                      />
                     </label>
                     <label class="field-stack field-stack--wide">
                       <span>{{ t("customerAdmin.fields.notes") }}</span>
@@ -1211,7 +1426,7 @@
                     </label>
                   </div>
                   <div class="cta-row" v-if="commercialActionState.canManageSurchargeRules">
-                    <button class="cta-button" type="submit" :disabled="loading.surchargeRule">
+                    <button class="cta-button" type="submit" :disabled="loading.surchargeRule || hasInvalidSurchargeTimeRange">
                       {{ editingSurchargeRuleId ? t("customerAdmin.actions.saveSurchargeRule") : t("customerAdmin.actions.createSurchargeRule") }}
                     </button>
                     <button class="cta-button cta-secondary" type="button" @click="resetSurchargeRuleDraft">
@@ -1688,6 +1903,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 
+import { webAppConfig } from "@/config/env";
 import {
   createCustomerAvailableAddress,
   createCustomerEmployeeBlock,
@@ -1754,12 +1970,23 @@ import {
 } from "@/api/customers";
 import StatusBadge from "@/components/StatusBadge.vue";
 import {
+  applySurchargeAmountMode,
+  buildWeekdayMask,
+  COMMON_CURRENCY_OPTIONS,
   buildCommercialConfirmationKey,
   deriveCustomerCommercialActionState,
+  minutesToTimeInput,
   mapCustomerCommercialApiMessage,
+  parseWeekdayMask,
+  RATE_LINE_BILLING_UNIT_OPTIONS,
+  RATE_LINE_KIND_OPTIONS,
+  RATE_LINE_PLANNING_MODE_OPTIONS,
   resolveBillingProfileApiError,
   resolveBillingProfileFeedbackError,
   resolveInvoicePartyApiError,
+  resolveSurchargeAmountMode,
+  SURCHARGE_TYPE_OPTIONS,
+  timeInputToMinutes,
   validateBillingProfileDraft,
   validateRateCardDraft,
   validateRateLineDraft,
@@ -1785,6 +2012,10 @@ import {
   resolveCustomerCancelSelection,
 } from "@/features/customers/customerAdmin.helpers.js";
 import {
+  EmployeeAdminApiError,
+  bootstrapEmployeeCatalogSamples,
+} from "@/api/employeeAdmin";
+import {
   createCustomerPortalAccess,
   listCustomerPortalAccess,
   resetCustomerPortalAccessPassword,
@@ -1795,7 +2026,7 @@ import {
 } from "#/api/sicherplan/customer-portal-access";
 import { useI18n } from "@/i18n";
 import { useAuthStore } from "@/stores/auth";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
   embedded: false,
@@ -1805,6 +2036,7 @@ const ACCESS_TOKEN_STORAGE_KEY = "sicherplan-access-token";
 const { t } = useI18n();
 const authStore = useAuthStore();
 const route = useRoute();
+const router = useRouter();
 
 const customers = ref<CustomerListItem[]>([]);
 const customerHistory = ref<CustomerHistoryEntryRead[]>([]);
@@ -1836,6 +2068,7 @@ const tenantScopeInput = ref(authStore.tenantScopeId);
 const tenantScopeId = ref(authStore.tenantScopeId);
 const accessTokenInput = ref(readStoredAccessToken());
 const accessToken = ref(readStoredAccessToken());
+const attemptedHrCatalogBootstrap = ref(false);
 const portalAccessGeneratedPassword = ref("");
 const portalAccessModalOpen = ref(false);
 const portalAccessPasswordTarget = ref<CustomerPortalAccessListItem | null>(null);
@@ -1873,6 +2106,7 @@ const loading = reactive({
   employeeBlock: false,
   portalPrivacy: false,
   sharedAddress: false,
+  hrCatalogBootstrap: false,
 });
 const feedback = reactive({
   tone: "info",
@@ -1989,6 +2223,10 @@ const rateLineDraft = reactive<CustomerRateLinePayload>({
   sort_order: 100,
   notes: "",
 });
+const surchargeAmountMode = ref<"fixed" | "percent">("percent");
+const surchargeSelectedWeekdays = ref<string[]>([]);
+const surchargeTimeFromInput = ref("");
+const surchargeTimeToInput = ref("");
 const surchargeRuleDraft = reactive<CustomerSurchargeRulePayload>({
   tenant_id: "",
   rate_card_id: "",
@@ -2043,6 +2281,13 @@ const canRead = computed(() => actionState.value.canRead);
 const canWrite = computed(() => actionState.value.canCreate);
 const canReadCommercial = computed(() => commercialActionState.value.canReadCommercial);
 const canWriteCommercial = computed(() => commercialActionState.value.canWriteCommercial);
+const isDevelopmentEnv = computed(() => webAppConfig.env === "development");
+const canBootstrapHrCatalogSamples = computed(() =>
+  isDevelopmentEnv.value
+  && !!tenantScopeId.value
+  && !!accessToken.value
+  && ["platform_admin", "tenant_admin"].includes(authStore.activeRole ?? ""),
+);
 const canManagePortalAccess = computed(() =>
   hasCustomerPermission(authStore.activeRole, "customers.portal_access.write"),
 );
@@ -2096,11 +2341,62 @@ const billingInvoiceLayoutOptions = computed(() => referenceData.value?.invoice_
 const billingShippingMethodOptions = computed(() => referenceData.value?.shipping_methods ?? []);
 const billingDunningPolicyOptions = computed(() => referenceData.value?.dunning_policies ?? []);
 const invoicePartyInvoiceLayoutOptions = computed(() => referenceData.value?.invoice_layouts ?? []);
+const rateLineFunctionTypeOptions = computed(() => referenceData.value?.function_types ?? []);
+const rateLineQualificationTypeOptions = computed(() => referenceData.value?.qualification_types ?? []);
+const isRateLineFunctionCatalogEmpty = computed(() => rateLineFunctionTypeOptions.value.length === 0);
+const isRateLineQualificationCatalogEmpty = computed(() => rateLineQualificationTypeOptions.value.length === 0);
+const isRateLineHrCatalogEmpty = computed(() =>
+  isRateLineFunctionCatalogEmpty.value || isRateLineQualificationCatalogEmpty.value,
+);
+const rateLineHrCatalogEmptyMessageKey = computed(() =>
+  canBootstrapHrCatalogSamples.value
+    ? "customerAdmin.commercial.hrCatalogEmptyDevHint"
+    : "customerAdmin.commercial.hrCatalogEmptyManagedHint",
+);
 const invoicePartyInvoiceLayoutPlaceholder = computed(() =>
   invoicePartyInvoiceLayoutOptions.value.length
     ? t("customerAdmin.commercial.invoicePartyLayoutPlaceholder")
     : t("customerAdmin.commercial.invoicePartyLayoutEmptyPlaceholder"),
 );
+const editingRateLine = computed(() =>
+  selectedRateCard.value?.rate_lines.find((row) => row.id === editingRateLineId.value) ?? null,
+);
+const rateLineFunctionTypeSelectOptions = computed(() => {
+  const options = new Map(rateLineFunctionTypeOptions.value.map((option) => [option.id, option]));
+  const fallback = editingRateLine.value?.function_type;
+  if (fallback?.id) {
+    options.set(fallback.id, fallback);
+  } else if (rateLineDraft.function_type_id && !options.has(rateLineDraft.function_type_id)) {
+    options.set(rateLineDraft.function_type_id, {
+      id: rateLineDraft.function_type_id,
+      code: rateLineDraft.function_type_id,
+      label: rateLineDraft.function_type_id,
+      description: null,
+      is_active: false,
+      status: "archived",
+      archived_at: null,
+    });
+  }
+  return [...options.values()];
+});
+const rateLineQualificationTypeSelectOptions = computed(() => {
+  const options = new Map(rateLineQualificationTypeOptions.value.map((option) => [option.id, option]));
+  const fallback = editingRateLine.value?.qualification_type;
+  if (fallback?.id) {
+    options.set(fallback.id, fallback);
+  } else if (rateLineDraft.qualification_type_id && !options.has(rateLineDraft.qualification_type_id)) {
+    options.set(rateLineDraft.qualification_type_id, {
+      id: rateLineDraft.qualification_type_id,
+      code: rateLineDraft.qualification_type_id,
+      label: rateLineDraft.qualification_type_id,
+      description: null,
+      is_active: false,
+      status: "archived",
+      archived_at: null,
+    });
+  }
+  return [...options.values()];
+});
 const invoicePartyAddressOptions = computed(() =>
   (selectedCustomer.value?.addresses ?? [])
     .filter((address) => address.status !== "archived")
@@ -2172,6 +2468,30 @@ const pricingRulesTabs = computed(() => {
     label: t(pricingRulesTabLabelKeys[tabId as keyof typeof pricingRulesTabLabelKeys] as never),
   }));
 });
+const surchargeWeekdayOptions = computed(() => [
+  { id: "mon", label: t("customerAdmin.weekday.mon" as never) },
+  { id: "tue", label: t("customerAdmin.weekday.tue" as never) },
+  { id: "wed", label: t("customerAdmin.weekday.wed" as never) },
+  { id: "thu", label: t("customerAdmin.weekday.thu" as never) },
+  { id: "fri", label: t("customerAdmin.weekday.fri" as never) },
+  { id: "sat", label: t("customerAdmin.weekday.sat" as never) },
+  { id: "sun", label: t("customerAdmin.weekday.sun" as never) },
+]);
+const surchargeCurrencyOptions = computed(() => {
+  const values = new Set(COMMON_CURRENCY_OPTIONS.map((option) => option.value));
+  const rateCardCurrency = `${selectedRateCard.value?.currency_code ?? ""}`.trim().toUpperCase();
+  if (rateCardCurrency) {
+    values.add(rateCardCurrency);
+  }
+  return [...values].map(
+    (value) => COMMON_CURRENCY_OPTIONS.find((option) => option.value === value) ?? { value, label: value },
+  );
+});
+const hasInvalidSurchargeTimeRange = computed(() => {
+  const from = timeInputToMinutes(surchargeTimeFromInput.value);
+  const to = timeInputToMinutes(surchargeTimeToInput.value);
+  return from !== null && to !== null && to <= from;
+});
 const sectionVisibility = computed(() =>
   resolveCustomerAdminSectionVisibility({
     effectiveRole: authStore.effectiveRole,
@@ -2187,6 +2507,42 @@ function formatReferenceLabel(
 
 function filterMandateOptions(branchId: null | string | undefined) {
   return filterCustomerMandatesByBranch(referenceData.value?.mandates ?? [], branchId);
+}
+
+function selectedRateCardCurrencyFallback() {
+  return `${selectedRateCard.value?.currency_code ?? ""}`.trim().toUpperCase();
+}
+
+function syncSurchargeWeekdayMask() {
+  surchargeRuleDraft.weekday_mask = buildWeekdayMask(surchargeSelectedWeekdays.value);
+}
+
+function toggleSurchargeWeekday(dayId: string) {
+  const activeDays = new Set(surchargeSelectedWeekdays.value);
+  if (activeDays.has(dayId)) {
+    activeDays.delete(dayId);
+  } else {
+    activeDays.add(dayId);
+  }
+  surchargeSelectedWeekdays.value = [...activeDays];
+  syncSurchargeWeekdayMask();
+}
+
+function syncSurchargeTimeDraft() {
+  surchargeRuleDraft.time_from_minute = timeInputToMinutes(surchargeTimeFromInput.value);
+  surchargeRuleDraft.time_to_minute = timeInputToMinutes(surchargeTimeToInput.value);
+}
+
+function setSurchargeAmountMode(mode: "fixed" | "percent") {
+  surchargeAmountMode.value = mode;
+  const normalized = applySurchargeAmountMode(mode, surchargeRuleDraft, selectedRateCardCurrencyFallback());
+  surchargeRuleDraft.percent_value = normalized.percent_value;
+  surchargeRuleDraft.fixed_amount = normalized.fixed_amount;
+  surchargeRuleDraft.currency_code = normalized.currency_code;
+}
+
+function normalizeSurchargeRegionCode() {
+  surchargeRuleDraft.region_code = `${surchargeRuleDraft.region_code ?? ""}`.toUpperCase();
 }
 
 function readStoredAccessToken() {
@@ -2215,6 +2571,7 @@ function rememberScopeAndToken() {
   authStore.setTenantScopeId(tenantScopeInput.value);
   tenantScopeId.value = authStore.tenantScopeId;
   accessToken.value = accessTokenInput.value.trim();
+  attemptedHrCatalogBootstrap.value = false;
   if (typeof window !== "undefined") {
     window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken.value);
   }
@@ -2228,6 +2585,55 @@ async function loadReferenceData() {
     return;
   }
   referenceData.value = await getCustomerReferenceData(tenantScopeId.value, accessToken.value);
+  if (
+    canBootstrapHrCatalogSamples.value
+    && !attemptedHrCatalogBootstrap.value
+    && (
+      referenceData.value.function_types.length === 0
+      || referenceData.value.qualification_types.length === 0
+    )
+  ) {
+    attemptedHrCatalogBootstrap.value = true;
+    await bootstrapRateLineHrCatalogs({ silentSuccess: true });
+  }
+}
+
+async function bootstrapRateLineHrCatalogs(options: { silentSuccess?: boolean } = {}) {
+  if (!tenantScopeId.value || !accessToken.value || !canBootstrapHrCatalogSamples.value) {
+    return;
+  }
+  loading.hrCatalogBootstrap = true;
+  try {
+    await bootstrapEmployeeCatalogSamples(tenantScopeId.value, accessToken.value);
+    referenceData.value = await getCustomerReferenceData(tenantScopeId.value, accessToken.value);
+    if (!options.silentSuccess) {
+      setFeedback(
+        "success",
+        t("customerAdmin.feedback.hrCatalogBootstrapSuccess"),
+        t("customerAdmin.feedback.hrCatalogBootstrapSuccessBody"),
+      );
+    }
+  } catch (error) {
+    const messageKey =
+      error instanceof EmployeeAdminApiError && error.messageKey === "errors.employees.catalog.bootstrap_not_allowed"
+        ? "customerAdmin.feedback.hrCatalogBootstrapNotAllowed"
+        : "customerAdmin.feedback.hrCatalogBootstrapError";
+    setFeedback(
+      "error",
+      t("customerAdmin.commercial.hrCatalogEmptyTitle"),
+      t(messageKey as never),
+    );
+  } finally {
+    loading.hrCatalogBootstrap = false;
+  }
+}
+
+function handleBootstrapRateLineHrCatalogs() {
+  void bootstrapRateLineHrCatalogs();
+}
+
+function openEmployeesAdmin() {
+  void router.push("/admin/employees");
 }
 
 function clearFeedback() {
@@ -2460,6 +2866,10 @@ function resetSurchargeRuleDraft() {
   surchargeRuleDraft.currency_code = "";
   surchargeRuleDraft.sort_order = 100;
   surchargeRuleDraft.notes = "";
+  surchargeAmountMode.value = "percent";
+  surchargeSelectedWeekdays.value = [];
+  surchargeTimeFromInput.value = "";
+  surchargeTimeToInput.value = "";
   editingSurchargeRuleId.value = "";
 }
 
@@ -2671,6 +3081,10 @@ function editSurchargeRule(rule: CustomerSurchargeRuleRead) {
   surchargeRuleDraft.currency_code = rule.currency_code ?? "";
   surchargeRuleDraft.sort_order = rule.sort_order;
   surchargeRuleDraft.notes = rule.notes ?? "";
+  surchargeAmountMode.value = resolveSurchargeAmountMode(rule);
+  surchargeSelectedWeekdays.value = parseWeekdayMask(rule.weekday_mask ?? "");
+  surchargeTimeFromInput.value = minutesToTimeInput(rule.time_from_minute);
+  surchargeTimeToInput.value = minutesToTimeInput(rule.time_to_minute);
   editingSurchargeRuleId.value = rule.id;
 }
 
@@ -3583,6 +3997,28 @@ function formatAddressDirectoryOption(address: CustomerAvailableAddressRead) {
   return address.street_line_2 ? `${location} · ${address.street_line_2}` : location;
 }
 
+function formatCatalogOptionLabel(option: { code: string; id: string; label: string }) {
+  return option.code ? `${option.code} · ${option.label}` : option.label || option.id;
+}
+
+function resolveRateLineCatalogLabel(
+  optionId: null | string | undefined,
+  nestedOption: null | { code: string; id: string; label: string } | undefined,
+  options: Array<{ code: string; id: string; label: string }>,
+) {
+  if (!optionId) {
+    return "";
+  }
+  const matched = options.find((option) => option.id === optionId);
+  if (matched) {
+    return formatCatalogOptionLabel(matched);
+  }
+  if (nestedOption) {
+    return formatCatalogOptionLabel(nestedOption);
+  }
+  return optionId;
+}
+
 function normalizeRateCardDraft(): CustomerRateCardPayload {
   return {
     tenant_id: tenantScopeId.value,
@@ -3612,25 +4048,24 @@ function normalizeRateLineDraft(): CustomerRateLinePayload {
 }
 
 function normalizeSurchargeRuleDraft(): CustomerSurchargeRulePayload {
+  const normalizedAmount = applySurchargeAmountMode(
+    surchargeAmountMode.value,
+    surchargeRuleDraft,
+    selectedRateCardCurrencyFallback(),
+  );
   return {
     tenant_id: tenantScopeId.value,
     rate_card_id: selectedRateCardId.value,
     surcharge_type: surchargeRuleDraft.surcharge_type.trim(),
     effective_from: surchargeRuleDraft.effective_from,
     effective_to: emptyToNull(surchargeRuleDraft.effective_to),
-    weekday_mask: emptyToNull(surchargeRuleDraft.weekday_mask),
-    time_from_minute:
-      surchargeRuleDraft.time_from_minute === null || surchargeRuleDraft.time_from_minute === undefined
-        ? null
-        : Number(surchargeRuleDraft.time_from_minute),
-    time_to_minute:
-      surchargeRuleDraft.time_to_minute === null || surchargeRuleDraft.time_to_minute === undefined
-        ? null
-        : Number(surchargeRuleDraft.time_to_minute),
-    region_code: emptyToNull(surchargeRuleDraft.region_code),
-    percent_value: emptyToNull(surchargeRuleDraft.percent_value),
-    fixed_amount: emptyToNull(surchargeRuleDraft.fixed_amount),
-    currency_code: emptyToNull(surchargeRuleDraft.currency_code)?.toUpperCase() ?? null,
+    weekday_mask: emptyToNull(buildWeekdayMask(surchargeSelectedWeekdays.value)),
+    time_from_minute: timeInputToMinutes(surchargeTimeFromInput.value),
+    time_to_minute: timeInputToMinutes(surchargeTimeToInput.value),
+    region_code: emptyToNull(`${surchargeRuleDraft.region_code ?? ""}`.trim().toUpperCase()),
+    percent_value: emptyToNull(normalizedAmount.percent_value),
+    fixed_amount: emptyToNull(normalizedAmount.fixed_amount),
+    currency_code: emptyToNull(normalizedAmount.currency_code)?.toUpperCase() ?? null,
     sort_order: Number(surchargeRuleDraft.sort_order ?? 100),
     notes: emptyToNull(surchargeRuleDraft.notes),
   };
@@ -4127,6 +4562,33 @@ watch(
 );
 
 watch(
+  () => surchargeTimeFromInput.value,
+  () => {
+    syncSurchargeTimeDraft();
+  },
+);
+
+watch(
+  () => surchargeTimeToInput.value,
+  () => {
+    syncSurchargeTimeDraft();
+  },
+);
+
+watch(
+  () => selectedRateCard.value?.currency_code ?? "",
+  (currencyCode) => {
+    if (
+      surchargeAmountMode.value === "fixed"
+      && !`${surchargeRuleDraft.currency_code ?? ""}`.trim()
+      && `${currencyCode}`.trim()
+    ) {
+      surchargeRuleDraft.currency_code = `${currencyCode}`.trim().toUpperCase();
+    }
+  },
+);
+
+watch(
   () => customerDraft.default_branch_id,
   (branchId) => {
     if (!customerDraft.default_mandate_id) {
@@ -4521,6 +4983,24 @@ onMounted(() => {
   margin-top: 0.1rem;
 }
 
+.customer-admin-field-help {
+  color: var(--sp-color-text-secondary);
+  margin-top: 0.1rem;
+}
+
+.customer-admin-catalog-empty-state {
+  align-self: start;
+  border: 1px dashed color-mix(in srgb, var(--sp-color-border) 72%, var(--sp-color-primary));
+  border-radius: 16px;
+  padding: 0.9rem 1rem;
+  background: color-mix(in srgb, var(--sp-color-surface-weak) 88%, white);
+}
+
+.customer-admin-catalog-empty-state p {
+  margin: 0;
+  color: var(--sp-color-text-secondary);
+}
+
 .field-stack {
   display: grid;
   gap: 0.42rem;
@@ -4605,6 +5085,13 @@ onMounted(() => {
 
 .field-stack--wide {
   grid-column: 1 / -1;
+}
+
+.customer-admin-weekday-picker,
+.customer-admin-segmented-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
 }
 
 @media (max-width: 960px) {

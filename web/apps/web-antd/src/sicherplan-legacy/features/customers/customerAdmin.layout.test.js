@@ -34,6 +34,60 @@ test("commercial workspace uses nested sub tabs and isolated panels", () => {
   assert.match(source, /activePricingRulesTab\.value = "surcharges"/);
 });
 
+test("pricing-rule editors use guided select, datalist, numeric, and time controls", () => {
+  assert.match(source, /<select[\s\S]*v-model="rateLineDraft\.line_kind"/);
+  assert.match(source, /<select[\s\S]*v-model="rateLineDraft\.billing_unit"/);
+  assert.match(source, /<select[\s\S]*v-model="rateLineDraft\.planning_mode_code"/);
+  assert.match(source, /v-model="rateLineDraft\.unit_price"[\s\S]*type="number"[\s\S]*step="0\.01"[\s\S]*min="0"/);
+  assert.match(source, /v-model="rateLineDraft\.minimum_quantity"[\s\S]*type="number"[\s\S]*step="0\.01"[\s\S]*min="0"/);
+  assert.match(source, /<select[\s\S]*v-model="rateLineDraft\.function_type_id"/);
+  assert.match(source, /<select[\s\S]*v-model="rateLineDraft\.qualification_type_id"/);
+  assert.match(source, /referenceData\.value\?\.function_types/);
+  assert.match(source, /referenceData\.value\?\.qualification_types/);
+  assert.match(source, /rateLineFunctionTypeOptions/);
+  assert.match(source, /rateLineQualificationTypeOptions/);
+  assert.match(source, /formatCatalogOptionLabel\(option\)/);
+  assert.match(source, /customerAdmin\.commercial\.functionTypeCatalogHint/);
+  assert.match(source, /customerAdmin\.commercial\.qualificationTypeCatalogHint/);
+  assert.match(source, /<select[\s\S]*v-model="surchargeRuleDraft\.surcharge_type"/);
+  assert.match(source, /customer-admin-weekday-picker/);
+  assert.match(source, /v-model="surchargeTimeFromInput"[\s\S]*type="time"/);
+  assert.match(source, /v-model="surchargeTimeToInput"[\s\S]*type="time"/);
+  assert.match(source, /setSurchargeAmountMode\('percent'\)/);
+  assert.match(source, /setSurchargeAmountMode\('fixed'\)/);
+  assert.match(source, /<select[\s\S]*v-model="surchargeRuleDraft\.currency_code"/);
+  assert.doesNotMatch(source, /<input v-model="rateLineDraft\.line_kind"/);
+  assert.doesNotMatch(source, /<input v-model="rateLineDraft\.billing_unit"/);
+  assert.doesNotMatch(source, /<input v-model="rateLineDraft\.planning_mode_code"/);
+  assert.doesNotMatch(source, /list="customer-rate-line-function-options"/);
+  assert.doesNotMatch(source, /list="customer-rate-line-qualification-options"/);
+  assert.doesNotMatch(source, /<input v-model="surchargeRuleDraft\.surcharge_type"/);
+  assert.doesNotMatch(source, /<input v-model="surchargeRuleDraft\.weekday_mask"/);
+  assert.doesNotMatch(source, /<input v-model\.number="surchargeRuleDraft\.time_from_minute"/);
+  assert.doesNotMatch(source, /<input v-model\.number="surchargeRuleDraft\.time_to_minute"/);
+  assert.doesNotMatch(source, /<input v-model="surchargeRuleDraft\.currency_code"/);
+});
+
+test("rate-line empty state offers HR bootstrap and recovery actions", () => {
+  assert.match(source, /webAppConfig\.env === "development"/);
+  assert.match(source, /bootstrapEmployeeCatalogSamples/);
+  assert.match(source, /attemptedHrCatalogBootstrap/);
+  assert.match(source, /customerAdmin\.commercial\.hrCatalogEmptyTitle/);
+  assert.match(source, /customerAdmin\.commercial\.hrCatalogEmptyDevHint/);
+  assert.match(source, /customerAdmin\.commercial\.hrCatalogEmptyManagedHint/);
+  assert.match(source, /customerAdmin\.actions\.createHrCatalogSamples/);
+  assert.match(source, /customerAdmin\.actions\.openEmployeesAdmin/);
+  assert.match(source, /openEmployeesAdmin/);
+  assert.match(source, /isRateLineHrCatalogEmpty/);
+});
+
+test("rate-line list resolves function and qualification labels from catalog data", () => {
+  assert.match(source, /resolveRateLineCatalogLabel/);
+  assert.match(source, /rateLine\.function_type/);
+  assert.match(source, /rateLine\.qualification_type/);
+  assert.match(source, /formatCatalogOptionLabel/);
+});
+
 test("detail forms use the denser detail-grid span classes", () => {
   assert.match(source, /customer-admin-form-grid--detail/);
   assert.match(source, /field-stack--half/);

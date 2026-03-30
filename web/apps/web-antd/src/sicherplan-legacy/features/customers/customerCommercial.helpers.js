@@ -8,6 +8,104 @@ const CUSTOMER_COMMERCIAL_PERMISSION_MATRIX = {
   subcontractor_user: [],
 };
 
+export const RATE_LINE_KIND_OPTIONS = [
+  { value: "base", label: "Base" },
+  { value: "function", label: "Function" },
+  { value: "qualification", label: "Qualification" },
+  { value: "planning_mode", label: "Planning mode" },
+];
+
+export const RATE_LINE_BILLING_UNIT_OPTIONS = [
+  { value: "hour", label: "Hour" },
+  { value: "day", label: "Day" },
+  { value: "flat", label: "Flat" },
+];
+
+export const RATE_LINE_PLANNING_MODE_OPTIONS = [
+  { value: "event", label: "Event" },
+  { value: "site", label: "Site" },
+  { value: "trade_fair", label: "Trade fair" },
+  { value: "patrol", label: "Patrol" },
+];
+
+export const SURCHARGE_TYPE_OPTIONS = [
+  { value: "night", label: "Night" },
+  { value: "weekend", label: "Weekend" },
+  { value: "holiday", label: "Holiday" },
+  { value: "regional", label: "Regional" },
+];
+
+export const COMMON_CURRENCY_OPTIONS = [
+  { value: "EUR", label: "EUR" },
+  { value: "CHF", label: "CHF" },
+  { value: "USD", label: "USD" },
+  { value: "GBP", label: "GBP" },
+];
+
+export const WEEKDAY_MASK_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+
+export function parseWeekdayMask(mask) {
+  if (!mask || !/^[01]{7}$/.test(mask)) {
+    return [];
+  }
+  return WEEKDAY_MASK_ORDER.filter((dayId, index) => mask[index] === "1");
+}
+
+export function buildWeekdayMask(selectedDayIds) {
+  const activeDays = new Set(selectedDayIds ?? []);
+  const mask = WEEKDAY_MASK_ORDER.map((dayId) => (activeDays.has(dayId) ? "1" : "0")).join("");
+  return mask === "0000000" ? "" : mask;
+}
+
+export function minutesToTimeInput(totalMinutes) {
+  if (totalMinutes === null || totalMinutes === undefined || totalMinutes === "") {
+    return "";
+  }
+  const value = Number(totalMinutes);
+  if (!Number.isInteger(value) || value < 0 || value > 1440) {
+    return "";
+  }
+  const boundedValue = value === 1440 ? 1439 : value;
+  const hours = Math.floor(boundedValue / 60);
+  const minutes = boundedValue % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+export function timeInputToMinutes(timeValue) {
+  if (!`${timeValue ?? ""}`.trim()) {
+    return null;
+  }
+  const match = /^(\d{2}):(\d{2})$/.exec(`${timeValue}`.trim());
+  if (!match) {
+    return null;
+  }
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+  return hours * 60 + minutes;
+}
+
+export function resolveSurchargeAmountMode(draft) {
+  return `${draft.fixed_amount ?? ""}`.trim() !== "" ? "fixed" : "percent";
+}
+
+export function applySurchargeAmountMode(mode, draft, fallbackCurrencyCode = "") {
+  if (mode === "fixed") {
+    return {
+      percent_value: "",
+      fixed_amount: `${draft.fixed_amount ?? ""}`,
+      currency_code: (`${draft.currency_code ?? ""}`.trim() || `${fallbackCurrencyCode ?? ""}`.trim()).toUpperCase(),
+    };
+  }
+  return {
+    percent_value: `${draft.percent_value ?? ""}`,
+    fixed_amount: "",
+    currency_code: "",
+  };
+}
+
 export function hasCustomerCommercialPermission(role, permissionKey) {
   return (CUSTOMER_COMMERCIAL_PERMISSION_MATRIX[role] ?? []).includes(permissionKey);
 }
@@ -180,6 +278,8 @@ export function mapCustomerCommercialApiMessage(messageKey) {
     "errors.customers.rate_card.stale_version": "customerAdmin.feedback.staleVersion",
     "errors.customers.rate_line.duplicate_dimension": "customerAdmin.feedback.duplicateRateDimension",
     "errors.customers.rate_line.invalid_billing_unit": "customerAdmin.feedback.invalidBillingUnit",
+    "errors.customers.rate_line.invalid_function_type": "customerAdmin.feedback.invalidFunctionType",
+    "errors.customers.rate_line.invalid_qualification_type": "customerAdmin.feedback.invalidQualificationType",
     "errors.customers.rate_line.invalid_unit_price": "customerAdmin.feedback.invalidUnitPrice",
     "errors.customers.rate_line.invalid_minimum_quantity": "customerAdmin.feedback.invalidMinimumQuantity",
     "errors.customers.rate_line.stale_version": "customerAdmin.feedback.staleVersion",

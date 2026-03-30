@@ -70,6 +70,30 @@ class FakeUser:
 
 
 @dataclass
+class FakeFunctionType:
+    id: str
+    tenant_id: str
+    code: str
+    label: str
+    description: str | None = None
+    is_active: bool = True
+    status: str = "active"
+    archived_at: datetime | None = None
+
+
+@dataclass
+class FakeQualificationType:
+    id: str
+    tenant_id: str
+    code: str
+    label: str
+    description: str | None = None
+    is_active: bool = True
+    status: str = "active"
+    archived_at: datetime | None = None
+
+
+@dataclass
 class FakeAddress:
     id: str
     street_line_1: str = "Hauptstrasse 1"
@@ -205,6 +229,22 @@ class FakeCustomerRepository:
         self.branches = {"branch-1": FakeBranch("branch-1", "tenant-1")}
         self.mandates = {"mandate-1": FakeMandate("mandate-1", "tenant-1", "branch-1")}
         self.users = {PORTAL_USER_ID: FakeUser(PORTAL_USER_ID, "tenant-1")}
+        self.function_types = {
+            "55555555-5555-4555-8555-555555555555": FakeFunctionType(
+                "55555555-5555-4555-8555-555555555555",
+                "tenant-1",
+                "SEC_GUARD",
+                "Security agent",
+            )
+        }
+        self.qualification_types = {
+            "66666666-6666-4666-8666-666666666666": FakeQualificationType(
+                "66666666-6666-4666-8666-666666666666",
+                "tenant-1",
+                "G34A",
+                "34a certified",
+            )
+        }
         self.addresses = {ADDRESS_ID: FakeAddress(ADDRESS_ID)}
         self.customers: dict[str, FakeCustomer] = {}
         self.customer_portal_policy = {
@@ -525,6 +565,32 @@ class FakeCustomerRepository:
             if row.domain == domain and row.archived_at is None and row.tenant_id in (None, tenant_id)
         ]
 
+    def list_function_types(self, tenant_id: str):
+        return [
+            row
+            for row in self.function_types.values()
+            if row.tenant_id == tenant_id and row.archived_at is None and row.is_active and row.status == "active"
+        ]
+
+    def get_function_type(self, tenant_id: str, function_type_id: str):
+        row = self.function_types.get(function_type_id)
+        if row and row.tenant_id == tenant_id:
+            return row
+        return None
+
+    def list_qualification_types(self, tenant_id: str):
+        return [
+            row
+            for row in self.qualification_types.values()
+            if row.tenant_id == tenant_id and row.archived_at is None and row.is_active and row.status == "active"
+        ]
+
+    def get_qualification_type(self, tenant_id: str, qualification_type_id: str):
+        row = self.qualification_types.get(qualification_type_id)
+        if row and row.tenant_id == tenant_id:
+            return row
+        return None
+
     def get_branch(self, tenant_id: str, branch_id: str):
         row = self.branches.get(branch_id)
         if row and row.tenant_id == tenant_id:
@@ -661,6 +727,8 @@ class TestCustomerService(unittest.TestCase):
         self.assertTrue(any(item.code == "standard" for item in reference_data.invoice_layouts))
         self.assertTrue(any(item.code == "email_pdf" for item in reference_data.shipping_methods))
         self.assertTrue(any(item.code == "standard" for item in reference_data.dunning_policies))
+        self.assertTrue(any(item.code == "SEC_GUARD" for item in reference_data.function_types))
+        self.assertTrue(any(item.code == "G34A" for item in reference_data.qualification_types))
         self.assertEqual(reference_data.branches[0].id, "branch-1")
         self.assertEqual(reference_data.mandates[0].branch_id, "branch-1")
 

@@ -51,6 +51,11 @@ def test_customer_reference_data_endpoint_uses_customer_read_scope() -> None:
             classifications=[],
             rankings=[],
             customer_statuses=[],
+            invoice_layouts=[],
+            shipping_methods=[],
+            dunning_policies=[],
+            function_types=[],
+            qualification_types=[],
             branches=[],
             mandates=[],
         )

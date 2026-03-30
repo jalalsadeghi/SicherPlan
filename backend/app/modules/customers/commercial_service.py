@@ -35,6 +35,7 @@ from app.modules.customers.schemas import (
     CustomerSurchargeRuleRead,
     CustomerSurchargeRuleUpdate,
 )
+from app.modules.employees.models import FunctionType, QualificationType
 from app.modules.iam.audit_service import AuditActor, AuditService
 from app.modules.iam.authz import RequestAuthorizationContext
 
@@ -152,6 +153,8 @@ class CustomerCommercialRepository(Protocol):
         payload: CustomerSurchargeRuleUpdate,
         actor_user_id: str | None,
     ) -> CustomerSurchargeRule | None: ...
+    def get_function_type(self, tenant_id: str, function_type_id: str) -> FunctionType | None: ...
+    def get_qualification_type(self, tenant_id: str, qualification_type_id: str) -> QualificationType | None: ...
     def get_lookup_value(self, lookup_id: str): ...  # noqa: ANN001
     def find_lookup_by_domain_code(self, tenant_id: str | None, domain: str, code: str): ...  # noqa: ANN001
     def get_address(self, address_id: str): ...  # noqa: ANN001
@@ -1042,6 +1045,7 @@ class CustomerCommercialService:
                 "customers.validation.rate_line_minimum_quantity",
                 "errors.customers.rate_line.invalid_minimum_quantity",
             )
+        self._validate_rate_line_catalog_refs(tenant_id, payload)
         if self.repository.find_duplicate_rate_line(
             tenant_id,
             rate_card.id,
@@ -1053,6 +1057,48 @@ class CustomerCommercialService:
             exclude_id=exclude_rate_line_id,
         ):
             raise ApiException(409, "customers.conflict.rate_line_duplicate", "errors.customers.rate_line.duplicate_dimension")
+
+    def _validate_rate_line_catalog_refs(self, tenant_id: str, payload: CustomerRateLineCreate) -> None:
+        if payload.function_type_id is not None:
+            self._require_active_function_type(tenant_id, payload.function_type_id)
+        if payload.qualification_type_id is not None:
+            self._require_active_qualification_type(tenant_id, payload.qualification_type_id)
+
+    def _require_active_function_type(self, tenant_id: str, function_type_id: str) -> FunctionType:
+        try:
+            UUID(function_type_id)
+        except ValueError as exc:
+            raise ApiException(
+                400,
+                "customers.validation.rate_line_function_type",
+                "errors.customers.rate_line.invalid_function_type",
+            ) from exc
+        row = self.repository.get_function_type(tenant_id, function_type_id)
+        if row is None or row.archived_at is not None or row.status != "active" or not row.is_active:
+            raise ApiException(
+                400,
+                "customers.validation.rate_line_function_type",
+                "errors.customers.rate_line.invalid_function_type",
+            )
+        return row
+
+    def _require_active_qualification_type(self, tenant_id: str, qualification_type_id: str) -> QualificationType:
+        try:
+            UUID(qualification_type_id)
+        except ValueError as exc:
+            raise ApiException(
+                400,
+                "customers.validation.rate_line_qualification_type",
+                "errors.customers.rate_line.invalid_qualification_type",
+            ) from exc
+        row = self.repository.get_qualification_type(tenant_id, qualification_type_id)
+        if row is None or row.archived_at is not None or row.status != "active" or not row.is_active:
+            raise ApiException(
+                400,
+                "customers.validation.rate_line_qualification_type",
+                "errors.customers.rate_line.invalid_qualification_type",
+            )
+        return row
 
     @staticmethod
     def _validate_surcharge_rule(rate_card: CustomerRateCard, payload: CustomerSurchargeRuleCreate) -> None:

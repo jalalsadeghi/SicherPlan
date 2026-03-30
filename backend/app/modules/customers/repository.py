@@ -43,6 +43,7 @@ from app.modules.customers.schemas import (
     CustomerSurchargeRuleUpdate,
     CustomerUpdate,
 )
+from app.modules.employees.models import FunctionType, QualificationType
 from app.modules.iam.models import UserAccount
 
 
@@ -58,7 +59,12 @@ class SqlAlchemyCustomerRepository:
                 selectinload(Customer.contacts),
                 selectinload(Customer.billing_profile),
                 selectinload(Customer.invoice_parties).selectinload(CustomerInvoiceParty.address),
-                selectinload(Customer.rate_cards).selectinload(CustomerRateCard.rate_lines),
+                selectinload(Customer.rate_cards)
+                .selectinload(CustomerRateCard.rate_lines)
+                .selectinload(CustomerRateLine.function_type),
+                selectinload(Customer.rate_cards)
+                .selectinload(CustomerRateCard.rate_lines)
+                .selectinload(CustomerRateLine.qualification_type),
                 selectinload(Customer.rate_cards).selectinload(CustomerRateCard.surcharge_rules),
                 selectinload(Customer.addresses).selectinload(CustomerAddressLink.address),
             )
@@ -91,7 +97,12 @@ class SqlAlchemyCustomerRepository:
                 selectinload(Customer.contacts),
                 selectinload(Customer.billing_profile),
                 selectinload(Customer.invoice_parties).selectinload(CustomerInvoiceParty.address),
-                selectinload(Customer.rate_cards).selectinload(CustomerRateCard.rate_lines),
+                selectinload(Customer.rate_cards)
+                .selectinload(CustomerRateCard.rate_lines)
+                .selectinload(CustomerRateLine.function_type),
+                selectinload(Customer.rate_cards)
+                .selectinload(CustomerRateCard.rate_lines)
+                .selectinload(CustomerRateLine.qualification_type),
                 selectinload(Customer.rate_cards).selectinload(CustomerRateCard.surcharge_rules),
                 selectinload(Customer.addresses).selectinload(CustomerAddressLink.address),
                 selectinload(Customer.history_entries),
@@ -367,7 +378,8 @@ class SqlAlchemyCustomerRepository:
             select(CustomerRateCard)
             .where(CustomerRateCard.tenant_id == tenant_id, CustomerRateCard.customer_id == customer_id)
             .options(
-                selectinload(CustomerRateCard.rate_lines),
+                selectinload(CustomerRateCard.rate_lines).selectinload(CustomerRateLine.function_type),
+                selectinload(CustomerRateCard.rate_lines).selectinload(CustomerRateLine.qualification_type),
                 selectinload(CustomerRateCard.surcharge_rules),
             )
             .order_by(CustomerRateCard.effective_from, CustomerRateCard.id)
@@ -383,7 +395,8 @@ class SqlAlchemyCustomerRepository:
                 CustomerRateCard.id == rate_card_id,
             )
             .options(
-                selectinload(CustomerRateCard.rate_lines),
+                selectinload(CustomerRateCard.rate_lines).selectinload(CustomerRateLine.function_type),
+                selectinload(CustomerRateCard.rate_lines).selectinload(CustomerRateLine.qualification_type),
                 selectinload(CustomerRateCard.surcharge_rules),
             )
         )
@@ -462,10 +475,17 @@ class SqlAlchemyCustomerRepository:
         return list(self.session.scalars(statement).all())
 
     def get_rate_line(self, tenant_id: str, rate_card_id: str, rate_line_id: str) -> CustomerRateLine | None:
-        statement = select(CustomerRateLine).where(
-            CustomerRateLine.tenant_id == tenant_id,
-            CustomerRateLine.rate_card_id == rate_card_id,
-            CustomerRateLine.id == rate_line_id,
+        statement = (
+            select(CustomerRateLine)
+            .where(
+                CustomerRateLine.tenant_id == tenant_id,
+                CustomerRateLine.rate_card_id == rate_card_id,
+                CustomerRateLine.id == rate_line_id,
+            )
+            .options(
+                selectinload(CustomerRateLine.function_type),
+                selectinload(CustomerRateLine.qualification_type),
+            )
         )
         return self.session.scalars(statement).one_or_none()
 
@@ -473,6 +493,10 @@ class SqlAlchemyCustomerRepository:
         statement = (
             select(CustomerRateLine)
             .where(CustomerRateLine.tenant_id == tenant_id, CustomerRateLine.rate_card_id == rate_card_id)
+            .options(
+                selectinload(CustomerRateLine.function_type),
+                selectinload(CustomerRateLine.qualification_type),
+            )
             .order_by(CustomerRateLine.sort_order, CustomerRateLine.id)
         )
         return list(self.session.scalars(statement).all())
@@ -488,8 +512,8 @@ class SqlAlchemyCustomerRepository:
             tenant_id=tenant_id,
             rate_card_id=rate_card_id,
             line_kind=payload.line_kind.strip().lower(),
-            function_type_id=payload.function_type_id.strip() if payload.function_type_id else None,
-            qualification_type_id=payload.qualification_type_id.strip() if payload.qualification_type_id else None,
+            function_type_id=payload.function_type_id,
+            qualification_type_id=payload.qualification_type_id,
             planning_mode_code=payload.planning_mode_code.strip().lower() if payload.planning_mode_code else None,
             billing_unit=payload.billing_unit.strip().lower(),
             unit_price=payload.unit_price,
@@ -910,6 +934,44 @@ class SqlAlchemyCustomerRepository:
             .order_by(LookupValue.sort_order.asc(), LookupValue.label.asc())
         )
         return list(self.session.scalars(statement).all())
+
+    def list_function_types(self, tenant_id: str) -> list[FunctionType]:
+        statement = (
+            select(FunctionType)
+            .where(
+                FunctionType.tenant_id == tenant_id,
+                FunctionType.archived_at.is_(None),
+                FunctionType.is_active.is_(True),
+            )
+            .order_by(FunctionType.code.asc(), FunctionType.label.asc())
+        )
+        return list(self.session.scalars(statement).all())
+
+    def get_function_type(self, tenant_id: str, function_type_id: str) -> FunctionType | None:
+        statement = select(FunctionType).where(
+            FunctionType.tenant_id == tenant_id,
+            FunctionType.id == function_type_id,
+        )
+        return self.session.scalars(statement).one_or_none()
+
+    def list_qualification_types(self, tenant_id: str) -> list[QualificationType]:
+        statement = (
+            select(QualificationType)
+            .where(
+                QualificationType.tenant_id == tenant_id,
+                QualificationType.archived_at.is_(None),
+                QualificationType.is_active.is_(True),
+            )
+            .order_by(QualificationType.code.asc(), QualificationType.label.asc())
+        )
+        return list(self.session.scalars(statement).all())
+
+    def get_qualification_type(self, tenant_id: str, qualification_type_id: str) -> QualificationType | None:
+        statement = select(QualificationType).where(
+            QualificationType.tenant_id == tenant_id,
+            QualificationType.id == qualification_type_id,
+        )
+        return self.session.scalars(statement).one_or_none()
 
     def find_lookup_by_domain_code(
         self,

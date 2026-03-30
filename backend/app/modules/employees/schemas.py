@@ -513,6 +513,13 @@ class QualificationTypeRead(BaseModel):
     version_no: int
 
 
+class EmployeeCatalogBootstrapRead(BaseModel):
+    function_types_inserted: int
+    function_types_updated: int
+    qualification_types_inserted: int
+    qualification_types_updated: int
+
+
 class EmployeeQualificationFilter(BaseModel):
     employee_id: str | None = None
     record_kind: str | None = None

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db.session import get_db_session
 from app.modules.employees.availability_service import EmployeeAvailabilityService
+from app.modules.employees.catalog_seed import seed_sample_employee_catalogs
 from app.modules.employees.compensation_service import EmployeeCompensationService
 from app.modules.employees.file_service import EmployeeFileService
 from app.modules.employees.ops_service import EmployeeOpsService
@@ -43,6 +44,7 @@ from app.modules.employees.schemas import (
     EmployeeAvailabilityRuleFilter,
     EmployeeAvailabilityRuleRead,
     EmployeeAvailabilityRuleUpdate,
+    EmployeeCatalogBootstrapRead,
     EmployeeCredentialBadgeIssue,
     EmployeeCredentialBadgeRead,
     EmployeeCredentialCreate,
@@ -831,6 +833,32 @@ def list_function_types(
     service: Annotated[EmployeeQualificationService, Depends(get_employee_qualification_service)] = None,
 ) -> list[FunctionTypeRead]:
     return service.list_function_types(str(tenant_id), context)
+
+
+@router.post("/catalog/bootstrap-sample-data", response_model=EmployeeCatalogBootstrapRead)
+def bootstrap_sample_catalog_data(
+    tenant_id: UUID,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.employee.write", scope="tenant")),
+    ],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> EmployeeCatalogBootstrapRead:
+    if settings.env not in {"development", "test"}:
+        from app.errors import ApiException
+
+        raise ApiException(
+            403,
+            "employees.catalog.bootstrap_disabled",
+            "errors.employees.catalog.bootstrap_not_allowed",
+        )
+    result = seed_sample_employee_catalogs(
+        session,
+        tenant_id=str(tenant_id),
+        actor_user_id=context.user_id,
+    )
+    session.commit()
+    return EmployeeCatalogBootstrapRead.model_validate(result)
 
 
 @router.post("/catalog/function-types", response_model=FunctionTypeRead, status_code=status.HTTP_201_CREATED)

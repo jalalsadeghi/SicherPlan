@@ -2,13 +2,24 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  applySurchargeAmountMode,
   buildCommercialConfirmationKey,
+  buildWeekdayMask,
+  COMMON_CURRENCY_OPTIONS,
   deriveCustomerCommercialActionState,
   hasCustomerCommercialPermission,
   mapCustomerCommercialApiMessage,
+  minutesToTimeInput,
+  parseWeekdayMask,
+  RATE_LINE_BILLING_UNIT_OPTIONS,
+  RATE_LINE_KIND_OPTIONS,
+  RATE_LINE_PLANNING_MODE_OPTIONS,
   resolveBillingProfileFeedbackError,
   resolveBillingProfileApiError,
   resolveInvoicePartyApiError,
+  resolveSurchargeAmountMode,
+  SURCHARGE_TYPE_OPTIONS,
+  timeInputToMinutes,
   validateBillingProfileDraft,
   validateRateCardDraft,
   validateRateLineDraft,
@@ -103,6 +114,26 @@ test("rate-card and rate-line validation catches missing fields and invalid valu
   );
 });
 
+test("pricing rule option constants expose guided select values", () => {
+  assert.deepEqual(
+    RATE_LINE_KIND_OPTIONS.map((option) => option.value),
+    ["base", "function", "qualification", "planning_mode"],
+  );
+  assert.deepEqual(
+    RATE_LINE_BILLING_UNIT_OPTIONS.map((option) => option.value),
+    ["hour", "day", "flat"],
+  );
+  assert.deepEqual(
+    RATE_LINE_PLANNING_MODE_OPTIONS.map((option) => option.value),
+    ["event", "site", "trade_fair", "patrol"],
+  );
+  assert.deepEqual(
+    SURCHARGE_TYPE_OPTIONS.map((option) => option.value),
+    ["night", "weekend", "holiday", "regional"],
+  );
+  assert.equal(COMMON_CURRENCY_OPTIONS[0]?.value, "EUR");
+});
+
 test("surcharge validation enforces mask, ranges, and amount rules", () => {
   assert.equal(
     validateSurchargeRuleDraft({
@@ -134,10 +165,54 @@ test("surcharge validation enforces mask, ranges, and amount rules", () => {
   );
 });
 
+test("weekday mask conversion stays compatible with backend bitmask format", () => {
+  assert.deepEqual(parseWeekdayMask("1010101"), ["mon", "wed", "fri", "sun"]);
+  assert.equal(buildWeekdayMask(["mon", "wed", "fri", "sun"]), "1010101");
+  assert.equal(buildWeekdayMask([]), "");
+});
+
+test("surcharge time conversion maps HH:mm controls to backend minute integers", () => {
+  assert.equal(minutesToTimeInput(0), "00:00");
+  assert.equal(minutesToTimeInput(75), "01:15");
+  assert.equal(minutesToTimeInput(1440), "23:59");
+  assert.equal(timeInputToMinutes("00:00"), 0);
+  assert.equal(timeInputToMinutes("13:45"), 825);
+  assert.equal(timeInputToMinutes(""), null);
+});
+
+test("surcharge amount mode helper keeps percent and fixed modes exclusive", () => {
+  assert.equal(resolveSurchargeAmountMode({ percent_value: "25", fixed_amount: "", currency_code: "" }), "percent");
+  assert.equal(resolveSurchargeAmountMode({ percent_value: "", fixed_amount: "12.50", currency_code: "eur" }), "fixed");
+  assert.deepEqual(
+    applySurchargeAmountMode("percent", { percent_value: "25", fixed_amount: "12.50", currency_code: "eur" }, "EUR"),
+    {
+      percent_value: "25",
+      fixed_amount: "",
+      currency_code: "",
+    },
+  );
+  assert.deepEqual(
+    applySurchargeAmountMode("fixed", { percent_value: "25", fixed_amount: "", currency_code: "" }, "EUR"),
+    {
+      percent_value: "",
+      fixed_amount: "",
+      currency_code: "EUR",
+    },
+  );
+});
+
 test("commercial api message mapping and active-change confirmation are stable", () => {
   assert.equal(
     mapCustomerCommercialApiMessage("errors.customers.rate_card.overlap"),
     "customerAdmin.feedback.rateCardOverlap",
+  );
+  assert.equal(
+    mapCustomerCommercialApiMessage("errors.customers.rate_line.invalid_function_type"),
+    "customerAdmin.feedback.invalidFunctionType",
+  );
+  assert.equal(
+    mapCustomerCommercialApiMessage("errors.customers.rate_line.invalid_qualification_type"),
+    "customerAdmin.feedback.invalidQualificationType",
   );
   assert.equal(buildCommercialConfirmationKey("rateCard", true), "customerAdmin.confirm.activeCommercialChange");
   assert.equal(buildCommercialConfirmationKey("rateCard", false), null);

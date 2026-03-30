@@ -1,150 +1,157 @@
-You are working in the SicherPlan web admin frontend.
+You are working in the SicherPlan repository.
 
-Task:
-Refactor the `Customers -> Commercial -> Pricing rules` workspace so that `Rate cards`, `Rate lines`, and `Surcharges` are organized as three separate tabs instead of being shown stacked in one long page.
+Task title:
+Fix empty Function ID / Qualification ID dropdowns in Customer Rate Lines by adding HR catalog bootstrap data and proper empty-state UX.
+
+Problem:
+In Customer Admin > Commercial > Pricing rules > Rate lines, the dropdowns for:
+- Function ID
+- Qualification ID
+are empty and only show:
+- "No active entries are available in the HR function catalog yet."
+- "No active entries are available in the HR qualification catalog yet."
+
+Context:
+- Real HR catalogs already exist in backend:
+  - hr.function_type
+  - hr.qualification_type
+- Employees API already exposes endpoints for them:
+  - GET /api/employees/tenants/{tenant_id}/employees/catalog/function-types
+  - POST /api/employees/tenants/{tenant_id}/employees/catalog/function-types
+  - GET /api/employees/tenants/{tenant_id}/employees/catalog/qualification-types
+  - POST /api/employees/tenants/{tenant_id}/employees/catalog/qualification-types
+- Customer pricing now depends on these catalogs for rate line references.
+- Current issue is not missing backend structure; it is missing usable catalog entries for the current tenant and poor UX when the catalogs are empty.
+
+Business decision:
+This project is still in test/development phase.
+There is no need to preserve an empty-demo experience.
+We want these dropdowns to show usable options immediately in dev/test environments.
 
 Goal:
-Make the Pricing Rules area cleaner and easier to use.
+1. Ensure Function ID and Qualification ID dropdowns can show real options for the current tenant.
+2. Add development/test bootstrap seed data for HR function and qualification catalogs.
+3. Improve the empty-state UX so users understand what to do when catalogs are empty.
+4. Keep HR catalog as the single source of truth. Do not create a CRM shadow catalog.
 
-Current problem:
-Inside the current `Pricing rules` panel:
-- `Rate cards` is shown first
-- after a rate card exists, `Rate lines` and `Surcharges` appear below it in the same page
-- this makes the workspace too long and visually crowded
+Scope:
+Implement a robust fix that covers both:
+- backend sample/demo seed/bootstrap
+- frontend empty-state behavior
 
-Desired UX:
-- `Rate cards`, `Rate lines`, and `Surcharges` should become three sub-tabs inside the Pricing Rules area
-- before any rate card exists, only the `Rate cards` tab should be visible
-- after at least one rate card exists, the other two tabs should become visible:
-  - `Rate lines`
-  - `Surcharges`
+Likely files to inspect/change:
+Backend:
+- backend/app/modules/employees/models.py
+- backend/app/modules/employees/schemas.py
+- backend/app/modules/employees/router.py
+- backend/app/modules/employees/qualification_service.py
+- backend/app/modules/employees/repository.py
+- backend/app/modules/customers/schemas.py
+- backend/app/modules/customers/commercial_service.py
+- backend/app/modules/customers/router.py
+- backend/app/modules/customers/repository.py
+- backend/app/message_catalog.py
+- backend/alembic/versions/*.py
+- any existing seed/bootstrap/dev fixture locations
+- tests under backend/tests/modules/employees/ and backend/tests/modules/customers/
 
-Important scope:
-- Frontend only
-- No backend changes
-- No API changes
-- No schema/model changes
-- No business-logic changes
-- No permission/auth/session changes
-- No unrelated refactors
+Frontend:
+- web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
+- web/apps/web-antd/src/sicherplan-legacy/api/customers.ts
+- web/apps/web-antd/src/sicherplan-legacy/features/customers/customerCommercial.helpers.js
+- web/apps/web-antd/src/sicherplan-legacy/i18n/messages.ts
+- relevant frontend tests
 
-Critical instruction:
-First inspect the ACTUAL active component that powers:
-`/admin/customers` -> `Commercial` -> `Pricing rules`
+Implementation requirements
 
-Do not edit an inactive file unless you confirm it is the real active path.
+A) Diagnose current loading path
+1. Verify how the customer rate-line form currently receives function and qualification options.
+2. Confirm whether it reads them from:
+   - customer reference-data,
+   - a dedicated customer commercial catalog bridge,
+   - or direct employee catalog calls.
+3. Keep the architecture clean. Prefer customer-facing read-only consumption if already implemented.
 
-Reference pattern:
-Reuse the same UI/UX idea already used elsewhere in the customer workspace:
-- top-level tabs in `Customer detail`
-- sub-tabs in `Commercial`
-Keep styling aligned with existing `customer-admin-tabs` / `customer-admin-tab--sub` patterns.
+B) Add dev/test bootstrap data
+4. Add a development/test bootstrap mechanism that creates sample entries for HR catalogs when they are empty for a tenant.
+5. Do NOT auto-create duplicates if entries already exist.
+6. Seed at least these sample function types:
+   - SEC_GUARD / Security agent
+   - SHIFT_SUP / Shift supervisor
+   - DISPATCH / Dispatch support
+   - FIRE_WATCH / Fire watch
+7. Seed at least these sample qualification types:
+   - G34A / 34a certified
+   - FIRST_AID / First aid
+   - FIRE_SAFETY / Fire safety
+   - CROWD_CONTROL / Crowd control
+8. Seeded rows must be:
+   - active
+   - not archived
+   - planning-relevant where appropriate
+9. Use real UUID rows from hr.function_type and hr.qualification_type, not frontend-only constants.
 
-Required behavior:
+C) Make the fix safe
+10. The bootstrap must be clearly limited to development/demo/test flows.
+11. Do NOT silently inject sample production data into real tenants in production mode.
+12. If the repo already has a fixture/seed/bootstrap mechanism, integrate there instead of inventing a parallel path.
+13. If no such mechanism exists, create a minimal, well-contained one and document it.
 
-1) Introduce sub-tabs inside Pricing Rules
-Inside the current `Pricing rules` panel, add a second tab level for:
-- `Rate cards`
-- `Rate lines`
-- `Surcharges`
+D) Improve frontend empty-state UX
+14. In the Rate lines form:
+   - keep Function ID and Qualification ID as real select controls
+   - if options exist, show them as:
+     CODE · Label
+   - selected value must remain the UUID id
+15. If no options exist:
+   - show a clearer empty-state help text
+   - add a visible action for the user, such as:
+     - "Create sample HR catalog data" (dev/test only), or
+     - "Open HR catalogs" / "Go to HR catalog management"
+16. If implementing a direct creation CTA in UI is too invasive, at minimum:
+   - show a precise hint saying that the HR catalog must be populated first
+   - provide a navigation link or button to the catalog management area if routing exists
 
-Use stable internal IDs such as:
-- `rate_cards`
-- `rate_lines`
-- `surcharges`
+E) Keep module ownership clean
+17. Do not create any duplicate function or qualification catalog inside CRM/customers.
+18. HR remains the single source of truth.
+19. Customer pricing only consumes the catalog.
 
-2) Visibility rules
-Before any rate card exists:
-- show only the `Rate cards` tab
-- do NOT show the `Rate lines` and `Surcharges` tabs yet
-- do NOT show disabled dead tabs if that makes the UI cluttered
-- the screen should make it obvious that the user must first create a rate card
+F) Optional but recommended improvement
+20. If there is no current customer-facing catalog bridge and the customer page is still depending on fragile wiring, add a stable read-only reference-data path so CustomerAdmin can reliably load:
+   - function_types
+   - qualification_types
+for the current tenant.
 
-After at least one rate card exists:
-- show all three tabs
-- allow switching between them
-- default to:
-  - `Rate cards` when first entering the area
-  - keep current/active sub-tab stable during normal interaction when possible
+G) Testing
+21. Add/update backend tests to cover:
+   - sample HR catalog bootstrap creates rows when missing
+   - bootstrap does not duplicate existing rows
+   - seeded rows are visible to the customer rate-line option loader
+22. Add/update frontend tests to cover:
+   - Function ID dropdown shows real seeded options
+   - Qualification ID dropdown shows real seeded options
+   - empty-state message is shown only when catalogs are truly empty
+   - option labels render as code + label
+   - selected value submitted remains UUID
 
-3) Content mapping
-Map the current content into the new tabs as follows:
+H) Acceptance criteria
+23. In a fresh dev/test environment, the Function ID and Qualification ID dropdowns are not empty.
+24. The options come from real HR catalog rows, not frontend mock data.
+25. No CRM shadow catalog is introduced.
+26. In environments where the catalogs are genuinely empty, the UI explains the reason and provides a next step.
+27. Existing customer rate-line create/edit flows continue to work.
 
-Tab: `Rate cards`
-Contains:
-- Rate cards header
-- Add rate card button
-- rate card list/selector
-- rate card create/edit form
+Before coding:
+Provide a short plan with:
+- which files you will change
+- where bootstrap data will live
+- how you will keep it dev/test-only
 
-Tab: `Rate lines`
-Contains:
-- Rate lines header
-- Add rate line button
-- rate lines list
-- rate line create/edit form
-
-Tab: `Surcharges`
-Contains:
-- Surcharges header
-- Add surcharge rule button
-- surcharge rules list
-- surcharge rule create/edit form
-
-4) Dependency behavior
-`Rate lines` and `Surcharges` depend on a selected rate card.
-
-Therefore:
-- these tabs should only appear when at least one rate card exists
-- inside those tabs, if a rate card exists but none is selected, automatically select the current/default one
-- do not break the current selectedRateCard behavior
-- preserve existing create/edit/cancel flows for rate lines and surcharge rules
-
-5) Preserve existing functionality
-Do not break:
-- rate card creation
-- rate card selection
-- rate line creation/edit
-- surcharge creation/edit
-- current selected rate card state
-- existing loading states
-- existing validation behavior
-- current success/error feedback behavior
-
-6) Improve readability
-The current UI is visually too dense.
-After the refactor:
-- only one pricing-rules subsection should be visible at a time
-- spacing and panel rhythm should remain aligned with the customer admin design
-- avoid nesting too many stacked sections in the same visible panel
-
-7) Implementation guidance
-- Reuse existing `customer-admin-tabs customer-admin-tabs--sub` styling if possible
-- Prefer a minimal clean diff
-- Add a local sub-tab state for the pricing-rules workspace
-- Gate tab visibility using the real existence of `commercialProfile.rate_cards.length`
-- Avoid broad restructuring outside the Pricing Rules area
-
-8) Acceptance criteria
-- Pricing Rules is split into three sub-tabs:
-  - Rate cards
-  - Rate lines
-  - Surcharges
-- Before any rate card exists:
-  - only Rate cards tab is visible
-- After a rate card exists:
-  - Rate lines and Surcharges tabs appear
-- Only the active pricing-rules sub-tab content is visible
-- Existing pricing logic and form behavior remain intact
-- No backend code is touched
-
-Work process:
-1. Identify the active frontend file(s)
-2. Summarize which file(s) you will change
-3. Implement the smallest clean refactor
-4. Run relevant frontend checks if available
-5. Provide a concise summary of:
-   - files changed
-   - pricing-rules sub-tab structure introduced
-   - visibility logic for the tabs
-   - confirmation that no backend code was touched
+After coding:
+Provide:
+1. files changed
+2. bootstrap strategy summary
+3. frontend UX changes
+4. test evidence
+5. any follow-up items

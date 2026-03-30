@@ -212,6 +212,18 @@ class CustomerMandateOptionRead(BaseModel):
     name: str
 
 
+class CustomerCatalogOptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    code: str
+    label: str
+    description: str | None = None
+    is_active: bool
+    status: str
+    archived_at: datetime | None
+
+
 class CustomerReferenceDataRead(BaseModel):
     legal_forms: list[CustomerReferenceOptionRead] = Field(default_factory=list)
     classifications: list[CustomerReferenceOptionRead] = Field(default_factory=list)
@@ -220,6 +232,8 @@ class CustomerReferenceDataRead(BaseModel):
     invoice_layouts: list[CustomerReferenceOptionRead] = Field(default_factory=list)
     shipping_methods: list[CustomerReferenceOptionRead] = Field(default_factory=list)
     dunning_policies: list[CustomerReferenceOptionRead] = Field(default_factory=list)
+    function_types: list[CustomerCatalogOptionRead] = Field(default_factory=list)
+    qualification_types: list[CustomerCatalogOptionRead] = Field(default_factory=list)
     branches: list[CustomerBranchOptionRead] = Field(default_factory=list)
     mandates: list[CustomerMandateOptionRead] = Field(default_factory=list)
 
@@ -635,6 +649,8 @@ class CustomerRateLineRead(BaseModel):
     line_kind: str
     function_type_id: str | None
     qualification_type_id: str | None
+    function_type: CustomerCatalogOptionRead | None = None
+    qualification_type: CustomerCatalogOptionRead | None = None
     planning_mode_code: str | None
     billing_unit: str
     unit_price: Decimal

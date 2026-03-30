@@ -1046,6 +1046,9 @@ export type MessageKey =
   | "customerAdmin.actions.addAddress"
   | "customerAdmin.actions.createAddress"
   | "customerAdmin.actions.createSharedAddress"
+  | "customerAdmin.actions.createHrCatalogSamples"
+  | "customerAdmin.actions.creatingHrCatalogSamples"
+  | "customerAdmin.actions.openEmployeesAdmin"
   | "customerAdmin.actions.saveAddress"
   | "customerAdmin.actions.refreshHistory"
   | "customerAdmin.actions.refreshPortalPrivacy"
@@ -1095,6 +1098,10 @@ export type MessageKey =
   | "customerAdmin.feedback.portalAccessStatusSavedBody"
   | "customerAdmin.feedback.portalAccessUnlinked"
   | "customerAdmin.feedback.portalAccessUnlinkedBody"
+  | "customerAdmin.feedback.hrCatalogBootstrapSuccess"
+  | "customerAdmin.feedback.hrCatalogBootstrapSuccessBody"
+  | "customerAdmin.feedback.hrCatalogBootstrapError"
+  | "customerAdmin.feedback.hrCatalogBootstrapNotAllowed"
   | "customerAdmin.feedback.validation"
   | "customerAdmin.feedback.customerRequired"
   | "customerAdmin.feedback.contactRequired"
@@ -1152,6 +1159,16 @@ export type MessageKey =
   | "customerAdmin.commercial.surchargesTitle"
   | "customerAdmin.commercial.surchargesEmpty"
   | "customerAdmin.commercial.pricingTabs.surcharges"
+  | "customerAdmin.commercial.provisionalCatalogHint"
+  | "customerAdmin.commercial.functionTypePlaceholder"
+  | "customerAdmin.commercial.functionTypeCatalogHint"
+  | "customerAdmin.commercial.functionTypeEmptyHint"
+  | "customerAdmin.commercial.qualificationTypePlaceholder"
+  | "customerAdmin.commercial.qualificationTypeCatalogHint"
+  | "customerAdmin.commercial.qualificationTypeEmptyHint"
+  | "customerAdmin.commercial.hrCatalogEmptyTitle"
+  | "customerAdmin.commercial.hrCatalogEmptyDevHint"
+  | "customerAdmin.commercial.hrCatalogEmptyManagedHint"
   | "customerAdmin.fields.invoiceEmail"
   | "customerAdmin.fields.paymentTermsDays"
   | "customerAdmin.fields.paymentTermsNote"
@@ -1191,9 +1208,11 @@ export type MessageKey =
   | "customerAdmin.fields.sortOrder"
   | "customerAdmin.fields.surchargeType"
   | "customerAdmin.fields.weekdayMask"
+  | "customerAdmin.fields.weekdays"
   | "customerAdmin.fields.timeFromMinute"
   | "customerAdmin.fields.timeToMinute"
   | "customerAdmin.fields.regionCode"
+  | "customerAdmin.fields.amountMode"
   | "customerAdmin.fields.percentValue"
   | "customerAdmin.fields.fixedAmount"
   | "customerAdmin.actions.refreshCommercial"
@@ -1245,6 +1264,8 @@ export type MessageKey =
   | "customerAdmin.feedback.rateCardOverlap"
   | "customerAdmin.feedback.rateLineKindRequired"
   | "customerAdmin.feedback.invalidBillingUnit"
+  | "customerAdmin.feedback.invalidFunctionType"
+  | "customerAdmin.feedback.invalidQualificationType"
   | "customerAdmin.feedback.invalidUnitPrice"
   | "customerAdmin.feedback.invalidMinimumQuantity"
   | "customerAdmin.feedback.duplicateRateDimension"
@@ -1254,6 +1275,32 @@ export type MessageKey =
   | "customerAdmin.feedback.invalidTimeRange"
   | "customerAdmin.feedback.invalidAmountCombination"
   | "customerAdmin.feedback.surchargeOutsideRateCardWindow"
+  | "customerAdmin.placeholder.select"
+  | "customerAdmin.placeholder.selectOptional"
+  | "customerAdmin.amountMode.percent"
+  | "customerAdmin.amountMode.fixed"
+  | "customerAdmin.weekday.mon"
+  | "customerAdmin.weekday.tue"
+  | "customerAdmin.weekday.wed"
+  | "customerAdmin.weekday.thu"
+  | "customerAdmin.weekday.fri"
+  | "customerAdmin.weekday.sat"
+  | "customerAdmin.weekday.sun"
+  | "customerAdmin.option.rateLineKind.base"
+  | "customerAdmin.option.rateLineKind.function"
+  | "customerAdmin.option.rateLineKind.qualification"
+  | "customerAdmin.option.rateLineKind.planning_mode"
+  | "customerAdmin.option.billingUnit.hour"
+  | "customerAdmin.option.billingUnit.day"
+  | "customerAdmin.option.billingUnit.flat"
+  | "customerAdmin.option.planningMode.event"
+  | "customerAdmin.option.planningMode.site"
+  | "customerAdmin.option.planningMode.trade_fair"
+  | "customerAdmin.option.planningMode.patrol"
+  | "customerAdmin.option.surchargeType.night"
+  | "customerAdmin.option.surchargeType.weekend"
+  | "customerAdmin.option.surchargeType.holiday"
+  | "customerAdmin.option.surchargeType.regional"
   | "customerAdmin.option.invoiceLayout.standard"
   | "customerAdmin.option.invoiceLayout.compact"
   | "customerAdmin.option.invoiceLayout.detailed_timesheet"
@@ -2550,6 +2597,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.addAddress": "Adresse verknüpfen",
     "customerAdmin.actions.createAddress": "Adresslink anlegen",
     "customerAdmin.actions.createSharedAddress": "Neue Adresse anlegen",
+    "customerAdmin.actions.createHrCatalogSamples": "HR-Katalogbeispiele anlegen",
+    "customerAdmin.actions.creatingHrCatalogSamples": "HR-Katalogbeispiele werden angelegt",
+    "customerAdmin.actions.openEmployeesAdmin": "Personalverwaltung öffnen",
     "customerAdmin.actions.saveAddress": "Adresslink speichern",
     "customerAdmin.actions.refreshHistory": "Historie neu laden",
     "customerAdmin.actions.refreshPortalPrivacy": "Freigabestatus neu laden",
@@ -2599,6 +2649,13 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.portalAccessStatusSavedBody": "Status und Zugriff wurden konsistent übernommen.",
     "customerAdmin.feedback.portalAccessUnlinked": "Portalzugang entkoppelt",
     "customerAdmin.feedback.portalAccessUnlinkedBody": "Der Kundenkontakt wurde vom Portalbenutzer getrennt und der Zugriff deaktiviert.",
+    "customerAdmin.feedback.hrCatalogBootstrapSuccess": "HR-Kataloge befüllt",
+    "customerAdmin.feedback.hrCatalogBootstrapSuccessBody":
+      "Die Beispiel-Funktions- und Qualifikationstypen wurden angelegt und stehen jetzt in den Preiszeilen zur Auswahl.",
+    "customerAdmin.feedback.hrCatalogBootstrapError":
+      "Die Beispiel-HR-Katalogdaten konnten nicht angelegt werden. Bitte HR-Kataloge im Personalmodul prüfen.",
+    "customerAdmin.feedback.hrCatalogBootstrapNotAllowed":
+      "Die Beispiel-HR-Katalogdaten dürfen in dieser Umgebung nicht automatisch angelegt werden.",
     "customerAdmin.feedback.validation": "Eingaben prüfen",
     "customerAdmin.feedback.customerRequired": "Kundennummer und Anzeigename sind Pflichtfelder.",
     "customerAdmin.feedback.contactRequired": "Für einen Kontakt wird mindestens der Name benötigt.",
@@ -2660,6 +2717,22 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.commercial.surchargesTitle": "Zeit-, Wochen- und Regionszuschläge",
     "customerAdmin.commercial.surchargesEmpty": "Noch keine Zuschlagsregeln für diese Preiskarte vorhanden.",
     "customerAdmin.commercial.pricingTabs.surcharges": "Zuschläge",
+    "customerAdmin.commercial.provisionalCatalogHint":
+      "Vorläufige Vorschläge bis ein eigener Katalog-Endpunkt verfügbar ist. Freie Eingaben bleiben erlaubt.",
+    "customerAdmin.commercial.functionTypePlaceholder": "Optionalen Funktionstyp auswählen",
+    "customerAdmin.commercial.functionTypeCatalogHint": "Werte kommen aus dem HR-Funktionskatalog.",
+    "customerAdmin.commercial.functionTypeEmptyHint":
+      "Im HR-Funktionskatalog sind noch keine aktiven Einträge für diesen Mandanten verfügbar.",
+    "customerAdmin.commercial.qualificationTypePlaceholder": "Optionalen Qualifikationstyp auswählen",
+    "customerAdmin.commercial.qualificationTypeCatalogHint":
+      "Werte kommen aus dem HR-Qualifikationskatalog.",
+    "customerAdmin.commercial.qualificationTypeEmptyHint":
+      "Im HR-Qualifikationskatalog sind noch keine aktiven Einträge für diesen Mandanten verfügbar.",
+    "customerAdmin.commercial.hrCatalogEmptyTitle": "HR-Katalogdaten fehlen",
+    "customerAdmin.commercial.hrCatalogEmptyDevHint":
+      "Die Preiszeilen brauchen aktive Funktions- und Qualifikationstypen aus HR. In der Entwicklungsumgebung können jetzt Beispielkataloge angelegt werden.",
+    "customerAdmin.commercial.hrCatalogEmptyManagedHint":
+      "Die Preiszeilen brauchen aktive Funktions- und Qualifikationstypen aus HR. Bitte die HR-Kataloge zuerst im Personalbereich pflegen.",
     "customerAdmin.fields.invoiceEmail": "Rechnungs-E-Mail",
     "customerAdmin.fields.paymentTermsDays": "Zahlungsziel in Tagen",
     "customerAdmin.fields.paymentTermsNote": "Zahlungsbedingung",
@@ -2699,9 +2772,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.sortOrder": "Sortierung",
     "customerAdmin.fields.surchargeType": "Zuschlagstyp",
     "customerAdmin.fields.weekdayMask": "Wochentagsmaske",
+    "customerAdmin.fields.weekdays": "Wochentage",
     "customerAdmin.fields.timeFromMinute": "Von Minute",
     "customerAdmin.fields.timeToMinute": "Bis Minute",
     "customerAdmin.fields.regionCode": "Regionscode",
+    "customerAdmin.fields.amountMode": "Betragsmodus",
     "customerAdmin.fields.percentValue": "Prozentwert",
     "customerAdmin.fields.fixedAmount": "Fixbetrag",
     "customerAdmin.actions.refreshCommercial": "Commercial neu laden",
@@ -2780,6 +2855,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Dieses Preisfenster überschneidet sich mit einer bestehenden aktiven Preiskarte.",
     "customerAdmin.feedback.rateLineKindRequired": "Für eine Preiszeile ist eine Zeilenart erforderlich.",
     "customerAdmin.feedback.invalidBillingUnit": "Die Abrechnungseinheit ist ungültig.",
+    "customerAdmin.feedback.invalidFunctionType": "Der ausgewählte Funktionstyp ist nicht verfügbar.",
+    "customerAdmin.feedback.invalidQualificationType": "Der ausgewählte Qualifikationstyp ist nicht verfügbar.",
     "customerAdmin.feedback.invalidUnitPrice": "Der Einzelpreis ist ungültig.",
     "customerAdmin.feedback.invalidMinimumQuantity": "Die Mindestmenge ist ungültig.",
     "customerAdmin.feedback.duplicateRateDimension":
@@ -2794,6 +2871,32 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Es muss genau ein Prozentwert oder ein Fixbetrag gesetzt sein.",
     "customerAdmin.feedback.surchargeOutsideRateCardWindow":
       "Der Zuschlag muss innerhalb des Gültigkeitsfensters der Preiskarte liegen.",
+    "customerAdmin.placeholder.select": "Bitte auswählen",
+    "customerAdmin.placeholder.selectOptional": "Optional auswählen",
+    "customerAdmin.amountMode.percent": "Prozent",
+    "customerAdmin.amountMode.fixed": "Fixbetrag",
+    "customerAdmin.weekday.mon": "Mo",
+    "customerAdmin.weekday.tue": "Di",
+    "customerAdmin.weekday.wed": "Mi",
+    "customerAdmin.weekday.thu": "Do",
+    "customerAdmin.weekday.fri": "Fr",
+    "customerAdmin.weekday.sat": "Sa",
+    "customerAdmin.weekday.sun": "So",
+    "customerAdmin.option.rateLineKind.base": "Basis",
+    "customerAdmin.option.rateLineKind.function": "Funktion",
+    "customerAdmin.option.rateLineKind.qualification": "Qualifikation",
+    "customerAdmin.option.rateLineKind.planning_mode": "Planungsmodus",
+    "customerAdmin.option.billingUnit.hour": "Stunde",
+    "customerAdmin.option.billingUnit.day": "Tag",
+    "customerAdmin.option.billingUnit.flat": "Pauschal",
+    "customerAdmin.option.planningMode.event": "Event",
+    "customerAdmin.option.planningMode.site": "Objekt",
+    "customerAdmin.option.planningMode.trade_fair": "Messe",
+    "customerAdmin.option.planningMode.patrol": "Revier",
+    "customerAdmin.option.surchargeType.night": "Nacht",
+    "customerAdmin.option.surchargeType.weekend": "Wochenende",
+    "customerAdmin.option.surchargeType.holiday": "Feiertag",
+    "customerAdmin.option.surchargeType.regional": "Regional",
     "customerAdmin.option.invoiceLayout.standard": "Standard",
     "customerAdmin.option.invoiceLayout.compact": "Kompakt",
     "customerAdmin.option.invoiceLayout.detailed_timesheet": "Mit Leistungsnachweis",
@@ -4090,6 +4193,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.addAddress": "Link address",
     "customerAdmin.actions.createAddress": "Create address link",
     "customerAdmin.actions.createSharedAddress": "Create new address",
+    "customerAdmin.actions.createHrCatalogSamples": "Create sample HR catalogs",
+    "customerAdmin.actions.creatingHrCatalogSamples": "Creating sample HR catalogs",
+    "customerAdmin.actions.openEmployeesAdmin": "Open Employees admin",
     "customerAdmin.actions.saveAddress": "Save address link",
     "customerAdmin.actions.refreshHistory": "Reload history",
     "customerAdmin.actions.refreshPortalPrivacy": "Reload privacy release",
@@ -4139,6 +4245,13 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.portalAccessStatusSavedBody": "Account status and scoped access were updated consistently.",
     "customerAdmin.feedback.portalAccessUnlinked": "Portal access unlinked",
     "customerAdmin.feedback.portalAccessUnlinkedBody": "The customer contact was detached from the portal user and access was deactivated.",
+    "customerAdmin.feedback.hrCatalogBootstrapSuccess": "HR catalogs populated",
+    "customerAdmin.feedback.hrCatalogBootstrapSuccessBody":
+      "Sample function and qualification types were created and can now be selected in rate lines.",
+    "customerAdmin.feedback.hrCatalogBootstrapError":
+      "The sample HR catalog data could not be created. Please check the HR catalogs in the Employees area.",
+    "customerAdmin.feedback.hrCatalogBootstrapNotAllowed":
+      "Sample HR catalog data cannot be created automatically in this environment.",
     "customerAdmin.feedback.validation": "Check input",
     "customerAdmin.feedback.customerRequired": "Customer number and display name are required.",
     "customerAdmin.feedback.contactRequired": "A contact needs at least a name.",
@@ -4200,6 +4313,21 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.commercial.surchargesTitle": "Time, weekday, and region surcharges",
     "customerAdmin.commercial.surchargesEmpty": "No surcharge rules exist for this rate card yet.",
     "customerAdmin.commercial.pricingTabs.surcharges": "Surcharges",
+    "customerAdmin.commercial.provisionalCatalogHint":
+      "Provisional suggestions until a dedicated catalog endpoint exists. Free-text entry stays allowed.",
+    "customerAdmin.commercial.functionTypePlaceholder": "Select an optional function type",
+    "customerAdmin.commercial.functionTypeCatalogHint": "Values come from the HR function catalog.",
+    "customerAdmin.commercial.functionTypeEmptyHint":
+      "No active entries are available in the tenant HR function catalog yet.",
+    "customerAdmin.commercial.qualificationTypePlaceholder": "Select an optional qualification type",
+    "customerAdmin.commercial.qualificationTypeCatalogHint": "Values come from the HR qualification catalog.",
+    "customerAdmin.commercial.qualificationTypeEmptyHint":
+      "No active entries are available in the tenant HR qualification catalog yet.",
+    "customerAdmin.commercial.hrCatalogEmptyTitle": "HR catalog data missing",
+    "customerAdmin.commercial.hrCatalogEmptyDevHint":
+      "Rate lines need active HR function and qualification types. In development you can create sample catalog data now.",
+    "customerAdmin.commercial.hrCatalogEmptyManagedHint":
+      "Rate lines need active HR function and qualification types. Populate the HR catalogs first in the Employees area.",
     "customerAdmin.fields.invoiceEmail": "Invoice email",
     "customerAdmin.fields.paymentTermsDays": "Payment terms in days",
     "customerAdmin.fields.paymentTermsNote": "Payment note",
@@ -4239,9 +4367,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.sortOrder": "Sort order",
     "customerAdmin.fields.surchargeType": "Surcharge type",
     "customerAdmin.fields.weekdayMask": "Weekday mask",
+    "customerAdmin.fields.weekdays": "Weekdays",
     "customerAdmin.fields.timeFromMinute": "From minute",
     "customerAdmin.fields.timeToMinute": "To minute",
     "customerAdmin.fields.regionCode": "Region code",
+    "customerAdmin.fields.amountMode": "Amount mode",
     "customerAdmin.fields.percentValue": "Percent value",
     "customerAdmin.fields.fixedAmount": "Fixed amount",
     "customerAdmin.actions.refreshCommercial": "Reload commercial data",
@@ -4321,6 +4451,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "This pricing window overlaps an existing active rate card.",
     "customerAdmin.feedback.rateLineKindRequired": "A rate line requires a line kind.",
     "customerAdmin.feedback.invalidBillingUnit": "The billing unit is invalid.",
+    "customerAdmin.feedback.invalidFunctionType": "The selected function type is not available.",
+    "customerAdmin.feedback.invalidQualificationType": "The selected qualification type is not available.",
     "customerAdmin.feedback.invalidUnitPrice": "The unit price is invalid.",
     "customerAdmin.feedback.invalidMinimumQuantity": "The minimum quantity is invalid.",
     "customerAdmin.feedback.duplicateRateDimension":
@@ -4335,6 +4467,32 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Exactly one percentage or fixed amount must be set.",
     "customerAdmin.feedback.surchargeOutsideRateCardWindow":
       "The surcharge must stay within the selected rate-card window.",
+    "customerAdmin.placeholder.select": "Select an option",
+    "customerAdmin.placeholder.selectOptional": "Select if needed",
+    "customerAdmin.amountMode.percent": "Percent",
+    "customerAdmin.amountMode.fixed": "Fixed amount",
+    "customerAdmin.weekday.mon": "Mon",
+    "customerAdmin.weekday.tue": "Tue",
+    "customerAdmin.weekday.wed": "Wed",
+    "customerAdmin.weekday.thu": "Thu",
+    "customerAdmin.weekday.fri": "Fri",
+    "customerAdmin.weekday.sat": "Sat",
+    "customerAdmin.weekday.sun": "Sun",
+    "customerAdmin.option.rateLineKind.base": "Base",
+    "customerAdmin.option.rateLineKind.function": "Function",
+    "customerAdmin.option.rateLineKind.qualification": "Qualification",
+    "customerAdmin.option.rateLineKind.planning_mode": "Planning mode",
+    "customerAdmin.option.billingUnit.hour": "Hour",
+    "customerAdmin.option.billingUnit.day": "Day",
+    "customerAdmin.option.billingUnit.flat": "Flat",
+    "customerAdmin.option.planningMode.event": "Event",
+    "customerAdmin.option.planningMode.site": "Site",
+    "customerAdmin.option.planningMode.trade_fair": "Trade fair",
+    "customerAdmin.option.planningMode.patrol": "Patrol",
+    "customerAdmin.option.surchargeType.night": "Night",
+    "customerAdmin.option.surchargeType.weekend": "Weekend",
+    "customerAdmin.option.surchargeType.holiday": "Holiday",
+    "customerAdmin.option.surchargeType.regional": "Regional",
     "customerAdmin.option.invoiceLayout.standard": "Standard",
     "customerAdmin.option.invoiceLayout.compact": "Compact",
     "customerAdmin.option.invoiceLayout.detailed_timesheet": "With timesheet detail",

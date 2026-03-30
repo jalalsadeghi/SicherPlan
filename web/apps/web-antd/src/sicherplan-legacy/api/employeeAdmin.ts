@@ -169,6 +169,13 @@ export interface EmployeeAccessResetPasswordRequest {
   password: string;
 }
 
+export interface EmployeeCatalogBootstrapRead {
+  function_types_inserted: number;
+  function_types_updated: number;
+  qualification_types_inserted: number;
+  qualification_types_updated: number;
+}
+
 export interface EmployeeListFilters {
   search?: string;
   status?: string;
@@ -359,6 +366,14 @@ export function listEmployeeAddresses(tenantId: string, employeeId: string, acce
 
 export function listEmployeeGroups(tenantId: string, accessToken: string) {
   return request<EmployeeGroupRead[]>(`/api/employees/tenants/${tenantId}/employees/groups/catalog`, accessToken);
+}
+
+export function bootstrapEmployeeCatalogSamples(tenantId: string, accessToken: string) {
+  return request<EmployeeCatalogBootstrapRead>(
+    `/api/employees/tenants/${tenantId}/employees/catalog/bootstrap-sample-data`,
+    accessToken,
+    { method: "POST" },
+  );
 }
 
 export function createEmployeeGroup(tenantId: string, accessToken: string, payload: Record<string, unknown>) {

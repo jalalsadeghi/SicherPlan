@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -24,6 +25,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import AuditLifecycleMixin, Base, UUIDPrimaryKeyMixin
 from app.modules.core.models import Address, Branch, LookupValue, Mandate
 from app.modules.iam.models import UserAccount
+
+if TYPE_CHECKING:
+    from app.modules.employees.models import FunctionType, QualificationType
 
 
 CUSTOMER_ADDRESS_TYPES = ("registered", "billing", "mailing", "service")
@@ -398,6 +402,18 @@ class CustomerRateLine(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
             name="fk_crm_customer_rate_line_tenant_rate_card",
             ondelete="RESTRICT",
         ),
+        ForeignKeyConstraint(
+            ["tenant_id", "function_type_id"],
+            ["hr.function_type.tenant_id", "hr.function_type.id"],
+            name="fk_crm_customer_rate_line_tenant_function_type",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "qualification_type_id"],
+            ["hr.qualification_type.tenant_id", "hr.qualification_type.id"],
+            name="fk_crm_customer_rate_line_tenant_qualification_type",
+            ondelete="RESTRICT",
+        ),
         UniqueConstraint("tenant_id", "id", name="uq_crm_customer_rate_line_tenant_id_id"),
         Index("ix_crm_customer_rate_line_rate_card", "tenant_id", "rate_card_id"),
         CheckConstraint("unit_price >= 0", name="crm_customer_rate_line_unit_price_non_negative"),
@@ -414,8 +430,8 @@ class CustomerRateLine(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
     )
     rate_card_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
     line_kind: Mapped[str] = mapped_column(String(40), nullable=False)
-    function_type_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    qualification_type_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    function_type_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), nullable=True)
+    qualification_type_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), nullable=True)
     planning_mode_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
     billing_unit: Mapped[str] = mapped_column(String(40), nullable=False)
     unit_price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
@@ -424,6 +440,16 @@ class CustomerRateLine(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
     notes: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
     rate_card: Mapped[CustomerRateCard] = relationship(back_populates="rate_lines", lazy="selectin")
+    function_type: Mapped["FunctionType | None"] = relationship(
+        "FunctionType",
+        lazy="selectin",
+        foreign_keys=[function_type_id],
+    )
+    qualification_type: Mapped["QualificationType | None"] = relationship(
+        "QualificationType",
+        lazy="selectin",
+        foreign_keys=[qualification_type_id],
+    )
 
 
 class CustomerSurchargeRule(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):

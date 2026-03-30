@@ -271,6 +271,8 @@ export interface CustomerRateLineRead {
   line_kind: string;
   function_type_id: string | null;
   qualification_type_id: string | null;
+  function_type: CustomerCatalogOptionRead | null;
+  qualification_type: CustomerCatalogOptionRead | null;
   planning_mode_code: string | null;
   billing_unit: string;
   unit_price: string;
@@ -480,6 +482,16 @@ export interface CustomerMandateOptionRead {
   name: string;
 }
 
+export interface CustomerCatalogOptionRead {
+  id: string;
+  code: string;
+  label: string;
+  description: string | null;
+  is_active: boolean;
+  status: string;
+  archived_at: string | null;
+}
+
 export interface CustomerReferenceDataRead {
   legal_forms: CustomerReferenceOptionRead[];
   classifications: CustomerReferenceOptionRead[];
@@ -488,6 +500,8 @@ export interface CustomerReferenceDataRead {
   invoice_layouts: CustomerReferenceOptionRead[];
   shipping_methods: CustomerReferenceOptionRead[];
   dunning_policies: CustomerReferenceOptionRead[];
+  function_types: CustomerCatalogOptionRead[];
+  qualification_types: CustomerCatalogOptionRead[];
   branches: CustomerBranchOptionRead[];
   mandates: CustomerMandateOptionRead[];
 }

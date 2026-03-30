@@ -22,6 +22,7 @@ from app.modules.customers.schemas import (
     CustomerAddressCreate,
     CustomerAddressRead,
     CustomerAddressUpdate,
+    CustomerCatalogOptionRead,
     CustomerContactCreate,
     CustomerContactRead,
     CustomerContactUpdate,
@@ -36,6 +37,7 @@ from app.modules.customers.schemas import (
     CustomerRead,
     CustomerUpdate,
 )
+from app.modules.employees.models import FunctionType, QualificationType
 from app.modules.iam.audit_service import AuditActor, AuditService
 from app.modules.iam.authz import RequestAuthorizationContext
 
@@ -138,6 +140,8 @@ class CustomerRepository(Protocol):
     def create_history_entry(self, row: CustomerHistoryEntry) -> CustomerHistoryEntry: ...
     def get_lookup_value(self, lookup_id: str): ...  # noqa: ANN001
     def list_lookup_values(self, tenant_id: str, domain: str): ...  # noqa: ANN001
+    def list_function_types(self, tenant_id: str) -> list[FunctionType]: ...
+    def list_qualification_types(self, tenant_id: str) -> list[QualificationType]: ...
     def get_branch(self, tenant_id: str, branch_id: str): ...  # noqa: ANN001
     def list_branches(self, tenant_id: str): ...  # noqa: ANN001
     def get_mandate(self, tenant_id: str, mandate_id: str): ...  # noqa: ANN001
@@ -209,6 +213,14 @@ class CustomerService:
             dunning_policies=[
                 CustomerReferenceOptionRead.model_validate(lookup)
                 for lookup in self.repository.list_lookup_values(None, "dunning_policy")
+            ],
+            function_types=[
+                CustomerCatalogOptionRead.model_validate(row)
+                for row in self.repository.list_function_types(tenant_id)
+            ],
+            qualification_types=[
+                CustomerCatalogOptionRead.model_validate(row)
+                for row in self.repository.list_qualification_types(tenant_id)
             ],
             branches=[
                 CustomerBranchOptionRead.model_validate(branch)
