@@ -1,120 +1,122 @@
 You are working in the SicherPlan repository.
 
-Task title:
-Fix customer dropdown labels so select options show only human-readable names/labels, not code + label.
+Task:
+Fix the frontend bug in Customer Admin > Commercial > Pricing rules > Rate lines where submitting the form fails silently when "Minimum quantity" is filled, but succeeds when that field is empty.
 
-Problem:
-In the Customer Admin UI, dropdown options currently render values like:
-- "standard - Standardkunde"
-- "test-branch - Test Breanch"
-But in user-facing dropdowns they should display only:
-- "Standardkunde"
-- "Test Breanch"
+Observed behavior:
+- Clicking "Create rate line" with Minimum quantity filled does not create any network request.
+- No backend POST is triggered.
+- The UI only shows the generic fallback message "The customer action failed."
+- Leaving Minimum quantity empty allows the form to submit successfully.
 
-Current root cause:
-In:
-- web/apps/web-antd/src/sicherplan-legacy/features/customers/customerAdmin.helpers.js
+Root cause hypothesis:
+The submit path is doing string-style normalization on a value that may be a number.
+In Vue, input[type="number"] can bind as a number, while an empty field becomes an empty string.
+So any helper that assumes `.trim()` is always available will break at runtime before the request is sent.
 
-the helper:
-- formatCustomerReferenceLabel(record)
-
-currently formats records as:
-- code + " - " + name
-or
-- code + " - " + label
-
-This helper is then reused by CustomerAdminView.vue for select option labels, which makes dropdowns show technical codes to end users.
-
-Important constraint:
-Do NOT change the underlying select values.
-The option value must remain the existing UUID / stored value.
-Only the visible text in dropdowns should change.
-
-Relevant files to inspect:
-- web/apps/web-antd/src/sicherplan-legacy/features/customers/customerAdmin.helpers.js
+Primary target:
 - web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
-- web/apps/web-antd/src/sicherplan-legacy/api/customers.ts
-- relevant tests in the customer frontend area
 
-Goal:
-Make all customer-facing dropdowns in Customer Admin show only human-readable labels/names, while keeping internal values unchanged.
+Secondary targets if needed:
+- any nearby customer commercial helper file if the normalization logic should be extracted
+- relevant customer admin frontend tests
 
-Implementation requirements:
+Important constraints:
+- Do NOT change backend API contracts.
+- Do NOT change backend validation, database models, or migrations.
+- Preserve current request payload semantics for customer pricing APIs.
+- The fix must be frontend-only unless you find a proven blocker that absolutely requires backend change.
 
-A) Refactor formatting helpers
-1. Do not keep using one shared formatter for both:
-   - user-facing select options
-   - summary/debug/internal display labels
+What to change:
+1. Inspect the Rate line submit path in CustomerAdminView.vue, especially:
+   - submitRateLine()
+   - normalizeRateLineDraft()
+   - emptyToNull() or any equivalent normalization helper
+   - the reactive draft fields used for:
+     - unit_price
+     - minimum_quantity
+     - sort_order
+     - any other numeric commercial inputs that may pass through string-only helpers
 
-2. Introduce separate helpers, for example:
-   - formatCustomerReferenceOptionLabel(record)
-     -> returns only record.name or record.label
-   - formatCustomerReferenceDisplayLabel(record)
-     -> may preserve code + label if still needed elsewhere
-   Use naming consistent with repo style.
+2. Fix the normalization bug so optional scalar form values are safe when they are:
+   - string
+   - number
+   - null
+   - undefined
+   - empty string
 
-3. For option label behavior:
-   - if record has "name", show only record.name
-   - else if record has "label", show only record.label
-   - fallback to record.code only if label/name is truly missing
+3. Replace any helper that currently assumes string-only input with a safer helper, for example:
+   - normalizeOptionalScalar(value)
+   or equivalent naming
+   Requirements:
+   - null/undefined => null
+   - empty string / whitespace-only string => null
+   - number => String(value)
+   - non-empty string => trimmed string
+   - never call .trim() directly on a number
 
-B) Apply to CustomerAdminView
-4. Update all customer dropdowns in CustomerAdminView.vue to use the option-only formatter.
-   This includes at least:
-   - customer filters:
-     - default branch
-     - default mandate
-   - customer overview form:
-     - legal form
-     - classification
-     - ranking
-     - customer status metadata
-     - default branch
-     - default mandate
-   - any other selects in this view currently using formatReferenceLabel(...) for option text
+4. Update normalizeRateLineDraft() so:
+   - minimum_quantity is normalized safely
+   - unit_price is normalized safely
+   - function_type_id / qualification_type_id / planning_mode_code / notes still work correctly
+   - the payload sent to createCustomerRateLine / updateCustomerRateLine remains compatible with the existing API client expectations
 
-5. Keep the select value attribute exactly as it is today.
-   Only visible text should change.
+5. Review the rest of CustomerAdminView.vue for the same bug pattern.
+   Search for all uses of:
+   - emptyToNull(...)
+   - .trim()
+   on values coming from form inputs
+   Especially check numeric commercial fields such as:
+   - billing payment_terms_days
+   - rate card numeric/date-adjacent normalization
+   - surcharge numeric fields
+   Only fix places that are genuinely vulnerable; avoid unrelated refactors.
 
-C) Preserve non-dropdown displays carefully
-6. Review where formatCustomerReferenceLabel() is used for:
-   - summary cards
-   - selected-customer summary labels
-   - read-only metadata
-7. Decide carefully:
-   - if those should also become label-only for consistency, update them
-   - if they are meant to remain code + label, switch them to a display-specific formatter
-8. Do not accidentally degrade other UI contexts.
+6. Keep the current user flow unchanged:
+   - Minimum quantity filled => submit works
+   - Minimum quantity empty => submit still works
+   - No extra confirmation dialogs
+   - No behavior change in successful backend payload handling
 
-D) UX consistency
-9. Ensure dropdown placeholders like "Not set" remain unchanged.
-10. Do not show technical codes in normal user selection controls unless no label/name exists.
+7. Improve resilience of the submit path:
+   - ensure submitRateLine does not fail before the request due to scalar normalization
+   - preserve existing error handling for actual API errors
+   - do not swallow runtime errors silently in a way that hides regressions from tests
 
-E) Tests
-11. Add or update frontend tests to verify:
-   - legal form dropdown option renders "GmbH", not "gmbh - GmbH"
-   - classification dropdown option renders "Standardkunde", not "standard - Standardkunde"
-   - branch dropdown option renders "Test Breanch", not "test-branch - Test Breanch"
-   - select option values still remain the same UUIDs / stored identifiers
-12. Avoid brittle snapshot-only coverage if more direct assertions are possible.
+Tests to add/update:
+1. Add or update focused frontend tests covering:
+   - submitting a Rate line with minimum_quantity = 4 succeeds and triggers the create request
+   - submitting a Rate line with minimum_quantity empty succeeds and sends null/empty-compatible payload
+   - normalization helper handles string, number, empty string, null, undefined correctly
+   - no runtime TypeError occurs when numeric fields are filled
+
+2. Prefer targeted tests over snapshot-heavy tests.
+3. If there is already a customer admin test file, extend it.
+4. If needed, add a small unit test around the normalization helper.
 
 Acceptance criteria:
-- Customer-facing dropdown options show only human-readable names/labels.
-- Technical codes are no longer visible in select option text.
-- Underlying submitted values are unchanged.
-- Any summary/read-only display remains intentional and not accidentally broken.
+- Filling "Minimum quantity" no longer blocks submission.
+- A real network request is triggered when the form is valid.
+- Leaving "Minimum quantity" empty still works.
+- No `.trim is not a function`-style runtime failure remains in the Rate line submit path.
+- Existing backend payload shape is preserved.
+- Relevant regression tests pass.
+
+Implementation guidance:
+- Keep the patch minimal and localized.
+- Prefer one reusable safe normalization helper over ad hoc fixes.
+- Avoid broad refactors unrelated to this bug.
 
 Before coding:
-Provide a short plan listing:
-- which helper functions you will introduce or change
-- which selects in CustomerAdminView will be updated
-- whether summary/read-only labels will stay code+label or become label-only
+Briefly state:
+- which file(s) you will edit
+- where the failing normalization happens
+- what helper strategy you will use
 
 After coding:
 Provide:
 1. files changed
-2. exact root cause
-3. exact fix
-4. examples before/after
-5. test evidence
-6. any follow-up items
+2. exact root cause confirmed
+3. summary of the fix
+4. tests added/updated
+5. any remaining similar-risk spots you noticed

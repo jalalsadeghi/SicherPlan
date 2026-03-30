@@ -1993,6 +1993,7 @@ import {
   deriveCustomerCommercialActionState,
   minutesToTimeInput,
   mapCustomerCommercialApiMessage,
+  normalizeRateLinePayloadDraft,
   parseWeekdayMask,
   RATE_LINE_BILLING_UNIT_OPTIONS,
   RATE_LINE_KIND_OPTIONS,
@@ -4056,19 +4057,10 @@ function normalizeRateCardDraft(): CustomerRateCardPayload {
 }
 
 function normalizeRateLineDraft(): CustomerRateLinePayload {
-  return {
-    tenant_id: tenantScopeId.value,
-    rate_card_id: selectedRateCardId.value,
-    line_kind: rateLineDraft.line_kind.trim(),
-    function_type_id: emptyToNull(rateLineDraft.function_type_id),
-    qualification_type_id: emptyToNull(rateLineDraft.qualification_type_id),
-    planning_mode_code: emptyToNull(rateLineDraft.planning_mode_code),
-    billing_unit: rateLineDraft.billing_unit.trim(),
-    unit_price: `${rateLineDraft.unit_price}`.trim(),
-    minimum_quantity: emptyToNull(rateLineDraft.minimum_quantity),
-    sort_order: Number(rateLineDraft.sort_order ?? 100),
-    notes: emptyToNull(rateLineDraft.notes),
-  };
+  return normalizeRateLinePayloadDraft(rateLineDraft, {
+    tenantId: tenantScopeId.value,
+    rateCardId: selectedRateCardId.value,
+  });
 }
 
 function normalizeSurchargeRuleDraft(): CustomerSurchargeRulePayload {

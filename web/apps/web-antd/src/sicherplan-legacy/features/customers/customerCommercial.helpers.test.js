@@ -10,6 +10,8 @@ import {
   hasCustomerCommercialPermission,
   mapCustomerCommercialApiMessage,
   minutesToTimeInput,
+  normalizeOptionalScalar,
+  normalizeRateLinePayloadDraft,
   parseWeekdayMask,
   RATE_LINE_BILLING_UNIT_OPTIONS,
   RATE_LINE_KIND_OPTIONS,
@@ -111,6 +113,77 @@ test("rate-card and rate-line validation catches missing fields and invalid valu
   assert.equal(
     validateRateLineDraft({ line_kind: "base", billing_unit: "hour", unit_price: "-1", minimum_quantity: "" }),
     "customerAdmin.feedback.invalidUnitPrice",
+  );
+});
+
+test("optional scalar normalization is safe for strings, numbers, and empty values", () => {
+  assert.equal(normalizeOptionalScalar("  demo  "), "demo");
+  assert.equal(normalizeOptionalScalar(4), "4");
+  assert.equal(normalizeOptionalScalar(0), "0");
+  assert.equal(normalizeOptionalScalar("   "), null);
+  assert.equal(normalizeOptionalScalar(""), null);
+  assert.equal(normalizeOptionalScalar(null), null);
+  assert.equal(normalizeOptionalScalar(undefined), null);
+});
+
+test("rate-line payload normalization accepts numeric minimum quantity without throwing", () => {
+  assert.deepEqual(
+    normalizeRateLinePayloadDraft(
+      {
+        line_kind: "function",
+        function_type_id: "",
+        qualification_type_id: null,
+        planning_mode_code: " patrol ",
+        billing_unit: "hour",
+        unit_price: 19.5,
+        minimum_quantity: 4,
+        sort_order: 120,
+        notes: "  Important  ",
+      },
+      { tenantId: "tenant-1", rateCardId: "rate-card-1" },
+    ),
+    {
+      tenant_id: "tenant-1",
+      rate_card_id: "rate-card-1",
+      line_kind: "function",
+      function_type_id: null,
+      qualification_type_id: null,
+      planning_mode_code: "patrol",
+      billing_unit: "hour",
+      unit_price: "19.5",
+      minimum_quantity: "4",
+      sort_order: 120,
+      notes: "Important",
+    },
+  );
+  assert.deepEqual(
+    normalizeRateLinePayloadDraft(
+      {
+        line_kind: "base",
+        function_type_id: "",
+        qualification_type_id: "",
+        planning_mode_code: "",
+        billing_unit: "flat",
+        unit_price: "25.00",
+        minimum_quantity: "",
+        sort_order: "",
+        notes: "",
+      },
+      { tenantId: "tenant-1", rateCardId: "rate-card-1" },
+    ),
+    {
+      tenant_id: "tenant-1",
+      rate_card_id: "rate-card-1",
+      line_kind: "base",
+      function_type_id: null,
+      qualification_type_id: null,
+      planning_mode_code: null,
+      billing_unit: "flat",
+      unit_price: "25.00",
+      minimum_quantity: null,
+      sort_order: 0,
+      notes: null,
+    },
   );
 });
 

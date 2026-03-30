@@ -106,6 +106,33 @@ export function applySurchargeAmountMode(mode, draft, fallbackCurrencyCode = "")
   };
 }
 
+export function normalizeOptionalScalar(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  const normalized = `${value}`.trim();
+  return normalized ? normalized : null;
+}
+
+export function normalizeRateLinePayloadDraft(draft, { tenantId, rateCardId }) {
+  return {
+    tenant_id: tenantId,
+    rate_card_id: rateCardId,
+    line_kind: `${draft.line_kind ?? ""}`.trim(),
+    function_type_id: normalizeOptionalScalar(draft.function_type_id),
+    qualification_type_id: normalizeOptionalScalar(draft.qualification_type_id),
+    planning_mode_code: normalizeOptionalScalar(draft.planning_mode_code),
+    billing_unit: `${draft.billing_unit ?? ""}`.trim(),
+    unit_price: normalizeOptionalScalar(draft.unit_price) ?? "",
+    minimum_quantity: normalizeOptionalScalar(draft.minimum_quantity),
+    sort_order: Number(draft.sort_order ?? 100),
+    notes: normalizeOptionalScalar(draft.notes),
+  };
+}
+
 export function hasCustomerCommercialPermission(role, permissionKey) {
   return (CUSTOMER_COMMERCIAL_PERMISSION_MATRIX[role] ?? []).includes(permissionKey);
 }
