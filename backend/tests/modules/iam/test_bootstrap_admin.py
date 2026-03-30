@@ -64,6 +64,7 @@ class FakeBootstrapRepository:
         }
         self.users: dict[str, FakeUser] = {}
         self.assignments: dict[tuple[str, str, str], FakeAssignment] = {}
+        self.seeded_tenant_ids: list[str] = []
 
     def get_tenant_by_code(self, code: str):
         return self.tenants.get(code)
@@ -79,6 +80,9 @@ class FakeBootstrapRepository:
         )
         self.tenants[fake.code] = fake
         return fake
+
+    def seed_tenant_baseline(self, tenant_id: str) -> None:
+        self.seeded_tenant_ids.append(tenant_id)
 
     def get_role_by_key(self, key: str):
         return self.roles.get(key)
@@ -119,6 +123,9 @@ class TestBootstrapSystemAdmin(unittest.TestCase):
         self.assertEqual(summary.tenant_code, "system")
         self.assertEqual(summary.username, "sysadmin")
         self.assertEqual(len(repository.assignments), 2)
+        tenant = repository.get_tenant_by_code("system")
+        assert tenant is not None
+        self.assertEqual(repository.seeded_tenant_ids, [tenant.id])
 
     def test_bootstrap_is_idempotent_and_reactivates_existing_user(self) -> None:
         repository = FakeBootstrapRepository()
@@ -144,6 +151,7 @@ class TestBootstrapSystemAdmin(unittest.TestCase):
         self.assertEqual(user.status, "active")
         self.assertIsNone(user.archived_at)
         self.assertTrue(user.is_platform_user)
+        self.assertEqual(len(repository.seeded_tenant_ids), 1)
 
     def test_bootstrap_reactivates_missing_or_archived_tenant_admin_assignment(self) -> None:
         repository = FakeBootstrapRepository()

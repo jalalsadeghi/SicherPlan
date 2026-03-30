@@ -93,6 +93,13 @@ class TestLookupSeed(unittest.TestCase):
         self.assertEqual(len(session.rows), expected)
         self.assertTrue(any(row.domain == "customer_ranking" for row in session.rows))
         self.assertTrue(any(row.domain == "customer_status" for row in session.rows))
+        seeded_codes_by_domain = {
+            domain: {row.code for row in session.rows if row.domain == domain and row.tenant_id == "tenant-1"}
+            for domain in ("customer_category", "customer_ranking", "customer_status")
+        }
+        self.assertEqual(seeded_codes_by_domain["customer_category"], {"standard", "key_account", "prospect"})
+        self.assertEqual(seeded_codes_by_domain["customer_ranking"], {"a", "b", "c"})
+        self.assertEqual(seeded_codes_by_domain["customer_status"], {"qualified", "on_hold", "blocked"})
 
     def test_seed_updates_existing_labels_without_duplication(self) -> None:
         session = _FakeSession()

@@ -982,6 +982,11 @@ export type MessageKey =
   | "customerAdmin.portalAccess.contactPlaceholder"
   | "customerAdmin.portalAccess.passwordResetEyebrow"
   | "customerAdmin.portalAccess.passwordResetTitle"
+  | "customerAdmin.overview.crmMetadataWarningTitle"
+  | "customerAdmin.overview.crmMetadataWarningBody"
+  | "customerAdmin.overview.classificationEmptyHint"
+  | "customerAdmin.overview.rankingEmptyHint"
+  | "customerAdmin.overview.customerStatusEmptyHint"
   | "customerAdmin.addressType.registered"
   | "customerAdmin.addressType.billing"
   | "customerAdmin.addressType.mailing"
@@ -2533,6 +2538,15 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.portalAccess.contactPlaceholder": "Kontakt auswählen",
     "customerAdmin.portalAccess.passwordResetEyebrow": "Passwort zurücksetzen",
     "customerAdmin.portalAccess.passwordResetTitle": "Temporäres Passwort neu vergeben",
+    "customerAdmin.overview.crmMetadataWarningTitle": "CRM-Metadatenkataloge fehlen",
+    "customerAdmin.overview.crmMetadataWarningBody":
+      "Klassifikation, Ranking oder Kundenstatus-Metadaten sind für diesen Mandanten noch nicht per Tenant-Lookup-Seed angelegt.",
+    "customerAdmin.overview.classificationEmptyHint":
+      "Der Mandantenkatalog customer_category ist noch nicht befüllt.",
+    "customerAdmin.overview.rankingEmptyHint":
+      "Der Mandantenkatalog customer_ranking ist noch nicht befüllt.",
+    "customerAdmin.overview.customerStatusEmptyHint":
+      "Der Mandantenkatalog customer_status ist noch nicht befüllt.",
     "customerAdmin.addressType.registered": "Firmensitz",
     "customerAdmin.addressType.billing": "Rechnung",
     "customerAdmin.addressType.mailing": "Post",
@@ -4129,6 +4143,15 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.portalAccess.contactPlaceholder": "Select a contact",
     "customerAdmin.portalAccess.passwordResetEyebrow": "Password reset",
     "customerAdmin.portalAccess.passwordResetTitle": "Issue a new temporary password",
+    "customerAdmin.overview.crmMetadataWarningTitle": "CRM metadata catalogs missing",
+    "customerAdmin.overview.crmMetadataWarningBody":
+      "Classification, ranking, or customer-status metadata has not been seeded yet for this tenant.",
+    "customerAdmin.overview.classificationEmptyHint":
+      "The tenant lookup domain customer_category has not been seeded yet.",
+    "customerAdmin.overview.rankingEmptyHint":
+      "The tenant lookup domain customer_ranking has not been seeded yet.",
+    "customerAdmin.overview.customerStatusEmptyHint":
+      "The tenant lookup domain customer_status has not been seeded yet.",
     "customerAdmin.addressType.registered": "Registered office",
     "customerAdmin.addressType.billing": "Billing",
     "customerAdmin.addressType.mailing": "Mailing",

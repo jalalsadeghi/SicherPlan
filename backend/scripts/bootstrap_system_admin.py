@@ -8,6 +8,8 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.modules.core.config_seed import seed_default_tenant_settings
+from app.modules.core.lookup_seed import seed_lookup_values
 from app.modules.core.models import Tenant
 from app.modules.iam.bootstrap_admin import (
     SystemAdminBootstrapConfig,
@@ -29,6 +31,10 @@ class SqlAlchemySystemAdminBootstrapRepository:
         self.session.add(tenant)
         self.session.flush()
         return tenant
+
+    def seed_tenant_baseline(self, tenant_id: str) -> None:
+        seed_default_tenant_settings(self.session, tenant_id=tenant_id)
+        seed_lookup_values(self.session, tenant_id=tenant_id)
 
     def get_role_by_key(self, key: str) -> Role | None:
         statement = select(Role).where(Role.key == key)

@@ -281,6 +281,13 @@
                   <span>{{ t("customerAdmin.fields.externalRef") }}</span>
                   <input v-model="customerDraft.external_ref" />
                 </label>
+                <div
+                  v-if="hasCustomerMetadataCatalogGap"
+                  class="customer-admin-metadata-warning field-stack field-stack--wide"
+                >
+                  <strong>{{ t("customerAdmin.overview.crmMetadataWarningTitle") }}</strong>
+                  <p>{{ t("customerAdmin.overview.crmMetadataWarningBody") }}</p>
+                </div>
                 <label class="field-stack field-stack--third">
                   <span>{{ t("customerAdmin.fields.legalFormLookupId") }}</span>
                   <select v-model="customerDraft.legal_form_lookup_id">
@@ -292,30 +299,39 @@
                 </label>
                 <label class="field-stack field-stack--third">
                   <span>{{ t("customerAdmin.fields.classificationLookupId") }}</span>
-                  <select v-model="customerDraft.classification_lookup_id">
+                  <select v-model="customerDraft.classification_lookup_id" :disabled="classificationOptions.length === 0">
                     <option value="">{{ t("customerAdmin.summary.none") }}</option>
-                    <option v-for="option in referenceData?.classifications || []" :key="option.id" :value="option.id">
+                    <option v-for="option in classificationOptions" :key="option.id" :value="option.id">
                       {{ formatReferenceLabel(option) }}
                     </option>
                   </select>
+                  <small v-if="classificationOptions.length === 0" class="customer-admin-field-help">
+                    {{ t("customerAdmin.overview.classificationEmptyHint") }}
+                  </small>
                 </label>
                 <label class="field-stack field-stack--third">
                   <span>{{ t("customerAdmin.fields.rankingLookupId") }}</span>
-                  <select v-model="customerDraft.ranking_lookup_id">
+                  <select v-model="customerDraft.ranking_lookup_id" :disabled="rankingOptions.length === 0">
                     <option value="">{{ t("customerAdmin.summary.none") }}</option>
-                    <option v-for="option in referenceData?.rankings || []" :key="option.id" :value="option.id">
+                    <option v-for="option in rankingOptions" :key="option.id" :value="option.id">
                       {{ formatReferenceLabel(option) }}
                     </option>
                   </select>
+                  <small v-if="rankingOptions.length === 0" class="customer-admin-field-help">
+                    {{ t("customerAdmin.overview.rankingEmptyHint") }}
+                  </small>
                 </label>
                 <label class="field-stack field-stack--third">
                   <span>{{ t("customerAdmin.fields.customerStatusLookupId") }}</span>
-                  <select v-model="customerDraft.customer_status_lookup_id">
+                  <select v-model="customerDraft.customer_status_lookup_id" :disabled="customerStatusMetadataOptions.length === 0">
                     <option value="">{{ t("customerAdmin.summary.none") }}</option>
-                    <option v-for="option in referenceData?.customer_statuses || []" :key="option.id" :value="option.id">
+                    <option v-for="option in customerStatusMetadataOptions" :key="option.id" :value="option.id">
                       {{ formatReferenceLabel(option) }}
                     </option>
                   </select>
+                  <small v-if="customerStatusMetadataOptions.length === 0" class="customer-admin-field-help">
+                    {{ t("customerAdmin.overview.customerStatusEmptyHint") }}
+                  </small>
                 </label>
                 <label class="field-stack field-stack--half">
                   <span>{{ t("customerAdmin.fields.defaultBranchId") }}</span>
@@ -2329,6 +2345,14 @@ const pricingRulesTabLabelKeys = {
 } as const;
 const primaryContactSummary = computed(() => formatPrimaryContactSummary(selectedCustomer.value));
 const referenceMaps = computed(() => buildCustomerReferenceMaps(referenceData.value));
+const classificationOptions = computed(() => referenceData.value?.classifications ?? []);
+const rankingOptions = computed(() => referenceData.value?.rankings ?? []);
+const customerStatusMetadataOptions = computed(() => referenceData.value?.customer_statuses ?? []);
+const hasCustomerMetadataCatalogGap = computed(() =>
+  classificationOptions.value.length === 0
+  || rankingOptions.value.length === 0
+  || customerStatusMetadataOptions.value.length === 0,
+);
 const branchOptions = computed(() => referenceData.value?.branches ?? []);
 const filteredCustomerMandates = computed(() =>
   filterMandateOptions(customerDraft.default_branch_id),
@@ -4997,6 +5021,19 @@ onMounted(() => {
 }
 
 .customer-admin-catalog-empty-state p {
+  margin: 0;
+  color: var(--sp-color-text-secondary);
+}
+
+.customer-admin-metadata-warning {
+  align-self: start;
+  border: 1px solid color-mix(in srgb, var(--sp-color-border) 70%, #d58d00);
+  border-radius: 16px;
+  padding: 0.85rem 1rem;
+  background: color-mix(in srgb, #fff4cf 58%, white);
+}
+
+.customer-admin-metadata-warning p {
   margin: 0;
   color: var(--sp-color-text-secondary);
 }

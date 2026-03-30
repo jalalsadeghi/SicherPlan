@@ -1,157 +1,128 @@
 You are working in the SicherPlan repository.
 
 Task title:
-Fix empty Function ID / Qualification ID dropdowns in Customer Rate Lines by adding HR catalog bootstrap data and proper empty-state UX.
+Fix empty Customer Overview metadata dropdowns for Classification, Ranking, and Customer status metadata.
 
 Problem:
-In Customer Admin > Commercial > Pricing rules > Rate lines, the dropdowns for:
-- Function ID
-- Qualification ID
-are empty and only show:
-- "No active entries are available in the HR function catalog yet."
-- "No active entries are available in the HR qualification catalog yet."
+In /admin/customers -> Overview tab, these dropdowns are empty and show only "Not set":
+- Classification
+- Ranking
+- Customer status metadata
 
-Context:
-- Real HR catalogs already exist in backend:
-  - hr.function_type
-  - hr.qualification_type
-- Employees API already exposes endpoints for them:
-  - GET /api/employees/tenants/{tenant_id}/employees/catalog/function-types
-  - POST /api/employees/tenants/{tenant_id}/employees/catalog/function-types
-  - GET /api/employees/tenants/{tenant_id}/employees/catalog/qualification-types
-  - POST /api/employees/tenants/{tenant_id}/employees/catalog/qualification-types
-- Customer pricing now depends on these catalogs for rate line references.
-- Current issue is not missing backend structure; it is missing usable catalog entries for the current tenant and poor UX when the catalogs are empty.
+Root cause already identified from current code:
+- CustomerService.get_reference_data() loads these fields from tenant-scoped lookup domains:
+  - classification_lookup_id -> customer_category
+  - ranking_lookup_id -> customer_ranking
+  - customer_status_lookup_id -> customer_status
+- These three domains are tenant-extensible and require tenant-specific seed data.
+- Legal form is visible because it is seeded as a global/system domain.
+- The repository returns lookup values for tenant_id in (None, tenant_id), so global legal forms appear, but tenant-specific customer metadata domains do not appear unless seeded for the current tenant.
 
-Business decision:
-This project is still in test/development phase.
-There is no need to preserve an empty-demo experience.
-We want these dropdowns to show usable options immediately in dev/test environments.
-
-Goal:
-1. Ensure Function ID and Qualification ID dropdowns can show real options for the current tenant.
-2. Add development/test bootstrap seed data for HR function and qualification catalogs.
-3. Improve the empty-state UX so users understand what to do when catalogs are empty.
-4. Keep HR catalog as the single source of truth. Do not create a CRM shadow catalog.
-
-Scope:
-Implement a robust fix that covers both:
-- backend sample/demo seed/bootstrap
-- frontend empty-state behavior
-
-Likely files to inspect/change:
-Backend:
-- backend/app/modules/employees/models.py
-- backend/app/modules/employees/schemas.py
-- backend/app/modules/employees/router.py
-- backend/app/modules/employees/qualification_service.py
-- backend/app/modules/employees/repository.py
-- backend/app/modules/customers/schemas.py
-- backend/app/modules/customers/commercial_service.py
-- backend/app/modules/customers/router.py
+Relevant files to inspect:
+- backend/app/modules/customers/service.py
 - backend/app/modules/customers/repository.py
-- backend/app/message_catalog.py
-- backend/alembic/versions/*.py
-- any existing seed/bootstrap/dev fixture locations
-- tests under backend/tests/modules/employees/ and backend/tests/modules/customers/
-
-Frontend:
+- backend/app/modules/core/lookup_seed.py
+- backend/scripts/seed_lookup_values.py
+- docs/engineering/lookup-seeding.md
 - web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
 - web/apps/web-antd/src/sicherplan-legacy/api/customers.ts
-- web/apps/web-antd/src/sicherplan-legacy/features/customers/customerCommercial.helpers.js
-- web/apps/web-antd/src/sicherplan-legacy/i18n/messages.ts
-- relevant frontend tests
+- related i18n files
+- relevant tests
 
-Implementation requirements
+Goal:
+Make Classification, Ranking, and Customer status metadata reliably available in dev/test environments, and improve the user experience when tenant lookup seeds are missing.
 
-A) Diagnose current loading path
-1. Verify how the customer rate-line form currently receives function and qualification options.
-2. Confirm whether it reads them from:
-   - customer reference-data,
-   - a dedicated customer commercial catalog bridge,
-   - or direct employee catalog calls.
-3. Keep the architecture clean. Prefer customer-facing read-only consumption if already implemented.
+Scope of work:
 
-B) Add dev/test bootstrap data
-4. Add a development/test bootstrap mechanism that creates sample entries for HR catalogs when they are empty for a tenant.
-5. Do NOT auto-create duplicates if entries already exist.
-6. Seed at least these sample function types:
-   - SEC_GUARD / Security agent
-   - SHIFT_SUP / Shift supervisor
-   - DISPATCH / Dispatch support
-   - FIRE_WATCH / Fire watch
-7. Seed at least these sample qualification types:
-   - G34A / 34a certified
-   - FIRST_AID / First aid
-   - FIRE_SAFETY / Fire safety
-   - CROWD_CONTROL / Crowd control
-8. Seeded rows must be:
-   - active
-   - not archived
-   - planning-relevant where appropriate
-9. Use real UUID rows from hr.function_type and hr.qualification_type, not frontend-only constants.
+A) Backend / bootstrap
+1. Keep the current architecture:
+   - customer_category, customer_ranking, customer_status remain tenant-extensible lookup domains
+   - do NOT convert them into global/system domains
+   - do NOT hardcode them in frontend
 
-C) Make the fix safe
-10. The bootstrap must be clearly limited to development/demo/test flows.
-11. Do NOT silently inject sample production data into real tenants in production mode.
-12. If the repo already has a fixture/seed/bootstrap mechanism, integrate there instead of inventing a parallel path.
-13. If no such mechanism exists, create a minimal, well-contained one and document it.
+2. Improve tenant bootstrap so that in dev/test/demo flows these three domains are seeded automatically or through a clearly documented and integrated setup path.
 
-D) Improve frontend empty-state UX
-14. In the Rate lines form:
-   - keep Function ID and Qualification ID as real select controls
-   - if options exist, show them as:
-     CODE · Label
-   - selected value must remain the UUID id
-15. If no options exist:
-   - show a clearer empty-state help text
-   - add a visible action for the user, such as:
-     - "Create sample HR catalog data" (dev/test only), or
-     - "Open HR catalogs" / "Go to HR catalog management"
-16. If implementing a direct creation CTA in UI is too invasive, at minimum:
-   - show a precise hint saying that the HR catalog must be populated first
-   - provide a navigation link or button to the catalog management area if routing exists
+3. Preferred solution:
+   - integrate tenant lookup seeding into the existing dev/bootstrap flow for a tenant
+   - do not require developers to manually discover and run a separate script for basic CRM customer onboarding
+   - keep production-safe behavior; do not silently seed arbitrary tenant data in production request paths
 
-E) Keep module ownership clean
-17. Do not create any duplicate function or qualification catalog inside CRM/customers.
-18. HR remains the single source of truth.
-19. Customer pricing only consumes the catalog.
+4. If there is already a tenant initialization/bootstrap path in the repo, hook into that path instead of inventing a new one.
 
-F) Optional but recommended improvement
-20. If there is no current customer-facing catalog bridge and the customer page is still depending on fragile wiring, add a stable read-only reference-data path so CustomerAdmin can reliably load:
-   - function_types
-   - qualification_types
-for the current tenant.
+5. Ensure these seed values exist for the tenant:
+   Domain: customer_category
+   - standard / Standardkunde
+   - key_account / Schluesselkunde
+   - prospect / Interessent
 
-G) Testing
-21. Add/update backend tests to cover:
-   - sample HR catalog bootstrap creates rows when missing
-   - bootstrap does not duplicate existing rows
-   - seeded rows are visible to the customer rate-line option loader
-22. Add/update frontend tests to cover:
-   - Function ID dropdown shows real seeded options
-   - Qualification ID dropdown shows real seeded options
-   - empty-state message is shown only when catalogs are truly empty
-   - option labels render as code + label
-   - selected value submitted remains UUID
+   Domain: customer_ranking
+   - a / A-Kunde
+   - b / B-Kunde
+   - c / C-Kunde
 
-H) Acceptance criteria
-23. In a fresh dev/test environment, the Function ID and Qualification ID dropdowns are not empty.
-24. The options come from real HR catalog rows, not frontend mock data.
-25. No CRM shadow catalog is introduced.
-26. In environments where the catalogs are genuinely empty, the UI explains the reason and provides a next step.
-27. Existing customer rate-line create/edit flows continue to work.
+   Domain: customer_status
+   - qualified / Qualifiziert
+   - on_hold / Pausiert
+   - blocked / Gesperrt
+
+6. Seeding must be idempotent and must not create duplicates.
+
+B) Documentation
+7. Update docs/engineering/lookup-seeding.md so it correctly documents:
+   - customer_category
+   - customer_ranking
+   - customer_status
+as tenant-extensible domains needed by the Customer Overview form.
+8. Add a short note that if these dropdowns are empty, tenant lookup seeds are missing.
+
+C) Frontend UX
+9. In CustomerAdminView.vue, improve the empty-state UX for these three fields:
+   - if option list is empty, do not just show a blank dropdown with "Not set"
+   - add a small contextual help text below the field explaining that tenant CRM metadata catalogs are not seeded yet
+   - if practical, add a lightweight warning banner in the Overview form when one or more of these option lists are empty
+
+10. Do NOT hardcode fallback options in frontend.
+11. Do NOT fake dropdown values from local constants.
+
+D) Optional improvement
+12. If feasible and consistent with the repo architecture, expose a small diagnostic in the reference-data response or frontend state indicating which lookup domains are empty, so the UI can show targeted help.
+
+E) Tests
+13. Add/update backend tests to verify:
+   - tenant lookup seeding creates the required rows for customer_category, customer_ranking, customer_status
+   - seeding is idempotent
+   - get_reference_data() returns those rows for the tenant
+
+14. Add/update frontend tests to verify:
+   - populated reference data renders non-empty dropdown options
+   - empty reference data shows the new help text / warning state
+   - no frontend hardcoded fallback values are introduced
+
+Hard constraints:
+- Keep these domains tenant-extensible
+- Do not turn them into global/system domains
+- Do not hardcode CRM metadata options in frontend
+- Do not change payload field names
+- Do not break existing legal_form behavior
+- Keep the solution production-safe
+
+Acceptance criteria:
+- In a properly bootstrapped dev/test tenant, Classification, Ranking, and Customer status metadata dropdowns are populated.
+- The seed mechanism is idempotent.
+- The docs correctly explain the dependency on tenant lookup seeds.
+- When seeds are missing, the UI gives a clear explanation instead of silently showing only "Not set".
 
 Before coding:
-Provide a short plan with:
-- which files you will change
-- where bootstrap data will live
-- how you will keep it dev/test-only
+Provide a short plan listing:
+- which files you will modify
+- where tenant seeding will be integrated
+- how production safety will be preserved
 
 After coding:
 Provide:
 1. files changed
-2. bootstrap strategy summary
-3. frontend UX changes
-4. test evidence
-5. any follow-up items
+2. seed/bootstrap strategy
+3. doc updates
+4. UI empty-state improvements
+5. test evidence
+6. any follow-up items

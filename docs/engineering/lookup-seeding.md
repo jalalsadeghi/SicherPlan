@@ -18,6 +18,8 @@ Platform-managed domains:
 Tenant-extensible domains:
 
 - `customer_category`
+- `customer_ranking`
+- `customer_status`
 - `employee_group`
 - `subcontractor_category`
 - `site_category`
@@ -48,6 +50,14 @@ Run tenant-extensible seeds for one tenant:
 ```bash
 PYTHONPATH=backend python backend/scripts/seed_lookup_values.py --tenant-id <tenant_uuid>
 ```
+
+The Customer -> Overview form depends on these tenant-extensible CRM metadata domains:
+
+- `customer_category`: `standard`, `key_account`, `prospect`
+- `customer_ranking`: `a`, `b`, `c`
+- `customer_status`: `qualified`, `on_hold`, `blocked`
+
+Those rows are already created automatically when a tenant is onboarded through the core admin flow, and they are now also created when a local tenant is created through the development `bootstrap_system_admin.py` path. If the three customer Overview dropdowns for Classification, Ranking, or Customer status metadata are empty, the tenant lookup seeds are missing for that tenant.
 
 ## Governance rules
 

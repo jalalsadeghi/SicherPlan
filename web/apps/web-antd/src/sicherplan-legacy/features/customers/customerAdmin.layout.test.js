@@ -94,6 +94,21 @@ test("detail forms use the denser detail-grid span classes", () => {
   assert.match(source, /field-stack--third/);
 });
 
+test("overview metadata fields show seed-aware warnings when tenant lookup domains are empty", () => {
+  assert.match(source, /hasCustomerMetadataCatalogGap/);
+  assert.match(source, /customerAdmin\.overview\.crmMetadataWarningTitle/);
+  assert.match(source, /customerAdmin\.overview\.crmMetadataWarningBody/);
+  assert.match(source, /customerAdmin\.overview\.classificationEmptyHint/);
+  assert.match(source, /customerAdmin\.overview\.rankingEmptyHint/);
+  assert.match(source, /customerAdmin\.overview\.customerStatusEmptyHint/);
+  assert.match(source, /classificationOptions\.length === 0/);
+  assert.match(source, /rankingOptions\.length === 0/);
+  assert.match(source, /customerStatusMetadataOptions\.length === 0/);
+  assert.doesNotMatch(source, /const CUSTOMER_CLASSIFICATION_OPTIONS =/);
+  assert.doesNotMatch(source, /const CUSTOMER_RANKING_OPTIONS =/);
+  assert.doesNotMatch(source, /const CUSTOMER_STATUS_OPTIONS =/);
+});
+
 test("non-overview customer tabs reuse the structured section pattern", () => {
   assert.match(source, /customer-tab-panel-contacts[\s\S]*customer-admin-form customer-admin-form--structured[\s\S]*customerAdmin\.contacts\.registerEyebrow[\s\S]*customerAdmin\.contacts\.editorEyebrow[\s\S]*customerAdmin\.fields\.notes/);
   assert.match(source, /customer-tab-panel-addresses[\s\S]*customerAdmin\.addresses\.registerEyebrow[\s\S]*customerAdmin\.addresses\.editorEyebrow/);
