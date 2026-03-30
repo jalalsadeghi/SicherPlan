@@ -1,128 +1,120 @@
 You are working in the SicherPlan repository.
 
 Task title:
-Fix empty Customer Overview metadata dropdowns for Classification, Ranking, and Customer status metadata.
+Fix customer dropdown labels so select options show only human-readable names/labels, not code + label.
 
 Problem:
-In /admin/customers -> Overview tab, these dropdowns are empty and show only "Not set":
-- Classification
-- Ranking
-- Customer status metadata
+In the Customer Admin UI, dropdown options currently render values like:
+- "standard - Standardkunde"
+- "test-branch - Test Breanch"
+But in user-facing dropdowns they should display only:
+- "Standardkunde"
+- "Test Breanch"
 
-Root cause already identified from current code:
-- CustomerService.get_reference_data() loads these fields from tenant-scoped lookup domains:
-  - classification_lookup_id -> customer_category
-  - ranking_lookup_id -> customer_ranking
-  - customer_status_lookup_id -> customer_status
-- These three domains are tenant-extensible and require tenant-specific seed data.
-- Legal form is visible because it is seeded as a global/system domain.
-- The repository returns lookup values for tenant_id in (None, tenant_id), so global legal forms appear, but tenant-specific customer metadata domains do not appear unless seeded for the current tenant.
+Current root cause:
+In:
+- web/apps/web-antd/src/sicherplan-legacy/features/customers/customerAdmin.helpers.js
+
+the helper:
+- formatCustomerReferenceLabel(record)
+
+currently formats records as:
+- code + " - " + name
+or
+- code + " - " + label
+
+This helper is then reused by CustomerAdminView.vue for select option labels, which makes dropdowns show technical codes to end users.
+
+Important constraint:
+Do NOT change the underlying select values.
+The option value must remain the existing UUID / stored value.
+Only the visible text in dropdowns should change.
 
 Relevant files to inspect:
-- backend/app/modules/customers/service.py
-- backend/app/modules/customers/repository.py
-- backend/app/modules/core/lookup_seed.py
-- backend/scripts/seed_lookup_values.py
-- docs/engineering/lookup-seeding.md
+- web/apps/web-antd/src/sicherplan-legacy/features/customers/customerAdmin.helpers.js
 - web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
 - web/apps/web-antd/src/sicherplan-legacy/api/customers.ts
-- related i18n files
-- relevant tests
+- relevant tests in the customer frontend area
 
 Goal:
-Make Classification, Ranking, and Customer status metadata reliably available in dev/test environments, and improve the user experience when tenant lookup seeds are missing.
+Make all customer-facing dropdowns in Customer Admin show only human-readable labels/names, while keeping internal values unchanged.
 
-Scope of work:
+Implementation requirements:
 
-A) Backend / bootstrap
-1. Keep the current architecture:
-   - customer_category, customer_ranking, customer_status remain tenant-extensible lookup domains
-   - do NOT convert them into global/system domains
-   - do NOT hardcode them in frontend
+A) Refactor formatting helpers
+1. Do not keep using one shared formatter for both:
+   - user-facing select options
+   - summary/debug/internal display labels
 
-2. Improve tenant bootstrap so that in dev/test/demo flows these three domains are seeded automatically or through a clearly documented and integrated setup path.
+2. Introduce separate helpers, for example:
+   - formatCustomerReferenceOptionLabel(record)
+     -> returns only record.name or record.label
+   - formatCustomerReferenceDisplayLabel(record)
+     -> may preserve code + label if still needed elsewhere
+   Use naming consistent with repo style.
 
-3. Preferred solution:
-   - integrate tenant lookup seeding into the existing dev/bootstrap flow for a tenant
-   - do not require developers to manually discover and run a separate script for basic CRM customer onboarding
-   - keep production-safe behavior; do not silently seed arbitrary tenant data in production request paths
+3. For option label behavior:
+   - if record has "name", show only record.name
+   - else if record has "label", show only record.label
+   - fallback to record.code only if label/name is truly missing
 
-4. If there is already a tenant initialization/bootstrap path in the repo, hook into that path instead of inventing a new one.
+B) Apply to CustomerAdminView
+4. Update all customer dropdowns in CustomerAdminView.vue to use the option-only formatter.
+   This includes at least:
+   - customer filters:
+     - default branch
+     - default mandate
+   - customer overview form:
+     - legal form
+     - classification
+     - ranking
+     - customer status metadata
+     - default branch
+     - default mandate
+   - any other selects in this view currently using formatReferenceLabel(...) for option text
 
-5. Ensure these seed values exist for the tenant:
-   Domain: customer_category
-   - standard / Standardkunde
-   - key_account / Schluesselkunde
-   - prospect / Interessent
+5. Keep the select value attribute exactly as it is today.
+   Only visible text should change.
 
-   Domain: customer_ranking
-   - a / A-Kunde
-   - b / B-Kunde
-   - c / C-Kunde
+C) Preserve non-dropdown displays carefully
+6. Review where formatCustomerReferenceLabel() is used for:
+   - summary cards
+   - selected-customer summary labels
+   - read-only metadata
+7. Decide carefully:
+   - if those should also become label-only for consistency, update them
+   - if they are meant to remain code + label, switch them to a display-specific formatter
+8. Do not accidentally degrade other UI contexts.
 
-   Domain: customer_status
-   - qualified / Qualifiziert
-   - on_hold / Pausiert
-   - blocked / Gesperrt
-
-6. Seeding must be idempotent and must not create duplicates.
-
-B) Documentation
-7. Update docs/engineering/lookup-seeding.md so it correctly documents:
-   - customer_category
-   - customer_ranking
-   - customer_status
-as tenant-extensible domains needed by the Customer Overview form.
-8. Add a short note that if these dropdowns are empty, tenant lookup seeds are missing.
-
-C) Frontend UX
-9. In CustomerAdminView.vue, improve the empty-state UX for these three fields:
-   - if option list is empty, do not just show a blank dropdown with "Not set"
-   - add a small contextual help text below the field explaining that tenant CRM metadata catalogs are not seeded yet
-   - if practical, add a lightweight warning banner in the Overview form when one or more of these option lists are empty
-
-10. Do NOT hardcode fallback options in frontend.
-11. Do NOT fake dropdown values from local constants.
-
-D) Optional improvement
-12. If feasible and consistent with the repo architecture, expose a small diagnostic in the reference-data response or frontend state indicating which lookup domains are empty, so the UI can show targeted help.
+D) UX consistency
+9. Ensure dropdown placeholders like "Not set" remain unchanged.
+10. Do not show technical codes in normal user selection controls unless no label/name exists.
 
 E) Tests
-13. Add/update backend tests to verify:
-   - tenant lookup seeding creates the required rows for customer_category, customer_ranking, customer_status
-   - seeding is idempotent
-   - get_reference_data() returns those rows for the tenant
-
-14. Add/update frontend tests to verify:
-   - populated reference data renders non-empty dropdown options
-   - empty reference data shows the new help text / warning state
-   - no frontend hardcoded fallback values are introduced
-
-Hard constraints:
-- Keep these domains tenant-extensible
-- Do not turn them into global/system domains
-- Do not hardcode CRM metadata options in frontend
-- Do not change payload field names
-- Do not break existing legal_form behavior
-- Keep the solution production-safe
+11. Add or update frontend tests to verify:
+   - legal form dropdown option renders "GmbH", not "gmbh - GmbH"
+   - classification dropdown option renders "Standardkunde", not "standard - Standardkunde"
+   - branch dropdown option renders "Test Breanch", not "test-branch - Test Breanch"
+   - select option values still remain the same UUIDs / stored identifiers
+12. Avoid brittle snapshot-only coverage if more direct assertions are possible.
 
 Acceptance criteria:
-- In a properly bootstrapped dev/test tenant, Classification, Ranking, and Customer status metadata dropdowns are populated.
-- The seed mechanism is idempotent.
-- The docs correctly explain the dependency on tenant lookup seeds.
-- When seeds are missing, the UI gives a clear explanation instead of silently showing only "Not set".
+- Customer-facing dropdown options show only human-readable names/labels.
+- Technical codes are no longer visible in select option text.
+- Underlying submitted values are unchanged.
+- Any summary/read-only display remains intentional and not accidentally broken.
 
 Before coding:
 Provide a short plan listing:
-- which files you will modify
-- where tenant seeding will be integrated
-- how production safety will be preserved
+- which helper functions you will introduce or change
+- which selects in CustomerAdminView will be updated
+- whether summary/read-only labels will stay code+label or become label-only
 
 After coding:
 Provide:
 1. files changed
-2. seed/bootstrap strategy
-3. doc updates
-4. UI empty-state improvements
+2. exact root cause
+3. exact fix
+4. examples before/after
 5. test evidence
 6. any follow-up items

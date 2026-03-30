@@ -109,6 +109,15 @@ test("overview metadata fields show seed-aware warnings when tenant lookup domai
   assert.doesNotMatch(source, /const CUSTOMER_STATUS_OPTIONS =/);
 });
 
+test("customer-facing dropdowns use label-only option formatting", () => {
+  assert.match(source, /formatCustomerReferenceOptionLabel as formatCustomerReferenceOptionOnlyLabel/);
+  assert.match(source, /function formatReferenceOptionLabel/);
+  assert.match(source, /formatReferenceOptionLabel\(branch\)/);
+  assert.match(source, /formatReferenceOptionLabel\(mandate\)/);
+  assert.match(source, /formatReferenceOptionLabel\(option\)/);
+  assert.doesNotMatch(source, /function formatReferenceLabel/);
+});
+
 test("non-overview customer tabs reuse the structured section pattern", () => {
   assert.match(source, /customer-tab-panel-contacts[\s\S]*customer-admin-form customer-admin-form--structured[\s\S]*customerAdmin\.contacts\.registerEyebrow[\s\S]*customerAdmin\.contacts\.editorEyebrow[\s\S]*customerAdmin\.fields\.notes/);
   assert.match(source, /customer-tab-panel-addresses[\s\S]*customerAdmin\.addresses\.registerEyebrow[\s\S]*customerAdmin\.addresses\.editorEyebrow/);

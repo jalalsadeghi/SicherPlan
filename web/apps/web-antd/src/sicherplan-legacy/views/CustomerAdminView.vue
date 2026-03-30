@@ -93,7 +93,7 @@
             <select v-model="filters.default_branch_id">
               <option value="">{{ t("customerAdmin.summary.none") }}</option>
               <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
-                {{ formatReferenceLabel(branch) }}
+                {{ formatReferenceOptionLabel(branch) }}
               </option>
             </select>
           </label>
@@ -106,7 +106,7 @@
                 :key="mandate.id"
                 :value="mandate.id"
               >
-                {{ formatReferenceLabel(mandate) }}
+                {{ formatReferenceOptionLabel(mandate) }}
               </option>
             </select>
           </label>
@@ -293,7 +293,7 @@
                   <select v-model="customerDraft.legal_form_lookup_id">
                     <option value="">{{ t("customerAdmin.summary.none") }}</option>
                     <option v-for="option in referenceData?.legal_forms || []" :key="option.id" :value="option.id">
-                      {{ formatReferenceLabel(option) }}
+                      {{ formatReferenceOptionLabel(option) }}
                     </option>
                   </select>
                 </label>
@@ -302,7 +302,7 @@
                   <select v-model="customerDraft.classification_lookup_id" :disabled="classificationOptions.length === 0">
                     <option value="">{{ t("customerAdmin.summary.none") }}</option>
                     <option v-for="option in classificationOptions" :key="option.id" :value="option.id">
-                      {{ formatReferenceLabel(option) }}
+                      {{ formatReferenceOptionLabel(option) }}
                     </option>
                   </select>
                   <small v-if="classificationOptions.length === 0" class="customer-admin-field-help">
@@ -314,7 +314,7 @@
                   <select v-model="customerDraft.ranking_lookup_id" :disabled="rankingOptions.length === 0">
                     <option value="">{{ t("customerAdmin.summary.none") }}</option>
                     <option v-for="option in rankingOptions" :key="option.id" :value="option.id">
-                      {{ formatReferenceLabel(option) }}
+                      {{ formatReferenceOptionLabel(option) }}
                     </option>
                   </select>
                   <small v-if="rankingOptions.length === 0" class="customer-admin-field-help">
@@ -326,7 +326,7 @@
                   <select v-model="customerDraft.customer_status_lookup_id" :disabled="customerStatusMetadataOptions.length === 0">
                     <option value="">{{ t("customerAdmin.summary.none") }}</option>
                     <option v-for="option in customerStatusMetadataOptions" :key="option.id" :value="option.id">
-                      {{ formatReferenceLabel(option) }}
+                      {{ formatReferenceOptionLabel(option) }}
                     </option>
                   </select>
                   <small v-if="customerStatusMetadataOptions.length === 0" class="customer-admin-field-help">
@@ -338,7 +338,7 @@
                   <select v-model="customerDraft.default_branch_id">
                     <option value="">{{ t("customerAdmin.summary.none") }}</option>
                     <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
-                      {{ formatReferenceLabel(branch) }}
+                      {{ formatReferenceOptionLabel(branch) }}
                     </option>
                   </select>
                 </label>
@@ -347,7 +347,7 @@
                   <select v-model="customerDraft.default_mandate_id">
                     <option value="">{{ t("customerAdmin.summary.none") }}</option>
                     <option v-for="mandate in filteredCustomerMandates" :key="mandate.id" :value="mandate.id">
-                      {{ formatReferenceLabel(mandate) }}
+                      {{ formatReferenceOptionLabel(mandate) }}
                     </option>
                   </select>
                 </label>
@@ -2016,7 +2016,7 @@ import {
   buildLifecyclePayload,
   deriveCustomerActionState,
   filterCustomerMandatesByBranch,
-  formatCustomerReferenceLabel,
+  formatCustomerReferenceOptionLabel as formatCustomerReferenceOptionOnlyLabel,
   formatPrimaryContactSummary,
   hasCustomerPermission,
   mapCustomerApiMessage,
@@ -2523,10 +2523,10 @@ const sectionVisibility = computed(() =>
   }),
 );
 
-function formatReferenceLabel(
+function formatReferenceOptionLabel(
   record: { code: string; label?: string | null; name?: string | null },
 ) {
-  return formatCustomerReferenceLabel(record);
+  return formatCustomerReferenceOptionOnlyLabel(record);
 }
 
 function filterMandateOptions(branchId: null | string | undefined) {

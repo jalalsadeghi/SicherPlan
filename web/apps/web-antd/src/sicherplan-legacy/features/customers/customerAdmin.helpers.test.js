@@ -11,7 +11,8 @@ import {
   deriveCustomerActionState,
   filterCustomerMandatesByBranch,
   formatPrimaryContactSummary,
-  formatCustomerReferenceLabel,
+  formatCustomerReferenceDisplayLabel,
+  formatCustomerReferenceOptionLabel,
   hasCustomerPermission,
   mapCustomerApiMessage,
   normalizeCustomerCommercialTab,
@@ -104,9 +105,14 @@ test("api message keys are mapped to customer-admin feedback keys", () => {
   assert.equal(mapCustomerApiMessage("errors.platform.internal"), "customerAdmin.feedback.error");
 });
 
-test("customer reference labels use code plus business label", () => {
-  assert.equal(formatCustomerReferenceLabel({ code: "A", label: "A-Kunde" }), "A - A-Kunde");
-  assert.equal(formatCustomerReferenceLabel({ code: "BER", name: "Berlin" }), "BER - Berlin");
+test("customer reference option labels use human-readable names only", () => {
+  assert.equal(formatCustomerReferenceOptionLabel({ code: "A", label: "A-Kunde" }), "A-Kunde");
+  assert.equal(formatCustomerReferenceOptionLabel({ code: "BER", name: "Berlin" }), "Berlin");
+});
+
+test("customer reference display labels can still preserve code plus business label", () => {
+  assert.equal(formatCustomerReferenceDisplayLabel({ code: "A", label: "A-Kunde" }), "A - A-Kunde");
+  assert.equal(formatCustomerReferenceDisplayLabel({ code: "BER", name: "Berlin" }), "BER - Berlin");
 });
 
 test("customer payload keeps lifecycle separate from customer-status metadata", () => {

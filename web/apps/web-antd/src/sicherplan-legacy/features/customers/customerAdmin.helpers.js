@@ -97,7 +97,23 @@ export function formatPrimaryContactSummary(customer) {
   return [primaryContact.full_name, primaryContact.email].filter(Boolean).join(" · ");
 }
 
-export function formatCustomerReferenceLabel(record) {
+export function formatCustomerReferenceOptionLabel(record) {
+  if (!record) {
+    return "";
+  }
+
+  if ("name" in record && record.name) {
+    return record.name;
+  }
+
+  if ("label" in record && record.label) {
+    return record.label;
+  }
+
+  return record.code ?? "";
+}
+
+export function formatCustomerReferenceDisplayLabel(record) {
   if (!record) {
     return "";
   }
@@ -118,7 +134,7 @@ export function filterCustomerMandatesByBranch(mandates, branchId) {
 }
 
 export function buildCustomerReferenceMaps(referenceData) {
-  const buildMap = (items) => new Map((items ?? []).map((item) => [item.id, formatCustomerReferenceLabel(item)]));
+  const buildMap = (items) => new Map((items ?? []).map((item) => [item.id, formatCustomerReferenceDisplayLabel(item)]));
 
   return {
     legalForms: buildMap(referenceData?.legal_forms),
