@@ -49,10 +49,20 @@ test("planning-orders detail workspace uses local customer-style tabs", () => {
 test("planning-orders commercial tab shows customer-specific guidance and readable issue lists", () => {
   assert.match(source, /commercialSummaryKey/);
   assert.match(source, /commercialContextKey/);
+  assert.match(source, /hasCommercialBlockingIssues/);
+  assert.match(source, /hasCommercialWarningIssues/);
+  assert.match(source, /showCommercialFixHint/);
+  assert.match(source, /showCommercialReviewHint/);
+  assert.match(source, /showCommercialSettingsCta/);
   assert.match(source, /selectedOrderCustomerLabel/);
+  assert.match(source, /<p v-if="showCommercialFixHint" class="field-help">/);
+  assert.match(source, /<p v-else-if="showCommercialReviewHint" class="field-help">/);
   assert.match(source, /tpf\("commercialFixHint"/);
+  assert.match(source, /tpf\("commercialReviewHint"/);
+  assert.match(source, /<div v-if="showCommercialSettingsCta" class="cta-row">/);
   assert.match(source, /tp\("commercialActionOpenCustomerCommercial"\)/);
   assert.match(source, /resolveCommercialIssueMessage\(issue\.code\)/);
+  assert.doesNotMatch(source, /<p class="field-help">\s*\{\{\s*selectedOrderCustomerLabel\s*\?\s*tpf\("commercialFixHint"/);
   assert.doesNotMatch(source, /<li v-for="issue in selectedOrderCommercial\.blocking_issues"[^>]*>{{ issue\.code }}/);
 });
 

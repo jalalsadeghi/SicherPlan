@@ -1163,6 +1163,9 @@ export type MessageKey =
   | "customerAdmin.commercial.surchargesEyebrow"
   | "customerAdmin.commercial.surchargesTitle"
   | "customerAdmin.commercial.surchargesEmpty"
+  | "customerAdmin.commercial.surchargeAllowedWindowBounded"
+  | "customerAdmin.commercial.surchargeAllowedWindowOpenEnded"
+  | "customerAdmin.commercial.surchargeEffectiveToRequiredHint"
   | "customerAdmin.commercial.pricingTabs.surcharges"
   | "customerAdmin.commercial.provisionalCatalogHint"
   | "customerAdmin.commercial.functionTypePlaceholder"
@@ -1276,6 +1279,7 @@ export type MessageKey =
   | "customerAdmin.feedback.duplicateRateDimension"
   | "customerAdmin.feedback.surchargeTypeRequired"
   | "customerAdmin.feedback.surchargeEffectiveFromRequired"
+  | "customerAdmin.feedback.surchargeEffectiveToRequiredForRateCard"
   | "customerAdmin.feedback.invalidWeekdayMask"
   | "customerAdmin.feedback.invalidTimeRange"
   | "customerAdmin.feedback.invalidAmountCombination"
@@ -2730,6 +2734,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.commercial.surchargesEyebrow": "Zuschläge",
     "customerAdmin.commercial.surchargesTitle": "Zeit-, Wochen- und Regionszuschläge",
     "customerAdmin.commercial.surchargesEmpty": "Noch keine Zuschlagsregeln für diese Preiskarte vorhanden.",
+    "customerAdmin.commercial.surchargeAllowedWindowBounded": "Erlaubtes Fenster: {from} → {to}",
+    "customerAdmin.commercial.surchargeAllowedWindowOpenEnded": "Erlaubtes Fenster: ab {from}",
+    "customerAdmin.commercial.surchargeEffectiveToRequiredHint":
+      "Da diese Preiskarte ein Enddatum hat, ist „Gültig bis“ für Zuschläge ebenfalls erforderlich.",
     "customerAdmin.commercial.pricingTabs.surcharges": "Zuschläge",
     "customerAdmin.commercial.provisionalCatalogHint":
       "Vorläufige Vorschläge bis ein eigener Katalog-Endpunkt verfügbar ist. Freie Eingaben bleiben erlaubt.",
@@ -2878,6 +2886,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.surchargeTypeRequired": "Für einen Zuschlag ist ein Typ erforderlich.",
     "customerAdmin.feedback.surchargeEffectiveFromRequired":
       "Für einen Zuschlag ist ein Startdatum erforderlich.",
+    "customerAdmin.feedback.surchargeEffectiveToRequiredForRateCard":
+      "Für diese Preiskarte ist ein Enddatum des Zuschlags erforderlich.",
     "customerAdmin.feedback.invalidWeekdayMask":
       "Die Wochentagsmaske muss aus sieben Zeichen mit 0 oder 1 bestehen.",
     "customerAdmin.feedback.invalidTimeRange": "Das Zeitfenster des Zuschlags ist ungültig.",
@@ -4335,6 +4345,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.commercial.surchargesEyebrow": "Surcharges",
     "customerAdmin.commercial.surchargesTitle": "Time, weekday, and region surcharges",
     "customerAdmin.commercial.surchargesEmpty": "No surcharge rules exist for this rate card yet.",
+    "customerAdmin.commercial.surchargeAllowedWindowBounded": "Allowed window: {from} → {to}",
+    "customerAdmin.commercial.surchargeAllowedWindowOpenEnded": "Allowed window: from {from} onward",
+    "customerAdmin.commercial.surchargeEffectiveToRequiredHint":
+      "Because this rate card has an end date, “Effective to” is also required for surcharges.",
     "customerAdmin.commercial.pricingTabs.surcharges": "Surcharges",
     "customerAdmin.commercial.provisionalCatalogHint":
       "Provisional suggestions until a dedicated catalog endpoint exists. Free-text entry stays allowed.",
@@ -4483,6 +4497,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.surchargeTypeRequired": "A surcharge needs a type.",
     "customerAdmin.feedback.surchargeEffectiveFromRequired":
       "A surcharge rule requires an effective-from date.",
+    "customerAdmin.feedback.surchargeEffectiveToRequiredForRateCard":
+      "This rate card requires an effective-to date on the surcharge rule.",
     "customerAdmin.feedback.invalidWeekdayMask":
       "The weekday mask must contain seven characters made of 0 or 1.",
     "customerAdmin.feedback.invalidTimeRange": "The surcharge time range is invalid.",

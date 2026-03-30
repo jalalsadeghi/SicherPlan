@@ -51,6 +51,26 @@ test("pricing-rule editors use guided select, datalist, numeric, and time contro
   assert.match(source, /customerAdmin\.commercial\.qualificationTypeCatalogHint/);
   assert.match(source, /<select[\s\S]*v-model="surchargeRuleDraft\.surcharge_type"/);
   assert.match(source, /customer-admin-weekday-picker/);
+  assert.match(source, /validateSurchargeRuleAgainstRateCardWindow/);
+  assert.match(source, /surchargeRuleDraft\.effective_from[\s\S]*:min="selectedRateCard\.effective_from"[\s\S]*:max="selectedRateCard\.effective_to \|\| undefined"/);
+  assert.match(source, /surchargeRuleDraft\.effective_to[\s\S]*:min="surchargeEffectiveToInputMin \|\| undefined"[\s\S]*:max="selectedRateCard\.effective_to \|\| undefined"/);
+  assert.match(source, /surchargeAllowedWindowHelper/);
+  assert.match(source, /customer-admin-surcharge-date-block/);
+  assert.match(source, /customer-admin-surcharge-date-grid/);
+  assert.match(source, /customer-admin-surcharge-date-help/);
+  assert.match(source, /\.customer-admin-form-grid--detail > \.customer-admin-surcharge-date-block \{/);
+  assert.match(source, /\.customer-admin-surcharge-date-grid \{/);
+  assert.match(source, /\.customer-admin-surcharge-date-help \{/);
+  assert.match(source, /customerAdmin\.commercial\.surchargeAllowedWindowBounded/);
+  assert.match(source, /customerAdmin\.commercial\.surchargeAllowedWindowOpenEnded/);
+  assert.match(source, /customerAdmin\.commercial\.surchargeEffectiveToRequiredHint/);
+  assert.match(source, /customerAdmin\.feedback\.surchargeEffectiveToRequiredForRateCard/);
+  assert.match(source, /surchargeRuleDraft\.effective_from = selectedRateCard\.value\?\.effective_from \?\? ""/);
+  assert.match(source, /surchargeRuleDraft\.effective_to = selectedRateCard\.value\?\.effective_to \?\? ""/);
+  assert.doesNotMatch(
+    source,
+    /<div class="field-stack field-stack--wide">\s*<small class="customer-admin-field-help">\s*\{\{\s*surchargeAllowedWindowHelper\s*\}\}/,
+  );
   assert.match(source, /v-model="surchargeTimeFromInput"[\s\S]*type="time"/);
   assert.match(source, /v-model="surchargeTimeToInput"[\s\S]*type="time"/);
   assert.match(source, /setSurchargeAmountMode\('percent'\)/);

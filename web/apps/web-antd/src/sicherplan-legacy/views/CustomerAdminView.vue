@@ -1318,14 +1318,50 @@
                         </option>
                       </select>
                     </label>
-                    <label class="field-stack field-stack--half">
-                      <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
-                      <input v-model="surchargeRuleDraft.effective_from" type="date" :disabled="!commercialActionState.canManageSurchargeRules" />
-                    </label>
-                    <label class="field-stack field-stack--half">
-                      <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
-                      <input v-model="surchargeRuleDraft.effective_to" type="date" :disabled="!commercialActionState.canManageSurchargeRules" />
-                    </label>
+                    <div class="customer-admin-surcharge-date-block">
+                      <div class="customer-admin-surcharge-date-grid">
+                        <label class="field-stack">
+                          <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
+                          <input
+                            v-model="surchargeRuleDraft.effective_from"
+                            type="date"
+                            :min="selectedRateCard.effective_from"
+                            :max="selectedRateCard.effective_to || undefined"
+                            :disabled="!commercialActionState.canManageSurchargeRules"
+                          />
+                        </label>
+                        <label class="field-stack">
+                          <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
+                          <input
+                            v-model="surchargeRuleDraft.effective_to"
+                            type="date"
+                            :min="surchargeEffectiveToInputMin || undefined"
+                            :max="selectedRateCard.effective_to || undefined"
+                            :disabled="!commercialActionState.canManageSurchargeRules"
+                          />
+                        </label>
+                      </div>
+                      <div class="customer-admin-surcharge-date-help">
+                        <small class="customer-admin-field-help">
+                          {{ surchargeAllowedWindowHelper }}
+                        </small>
+                        <small
+                          v-if="surchargeMissingEffectiveToForRateCard"
+                          class="customer-admin-field-help customer-admin-field-help--error"
+                        >
+                          {{ t("customerAdmin.feedback.surchargeEffectiveToRequiredForRateCard") }}
+                        </small>
+                        <small v-else-if="surchargeEffectiveToRequired" class="customer-admin-field-help">
+                          {{ t("customerAdmin.commercial.surchargeEffectiveToRequiredHint") }}
+                        </small>
+                        <small
+                          v-if="surchargeRateCardWindowValidationKey === 'customerAdmin.feedback.surchargeOutsideRateCardWindow'"
+                          class="customer-admin-field-help customer-admin-field-help--error"
+                        >
+                          {{ t("customerAdmin.feedback.surchargeOutsideRateCardWindow") }}
+                        </small>
+                      </div>
+                    </div>
                     <div class="field-stack field-stack--wide">
                       <span>{{ t("customerAdmin.fields.weekdays") }}</span>
                       <div class="customer-admin-weekday-picker">
@@ -2004,6 +2040,7 @@ import {
   resolveSurchargeAmountMode,
   SURCHARGE_TYPE_OPTIONS,
   timeInputToMinutes,
+  validateSurchargeRuleAgainstRateCardWindow,
   validateBillingProfileDraft,
   validateRateCardDraft,
   validateRateLineDraft,
@@ -2517,6 +2554,38 @@ const hasInvalidSurchargeTimeRange = computed(() => {
   const to = timeInputToMinutes(surchargeTimeToInput.value);
   return from !== null && to !== null && to <= from;
 });
+const surchargeRateCardWindowValidationKey = computed(() =>
+  selectedRateCard.value
+    ? validateSurchargeRuleAgainstRateCardWindow(selectedRateCard.value, surchargeRuleDraft)
+    : null,
+);
+const surchargeAllowedWindowHelper = computed(() => {
+  const rateCard = selectedRateCard.value;
+  if (!rateCard?.effective_from) {
+    return "";
+  }
+  if (rateCard.effective_to) {
+    return t("customerAdmin.commercial.surchargeAllowedWindowBounded" as never, {
+      from: rateCard.effective_from,
+      to: rateCard.effective_to,
+    });
+  }
+  return t("customerAdmin.commercial.surchargeAllowedWindowOpenEnded" as never, {
+    from: rateCard.effective_from,
+  });
+});
+const surchargeEffectiveToInputMin = computed(() => {
+  const rateCardStart = `${selectedRateCard.value?.effective_from ?? ""}`.trim();
+  const draftStart = `${surchargeRuleDraft.effective_from ?? ""}`.trim();
+  if (rateCardStart && draftStart) {
+    return draftStart > rateCardStart ? draftStart : rateCardStart;
+  }
+  return draftStart || rateCardStart || "";
+});
+const surchargeEffectiveToRequired = computed(() => !!`${selectedRateCard.value?.effective_to ?? ""}`.trim());
+const surchargeMissingEffectiveToForRateCard = computed(() =>
+  surchargeEffectiveToRequired.value && !`${surchargeRuleDraft.effective_to ?? ""}`.trim(),
+);
 const sectionVisibility = computed(() =>
   resolveCustomerAdminSectionVisibility({
     effectiveRole: authStore.effectiveRole,
@@ -2880,8 +2949,8 @@ function resetSurchargeRuleDraft() {
   surchargeRuleDraft.tenant_id = tenantScopeId.value;
   surchargeRuleDraft.rate_card_id = selectedRateCardId.value;
   surchargeRuleDraft.surcharge_type = "";
-  surchargeRuleDraft.effective_from = "";
-  surchargeRuleDraft.effective_to = "";
+  surchargeRuleDraft.effective_from = selectedRateCard.value?.effective_from ?? "";
+  surchargeRuleDraft.effective_to = selectedRateCard.value?.effective_to ?? "";
   surchargeRuleDraft.weekday_mask = "";
   surchargeRuleDraft.time_from_minute = null;
   surchargeRuleDraft.time_to_minute = null;
@@ -3812,6 +3881,14 @@ async function submitSurchargeRule() {
   const validationKey = validateSurchargeRuleDraft(surchargeRuleDraft);
   if (validationKey) {
     setFeedback("error", t("customerAdmin.feedback.validation"), t(validationKey as never));
+    return;
+  }
+  const rateCardWindowValidationKey = validateSurchargeRuleAgainstRateCardWindow(
+    selectedRateCard.value,
+    surchargeRuleDraft,
+  );
+  if (rateCardWindowValidationKey) {
+    setFeedback("error", t("customerAdmin.feedback.validation"), t(rateCardWindowValidationKey as never));
     return;
   }
   const confirmationKey = buildCommercialConfirmationKey("surchargeRule", !!editingSurchargeRuleId.value);
@@ -5053,6 +5130,10 @@ onMounted(() => {
   grid-column: span 2;
 }
 
+.customer-admin-form-grid--detail > .customer-admin-surcharge-date-block {
+  grid-column: span 4;
+}
+
 .customer-admin-billing-row-field {
   align-self: start;
 }
@@ -5116,6 +5197,25 @@ onMounted(() => {
   grid-column: 1 / -1;
 }
 
+.customer-admin-surcharge-date-block {
+  display: grid;
+  gap: 0.42rem;
+  align-self: start;
+  min-width: 0;
+}
+
+.customer-admin-surcharge-date-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.customer-admin-surcharge-date-help {
+  display: grid;
+  gap: 0.18rem;
+}
+
 .customer-admin-weekday-picker,
 .customer-admin-segmented-control {
   display: flex;
@@ -5145,8 +5245,13 @@ onMounted(() => {
   .customer-admin-form-grid--detail > .field-stack,
   .customer-admin-form-grid--detail > .field-stack--half,
   .customer-admin-form-grid--detail > .field-stack--third,
-  .customer-admin-form-grid--detail > .field-stack--wide {
+  .customer-admin-form-grid--detail > .field-stack--wide,
+  .customer-admin-form-grid--detail > .customer-admin-surcharge-date-block {
     grid-column: 1 / -1;
+  }
+
+  .customer-admin-surcharge-date-grid {
+    grid-template-columns: 1fr;
   }
 
 }

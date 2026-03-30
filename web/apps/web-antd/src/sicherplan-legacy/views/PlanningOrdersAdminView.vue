@@ -263,27 +263,30 @@
             <div class="planning-orders-commercial-summary">
               <p
                 class="planning-orders-commercial-summary__headline"
-                :class="selectedOrderCommercial?.is_release_ready ? 'planning-orders-state--good' : orderCommercialBlockingIssues.length ? 'planning-orders-state--bad' : 'planning-orders-state--warn'"
+                :class="selectedOrderCommercial?.is_release_ready ? 'planning-orders-state--good' : hasCommercialBlockingIssues ? 'planning-orders-state--bad' : 'planning-orders-state--warn'"
               >
                 {{ tp(commercialSummaryKey) }}
               </p>
               <p class="field-help">
                 {{ tpf(commercialContextKey, { customerLabel: commercialCustomerLabel }) }}
               </p>
-              <p class="field-help">
+              <p v-if="showCommercialFixHint" class="field-help">
                 {{
                   selectedOrderCustomerLabel
                     ? tpf("commercialFixHint", { customerLabel: selectedOrderCustomerLabel })
                     : tp("commercialFixHintFallback")
                 }}
               </p>
-              <div class="cta-row">
+              <p v-else-if="showCommercialReviewHint" class="field-help">
+                {{ tpf("commercialReviewHint", { customerLabel: commercialCustomerLabel }) }}
+              </p>
+              <div v-if="showCommercialSettingsCta" class="cta-row">
                 <button class="cta-button cta-secondary" type="button" @click="openCustomerCommercialSettings">
                   {{ tp("commercialActionOpenCustomerCommercial") }}
                 </button>
               </div>
             </div>
-            <div v-if="orderCommercialBlockingIssues.length" class="planning-orders-commercial-block">
+            <div v-if="hasCommercialBlockingIssues" class="planning-orders-commercial-block">
               <strong>{{ tp("commercialBlockingListTitle") }}</strong>
               <ul class="planning-orders-issues planning-orders-issues--blocking">
                 <li v-for="issue in orderCommercialBlockingIssues" :key="issue.code">
@@ -291,7 +294,7 @@
                 </li>
               </ul>
             </div>
-            <div v-if="orderCommercialWarningIssues.length" class="planning-orders-commercial-block">
+            <div v-if="hasCommercialWarningIssues" class="planning-orders-commercial-block">
               <strong class="planning-orders-state--warn">{{ tp("commercialWarningsListTitle") }}</strong>
               <ul class="planning-orders-issues planning-orders-issues--warning">
                 <li v-for="issue in orderCommercialWarningIssues" :key="issue.code">
@@ -819,14 +822,23 @@ const orderCommercialBlockingIssues = computed(
 const orderCommercialWarningIssues = computed(
   () => selectedOrderCommercial.value?.warning_issues ?? [],
 );
+const hasCommercialBlockingIssues = computed(() => orderCommercialBlockingIssues.value.length > 0);
+const hasCommercialWarningIssues = computed(() => orderCommercialWarningIssues.value.length > 0);
+const showCommercialFixHint = computed(() => hasCommercialBlockingIssues.value);
+const showCommercialReviewHint = computed(() =>
+  !hasCommercialBlockingIssues.value && hasCommercialWarningIssues.value,
+);
+const showCommercialSettingsCta = computed(() =>
+  hasCommercialBlockingIssues.value || hasCommercialWarningIssues.value,
+);
 const commercialSummaryKey = computed(() => {
   if (selectedOrderCommercial.value?.is_release_ready) {
     return "commercialSummaryReady";
   }
-  if (orderCommercialBlockingIssues.value.length) {
+  if (hasCommercialBlockingIssues.value) {
     return "commercialSummaryBlocked";
   }
-  if (orderCommercialWarningIssues.value.length) {
+  if (hasCommercialWarningIssues.value) {
     return "commercialSummaryWarnings";
   }
   return "commercialSummaryBlocked";
@@ -835,7 +847,7 @@ const commercialContextKey = computed(() => {
   if (selectedOrderCommercial.value?.is_release_ready) {
     return "commercialContextReady";
   }
-  if (orderCommercialBlockingIssues.value.length) {
+  if (hasCommercialBlockingIssues.value) {
     return "commercialContextBlocked";
   }
   return "commercialContextWarnings";

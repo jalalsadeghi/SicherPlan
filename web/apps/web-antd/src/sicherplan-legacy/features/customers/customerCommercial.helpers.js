@@ -267,6 +267,32 @@ export function validateSurchargeRuleDraft(draft) {
   return null;
 }
 
+export function validateSurchargeRuleAgainstRateCardWindow(rateCard, draft) {
+  const rateCardStart = `${rateCard?.effective_from ?? ""}`.trim();
+  const rateCardEnd = `${rateCard?.effective_to ?? ""}`.trim();
+  const effectiveFrom = `${draft?.effective_from ?? ""}`.trim();
+  const effectiveTo = `${draft?.effective_to ?? ""}`.trim();
+
+  if (!rateCardStart || !effectiveFrom) {
+    return null;
+  }
+  if (effectiveFrom < rateCardStart) {
+    return "customerAdmin.feedback.surchargeOutsideRateCardWindow";
+  }
+  if (effectiveTo && effectiveTo < effectiveFrom) {
+    return "customerAdmin.feedback.invalidEffectiveWindow";
+  }
+  if (rateCardEnd) {
+    if (!effectiveTo) {
+      return "customerAdmin.feedback.surchargeEffectiveToRequiredForRateCard";
+    }
+    if (effectiveTo > rateCardEnd) {
+      return "customerAdmin.feedback.surchargeOutsideRateCardWindow";
+    }
+  }
+  return null;
+}
+
 export function buildCommercialConfirmationKey(kind, active) {
   if (!active) {
     return null;

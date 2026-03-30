@@ -22,6 +22,7 @@ import {
   resolveSurchargeAmountMode,
   SURCHARGE_TYPE_OPTIONS,
   timeInputToMinutes,
+  validateSurchargeRuleAgainstRateCardWindow,
   validateBillingProfileDraft,
   validateRateCardDraft,
   validateRateLineDraft,
@@ -235,6 +236,51 @@ test("surcharge validation enforces mask, ranges, and amount rules", () => {
       currency_code: "",
     }),
     "customerAdmin.feedback.invalidTimeRange",
+  );
+});
+
+test("surcharge validation mirrors rate-card date window rules", () => {
+  const boundedRateCard = {
+    effective_from: "2026-01-01",
+    effective_to: "2026-12-31",
+  };
+  assert.equal(
+    validateSurchargeRuleAgainstRateCardWindow(boundedRateCard, {
+      effective_from: "2025-12-31",
+      effective_to: "2026-12-31",
+    }),
+    "customerAdmin.feedback.surchargeOutsideRateCardWindow",
+  );
+  assert.equal(
+    validateSurchargeRuleAgainstRateCardWindow(boundedRateCard, {
+      effective_from: "2026-01-01",
+      effective_to: "",
+    }),
+    "customerAdmin.feedback.surchargeEffectiveToRequiredForRateCard",
+  );
+  assert.equal(
+    validateSurchargeRuleAgainstRateCardWindow(boundedRateCard, {
+      effective_from: "2026-01-01",
+      effective_to: "2027-01-01",
+    }),
+    "customerAdmin.feedback.surchargeOutsideRateCardWindow",
+  );
+  assert.equal(
+    validateSurchargeRuleAgainstRateCardWindow(boundedRateCard, {
+      effective_from: "2026-03-01",
+      effective_to: "2026-02-01",
+    }),
+    "customerAdmin.feedback.invalidEffectiveWindow",
+  );
+  assert.equal(
+    validateSurchargeRuleAgainstRateCardWindow(
+      { effective_from: "2026-01-01", effective_to: "" },
+      {
+        effective_from: "2026-03-01",
+        effective_to: "",
+      },
+    ),
+    null,
   );
 });
 
