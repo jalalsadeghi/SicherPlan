@@ -1,159 +1,93 @@
 You are working in the SicherPlan repository.
 
 Task title:
-Refactor /admin/planning-shifts UI so it matches the visual quality and interaction structure of /admin/customers, while removing duplicate wrapper boxes.
+Remove the visible Tenant scope / Bearer token control box from the planning-shifts page UI
 
 Goal:
-Fix the planning-shifts page layout and styling in the latest repo version so that:
-1. the top "Module control" intro remains visible,
-2. the extra "Workspace" box is removed,
-3. the inner duplicate "Shift planning" hero box is removed,
-4. the forms and panels get proper styling and spacing,
-5. the page uses the Customer Admin page as the visual and structural reference pattern,
-6. the result feels like a real embedded admin workspace, not an unstyled raw form dump.
+In `/admin/planning-shifts`, remove the whole visible control box that currently contains:
+- Tenant scope
+- Bearer token
+- helper text about real shift-planning endpoints
+- Remember scope and token
+- Refresh
 
-Repository context:
-Relevant files:
-- web/apps/web-antd/src/views/sicherplan/admin-module-view.vue
-- web/apps/web-antd/src/views/sicherplan/module-registry.ts
-- web/apps/web-antd/src/sicherplan-legacy/views/PlanningShiftsAdminView.vue
-- web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
+This box should no longer be shown to the user in the page UI.
 
-Observed issues:
-1. The "Workspace" box is rendered by the shell wrapper, not by the planning-shifts page itself.
-   This comes from admin-module-view.vue + module-registry.ts behavior.
-2. PlanningShiftsAdminView.vue renders its own hero/intro box ("Shift planning") even when embedded.
-   This duplicates the shell-level module intro ("Module control").
-3. PlanningShiftsAdminView.vue currently has only minimal scoped CSS, so:
-   - form controls look unstyled
-   - cards feel cramped
-   - field layout is weak
-   - action rows and lists do not visually match the rest of the admin UI
-4. /admin/customers has a much better internal structure and visual rhythm, and should be used as the design reference only.
-   Do NOT copy customer business logic, but DO reuse its layout language, spacing, field styling, and tab/workspace patterns.
+Reason:
+- It is not needed for the end user
+- It is confusing
+- It adds unnecessary visual clutter
+- The page should behave like a normal admin workspace, not like a developer/debug screen
 
-What to change
+Important constraints:
+1. Remove this box from the visible page layout only.
+2. Do NOT break the existing page logic.
+3. Do NOT remove backend/API functionality.
+4. Do NOT change route structure.
+5. Do NOT remove the top shell-level "Module control" intro.
+6. Do NOT reintroduce any duplicate inner header/card.
+7. Keep the rest of the planning-shifts page intact.
 
-A) Remove the extra "Workspace" box for planning-shifts only
-1. In module-registry.ts, configure the planning-shifts module so that the shell-level workspace section header does NOT render.
-2. Keep the top shell intro ("Module control") intact.
-3. Do not globally disable workspace headers for other modules unless needed.
+Preferred behavior:
+- The page should silently use the existing auth/session/store state.
+- If scope/token are already available from the auth store, the page should continue working normally.
+- If missing scope/token creates a real runtime problem, handle it with the existing empty/error state logic instead of showing the old manual control box.
 
-Expected result:
-- "Module control" stays
-- "Workspace" box disappears for /admin/planning-shifts
+Implementation guidance:
+A. In:
+- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningShiftsAdminView.vue`
 
-B) Remove the duplicate inner "Shift planning" hero box
-4. In PlanningShiftsAdminView.vue, add explicit embedded-mode support, similar in spirit to CustomerAdminView.
-5. Accept an `embedded?: boolean` prop.
-6. When embedded === true:
-   - do NOT render the internal `planning-shifts-hero` box
-   - relocate any essential controls from that box (tenant scope, bearer token, refresh actions) into the main workspace in a compact structured section
-7. When embedded === false:
-   - it is acceptable to keep a standalone intro if still useful
+remove the visible workspace section/card that renders the controls for:
+- `tenantScopeInput`
+- `accessTokenInput`
+- rememberScopeAndToken()
+- refreshAll()
 
-Expected result:
-- no duplicate "Shift planning" hero when the page is shown inside the shell module wrapper
-- scope/token controls remain accessible
+B. Keep internal logic only if still needed:
+- `tenantScopeId`
+- `accessToken`
+- `canRead`
+- existing feedback/error states
+- any store-based session usage
 
-C) Rebuild the planning-shifts page layout using Customer Admin as the UI reference
-8. Use CustomerAdminView.vue only as a visual/layout reference.
-9. Rework PlanningShiftsAdminView.vue to use the same design language:
-   - structured card sections
-   - clear headers
-   - consistent action rows
-   - proper field-stack spacing
-   - proper form-grid layout
-   - consistent textarea/input/select styling
-   - responsive grid behavior
-   - clean empty states
-10. Prefer the same or very similar CSS patterns used in CustomerAdminView.vue for:
-   - `.field-stack`
-   - `.field-stack--wide`
-   - `.cta-row`
-   - section/panel headers
-   - list/register cards
-   - form section containers
-   - feedback box
-   - responsive behavior
+C. Refactor so the page derives scope/token from the auth/session store automatically.
+Use the existing auth store values as the source of truth instead of exposing manual inputs.
 
-D) Improve information architecture
-11. The current page dumps 5 different sections at once:
-   - Shift templates
-   - Shift plans
-   - Series and exceptions
-   - Concrete shifts
-   - Board preview
-   This is too dense.
-12. Reorganize the workspace into clearer tabs or section navigation inspired by Customer Admin.
-13. Recommended tab structure:
-   - Templates
-   - Shift plans
-   - Series
-   - Shifts
-   - Board
-14. Only the active tab panel should be visible at one time.
-15. Inside each tab, keep a clear “register + editor” rhythm similar to Customer Admin:
-   - list/register area for existing records
-   - editor/form area for create/update
-16. For the Series tab, exceptions can remain in the same tab but visually separated as a sub-section.
+D. If the component still needs initialization from remembered values:
+- do that internally
+- do not show any visible form for it
 
-E) Preserve business behavior
-17. Do NOT change backend endpoints.
-18. Do NOT change payload shapes.
-19. Do NOT remove existing actions:
-   - create template
-   - create shift plan
-   - create series
-   - generate series
-   - create exception
-   - create shift
-   - copy one day / copy one week
-   - refresh board
-20. This task is about UI structure, styling, and embedded rendering only.
+E. If `rememberScopeAndToken()` becomes unused after this change:
+- remove it
+- remove related reactive inputs
+- remove dead code cleanly
 
-F) Styling requirements
-21. Inputs, selects, textareas, checkboxes, and action buttons must visually match the rest of the admin system.
-22. The page must not look like unstyled browser defaults.
-23. Cards must have consistent spacing and border treatment.
-24. The page must remain responsive on smaller screens.
-25. Avoid introducing a radically different design system.
-26. Reuse existing class patterns where practical rather than inventing totally unrelated ones.
+F. If `refreshAll()` should still remain available:
+- keep it callable internally
+- or expose refresh only in a more normal page action pattern if already used elsewhere
+- but do NOT keep the removed control box just to host Refresh
 
-G) Empty states and disabled states
-27. Keep disabled buttons functionally correct, but make them visually consistent with the rest of the admin UI.
-28. Keep “No records yet.” states, but style them consistently with Customer Admin empty states.
+G. Ensure there is no empty gap left behind after removing the box.
 
-H) Optional refactor if helpful
-29. If large chunks of CustomerAdminView styling are useful across multiple admin pages, you may extract common admin-workspace styling into a shared CSS/module/composable ONLY if this stays scoped, clean, and low-risk.
-30. Do not perform a huge cross-project refactor. Prefer the smallest clean change that fixes planning-shifts properly.
+Acceptance criteria:
+1. The planning-shifts page no longer shows a box/card containing Tenant scope and Bearer token.
+2. The page looks cleaner and less confusing.
+3. Existing page behavior is preserved as much as possible.
+4. No backend/API changes are made.
+5. No dead code for the removed visible controls remains.
+6. The top shell-level page intro stays visible.
 
-Acceptance criteria
-1. /admin/planning-shifts still shows the shell-level "Module control" intro.
-2. The extra shell-level "Workspace" box is gone for this module.
-3. The inner duplicate "Shift planning" hero box is gone in embedded mode.
-4. Forms and cards are styled properly and no longer look raw/unstyled.
-5. The page structure is clearer and closer to /admin/customers in quality and rhythm.
-6. Tabs or equivalent section switching ensure the screen is not overloaded.
-7. No backend behavior is changed.
-8. No route paths are changed.
-9. The page works in embedded mode inside the admin shell.
-
-Files expected to change
-- web/apps/web-antd/src/views/sicherplan/module-registry.ts
-- web/apps/web-antd/src/sicherplan-legacy/views/PlanningShiftsAdminView.vue
-- optionally a small shared style/helper file ONLY if truly justified
+Files expected to change:
+- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningShiftsAdminView.vue`
 
 Before coding:
 Briefly explain:
-- why the Workspace box appears
-- why the inner Shift planning box is duplicated
-- which CustomerAdminView patterns you will mirror
+- which visible box you are removing
+- whether you will keep any hidden/internal auth state handling
 
 After coding:
 Provide:
 1. files changed
-2. layout changes summary
-3. styling changes summary
-4. confirmation that Module control stayed and Workspace/inner Shift planning box were removed appropriately
-5. confirmation that backend/API behavior was not changed
+2. what UI block was removed
+3. whether any internal auth/scope logic was retained
+4. confirmation that no backend/API behavior was changed

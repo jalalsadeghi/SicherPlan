@@ -6,21 +6,6 @@
         <h2>{{ tp("title") }}</h2>
         <p class="planning-shifts-lead">{{ tp("lead") }}</p>
       </div>
-      <div class="module-card planning-shifts-scope">
-        <label class="field-stack">
-          <span>{{ tp("scopeLabel") }}</span>
-          <input v-model="tenantScopeInput" :placeholder="tp('scopePlaceholder')" />
-        </label>
-        <label class="field-stack">
-          <span>{{ tp("tokenLabel") }}</span>
-          <input v-model="accessTokenInput" type="password" :placeholder="tp('tokenPlaceholder')" />
-        </label>
-        <p class="field-help">{{ tp("tokenHelp") }}</p>
-        <div class="cta-row">
-          <button class="cta-button" type="button" @click="rememberScopeAndToken">{{ tp("actionsRemember") }}</button>
-          <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshAll">{{ tp("actionsRefresh") }}</button>
-        </div>
-      </div>
     </section>
 
     <section v-if="feedback.message" class="planning-orders-feedback" :data-tone="feedback.tone">
@@ -42,31 +27,6 @@
     </section>
 
     <div v-else class="planning-shifts-workspace" data-testid="planning-shifts-workspace">
-      <section v-if="props.embedded" class="module-card planning-shifts-controls">
-        <div class="planning-shifts-panel__header">
-          <div>
-            <p class="eyebrow">{{ tp("eyebrow") }}</p>
-            <h3>{{ tp("title") }}</h3>
-          </div>
-          <StatusBadge :status="canRead ? 'active' : 'inactive'" />
-        </div>
-        <div class="planning-shifts-form-grid planning-shifts-form-grid--controls">
-          <label class="field-stack">
-            <span>{{ tp("scopeLabel") }}</span>
-            <input v-model="tenantScopeInput" :placeholder="tp('scopePlaceholder')" />
-          </label>
-          <label class="field-stack">
-            <span>{{ tp("tokenLabel") }}</span>
-            <input v-model="accessTokenInput" type="password" :placeholder="tp('tokenPlaceholder')" />
-          </label>
-        </div>
-        <p class="field-help">{{ tp("tokenHelp") }}</p>
-        <div class="cta-row">
-          <button class="cta-button" type="button" @click="rememberScopeAndToken">{{ tp("actionsRemember") }}</button>
-          <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshAll">{{ tp("actionsRefresh") }}</button>
-        </div>
-      </section>
-
       <nav class="planning-shifts-tabs" data-testid="planning-shifts-tabs">
         <button
           v-for="tab in workspaceTabs"
@@ -141,7 +101,15 @@
           <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreatePlan" @click="startCreatePlan">{{ tp("actionsCreatePlan") }}</button>
         </div>
         <div class="planning-orders-form-grid">
-          <label class="field-stack"><span>{{ tp("filtersPlanningRecord") }}</span><input v-model="planFilters.planning_record_id" /></label>
+          <label class="field-stack">
+            <span>{{ tp("filtersPlanningRecord") }}</span>
+            <select v-model="planFilters.planning_record_id">
+              <option value="">{{ tp("planningRecordPlaceholder") }}</option>
+              <option v-for="record in planningRecordOptions" :key="record.id" :value="record.id">
+                {{ record.label }}
+              </option>
+            </select>
+          </label>
         </div>
         <div class="cta-row">
           <button class="cta-button cta-secondary" type="button" @click="refreshPlans">{{ tp("actionsRefresh") }}</button>
@@ -164,7 +132,15 @@
         <p v-if="!shiftPlans.length" class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
         <form class="planning-orders-form" @submit.prevent="submitShiftPlan">
           <div class="planning-orders-form-grid">
-            <label class="field-stack"><span>{{ tp("fieldsPlanningRecordId") }}</span><input v-model="shiftPlanDraft.planning_record_id" required /></label>
+            <label class="field-stack">
+              <span>{{ tp("fieldsPlanningRecordId") }}</span>
+              <select v-model="shiftPlanDraft.planning_record_id" required>
+                <option value="" disabled>{{ tp("planningRecordPlaceholder") }}</option>
+                <option v-for="record in planningRecordOptions" :key="record.id" :value="record.id">
+                  {{ record.label }}
+                </option>
+              </select>
+            </label>
             <label class="field-stack"><span>{{ tp("fieldsName") }}</span><input v-model="shiftPlanDraft.name" required /></label>
             <label class="field-stack">
               <span>{{ tp("fieldsWorkforceScope") }}</span>
@@ -215,6 +191,15 @@
         <p v-if="!seriesRows.length" class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
         <form class="planning-orders-form" @submit.prevent="submitSeries">
           <div class="planning-orders-form-grid">
+            <label class="field-stack">
+              <span>{{ tp("fieldsShiftTemplateId") }}</span>
+              <select v-model="seriesDraft.shift_template_id" required>
+                <option value="" disabled>{{ tp("shiftTemplatePlaceholder") }}</option>
+                <option v-for="template in shiftTemplateOptions" :key="template.id" :value="template.id">
+                  {{ template.label }}
+                </option>
+              </select>
+            </label>
             <label class="field-stack"><span>{{ tp("fieldsLabel") }}</span><input v-model="seriesDraft.label" required /></label>
             <label class="field-stack">
               <span>{{ tp("fieldsRecurrence") }}</span>
@@ -224,8 +209,25 @@
               </select>
             </label>
             <label class="field-stack"><span>{{ tp("fieldsInterval") }}</span><input v-model.number="seriesDraft.interval_count" type="number" min="1" /></label>
-            <label class="field-stack"><span>{{ tp("fieldsWeekdayMask") }}</span><input v-model="seriesDraft.weekday_mask" /></label>
-            <label class="field-stack"><span>{{ tp("fieldsTimezone") }}</span><input v-model="seriesDraft.timezone" required /></label>
+            <div v-if="seriesUsesWeeklyRecurrence" class="field-stack field-stack--wide">
+              <span>{{ tp("fieldsWeekdayMask") }}</span>
+              <div class="planning-shifts-weekday-picker" data-testid="planning-shifts-weekday-picker">
+                <button
+                  v-for="day in weekdayOptions"
+                  :key="day.index"
+                  type="button"
+                  class="planning-shifts-weekday-chip"
+                  :class="{ active: isWeekdaySelected(day.index) }"
+                  @click="toggleWeekday(day.index)"
+                >
+                  {{ day.label }}
+                </button>
+              </div>
+            </div>
+            <label class="field-stack">
+              <span>{{ tp("fieldsTimezone") }}</span>
+              <input v-model="seriesDraft.timezone" list="planning-shifts-timezones" required />
+            </label>
             <label class="field-stack"><span>{{ tp("fieldsPlanningFrom") }}</span><input v-model="seriesDraft.date_from" type="date" required /></label>
             <label class="field-stack"><span>{{ tp("fieldsPlanningTo") }}</span><input v-model="seriesDraft.date_to" type="date" required /></label>
             <label class="field-stack"><span>{{ tp("fieldsReleaseState") }}</span>
@@ -239,6 +241,7 @@
             <label class="field-stack"><span>{{ tp("fieldsMeetingPoint") }}</span><input v-model="seriesDraft.meeting_point" /></label>
             <label class="field-stack"><span>{{ tp("fieldsLocationText") }}</span><input v-model="seriesDraft.location_text" /></label>
             <label class="field-stack"><span>{{ tp("fieldsBreakMinutes") }}</span><input v-model.number="seriesDraft.default_break_minutes" type="number" min="0" /></label>
+            <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="seriesDraft.notes" rows="2" /></label>
             <label class="planning-orders-checkbox"><input v-model="seriesDraft.customer_visible_flag" type="checkbox" /><span>{{ tp("fieldsVisibilityCustomer") }}</span></label>
             <label class="planning-orders-checkbox"><input v-model="seriesDraft.subcontractor_visible_flag" type="checkbox" /><span>{{ tp("fieldsVisibilitySubcontractor") }}</span></label>
             <label class="planning-orders-checkbox"><input v-model="seriesDraft.stealth_mode_flag" type="checkbox" /><span>{{ tp("fieldsVisibilityStealth") }}</span></label>
@@ -258,8 +261,9 @@
                 <option value="override">{{ tp("exceptionOverride") }}</option>
               </select>
             </label>
-            <label class="field-stack"><span>{{ tp("fieldsOverrideStart") }}</span><input v-model="exceptionDraft.override_local_start_time" type="time" /></label>
-            <label class="field-stack"><span>{{ tp("fieldsOverrideEnd") }}</span><input v-model="exceptionDraft.override_local_end_time" type="time" /></label>
+            <label v-if="exceptionRequiresOverrideTimes" class="field-stack"><span>{{ tp("fieldsOverrideStart") }}</span><input v-model="exceptionDraft.override_local_start_time" type="time" required /></label>
+            <label v-if="exceptionRequiresOverrideTimes" class="field-stack"><span>{{ tp("fieldsOverrideEnd") }}</span><input v-model="exceptionDraft.override_local_end_time" type="time" required /></label>
+            <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="exceptionDraft.notes" rows="2" /></label>
           </div>
           <div class="cta-row">
             <button class="cta-button cta-secondary" type="submit" :disabled="!actionState.canManageExceptions">{{ tp("actionsCreateException") }}</button>
@@ -282,7 +286,15 @@
         <div class="planning-orders-form-grid">
           <label class="field-stack"><span>{{ tp("filtersDateFrom") }}</span><input v-model="shiftFilters.date_from" type="date" /></label>
           <label class="field-stack"><span>{{ tp("filtersDateTo") }}</span><input v-model="shiftFilters.date_to" type="date" /></label>
-          <label class="field-stack"><span>{{ tp("filtersVisibility") }}</span><input v-model="shiftFilters.visibility_state" /></label>
+          <label class="field-stack">
+            <span>{{ tp("filtersVisibility") }}</span>
+            <select v-model="shiftFilters.visibility_state">
+              <option value="">{{ tp("visibilityPlaceholder") }}</option>
+              <option v-for="option in visibilityStateOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
         </div>
         <div class="cta-row">
           <button class="cta-button cta-secondary" type="button" @click="refreshShifts">{{ tp("actionsRefresh") }}</button>
@@ -307,8 +319,16 @@
         <p v-if="!shifts.length" class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
         <form class="planning-orders-form" @submit.prevent="submitShift">
           <div class="planning-orders-form-grid">
-            <label class="field-stack"><span>{{ tp("fieldsStartsAt") }}</span><input v-model="shiftDraft.starts_at" type="datetime-local" required /></label>
-            <label class="field-stack"><span>{{ tp("fieldsEndsAt") }}</span><input v-model="shiftDraft.ends_at" type="datetime-local" required /></label>
+            <label class="field-stack">
+              <span>{{ tp("fieldsStartsAtLocal") }}</span>
+              <input v-model="shiftDraft.starts_at" type="datetime-local" required />
+              <span class="field-help">{{ tp("fieldsLocalDateTimeHelp") }}</span>
+            </label>
+            <label class="field-stack">
+              <span>{{ tp("fieldsEndsAtLocal") }}</span>
+              <input v-model="shiftDraft.ends_at" type="datetime-local" required />
+              <span class="field-help">{{ tp("fieldsLocalDateTimeHelp") }}</span>
+            </label>
             <label class="field-stack"><span>{{ tp("fieldsBreakMinutes") }}</span><input v-model.number="shiftDraft.break_minutes" type="number" min="0" /></label>
             <label class="field-stack"><span>{{ tp("fieldsShiftType") }}</span><input v-model="shiftDraft.shift_type_code" required /></label>
             <label class="field-stack"><span>{{ tp("fieldsMeetingPoint") }}</span><input v-model="shiftDraft.meeting_point" /></label>
@@ -320,6 +340,7 @@
                 <option value="released">{{ tp("statusReleased") }}</option>
               </select>
             </label>
+            <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="shiftDraft.notes" rows="2" /></label>
             <label class="planning-orders-checkbox"><input v-model="shiftDraft.customer_visible_flag" type="checkbox" /><span>{{ tp("fieldsVisibilityCustomer") }}</span></label>
             <label class="planning-orders-checkbox"><input v-model="shiftDraft.subcontractor_visible_flag" type="checkbox" /><span>{{ tp("fieldsVisibilitySubcontractor") }}</span></label>
             <label class="planning-orders-checkbox"><input v-model="shiftDraft.stealth_mode_flag" type="checkbox" /><span>{{ tp("fieldsVisibilityStealth") }}</span></label>
@@ -345,7 +366,15 @@
         <div class="planning-orders-form-grid">
           <label class="field-stack"><span>{{ tp("filtersDateFrom") }}</span><input v-model="boardFilters.date_from" type="datetime-local" /></label>
           <label class="field-stack"><span>{{ tp("filtersDateTo") }}</span><input v-model="boardFilters.date_to" type="datetime-local" /></label>
-          <label class="field-stack"><span>{{ tp("filtersReleaseState") }}</span><input v-model="boardFilters.release_state" /></label>
+          <label class="field-stack">
+            <span>{{ tp("filtersReleaseState") }}</span>
+            <select v-model="boardFilters.release_state">
+              <option value="">{{ tp("releaseStatePlaceholder") }}</option>
+              <option v-for="option in releaseStateOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
         </div>
         <div class="cta-row">
           <button class="cta-button cta-secondary" type="button" @click="refreshBoard">{{ tp("actionsRefresh") }}</button>
@@ -361,13 +390,17 @@
         </div>
         <p v-if="!boardRows.length" class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
       </section>
+      <datalist id="planning-shifts-timezones">
+        <option v-for="timezone in timezoneSuggestions" :key="timezone" :value="timezone" />
+      </datalist>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 
+import { listPlanningRecords, type PlanningRecordListItem } from "@/api/planningOrders";
 import {
   createShift,
   createShiftPlan,
@@ -396,7 +429,6 @@ import {
 import { planningShiftsMessages } from "@/i18n/planningShifts.messages";
 import { useAuthStore } from "@/stores/auth";
 import { useLocaleStore } from "@/stores/locale";
-import StatusBadge from "@/components/StatusBadge.vue";
 import {
   derivePlanningShiftActionState,
   mapPlanningShiftApiMessage,
@@ -411,12 +443,11 @@ const authStore = useAuthStore();
 const localeStore = useLocaleStore();
 const currentLocale = computed(() => (localeStore.locale === "en" ? "en" : "de"));
 const role = computed(() => authStore.effectiveRole || "tenant_admin");
-const tenantScopeInput = ref(authStore.tenantScopeId || "");
-const accessTokenInput = ref(authStore.accessToken || "");
 const tenantScopeId = ref(authStore.tenantScopeId || "");
 const accessToken = ref(authStore.accessToken || "");
 
 const templates = ref<ShiftTemplateListItem[]>([]);
+const planningRecords = ref<PlanningRecordListItem[]>([]);
 const shiftPlans = ref<ShiftPlanListItem[]>([]);
 const seriesRows = ref<ShiftSeriesListItem[]>([]);
 const shifts = ref<ShiftListItem[]>([]);
@@ -448,6 +479,35 @@ const workspaceTabs = computed(() => [
   { id: "shifts", label: tp("shiftsTitle") },
   { id: "board", label: tp("boardTitle") },
 ]);
+const shiftTemplateOptions = computed(() => templates.value);
+const planningRecordOptions = computed(() =>
+  planningRecords.value.map((record) => ({
+    id: record.id,
+    label: `${record.name} · ${record.planning_from} - ${record.planning_to}`,
+  })),
+);
+const weekdayOptions = computed(() => [
+  { index: 0, label: tp("weekdayMon") },
+  { index: 1, label: tp("weekdayTue") },
+  { index: 2, label: tp("weekdayWed") },
+  { index: 3, label: tp("weekdayThu") },
+  { index: 4, label: tp("weekdayFri") },
+  { index: 5, label: tp("weekdaySat") },
+  { index: 6, label: tp("weekdaySun") },
+]);
+const visibilityStateOptions = computed(() => [
+  { value: "customer", label: tp("visibilityCustomer") },
+  { value: "subcontractor", label: tp("visibilitySubcontractor") },
+  { value: "stealth", label: tp("visibilityStealth") },
+]);
+const releaseStateOptions = computed(() => [
+  { value: "draft", label: tp("statusDraft") },
+  { value: "release_ready", label: tp("statusReleaseReady") },
+  { value: "released", label: tp("statusReleased") },
+]);
+const timezoneSuggestions = ["Europe/Berlin", "Europe/Vienna", "Europe/Zurich", "UTC"];
+const seriesUsesWeeklyRecurrence = computed(() => seriesDraft.recurrence_code === "weekly");
+const exceptionRequiresOverrideTimes = computed(() => exceptionDraft.action_code === "override");
 
 const actionState = computed(() =>
   derivePlanningShiftActionState(
@@ -461,13 +521,6 @@ const canRead = computed(() => actionState.value.canRead);
 
 function tp(key: keyof typeof planningShiftsMessages.de) {
   return planningShiftsMessages[currentLocale.value][key] ?? planningShiftsMessages.de[key] ?? key;
-}
-
-function rememberScopeAndToken() {
-  tenantScopeId.value = tenantScopeInput.value.trim();
-  accessToken.value = accessTokenInput.value.trim();
-  authStore.tenantScopeId = tenantScopeId.value;
-  authStore.accessToken = accessToken.value;
 }
 
 function setFeedback(tone: string, title: string, message: string) {
@@ -527,6 +580,7 @@ function createEmptySeriesDraft() {
     shift_type_code: "",
     meeting_point: "",
     location_text: "",
+    notes: "",
     customer_visible_flag: false,
     subcontractor_visible_flag: false,
     stealth_mode_flag: false,
@@ -542,6 +596,7 @@ function createEmptyExceptionDraft() {
     action_code: "skip",
     override_local_start_time: "",
     override_local_end_time: "",
+    notes: "",
   };
 }
 
@@ -557,6 +612,7 @@ function createEmptyShiftDraft() {
     shift_type_code: "day",
     location_text: "",
     meeting_point: "",
+    notes: "",
     release_state: "draft",
     customer_visible_flag: false,
     subcontractor_visible_flag: false,
@@ -621,17 +677,21 @@ function startCreatePlan() { resetShiftPlanDraft(); selectedShiftPlanId.value = 
 function startCreateSeries() { resetSeriesDraft(); selectedSeriesId.value = ""; }
 function startCreateShift() { resetShiftDraft(); selectedShiftId.value = ""; }
 
-async function refreshAll() {
-  await Promise.all([refreshTemplates(), refreshPlans()]);
-  await refreshBoard();
-}
-
 async function refreshTemplates() {
   templates.value = await listShiftTemplates(tenantScopeId.value, accessToken.value, {});
 }
 
+async function refreshPlanningRecords() {
+  planningRecords.value = await listPlanningRecords(tenantScopeId.value, accessToken.value, {});
+}
+
 async function refreshPlans() {
-  shiftPlans.value = await listShiftPlans(tenantScopeId.value, accessToken.value, planFilters);
+  const [records, plans] = await Promise.all([
+    listPlanningRecords(tenantScopeId.value, accessToken.value, {}),
+    listShiftPlans(tenantScopeId.value, accessToken.value, planFilters),
+  ]);
+  planningRecords.value = records;
+  shiftPlans.value = plans;
 }
 
 async function refreshPlanDetails() {
@@ -791,6 +851,21 @@ function recurrenceLabelText(value: string) {
   return value;
 }
 
+function normalizeWeekdayMask(value: string | null | undefined) {
+  const candidate = (value || "").trim();
+  return /^[01]{7}$/.test(candidate) ? candidate : "1111100";
+}
+
+function isWeekdaySelected(index: number) {
+  return normalizeWeekdayMask(seriesDraft.weekday_mask)[index] === "1";
+}
+
+function toggleWeekday(index: number) {
+  const mask = normalizeWeekdayMask(seriesDraft.weekday_mask).split("");
+  mask[index] = mask[index] === "1" ? "0" : "1";
+  seriesDraft.weekday_mask = mask.join("");
+}
+
 function handleApiError(error: unknown) {
   const messageKey = error instanceof PlanningShiftsApiError ? error.messageKey : "error";
   setFeedback("error", tp("errorTitle"), tp(mapPlanningShiftApiMessage(messageKey) as keyof typeof planningShiftsMessages.de));
@@ -813,6 +888,29 @@ function addDays(value: string, delta: number) {
   parsed.setUTCDate(parsed.getUTCDate() + delta);
   return parsed.toISOString().slice(0, 10);
 }
+
+watch(
+  () => seriesDraft.recurrence_code,
+  (value) => {
+    if (value === "weekly") {
+      seriesDraft.weekday_mask = normalizeWeekdayMask(seriesDraft.weekday_mask);
+      return;
+    }
+    seriesDraft.weekday_mask = "";
+  },
+  { immediate: true },
+);
+
+watch(
+  () => exceptionDraft.action_code,
+  (value) => {
+    if (value !== "override") {
+      exceptionDraft.override_local_start_time = "";
+      exceptionDraft.override_local_end_time = "";
+    }
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped>
@@ -827,7 +925,6 @@ function addDays(value: string, delta: number) {
 }
 
 .planning-shifts-hero,
-.planning-shifts-controls,
 .planning-shifts-panel,
 .planning-orders-feedback,
 .planning-orders-empty {
@@ -838,16 +935,28 @@ function addDays(value: string, delta: number) {
 }
 
 .planning-shifts-hero {
-  display: flex;
-  justify-content: space-between;
-  gap: 1.25rem;
-  align-items: flex-start;
-}
-
-.planning-shifts-controls,
-.planning-shifts-panel {
   display: grid;
   gap: 1rem;
+}
+
+.planning-shifts-weekday-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.planning-shifts-weekday-chip {
+  border: 1px solid color-mix(in srgb, var(--primary-color, rgb(40,170,170)) 30%, white);
+  background: white;
+  color: #184949;
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  font-weight: 600;
+}
+
+.planning-shifts-weekday-chip.active {
+  border-color: var(--primary-color, rgb(40,170,170));
+  background: color-mix(in srgb, var(--primary-color, rgb(40,170,170)) 16%, white);
 }
 
 .planning-shifts-board {
@@ -856,11 +965,6 @@ function addDays(value: string, delta: number) {
 
 .planning-shifts-lead {
   max-width: 70ch;
-}
-
-.planning-shifts-scope {
-  display: grid;
-  gap: 0.75rem;
 }
 
 .planning-shifts-tabs {
