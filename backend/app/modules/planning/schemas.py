@@ -839,6 +839,16 @@ class PlanningRecordRead(PlanningRecordListItem):
     updated_at: datetime
     created_by_user_id: str | None
     updated_by_user_id: str | None
+
+
+class PlanningDispatcherCandidateRead(BaseModel):
+    id: str
+    tenant_id: str
+    username: str
+    email: str | None
+    full_name: str
+    status: str
+    role_keys: list[str] = Field(default_factory=list)
     archived_at: datetime | None
 
 

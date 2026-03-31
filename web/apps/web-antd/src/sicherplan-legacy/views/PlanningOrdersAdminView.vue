@@ -398,29 +398,164 @@
                 <label class="field-stack"><span>{{ tp("fieldsPlanningName") }}</span><input v-model="planningDraft.name" required /></label>
                 <label class="field-stack"><span>{{ tp("fieldsPlanningFrom") }}</span><input v-model="planningDraft.planning_from" type="date" required /></label>
                 <label class="field-stack"><span>{{ tp("fieldsPlanningTo") }}</span><input v-model="planningDraft.planning_to" type="date" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsDispatcherUserId") }}</span><input v-model="planningDraft.dispatcher_user_id" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsParentPlanningRecordId") }}</span><input v-model="planningDraft.parent_planning_record_id" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsStatus") }}</span><input v-model="planningDraft.status" /></label>
+                <label class="field-stack">
+                  <span>{{ tp("fieldsDispatcherUserId") }}</span>
+                  <Select
+                    :value="planningDraft.dispatcher_user_id || undefined"
+                    show-search
+                    allow-clear
+                    class="planning-admin-select"
+                    popup-class-name="planning-admin-select-dropdown"
+                    :options="dispatcherSelectOptions"
+                    :loading="dispatcherLookupLoading"
+                    :disabled="loading.action || dispatcherLookupLoading"
+                    :filter-option="filterSelectOption"
+                    :placeholder="dispatcherPlaceholder"
+                    :status="dispatcherLookupError ? 'error' : undefined"
+                    @change="handlePlanningDispatcherChange"
+                    @clear="clearPlanningDispatcher"
+                  />
+                  <p v-if="dispatcherLookupError" class="field-help">{{ dispatcherLookupError }}</p>
+                  <p v-else-if="!dispatcherLookupLoading && !dispatcherSelectOptions.length" class="field-help">{{ tp("dispatcherEmpty") }}</p>
+                </label>
+                <label class="field-stack">
+                  <span>{{ tp("fieldsParentPlanningRecordId") }}</span>
+                  <Select
+                    :value="planningDraft.parent_planning_record_id || undefined"
+                    show-search
+                    allow-clear
+                    class="planning-admin-select"
+                    popup-class-name="planning-admin-select-dropdown"
+                    :options="parentPlanningRecordOptions"
+                    :disabled="loading.action || !selectedOrderId"
+                    :filter-option="filterSelectOption"
+                    :placeholder="parentPlanningRecordPlaceholder"
+                    @change="handleParentPlanningRecordChange"
+                    @clear="clearParentPlanningRecord"
+                  />
+                  <p v-if="!selectedOrderId" class="field-help">{{ tp("parentPlanningRecordDisabled") }}</p>
+                  <p v-else-if="!parentPlanningRecordOptions.length" class="field-help">{{ tp("parentPlanningRecordEmpty") }}</p>
+                </label>
+                <label v-if="!isCreatingPlanning && selectedPlanningRecord" class="field-stack">
+                  <span>{{ tp("fieldsStatus") }}</span>
+                  <select v-model="planningDraft.status">
+                    <option v-for="option in planningStatusOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </label>
                 <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="planningDraft.notes" rows="3" /></label>
               </div>
 
               <section class="planning-orders-subsection">
                 <h4>{{ tp("sectionModeDetails") }}</h4>
                 <div v-if="planningDraft.planning_mode_code === 'event'" class="planning-orders-form-grid">
-                  <label class="field-stack"><span>{{ tp("fieldsEventVenueId") }}</span><input v-model="planningDraft.event_detail.event_venue_id" required /></label>
+                  <label class="field-stack">
+                    <span>{{ tp("fieldsEventVenueId") }}</span>
+                    <Select
+                      :value="planningDraft.event_detail.event_venue_id || undefined"
+                      show-search
+                      class="planning-admin-select"
+                      popup-class-name="planning-admin-select-dropdown"
+                      :options="eventVenueSelectOptions"
+                      :loading="eventVenueLookupLoading"
+                      :disabled="loading.action || !planningCustomerId"
+                      :filter-option="filterSelectOption"
+                      :placeholder="eventVenuePlaceholder"
+                      :status="eventVenueLookupError ? 'error' : undefined"
+                      @change="handleEventVenueChange"
+                    />
+                    <p v-if="eventVenueLookupError" class="field-help">{{ eventVenueLookupError }}</p>
+                    <p v-else-if="!planningCustomerId" class="field-help">{{ tp("eventVenueCustomerRequired") }}</p>
+                    <p v-else-if="!eventVenueLookupLoading && !eventVenueSelectOptions.length" class="field-help">{{ tp("eventVenueEmpty") }}</p>
+                  </label>
                   <label class="field-stack field-stack--wide"><span>{{ tp("fieldsSetupNote") }}</span><textarea v-model="planningDraft.event_detail.setup_note" rows="2" /></label>
                 </div>
                 <div v-else-if="planningDraft.planning_mode_code === 'site'" class="planning-orders-form-grid">
-                  <label class="field-stack"><span>{{ tp("fieldsSiteId") }}</span><input v-model="planningDraft.site_detail.site_id" required /></label>
+                  <label class="field-stack">
+                    <span>{{ tp("fieldsSiteId") }}</span>
+                    <Select
+                      :value="planningDraft.site_detail.site_id || undefined"
+                      show-search
+                      class="planning-admin-select"
+                      popup-class-name="planning-admin-select-dropdown"
+                      :options="siteSelectOptions"
+                      :loading="siteLookupLoading"
+                      :disabled="loading.action || !planningCustomerId"
+                      :filter-option="filterSelectOption"
+                      :placeholder="sitePlaceholder"
+                      :status="siteLookupError ? 'error' : undefined"
+                      @change="handleSiteChange"
+                    />
+                    <p v-if="siteLookupError" class="field-help">{{ siteLookupError }}</p>
+                    <p v-else-if="!planningCustomerId" class="field-help">{{ tp("siteCustomerRequired") }}</p>
+                    <p v-else-if="!siteLookupLoading && !siteSelectOptions.length" class="field-help">{{ tp("siteEmpty") }}</p>
+                  </label>
                   <label class="field-stack field-stack--wide"><span>{{ tp("fieldsWatchbookScopeNote") }}</span><textarea v-model="planningDraft.site_detail.watchbook_scope_note" rows="2" /></label>
                 </div>
                 <div v-else-if="planningDraft.planning_mode_code === 'trade_fair'" class="planning-orders-form-grid">
-                  <label class="field-stack"><span>{{ tp("fieldsTradeFairId") }}</span><input v-model="planningDraft.trade_fair_detail.trade_fair_id" required /></label>
-                  <label class="field-stack"><span>{{ tp("fieldsTradeFairZoneId") }}</span><input v-model="planningDraft.trade_fair_detail.trade_fair_zone_id" /></label>
+                  <label class="field-stack">
+                    <span>{{ tp("fieldsTradeFairId") }}</span>
+                    <Select
+                      :value="planningDraft.trade_fair_detail.trade_fair_id || undefined"
+                      show-search
+                      class="planning-admin-select"
+                      popup-class-name="planning-admin-select-dropdown"
+                      :options="tradeFairSelectOptions"
+                      :loading="tradeFairLookupLoading"
+                      :disabled="loading.action || !planningCustomerId"
+                      :filter-option="filterSelectOption"
+                      :placeholder="tradeFairPlaceholder"
+                      :status="tradeFairLookupError ? 'error' : undefined"
+                      @change="handleTradeFairChange"
+                    />
+                    <p v-if="tradeFairLookupError" class="field-help">{{ tradeFairLookupError }}</p>
+                    <p v-else-if="!planningCustomerId" class="field-help">{{ tp("tradeFairCustomerRequired") }}</p>
+                    <p v-else-if="!tradeFairLookupLoading && !tradeFairSelectOptions.length" class="field-help">{{ tp("tradeFairEmpty") }}</p>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ tp("fieldsTradeFairZoneId") }}</span>
+                    <Select
+                      :value="planningDraft.trade_fair_detail.trade_fair_zone_id || undefined"
+                      show-search
+                      allow-clear
+                      class="planning-admin-select"
+                      popup-class-name="planning-admin-select-dropdown"
+                      :options="tradeFairZoneSelectOptions"
+                      :loading="tradeFairZoneLookupLoading"
+                      :disabled="loading.action || !planningDraft.trade_fair_detail.trade_fair_id"
+                      :filter-option="filterSelectOption"
+                      :placeholder="tradeFairZonePlaceholder"
+                      :status="tradeFairZoneLookupError ? 'error' : undefined"
+                      @change="handleTradeFairZoneChange"
+                      @clear="clearTradeFairZone"
+                    />
+                    <p v-if="tradeFairZoneLookupError" class="field-help">{{ tradeFairZoneLookupError }}</p>
+                    <p v-else-if="!planningDraft.trade_fair_detail.trade_fair_id" class="field-help">{{ tp("tradeFairZoneTradeFairRequired") }}</p>
+                    <p v-else-if="!tradeFairZoneLookupLoading && !tradeFairZoneSelectOptions.length" class="field-help">{{ tp("tradeFairZoneEmpty") }}</p>
+                  </label>
                   <label class="field-stack field-stack--wide"><span>{{ tp("fieldsStandNote") }}</span><textarea v-model="planningDraft.trade_fair_detail.stand_note" rows="2" /></label>
                 </div>
                 <div v-else class="planning-orders-form-grid">
-                  <label class="field-stack"><span>{{ tp("fieldsPatrolRouteDetailId") }}</span><input v-model="planningDraft.patrol_detail.patrol_route_id" required /></label>
+                  <label class="field-stack">
+                    <span>{{ tp("fieldsPatrolRouteDetailId") }}</span>
+                    <Select
+                      :value="planningDraft.patrol_detail.patrol_route_id || undefined"
+                      show-search
+                      class="planning-admin-select"
+                      popup-class-name="planning-admin-select-dropdown"
+                      :options="patrolRouteSelectOptions"
+                      :loading="patrolRouteLookupLoading"
+                      :disabled="loading.action || !planningCustomerId"
+                      :filter-option="filterSelectOption"
+                      :placeholder="patrolRouteDetailPlaceholder"
+                      :status="patrolRouteLookupError ? 'error' : undefined"
+                      @change="handlePlanningPatrolRouteChange"
+                    />
+                    <p v-if="patrolRouteLookupError" class="field-help">{{ patrolRouteLookupError }}</p>
+                    <p v-else-if="!planningCustomerId" class="field-help">{{ tp("patrolRouteCustomerRequired") }}</p>
+                    <p v-else-if="!patrolRouteLookupLoading && !patrolRouteSelectOptions.length" class="field-help">{{ tp("patrolRouteEmpty") }}</p>
+                  </label>
                   <label class="field-stack field-stack--wide"><span>{{ tp("fieldsExecutionNote") }}</span><textarea v-model="planningDraft.patrol_detail.execution_note" rows="2" /></label>
                 </div>
               </section>
@@ -579,7 +714,9 @@ import { listCustomers, type CustomerListItem } from "@/api/customers";
 import {
   createPlanningRecord as createPlanningCatalogRecord,
   listPlanningRecords as listPlanningCatalogRecords,
+  listTradeFairZones,
   type PlanningListItem,
+  type TradeFairZoneRead,
 } from "@/api/planningAdmin";
 import {
   createCustomerOrder,
@@ -594,6 +731,7 @@ import {
   linkPlanningRecordAttachment,
   listCustomerOrders,
   listOrderAttachments,
+  listPlanningDispatcherCandidates,
   listPlanningRecordAttachments,
   listPlanningRecords,
   setCustomerOrderReleaseState,
@@ -602,6 +740,7 @@ import {
   updatePlanningRecord,
   type CustomerOrderListItem,
   type CustomerOrderRead,
+  type PlanningDispatcherCandidateRead,
   type PlanningCommercialLinkRead,
   type PlanningRecordListItem,
   type PlanningRecordRead,
@@ -643,6 +782,21 @@ const requirementTypeLookupError = ref("");
 const patrolRouteOptions = ref<PlanningListItem[]>([]);
 const patrolRouteLookupLoading = ref(false);
 const patrolRouteLookupError = ref("");
+const dispatcherOptions = ref<PlanningDispatcherCandidateRead[]>([]);
+const dispatcherLookupLoading = ref(false);
+const dispatcherLookupError = ref("");
+const eventVenueOptions = ref<PlanningListItem[]>([]);
+const eventVenueLookupLoading = ref(false);
+const eventVenueLookupError = ref("");
+const siteOptions = ref<PlanningListItem[]>([]);
+const siteLookupLoading = ref(false);
+const siteLookupError = ref("");
+const tradeFairOptions = ref<PlanningListItem[]>([]);
+const tradeFairLookupLoading = ref(false);
+const tradeFairLookupError = ref("");
+const tradeFairZoneOptions = ref<TradeFairZoneRead[]>([]);
+const tradeFairZoneLookupLoading = ref(false);
+const tradeFairZoneLookupError = ref("");
 const orderValidationState = reactive({ attempted: false });
 const requirementTypeModal = reactive({
   open: false,
@@ -742,6 +896,49 @@ const patrolRouteSelectOptions = computed(() =>
     value: row.id,
   })),
 );
+const planningCustomerId = computed(() => selectedOrder.value?.customer_id || orderDraft.customer_id || "");
+const dispatcherSelectOptions = computed(() =>
+  dispatcherOptions.value.map((row) => ({
+    label: formatPlanningOrderReferenceOption("dispatcher_user", row),
+    value: row.id,
+  })),
+);
+const parentPlanningRecordOptions = computed(() =>
+  planningRecords.value
+    .filter((row) => row.id !== selectedPlanningRecordId.value)
+    .map((row) => ({
+      label: formatPlanningOrderReferenceOption("planning_record", row),
+      value: row.id,
+    })),
+);
+const eventVenueSelectOptions = computed(() =>
+  filterPlanningOrderOptionsByCustomer(eventVenueOptions.value, planningCustomerId.value).map((row) => ({
+    label: formatPlanningOrderReferenceOption("event_venue", row),
+    value: row.id,
+  })),
+);
+const siteSelectOptions = computed(() =>
+  filterPlanningOrderOptionsByCustomer(siteOptions.value, planningCustomerId.value).map((row) => ({
+    label: formatPlanningOrderReferenceOption("site", row),
+    value: row.id,
+  })),
+);
+const tradeFairSelectOptions = computed(() =>
+  filterPlanningOrderOptionsByCustomer(tradeFairOptions.value, planningCustomerId.value).map((row) => ({
+    label: formatPlanningOrderReferenceOption("trade_fair", row),
+    value: row.id,
+  })),
+);
+const tradeFairZoneSelectOptions = computed(() =>
+  tradeFairZoneOptions.value.map((row) => ({
+    label: formatPlanningOrderReferenceOption("trade_fair_zone", row),
+    value: row.id,
+  })),
+);
+const planningStatusOptions = computed(() => [
+  { label: tp("statusActive"), value: "active" },
+  { label: tp("statusInactive"), value: "inactive" },
+]);
 const requirementTypePlaceholder = computed(() => {
   if (!orderDraft.customer_id) {
     return tp("requirementTypeCustomerRequired");
@@ -759,6 +956,57 @@ const patrolRoutePlaceholder = computed(() => {
     return tp("patrolRouteEmpty");
   }
   return tp("patrolRouteSearchPlaceholder");
+});
+const dispatcherPlaceholder = computed(() => {
+  if (dispatcherLookupLoading.value) {
+    return tp("dispatcherLoading");
+  }
+  if (dispatcherLookupError.value) {
+    return dispatcherLookupError.value;
+  }
+  if (!dispatcherSelectOptions.value.length) {
+    return tp("dispatcherEmpty");
+  }
+  return tp("dispatcherSearchPlaceholder");
+});
+const parentPlanningRecordPlaceholder = computed(() => {
+  if (!selectedOrderId.value) {
+    return tp("parentPlanningRecordDisabled");
+  }
+  if (!parentPlanningRecordOptions.value.length) {
+    return tp("parentPlanningRecordEmpty");
+  }
+  return tp("parentPlanningRecordPlaceholder");
+});
+const eventVenuePlaceholder = computed(() => {
+  if (!planningCustomerId.value) return tp("eventVenueCustomerRequired");
+  if (eventVenueLookupLoading.value) return tp("eventVenueLoading");
+  if (!eventVenueLookupError.value && !eventVenueSelectOptions.value.length) return tp("eventVenueEmpty");
+  return tp("eventVenuePlaceholder");
+});
+const sitePlaceholder = computed(() => {
+  if (!planningCustomerId.value) return tp("siteCustomerRequired");
+  if (siteLookupLoading.value) return tp("siteLoading");
+  if (!siteLookupError.value && !siteSelectOptions.value.length) return tp("siteEmpty");
+  return tp("sitePlaceholder");
+});
+const tradeFairPlaceholder = computed(() => {
+  if (!planningCustomerId.value) return tp("tradeFairCustomerRequired");
+  if (tradeFairLookupLoading.value) return tp("tradeFairLoading");
+  if (!tradeFairLookupError.value && !tradeFairSelectOptions.value.length) return tp("tradeFairEmpty");
+  return tp("tradeFairPlaceholder");
+});
+const tradeFairZonePlaceholder = computed(() => {
+  if (!planningDraft.trade_fair_detail.trade_fair_id) return tp("tradeFairZoneTradeFairRequired");
+  if (tradeFairZoneLookupLoading.value) return tp("tradeFairZoneLoading");
+  if (!tradeFairZoneLookupError.value && !tradeFairZoneSelectOptions.value.length) return tp("tradeFairZoneEmpty");
+  return tp("tradeFairZonePlaceholder");
+});
+const patrolRouteDetailPlaceholder = computed(() => {
+  if (!planningCustomerId.value) return tp("patrolRouteCustomerRequired");
+  if (patrolRouteLookupLoading.value) return tp("patrolRouteLoading");
+  if (!patrolRouteLookupError.value && !patrolRouteSelectOptions.value.length) return tp("patrolRouteEmpty");
+  return tp("patrolRouteDetailPlaceholder");
 });
 const requirementTypeSetupMissing = computed(() =>
   hasPlanningOrderSetupGap({
@@ -1139,6 +1387,46 @@ function handlePatrolRouteClear() {
   orderDraft.patrol_route_id = "";
 }
 
+function handlePlanningDispatcherChange(value: string | number | undefined) {
+  planningDraft.dispatcher_user_id = typeof value === "string" ? value : "";
+}
+
+function clearPlanningDispatcher() {
+  planningDraft.dispatcher_user_id = "";
+}
+
+function handleParentPlanningRecordChange(value: string | number | undefined) {
+  planningDraft.parent_planning_record_id = typeof value === "string" ? value : "";
+}
+
+function clearParentPlanningRecord() {
+  planningDraft.parent_planning_record_id = "";
+}
+
+function handleEventVenueChange(value: string | number | undefined) {
+  planningDraft.event_detail.event_venue_id = typeof value === "string" ? value : "";
+}
+
+function handleSiteChange(value: string | number | undefined) {
+  planningDraft.site_detail.site_id = typeof value === "string" ? value : "";
+}
+
+function handleTradeFairChange(value: string | number | undefined) {
+  planningDraft.trade_fair_detail.trade_fair_id = typeof value === "string" ? value : "";
+}
+
+function handleTradeFairZoneChange(value: string | number | undefined) {
+  planningDraft.trade_fair_detail.trade_fair_zone_id = typeof value === "string" ? value : "";
+}
+
+function clearTradeFairZone() {
+  planningDraft.trade_fair_detail.trade_fair_zone_id = "";
+}
+
+function handlePlanningPatrolRouteChange(value: string | number | undefined) {
+  planningDraft.patrol_detail.patrol_route_id = typeof value === "string" ? value : "";
+}
+
 function resolveCommercialIssueMessage(issueCode: string) {
   const mappedKey = mapPlanningCommercialIssueCode(issueCode);
   if (mappedKey) {
@@ -1188,14 +1476,27 @@ async function refreshOrderReferenceOptions(customerId: string) {
   if (!tenantScopeId.value || !accessToken.value || !actionState.value.canReadOrders || !customerId) {
     requirementTypeOptions.value = [];
     patrolRouteOptions.value = [];
+    eventVenueOptions.value = [];
+    siteOptions.value = [];
+    tradeFairOptions.value = [];
+    tradeFairZoneOptions.value = [];
     requirementTypeLookupError.value = "";
     patrolRouteLookupError.value = "";
+    eventVenueLookupError.value = "";
+    siteLookupError.value = "";
+    tradeFairLookupError.value = "";
+    tradeFairZoneLookupError.value = "";
     if (orderDraft.requirement_type_id) {
       orderDraft.requirement_type_id = "";
     }
     if (orderDraft.patrol_route_id) {
       orderDraft.patrol_route_id = "";
     }
+    planningDraft.event_detail.event_venue_id = "";
+    planningDraft.site_detail.site_id = "";
+    planningDraft.trade_fair_detail.trade_fair_id = "";
+    planningDraft.trade_fair_detail.trade_fair_zone_id = "";
+    planningDraft.patrol_detail.patrol_route_id = "";
     return;
   }
 
@@ -1239,6 +1540,114 @@ async function refreshOrderReferenceOptions(customerId: string) {
   } finally {
     patrolRouteLookupLoading.value = false;
   }
+
+  eventVenueLookupLoading.value = true;
+  eventVenueLookupError.value = "";
+  try {
+    eventVenueOptions.value = await listPlanningCatalogRecords(
+      "event_venue",
+      tenantScopeId.value,
+      accessToken.value,
+      { customer_id: customerId },
+    ) as PlanningListItem[];
+    if (!eventVenueOptions.value.some((row) => row.id === planningDraft.event_detail.event_venue_id)) {
+      planningDraft.event_detail.event_venue_id = "";
+    }
+  } catch {
+    eventVenueOptions.value = [];
+    eventVenueLookupError.value = tp("eventVenueLoadError");
+    planningDraft.event_detail.event_venue_id = "";
+  } finally {
+    eventVenueLookupLoading.value = false;
+  }
+
+  siteLookupLoading.value = true;
+  siteLookupError.value = "";
+  try {
+    siteOptions.value = await listPlanningCatalogRecords(
+      "site",
+      tenantScopeId.value,
+      accessToken.value,
+      { customer_id: customerId },
+    ) as PlanningListItem[];
+    if (!siteOptions.value.some((row) => row.id === planningDraft.site_detail.site_id)) {
+      planningDraft.site_detail.site_id = "";
+    }
+  } catch {
+    siteOptions.value = [];
+    siteLookupError.value = tp("siteLoadError");
+    planningDraft.site_detail.site_id = "";
+  } finally {
+    siteLookupLoading.value = false;
+  }
+
+  tradeFairLookupLoading.value = true;
+  tradeFairLookupError.value = "";
+  try {
+    tradeFairOptions.value = await listPlanningCatalogRecords(
+      "trade_fair",
+      tenantScopeId.value,
+      accessToken.value,
+      { customer_id: customerId },
+    ) as PlanningListItem[];
+    if (!tradeFairOptions.value.some((row) => row.id === planningDraft.trade_fair_detail.trade_fair_id)) {
+      planningDraft.trade_fair_detail.trade_fair_id = "";
+    }
+  } catch {
+    tradeFairOptions.value = [];
+    tradeFairLookupError.value = tp("tradeFairLoadError");
+    planningDraft.trade_fair_detail.trade_fair_id = "";
+  } finally {
+    tradeFairLookupLoading.value = false;
+  }
+}
+
+async function refreshDispatcherOptions() {
+  if (!tenantScopeId.value || !accessToken.value || !actionState.value.canReadPlanning) {
+    dispatcherOptions.value = [];
+    dispatcherLookupError.value = "";
+    planningDraft.dispatcher_user_id = "";
+    return;
+  }
+
+  dispatcherLookupLoading.value = true;
+  dispatcherLookupError.value = "";
+  try {
+    dispatcherOptions.value = await listPlanningDispatcherCandidates(tenantScopeId.value, accessToken.value);
+    if (!dispatcherOptions.value.some((row) => row.id === planningDraft.dispatcher_user_id)) {
+      planningDraft.dispatcher_user_id = "";
+    }
+  } catch {
+    dispatcherOptions.value = [];
+    dispatcherLookupError.value = tp("dispatcherLoadError");
+    planningDraft.dispatcher_user_id = "";
+  } finally {
+    dispatcherLookupLoading.value = false;
+  }
+}
+
+async function refreshTradeFairZoneOptions(tradeFairId: string) {
+  if (!tenantScopeId.value || !accessToken.value || !tradeFairId) {
+    tradeFairZoneOptions.value = [];
+    tradeFairZoneLookupError.value = "";
+    planningDraft.trade_fair_detail.trade_fair_zone_id = "";
+    return;
+  }
+
+  tradeFairZoneLookupLoading.value = true;
+  tradeFairZoneLookupError.value = "";
+  try {
+    tradeFairZoneOptions.value = await listTradeFairZones(tenantScopeId.value, tradeFairId, accessToken.value);
+    if (!tradeFairZoneOptions.value.some((row) => row.id === planningDraft.trade_fair_detail.trade_fair_zone_id)) {
+      planningDraft.trade_fair_detail.trade_fair_zone_id = "";
+    }
+  } catch {
+    tradeFairZoneOptions.value = [];
+    tradeFairZoneLookupError.value = tp("tradeFairZoneLoadError");
+    planningDraft.trade_fair_detail.trade_fair_zone_id = "";
+  } finally {
+    tradeFairZoneLookupLoading.value = false;
+  }
 }
 
 function buildPlanningPayload(includeVersion = false) {
@@ -1252,7 +1661,6 @@ function buildPlanningPayload(includeVersion = false) {
     planning_from: planningDraft.planning_from,
     planning_to: planningDraft.planning_to,
     notes: planningDraft.notes || null,
-    status: planningDraft.status || "active",
   };
   if (planningDraft.planning_mode_code === "event") {
     payload.event_detail = {
@@ -1278,6 +1686,7 @@ function buildPlanningPayload(includeVersion = false) {
   }
   if (includeVersion && selectedPlanningRecord.value) {
     payload.version_no = selectedPlanningRecord.value.version_no;
+    payload.status = planningDraft.status || selectedPlanningRecord.value.status || "active";
   }
   return payload;
 }
@@ -1620,18 +2029,31 @@ function handleError(error: unknown) {
 }
 
 watch(
-  () => [tenantScopeId.value, accessToken.value, actionState.value.canReadOrders] as const,
-  async ([nextTenantScopeId, nextAccessToken, canReadOrders]) => {
-    if (!nextTenantScopeId || !nextAccessToken || !canReadOrders) {
+  () => [tenantScopeId.value, accessToken.value, actionState.value.canReadOrders, actionState.value.canReadPlanning] as const,
+  async ([nextTenantScopeId, nextAccessToken, canReadOrders, canReadPlanning]) => {
+    if (!nextTenantScopeId || !nextAccessToken || (!canReadOrders && !canReadPlanning)) {
       customerOptions.value = [];
       requirementTypeOptions.value = [];
       patrolRouteOptions.value = [];
+      eventVenueOptions.value = [];
+      siteOptions.value = [];
+      tradeFairOptions.value = [];
+      tradeFairZoneOptions.value = [];
+      dispatcherOptions.value = [];
       customerLookupError.value = "";
       requirementTypeLookupError.value = "";
       patrolRouteLookupError.value = "";
+      eventVenueLookupError.value = "";
+      siteLookupError.value = "";
+      tradeFairLookupError.value = "";
+      tradeFairZoneLookupError.value = "";
+      dispatcherLookupError.value = "";
       return;
     }
-    await refreshCustomerOptions();
+    await Promise.all([
+      refreshCustomerOptions(),
+      refreshDispatcherOptions(),
+    ]);
   },
   { immediate: true },
 );
@@ -1640,6 +2062,13 @@ watch(
   () => orderDraft.customer_id,
   async (customerId) => {
     await refreshOrderReferenceOptions(customerId);
+  },
+);
+
+watch(
+  () => planningDraft.trade_fair_detail.trade_fair_id,
+  async (tradeFairId) => {
+    await refreshTradeFairZoneOptions(tradeFairId);
   },
 );
 

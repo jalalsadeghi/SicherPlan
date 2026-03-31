@@ -18,6 +18,7 @@ from app.modules.planning.schemas import (
     PatrolPlanDetailCreate,
     PatrolPlanDetailRead,
     PatrolPlanDetailUpdate,
+    PlanningDispatcherCandidateRead,
     PlanningRecordCreate,
     PlanningRecordAttachmentCreate,
     PlanningRecordAttachmentLinkCreate,
@@ -42,6 +43,7 @@ from app.modules.planning.validation_service import PlanningValidationService
 class PlanningRecordRepository(Protocol):
     def get_customer(self, tenant_id: str, customer_id: str) -> Customer | None: ...
     def get_user_account(self, tenant_id: str, user_id: str): ...  # noqa: ANN001
+    def list_dispatcher_candidates(self, tenant_id: str) -> list[PlanningDispatcherCandidateRead]: ...
     def get_customer_order(self, tenant_id: str, order_id: str) -> CustomerOrder | None: ...
     def get_event_venue(self, tenant_id: str, row_id: str) -> EventVenue | None: ...
     def get_site(self, tenant_id: str, row_id: str) -> Site | None: ...
@@ -100,6 +102,9 @@ class PlanningRecordService:
 
     def list_planning_records(self, tenant_id: str, filters: PlanningRecordFilter, _actor: RequestAuthorizationContext) -> list[PlanningRecordListItem]:
         return [PlanningRecordListItem.model_validate(row) for row in self.repository.list_planning_records(tenant_id, filters)]
+
+    def list_dispatcher_candidates(self, tenant_id: str, _actor: RequestAuthorizationContext) -> list[PlanningDispatcherCandidateRead]:
+        return self.repository.list_dispatcher_candidates(tenant_id)
 
     def get_planning_record(self, tenant_id: str, planning_record_id: str, _actor: RequestAuthorizationContext) -> PlanningRecordRead:
         return self._read(self._require_record(tenant_id, planning_record_id))

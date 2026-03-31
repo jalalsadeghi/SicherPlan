@@ -56,6 +56,40 @@ test("planning-order reference options use business labels", () => {
     formatPlanningOrderReferenceOption("patrol_route", { id: "route-1", route_no: "R-7", name: "Nachtstreife" }),
     "R-7 — Nachtstreife",
   );
+  assert.equal(
+    formatPlanningOrderReferenceOption("event_venue", { id: "venue-1", venue_no: "VEN-2", name: "Arena Nord" }),
+    "VEN-2 — Arena Nord",
+  );
+  assert.equal(
+    formatPlanningOrderReferenceOption("site", { id: "site-1", site_no: "SITE-4", name: "Werkstor" }),
+    "SITE-4 — Werkstor",
+  );
+  assert.equal(
+    formatPlanningOrderReferenceOption("trade_fair", { id: "fair-1", fair_no: "FAIR-9", name: "Expo Ost" }),
+    "FAIR-9 — Expo Ost",
+  );
+  assert.equal(
+    formatPlanningOrderReferenceOption("trade_fair_zone", { id: "zone-1", zone_code: "H2-A", label: "Halle 2 A" }),
+    "H2-A — Halle 2 A",
+  );
+  assert.equal(
+    formatPlanningOrderReferenceOption("planning_record", {
+      id: "plan-1",
+      name: "Objektschutz Woche 1",
+      planning_from: "2026-04-01",
+      planning_to: "2026-04-07",
+    }),
+    "Objektschutz Woche 1 · 2026-04-01 - 2026-04-07",
+  );
+  assert.equal(
+    formatPlanningOrderReferenceOption("dispatcher_user", {
+      id: "user-1",
+      full_name: "Max Mustermann",
+      username: "m.mustermann",
+      email: "max@example.com",
+    }),
+    "Max Mustermann · m.mustermann",
+  );
 });
 
 test("planning-order reference options can be filtered by customer", () => {

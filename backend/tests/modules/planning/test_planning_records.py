@@ -40,6 +40,24 @@ class FakePlanningRecordRepository(FakeCustomerOrderRepository):
             return None
         return row
 
+    def list_dispatcher_candidates(self, tenant_id: str):
+        rows = []
+        for user in sorted(self.user_accounts.values(), key=lambda row: row.id):
+            if user.tenant_id != tenant_id:
+                continue
+            rows.append(
+                SimpleNamespace(
+                    id=user.id,
+                    tenant_id=user.tenant_id,
+                    username=getattr(user, "username", user.id),
+                    email=getattr(user, "email", None),
+                    full_name=getattr(user, "full_name", user.id),
+                    status=user.status,
+                    role_keys=["dispatcher"],
+                )
+            )
+        return rows
+
     def list_planning_records(self, tenant_id: str, filters: PlanningRecordFilter):
         rows = [row for row in self.planning_records.values() if row.tenant_id == tenant_id]
         if not filters.include_archived:
@@ -417,6 +435,25 @@ class PlanningRecordServiceTests(unittest.TestCase):
         )
         self.assertEqual(row.release_state, "release_ready")
         self.assertEqual(len(filtered), 1)
+
+    def test_lists_dispatcher_candidates_with_readable_labels(self) -> None:
+        self.repository.user_accounts["dispatcher-2"] = SimpleNamespace(
+            id="dispatcher-2",
+            tenant_id="tenant-1",
+            username="dispatch.two",
+            email="dispatch.two@example.com",
+            full_name="Dispatch Two",
+            status="active",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+
+        rows = self.service.list_dispatcher_candidates("tenant-1", self.actor)
+
+        self.assertEqual([row.id for row in rows], ["dispatcher-1", "dispatcher-2"])
+        self.assertEqual(rows[1].full_name, "Dispatch Two")
+        self.assertEqual(rows[1].email, "dispatch.two@example.com")
+        self.assertEqual(rows[1].role_keys, ["dispatcher"])
 
 
 if __name__ == "__main__":

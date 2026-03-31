@@ -14,7 +14,7 @@ from app.modules.core.models import Address, TenantSetting
 from app.modules.customers.models import Customer, CustomerBillingProfile, CustomerInvoiceParty, CustomerRateCard
 from app.modules.customers.models import CustomerEmployeeBlock
 from app.modules.employees.models import EmployeeAbsence, EmployeeQualification, EmployeeTimeAccount, EmployeeTimeAccountTxn, FunctionType, QualificationType
-from app.modules.iam.models import UserAccount
+from app.modules.iam.models import Role, UserAccount, UserRoleAssignment
 from app.modules.platform_services.docs_models import Document, DocumentLink
 from app.modules.platform_services.integration_models import ImportExportJob
 from app.modules.planning.models import (
@@ -68,6 +68,7 @@ from app.modules.planning.schemas import (
     PatrolRouteCreate,
     PatrolRouteUpdate,
     PlanningRecordCreate,
+    PlanningDispatcherCandidateRead,
     PlanningRecordFilter,
     PlanningRecordUpdate,
     RequirementTypeCreate,
@@ -191,6 +192,39 @@ class SqlAlchemyPlanningRepository:
     def get_user_account(self, tenant_id: str, user_id: str) -> UserAccount | None:
         statement = select(UserAccount).where(UserAccount.tenant_id == tenant_id, UserAccount.id == user_id)
         return self.session.scalars(statement).one_or_none()
+
+    def list_dispatcher_candidates(self, tenant_id: str) -> list[PlanningDispatcherCandidateRead]:
+        statement = (
+            select(UserAccount, Role.key)
+            .join(UserRoleAssignment, UserRoleAssignment.user_account_id == UserAccount.id)
+            .join(Role, Role.id == UserRoleAssignment.role_id)
+            .where(
+                UserAccount.tenant_id == tenant_id,
+                UserAccount.archived_at.is_(None),
+                UserRoleAssignment.tenant_id == tenant_id,
+                UserRoleAssignment.archived_at.is_(None),
+                UserRoleAssignment.status == "active",
+                UserRoleAssignment.scope_type.in_(("tenant", "branch", "mandate")),
+                Role.key.in_(("platform_admin", "tenant_admin", "dispatcher", "controller_qm", "accounting")),
+            )
+            .order_by(func.lower(UserAccount.full_name), func.lower(UserAccount.username))
+        )
+        rows = self.session.execute(statement).all()
+        candidates: dict[str, PlanningDispatcherCandidateRead] = {}
+        for user, role_key in rows:
+            if user.id not in candidates:
+                candidates[user.id] = PlanningDispatcherCandidateRead(
+                    id=user.id,
+                    tenant_id=user.tenant_id,
+                    username=user.username,
+                    email=user.email,
+                    full_name=user.full_name,
+                    status=user.status,
+                    role_keys=[],
+                )
+            if role_key not in candidates[user.id].role_keys:
+                candidates[user.id].role_keys.append(role_key)
+        return list(candidates.values())
 
     def get_tenant_setting_value(self, tenant_id: str, key: str) -> dict[str, object] | None:
         statement = select(TenantSetting).where(TenantSetting.tenant_id == tenant_id, TenantSetting.key == key)

@@ -110,6 +110,45 @@ export function formatPlanningOrderReferenceOption(entityKey, record) {
     return [routeNo, name].filter(Boolean).join(" — ") || record.id || "";
   }
 
+  if (entityKey === "event_venue") {
+    const venueNo = typeof record.venue_no === "string" ? record.venue_no.trim() : "";
+    const name = typeof record.name === "string" ? record.name.trim() : "";
+    return [venueNo, name].filter(Boolean).join(" — ") || record.id || "";
+  }
+
+  if (entityKey === "site") {
+    const siteNo = typeof record.site_no === "string" ? record.site_no.trim() : "";
+    const name = typeof record.name === "string" ? record.name.trim() : "";
+    return [siteNo, name].filter(Boolean).join(" — ") || record.id || "";
+  }
+
+  if (entityKey === "trade_fair") {
+    const fairNo = typeof record.fair_no === "string" ? record.fair_no.trim() : "";
+    const name = typeof record.name === "string" ? record.name.trim() : "";
+    return [fairNo, name].filter(Boolean).join(" — ") || record.id || "";
+  }
+
+  if (entityKey === "trade_fair_zone") {
+    const zoneCode = typeof record.zone_code === "string" ? record.zone_code.trim() : "";
+    const label = typeof record.label === "string" ? record.label.trim() : "";
+    return [zoneCode, label].filter(Boolean).join(" — ") || record.id || "";
+  }
+
+  if (entityKey === "planning_record") {
+    const name = typeof record.name === "string" ? record.name.trim() : "";
+    const planningFrom = typeof record.planning_from === "string" ? record.planning_from.trim() : "";
+    const planningTo = typeof record.planning_to === "string" ? record.planning_to.trim() : "";
+    const windowLabel = [planningFrom, planningTo].filter(Boolean).join(" - ");
+    return [name, windowLabel].filter(Boolean).join(" · ") || record.id || "";
+  }
+
+  if (entityKey === "dispatcher_user") {
+    const fullName = typeof record.full_name === "string" ? record.full_name.trim() : "";
+    const username = typeof record.username === "string" ? record.username.trim() : "";
+    const email = typeof record.email === "string" ? record.email.trim() : "";
+    return [fullName, username || email].filter(Boolean).join(" · ") || record.id || "";
+  }
+
   return typeof record.name === "string" && record.name.trim()
     ? record.name.trim()
     : record.id || "";

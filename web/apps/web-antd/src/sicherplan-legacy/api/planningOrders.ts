@@ -66,6 +66,16 @@ export interface PlanningRecordRead extends PlanningRecordListItem {
   archived_at: string | null;
 }
 
+export interface PlanningDispatcherCandidateRead {
+  id: string;
+  tenant_id: string;
+  username: string;
+  email: string | null;
+  full_name: string;
+  status: string;
+  role_keys: string[];
+}
+
 export interface PlanningCommercialIssueRead {
   code: string;
   severity: string;
@@ -107,10 +117,21 @@ function generateRequestId() {
 }
 
 function isApiErrorEnvelope(payload: unknown): payload is { error: { message_key: string; details: Record<string, unknown> } } {
-  return Boolean(payload && typeof payload === "object" && "error" in payload && typeof payload.error?.message_key === "string");
+  if (!payload || typeof payload !== "object" || !("error" in payload)) {
+    return false;
+  }
+  const { error } = payload as { error?: unknown };
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "message_key" in error &&
+      typeof (error as { message_key?: unknown }).message_key === "string",
+  );
 }
 
-async function request<T>(path: string, accessToken: string, options: RequestInit & { body?: unknown } = {}): Promise<T> {
+type JsonRequestOptions = Omit<RequestInit, "body"> & { body?: unknown };
+
+async function request<T>(path: string, accessToken: string, options: JsonRequestOptions = {}): Promise<T> {
   const response = await fetch(`${webAppConfig.apiBaseUrl}${path}`, {
     ...options,
     headers: {
@@ -208,6 +229,13 @@ export function listPlanningRecords(tenantId: string, accessToken: string, filte
 
 export function getPlanningRecord(tenantId: string, planningRecordId: string, accessToken: string) {
   return request<PlanningRecordRead>(`/api/planning/tenants/${tenantId}/ops/planning-records/${planningRecordId}`, accessToken);
+}
+
+export function listPlanningDispatcherCandidates(tenantId: string, accessToken: string) {
+  return request<PlanningDispatcherCandidateRead[]>(
+    `/api/planning/tenants/${tenantId}/ops/planning-records/dispatcher-candidates`,
+    accessToken,
+  );
 }
 
 export function createPlanningRecord(tenantId: string, accessToken: string, payload: Record<string, unknown>) {

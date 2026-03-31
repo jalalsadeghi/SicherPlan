@@ -102,6 +102,46 @@ test("planning-orders detail form uses friendly labels and inline placeholders",
   assert.doesNotMatch(source, /tp\("patrolRouteEmpty"\)\s*<\/p>/);
 });
 
+test("planning-record detail form replaces raw UUID fields with selectors", () => {
+  assert.doesNotMatch(source, /fieldsDispatcherUserId[\s\S]*<input v-model="planningDraft\.dispatcher_user_id"/);
+  assert.doesNotMatch(source, /fieldsParentPlanningRecordId[\s\S]*<input v-model="planningDraft\.parent_planning_record_id"/);
+  assert.doesNotMatch(source, /fieldsEventVenueId[\s\S]*<input v-model="planningDraft\.event_detail\.event_venue_id"/);
+  assert.doesNotMatch(source, /fieldsSiteId[\s\S]*<input v-model="planningDraft\.site_detail\.site_id"/);
+  assert.doesNotMatch(source, /fieldsTradeFairId[\s\S]*<input v-model="planningDraft\.trade_fair_detail\.trade_fair_id"/);
+  assert.doesNotMatch(source, /fieldsTradeFairZoneId[\s\S]*<input v-model="planningDraft\.trade_fair_detail\.trade_fair_zone_id"/);
+  assert.doesNotMatch(source, /fieldsPatrolRouteDetailId[\s\S]*<input v-model="planningDraft\.patrol_detail\.patrol_route_id"/);
+  assert.match(source, /fieldsDispatcherUserId[\s\S]*:value="planningDraft\.dispatcher_user_id \|\| undefined"[\s\S]*dispatcherPlaceholder/s);
+  assert.match(source, /fieldsParentPlanningRecordId[\s\S]*:value="planningDraft\.parent_planning_record_id \|\| undefined"[\s\S]*parentPlanningRecordPlaceholder/s);
+  assert.match(source, /fieldsEventVenueId[\s\S]*:value="planningDraft\.event_detail\.event_venue_id \|\| undefined"[\s\S]*eventVenuePlaceholder/s);
+  assert.match(source, /fieldsSiteId[\s\S]*:value="planningDraft\.site_detail\.site_id \|\| undefined"[\s\S]*sitePlaceholder/s);
+  assert.match(source, /fieldsTradeFairId[\s\S]*:value="planningDraft\.trade_fair_detail\.trade_fair_id \|\| undefined"[\s\S]*tradeFairPlaceholder/s);
+  assert.match(source, /fieldsTradeFairZoneId[\s\S]*:value="planningDraft\.trade_fair_detail\.trade_fair_zone_id \|\| undefined"[\s\S]*tradeFairZonePlaceholder/s);
+  assert.match(source, /fieldsPatrolRouteDetailId[\s\S]*:value="planningDraft\.patrol_detail\.patrol_route_id \|\| undefined"[\s\S]*patrolRouteDetailPlaceholder/s);
+});
+
+test("planning-record status is edit-only and no longer sent on create", () => {
+  assert.doesNotMatch(source, /fieldsStatus[\s\S]*<input v-model="planningDraft\.status"/);
+  assert.match(source, /v-if="!isCreatingPlanning && selectedPlanningRecord"[\s\S]*fieldsStatus[\s\S]*v-model="planningDraft\.status"/s);
+  assert.doesNotMatch(source, /notes:\s*planningDraft\.notes \|\| null,\s*status:/);
+  assert.match(source, /if \(includeVersion && selectedPlanningRecord\.value\) \{[\s\S]*payload\.version_no = selectedPlanningRecord\.value\.version_no;[\s\S]*payload\.status = planningDraft\.status \|\| selectedPlanningRecord\.value\.status \|\| "active";/s);
+});
+
+test("planning-record trade-fair zone selector depends on selected trade fair", () => {
+  assert.match(source, /watch\(\s*\(\) => planningDraft\.trade_fair_detail\.trade_fair_id,/);
+  assert.match(source, /await refreshTradeFairZoneOptions\(tradeFairId\);/);
+  assert.match(source, /:disabled="loading\.action \|\| !planningDraft\.trade_fair_detail\.trade_fair_id"/);
+});
+
+test("planning-record selectors reuse the correct lookup sources", () => {
+  assert.match(source, /await listPlanningDispatcherCandidates\(tenantScopeId\.value, accessToken\.value\)/);
+  assert.match(source, /listPlanningCatalogRecords\(\s*"event_venue"/);
+  assert.match(source, /listPlanningCatalogRecords\(\s*"site"/);
+  assert.match(source, /listPlanningCatalogRecords\(\s*"trade_fair"/);
+  assert.match(source, /listPlanningCatalogRecords\(\s*"patrol_route"/);
+  assert.match(source, /await listTradeFairZones\(tenantScopeId\.value, tradeFairId, accessToken\.value\)/);
+  assert.match(source, /listPlanningRecords\(tenantScopeId\.value, accessToken\.value, \{ order_id: selectedOrderId\.value \}\)/);
+});
+
 test("planning-orders exposes inline setup links, add buttons, and real create modals", () => {
   assert.match(source, /@click="openPlanningSetup\('requirement_type'\)"/);
   assert.match(source, /@click="openPlanningSetup\('patrol_route'\)"/);

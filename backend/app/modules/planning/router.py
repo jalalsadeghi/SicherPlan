@@ -66,6 +66,7 @@ from app.modules.planning.schemas import (
     PlanningRecordAttachmentCreate,
     PlanningRecordAttachmentLinkCreate,
     PlanningRecordFilter,
+    PlanningDispatcherCandidateRead,
     PlanningRecordListItem,
     PlanningRecordRead,
     PlanningRecordReleaseValidationRead,
@@ -1023,6 +1024,15 @@ def list_planning_records(
     service: Annotated[PlanningRecordService, Depends(get_planning_record_service)],
 ) -> list[PlanningRecordListItem]:
     return service.list_planning_records(str(tenant_id), filters, context)
+
+
+@router.get("/planning-records/dispatcher-candidates", response_model=list[PlanningDispatcherCandidateRead])
+def list_planning_dispatcher_candidates(
+    tenant_id: UUID,
+    context: Annotated[RequestAuthorizationContext, Depends(require_permission_only("planning.record.read"))],
+    service: Annotated[PlanningRecordService, Depends(get_planning_record_service)],
+) -> list[PlanningDispatcherCandidateRead]:
+    return service.list_dispatcher_candidates(str(tenant_id), context)
 
 
 @router.post("/planning-records", response_model=PlanningRecordRead, status_code=status.HTTP_201_CREATED)
