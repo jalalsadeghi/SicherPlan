@@ -45,6 +45,32 @@ test("employee list rows use structured text stack markup and card row styling",
   assert.match(viewSource, /\.employee-admin-row,\s*\.employee-admin-record\s*{[\s\S]*padding:\s*1rem;[\s\S]*border-radius:\s*18px;[\s\S]*border:\s*1px solid var\(--sp-color-border-soft\);/);
 });
 
+test("employee list panel splits search and import-export into tabs and preserves tab-panel structure", () => {
+  assert.match(viewSource, /data-testid="employee-list-tabs"/);
+  assert.match(viewSource, /data-testid="employee-list-tab-search"/);
+  assert.match(viewSource, /data-testid="employee-list-tab-import-export"/);
+  assert.match(viewSource, /data-testid="employee-list-tab-panel-search"/);
+  assert.match(viewSource, /data-testid="employee-list-tab-panel-import-export"/);
+  assert.match(viewSource, /v-show="listPanelTab === 'search'"/);
+  assert.match(viewSource, /v-show="listPanelTab === 'import_export'"/);
+  assert.match(viewSource, /employee-list-tab-panel-search[\s\S]*employeeAdmin\.actions\.search/);
+  assert.match(viewSource, /employee-list-tab-panel-search[\s\S]*employeeAdmin\.actions\.newEmployee/);
+  assert.match(viewSource, /employee-list-tab-panel-import-export[\s\S]*employeeAdmin\.actions\.loadImportFile/);
+  assert.match(viewSource, /employee-list-tab-panel-import-export[\s\S]*employeeAdmin\.actions\.importExecute/);
+  assert.match(viewSource, /employee-list-tab-panel-import-export[\s\S]*employeeAdmin\.actions\.exportEmployees/);
+});
+
+test("employee feedback banner exposes stable tone-aware markup", () => {
+  assert.match(viewSource, /data-testid="'employee-feedback-banner'"/);
+  assert.match(viewSource, /class="employee-admin-feedback__body"/);
+  assert.match(viewSource, /class="employee-admin-feedback__title"/);
+  assert.match(viewSource, /class="employee-admin-feedback__message"/);
+  assert.match(viewSource, /class="employee-admin-feedback__dismiss"/);
+  assert.match(viewSource, /\.employee-admin-feedback\[data-tone='success'\]/);
+  assert.match(viewSource, /\.employee-admin-feedback\[data-tone='error'\]/);
+  assert.match(viewSource, /\.employee-admin-feedback\[data-tone='neutral'\]/);
+});
+
 test("non-overview employee tabs reuse the structured section pattern", () => {
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*employeeAdmin\.privateProfile\.identityEyebrow/);
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*submitPrivateProfile/);

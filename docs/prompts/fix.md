@@ -1,117 +1,109 @@
 You are working in the latest SicherPlan repository.
 
-Problem:
-In the Employees admin workspace, the Documents tab is currently not actionable.
-The current implementation only lists already-linked employee documents and allows download, but it does not allow:
-- uploading a new employee document
-- linking an existing shared document to the employee file
-- creating a document record for the employee
-- adding new versions to an existing employee-linked document
+Scope:
+Fix two UI issues in the Employees admin page only.
+Do not change backend behavior, API contracts, permissions, or business logic unless absolutely required for the frontend layout fix.
+This is a focused UI/UX refinement task.
 
-Current findings:
-1. Frontend documents tab in:
-   web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
-   only renders a read-only list and calls downloadDocument(document).
-   There is no upload input, no create/link form, and no save handler for employee documents.
-
-2. Frontend API layer in:
-   web/apps/web-antd/src/sicherplan-legacy/api/employeeAdmin.ts
-   only provides:
-   - listEmployeeDocuments(...)
-   - downloadEmployeeDocument(...)
-   and has no create/link/upload employee-document API methods.
-
-3. Backend router in:
-   backend/app/modules/employees/router.py
-   only exposes:
-   - GET /api/employees/tenants/{tenant_id}/employees/{employee_id}/documents
-   - GET /{employee_id}/photo
-   - POST /{employee_id}/photo
-   There is no POST/link/upload endpoint for generic employee documents.
-
-4. Backend file service in:
-   backend/app/modules/employees/file_service.py
-   currently supports:
-   - list_documents(...)
-   - get_profile_photo(...)
-   - upsert_profile_photo(...)
-   but no generic employee-document create/upload/link flow.
-
-Goal:
-Upgrade the Employees -> Documents tab from read-only to a proper document-management area for the employee file.
-
-Requirements:
-1. Keep the existing master-detail Employees page and current tab structure.
-2. Extend the Documents tab so authorized users can:
-   - upload a new employee document
-   - link an existing document to the employee
-   - optionally add a new version to an existing employee-linked document
-   - see metadata such as title, relation_type, file name, content type, current version, linked_at
-   - download documents as before
-3. Reuse the shared platform document service and document-link backbone.
-4. Use owner_type = "hr.employee" for employee-linked documents.
-5. Support relation types explicitly, e.g.:
-   - employee_document
-   - id_proof
-   - contract
-   - certificate
-   - residence_permit
-   - misc
-   Keep this extensible and avoid hardcoding brittle UI-only logic.
-6. Add backend endpoints for generic employee documents, for example:
-   - POST /api/employees/tenants/{tenant_id}/employees/{employee_id}/documents/uploads
-   - POST /api/employees/tenants/{tenant_id}/employees/{employee_id}/documents/links
-   - POST /api/employees/tenants/{tenant_id}/employees/{employee_id}/documents/{document_id}/versions
-   Adjust naming only if needed for consistency with existing project conventions.
-7. Add backend schemas for:
-   - employee document upload/create
-   - employee document link
-   - employee document version add
-8. Add service methods in EmployeeFileService for:
-   - upload_employee_document
-   - link_employee_document
-   - add_employee_document_version
-9. Preserve profile-photo behavior as a separate dedicated feature; do not break the existing photo flow.
-10. Enforce permissions correctly:
-   - viewing employee documents should require employees.employee.read
-   - creating/linking/updating employee documents should require employees.employee.write
-   - do not expose private-only fields unless already allowed elsewhere
-11. Update the UI copy/i18n for the new document actions.
-12. Add/adjust tests:
-   - frontend layout/render test for new documents controls
-   - frontend API tests if present
-   - backend router/service tests for upload/link/version flows
-   - permission tests
-13. Backward compatibility:
-   - existing employees with no documents must still load cleanly
-   - existing profile-photo behavior must remain unchanged
-
-Files to inspect and update:
-Frontend:
+Target page:
 - web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
-- web/apps/web-antd/src/sicherplan-legacy/api/employeeAdmin.ts
-- web/apps/web-antd/src/sicherplan-legacy/i18n/messages.ts
-- related frontend tests
 
-Backend:
-- backend/app/modules/employees/router.py
-- backend/app/modules/employees/file_service.py
-- backend/app/modules/employees/schemas.py
-- backend/app/modules/platform_services/docs_service.py
-- backend/app/modules/platform_services/docs_schemas.py
-- backend/app/modules/platform_services/docs_repository.py
-- related tests
+Likely related test file:
+- web/apps/web-antd/src/sicherplan-legacy/features/employees/employeeAdmin.layout.test.js
 
-Implementation notes:
-- Prefer using the existing shared document service instead of inventing a separate employee-only file subsystem.
-- Keep the Documents tab structured similarly to other employee tabs: intro section, library/register section, editor/actions section.
-- Be explicit about relation types and document metadata.
-- Keep code production-ready, not a placeholder.
+Context:
+The Employees page currently has:
+1. A left-side “List” panel containing both:
+   - Search/filter form
+   - Import / Export form
+   in the same scrollable box
+2. A feedback / alert box rendered after save, update, import, etc. through:
+   - `feedback.message`
+   - `.employee-admin-feedback`
+This alert currently needs visual cleanup.
 
-Before changing code, first provide:
+Task 1 — Put Search and Import/Export into tabs inside the List panel
+Requirements:
+- Keep the existing left-side List panel.
+- Inside that panel, split the two areas into two tabs:
+  - Tab 1: Search
+  - Tab 2: Import / Export
+- The Search tab should contain:
+  - search input
+  - status filter
+  - default branch filter
+  - default mandate filter
+  - include archived checkbox
+  - search button
+  - create employee button
+  - export button only if you decide it still belongs there; otherwise move export into Import / Export tab and keep it logically grouped
+- The Import / Export tab should contain:
+  - file input
+  - load CSV
+  - use template/reset template
+  - CSV textarea
+  - continue on error checkbox
+  - validate import
+  - run import
+  - export controls if grouped there
+  - dry-run / execute summaries
+- Preserve current actions and handlers. This is a layout reorganization, not a workflow rewrite.
+- Preserve entered form state when switching tabs. Do not reset search or import state just because the user changes tabs.
+- Use the existing design language of the page:
+  - pill/tab style similar to the employee detail tabs
+  - clean spacing
+  - no visual crowding
+- Default open tab should be:
+  - Search
+- Keep the page responsive and consistent with the existing master-detail layout.
+
+Task 2 — Fix the Alert / Feedback message styling
+Requirements:
+- Improve the visual style of the feedback area rendered when `feedback.message` exists.
+- Make it look like a proper page-level status banner:
+  - clear padding
+  - rounded corners
+  - readable text hierarchy
+  - proper spacing between title, message, and dismiss button
+  - consistent background/border per tone
+- Support these tones cleanly:
+  - success
+  - error
+  - neutral
+- Ensure the banner:
+  - does not look broken or collapsed
+  - does not overflow awkwardly
+  - aligns with the page content width
+  - wraps correctly on smaller screens
+  - keeps the dismiss button visually aligned
+- Do not change the feedback logic itself unless necessary for class binding cleanup.
+
+Implementation guidance:
+- Keep changes local to the Employees page as much as possible.
+- Reuse the existing tab styling pattern already used in the employee detail workspace if appropriate.
+- Prefer small, maintainable refactoring over large rewrites.
+- If needed, extract tiny computed helpers for tab labels/state, but do not over-engineer.
+- Do not touch unrelated employee tabs such as Overview, App access, Profile photo, Notes, Groups, Addresses, Documents.
+
+Testing:
+Update or add frontend tests so they verify:
+1. The left panel now has two tabs for Search and Import / Export
+2. The relevant content switches by active tab
+3. The alert/feedback container has stable markup/hooks for tone-based styling
+4. Existing master-detail layout expectations still pass
+
+Acceptance criteria:
+- The left List panel contains two tabs: Search and Import / Export
+- Search and Import / Export are no longer shown together in one long stacked block
+- Form state is preserved when switching tabs
+- The feedback/alert box has a clean, production-ready visual style
+- No backend changes are required
+- Existing employee page behavior still works
+
+Before coding:
+Briefly summarize:
 1. impacted files
-2. API contract changes
-3. permission implications
-4. test plan
+2. whether export stays in Search or moves to Import / Export
+3. test changes
 
-Then implement the fix.
+Then implement.

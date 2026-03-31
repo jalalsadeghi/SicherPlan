@@ -29,12 +29,12 @@
       </div>
     </div>
 
-    <section v-if="feedback.message" class="employee-admin-feedback" :data-tone="feedback.tone">
-      <div>
-        <strong>{{ feedback.title }}</strong>
-        <span>{{ feedback.message }}</span>
+    <section v-if="feedback.message" class="employee-admin-feedback" :data-testid="'employee-feedback-banner'" :data-tone="feedback.tone">
+      <div class="employee-admin-feedback__body">
+        <strong class="employee-admin-feedback__title">{{ feedback.title }}</strong>
+        <p class="employee-admin-feedback__message">{{ feedback.message }}</p>
       </div>
-      <button type="button" @click="clearFeedback">{{ t("employeeAdmin.actions.clearFeedback") }}</button>
+      <button class="employee-admin-feedback__dismiss" type="button" @click="clearFeedback">{{ t("employeeAdmin.actions.clearFeedback") }}</button>
     </section>
 
     <section v-if="!resolvedTenantScopeId" class="module-card employee-admin-empty">
@@ -57,56 +57,76 @@
           <StatusBadge :status="loading.list ? 'inactive' : 'active'" />
         </div>
 
-        <div class="employee-admin-form-grid">
-          <label class="field-stack">
-            <span>{{ t("employeeAdmin.filters.search") }}</span>
-            <input v-model="filters.search" :placeholder="t('employeeAdmin.filters.searchPlaceholder')" />
-          </label>
-          <label class="field-stack">
-            <span>{{ t("employeeAdmin.filters.status") }}</span>
-            <select v-model="filters.status">
-              <option value="">{{ t("employeeAdmin.filters.allStatuses") }}</option>
-              <option value="active">{{ t("employeeAdmin.status.active") }}</option>
-              <option value="inactive">{{ t("employeeAdmin.status.inactive") }}</option>
-              <option value="archived">{{ t("employeeAdmin.status.archived") }}</option>
-            </select>
-          </label>
-          <label class="field-stack">
-            <span>{{ t("employeeAdmin.fields.defaultBranchId") }}</span>
-            <select v-model="filters.default_branch_id">
-              <option value="">{{ t("employeeAdmin.summary.none") }}</option>
-              <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
-                {{ formatStructureLabel(branch) }}
-              </option>
-            </select>
-          </label>
-          <label class="field-stack">
-            <span>{{ t("employeeAdmin.fields.defaultMandateId") }}</span>
-            <select v-model="filters.default_mandate_id">
-              <option value="">{{ t("employeeAdmin.summary.none") }}</option>
-              <option v-for="mandate in filterMandateOptions(filters.default_branch_id)" :key="mandate.id" :value="mandate.id">
-                {{ formatStructureLabel(mandate) }}
-              </option>
-            </select>
-          </label>
-        </div>
-
-        <label class="employee-admin-checkbox">
-          <input v-model="filters.include_archived" type="checkbox" />
-          <span>{{ t("employeeAdmin.filters.includeArchived") }}</span>
-        </label>
-
-        <div class="cta-row">
-          <button class="cta-button" type="button" @click="refreshEmployees">{{ t("employeeAdmin.actions.search") }}</button>
-          <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreate" @click="startCreateEmployee">
-            {{ t("employeeAdmin.actions.newEmployee") }}
+        <nav class="employee-admin-tabs employee-admin-tabs--panel" data-testid="employee-list-tabs" aria-label="Employee list tools">
+          <button
+            type="button"
+            class="employee-admin-tab"
+            :class="{ active: listPanelTab === 'search' }"
+            data-testid="employee-list-tab-search"
+            @click="listPanelTab = 'search'"
+          >
+            {{ t("employeeAdmin.actions.search") }}
           </button>
-          <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canExport" @click="runExport">
-            {{ t("employeeAdmin.actions.exportEmployees") }}
+          <button
+            type="button"
+            class="employee-admin-tab"
+            :class="{ active: listPanelTab === 'import_export' }"
+            data-testid="employee-list-tab-import-export"
+            @click="listPanelTab = 'import_export'"
+          >
+            {{ t("employeeAdmin.import.eyebrow") }}
           </button>
-        </div>
+        </nav>
 
-        <section class="employee-admin-section">
+        <section v-show="listPanelTab === 'search'" class="employee-admin-section employee-admin-tab-panel" data-testid="employee-list-tab-panel-search">
+          <div class="employee-admin-form-grid">
+            <label class="field-stack">
+              <span>{{ t("employeeAdmin.filters.search") }}</span>
+              <input v-model="filters.search" :placeholder="t('employeeAdmin.filters.searchPlaceholder')" />
+            </label>
+            <label class="field-stack">
+              <span>{{ t("employeeAdmin.filters.status") }}</span>
+              <select v-model="filters.status">
+                <option value="">{{ t("employeeAdmin.filters.allStatuses") }}</option>
+                <option value="active">{{ t("employeeAdmin.status.active") }}</option>
+                <option value="inactive">{{ t("employeeAdmin.status.inactive") }}</option>
+                <option value="archived">{{ t("employeeAdmin.status.archived") }}</option>
+              </select>
+            </label>
+            <label class="field-stack">
+              <span>{{ t("employeeAdmin.fields.defaultBranchId") }}</span>
+              <select v-model="filters.default_branch_id">
+                <option value="">{{ t("employeeAdmin.summary.none") }}</option>
+                <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
+                  {{ formatStructureLabel(branch) }}
+                </option>
+              </select>
+            </label>
+            <label class="field-stack">
+              <span>{{ t("employeeAdmin.fields.defaultMandateId") }}</span>
+              <select v-model="filters.default_mandate_id">
+                <option value="">{{ t("employeeAdmin.summary.none") }}</option>
+                <option v-for="mandate in filterMandateOptions(filters.default_branch_id)" :key="mandate.id" :value="mandate.id">
+                  {{ formatStructureLabel(mandate) }}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <label class="employee-admin-checkbox">
+            <input v-model="filters.include_archived" type="checkbox" />
+            <span>{{ t("employeeAdmin.filters.includeArchived") }}</span>
+          </label>
+
+          <div class="cta-row">
+            <button class="cta-button" type="button" @click="refreshEmployees">{{ t("employeeAdmin.actions.search") }}</button>
+            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreate" @click="startCreateEmployee">
+              {{ t("employeeAdmin.actions.newEmployee") }}
+            </button>
+          </div>
+        </section>
+
+        <section v-show="listPanelTab === 'import_export'" class="employee-admin-section employee-admin-tab-panel" data-testid="employee-list-tab-panel-import-export">
           <div class="employee-admin-panel__header">
             <div>
               <p class="eyebrow">{{ t("employeeAdmin.import.eyebrow") }}</p>
@@ -120,6 +140,9 @@
             </button>
             <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canImport" @click="importDraft.csv_text = buildEmployeeImportTemplateRows()">
               {{ t("employeeAdmin.actions.resetImportTemplate") }}
+            </button>
+            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canExport" @click="runExport">
+              {{ t("employeeAdmin.actions.exportEmployees") }}
             </button>
           </div>
           <label class="field-stack">
@@ -1393,6 +1416,7 @@ const pendingEmployeeDocumentFile = ref<File | null>(null);
 const pendingEmployeeDocumentVersionFile = ref<File | null>(null);
 const pendingImportFile = ref<File | null>(null);
 const isCreatingEmployee = ref(false);
+const listPanelTab = ref<"import_export" | "search">("search");
 const activeDetailTab = ref("overview");
 const editingNoteId = ref("");
 const editingGroupId = ref("");
@@ -2675,6 +2699,63 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.employee-admin-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: color-mix(in srgb, var(--sp-color-surface-page) 82%, white 18%);
+}
+
+.employee-admin-feedback[data-tone='success'] {
+  border-color: color-mix(in srgb, var(--sp-color-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 62%, white 38%);
+}
+
+.employee-admin-feedback[data-tone='error'] {
+  border-color: rgb(190 72 72 / 34%);
+  background: rgb(255 240 240 / 88%);
+}
+
+.employee-admin-feedback[data-tone='neutral'] {
+  border-color: var(--sp-color-border-soft);
+}
+
+.employee-admin-feedback__body {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.employee-admin-feedback__title,
+.employee-admin-feedback__message {
+  margin: 0;
+}
+
+.employee-admin-feedback__title {
+  color: var(--sp-color-text-primary);
+}
+
+.employee-admin-feedback__message {
+  color: var(--sp-color-text-secondary);
+}
+
+.employee-admin-feedback__dismiss {
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-card);
+  color: var(--sp-color-text-primary);
+  border-radius: 999px;
+  padding: 0.65rem 0.95rem;
+  font: inherit;
+  cursor: pointer;
+  align-self: center;
+}
+
 .employee-admin-grid {
   display: grid;
   gap: var(--sp-page-gap, 1.25rem);
@@ -2841,6 +2922,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+.employee-admin-tabs--panel {
+  margin-top: -0.1rem;
 }
 
 .employee-admin-tab {
@@ -3048,6 +3133,14 @@ onBeforeUnmount(() => {
   .employee-admin-form-grid--editor,
   .employee-admin-form-actions {
     grid-template-columns: 1fr;
+  }
+
+  .employee-admin-feedback {
+    align-items: stretch;
+  }
+
+  .employee-admin-feedback__dismiss {
+    align-self: stretch;
   }
 
   .employee-admin-record__actions {
