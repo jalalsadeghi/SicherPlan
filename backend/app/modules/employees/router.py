@@ -52,6 +52,9 @@ from app.modules.employees.schemas import (
     EmployeeCredentialRead,
     EmployeeCredentialUpdate,
     EmployeeDocumentListItemRead,
+    EmployeeDocumentLinkCreate,
+    EmployeeDocumentUploadCreate,
+    EmployeeDocumentVersionCreate,
     EmployeeEventApplicationCreate,
     EmployeeEventApplicationFilter,
     EmployeeEventApplicationRead,
@@ -1144,6 +1147,49 @@ def list_employee_documents(
     service: Annotated[EmployeeFileService, Depends(get_employee_file_service)] = None,
 ) -> list[EmployeeDocumentListItemRead]:
     return service.list_documents(str(tenant_id), str(employee_id), context)
+
+
+@router.post("/{employee_id}/documents/uploads", response_model=EmployeeDocumentListItemRead, status_code=status.HTTP_201_CREATED)
+def upload_employee_document(
+    tenant_id: UUID,
+    employee_id: UUID,
+    payload: EmployeeDocumentUploadCreate,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.employee.write", scope="tenant")),
+    ],
+    service: Annotated[EmployeeFileService, Depends(get_employee_file_service)],
+) -> EmployeeDocumentListItemRead:
+    return service.upload_employee_document(str(tenant_id), str(employee_id), payload, context)
+
+
+@router.post("/{employee_id}/documents/links", response_model=EmployeeDocumentListItemRead, status_code=status.HTTP_201_CREATED)
+def link_employee_document(
+    tenant_id: UUID,
+    employee_id: UUID,
+    payload: EmployeeDocumentLinkCreate,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.employee.write", scope="tenant")),
+    ],
+    service: Annotated[EmployeeFileService, Depends(get_employee_file_service)],
+) -> EmployeeDocumentListItemRead:
+    return service.link_employee_document(str(tenant_id), str(employee_id), payload, context)
+
+
+@router.post("/{employee_id}/documents/{document_id}/versions", response_model=EmployeeDocumentListItemRead, status_code=status.HTTP_201_CREATED)
+def add_employee_document_version(
+    tenant_id: UUID,
+    employee_id: UUID,
+    document_id: UUID,
+    payload: EmployeeDocumentVersionCreate,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.employee.write", scope="tenant")),
+    ],
+    service: Annotated[EmployeeFileService, Depends(get_employee_file_service)],
+) -> EmployeeDocumentListItemRead:
+    return service.add_employee_document_version(str(tenant_id), str(employee_id), str(document_id), payload, context)
 
 
 @router.get("/{employee_id}/photo", response_model=EmployeePhotoRead | None)

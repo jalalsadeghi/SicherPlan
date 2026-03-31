@@ -1025,21 +1025,139 @@
                   <h4>{{ t("employeeAdmin.documents.libraryTitle") }}</h4>
                 </div>
                 <div v-if="employeeDocuments.length" class="employee-admin-record-list">
-                  <button
+                  <article
                     v-for="document in employeeDocuments"
                     :key="document.document_id"
-                    type="button"
                     class="employee-admin-record"
-                    @click="downloadDocument(document)"
                   >
                     <div class="employee-admin-record__body">
                       <strong>{{ document.title }}</strong>
-                      <span class="employee-admin-record__meta">{{ document.file_name || t("employeeAdmin.summary.none") }} · {{ document.relation_type }}</span>
+                      <span class="employee-admin-record__meta">{{ document.label || t("employeeAdmin.summary.none") }} · {{ resolveEmployeeDocumentRelationLabel(document.relation_type) }}</span>
+                      <span class="employee-admin-record__meta">
+                        {{ document.file_name || t("employeeAdmin.summary.none") }}
+                        ·
+                        {{ document.content_type || t("employeeAdmin.summary.none") }}
+                        ·
+                        v{{ document.current_version_no || 0 }}
+                      </span>
+                      <span class="employee-admin-record__meta">{{ document.linked_at || t("employeeAdmin.summary.none") }}</span>
                     </div>
-                    <StatusBadge :status="document.current_version_no ? 'active' : 'inactive'" />
-                  </button>
+                    <div class="employee-admin-record__actions">
+                      <button class="cta-button cta-secondary" type="button" :disabled="!document.current_version_no" @click="downloadDocument(document)">
+                        {{ t("employeeAdmin.actions.downloadDocument") }}
+                      </button>
+                      <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canEdit" @click="useEmployeeDocumentForVersion(document)">
+                        {{ t("employeeAdmin.actions.useDocumentForVersion") }}
+                      </button>
+                      <StatusBadge :status="document.current_version_no ? 'active' : 'inactive'" />
+                    </div>
+                  </article>
                 </div>
                 <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.documents.empty") }}</p>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.documents.uploadEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.documents.uploadTitle") }}</h4>
+                </div>
+                <p class="field-help">{{ t("employeeAdmin.documents.uploadLead") }}</p>
+                <form class="employee-admin-form" @submit.prevent="submitEmployeeDocumentUpload">
+                  <div class="employee-admin-form-grid">
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.fields.documentTitle") }}</span>
+                      <input v-model="documentUploadDraft.title" required />
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.fields.documentLabel") }}</span>
+                      <input v-model="documentUploadDraft.label" />
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.fields.documentRelationType") }}</span>
+                      <select v-model="documentUploadDraft.relation_type">
+                        <option v-for="option in employeeDocumentRelationOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                      </select>
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.fields.documentTypeKey") }}</span>
+                      <input v-model="documentUploadDraft.document_type_key" />
+                    </label>
+                    <label class="field-stack field-stack--wide">
+                      <span>{{ t("employeeAdmin.fields.documentFile") }}</span>
+                      <input type="file" @change="onEmployeeDocumentSelected" />
+                    </label>
+                  </div>
+                  <div class="cta-row">
+                    <button class="cta-button" type="submit" :disabled="!actionState.canEdit || !pendingEmployeeDocumentFile">
+                      {{ t("employeeAdmin.actions.uploadDocument") }}
+                    </button>
+                  </div>
+                </form>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.documents.linkEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.documents.linkTitle") }}</h4>
+                </div>
+                <p class="field-help">{{ t("employeeAdmin.documents.linkLead") }}</p>
+                <form class="employee-admin-form" @submit.prevent="submitEmployeeDocumentLink">
+                  <div class="employee-admin-form-grid">
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.fields.documentId") }}</span>
+                      <input v-model="documentLinkDraft.document_id" required />
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.fields.documentLabel") }}</span>
+                      <input v-model="documentLinkDraft.label" />
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.fields.documentRelationType") }}</span>
+                      <select v-model="documentLinkDraft.relation_type">
+                        <option v-for="option in employeeDocumentRelationOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="cta-row">
+                    <button class="cta-button cta-secondary" type="submit" :disabled="!actionState.canEdit">
+                      {{ t("employeeAdmin.actions.linkDocument") }}
+                    </button>
+                  </div>
+                </form>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.documents.versionEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.documents.versionTitle") }}</h4>
+                </div>
+                <p class="field-help">{{ t("employeeAdmin.documents.versionLead") }}</p>
+                <p v-if="selectedEmployeeDocument" class="field-help">
+                  {{ t("employeeAdmin.documents.selectedVersionTarget") }}: {{ selectedEmployeeDocument.title }}
+                </p>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.documents.versionEmpty") }}</p>
+                <form class="employee-admin-form" @submit.prevent="submitEmployeeDocumentVersion">
+                  <div class="employee-admin-form-grid">
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.fields.documentVersionTarget") }}</span>
+                      <select v-model="selectedEmployeeDocumentId">
+                        <option value="">{{ t("employeeAdmin.summary.none") }}</option>
+                        <option v-for="document in employeeDocuments" :key="document.document_id" :value="document.document_id">
+                          {{ document.title }}
+                        </option>
+                      </select>
+                    </label>
+                    <label class="field-stack field-stack--wide">
+                      <span>{{ t("employeeAdmin.fields.documentFile") }}</span>
+                      <input type="file" @change="onEmployeeDocumentVersionSelected" />
+                    </label>
+                  </div>
+                  <div class="cta-row">
+                    <button class="cta-button" type="submit" :disabled="!actionState.canEdit || !selectedEmployeeDocumentId || !pendingEmployeeDocumentVersionFile">
+                      {{ t("employeeAdmin.actions.addDocumentVersion") }}
+                    </button>
+                  </div>
+                </form>
               </section>
             </div>
           </section>
@@ -1060,6 +1178,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 
 import { listBranches, listMandates, type BranchRead, type MandateRead } from "@/api/coreAdmin";
 import {
+  addEmployeeDocumentVersion,
   attachEmployeeAccessUser,
   createEmployeeAccessUser,
   createEmployeeAddress,
@@ -1077,6 +1196,7 @@ import {
   getEmployeePhoto,
   importEmployeesDryRun,
   importEmployeesExecute,
+  linkEmployeeDocument,
   listEmployeeAddresses,
   listEmployeeDocuments,
   listEmployeeGroups,
@@ -1097,7 +1217,10 @@ import {
   type EmployeeAddressHistoryCreatePayload,
   type EmployeeAddressHistoryRead,
   type EmployeeAddressHistoryUpdatePayload,
+  type EmployeeDocumentLinkPayload,
   type EmployeeDocumentListItemRead,
+  type EmployeeDocumentUploadPayload,
+  type EmployeeDocumentVersionPayload,
   type EmployeeExportResult,
   type EmployeeGroupMembershipRead,
   type EmployeeGroupRead,
@@ -1111,6 +1234,7 @@ import {
   type EmployeePrivateProfileWritePayload,
   type EmployeePhotoRead,
   updateEmployeePrivateProfile,
+  uploadEmployeeDocument,
   upsertEmployeePrivateProfile,
 } from "@/api/employeeAdmin";
 import StatusBadge from "@/components/StatusBadge.vue";
@@ -1265,6 +1389,8 @@ const lastImportResult = ref<EmployeeImportExecuteResult | null>(null);
 const lastExportResult = ref<EmployeeExportResult | null>(null);
 const photoPreviewUrl = ref("");
 const pendingPhotoFile = ref<File | null>(null);
+const pendingEmployeeDocumentFile = ref<File | null>(null);
+const pendingEmployeeDocumentVersionFile = ref<File | null>(null);
 const pendingImportFile = ref<File | null>(null);
 const isCreatingEmployee = ref(false);
 const activeDetailTab = ref("overview");
@@ -1272,6 +1398,20 @@ const editingNoteId = ref("");
 const editingGroupId = ref("");
 const editingMembershipId = ref("");
 const editingAddressId = ref("");
+const selectedEmployeeDocumentId = ref("");
+
+const documentUploadDraft = reactive({
+  title: "",
+  relation_type: "employee_document",
+  label: "",
+  document_type_key: "",
+});
+
+const documentLinkDraft = reactive<EmployeeDocumentLinkPayload>({
+  document_id: "",
+  relation_type: "employee_document",
+  label: "",
+});
 
 const effectiveRole = computed(() => authStore.effectiveRole);
 const isPlatformAdmin = computed(() => effectiveRole.value === "platform_admin");
@@ -1299,6 +1439,9 @@ const employeeAddressTimeline = computed(() =>
 const currentEmployeeAddress = computed(
   () => [...employeeAddresses.value].filter((row) => !row.archived_at && !row.valid_to).sort((a, b) => a.valid_from.localeCompare(b.valid_from)).at(-1) ?? null,
 );
+const selectedEmployeeDocument = computed(
+  () => employeeDocuments.value.find((document) => document.document_id === selectedEmployeeDocumentId.value) ?? null,
+);
 const employmentTypeOptions = computed(() => [
   { value: "full_time", label: t("employeeAdmin.employmentType.full_time") },
   { value: "part_time", label: t("employeeAdmin.employmentType.part_time") },
@@ -1307,6 +1450,14 @@ const employmentTypeOptions = computed(() => [
   { value: "working_student", label: t("employeeAdmin.employmentType.working_student") },
   { value: "freelance", label: t("employeeAdmin.employmentType.freelance") },
   { value: "other", label: t("employeeAdmin.employmentType.other") },
+]);
+const employeeDocumentRelationOptions = computed(() => [
+  { value: "employee_document", label: t("employeeAdmin.documents.relation.employee_document") },
+  { value: "id_proof", label: t("employeeAdmin.documents.relation.id_proof") },
+  { value: "contract", label: t("employeeAdmin.documents.relation.contract") },
+  { value: "certificate", label: t("employeeAdmin.documents.relation.certificate") },
+  { value: "residence_permit", label: t("employeeAdmin.documents.relation.residence_permit") },
+  { value: "misc", label: t("employeeAdmin.documents.relation.misc") },
 ]);
 const branchOptions = computed(() => branches.value.filter((branch) => branch.archived_at == null));
 const mandateOptions = computed(() => mandates.value.filter((mandate) => mandate.archived_at == null));
@@ -1345,6 +1496,11 @@ function formatStructureLabel(record: BranchRead | MandateRead) {
 
 function filterMandateOptions(branchId: string) {
   return filterMandatesForBranch(mandateOptions.value, branchId) as MandateRead[];
+}
+
+function resolveEmployeeDocumentRelationLabel(relationType: string) {
+  const match = employeeDocumentRelationOptions.value.find((option) => option.value === relationType);
+  return match?.label ?? relationType;
 }
 
 function setFeedback(tone: "error" | "neutral" | "success", title: string, message: string) {
@@ -1542,6 +1698,23 @@ function resetAddressDraft() {
   editingAddressId.value = "";
 }
 
+function resetEmployeeDocumentDrafts() {
+  documentUploadDraft.title = "";
+  documentUploadDraft.relation_type = "employee_document";
+  documentUploadDraft.label = "";
+  documentUploadDraft.document_type_key = "";
+  documentLinkDraft.document_id = "";
+  documentLinkDraft.relation_type = "employee_document";
+  documentLinkDraft.label = "";
+  selectedEmployeeDocumentId.value = "";
+  pendingEmployeeDocumentFile.value = null;
+  pendingEmployeeDocumentVersionFile.value = null;
+}
+
+function useEmployeeDocumentForVersion(document: EmployeeDocumentListItemRead) {
+  selectedEmployeeDocumentId.value = document.document_id;
+}
+
 function editAddress(row: EmployeeAddressHistoryRead) {
   editingAddressId.value = row.id;
   addressDraft.street_line_1 = row.address?.street_line_1 || "";
@@ -1614,6 +1787,7 @@ function startCreateEmployee() {
   accessLink.value = null;
   syncPrivateProfileDraft(null);
   clearPhotoPreview();
+  resetEmployeeDocumentDrafts();
   resetEmployeeDraft();
   resetNoteDraft();
   resetMembershipDraft();
@@ -1718,6 +1892,7 @@ async function selectEmployee(employeeId: string) {
     resetNoteDraft();
     resetMembershipDraft();
     resetAddressDraft();
+    resetEmployeeDocumentDrafts();
     syncPrivateProfileDraft(null);
     resetAccessDrafts();
     if (canReadPrivate.value) {
@@ -2029,9 +2204,108 @@ function onPhotoSelected(event: Event) {
   pendingPhotoFile.value = target.files?.[0] ?? null;
 }
 
+function onEmployeeDocumentSelected(event: Event) {
+  const target = event.target as HTMLInputElement;
+  pendingEmployeeDocumentFile.value = target.files?.[0] ?? null;
+}
+
+function onEmployeeDocumentVersionSelected(event: Event) {
+  const target = event.target as HTMLInputElement;
+  pendingEmployeeDocumentVersionFile.value = target.files?.[0] ?? null;
+}
+
 function onImportSelected(event: Event) {
   const target = event.target as HTMLInputElement;
   pendingImportFile.value = target.files?.[0] ?? null;
+}
+
+async function submitEmployeeDocumentUpload() {
+  if (!pendingEmployeeDocumentFile.value || !selectedEmployeeId.value || !resolvedTenantScopeId.value || !authStore.accessToken) {
+    return;
+  }
+
+  loading.action = true;
+  try {
+    const payload: EmployeeDocumentUploadPayload = {
+      title: documentUploadDraft.title.trim(),
+      relation_type: documentUploadDraft.relation_type,
+      label: emptyToNull(documentUploadDraft.label),
+      document_type_key: emptyToNull(documentUploadDraft.document_type_key),
+      file_name: pendingEmployeeDocumentFile.value.name,
+      content_type: pendingEmployeeDocumentFile.value.type || "application/octet-stream",
+      content_base64: await fileToBase64(pendingEmployeeDocumentFile.value),
+    };
+    await uploadEmployeeDocument(resolvedTenantScopeId.value, selectedEmployeeId.value, authStore.accessToken, payload);
+    await selectEmployee(selectedEmployeeId.value);
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.documentUploaded"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
+async function submitEmployeeDocumentLink() {
+  if (!selectedEmployeeId.value || !resolvedTenantScopeId.value || !authStore.accessToken) {
+    return;
+  }
+
+  loading.action = true;
+  try {
+    await linkEmployeeDocument(
+      resolvedTenantScopeId.value,
+      selectedEmployeeId.value,
+      authStore.accessToken,
+      {
+        document_id: documentLinkDraft.document_id.trim(),
+        relation_type: documentLinkDraft.relation_type || "employee_document",
+        label: emptyToNull(documentLinkDraft.label || ""),
+      },
+    );
+    await selectEmployee(selectedEmployeeId.value);
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.documentLinked"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
+async function submitEmployeeDocumentVersion() {
+  if (
+    !pendingEmployeeDocumentVersionFile.value
+    || !selectedEmployeeDocumentId.value
+    || !selectedEmployeeId.value
+    || !resolvedTenantScopeId.value
+    || !authStore.accessToken
+  ) {
+    return;
+  }
+
+  loading.action = true;
+  try {
+    const payload: EmployeeDocumentVersionPayload = {
+      file_name: pendingEmployeeDocumentVersionFile.value.name,
+      content_type: pendingEmployeeDocumentVersionFile.value.type || "application/octet-stream",
+      content_base64: await fileToBase64(pendingEmployeeDocumentVersionFile.value),
+    };
+    await addEmployeeDocumentVersion(
+      resolvedTenantScopeId.value,
+      selectedEmployeeId.value,
+      selectedEmployeeDocumentId.value,
+      authStore.accessToken,
+      payload,
+    );
+    await selectEmployee(selectedEmployeeId.value);
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.documentVersionSaved"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
 }
 
 async function submitPhoto() {

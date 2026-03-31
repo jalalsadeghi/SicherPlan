@@ -4,9 +4,15 @@ import unittest
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from app.errors import ApiException
 from app.modules.employees.file_service import EmployeeFileService
 from app.modules.employees.models import Employee
-from app.modules.employees.schemas import EmployeePhotoUpload
+from app.modules.employees.schemas import (
+    EmployeeDocumentLinkCreate,
+    EmployeeDocumentUploadCreate,
+    EmployeeDocumentVersionCreate,
+    EmployeePhotoUpload,
+)
 from app.modules.iam.auth_schemas import AuthenticatedRoleScope
 from app.modules.iam.audit_service import AuditService
 from app.modules.iam.authz import RequestAuthorizationContext
@@ -20,13 +26,13 @@ from app.modules.platform_services.docs_schemas import (
 )
 
 
-def _context() -> RequestAuthorizationContext:
+def _context(*permissions: str) -> RequestAuthorizationContext:
     return RequestAuthorizationContext(
         session_id="session-1",
         user_id="user-1",
         tenant_id="tenant-1",
         role_keys=frozenset({"tenant_admin"}),
-        permission_keys=frozenset({"employees.employee.read", "employees.employee.write"}),
+        permission_keys=frozenset(permissions or {"employees.employee.read", "employees.employee.write"}),
         scopes=(AuthenticatedRoleScope(role_key="tenant_admin", scope_type="tenant"),),
         request_id="req-1",
     )
@@ -65,6 +71,12 @@ class FakeDocumentRepo:
             if document.tenant_id == tenant_id
             and any(link.owner_type == owner_type and link.owner_id == owner_id for link in document.links)
         ]
+
+    def get_document(self, tenant_id: str, document_id: str) -> Document | None:
+        return next(
+            (document for document in self.documents if document.tenant_id == tenant_id and document.id == document_id),
+            None,
+        )
 
 
 class FakeDocumentService:
@@ -192,6 +204,125 @@ class EmployeeFileServiceTest(unittest.TestCase):
         self.assertEqual(repository.documents[0].current_version_no, 2)
         self.assertEqual(second.file_name, "anna-new.png")
         self.assertIn("employees.photo.updated", [event.event_type for event in audit_repo.audit_events])
+
+    def test_upload_link_and_add_version_use_docs_backbone_for_generic_employee_documents(self) -> None:
+        repository = FakeDocumentRepo()
+        audit_repo = RecordingAuditRepository()
+        service = EmployeeFileService(
+            employee_repository=FakeEmployeeRepo(),
+            document_repository=repository,
+            document_service=FakeDocumentService(repository),
+            audit_service=AuditService(audit_repo),
+        )
+
+        uploaded = service.upload_employee_document(
+            "tenant-1",
+            "employee-1",
+            EmployeeDocumentUploadCreate(
+                title="Arbeitsvertrag",
+                relation_type="contract",
+                label="Vertrag 2026",
+                file_name="contract.pdf",
+                content_type="application/pdf",
+                content_base64="YQ==",
+            ),
+            _context(),
+        )
+        linked = service.link_employee_document(
+            "tenant-1",
+            "employee-1",
+            EmployeeDocumentLinkCreate(
+                document_id=uploaded.document_id,
+                relation_type="employee_document",
+                label="Ablage",
+            ),
+            _context(),
+        )
+        versioned = service.add_employee_document_version(
+            "tenant-1",
+            "employee-1",
+            uploaded.document_id,
+            EmployeeDocumentVersionCreate(
+                file_name="contract-v2.pdf",
+                content_type="application/pdf",
+                content_base64="Yg==",
+            ),
+            _context(),
+        )
+
+        self.assertEqual(uploaded.relation_type, "contract")
+        self.assertEqual(linked.document_id, uploaded.document_id)
+        self.assertEqual(versioned.current_version_no, 2)
+        self.assertEqual(versioned.file_name, "contract-v2.pdf")
+        self.assertNotIn("profile_photo", [item.relation_type for item in service.list_documents("tenant-1", "employee-1", _context())])
+        self.assertEqual(
+            [event.event_type for event in audit_repo.audit_events],
+            ["employees.document.uploaded", "employees.document.linked", "employees.document.version_added"],
+        )
+
+    def test_generic_document_mutations_require_employee_write_permission(self) -> None:
+        repository = FakeDocumentRepo()
+        service = EmployeeFileService(
+            employee_repository=FakeEmployeeRepo(),
+            document_repository=repository,
+            document_service=FakeDocumentService(repository),
+            audit_service=None,
+        )
+        with self.assertRaises(ApiException) as raised:
+            service.upload_employee_document(
+                "tenant-1",
+                "employee-1",
+                EmployeeDocumentUploadCreate(
+                    title="Nachweis",
+                    relation_type="certificate",
+                    file_name="proof.pdf",
+                    content_type="application/pdf",
+                    content_base64="YQ==",
+                ),
+                _context("employees.employee.read"),
+            )
+        self.assertEqual(raised.exception.code, "iam.authorization.permission_denied")
+
+    def test_add_version_rejects_document_not_linked_to_employee(self) -> None:
+        repository = FakeDocumentRepo()
+        other_owner_document = Document(
+            id="document-x",
+            tenant_id="tenant-1",
+            title="Shared Doc",
+            source_module="employees",
+            source_label="employee_document",
+            metadata_json={},
+            current_version_no=1,
+            status="active",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            created_by_user_id="user-1",
+            updated_by_user_id="user-1",
+            version_no=1,
+            versions=[],
+            links=[],
+        )
+        repository.documents.append(other_owner_document)
+        service = EmployeeFileService(
+            employee_repository=FakeEmployeeRepo(),
+            document_repository=repository,
+            document_service=FakeDocumentService(repository),
+            audit_service=None,
+        )
+
+        with self.assertRaises(ApiException) as raised:
+            service.add_employee_document_version(
+                "tenant-1",
+                "employee-1",
+                "document-x",
+                EmployeeDocumentVersionCreate(
+                    file_name="shared-v2.pdf",
+                    content_type="application/pdf",
+                    content_base64="YQ==",
+                ),
+                _context(),
+            )
+        self.assertEqual(raised.exception.code, "employees.document.not_linked")
 
 
 if __name__ == "__main__":

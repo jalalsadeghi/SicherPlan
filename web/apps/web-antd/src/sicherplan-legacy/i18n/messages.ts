@@ -555,6 +555,13 @@ export type MessageKey =
   | "employeeAdmin.fields.groupName"
   | "employeeAdmin.fields.groupDescription"
   | "employeeAdmin.fields.assignGroup"
+  | "employeeAdmin.fields.documentTitle"
+  | "employeeAdmin.fields.documentLabel"
+  | "employeeAdmin.fields.documentRelationType"
+  | "employeeAdmin.fields.documentTypeKey"
+  | "employeeAdmin.fields.documentFile"
+  | "employeeAdmin.fields.documentId"
+  | "employeeAdmin.fields.documentVersionTarget"
   | "employeeAdmin.fields.validFrom"
   | "employeeAdmin.fields.validUntil"
   | "employeeAdmin.fields.membershipNotes"
@@ -626,6 +633,23 @@ export type MessageKey =
   | "employeeAdmin.documents.libraryEyebrow"
   | "employeeAdmin.documents.libraryTitle"
   | "employeeAdmin.documents.empty"
+  | "employeeAdmin.documents.uploadEyebrow"
+  | "employeeAdmin.documents.uploadTitle"
+  | "employeeAdmin.documents.uploadLead"
+  | "employeeAdmin.documents.linkEyebrow"
+  | "employeeAdmin.documents.linkTitle"
+  | "employeeAdmin.documents.linkLead"
+  | "employeeAdmin.documents.versionEyebrow"
+  | "employeeAdmin.documents.versionTitle"
+  | "employeeAdmin.documents.versionLead"
+  | "employeeAdmin.documents.versionEmpty"
+  | "employeeAdmin.documents.selectedVersionTarget"
+  | "employeeAdmin.documents.relation.employee_document"
+  | "employeeAdmin.documents.relation.id_proof"
+  | "employeeAdmin.documents.relation.contract"
+  | "employeeAdmin.documents.relation.certificate"
+  | "employeeAdmin.documents.relation.residence_permit"
+  | "employeeAdmin.documents.relation.misc"
   | "employeeAdmin.noteType.operational_note"
   | "employeeAdmin.noteType.positive_activity"
   | "employeeAdmin.noteType.reminder"
@@ -639,6 +663,11 @@ export type MessageKey =
   | "employeeAdmin.actions.reset"
   | "employeeAdmin.actions.uploadPhoto"
   | "employeeAdmin.actions.downloadPhoto"
+  | "employeeAdmin.actions.downloadDocument"
+  | "employeeAdmin.actions.uploadDocument"
+  | "employeeAdmin.actions.linkDocument"
+  | "employeeAdmin.actions.addDocumentVersion"
+  | "employeeAdmin.actions.useDocumentForVersion"
   | "employeeAdmin.actions.createNote"
   | "employeeAdmin.actions.saveNote"
   | "employeeAdmin.actions.resetNote"
@@ -740,6 +769,7 @@ export type MessageKey =
   | "employeeAdmin.feedback.reminderDateRequired"
   | "employeeAdmin.feedback.invalidNoteType"
   | "employeeAdmin.feedback.photoUploadFailed"
+  | "employeeAdmin.feedback.documentAlreadyLinked"
   | "employeeAdmin.feedback.invalidImportCsv"
   | "employeeAdmin.feedback.invalidImportHeaders"
   | "employeeAdmin.feedback.accessUsernameTaken"
@@ -756,6 +786,9 @@ export type MessageKey =
   | "employeeAdmin.feedback.privateProfileSaved"
   | "employeeAdmin.feedback.addressSaved"
   | "employeeAdmin.feedback.photoSaved"
+  | "employeeAdmin.feedback.documentUploaded"
+  | "employeeAdmin.feedback.documentLinked"
+  | "employeeAdmin.feedback.documentVersionSaved"
   | "employeeAdmin.feedback.importDryRunReady"
   | "employeeAdmin.feedback.importExecuted"
   | "employeeAdmin.feedback.exportReady"
@@ -2096,6 +2129,13 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.fields.groupName": "Gruppenname",
     "employeeAdmin.fields.groupDescription": "Gruppenbeschreibung",
     "employeeAdmin.fields.assignGroup": "Gruppe zuordnen",
+    "employeeAdmin.fields.documentTitle": "Dokumenttitel",
+    "employeeAdmin.fields.documentLabel": "Bezeichnung",
+    "employeeAdmin.fields.documentRelationType": "Dokumentrelation",
+    "employeeAdmin.fields.documentTypeKey": "Dokumenttyp-Schlüssel",
+    "employeeAdmin.fields.documentFile": "Datei",
+    "employeeAdmin.fields.documentId": "Dokument-ID",
+    "employeeAdmin.fields.documentVersionTarget": "Version zu Dokument",
     "employeeAdmin.fields.validFrom": "Gültig ab",
     "employeeAdmin.fields.validUntil": "Gültig bis",
     "employeeAdmin.fields.membershipNotes": "Zuordnungsnotiz",
@@ -2167,6 +2207,23 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.documents.libraryEyebrow": "Ablage",
     "employeeAdmin.documents.libraryTitle": "Verknüpfte Dokumente",
     "employeeAdmin.documents.empty": "Keine mitarbeitendenbezogenen Dokumente vorhanden.",
+    "employeeAdmin.documents.uploadEyebrow": "Upload",
+    "employeeAdmin.documents.uploadTitle": "Neues Dokument hochladen",
+    "employeeAdmin.documents.uploadLead": "Es wird ein neues Dokument erzeugt, versioniert und direkt mit dieser Mitarbeitendenakte verknüpft.",
+    "employeeAdmin.documents.linkEyebrow": "Verknüpfen",
+    "employeeAdmin.documents.linkTitle": "Bestehendes Dokument verknüpfen",
+    "employeeAdmin.documents.linkLead": "Vorhandene Dokumente können über ihre Dokument-ID mit dieser Mitarbeitendenakte verknüpft werden.",
+    "employeeAdmin.documents.versionEyebrow": "Versionen",
+    "employeeAdmin.documents.versionTitle": "Neue Dokumentversion hochladen",
+    "employeeAdmin.documents.versionLead": "Für bereits verknüpfte Dokumente kann direkt eine neue Version hochgeladen werden.",
+    "employeeAdmin.documents.versionEmpty": "Wähle zuerst ein verknüpftes Dokument aus der Ablage aus.",
+    "employeeAdmin.documents.selectedVersionTarget": "Ausgewähltes Zieldokument",
+    "employeeAdmin.documents.relation.employee_document": "Mitarbeitendendokument",
+    "employeeAdmin.documents.relation.id_proof": "Identitätsnachweis",
+    "employeeAdmin.documents.relation.contract": "Vertrag",
+    "employeeAdmin.documents.relation.certificate": "Zertifikat",
+    "employeeAdmin.documents.relation.residence_permit": "Aufenthaltstitel",
+    "employeeAdmin.documents.relation.misc": "Sonstiges",
     "employeeAdmin.noteType.operational_note": "Operative Notiz",
     "employeeAdmin.noteType.positive_activity": "Positive Aktivität",
     "employeeAdmin.noteType.reminder": "Erinnerung",
@@ -2180,6 +2237,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.reset": "Formular zurücksetzen",
     "employeeAdmin.actions.uploadPhoto": "Foto hochladen",
     "employeeAdmin.actions.downloadPhoto": "Foto herunterladen",
+    "employeeAdmin.actions.downloadDocument": "Dokument herunterladen",
+    "employeeAdmin.actions.uploadDocument": "Dokument hochladen",
+    "employeeAdmin.actions.linkDocument": "Dokument verknüpfen",
+    "employeeAdmin.actions.addDocumentVersion": "Neue Version hochladen",
+    "employeeAdmin.actions.useDocumentForVersion": "Für Version verwenden",
     "employeeAdmin.actions.createNote": "Notiz anlegen",
     "employeeAdmin.actions.saveNote": "Notiz speichern",
     "employeeAdmin.actions.resetNote": "Notizformular leeren",
@@ -2294,6 +2356,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Der gewählt Notiztyp ist nicht zulässig.",
     "employeeAdmin.feedback.photoUploadFailed":
       "Das Profilfoto konnte nicht gespeichert werden.",
+    "employeeAdmin.feedback.documentAlreadyLinked":
+      "Dieses Dokument ist bereits mit dieser Mitarbeitendenakte und Relation verknüpft.",
     "employeeAdmin.feedback.invalidImportCsv":
       "Die Importdatei ist leer oder unlesbar.",
     "employeeAdmin.feedback.invalidImportHeaders":
@@ -2326,6 +2390,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Die Mitarbeitendenadresse wurde gespeichert.",
     "employeeAdmin.feedback.photoSaved":
       "Das Profilfoto wurde erfolgreich aktualisiert.",
+    "employeeAdmin.feedback.documentUploaded":
+      "Das Dokument wurde hochgeladen und verknüpft.",
+    "employeeAdmin.feedback.documentLinked":
+      "Das Dokument wurde mit der Mitarbeitendenakte verknüpft.",
+    "employeeAdmin.feedback.documentVersionSaved":
+      "Die neue Dokumentversion wurde gespeichert.",
     "employeeAdmin.feedback.importDryRunReady":
       "Die Importvorschau wurde erzeugt.",
     "employeeAdmin.feedback.importExecuted":
@@ -3757,6 +3827,13 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.fields.groupName": "Group name",
     "employeeAdmin.fields.groupDescription": "Group description",
     "employeeAdmin.fields.assignGroup": "Assign group",
+    "employeeAdmin.fields.documentTitle": "Document title",
+    "employeeAdmin.fields.documentLabel": "Label",
+    "employeeAdmin.fields.documentRelationType": "Document relation",
+    "employeeAdmin.fields.documentTypeKey": "Document type key",
+    "employeeAdmin.fields.documentFile": "File",
+    "employeeAdmin.fields.documentId": "Document ID",
+    "employeeAdmin.fields.documentVersionTarget": "Version target document",
     "employeeAdmin.fields.validFrom": "Valid from",
     "employeeAdmin.fields.validUntil": "Valid until",
     "employeeAdmin.fields.membershipNotes": "Assignment notes",
@@ -3828,6 +3905,23 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.documents.libraryEyebrow": "Library",
     "employeeAdmin.documents.libraryTitle": "Linked documents",
     "employeeAdmin.documents.empty": "No employee-linked documents are available.",
+    "employeeAdmin.documents.uploadEyebrow": "Upload",
+    "employeeAdmin.documents.uploadTitle": "Upload new document",
+    "employeeAdmin.documents.uploadLead": "A new shared document is created, versioned, and linked directly to this employee file.",
+    "employeeAdmin.documents.linkEyebrow": "Link existing",
+    "employeeAdmin.documents.linkTitle": "Link existing document",
+    "employeeAdmin.documents.linkLead": "Existing shared documents can be linked to this employee file by document ID.",
+    "employeeAdmin.documents.versionEyebrow": "Versions",
+    "employeeAdmin.documents.versionTitle": "Upload new document version",
+    "employeeAdmin.documents.versionLead": "Upload a new version directly to an already linked employee document.",
+    "employeeAdmin.documents.versionEmpty": "Select a linked employee document from the library first.",
+    "employeeAdmin.documents.selectedVersionTarget": "Selected target document",
+    "employeeAdmin.documents.relation.employee_document": "Employee document",
+    "employeeAdmin.documents.relation.id_proof": "ID proof",
+    "employeeAdmin.documents.relation.contract": "Contract",
+    "employeeAdmin.documents.relation.certificate": "Certificate",
+    "employeeAdmin.documents.relation.residence_permit": "Residence permit",
+    "employeeAdmin.documents.relation.misc": "Miscellaneous",
     "employeeAdmin.noteType.operational_note": "Operational note",
     "employeeAdmin.noteType.positive_activity": "Positive activity",
     "employeeAdmin.noteType.reminder": "Reminder",
@@ -3841,6 +3935,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.reset": "Reset form",
     "employeeAdmin.actions.uploadPhoto": "Upload photo",
     "employeeAdmin.actions.downloadPhoto": "Download photo",
+    "employeeAdmin.actions.downloadDocument": "Download document",
+    "employeeAdmin.actions.uploadDocument": "Upload document",
+    "employeeAdmin.actions.linkDocument": "Link document",
+    "employeeAdmin.actions.addDocumentVersion": "Upload new version",
+    "employeeAdmin.actions.useDocumentForVersion": "Use for versioning",
     "employeeAdmin.actions.createNote": "Create note",
     "employeeAdmin.actions.saveNote": "Save note",
     "employeeAdmin.actions.resetNote": "Clear note form",
@@ -3956,6 +4055,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "The selected note type is not allowed.",
     "employeeAdmin.feedback.photoUploadFailed":
       "The profile photo could not be stored.",
+    "employeeAdmin.feedback.documentAlreadyLinked":
+      "This document is already linked to this employee file with the same relation.",
     "employeeAdmin.feedback.invalidImportCsv":
       "The import file is empty or unreadable.",
     "employeeAdmin.feedback.invalidImportHeaders":
@@ -3988,6 +4089,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "The employee address was saved.",
     "employeeAdmin.feedback.photoSaved":
       "The profile photo was updated successfully.",
+    "employeeAdmin.feedback.documentUploaded":
+      "The document was uploaded and linked.",
+    "employeeAdmin.feedback.documentLinked":
+      "The document was linked to the employee file.",
+    "employeeAdmin.feedback.documentVersionSaved":
+      "The new document version was saved.",
     "employeeAdmin.feedback.importDryRunReady":
       "The import preview is ready.",
     "employeeAdmin.feedback.importExecuted":

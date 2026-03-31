@@ -331,6 +331,30 @@ class EmployeeDocumentListItemRead(BaseModel):
     linked_at: datetime | None
 
 
+class EmployeeDocumentUploadCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    relation_type: str = Field(default="employee_document", min_length=1, max_length=80)
+    label: str | None = Field(default=None, max_length=255)
+    document_type_key: str | None = Field(default=None, max_length=120)
+    file_name: str = Field(min_length=1, max_length=255)
+    content_type: str = Field(min_length=1, max_length=255)
+    content_base64: str = Field(min_length=1)
+    is_revision_safe_pdf: bool = False
+
+
+class EmployeeDocumentLinkCreate(BaseModel):
+    document_id: str = Field(min_length=1, max_length=36)
+    relation_type: str = Field(default="employee_document", min_length=1, max_length=80)
+    label: str | None = Field(default=None, max_length=255)
+
+
+class EmployeeDocumentVersionCreate(BaseModel):
+    file_name: str = Field(min_length=1, max_length=255)
+    content_type: str = Field(min_length=1, max_length=255)
+    content_base64: str = Field(min_length=1)
+    is_revision_safe_pdf: bool = False
+
+
 class EmployeePhotoUpload(BaseModel):
     title: str | None = Field(default=None, max_length=255)
     file_name: str = Field(min_length=1, max_length=255)

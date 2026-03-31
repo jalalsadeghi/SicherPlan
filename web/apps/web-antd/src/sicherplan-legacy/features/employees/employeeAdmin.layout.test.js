@@ -67,6 +67,13 @@ test("non-overview employee tabs reuse the structured section pattern", () => {
   assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.actions\.markCurrentAddress/);
   assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.actions\.closeAddressValidity/);
   assert.match(viewSource, /employee-tab-panel-documents[\s\S]*employeeAdmin\.documents\.libraryEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-documents[\s\S]*employeeAdmin\.documents\.uploadEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-documents[\s\S]*employeeAdmin\.documents\.linkEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-documents[\s\S]*employeeAdmin\.documents\.versionEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-documents[\s\S]*uploadEmployeeDocument/);
+  assert.match(viewSource, /employee-tab-panel-documents[\s\S]*linkEmployeeDocument/);
+  assert.match(viewSource, /employee-tab-panel-documents[\s\S]*addEmployeeDocumentVersion/);
+  assert.match(viewSource, /employee-tab-panel-documents[\s\S]*employeeAdmin\.actions\.useDocumentForVersion/);
 });
 
 test("employee addresses tab uses admin editor copy and removes released timeline wording", () => {

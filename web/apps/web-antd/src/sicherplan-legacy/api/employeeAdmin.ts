@@ -204,6 +204,30 @@ export interface EmployeeDocumentListItemRead {
   linked_at: string | null;
 }
 
+export interface EmployeeDocumentUploadPayload {
+  title: string;
+  relation_type?: string | null;
+  label?: string | null;
+  document_type_key?: string | null;
+  file_name: string;
+  content_type: string;
+  content_base64: string;
+  is_revision_safe_pdf?: boolean;
+}
+
+export interface EmployeeDocumentLinkPayload {
+  document_id: string;
+  relation_type?: string | null;
+  label?: string | null;
+}
+
+export interface EmployeeDocumentVersionPayload {
+  file_name: string;
+  content_type: string;
+  content_base64: string;
+  is_revision_safe_pdf?: boolean;
+}
+
 export interface EmployeePhotoRead extends EmployeeDocumentListItemRead {}
 
 export interface EmployeeImportRowResult {
@@ -591,6 +615,55 @@ export function updateEmployeeNote(
 
 export function listEmployeeDocuments(tenantId: string, employeeId: string, accessToken: string) {
   return request<EmployeeDocumentListItemRead[]>(`/api/employees/tenants/${tenantId}/employees/${employeeId}/documents`, accessToken);
+}
+
+export function uploadEmployeeDocument(
+  tenantId: string,
+  employeeId: string,
+  accessToken: string,
+  payload: EmployeeDocumentUploadPayload,
+) {
+  return request<EmployeeDocumentListItemRead>(
+    `/api/employees/tenants/${tenantId}/employees/${employeeId}/documents/uploads`,
+    accessToken,
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
+}
+
+export function linkEmployeeDocument(
+  tenantId: string,
+  employeeId: string,
+  accessToken: string,
+  payload: EmployeeDocumentLinkPayload,
+) {
+  return request<EmployeeDocumentListItemRead>(
+    `/api/employees/tenants/${tenantId}/employees/${employeeId}/documents/links`,
+    accessToken,
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
+}
+
+export function addEmployeeDocumentVersion(
+  tenantId: string,
+  employeeId: string,
+  documentId: string,
+  accessToken: string,
+  payload: EmployeeDocumentVersionPayload,
+) {
+  return request<EmployeeDocumentListItemRead>(
+    `/api/employees/tenants/${tenantId}/employees/${employeeId}/documents/${documentId}/versions`,
+    accessToken,
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
 }
 
 export function getEmployeePhoto(tenantId: string, employeeId: string, accessToken: string) {
