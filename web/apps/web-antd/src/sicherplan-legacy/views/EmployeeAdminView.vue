@@ -787,16 +787,136 @@
 
               <section class="employee-admin-form-section">
                 <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.addresses.currentEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.addresses.currentTitle") }}</h4>
+                </div>
+                <div v-if="currentEmployeeAddress" class="employee-admin-record employee-admin-record--static">
+                  <div class="employee-admin-record__body">
+                    <strong>{{ currentAddressSummary || currentEmployeeAddress.address_id }}</strong>
+                    <span class="employee-admin-record__meta">
+                      {{ currentEmployeeAddress.valid_from }} · {{ currentEmployeeAddress.valid_to || t("employeeAdmin.summary.none") }}
+                    </span>
+                  </div>
+                  <StatusBadge :status="currentEmployeeAddress.status" />
+                </div>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.addresses.currentEmpty") }}</p>
+              </section>
+
+              <form class="employee-admin-form-section" @submit.prevent="submitAddress">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.addresses.editorEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.addresses.editorTitle") }}</h4>
+                </div>
+                <p class="field-help">{{ t("employeeAdmin.addresses.editorLead") }}</p>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("customerAdmin.fields.streetLine1") }}</span>
+                    <input v-model="addressDraft.street_line_1" :disabled="!actionState.canManageAddresses" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("customerAdmin.fields.streetLine2") }}</span>
+                    <input v-model="addressDraft.street_line_2" :disabled="!actionState.canManageAddresses" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.postalCode") }}</span>
+                    <input v-model="addressDraft.postal_code" :disabled="!actionState.canManageAddresses" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.city") }}</span>
+                    <input v-model="addressDraft.city" :disabled="!actionState.canManageAddresses" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.state") }}</span>
+                    <input v-model="addressDraft.state_region" :disabled="!actionState.canManageAddresses" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.countryCode") }}</span>
+                    <input v-model="addressDraft.country_code" :disabled="!actionState.canManageAddresses" maxlength="2" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.addressType") }}</span>
+                    <select v-model="addressDraft.address_type" :disabled="!actionState.canManageAddresses">
+                      <option value="home">{{ t("employeeAdmin.addresses.typeHome") }}</option>
+                      <option value="mailing">{{ t("employeeAdmin.addresses.typeMailing") }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validFrom") }}</span>
+                    <input v-model="addressDraft.valid_from" :disabled="!actionState.canManageAddresses" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
+                    <input
+                      v-model="addressDraft.valid_to"
+                      :disabled="!actionState.canManageAddresses || addressDraft.is_current"
+                      type="date"
+                    />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
+                    <textarea v-model="addressDraft.notes" :disabled="!actionState.canManageAddresses" rows="3" />
+                  </label>
+                </div>
+                <div class="employee-admin-checkbox">
+                  <input
+                    v-model="addressDraft.is_current"
+                    :disabled="!actionState.canManageAddresses"
+                    type="checkbox"
+                    @change="onAddressCurrentToggle"
+                  />
+                  <span>{{ t("employeeAdmin.addresses.currentBadge") }}</span>
+                </div>
+                <div class="employee-admin-checkbox">
+                  <input v-model="addressDraft.is_primary" :disabled="!actionState.canManageAddresses" type="checkbox" />
+                  <span>{{ t("employeeAdmin.summary.currentAddress") }}</span>
+                </div>
+                <div class="cta-row">
+                  <button
+                    v-if="editingAddressId"
+                    class="cta-button cta-secondary"
+                    type="button"
+                    :disabled="!actionState.canManageAddresses"
+                    @click="resetAddressDraft"
+                  >
+                    {{ t("employeeAdmin.actions.addAddress") }}
+                  </button>
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageAddresses">
+                    {{ editingAddressId ? t("employeeAdmin.actions.saveAddress") : t("employeeAdmin.actions.addAddress") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetAddressDraft">
+                    {{ t("employeeAdmin.actions.resetAddress") }}
+                  </button>
+                </div>
+              </form>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
                   <p class="eyebrow">{{ t("employeeAdmin.addresses.historyEyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.addresses.historyTitle") }}</h4>
                 </div>
-                <div v-if="employeeAddresses.length" class="employee-admin-record-list">
-                  <article v-for="addressRow in employeeAddresses" :key="addressRow.id" class="employee-admin-record employee-admin-record--static">
+                <div v-if="employeeAddressTimeline.length" class="employee-admin-record-list">
+                  <article v-for="addressRow in employeeAddressTimeline" :key="addressRow.id" class="employee-admin-record employee-admin-record--static">
                     <div class="employee-admin-record__body">
                       <strong>{{ addressRow.address?.street_line_1 || addressRow.address_id }}</strong>
                       <span class="employee-admin-record__meta">{{ addressRow.valid_from }} · {{ addressRow.valid_to || t("employeeAdmin.summary.none") }}</span>
+                      <span class="employee-admin-record__meta">
+                        {{ addressRow.address_type === "home" ? t("employeeAdmin.addresses.typeHome") : t("employeeAdmin.addresses.typeMailing") }}
+                        ·
+                        {{ addressRow.valid_to ? t("employeeAdmin.addresses.closedBadge") : t("employeeAdmin.addresses.currentBadge") }}
+                      </span>
                     </div>
-                    <StatusBadge :status="addressRow.status" />
+                    <div class="employee-admin-record__actions">
+                      <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="editAddress(addressRow)">
+                        {{ t("employeeAdmin.actions.editAddress") }}
+                      </button>
+                      <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="prepareAddressAsCurrent(addressRow)">
+                        {{ t("employeeAdmin.actions.markCurrentAddress") }}
+                      </button>
+                      <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="prepareAddressValidityClose(addressRow)">
+                        {{ t("employeeAdmin.actions.closeAddressValidity") }}
+                      </button>
+                      <StatusBadge :status="addressRow.status" />
+                    </div>
                   </article>
                 </div>
                 <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.addresses.empty") }}</p>
@@ -861,6 +981,7 @@ import { listBranches, listMandates, type BranchRead, type MandateRead } from "@
 import {
   attachEmployeeAccessUser,
   createEmployeeAccessUser,
+  createEmployeeAddress,
   createEmployee,
   createEmployeeGroup,
   createEmployeeGroupMembership,
@@ -882,24 +1003,27 @@ import {
   reconcileEmployeeAccessUser,
   resetEmployeeAccessUserPassword,
   updateEmployee,
+  updateEmployeeAddress,
   updateEmployeeAccessUser,
   updateEmployeeGroup,
   updateEmployeeGroupMembership,
   updateEmployeeNote,
   uploadEmployeePhoto,
   type EmployeeAccessLinkRead,
-    type EmployeeAccessResetPasswordRequest,
-    type EmployeeAccessUpdateUserRequest,
-    type EmployeeAddressHistoryRead,
-    type EmployeeDocumentListItemRead,
-    type EmployeeExportResult,
-    type EmployeeGroupMembershipRead,
-    type EmployeeGroupRead,
-    type EmployeeImportDryRunResult,
-    type EmployeeImportExecuteResult,
-    type EmployeeListItem,
-    type EmployeeNoteRead,
-    type EmployeeOperationalRead,
+  type EmployeeAccessResetPasswordRequest,
+  type EmployeeAccessUpdateUserRequest,
+  type EmployeeAddressHistoryCreatePayload,
+  type EmployeeAddressHistoryRead,
+  type EmployeeAddressHistoryUpdatePayload,
+  type EmployeeDocumentListItemRead,
+  type EmployeeExportResult,
+  type EmployeeGroupMembershipRead,
+  type EmployeeGroupRead,
+  type EmployeeImportDryRunResult,
+  type EmployeeImportExecuteResult,
+  type EmployeeListItem,
+  type EmployeeNoteRead,
+  type EmployeeOperationalRead,
   type EmployeePhotoRead,
 } from "@/api/employeeAdmin";
 import StatusBadge from "@/components/StatusBadge.vue";
@@ -912,6 +1036,7 @@ import {
   formatEmployeeStructureLabel,
   mapEmployeeApiMessage,
   summarizeCurrentAddress,
+  validateEmployeeAddressDraft,
 } from "@/features/employees/employeeAdmin.helpers.js";
 import { useAuthStore } from "@/stores/auth";
 
@@ -980,6 +1105,21 @@ const membershipDraft = reactive({
   notes: "",
 });
 
+const addressDraft = reactive({
+  street_line_1: "",
+  street_line_2: "",
+  postal_code: "",
+  city: "",
+  state_region: "",
+  country_code: "DE",
+  address_type: "home",
+  valid_from: "",
+  valid_to: "",
+  is_current: true,
+  is_primary: true,
+  notes: "",
+});
+
 const importDraft = reactive({
   csv_text: buildEmployeeImportTemplateRows(),
   continue_on_error: true,
@@ -1032,6 +1172,7 @@ const activeDetailTab = ref("overview");
 const editingNoteId = ref("");
 const editingGroupId = ref("");
 const editingMembershipId = ref("");
+const editingAddressId = ref("");
 
 const effectiveRole = computed(() => authStore.effectiveRole);
 const isPlatformAdmin = computed(() => effectiveRole.value === "platform_admin");
@@ -1047,6 +1188,18 @@ const selectedEmployeeLabel = computed(() =>
     : t("employeeAdmin.detail.emptyTitle"),
 );
 const currentAddressSummary = computed(() => summarizeCurrentAddress(employeeAddresses.value));
+const employeeAddressTimeline = computed(() =>
+  [...employeeAddresses.value].sort((left, right) => {
+    const startCompare = right.valid_from.localeCompare(left.valid_from);
+    if (startCompare !== 0) {
+      return startCompare;
+    }
+    return (right.valid_to || "9999-12-31").localeCompare(left.valid_to || "9999-12-31");
+  }),
+);
+const currentEmployeeAddress = computed(
+  () => [...employeeAddresses.value].filter((row) => !row.archived_at && !row.valid_to).sort((a, b) => a.valid_from.localeCompare(b.valid_from)).at(-1) ?? null,
+);
 const branchOptions = computed(() => branches.value.filter((branch) => branch.archived_at == null));
 const mandateOptions = computed(() => mandates.value.filter((mandate) => mandate.archived_at == null));
 const filteredEmployeeMandates = computed(() => filterMandateOptions(employeeDraft.default_branch_id));
@@ -1243,6 +1396,56 @@ function resetMembershipDraft() {
   editingMembershipId.value = "";
 }
 
+function resetAddressDraft() {
+  addressDraft.street_line_1 = "";
+  addressDraft.street_line_2 = "";
+  addressDraft.postal_code = "";
+  addressDraft.city = "";
+  addressDraft.state_region = "";
+  addressDraft.country_code = "DE";
+  addressDraft.address_type = "home";
+  addressDraft.valid_from = "";
+  addressDraft.valid_to = "";
+  addressDraft.is_current = true;
+  addressDraft.is_primary = true;
+  addressDraft.notes = "";
+  editingAddressId.value = "";
+}
+
+function editAddress(row: EmployeeAddressHistoryRead) {
+  editingAddressId.value = row.id;
+  addressDraft.street_line_1 = row.address?.street_line_1 || "";
+  addressDraft.street_line_2 = row.address?.street_line_2 || "";
+  addressDraft.postal_code = row.address?.postal_code || "";
+  addressDraft.city = row.address?.city || "";
+  addressDraft.state_region = row.address?.state_region || "";
+  addressDraft.country_code = row.address?.country_code || "DE";
+  addressDraft.address_type = row.address_type;
+  addressDraft.valid_from = row.valid_from;
+  addressDraft.valid_to = row.valid_to || "";
+  addressDraft.is_current = !row.valid_to;
+  addressDraft.is_primary = row.is_primary;
+  addressDraft.notes = row.notes || "";
+}
+
+function prepareAddressAsCurrent(row: EmployeeAddressHistoryRead) {
+  editAddress(row);
+  addressDraft.is_current = true;
+  addressDraft.valid_to = "";
+}
+
+function prepareAddressValidityClose(row: EmployeeAddressHistoryRead) {
+  editAddress(row);
+  addressDraft.is_current = false;
+  addressDraft.valid_to = row.valid_to || new Date().toISOString().slice(0, 10);
+}
+
+function onAddressCurrentToggle() {
+  if (addressDraft.is_current) {
+    addressDraft.valid_to = "";
+  }
+}
+
 function resetAccessDrafts() {
   accessCreateDraft.username = "";
   accessCreateDraft.email = "";
@@ -1282,6 +1485,7 @@ function startCreateEmployee() {
   resetEmployeeDraft();
   resetNoteDraft();
   resetMembershipDraft();
+  resetAddressDraft();
   resetAccessDrafts();
 }
 
@@ -1381,6 +1585,7 @@ async function selectEmployee(employeeId: string) {
     syncEmployeeDraft(employee);
     resetNoteDraft();
     resetMembershipDraft();
+    resetAddressDraft();
     resetAccessDrafts();
     if (canReadPrivate.value) {
       employeeAddresses.value = await listEmployeeAddresses(resolvedTenantScopeId.value, employeeId, authStore.accessToken);
@@ -1559,6 +1764,73 @@ async function submitMembership() {
     resetMembershipDraft();
     await selectEmployee(selectedEmployeeId.value);
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.membershipSaved"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
+function buildEmployeeAddressPayload(): EmployeeAddressHistoryCreatePayload | EmployeeAddressHistoryUpdatePayload {
+  return {
+    ...(editingAddressId.value ? {} : { tenant_id: resolvedTenantScopeId.value, employee_id: selectedEmployeeId.value }),
+    address: {
+      street_line_1: addressDraft.street_line_1.trim(),
+      street_line_2: addressDraft.street_line_2.trim() || null,
+      postal_code: addressDraft.postal_code.trim(),
+      city: addressDraft.city.trim(),
+      state_region: addressDraft.state_region.trim() || null,
+      country_code: addressDraft.country_code.trim().toUpperCase(),
+    },
+    address_type: addressDraft.address_type,
+    valid_from: addressDraft.valid_from,
+    valid_to: addressDraft.is_current ? null : (addressDraft.valid_to.trim() || null),
+    is_primary: addressDraft.is_primary,
+    notes: addressDraft.notes.trim() || null,
+  };
+}
+
+async function submitAddress() {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !selectedEmployeeId.value) {
+    return;
+  }
+
+  const validationKey = validateEmployeeAddressDraft(addressDraft, employeeAddresses.value, editingAddressId.value);
+  if (validationKey) {
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(validationKey as never));
+    return;
+  }
+
+  loading.action = true;
+  try {
+    if (editingAddressId.value) {
+      const existing = employeeAddresses.value.find((row) => row.id === editingAddressId.value);
+      await updateEmployeeAddress(
+        resolvedTenantScopeId.value,
+        selectedEmployeeId.value,
+        editingAddressId.value,
+        authStore.accessToken,
+        {
+          ...buildEmployeeAddressPayload(),
+          version_no: existing?.version_no ?? 1,
+        },
+      );
+    } else {
+      await createEmployeeAddress(
+        resolvedTenantScopeId.value,
+        selectedEmployeeId.value,
+        authStore.accessToken,
+        buildEmployeeAddressPayload() as EmployeeAddressHistoryCreatePayload,
+      );
+    }
+    employeeAddresses.value = await listEmployeeAddresses(
+      resolvedTenantScopeId.value,
+      selectedEmployeeId.value,
+      authStore.accessToken,
+    );
+    resetAddressDraft();
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.addressSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
     setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
@@ -2089,6 +2361,14 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
+.employee-admin-record__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  align-items: center;
+}
+
 .employee-admin-panel__header {
   display: flex;
   flex-wrap: wrap;
@@ -2309,6 +2589,10 @@ onBeforeUnmount(() => {
   .employee-admin-form-grid--editor,
   .employee-admin-form-actions {
     grid-template-columns: 1fr;
+  }
+
+  .employee-admin-record__actions {
+    justify-content: flex-start;
   }
 }
 </style>

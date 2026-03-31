@@ -6,7 +6,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.modules.core.schemas import AddressCreate, AddressRead
+from app.modules.core.schemas import AddressRead
 
 
 class EmployeeFilter(BaseModel):
@@ -150,10 +150,20 @@ class EmployeePrivateProfileRead(BaseModel):
     version_no: int
 
 
+class EmployeeAddressWriteAddress(BaseModel):
+    street_line_1: str
+    street_line_2: str | None = None
+    postal_code: str
+    city: str
+    state_region: str | None = None
+    country_code: str = Field(min_length=2, max_length=2)
+
+
 class EmployeeAddressHistoryCreate(BaseModel):
     tenant_id: str
     employee_id: str
-    address_id: str
+    address_id: str | None = None
+    address: EmployeeAddressWriteAddress | None = None
     address_type: str = Field(default="home", max_length=40)
     valid_from: date
     valid_to: date | None = None
@@ -163,6 +173,7 @@ class EmployeeAddressHistoryCreate(BaseModel):
 
 class EmployeeAddressHistoryUpdate(BaseModel):
     address_id: str | None = None
+    address: EmployeeAddressWriteAddress | None = None
     address_type: str | None = Field(default=None, max_length=40)
     valid_from: date | None = None
     valid_to: date | None = None

@@ -52,6 +52,22 @@ test("non-overview employee tabs reuse the structured section pattern", () => {
   assert.match(viewSource, /employee-tab-panel-profile-photo[\s\S]*employee-admin-editor-intro[\s\S]*employeeAdmin\.photo\.manageEyebrow/);
   assert.match(viewSource, /employee-tab-panel-notes[\s\S]*employeeAdmin\.notes\.registerEyebrow[\s\S]*employeeAdmin\.notes\.editorEyebrow/);
   assert.match(viewSource, /employee-tab-panel-groups[\s\S]*employeeAdmin\.groups\.catalogEyebrow[\s\S]*employeeAdmin\.groups\.assignEyebrow[\s\S]*employeeAdmin\.groups\.currentEyebrow/);
-  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.addresses\.historyEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.addresses\.currentEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.addresses\.editorEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*submitAddress/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*createEmployeeAddress/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*updateEmployeeAddress/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.actions\.editAddress/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.actions\.markCurrentAddress/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.actions\.closeAddressValidity/);
   assert.match(viewSource, /employee-tab-panel-documents[\s\S]*employeeAdmin\.documents\.libraryEyebrow/);
+});
+
+test("employee addresses tab uses admin editor copy and removes released timeline wording", () => {
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.addresses\.empty/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.feedback\.addressSaved/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAddressTimeline/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*onAddressCurrentToggle/);
+  assert.doesNotMatch(viewSource, /Released address timeline/);
+  assert.doesNotMatch(viewSource, /No released address history is available/);
 });

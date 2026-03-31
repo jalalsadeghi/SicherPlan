@@ -23,6 +23,7 @@ from app.modules.employees.schemas import (
     EmployeeAddressHistoryCreate,
     EmployeeAddressHistoryRead,
     EmployeeAddressHistoryUpdate,
+    EmployeeAddressWriteAddress,
     EmployeeFilter,
     EmployeeGroupCreate,
     EmployeeGroupMemberCreate,
@@ -96,6 +97,7 @@ class EmployeeRepository(Protocol):
     def get_branch(self, tenant_id: str, branch_id: str) -> Branch | None: ...
     def get_mandate(self, tenant_id: str, mandate_id: str) -> Mandate | None: ...
     def get_address(self, address_id: str) -> Address | None: ...
+    def create_address(self, row: Address) -> Address: ...
 
 
 class EmployeeService:
@@ -418,10 +420,11 @@ class EmployeeService:
                 "employees.address_history.employee_mismatch",
                 "errors.employees.address_history.employee_mismatch",
             )
+        resolved_address_id = self._resolve_address_id(payload.address_id, payload.address)
         self._validate_address_history_payload(
             tenant_id,
             employee_id,
-            payload.address_id,
+            resolved_address_id,
             payload.address_type,
             payload.valid_from,
             payload.valid_to,
@@ -430,7 +433,7 @@ class EmployeeService:
             EmployeeAddressHistory(
                 tenant_id=tenant_id,
                 employee_id=employee_id,
-                address_id=payload.address_id,
+                address_id=resolved_address_id,
                 address_type=payload.address_type,
                 valid_from=payload.valid_from,
                 valid_to=payload.valid_to,
@@ -467,7 +470,11 @@ class EmployeeService:
             raise ApiException(404, "employees.address_history.not_found", "errors.employees.address_history.not_found")
         before = self._address_history_snapshot(row)
         self._require_version(row.version_no, payload.version_no, "address_history")
-        next_address_id = payload.address_id if payload.address_id is not None else row.address_id
+        next_address_id = (
+            self._resolve_address_id(payload.address_id, payload.address)
+            if payload.address_id is not None or payload.address is not None
+            else row.address_id
+        )
         next_address_type = payload.address_type if payload.address_type is not None else row.address_type
         next_valid_from = payload.valid_from if payload.valid_from is not None else row.valid_from
         next_valid_to = payload.valid_to if payload.valid_to is not None else row.valid_to
@@ -823,6 +830,37 @@ class EmployeeService:
             valid_to=valid_to,
             exclude_id=exclude_id,
         )
+
+    def _resolve_address_id(self, address_id: str | None, address_payload: EmployeeAddressWriteAddress | None) -> str:
+        if address_payload is not None:
+            normalized = EmployeeAddressWriteAddress(
+                street_line_1=address_payload.street_line_1.strip(),
+                street_line_2=self._normalize_optional(address_payload.street_line_2),
+                postal_code=address_payload.postal_code.strip(),
+                city=address_payload.city.strip(),
+                state_region=self._normalize_optional(address_payload.state_region),
+                country_code=address_payload.country_code.strip().upper(),
+            )
+            created = self.repository.create_address(
+                Address(
+                    street_line_1=normalized.street_line_1,
+                    street_line_2=normalized.street_line_2,
+                    postal_code=normalized.postal_code,
+                    city=normalized.city,
+                    state=normalized.state_region,
+                    country_code=normalized.country_code,
+                )
+            )
+            return created.id
+
+        normalized_address_id = self._normalize_optional(address_id)
+        if normalized_address_id is None:
+            raise ApiException(
+                400,
+                "employees.address_history.address_required",
+                "errors.employees.address_history.address_required",
+            )
+        return normalized_address_id
 
     def _apply_private_profile_update(
         self,

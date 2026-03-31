@@ -80,6 +80,39 @@ export interface EmployeeAddressHistoryRead {
   } | null;
 }
 
+export interface EmployeeAddressWriteAddressInput {
+  street_line_1: string;
+  street_line_2?: string | null;
+  postal_code: string;
+  city: string;
+  state_region?: string | null;
+  country_code: string;
+}
+
+export interface EmployeeAddressHistoryCreatePayload {
+  tenant_id: string;
+  employee_id: string;
+  address_id?: string | null;
+  address?: EmployeeAddressWriteAddressInput | null;
+  address_type: string;
+  valid_from: string;
+  valid_to?: string | null;
+  is_primary: boolean;
+  notes?: string | null;
+}
+
+export interface EmployeeAddressHistoryUpdatePayload {
+  address_id?: string | null;
+  address?: EmployeeAddressWriteAddressInput | null;
+  address_type?: string | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  is_primary?: boolean | null;
+  notes?: string | null;
+  status?: string | null;
+  version_no?: number | null;
+}
+
 export interface EmployeeNoteRead {
   id: string;
   tenant_id: string;
@@ -362,6 +395,33 @@ export function updateEmployee(tenantId: string, employeeId: string, accessToken
 
 export function listEmployeeAddresses(tenantId: string, employeeId: string, accessToken: string) {
   return request<EmployeeAddressHistoryRead[]>(`/api/employees/tenants/${tenantId}/employees/${employeeId}/addresses`, accessToken);
+}
+
+export function createEmployeeAddress(
+  tenantId: string,
+  employeeId: string,
+  accessToken: string,
+  payload: EmployeeAddressHistoryCreatePayload,
+) {
+  return request<EmployeeAddressHistoryRead>(
+    `/api/employees/tenants/${tenantId}/employees/${employeeId}/addresses`,
+    accessToken,
+    { method: "POST", body: payload },
+  );
+}
+
+export function updateEmployeeAddress(
+  tenantId: string,
+  employeeId: string,
+  historyId: string,
+  accessToken: string,
+  payload: EmployeeAddressHistoryUpdatePayload,
+) {
+  return request<EmployeeAddressHistoryRead>(
+    `/api/employees/tenants/${tenantId}/employees/${employeeId}/addresses/${historyId}`,
+    accessToken,
+    { method: "PATCH", body: payload },
+  );
 }
 
 export function listEmployeeGroups(tenantId: string, accessToken: string) {

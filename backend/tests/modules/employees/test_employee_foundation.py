@@ -55,7 +55,9 @@ class FakeEmployeeRepository:
     mandate_id: str = "33333333-3333-3333-3333-333333333333"
     user_id: str = "11111111-1111-1111-1111-111111111111"
     address_id: str = "address-1"
+    address_seq: int = 1
     employees: dict[str, Employee] = field(default_factory=dict)
+    addresses: dict[str, Address] = field(default_factory=dict)
     private_profiles: dict[str, EmployeePrivateProfile] = field(default_factory=dict)
     address_history: dict[str, list[EmployeeAddressHistory]] = field(default_factory=dict)
     groups: dict[str, EmployeeGroup] = field(default_factory=dict)
@@ -120,6 +122,7 @@ class FakeEmployeeRepository:
         )
         self.branches[self.branch_id] = self.branch
         self.mandates[self.mandate_id] = self.mandate
+        self.addresses = {self.address_id: self.address}
 
     def list_employees(self, tenant_id: str, filters=None) -> list[Employee]:  # noqa: ANN001
         rows = [row for row in self.employees.values() if row.tenant_id == tenant_id]
@@ -219,7 +222,7 @@ class FakeEmployeeRepository:
     def create_address_history(self, row: EmployeeAddressHistory) -> EmployeeAddressHistory:
         row.id = row.id or str(uuid4())
         self._stamp_lifecycle(row)
-        row.address = self.address
+        row.address = self.get_address(row.address_id)
         self.address_history.setdefault(row.employee_id, []).append(row)
         return row
 
@@ -328,9 +331,13 @@ class FakeEmployeeRepository:
         return mandate
 
     def get_address(self, address_id: str) -> Address | None:
-        if address_id == self.address_id:
-            return self.address
-        return None
+        return self.addresses.get(address_id)
+
+    def create_address(self, row: Address) -> Address:
+        self.address_seq += 1
+        row.id = row.id or f"address-{self.address_seq}"
+        self.addresses[row.id] = row
+        return row
 
 
 class TestEmployeeFoundationMetadata(unittest.TestCase):
@@ -491,6 +498,43 @@ class TestEmployeeService(unittest.TestCase):
             )
 
         self.assertEqual(ctx.exception.message_key, "errors.employees.address_history.overlap")
+
+    def test_address_history_can_create_inline_address_on_admin_endpoint(self) -> None:
+        employee = self.service.create_employee(
+            "tenant-1",
+            EmployeeOperationalCreate(
+                tenant_id="tenant-1",
+                personnel_no="EMP-1003A",
+                first_name="Clara",
+                last_name="Neumann",
+            ),
+            _context("employees.employee.write"),
+        )
+
+        created = self.service.add_address_history(
+            "tenant-1",
+            employee.id,
+            EmployeeAddressHistoryCreate(
+                tenant_id="tenant-1",
+                employee_id=employee.id,
+                address={
+                    "street_line_1": "Neue Strasse 5",
+                    "street_line_2": "2. OG",
+                    "postal_code": "40210",
+                    "city": "Duesseldorf",
+                    "state_region": "NRW",
+                    "country_code": "de",
+                },
+                address_type="home",
+                valid_from=date(2026, 1, 1),
+                valid_to=None,
+            ),
+            _context("employees.private.write"),
+        )
+
+        self.assertEqual(created.address.street_line_1, "Neue Strasse 5")
+        self.assertEqual(created.address.country_code, "DE")
+        self.assertEqual(created.address_id, created.address.id)
 
     def test_duplicate_user_link_is_blocked(self) -> None:
         self.service.create_employee(

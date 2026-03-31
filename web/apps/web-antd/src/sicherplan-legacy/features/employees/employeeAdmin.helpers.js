@@ -26,6 +26,7 @@ export function deriveEmployeeActionState(role, selectedEmployee) {
     canReadPrivate,
     canCreate: canWrite,
     canEdit: canWrite && !!selectedEmployee,
+    canManageAddresses: canWrite && canReadPrivate && !!selectedEmployee,
     canManageNotes: canWrite && !!selectedEmployee,
     canManageGroups: canWrite && !!selectedEmployee,
     canManagePhoto: canWrite && !!selectedEmployee,
@@ -50,6 +51,8 @@ export function mapEmployeeApiMessage(messageKey) {
     "errors.employees.group_member.stale_version": "employeeAdmin.feedback.staleVersion",
     "errors.employees.note.stale_version": "employeeAdmin.feedback.staleVersion",
     "errors.employees.address_history.overlap": "employeeAdmin.feedback.addressOverlap",
+    "errors.employees.address_history.invalid_window": "employeeAdmin.feedback.addressInvalidWindow",
+    "errors.employees.address_history.address_required": "employeeAdmin.feedback.addressRequired",
     "errors.employees.note.reminder_date_required": "employeeAdmin.feedback.reminderDateRequired",
     "errors.employees.note.invalid_type": "employeeAdmin.feedback.invalidNoteType",
     "errors.employees.photo.write_failed": "employeeAdmin.feedback.photoUploadFailed",
@@ -138,6 +141,35 @@ export function summarizeCurrentAddress(addressRows) {
   ]
     .filter(Boolean)
     .join(", ");
+}
+
+export function validateEmployeeAddressDraft(addressDraft, existingRows = [], editingAddressId = "") {
+  const validFrom = typeof addressDraft?.valid_from === "string" ? addressDraft.valid_from.trim() : "";
+  const validTo = typeof addressDraft?.valid_to === "string" ? addressDraft.valid_to.trim() : "";
+  const addressType = typeof addressDraft?.address_type === "string" ? addressDraft.address_type.trim() : "";
+  const line1 = typeof addressDraft?.street_line_1 === "string" ? addressDraft.street_line_1.trim() : "";
+  const postalCode = typeof addressDraft?.postal_code === "string" ? addressDraft.postal_code.trim() : "";
+  const city = typeof addressDraft?.city === "string" ? addressDraft.city.trim() : "";
+  const countryCode = typeof addressDraft?.country_code === "string" ? addressDraft.country_code.trim() : "";
+  const nextEnd = addressDraft?.is_current ? "" : validTo;
+
+  if (!line1 || !postalCode || !city || !countryCode || !validFrom) {
+    return "employeeAdmin.feedback.addressRequired";
+  }
+  if (nextEnd && nextEnd < validFrom) {
+    return "employeeAdmin.feedback.addressInvalidWindow";
+  }
+
+  const overlaps = (existingRows ?? []).some((row) => {
+    if (!row || row.id === editingAddressId || row.archived_at || row.address_type !== addressType) {
+      return false;
+    }
+    const rowEnd = row.valid_to || "9999-12-31";
+    const draftEnd = nextEnd || "9999-12-31";
+    return validFrom <= rowEnd && row.valid_from <= draftEnd;
+  });
+
+  return overlaps ? "employeeAdmin.feedback.addressOverlap" : null;
 }
 
 export function buildEmployeeImportTemplateRows() {

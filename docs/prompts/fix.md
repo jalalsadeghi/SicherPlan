@@ -1,135 +1,86 @@
-You are working in the SicherPlan repository.
-
-Task title:
-Fix Planning Orders > Planning records create UX so users get precise validation and cannot submit obviously invalid planning records.
-
-Problem:
-In `/admin/planning-orders`, creating a planning record currently fails with a generic frontend error:
-- "The action could not be completed."
-
-But backend validation is more specific. In the current implementation, create can fail because:
-1) planning_from / planning_to are outside the selected order service window
-2) event mode requires a valid event_detail.event_venue_id
-3) other mode-specific detail references may be missing or invalid
-4) dispatcher_user_id may be invalid if manually supplied
-
-Current backend behavior:
-In `backend/app/modules/planning/planning_record_service.py`, `create_planning_record()` validates, in this order:
-- planning mode is valid
-- order exists
-- planning window is valid
-- planning window stays within order.service_from / order.service_to
-- dispatcher (if provided) exists
-- parent record (if provided) is valid
-- detail payload matches the selected mode
-- mode-specific referenced entity exists and belongs to the same customer
-
-Important frontend issue:
-In `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue`
-the planning record form currently:
-- allows submission even when planning dates are outside the selected order window
-- allows submission in event mode even when no event venue exists / is selected
-- maps many backend errors to the generic fallback "error"
-
-This creates a poor UX and hides the real reason.
+You are working in the SicherPlan monorepo.
 
 Goal:
-Make Planning record creation safe and self-explanatory on the frontend, while preserving backend validation as source of truth.
+Fix the missing admin-side employee address entry/edit flow in the current Employees workspace.
 
-Files likely involved:
-- web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue
-- web/apps/web-antd/src/sicherplan-legacy/features/planning/planningOrders.helpers.js
-- web/apps/web-antd/src/sicherplan-legacy/i18n/planningOrders.messages.ts
+Context:
+- The current admin route for employee management is the Employees workspace mounted from the SicherPlan web shell. The module registry shows the employees admin surface is registered in the current web app and routed through the admin shell.
+- The documented canonical workspace is E-01 — Employees Workspace, and its scope explicitly includes employee addresses/address history.
+- Backend/admin API already exists for employee addresses:
+  - GET /api/employees/tenants/{tenant_id}/employees/{employee_id}/addresses
+  - POST /api/employees/tenants/{tenant_id}/employees/{employee_id}/addresses
+  - PATCH /api/employees/tenants/{tenant_id}/employees/{employee_id}/addresses/{history_id}
+- A separate self-service endpoint also exists:
+  - POST /api/employee-self-service/me/current-address
+  This self-service endpoint must NOT be used for the tenant-admin workflow.
+- Data model expectation:
+  - hr.employee_address_history stores address history
+  - linked to common.address
+  - fields conceptually include address_id, valid_from, valid_to, is_current
+  - overlapping active/current windows should be prevented
 
-Do NOT change backend business rules unless absolutely necessary.
-Assume backend behavior is correct.
+Current bug:
+In /admin/employees, the Addresses section only shows a passive timeline/empty-state text like:
+- “Current address history”
+- “Released address timeline”
+- “No released address history is available.”
+There is no usable admin form/action to create or update an employee address from the canonical Employees workspace.
 
-Implementation requirements
+What to do:
+1. Locate the current Employees admin view and all related address subcomponents, composables, stores, and API client code.
+2. Implement proper admin-side address CRUD inside the employee detail/editor area.
+3. Add clear actions such as:
+   - Add address
+   - Edit address
+   - Mark as current
+   - Close current validity / set valid_to
+4. Use the existing admin employee-address endpoints only.
+5. Replace misleading employee-address copy like “Released address timeline” with employee-specific wording such as:
+   - “Address history”
+   - “Current and past employee addresses”
+   - “No address history is available”
+6. The form should support at minimum:
+   - line1
+   - line2
+   - postal_code
+   - city
+   - state_region
+   - country_code
+   - valid_from
+   - valid_to
+   - is_current
+   Only include additional fields if they are already supported by the backend contract.
+7. After save/update, refresh the employee address timeline from the GET endpoint and render it chronologically.
+8. Surface validation errors clearly in the UI.
+9. Prevent overlapping current/active address windows client-side where practical, but also preserve backend validation as source of truth.
+10. Keep employee self-service current-address behavior unchanged.
+11. Add/update tests for:
+   - creating the first employee address
+   - editing an existing history row
+   - showing empty state when no addresses exist
+   - showing the new address immediately after save
+   - preventing invalid overlapping current periods
+12. Follow existing project patterns for:
+   - API client structure
+   - optimistic updates / refetch
+   - form validation
+   - i18n keys
+   - role-scoped admin UI
 
-A) Add frontend validation for planning record date window
-1. Introduce a frontend validation helper for planning record create/update.
-2. It must enforce:
-   - planning_from is required
-   - planning_to is required
-   - planning_to >= planning_from
-   - if a selectedOrder exists:
-     - planning_from >= selectedOrder.service_from
-     - planning_to <= selectedOrder.service_to
-3. If the planning window is outside the order window, show a specific validation message before submit.
+Acceptance criteria:
+- A Tenant Administrator can create an employee address directly from /admin/employees.
+- The saved address appears in the employee address history/timeline immediately after save.
+- Existing address history rows can be edited through the admin UI.
+- The empty state is shown only when there are truly no address records.
+- The admin UI uses admin endpoints, not self-service endpoints.
+- Copy/labels for the Addresses section are employee-specific and no longer misleading.
 
-B) Add min/max constraints to planning date inputs
-4. In the planning record form:
-   - `Planning from` input min must be `selectedOrder.service_from`
-   - `Planning from` input max must be `selectedOrder.service_to`
-   - `Planning to` input min must be max(planning_from, selectedOrder.service_from)
-   - `Planning to` input max must be `selectedOrder.service_to`
-5. Add a helper text below the planning date row that clearly shows:
-   - "Allowed window: {service_from} → {service_to}"
-
-C) Enforce mode-specific required selectors before submit
-6. If `planning_mode_code === "event"`:
-   - require `planningDraft.event_detail.event_venue_id`
-   - if event venue options are empty, block submit and show a specific hint
-7. If `planning_mode_code === "site"`:
-   - require `planningDraft.site_detail.site_id`
-8. If `planning_mode_code === "trade_fair"`:
-   - require `planningDraft.trade_fair_detail.trade_fair_id`
-9. If `planning_mode_code === "patrol"`:
-   - require `planningDraft.patrol_detail.patrol_route_id`
-
-D) Improve empty-state guidance
-10. When event mode is selected and there are no event venues for the selected customer:
-   - show a clear helper message
-   - add a direct CTA/button/link to open Planning Setup for `event_venue`
-11. Do the same pattern for site / trade fair / patrol route when relevant.
-
-E) Improve error mapping
-12. Extend `mapPlanningOrderApiMessage()` in `planningOrders.helpers.js` to handle at least:
-- errors.planning.planning_record.order_window_mismatch
-- errors.planning.planning_record.invalid_window
-- errors.planning.planning_record.detail_mismatch
-- errors.planning.planning_record.detail_customer_mismatch
-- errors.planning.event_venue.not_found
-- errors.planning.site.not_found
-- errors.planning.trade_fair.not_found
-- errors.planning.trade_fair_zone.not_found
-- errors.planning.patrol_route.not_found
-- errors.planning.dispatcher_user.not_found
-- errors.planning.planning_record.parent_mismatch
-- errors.planning.planning_record.parent_not_allowed
-
-13. Add corresponding message keys in `planningOrders.messages.ts` for both DE and EN.
-14. Do not fall back to the generic error message for these common validation cases.
-
-F) Submit behavior
-15. In `submitPlanningRecord()`:
-   - run the new frontend validation before POST/PATCH
-   - if invalid, show specific feedback and do not submit
-16. Preserve existing backend validation and error handling.
-
-G) UX consistency
-17. Keep Dispatcher optional.
-18. Keep Parent planning record optional.
-19. Do not force users to enter values that backend allows to be null.
-20. Do not change release workflow in this task.
-
-Acceptance criteria
-- Users cannot submit a planning record with dates outside the selected order window without seeing a specific frontend validation message first.
-- Users cannot submit event mode without selecting a valid event venue.
-- The planning record form visibly communicates the allowed date window from the selected order.
-- Backend validation remains unchanged.
-- Common planning-record errors no longer collapse into the generic "The action could not be completed."
-
-Before coding:
-Briefly summarize:
-1. which files you will change
-2. which frontend validations you will add
-3. which backend message keys you will explicitly map
-
-After coding:
-Provide:
-1. files changed
-2. validation logic summary
-3. added message keys
-4. UX improvements
-5. confirmation that backend business rules were not changed
+Important:
+- Prefer a UI fix first. Do not redesign backend contracts unless the current backend contract is genuinely insufficient.
+- If backend payload shape is unclear, inspect the existing request/response models and align the UI to the current contract instead of inventing a new one.
+- Keep changes minimal, coherent, and production-ready.
+- At the end, provide:
+  1. changed files
+  2. short explanation of root cause
+  3. test coverage added
+  4. any backend follow-up only if strictly necessary

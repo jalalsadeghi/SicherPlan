@@ -585,9 +585,19 @@ export type MessageKey =
   | "employeeAdmin.addresses.eyebrow"
   | "employeeAdmin.addresses.title"
   | "employeeAdmin.addresses.lead"
+  | "employeeAdmin.addresses.currentEyebrow"
+  | "employeeAdmin.addresses.currentTitle"
+  | "employeeAdmin.addresses.currentEmpty"
   | "employeeAdmin.addresses.historyEyebrow"
   | "employeeAdmin.addresses.historyTitle"
+  | "employeeAdmin.addresses.editorEyebrow"
+  | "employeeAdmin.addresses.editorTitle"
+  | "employeeAdmin.addresses.editorLead"
   | "employeeAdmin.addresses.empty"
+  | "employeeAdmin.addresses.typeHome"
+  | "employeeAdmin.addresses.typeMailing"
+  | "employeeAdmin.addresses.currentBadge"
+  | "employeeAdmin.addresses.closedBadge"
   | "employeeAdmin.documents.eyebrow"
   | "employeeAdmin.documents.title"
   | "employeeAdmin.documents.lead"
@@ -616,6 +626,12 @@ export type MessageKey =
   | "employeeAdmin.actions.assignGroup"
   | "employeeAdmin.actions.saveMembership"
   | "employeeAdmin.actions.resetMembership"
+  | "employeeAdmin.actions.addAddress"
+  | "employeeAdmin.actions.saveAddress"
+  | "employeeAdmin.actions.editAddress"
+  | "employeeAdmin.actions.markCurrentAddress"
+  | "employeeAdmin.actions.closeAddressValidity"
+  | "employeeAdmin.actions.resetAddress"
   | "employeeAdmin.actions.exportEmployees"
   | "employeeAdmin.actions.loadImportFile"
   | "employeeAdmin.actions.resetImportTemplate"
@@ -692,6 +708,8 @@ export type MessageKey =
   | "employeeAdmin.feedback.duplicatePersonnelNo"
   | "employeeAdmin.feedback.duplicateGroupCode"
   | "employeeAdmin.feedback.staleVersion"
+  | "employeeAdmin.feedback.addressRequired"
+  | "employeeAdmin.feedback.addressInvalidWindow"
   | "employeeAdmin.feedback.addressOverlap"
   | "employeeAdmin.feedback.reminderDateRequired"
   | "employeeAdmin.feedback.invalidNoteType"
@@ -709,6 +727,7 @@ export type MessageKey =
   | "employeeAdmin.feedback.noteSaved"
   | "employeeAdmin.feedback.groupSaved"
   | "employeeAdmin.feedback.membershipSaved"
+  | "employeeAdmin.feedback.addressSaved"
   | "employeeAdmin.feedback.photoSaved"
   | "employeeAdmin.feedback.importDryRunReady"
   | "employeeAdmin.feedback.importExecuted"
@@ -2078,11 +2097,21 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.groups.empty": "Noch keine Gruppenzuordnungen vorhanden.",
     "employeeAdmin.groups.selectPlaceholder": "Gruppe auswählen",
     "employeeAdmin.addresses.eyebrow": "Adressen",
-    "employeeAdmin.addresses.title": "Aktuelle Adresshistorie",
-    "employeeAdmin.addresses.lead": "Freigegebene Adressstammsätze werden als nachvollziehbare Historie dargestellt.",
+    "employeeAdmin.addresses.title": "Adresshistorie",
+    "employeeAdmin.addresses.lead": "Aktuelle und frühere Mitarbeitendenadressen werden direkt in dieser Akte gepflegt.",
+    "employeeAdmin.addresses.currentEyebrow": "Aktuell",
+    "employeeAdmin.addresses.currentTitle": "Aktuelle Adresse",
+    "employeeAdmin.addresses.currentEmpty": "Keine aktuelle Adresse vorhanden.",
     "employeeAdmin.addresses.historyEyebrow": "Historie",
-    "employeeAdmin.addresses.historyTitle": "Freigegebene Adressverläufe",
-    "employeeAdmin.addresses.empty": "Keine freigegebene Adresshistorie vorhanden.",
+    "employeeAdmin.addresses.historyTitle": "Aktuelle und frühere Mitarbeitendenadressen",
+    "employeeAdmin.addresses.editorEyebrow": "Bearbeitung",
+    "employeeAdmin.addresses.editorTitle": "Adresse anlegen oder bearbeiten",
+    "employeeAdmin.addresses.editorLead": "Straße, Ort und Gültigkeitsfenster werden direkt über die Admin-Endpunkte gespeichert.",
+    "employeeAdmin.addresses.empty": "Keine Adresshistorie vorhanden.",
+    "employeeAdmin.addresses.typeHome": "Privatadresse",
+    "employeeAdmin.addresses.typeMailing": "Postadresse",
+    "employeeAdmin.addresses.currentBadge": "Aktuell",
+    "employeeAdmin.addresses.closedBadge": "Beendet",
     "employeeAdmin.documents.eyebrow": "Dateien",
     "employeeAdmin.documents.title": "Dokumente und Nachweise",
     "employeeAdmin.documents.lead": "Dokumente und Nachweise bleiben als geordnete Liste mit direktem Download verfügbar.",
@@ -2111,6 +2140,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.assignGroup": "Gruppe zuordnen",
     "employeeAdmin.actions.saveMembership": "Zuordnung speichern",
     "employeeAdmin.actions.resetMembership": "Zuordnung leeren",
+    "employeeAdmin.actions.addAddress": "Adresse anlegen",
+    "employeeAdmin.actions.saveAddress": "Adresse speichern",
+    "employeeAdmin.actions.editAddress": "Adresse bearbeiten",
+    "employeeAdmin.actions.markCurrentAddress": "Als aktuell markieren",
+    "employeeAdmin.actions.closeAddressValidity": "Gültigkeit beenden",
+    "employeeAdmin.actions.resetAddress": "Adressformular leeren",
     "employeeAdmin.actions.exportEmployees": "Export starten",
     "employeeAdmin.actions.loadImportFile": "CSV laden",
     "employeeAdmin.actions.resetImportTemplate": "Vorlage einsetzen",
@@ -2192,6 +2227,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Dieser Gruppencode ist im Mandanten bereits vergeben.",
     "employeeAdmin.feedback.staleVersion":
       "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden und erneut versuchen.",
+    "employeeAdmin.feedback.addressRequired":
+      "Straße, Postleitzahl, Ort, Ländercode und Gültig-ab sind für die Mitarbeitendenadresse erforderlich.",
+    "employeeAdmin.feedback.addressInvalidWindow":
+      "Gültig-bis darf nicht vor Gültig-ab liegen.",
     "employeeAdmin.feedback.addressOverlap":
       "Die Adresshistorie enthält ein überlappendes Zeitfenster.",
     "employeeAdmin.feedback.reminderDateRequired":
@@ -2226,6 +2265,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Die Mitarbeitendengruppe wurde gespeichert.",
     "employeeAdmin.feedback.membershipSaved":
       "Die Gruppenzuordnung wurde gespeichert.",
+    "employeeAdmin.feedback.addressSaved":
+      "Die Mitarbeitendenadresse wurde gespeichert.",
     "employeeAdmin.feedback.photoSaved":
       "Das Profilfoto wurde erfolgreich aktualisiert.",
     "employeeAdmin.feedback.importDryRunReady":
@@ -3687,11 +3728,21 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.groups.empty": "No group assignments exist yet.",
     "employeeAdmin.groups.selectPlaceholder": "Select a group",
     "employeeAdmin.addresses.eyebrow": "Addresses",
-    "employeeAdmin.addresses.title": "Current address history",
-    "employeeAdmin.addresses.lead": "Released address master records are presented as a clear timeline.",
+    "employeeAdmin.addresses.title": "Address history",
+    "employeeAdmin.addresses.lead": "Current and past employee addresses can be maintained directly in this file.",
+    "employeeAdmin.addresses.currentEyebrow": "Current",
+    "employeeAdmin.addresses.currentTitle": "Current address",
+    "employeeAdmin.addresses.currentEmpty": "No current address is available.",
     "employeeAdmin.addresses.historyEyebrow": "History",
-    "employeeAdmin.addresses.historyTitle": "Released address timeline",
-    "employeeAdmin.addresses.empty": "No released address history is available.",
+    "employeeAdmin.addresses.historyTitle": "Current and past employee addresses",
+    "employeeAdmin.addresses.editorEyebrow": "Editor",
+    "employeeAdmin.addresses.editorTitle": "Create or edit address",
+    "employeeAdmin.addresses.editorLead": "Street, location, and validity dates are saved through the admin employee-address endpoints.",
+    "employeeAdmin.addresses.empty": "No address history is available.",
+    "employeeAdmin.addresses.typeHome": "Home address",
+    "employeeAdmin.addresses.typeMailing": "Mailing address",
+    "employeeAdmin.addresses.currentBadge": "Current",
+    "employeeAdmin.addresses.closedBadge": "Closed",
     "employeeAdmin.documents.eyebrow": "Documents",
     "employeeAdmin.documents.title": "Files and evidence",
     "employeeAdmin.documents.lead": "Files and evidence stay available as an ordered list with direct download access.",
@@ -3720,6 +3771,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.assignGroup": "Assign group",
     "employeeAdmin.actions.saveMembership": "Save assignment",
     "employeeAdmin.actions.resetMembership": "Clear assignment",
+    "employeeAdmin.actions.addAddress": "Add address",
+    "employeeAdmin.actions.saveAddress": "Save address",
+    "employeeAdmin.actions.editAddress": "Edit address",
+    "employeeAdmin.actions.markCurrentAddress": "Mark as current",
+    "employeeAdmin.actions.closeAddressValidity": "Close validity",
+    "employeeAdmin.actions.resetAddress": "Clear address form",
     "employeeAdmin.actions.exportEmployees": "Run export",
     "employeeAdmin.actions.loadImportFile": "Load CSV",
     "employeeAdmin.actions.resetImportTemplate": "Use template",
@@ -3802,6 +3859,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "This group code is already used in the tenant.",
     "employeeAdmin.feedback.staleVersion":
       "The record changed in the meantime. Reload and try again.",
+    "employeeAdmin.feedback.addressRequired":
+      "Street, postal code, city, country code, and valid-from are required for an employee address.",
+    "employeeAdmin.feedback.addressInvalidWindow":
+      "Valid until may not be earlier than valid from.",
     "employeeAdmin.feedback.addressOverlap":
       "The address history contains an overlapping validity window.",
     "employeeAdmin.feedback.reminderDateRequired":
@@ -3836,6 +3897,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "The employee group was saved.",
     "employeeAdmin.feedback.membershipSaved":
       "The group assignment was saved.",
+    "employeeAdmin.feedback.addressSaved":
+      "The employee address was saved.",
     "employeeAdmin.feedback.photoSaved":
       "The profile photo was updated successfully.",
     "employeeAdmin.feedback.importDryRunReady":
