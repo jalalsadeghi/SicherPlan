@@ -32,6 +32,7 @@ test("employee detail uses top-level tabs and isolated tab panels", () => {
   assert.match(viewSource, /data-testid="employee-tab-panel-overview"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-app-access"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-profile-photo"/);
+  assert.match(viewSource, /data-testid="employee-tab-panel-private-profile"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-notes"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-groups"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-documents"/);
@@ -45,6 +46,11 @@ test("employee list rows use structured text stack markup and card row styling",
 });
 
 test("non-overview employee tabs reuse the structured section pattern", () => {
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*employeeAdmin\.privateProfile\.identityEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*submitPrivateProfile/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*getEmployeePrivateProfile/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*upsertEmployeePrivateProfile/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*updateEmployeePrivateProfile/);
   assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*employee-admin-form employee-admin-form--structured[\s\S]*employeeAdmin\.access\.stateCreateEyebrow/);
   assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*v-if="!hasLinkedAccess"[\s\S]*employeeAdmin\.access\.createEyebrow/);
   assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*v-else[\s\S]*employeeAdmin\.access\.manageEyebrow[\s\S]*employeeAdmin\.access\.resetEyebrow[\s\S]*employeeAdmin\.access\.detachEyebrow/);
@@ -70,4 +76,11 @@ test("employee addresses tab uses admin editor copy and removes released timelin
   assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*onAddressCurrentToggle/);
   assert.doesNotMatch(viewSource, /Released address timeline/);
   assert.doesNotMatch(viewSource, /No released address history is available/);
+});
+
+test("employee overview exposes status and extended employment fields", () => {
+  assert.match(viewSource, /employeeAdmin\.fields\.status/);
+  assert.match(viewSource, /employeeAdmin\.fields\.employmentTypeCode/);
+  assert.match(viewSource, /employeeAdmin\.fields\.targetWeeklyHours/);
+  assert.match(viewSource, /employeeAdmin\.fields\.targetMonthlyHours/);
 });

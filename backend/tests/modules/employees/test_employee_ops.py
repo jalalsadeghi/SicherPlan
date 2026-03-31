@@ -77,9 +77,12 @@ class FakeEmployeeService:
             default_mandate_id=payload.default_mandate_id,
             hire_date=payload.hire_date,
             termination_date=payload.termination_date,
+            employment_type_code=payload.employment_type_code,
+            target_weekly_hours=payload.target_weekly_hours,
+            target_monthly_hours=payload.target_monthly_hours,
             user_id=payload.user_id,
             notes=payload.notes,
-            status="active",
+            status=payload.status or "active",
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
             created_by_user_id=context.user_id,
@@ -121,6 +124,12 @@ class FakeEmployeeService:
             row.hire_date = payload.hire_date
         if payload.termination_date is not None:
             row.termination_date = payload.termination_date
+        if payload.employment_type_code is not None:
+            row.employment_type_code = payload.employment_type_code
+        if payload.target_weekly_hours is not None:
+            row.target_weekly_hours = payload.target_weekly_hours
+        if payload.target_monthly_hours is not None:
+            row.target_monthly_hours = payload.target_monthly_hours
         if payload.user_id is not None:
             row.user_id = payload.user_id
         if payload.notes is not None:
@@ -373,6 +382,9 @@ class EmployeeOpsServiceTest(unittest.TestCase):
                             "hire_date": "",
                             "termination_date": "",
                             "status": "",
+                            "employment_type_code": "",
+                            "target_weekly_hours": "",
+                            "target_monthly_hours": "",
                             "user_id": "",
                             "notes": "",
                         }
@@ -402,6 +414,9 @@ class EmployeeOpsServiceTest(unittest.TestCase):
                         "hire_date": "",
                         "termination_date": "",
                         "status": "inactive",
+                        "employment_type_code": "part_time",
+                        "target_weekly_hours": "30",
+                        "target_monthly_hours": "130",
                         "user_id": "",
                         "notes": "Updated",
                     }
@@ -416,6 +431,9 @@ class EmployeeOpsServiceTest(unittest.TestCase):
         self.assertEqual(len(self.repository.employees), 1)
         self.assertEqual(self.repository.employees[0].last_name, "Wagner-Updated")
         self.assertEqual(self.repository.employees[0].status, "inactive")
+        self.assertEqual(self.repository.employees[0].employment_type_code, "part_time")
+        self.assertEqual(self.repository.employees[0].target_weekly_hours, 30)
+        self.assertEqual(self.repository.employees[0].target_monthly_hours, 130)
 
     def test_export_uses_operational_fields_only(self) -> None:
         result = self.service.export_employees(
@@ -427,6 +445,7 @@ class EmployeeOpsServiceTest(unittest.TestCase):
         version_payload = self.document_service.documents[0]["versions"][0]
         decoded = base64.b64decode(version_payload.content_base64).decode("utf-8")
         self.assertIn("personnel_no,first_name,last_name", decoded)
+        self.assertIn("employment_type_code,target_weekly_hours,target_monthly_hours", decoded)
         self.assertNotIn("tax_id", decoded)
         self.assertNotIn("bank_iban", decoded)
 

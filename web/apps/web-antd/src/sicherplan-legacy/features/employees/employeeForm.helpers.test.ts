@@ -21,6 +21,10 @@ describe('employee create payload helpers', () => {
       default_mandate_id: '33333333-3333-3333-3333-333333333333',
       hire_date: '',
       termination_date: '',
+      status: 'active',
+      employment_type_code: 'full_time',
+      target_weekly_hours: '40',
+      target_monthly_hours: '173.2',
       user_id: '11111111-1111-1111-1111-111111111111',
       notes: '',
     });
@@ -28,6 +32,9 @@ describe('employee create payload helpers', () => {
     expect(payload.default_branch_id).toBe('22222222-2222-2222-2222-222222222222');
     expect(payload.default_mandate_id).toBe('33333333-3333-3333-3333-333333333333');
     expect(payload.personnel_no).toBe('EMP-1001');
+    expect(payload.employment_type_code).toBe('full_time');
+    expect(payload.target_weekly_hours).toBe('40');
+    expect(payload.target_monthly_hours).toBe('173.2');
   });
 
   it('does not keep stale free-text labels as IDs', () => {
@@ -47,6 +54,10 @@ describe('employee create payload helpers', () => {
       default_mandate_id: mandateLabel,
       hire_date: '',
       termination_date: '',
+      status: 'active',
+      employment_type_code: '',
+      target_weekly_hours: '',
+      target_monthly_hours: '',
       user_id: '',
       notes: '',
     }, {
@@ -75,6 +86,10 @@ describe('employee create payload helpers', () => {
         default_mandate_id: '',
         hire_date: '',
         termination_date: '',
+        status: 'active',
+        employment_type_code: 'part_time',
+        target_weekly_hours: '30',
+        target_monthly_hours: '130',
         user_id: 'usr-emp-0042',
         notes: '',
       },
@@ -82,6 +97,9 @@ describe('employee create payload helpers', () => {
     );
 
     expect(payload.user_id).toBeNull();
+    expect(payload.employment_type_code).toBe('part_time');
+    expect(payload.target_weekly_hours).toBe('30');
+    expect(payload.target_monthly_hours).toBe('130');
   });
 
   it('filters mandate options by the selected branch', () => {

@@ -29,6 +29,7 @@ from app.modules.iam.models import UserAccount
 
 EMPLOYEE_ADDRESS_TYPES = ("home", "mailing")
 EMPLOYEE_NOTE_TYPES = ("operational_note", "positive_activity", "reminder")
+EMPLOYEE_EMPLOYMENT_TYPES = ("full_time", "part_time", "mini_job", "temporary", "working_student", "freelance", "other")
 EMPLOYEE_QUALIFICATION_RECORD_KINDS = ("function", "qualification")
 EMPLOYEE_AVAILABILITY_RULE_KINDS = ("availability", "unavailable", "free_wish")
 EMPLOYEE_AVAILABILITY_RECURRENCE_TYPES = ("none", "weekly")
@@ -70,6 +71,14 @@ class Employee(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
             "termination_date IS NULL OR hire_date IS NULL OR termination_date >= hire_date",
             name="employee_hire_termination_valid",
         ),
+        CheckConstraint(
+            "target_weekly_hours IS NULL OR target_weekly_hours >= 0",
+            name="employee_target_weekly_hours_non_negative",
+        ),
+        CheckConstraint(
+            "target_monthly_hours IS NULL OR target_monthly_hours >= 0",
+            name="employee_target_monthly_hours_non_negative",
+        ),
         {"schema": "hr"},
     )
 
@@ -85,6 +94,9 @@ class Employee(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
     default_mandate_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), nullable=True)
     hire_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
     termination_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    employment_type_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    target_weekly_hours: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    target_monthly_hours: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
     user_id: Mapped[str | None] = mapped_column(ForeignKey("iam.user_account.id", ondelete="SET NULL"), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text(), nullable=True)
 

@@ -496,6 +496,7 @@ export type MessageKey =
   | "employeeAdmin.tabs.overview"
   | "employeeAdmin.tabs.appAccess"
   | "employeeAdmin.tabs.profilePhoto"
+  | "employeeAdmin.tabs.privateProfile"
   | "employeeAdmin.tabs.notes"
   | "employeeAdmin.tabs.groups"
   | "employeeAdmin.tabs.addresses"
@@ -536,6 +537,13 @@ export type MessageKey =
   | "employeeAdmin.fields.defaultMandateId"
   | "employeeAdmin.fields.hireDate"
   | "employeeAdmin.fields.terminationDate"
+  | "employeeAdmin.fields.status"
+  | "employeeAdmin.fields.employmentTypeCode"
+  | "employeeAdmin.fields.targetWeeklyHours"
+  | "employeeAdmin.fields.targetMonthlyHours"
+  | "employeeAdmin.fields.birthDate"
+  | "employeeAdmin.fields.placeOfBirth"
+  | "employeeAdmin.fields.nationalityCountryCode"
   | "employeeAdmin.fields.userId"
   | "employeeAdmin.fields.notes"
   | "employeeAdmin.fields.noteType"
@@ -555,6 +563,20 @@ export type MessageKey =
   | "employeeAdmin.summary.currentAddress"
   | "employeeAdmin.summary.groups"
   | "employeeAdmin.summary.none"
+  | "employeeAdmin.privateProfile.eyebrow"
+  | "employeeAdmin.privateProfile.title"
+  | "employeeAdmin.privateProfile.lead"
+  | "employeeAdmin.privateProfile.identityEyebrow"
+  | "employeeAdmin.privateProfile.identityTitle"
+  | "employeeAdmin.privateProfile.actionsEyebrow"
+  | "employeeAdmin.privateProfile.actionsTitle"
+  | "employeeAdmin.employmentType.full_time"
+  | "employeeAdmin.employmentType.part_time"
+  | "employeeAdmin.employmentType.mini_job"
+  | "employeeAdmin.employmentType.temporary"
+  | "employeeAdmin.employmentType.working_student"
+  | "employeeAdmin.employmentType.freelance"
+  | "employeeAdmin.employmentType.other"
   | "employeeAdmin.photo.eyebrow"
   | "employeeAdmin.photo.title"
   | "employeeAdmin.photo.alt"
@@ -626,6 +648,8 @@ export type MessageKey =
   | "employeeAdmin.actions.assignGroup"
   | "employeeAdmin.actions.saveMembership"
   | "employeeAdmin.actions.resetMembership"
+  | "employeeAdmin.actions.savePrivateProfile"
+  | "employeeAdmin.actions.resetPrivateProfile"
   | "employeeAdmin.actions.addAddress"
   | "employeeAdmin.actions.saveAddress"
   | "employeeAdmin.actions.editAddress"
@@ -708,6 +732,8 @@ export type MessageKey =
   | "employeeAdmin.feedback.duplicatePersonnelNo"
   | "employeeAdmin.feedback.duplicateGroupCode"
   | "employeeAdmin.feedback.staleVersion"
+  | "employeeAdmin.feedback.invalidTargetWeeklyHours"
+  | "employeeAdmin.feedback.invalidTargetMonthlyHours"
   | "employeeAdmin.feedback.addressRequired"
   | "employeeAdmin.feedback.addressInvalidWindow"
   | "employeeAdmin.feedback.addressOverlap"
@@ -727,6 +753,7 @@ export type MessageKey =
   | "employeeAdmin.feedback.noteSaved"
   | "employeeAdmin.feedback.groupSaved"
   | "employeeAdmin.feedback.membershipSaved"
+  | "employeeAdmin.feedback.privateProfileSaved"
   | "employeeAdmin.feedback.addressSaved"
   | "employeeAdmin.feedback.photoSaved"
   | "employeeAdmin.feedback.importDryRunReady"
@@ -2008,6 +2035,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.tabs.overview": "Überblick",
     "employeeAdmin.tabs.appAccess": "App-Zugang",
     "employeeAdmin.tabs.profilePhoto": "Profilfoto",
+    "employeeAdmin.tabs.privateProfile": "Privatprofil",
     "employeeAdmin.tabs.notes": "Notizen",
     "employeeAdmin.tabs.groups": "Gruppen",
     "employeeAdmin.tabs.addresses": "Adressen",
@@ -2050,6 +2078,13 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.fields.defaultMandateId": "Standardmandat",
     "employeeAdmin.fields.hireDate": "Eintrittsdatum",
     "employeeAdmin.fields.terminationDate": "Austrittsdatum",
+    "employeeAdmin.fields.status": "Status",
+    "employeeAdmin.fields.employmentTypeCode": "Beschäftigungsart",
+    "employeeAdmin.fields.targetWeeklyHours": "Wochen-Sollstunden",
+    "employeeAdmin.fields.targetMonthlyHours": "Monats-Sollstunden",
+    "employeeAdmin.fields.birthDate": "Geburtsdatum",
+    "employeeAdmin.fields.placeOfBirth": "Geburtsort",
+    "employeeAdmin.fields.nationalityCountryCode": "Nationalität-Ländercode",
     "employeeAdmin.fields.userId": "Benutzerkonto-ID",
     "employeeAdmin.fields.notes": "Operative Notizen",
     "employeeAdmin.fields.noteType": "Notiztyp",
@@ -2069,6 +2104,20 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.summary.currentAddress": "Aktuelle Adresse",
     "employeeAdmin.summary.groups": "Gruppen",
     "employeeAdmin.summary.none": "Keine Angabe",
+    "employeeAdmin.privateProfile.eyebrow": "Privatprofil",
+    "employeeAdmin.privateProfile.title": "Geburts- und Identitätsdaten",
+    "employeeAdmin.privateProfile.lead": "Diese Angaben liegen im HR-Privatprofil und sind nur mit privater Berechtigung sichtbar.",
+    "employeeAdmin.privateProfile.identityEyebrow": "Identität",
+    "employeeAdmin.privateProfile.identityTitle": "Geburtsdaten und Nationalität",
+    "employeeAdmin.privateProfile.actionsEyebrow": "Aktion",
+    "employeeAdmin.privateProfile.actionsTitle": "Privatprofil speichern oder zurücksetzen",
+    "employeeAdmin.employmentType.full_time": "Vollzeit",
+    "employeeAdmin.employmentType.part_time": "Teilzeit",
+    "employeeAdmin.employmentType.mini_job": "Minijob",
+    "employeeAdmin.employmentType.temporary": "Befristet",
+    "employeeAdmin.employmentType.working_student": "Werkstudium",
+    "employeeAdmin.employmentType.freelance": "Freelance",
+    "employeeAdmin.employmentType.other": "Sonstiges",
     "employeeAdmin.photo.eyebrow": "Profilfoto",
     "employeeAdmin.photo.title": "Foto und Vorschau",
     "employeeAdmin.photo.alt": "Profilfoto der mitarbeitenden Person",
@@ -2140,6 +2189,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.assignGroup": "Gruppe zuordnen",
     "employeeAdmin.actions.saveMembership": "Zuordnung speichern",
     "employeeAdmin.actions.resetMembership": "Zuordnung leeren",
+    "employeeAdmin.actions.savePrivateProfile": "Privatprofil speichern",
+    "employeeAdmin.actions.resetPrivateProfile": "Privatprofil zurücksetzen",
     "employeeAdmin.actions.addAddress": "Adresse anlegen",
     "employeeAdmin.actions.saveAddress": "Adresse speichern",
     "employeeAdmin.actions.editAddress": "Adresse bearbeiten",
@@ -2227,6 +2278,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Dieser Gruppencode ist im Mandanten bereits vergeben.",
     "employeeAdmin.feedback.staleVersion":
       "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden und erneut versuchen.",
+    "employeeAdmin.feedback.invalidTargetWeeklyHours":
+      "Die Wochen-Sollstunden müssen null oder positiv sein.",
+    "employeeAdmin.feedback.invalidTargetMonthlyHours":
+      "Die Monats-Sollstunden müssen null oder positiv sein.",
     "employeeAdmin.feedback.addressRequired":
       "Straße, Postleitzahl, Ort, Ländercode und Gültig-ab sind für die Mitarbeitendenadresse erforderlich.",
     "employeeAdmin.feedback.addressInvalidWindow":
@@ -2265,6 +2320,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Die Mitarbeitendengruppe wurde gespeichert.",
     "employeeAdmin.feedback.membershipSaved":
       "Die Gruppenzuordnung wurde gespeichert.",
+    "employeeAdmin.feedback.privateProfileSaved":
+      "Das private Mitarbeitendenprofil wurde gespeichert.",
     "employeeAdmin.feedback.addressSaved":
       "Die Mitarbeitendenadresse wurde gespeichert.",
     "employeeAdmin.feedback.photoSaved":
@@ -3639,6 +3696,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.tabs.overview": "Overview",
     "employeeAdmin.tabs.appAccess": "App access",
     "employeeAdmin.tabs.profilePhoto": "Profile photo",
+    "employeeAdmin.tabs.privateProfile": "Private profile",
     "employeeAdmin.tabs.notes": "Notes",
     "employeeAdmin.tabs.groups": "Groups",
     "employeeAdmin.tabs.addresses": "Addresses",
@@ -3681,6 +3739,13 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.fields.defaultMandateId": "Default mandate",
     "employeeAdmin.fields.hireDate": "Hire date",
     "employeeAdmin.fields.terminationDate": "Termination date",
+    "employeeAdmin.fields.status": "Status",
+    "employeeAdmin.fields.employmentTypeCode": "Employment type",
+    "employeeAdmin.fields.targetWeeklyHours": "Target weekly hours",
+    "employeeAdmin.fields.targetMonthlyHours": "Target monthly hours",
+    "employeeAdmin.fields.birthDate": "Birth date",
+    "employeeAdmin.fields.placeOfBirth": "Place of birth",
+    "employeeAdmin.fields.nationalityCountryCode": "Nationality country code",
     "employeeAdmin.fields.userId": "User account ID",
     "employeeAdmin.fields.notes": "Operational notes",
     "employeeAdmin.fields.noteType": "Note type",
@@ -3700,6 +3765,20 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.summary.currentAddress": "Current address",
     "employeeAdmin.summary.groups": "Groups",
     "employeeAdmin.summary.none": "Not provided",
+    "employeeAdmin.privateProfile.eyebrow": "Private profile",
+    "employeeAdmin.privateProfile.title": "Birth and identity data",
+    "employeeAdmin.privateProfile.lead": "These fields live in the HR-private profile and stay visible only for roles with private permissions.",
+    "employeeAdmin.privateProfile.identityEyebrow": "Identity",
+    "employeeAdmin.privateProfile.identityTitle": "Birth details and nationality",
+    "employeeAdmin.privateProfile.actionsEyebrow": "Action",
+    "employeeAdmin.privateProfile.actionsTitle": "Save or reset the private profile",
+    "employeeAdmin.employmentType.full_time": "Full time",
+    "employeeAdmin.employmentType.part_time": "Part time",
+    "employeeAdmin.employmentType.mini_job": "Mini job",
+    "employeeAdmin.employmentType.temporary": "Temporary",
+    "employeeAdmin.employmentType.working_student": "Working student",
+    "employeeAdmin.employmentType.freelance": "Freelance",
+    "employeeAdmin.employmentType.other": "Other",
     "employeeAdmin.photo.eyebrow": "Profile photo",
     "employeeAdmin.photo.title": "Photo and preview",
     "employeeAdmin.photo.alt": "Profile photo of the employee",
@@ -3771,6 +3850,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.assignGroup": "Assign group",
     "employeeAdmin.actions.saveMembership": "Save assignment",
     "employeeAdmin.actions.resetMembership": "Clear assignment",
+    "employeeAdmin.actions.savePrivateProfile": "Save private profile",
+    "employeeAdmin.actions.resetPrivateProfile": "Reset private profile",
     "employeeAdmin.actions.addAddress": "Add address",
     "employeeAdmin.actions.saveAddress": "Save address",
     "employeeAdmin.actions.editAddress": "Edit address",
@@ -3859,6 +3940,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "This group code is already used in the tenant.",
     "employeeAdmin.feedback.staleVersion":
       "The record changed in the meantime. Reload and try again.",
+    "employeeAdmin.feedback.invalidTargetWeeklyHours":
+      "Target weekly hours must be null or positive.",
+    "employeeAdmin.feedback.invalidTargetMonthlyHours":
+      "Target monthly hours must be null or positive.",
     "employeeAdmin.feedback.addressRequired":
       "Street, postal code, city, country code, and valid-from are required for an employee address.",
     "employeeAdmin.feedback.addressInvalidWindow":
@@ -3897,6 +3982,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "The employee group was saved.",
     "employeeAdmin.feedback.membershipSaved":
       "The group assignment was saved.",
+    "employeeAdmin.feedback.privateProfileSaved":
+      "The private employee profile was saved.",
     "employeeAdmin.feedback.addressSaved":
       "The employee address was saved.",
     "employeeAdmin.feedback.photoSaved":

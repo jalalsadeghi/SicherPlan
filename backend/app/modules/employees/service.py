@@ -153,8 +153,12 @@ class EmployeeService:
                 default_mandate_id=normalized.default_mandate_id,
                 hire_date=normalized.hire_date,
                 termination_date=normalized.termination_date,
+                employment_type_code=normalized.employment_type_code,
+                target_weekly_hours=normalized.target_weekly_hours,
+                target_monthly_hours=normalized.target_monthly_hours,
                 user_id=normalized.user_id,
                 notes=normalized.notes,
+                status=normalized.status or "active",
                 created_by_user_id=context.user_id,
                 updated_by_user_id=context.user_id,
             )
@@ -196,6 +200,21 @@ class EmployeeService:
         )
         next_hire_date = payload.hire_date if payload.hire_date is not None else row.hire_date
         next_termination_date = payload.termination_date if payload.termination_date is not None else row.termination_date
+        next_employment_type_code = (
+            self._normalize_optional(payload.employment_type_code)
+            if payload.employment_type_code is not None
+            else row.employment_type_code
+        )
+        next_target_weekly_hours = (
+            self._normalize_target_hours(payload.target_weekly_hours, "weekly")
+            if payload.target_weekly_hours is not None
+            else row.target_weekly_hours
+        )
+        next_target_monthly_hours = (
+            self._normalize_target_hours(payload.target_monthly_hours, "monthly")
+            if payload.target_monthly_hours is not None
+            else row.target_monthly_hours
+        )
         next_notes = self._effective_optional(payload.notes, row.notes)
 
         self._validate_employee_payload(
@@ -213,6 +232,10 @@ class EmployeeService:
                 default_mandate_id=next_mandate_id,
                 hire_date=next_hire_date,
                 termination_date=next_termination_date,
+                status=payload.status or row.status,
+                employment_type_code=next_employment_type_code,
+                target_weekly_hours=next_target_weekly_hours,
+                target_monthly_hours=next_target_monthly_hours,
                 user_id=next_user_id,
                 notes=next_notes,
             ),
@@ -230,6 +253,9 @@ class EmployeeService:
         row.default_mandate_id = next_mandate_id
         row.hire_date = next_hire_date
         row.termination_date = next_termination_date
+        row.employment_type_code = next_employment_type_code
+        row.target_weekly_hours = next_target_weekly_hours
+        row.target_monthly_hours = next_target_monthly_hours
         row.user_id = next_user_id
         row.notes = next_notes
         if payload.status is not None:
@@ -781,6 +807,18 @@ class EmployeeService:
     ) -> None:
         if payload.termination_date is not None and payload.hire_date is not None and payload.termination_date < payload.hire_date:
             raise ApiException(422, "employees.employee.invalid_dates", "errors.employees.employee.invalid_dates")
+        if payload.target_weekly_hours is not None and payload.target_weekly_hours < 0:
+            raise ApiException(
+                422,
+                "employees.employee.invalid_target_weekly_hours",
+                "errors.employees.employee.invalid_target_weekly_hours",
+            )
+        if payload.target_monthly_hours is not None and payload.target_monthly_hours < 0:
+            raise ApiException(
+                422,
+                "employees.employee.invalid_target_monthly_hours",
+                "errors.employees.employee.invalid_target_monthly_hours",
+            )
         if self.repository.find_employee_by_personnel_no(tenant_id, payload.personnel_no, exclude_id=exclude_id) is not None:
             raise ApiException(409, "employees.employee.duplicate_personnel_no", "errors.employees.employee.duplicate_personnel_no")
         if payload.user_id is not None:
@@ -996,6 +1034,10 @@ class EmployeeService:
             default_mandate_id=self._normalize_mandate_id(payload.default_mandate_id),
             hire_date=payload.hire_date,
             termination_date=payload.termination_date,
+            status=self._normalize_optional(payload.status),
+            employment_type_code=self._normalize_optional(payload.employment_type_code),
+            target_weekly_hours=self._normalize_target_hours(payload.target_weekly_hours, "weekly"),
+            target_monthly_hours=self._normalize_target_hours(payload.target_monthly_hours, "monthly"),
             user_id=self._normalize_user_id(payload.user_id),
             notes=self._normalize_optional(payload.notes),
         )
@@ -1004,6 +1046,19 @@ class EmployeeService:
         if candidate is None:
             return current
         return self._normalize_optional(candidate)
+
+    @staticmethod
+    def _normalize_target_hours(value: float | None, period: str) -> float | None:
+        if value is None:
+            return None
+        normalized = float(value)
+        if normalized < 0:
+            raise ApiException(
+                422,
+                f"employees.employee.invalid_target_{period}_hours",
+                f"errors.employees.employee.invalid_target_{period}_hours",
+            )
+        return normalized
 
     def _normalize_user_id(self, user_id: str | None) -> str | None:
         return self._normalize_uuid_reference(
@@ -1094,6 +1149,9 @@ class EmployeeService:
             "default_mandate_id": row.default_mandate_id,
             "hire_date": row.hire_date.isoformat() if row.hire_date else None,
             "termination_date": row.termination_date.isoformat() if row.termination_date else None,
+            "employment_type_code": row.employment_type_code,
+            "target_weekly_hours": row.target_weekly_hours,
+            "target_monthly_hours": row.target_monthly_hours,
             "user_id": row.user_id,
             "status": row.status,
             "archived_at": row.archived_at.isoformat() if row.archived_at else None,

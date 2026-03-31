@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildEmployeeImportTemplateRows,
+  buildEmployeePrivateProfilePayload,
   deriveEmployeeActionState,
   hasEmployeePermission,
   mapEmployeeApiMessage,
@@ -22,6 +23,7 @@ test("action state reflects selected employee and role", () => {
   const dispatcherState = deriveEmployeeActionState("dispatcher", selectedEmployee);
 
   assert.equal(adminState.canManageNotes, true);
+  assert.equal(adminState.canManagePrivateProfile, true);
   assert.equal(adminState.canManageAddresses, true);
   assert.equal(adminState.canManagePhoto, true);
   assert.equal(adminState.canImport, true);
@@ -129,9 +131,29 @@ test("employee address validation blocks invalid windows and overlap", () => {
   );
 });
 
+test("private profile payload normalizes date and country code", () => {
+  assert.deepEqual(
+    buildEmployeePrivateProfilePayload(
+      {
+        birth_date: "2026-03-01",
+        place_of_birth: " Berlin ",
+        nationality_country_code: "de",
+      },
+      { tenantId: "tenant-1", employeeId: "employee-1" },
+    ),
+    {
+      tenant_id: "tenant-1",
+      employee_id: "employee-1",
+      birth_date: "2026-03-01",
+      place_of_birth: "Berlin",
+      nationality_country_code: "DE",
+    },
+  );
+});
+
 test("import template rows use the stable employee operational header order", () => {
   assert.equal(
     buildEmployeeImportTemplateRows(),
-    "personnel_no,first_name,last_name,preferred_name,work_email,work_phone,mobile_phone,default_branch_id,default_mandate_id,hire_date,termination_date,status,user_id,notes",
+    "personnel_no,first_name,last_name,preferred_name,work_email,work_phone,mobile_phone,default_branch_id,default_mandate_id,hire_date,termination_date,status,employment_type_code,target_weekly_hours,target_monthly_hours,user_id,notes",
   );
 });

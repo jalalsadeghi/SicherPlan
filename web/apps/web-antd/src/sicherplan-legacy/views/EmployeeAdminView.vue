@@ -307,6 +307,31 @@
                   <span>{{ t("employeeAdmin.fields.terminationDate") }}</span>
                   <input v-model="employeeDraft.termination_date" type="date" />
                 </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.status") }}</span>
+                  <select v-model="employeeDraft.status">
+                    <option value="active">{{ t("employeeAdmin.status.active") }}</option>
+                    <option value="inactive">{{ t("employeeAdmin.status.inactive") }}</option>
+                    <option value="archived">{{ t("employeeAdmin.status.archived") }}</option>
+                  </select>
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.employmentTypeCode") }}</span>
+                  <select v-model="employeeDraft.employment_type_code">
+                    <option value="">{{ t("employeeAdmin.summary.none") }}</option>
+                    <option v-for="option in employmentTypeOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.targetWeeklyHours") }}</span>
+                  <input v-model="employeeDraft.target_weekly_hours" min="0" step="0.25" type="number" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.fields.targetMonthlyHours") }}</span>
+                  <input v-model="employeeDraft.target_monthly_hours" min="0" step="0.25" type="number" />
+                </label>
               </div>
             </section>
 
@@ -772,6 +797,62 @@
           </section>
 
           <section
+            v-if="selectedEmployee && !isCreatingEmployee && canReadPrivate && activeDetailTab === 'private_profile'"
+            class="employee-admin-section employee-admin-tab-panel"
+            data-testid="employee-tab-panel-private-profile"
+          >
+            <form class="employee-admin-form employee-admin-form--structured" @submit.prevent="submitPrivateProfile">
+              <section class="employee-admin-editor-intro">
+                <div>
+                  <p class="eyebrow">{{ t("employeeAdmin.privateProfile.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.privateProfile.title") }}</h4>
+                </div>
+                <p class="field-help">{{ t("employeeAdmin.privateProfile.lead") }}</p>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.privateProfile.identityEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.privateProfile.identityTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.birthDate") }}</span>
+                    <input v-model="privateProfileDraft.birth_date" :disabled="!actionState.canManagePrivateProfile" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.placeOfBirth") }}</span>
+                    <input v-model="privateProfileDraft.place_of_birth" :disabled="!actionState.canManagePrivateProfile" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.nationalityCountryCode") }}</span>
+                    <input
+                      v-model="privateProfileDraft.nationality_country_code"
+                      :disabled="!actionState.canManagePrivateProfile"
+                      maxlength="2"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <div class="employee-admin-form-actions">
+                <div>
+                  <p class="eyebrow">{{ t("employeeAdmin.privateProfile.actionsEyebrow") }}</p>
+                  <strong>{{ t("employeeAdmin.privateProfile.actionsTitle") }}</strong>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManagePrivateProfile">
+                    {{ t("employeeAdmin.actions.savePrivateProfile") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetPrivateProfileDraft">
+                    {{ t("employeeAdmin.actions.resetPrivateProfile") }}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </section>
+
+          <section
             v-if="selectedEmployee && !isCreatingEmployee && canReadPrivate && activeDetailTab === 'addresses'"
             class="employee-admin-section employee-admin-tab-panel"
             data-testid="employee-tab-panel-addresses"
@@ -992,6 +1073,7 @@ import {
   exportEmployees,
   getEmployee,
   getEmployeeAccessLink,
+  getEmployeePrivateProfile,
   getEmployeePhoto,
   importEmployeesDryRun,
   importEmployeesExecute,
@@ -1024,13 +1106,19 @@ import {
   type EmployeeListItem,
   type EmployeeNoteRead,
   type EmployeeOperationalRead,
+  type EmployeePrivateProfileRead,
+  type EmployeePrivateProfileUpdatePayload,
+  type EmployeePrivateProfileWritePayload,
   type EmployeePhotoRead,
+  updateEmployeePrivateProfile,
+  upsertEmployeePrivateProfile,
 } from "@/api/employeeAdmin";
 import StatusBadge from "@/components/StatusBadge.vue";
 import { useI18n } from "@/i18n";
 import {
   buildEmployeeImportTemplateRows,
   buildEmployeeOperationalPayload,
+  buildEmployeePrivateProfilePayload,
   deriveEmployeeActionState,
   filterMandatesForBranch,
   formatEmployeeStructureLabel,
@@ -1080,8 +1168,18 @@ const employeeDraft = reactive({
   default_mandate_id: "",
   hire_date: "",
   termination_date: "",
+  status: "active",
+  employment_type_code: "",
+  target_weekly_hours: "",
+  target_monthly_hours: "",
   user_id: "",
   notes: "",
+});
+
+const privateProfileDraft = reactive({
+  birth_date: "",
+  place_of_birth: "",
+  nationality_country_code: "",
 });
 
 const noteDraft = reactive({
@@ -1155,6 +1253,7 @@ const mandates = ref<MandateRead[]>([]);
 const employees = ref<EmployeeListItem[]>([]);
 const selectedEmployeeId = ref("");
 const selectedEmployee = ref<EmployeeOperationalRead | null>(null);
+const selectedPrivateProfile = ref<EmployeePrivateProfileRead | null>(null);
 const employeeAddresses = ref<EmployeeAddressHistoryRead[]>([]);
 const employeeNotes = ref<EmployeeNoteRead[]>([]);
 const employeeGroups = ref<EmployeeGroupRead[]>([]);
@@ -1200,6 +1299,15 @@ const employeeAddressTimeline = computed(() =>
 const currentEmployeeAddress = computed(
   () => [...employeeAddresses.value].filter((row) => !row.archived_at && !row.valid_to).sort((a, b) => a.valid_from.localeCompare(b.valid_from)).at(-1) ?? null,
 );
+const employmentTypeOptions = computed(() => [
+  { value: "full_time", label: t("employeeAdmin.employmentType.full_time") },
+  { value: "part_time", label: t("employeeAdmin.employmentType.part_time") },
+  { value: "mini_job", label: t("employeeAdmin.employmentType.mini_job") },
+  { value: "temporary", label: t("employeeAdmin.employmentType.temporary") },
+  { value: "working_student", label: t("employeeAdmin.employmentType.working_student") },
+  { value: "freelance", label: t("employeeAdmin.employmentType.freelance") },
+  { value: "other", label: t("employeeAdmin.employmentType.other") },
+]);
 const branchOptions = computed(() => branches.value.filter((branch) => branch.archived_at == null));
 const mandateOptions = computed(() => mandates.value.filter((mandate) => mandate.archived_at == null));
 const filteredEmployeeMandates = computed(() => filterMandateOptions(employeeDraft.default_branch_id));
@@ -1224,7 +1332,8 @@ const employeeDetailTabs = computed(() => {
   ];
 
   if (canReadPrivate.value) {
-    tabs.splice(5, 0, { id: "addresses", label: t("employeeAdmin.tabs.addresses") });
+    tabs.splice(5, 0, { id: "private_profile", label: t("employeeAdmin.tabs.privateProfile") });
+    tabs.splice(6, 0, { id: "addresses", label: t("employeeAdmin.tabs.addresses") });
   }
 
   return isCreatingEmployee.value ? tabs.filter((tab) => tab.id === "overview") : tabs;
@@ -1342,8 +1451,18 @@ function resetEmployeeDraft() {
   employeeDraft.default_mandate_id = "";
   employeeDraft.hire_date = "";
   employeeDraft.termination_date = "";
+  employeeDraft.status = "active";
+  employeeDraft.employment_type_code = "";
+  employeeDraft.target_weekly_hours = "";
+  employeeDraft.target_monthly_hours = "";
   employeeDraft.user_id = "";
   employeeDraft.notes = "";
+}
+
+function resetPrivateProfileDraft() {
+  privateProfileDraft.birth_date = selectedPrivateProfile.value?.birth_date || "";
+  privateProfileDraft.place_of_birth = selectedPrivateProfile.value?.place_of_birth || "";
+  privateProfileDraft.nationality_country_code = selectedPrivateProfile.value?.nationality_country_code || "";
 }
 
 function syncEmployeeDraft(employee: EmployeeOperationalRead) {
@@ -1359,8 +1478,19 @@ function syncEmployeeDraft(employee: EmployeeOperationalRead) {
   employeeDraft.default_mandate_id = employee.default_mandate_id || "";
   employeeDraft.hire_date = employee.hire_date || "";
   employeeDraft.termination_date = employee.termination_date || "";
+  employeeDraft.status = employee.status || "active";
+  employeeDraft.employment_type_code = employee.employment_type_code || "";
+  employeeDraft.target_weekly_hours = employee.target_weekly_hours == null ? "" : String(employee.target_weekly_hours);
+  employeeDraft.target_monthly_hours = employee.target_monthly_hours == null ? "" : String(employee.target_monthly_hours);
   employeeDraft.user_id = employee.user_id || "";
   employeeDraft.notes = employee.notes || "";
+}
+
+function syncPrivateProfileDraft(profile: EmployeePrivateProfileRead | null) {
+  selectedPrivateProfile.value = profile;
+  privateProfileDraft.birth_date = profile?.birth_date || "";
+  privateProfileDraft.place_of_birth = profile?.place_of_birth || "";
+  privateProfileDraft.nationality_country_code = profile?.nationality_country_code || "";
 }
 
 function resetNoteDraft() {
@@ -1476,11 +1606,13 @@ function startCreateEmployee() {
   activeDetailTab.value = "overview";
   selectedEmployeeId.value = "";
   selectedEmployee.value = null;
+  selectedPrivateProfile.value = null;
   employeeAddresses.value = [];
   employeeNotes.value = [];
   employeeDocuments.value = [];
   currentPhoto.value = null;
   accessLink.value = null;
+  syncPrivateProfileDraft(null);
   clearPhotoPreview();
   resetEmployeeDraft();
   resetNoteDraft();
@@ -1586,11 +1718,23 @@ async function selectEmployee(employeeId: string) {
     resetNoteDraft();
     resetMembershipDraft();
     resetAddressDraft();
+    syncPrivateProfileDraft(null);
     resetAccessDrafts();
     if (canReadPrivate.value) {
-      employeeAddresses.value = await listEmployeeAddresses(resolvedTenantScopeId.value, employeeId, authStore.accessToken);
+      const [addresses, privateProfile] = await Promise.all([
+        listEmployeeAddresses(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
+        getEmployeePrivateProfile(resolvedTenantScopeId.value, employeeId, authStore.accessToken).catch((error) => {
+          if (error instanceof EmployeeAdminApiError && error.statusCode === 404) {
+            return null;
+          }
+          throw error;
+        }),
+      ]);
+      employeeAddresses.value = addresses;
+      syncPrivateProfileDraft(privateProfile);
     } else {
       employeeAddresses.value = [];
+      syncPrivateProfileDraft(null);
     }
     await refreshPhotoPreview();
   } catch (error) {
@@ -1640,6 +1784,10 @@ async function submitEmployee() {
         default_mandate_id: employeeDraft.default_mandate_id,
         hire_date: employeeDraft.hire_date,
         termination_date: employeeDraft.termination_date,
+        status: employeeDraft.status,
+        employment_type_code: employeeDraft.employment_type_code,
+        target_weekly_hours: employeeDraft.target_weekly_hours,
+        target_monthly_hours: employeeDraft.target_monthly_hours,
         user_id: employeeDraft.user_id,
         notes: employeeDraft.notes,
       },
@@ -1659,6 +1807,43 @@ async function submitEmployee() {
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.employeeSaved"));
     await refreshEmployees();
     await selectEmployee(employee.id);
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
+async function submitPrivateProfile() {
+  if (!selectedEmployeeId.value || !resolvedTenantScopeId.value || !authStore.accessToken) {
+    return;
+  }
+
+  loading.action = true;
+  try {
+    const payload = buildEmployeePrivateProfilePayload(privateProfileDraft, {
+      tenantId: resolvedTenantScopeId.value,
+      employeeId: selectedEmployeeId.value,
+    });
+    const saved = selectedPrivateProfile.value
+      ? await updateEmployeePrivateProfile(
+          resolvedTenantScopeId.value,
+          selectedEmployeeId.value,
+          authStore.accessToken,
+          {
+            ...payload,
+            version_no: selectedPrivateProfile.value.version_no,
+          } as EmployeePrivateProfileUpdatePayload,
+        )
+      : await upsertEmployeePrivateProfile(
+          resolvedTenantScopeId.value,
+          selectedEmployeeId.value,
+          authStore.accessToken,
+          payload as EmployeePrivateProfileWritePayload,
+        );
+    syncPrivateProfileDraft(saved);
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.privateProfileSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
     setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));

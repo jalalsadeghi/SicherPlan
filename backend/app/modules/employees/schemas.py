@@ -30,6 +30,10 @@ class EmployeeOperationalCreate(BaseModel):
     default_mandate_id: str | None = None
     hire_date: date | None = None
     termination_date: date | None = None
+    status: str | None = Field(default=None, max_length=40)
+    employment_type_code: str | None = Field(default=None, max_length=80)
+    target_weekly_hours: float | None = None
+    target_monthly_hours: float | None = None
     user_id: str | None = None
     notes: str | None = None
 
@@ -46,6 +50,9 @@ class EmployeeOperationalUpdate(BaseModel):
     default_mandate_id: str | None = None
     hire_date: date | None = None
     termination_date: date | None = None
+    employment_type_code: str | None = Field(default=None, max_length=80)
+    target_weekly_hours: float | None = None
+    target_monthly_hours: float | None = None
     user_id: str | None = None
     notes: str | None = None
     status: str | None = None
@@ -79,6 +86,9 @@ class EmployeeOperationalRead(EmployeeListItem):
     model_config = ConfigDict(from_attributes=True)
 
     work_phone: str | None
+    employment_type_code: str | None
+    target_weekly_hours: float | None
+    target_monthly_hours: float | None
     user_id: str | None
     notes: str | None
     group_memberships: list["EmployeeGroupMemberRead"] = Field(default_factory=list)

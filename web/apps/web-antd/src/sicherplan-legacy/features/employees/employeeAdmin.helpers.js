@@ -26,6 +26,7 @@ export function deriveEmployeeActionState(role, selectedEmployee) {
     canReadPrivate,
     canCreate: canWrite,
     canEdit: canWrite && !!selectedEmployee,
+    canManagePrivateProfile: canWrite && canReadPrivate && !!selectedEmployee,
     canManageAddresses: canWrite && canReadPrivate && !!selectedEmployee,
     canManageNotes: canWrite && !!selectedEmployee,
     canManageGroups: canWrite && !!selectedEmployee,
@@ -46,10 +47,14 @@ export function mapEmployeeApiMessage(messageKey) {
     "errors.employees.employee.not_found": "employeeAdmin.feedback.notFound",
     "errors.employees.employee.duplicate_personnel_no": "employeeAdmin.feedback.duplicatePersonnelNo",
     "errors.employees.employee.stale_version": "employeeAdmin.feedback.staleVersion",
+    "errors.employees.employee.invalid_target_weekly_hours": "employeeAdmin.feedback.invalidTargetWeeklyHours",
+    "errors.employees.employee.invalid_target_monthly_hours": "employeeAdmin.feedback.invalidTargetMonthlyHours",
     "errors.employees.group.duplicate_code": "employeeAdmin.feedback.duplicateGroupCode",
     "errors.employees.group.stale_version": "employeeAdmin.feedback.staleVersion",
     "errors.employees.group_member.stale_version": "employeeAdmin.feedback.staleVersion",
     "errors.employees.note.stale_version": "employeeAdmin.feedback.staleVersion",
+    "errors.employees.private_profile.not_found": "employeeAdmin.feedback.notFound",
+    "errors.employees.private_profile.stale_version": "employeeAdmin.feedback.staleVersion",
     "errors.employees.address_history.overlap": "employeeAdmin.feedback.addressOverlap",
     "errors.employees.address_history.invalid_window": "employeeAdmin.feedback.addressInvalidWindow",
     "errors.employees.address_history.address_required": "employeeAdmin.feedback.addressRequired",
@@ -87,7 +92,18 @@ export function filterMandatesForBranch(mandates, branchId) {
   return (mandates ?? []).filter((mandate) => mandate.branch_id === normalizedBranchId);
 }
 
-export function buildEmployeeOperationalPayload(draft, { deferUserLink = false, allowedBranchIds = null, allowedMandateIds = null } = {}) {
+/**
+ * @param {Record<string, any>} draft
+ * @param {{
+ *   deferUserLink?: boolean,
+ *   allowedBranchIds?: string[] | null,
+ *   allowedMandateIds?: string[] | null,
+ * } | undefined} options
+ */
+export function buildEmployeeOperationalPayload(
+  draft,
+  { deferUserLink = false, allowedBranchIds = null, allowedMandateIds = null } = {},
+) {
   const emptyToNull = (value) => {
     if (typeof value !== "string") {
       return value ?? null;
@@ -119,8 +135,25 @@ export function buildEmployeeOperationalPayload(draft, { deferUserLink = false, 
     default_mandate_id: normalizeReference(draft.default_mandate_id, allowedMandateIds),
     hire_date: emptyToNull(draft.hire_date),
     termination_date: emptyToNull(draft.termination_date),
+    status: emptyToNull(draft.status),
+    employment_type_code: emptyToNull(draft.employment_type_code),
+    target_weekly_hours: emptyToNull(draft.target_weekly_hours),
+    target_monthly_hours: emptyToNull(draft.target_monthly_hours),
     user_id: deferUserLink ? null : emptyToNull(draft.user_id),
     notes: emptyToNull(draft.notes),
+  };
+}
+
+export function buildEmployeePrivateProfilePayload(draft, { tenantId, employeeId } = {}) {
+  return {
+    tenant_id: tenantId,
+    employee_id: employeeId,
+    birth_date: typeof draft?.birth_date === "string" && draft.birth_date.trim() ? draft.birth_date.trim() : null,
+    place_of_birth: typeof draft?.place_of_birth === "string" && draft.place_of_birth.trim() ? draft.place_of_birth.trim() : null,
+    nationality_country_code:
+      typeof draft?.nationality_country_code === "string" && draft.nationality_country_code.trim()
+        ? draft.nationality_country_code.trim().toUpperCase()
+        : null,
   };
 }
 
@@ -187,6 +220,9 @@ export function buildEmployeeImportTemplateRows() {
       "hire_date",
       "termination_date",
       "status",
+      "employment_type_code",
+      "target_weekly_hours",
+      "target_monthly_hours",
       "user_id",
       "notes",
     ].join(","),

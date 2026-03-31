@@ -52,6 +52,9 @@ IMPORT_HEADERS = (
     "hire_date",
     "termination_date",
     "status",
+    "employment_type_code",
+    "target_weekly_hours",
+    "target_monthly_hours",
     "user_id",
     "notes",
 )
@@ -516,6 +519,8 @@ class EmployeeOpsService:
         user_id = (row.data.get("user_id") or "").strip()
         hire_date = (row.data.get("hire_date") or "").strip()
         termination_date = (row.data.get("termination_date") or "").strip()
+        target_weekly_hours = (row.data.get("target_weekly_hours") or "").strip()
+        target_monthly_hours = (row.data.get("target_monthly_hours") or "").strip()
 
         if branch_id and self.employee_service.repository.get_branch(tenant_id, branch_id) is None:
             messages.append("errors.employees.employee.branch_not_found")
@@ -539,6 +544,8 @@ class EmployeeOpsService:
             "employees.import.invalid_termination_date",
             messages,
         )
+        self._parse_target_hours(target_weekly_hours, "employees.import.invalid_target_weekly_hours", messages)
+        self._parse_target_hours(target_monthly_hours, "employees.import.invalid_target_monthly_hours", messages)
         if parsed_hire_date and parsed_termination_date and parsed_termination_date < parsed_hire_date:
             messages.append("errors.employees.employee.invalid_dates")
         return EmployeeImportRowResult(
@@ -573,6 +580,18 @@ class EmployeeOpsService:
                 "employees.import.invalid_termination_date",
                 [],
             ),
+            status=self._empty_to_none(row.data.get("status")),
+            employment_type_code=self._empty_to_none(row.data.get("employment_type_code")),
+            target_weekly_hours=self._parse_target_hours(
+                row.data.get("target_weekly_hours") or "",
+                "employees.import.invalid_target_weekly_hours",
+                [],
+            ),
+            target_monthly_hours=self._parse_target_hours(
+                row.data.get("target_monthly_hours") or "",
+                "employees.import.invalid_target_monthly_hours",
+                [],
+            ),
             user_id=self._empty_to_none(row.data.get("user_id")),
             notes=self._empty_to_none(row.data.get("notes")),
         )
@@ -580,14 +599,6 @@ class EmployeeOpsService:
         if existing is None:
             employee = self.employee_service.create_employee(tenant_id, payload, actor)
             messages.append("created_employees")
-            status_value = self._empty_to_none(row.data.get("status"))
-            if status_value and status_value != employee.status:
-                employee = self.employee_service.update_employee(
-                    tenant_id,
-                    employee.id,
-                    EmployeeOperationalUpdate(status=status_value, version_no=employee.version_no),
-                    actor,
-                )
         else:
             employee = self.employee_service.update_employee(
                 tenant_id,
@@ -604,9 +615,12 @@ class EmployeeOpsService:
                     default_mandate_id=payload.default_mandate_id,
                     hire_date=payload.hire_date,
                     termination_date=payload.termination_date,
+                    employment_type_code=payload.employment_type_code,
+                    target_weekly_hours=payload.target_weekly_hours,
+                    target_monthly_hours=payload.target_monthly_hours,
                     user_id=payload.user_id,
                     notes=payload.notes,
-                    status=self._empty_to_none(row.data.get("status")) or existing.status,
+                    status=payload.status or existing.status,
                     version_no=existing.version_no,
                 ),
                 actor,
@@ -640,7 +654,11 @@ class EmployeeOpsService:
                 "hire_date",
                 "termination_date",
                 "status",
+                "employment_type_code",
+                "target_weekly_hours",
+                "target_monthly_hours",
                 "user_id",
+                "notes",
                 "app_access_enabled",
             ]
         )
@@ -659,7 +677,11 @@ class EmployeeOpsService:
                     employee.hire_date.isoformat() if employee.hire_date else "",
                     employee.termination_date.isoformat() if employee.termination_date else "",
                     employee.status,
+                    employee.employment_type_code or "",
+                    f"{employee.target_weekly_hours:.2f}" if employee.target_weekly_hours is not None else "",
+                    f"{employee.target_monthly_hours:.2f}" if employee.target_monthly_hours is not None else "",
                     employee.user_id or "",
+                    employee.notes or "",
                     "true" if employee.user_id else "false",
                 ]
             )
@@ -858,6 +880,21 @@ class EmployeeOpsService:
         except ValueError:
             messages.append(message)
             return None
+
+    @staticmethod
+    def _parse_target_hours(value: str, message: str, messages: list[str]) -> float | None:
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            parsed = float(text)
+        except ValueError:
+            messages.append(message)
+            return None
+        if parsed < 0:
+            messages.append(message)
+            return None
+        return parsed
 
     @staticmethod
     def _empty_to_none(value: str | None) -> str | None:

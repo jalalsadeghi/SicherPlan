@@ -80,6 +80,9 @@ from app.modules.employees.schemas import (
     EmployeeOperationalCreate,
     EmployeeOperationalRead,
     EmployeeOperationalUpdate,
+    EmployeePrivateProfileCreate,
+    EmployeePrivateProfileRead,
+    EmployeePrivateProfileUpdate,
     EmployeeQualificationCreate,
     EmployeeQualificationFilter,
     EmployeeQualificationProofLinkCreate,
@@ -329,6 +332,47 @@ def update_employee(
     service: Annotated[EmployeeService, Depends(get_employee_service)],
 ) -> EmployeeOperationalRead:
     return service.update_employee(str(tenant_id), str(employee_id), payload, context)
+
+
+@router.get("/{employee_id}/private-profile", response_model=EmployeePrivateProfileRead)
+def get_private_profile(
+    tenant_id: UUID,
+    employee_id: UUID,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.private.read", scope="tenant")),
+    ] = None,
+    service: Annotated[EmployeeService, Depends(get_employee_service)] = None,
+) -> EmployeePrivateProfileRead:
+    return service.get_private_profile(str(tenant_id), str(employee_id), context)
+
+
+@router.put("/{employee_id}/private-profile", response_model=EmployeePrivateProfileRead)
+def upsert_private_profile(
+    tenant_id: UUID,
+    employee_id: UUID,
+    payload: EmployeePrivateProfileCreate,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.private.write", scope="tenant")),
+    ],
+    service: Annotated[EmployeeService, Depends(get_employee_service)],
+) -> EmployeePrivateProfileRead:
+    return service.upsert_private_profile(str(tenant_id), str(employee_id), payload, context)
+
+
+@router.patch("/{employee_id}/private-profile", response_model=EmployeePrivateProfileRead)
+def update_private_profile(
+    tenant_id: UUID,
+    employee_id: UUID,
+    payload: EmployeePrivateProfileUpdate,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.private.write", scope="tenant")),
+    ],
+    service: Annotated[EmployeeService, Depends(get_employee_service)],
+) -> EmployeePrivateProfileRead:
+    return service.update_private_profile(str(tenant_id), str(employee_id), payload, context)
 
 
 @router.post("/{employee_id}/archive", response_model=EmployeeOperationalRead)

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from uuid import uuid4
 
-from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy import CheckConstraint, Index, UniqueConstraint
 
 from app.db import Base
 from app.errors import ApiException
@@ -25,6 +25,7 @@ from app.modules.employees.schemas import (
     EmployeeNoteCreate,
     EmployeeNoteUpdate,
     EmployeeOperationalCreate,
+    EmployeeOperationalUpdate,
     EmployeePrivateProfileCreate,
     EmployeePrivateProfileUpdate,
 )
@@ -353,10 +354,15 @@ class TestEmployeeFoundationMetadata(unittest.TestCase):
         constraint_names = {
             constraint.name for constraint in Employee.__table__.constraints if isinstance(constraint, UniqueConstraint)
         }
+        check_names = {
+            constraint.name for constraint in Employee.__table__.constraints if isinstance(constraint, CheckConstraint)
+        }
         index_names = {index.name for index in Employee.__table__.indexes if isinstance(index, Index)}
         self.assertIn("uq_hr_employee_tenant_personnel_no", constraint_names)
         self.assertIn("uq_hr_employee_tenant_id_id", constraint_names)
         self.assertIn("uq_hr_employee_tenant_user_id", index_names)
+        self.assertIn("ck_employee_employee_target_weekly_hours_non_negative", check_names)
+        self.assertIn("ck_employee_employee_target_monthly_hours_non_negative", check_names)
 
     def test_private_profile_is_strict_one_to_one(self) -> None:
         constraint_names = {
@@ -398,6 +404,9 @@ class TestEmployeeService(unittest.TestCase):
                 last_name="Schmidt",
                 default_branch_id=self.repository.branch_id,
                 default_mandate_id=self.repository.mandate_id,
+                employment_type_code="full_time",
+                target_weekly_hours=40,
+                target_monthly_hours=173.2,
                 user_id=self.repository.user_id,
             ),
             _context("employees.employee.write"),
@@ -422,8 +431,41 @@ class TestEmployeeService(unittest.TestCase):
         )
 
         self.assertEqual(operational.personnel_no, "EMP-1001")
+        self.assertEqual(operational.employment_type_code, "full_time")
+        self.assertEqual(operational.target_weekly_hours, 40)
+        self.assertEqual(operational.target_monthly_hours, 173.2)
         self.assertFalse(hasattr(operational, "tax_id"))
         self.assertEqual(private_profile.tax_id, "DE123")
+
+    def test_operational_update_persists_status_and_target_hours(self) -> None:
+        employee = self.service.create_employee(
+            "tenant-1",
+            EmployeeOperationalCreate(
+                tenant_id="tenant-1",
+                personnel_no="EMP-1001B",
+                first_name="Mara",
+                last_name="Klein",
+            ),
+            _context("employees.employee.write"),
+        )
+
+        updated = self.service.update_employee(
+            "tenant-1",
+            employee.id,
+            EmployeeOperationalUpdate(
+                status="inactive",
+                employment_type_code="part_time",
+                target_weekly_hours=30,
+                target_monthly_hours=130,
+                version_no=employee.version_no,
+            ),
+            _context("employees.employee.write"),
+        )
+
+        self.assertEqual(updated.status, "inactive")
+        self.assertEqual(updated.employment_type_code, "part_time")
+        self.assertEqual(updated.target_weekly_hours, 30)
+        self.assertEqual(updated.target_monthly_hours, 130)
 
     def test_private_profile_requires_private_permission(self) -> None:
         employee = self.service.create_employee(

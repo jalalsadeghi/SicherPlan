@@ -51,9 +51,73 @@ export interface EmployeeGroupMembershipRead {
 
 export interface EmployeeOperationalRead extends EmployeeListItem {
   work_phone: string | null;
+  employment_type_code: string | null;
+  target_weekly_hours: number | null;
+  target_monthly_hours: number | null;
   user_id: string | null;
   notes: string | null;
   group_memberships: EmployeeGroupMembershipRead[];
+}
+
+export interface EmployeePrivateProfileRead {
+  id: string;
+  tenant_id: string;
+  employee_id: string;
+  private_email: string | null;
+  private_phone: string | null;
+  birth_date: string | null;
+  place_of_birth: string | null;
+  nationality_country_code: string | null;
+  marital_status: string | null;
+  tax_id: string | null;
+  social_security_no: string | null;
+  bank_account_holder: string | null;
+  bank_iban: string | null;
+  bank_bic: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  notes: string | null;
+  status: string;
+  archived_at: string | null;
+  version_no: number;
+}
+
+export interface EmployeePrivateProfileWritePayload {
+  tenant_id: string;
+  employee_id: string;
+  private_email?: string | null;
+  private_phone?: string | null;
+  birth_date?: string | null;
+  place_of_birth?: string | null;
+  nationality_country_code?: string | null;
+  marital_status?: string | null;
+  tax_id?: string | null;
+  social_security_no?: string | null;
+  bank_account_holder?: string | null;
+  bank_iban?: string | null;
+  bank_bic?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  notes?: string | null;
+}
+
+export interface EmployeePrivateProfileUpdatePayload {
+  private_email?: string | null;
+  private_phone?: string | null;
+  birth_date?: string | null;
+  place_of_birth?: string | null;
+  nationality_country_code?: string | null;
+  marital_status?: string | null;
+  tax_id?: string | null;
+  social_security_no?: string | null;
+  bank_account_holder?: string | null;
+  bank_iban?: string | null;
+  bank_bic?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  notes?: string | null;
+  status?: string | null;
+  version_no?: number | null;
 }
 
 export interface EmployeeAddressHistoryRead {
@@ -388,6 +452,34 @@ export function createEmployee(tenantId: string, accessToken: string, payload: R
 
 export function updateEmployee(tenantId: string, employeeId: string, accessToken: string, payload: Record<string, unknown>) {
   return request<EmployeeOperationalRead>(`/api/employees/tenants/${tenantId}/employees/${employeeId}`, accessToken, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export function getEmployeePrivateProfile(tenantId: string, employeeId: string, accessToken: string) {
+  return request<EmployeePrivateProfileRead>(`/api/employees/tenants/${tenantId}/employees/${employeeId}/private-profile`, accessToken);
+}
+
+export function upsertEmployeePrivateProfile(
+  tenantId: string,
+  employeeId: string,
+  accessToken: string,
+  payload: EmployeePrivateProfileWritePayload,
+) {
+  return request<EmployeePrivateProfileRead>(`/api/employees/tenants/${tenantId}/employees/${employeeId}/private-profile`, accessToken, {
+    method: "PUT",
+    body: payload,
+  });
+}
+
+export function updateEmployeePrivateProfile(
+  tenantId: string,
+  employeeId: string,
+  accessToken: string,
+  payload: EmployeePrivateProfileUpdatePayload,
+) {
+  return request<EmployeePrivateProfileRead>(`/api/employees/tenants/${tenantId}/employees/${employeeId}/private-profile`, accessToken, {
     method: "PATCH",
     body: payload,
   });
