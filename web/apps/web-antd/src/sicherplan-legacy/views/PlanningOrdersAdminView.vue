@@ -396,8 +396,37 @@
                   </select>
                 </label>
                 <label class="field-stack"><span>{{ tp("fieldsPlanningName") }}</span><input v-model="planningDraft.name" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsPlanningFrom") }}</span><input v-model="planningDraft.planning_from" type="date" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsPlanningTo") }}</span><input v-model="planningDraft.planning_to" type="date" required /></label>
+                <div class="planning-orders-form-row planning-orders-form-row--double">
+                  <label class="field-stack">
+                    <span>{{ tp("fieldsPlanningFrom") }}</span>
+                    <input
+                      v-model="planningDraft.planning_from"
+                      type="date"
+                      required
+                      :min="planningFromMin"
+                      :max="planningFromMax"
+                      :class="{ 'planning-orders-input-invalid': planningFromFieldInvalid }"
+                    />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ tp("fieldsPlanningTo") }}</span>
+                    <input
+                      v-model="planningDraft.planning_to"
+                      type="date"
+                      required
+                      :min="planningToMin"
+                      :max="planningToMax"
+                      :class="{ 'planning-orders-input-invalid': planningToFieldInvalid }"
+                    />
+                  </label>
+                  <p v-if="planningWindowHelp" class="field-help planning-orders-row-help">{{ planningWindowHelp }}</p>
+                  <p
+                    v-if="planningValidationState.attempted && planningRecordValidation.messageKey"
+                    class="field-help planning-orders-row-help"
+                  >
+                    {{ tp(planningRecordValidation.messageKey) }}
+                  </p>
+                </div>
                 <label class="field-stack">
                   <span>{{ tp("fieldsDispatcherUserId") }}</span>
                   <Select
@@ -462,12 +491,18 @@
                       :disabled="loading.action || !planningCustomerId"
                       :filter-option="filterSelectOption"
                       :placeholder="eventVenuePlaceholder"
-                      :status="eventVenueLookupError ? 'error' : undefined"
+                      :status="eventVenueLookupError || planningModeDetailInvalid ? 'error' : undefined"
                       @change="handleEventVenueChange"
                     />
                     <p v-if="eventVenueLookupError" class="field-help">{{ eventVenueLookupError }}</p>
                     <p v-else-if="!planningCustomerId" class="field-help">{{ tp("eventVenueCustomerRequired") }}</p>
-                    <p v-else-if="!eventVenueLookupLoading && !eventVenueSelectOptions.length" class="field-help">{{ tp("eventVenueEmpty") }}</p>
+                    <p v-else-if="!eventVenueLookupLoading && !eventVenueSelectOptions.length" class="field-help">
+                      {{ tp("eventVenueEmpty") }}
+                      <button class="planning-orders-inline-link" type="button" @click="openPlanningSetup('event_venue')">
+                        {{ tp("actionsOpenPlanningSetup") }}
+                      </button>
+                    </p>
+                    <p v-else-if="planningModeDetailInvalid" class="field-help">{{ tp("eventVenueRequired") }}</p>
                   </label>
                   <label class="field-stack field-stack--wide"><span>{{ tp("fieldsSetupNote") }}</span><textarea v-model="planningDraft.event_detail.setup_note" rows="2" /></label>
                 </div>
@@ -484,12 +519,18 @@
                       :disabled="loading.action || !planningCustomerId"
                       :filter-option="filterSelectOption"
                       :placeholder="sitePlaceholder"
-                      :status="siteLookupError ? 'error' : undefined"
+                      :status="siteLookupError || planningModeDetailInvalid ? 'error' : undefined"
                       @change="handleSiteChange"
                     />
                     <p v-if="siteLookupError" class="field-help">{{ siteLookupError }}</p>
                     <p v-else-if="!planningCustomerId" class="field-help">{{ tp("siteCustomerRequired") }}</p>
-                    <p v-else-if="!siteLookupLoading && !siteSelectOptions.length" class="field-help">{{ tp("siteEmpty") }}</p>
+                    <p v-else-if="!siteLookupLoading && !siteSelectOptions.length" class="field-help">
+                      {{ tp("siteEmpty") }}
+                      <button class="planning-orders-inline-link" type="button" @click="openPlanningSetup('site')">
+                        {{ tp("actionsOpenPlanningSetup") }}
+                      </button>
+                    </p>
+                    <p v-else-if="planningModeDetailInvalid" class="field-help">{{ tp("siteRequired") }}</p>
                   </label>
                   <label class="field-stack field-stack--wide"><span>{{ tp("fieldsWatchbookScopeNote") }}</span><textarea v-model="planningDraft.site_detail.watchbook_scope_note" rows="2" /></label>
                 </div>
@@ -506,12 +547,18 @@
                       :disabled="loading.action || !planningCustomerId"
                       :filter-option="filterSelectOption"
                       :placeholder="tradeFairPlaceholder"
-                      :status="tradeFairLookupError ? 'error' : undefined"
+                      :status="tradeFairLookupError || planningModeDetailInvalid ? 'error' : undefined"
                       @change="handleTradeFairChange"
                     />
                     <p v-if="tradeFairLookupError" class="field-help">{{ tradeFairLookupError }}</p>
                     <p v-else-if="!planningCustomerId" class="field-help">{{ tp("tradeFairCustomerRequired") }}</p>
-                    <p v-else-if="!tradeFairLookupLoading && !tradeFairSelectOptions.length" class="field-help">{{ tp("tradeFairEmpty") }}</p>
+                    <p v-else-if="!tradeFairLookupLoading && !tradeFairSelectOptions.length" class="field-help">
+                      {{ tp("tradeFairEmpty") }}
+                      <button class="planning-orders-inline-link" type="button" @click="openPlanningSetup('trade_fair')">
+                        {{ tp("actionsOpenPlanningSetup") }}
+                      </button>
+                    </p>
+                    <p v-else-if="planningModeDetailInvalid" class="field-help">{{ tp("tradeFairRequired") }}</p>
                   </label>
                   <label class="field-stack">
                     <span>{{ tp("fieldsTradeFairZoneId") }}</span>
@@ -549,12 +596,18 @@
                       :disabled="loading.action || !planningCustomerId"
                       :filter-option="filterSelectOption"
                       :placeholder="patrolRouteDetailPlaceholder"
-                      :status="patrolRouteLookupError ? 'error' : undefined"
+                      :status="patrolRouteLookupError || planningModeDetailInvalid ? 'error' : undefined"
                       @change="handlePlanningPatrolRouteChange"
                     />
                     <p v-if="patrolRouteLookupError" class="field-help">{{ patrolRouteLookupError }}</p>
                     <p v-else-if="!planningCustomerId" class="field-help">{{ tp("patrolRouteCustomerRequired") }}</p>
-                    <p v-else-if="!patrolRouteLookupLoading && !patrolRouteSelectOptions.length" class="field-help">{{ tp("patrolRouteEmpty") }}</p>
+                    <p v-else-if="!patrolRouteLookupLoading && !patrolRouteSelectOptions.length" class="field-help">
+                      {{ tp("patrolRouteEmpty") }}
+                      <button class="planning-orders-inline-link" type="button" @click="openPlanningSetup('patrol_route')">
+                        {{ tp("actionsOpenPlanningSetup") }}
+                      </button>
+                    </p>
+                    <p v-else-if="planningModeDetailInvalid" class="field-help">{{ tp("patrolRouteRequired") }}</p>
                   </label>
                   <label class="field-stack field-stack--wide"><span>{{ tp("fieldsExecutionNote") }}</span><textarea v-model="planningDraft.patrol_detail.execution_note" rows="2" /></label>
                 </div>
@@ -760,6 +813,7 @@ import {
   normalizePlanningOrderUuidValue,
   planningModeLabel,
   validatePlanningOrderDraft,
+  validatePlanningRecordDraft,
 } from "@/features/planning/planningOrders.helpers.js";
 import { formatPlanningCustomerOption, hasPlanningPermission } from "@/features/planning/planningAdmin.helpers.js";
 import { planningOrdersMessages } from "@/i18n/planningOrders.messages";
@@ -798,6 +852,7 @@ const tradeFairZoneOptions = ref<TradeFairZoneRead[]>([]);
 const tradeFairZoneLookupLoading = ref(false);
 const tradeFairZoneLookupError = ref("");
 const orderValidationState = reactive({ attempted: false });
+const planningValidationState = reactive({ attempted: false });
 const requirementTypeModal = reactive({
   open: false,
   saving: false,
@@ -1053,6 +1108,45 @@ const customerFieldInvalid = computed(() => orderValidationState.attempted && or
 const requirementTypeFieldInvalid = computed(
   () => orderValidationState.attempted && orderValidationErrors.value.requirement_type_id,
 );
+const planningRecordValidation = computed(() =>
+  validatePlanningRecordDraft(planningDraft, {
+    orderServiceFrom: selectedOrder.value?.service_from,
+    orderServiceTo: selectedOrder.value?.service_to,
+    eventVenueOptions: eventVenueSelectOptions.value,
+    siteOptions: siteSelectOptions.value,
+    tradeFairOptions: tradeFairSelectOptions.value,
+    patrolRouteOptions: patrolRouteSelectOptions.value,
+  }),
+);
+const planningFromFieldInvalid = computed(
+  () => planningValidationState.attempted && planningRecordValidation.value.planning_from,
+);
+const planningToFieldInvalid = computed(
+  () => planningValidationState.attempted && planningRecordValidation.value.planning_to,
+);
+const planningModeDetailInvalid = computed(
+  () => planningValidationState.attempted && planningRecordValidation.value.mode_detail,
+);
+const planningWindowHelp = computed(() => {
+  if (!selectedOrder.value?.service_from || !selectedOrder.value?.service_to) {
+    return "";
+  }
+  return tpf("planningWindowAllowed", {
+    serviceFrom: selectedOrder.value.service_from,
+    serviceTo: selectedOrder.value.service_to,
+  });
+});
+const planningFromMin = computed(() => selectedOrder.value?.service_from || undefined);
+const planningFromMax = computed(() => selectedOrder.value?.service_to || undefined);
+const planningToMin = computed(() => {
+  const orderStart = selectedOrder.value?.service_from || "";
+  const planningStart = planningDraft.planning_from || "";
+  if (planningStart && orderStart) {
+    return planningStart > orderStart ? planningStart : orderStart;
+  }
+  return planningStart || orderStart || undefined;
+});
+const planningToMax = computed(() => selectedOrder.value?.service_to || undefined);
 const selectedOrderCustomerLabel = computed(() => {
   const customerId = selectedOrder.value?.customer_id || orderDraft.customer_id;
   const matchedCustomer = customerOptions.value.find((row) => row.id === customerId);
@@ -1168,6 +1262,7 @@ function resetOrderDraft() {
 }
 
 function resetPlanningDraft() {
+  planningValidationState.attempted = false;
   Object.assign(planningDraft, {
     dispatcher_user_id: "",
     parent_planning_record_id: "",
@@ -1202,6 +1297,7 @@ function syncOrderDraft(order: CustomerOrderRead) {
 }
 
 function syncPlanningDraft(record: PlanningRecordRead) {
+  planningValidationState.attempted = false;
   resetPlanningDraft();
   Object.assign(planningDraft, {
     dispatcher_user_id: record.dispatcher_user_id ?? "",
@@ -1904,6 +2000,7 @@ function startCreatePlanning() {
   selectedPlanningRecord.value = null;
   planningAttachments.value = [];
   selectedPlanningCommercial.value = null;
+  planningValidationState.attempted = false;
   resetPlanningDraft();
 }
 
@@ -1930,6 +2027,11 @@ async function selectPlanningRecord(planningRecordId: string) {
 
 async function submitPlanningRecord() {
   if (!tenantScopeId.value || !accessToken.value || !selectedOrderId.value) return;
+  planningValidationState.attempted = true;
+  if (planningRecordValidation.value.messageKey) {
+    setFeedback("error", tp("errorTitle"), tp(planningRecordValidation.value.messageKey));
+    return;
+  }
   loading.action = true;
   try {
     if (isCreatingPlanning.value || !selectedPlanningRecordId.value) {
@@ -2205,6 +2307,14 @@ watch(
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.planning-orders-form-row--double {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.planning-orders-row-help {
+  grid-column: 1 / -1;
+}
+
 .field-stack {
   display: grid;
   gap: 0.42rem;
@@ -2281,6 +2391,11 @@ watch(
 .field-stack textarea:disabled {
   opacity: 0.72;
   cursor: not-allowed;
+}
+
+.planning-orders-input-invalid {
+  border-color: rgb(220 38 38 / 60%);
+  box-shadow: 0 0 0 3px rgb(220 38 38 / 12%);
 }
 
 :global(.planning-admin-select-dropdown .ant-select-item-option-content) {
@@ -2413,6 +2528,10 @@ watch(
   }
 
   .planning-orders-form-row--triple {
+    grid-template-columns: 1fr;
+  }
+
+  .planning-orders-form-row--double {
     grid-template-columns: 1fr;
   }
 

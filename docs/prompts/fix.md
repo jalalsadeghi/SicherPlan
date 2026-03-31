@@ -1,187 +1,135 @@
 You are working in the SicherPlan repository.
 
 Task title:
-Fix Planning Orders > Planning records form so UUID/reference fields use proper selectors instead of raw text inputs.
+Fix Planning Orders > Planning records create UX so users get precise validation and cannot submit obviously invalid planning records.
 
 Problem:
-In the Planning Orders page (`/admin/planning-orders`), the "Planning records for order" form still uses plain text inputs for several reference/ID fields that users cannot realistically enter by hand.
+In `/admin/planning-orders`, creating a planning record currently fails with a generic frontend error:
+- "The action could not be completed."
 
-Current problematic fields in `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue`:
-- dispatcher_user_id
-- parent_planning_record_id
-- status
-- event_detail.event_venue_id
-- site_detail.site_id
-- trade_fair_detail.trade_fair_id
-- trade_fair_detail.trade_fair_zone_id
-- patrol_detail.patrol_route_id
+But backend validation is more specific. In the current implementation, create can fail because:
+1) planning_from / planning_to are outside the selected order service window
+2) event mode requires a valid event_detail.event_venue_id
+3) other mode-specific detail references may be missing or invalid
+4) dispatcher_user_id may be invalid if manually supplied
 
-Observed issue:
-These fields currently expect UUID-like IDs or internal references, but are rendered as raw `<input>` fields.
-This is poor UX and leads to invalid/manual entry patterns.
+Current backend behavior:
+In `backend/app/modules/planning/planning_record_service.py`, `create_planning_record()` validates, in this order:
+- planning mode is valid
+- order exists
+- planning window is valid
+- planning window stays within order.service_from / order.service_to
+- dispatcher (if provided) exists
+- parent record (if provided) is valid
+- detail payload matches the selected mode
+- mode-specific referenced entity exists and belongs to the same customer
 
-Important backend context:
-From `backend/app/modules/planning/schemas.py`:
-- PlanningRecordCreate:
-  - parent_planning_record_id: str | None
-  - dispatcher_user_id: str | None
-  - planning_mode_code: str
-  - event_detail.event_venue_id is required for event mode
-  - site_detail.site_id is required for site mode
-  - trade_fair_detail.trade_fair_id is required for trade_fair mode
-  - patrol_detail.patrol_route_id is required for patrol mode
-- PlanningRecordUpdate:
-  - status exists here
-- PlanningRecordCreate does NOT define a `status` field
-- release_state is already modeled separately for order/planning release workflows
+Important frontend issue:
+In `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue`
+the planning record form currently:
+- allows submission even when planning dates are outside the selected order window
+- allows submission in event mode even when no event venue exists / is selected
+- maps many backend errors to the generic fallback "error"
 
-Existing repo assets that should be reused:
-- `web/apps/web-antd/src/sicherplan-legacy/api/planningAdmin.ts`
-  already provides list endpoints for:
-  - requirement_type
-  - equipment_item
-  - site
-  - event_venue
-  - trade_fair
-  - patrol_route
-- `PlanningOrdersAdminView.vue` already uses good lookup UI patterns for:
-  - customer_id
-  - requirement_type_id
-  - patrol_route_id
-  via Select / search-select style controls
-- `PlanningOpsAdminView.vue` confirms those planning setup entities are real and listable through the planning admin API.
+This creates a poor UX and hides the real reason.
 
 Goal:
-Refactor the Planning records form so reference fields are selected from valid records instead of manually typed as IDs.
+Make Planning record creation safe and self-explanatory on the frontend, while preserving backend validation as source of truth.
+
+Files likely involved:
+- web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue
+- web/apps/web-antd/src/sicherplan-legacy/features/planning/planningOrders.helpers.js
+- web/apps/web-antd/src/sicherplan-legacy/i18n/planningOrders.messages.ts
+
+Do NOT change backend business rules unless absolutely necessary.
+Assume backend behavior is correct.
 
 Implementation requirements
 
-A) Replace UUID/manual reference fields with selectors
-1. In `PlanningOrdersAdminView.vue`, replace these raw text inputs with controlled selectors:
+A) Add frontend validation for planning record date window
+1. Introduce a frontend validation helper for planning record create/update.
+2. It must enforce:
+   - planning_from is required
+   - planning_to is required
+   - planning_to >= planning_from
+   - if a selectedOrder exists:
+     - planning_from >= selectedOrder.service_from
+     - planning_to <= selectedOrder.service_to
+3. If the planning window is outside the order window, show a specific validation message before submit.
 
-- dispatcher_user_id
-- parent_planning_record_id
-- event_detail.event_venue_id
-- site_detail.site_id
-- trade_fair_detail.trade_fair_id
-- trade_fair_detail.trade_fair_zone_id
-- patrol_detail.patrol_route_id
+B) Add min/max constraints to planning date inputs
+4. In the planning record form:
+   - `Planning from` input min must be `selectedOrder.service_from`
+   - `Planning from` input max must be `selectedOrder.service_to`
+   - `Planning to` input min must be max(planning_from, selectedOrder.service_from)
+   - `Planning to` input max must be `selectedOrder.service_to`
+5. Add a helper text below the planning date row that clearly shows:
+   - "Allowed window: {service_from} → {service_to}"
 
-2. Preferred control type:
-- searchable select / combobox when option lists may grow
-- normal select only if a searchable select is too heavy for the current local setup
+C) Enforce mode-specific required selectors before submit
+6. If `planning_mode_code === "event"`:
+   - require `planningDraft.event_detail.event_venue_id`
+   - if event venue options are empty, block submit and show a specific hint
+7. If `planning_mode_code === "site"`:
+   - require `planningDraft.site_detail.site_id`
+8. If `planning_mode_code === "trade_fair"`:
+   - require `planningDraft.trade_fair_detail.trade_fair_id`
+9. If `planning_mode_code === "patrol"`:
+   - require `planningDraft.patrol_detail.patrol_route_id`
 
-3. Display labels must be human-friendly, not UUID-only.
-Examples:
-- event venue: `VENUE_NO — Name`
-- site: `SITE_NO — Name`
-- trade fair: `FAIR_NO — Name`
-- patrol route: `ROUTE_NO — Name`
-- parent planning record: `Planning name · YYYY-MM-DD - YYYY-MM-DD`
-- dispatcher: `Full name · username/email` or best available readable label
+D) Improve empty-state guidance
+10. When event mode is selected and there are no event venues for the selected customer:
+   - show a clear helper message
+   - add a direct CTA/button/link to open Planning Setup for `event_venue`
+11. Do the same pattern for site / trade fair / patrol route when relevant.
 
-B) Reuse existing planning setup APIs where possible
-4. For planning setup entities, reuse `planningAdmin.ts` list APIs instead of inventing duplicate lookup sources:
-- event_venue
-- site
-- trade_fair
-- patrol_route
+E) Improve error mapping
+12. Extend `mapPlanningOrderApiMessage()` in `planningOrders.helpers.js` to handle at least:
+- errors.planning.planning_record.order_window_mismatch
+- errors.planning.planning_record.invalid_window
+- errors.planning.planning_record.detail_mismatch
+- errors.planning.planning_record.detail_customer_mismatch
+- errors.planning.event_venue.not_found
+- errors.planning.site.not_found
+- errors.planning.trade_fair.not_found
+- errors.planning.trade_fair_zone.not_found
+- errors.planning.patrol_route.not_found
+- errors.planning.dispatcher_user.not_found
+- errors.planning.planning_record.parent_mismatch
+- errors.planning.planning_record.parent_not_allowed
 
-5. Filter these options by selected customer when appropriate.
+13. Add corresponding message keys in `planningOrders.messages.ts` for both DE and EN.
+14. Do not fall back to the generic error message for these common validation cases.
 
-6. For `trade_fair_zone_id`, make it dependent on selected `trade_fair_id`:
-- no free text
-- disabled until a trade fair is selected
-- load/select zones only for the selected trade fair
+F) Submit behavior
+15. In `submitPlanningRecord()`:
+   - run the new frontend validation before POST/PATCH
+   - if invalid, show specific feedback and do not submit
+16. Preserve existing backend validation and error handling.
 
-C) Parent planning-record selector
-7. Replace `parent_planning_record_id` with a select/search-select.
-8. The option set should be filtered at least by:
-- same tenant
-- ideally same order_id
-9. Exclude the currently edited planning record from the parent options to avoid self-parenting.
-10. Keep backend validation as source of truth for any remaining parent constraints.
-
-D) Dispatcher selector
-11. Replace `dispatcher_user_id` with a search-select.
-12. First inspect the repo for an existing user/employee lookup source that can be safely reused.
-13. If a suitable existing lookup already exists, use it.
-14. If no suitable lookup exists, add a minimal read-only lookup path for dispatcher candidates.
-Requirements for this lookup:
-- tenant-scoped
-- returns readable labels for users
-- does not expose unrelated private HR data
-- suitable for assignment in planning records
-
-E) Status field cleanup
-15. The `status` field is currently misleading:
-- frontend includes it in the form and payload
-- backend `PlanningRecordCreate` does not define it
-- release workflow already uses `release_state` separately
-
-16. Fix this properly:
-- remove `status` from the create form
-- do not send it in create payload
-- if lifecycle editing is actually needed for existing records, only show it in edit mode
-- if shown in edit mode, render it as a dropdown, not free text
-
-17. Do not confuse `status` with `release_state`.
-Release state remains handled separately by the existing release actions/workflow.
-
-F) UX details
-18. Add proper placeholders like:
-- “Select dispatcher”
-- “Select parent planning record”
-- “Select event venue”
-- “Select site”
-- “Select trade fair”
-- “Select trade fair zone”
-- “Select patrol route”
-
-19. Disable dependent selectors when prerequisites are missing:
-- disable event venue until customer is chosen
-- disable site until customer is chosen
-- disable trade fair until customer is chosen
-- disable trade fair zone until trade fair is chosen
-- disable parent planning record until order exists / is selected
-- disable dispatcher selector while loading
-
-20. Show inline helper text or empty-state hints when no options exist, instead of leaving a confusing empty selector.
-
-G) Payload correctness
-21. Keep backend payload field names unchanged.
-22. Ensure selectors submit actual IDs, not labels.
-23. Remove any create-payload status field that backend does not support.
-24. Keep existing release-state behavior intact.
-
-H) Testing
-25. Add/update frontend tests for:
-- event venue field is no longer a raw text input
-- parent planning-record field is no longer a raw text input
-- status field is hidden in create mode or rendered correctly in edit mode
-- selectors load options from the correct sources
-- trade fair zone selector depends on selected trade fair
-- payload submission sends IDs correctly
-- create payload no longer includes unsupported free-text status
+G) UX consistency
+17. Keep Dispatcher optional.
+18. Keep Parent planning record optional.
+19. Do not force users to enter values that backend allows to be null.
+20. Do not change release workflow in this task.
 
 Acceptance criteria
-- Users no longer need to type UUIDs manually for planning-record references.
-- Planning record reference fields use selectors with readable labels.
-- Status is not a free-text field in create mode.
-- Existing planning setup entities are reused as option sources where appropriate.
-- No backend business logic is weakened.
-- UX is consistent with the already improved selectors elsewhere in Planning Orders.
+- Users cannot submit a planning record with dates outside the selected order window without seeing a specific frontend validation message first.
+- Users cannot submit event mode without selecting a valid event venue.
+- The planning record form visibly communicates the allowed date window from the selected order.
+- Backend validation remains unchanged.
+- Common planning-record errors no longer collapse into the generic "The action could not be completed."
 
 Before coding:
 Briefly summarize:
 1. which files you will change
-2. which lookup sources already exist
-3. whether dispatcher lookup needs a new endpoint or can reuse an existing one
+2. which frontend validations you will add
+3. which backend message keys you will explicitly map
 
 After coding:
 Provide:
 1. files changed
-2. selector mappings for each field
-3. payload changes
-4. any new lookup endpoint added
-5. test coverage summary
+2. validation logic summary
+3. added message keys
+4. UX improvements
+5. confirmation that backend business rules were not changed

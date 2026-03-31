@@ -16,6 +16,7 @@ import {
   normalizePlanningOrderUuidValue,
   planningModeLabel,
   validatePlanningOrderDraft,
+  validatePlanningRecordDraft,
 } from "./planningOrders.helpers.js";
 
 test("dispatcher can manage orders and planning records", () => {
@@ -37,7 +38,15 @@ test("api message mapping covers planning-specific errors", () => {
   assert.equal(mapPlanningOrderApiMessage("errors.planning.customer_order.duplicate_number"), "orderDuplicateNumber");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.customer_order.invalid_requirement_type_id"), "requirementTypeRequired");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.requirement_type.duplicate_code"), "planningSetupDuplicateCode");
+  assert.equal(mapPlanningOrderApiMessage("errors.planning.planning_record.invalid_window"), "planningInvalidWindow");
+  assert.equal(mapPlanningOrderApiMessage("errors.planning.planning_record.order_window_mismatch"), "planningOrderWindowMismatch");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.planning_record.detail_mismatch"), "planningDetailMismatch");
+  assert.equal(mapPlanningOrderApiMessage("errors.planning.event_venue.not_found"), "eventVenueNotFound");
+  assert.equal(mapPlanningOrderApiMessage("errors.planning.site.not_found"), "siteNotFound");
+  assert.equal(mapPlanningOrderApiMessage("errors.planning.trade_fair.not_found"), "tradeFairNotFound");
+  assert.equal(mapPlanningOrderApiMessage("errors.planning.trade_fair_zone.not_found"), "tradeFairZoneNotFound");
+  assert.equal(mapPlanningOrderApiMessage("errors.planning.patrol_route.not_found"), "patrolRouteNotFound");
+  assert.equal(mapPlanningOrderApiMessage("errors.planning.planning_record.parent_mismatch"), "planningParentMismatch");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.planning_record_attachment.scope_mismatch"), "attachmentScopeMismatch");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.commercial_link.prerequisites_missing"), "commercialPrerequisitesMissing");
 });
@@ -119,6 +128,64 @@ test("planning-order draft validation blocks missing required selects only", () 
   assert.deepEqual(
     validatePlanningOrderDraft({ customer_id: "customer-1", requirement_type_id: "req-1", patrol_route_id: "" }),
     { customer_id: false, requirement_type_id: false },
+  );
+});
+
+test("planning-record validation enforces order window and mode-specific selectors", () => {
+  assert.deepEqual(
+    validatePlanningRecordDraft(
+      { planning_mode_code: "event", planning_from: "", planning_to: "", event_detail: { event_venue_id: "" } },
+      { orderServiceFrom: "2026-05-01", orderServiceTo: "2026-05-31", eventVenueOptions: [] },
+    ),
+    {
+      planning_from: true,
+      planning_to: false,
+      planning_window: false,
+      mode_detail: false,
+      messageKey: "planningFromRequired",
+    },
+  );
+  assert.deepEqual(
+    validatePlanningRecordDraft(
+      { planning_mode_code: "event", planning_from: "2026-05-10", planning_to: "2026-05-05", event_detail: { event_venue_id: "" } },
+      { orderServiceFrom: "2026-05-01", orderServiceTo: "2026-05-31", eventVenueOptions: [] },
+    ).messageKey,
+    "planningInvalidWindow",
+  );
+  assert.deepEqual(
+    validatePlanningRecordDraft(
+      { planning_mode_code: "event", planning_from: "2026-04-30", planning_to: "2026-05-05", event_detail: { event_venue_id: "" } },
+      { orderServiceFrom: "2026-05-01", orderServiceTo: "2026-05-31", eventVenueOptions: [] },
+    ).messageKey,
+    "planningOrderWindowMismatch",
+  );
+  assert.deepEqual(
+    validatePlanningRecordDraft(
+      { planning_mode_code: "event", planning_from: "2026-05-05", planning_to: "2026-05-06", event_detail: { event_venue_id: "" } },
+      { orderServiceFrom: "2026-05-01", orderServiceTo: "2026-05-31", eventVenueOptions: [] },
+    ).messageKey,
+    "eventVenueSetupBlocked",
+  );
+  assert.deepEqual(
+    validatePlanningRecordDraft(
+      { planning_mode_code: "site", planning_from: "2026-05-05", planning_to: "2026-05-06", site_detail: { site_id: "" } },
+      { orderServiceFrom: "2026-05-01", orderServiceTo: "2026-05-31", siteOptions: [{ id: "site-1" }] },
+    ).messageKey,
+    "siteRequired",
+  );
+  assert.deepEqual(
+    validatePlanningRecordDraft(
+      { planning_mode_code: "trade_fair", planning_from: "2026-05-05", planning_to: "2026-05-06", trade_fair_detail: { trade_fair_id: "" } },
+      { orderServiceFrom: "2026-05-01", orderServiceTo: "2026-05-31", tradeFairOptions: [{ id: "fair-1" }] },
+    ).messageKey,
+    "tradeFairRequired",
+  );
+  assert.deepEqual(
+    validatePlanningRecordDraft(
+      { planning_mode_code: "patrol", planning_from: "2026-05-05", planning_to: "2026-05-06", patrol_detail: { patrol_route_id: "" } },
+      { orderServiceFrom: "2026-05-01", orderServiceTo: "2026-05-31", patrolRouteOptions: [{ id: "route-1" }] },
+    ).messageKey,
+    "patrolRouteRequired",
   );
 });
 

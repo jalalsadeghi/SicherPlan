@@ -119,6 +119,27 @@ test("planning-record detail form replaces raw UUID fields with selectors", () =
   assert.match(source, /fieldsPatrolRouteDetailId[\s\S]*:value="planningDraft\.patrol_detail\.patrol_route_id \|\| undefined"[\s\S]*patrolRouteDetailPlaceholder/s);
 });
 
+test("planning-record create form validates the order window before submit", () => {
+  assert.match(source, /validatePlanningRecordDraft\(/);
+  assert.match(source, /const planningRecordValidation = computed\(\(\) =>/);
+  assert.match(source, /const planningWindowHelp = computed\(\(\) =>/);
+  assert.match(source, /tpf\("planningWindowAllowed", \{/);
+  assert.match(source, /v-model="planningDraft\.planning_from"[\s\S]*:min="planningFromMin"[\s\S]*:max="planningFromMax"/s);
+  assert.match(source, /v-model="planningDraft\.planning_to"[\s\S]*:min="planningToMin"[\s\S]*:max="planningToMax"/s);
+  assert.match(source, /planningValidationState\.attempted = true;[\s\S]*planningRecordValidation\.value\.messageKey/s);
+});
+
+test("planning-record mode-specific empty states expose direct planning-setup recovery", () => {
+  assert.match(source, /@click="openPlanningSetup\('event_venue'\)"/);
+  assert.match(source, /@click="openPlanningSetup\('site'\)"/);
+  assert.match(source, /@click="openPlanningSetup\('trade_fair'\)"/);
+  assert.match(source, /@click="openPlanningSetup\('patrol_route'\)"/);
+  assert.match(source, /tp\("eventVenueRequired"\)/);
+  assert.match(source, /tp\("siteRequired"\)/);
+  assert.match(source, /tp\("tradeFairRequired"\)/);
+  assert.match(source, /tp\("patrolRouteRequired"\)/);
+});
+
 test("planning-record status is edit-only and no longer sent on create", () => {
   assert.doesNotMatch(source, /fieldsStatus[\s\S]*<input v-model="planningDraft\.status"/);
   assert.match(source, /v-if="!isCreatingPlanning && selectedPlanningRecord"[\s\S]*fieldsStatus[\s\S]*v-model="planningDraft\.status"/s);

@@ -67,12 +67,20 @@ export function mapPlanningOrderApiMessage(messageKey) {
     "errors.planning.planning_record.duplicate_name": "planningDuplicateName",
     "errors.planning.planning_record.stale_version": "staleVersion",
     "errors.planning.planning_record.invalid_release_transition": "invalidReleaseTransition",
+    "errors.planning.planning_record.invalid_window": "planningInvalidWindow",
+    "errors.planning.planning_record.order_window_mismatch": "planningOrderWindowMismatch",
     "errors.planning.planning_record.detail_mismatch": "planningDetailMismatch",
     "errors.planning.planning_record.detail_customer_mismatch": "planningDetailCustomerMismatch",
+    "errors.planning.planning_record.parent_mismatch": "planningParentMismatch",
     "errors.planning.planning_record.parent_not_allowed": "planningParentNotAllowed",
     "errors.planning.planning_record.parent_window_mismatch": "planningParentWindowMismatch",
     "errors.planning.planning_record_attachment.scope_mismatch": "attachmentScopeMismatch",
     "errors.planning.dispatcher_user.not_found": "dispatcherNotFound",
+    "errors.planning.event_venue.not_found": "eventVenueNotFound",
+    "errors.planning.site.not_found": "siteNotFound",
+    "errors.planning.trade_fair.not_found": "tradeFairNotFound",
+    "errors.planning.trade_fair_zone.not_found": "tradeFairZoneNotFound",
+    "errors.planning.patrol_route.not_found": "patrolRouteNotFound",
     "errors.planning.commercial_link.prerequisites_missing": "commercialPrerequisitesMissing",
   };
   return map[messageKey] ?? "error";
@@ -174,6 +182,115 @@ export function validatePlanningOrderDraft(orderDraft) {
     customer_id: !normalizePlanningOrderUuidValue(orderDraft?.customer_id),
     requirement_type_id: !normalizePlanningOrderUuidValue(orderDraft?.requirement_type_id),
   };
+}
+
+export function validatePlanningRecordDraft(
+  planningDraft,
+  {
+    orderServiceFrom = "",
+    orderServiceTo = "",
+    eventVenueOptions = [],
+    siteOptions = [],
+    tradeFairOptions = [],
+    patrolRouteOptions = [],
+  } = {},
+) {
+  const planningFrom = typeof planningDraft?.planning_from === "string" ? planningDraft.planning_from.trim() : "";
+  const planningTo = typeof planningDraft?.planning_to === "string" ? planningDraft.planning_to.trim() : "";
+  const planningMode = typeof planningDraft?.planning_mode_code === "string" ? planningDraft.planning_mode_code.trim() : "";
+  const eventVenueId = normalizePlanningOrderUuidValue(planningDraft?.event_detail?.event_venue_id);
+  const siteId = normalizePlanningOrderUuidValue(planningDraft?.site_detail?.site_id);
+  const tradeFairId = normalizePlanningOrderUuidValue(planningDraft?.trade_fair_detail?.trade_fair_id);
+  const patrolRouteId = normalizePlanningOrderUuidValue(planningDraft?.patrol_detail?.patrol_route_id);
+  const orderWindowStart = typeof orderServiceFrom === "string" ? orderServiceFrom.trim() : "";
+  const orderWindowEnd = typeof orderServiceTo === "string" ? orderServiceTo.trim() : "";
+
+  const result = {
+    planning_from: false,
+    planning_to: false,
+    planning_window: false,
+    mode_detail: false,
+    messageKey: null,
+  };
+
+  if (!planningFrom) {
+    result.planning_from = true;
+    result.messageKey = "planningFromRequired";
+    return result;
+  }
+  if (!planningTo) {
+    result.planning_to = true;
+    result.messageKey = "planningToRequired";
+    return result;
+  }
+  if (planningTo < planningFrom) {
+    result.planning_from = true;
+    result.planning_to = true;
+    result.planning_window = true;
+    result.messageKey = "planningInvalidWindow";
+    return result;
+  }
+  if (orderWindowStart && orderWindowEnd && (planningFrom < orderWindowStart || planningTo > orderWindowEnd)) {
+    result.planning_from = true;
+    result.planning_to = true;
+    result.planning_window = true;
+    result.messageKey = "planningOrderWindowMismatch";
+    return result;
+  }
+
+  if (planningMode === "event") {
+    if (!Array.isArray(eventVenueOptions) || eventVenueOptions.length === 0) {
+      result.mode_detail = true;
+      result.messageKey = "eventVenueSetupBlocked";
+      return result;
+    }
+    if (!eventVenueId) {
+      result.mode_detail = true;
+      result.messageKey = "eventVenueRequired";
+      return result;
+    }
+  }
+
+  if (planningMode === "site") {
+    if (!Array.isArray(siteOptions) || siteOptions.length === 0) {
+      result.mode_detail = true;
+      result.messageKey = "siteSetupBlocked";
+      return result;
+    }
+    if (!siteId) {
+      result.mode_detail = true;
+      result.messageKey = "siteRequired";
+      return result;
+    }
+  }
+
+  if (planningMode === "trade_fair") {
+    if (!Array.isArray(tradeFairOptions) || tradeFairOptions.length === 0) {
+      result.mode_detail = true;
+      result.messageKey = "tradeFairSetupBlocked";
+      return result;
+    }
+    if (!tradeFairId) {
+      result.mode_detail = true;
+      result.messageKey = "tradeFairRequired";
+      return result;
+    }
+  }
+
+  if (planningMode === "patrol") {
+    if (!Array.isArray(patrolRouteOptions) || patrolRouteOptions.length === 0) {
+      result.mode_detail = true;
+      result.messageKey = "patrolRouteSetupBlocked";
+      return result;
+    }
+    if (!patrolRouteId) {
+      result.mode_detail = true;
+      result.messageKey = "patrolRouteRequired";
+      return result;
+    }
+  }
+
+  return result;
 }
 
 export function hasPlanningOrderSetupGap({ customerId, options, loading, error }) {
