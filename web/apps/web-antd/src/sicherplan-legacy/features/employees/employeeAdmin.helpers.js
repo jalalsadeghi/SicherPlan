@@ -76,6 +76,7 @@ export function mapEmployeeApiMessage(messageKey) {
     "errors.employees.employee.invalid_target_monthly_hours": "employeeAdmin.feedback.invalidTargetMonthlyHours",
     "errors.employees.document.not_linked": "employeeAdmin.feedback.notFound",
     "errors.docs.document.not_found": "employeeAdmin.feedback.notFound",
+    "errors.docs.document_type.not_found": "employeeAdmin.feedback.documentTypeNotConfigured",
     "errors.docs.document_link.duplicate": "employeeAdmin.feedback.documentAlreadyLinked",
     "errors.employees.group.duplicate_code": "employeeAdmin.feedback.duplicateGroupCode",
     "errors.employees.group.stale_version": "employeeAdmin.feedback.staleVersion",

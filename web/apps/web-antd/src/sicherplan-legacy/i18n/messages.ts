@@ -884,6 +884,7 @@ export type MessageKey =
   | "employeeAdmin.feedback.invalidNoteType"
   | "employeeAdmin.feedback.photoUploadFailed"
   | "employeeAdmin.feedback.documentAlreadyLinked"
+  | "employeeAdmin.feedback.documentTypeNotConfigured"
   | "employeeAdmin.feedback.invalidImportCsv"
   | "employeeAdmin.feedback.invalidImportHeaders"
   | "employeeAdmin.feedback.accessUsernameTaken"
@@ -2677,6 +2678,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Das Dokument wurde mit der Mitarbeitendenakte verknüpft.",
     "employeeAdmin.feedback.documentVersionSaved":
       "Die neue Dokumentversion wurde gespeichert.",
+    "employeeAdmin.feedback.documentTypeNotConfigured":
+      "Der ausgewählte Dokumenttyp ist im Backend nicht konfiguriert.",
     "employeeAdmin.feedback.importDryRunReady":
       "Die Importvorschau wurde erzeugt.",
     "employeeAdmin.feedback.importExecuted":
@@ -4544,6 +4547,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "The document was linked to the employee file.",
     "employeeAdmin.feedback.documentVersionSaved":
       "The new document version was saved.",
+    "employeeAdmin.feedback.documentTypeNotConfigured":
+      "The selected document type is not configured in the backend.",
     "employeeAdmin.feedback.importDryRunReady":
       "The import preview is ready.",
     "employeeAdmin.feedback.importExecuted":

@@ -1,34 +1,21 @@
-Task: Fix employee document upload failures caused by unknown document_type_key values in the SicherPlan employee admin workflow.
-
-Repository:
-- jalalsadeghi/SicherPlan
-- branch: inspect current branch state first and work on top of the latest code
-
-Problem summary:
-In the current employee documents tab, the frontend exposes a free-text "Document type key" field.
-The backend route exists and is correct:
-POST /api/employees/tenants/{tenant_id}/employees/{employee_id}/documents/uploads
-However, the backend passes document_type_key into DocumentService.create_document().
-If the key is non-empty and not present in docs.document_type, DocumentService raises:
-404 docs.document_type.not_found
-This makes the employee document upload UX fragile and causes avoidable failures during normal UAT/manual data entry.
-
-Confirmed code locations to inspect first:
-- backend/app/modules/employees/router.py
-- backend/app/modules/employees/file_service.py
-- backend/app/modules/platform_services/docs_service.py
-- backend/app/modules/platform_services/document_type_seed.py
-- backend/scripts/seed_go_live_configuration.py
-- web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
-- web/apps/web-antd/src/sicherplan-legacy/api/employeeAdmin.ts
-- backend/tests/modules/employees/test_employee_file_service.py
+You are working in the SicherPlan repository.
 
 Goal:
-Make employee document uploads reliable and operator-safe, without weakening backend validation for truly unknown keys.
+Fix the 404 business error `docs.document_type.not_found` that occurs when the Employees workspace uploads a document via:
 
-Required changes:
-1. Extend the document type seed set with employee-facing document types that are actually used in the employee documents workflow.
-   Add at least:
+POST /api/employees/tenants/{tenant_id}/employees/{employee_id}/documents/uploads
+
+Observed behavior:
+- The route exists and must remain unchanged.
+- The backend returns 404 with:
+  code: docs.document_type.not_found
+  message_key: errors.docs.document_type.not_found
+- The failing flow is the Employees > Documents > Upload document form.
+
+Root-cause evidence already confirmed in the repo:
+1. Frontend hardcodes employee document type options in:
+   web/apps/web-antd/src/sicherplan-legacy/features/employees/employeeAdmin.helpers.js
+   Keys currently used:
    - employment_contract
    - identity_card
    - passport_copy
@@ -36,53 +23,74 @@ Required changes:
    - driving_licence
    - qualification_certificate
    - employee_misc
-   Keep existing keys unchanged.
 
-2. Preserve current backend behavior:
-   - blank/null document_type_key must remain allowed
-   - unknown non-empty keys should still be rejected by the backend
-   Do not silently auto-create arbitrary keys from user input.
+2. Upload request is built and sent from:
+   web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
+   web/apps/web-antd/src/sicherplan-legacy/api/employeeAdmin.ts
 
-3. Improve the employee documents UI so operators are not forced to guess valid keys:
-   - replace the free-text "Document type key" input with a controlled select
-   - include an empty/none option
-   - include the seeded employee-facing keys above
-   - keep relation_type as a separate field
-   - add helper text that document_type_key is optional and relation_type controls employee-side relation semantics
+3. Backend upload handler is:
+   backend/app/modules/employees/router.py
+   backend/app/modules/employees/file_service.py
 
-4. Do not break existing flows:
-   - qualification proof upload must still work
-   - profile photo flow must still work
-   - generic employee document upload, link, and add-version flows must still work
+4. Backend document creation resolves `document_type_key` in:
+   backend/app/modules/platform_services/docs_service.py
+   If the key is non-null and not found in `docs.document_type`, it raises:
+   `docs.document_type.not_found`
 
-5. Add/update tests:
-   Backend:
-   - test that seeded document types include the new employee-facing keys
-   - test employee document upload succeeds with null document_type_key
-   - test employee document upload succeeds with a seeded employee document type key
-   - test employee document upload still fails for an unknown non-empty key
-   Frontend:
-   - test the documents tab renders a controlled document type select, not a raw free-text field
-   - test submit payload sends null when the document type select is empty
-   - test selecting a seeded key submits that key unchanged
+5. The docs backbone migration creates `docs.document_type` but does not seed the employee document types:
+   backend/alembic/versions/0006_docs_backbone.py
+
+Required fix:
+Implement a production-safe, minimal fix so that the Employees upload form works when one of the hardcoded employee document types is selected.
+
+Tasks:
+1. Add a new Alembic migration that seeds the canonical employee document types used by the Employees UI.
+   Required keys:
+   - employment_contract
+   - identity_card
+   - passport_copy
+   - residence_permit
+   - driving_licence
+   - qualification_certificate
+   - employee_misc
+
+2. Make the migration idempotent.
+   - It must be safe on existing databases.
+   - Use INSERT ... ON CONFLICT (key) DO NOTHING, or an equivalent safe upsert.
+   - Do not delete or replace existing rows unnecessarily.
+   - Preserve existing user data.
+
+3. Keep current API paths and payload shapes unchanged.
+   - Do not rename `/documents/uploads`
+   - Do not remove the ability to upload with `document_type_key = null`
+
+4. Improve frontend error handling for this specific case.
+   - Add a dedicated UI mapping for `errors.docs.document_type.not_found`
+   - Show a user-friendly message like:
+     “The selected document type is not configured in the backend.”
+   - Implement this in the existing employee admin error-mapping flow only; do not introduce a new global pattern unless already consistent with the repo.
+
+5. Add automated tests:
+   - Backend test proving that employee document upload with `document_type_key="employment_contract"` succeeds once the seed exists.
+   - Keep or extend existing route-registration tests; do not remove them.
+   - If there is already a suitable platform-services or employee module test file, extend it instead of creating unnecessary duplicates.
+
+6. Verify no regression:
+   - Upload still works when document_type_key is omitted/null
+   - Link existing document flow still works
+   - Add document version flow still works
+   - Profile photo flow still works
 
 Implementation constraints:
-- keep changes minimal and scoped to this problem
-- do not redesign the whole platform services API unless necessary
-- do not remove backend validation of document_type_key
-- do not introduce tenant-specific document type duplication for these system-level keys
-- keep the code style consistent with the current repo
+- Follow existing repo conventions and naming.
+- Keep the change set focused on this issue.
+- Do not refactor unrelated modules.
+- Do not change business semantics outside employee document upload + error messaging.
+- If a helper constant or shared seed list improves maintainability, keep it small and local.
 
-Acceptance criteria:
-- Uploading an employee document with an empty document_type_key succeeds
-- Uploading with document_type_key=employment_contract succeeds after seeding
-- Uploading with document_type_key=identity_card succeeds after seeding
-- Uploading with an unknown key still returns a clear API error
-- The employee documents UI no longer invites invalid manual key entry
-- Tests pass
-
-Deliverables:
-- code changes
-- tests
-- short change summary
-- exact commands to run migrations/seeds/tests locally
+Please do the work and then return:
+1. A short root-cause summary
+2. The exact files changed
+3. The migration behavior
+4. The tests added/updated
+5. Any remaining caveats

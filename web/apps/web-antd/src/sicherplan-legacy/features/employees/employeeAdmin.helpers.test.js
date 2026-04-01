@@ -77,6 +77,10 @@ test("api message keys map to localized employee feedback keys", () => {
     mapEmployeeApiMessage("errors.employees.credential.duplicate_no"),
     "employeeAdmin.feedback.credentialDuplicateNo",
   );
+  assert.equal(
+    mapEmployeeApiMessage("errors.docs.document_type.not_found"),
+    "employeeAdmin.feedback.documentTypeNotConfigured",
+  );
 });
 
 test("employee document type options expose the seeded employee-facing keys", () => {
