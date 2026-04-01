@@ -101,6 +101,8 @@ class EmployeeRouterPathOrderTest(unittest.TestCase):
 
     def test_readiness_collection_post_routes_match_static_handlers(self) -> None:
         tenant_id = str(uuid4())
+        employee_id = str(uuid4())
+        document_id = str(uuid4())
 
         self.assertEqual(
             _matched_route_path(
@@ -129,4 +131,25 @@ class EmployeeRouterPathOrderTest(unittest.TestCase):
                 f"/api/employees/tenants/{tenant_id}/employees/absences",
             ),
             "/api/employees/tenants/{tenant_id}/employees/absences",
+        )
+        self.assertEqual(
+            _matched_route_path(
+                "POST",
+                f"/api/employees/tenants/{tenant_id}/employees/{employee_id}/documents/uploads",
+            ),
+            "/api/employees/tenants/{tenant_id}/employees/{employee_id}/documents/uploads",
+        )
+        self.assertEqual(
+            _matched_route_path(
+                "POST",
+                f"/api/employees/tenants/{tenant_id}/employees/{employee_id}/documents/links",
+            ),
+            "/api/employees/tenants/{tenant_id}/employees/{employee_id}/documents/links",
+        )
+        self.assertEqual(
+            _matched_route_path(
+                "POST",
+                f"/api/employees/tenants/{tenant_id}/employees/{employee_id}/documents/{document_id}/versions",
+            ),
+            "/api/employees/tenants/{tenant_id}/employees/{employee_id}/documents/{document_id}/versions",
         )

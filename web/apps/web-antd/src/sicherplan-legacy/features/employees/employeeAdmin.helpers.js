@@ -9,6 +9,27 @@ export const EMPLOYEE_PERMISSION_MATRIX = {
   subcontractor_user: [],
 };
 
+export const EMPLOYEE_CREDENTIAL_TYPE_OPTIONS = [
+  { value: "company_id", labelKey: "employeeAdmin.credentialType.company_id" },
+  { value: "work_badge", labelKey: "employeeAdmin.credentialType.work_badge" },
+];
+
+export const EMPLOYEE_AVAILABILITY_RULE_KIND_OPTIONS = [
+  { value: "availability", labelKey: "employeeAdmin.availabilityRuleKind.availability" },
+  { value: "unavailable", labelKey: "employeeAdmin.availabilityRuleKind.unavailable" },
+  { value: "free_wish", labelKey: "employeeAdmin.availabilityRuleKind.free_wish" },
+];
+
+export const EMPLOYEE_DOCUMENT_TYPE_OPTIONS = [
+  { value: "employment_contract", labelKey: "employeeAdmin.documentType.employment_contract" },
+  { value: "identity_card", labelKey: "employeeAdmin.documentType.identity_card" },
+  { value: "passport_copy", labelKey: "employeeAdmin.documentType.passport_copy" },
+  { value: "residence_permit", labelKey: "employeeAdmin.documentType.residence_permit" },
+  { value: "driving_licence", labelKey: "employeeAdmin.documentType.driving_licence" },
+  { value: "qualification_certificate", labelKey: "employeeAdmin.documentType.qualification_certificate" },
+  { value: "employee_misc", labelKey: "employeeAdmin.documentType.employee_misc" },
+];
+
 export function hasEmployeePermission(role, permissionKey) {
   return (EMPLOYEE_PERMISSION_MATRIX[role] ?? []).includes(permissionKey);
 }
@@ -105,6 +126,18 @@ export function mapEmployeeApiMessage(messageKey) {
   };
 
   return messageMap[messageKey] ?? "employeeAdmin.feedback.error";
+}
+
+export function buildEmployeeDocumentUploadPayload(draft, file, toBase64) {
+  return Promise.resolve(toBase64(file)).then((contentBase64) => ({
+    title: draft.title.trim(),
+    relation_type: draft.relation_type,
+    label: normalizeOptionalText(draft.label),
+    document_type_key: normalizeOptionalText(draft.document_type_key),
+    file_name: file.name,
+    content_type: file.type || "application/octet-stream",
+    content_base64: contentBase64,
+  }));
 }
 
 export function formatEmployeeStructureLabel(record) {
@@ -292,6 +325,9 @@ export function validateEmployeeCredentialDraft(draft) {
   if (!credentialNo || !credentialType || !encodedValue || !validFrom) {
     return "employeeAdmin.feedback.credentialRequired";
   }
+  if (!EMPLOYEE_CREDENTIAL_TYPE_OPTIONS.some((option) => option.value === credentialType)) {
+    return "employeeAdmin.feedback.invalidCredentialType";
+  }
   if (validUntil && validUntil < validFrom) {
     return "employeeAdmin.feedback.credentialInvalidWindow";
   }
@@ -321,6 +357,9 @@ export function validateEmployeeAvailabilityDraft(draft) {
 
   if (!ruleKind) {
     return "employeeAdmin.feedback.availabilityRuleRequired";
+  }
+  if (!EMPLOYEE_AVAILABILITY_RULE_KIND_OPTIONS.some((option) => option.value === ruleKind)) {
+    return "employeeAdmin.feedback.invalidAvailabilityKind";
   }
   if (!startsAt || !endsAt || endsAt < startsAt) {
     return "employeeAdmin.feedback.availabilityInvalidWindow";

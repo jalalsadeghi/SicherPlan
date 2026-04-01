@@ -539,6 +539,7 @@ export class EmployeeAdminApiError extends Error {
   readonly statusCode: number;
   readonly code: string;
   readonly messageKey: string;
+  readonly requestId: string;
   readonly details: Record<string, unknown>;
 
   constructor(statusCode: number, payload: ApiErrorEnvelope["error"]) {
@@ -546,6 +547,7 @@ export class EmployeeAdminApiError extends Error {
     this.statusCode = statusCode;
     this.code = payload.code;
     this.messageKey = payload.message_key;
+    this.requestId = payload.request_id;
     this.details = payload.details;
   }
 }
@@ -585,9 +587,9 @@ async function request<T>(
     }
 
     throw new EmployeeAdminApiError(response.status, {
-      code: "platform.internal",
-      message_key: "errors.platform.internal",
-      request_id: "",
+      code: response.status === 404 ? "platform.http_not_found" : "platform.internal",
+      message_key: response.status === 404 ? "errors.platform.http_not_found" : "errors.platform.internal",
+      request_id: response.headers.get("X-Request-ID") || "",
       details: {},
     });
   }
@@ -1229,9 +1231,9 @@ export async function downloadEmployeeDocument(
       throw new EmployeeAdminApiError(response.status, payload.error);
     }
     throw new EmployeeAdminApiError(response.status, {
-      code: "platform.internal",
-      message_key: "errors.platform.internal",
-      request_id: "",
+      code: response.status === 404 ? "platform.http_not_found" : "platform.internal",
+      message_key: response.status === 404 ? "errors.platform.http_not_found" : "errors.platform.internal",
+      request_id: response.headers.get("X-Request-ID") || "",
       details: {},
     });
   }

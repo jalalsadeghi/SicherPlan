@@ -80,6 +80,21 @@ class TestConfigSeed(unittest.TestCase):
         self.assertEqual(first["inserted"], len(session.document_types))
         self.assertEqual(second, {"inserted": 0, "updated": 0})
 
+    def test_document_type_seed_includes_employee_document_workflow_keys(self) -> None:
+        session = _FakeSession()
+        seed_document_types(session)
+        self.assertTrue(
+            {
+                "employment_contract",
+                "identity_card",
+                "passport_copy",
+                "residence_permit",
+                "driving_licence",
+                "qualification_certificate",
+                "employee_misc",
+            }.issubset({row.key for row in session.document_types})
+        )
+
     def test_document_type_seed_updates_existing_name(self) -> None:
         session = _FakeSession()
         session.document_types.append(

@@ -6,10 +6,14 @@ import {
   buildEmployeeAbsencePayload,
   buildEmployeeAvailabilityPayload,
   buildEmployeeCredentialPayload,
+  buildEmployeeDocumentUploadPayload,
   buildEmployeePrivateProfilePayload,
   buildEmployeeQualificationPayload,
   buildWeekdayMask,
   deriveEmployeeActionState,
+  EMPLOYEE_AVAILABILITY_RULE_KIND_OPTIONS,
+  EMPLOYEE_CREDENTIAL_TYPE_OPTIONS,
+  EMPLOYEE_DOCUMENT_TYPE_OPTIONS,
   hasEmployeePermission,
   mapEmployeeApiMessage,
   parseWeekdayMask,
@@ -73,6 +77,48 @@ test("api message keys map to localized employee feedback keys", () => {
     mapEmployeeApiMessage("errors.employees.credential.duplicate_no"),
     "employeeAdmin.feedback.credentialDuplicateNo",
   );
+});
+
+test("employee document type options expose the seeded employee-facing keys", () => {
+  assert.deepEqual(
+    EMPLOYEE_DOCUMENT_TYPE_OPTIONS.map((option) => option.value),
+    [
+      "employment_contract",
+      "identity_card",
+      "passport_copy",
+      "residence_permit",
+      "driving_licence",
+      "qualification_certificate",
+      "employee_misc",
+    ],
+  );
+});
+
+test("employee document upload payload normalizes empty and selected document type keys", async () => {
+  const emptyPayload = await buildEmployeeDocumentUploadPayload(
+    {
+      title: " Arbeitsvertrag ",
+      relation_type: "contract",
+      label: " Vertragsakte ",
+      document_type_key: "   ",
+    },
+    { name: "contract.pdf", type: "application/pdf" },
+    async () => "YQ==",
+  );
+  assert.equal(emptyPayload.document_type_key, null);
+  assert.equal(emptyPayload.title, "Arbeitsvertrag");
+
+  const seededPayload = await buildEmployeeDocumentUploadPayload(
+    {
+      title: "Ausweis",
+      relation_type: "id_proof",
+      label: "",
+      document_type_key: "identity_card",
+    },
+    { name: "id.pdf", type: "application/pdf" },
+    async () => "Yg==",
+  );
+  assert.equal(seededPayload.document_type_key, "identity_card");
 });
 
 test("current address summary uses latest active primary address", () => {
@@ -220,6 +266,17 @@ test("credential and absence validations catch required and invalid windows", ()
       valid_from: "2026-03-10",
       valid_until: "2026-03-01",
     }),
+    "employeeAdmin.feedback.invalidCredentialType",
+  );
+
+  assert.equal(
+    validateEmployeeCredentialDraft({
+      credential_no: "CARD-1",
+      credential_type: "work_badge",
+      encoded_value: "ABC",
+      valid_from: "2026-03-10",
+      valid_until: "2026-03-01",
+    }),
     "employeeAdmin.feedback.credentialInvalidWindow",
   );
 
@@ -227,7 +284,7 @@ test("credential and absence validations catch required and invalid windows", ()
     buildEmployeeCredentialPayload(
       {
         credential_no: " CARD-2 ",
-        credential_type: " badge ",
+        credential_type: " work_badge ",
         encoded_value: " 123 ",
         valid_from: "2026-03-01",
         valid_until: "",
@@ -239,7 +296,7 @@ test("credential and absence validations catch required and invalid windows", ()
       tenant_id: "tenant-1",
       employee_id: "employee-1",
       credential_no: "CARD-2",
-      credential_type: "badge",
+      credential_type: "work_badge",
       encoded_value: "123",
       valid_from: "2026-03-01",
       valid_until: null,
@@ -277,13 +334,20 @@ test("credential and absence validations catch required and invalid windows", ()
   );
 });
 
+test("credential type options expose only supported backend values", () => {
+  assert.deepEqual(
+    EMPLOYEE_CREDENTIAL_TYPE_OPTIONS.map((option) => option.value),
+    ["company_id", "work_badge"],
+  );
+});
+
 test("availability payloads map local datetime and weekday masks", () => {
   assert.equal(buildWeekdayMask([0, 2, 4]), "1010100");
   assert.deepEqual(parseWeekdayMask("1010100"), [0, 2, 4]);
 
   const payload = buildEmployeeAvailabilityPayload(
     {
-      rule_kind: "preferred",
+      rule_kind: "availability",
       starts_at: "2026-04-10T08:00",
       ends_at: "2026-04-10T16:00",
       recurrence_type: "weekly",
@@ -295,19 +359,33 @@ test("availability payloads map local datetime and weekday masks", () => {
 
   assert.equal(payload.tenant_id, "tenant-1");
   assert.equal(payload.employee_id, "employee-1");
-  assert.equal(payload.rule_kind, "preferred");
+  assert.equal(payload.rule_kind, "availability");
   assert.equal(payload.recurrence_type, "weekly");
   assert.equal(payload.weekday_mask, "1010100");
   assert.equal(typeof payload.starts_at, "string");
   assert.equal(typeof payload.ends_at, "string");
   assert.equal(validateEmployeeAvailabilityDraft({
     rule_kind: "preferred",
+    starts_at: "2026-04-10T08:00",
+    ends_at: "2026-04-10T16:00",
+    recurrence_type: "none",
+    weekday_indexes: [],
+  }), "employeeAdmin.feedback.invalidAvailabilityKind");
+  assert.equal(validateEmployeeAvailabilityDraft({
+    rule_kind: "availability",
     starts_at: "2026-04-10T16:00",
     ends_at: "2026-04-10T08:00",
     recurrence_type: "none",
     weekday_indexes: [],
   }), "employeeAdmin.feedback.availabilityInvalidWindow");
   assert.equal(toLocalDateTimeInput(payload.starts_at).slice(0, 10), "2026-04-10");
+});
+
+test("availability rule kind options expose only supported backend values", () => {
+  assert.deepEqual(
+    EMPLOYEE_AVAILABILITY_RULE_KIND_OPTIONS.map((option) => option.value),
+    ["availability", "unavailable", "free_wish"],
+  );
 });
 
 test("import template rows use the stable employee operational header order", () => {

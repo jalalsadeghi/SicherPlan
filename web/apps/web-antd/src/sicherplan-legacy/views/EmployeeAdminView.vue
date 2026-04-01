@@ -835,11 +835,17 @@
                   </label>
                   <label class="field-stack">
                     <span>{{ t("employeeAdmin.fields.credentialType") }}</span>
-                    <input v-model="credentialDraft.credential_type" :disabled="!actionState.canManageCredentials || !!editingCredentialId" />
+                    <select v-model="credentialDraft.credential_type" :disabled="!actionState.canManageCredentials || !!editingCredentialId">
+                      <option value="">{{ t("employeeAdmin.credentials.credentialTypePlaceholder") }}</option>
+                      <option v-for="option in employeeCredentialTypeOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                      </option>
+                    </select>
                   </label>
                   <label class="field-stack">
                     <span>{{ t("employeeAdmin.fields.encodedValue") }}</span>
                     <input v-model="credentialDraft.encoded_value" :disabled="!actionState.canManageCredentials" />
+                    <p class="field-help">{{ t("employeeAdmin.credentials.encodedValueHelp") }}</p>
                   </label>
                   <label class="field-stack">
                     <span>{{ t("employeeAdmin.fields.validFrom") }}</span>
@@ -912,7 +918,12 @@
                 <div class="employee-admin-form-grid employee-admin-form-grid--editor">
                   <label class="field-stack">
                     <span>{{ t("employeeAdmin.fields.ruleKind") }}</span>
-                    <input v-model="availabilityDraft.rule_kind" :disabled="!actionState.canManageAvailability" />
+                    <select v-model="availabilityDraft.rule_kind" :disabled="!actionState.canManageAvailability">
+                      <option value="">{{ t("employeeAdmin.availability.ruleKindPlaceholder") }}</option>
+                      <option v-for="option in employeeAvailabilityRuleKindOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                      </option>
+                    </select>
                   </label>
                   <label class="field-stack">
                     <span>{{ t("employeeAdmin.fields.startsAt") }}</span>
@@ -1508,7 +1519,12 @@
                     </label>
                     <label class="field-stack">
                       <span>{{ t("employeeAdmin.fields.documentTypeKey") }}</span>
-                      <input v-model="documentUploadDraft.document_type_key" />
+                      <select v-model="documentUploadDraft.document_type_key">
+                        <option v-for="option in employeeDocumentTypeOptions" :key="option.value || 'none'" :value="option.value">
+                          {{ option.label }}
+                        </option>
+                      </select>
+                      <span class="field-help">{{ t("employeeAdmin.documents.documentTypeHelp") }}</span>
                     </label>
                     <label class="field-stack field-stack--wide">
                       <span>{{ t("employeeAdmin.fields.documentFile") }}</span>
@@ -1705,12 +1721,16 @@ import {
   buildEmployeeImportTemplateRows,
   buildEmployeeAbsencePayload,
   buildEmployeeAvailabilityPayload,
+  EMPLOYEE_AVAILABILITY_RULE_KIND_OPTIONS,
   buildEmployeeCredentialPayload,
+  buildEmployeeDocumentUploadPayload,
   buildEmployeeOperationalPayload,
   buildEmployeePrivateProfilePayload,
   buildEmployeeQualificationPayload,
   buildWeekdayMask,
   deriveEmployeeActionState,
+  EMPLOYEE_CREDENTIAL_TYPE_OPTIONS,
+  EMPLOYEE_DOCUMENT_TYPE_OPTIONS,
   filterMandatesForBranch,
   formatEmployeeStructureLabel,
   mapEmployeeApiMessage,
@@ -1724,6 +1744,7 @@ import {
   validateEmployeeCredentialDraft,
   validateEmployeeQualificationDraft,
 } from "@/features/employees/employeeAdmin.helpers.js";
+import type { MessageKey } from "@/i18n/messages";
 import { useAuthStore } from "@/stores/auth";
 
 withDefaults(defineProps<{ embedded?: boolean }>(), {
@@ -1987,6 +2008,18 @@ const employeeQualificationTypeOptions = computed(() =>
     .filter((row) => row.archived_at == null && row.is_active)
     .map((row) => ({ value: row.id, label: `${row.code} · ${row.label}` })),
 );
+const employeeCredentialTypeOptions = computed(() =>
+  EMPLOYEE_CREDENTIAL_TYPE_OPTIONS.map((option) => ({
+    value: option.value,
+    label: t(option.labelKey as never),
+  })),
+);
+const employeeAvailabilityRuleKindOptions = computed(() =>
+  EMPLOYEE_AVAILABILITY_RULE_KIND_OPTIONS.map((option) => ({
+    value: option.value,
+    label: t(option.labelKey as never),
+  })),
+);
 const readinessRecordKindOptions = computed(() => [
   { value: "qualification", label: t("employeeAdmin.readiness.recordKindQualification") },
   { value: "function", label: t("employeeAdmin.readiness.recordKindFunction") },
@@ -2020,6 +2053,13 @@ const employeeDocumentRelationOptions = computed(() => [
   { value: "certificate", label: t("employeeAdmin.documents.relation.certificate") },
   { value: "residence_permit", label: t("employeeAdmin.documents.relation.residence_permit") },
   { value: "misc", label: t("employeeAdmin.documents.relation.misc") },
+]);
+const employeeDocumentTypeOptions = computed(() => [
+  { value: "", label: t("employeeAdmin.documents.documentTypePlaceholder") },
+  ...EMPLOYEE_DOCUMENT_TYPE_OPTIONS.map((option) => ({
+    value: option.value,
+    label: t(option.labelKey as MessageKey),
+  })),
 ]);
 const branchOptions = computed(() => branches.value.filter((branch) => branch.archived_at == null));
 const mandateOptions = computed(() => mandates.value.filter((mandate) => mandate.archived_at == null));
@@ -2079,6 +2119,32 @@ function clearFeedback() {
   feedback.tone = "neutral";
   feedback.title = "";
   feedback.message = "";
+}
+
+function resolveEmployeeDocumentErrorMessage(error: unknown) {
+  if (!(error instanceof EmployeeAdminApiError)) {
+    return t("employeeAdmin.feedback.error");
+  }
+
+  const mappedKey = mapEmployeeApiMessage(error.messageKey);
+  if (mappedKey !== "employeeAdmin.feedback.error") {
+    return t(mappedKey as never);
+  }
+
+  if (import.meta.env.DEV) {
+    return t("employeeAdmin.feedback.apiDiagnostic" as never, {
+      statusCode: String(error.statusCode),
+      code: error.code || "-",
+      messageKey: error.messageKey || "-",
+      requestId: error.requestId || "-",
+    });
+  }
+
+  if (error.statusCode === 404) {
+    return t("employeeAdmin.feedback.routeNotFound");
+  }
+
+  return t("employeeAdmin.feedback.error");
 }
 
 function normalizeAccessToken(value: string) {
@@ -3182,21 +3248,16 @@ async function submitEmployeeDocumentUpload() {
 
   loading.action = true;
   try {
-    const payload: EmployeeDocumentUploadPayload = {
-      title: documentUploadDraft.title.trim(),
-      relation_type: documentUploadDraft.relation_type,
-      label: emptyToNull(documentUploadDraft.label),
-      document_type_key: emptyToNull(documentUploadDraft.document_type_key),
-      file_name: pendingEmployeeDocumentFile.value.name,
-      content_type: pendingEmployeeDocumentFile.value.type || "application/octet-stream",
-      content_base64: await fileToBase64(pendingEmployeeDocumentFile.value),
-    };
+    const payload: EmployeeDocumentUploadPayload = await buildEmployeeDocumentUploadPayload(
+      documentUploadDraft,
+      pendingEmployeeDocumentFile.value,
+      fileToBase64,
+    );
     await uploadEmployeeDocument(resolvedTenantScopeId.value, selectedEmployeeId.value, authStore.accessToken, payload);
     await selectEmployee(selectedEmployeeId.value);
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.documentUploaded"));
   } catch (error) {
-    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
-    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), resolveEmployeeDocumentErrorMessage(error));
   } finally {
     loading.action = false;
   }
@@ -3222,8 +3283,7 @@ async function submitEmployeeDocumentLink() {
     await selectEmployee(selectedEmployeeId.value);
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.documentLinked"));
   } catch (error) {
-    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
-    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), resolveEmployeeDocumentErrorMessage(error));
   } finally {
     loading.action = false;
   }
@@ -3257,8 +3317,7 @@ async function submitEmployeeDocumentVersion() {
     await selectEmployee(selectedEmployeeId.value);
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.documentVersionSaved"));
   } catch (error) {
-    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
-    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), resolveEmployeeDocumentErrorMessage(error));
   } finally {
     loading.action = false;
   }

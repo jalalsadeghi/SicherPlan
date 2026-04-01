@@ -17,6 +17,7 @@ from app.modules.iam.auth_schemas import AuthenticatedRoleScope
 from app.modules.iam.audit_service import AuditService
 from app.modules.iam.authz import RequestAuthorizationContext
 from app.modules.platform_services.docs_models import Document, DocumentLink, DocumentVersion
+from app.modules.platform_services.docs_models import DocumentType
 from app.modules.platform_services.docs_schemas import (
     DocumentCreate,
     DocumentLinkCreate,
@@ -24,6 +25,7 @@ from app.modules.platform_services.docs_schemas import (
     DocumentVersionCreate,
     DocumentVersionRead,
 )
+from app.modules.platform_services.document_type_seed import DOCUMENT_TYPE_SEEDS
 
 
 def _context(*permissions: str) -> RequestAuthorizationContext:
@@ -82,12 +84,27 @@ class FakeDocumentRepo:
 class FakeDocumentService:
     def __init__(self, repository: FakeDocumentRepo) -> None:
         self.repository = repository
+        self.allowed_document_type_keys = {seed.key for seed in DOCUMENT_TYPE_SEEDS}
 
     def create_document(self, tenant_id: str, payload: DocumentCreate, actor) -> DocumentRead:  # noqa: ANN001
+        if payload.document_type_key and payload.document_type_key not in self.allowed_document_type_keys:
+            raise ApiException(404, "docs.document_type.not_found", "errors.docs.document_type.not_found")
         now = datetime.now(UTC)
+        document_type = (
+            DocumentType(
+                id=f"type-{payload.document_type_key}",
+                key=payload.document_type_key,
+                name=payload.document_type_key,
+                description="",
+                is_system_type=True,
+            )
+            if payload.document_type_key
+            else None
+        )
         document = Document(
             id=f"document-{len(self.repository.documents) + 1}",
             tenant_id=tenant_id,
+            document_type_id=f"type-{payload.document_type_key}" if payload.document_type_key else None,
             title=payload.title,
             source_module=payload.source_module,
             source_label=payload.source_label,
@@ -102,6 +119,7 @@ class FakeDocumentService:
             versions=[],
             links=[],
         )
+        document.document_type = document_type
         self.repository.documents.append(document)
         return DocumentRead.model_validate(document)
 
@@ -259,6 +277,85 @@ class EmployeeFileServiceTest(unittest.TestCase):
             [event.event_type for event in audit_repo.audit_events],
             ["employees.document.uploaded", "employees.document.linked", "employees.document.version_added"],
         )
+
+    def test_upload_employee_document_accepts_null_document_type_key(self) -> None:
+        repository = FakeDocumentRepo()
+        service = EmployeeFileService(
+            employee_repository=FakeEmployeeRepo(),
+            document_repository=repository,
+            document_service=FakeDocumentService(repository),
+            audit_service=None,
+        )
+
+        uploaded = service.upload_employee_document(
+            "tenant-1",
+            "employee-1",
+            EmployeeDocumentUploadCreate(
+                title="Allgemeiner Nachweis",
+                relation_type="employee_document",
+                label="Ohne Typ",
+                document_type_key=None,
+                file_name="misc.pdf",
+                content_type="application/pdf",
+                content_base64="YQ==",
+            ),
+            _context(),
+        )
+
+        self.assertIsNone(uploaded.document_type_key)
+
+    def test_upload_employee_document_accepts_seeded_employee_document_type_key(self) -> None:
+        repository = FakeDocumentRepo()
+        service = EmployeeFileService(
+            employee_repository=FakeEmployeeRepo(),
+            document_repository=repository,
+            document_service=FakeDocumentService(repository),
+            audit_service=None,
+        )
+
+        uploaded = service.upload_employee_document(
+            "tenant-1",
+            "employee-1",
+            EmployeeDocumentUploadCreate(
+                title="Arbeitsvertrag",
+                relation_type="contract",
+                label="Vertrag 2026",
+                document_type_key="employment_contract",
+                file_name="contract.pdf",
+                content_type="application/pdf",
+                content_base64="YQ==",
+            ),
+            _context(),
+        )
+
+        self.assertEqual(uploaded.document_type_key, "employment_contract")
+
+    def test_upload_employee_document_rejects_unknown_non_empty_document_type_key(self) -> None:
+        repository = FakeDocumentRepo()
+        service = EmployeeFileService(
+            employee_repository=FakeEmployeeRepo(),
+            document_repository=repository,
+            document_service=FakeDocumentService(repository),
+            audit_service=None,
+        )
+
+        with self.assertRaises(ApiException) as raised:
+            service.upload_employee_document(
+                "tenant-1",
+                "employee-1",
+                EmployeeDocumentUploadCreate(
+                    title="Unbekannt",
+                    relation_type="misc",
+                    label="Fehler",
+                    document_type_key="totally_unknown_key",
+                    file_name="unknown.pdf",
+                    content_type="application/pdf",
+                    content_base64="YQ==",
+                ),
+                _context(),
+            )
+
+        self.assertEqual(raised.exception.code, "docs.document_type.not_found")
 
     def test_generic_document_mutations_require_employee_write_permission(self) -> None:
         repository = FakeDocumentRepo()

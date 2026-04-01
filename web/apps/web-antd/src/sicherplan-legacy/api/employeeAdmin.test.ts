@@ -39,7 +39,7 @@ vi.mock('@/stores/auth', () => ({
   }),
 }));
 
-import { createEmployee, listEmployees } from './employeeAdmin';
+import { createEmployee, EmployeeAdminApiError, listEmployees, uploadEmployeeDocument } from './employeeAdmin';
 
 describe('employee admin auth recovery', () => {
   beforeEach(() => {
@@ -178,5 +178,29 @@ describe('employee admin auth recovery', () => {
     expect(String(requestedUrl)).toContain('default_branch_id=branch-1');
     expect(String(requestedUrl)).toContain('include_archived=true');
     expect(String(requestedUrl)).not.toContain('default_mandate_id=');
+  });
+
+  it('surfaces raw route-level 404s as dedicated employee API errors with request id', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('Not Found', {
+        status: 404,
+        headers: { 'X-Request-ID': 'req-upload-404' },
+      }),
+    );
+
+    await expect(
+      uploadEmployeeDocument('tenant-1', 'employee-1', 'access-1', {
+        title: 'Arbeitsvertrag',
+        relation_type: 'contract',
+        file_name: 'contract.pdf',
+        content_type: 'application/pdf',
+        content_base64: 'YQ==',
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'platform.http_not_found',
+      messageKey: 'errors.platform.http_not_found',
+      requestId: 'req-upload-404',
+    });
   });
 });

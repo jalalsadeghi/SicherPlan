@@ -20,6 +20,13 @@ class DocumentTypeSeed:
 DOCUMENT_TYPE_SEEDS: tuple[DocumentTypeSeed, ...] = (
     DocumentTypeSeed("customer_contract", "Kundenvertrag", "Vertrags- und Stammakten fuer Kundenmigration und CRM."),
     DocumentTypeSeed("employee_personnel_file", "Personalakte", "Historische oder aktuelle Personalunterlagen."),
+    DocumentTypeSeed("employment_contract", "Arbeitsvertrag", "Unterzeichnete Arbeitsvertraege und Vertragsnachtraege."),
+    DocumentTypeSeed("identity_card", "Personalausweis", "Ausweis- oder Identitaetsnachweise fuer Mitarbeitende."),
+    DocumentTypeSeed("passport_copy", "Passkopie", "Passkopien fuer Identitaets- oder Reisepruefungen."),
+    DocumentTypeSeed("residence_permit", "Aufenthaltstitel", "Nachweise ueber gueltige Aufenthalts- und Arbeitsberechtigungen."),
+    DocumentTypeSeed("driving_licence", "Fuehrerschein", "Fuehrerscheinkopien fuer fahrzeugbezogene Einsaetze."),
+    DocumentTypeSeed("qualification_certificate", "Qualifikationsnachweis", "Zertifikate, Befaehigungsnachweise und Schulungsbelege."),
+    DocumentTypeSeed("employee_misc", "Mitarbeitendenanlage", "Sonstige mitarbeitendenbezogene Dokumente ausserhalb der Standardkategorien."),
     DocumentTypeSeed("subcontractor_compliance", "Subunternehmer-Nachweis", "Partnerbezogene Compliance- und Vertragsnachweise."),
     DocumentTypeSeed("order_attachment", "Auftragsanlage", "Bestandsdokumente und Anlagen zu Kundenauftraegen."),
     DocumentTypeSeed("finance_supporting_document", "Finanzbeleg", "Abrechnungsnahe Belege fuer Zeiten, Kosten oder Rechnungen."),

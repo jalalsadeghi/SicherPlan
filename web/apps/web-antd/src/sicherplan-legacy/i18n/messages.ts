@@ -673,6 +673,10 @@ export type MessageKey =
   | "employeeAdmin.credentials.empty"
   | "employeeAdmin.credentials.editorEyebrow"
   | "employeeAdmin.credentials.editorTitle"
+  | "employeeAdmin.credentials.credentialTypePlaceholder"
+  | "employeeAdmin.credentials.encodedValueHelp"
+  | "employeeAdmin.credentialType.company_id"
+  | "employeeAdmin.credentialType.work_badge"
   | "employeeAdmin.availability.eyebrow"
   | "employeeAdmin.availability.title"
   | "employeeAdmin.availability.lead"
@@ -681,6 +685,10 @@ export type MessageKey =
   | "employeeAdmin.availability.empty"
   | "employeeAdmin.availability.editorEyebrow"
   | "employeeAdmin.availability.editorTitle"
+  | "employeeAdmin.availability.ruleKindPlaceholder"
+  | "employeeAdmin.availabilityRuleKind.availability"
+  | "employeeAdmin.availabilityRuleKind.unavailable"
+  | "employeeAdmin.availabilityRuleKind.free_wish"
   | "employeeAdmin.absences.eyebrow"
   | "employeeAdmin.absences.title"
   | "employeeAdmin.absences.lead"
@@ -706,12 +714,22 @@ export type MessageKey =
   | "employeeAdmin.documents.versionLead"
   | "employeeAdmin.documents.versionEmpty"
   | "employeeAdmin.documents.selectedVersionTarget"
+  | "employeeAdmin.documents.documentTypePlaceholder"
+  | "employeeAdmin.documents.documentTypeHelp"
   | "employeeAdmin.documents.relation.employee_document"
   | "employeeAdmin.documents.relation.id_proof"
   | "employeeAdmin.documents.relation.contract"
   | "employeeAdmin.documents.relation.certificate"
   | "employeeAdmin.documents.relation.residence_permit"
   | "employeeAdmin.documents.relation.misc"
+  | "employeeAdmin.documentType.none"
+  | "employeeAdmin.documentType.employment_contract"
+  | "employeeAdmin.documentType.identity_card"
+  | "employeeAdmin.documentType.passport_copy"
+  | "employeeAdmin.documentType.residence_permit"
+  | "employeeAdmin.documentType.driving_licence"
+  | "employeeAdmin.documentType.qualification_certificate"
+  | "employeeAdmin.documentType.employee_misc"
   | "employeeAdmin.noteType.operational_note"
   | "employeeAdmin.noteType.positive_activity"
   | "employeeAdmin.noteType.reminder"
@@ -901,6 +919,8 @@ export type MessageKey =
   | "employeeAdmin.feedback.accessReconciled"
   | "employeeAdmin.feedback.catalogPartial"
   | "employeeAdmin.feedback.error"
+  | "employeeAdmin.feedback.routeNotFound"
+  | "employeeAdmin.feedback.apiDiagnostic"
   | "employeeAdmin.readiness.recordKindQualification"
   | "employeeAdmin.readiness.recordKindFunction"
   | "employeeAdmin.readiness.recurrenceNone"
@@ -2249,7 +2269,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.fields.documentTitle": "Dokumenttitel",
     "employeeAdmin.fields.documentLabel": "Bezeichnung",
     "employeeAdmin.fields.documentRelationType": "Dokumentrelation",
-    "employeeAdmin.fields.documentTypeKey": "Dokumenttyp-Schlüssel",
+    "employeeAdmin.fields.documentTypeKey": "Dokumenttyp",
     "employeeAdmin.fields.documentFile": "Datei",
     "employeeAdmin.fields.documentId": "Dokument-ID",
     "employeeAdmin.fields.documentVersionTarget": "Version zu Dokument",
@@ -2360,6 +2380,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.credentials.empty": "Noch keine Ausweise vorhanden.",
     "employeeAdmin.credentials.editorEyebrow": "Bearbeitung",
     "employeeAdmin.credentials.editorTitle": "Ausweis anlegen oder aktualisieren",
+    "employeeAdmin.credentials.credentialTypePlaceholder": "Ausweistyp auswählen",
+    "employeeAdmin.credentials.encodedValueHelp":
+      "QR-, Barcode- oder NFC-Daten gehören in den kodierten Wert.",
+    "employeeAdmin.credentialType.company_id": "Company ID",
+    "employeeAdmin.credentialType.work_badge": "Work badge",
     "employeeAdmin.availability.eyebrow": "Verfügbarkeit",
     "employeeAdmin.availability.title": "Verfügbarkeitsregeln",
     "employeeAdmin.availability.lead": "Zeitfenster, Wiederholung und Wochentagsmuster bleiben direkt in der Mitarbeitendenakte pflegbar.",
@@ -2368,6 +2393,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.availability.empty": "Noch keine Verfügbarkeitsregeln vorhanden.",
     "employeeAdmin.availability.editorEyebrow": "Bearbeitung",
     "employeeAdmin.availability.editorTitle": "Verfügbarkeitsregel anlegen oder anpassen",
+    "employeeAdmin.availability.ruleKindPlaceholder": "Regelart auswählen",
+    "employeeAdmin.availabilityRuleKind.availability": "Verfügbar",
+    "employeeAdmin.availabilityRuleKind.unavailable": "Nicht verfügbar",
+    "employeeAdmin.availabilityRuleKind.free_wish": "Freier Wunsch",
     "employeeAdmin.absences.eyebrow": "Abwesenheiten",
     "employeeAdmin.absences.title": "Abwesenheiten und Sperrzeiten",
     "employeeAdmin.absences.lead": "Abwesenheiten bleiben im privaten Mitarbeitendenbereich und werden hier mit Zeitraum und Notiz gepflegt.",
@@ -2393,12 +2422,23 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.documents.versionLead": "Für bereits verknüpfte Dokumente kann direkt eine neue Version hochgeladen werden.",
     "employeeAdmin.documents.versionEmpty": "Wähle zuerst ein verknüpftes Dokument aus der Ablage aus.",
     "employeeAdmin.documents.selectedVersionTarget": "Ausgewähltes Zieldokument",
+    "employeeAdmin.documents.documentTypePlaceholder": "Optionalen Dokumenttyp auswählen",
+    "employeeAdmin.documents.documentTypeHelp":
+      "Der Dokumenttyp ist optional. Die Mitarbeitendenbeziehung wird weiterhin über die Dokumentrelation gesteuert.",
     "employeeAdmin.documents.relation.employee_document": "Mitarbeitendendokument",
     "employeeAdmin.documents.relation.id_proof": "Identitätsnachweis",
     "employeeAdmin.documents.relation.contract": "Vertrag",
     "employeeAdmin.documents.relation.certificate": "Zertifikat",
     "employeeAdmin.documents.relation.residence_permit": "Aufenthaltstitel",
     "employeeAdmin.documents.relation.misc": "Sonstiges",
+    "employeeAdmin.documentType.none": "Kein Dokumenttyp",
+    "employeeAdmin.documentType.employment_contract": "Arbeitsvertrag",
+    "employeeAdmin.documentType.identity_card": "Personalausweis",
+    "employeeAdmin.documentType.passport_copy": "Passkopie",
+    "employeeAdmin.documentType.residence_permit": "Aufenthaltstitel",
+    "employeeAdmin.documentType.driving_licence": "Fuehrerschein",
+    "employeeAdmin.documentType.qualification_certificate": "Qualifikationsnachweis",
+    "employeeAdmin.documentType.employee_misc": "Sonstiges Mitarbeitendendokument",
     "employeeAdmin.noteType.operational_note": "Operative Notiz",
     "employeeAdmin.noteType.positive_activity": "Positive Aktivität",
     "employeeAdmin.noteType.reminder": "Erinnerung",
@@ -2552,7 +2592,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.feedback.credentialRequired":
       "Ausweisnummer, Ausweistyp, kodierter Wert und Gültig-ab sind erforderlich.",
     "employeeAdmin.feedback.invalidCredentialType":
-      "Der gewählte Ausweistyp ist ungültig.",
+      "Als Ausweistyp sind nur Company ID oder Work badge zulässig.",
     "employeeAdmin.feedback.invalidCredentialStatus":
       "Der gewählte Ausweisstatus ist ungültig.",
     "employeeAdmin.feedback.credentialInvalidWindow":
@@ -2657,6 +2697,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Die Mitarbeitendenliste wurde geladen, aber ergänzende Katalogdaten konnten nicht vollständig aktualisiert werden.",
     "employeeAdmin.feedback.error":
       "Die Mitarbeitendenaktion konnte nicht abgeschlossen werden.",
+    "employeeAdmin.feedback.routeNotFound":
+      "Der gewünschte Mitarbeitenden-Endpunkt wurde nicht gefunden. Bitte Backend-Route und Proxy prüfen.",
+    "employeeAdmin.feedback.apiDiagnostic":
+      "Aktion fehlgeschlagen. Status: {statusCode}, Code: {code}, message_key: {messageKey}, request_id: {requestId}",
     "employeeAdmin.readiness.recordKindQualification": "Qualifikation",
     "employeeAdmin.readiness.recordKindFunction": "Funktion",
     "employeeAdmin.readiness.recurrenceNone": "Keine Wiederholung",
@@ -4086,7 +4130,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.fields.documentTitle": "Document title",
     "employeeAdmin.fields.documentLabel": "Label",
     "employeeAdmin.fields.documentRelationType": "Document relation",
-    "employeeAdmin.fields.documentTypeKey": "Document type key",
+    "employeeAdmin.fields.documentTypeKey": "Document type",
     "employeeAdmin.fields.documentFile": "File",
     "employeeAdmin.fields.documentId": "Document ID",
     "employeeAdmin.fields.documentVersionTarget": "Version target document",
@@ -4200,6 +4244,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.credentials.empty": "No credentials have been recorded yet.",
     "employeeAdmin.credentials.editorEyebrow": "Editor",
     "employeeAdmin.credentials.editorTitle": "Create or update credential",
+    "employeeAdmin.credentials.credentialTypePlaceholder": "Select credential type",
+    "employeeAdmin.credentials.encodedValueHelp":
+      "QR, barcode, or NFC data belongs in the encoded value field.",
+    "employeeAdmin.credentialType.company_id": "Company ID",
+    "employeeAdmin.credentialType.work_badge": "Work badge",
     "employeeAdmin.availability.eyebrow": "Availability",
     "employeeAdmin.availability.title": "Availability rules",
     "employeeAdmin.availability.lead":
@@ -4209,6 +4258,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.availability.empty": "No availability rules have been recorded yet.",
     "employeeAdmin.availability.editorEyebrow": "Editor",
     "employeeAdmin.availability.editorTitle": "Create or update availability rule",
+    "employeeAdmin.availability.ruleKindPlaceholder": "Select rule kind",
+    "employeeAdmin.availabilityRuleKind.availability": "Availability",
+    "employeeAdmin.availabilityRuleKind.unavailable": "Unavailable",
+    "employeeAdmin.availabilityRuleKind.free_wish": "Free wish",
     "employeeAdmin.absences.eyebrow": "Absences",
     "employeeAdmin.absences.title": "Absences and blocked periods",
     "employeeAdmin.absences.lead":
@@ -4235,12 +4288,23 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.documents.versionLead": "Upload a new version directly to an already linked employee document.",
     "employeeAdmin.documents.versionEmpty": "Select a linked employee document from the library first.",
     "employeeAdmin.documents.selectedVersionTarget": "Selected target document",
+    "employeeAdmin.documents.documentTypePlaceholder": "Select an optional document type",
+    "employeeAdmin.documents.documentTypeHelp":
+      "Document type is optional. Relation type still controls the employee-side relation semantics.",
     "employeeAdmin.documents.relation.employee_document": "Employee document",
     "employeeAdmin.documents.relation.id_proof": "ID proof",
     "employeeAdmin.documents.relation.contract": "Contract",
     "employeeAdmin.documents.relation.certificate": "Certificate",
     "employeeAdmin.documents.relation.residence_permit": "Residence permit",
     "employeeAdmin.documents.relation.misc": "Miscellaneous",
+    "employeeAdmin.documentType.none": "No document type",
+    "employeeAdmin.documentType.employment_contract": "Employment contract",
+    "employeeAdmin.documentType.identity_card": "Identity card",
+    "employeeAdmin.documentType.passport_copy": "Passport copy",
+    "employeeAdmin.documentType.residence_permit": "Residence permit",
+    "employeeAdmin.documentType.driving_licence": "Driving licence",
+    "employeeAdmin.documentType.qualification_certificate": "Qualification certificate",
+    "employeeAdmin.documentType.employee_misc": "Miscellaneous employee document",
     "employeeAdmin.noteType.operational_note": "Operational note",
     "employeeAdmin.noteType.positive_activity": "Positive activity",
     "employeeAdmin.noteType.reminder": "Reminder",
@@ -4395,7 +4459,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.feedback.credentialRequired":
       "Credential number, credential type, encoded value, and valid-from are required.",
     "employeeAdmin.feedback.invalidCredentialType":
-      "The selected credential type is invalid.",
+      "Only Company ID or Work badge are allowed as credential types.",
     "employeeAdmin.feedback.invalidCredentialStatus":
       "The selected credential status is invalid.",
     "employeeAdmin.feedback.credentialInvalidWindow":
@@ -4500,6 +4564,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "The employee list loaded, but supplemental catalog data could not be refreshed completely.",
     "employeeAdmin.feedback.error":
       "The employee action could not be completed.",
+    "employeeAdmin.feedback.routeNotFound":
+      "The requested employee endpoint was not found. Check backend routing and proxy configuration.",
+    "employeeAdmin.feedback.apiDiagnostic":
+      "Action failed. Status: {statusCode}, code: {code}, message_key: {messageKey}, request_id: {requestId}",
     "employeeAdmin.readiness.recordKindQualification": "Qualification",
     "employeeAdmin.readiness.recordKindFunction": "Function",
     "employeeAdmin.readiness.recurrenceNone": "No recurrence",
