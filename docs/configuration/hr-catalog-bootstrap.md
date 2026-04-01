@@ -5,6 +5,8 @@ Production-safe baseline HR catalogs are provisioned during tenant baseline init
 - core tenant onboarding through the Core admin onboarding flow
 - explicit tenant baseline setup via `backend/scripts/seed_go_live_configuration.py --tenant-id <tenant_uuid>`
 
+Code-only deployment does not retroactively backfill older tenants that were created before this baseline logic existed. For already deployed tenants, run an explicit backfill after deploy.
+
 That baseline path inserts missing tenant-owned rows for:
 
 - `hr.function_type`
@@ -38,6 +40,22 @@ Sample qualification types:
 ```bash
 PYTHONPATH=backend .venv-backend-test/bin/python backend/scripts/seed_employee_catalogs.py --tenant-id <tenant_uuid>
 ```
+
+### Explicit production-safe backfill commands
+
+Single tenant:
+
+```bash
+PYTHONPATH=backend .venv-backend-test/bin/python backend/scripts/seed_go_live_configuration.py --tenant-id <tenant_uuid>
+```
+
+All active tenants, explicit confirmation required:
+
+```bash
+PYTHONPATH=backend .venv-backend-test/bin/python backend/scripts/seed_go_live_configuration.py --all-tenants --confirm-all-tenants RUN_ALL_TENANTS
+```
+
+The all-tenant mode is idempotent. It inserts missing baseline rows and reactivates matching baseline codes without clobbering customized tenant labels or descriptions.
 
 ### Dev/test API bootstrap
 

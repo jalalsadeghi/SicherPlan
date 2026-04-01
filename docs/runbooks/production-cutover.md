@@ -39,6 +39,7 @@ Rollback must be prepared before release proceeds if any of the following fail:
 2. Confirm backup/restore evidence from [backup-restore-and-security-drills.md](/home/jey/Projects/SicherPlan/docs/qa/backup-restore-and-security-drills.md).
 3. Run `backend/scripts/run_production_cutover_dry_run.py`.
 4. Execute migration/config steps in the approved environment.
+   For tenants created before HR baseline onboarding existed, include an explicit `seed_go_live_configuration.py --tenant-id <uuid>` backfill step, or use the guarded all-tenant variant only with approved confirmation.
 5. Run secured smoke checks and monitoring gates.
 6. Record outputs in [production-cutover-evidence.md](/home/jey/Projects/SicherPlan/docs/runbooks/production-cutover-evidence.md).
 

@@ -5,6 +5,23 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      run_hr_baseline_backfill:
+        description: "Run explicit HR baseline backfill after deploy"
+        type: boolean
+        default: false
+      hr_baseline_tenant_id:
+        description: "Tenant UUID for single-tenant HR baseline backfill"
+        type: string
+        required: false
+      hr_baseline_all_tenants:
+        description: "Backfill all active tenants. Requires confirmation string."
+        type: boolean
+        default: false
+      hr_baseline_confirmation:
+        description: "Required only for all-tenant backfill: RUN_ALL_TENANTS"
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -160,12 +177,34 @@ jobs:
           STAGE_USER: ${{ secrets.STAGE_USER }}
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          RUN_HR_BASELINE_BACKFILL: ${{ github.event_name == 'workflow_dispatch' && inputs.run_hr_baseline_backfill || 'false' }}
+          HR_BASELINE_TENANT_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.hr_baseline_tenant_id || '' }}
+          HR_BASELINE_ALL_TENANTS: ${{ github.event_name == 'workflow_dispatch' && inputs.hr_baseline_all_tenants || 'false' }}
+          HR_BASELINE_CONFIRMATION: ${{ github.event_name == 'workflow_dispatch' && inputs.hr_baseline_confirmation || '' }}
         run: |
+          if [[ "$RUN_HR_BASELINE_BACKFILL" == "true" ]]; then
+            if [[ -n "$HR_BASELINE_TENANT_ID" && "$HR_BASELINE_ALL_TENANTS" == "true" ]]; then
+              echo "Choose either hr_baseline_tenant_id or hr_baseline_all_tenants=true, not both." >&2
+              exit 1
+            fi
+            if [[ -z "$HR_BASELINE_TENANT_ID" && "$HR_BASELINE_ALL_TENANTS" != "true" ]]; then
+              echo "Backfill requested, but neither hr_baseline_tenant_id nor hr_baseline_all_tenants=true was provided." >&2
+              exit 1
+            fi
+            if [[ "$HR_BASELINE_ALL_TENANTS" == "true" && "$HR_BASELINE_CONFIRMATION" != "RUN_ALL_TENANTS" ]]; then
+              echo "All-tenant backfill requires hr_baseline_confirmation=RUN_ALL_TENANTS." >&2
+              exit 1
+            fi
+          fi
           DEPLOY_ROOT_Q=$(printf '%q' "$DEPLOY_ROOT")
           STAGE_ENV_FILE_Q=$(printf '%q' "$STAGE_ENV_FILE")
           BACKEND_ENV_FILE_Q=$(printf '%q' "$BACKEND_ENV_FILE")
           GHCR_USERNAME_Q=$(printf '%q' "$GHCR_USERNAME")
           GHCR_TOKEN_Q=$(printf '%q' "$GHCR_TOKEN")
+          RUN_HR_BASELINE_BACKFILL_Q=$(printf '%q' "$RUN_HR_BASELINE_BACKFILL")
+          HR_BASELINE_TENANT_ID_Q=$(printf '%q' "$HR_BASELINE_TENANT_ID")
+          HR_BASELINE_ALL_TENANTS_Q=$(printf '%q' "$HR_BASELINE_ALL_TENANTS")
+          HR_BASELINE_CONFIRMATION_Q=$(printf '%q' "$HR_BASELINE_CONFIRMATION")
           ssh -i ~/.ssh/id_ed25519 -p "$STAGE_PORT" "$STAGE_USER@$STAGE_HOST" \
             "set -euo pipefail; \
              export DEPLOY_ROOT=$DEPLOY_ROOT_Q; \
@@ -173,5 +212,9 @@ jobs:
              export BACKEND_ENV_FILE=$BACKEND_ENV_FILE_Q; \
              export GHCR_USERNAME=$GHCR_USERNAME_Q; \
              export GHCR_TOKEN=$GHCR_TOKEN_Q; \
+             export RUN_HR_BASELINE_BACKFILL=$RUN_HR_BASELINE_BACKFILL_Q; \
+             export HR_BASELINE_TENANT_ID=$HR_BASELINE_TENANT_ID_Q; \
+             export HR_BASELINE_ALL_TENANTS=$HR_BASELINE_ALL_TENANTS_Q; \
+             export HR_BASELINE_CONFIRMATION=$HR_BASELINE_CONFIRMATION_Q; \
              chmod +x \"\$DEPLOY_ROOT/deploy/deploy_stage_remote.sh\"; \
              bash \"\$DEPLOY_ROOT/deploy/deploy_stage_remote.sh\""

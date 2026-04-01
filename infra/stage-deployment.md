@@ -86,6 +86,15 @@ The script will:
 
 The workflow file is [stage-deploy.yml](/home/jey/Projects/SicherPlan/.github/workflows/stage-deploy.yml). It builds the backend and web stage images on every push to `main` and on `workflow_dispatch`, pushes them to GHCR, copies the latest compose/script files to the server, and then runs the remote deploy script over SSH.
 
+For preexisting tenants that were created before HR baseline onboarding was introduced, code deploy alone is not enough. The workflow now supports an explicit optional post-deploy HR catalog backfill on `workflow_dispatch` only:
+
+- `run_hr_baseline_backfill=true`
+- then either:
+  - `hr_baseline_tenant_id=<tenant_uuid>`
+  - or `hr_baseline_all_tenants=true` plus `hr_baseline_confirmation=RUN_ALL_TENANTS`
+
+This backfill is not enabled on normal `push` deploys.
+
 ### Required GitHub Secrets
 
 - `STAGE_HOST`
@@ -144,6 +153,22 @@ docker-compose -f /opt/sicherplan-stage/deploy/docker-compose.stage.yml \
 ```
 
 Both commands use the backend env file already referenced by `docker-compose.stage.yml`, so they will run against the stage database and stage filesystem object-storage volume.
+
+### Explicit HR baseline backfill after deploy
+
+Single tenant:
+
+```bash
+docker-compose -f /opt/sicherplan-stage/deploy/docker-compose.stage.yml \
+  run --rm backend python scripts/seed_go_live_configuration.py --tenant-id <tenant_uuid>
+```
+
+All active tenants, explicit confirmation required:
+
+```bash
+docker-compose -f /opt/sicherplan-stage/deploy/docker-compose.stage.yml \
+  run --rm backend python scripts/seed_go_live_configuration.py --all-tenants --confirm-all-tenants RUN_ALL_TENANTS
+```
 
 ## Notes
 

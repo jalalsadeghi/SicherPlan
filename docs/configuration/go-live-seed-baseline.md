@@ -30,6 +30,21 @@ This seed bundle is idempotent and covers:
 - central `docs.document_type` rows used by migration and generated outputs
 - tenant-scoped numbering rules in `core.tenant_setting`
 - tenant-scoped print-template metadata in `core.tenant_setting`
+- tenant-owned HR baseline catalogs in `hr.function_type` and `hr.qualification_type`
+
+For existing deployed tenants that predate the HR baseline onboarding logic, code deploy alone is not enough. Run one of these explicit backfill commands after deploy:
+
+Single tenant:
+
+```bash
+PYTHONPATH=backend .venv-backend-test/bin/python backend/scripts/seed_go_live_configuration.py --tenant-id <tenant_uuid>
+```
+
+All active tenants with strong confirmation:
+
+```bash
+PYTHONPATH=backend .venv-backend-test/bin/python backend/scripts/seed_go_live_configuration.py --all-tenants --confirm-all-tenants RUN_ALL_TENANTS
+```
 
 ## Numbering rules
 
