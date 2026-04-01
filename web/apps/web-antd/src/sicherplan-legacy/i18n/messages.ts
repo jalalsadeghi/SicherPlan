@@ -664,7 +664,9 @@ export type MessageKey =
   | "employeeAdmin.qualifications.proofLead"
   | "employeeAdmin.qualifications.proofEmpty"
   | "employeeAdmin.qualifications.functionTypePlaceholder"
+  | "employeeAdmin.qualifications.functionTypeEmptyHint"
   | "employeeAdmin.qualifications.qualificationTypePlaceholder"
+  | "employeeAdmin.qualifications.qualificationTypeEmptyHint"
   | "employeeAdmin.credentials.eyebrow"
   | "employeeAdmin.credentials.title"
   | "employeeAdmin.credentials.lead"
@@ -2372,7 +2374,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.qualifications.proofLead": "Nachweise werden über den zentralen Dokumentendienst versioniert und bleiben an die ausgewählte Qualifikation gebunden",
     "employeeAdmin.qualifications.proofEmpty": "Wähle zuerst eine Qualifikation aus dem Register aus.",
     "employeeAdmin.qualifications.functionTypePlaceholder": "Funktionstyp auswählen",
+    "employeeAdmin.qualifications.functionTypeEmptyHint": "Für diesen Mandanten sind noch keine Funktionstypen konfiguriert.",
     "employeeAdmin.qualifications.qualificationTypePlaceholder": "Qualifikationstyp auswählen",
+    "employeeAdmin.qualifications.qualificationTypeEmptyHint": "Für diesen Mandanten sind noch keine Qualifikationstypen konfiguriert.",
     "employeeAdmin.credentials.eyebrow": "Ausweise",
     "employeeAdmin.credentials.title": "Ausweise und Badge-Ausgabe",
     "employeeAdmin.credentials.lead": "Mitarbeitendenausweise bleiben als eigener Bestand mit Gültigkeit, Kennungswert und Badge-Ausgabe verfügbar.",
@@ -4237,7 +4241,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Proof documents remain versioned in the shared document service and tied to the selected qualification",
     "employeeAdmin.qualifications.proofEmpty": "Select a qualification from the register first.",
     "employeeAdmin.qualifications.functionTypePlaceholder": "Select function type",
+    "employeeAdmin.qualifications.functionTypeEmptyHint": "No function types are configured for this tenant yet.",
     "employeeAdmin.qualifications.qualificationTypePlaceholder": "Select qualification type",
+    "employeeAdmin.qualifications.qualificationTypeEmptyHint": "No qualification types are configured for this tenant yet.",
     "employeeAdmin.credentials.eyebrow": "Credentials",
     "employeeAdmin.credentials.title": "Credentials and badge output",
     "employeeAdmin.credentials.lead":

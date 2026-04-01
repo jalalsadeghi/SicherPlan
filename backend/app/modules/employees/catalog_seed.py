@@ -1,4 +1,4 @@
-"""Idempotent dev/test sample bootstrap for HR function and qualification catalogs."""
+"""Tenant HR catalog seed helpers for baseline and dev/test sample bootstrap."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ class QualificationTypeSeed:
     proof_required: bool = False
 
 
-SAMPLE_FUNCTION_TYPES: tuple[FunctionTypeSeed, ...] = (
+BASELINE_FUNCTION_TYPES: tuple[FunctionTypeSeed, ...] = (
     FunctionTypeSeed(
         code="SEC_GUARD",
         label="Security agent",
@@ -60,7 +60,7 @@ SAMPLE_FUNCTION_TYPES: tuple[FunctionTypeSeed, ...] = (
 )
 
 
-SAMPLE_QUALIFICATION_TYPES: tuple[QualificationTypeSeed, ...] = (
+BASELINE_QUALIFICATION_TYPES: tuple[QualificationTypeSeed, ...] = (
     QualificationTypeSeed(
         code="G34A",
         label="34a certified",
@@ -97,14 +97,54 @@ SAMPLE_QUALIFICATION_TYPES: tuple[QualificationTypeSeed, ...] = (
 )
 
 
+SAMPLE_FUNCTION_TYPES = BASELINE_FUNCTION_TYPES
+SAMPLE_QUALIFICATION_TYPES = BASELINE_QUALIFICATION_TYPES
+
+
+def seed_baseline_employee_catalogs(
+    session: Session,
+    *,
+    tenant_id: str,
+    actor_user_id: str | None = None,
+) -> dict[str, int]:
+    function_result = _seed_function_types(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=actor_user_id,
+        refresh_metadata=False,
+    )
+    qualification_result = _seed_qualification_types(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=actor_user_id,
+        refresh_metadata=False,
+    )
+    return {
+        "function_types_inserted": function_result["inserted"],
+        "function_types_updated": function_result["updated"],
+        "qualification_types_inserted": qualification_result["inserted"],
+        "qualification_types_updated": qualification_result["updated"],
+    }
+
+
 def seed_sample_employee_catalogs(
     session: Session,
     *,
     tenant_id: str,
     actor_user_id: str | None = None,
 ) -> dict[str, int]:
-    function_result = _seed_function_types(session, tenant_id=tenant_id, actor_user_id=actor_user_id)
-    qualification_result = _seed_qualification_types(session, tenant_id=tenant_id, actor_user_id=actor_user_id)
+    function_result = _seed_function_types(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=actor_user_id,
+        refresh_metadata=True,
+    )
+    qualification_result = _seed_qualification_types(
+        session,
+        tenant_id=tenant_id,
+        actor_user_id=actor_user_id,
+        refresh_metadata=True,
+    )
     return {
         "function_types_inserted": function_result["inserted"],
         "function_types_updated": function_result["updated"],
@@ -118,10 +158,11 @@ def _seed_function_types(
     *,
     tenant_id: str,
     actor_user_id: str | None,
+    refresh_metadata: bool,
 ) -> dict[str, int]:
     inserted = 0
     updated = 0
-    for seed in SAMPLE_FUNCTION_TYPES:
+    for seed in BASELINE_FUNCTION_TYPES:
         existing = session.scalars(
             select(FunctionType).where(
                 FunctionType.tenant_id == tenant_id,
@@ -147,13 +188,14 @@ def _seed_function_types(
             inserted += 1
             continue
         changed = False
-        changed |= _assign(existing, "label", seed.label)
-        changed |= _assign(existing, "category", seed.category)
-        changed |= _assign(existing, "description", seed.description)
         changed |= _assign(existing, "is_active", True)
-        changed |= _assign(existing, "planning_relevant", seed.planning_relevant)
         changed |= _assign(existing, "status", "active")
         changed |= _assign(existing, "archived_at", None)
+        if refresh_metadata:
+            changed |= _assign(existing, "label", seed.label)
+            changed |= _assign(existing, "category", seed.category)
+            changed |= _assign(existing, "description", seed.description)
+            changed |= _assign(existing, "planning_relevant", seed.planning_relevant)
         if changed:
             existing.updated_by_user_id = actor_user_id
             existing.version_no = (existing.version_no or 0) + 1
@@ -166,10 +208,11 @@ def _seed_qualification_types(
     *,
     tenant_id: str,
     actor_user_id: str | None,
+    refresh_metadata: bool,
 ) -> dict[str, int]:
     inserted = 0
     updated = 0
-    for seed in SAMPLE_QUALIFICATION_TYPES:
+    for seed in BASELINE_QUALIFICATION_TYPES:
         existing = session.scalars(
             select(QualificationType).where(
                 QualificationType.tenant_id == tenant_id,
@@ -199,17 +242,18 @@ def _seed_qualification_types(
             inserted += 1
             continue
         changed = False
-        changed |= _assign(existing, "label", seed.label)
-        changed |= _assign(existing, "category", seed.category)
-        changed |= _assign(existing, "description", seed.description)
         changed |= _assign(existing, "is_active", True)
-        changed |= _assign(existing, "planning_relevant", seed.planning_relevant)
-        changed |= _assign(existing, "compliance_relevant", seed.compliance_relevant)
-        changed |= _assign(existing, "expiry_required", seed.expiry_required)
-        changed |= _assign(existing, "default_validity_days", seed.default_validity_days)
-        changed |= _assign(existing, "proof_required", seed.proof_required)
         changed |= _assign(existing, "status", "active")
         changed |= _assign(existing, "archived_at", None)
+        if refresh_metadata:
+            changed |= _assign(existing, "label", seed.label)
+            changed |= _assign(existing, "category", seed.category)
+            changed |= _assign(existing, "description", seed.description)
+            changed |= _assign(existing, "planning_relevant", seed.planning_relevant)
+            changed |= _assign(existing, "compliance_relevant", seed.compliance_relevant)
+            changed |= _assign(existing, "expiry_required", seed.expiry_required)
+            changed |= _assign(existing, "default_validity_days", seed.default_validity_days)
+            changed |= _assign(existing, "proof_required", seed.proof_required)
         if changed:
             existing.updated_by_user_id = actor_user_id
             existing.version_no = (existing.version_no or 0) + 1

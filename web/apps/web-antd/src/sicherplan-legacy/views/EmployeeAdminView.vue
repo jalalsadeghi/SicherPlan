@@ -692,17 +692,25 @@
                   </label>
                   <label v-if="qualificationDraft.record_kind === 'function'" class="field-stack">
                     <span>{{ t("employeeAdmin.fields.functionType") }}</span>
-                    <select v-model="qualificationDraft.function_type_id" :disabled="!actionState.canManageQualifications">
+                    <select
+                      v-model="qualificationDraft.function_type_id"
+                      :disabled="!actionState.canManageQualifications || employeeFunctionTypeOptions.length === 0"
+                    >
                       <option value="">{{ t("employeeAdmin.qualifications.functionTypePlaceholder") }}</option>
                       <option v-for="option in employeeFunctionTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
                     </select>
+                    <span v-if="employeeFunctionTypeOptions.length === 0" class="field-help">{{ t("employeeAdmin.qualifications.functionTypeEmptyHint") }}</span>
                   </label>
                   <label v-else class="field-stack">
                     <span>{{ t("employeeAdmin.fields.qualificationType") }}</span>
-                    <select v-model="qualificationDraft.qualification_type_id" :disabled="!actionState.canManageQualifications">
+                    <select
+                      v-model="qualificationDraft.qualification_type_id"
+                      :disabled="!actionState.canManageQualifications || employeeQualificationTypeOptions.length === 0"
+                    >
                       <option value="">{{ t("employeeAdmin.qualifications.qualificationTypePlaceholder") }}</option>
                       <option v-for="option in employeeQualificationTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
                     </select>
+                    <span v-if="employeeQualificationTypeOptions.length === 0" class="field-help">{{ t("employeeAdmin.qualifications.qualificationTypeEmptyHint") }}</span>
                   </label>
                   <label class="field-stack">
                     <span>{{ t("employeeAdmin.fields.certificateNo") }}</span>

@@ -10,6 +10,7 @@ from app.errors import ApiException
 from app.modules.core.config_seed import seed_default_tenant_settings
 from app.modules.core.lookup_seed import seed_lookup_values
 from app.modules.core.models import Branch, Mandate, Tenant, TenantSetting
+from app.modules.employees.catalog_seed import seed_baseline_employee_catalogs
 from app.modules.core.schemas import (
     BranchCreate,
     BranchRead,
@@ -94,6 +95,12 @@ class SqlAlchemyCoreAdminRepository:
         )
 
         seed_lookup_values(
+            self.session,
+            tenant_id=tenant.id,
+            actor_user_id=actor_user_id,
+        )
+
+        seed_baseline_employee_catalogs(
             self.session,
             tenant_id=tenant.id,
             actor_user_id=actor_user_id,

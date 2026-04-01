@@ -1,5 +1,17 @@
 ## HR Catalog Bootstrap
 
+Production-safe baseline HR catalogs are provisioned during tenant baseline initialization:
+
+- core tenant onboarding through the Core admin onboarding flow
+- explicit tenant baseline setup via `backend/scripts/seed_go_live_configuration.py --tenant-id <tenant_uuid>`
+
+That baseline path inserts missing tenant-owned rows for:
+
+- `hr.function_type`
+- `hr.qualification_type`
+
+and is safe to re-run without creating duplicate codes.
+
 Customer pricing rate lines consume the tenant-owned HR catalogs:
 
 - `hr.function_type`

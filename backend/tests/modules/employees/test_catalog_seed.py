@@ -3,8 +3,11 @@ from __future__ import annotations
 import unittest
 
 from app.modules.employees.catalog_seed import (
+    BASELINE_FUNCTION_TYPES,
+    BASELINE_QUALIFICATION_TYPES,
     SAMPLE_FUNCTION_TYPES,
     SAMPLE_QUALIFICATION_TYPES,
+    seed_baseline_employee_catalogs,
     seed_sample_employee_catalogs,
 )
 from app.modules.employees.models import FunctionType, QualificationType
@@ -47,6 +50,76 @@ class _FakeSession:
 
 
 class TestEmployeeCatalogSeed(unittest.TestCase):
+    def test_baseline_seed_creates_missing_rows_when_tenant_is_initialized(self) -> None:
+        session = _FakeSession()
+
+        result = seed_baseline_employee_catalogs(session, tenant_id="tenant-1", actor_user_id="user-1")
+
+        self.assertEqual(result["function_types_inserted"], len(BASELINE_FUNCTION_TYPES))
+        self.assertEqual(result["qualification_types_inserted"], len(BASELINE_QUALIFICATION_TYPES))
+        self.assertTrue(any(row.code == "SEC_GUARD" for row in session.function_types))
+        self.assertTrue(any(row.code == "G34A" for row in session.qualification_types))
+
+    def test_baseline_seed_is_idempotent_and_preserves_existing_custom_metadata(self) -> None:
+        session = _FakeSession()
+        session.function_types.append(
+            FunctionType(
+                tenant_id="tenant-1",
+                code="SEC_GUARD",
+                label="Custom guard label",
+                category="custom-category",
+                description="Custom description",
+                is_active=False,
+                planning_relevant=False,
+                status="inactive",
+                archived_at="2026-01-01T00:00:00Z",
+                version_no=3,
+            )
+        )
+        session.qualification_types.append(
+            QualificationType(
+                tenant_id="tenant-1",
+                code="G34A",
+                label="Custom qualification label",
+                category="custom-category",
+                description="Custom description",
+                is_active=False,
+                planning_relevant=False,
+                compliance_relevant=False,
+                expiry_required=False,
+                default_validity_days=None,
+                proof_required=False,
+                status="inactive",
+                archived_at="2026-01-01T00:00:00Z",
+                version_no=4,
+            )
+        )
+
+        first = seed_baseline_employee_catalogs(session, tenant_id="tenant-1", actor_user_id="user-1")
+        second = seed_baseline_employee_catalogs(session, tenant_id="tenant-1", actor_user_id="user-1")
+
+        self.assertEqual(first["function_types_updated"], 1)
+        self.assertEqual(first["qualification_types_updated"], 1)
+        self.assertEqual(second["function_types_inserted"], 0)
+        self.assertEqual(second["function_types_updated"], 0)
+        self.assertEqual(second["qualification_types_inserted"], 0)
+        self.assertEqual(second["qualification_types_updated"], 0)
+        self.assertEqual(len(session.function_types), len(BASELINE_FUNCTION_TYPES))
+        self.assertEqual(len(session.qualification_types), len(BASELINE_QUALIFICATION_TYPES))
+
+        guard = next(row for row in session.function_types if row.code == "SEC_GUARD")
+        qualification = next(row for row in session.qualification_types if row.code == "G34A")
+        self.assertEqual(guard.label, "Custom guard label")
+        self.assertEqual(guard.category, "custom-category")
+        self.assertEqual(guard.description, "Custom description")
+        self.assertTrue(guard.is_active)
+        self.assertIsNone(guard.archived_at)
+        self.assertEqual(qualification.label, "Custom qualification label")
+        self.assertEqual(qualification.category, "custom-category")
+        self.assertEqual(qualification.description, "Custom description")
+        self.assertTrue(qualification.is_active)
+        self.assertIsNone(qualification.archived_at)
+
     def test_seed_creates_sample_rows_when_missing(self) -> None:
         session = _FakeSession()
 

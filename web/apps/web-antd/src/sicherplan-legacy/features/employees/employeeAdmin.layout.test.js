@@ -91,6 +91,8 @@ test("non-overview employee tabs reuse the structured section pattern", () => {
   assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*updateEmployeeQualification/);
   assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*listEmployeeQualificationProofs/);
   assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*uploadEmployeeQualificationProof/);
+  assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*employeeAdmin\.qualifications\.functionTypeEmptyHint/);
+  assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*employeeAdmin\.qualifications\.qualificationTypeEmptyHint/);
   assert.match(viewSource, /employee-tab-panel-credentials[\s\S]*employeeAdmin\.credentials\.registerEyebrow/);
   assert.match(viewSource, /employee-tab-panel-credentials[\s\S]*createEmployeeCredential/);
   assert.match(viewSource, /employee-tab-panel-credentials[\s\S]*updateEmployeeCredential/);
