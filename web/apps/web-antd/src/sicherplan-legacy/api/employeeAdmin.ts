@@ -297,6 +297,227 @@ export interface EmployeeCatalogBootstrapRead {
   qualification_types_updated: number;
 }
 
+export interface FunctionTypeRead {
+  id: string;
+  tenant_id: string;
+  code: string;
+  label: string;
+  category: string | null;
+  description: string | null;
+  is_active: boolean;
+  planning_relevant: boolean;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+  version_no: number;
+}
+
+export interface QualificationTypeRead {
+  id: string;
+  tenant_id: string;
+  code: string;
+  label: string;
+  category: string | null;
+  description: string | null;
+  is_active: boolean;
+  planning_relevant: boolean;
+  compliance_relevant: boolean;
+  expiry_required: boolean;
+  default_validity_days: number | null;
+  proof_required: boolean;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+  version_no: number;
+}
+
+export interface EmployeeQualificationRead {
+  id: string;
+  tenant_id: string;
+  employee_id: string;
+  record_kind: string;
+  function_type_id: string | null;
+  qualification_type_id: string | null;
+  certificate_no: string | null;
+  issued_at: string | null;
+  valid_until: string | null;
+  issuing_authority: string | null;
+  granted_internally: boolean;
+  notes: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+  version_no: number;
+  function_type: FunctionTypeRead | null;
+  qualification_type: QualificationTypeRead | null;
+}
+
+export interface EmployeeQualificationCreatePayload {
+  tenant_id: string;
+  employee_id: string;
+  record_kind: string;
+  function_type_id?: string | null;
+  qualification_type_id?: string | null;
+  certificate_no?: string | null;
+  issued_at?: string | null;
+  valid_until?: string | null;
+  issuing_authority?: string | null;
+  granted_internally?: boolean;
+  notes?: string | null;
+}
+
+export interface EmployeeQualificationUpdatePayload {
+  function_type_id?: string | null;
+  qualification_type_id?: string | null;
+  certificate_no?: string | null;
+  issued_at?: string | null;
+  valid_until?: string | null;
+  issuing_authority?: string | null;
+  granted_internally?: boolean | null;
+  notes?: string | null;
+  status?: string | null;
+  archived_at?: string | null;
+  version_no?: number | null;
+}
+
+export interface EmployeeQualificationProofUploadPayload {
+  title?: string | null;
+  file_name: string;
+  content_type: string;
+  content_base64: string;
+}
+
+export interface EmployeeQualificationProofRead extends EmployeeDocumentListItemRead {}
+
+export interface EmployeeAvailabilityRuleRead {
+  id: string;
+  tenant_id: string;
+  employee_id: string;
+  rule_kind: string;
+  starts_at: string;
+  ends_at: string;
+  recurrence_type: string;
+  weekday_mask: string | null;
+  notes: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+  version_no: number;
+}
+
+export interface EmployeeAvailabilityRuleCreatePayload {
+  tenant_id: string;
+  employee_id: string;
+  rule_kind: string;
+  starts_at: string;
+  ends_at: string;
+  recurrence_type: string;
+  weekday_mask?: string | null;
+  notes?: string | null;
+}
+
+export interface EmployeeAvailabilityRuleUpdatePayload {
+  rule_kind?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  recurrence_type?: string | null;
+  weekday_mask?: string | null;
+  notes?: string | null;
+  status?: string | null;
+  archived_at?: string | null;
+  version_no?: number | null;
+}
+
+export interface EmployeeAbsenceRead {
+  id: string;
+  tenant_id: string;
+  employee_id: string;
+  absence_type: string;
+  starts_on: string;
+  ends_on: string;
+  quantity_days: number;
+  status: string;
+  requested_at: string;
+  approved_by_user_id: string | null;
+  approved_at: string | null;
+  decision_note: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+  version_no: number;
+}
+
+export interface EmployeeAbsenceCreatePayload {
+  tenant_id: string;
+  employee_id: string;
+  absence_type: string;
+  starts_on: string;
+  ends_on: string;
+  notes?: string | null;
+}
+
+export interface EmployeeAbsenceUpdatePayload {
+  absence_type?: string | null;
+  starts_on?: string | null;
+  ends_on?: string | null;
+  status?: string | null;
+  decision_note?: string | null;
+  notes?: string | null;
+  archived_at?: string | null;
+  version_no?: number | null;
+}
+
+export interface EmployeeCredentialRead {
+  id: string;
+  tenant_id: string;
+  employee_id: string;
+  credential_no: string;
+  credential_type: string;
+  encoded_value: string;
+  valid_from: string;
+  valid_until: string | null;
+  status: string;
+  issued_at: string | null;
+  revoked_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+  version_no: number;
+}
+
+export interface EmployeeCredentialCreatePayload {
+  tenant_id: string;
+  employee_id: string;
+  credential_no: string;
+  credential_type: string;
+  encoded_value: string;
+  valid_from: string;
+  valid_until?: string | null;
+  notes?: string | null;
+}
+
+export interface EmployeeCredentialUpdatePayload {
+  status?: string | null;
+  encoded_value?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  notes?: string | null;
+  archived_at?: string | null;
+  version_no?: number | null;
+}
+
+export interface EmployeeCredentialBadgeIssuePayload {
+  title?: string | null;
+}
+
+export interface EmployeeCredentialBadgeRead extends EmployeeDocumentListItemRead {}
+
 export interface EmployeeListFilters {
   search?: string;
   status?: string;
@@ -459,6 +680,24 @@ function buildQuery(params: EmployeeListFilters) {
   return serialized ? `?${serialized}` : "";
 }
 
+function buildScopedQuery(params: Record<string, boolean | null | number | string | undefined>) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value == null || value === "") {
+      continue;
+    }
+    if (typeof value === "boolean") {
+      if (value) {
+        query.set(key, "true");
+      }
+      continue;
+    }
+    query.set(key, String(value));
+  }
+  const serialized = query.toString();
+  return serialized ? `?${serialized}` : "";
+}
+
 export function listEmployees(tenantId: string, accessToken: string, params: EmployeeListFilters) {
   return request<EmployeeListItem[]>(`/api/employees/tenants/${tenantId}/employees${buildQuery(params)}`, accessToken);
 }
@@ -552,6 +791,14 @@ export function bootstrapEmployeeCatalogSamples(tenantId: string, accessToken: s
   );
 }
 
+export function listFunctionTypes(tenantId: string, accessToken: string) {
+  return request<FunctionTypeRead[]>(`/api/employees/tenants/${tenantId}/employees/catalog/function-types`, accessToken);
+}
+
+export function listQualificationTypes(tenantId: string, accessToken: string) {
+  return request<QualificationTypeRead[]>(`/api/employees/tenants/${tenantId}/employees/catalog/qualification-types`, accessToken);
+}
+
 export function createEmployeeGroup(tenantId: string, accessToken: string, payload: Record<string, unknown>) {
   return request<EmployeeGroupRead>(`/api/employees/tenants/${tenantId}/employees/groups/catalog`, accessToken, {
     method: "POST",
@@ -591,6 +838,189 @@ export function updateEmployeeGroupMembership(
 
 export function listEmployeeNotes(tenantId: string, employeeId: string, accessToken: string) {
   return request<EmployeeNoteRead[]>(`/api/employees/tenants/${tenantId}/employees/${employeeId}/notes`, accessToken);
+}
+
+export function listEmployeeQualifications(tenantId: string, employeeId: string, accessToken: string) {
+  return request<EmployeeQualificationRead[]>(
+    `/api/employees/tenants/${tenantId}/employees/qualifications${buildScopedQuery({ employee_id: employeeId })}`,
+    accessToken,
+  );
+}
+
+export function createEmployeeQualification(
+  tenantId: string,
+  accessToken: string,
+  payload: EmployeeQualificationCreatePayload,
+) {
+  return request<EmployeeQualificationRead>(`/api/employees/tenants/${tenantId}/employees/qualifications`, accessToken, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function updateEmployeeQualification(
+  tenantId: string,
+  qualificationId: string,
+  accessToken: string,
+  payload: EmployeeQualificationUpdatePayload,
+) {
+  return request<EmployeeQualificationRead>(
+    `/api/employees/tenants/${tenantId}/employees/qualifications/${qualificationId}`,
+    accessToken,
+    {
+      method: "PATCH",
+      body: payload,
+    },
+  );
+}
+
+export function listEmployeeQualificationProofs(
+  tenantId: string,
+  qualificationId: string,
+  accessToken: string,
+) {
+  return request<EmployeeQualificationProofRead[]>(
+    `/api/employees/tenants/${tenantId}/employees/qualifications/${qualificationId}/proofs`,
+    accessToken,
+  );
+}
+
+export function uploadEmployeeQualificationProof(
+  tenantId: string,
+  qualificationId: string,
+  accessToken: string,
+  payload: EmployeeQualificationProofUploadPayload,
+) {
+  return request<EmployeeQualificationProofRead>(
+    `/api/employees/tenants/${tenantId}/employees/qualifications/${qualificationId}/proofs/uploads`,
+    accessToken,
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
+}
+
+export function listEmployeeAvailabilityRules(tenantId: string, employeeId: string, accessToken: string) {
+  return request<EmployeeAvailabilityRuleRead[]>(
+    `/api/employees/tenants/${tenantId}/employees/availability-rules${buildScopedQuery({ employee_id: employeeId })}`,
+    accessToken,
+  );
+}
+
+export function createEmployeeAvailabilityRule(
+  tenantId: string,
+  accessToken: string,
+  payload: EmployeeAvailabilityRuleCreatePayload,
+) {
+  return request<EmployeeAvailabilityRuleRead>(
+    `/api/employees/tenants/${tenantId}/employees/availability-rules`,
+    accessToken,
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
+}
+
+export function updateEmployeeAvailabilityRule(
+  tenantId: string,
+  ruleId: string,
+  accessToken: string,
+  payload: EmployeeAvailabilityRuleUpdatePayload,
+) {
+  return request<EmployeeAvailabilityRuleRead>(
+    `/api/employees/tenants/${tenantId}/employees/availability-rules/${ruleId}`,
+    accessToken,
+    {
+      method: "PATCH",
+      body: payload,
+    },
+  );
+}
+
+export function listEmployeeAbsences(tenantId: string, employeeId: string, accessToken: string) {
+  return request<EmployeeAbsenceRead[]>(
+    `/api/employees/tenants/${tenantId}/employees/absences${buildScopedQuery({ employee_id: employeeId })}`,
+    accessToken,
+  );
+}
+
+export function createEmployeeAbsence(
+  tenantId: string,
+  accessToken: string,
+  payload: EmployeeAbsenceCreatePayload,
+) {
+  return request<EmployeeAbsenceRead>(`/api/employees/tenants/${tenantId}/employees/absences`, accessToken, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function updateEmployeeAbsence(
+  tenantId: string,
+  absenceId: string,
+  accessToken: string,
+  payload: EmployeeAbsenceUpdatePayload,
+) {
+  return request<EmployeeAbsenceRead>(
+    `/api/employees/tenants/${tenantId}/employees/absences/${absenceId}`,
+    accessToken,
+    {
+      method: "PATCH",
+      body: payload,
+    },
+  );
+}
+
+export function listEmployeeCredentials(tenantId: string, employeeId: string, accessToken: string) {
+  return request<EmployeeCredentialRead[]>(
+    `/api/employees/tenants/${tenantId}/employees/credentials${buildScopedQuery({ employee_id: employeeId })}`,
+    accessToken,
+  );
+}
+
+export function createEmployeeCredential(
+  tenantId: string,
+  accessToken: string,
+  payload: EmployeeCredentialCreatePayload,
+) {
+  return request<EmployeeCredentialRead>(`/api/employees/tenants/${tenantId}/employees/credentials`, accessToken, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function updateEmployeeCredential(
+  tenantId: string,
+  credentialId: string,
+  accessToken: string,
+  payload: EmployeeCredentialUpdatePayload,
+) {
+  return request<EmployeeCredentialRead>(
+    `/api/employees/tenants/${tenantId}/employees/credentials/${credentialId}`,
+    accessToken,
+    {
+      method: "PATCH",
+      body: payload,
+    },
+  );
+}
+
+export function issueEmployeeCredentialBadgeOutput(
+  tenantId: string,
+  credentialId: string,
+  accessToken: string,
+  payload: EmployeeCredentialBadgeIssuePayload,
+) {
+  return request<EmployeeCredentialBadgeRead>(
+    `/api/employees/tenants/${tenantId}/employees/credentials/${credentialId}/badge-output`,
+    accessToken,
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
 }
 
 export function createEmployeeNote(tenantId: string, employeeId: string, accessToken: string, payload: Record<string, unknown>) {

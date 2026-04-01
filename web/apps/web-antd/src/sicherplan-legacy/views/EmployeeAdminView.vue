@@ -633,6 +633,411 @@
           </section>
 
           <section
+            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'qualifications'"
+            class="employee-admin-section employee-admin-tab-panel"
+            data-testid="employee-tab-panel-qualifications"
+          >
+            <div class="employee-admin-form employee-admin-form--structured">
+              <section class="employee-admin-editor-intro">
+                <div>
+                  <p class="eyebrow">{{ t("employeeAdmin.qualifications.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.qualifications.title") }}</h4>
+                </div>
+                <p class="field-help">{{ t("employeeAdmin.qualifications.lead") }}</p>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.qualifications.registerEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.qualifications.registerTitle") }}</h4>
+                </div>
+                <div v-if="employeeQualifications.length" class="employee-admin-record-list">
+                  <button
+                    v-for="qualification in employeeQualifications"
+                    :key="qualification.id"
+                    type="button"
+                    class="employee-admin-record"
+                    :class="{ selected: qualification.id === editingQualificationId }"
+                    @click="editQualification(qualification)"
+                  >
+                    <div class="employee-admin-record__body">
+                      <strong>
+                        {{ qualification.qualification_type?.label || qualification.function_type?.label || qualification.certificate_no || t("employeeAdmin.summary.none") }}
+                      </strong>
+                      <span class="employee-admin-record__meta">
+                        {{ qualification.record_kind === "function" ? t("employeeAdmin.readiness.recordKindFunction") : t("employeeAdmin.readiness.recordKindQualification") }}
+                        ·
+                        {{ qualification.issued_at || t("employeeAdmin.summary.none") }}
+                        ·
+                        {{ qualification.valid_until || t("employeeAdmin.summary.none") }}
+                      </span>
+                    </div>
+                    <StatusBadge :status="qualification.status" />
+                  </button>
+                </div>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.qualifications.empty") }}</p>
+              </section>
+
+              <form class="employee-admin-form-section employee-admin-inline-form" @submit.prevent="submitQualification">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.qualifications.editorEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.qualifications.editorTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.recordKind") }}</span>
+                    <select v-model="qualificationDraft.record_kind" :disabled="!actionState.canManageQualifications">
+                      <option v-for="option in readinessRecordKindOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                  </label>
+                  <label v-if="qualificationDraft.record_kind === 'function'" class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.functionType") }}</span>
+                    <select v-model="qualificationDraft.function_type_id" :disabled="!actionState.canManageQualifications">
+                      <option value="">{{ t("employeeAdmin.qualifications.functionTypePlaceholder") }}</option>
+                      <option v-for="option in employeeFunctionTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                  </label>
+                  <label v-else class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.qualificationType") }}</span>
+                    <select v-model="qualificationDraft.qualification_type_id" :disabled="!actionState.canManageQualifications">
+                      <option value="">{{ t("employeeAdmin.qualifications.qualificationTypePlaceholder") }}</option>
+                      <option v-for="option in employeeQualificationTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.certificateNo") }}</span>
+                    <input v-model="qualificationDraft.certificate_no" :disabled="!actionState.canManageQualifications" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.issuedAt") }}</span>
+                    <input v-model="qualificationDraft.issued_at" :disabled="!actionState.canManageQualifications" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
+                    <input v-model="qualificationDraft.valid_until" :disabled="!actionState.canManageQualifications" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.issuingAuthority") }}</span>
+                    <input v-model="qualificationDraft.issuing_authority" :disabled="!actionState.canManageQualifications" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
+                    <textarea v-model="qualificationDraft.notes" :disabled="!actionState.canManageQualifications" rows="3" />
+                  </label>
+                </div>
+                <label class="employee-admin-checkbox">
+                  <input v-model="qualificationDraft.granted_internally" :disabled="!actionState.canManageQualifications" type="checkbox" />
+                  <span>{{ t("employeeAdmin.fields.grantedInternally") }}</span>
+                </label>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageQualifications">
+                    {{ editingQualificationId ? t("employeeAdmin.actions.saveQualification") : t("employeeAdmin.actions.createQualification") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetQualificationDraft">
+                    {{ t("employeeAdmin.actions.resetQualification") }}
+                  </button>
+                </div>
+              </form>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.qualifications.proofEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.qualifications.proofTitle") }}</h4>
+                </div>
+                <p v-if="selectedQualification" class="field-help">
+                  {{ t("employeeAdmin.qualifications.proofLead") }}: {{ selectedQualification.qualification_type?.label || selectedQualification.function_type?.label || selectedQualification.id }}
+                </p>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.qualifications.proofEmpty") }}</p>
+                <div v-if="selectedQualificationProofs.length" class="employee-admin-record-list">
+                  <article v-for="proof in selectedQualificationProofs" :key="`${proof.document_id}-${proof.current_version_no || 0}`" class="employee-admin-record employee-admin-record--static">
+                    <div class="employee-admin-record__body">
+                      <strong>{{ proof.title }}</strong>
+                      <span class="employee-admin-record__meta">{{ proof.file_name || t("employeeAdmin.summary.none") }} · v{{ proof.current_version_no || 0 }}</span>
+                    </div>
+                    <div class="employee-admin-record__actions">
+                      <button class="cta-button cta-secondary" type="button" :disabled="!proof.current_version_no" @click="downloadDocument(proof)">
+                        {{ t("employeeAdmin.actions.downloadDocument") }}
+                      </button>
+                    </div>
+                  </article>
+                </div>
+                <form v-if="selectedQualification" class="employee-admin-form" @submit.prevent="submitQualificationProof">
+                  <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                    <label class="field-stack">
+                      <span>{{ t("employeeAdmin.fields.documentTitle") }}</span>
+                      <input v-model="qualificationProofDraft.title" :disabled="!actionState.canManageQualifications" />
+                    </label>
+                    <label class="field-stack field-stack--wide">
+                      <span>{{ t("employeeAdmin.fields.proofFile") }}</span>
+                      <input :disabled="!actionState.canManageQualifications" type="file" @change="onQualificationProofSelected" />
+                    </label>
+                  </div>
+                  <div class="cta-row">
+                    <button class="cta-button cta-secondary" type="submit" :disabled="!actionState.canManageQualifications || !pendingQualificationProofFile">
+                      {{ t("employeeAdmin.actions.uploadQualificationProof") }}
+                    </button>
+                  </div>
+                </form>
+              </section>
+            </div>
+          </section>
+
+          <section
+            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'credentials'"
+            class="employee-admin-section employee-admin-tab-panel"
+            data-testid="employee-tab-panel-credentials"
+          >
+            <div class="employee-admin-form employee-admin-form--structured">
+              <section class="employee-admin-editor-intro">
+                <div>
+                  <p class="eyebrow">{{ t("employeeAdmin.credentials.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.credentials.title") }}</h4>
+                </div>
+                <p class="field-help">{{ t("employeeAdmin.credentials.lead") }}</p>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.credentials.registerEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.credentials.registerTitle") }}</h4>
+                </div>
+                <div v-if="employeeCredentials.length" class="employee-admin-record-list">
+                  <article
+                    v-for="credential in employeeCredentials"
+                    :key="credential.id"
+                    class="employee-admin-record"
+                    :class="{ selected: credential.id === editingCredentialId }"
+                  >
+                    <button type="button" class="employee-admin-record__body employee-admin-record__button" @click="editCredential(credential)">
+                      <strong>{{ credential.credential_no }}</strong>
+                      <span class="employee-admin-record__meta">{{ credential.credential_type }} · {{ credential.valid_from }} · {{ credential.valid_until || t("employeeAdmin.summary.none") }}</span>
+                    </button>
+                    <div class="employee-admin-record__actions">
+                      <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageCredentials" @click="issueCredentialBadge(credential)">
+                        {{ t("employeeAdmin.actions.issueCredentialBadge") }}
+                      </button>
+                      <StatusBadge :status="credential.status" />
+                    </div>
+                  </article>
+                </div>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.credentials.empty") }}</p>
+              </section>
+
+              <form class="employee-admin-form-section employee-admin-inline-form" @submit.prevent="submitCredential">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.credentials.editorEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.credentials.editorTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.credentialNo") }}</span>
+                    <input v-model="credentialDraft.credential_no" :disabled="!actionState.canManageCredentials || !!editingCredentialId" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.credentialType") }}</span>
+                    <input v-model="credentialDraft.credential_type" :disabled="!actionState.canManageCredentials || !!editingCredentialId" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.encodedValue") }}</span>
+                    <input v-model="credentialDraft.encoded_value" :disabled="!actionState.canManageCredentials" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validFrom") }}</span>
+                    <input v-model="credentialDraft.valid_from" :disabled="!actionState.canManageCredentials" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
+                    <input v-model="credentialDraft.valid_until" :disabled="!actionState.canManageCredentials" type="date" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
+                    <textarea v-model="credentialDraft.notes" :disabled="!actionState.canManageCredentials" rows="3" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageCredentials">
+                    {{ editingCredentialId ? t("employeeAdmin.actions.saveCredential") : t("employeeAdmin.actions.createCredential") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetCredentialDraft">
+                    {{ t("employeeAdmin.actions.resetCredential") }}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section
+            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'availability'"
+            class="employee-admin-section employee-admin-tab-panel"
+            data-testid="employee-tab-panel-availability"
+          >
+            <div class="employee-admin-form employee-admin-form--structured">
+              <section class="employee-admin-editor-intro">
+                <div>
+                  <p class="eyebrow">{{ t("employeeAdmin.availability.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.availability.title") }}</h4>
+                </div>
+                <p class="field-help">{{ t("employeeAdmin.availability.lead") }}</p>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.availability.registerEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.availability.registerTitle") }}</h4>
+                </div>
+                <div v-if="employeeAvailabilityRules.length" class="employee-admin-record-list">
+                  <button
+                    v-for="rule in employeeAvailabilityRules"
+                    :key="rule.id"
+                    type="button"
+                    class="employee-admin-record"
+                    :class="{ selected: rule.id === editingAvailabilityRuleId }"
+                    @click="editAvailabilityRule(rule)"
+                  >
+                    <div class="employee-admin-record__body">
+                      <strong>{{ rule.rule_kind }}</strong>
+                      <span class="employee-admin-record__meta">{{ toLocalDateTimeInput(rule.starts_at) }} · {{ toLocalDateTimeInput(rule.ends_at) }}</span>
+                    </div>
+                    <StatusBadge :status="rule.status" />
+                  </button>
+                </div>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.availability.empty") }}</p>
+              </section>
+
+              <form class="employee-admin-form-section employee-admin-inline-form" @submit.prevent="submitAvailabilityRule">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.availability.editorEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.availability.editorTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.ruleKind") }}</span>
+                    <input v-model="availabilityDraft.rule_kind" :disabled="!actionState.canManageAvailability" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.startsAt") }}</span>
+                    <input v-model="availabilityDraft.starts_at" :disabled="!actionState.canManageAvailability" type="datetime-local" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.endsAt") }}</span>
+                    <input v-model="availabilityDraft.ends_at" :disabled="!actionState.canManageAvailability" type="datetime-local" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.recurrenceType") }}</span>
+                    <select v-model="availabilityDraft.recurrence_type" :disabled="!actionState.canManageAvailability">
+                      <option v-for="option in availabilityRecurrenceOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                  </label>
+                  <div v-if="availabilityDraft.recurrence_type === 'weekly'" class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.weekdays") }}</span>
+                    <div class="employee-admin-weekday-grid">
+                      <label v-for="option in weekdayOptions" :key="option.value" class="employee-admin-checkbox">
+                        <input
+                          :checked="availabilityDraft.weekday_indexes.includes(option.value)"
+                          :disabled="!actionState.canManageAvailability"
+                          type="checkbox"
+                          @change="toggleAvailabilityWeekday(option.value, ($event.target as HTMLInputElement).checked)"
+                        />
+                        <span>{{ option.label }}</span>
+                      </label>
+                    </div>
+                    <p class="field-help">{{ buildWeekdayMask(availabilityDraft.weekday_indexes) }}</p>
+                  </div>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
+                    <textarea v-model="availabilityDraft.notes" :disabled="!actionState.canManageAvailability" rows="3" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageAvailability">
+                    {{ editingAvailabilityRuleId ? t("employeeAdmin.actions.saveAvailability") : t("employeeAdmin.actions.createAvailability") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetAvailabilityDraft">
+                    {{ t("employeeAdmin.actions.resetAvailability") }}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section
+            v-if="selectedEmployee && !isCreatingEmployee && canReadPrivate && activeDetailTab === 'absences'"
+            class="employee-admin-section employee-admin-tab-panel"
+            data-testid="employee-tab-panel-absences"
+          >
+            <div class="employee-admin-form employee-admin-form--structured">
+              <section class="employee-admin-editor-intro">
+                <div>
+                  <p class="eyebrow">{{ t("employeeAdmin.absences.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.absences.title") }}</h4>
+                </div>
+                <p class="field-help">{{ t("employeeAdmin.absences.lead") }}</p>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.absences.registerEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.absences.registerTitle") }}</h4>
+                </div>
+                <div v-if="employeeAbsences.length" class="employee-admin-record-list">
+                  <button
+                    v-for="absence in employeeAbsences"
+                    :key="absence.id"
+                    type="button"
+                    class="employee-admin-record"
+                    :class="{ selected: absence.id === editingAbsenceId }"
+                    @click="editAbsence(absence)"
+                  >
+                    <div class="employee-admin-record__body">
+                      <strong>{{ absence.absence_type }}</strong>
+                      <span class="employee-admin-record__meta">{{ absence.starts_on }} · {{ absence.ends_on }} · {{ absence.quantity_days }}</span>
+                    </div>
+                    <StatusBadge :status="absence.status" />
+                  </button>
+                </div>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.absences.empty") }}</p>
+              </section>
+
+              <form class="employee-admin-form-section employee-admin-inline-form" @submit.prevent="submitAbsence">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.absences.editorEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.absences.editorTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.absenceType") }}</span>
+                    <input v-model="absenceDraft.absence_type" :disabled="!actionState.canManageAbsences" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.startsOn") }}</span>
+                    <input v-model="absenceDraft.starts_on" :disabled="!actionState.canManageAbsences" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.endsOn") }}</span>
+                    <input v-model="absenceDraft.ends_on" :disabled="!actionState.canManageAbsences" type="date" />
+                  </label>
+                  <label v-if="editingAbsenceId" class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.decisionNote") }}</span>
+                    <input v-model="absenceDraft.decision_note" :disabled="!actionState.canManageAbsences" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
+                    <textarea v-model="absenceDraft.notes" :disabled="!actionState.canManageAbsences" rows="3" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageAbsences">
+                    {{ editingAbsenceId ? t("employeeAdmin.actions.saveAbsence") : t("employeeAdmin.actions.createAbsence") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetAbsenceDraft">
+                    {{ t("employeeAdmin.actions.resetAbsence") }}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section
             v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'notes'"
             class="employee-admin-section employee-admin-tab-panel"
             data-testid="employee-tab-panel-notes"
@@ -1203,12 +1608,16 @@ import { listBranches, listMandates, type BranchRead, type MandateRead } from "@
 import {
   addEmployeeDocumentVersion,
   attachEmployeeAccessUser,
+  createEmployeeAbsence,
   createEmployeeAccessUser,
   createEmployeeAddress,
+  createEmployeeAvailabilityRule,
+  createEmployeeCredential,
   createEmployee,
   createEmployeeGroup,
   createEmployeeGroupMembership,
   createEmployeeNote,
+  createEmployeeQualification,
   detachEmployeeAccessUser,
   downloadEmployeeDocument,
   EmployeeAdminApiError,
@@ -1219,21 +1628,51 @@ import {
   getEmployeePhoto,
   importEmployeesDryRun,
   importEmployeesExecute,
+  issueEmployeeCredentialBadgeOutput,
   linkEmployeeDocument,
+  listEmployeeAbsences,
   listEmployeeAddresses,
+  listEmployeeAvailabilityRules,
+  listEmployeeCredentials,
   listEmployeeDocuments,
   listEmployeeGroups,
   listEmployeeNotes,
+  listEmployeeQualificationProofs,
+  listEmployeeQualifications,
   listEmployees,
+  listFunctionTypes,
+  listQualificationTypes,
+  type EmployeeAbsenceCreatePayload,
+  type EmployeeAbsenceRead,
+  type EmployeeAbsenceUpdatePayload,
   reconcileEmployeeAccessUser,
   resetEmployeeAccessUserPassword,
+  type EmployeeAvailabilityRuleCreatePayload,
+  type EmployeeAvailabilityRuleRead,
+  type EmployeeAvailabilityRuleUpdatePayload,
+  type EmployeeCredentialBadgeIssuePayload,
+  type EmployeeCredentialCreatePayload,
+  type EmployeeCredentialRead,
+  type EmployeeCredentialUpdatePayload,
+  type EmployeeQualificationCreatePayload,
+  type EmployeeQualificationProofRead,
+  type EmployeeQualificationProofUploadPayload,
+  type EmployeeQualificationRead,
+  type EmployeeQualificationUpdatePayload,
+  type FunctionTypeRead,
   updateEmployee,
   updateEmployeeAddress,
   updateEmployeeAccessUser,
+  updateEmployeeAbsence,
+  updateEmployeeAvailabilityRule,
+  updateEmployeeCredential,
   updateEmployeeGroup,
   updateEmployeeGroupMembership,
   updateEmployeeNote,
+  updateEmployeeQualification,
   uploadEmployeePhoto,
+  uploadEmployeeQualificationProof,
+  type QualificationTypeRead,
   type EmployeeAccessLinkRead,
   type EmployeeAccessResetPasswordRequest,
   type EmployeeAccessUpdateUserRequest,
@@ -1264,14 +1703,26 @@ import StatusBadge from "@/components/StatusBadge.vue";
 import { useI18n } from "@/i18n";
 import {
   buildEmployeeImportTemplateRows,
+  buildEmployeeAbsencePayload,
+  buildEmployeeAvailabilityPayload,
+  buildEmployeeCredentialPayload,
   buildEmployeeOperationalPayload,
   buildEmployeePrivateProfilePayload,
+  buildEmployeeQualificationPayload,
+  buildWeekdayMask,
   deriveEmployeeActionState,
   filterMandatesForBranch,
   formatEmployeeStructureLabel,
   mapEmployeeApiMessage,
+  normalizeOptionalText,
+  parseWeekdayMask,
   summarizeCurrentAddress,
+  toLocalDateTimeInput,
+  validateEmployeeAbsenceDraft,
   validateEmployeeAddressDraft,
+  validateEmployeeAvailabilityDraft,
+  validateEmployeeCredentialDraft,
+  validateEmployeeQualificationDraft,
 } from "@/features/employees/employeeAdmin.helpers.js";
 import { useAuthStore } from "@/stores/auth";
 
@@ -1365,6 +1816,48 @@ const addressDraft = reactive({
   notes: "",
 });
 
+const qualificationDraft = reactive({
+  record_kind: "qualification",
+  function_type_id: "",
+  qualification_type_id: "",
+  certificate_no: "",
+  issued_at: "",
+  valid_until: "",
+  issuing_authority: "",
+  granted_internally: false,
+  notes: "",
+});
+
+const qualificationProofDraft = reactive({
+  title: "",
+});
+
+const credentialDraft = reactive({
+  credential_no: "",
+  credential_type: "",
+  encoded_value: "",
+  valid_from: "",
+  valid_until: "",
+  notes: "",
+});
+
+const availabilityDraft = reactive({
+  rule_kind: "",
+  starts_at: "",
+  ends_at: "",
+  recurrence_type: "none",
+  weekday_indexes: [] as number[],
+  notes: "",
+});
+
+const absenceDraft = reactive({
+  absence_type: "",
+  starts_on: "",
+  ends_on: "",
+  decision_note: "",
+  notes: "",
+});
+
 const importDraft = reactive({
   csv_text: buildEmployeeImportTemplateRows(),
   continue_on_error: true,
@@ -1404,7 +1897,14 @@ const selectedPrivateProfile = ref<EmployeePrivateProfileRead | null>(null);
 const employeeAddresses = ref<EmployeeAddressHistoryRead[]>([]);
 const employeeNotes = ref<EmployeeNoteRead[]>([]);
 const employeeGroups = ref<EmployeeGroupRead[]>([]);
+const employeeQualifications = ref<EmployeeQualificationRead[]>([]);
+const employeeCredentials = ref<EmployeeCredentialRead[]>([]);
+const employeeAvailabilityRules = ref<EmployeeAvailabilityRuleRead[]>([]);
+const employeeAbsences = ref<EmployeeAbsenceRead[]>([]);
 const employeeDocuments = ref<EmployeeDocumentListItemRead[]>([]);
+const functionTypes = ref<FunctionTypeRead[]>([]);
+const qualificationTypes = ref<QualificationTypeRead[]>([]);
+const qualificationProofsById = reactive<Record<string, EmployeeQualificationProofRead[]>>({});
 const currentPhoto = ref<EmployeePhotoRead | null>(null);
 const accessLink = ref<EmployeeAccessLinkRead | null>(null);
 const importDryRunResult = ref<EmployeeImportDryRunResult | null>(null);
@@ -1422,7 +1922,12 @@ const editingNoteId = ref("");
 const editingGroupId = ref("");
 const editingMembershipId = ref("");
 const editingAddressId = ref("");
+const editingQualificationId = ref("");
+const editingCredentialId = ref("");
+const editingAvailabilityRuleId = ref("");
+const editingAbsenceId = ref("");
 const selectedEmployeeDocumentId = ref("");
+const pendingQualificationProofFile = ref<File | null>(null);
 
 const documentUploadDraft = reactive({
   title: "",
@@ -1466,6 +1971,39 @@ const currentEmployeeAddress = computed(
 const selectedEmployeeDocument = computed(
   () => employeeDocuments.value.find((document) => document.document_id === selectedEmployeeDocumentId.value) ?? null,
 );
+const selectedQualification = computed(
+  () => employeeQualifications.value.find((qualification) => qualification.id === editingQualificationId.value) ?? null,
+);
+const selectedQualificationProofs = computed(() =>
+  editingQualificationId.value ? (qualificationProofsById[editingQualificationId.value] ?? []) : [],
+);
+const employeeFunctionTypeOptions = computed(() =>
+  functionTypes.value
+    .filter((row) => row.archived_at == null && row.is_active)
+    .map((row) => ({ value: row.id, label: `${row.code} · ${row.label}` })),
+);
+const employeeQualificationTypeOptions = computed(() =>
+  qualificationTypes.value
+    .filter((row) => row.archived_at == null && row.is_active)
+    .map((row) => ({ value: row.id, label: `${row.code} · ${row.label}` })),
+);
+const readinessRecordKindOptions = computed(() => [
+  { value: "qualification", label: t("employeeAdmin.readiness.recordKindQualification") },
+  { value: "function", label: t("employeeAdmin.readiness.recordKindFunction") },
+]);
+const availabilityRecurrenceOptions = computed(() => [
+  { value: "none", label: t("employeeAdmin.readiness.recurrenceNone") },
+  { value: "weekly", label: t("employeeAdmin.readiness.recurrenceWeekly") },
+]);
+const weekdayOptions = computed(() => [
+  { value: 0, label: t("employeeAdmin.readiness.weekdayMon") },
+  { value: 1, label: t("employeeAdmin.readiness.weekdayTue") },
+  { value: 2, label: t("employeeAdmin.readiness.weekdayWed") },
+  { value: 3, label: t("employeeAdmin.readiness.weekdayThu") },
+  { value: 4, label: t("employeeAdmin.readiness.weekdayFri") },
+  { value: 5, label: t("employeeAdmin.readiness.weekdaySat") },
+  { value: 6, label: t("employeeAdmin.readiness.weekdaySun") },
+]);
 const employmentTypeOptions = computed(() => [
   { value: "full_time", label: t("employeeAdmin.employmentType.full_time") },
   { value: "part_time", label: t("employeeAdmin.employmentType.part_time") },
@@ -1501,14 +2039,18 @@ const employeeDetailTabs = computed(() => {
     { id: "overview", label: t("employeeAdmin.tabs.overview") },
     { id: "app_access", label: t("employeeAdmin.tabs.appAccess") },
     { id: "profile_photo", label: t("employeeAdmin.tabs.profilePhoto") },
+    { id: "qualifications", label: t("employeeAdmin.tabs.qualifications") },
+    { id: "credentials", label: t("employeeAdmin.tabs.credentials") },
+    { id: "availability", label: t("employeeAdmin.tabs.availability") },
     { id: "notes", label: t("employeeAdmin.tabs.notes") },
     { id: "groups", label: t("employeeAdmin.tabs.groups") },
     { id: "documents", label: t("employeeAdmin.tabs.documents") },
   ];
 
   if (canReadPrivate.value) {
-    tabs.splice(5, 0, { id: "private_profile", label: t("employeeAdmin.tabs.privateProfile") });
-    tabs.splice(6, 0, { id: "addresses", label: t("employeeAdmin.tabs.addresses") });
+    tabs.splice(6, 0, { id: "private_profile", label: t("employeeAdmin.tabs.privateProfile") });
+    tabs.splice(7, 0, { id: "addresses", label: t("employeeAdmin.tabs.addresses") });
+    tabs.splice(8, 0, { id: "absences", label: t("employeeAdmin.tabs.absences") });
   }
 
   return isCreatingEmployee.value ? tabs.filter((tab) => tab.id === "overview") : tabs;
@@ -1722,6 +2264,50 @@ function resetAddressDraft() {
   editingAddressId.value = "";
 }
 
+function resetQualificationDraft() {
+  qualificationDraft.record_kind = "qualification";
+  qualificationDraft.function_type_id = "";
+  qualificationDraft.qualification_type_id = "";
+  qualificationDraft.certificate_no = "";
+  qualificationDraft.issued_at = "";
+  qualificationDraft.valid_until = "";
+  qualificationDraft.issuing_authority = "";
+  qualificationDraft.granted_internally = false;
+  qualificationDraft.notes = "";
+  qualificationProofDraft.title = "";
+  editingQualificationId.value = "";
+  pendingQualificationProofFile.value = null;
+}
+
+function resetCredentialDraft() {
+  credentialDraft.credential_no = "";
+  credentialDraft.credential_type = "";
+  credentialDraft.encoded_value = "";
+  credentialDraft.valid_from = "";
+  credentialDraft.valid_until = "";
+  credentialDraft.notes = "";
+  editingCredentialId.value = "";
+}
+
+function resetAvailabilityDraft() {
+  availabilityDraft.rule_kind = "";
+  availabilityDraft.starts_at = "";
+  availabilityDraft.ends_at = "";
+  availabilityDraft.recurrence_type = "none";
+  availabilityDraft.weekday_indexes = [];
+  availabilityDraft.notes = "";
+  editingAvailabilityRuleId.value = "";
+}
+
+function resetAbsenceDraft() {
+  absenceDraft.absence_type = "";
+  absenceDraft.starts_on = "";
+  absenceDraft.ends_on = "";
+  absenceDraft.decision_note = "";
+  absenceDraft.notes = "";
+  editingAbsenceId.value = "";
+}
+
 function resetEmployeeDocumentDrafts() {
   documentUploadDraft.title = "";
   documentUploadDraft.relation_type = "employee_document";
@@ -1733,6 +2319,50 @@ function resetEmployeeDocumentDrafts() {
   selectedEmployeeDocumentId.value = "";
   pendingEmployeeDocumentFile.value = null;
   pendingEmployeeDocumentVersionFile.value = null;
+}
+
+function editQualification(qualification: EmployeeQualificationRead) {
+  editingQualificationId.value = qualification.id;
+  qualificationDraft.record_kind = qualification.record_kind || "qualification";
+  qualificationDraft.function_type_id = qualification.function_type_id || "";
+  qualificationDraft.qualification_type_id = qualification.qualification_type_id || "";
+  qualificationDraft.certificate_no = qualification.certificate_no || "";
+  qualificationDraft.issued_at = qualification.issued_at || "";
+  qualificationDraft.valid_until = qualification.valid_until || "";
+  qualificationDraft.issuing_authority = qualification.issuing_authority || "";
+  qualificationDraft.granted_internally = qualification.granted_internally;
+  qualificationDraft.notes = qualification.notes || "";
+  qualificationProofDraft.title = "";
+  void loadQualificationProofs(qualification.id);
+}
+
+function editCredential(credential: EmployeeCredentialRead) {
+  editingCredentialId.value = credential.id;
+  credentialDraft.credential_no = credential.credential_no;
+  credentialDraft.credential_type = credential.credential_type;
+  credentialDraft.encoded_value = credential.encoded_value;
+  credentialDraft.valid_from = credential.valid_from;
+  credentialDraft.valid_until = credential.valid_until || "";
+  credentialDraft.notes = credential.notes || "";
+}
+
+function editAvailabilityRule(rule: EmployeeAvailabilityRuleRead) {
+  editingAvailabilityRuleId.value = rule.id;
+  availabilityDraft.rule_kind = rule.rule_kind;
+  availabilityDraft.starts_at = toLocalDateTimeInput(rule.starts_at);
+  availabilityDraft.ends_at = toLocalDateTimeInput(rule.ends_at);
+  availabilityDraft.recurrence_type = rule.recurrence_type || "none";
+  availabilityDraft.weekday_indexes = parseWeekdayMask(rule.weekday_mask);
+  availabilityDraft.notes = rule.notes || "";
+}
+
+function editAbsence(absence: EmployeeAbsenceRead) {
+  editingAbsenceId.value = absence.id;
+  absenceDraft.absence_type = absence.absence_type;
+  absenceDraft.starts_on = absence.starts_on;
+  absenceDraft.ends_on = absence.ends_on;
+  absenceDraft.decision_note = absence.decision_note || "";
+  absenceDraft.notes = absence.notes || "";
 }
 
 function useEmployeeDocumentForVersion(document: EmployeeDocumentListItemRead) {
@@ -1806,6 +2436,10 @@ function startCreateEmployee() {
   selectedPrivateProfile.value = null;
   employeeAddresses.value = [];
   employeeNotes.value = [];
+  employeeQualifications.value = [];
+  employeeCredentials.value = [];
+  employeeAvailabilityRules.value = [];
+  employeeAbsences.value = [];
   employeeDocuments.value = [];
   currentPhoto.value = null;
   accessLink.value = null;
@@ -1816,6 +2450,10 @@ function startCreateEmployee() {
   resetNoteDraft();
   resetMembershipDraft();
   resetAddressDraft();
+  resetQualificationDraft();
+  resetCredentialDraft();
+  resetAvailabilityDraft();
+  resetAbsenceDraft();
   resetAccessDrafts();
 }
 
@@ -1873,6 +2511,14 @@ async function refreshEmployees() {
   } catch {
     employeeGroups.value = [];
     catalogRefreshFailed = true;
+  }
+
+  try {
+    await loadEmployeeReadinessCatalogs();
+  } catch {
+    functionTypes.value = [];
+    qualificationTypes.value = [];
+    catalogRefreshFailed = true;
   } finally {
     loading.list = false;
   }
@@ -1890,6 +2536,31 @@ async function listSupplementalGroups() {
   employeeGroups.value = await listEmployeeGroups(resolvedTenantScopeId.value, authStore.accessToken);
 }
 
+async function loadEmployeeReadinessCatalogs() {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !canRead.value) {
+    functionTypes.value = [];
+    qualificationTypes.value = [];
+    return;
+  }
+  const [functionTypeRows, qualificationTypeRows] = await Promise.all([
+    listFunctionTypes(resolvedTenantScopeId.value, authStore.accessToken),
+    listQualificationTypes(resolvedTenantScopeId.value, authStore.accessToken),
+  ]);
+  functionTypes.value = functionTypeRows;
+  qualificationTypes.value = qualificationTypeRows;
+}
+
+async function loadQualificationProofs(qualificationId: string) {
+  if (!qualificationId || !resolvedTenantScopeId.value || !authStore.accessToken) {
+    return;
+  }
+  qualificationProofsById[qualificationId] = await listEmployeeQualificationProofs(
+    resolvedTenantScopeId.value,
+    qualificationId,
+    authStore.accessToken,
+  );
+}
+
 async function selectEmployee(employeeId: string) {
   if (!resolvedTenantScopeId.value || !authStore.accessToken) {
     return;
@@ -1899,15 +2570,34 @@ async function selectEmployee(employeeId: string) {
   selectedEmployeeId.value = employeeId;
   loading.detail = true;
   try {
-    const [employee, notes, documents, photo] = await Promise.all([
+    const [
+      employee,
+      notes,
+      documents,
+      photo,
+      qualifications,
+      credentials,
+      availabilityRules,
+      absencesOrNull,
+    ] = await Promise.all([
       getEmployee(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
       listEmployeeNotes(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
       listEmployeeDocuments(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
       getEmployeePhoto(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
+      listEmployeeQualifications(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
+      listEmployeeCredentials(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
+      listEmployeeAvailabilityRules(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
+      canReadPrivate.value
+        ? listEmployeeAbsences(resolvedTenantScopeId.value, employeeId, authStore.accessToken)
+        : Promise.resolve(null),
     ]);
     selectedEmployee.value = employee;
     employeeNotes.value = notes;
     employeeDocuments.value = documents;
+    employeeQualifications.value = qualifications;
+    employeeCredentials.value = credentials;
+    employeeAvailabilityRules.value = availabilityRules;
+    employeeAbsences.value = absencesOrNull ?? [];
     currentPhoto.value = photo;
     accessLink.value = actionState.value.canManageAccess
       ? await getEmployeeAccessLink(resolvedTenantScopeId.value, employeeId, authStore.accessToken)
@@ -1916,6 +2606,10 @@ async function selectEmployee(employeeId: string) {
     resetNoteDraft();
     resetMembershipDraft();
     resetAddressDraft();
+    resetQualificationDraft();
+    resetCredentialDraft();
+    resetAvailabilityDraft();
+    resetAbsenceDraft();
     resetEmployeeDocumentDrafts();
     syncPrivateProfileDraft(null);
     resetAccessDrafts();
@@ -1934,6 +2628,11 @@ async function selectEmployee(employeeId: string) {
     } else {
       employeeAddresses.value = [];
       syncPrivateProfileDraft(null);
+    }
+    Object.keys(qualificationProofsById).forEach((key) => delete qualificationProofsById[key]);
+    const [firstQualification] = qualifications;
+    if (firstQualification) {
+      await loadQualificationProofs(firstQualification.id);
     }
     await refreshPhotoPreview();
   } catch (error) {
@@ -2223,9 +2922,242 @@ async function submitAddress() {
   }
 }
 
+async function submitQualification() {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !selectedEmployeeId.value) {
+    return;
+  }
+
+  const validationKey = validateEmployeeQualificationDraft(qualificationDraft);
+  if (validationKey) {
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(validationKey as never));
+    return;
+  }
+
+  loading.action = true;
+  try {
+    const payload = buildEmployeeQualificationPayload(qualificationDraft, {
+      tenantId: resolvedTenantScopeId.value,
+      employeeId: selectedEmployeeId.value,
+    }) as EmployeeQualificationCreatePayload;
+    if (editingQualificationId.value) {
+      const existing = employeeQualifications.value.find((row) => row.id === editingQualificationId.value);
+      await updateEmployeeQualification(resolvedTenantScopeId.value, editingQualificationId.value, authStore.accessToken, {
+        function_type_id: payload.function_type_id,
+        qualification_type_id: payload.qualification_type_id,
+        certificate_no: payload.certificate_no,
+        issued_at: payload.issued_at,
+        valid_until: payload.valid_until,
+        issuing_authority: payload.issuing_authority,
+        granted_internally: payload.granted_internally,
+        notes: payload.notes,
+        version_no: existing?.version_no ?? 1,
+      } as EmployeeQualificationUpdatePayload);
+    } else {
+      await createEmployeeQualification(resolvedTenantScopeId.value, authStore.accessToken, payload);
+    }
+    await selectEmployee(selectedEmployeeId.value);
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.qualificationSaved"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
+async function submitQualificationProof() {
+  if (!editingQualificationId.value || !pendingQualificationProofFile.value || !resolvedTenantScopeId.value || !authStore.accessToken) {
+    return;
+  }
+
+  loading.action = true;
+  try {
+    const payload: EmployeeQualificationProofUploadPayload = {
+      title: normalizeOptionalText(qualificationProofDraft.title),
+      file_name: pendingQualificationProofFile.value.name,
+      content_type: pendingQualificationProofFile.value.type || "application/octet-stream",
+      content_base64: await fileToBase64(pendingQualificationProofFile.value),
+    };
+    await uploadEmployeeQualificationProof(
+      resolvedTenantScopeId.value,
+      editingQualificationId.value,
+      authStore.accessToken,
+      payload,
+    );
+    pendingQualificationProofFile.value = null;
+    qualificationProofDraft.title = "";
+    await loadQualificationProofs(editingQualificationId.value);
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.qualificationProofSaved"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
+async function submitCredential() {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !selectedEmployeeId.value) {
+    return;
+  }
+
+  const validationKey = validateEmployeeCredentialDraft(credentialDraft);
+  if (validationKey) {
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(validationKey as never));
+    return;
+  }
+
+  loading.action = true;
+  try {
+    const payload = buildEmployeeCredentialPayload(credentialDraft, {
+      tenantId: resolvedTenantScopeId.value,
+      employeeId: selectedEmployeeId.value,
+    }) as EmployeeCredentialCreatePayload;
+    if (editingCredentialId.value) {
+      const existing = employeeCredentials.value.find((row) => row.id === editingCredentialId.value);
+      await updateEmployeeCredential(resolvedTenantScopeId.value, editingCredentialId.value, authStore.accessToken, {
+        encoded_value: payload.encoded_value,
+        valid_from: payload.valid_from,
+        valid_until: payload.valid_until,
+        notes: payload.notes,
+        version_no: existing?.version_no ?? 1,
+      } as EmployeeCredentialUpdatePayload);
+    } else {
+      await createEmployeeCredential(resolvedTenantScopeId.value, authStore.accessToken, payload);
+    }
+    await selectEmployee(selectedEmployeeId.value);
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.credentialSaved"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
+async function issueCredentialBadge(credential: EmployeeCredentialRead) {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken) {
+    return;
+  }
+  loading.action = true;
+  try {
+    await issueEmployeeCredentialBadgeOutput(
+      resolvedTenantScopeId.value,
+      credential.id,
+      authStore.accessToken,
+      { title: `${credential.credential_no}-badge` } as EmployeeCredentialBadgeIssuePayload,
+    );
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.credentialBadgeIssued"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
+async function submitAvailabilityRule() {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !selectedEmployeeId.value) {
+    return;
+  }
+
+  const validationKey = validateEmployeeAvailabilityDraft(availabilityDraft);
+  if (validationKey) {
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(validationKey as never));
+    return;
+  }
+
+  loading.action = true;
+  try {
+    const payload = buildEmployeeAvailabilityPayload(availabilityDraft, {
+      tenantId: resolvedTenantScopeId.value,
+      employeeId: selectedEmployeeId.value,
+    }) as EmployeeAvailabilityRuleCreatePayload;
+    if (editingAvailabilityRuleId.value) {
+      const existing = employeeAvailabilityRules.value.find((row) => row.id === editingAvailabilityRuleId.value);
+      await updateEmployeeAvailabilityRule(
+        resolvedTenantScopeId.value,
+        editingAvailabilityRuleId.value,
+        authStore.accessToken,
+        {
+          rule_kind: payload.rule_kind,
+          starts_at: payload.starts_at,
+          ends_at: payload.ends_at,
+          recurrence_type: payload.recurrence_type,
+          weekday_mask: payload.weekday_mask,
+          notes: payload.notes,
+          version_no: existing?.version_no ?? 1,
+        } as EmployeeAvailabilityRuleUpdatePayload,
+      );
+    } else {
+      await createEmployeeAvailabilityRule(resolvedTenantScopeId.value, authStore.accessToken, payload);
+    }
+    await selectEmployee(selectedEmployeeId.value);
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.availabilitySaved"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
+async function submitAbsence() {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !selectedEmployeeId.value) {
+    return;
+  }
+
+  const validationKey = validateEmployeeAbsenceDraft(absenceDraft);
+  if (validationKey) {
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(validationKey as never));
+    return;
+  }
+
+  loading.action = true;
+  try {
+    const payload = buildEmployeeAbsencePayload(absenceDraft, {
+      tenantId: resolvedTenantScopeId.value,
+      employeeId: selectedEmployeeId.value,
+    }) as EmployeeAbsenceCreatePayload;
+    if (editingAbsenceId.value) {
+      const existing = employeeAbsences.value.find((row) => row.id === editingAbsenceId.value);
+      await updateEmployeeAbsence(resolvedTenantScopeId.value, editingAbsenceId.value, authStore.accessToken, {
+        absence_type: payload.absence_type,
+        starts_on: payload.starts_on,
+        ends_on: payload.ends_on,
+        decision_note: normalizeOptionalText(absenceDraft.decision_note),
+        notes: payload.notes,
+        version_no: existing?.version_no ?? 1,
+      } as EmployeeAbsenceUpdatePayload);
+    } else {
+      await createEmployeeAbsence(resolvedTenantScopeId.value, authStore.accessToken, payload);
+    }
+    await selectEmployee(selectedEmployeeId.value);
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.absenceSaved"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
 function onPhotoSelected(event: Event) {
   const target = event.target as HTMLInputElement;
   pendingPhotoFile.value = target.files?.[0] ?? null;
+}
+
+function onQualificationProofSelected(event: Event) {
+  const target = event.target as HTMLInputElement;
+  pendingQualificationProofFile.value = target.files?.[0] ?? null;
+}
+
+function toggleAvailabilityWeekday(dayValue: number, checked: boolean) {
+  if (checked) {
+    availabilityDraft.weekday_indexes = Array.from(new Set([...availabilityDraft.weekday_indexes, dayValue])).sort((left, right) => left - right);
+    return;
+  }
+  availabilityDraft.weekday_indexes = availabilityDraft.weekday_indexes.filter((value) => value !== dayValue);
 }
 
 function onEmployeeDocumentSelected(event: Event) {
@@ -2612,6 +3544,26 @@ watch(
 );
 
 watch(
+  () => qualificationDraft.record_kind,
+  (recordKind) => {
+    if (recordKind === "function") {
+      qualificationDraft.qualification_type_id = "";
+    } else {
+      qualificationDraft.function_type_id = "";
+    }
+  },
+);
+
+watch(
+  () => availabilityDraft.recurrence_type,
+  (recurrenceType) => {
+    if (recurrenceType !== "weekly") {
+      availabilityDraft.weekday_indexes = [];
+    }
+  },
+);
+
+watch(
   () => [
     selectedEmployee.value?.id,
     selectedEmployee.value?.personnel_no,
@@ -2897,6 +3849,15 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
 }
 
+.employee-admin-record__button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
 .employee-admin-record__meta {
   margin: 0;
 }
@@ -3088,6 +4049,12 @@ onBeforeUnmount(() => {
   height: 1rem;
   margin: 0;
   accent-color: var(--sp-color-primary);
+}
+
+.employee-admin-weekday-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
 }
 
 .employee-admin-form-actions {

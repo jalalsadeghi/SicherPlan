@@ -28,6 +28,10 @@ export function deriveEmployeeActionState(role, selectedEmployee) {
     canEdit: canWrite && !!selectedEmployee,
     canManagePrivateProfile: canWrite && canReadPrivate && !!selectedEmployee,
     canManageAddresses: canWrite && canReadPrivate && !!selectedEmployee,
+    canManageAbsences: canWrite && canReadPrivate && !!selectedEmployee,
+    canManageQualifications: canWrite && !!selectedEmployee,
+    canManageCredentials: canWrite && !!selectedEmployee,
+    canManageAvailability: canWrite && !!selectedEmployee,
     canManageNotes: canWrite && !!selectedEmployee,
     canManageGroups: canWrite && !!selectedEmployee,
     canManagePhoto: canWrite && !!selectedEmployee,
@@ -73,6 +77,31 @@ export function mapEmployeeApiMessage(messageKey) {
     "errors.employees.access.not_linked": "employeeAdmin.feedback.accessNotLinked",
     "errors.employees.access.full_name_required": "employeeAdmin.feedback.accessFullNameRequired",
     "errors.employees.access.role_missing": "employeeAdmin.feedback.accessRoleMissing",
+    "errors.employees.function_type.not_found": "employeeAdmin.feedback.functionTypeNotFound",
+    "errors.employees.qualification_type.not_found": "employeeAdmin.feedback.qualificationTypeNotFound",
+    "errors.employees.qualification.not_found": "employeeAdmin.feedback.notFound",
+    "errors.employees.qualification.invalid_record_kind": "employeeAdmin.feedback.invalidQualificationRecordKind",
+    "errors.employees.qualification.record_target_required": "employeeAdmin.feedback.qualificationTargetRequired",
+    "errors.employees.qualification.invalid_window": "employeeAdmin.feedback.qualificationInvalidWindow",
+    "errors.employees.qualification.stale_version": "employeeAdmin.feedback.staleVersion",
+    "errors.employees.availability_rule.not_found": "employeeAdmin.feedback.notFound",
+    "errors.employees.availability_rule.invalid_kind": "employeeAdmin.feedback.invalidAvailabilityKind",
+    "errors.employees.availability_rule.invalid_window": "employeeAdmin.feedback.availabilityInvalidWindow",
+    "errors.employees.availability_rule.invalid_recurrence": "employeeAdmin.feedback.invalidAvailabilityRecurrence",
+    "errors.employees.availability_rule.invalid_recurrence_mask": "employeeAdmin.feedback.invalidAvailabilityWeekdayMask",
+    "errors.employees.availability_rule.stale_version": "employeeAdmin.feedback.staleVersion",
+    "errors.employees.absence.not_found": "employeeAdmin.feedback.notFound",
+    "errors.employees.absence.invalid_type": "employeeAdmin.feedback.invalidAbsenceType",
+    "errors.employees.absence.invalid_window": "employeeAdmin.feedback.absenceInvalidWindow",
+    "errors.employees.absence.overlap": "employeeAdmin.feedback.absenceOverlap",
+    "errors.employees.absence.stale_version": "employeeAdmin.feedback.staleVersion",
+    "errors.employees.credential.not_found": "employeeAdmin.feedback.notFound",
+    "errors.employees.credential.invalid_type": "employeeAdmin.feedback.invalidCredentialType",
+    "errors.employees.credential.invalid_status": "employeeAdmin.feedback.invalidCredentialStatus",
+    "errors.employees.credential.invalid_window": "employeeAdmin.feedback.credentialInvalidWindow",
+    "errors.employees.credential.duplicate_no": "employeeAdmin.feedback.credentialDuplicateNo",
+    "errors.employees.credential.duplicate_encoded_value": "employeeAdmin.feedback.credentialDuplicateEncodedValue",
+    "errors.employees.credential.stale_version": "employeeAdmin.feedback.staleVersion",
   };
 
   return messageMap[messageKey] ?? "employeeAdmin.feedback.error";
@@ -158,6 +187,173 @@ export function buildEmployeePrivateProfilePayload(draft, { tenantId, employeeId
         ? draft.nationality_country_code.trim().toUpperCase()
         : null,
   };
+}
+
+export function normalizeOptionalText(value, { uppercase = false } = {}) {
+  if (value == null) {
+    return null;
+  }
+  const trimmed = typeof value === "string" ? value.trim() : String(value).trim();
+  if (!trimmed) {
+    return null;
+  }
+  return uppercase ? trimmed.toUpperCase() : trimmed;
+}
+
+export function toLocalDateTimeInput(value) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+export function normalizeDateTimeInput(value) {
+  const normalized = normalizeOptionalText(value);
+  if (!normalized) {
+    return null;
+  }
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+export function buildWeekdayMask(selectedWeekdays) {
+  const daySet = new Set((selectedWeekdays ?? []).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value >= 0 && value <= 6));
+  return Array.from({ length: 7 }, (_, index) => (daySet.has(index) ? "1" : "0")).join("");
+}
+
+export function parseWeekdayMask(mask) {
+  if (typeof mask !== "string" || mask.length !== 7) {
+    return [];
+  }
+  return mask
+    .split("")
+    .map((flag, index) => (flag === "1" ? index : null))
+    .filter((value) => value != null);
+}
+
+export function buildEmployeeQualificationPayload(draft, { tenantId, employeeId } = {}) {
+  return {
+    tenant_id: tenantId,
+    employee_id: employeeId,
+    record_kind: normalizeOptionalText(draft?.record_kind) || "qualification",
+    function_type_id: normalizeOptionalText(draft?.function_type_id),
+    qualification_type_id: normalizeOptionalText(draft?.qualification_type_id),
+    certificate_no: normalizeOptionalText(draft?.certificate_no),
+    issued_at: normalizeOptionalText(draft?.issued_at),
+    valid_until: normalizeOptionalText(draft?.valid_until),
+    issuing_authority: normalizeOptionalText(draft?.issuing_authority),
+    granted_internally: Boolean(draft?.granted_internally),
+    notes: normalizeOptionalText(draft?.notes),
+  };
+}
+
+export function validateEmployeeQualificationDraft(draft) {
+  const recordKind = normalizeOptionalText(draft?.record_kind) || "qualification";
+  const validUntil = normalizeOptionalText(draft?.valid_until);
+  const issuedAt = normalizeOptionalText(draft?.issued_at);
+  const hasTarget = recordKind === "function"
+    ? !!normalizeOptionalText(draft?.function_type_id)
+    : !!normalizeOptionalText(draft?.qualification_type_id);
+
+  if (!hasTarget) {
+    return "employeeAdmin.feedback.qualificationTargetRequired";
+  }
+  if (issuedAt && validUntil && validUntil < issuedAt) {
+    return "employeeAdmin.feedback.qualificationInvalidWindow";
+  }
+  return null;
+}
+
+export function buildEmployeeCredentialPayload(draft, { tenantId, employeeId } = {}) {
+  return {
+    tenant_id: tenantId,
+    employee_id: employeeId,
+    credential_no: normalizeOptionalText(draft?.credential_no) || "",
+    credential_type: normalizeOptionalText(draft?.credential_type) || "",
+    encoded_value: normalizeOptionalText(draft?.encoded_value) || "",
+    valid_from: normalizeOptionalText(draft?.valid_from) || "",
+    valid_until: normalizeOptionalText(draft?.valid_until),
+    notes: normalizeOptionalText(draft?.notes),
+  };
+}
+
+export function validateEmployeeCredentialDraft(draft) {
+  const credentialNo = normalizeOptionalText(draft?.credential_no);
+  const credentialType = normalizeOptionalText(draft?.credential_type);
+  const encodedValue = normalizeOptionalText(draft?.encoded_value);
+  const validFrom = normalizeOptionalText(draft?.valid_from);
+  const validUntil = normalizeOptionalText(draft?.valid_until);
+
+  if (!credentialNo || !credentialType || !encodedValue || !validFrom) {
+    return "employeeAdmin.feedback.credentialRequired";
+  }
+  if (validUntil && validUntil < validFrom) {
+    return "employeeAdmin.feedback.credentialInvalidWindow";
+  }
+  return null;
+}
+
+export function buildEmployeeAvailabilityPayload(draft, { tenantId, employeeId } = {}) {
+  const recurrenceType = normalizeOptionalText(draft?.recurrence_type) || "none";
+  return {
+    tenant_id: tenantId,
+    employee_id: employeeId,
+    rule_kind: normalizeOptionalText(draft?.rule_kind) || "",
+    starts_at: normalizeDateTimeInput(draft?.starts_at),
+    ends_at: normalizeDateTimeInput(draft?.ends_at),
+    recurrence_type: recurrenceType,
+    weekday_mask: recurrenceType === "weekly" ? buildWeekdayMask(draft?.weekday_indexes) : null,
+    notes: normalizeOptionalText(draft?.notes),
+  };
+}
+
+export function validateEmployeeAvailabilityDraft(draft) {
+  const ruleKind = normalizeOptionalText(draft?.rule_kind);
+  const startsAt = normalizeDateTimeInput(draft?.starts_at);
+  const endsAt = normalizeDateTimeInput(draft?.ends_at);
+  const recurrenceType = normalizeOptionalText(draft?.recurrence_type) || "none";
+  const weekdayMask = buildWeekdayMask(draft?.weekday_indexes);
+
+  if (!ruleKind) {
+    return "employeeAdmin.feedback.availabilityRuleRequired";
+  }
+  if (!startsAt || !endsAt || endsAt < startsAt) {
+    return "employeeAdmin.feedback.availabilityInvalidWindow";
+  }
+  if (recurrenceType === "weekly" && weekdayMask === "0000000") {
+    return "employeeAdmin.feedback.invalidAvailabilityWeekdayMask";
+  }
+  return null;
+}
+
+export function buildEmployeeAbsencePayload(draft, { tenantId, employeeId } = {}) {
+  return {
+    tenant_id: tenantId,
+    employee_id: employeeId,
+    absence_type: normalizeOptionalText(draft?.absence_type) || "",
+    starts_on: normalizeOptionalText(draft?.starts_on) || "",
+    ends_on: normalizeOptionalText(draft?.ends_on) || "",
+    notes: normalizeOptionalText(draft?.notes),
+  };
+}
+
+export function validateEmployeeAbsenceDraft(draft) {
+  const absenceType = normalizeOptionalText(draft?.absence_type);
+  const startsOn = normalizeOptionalText(draft?.starts_on);
+  const endsOn = normalizeOptionalText(draft?.ends_on);
+
+  if (!absenceType || !startsOn || !endsOn) {
+    return "employeeAdmin.feedback.absenceRequired";
+  }
+  if (endsOn < startsOn) {
+    return "employeeAdmin.feedback.absenceInvalidWindow";
+  }
+  return null;
 }
 
 export function summarizeCurrentAddress(addressRows) {

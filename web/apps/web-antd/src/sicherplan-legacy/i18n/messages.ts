@@ -496,7 +496,11 @@ export type MessageKey =
   | "employeeAdmin.tabs.overview"
   | "employeeAdmin.tabs.appAccess"
   | "employeeAdmin.tabs.profilePhoto"
+  | "employeeAdmin.tabs.qualifications"
+  | "employeeAdmin.tabs.credentials"
+  | "employeeAdmin.tabs.availability"
   | "employeeAdmin.tabs.privateProfile"
+  | "employeeAdmin.tabs.absences"
   | "employeeAdmin.tabs.notes"
   | "employeeAdmin.tabs.groups"
   | "employeeAdmin.tabs.addresses"
@@ -565,6 +569,26 @@ export type MessageKey =
   | "employeeAdmin.fields.validFrom"
   | "employeeAdmin.fields.validUntil"
   | "employeeAdmin.fields.membershipNotes"
+  | "employeeAdmin.fields.recordKind"
+  | "employeeAdmin.fields.functionType"
+  | "employeeAdmin.fields.qualificationType"
+  | "employeeAdmin.fields.certificateNo"
+  | "employeeAdmin.fields.issuedAt"
+  | "employeeAdmin.fields.issuingAuthority"
+  | "employeeAdmin.fields.grantedInternally"
+  | "employeeAdmin.fields.proofFile"
+  | "employeeAdmin.fields.credentialNo"
+  | "employeeAdmin.fields.credentialType"
+  | "employeeAdmin.fields.encodedValue"
+  | "employeeAdmin.fields.ruleKind"
+  | "employeeAdmin.fields.startsAt"
+  | "employeeAdmin.fields.endsAt"
+  | "employeeAdmin.fields.recurrenceType"
+  | "employeeAdmin.fields.weekdays"
+  | "employeeAdmin.fields.absenceType"
+  | "employeeAdmin.fields.startsOn"
+  | "employeeAdmin.fields.endsOn"
+  | "employeeAdmin.fields.decisionNote"
   | "employeeAdmin.summary.branch"
   | "employeeAdmin.summary.mandate"
   | "employeeAdmin.summary.currentAddress"
@@ -627,6 +651,44 @@ export type MessageKey =
   | "employeeAdmin.addresses.typeMailing"
   | "employeeAdmin.addresses.currentBadge"
   | "employeeAdmin.addresses.closedBadge"
+  | "employeeAdmin.qualifications.eyebrow"
+  | "employeeAdmin.qualifications.title"
+  | "employeeAdmin.qualifications.lead"
+  | "employeeAdmin.qualifications.registerEyebrow"
+  | "employeeAdmin.qualifications.registerTitle"
+  | "employeeAdmin.qualifications.empty"
+  | "employeeAdmin.qualifications.editorEyebrow"
+  | "employeeAdmin.qualifications.editorTitle"
+  | "employeeAdmin.qualifications.proofEyebrow"
+  | "employeeAdmin.qualifications.proofTitle"
+  | "employeeAdmin.qualifications.proofLead"
+  | "employeeAdmin.qualifications.proofEmpty"
+  | "employeeAdmin.qualifications.functionTypePlaceholder"
+  | "employeeAdmin.qualifications.qualificationTypePlaceholder"
+  | "employeeAdmin.credentials.eyebrow"
+  | "employeeAdmin.credentials.title"
+  | "employeeAdmin.credentials.lead"
+  | "employeeAdmin.credentials.registerEyebrow"
+  | "employeeAdmin.credentials.registerTitle"
+  | "employeeAdmin.credentials.empty"
+  | "employeeAdmin.credentials.editorEyebrow"
+  | "employeeAdmin.credentials.editorTitle"
+  | "employeeAdmin.availability.eyebrow"
+  | "employeeAdmin.availability.title"
+  | "employeeAdmin.availability.lead"
+  | "employeeAdmin.availability.registerEyebrow"
+  | "employeeAdmin.availability.registerTitle"
+  | "employeeAdmin.availability.empty"
+  | "employeeAdmin.availability.editorEyebrow"
+  | "employeeAdmin.availability.editorTitle"
+  | "employeeAdmin.absences.eyebrow"
+  | "employeeAdmin.absences.title"
+  | "employeeAdmin.absences.lead"
+  | "employeeAdmin.absences.registerEyebrow"
+  | "employeeAdmin.absences.registerTitle"
+  | "employeeAdmin.absences.empty"
+  | "employeeAdmin.absences.editorEyebrow"
+  | "employeeAdmin.absences.editorTitle"
   | "employeeAdmin.documents.eyebrow"
   | "employeeAdmin.documents.title"
   | "employeeAdmin.documents.lead"
@@ -685,6 +747,20 @@ export type MessageKey =
   | "employeeAdmin.actions.markCurrentAddress"
   | "employeeAdmin.actions.closeAddressValidity"
   | "employeeAdmin.actions.resetAddress"
+  | "employeeAdmin.actions.createQualification"
+  | "employeeAdmin.actions.saveQualification"
+  | "employeeAdmin.actions.resetQualification"
+  | "employeeAdmin.actions.uploadQualificationProof"
+  | "employeeAdmin.actions.createCredential"
+  | "employeeAdmin.actions.saveCredential"
+  | "employeeAdmin.actions.resetCredential"
+  | "employeeAdmin.actions.issueCredentialBadge"
+  | "employeeAdmin.actions.createAvailability"
+  | "employeeAdmin.actions.saveAvailability"
+  | "employeeAdmin.actions.resetAvailability"
+  | "employeeAdmin.actions.createAbsence"
+  | "employeeAdmin.actions.saveAbsence"
+  | "employeeAdmin.actions.resetAbsence"
   | "employeeAdmin.actions.exportEmployees"
   | "employeeAdmin.actions.loadImportFile"
   | "employeeAdmin.actions.resetImportTemplate"
@@ -763,9 +839,29 @@ export type MessageKey =
   | "employeeAdmin.feedback.staleVersion"
   | "employeeAdmin.feedback.invalidTargetWeeklyHours"
   | "employeeAdmin.feedback.invalidTargetMonthlyHours"
+  | "employeeAdmin.feedback.functionTypeNotFound"
+  | "employeeAdmin.feedback.qualificationTypeNotFound"
+  | "employeeAdmin.feedback.invalidQualificationRecordKind"
+  | "employeeAdmin.feedback.qualificationTargetRequired"
+  | "employeeAdmin.feedback.qualificationInvalidWindow"
   | "employeeAdmin.feedback.addressRequired"
   | "employeeAdmin.feedback.addressInvalidWindow"
   | "employeeAdmin.feedback.addressOverlap"
+  | "employeeAdmin.feedback.credentialRequired"
+  | "employeeAdmin.feedback.invalidCredentialType"
+  | "employeeAdmin.feedback.invalidCredentialStatus"
+  | "employeeAdmin.feedback.credentialInvalidWindow"
+  | "employeeAdmin.feedback.credentialDuplicateNo"
+  | "employeeAdmin.feedback.credentialDuplicateEncodedValue"
+  | "employeeAdmin.feedback.availabilityRuleRequired"
+  | "employeeAdmin.feedback.invalidAvailabilityKind"
+  | "employeeAdmin.feedback.invalidAvailabilityRecurrence"
+  | "employeeAdmin.feedback.invalidAvailabilityWeekdayMask"
+  | "employeeAdmin.feedback.availabilityInvalidWindow"
+  | "employeeAdmin.feedback.absenceRequired"
+  | "employeeAdmin.feedback.invalidAbsenceType"
+  | "employeeAdmin.feedback.absenceInvalidWindow"
+  | "employeeAdmin.feedback.absenceOverlap"
   | "employeeAdmin.feedback.reminderDateRequired"
   | "employeeAdmin.feedback.invalidNoteType"
   | "employeeAdmin.feedback.photoUploadFailed"
@@ -779,6 +875,12 @@ export type MessageKey =
   | "employeeAdmin.feedback.accessNotLinked"
   | "employeeAdmin.feedback.accessFullNameRequired"
   | "employeeAdmin.feedback.accessRoleMissing"
+  | "employeeAdmin.feedback.qualificationSaved"
+  | "employeeAdmin.feedback.qualificationProofSaved"
+  | "employeeAdmin.feedback.credentialSaved"
+  | "employeeAdmin.feedback.credentialBadgeIssued"
+  | "employeeAdmin.feedback.availabilitySaved"
+  | "employeeAdmin.feedback.absenceSaved"
   | "employeeAdmin.feedback.employeeSaved"
   | "employeeAdmin.feedback.noteSaved"
   | "employeeAdmin.feedback.groupSaved"
@@ -799,6 +901,17 @@ export type MessageKey =
   | "employeeAdmin.feedback.accessReconciled"
   | "employeeAdmin.feedback.catalogPartial"
   | "employeeAdmin.feedback.error"
+  | "employeeAdmin.readiness.recordKindQualification"
+  | "employeeAdmin.readiness.recordKindFunction"
+  | "employeeAdmin.readiness.recurrenceNone"
+  | "employeeAdmin.readiness.recurrenceWeekly"
+  | "employeeAdmin.readiness.weekdayMon"
+  | "employeeAdmin.readiness.weekdayTue"
+  | "employeeAdmin.readiness.weekdayWed"
+  | "employeeAdmin.readiness.weekdayThu"
+  | "employeeAdmin.readiness.weekdayFri"
+  | "employeeAdmin.readiness.weekdaySat"
+  | "employeeAdmin.readiness.weekdaySun"
   | "api.errors.platform.internal"
   | "coreAdmin.eyebrow"
   | "coreAdmin.breadcrumb"
@@ -2068,7 +2181,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.tabs.overview": "Überblick",
     "employeeAdmin.tabs.appAccess": "App-Zugang",
     "employeeAdmin.tabs.profilePhoto": "Profilfoto",
+    "employeeAdmin.tabs.qualifications": "Qualifikationen",
+    "employeeAdmin.tabs.credentials": "Ausweise",
+    "employeeAdmin.tabs.availability": "Verfügbarkeit",
     "employeeAdmin.tabs.privateProfile": "Privatprofil",
+    "employeeAdmin.tabs.absences": "Abwesenheiten",
     "employeeAdmin.tabs.notes": "Notizen",
     "employeeAdmin.tabs.groups": "Gruppen",
     "employeeAdmin.tabs.addresses": "Adressen",
@@ -2139,6 +2256,26 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.fields.validFrom": "Gültig ab",
     "employeeAdmin.fields.validUntil": "Gültig bis",
     "employeeAdmin.fields.membershipNotes": "Zuordnungsnotiz",
+    "employeeAdmin.fields.recordKind": "Eintragstyp",
+    "employeeAdmin.fields.functionType": "Funktionstyp",
+    "employeeAdmin.fields.qualificationType": "Qualifikationstyp",
+    "employeeAdmin.fields.certificateNo": "Zertifikatsnummer",
+    "employeeAdmin.fields.issuedAt": "Ausgestellt am",
+    "employeeAdmin.fields.issuingAuthority": "Ausstellende Stelle",
+    "employeeAdmin.fields.grantedInternally": "Intern vergeben",
+    "employeeAdmin.fields.proofFile": "Nachweisdatei",
+    "employeeAdmin.fields.credentialNo": "Ausweisnummer",
+    "employeeAdmin.fields.credentialType": "Ausweistyp",
+    "employeeAdmin.fields.encodedValue": "Kodierter Wert",
+    "employeeAdmin.fields.ruleKind": "Regelart",
+    "employeeAdmin.fields.startsAt": "Beginnt am",
+    "employeeAdmin.fields.endsAt": "Endet am",
+    "employeeAdmin.fields.recurrenceType": "Wiederholung",
+    "employeeAdmin.fields.weekdays": "Wochentage",
+    "employeeAdmin.fields.absenceType": "Abwesenheitsart",
+    "employeeAdmin.fields.startsOn": "Beginnt am",
+    "employeeAdmin.fields.endsOn": "Endet am",
+    "employeeAdmin.fields.decisionNote": "Entscheidungsnotiz",
     "employeeAdmin.summary.branch": "Niederlassung",
     "employeeAdmin.summary.mandate": "Mandat",
     "employeeAdmin.summary.currentAddress": "Aktuelle Adresse",
@@ -2201,6 +2338,44 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.addresses.typeMailing": "Postadresse",
     "employeeAdmin.addresses.currentBadge": "Aktuell",
     "employeeAdmin.addresses.closedBadge": "Beendet",
+    "employeeAdmin.qualifications.eyebrow": "Qualifikationen",
+    "employeeAdmin.qualifications.title": "Qualifikationen und Funktionen",
+    "employeeAdmin.qualifications.lead": "Qualifikationen, Funktionsfreigaben und zugehörige Nachweise werden direkt in der Mitarbeitendenakte gepflegt.",
+    "employeeAdmin.qualifications.registerEyebrow": "Register",
+    "employeeAdmin.qualifications.registerTitle": "Bestehende Qualifikationen",
+    "employeeAdmin.qualifications.empty": "Noch keine Qualifikationen oder Funktionsfreigaben vorhanden.",
+    "employeeAdmin.qualifications.editorEyebrow": "Bearbeitung",
+    "employeeAdmin.qualifications.editorTitle": "Qualifikation anlegen oder anpassen",
+    "employeeAdmin.qualifications.proofEyebrow": "Nachweise",
+    "employeeAdmin.qualifications.proofTitle": "Nachweis-Metadaten und Upload",
+    "employeeAdmin.qualifications.proofLead": "Nachweise werden über den zentralen Dokumentendienst versioniert und bleiben an die ausgewählte Qualifikation gebunden",
+    "employeeAdmin.qualifications.proofEmpty": "Wähle zuerst eine Qualifikation aus dem Register aus.",
+    "employeeAdmin.qualifications.functionTypePlaceholder": "Funktionstyp auswählen",
+    "employeeAdmin.qualifications.qualificationTypePlaceholder": "Qualifikationstyp auswählen",
+    "employeeAdmin.credentials.eyebrow": "Ausweise",
+    "employeeAdmin.credentials.title": "Ausweise und Badge-Ausgabe",
+    "employeeAdmin.credentials.lead": "Mitarbeitendenausweise bleiben als eigener Bestand mit Gültigkeit, Kennungswert und Badge-Ausgabe verfügbar.",
+    "employeeAdmin.credentials.registerEyebrow": "Register",
+    "employeeAdmin.credentials.registerTitle": "Bestehende Ausweise",
+    "employeeAdmin.credentials.empty": "Noch keine Ausweise vorhanden.",
+    "employeeAdmin.credentials.editorEyebrow": "Bearbeitung",
+    "employeeAdmin.credentials.editorTitle": "Ausweis anlegen oder aktualisieren",
+    "employeeAdmin.availability.eyebrow": "Verfügbarkeit",
+    "employeeAdmin.availability.title": "Verfügbarkeitsregeln",
+    "employeeAdmin.availability.lead": "Zeitfenster, Wiederholung und Wochentagsmuster bleiben direkt in der Mitarbeitendenakte pflegbar.",
+    "employeeAdmin.availability.registerEyebrow": "Register",
+    "employeeAdmin.availability.registerTitle": "Bestehende Verfügbarkeitsregeln",
+    "employeeAdmin.availability.empty": "Noch keine Verfügbarkeitsregeln vorhanden.",
+    "employeeAdmin.availability.editorEyebrow": "Bearbeitung",
+    "employeeAdmin.availability.editorTitle": "Verfügbarkeitsregel anlegen oder anpassen",
+    "employeeAdmin.absences.eyebrow": "Abwesenheiten",
+    "employeeAdmin.absences.title": "Abwesenheiten und Sperrzeiten",
+    "employeeAdmin.absences.lead": "Abwesenheiten bleiben im privaten Mitarbeitendenbereich und werden hier mit Zeitraum und Notiz gepflegt.",
+    "employeeAdmin.absences.registerEyebrow": "Register",
+    "employeeAdmin.absences.registerTitle": "Bestehende Abwesenheiten",
+    "employeeAdmin.absences.empty": "Noch keine Abwesenheiten vorhanden.",
+    "employeeAdmin.absences.editorEyebrow": "Bearbeitung",
+    "employeeAdmin.absences.editorTitle": "Abwesenheit anlegen oder aktualisieren",
     "employeeAdmin.documents.eyebrow": "Dateien",
     "employeeAdmin.documents.title": "Dokumente und Nachweise",
     "employeeAdmin.documents.lead": "Dokumente und Nachweise bleiben als geordnete Liste mit direktem Download verfügbar.",
@@ -2259,6 +2434,20 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.markCurrentAddress": "Als aktuell markieren",
     "employeeAdmin.actions.closeAddressValidity": "Gültigkeit beenden",
     "employeeAdmin.actions.resetAddress": "Adressformular leeren",
+    "employeeAdmin.actions.createQualification": "Qualifikation anlegen",
+    "employeeAdmin.actions.saveQualification": "Qualifikation speichern",
+    "employeeAdmin.actions.resetQualification": "Qualifikationsformular leeren",
+    "employeeAdmin.actions.uploadQualificationProof": "Nachweis hochladen",
+    "employeeAdmin.actions.createCredential": "Ausweis anlegen",
+    "employeeAdmin.actions.saveCredential": "Ausweis speichern",
+    "employeeAdmin.actions.resetCredential": "Ausweisformular leeren",
+    "employeeAdmin.actions.issueCredentialBadge": "Badge-Ausgabe erzeugen",
+    "employeeAdmin.actions.createAvailability": "Verfügbarkeitsregel anlegen",
+    "employeeAdmin.actions.saveAvailability": "Verfügbarkeitsregel speichern",
+    "employeeAdmin.actions.resetAvailability": "Verfügbarkeitsformular leeren",
+    "employeeAdmin.actions.createAbsence": "Abwesenheit anlegen",
+    "employeeAdmin.actions.saveAbsence": "Abwesenheit speichern",
+    "employeeAdmin.actions.resetAbsence": "Abwesenheitsformular leeren",
     "employeeAdmin.actions.exportEmployees": "Export starten",
     "employeeAdmin.actions.loadImportFile": "CSV laden",
     "employeeAdmin.actions.resetImportTemplate": "Vorlage einsetzen",
@@ -2344,12 +2533,52 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Die Wochen-Sollstunden müssen null oder positiv sein.",
     "employeeAdmin.feedback.invalidTargetMonthlyHours":
       "Die Monats-Sollstunden müssen null oder positiv sein.",
+    "employeeAdmin.feedback.functionTypeNotFound":
+      "Der gewählte Funktionstyp ist im aktuellen Mandanten nicht verfügbar.",
+    "employeeAdmin.feedback.qualificationTypeNotFound":
+      "Der gewählte Qualifikationstyp ist im aktuellen Mandanten nicht verfügbar.",
+    "employeeAdmin.feedback.invalidQualificationRecordKind":
+      "Die Art des Qualifikationseintrags ist ungültig.",
+    "employeeAdmin.feedback.qualificationTargetRequired":
+      "Für den gewählten Eintragstyp muss ein passender Funktions- oder Qualifikationstyp gewählt werden.",
+    "employeeAdmin.feedback.qualificationInvalidWindow":
+      "Gültig-bis darf nicht vor Ausgestellt-am liegen.",
     "employeeAdmin.feedback.addressRequired":
       "Straße, Postleitzahl, Ort, Ländercode und Gültig-ab sind für die Mitarbeitendenadresse erforderlich.",
     "employeeAdmin.feedback.addressInvalidWindow":
       "Gültig-bis darf nicht vor Gültig-ab liegen.",
     "employeeAdmin.feedback.addressOverlap":
       "Die Adresshistorie enthält ein überlappendes Zeitfenster.",
+    "employeeAdmin.feedback.credentialRequired":
+      "Ausweisnummer, Ausweistyp, kodierter Wert und Gültig-ab sind erforderlich.",
+    "employeeAdmin.feedback.invalidCredentialType":
+      "Der gewählte Ausweistyp ist ungültig.",
+    "employeeAdmin.feedback.invalidCredentialStatus":
+      "Der gewählte Ausweisstatus ist ungültig.",
+    "employeeAdmin.feedback.credentialInvalidWindow":
+      "Gültig-bis darf nicht vor Gültig-ab liegen.",
+    "employeeAdmin.feedback.credentialDuplicateNo":
+      "Diese Ausweisnummer ist im Mandanten bereits vergeben.",
+    "employeeAdmin.feedback.credentialDuplicateEncodedValue":
+      "Dieser kodierte Ausweiswert ist im Mandanten bereits vergeben.",
+    "employeeAdmin.feedback.availabilityRuleRequired":
+      "Für die Verfügbarkeitsregel muss eine Regelart angegeben werden.",
+    "employeeAdmin.feedback.invalidAvailabilityKind":
+      "Die Regelart der Verfügbarkeitsregel ist ungültig.",
+    "employeeAdmin.feedback.invalidAvailabilityRecurrence":
+      "Die Wiederholungsart der Verfügbarkeitsregel ist ungültig.",
+    "employeeAdmin.feedback.invalidAvailabilityWeekdayMask":
+      "Für wöchentliche Verfügbarkeitsregeln muss mindestens ein Wochentag gewählt werden.",
+    "employeeAdmin.feedback.availabilityInvalidWindow":
+      "Ende darf nicht vor Beginn der Verfügbarkeitsregel liegen.",
+    "employeeAdmin.feedback.absenceRequired":
+      "Abwesenheitsart, Beginn und Ende sind erforderlich.",
+    "employeeAdmin.feedback.invalidAbsenceType":
+      "Die Abwesenheitsart ist ungültig.",
+    "employeeAdmin.feedback.absenceInvalidWindow":
+      "Das Ende der Abwesenheit darf nicht vor dem Beginn liegen.",
+    "employeeAdmin.feedback.absenceOverlap":
+      "Für diese Mitarbeitendenakte existiert bereits eine überlappende aktive Abwesenheit.",
     "employeeAdmin.feedback.reminderDateRequired":
       "Für Erinnerungen muss ein Erinnerungsdatum gesetzt werden.",
     "employeeAdmin.feedback.invalidNoteType":
@@ -2376,6 +2605,18 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Für den verknüpften App-Zugang ist ein Anzeigename erforderlich.",
     "employeeAdmin.feedback.accessRoleMissing":
       "Die Rolle für Mitarbeitendenzugang fehlt im IAM-Katalog.",
+    "employeeAdmin.feedback.qualificationSaved":
+      "Die Qualifikation wurde gespeichert.",
+    "employeeAdmin.feedback.qualificationProofSaved":
+      "Der Qualifikationsnachweis wurde hochgeladen.",
+    "employeeAdmin.feedback.credentialSaved":
+      "Der Ausweis wurde gespeichert.",
+    "employeeAdmin.feedback.credentialBadgeIssued":
+      "Die Badge-Ausgabe wurde erzeugt.",
+    "employeeAdmin.feedback.availabilitySaved":
+      "Die Verfügbarkeitsregel wurde gespeichert.",
+    "employeeAdmin.feedback.absenceSaved":
+      "Die Abwesenheit wurde gespeichert.",
     "employeeAdmin.feedback.employeeSaved":
       "Die Mitarbeitendenakte wurde gespeichert.",
     "employeeAdmin.feedback.noteSaved":
@@ -2416,6 +2657,17 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Die Mitarbeitendenliste wurde geladen, aber ergänzende Katalogdaten konnten nicht vollständig aktualisiert werden.",
     "employeeAdmin.feedback.error":
       "Die Mitarbeitendenaktion konnte nicht abgeschlossen werden.",
+    "employeeAdmin.readiness.recordKindQualification": "Qualifikation",
+    "employeeAdmin.readiness.recordKindFunction": "Funktion",
+    "employeeAdmin.readiness.recurrenceNone": "Keine Wiederholung",
+    "employeeAdmin.readiness.recurrenceWeekly": "Wöchentlich",
+    "employeeAdmin.readiness.weekdayMon": "Mo",
+    "employeeAdmin.readiness.weekdayTue": "Di",
+    "employeeAdmin.readiness.weekdayWed": "Mi",
+    "employeeAdmin.readiness.weekdayThu": "Do",
+    "employeeAdmin.readiness.weekdayFri": "Fr",
+    "employeeAdmin.readiness.weekdaySat": "Sa",
+    "employeeAdmin.readiness.weekdaySun": "So",
     "api.errors.platform.internal":
       "Es ist ein interner Plattformfehler aufgetreten.",
     "coreAdmin.breadcrumb": "Admin / Kernsystem / Mandantenverwaltung",
@@ -3766,7 +4018,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.tabs.overview": "Overview",
     "employeeAdmin.tabs.appAccess": "App access",
     "employeeAdmin.tabs.profilePhoto": "Profile photo",
+    "employeeAdmin.tabs.qualifications": "Qualifications",
+    "employeeAdmin.tabs.credentials": "Credentials",
+    "employeeAdmin.tabs.availability": "Availability",
     "employeeAdmin.tabs.privateProfile": "Private profile",
+    "employeeAdmin.tabs.absences": "Absences",
     "employeeAdmin.tabs.notes": "Notes",
     "employeeAdmin.tabs.groups": "Groups",
     "employeeAdmin.tabs.addresses": "Addresses",
@@ -3837,6 +4093,26 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.fields.validFrom": "Valid from",
     "employeeAdmin.fields.validUntil": "Valid until",
     "employeeAdmin.fields.membershipNotes": "Assignment notes",
+    "employeeAdmin.fields.recordKind": "Record kind",
+    "employeeAdmin.fields.functionType": "Function type",
+    "employeeAdmin.fields.qualificationType": "Qualification type",
+    "employeeAdmin.fields.certificateNo": "Certificate number",
+    "employeeAdmin.fields.issuedAt": "Issued on",
+    "employeeAdmin.fields.issuingAuthority": "Issuing authority",
+    "employeeAdmin.fields.grantedInternally": "Granted internally",
+    "employeeAdmin.fields.proofFile": "Proof file",
+    "employeeAdmin.fields.credentialNo": "Credential number",
+    "employeeAdmin.fields.credentialType": "Credential type",
+    "employeeAdmin.fields.encodedValue": "Encoded value",
+    "employeeAdmin.fields.ruleKind": "Rule kind",
+    "employeeAdmin.fields.startsAt": "Starts at",
+    "employeeAdmin.fields.endsAt": "Ends at",
+    "employeeAdmin.fields.recurrenceType": "Recurrence",
+    "employeeAdmin.fields.weekdays": "Weekdays",
+    "employeeAdmin.fields.absenceType": "Absence type",
+    "employeeAdmin.fields.startsOn": "Starts on",
+    "employeeAdmin.fields.endsOn": "Ends on",
+    "employeeAdmin.fields.decisionNote": "Decision note",
     "employeeAdmin.summary.branch": "Branch",
     "employeeAdmin.summary.mandate": "Mandate",
     "employeeAdmin.summary.currentAddress": "Current address",
@@ -3899,6 +4175,49 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.addresses.typeMailing": "Mailing address",
     "employeeAdmin.addresses.currentBadge": "Current",
     "employeeAdmin.addresses.closedBadge": "Closed",
+    "employeeAdmin.qualifications.eyebrow": "Qualifications",
+    "employeeAdmin.qualifications.title": "Qualifications and function clearances",
+    "employeeAdmin.qualifications.lead":
+      "Qualifications, function clearances, and supporting proofs stay directly manageable inside the employee file.",
+    "employeeAdmin.qualifications.registerEyebrow": "Register",
+    "employeeAdmin.qualifications.registerTitle": "Existing qualifications",
+    "employeeAdmin.qualifications.empty": "No qualifications or function clearances have been recorded yet.",
+    "employeeAdmin.qualifications.editorEyebrow": "Editor",
+    "employeeAdmin.qualifications.editorTitle": "Create or update qualification",
+    "employeeAdmin.qualifications.proofEyebrow": "Proofs",
+    "employeeAdmin.qualifications.proofTitle": "Proof metadata and upload",
+    "employeeAdmin.qualifications.proofLead":
+      "Proof documents remain versioned in the shared document service and tied to the selected qualification",
+    "employeeAdmin.qualifications.proofEmpty": "Select a qualification from the register first.",
+    "employeeAdmin.qualifications.functionTypePlaceholder": "Select function type",
+    "employeeAdmin.qualifications.qualificationTypePlaceholder": "Select qualification type",
+    "employeeAdmin.credentials.eyebrow": "Credentials",
+    "employeeAdmin.credentials.title": "Credentials and badge output",
+    "employeeAdmin.credentials.lead":
+      "Employee credentials remain available as their own register with validity, encoded value, and badge-output action.",
+    "employeeAdmin.credentials.registerEyebrow": "Register",
+    "employeeAdmin.credentials.registerTitle": "Existing credentials",
+    "employeeAdmin.credentials.empty": "No credentials have been recorded yet.",
+    "employeeAdmin.credentials.editorEyebrow": "Editor",
+    "employeeAdmin.credentials.editorTitle": "Create or update credential",
+    "employeeAdmin.availability.eyebrow": "Availability",
+    "employeeAdmin.availability.title": "Availability rules",
+    "employeeAdmin.availability.lead":
+      "Time windows, recurrence, and weekday patterns remain editable directly inside the employee file.",
+    "employeeAdmin.availability.registerEyebrow": "Register",
+    "employeeAdmin.availability.registerTitle": "Existing availability rules",
+    "employeeAdmin.availability.empty": "No availability rules have been recorded yet.",
+    "employeeAdmin.availability.editorEyebrow": "Editor",
+    "employeeAdmin.availability.editorTitle": "Create or update availability rule",
+    "employeeAdmin.absences.eyebrow": "Absences",
+    "employeeAdmin.absences.title": "Absences and blocked periods",
+    "employeeAdmin.absences.lead":
+      "Absences stay in the private employee scope and are managed here with their date window and notes.",
+    "employeeAdmin.absences.registerEyebrow": "Register",
+    "employeeAdmin.absences.registerTitle": "Existing absences",
+    "employeeAdmin.absences.empty": "No absences have been recorded yet.",
+    "employeeAdmin.absences.editorEyebrow": "Editor",
+    "employeeAdmin.absences.editorTitle": "Create or update absence",
     "employeeAdmin.documents.eyebrow": "Documents",
     "employeeAdmin.documents.title": "Files and evidence",
     "employeeAdmin.documents.lead": "Files and evidence stay available as an ordered list with direct download access.",
@@ -3957,6 +4276,20 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.markCurrentAddress": "Mark as current",
     "employeeAdmin.actions.closeAddressValidity": "Close validity",
     "employeeAdmin.actions.resetAddress": "Clear address form",
+    "employeeAdmin.actions.createQualification": "Create qualification",
+    "employeeAdmin.actions.saveQualification": "Save qualification",
+    "employeeAdmin.actions.resetQualification": "Clear qualification form",
+    "employeeAdmin.actions.uploadQualificationProof": "Upload proof",
+    "employeeAdmin.actions.createCredential": "Create credential",
+    "employeeAdmin.actions.saveCredential": "Save credential",
+    "employeeAdmin.actions.resetCredential": "Clear credential form",
+    "employeeAdmin.actions.issueCredentialBadge": "Issue badge output",
+    "employeeAdmin.actions.createAvailability": "Create availability rule",
+    "employeeAdmin.actions.saveAvailability": "Save availability rule",
+    "employeeAdmin.actions.resetAvailability": "Clear availability form",
+    "employeeAdmin.actions.createAbsence": "Create absence",
+    "employeeAdmin.actions.saveAbsence": "Save absence",
+    "employeeAdmin.actions.resetAbsence": "Clear absence form",
     "employeeAdmin.actions.exportEmployees": "Run export",
     "employeeAdmin.actions.loadImportFile": "Load CSV",
     "employeeAdmin.actions.resetImportTemplate": "Use template",
@@ -4043,12 +4376,52 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Target weekly hours must be null or positive.",
     "employeeAdmin.feedback.invalidTargetMonthlyHours":
       "Target monthly hours must be null or positive.",
+    "employeeAdmin.feedback.functionTypeNotFound":
+      "The selected function type is not available in this tenant.",
+    "employeeAdmin.feedback.qualificationTypeNotFound":
+      "The selected qualification type is not available in this tenant.",
+    "employeeAdmin.feedback.invalidQualificationRecordKind":
+      "The qualification record kind is invalid.",
+    "employeeAdmin.feedback.qualificationTargetRequired":
+      "The selected record kind requires a matching function type or qualification type.",
+    "employeeAdmin.feedback.qualificationInvalidWindow":
+      "Valid until must not be earlier than issued on.",
     "employeeAdmin.feedback.addressRequired":
       "Street, postal code, city, country code, and valid-from are required for an employee address.",
     "employeeAdmin.feedback.addressInvalidWindow":
       "Valid until may not be earlier than valid from.",
     "employeeAdmin.feedback.addressOverlap":
       "The address history contains an overlapping validity window.",
+    "employeeAdmin.feedback.credentialRequired":
+      "Credential number, credential type, encoded value, and valid-from are required.",
+    "employeeAdmin.feedback.invalidCredentialType":
+      "The selected credential type is invalid.",
+    "employeeAdmin.feedback.invalidCredentialStatus":
+      "The selected credential status is invalid.",
+    "employeeAdmin.feedback.credentialInvalidWindow":
+      "Valid until must not be earlier than valid from.",
+    "employeeAdmin.feedback.credentialDuplicateNo":
+      "This credential number already exists in the tenant.",
+    "employeeAdmin.feedback.credentialDuplicateEncodedValue":
+      "This encoded credential value already exists in the tenant.",
+    "employeeAdmin.feedback.availabilityRuleRequired":
+      "An availability rule kind is required.",
+    "employeeAdmin.feedback.invalidAvailabilityKind":
+      "The selected availability rule kind is invalid.",
+    "employeeAdmin.feedback.invalidAvailabilityRecurrence":
+      "The selected availability recurrence is invalid.",
+    "employeeAdmin.feedback.invalidAvailabilityWeekdayMask":
+      "Weekly availability rules must include at least one weekday.",
+    "employeeAdmin.feedback.availabilityInvalidWindow":
+      "Availability end must not be earlier than availability start.",
+    "employeeAdmin.feedback.absenceRequired":
+      "Absence type, start date, and end date are required.",
+    "employeeAdmin.feedback.invalidAbsenceType":
+      "The selected absence type is invalid.",
+    "employeeAdmin.feedback.absenceInvalidWindow":
+      "Absence end must not be earlier than absence start.",
+    "employeeAdmin.feedback.absenceOverlap":
+      "An overlapping active absence already exists for this employee.",
     "employeeAdmin.feedback.reminderDateRequired":
       "Reminder notes require a reminder date.",
     "employeeAdmin.feedback.invalidNoteType":
@@ -4075,6 +4448,18 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "A full display name is required for the linked app account.",
     "employeeAdmin.feedback.accessRoleMissing":
       "The employee access role is missing from the IAM catalog.",
+    "employeeAdmin.feedback.qualificationSaved":
+      "The qualification was saved.",
+    "employeeAdmin.feedback.qualificationProofSaved":
+      "The qualification proof was uploaded.",
+    "employeeAdmin.feedback.credentialSaved":
+      "The credential was saved.",
+    "employeeAdmin.feedback.credentialBadgeIssued":
+      "The badge output was issued.",
+    "employeeAdmin.feedback.availabilitySaved":
+      "The availability rule was saved.",
+    "employeeAdmin.feedback.absenceSaved":
+      "The absence was saved.",
     "employeeAdmin.feedback.employeeSaved":
       "The employee file was saved.",
     "employeeAdmin.feedback.noteSaved":
@@ -4115,6 +4500,17 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "The employee list loaded, but supplemental catalog data could not be refreshed completely.",
     "employeeAdmin.feedback.error":
       "The employee action could not be completed.",
+    "employeeAdmin.readiness.recordKindQualification": "Qualification",
+    "employeeAdmin.readiness.recordKindFunction": "Function",
+    "employeeAdmin.readiness.recurrenceNone": "No recurrence",
+    "employeeAdmin.readiness.recurrenceWeekly": "Weekly",
+    "employeeAdmin.readiness.weekdayMon": "Mon",
+    "employeeAdmin.readiness.weekdayTue": "Tue",
+    "employeeAdmin.readiness.weekdayWed": "Wed",
+    "employeeAdmin.readiness.weekdayThu": "Thu",
+    "employeeAdmin.readiness.weekdayFri": "Fri",
+    "employeeAdmin.readiness.weekdaySat": "Sat",
+    "employeeAdmin.readiness.weekdaySun": "Sun",
     "api.errors.platform.internal":
       "An internal platform error has occurred.",
     "coreAdmin.breadcrumb": "Admin / Core system / Tenant administration",

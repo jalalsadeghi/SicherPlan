@@ -310,33 +310,6 @@ def update_group_membership(
     return service.update_group_member(str(tenant_id), str(member_id), payload, context)
 
 
-@router.get("/{employee_id}", response_model=EmployeeOperationalRead)
-def get_employee(
-    tenant_id: UUID,
-    employee_id: UUID,
-    context: Annotated[
-        RequestAuthorizationContext,
-        Depends(require_authorization("employees.employee.read", scope="tenant")),
-    ] = None,
-    service: Annotated[EmployeeService, Depends(get_employee_service)] = None,
-) -> EmployeeOperationalRead:
-    return service.get_operational_employee(str(tenant_id), str(employee_id), context)
-
-
-@router.patch("/{employee_id}", response_model=EmployeeOperationalRead)
-def update_employee(
-    tenant_id: UUID,
-    employee_id: UUID,
-    payload: EmployeeOperationalUpdate,
-    context: Annotated[
-        RequestAuthorizationContext,
-        Depends(require_authorization("employees.employee.write", scope="tenant")),
-    ],
-    service: Annotated[EmployeeService, Depends(get_employee_service)],
-) -> EmployeeOperationalRead:
-    return service.update_employee(str(tenant_id), str(employee_id), payload, context)
-
-
 @router.get("/{employee_id}/private-profile", response_model=EmployeePrivateProfileRead)
 def get_private_profile(
     tenant_id: UUID,
@@ -1092,6 +1065,33 @@ def link_employee_qualification_proof(
     service: Annotated[EmployeeQualificationService, Depends(get_employee_qualification_service)],
 ) -> EmployeeQualificationProofRead:
     return service.link_existing_proof(str(tenant_id), str(qualification_id), payload, context)
+
+
+@router.get("/{employee_id}", response_model=EmployeeOperationalRead)
+def get_employee(
+    tenant_id: UUID,
+    employee_id: UUID,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.employee.read", scope="tenant")),
+    ] = None,
+    service: Annotated[EmployeeService, Depends(get_employee_service)] = None,
+) -> EmployeeOperationalRead:
+    return service.get_operational_employee(str(tenant_id), str(employee_id), context)
+
+
+@router.patch("/{employee_id}", response_model=EmployeeOperationalRead)
+def update_employee(
+    tenant_id: UUID,
+    employee_id: UUID,
+    payload: EmployeeOperationalUpdate,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.employee.write", scope="tenant")),
+    ],
+    service: Annotated[EmployeeService, Depends(get_employee_service)],
+) -> EmployeeOperationalRead:
+    return service.update_employee(str(tenant_id), str(employee_id), payload, context)
 
 
 @router.get("/{employee_id}/notes", response_model=list[EmployeeNoteRead])

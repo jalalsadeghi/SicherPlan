@@ -32,7 +32,11 @@ test("employee detail uses top-level tabs and isolated tab panels", () => {
   assert.match(viewSource, /data-testid="employee-tab-panel-overview"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-app-access"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-profile-photo"/);
+  assert.match(viewSource, /data-testid="employee-tab-panel-qualifications"/);
+  assert.match(viewSource, /data-testid="employee-tab-panel-credentials"/);
+  assert.match(viewSource, /data-testid="employee-tab-panel-availability"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-private-profile"/);
+  assert.match(viewSource, /data-testid="employee-tab-panel-absences"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-notes"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-groups"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-documents"/);
@@ -82,6 +86,18 @@ test("non-overview employee tabs reuse the structured section pattern", () => {
   assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*v-else[\s\S]*employeeAdmin\.access\.manageEyebrow[\s\S]*employeeAdmin\.access\.resetEyebrow[\s\S]*employeeAdmin\.access\.detachEyebrow/);
   assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*employee-admin-advanced-access[\s\S]*employeeAdmin\.access\.attachEyebrow[\s\S]*employeeAdmin\.access\.reconcileEyebrow/);
   assert.match(viewSource, /employee-tab-panel-profile-photo[\s\S]*employee-admin-editor-intro[\s\S]*employeeAdmin\.photo\.manageEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*employeeAdmin\.qualifications\.registerEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*createEmployeeQualification/);
+  assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*updateEmployeeQualification/);
+  assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*listEmployeeQualificationProofs/);
+  assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*uploadEmployeeQualificationProof/);
+  assert.match(viewSource, /employee-tab-panel-credentials[\s\S]*employeeAdmin\.credentials\.registerEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-credentials[\s\S]*createEmployeeCredential/);
+  assert.match(viewSource, /employee-tab-panel-credentials[\s\S]*updateEmployeeCredential/);
+  assert.match(viewSource, /employee-tab-panel-credentials[\s\S]*issueEmployeeCredentialBadgeOutput/);
+  assert.match(viewSource, /employee-tab-panel-availability[\s\S]*employeeAdmin\.availability\.registerEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-availability[\s\S]*createEmployeeAvailabilityRule/);
+  assert.match(viewSource, /employee-tab-panel-availability[\s\S]*updateEmployeeAvailabilityRule/);
   assert.match(viewSource, /employee-tab-panel-notes[\s\S]*employeeAdmin\.notes\.registerEyebrow[\s\S]*employeeAdmin\.notes\.editorEyebrow/);
   assert.match(viewSource, /employee-tab-panel-groups[\s\S]*employeeAdmin\.groups\.catalogEyebrow[\s\S]*employeeAdmin\.groups\.assignEyebrow[\s\S]*employeeAdmin\.groups\.currentEyebrow/);
   assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.addresses\.currentEyebrow/);
@@ -100,6 +116,9 @@ test("non-overview employee tabs reuse the structured section pattern", () => {
   assert.match(viewSource, /employee-tab-panel-documents[\s\S]*linkEmployeeDocument/);
   assert.match(viewSource, /employee-tab-panel-documents[\s\S]*addEmployeeDocumentVersion/);
   assert.match(viewSource, /employee-tab-panel-documents[\s\S]*employeeAdmin\.actions\.useDocumentForVersion/);
+  assert.match(viewSource, /employee-tab-panel-absences[\s\S]*employeeAdmin\.absences\.registerEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-absences[\s\S]*createEmployeeAbsence/);
+  assert.match(viewSource, /employee-tab-panel-absences[\s\S]*updateEmployeeAbsence/);
 });
 
 test("employee addresses tab uses admin editor copy and removes released timeline wording", () => {

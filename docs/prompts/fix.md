@@ -1,109 +1,86 @@
 You are working in the latest SicherPlan repository.
 
-Scope:
-Fix two UI issues in the Employees admin page only.
-Do not change backend behavior, API contracts, permissions, or business logic unless absolutely required for the frontend layout fix.
-This is a focused UI/UX refinement task.
+Bug to fix:
+The Employees admin page now loads readiness tabs (qualifications, credentials, availability, absences), but the page throws a generic frontend error after loading or saving an employee.
 
-Target page:
-- web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
+Observed backend log:
+- GET /api/employees/tenants/{tenant_id}/employees/{employee_id} -> 200
+- GET /api/employees/tenants/{tenant_id}/employees/{employee_id}/notes -> 200
+- GET /api/employees/tenants/{tenant_id}/employees/{employee_id}/documents -> 200
+- GET /api/employees/tenants/{tenant_id}/employees/{employee_id}/photo -> 200
+- GET /api/employees/tenants/{tenant_id}/employees/availability-rules?employee_id=... -> 422
+- GET /api/employees/tenants/{tenant_id}/employees/qualifications?employee_id=... -> 422
+- GET /api/employees/tenants/{tenant_id}/employees/credentials?employee_id=... -> 422
+- GET /api/employees/tenants/{tenant_id}/employees/absences?employee_id=... -> 422
 
-Likely related test file:
-- web/apps/web-antd/src/sicherplan-legacy/features/employees/employeeAdmin.layout.test.js
+Root cause:
+In backend/app/modules/employees/router.py, the dynamic route
+    @router.get("/{employee_id}")
+is declared before several fixed collection routes like:
+    /availability-rules
+    /qualifications
+    /credentials
+    /absences
+and likely similar one-segment collection routes.
 
-Context:
-The Employees page currently has:
-1. A left-side “List” panel containing both:
-   - Search/filter form
-   - Import / Export form
-   in the same scrollable box
-2. A feedback / alert box rendered after save, update, import, etc. through:
-   - `feedback.message`
-   - `.employee-admin-feedback`
-This alert currently needs visual cleanup.
+Because FastAPI/Starlette routing is order-sensitive, requests such as:
+    /employees/availability-rules
+are being matched against:
+    /employees/{employee_id}
+so "availability-rules" is parsed as employee_id and fails UUID validation, causing HTTP 422.
 
-Task 1 — Put Search and Import/Export into tabs inside the List panel
-Requirements:
-- Keep the existing left-side List panel.
-- Inside that panel, split the two areas into two tabs:
-  - Tab 1: Search
-  - Tab 2: Import / Export
-- The Search tab should contain:
-  - search input
-  - status filter
-  - default branch filter
-  - default mandate filter
-  - include archived checkbox
-  - search button
-  - create employee button
-  - export button only if you decide it still belongs there; otherwise move export into Import / Export tab and keep it logically grouped
-- The Import / Export tab should contain:
-  - file input
-  - load CSV
-  - use template/reset template
-  - CSV textarea
-  - continue on error checkbox
-  - validate import
-  - run import
-  - export controls if grouped there
-  - dry-run / execute summaries
-- Preserve current actions and handlers. This is a layout reorganization, not a workflow rewrite.
-- Preserve entered form state when switching tabs. Do not reset search or import state just because the user changes tabs.
-- Use the existing design language of the page:
-  - pill/tab style similar to the employee detail tabs
-  - clean spacing
-  - no visual crowding
-- Default open tab should be:
-  - Search
-- Keep the page responsive and consistent with the existing master-detail layout.
+Task:
+Fix the backend routing bug cleanly and add regression coverage.
 
-Task 2 — Fix the Alert / Feedback message styling
-Requirements:
-- Improve the visual style of the feedback area rendered when `feedback.message` exists.
-- Make it look like a proper page-level status banner:
-  - clear padding
-  - rounded corners
-  - readable text hierarchy
-  - proper spacing between title, message, and dismiss button
-  - consistent background/border per tone
-- Support these tones cleanly:
-  - success
-  - error
-  - neutral
-- Ensure the banner:
-  - does not look broken or collapsed
-  - does not overflow awkwardly
-  - aligns with the page content width
-  - wraps correctly on smaller screens
-  - keeps the dismiss button visually aligned
-- Do not change the feedback logic itself unless necessary for class binding cleanup.
+Required changes:
+1. In backend/app/modules/employees/router.py
+   reorder routes so all fixed collection/static routes are declared BEFORE any dynamic
+   /{employee_id}
+   route and before any other conflicting one-segment dynamic route.
+2. Specifically ensure these list/create/update families are not shadowed:
+   - /availability-rules
+   - /absences
+   - /leave-balances
+   - /event-applications
+   - /time-accounts
+   - /allowances
+   - /advances
+   - /credentials
+   - /qualifications
+   and any other static collection route under the same prefix.
+3. Preserve existing endpoint paths. Do NOT redesign the API.
+4. Add backend regression tests proving that these routes resolve correctly and return 200/201 instead of 422 due to path shadowing.
+5. If there are existing API tests for employee routes, extend them. Otherwise add focused route-resolution regression tests in backend/tests/modules/employees/.
+6. Keep the new employee readiness UI unchanged unless a tiny frontend hardening improvement is needed.
 
-Implementation guidance:
-- Keep changes local to the Employees page as much as possible.
-- Reuse the existing tab styling pattern already used in the employee detail workspace if appropriate.
-- Prefer small, maintainable refactoring over large rewrites.
-- If needed, extract tiny computed helpers for tab labels/state, but do not over-engineer.
-- Do not touch unrelated employee tabs such as Overview, App access, Profile photo, Notes, Groups, Addresses, Documents.
+Optional but recommended frontend hardening:
+If one secondary readiness request fails, do not collapse the whole employee page into a generic “Action failed” state.
+Instead:
+- keep the main employee record visible
+- show tab-level feedback for the failing readiness area
+But only do this if it is a small, contained change.
 
-Testing:
-Update or add frontend tests so they verify:
-1. The left panel now has two tabs for Search and Import / Export
-2. The relevant content switches by active tab
-3. The alert/feedback container has stable markup/hooks for tone-based styling
-4. Existing master-detail layout expectations still pass
+Files to inspect:
+- backend/app/modules/employees/router.py
+- backend/tests/modules/employees/*
+- possibly frontend files only if needed for small error-isolation improvement:
+  - web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
+  - web/apps/web-antd/src/sicherplan-legacy/api/employeeAdmin.ts
 
 Acceptance criteria:
-- The left List panel contains two tabs: Search and Import / Export
-- Search and Import / Export are no longer shown together in one long stacked block
-- Form state is preserved when switching tabs
-- The feedback/alert box has a clean, production-ready visual style
-- No backend changes are required
-- Existing employee page behavior still works
+- Loading an employee no longer triggers 422 for readiness list endpoints
+- Saving a new employee no longer surfaces the generic error caused by those failing GETs
+- The following endpoints resolve correctly:
+  /availability-rules
+  /qualifications
+  /credentials
+  /absences
+- Existing employee detail endpoints still work
+- Regression tests pass
 
 Before coding:
-Briefly summarize:
-1. impacted files
-2. whether export stays in Search or moves to Import / Export
-3. test changes
-
+First summarize:
+- which routes are shadowed
+- the exact route-order fix
+- the tests you will add
 Then implement.
