@@ -46,14 +46,6 @@
       </div>
     </section>
 
-    <section v-if="feedback.message" class="customer-admin-feedback" :data-tone="feedback.tone">
-      <div>
-        <strong>{{ feedback.title }}</strong>
-        <span>{{ feedback.message }}</span>
-      </div>
-      <button type="button" @click="clearFeedback">{{ t("customerAdmin.actions.clearFeedback") }}</button>
-    </section>
-
     <section v-if="!tenantScopeId || !accessToken" class="module-card customer-admin-empty">
       <p class="eyebrow">{{ t("customerAdmin.scope.missingTitle") }}</p>
       <h3>{{ t("customerAdmin.scope.missingBody") }}</h3>
@@ -2078,6 +2070,7 @@ import {
   EmployeeAdminApiError,
   bootstrapEmployeeCatalogSamples,
 } from "@/api/employeeAdmin";
+import { useSicherPlanFeedback } from "@/composables/useSicherPlanFeedback";
 import {
   createCustomerPortalAccess,
   listCustomerPortalAccess,
@@ -2100,6 +2093,7 @@ const { t } = useI18n();
 const authStore = useAuthStore();
 const route = useRoute();
 const router = useRouter();
+const { showFeedbackToast } = useSicherPlanFeedback();
 
 const customers = ref<CustomerListItem[]>([]);
 const customerHistory = ref<CustomerHistoryEntryRead[]>([]);
@@ -2170,11 +2164,6 @@ const loading = reactive({
   portalPrivacy: false,
   sharedAddress: false,
   hrCatalogBootstrap: false,
-});
-const feedback = reactive({
-  tone: "info",
-  title: "",
-  message: "",
 });
 const filters = reactive<CustomerFilterParams>({
   search: "",
@@ -2755,16 +2744,13 @@ function openEmployeesAdmin() {
   void router.push("/admin/employees");
 }
 
-function clearFeedback() {
-  feedback.tone = "info";
-  feedback.title = "";
-  feedback.message = "";
-}
-
 function setFeedback(tone: "info" | "success" | "error", title: string, message: string) {
-  feedback.tone = tone;
-  feedback.title = title;
-  feedback.message = message;
+  showFeedbackToast({
+    key: "customer-admin-feedback",
+    message,
+    title,
+    tone,
+  });
 }
 
 function clearBillingProfileErrors() {

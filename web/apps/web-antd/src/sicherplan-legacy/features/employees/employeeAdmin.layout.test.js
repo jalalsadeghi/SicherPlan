@@ -73,15 +73,13 @@ test("employee list panel splits search and import-export into tabs and preserve
   assert.match(viewSource, /employee-list-tab-panel-import-export[\s\S]*employeeAdmin\.actions\.exportEmployees/);
 });
 
-test("employee feedback banner exposes stable tone-aware markup", () => {
-  assert.match(viewSource, /data-testid="'employee-feedback-banner'"/);
-  assert.match(viewSource, /class="employee-admin-feedback__body"/);
-  assert.match(viewSource, /class="employee-admin-feedback__title"/);
-  assert.match(viewSource, /class="employee-admin-feedback__message"/);
-  assert.match(viewSource, /class="employee-admin-feedback__dismiss"/);
-  assert.match(viewSource, /\.employee-admin-feedback\[data-tone='success'\]/);
-  assert.match(viewSource, /\.employee-admin-feedback\[data-tone='error'\]/);
-  assert.match(viewSource, /\.employee-admin-feedback\[data-tone='neutral'\]/);
+test("employee workspace uses shared toast feedback instead of a persistent inline banner", () => {
+  assert.match(viewSource, /useSicherPlanFeedback/);
+  assert.match(viewSource, /showFeedbackToast\(\{\s*key:\s*"employee-admin-feedback"/);
+  assert.doesNotMatch(viewSource, /employee-feedback-banner/);
+  assert.doesNotMatch(viewSource, /class="employee-admin-feedback__dismiss"/);
+  assert.doesNotMatch(viewSource, /function clearFeedback\(/);
+  assert.doesNotMatch(viewSource, /\.employee-admin-feedback\[data-tone='success'\]/);
 });
 
 test("non-overview employee tabs reuse the structured section pattern", () => {

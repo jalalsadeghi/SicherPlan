@@ -29,14 +29,6 @@
       </div>
     </div>
 
-    <section v-if="feedback.message" class="employee-admin-feedback" :data-testid="'employee-feedback-banner'" :data-tone="feedback.tone">
-      <div class="employee-admin-feedback__body">
-        <strong class="employee-admin-feedback__title">{{ feedback.title }}</strong>
-        <p class="employee-admin-feedback__message">{{ feedback.message }}</p>
-      </div>
-      <button class="employee-admin-feedback__dismiss" type="button" @click="clearFeedback">{{ t("employeeAdmin.actions.clearFeedback") }}</button>
-    </section>
-
     <section v-if="!resolvedTenantScopeId" class="module-card employee-admin-empty">
       <p class="eyebrow">{{ t("employeeAdmin.scope.missingTitle") }}</p>
       <h3>{{ t("employeeAdmin.scope.missingBody") }}</h3>
@@ -1733,6 +1725,7 @@ import {
 } from "@/api/employeeAdmin";
 import SicherPlanLoadingOverlay from "@/components/SicherPlanLoadingOverlay.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
+import { useSicherPlanFeedback } from "@/composables/useSicherPlanFeedback";
 import { useI18n } from "@/i18n";
 import {
   buildEmployeeImportTemplateRows,
@@ -1771,17 +1764,12 @@ withDefaults(defineProps<{ embedded?: boolean }>(), {
 
 const { t } = useI18n();
 const authStore = useAuthStore();
+const { showFeedbackToast } = useSicherPlanFeedback();
 
 const loading = reactive({
   list: false,
   detail: false,
   action: false,
-});
-
-const feedback = reactive({
-  tone: "neutral",
-  title: "",
-  message: "",
 });
 
 const filters = reactive({
@@ -2135,15 +2123,12 @@ function resolveEmployeeDocumentRelationLabel(relationType: string) {
 }
 
 function setFeedback(tone: "error" | "neutral" | "success", title: string, message: string) {
-  feedback.tone = tone;
-  feedback.title = title;
-  feedback.message = message;
-}
-
-function clearFeedback() {
-  feedback.tone = "neutral";
-  feedback.title = "";
-  feedback.message = "";
+  showFeedbackToast({
+    key: "employee-admin-feedback",
+    message,
+    title,
+    tone,
+  });
 }
 
 function resolveEmployeeDocumentErrorMessage(error: unknown) {
@@ -3741,63 +3726,6 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-.employee-admin-feedback {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: start;
-  padding: 1rem 1.1rem;
-  border-radius: 18px;
-  border: 1px solid var(--sp-color-border-soft);
-  background: color-mix(in srgb, var(--sp-color-surface-page) 82%, white 18%);
-}
-
-.employee-admin-feedback[data-tone='success'] {
-  border-color: color-mix(in srgb, var(--sp-color-primary) 45%, transparent);
-  background: color-mix(in srgb, var(--sp-color-primary-muted) 62%, white 38%);
-}
-
-.employee-admin-feedback[data-tone='error'] {
-  border-color: rgb(190 72 72 / 34%);
-  background: rgb(255 240 240 / 88%);
-}
-
-.employee-admin-feedback[data-tone='neutral'] {
-  border-color: var(--sp-color-border-soft);
-}
-
-.employee-admin-feedback__body {
-  display: grid;
-  gap: 0.35rem;
-  min-width: 0;
-  flex: 1 1 280px;
-}
-
-.employee-admin-feedback__title,
-.employee-admin-feedback__message {
-  margin: 0;
-}
-
-.employee-admin-feedback__title {
-  color: var(--sp-color-text-primary);
-}
-
-.employee-admin-feedback__message {
-  color: var(--sp-color-text-secondary);
-}
-
-.employee-admin-feedback__dismiss {
-  border: 1px solid var(--sp-color-border-soft);
-  background: var(--sp-color-surface-card);
-  color: var(--sp-color-text-primary);
-  border-radius: 999px;
-  padding: 0.65rem 0.95rem;
-  font: inherit;
-  cursor: pointer;
-  align-self: center;
-}
-
 .employee-admin-grid {
   display: grid;
   gap: var(--sp-page-gap, 1.25rem);
@@ -4190,14 +4118,6 @@ onBeforeUnmount(() => {
   .employee-admin-form-grid--editor,
   .employee-admin-form-actions {
     grid-template-columns: 1fr;
-  }
-
-  .employee-admin-feedback {
-    align-items: stretch;
-  }
-
-  .employee-admin-feedback__dismiss {
-    align-self: stretch;
   }
 
   .employee-admin-record__actions {

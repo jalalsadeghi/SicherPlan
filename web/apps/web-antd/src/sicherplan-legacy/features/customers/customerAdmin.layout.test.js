@@ -34,6 +34,13 @@ test("customer workspace keeps desktop master detail layout with detail tabs", (
   assert.match(source, /resolveCustomerAdminRouteContext\(route\.query\)/);
 });
 
+test("customer workspace uses shared toast feedback instead of a persistent inline banner", () => {
+  assert.match(source, /useSicherPlanFeedback/);
+  assert.match(source, /showFeedbackToast\(\{\s*key:\s*"customer-admin-feedback"/);
+  assert.doesNotMatch(source, /<section v-if="feedback\.message" class="customer-admin-feedback"/);
+  assert.doesNotMatch(source, /function clearFeedback\(/);
+});
+
 test("commercial workspace uses nested sub tabs and isolated panels", () => {
   assert.match(source, /data-testid="customer-commercial-tabs"/);
   assert.match(source, /data-testid="customer-commercial-panel-billing-profile"/);
