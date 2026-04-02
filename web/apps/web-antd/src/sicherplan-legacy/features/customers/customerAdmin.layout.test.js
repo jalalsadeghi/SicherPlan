@@ -34,6 +34,26 @@ test("customer workspace keeps desktop master detail layout with detail tabs", (
   assert.match(source, /resolveCustomerAdminRouteContext\(route\.query\)/);
 });
 
+test("customer same-record reloads preserve nested tab context with safe fallbacks", () => {
+  assert.match(source, /type SelectCustomerOptions = \{/);
+  assert.match(source, /preserveDetailTab\?: boolean/);
+  assert.match(source, /preserveCommercialTab\?: boolean/);
+  assert.match(source, /preservePricingRulesTab\?: boolean/);
+  assert.match(source, /preserveSelectedRateCard\?: boolean/);
+  assert.match(source, /function buildPreservedCustomerSelectionOptions\(\): SelectCustomerOptions/);
+  assert.match(source, /preferredDetailTab: activeDetailTab\.value/);
+  assert.match(source, /preferredCommercialTab: activeCommercialTab\.value/);
+  assert.match(source, /preferredPricingRulesTab: activePricingRulesTab\.value/);
+  assert.match(source, /preferredRateCardId: selectedRateCardId\.value/);
+  assert.match(source, /async function selectCustomer\(customerId: string, options: SelectCustomerOptions = \{\}\)/);
+  assert.match(source, /activeDetailTab\.value = normalizeCustomerDetailTab\(desiredDetailTab/);
+  assert.match(source, /activeCommercialTab\.value = normalizeCustomerCommercialTab\(desiredCommercialTab\)/);
+  assert.match(source, /activePricingRulesTab\.value = normalizeCustomerPricingRulesTab\(desiredPricingRulesTab/);
+  assert.match(source, /selectedRateCardId\.value = resolveCustomerSelectedRateCardId\(/);
+  assert.match(source, /await selectCustomer\(selectedCustomer\.value\.id, buildPreservedCustomerSelectionOptions\(\)\)/);
+  assert.match(source, /await refreshCustomers\(\{\s*preferredCustomerId: updated\.id,[\s\S]*selectionOptions: buildPreservedCustomerSelectionOptions\(\)/);
+});
+
 test("customer workspace uses shared toast feedback instead of a persistent inline banner", () => {
   assert.match(source, /useSicherPlanFeedback/);
   assert.match(source, /showFeedbackToast\(\{\s*key:\s*"customer-admin-feedback"/);

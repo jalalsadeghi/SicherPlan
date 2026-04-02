@@ -29,6 +29,12 @@ export const CUSTOMER_COMMERCIAL_TAB_ORDER = [
   "pricing_rules",
 ];
 
+export const CUSTOMER_PRICING_RULES_TAB_ORDER = [
+  "rate_cards",
+  "rate_lines",
+  "surcharges",
+];
+
 export function hasCustomerPermission(role, permissionKey) {
   return (CUSTOMER_PERMISSION_MATRIX[role] ?? []).includes(permissionKey);
 }
@@ -211,6 +217,22 @@ export function normalizeCustomerDetailTab(activeTab, options) {
 
 export function normalizeCustomerCommercialTab(activeTab) {
   return CUSTOMER_COMMERCIAL_TAB_ORDER.includes(activeTab) ? activeTab : "billing_profile";
+}
+
+export function buildCustomerPricingRulesTabs({ hasRateCards }) {
+  return hasRateCards ? [...CUSTOMER_PRICING_RULES_TAB_ORDER] : ["rate_cards"];
+}
+
+export function normalizeCustomerPricingRulesTab(activeTab, { hasRateCards }) {
+  const tabs = buildCustomerPricingRulesTabs({ hasRateCards });
+  return tabs.includes(activeTab) ? activeTab : "rate_cards";
+}
+
+export function resolveCustomerSelectedRateCardId(activeRateCardId, rateCards) {
+  if ((rateCards ?? []).some((row) => row.id === activeRateCardId)) {
+    return activeRateCardId;
+  }
+  return rateCards?.[0]?.id ?? "";
 }
 
 export function resolveCustomerAdminRouteContext(query) {

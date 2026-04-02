@@ -39,7 +39,7 @@
           <button class="cta-button" type="button" @click="rememberScopeAndToken">
             {{ t("customerAdmin.actions.rememberScope") }}
           </button>
-          <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshCustomers">
+          <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="handleRefreshCustomers">
             {{ t("customerAdmin.actions.refresh") }}
           </button>
         </div>
@@ -117,7 +117,7 @@
         </label>
 
         <div class="cta-row">
-          <button class="cta-button" type="button" @click="refreshCustomers">
+          <button class="cta-button" type="button" @click="handleRefreshCustomers">
             {{ t("customerAdmin.actions.search") }}
           </button>
           <button
@@ -2061,6 +2061,8 @@ import {
   mapCustomerApiMessage,
   normalizeCustomerCommercialTab,
   normalizeCustomerDetailTab,
+  normalizeCustomerPricingRulesTab,
+  resolveCustomerSelectedRateCardId,
   resolveCustomerAdminRouteContext,
   resolveCustomerAdminSectionVisibility,
   resolveCustomerAdminSessionScope,
@@ -2607,6 +2609,25 @@ const sectionVisibility = computed(() =>
   }),
 );
 
+type SelectCustomerOptions = {
+  fallbackCommercialTab?: string;
+  fallbackDetailTab?: string;
+  fallbackPricingRulesTab?: string;
+  preferredCommercialTab?: string;
+  preferredDetailTab?: string;
+  preferredPricingRulesTab?: string;
+  preferredRateCardId?: string;
+  preserveCommercialTab?: boolean;
+  preserveDetailTab?: boolean;
+  preservePricingRulesTab?: boolean;
+  preserveSelectedRateCard?: boolean;
+};
+
+type RefreshCustomersOptions = {
+  preferredCustomerId?: string;
+  selectionOptions?: SelectCustomerOptions;
+};
+
 function formatReferenceOptionLabel(
   record: { code: string; label?: string | null; name?: string | null },
 ) {
@@ -2619,6 +2640,19 @@ function filterMandateOptions(branchId: null | string | undefined) {
 
 function selectedRateCardCurrencyFallback() {
   return `${selectedRateCard.value?.currency_code ?? ""}`.trim().toUpperCase();
+}
+
+function buildPreservedCustomerSelectionOptions(): SelectCustomerOptions {
+  return {
+    preferredCommercialTab: activeCommercialTab.value,
+    preferredDetailTab: activeDetailTab.value,
+    preferredPricingRulesTab: activePricingRulesTab.value,
+    preferredRateCardId: selectedRateCardId.value,
+    preserveCommercialTab: true,
+    preserveDetailTab: true,
+    preservePricingRulesTab: true,
+    preserveSelectedRateCard: true,
+  };
 }
 
 function syncSurchargeWeekdayMask() {
@@ -2684,6 +2718,10 @@ function rememberScopeAndToken() {
     window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken.value);
   }
   setFeedback("info", t("customerAdmin.feedback.scopeSaved"), t("customerAdmin.feedback.tokenSaved"));
+  void refreshCustomers();
+}
+
+function handleRefreshCustomers() {
   void refreshCustomers();
 }
 
@@ -3286,7 +3324,7 @@ function cancelCustomerEdit() {
   }
 }
 
-async function refreshCustomers() {
+async function refreshCustomers(options: RefreshCustomersOptions = {}) {
   if (!tenantScopeId.value || !accessToken.value || !canRead.value) {
     referenceData.value = null;
     customers.value = [];
@@ -3309,17 +3347,21 @@ async function refreshCustomers() {
   try {
     await loadReferenceData();
     customers.value = await listCustomers(tenantScopeId.value, accessToken.value, filters);
+    const preferredCustomerId = options.preferredCustomerId?.trim() ?? "";
     if (pendingRouteCustomerId.value) {
       const routeCustomer = customers.value.find((row) => row.id === pendingRouteCustomerId.value);
       if (routeCustomer) {
-        await selectCustomer(routeCustomer.id, pendingRouteDetailTab.value);
+        await selectCustomer(routeCustomer.id, {
+          preferredDetailTab: pendingRouteDetailTab.value,
+        });
         return;
       }
     }
-    if (selectedCustomerId.value) {
-      const stillExists = customers.value.some((row) => row.id === selectedCustomerId.value);
+    const selectionTargetId = preferredCustomerId || selectedCustomerId.value;
+    if (selectionTargetId) {
+      const stillExists = customers.value.some((row) => row.id === selectionTargetId);
       if (stillExists) {
-        await selectCustomer(selectedCustomerId.value);
+        await selectCustomer(selectionTargetId, options.selectionOptions);
       } else if (customers.value[0]) {
         await selectCustomer(customers.value[0].id);
       } else {
@@ -3346,16 +3388,26 @@ async function refreshCustomers() {
   }
 }
 
-async function selectCustomer(customerId: string, preferredTab = "") {
+async function selectCustomer(customerId: string, options: SelectCustomerOptions = {}) {
   if (!tenantScopeId.value || !accessToken.value) {
     return;
   }
 
   loading.detail = true;
   try {
+    const desiredDetailTab = options.preserveDetailTab
+      ? activeDetailTab.value
+      : (options.preferredDetailTab ?? options.fallbackDetailTab ?? "overview");
+    const desiredCommercialTab = options.preserveCommercialTab
+      ? activeCommercialTab.value
+      : (options.preferredCommercialTab ?? options.fallbackCommercialTab ?? "billing_profile");
+    const desiredPricingRulesTab = options.preservePricingRulesTab
+      ? activePricingRulesTab.value
+      : (options.preferredPricingRulesTab ?? options.fallbackPricingRulesTab ?? "rate_cards");
+    const desiredRateCardId = options.preserveSelectedRateCard
+      ? selectedRateCardId.value
+      : (options.preferredRateCardId ?? "");
     selectedCustomerId.value = customerId;
-    activeDetailTab.value = "overview";
-    activeCommercialTab.value = "billing_profile";
     selectedCustomer.value = await getCustomer(tenantScopeId.value, customerId, accessToken.value);
     if (selectedCustomer.value) {
       populateCustomerDraft(selectedCustomer.value);
@@ -3379,6 +3431,16 @@ async function selectCustomer(customerId: string, preferredTab = "") {
       resetPortalAccessDraft();
       await refreshAvailableAddresses();
       isCreatingCustomer.value = false;
+      activeDetailTab.value = normalizeCustomerDetailTab(desiredDetailTab, {
+        canReadCommercial: canReadCommercial.value,
+        hasSelectedCustomer: !!selectedCustomer.value,
+        isCreatingCustomer: isCreatingCustomer.value,
+      });
+      activeCommercialTab.value = normalizeCustomerCommercialTab(desiredCommercialTab);
+      activePricingRulesTab.value = normalizeCustomerPricingRulesTab(desiredPricingRulesTab, {
+        hasRateCards: false,
+      });
+      selectedRateCardId.value = desiredRateCardId;
       if (canReadCommercial.value) {
         await refreshCommercialProfile();
       }
@@ -3387,11 +3449,21 @@ async function selectCustomer(customerId: string, preferredTab = "") {
       await refreshEmployeeBlocks();
       await refreshPortalPrivacy();
       await refreshCustomerPortalAccess();
-      activeDetailTab.value = normalizeCustomerDetailTab(preferredTab || activeDetailTab.value, {
+      activeDetailTab.value = normalizeCustomerDetailTab(activeDetailTab.value || options.fallbackDetailTab || "overview", {
         canReadCommercial: canReadCommercial.value,
         hasSelectedCustomer: !!selectedCustomer.value,
         isCreatingCustomer: isCreatingCustomer.value,
       });
+      const preservedCommercialProfile = commercialProfile.value as CustomerCommercialProfileRead | null;
+      const preservedRateCards = preservedCommercialProfile ? preservedCommercialProfile.rate_cards : [];
+      activeCommercialTab.value = normalizeCustomerCommercialTab(activeCommercialTab.value || options.fallbackCommercialTab || "billing_profile");
+      activePricingRulesTab.value = normalizeCustomerPricingRulesTab(
+        activePricingRulesTab.value || options.fallbackPricingRulesTab || "rate_cards",
+        {
+          hasRateCards: preservedRateCards.length > 0,
+        },
+      );
+      selectedRateCardId.value = resolveCustomerSelectedRateCardId(selectedRateCardId.value, preservedRateCards);
       if (selectedCustomer.value.id === pendingRouteCustomerId.value) {
         pendingRouteCustomerId.value = "";
         pendingRouteDetailTab.value = "";
@@ -3419,10 +3491,7 @@ async function refreshCommercialProfile() {
     );
     populateBillingProfileDraft(commercialProfile.value.billing_profile);
     if (commercialProfile.value.rate_cards.length) {
-      if (!commercialProfile.value.rate_cards.some((row) => row.id === selectedRateCardId.value)) {
-        const firstRateCard = commercialProfile.value.rate_cards[0];
-        selectedRateCardId.value = firstRateCard ? firstRateCard.id : "";
-      }
+      selectedRateCardId.value = resolveCustomerSelectedRateCardId(selectedRateCardId.value, commercialProfile.value?.rate_cards ?? []);
     } else {
       selectedRateCardId.value = "";
     }
@@ -3451,8 +3520,7 @@ async function submitCustomer() {
     if (isCreatingCustomer.value || !selectedCustomer.value) {
       const created = await createCustomer(tenantScopeId.value, accessToken.value, payload);
       setFeedback("success", t("customerAdmin.feedback.created"), t("customerAdmin.feedback.createdNextStep"));
-      await refreshCustomers();
-      await selectCustomer(created.id);
+      await refreshCustomers({ preferredCustomerId: created.id });
       previousSelectedCustomer.value = selectedCustomer.value;
       isCreatingCustomer.value = false;
     } else {
@@ -3461,8 +3529,10 @@ async function submitCustomer() {
         version_no: selectedCustomer.value.version_no,
       });
       setFeedback("success", t("customerAdmin.feedback.saved"), updated.name);
-      await refreshCustomers();
-      await selectCustomer(updated.id);
+      await refreshCustomers({
+        preferredCustomerId: updated.id,
+        selectionOptions: buildPreservedCustomerSelectionOptions(),
+      });
     }
   } catch (error) {
     handleApiError(error);
@@ -3500,8 +3570,10 @@ async function applyStatus(nextStatus: "active" | "inactive" | "archived") {
           ? "customerAdmin.feedback.deactivated"
           : "customerAdmin.feedback.archived";
     setFeedback("success", t(feedbackKey), updated.name);
-    await refreshCustomers();
-    await selectCustomer(updated.id);
+    await refreshCustomers({
+      preferredCustomerId: updated.id,
+      selectionOptions: buildPreservedCustomerSelectionOptions(),
+    });
   } catch (error) {
     handleApiError(error);
   }
@@ -3539,7 +3611,7 @@ async function submitContact() {
     }
     setFeedback("success", t("customerAdmin.feedback.contactSaved"), contactDraft.full_name);
     resetContactDraft();
-    await selectCustomer(selectedCustomer.value.id);
+    await selectCustomer(selectedCustomer.value.id, buildPreservedCustomerSelectionOptions());
   } catch (error) {
     handleApiError(error);
   } finally {
@@ -3567,7 +3639,7 @@ async function archiveContact(contact: CustomerContactRead) {
       },
     );
     setFeedback("success", t("customerAdmin.feedback.contactSaved"), contact.full_name);
-    await selectCustomer(selectedCustomer.value.id);
+    await selectCustomer(selectedCustomer.value.id, buildPreservedCustomerSelectionOptions());
   } catch (error) {
     handleApiError(error);
   }
@@ -3609,7 +3681,7 @@ async function submitAddress() {
     }
     setFeedback("success", t("customerAdmin.feedback.addressSaved"), addressDraft.address_type);
     resetAddressDraft();
-    await selectCustomer(selectedCustomer.value.id);
+    await selectCustomer(selectedCustomer.value.id, buildPreservedCustomerSelectionOptions());
   } catch (error) {
     handleApiError(error);
   } finally {
@@ -3962,7 +4034,7 @@ async function archiveAddress(address: CustomerAddressRead) {
       },
     );
     setFeedback("success", t("customerAdmin.feedback.addressSaved"), address.address_type);
-    await selectCustomer(selectedCustomer.value.id);
+    await selectCustomer(selectedCustomer.value.id, buildPreservedCustomerSelectionOptions());
   } catch (error) {
     handleApiError(error);
   }
@@ -4333,7 +4405,7 @@ async function submitCustomerPortalAccess() {
     closePortalAccessCreateModal();
     resetPortalAccessDraft();
     await refreshCustomerPortalAccess();
-    await selectCustomer(selectedCustomer.value.id);
+    await selectCustomer(selectedCustomer.value.id, buildPreservedCustomerSelectionOptions());
     setFeedback(
       "success",
       t("customerAdmin.feedback.portalAccessCreated"),
@@ -4418,7 +4490,7 @@ async function unlinkCustomerPortalAccount(account: CustomerPortalAccessListItem
     portalAccessGeneratedPassword.value = "";
     closePortalAccessPasswordReset();
     await refreshCustomerPortalAccess();
-    await selectCustomer(selectedCustomer.value.id);
+    await selectCustomer(selectedCustomer.value.id, buildPreservedCustomerSelectionOptions());
     setFeedback(
       "success",
       t("customerAdmin.feedback.portalAccessUnlinked"),
@@ -4619,7 +4691,9 @@ watch(
       return;
     }
     if (customers.value.some((row) => row.id === nextContext.customerId)) {
-      await selectCustomer(nextContext.customerId, nextContext.detailTab);
+      await selectCustomer(nextContext.customerId, {
+        preferredDetailTab: nextContext.detailTab,
+      });
     }
   },
   { immediate: true },
@@ -4653,13 +4727,14 @@ watch(
     if (activeCommercialTab.value !== "pricing_rules") {
       return;
     }
-    const allowedTabs = pricingRulesTabs.value.map((tab) => tab.id);
-    if (!allowedTabs.includes(activePricingRulesTab.value)) {
-      activePricingRulesTab.value = "rate_cards";
-    }
+    activePricingRulesTab.value = normalizeCustomerPricingRulesTab(activePricingRulesTab.value, {
+      hasRateCards: !!commercialProfile.value?.rate_cards.length,
+    });
     if ((activePricingRulesTab.value === "rate_lines" || activePricingRulesTab.value === "surcharges") && !selectedRateCard.value) {
-      const firstRateCard = commercialProfile.value?.rate_cards[0];
-      selectedRateCardId.value = firstRateCard ? firstRateCard.id : "";
+      selectedRateCardId.value = resolveCustomerSelectedRateCardId(
+        selectedRateCardId.value,
+        commercialProfile.value?.rate_cards ?? [],
+      );
     }
   },
   { immediate: true },

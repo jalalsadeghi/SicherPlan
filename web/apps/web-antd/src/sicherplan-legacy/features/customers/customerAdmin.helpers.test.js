@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import {
   buildCustomerCommercialLocation,
   CUSTOMER_COMMERCIAL_TAB_ORDER,
+  CUSTOMER_PRICING_RULES_TAB_ORDER,
   buildCustomerDetailTabs,
+  buildCustomerPricingRulesTabs,
   buildLifecyclePayload,
   buildCustomerDraftPayload,
   buildCustomerReferenceMaps,
@@ -17,6 +19,8 @@ import {
   mapCustomerApiMessage,
   normalizeCustomerCommercialTab,
   normalizeCustomerDetailTab,
+  normalizeCustomerPricingRulesTab,
+  resolveCustomerSelectedRateCardId,
   resolveCustomerAdminRouteContext,
   resolveCustomerAdminSectionVisibility,
   resolveCustomerAdminSessionScope,
@@ -258,6 +262,31 @@ test("commercial subtab state falls back to billing profile", () => {
   ]);
   assert.equal(normalizeCustomerCommercialTab("pricing_rules"), "pricing_rules");
   assert.equal(normalizeCustomerCommercialTab("unknown"), "billing_profile");
+});
+
+test("pricing-rules subtab state and selected rate card fall back safely", () => {
+  assert.deepEqual(CUSTOMER_PRICING_RULES_TAB_ORDER, [
+    "rate_cards",
+    "rate_lines",
+    "surcharges",
+  ]);
+  assert.deepEqual(buildCustomerPricingRulesTabs({ hasRateCards: false }), ["rate_cards"]);
+  assert.deepEqual(buildCustomerPricingRulesTabs({ hasRateCards: true }), [
+    "rate_cards",
+    "rate_lines",
+    "surcharges",
+  ]);
+  assert.equal(normalizeCustomerPricingRulesTab("surcharges", { hasRateCards: true }), "surcharges");
+  assert.equal(normalizeCustomerPricingRulesTab("rate_lines", { hasRateCards: false }), "rate_cards");
+  assert.equal(
+    resolveCustomerSelectedRateCardId("rate-card-2", [{ id: "rate-card-1" }, { id: "rate-card-2" }]),
+    "rate-card-2",
+  );
+  assert.equal(
+    resolveCustomerSelectedRateCardId("missing-rate-card", [{ id: "rate-card-1" }, { id: "rate-card-2" }]),
+    "rate-card-1",
+  );
+  assert.equal(resolveCustomerSelectedRateCardId("missing-rate-card", []), "");
 });
 
 test("customer admin route context extracts commercial deep-link state", () => {

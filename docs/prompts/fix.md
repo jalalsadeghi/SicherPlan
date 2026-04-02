@@ -1,125 +1,155 @@
-You are working in the latest SicherPlan repository.
+You are working on the latest main branch of the public repository `jalalsadeghi/SicherPlan`.
 
-Goal
-Replace the current fixed inline “Alert Message” / feedback banner pattern in SicherPlan legacy admin form pages with standard bottom-right toast notifications that:
-- appear as floating notifications in the bottom-right corner
-- auto-dismiss after a few seconds
-- use standard semantic styles for success / info / warning / error
-- do not require the user to click “Dismiss notice”
-- fit the current vben admin + ant-design stack
+Task
+Fix a UX bug in the admin customers workspace so that after saving or updating data from a non-Overview tab, the UI stays on the same active tab instead of jumping back to the first tab (`Overview`).
 
-Important repo context
-- The app is based on the vben admin monorepo and the web-antd app already uses ant-design-vue.
-- In web/apps/web-antd/src/adapter/component/index.ts, ant-design-vue `notification` is already imported and used with `placement: 'bottomRight'`.
-- Therefore, prefer reusing `notification` from ant-design-vue instead of building a custom toast system from scratch.
-- Do not introduce a second competing notification framework unless there is a strong repo-local reason.
+Inspect first
+- web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
+- web/apps/web-antd/src/sicherplan-legacy/features/customers/customerAdmin.layout.test.js
+- any nearby Vitest / Vue Test Utils helpers already used by the web workspace
+- optionally inspect small nearby helper files already imported by CustomerAdminView if they are the right place for tiny tab-validation helpers
 
-Current problem pattern
-- Pages like:
-  - web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
-  - web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
-  currently keep a reactive `feedback` object and render a persistent inline banner near the top of the workspace.
-- The banner remains visible until the user manually dismisses it.
-- Similar feedback/setFeedback usage likely exists in other SicherPlan legacy views, including planning, subcontractor, recruiting, finance, and core admin pages.
+Observed problem
+- The customers admin page has multiple detail tabs:
+  - overview
+  - contacts
+  - addresses
+  - commercial
+  - portal
+  - history
+  - employee_blocks
+- The commercial tab also has nested tabs:
+  - billing_profile
+  - invoice_parties
+  - pricing_rules
+- The pricing_rules tab has another nested level:
+  - rate_cards
+  - rate_lines
+  - surcharges
+- The currently selected tabs are controlled in the view layer by:
+  - activeDetailTab
+  - activeCommercialTab
+  - activePricingRulesTab
+  - and selectedRateCardId for the selected pricing context
+- After successful save/update flows, the page often reloads the selected customer detail through selectCustomer(...) or equivalent refresh logic.
+- During that reload, the tab state is reset:
+  - activeDetailTab goes back to `overview`
+  - activeCommercialTab goes back to `billing_profile`
+  - pricing context may also be lost
+- As a result, the user loses context and must manually reopen the same tab/subtab to verify the saved data.
 
-Implementation objective
-Refactor the feedback UX so that:
-1. Business result messages are shown as bottom-right toast notifications instead of inline fixed banners.
-2. Success/info/warning/error toasts auto-close after a sensible duration.
-3. The notification style is consistent with ant-design-vue / vben admin.
-4. Existing business logic and API flows remain intact.
-5. Existing `setFeedback(...)` calls should not require large business-logic rewrites.
+Required behavior
+1. When the user saves/updates data from a non-Overview detail tab, keep the same detail tab active after the refresh.
+2. If the user is inside `commercial`, preserve:
+   - the active commercial sub-tab
+   - and if relevant, the active pricing sub-tab
+3. If the user is inside `commercial -> pricing_rules`, preserve:
+   - activeDetailTab = `commercial`
+   - activeCommercialTab = `pricing_rules`
+   - activePricingRulesTab = the previously active one
+   - selectedRateCardId when still valid
+4. Preserve tab state only for “reload the same selected customer after mutation/refresh” flows.
+5. Keep the existing “new customer” create flow safe:
+   - while creating a brand-new customer, `Overview` may remain the only valid/active tab
+   - after first creation, fallback to a valid tab if needed
+6. If any previously active tab/subtab becomes invalid after reload, fall back safely:
+   - invalid detail tab -> `overview`
+   - invalid commercial tab -> `billing_profile`
+   - invalid pricing tab -> `rate_cards`
+   - invalid selectedRateCardId -> first valid rate card or empty state
+7. Do not add localStorage, route-query persistence, or unrelated global state unless absolutely necessary.
+8. Do not change backend APIs or business rules.
 
-Preferred architecture
-Create a small reusable helper/composable for SicherPlan legacy pages, for example:
-- web/apps/web-antd/src/sicherplan-legacy/composables/useSicherPlanFeedback.ts
-or a similarly named file
+Implementation guidance
+- Make the smallest safe front-end change.
+- Refactor the customer reload/select flow so it can preserve the current tab context when appropriate.
+- A good approach is to refactor `selectCustomer(...)` to accept an options object, for example:
+  - preserveDetailTab?: boolean
+  - fallbackDetailTab?: string
+  - preferredDetailTab?: string
+  - preserveCommercialTab?: boolean
+  - fallbackCommercialTab?: string
+  - preferredCommercialTab?: string
+  - preservePricingRulesTab?: boolean
+  - fallbackPricingRulesTab?: string
+  - preferredPricingRulesTab?: string
+  - preserveSelectedRateCard?: boolean
+  - preferredRateCardId?: string
+- Add tiny helpers that validate:
+  - desired detail tab against currently available detail tabs
+  - desired commercial tab against allowed commercial tabs
+  - desired pricing tab against allowed pricing tabs
+  - desired selectedRateCardId against current commercialProfile.rate_cards
+- Use tab preservation in post-save/post-update reload paths for the same selected customer.
+- It is acceptable to keep explicit manual “start create customer” behavior on `overview`.
 
-This helper should:
-- expose a function like `showFeedbackToast(...)`
-- map existing tone values such as:
-  - success
-  - error
-  - warning
-  - info / neutral
-  to the proper ant-design-vue notification API
-- use `placement: 'bottomRight'`
-- set a consistent duration, for example:
-  - success/info: around 3 to 4 seconds
-  - warning/error: around 4 to 6 seconds
-- optionally support a stable notification key to avoid duplicate stacking during rapid repeat actions when appropriate
+Important constraints
+- Keep the fix local to the customers admin page unless a tiny shared helper is clearly better.
+- Avoid unrelated refactors, renames, formatting churn, or permission-model changes.
+- Preserve the current tab only when it is still valid in the current UI state.
+- Do not break permission-gated tabs, especially `commercial`.
+- Do not break the nested pricing tabs or the selected rate-card behavior.
 
-Refactor strategy
-1. Identify all SicherPlan legacy pages/components that currently use the inline feedback banner pattern.
-   Look for:
-   - reactive `feedback` object
-   - `setFeedback(...)`
-   - `clearFeedback()`
-   - template sections like `v-if="feedback.message"`
+Acceptance criteria
+- Editing data in `Contacts` and saving keeps the user on `Contacts`.
+- Editing data in `Addresses` and saving keeps the user on `Addresses`.
+- Editing data in `Commercial -> Billing Profile` and saving keeps the user on `Commercial -> Billing Profile`.
+- Editing data in `Commercial -> Invoice Parties` and saving keeps the user on `Commercial -> Invoice Parties`.
+- Editing data in `Commercial -> Pricing Rules -> Rate Cards` and saving keeps the user on the same pricing context.
+- Editing data in `Commercial -> Pricing Rules -> Rate Lines` and saving keeps the user on `Rate Lines`.
+- Editing data in `Commercial -> Pricing Rules -> Surcharges` and saving keeps the user on `Surcharges`.
+- Editing data in `Portal`, `History`, or `Employee Blocks` and saving keeps the user on the same tab after save/update.
+- If a tab becomes unavailable after reload, the UI falls back safely without errors.
+- Starting a brand-new customer still behaves safely and does not expose invalid tabs before the record exists.
 
-2. Replace the inline banner rendering with toast notifications.
-   - Remove the fixed top-of-form feedback banner markup where appropriate.
-   - Remove “Dismiss notice” UX from these pages if it is no longer needed.
-   - Keep any real validation-inline field errors in forms. Only replace the global action/result feedback banner.
+Search hints
+Look for:
+- `activeDetailTab`
+- `activeCommercialTab`
+- `activePricingRulesTab`
+- `selectedRateCardId`
+- `overview`
+- `billing_profile`
+- `rate_cards`
+- `selectCustomer(`
+- post-submit success handlers that reload the selected customer
+- refresh logic that re-selects the current customer
+- anywhere that resets nested tabs during reload
 
-3. Preserve the current success/error semantics.
-   For example:
-   - after successful save/create/update/import/export:
-     show success toast
-   - after failed API call:
-     show error toast
-   - for neutral/informational messages:
-     show info toast
-   - if warning semantics exist, use warning toast
-
-4. First migrate these pages explicitly:
-   - web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
-   - web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
-
-5. Then migrate the other SicherPlan legacy views/components that use the same global feedback-banner pattern, as long as the change is mechanical and safe.
-   Likely candidates include files such as:
-   - FinanceActualApprovalView.vue
-   - PlanningShiftsAdminView.vue
-   - SubcontractorAdminView.vue
-   - PlanningOrdersAdminView.vue
-   - PlanningOpsAdminView.vue
-   - RecruitingAdminView.vue
-   - FinancePayrollAdminView.vue
-   - CoreAdminView.vue
-   - any other legacy component/view with the same feedback banner pattern
-   Do not refactor unrelated UI.
-
-Behavior requirements
-- Notifications must appear in the bottom-right corner.
-- Notifications must auto-dismiss after a few seconds.
-- Standard semantic colors/icons must be used from the existing ant-design-vue notification system.
-- Notifications should not block the page.
-- Do not replace inline field-level validation messages.
-- Do not change API payloads or business rules.
-- Do not break tests by changing unrelated text or structure more than necessary.
+Likely places to audit carefully
+- selectCustomer(...)
+- refreshCustomers()
+- submitCustomer()
+- submitContact()
+- submitAddress()
+- submitBillingProfile()
+- submitInvoiceParty()
+- submitRateCard()
+- submitRateLine()
+- submitSurchargeRule()
+- submitPortalPrivacy()
+- submitCustomerPortalAccess()
+- submitCustomerPortalAccessPasswordReset()
+- unlinkCustomerPortalAccount()
+- submitHistoryAttachmentLink()
+- submitEmployeeBlock()
+- any success handler that calls selectCustomer(...) or refreshCustomers() for the same customer
 
 Testing
-Add or update focused tests so that:
-- success actions trigger toast notifications
-- error paths trigger error notifications
-- the old inline persistent feedback banner is no longer rendered on the migrated pages
-Mock ant-design-vue notification APIs where appropriate.
+- Add regression test(s) for this bug.
+- Prefer a real component behavior test if practical.
+- At minimum, add focused regression coverage that proves:
+  1. the customer admin view can preserve a non-Overview detail tab after a successful same-customer reload
+  2. the customer admin view can preserve nested commercial tab state
+  3. invalid tab state falls back safely
+- If the existing test harness makes a full behavior test impractical, add the smallest focused regression test around the tab-preservation logic and explain the limitation in the final summary.
 
-Implementation guardrails
-- Keep the patch clean and minimal.
-- Reuse existing stack primitives.
-- Do not invent a global event bus unless really required.
-- Avoid duplicating notification mapping code in every page; centralize it in a helper/composable.
-
-Output format
-Before changing code, briefly summarize:
-- which files currently use the inline feedback banner pattern
-- the chosen migration strategy
-- why ant-design-vue notification is the right fit here
-
-After the change, report:
-- changed files
-- which pages were migrated
-- duration/placement rules used
-- whether any legacy pages still remain on the old banner pattern
-- test results
+Deliverables
+- Code change
+- Regression test(s)
+- Final summary including:
+  - root cause
+  - files changed
+  - why the fix works
+  - which tab levels are preserved
+  - any edge cases intentionally handled
