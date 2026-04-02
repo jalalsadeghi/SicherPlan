@@ -10,6 +10,23 @@ const viewPath = resolve(
 const source = readFileSync(viewPath, "utf8");
 
 test("customer workspace keeps desktop master detail layout with detail tabs", () => {
+  assert.match(source, /<SicherPlanLoadingOverlay[\s\S]*busy-testid="customer-workspace-loading-overlay"/);
+  assert.match(source, /:busy="customerWorkspaceBusy"/);
+  assert.match(source, /:text="customerWorkspaceLoadingText"/);
+  assert.match(source, /const customerWorkspaceBusy = computed\(/);
+  assert.match(source, /loading\.customer/);
+  assert.match(source, /loading\.contact/);
+  assert.match(source, /loading\.address/);
+  assert.match(source, /loading\.commercial/);
+  assert.match(source, /loading\.rateLine/);
+  assert.match(source, /loading\.surchargeRule/);
+  assert.match(source, /loading\.portalAccess/);
+  assert.match(source, /loading\.portalPrivacy/);
+  assert.match(source, /loading\.historyAttachment/);
+  assert.match(source, /loading\.employeeBlock/);
+  assert.match(source, /loading\.sharedAddress/);
+  assert.match(source, /loading\.hrCatalogBootstrap/);
+  assert.match(source, /const customerWorkspaceLoadingText = computed\(\(\) => \(customerWorkspaceBusy\.value \? t\("workspace\.loading\.processing"\) : ""\)\)/);
   assert.match(source, /class="customer-admin-grid"/);
   assert.match(source, /data-testid="customer-list-section"/);
   assert.match(source, /data-testid="customer-detail-workspace"/);

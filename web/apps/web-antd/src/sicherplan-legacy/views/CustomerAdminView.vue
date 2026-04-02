@@ -64,7 +64,14 @@
       <h3>{{ t("customerAdmin.permission.missingBody") }}</h3>
     </section>
 
-    <div v-else class="customer-admin-grid" data-testid="customer-master-detail-layout">
+    <SicherPlanLoadingOverlay
+      v-else
+      :aria-label="customerWorkspaceLoadingText"
+      :busy="customerWorkspaceBusy"
+      :text="customerWorkspaceLoadingText"
+      busy-testid="customer-workspace-loading-overlay"
+    >
+      <div class="customer-admin-grid" data-testid="customer-master-detail-layout">
       <section class="module-card customer-admin-panel customer-admin-list-panel" data-testid="customer-list-section">
         <div class="customer-admin-panel__header">
           <div>
@@ -1948,7 +1955,8 @@
           <h3>{{ t("customerAdmin.detail.emptyBody") }}</h3>
         </section>
       </section>
-    </div>
+      </div>
+    </SicherPlanLoadingOverlay>
   </section>
 </template>
 
@@ -2020,6 +2028,7 @@ import {
   updateCustomerSurchargeRule,
   upsertCustomerBillingProfile,
 } from "@/api/customers";
+import SicherPlanLoadingOverlay from "@/components/SicherPlanLoadingOverlay.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import {
   applySurchargeAmountMode,
@@ -2335,6 +2344,22 @@ const canRead = computed(() => actionState.value.canRead);
 const canWrite = computed(() => actionState.value.canCreate);
 const canReadCommercial = computed(() => commercialActionState.value.canReadCommercial);
 const canWriteCommercial = computed(() => commercialActionState.value.canWriteCommercial);
+const customerWorkspaceBusy = computed(
+  () =>
+    loading.customer
+    || loading.contact
+    || loading.address
+    || loading.commercial
+    || loading.rateLine
+    || loading.surchargeRule
+    || loading.portalAccess
+    || loading.portalPrivacy
+    || loading.historyAttachment
+    || loading.employeeBlock
+    || loading.sharedAddress
+    || loading.hrCatalogBootstrap,
+);
+const customerWorkspaceLoadingText = computed(() => (customerWorkspaceBusy.value ? t("workspace.loading.processing") : ""));
 const isDevelopmentEnv = computed(() => webAppConfig.env === "development");
 const canBootstrapHrCatalogSamples = computed(() =>
   isDevelopmentEnv.value

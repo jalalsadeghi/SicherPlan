@@ -64,6 +64,17 @@ export function deriveEmployeeActionState(role, selectedEmployee) {
   };
 }
 
+export function resolveEmployeeDetailTab(desiredTab, availableTabIds, fallbackTab = "overview") {
+  const availableTabs = Array.isArray(availableTabIds) ? availableTabIds : [];
+  if (typeof desiredTab === "string" && availableTabs.includes(desiredTab)) {
+    return desiredTab;
+  }
+  if (typeof fallbackTab === "string" && availableTabs.includes(fallbackTab)) {
+    return fallbackTab;
+  }
+  return availableTabs[0] ?? "overview";
+}
+
 export function mapEmployeeApiMessage(messageKey) {
   const messageMap = {
     "errors.iam.auth.invalid_access_token": "employeeAdmin.feedback.authRequired",

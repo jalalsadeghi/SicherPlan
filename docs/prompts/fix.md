@@ -1,98 +1,83 @@
-You are working in the SicherPlan repository.
+The previous change introduced an import-resolution error in web/apps/web-antd.
 
-Goal:
-Fix the deployed-environment issue where the Employees workspace still shows empty Function Type and Qualification Type dropdowns for existing tenants after a normal code-only deployment.
+Current error
+[plugin:vite:import-analysis] Failed to resolve import "@/sicherplan-legacy/components/SicherPlanLoadingOverlay.vue" from "src/sicherplan-legacy/views/CustomerAdminView.vue"
 
-Observed production behavior:
-- The Employees UI now correctly shows empty-state hints:
-  - “No function types are configured for this tenant yet.”
-  - “No qualification types are configured for this tenant yet.”
-- This means the frontend is working as designed and the backend catalog endpoints are returning empty arrays for that tenant.
+Root cause to verify first
+In web/apps/web-antd/tsconfig.json, the alias mapping is:
+- "#/*" -> "./src/*"
+- "@/*" -> "./src/sicherplan-legacy/*"
 
-Confirmed repo facts:
-1. The Employees UI loads catalog data from backend APIs and disables the dropdown when the arrays are empty:
+That means an import like:
+@/sicherplan-legacy/components/SicherPlanLoadingOverlay.vue
+incorrectly resolves to:
+src/sicherplan-legacy/sicherplan-legacy/components/...
+So the import path is structurally wrong.
+
+Also verify exact filename case on disk.
+This repo is being run on Linux/WSL, so case must match exactly.
+If the file is named SicherPlanLoadingOverlay.vue, every import must use the same exact casing.
+
+Task
+Fix the loading-overlay integration cleanly and make the project build again.
+
+Required steps
+1. Inspect the actual local file path that was created for the overlay component.
+   Check whether the file exists in one of these locations:
+   - web/apps/web-antd/src/sicherplan-legacy/components/SicherPlanLoadingOverlay.vue
+   - web/apps/web-antd/src/components/SicherPlanLoadingOverlay.vue
+   - or some differently cased variant
+
+2. Normalize the component location and imports.
+   Preferred target location:
+   - web/apps/web-antd/src/sicherplan-legacy/components/SicherPlanLoadingOverlay.vue
+
+   If you keep the file there, then the correct import from legacy views must be:
+   - "@/components/SicherPlanLoadingOverlay.vue"
+
+   because @ already points to src/sicherplan-legacy.
+
+   Alternative acceptable fix:
+   - use a relative import such as "../components/SicherPlanLoadingOverlay.vue"
+   But prefer the alias form if it matches existing code style.
+
+3. Fix all broken references consistently.
+   At minimum inspect and fix:
+   - web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
    - web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
-   - web/apps/web-antd/src/sicherplan-legacy/api/employeeAdmin.ts
+   - web/apps/web-antd/src/sicherplan-legacy/components/sicherplanLoadingOverlay.test.ts
+   - any other file changed by the previous patch that imports this component
 
-2. Tenant baseline HR catalogs are provisioned automatically only during tenant onboarding:
-   - backend/app/modules/core/admin_repository.py
-   via seed_baseline_employee_catalogs(...)
+4. Verify the component filename casing and test filename casing.
+   Use one naming convention consistently:
+   - component file: SicherPlanLoadingOverlay.vue
+   - test file may stay sicherplanLoadingOverlay.test.ts if desired, but imports must match the component file’s exact case
 
-3. Existing tenants can be backfilled manually with:
-   - backend/scripts/seed_go_live_configuration.py
-   which calls seed_baseline_employee_catalogs(...)
+5. Do not change the functional behavior of the loading overlay unless needed for the fix.
+   Keep the previously implemented behavior:
+   - page/workspace-local translucent overlay
+   - underlying form still visible
+   - pointer interaction blocked while busy
+   - aria-busy on the covered region
+   - reuse existing loading flags already wired in EmployeeAdminView and CustomerAdminView
 
-4. The HR baseline definitions live in:
-   - backend/app/modules/employees/catalog_seed.py
+6. After fixing imports, run verification.
+   Please run and report the result of:
+   - a targeted build or vite check for web/apps/web-antd
+   - the focused tests related to:
+     - EmployeeAdminView
+     - CustomerAdminView
+     - SicherPlanLoadingOverlay
+   - if a full build is too heavy, run the narrowest reliable command that proves the import issue is gone
 
-Problem to solve:
-A normal GitHub Action / CI-CD deployment updates application code, but existing tenants that were created before this baseline logic still remain empty unless an operator manually runs the seed script.
+7. Output format
+   Before editing, briefly state:
+   - actual overlay component path found on disk
+   - incorrect imports found
+   - corrected import strategy
 
-Required outcome:
-Introduce a production-safe, explicit, idempotent post-deploy/backfill mechanism so existing deployed tenants can receive missing baseline HR catalogs without changing normal read endpoints and without relying on dev/test bootstrap.
-
-What to implement:
-1. Add an operator-safe backfill path for existing tenants in deployment/rollout automation.
-   Preferred options:
-   - a deploy script step
-   - a dedicated post-deploy command
-   - a CI/CD workflow step guarded by explicit env vars / inputs
-   Do NOT add hidden request-time auto-seeding to the list endpoints.
-
-2. Keep behavior production-safe and explicit:
-   - do not seed all tenants accidentally
-   - require either:
-     a) a specific tenant id
-     or
-     b) an explicit opt-in flag for all active tenants
-   - make the action idempotent
-
-3. Add or improve a script that can be used in deployment automation.
-   If backend/scripts/seed_go_live_configuration.py is already sufficient, reuse it.
-   If it needs enhancement, improve it carefully.
-   Good options:
-   - support `--tenant-id <uuid>`
-   - optionally support `--all-tenants` only with strong explicit confirmation
-   - clear console output for inserted/updated counts
-
-4. Update deployment docs or workflow docs so operators know:
-   - code deploy alone is not enough for old tenants
-   - how to run the backfill safely
-   - when it is required
-
-5. If this repository already contains GitHub Actions deployment workflows, update them only in a safe and optional way:
-   - no dangerous auto-backfill by default
-   - use workflow_dispatch input or protected env var such as:
-     - RUN_HR_BASELINE_BACKFILL=true
-     - HR_BASELINE_TENANT_ID=<uuid>
-   - fail clearly if the flag is enabled but required inputs are missing
-
-6. Add tests where appropriate:
-   - script/service idempotency for repeated backfill
-   - existing tenant with missing catalogs receives baseline rows
-   - tenant with existing customized rows is not duplicated or clobbered
-   - no change to read endpoint semantics
-
-7. Preserve these constraints:
-   - no auto-seeding inside GET catalog endpoints
-   - keep dev/test bootstrap behavior unchanged
-   - keep onboarding behavior unchanged
-   - keep Employees UI empty-state behavior unchanged
-
-Desired deliverables:
-- implementation
-- tests
-- rollout notes
-- exact operator command examples for deployed environments
-
-Implementation notes:
-- Treat this as a rollout/backfill problem, not a frontend rendering bug.
-- Prefer explicit operational control over hidden side effects.
-- Keep changes focused and production-safe.
-
-Please return:
-1. Root-cause summary
-2. Chosen rollout/backfill design
-3. Exact files changed
-4. How operators should run it in deployed environments
-5. Any caveats
+   After editing, report:
+   - changed files
+   - exact corrected import strings
+   - build/test result
+   - whether any remaining alias inconsistencies were found

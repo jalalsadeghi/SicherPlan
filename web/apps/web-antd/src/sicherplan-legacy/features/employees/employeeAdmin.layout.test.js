@@ -28,6 +28,11 @@ test("employee workspace uses master detail layout and embedded scope is removed
 });
 
 test("employee detail uses top-level tabs and isolated tab panels", () => {
+  assert.match(viewSource, /<SicherPlanLoadingOverlay[\s\S]*busy-testid="employee-workspace-loading-overlay"/);
+  assert.match(viewSource, /:busy="employeeWorkspaceBusy"/);
+  assert.match(viewSource, /:text="employeeWorkspaceLoadingText"/);
+  assert.match(viewSource, /const employeeWorkspaceBusy = computed\(\(\) => loading\.action\)/);
+  assert.match(viewSource, /const employeeWorkspaceLoadingText = computed\(\(\) => \(employeeWorkspaceBusy\.value \? t\("workspace\.loading\.processing"\) : ""\)\)/);
   assert.match(viewSource, /data-testid="employee-detail-tabs"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-overview"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-app-access"/);
@@ -40,6 +45,10 @@ test("employee detail uses top-level tabs and isolated tab panels", () => {
   assert.match(viewSource, /data-testid="employee-tab-panel-notes"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-groups"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-documents"/);
+  assert.match(viewSource, /async function selectEmployee\(employeeId: string, options: SelectEmployeeOptions = \{\}\)/);
+  assert.match(viewSource, /preserveActiveTab = false/);
+  assert.match(viewSource, /resolveEmployeeDetailTab\(\s*desiredTab,[\s\S]*employeeDetailTabs\.value\.map\(\(tab\) => tab\.id\)/);
+  assert.match(viewSource, /selectEmployee\(selectedEmployeeId\.value, \{ preserveActiveTab: true \}\)/);
 });
 
 test("employee list rows use structured text stack markup and card row styling", () => {

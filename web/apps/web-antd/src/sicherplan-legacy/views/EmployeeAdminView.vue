@@ -47,7 +47,14 @@
       <h3>{{ t("employeeAdmin.permission.missingBody") }}</h3>
     </section>
 
-    <div v-else class="employee-admin-grid" data-testid="employee-master-detail-layout">
+    <SicherPlanLoadingOverlay
+      v-else
+      :aria-label="employeeWorkspaceLoadingText"
+      :busy="employeeWorkspaceBusy"
+      :text="employeeWorkspaceLoadingText"
+      busy-testid="employee-workspace-loading-overlay"
+    >
+      <div class="employee-admin-grid" data-testid="employee-master-detail-layout">
       <section class="module-card employee-admin-panel employee-admin-list-panel" data-testid="employee-list-section">
         <div class="employee-admin-panel__header">
           <div>
@@ -1621,7 +1628,8 @@
           <p>{{ t("employeeAdmin.detail.emptyBody") }}</p>
         </section>
       </section>
-    </div>
+      </div>
+    </SicherPlanLoadingOverlay>
   </section>
 </template>
 
@@ -1723,6 +1731,7 @@ import {
   uploadEmployeeDocument,
   upsertEmployeePrivateProfile,
 } from "@/api/employeeAdmin";
+import SicherPlanLoadingOverlay from "@/components/SicherPlanLoadingOverlay.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import { useI18n } from "@/i18n";
 import {
@@ -1744,6 +1753,7 @@ import {
   mapEmployeeApiMessage,
   normalizeOptionalText,
   parseWeekdayMask,
+  resolveEmployeeDetailTab,
   summarizeCurrentAddress,
   toLocalDateTimeInput,
   validateEmployeeAbsenceDraft,
@@ -1977,6 +1987,8 @@ const actionState = computed(() => deriveEmployeeActionState(effectiveRole.value
 const canRead = computed(() => actionState.value.canRead);
 const canWrite = computed(() => actionState.value.canWrite);
 const canReadPrivate = computed(() => actionState.value.canReadPrivate);
+const employeeWorkspaceBusy = computed(() => loading.action);
+const employeeWorkspaceLoadingText = computed(() => (employeeWorkspaceBusy.value ? t("workspace.loading.processing") : ""));
 const resolvedTenantScopeId = computed(() => authStore.effectiveTenantScopeId);
 const hasLinkedAccess = computed(() => !!accessLink.value?.user_id);
 const selectedEmployeeLabel = computed(() =>
@@ -2103,6 +2115,11 @@ const employeeDetailTabs = computed(() => {
 
   return isCreatingEmployee.value ? tabs.filter((tab) => tab.id === "overview") : tabs;
 });
+
+type SelectEmployeeOptions = {
+  fallbackTab?: string;
+  preserveActiveTab?: boolean;
+};
 
 function formatStructureLabel(record: BranchRead | MandateRead) {
   return formatEmployeeStructureLabel(record);
@@ -2635,12 +2652,13 @@ async function loadQualificationProofs(qualificationId: string) {
   );
 }
 
-async function selectEmployee(employeeId: string) {
+async function selectEmployee(employeeId: string, options: SelectEmployeeOptions = {}) {
   if (!resolvedTenantScopeId.value || !authStore.accessToken) {
     return;
   }
+  const { preserveActiveTab = false, fallbackTab = "overview" } = options;
+  const desiredTab = preserveActiveTab ? activeDetailTab.value : fallbackTab;
   isCreatingEmployee.value = false;
-  activeDetailTab.value = "overview";
   selectedEmployeeId.value = employeeId;
   loading.detail = true;
   try {
@@ -2708,6 +2726,11 @@ async function selectEmployee(employeeId: string) {
     if (firstQualification) {
       await loadQualificationProofs(firstQualification.id);
     }
+    activeDetailTab.value = resolveEmployeeDetailTab(
+      desiredTab,
+      employeeDetailTabs.value.map((tab) => tab.id),
+      fallbackTab,
+    );
     await refreshPhotoPreview();
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -2778,7 +2801,7 @@ async function submitEmployee() {
         });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.employeeSaved"));
     await refreshEmployees();
-    await selectEmployee(employee.id);
+    await selectEmployee(employee.id, { preserveActiveTab: true });
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
     setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
@@ -2851,7 +2874,7 @@ async function submitNote() {
       });
     }
     resetNoteDraft();
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.noteSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -2919,7 +2942,7 @@ async function submitMembership() {
       });
     }
     resetMembershipDraft();
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.membershipSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3029,7 +3052,7 @@ async function submitQualification() {
     } else {
       await createEmployeeQualification(resolvedTenantScopeId.value, authStore.accessToken, payload);
     }
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.qualificationSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3099,7 +3122,7 @@ async function submitCredential() {
     } else {
       await createEmployeeCredential(resolvedTenantScopeId.value, authStore.accessToken, payload);
     }
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.credentialSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3166,7 +3189,7 @@ async function submitAvailabilityRule() {
     } else {
       await createEmployeeAvailabilityRule(resolvedTenantScopeId.value, authStore.accessToken, payload);
     }
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.availabilitySaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3206,7 +3229,7 @@ async function submitAbsence() {
     } else {
       await createEmployeeAbsence(resolvedTenantScopeId.value, authStore.accessToken, payload);
     }
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.absenceSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3262,7 +3285,7 @@ async function submitEmployeeDocumentUpload() {
       fileToBase64,
     );
     await uploadEmployeeDocument(resolvedTenantScopeId.value, selectedEmployeeId.value, authStore.accessToken, payload);
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.documentUploaded"));
   } catch (error) {
     setFeedback("error", t("employeeAdmin.feedback.titleError"), resolveEmployeeDocumentErrorMessage(error));
@@ -3288,7 +3311,7 @@ async function submitEmployeeDocumentLink() {
         label: emptyToNull(documentLinkDraft.label || ""),
       },
     );
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.documentLinked"));
   } catch (error) {
     setFeedback("error", t("employeeAdmin.feedback.titleError"), resolveEmployeeDocumentErrorMessage(error));
@@ -3322,7 +3345,7 @@ async function submitEmployeeDocumentVersion() {
       authStore.accessToken,
       payload,
     );
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.documentVersionSaved"));
   } catch (error) {
     setFeedback("error", t("employeeAdmin.feedback.titleError"), resolveEmployeeDocumentErrorMessage(error));
@@ -3345,7 +3368,7 @@ async function submitPhoto() {
       content_base64: contentBase64,
     });
     pendingPhotoFile.value = null;
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.photoSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3439,7 +3462,7 @@ async function createAccessUser() {
         password: accessCreateDraft.password,
       },
     );
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.accessLinked"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3466,7 +3489,7 @@ async function updateAccessUser() {
         full_name: accessManageDraft.full_name.trim(),
       },
     );
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.accessUpdated"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3491,7 +3514,7 @@ async function resetAccessPassword() {
         password: accessResetDraft.password,
       },
     );
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.accessPasswordReset"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3518,7 +3541,7 @@ async function attachAccessUser() {
         email: emptyToNull(accessAttachDraft.email),
       },
     );
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.accessLinked"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3540,7 +3563,7 @@ async function detachAccessUser() {
       authStore.accessToken,
       { tenant_id: resolvedTenantScopeId.value },
     );
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.accessDetached"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3561,7 +3584,7 @@ async function reconcileAccessUser() {
       selectedEmployeeId.value,
       authStore.accessToken,
     );
-    await selectEmployee(selectedEmployeeId.value);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.accessReconciled"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3604,7 +3627,7 @@ watch(
   () => {
     const allowedTabs = employeeDetailTabs.value.map((tab) => tab.id);
     if (!allowedTabs.includes(activeDetailTab.value)) {
-      activeDetailTab.value = "overview";
+      activeDetailTab.value = resolveEmployeeDetailTab(activeDetailTab.value, allowedTabs);
     }
   },
   { immediate: true },

@@ -17,6 +17,7 @@ import {
   hasEmployeePermission,
   mapEmployeeApiMessage,
   parseWeekdayMask,
+  resolveEmployeeDetailTab,
   summarizeCurrentAddress,
   toLocalDateTimeInput,
   validateEmployeeAbsenceDraft,
@@ -81,6 +82,15 @@ test("api message keys map to localized employee feedback keys", () => {
     mapEmployeeApiMessage("errors.docs.document_type.not_found"),
     "employeeAdmin.feedback.documentTypeNotConfigured",
   );
+});
+
+test("detail tab resolver preserves valid tabs and falls back safely", () => {
+  const tabs = ["overview", "qualifications", "credentials"];
+
+  assert.equal(resolveEmployeeDetailTab("qualifications", tabs), "qualifications");
+  assert.equal(resolveEmployeeDetailTab("private_profile", tabs), "overview");
+  assert.equal(resolveEmployeeDetailTab("private_profile", ["credentials"], "overview"), "credentials");
+  assert.equal(resolveEmployeeDetailTab("", []), "overview");
 });
 
 test("employee document type options expose the seeded employee-facing keys", () => {

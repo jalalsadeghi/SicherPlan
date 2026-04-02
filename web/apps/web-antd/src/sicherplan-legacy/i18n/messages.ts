@@ -31,6 +31,7 @@ export type MessageKey =
   | "shell.stat.roles"
   | "shell.stat.modules"
   | "shell.stat.portals"
+  | "workspace.loading.processing"
   | "module.eyebrow"
   | "module.note.navigation"
   | "module.note.future"
@@ -1571,6 +1572,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "shell.stat.roles": "Rollen",
     "shell.stat.modules": "Modulgruppen",
     "shell.stat.portals": "Portalpfade",
+    "workspace.loading.processing": "Vorgang wird verarbeitet",
     "module.eyebrow": "Platzhaltermodul",
     "module.note.navigation":
       "Navigation und Rollenfreigaben sind bereits im Shell-Register hinterlegt.",
@@ -3435,6 +3437,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "shell.stat.roles": "Roles",
     "shell.stat.modules": "Module groups",
     "shell.stat.portals": "Portal paths",
+    "workspace.loading.processing": "Processing request",
     "module.eyebrow": "Placeholder module",
     "module.note.navigation":
       "Navigation and role visibility are already registered in the shell.",
