@@ -18,6 +18,61 @@ export const PLANNING_ENTITY_OPTIONS = [
   "patrol_route",
 ];
 
+export const PLANNING_CREATE_ENTITY_OPTIONS = [
+  ...PLANNING_ENTITY_OPTIONS,
+  "trade_fair_zone",
+  "patrol_checkpoint",
+];
+
+export const PLANNING_STATUS_OPTIONS = [
+  "active",
+  "inactive",
+  "archived",
+];
+
+export const PLANNING_ENTITY_FORM_CONFIG = {
+  requirement_type: {
+    child: false,
+    labelKey: "entityRequirementType",
+    parentEntityKey: null,
+  },
+  equipment_item: {
+    child: false,
+    labelKey: "entityEquipmentItem",
+    parentEntityKey: null,
+  },
+  site: {
+    child: false,
+    labelKey: "entitySite",
+    parentEntityKey: null,
+  },
+  event_venue: {
+    child: false,
+    labelKey: "entityEventVenue",
+    parentEntityKey: null,
+  },
+  trade_fair: {
+    child: false,
+    labelKey: "entityTradeFair",
+    parentEntityKey: null,
+  },
+  trade_fair_zone: {
+    child: true,
+    labelKey: "entityTradeFairZone",
+    parentEntityKey: "trade_fair",
+  },
+  patrol_route: {
+    child: false,
+    labelKey: "entityPatrolRoute",
+    parentEntityKey: null,
+  },
+  patrol_checkpoint: {
+    child: true,
+    labelKey: "entityPatrolCheckpoint",
+    parentEntityKey: "patrol_route",
+  },
+};
+
 export function hasPlanningPermission(role, permissionKey) {
   return (PLANNING_PERMISSION_MATRIX[role] ?? []).includes(permissionKey);
 }
@@ -33,6 +88,121 @@ export function derivePlanningActionState(role, entityKey, selectedRecord) {
     canImport: canWrite,
     canManageChildren: canWrite && !!selectedRecord && (entityKey === "trade_fair" || entityKey === "patrol_route"),
   };
+}
+
+export function normalizePlanningEditorEntity(entityKey, fallback = "site") {
+  return PLANNING_CREATE_ENTITY_OPTIONS.includes(entityKey) ? entityKey : fallback;
+}
+
+export function resolvePlanningBrowseEntity(entityKey) {
+  const normalized = normalizePlanningEditorEntity(entityKey);
+  const config = PLANNING_ENTITY_FORM_CONFIG[normalized];
+  return config?.parentEntityKey ?? normalized;
+}
+
+export function isPlanningChildEntity(entityKey) {
+  const config = PLANNING_ENTITY_FORM_CONFIG[normalizePlanningEditorEntity(entityKey)];
+  return !!config?.child;
+}
+
+export function validatePlanningCreateDraft({
+  checkpointDraft,
+  draft,
+  editorEntityKey,
+  parentPatrolRouteId,
+  parentTradeFairId,
+  zoneDraft,
+}) {
+  const normalizedEntityKey = normalizePlanningEditorEntity(editorEntityKey);
+  const requiredValue = (value) => typeof value === "string" ? value.trim() : value;
+
+  if (normalizedEntityKey === "trade_fair_zone") {
+    if (!requiredValue(parentTradeFairId)) return "validationTradeFairParentRequired";
+    if (!requiredValue(zoneDraft.zone_type_code)) return "validationZoneTypeRequired";
+    if (!requiredValue(zoneDraft.zone_code)) return "validationZoneCodeRequired";
+    if (!requiredValue(zoneDraft.label)) return "validationLabelRequired";
+    return null;
+  }
+
+  if (normalizedEntityKey === "patrol_checkpoint") {
+    if (!requiredValue(parentPatrolRouteId)) return "validationPatrolRouteParentRequired";
+    if (!Number.isFinite(Number(checkpointDraft.sequence_no)) || Number(checkpointDraft.sequence_no) < 1) {
+      return "validationCheckpointSequenceInvalid";
+    }
+    if (!requiredValue(checkpointDraft.checkpoint_code)) return "validationCheckpointCodeRequired";
+    if (!requiredValue(checkpointDraft.label)) return "validationLabelRequired";
+    if (parseOptionalCoordinate(checkpointDraft.latitude) == null || parseOptionalCoordinate(checkpointDraft.longitude) == null) {
+      return "validationCheckpointCoordinatesRequired";
+    }
+    if (!requiredValue(checkpointDraft.scan_type_code)) return "validationCheckpointScanTypeRequired";
+    if (!Number.isFinite(Number(checkpointDraft.minimum_dwell_seconds)) || Number(checkpointDraft.minimum_dwell_seconds) < 0) {
+      return "validationCheckpointDwellInvalid";
+    }
+    return null;
+  }
+
+  if (!requiredValue(draft.customer_id)) return "validationCustomerRequired";
+
+  if (normalizedEntityKey === "requirement_type") {
+    if (!requiredValue(draft.code)) return "validationCodeRequired";
+    if (!requiredValue(draft.label)) return "validationLabelRequired";
+    if (!requiredValue(draft.default_planning_mode_code)) return "validationDefaultPlanningModeRequired";
+    return null;
+  }
+
+  if (normalizedEntityKey === "equipment_item") {
+    if (!requiredValue(draft.code)) return "validationCodeRequired";
+    if (!requiredValue(draft.label)) return "validationLabelRequired";
+    if (!requiredValue(draft.unit_of_measure_code)) return "validationUnitRequired";
+    return null;
+  }
+
+  if (normalizedEntityKey === "site") {
+    if (!requiredValue(draft.site_no)) return "validationSiteNoRequired";
+    if (!requiredValue(draft.name)) return "validationNameRequired";
+    return null;
+  }
+
+  if (normalizedEntityKey === "event_venue") {
+    if (!requiredValue(draft.venue_no)) return "validationVenueNoRequired";
+    if (!requiredValue(draft.name)) return "validationNameRequired";
+    return null;
+  }
+
+  if (normalizedEntityKey === "trade_fair") {
+    if (!requiredValue(draft.fair_no)) return "validationFairNoRequired";
+    if (!requiredValue(draft.name)) return "validationNameRequired";
+    if (!requiredValue(draft.start_date)) return "validationTradeFairStartRequired";
+    if (!requiredValue(draft.end_date)) return "validationTradeFairEndRequired";
+    if (draft.start_date > draft.end_date) return "validationTradeFairDateRange";
+    return null;
+  }
+
+  if (!requiredValue(draft.route_no)) return "validationRouteNoRequired";
+  if (!requiredValue(draft.name)) return "validationNameRequired";
+  return null;
+}
+
+export function buildPlanningDirtySnapshot({
+  checkpointDraft,
+  draft,
+  editorEntityKey,
+  isCreatingRecord,
+  parentPatrolRouteId,
+  parentTradeFairId,
+  selectedRecordId,
+  zoneDraft,
+}) {
+  return JSON.stringify({
+    checkpointDraft,
+    draft,
+    editorEntityKey,
+    isCreatingRecord,
+    parentPatrolRouteId,
+    parentTradeFairId,
+    selectedRecordId,
+    zoneDraft,
+  });
 }
 
 export function mapPlanningApiMessage(messageKey) {

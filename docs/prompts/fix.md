@@ -1,155 +1,184 @@
-You are working on the latest main branch of the public repository `jalalsadeghi/SicherPlan`.
+You are working in the public repository jalalsadeghi/SicherPlan.
 
-Task
-Fix a UX bug in the admin customers workspace so that after saving or updating data from a non-Overview tab, the UI stays on the same active tab instead of jumping back to the first tab (`Overview`).
+Goal:
+Audit and standardize the "Create a new record" experience in the Planning Setup admin page (admin/planning), implemented in the legacy Vben web app. The target page is the P-01 Planning Setup workspace, not Orders/Planning Records, Shift Planning, or Staffing Coverage.
 
-Inspect first
-- web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
-- web/apps/web-antd/src/sicherplan-legacy/features/customers/customerAdmin.layout.test.js
-- any nearby Vitest / Vue Test Utils helpers already used by the web workspace
-- optionally inspect small nearby helper files already imported by CustomerAdminView if they are the right place for tiny tab-validation helpers
+Primary file to inspect:
+- web/apps/web-antd/src/sicherplan-legacy/views/PlanningOpsAdminView.vue
 
-Observed problem
-- The customers admin page has multiple detail tabs:
-  - overview
-  - contacts
-  - addresses
-  - commercial
-  - portal
-  - history
-  - employee_blocks
-- The commercial tab also has nested tabs:
-  - billing_profile
-  - invoice_parties
-  - pricing_rules
-- The pricing_rules tab has another nested level:
-  - rate_cards
-  - rate_lines
-  - surcharges
-- The currently selected tabs are controlled in the view layer by:
-  - activeDetailTab
-  - activeCommercialTab
-  - activePricingRulesTab
-  - and selectedRateCardId for the selected pricing context
-- After successful save/update flows, the page often reloads the selected customer detail through selectCustomer(...) or equivalent refresh logic.
-- During that reload, the tab state is reset:
-  - activeDetailTab goes back to `overview`
-  - activeCommercialTab goes back to `billing_profile`
-  - pricing context may also be lost
-- As a result, the user loses context and must manually reopen the same tab/subtab to verify the saved data.
+Also inspect any related files that drive this page, especially under:
+- web/apps/web-antd/src/sicherplan-legacy/features/planning/
+- web/apps/web-antd/src/sicherplan-legacy/components/
+- web/apps/web-antd/src/sicherplan-legacy/api/
+- web/apps/web-antd/src/sicherplan-legacy/i18n/
+- any existing tests for admin workspace layout / create flows
 
-Required behavior
-1. When the user saves/updates data from a non-Overview detail tab, keep the same detail tab active after the refresh.
-2. If the user is inside `commercial`, preserve:
-   - the active commercial sub-tab
-   - and if relevant, the active pricing sub-tab
-3. If the user is inside `commercial -> pricing_rules`, preserve:
-   - activeDetailTab = `commercial`
-   - activeCommercialTab = `pricing_rules`
-   - activePricingRulesTab = the previously active one
-   - selectedRateCardId when still valid
-4. Preserve tab state only for “reload the same selected customer after mutation/refresh” flows.
-5. Keep the existing “new customer” create flow safe:
-   - while creating a brand-new customer, `Overview` may remain the only valid/active tab
-   - after first creation, fallback to a valid tab if needed
-6. If any previously active tab/subtab becomes invalid after reload, fall back safely:
-   - invalid detail tab -> `overview`
-   - invalid commercial tab -> `billing_profile`
-   - invalid pricing tab -> `rate_cards`
-   - invalid selectedRateCardId -> first valid rate card or empty state
-7. Do not add localStorage, route-query persistence, or unrelated global state unless absolutely necessary.
-8. Do not change backend APIs or business rules.
+Reference UX pattern:
+- Use the same admin workspace pattern already used by the other legacy admin pages such as EmployeeAdminView and CustomerAdminView:
+  - list/search panel on the left
+  - detail/editor panel on the right
+  - create/edit mode clearly visible
+  - save/cancel actions always obvious
+  - no child-resource editing before the parent record exists
+  - only show fields relevant to the selected record type
 
-Implementation guidance
-- Make the smallest safe front-end change.
-- Refactor the customer reload/select flow so it can preserve the current tab context when appropriate.
-- A good approach is to refactor `selectCustomer(...)` to accept an options object, for example:
-  - preserveDetailTab?: boolean
-  - fallbackDetailTab?: string
-  - preferredDetailTab?: string
-  - preserveCommercialTab?: boolean
-  - fallbackCommercialTab?: string
-  - preferredCommercialTab?: string
-  - preservePricingRulesTab?: boolean
-  - fallbackPricingRulesTab?: string
-  - preferredPricingRulesTab?: string
-  - preserveSelectedRateCard?: boolean
-  - preferredRateCardId?: string
-- Add tiny helpers that validate:
-  - desired detail tab against currently available detail tabs
-  - desired commercial tab against allowed commercial tabs
-  - desired pricing tab against allowed pricing tabs
-  - desired selectedRateCardId against current commercialProfile.rate_cards
-- Use tab preservation in post-save/post-update reload paths for the same selected customer.
-- It is acceptable to keep explicit manual “start create customer” behavior on `overview`.
+Important domain rule:
+This page is P-01 Planning Setup and must support multiple planning setup record families with entity-specific forms:
+- requirement type
+- equipment item
+- site
+- event venue
+- trade fair
+- trade fair zone
+- patrol route
+- patrol checkpoint
 
-Important constraints
-- Keep the fix local to the customers admin page unless a tiny shared helper is clearly better.
-- Avoid unrelated refactors, renames, formatting churn, or permission-model changes.
-- Preserve the current tab only when it is still valid in the current UI state.
-- Do not break permission-gated tabs, especially `commercial`.
-- Do not break the nested pricing tabs or the selected rate-card behavior.
+Problem to fix:
+The current "Create a new record" flow in the Detail view is not sufficiently standardized unless it behaves like a proper entity-aware admin editor. Fix the page so that the create-new experience is consistent, safe, and aligned with the documented planning model.
 
-Acceptance criteria
-- Editing data in `Contacts` and saving keeps the user on `Contacts`.
-- Editing data in `Addresses` and saving keeps the user on `Addresses`.
-- Editing data in `Commercial -> Billing Profile` and saving keeps the user on `Commercial -> Billing Profile`.
-- Editing data in `Commercial -> Invoice Parties` and saving keeps the user on `Commercial -> Invoice Parties`.
-- Editing data in `Commercial -> Pricing Rules -> Rate Cards` and saving keeps the user on the same pricing context.
-- Editing data in `Commercial -> Pricing Rules -> Rate Lines` and saving keeps the user on `Rate Lines`.
-- Editing data in `Commercial -> Pricing Rules -> Surcharges` and saving keeps the user on `Surcharges`.
-- Editing data in `Portal`, `History`, or `Employee Blocks` and saving keeps the user on the same tab after save/update.
-- If a tab becomes unavailable after reload, the UI falls back safely without errors.
-- Starting a brand-new customer still behaves safely and does not expose invalid tabs before the record exists.
+Implement these requirements:
 
-Search hints
-Look for:
-- `activeDetailTab`
-- `activeCommercialTab`
-- `activePricingRulesTab`
-- `selectedRateCardId`
-- `overview`
-- `billing_profile`
-- `rate_cards`
-- `selectCustomer(`
-- post-submit success handlers that reload the selected customer
-- refresh logic that re-selects the current customer
-- anywhere that resets nested tabs during reload
+1) Create mode architecture
+- When the user clicks "Create a new record", open a clean draft detail editor in the right-hand detail panel.
+- Show a clear create mode state in the header, e.g. "New record" + selected record family.
+- Add explicit Save and Cancel actions.
+- Add dirty-state handling so unsaved edits are not silently lost.
+- Do not show update-only actions in create mode.
 
-Likely places to audit carefully
-- selectCustomer(...)
-- refreshCustomers()
-- submitCustomer()
-- submitContact()
-- submitAddress()
-- submitBillingProfile()
-- submitInvoiceParty()
-- submitRateCard()
-- submitRateLine()
-- submitSurchargeRule()
-- submitPortalPrivacy()
-- submitCustomerPortalAccess()
-- submitCustomerPortalAccessPasswordReset()
-- unlinkCustomerPortalAccount()
-- submitHistoryAttachmentLink()
-- submitEmployeeBlock()
-- any success handler that calls selectCustomer(...) or refreshCustomers() for the same customer
+2) Entity-aware create flow
+- Add a record-family selector at the start of create mode, OR separate create actions that directly open the correct schema.
+- The detail form must switch schema based on record family.
+- Never use one generic flat form for all planning setup entities.
 
-Testing
-- Add regression test(s) for this bug.
-- Prefer a real component behavior test if practical.
-- At minimum, add focused regression coverage that proves:
-  1. the customer admin view can preserve a non-Overview detail tab after a successful same-customer reload
-  2. the customer admin view can preserve nested commercial tab state
-  3. invalid tab state falls back safely
-- If the existing test harness makes a full behavior test impractical, add the smallest focused regression test around the tab-preservation logic and explain the limitation in the final summary.
+3) Field grouping and visibility
+Use clear sections and only show the fields relevant to the selected entity.
 
-Deliverables
-- Code change
-- Regression test(s)
-- Final summary including:
-  - root cause
-  - files changed
-  - why the fix works
-  - which tab levels are preserved
-  - any edge cases intentionally handled
+Expected minimum behavior by entity:
+
+A. Requirement type
+- code
+- label
+- default_planning_mode_code
+- status
+- notes (optional)
+
+B. Equipment item
+- code
+- label
+- unit_of_measure_code
+- status
+- notes (optional)
+
+C. Site
+- site_no
+- customer_id
+- name
+- address fields or address picker
+- latitude / longitude where available
+- timezone
+- watchbook_enabled
+- status if supported
+
+D. Event venue
+- venue_no
+- customer_id
+- name
+- address fields or address picker
+- latitude / longitude
+- status if supported
+
+E. Trade fair
+- fair_no
+- customer_id
+- name
+- address fields or address picker
+- start_date
+- end_date
+- status if supported
+
+F. Trade fair zone
+- trade_fair_id (required parent)
+- zone_type_code
+- zone_code
+- label
+- notes (optional)
+
+G. Patrol route
+- route_no
+- customer_id
+- site_id (optional)
+- name
+- start_point_text
+- end_point_text
+- travel_policy_code
+- status
+
+H. Patrol checkpoint
+- patrol_route_id (required parent)
+- sequence_no
+- checkpoint_code
+- label
+- latitude / longitude
+- scan_type_code
+- expected_token
+- min_dwell_seconds
+- notes (optional)
+
+4) Parent-child safety
+- A trade fair zone must not be creatable without a selected/saved parent trade fair.
+- A patrol checkpoint must not be creatable without a selected/saved parent patrol route.
+- In create mode, if the selected entity is a child entity, require parent selection first.
+- If parent selection is impossible in the current context, disable Save and show a clear validation message.
+
+5) Save lifecycle
+- On first save, call the correct create endpoint for the selected entity type.
+- After successful save:
+  - switch the editor from create mode to edit mode
+  - keep the saved record selected in the list
+  - enable any valid post-save sections or actions
+- Child collections, location projection panels, and dependent read-only cards must remain hidden or disabled until the parent record exists.
+
+6) Validation
+Implement explicit client-side validation before submit:
+- required code/identifier fields
+- required label/name fields
+- start_date <= end_date for trade fair
+- positive / sensible checkpoint sequence and dwell values
+- required parent references for zone/checkpoint
+- no invalid mixed field submissions from other entity types
+
+7) UX consistency
+- Keep the page consistent with the rest of the legacy admin workspace design.
+- Avoid mixing P-01 data with P-02/P-03/P-04 concepts.
+- Do not expose release-state, shift-visibility, dispatch, staffing, or actuals controls in this page.
+- Keep labels and helper text consistent with existing i18n patterns.
+- Preserve tenant-scoped and role-scoped behavior.
+
+8) Technical cleanup
+- Extract entity-specific form schemas/config into a planning form config/composable instead of keeping a giant conditional template in one file.
+- Remove dead or duplicated create-form code paths if they exist.
+- Keep the implementation readable and testable.
+
+9) Tests
+Add or update tests covering:
+- create requirement type
+- create equipment item
+- create site
+- create trade fair with date validation
+- block zone creation without parent trade fair
+- block checkpoint creation without parent route
+- hide post-save-only sections during initial create mode
+- save success switches to edit mode and keeps selection stable
+- cancel create resets draft state cleanly
+
+10) Deliverables
+Return:
+- the code changes
+- the tests
+- a short summary of what was fixed
+- a short list of any assumptions or follow-up gaps
+
+Constraints:
+- Stay within the current web app architecture.
+- Prefer minimal, focused refactoring over broad unrelated rewrites.
+- Do not change behavior of P-02, P-03, or P-04 while fixing P-01.

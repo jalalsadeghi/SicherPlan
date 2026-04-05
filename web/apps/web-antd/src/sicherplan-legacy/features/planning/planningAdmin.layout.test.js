@@ -40,3 +40,33 @@ test("planning setup accepts deep-link entity and customer query context", () =>
   assert.match(source, /filters\.customer_id = customerId/);
   assert.match(source, /entityKey\.value = entity/);
 });
+
+test("create mode exposes entity-aware header, family selector, and cancel action", () => {
+  assert.match(source, /tp\("newRecordHeading", \{ entity: editorEntityLabel \}\)/);
+  assert.match(source, /tp\("detailCreateLead", \{ entity: editorEntityLabel \}\)/);
+  assert.match(source, /<select v-model="editorEntityKey" @change="handleEditorEntityChange">/);
+  assert.match(source, /isCreatingRecord \? tp\("actionsCancelCreate"\) : tp\("actionsResetRecord"\)/);
+});
+
+test("create mode blocks child entity saves without a selected parent and hides post-save child sections", () => {
+  assert.match(source, /const childCreateBlockedMessage = computed\(\(\) => \{/);
+  assert.match(source, /editorEntityKey\.value === "trade_fair_zone" && !createTradeFairParentId\.value/);
+  assert.match(source, /editorEntityKey\.value === "patrol_checkpoint" && !createPatrolRouteParentId\.value/);
+  assert.match(source, /:disabled="\(!actionState\.canCreate && !actionState\.canEdit\) \|\| !!childCreateBlockedMessage"/);
+  assert.match(source, /v-if="entityKey === 'trade_fair' && selectedRecord && !isCreatingRecord"/);
+  assert.match(source, /v-if="entityKey === 'patrol_route' && selectedRecord && !isCreatingRecord"/);
+});
+
+test("planning setup create form uses parent selectors for zones and checkpoints and shows top-level status", () => {
+  assert.match(source, /tp\("fieldsTradeFairParent"\)/);
+  assert.match(source, /tp\("fieldsPatrolRouteParent"\)/);
+  assert.match(source, /tp\("parentTradeFairPlaceholder"\)/);
+  assert.match(source, /tp\("parentPatrolRoutePlaceholder"\)/);
+  assert.match(source, /<label v-if="visibleStatus" class="field-stack field-stack--half">/);
+});
+
+test("planning setup address picker refresh is shared across all address-backed entity families", () => {
+  assert.match(source, /function usesAddressSelection\(entity = editorEntityKey\.value\)/);
+  assert.match(source, /\["site", "event_venue", "trade_fair", "patrol_route"\]\.includes\(entity\)/);
+  assert.match(source, /\(\) => \[editorEntityKey\.value, draft\.customer_id\]/);
+});

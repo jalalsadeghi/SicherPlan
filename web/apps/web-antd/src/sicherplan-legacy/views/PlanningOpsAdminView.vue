@@ -234,13 +234,14 @@
             <h3>
               {{
                 isCreatingRecord
-                  ? tp("newTitle")
+                  ? tp("newRecordHeading", { entity: editorEntityLabel })
                   : selectedRecord
                     ? recordTitle(selectedRecord)
                     : tp("detailEmptyTitle")
               }}
             </h3>
-            <p v-if="isCreatingRecord || selectedRecord" class="field-help">{{ tp("detailLead") }}</p>
+            <p v-if="isCreatingRecord" class="field-help">{{ tp("detailCreateLead", { entity: editorEntityLabel }) }}</p>
+            <p v-else-if="selectedRecord" class="field-help">{{ tp("detailLead") }}</p>
           </div>
           <StatusBadge
             v-if="selectedRecord && !isCreatingRecord"
@@ -268,10 +269,28 @@
             </section>
 
             <section class="planning-admin-form-section">
-              <p v-if="isCreatingRecord" class="field-help">{{ tp("newRecordLead") }}</p>
+              <div class="planning-admin-form-section__header">
+                <p v-if="isCreatingRecord" class="field-help">{{ tp("newRecordLead") }}</p>
+                <p v-if="isCreatingRecord && isDirty" class="field-help planning-admin-dirty-help">{{ tp("dirtyStateHint") }}</p>
+              </div>
 
               <div class="planning-admin-form-grid planning-admin-form-grid--detail">
+                <label v-if="isCreatingRecord" class="field-stack field-stack--half">
+                  <span>{{ tp("createFamilyLabel") }}</span>
+                  <select v-model="editorEntityKey" @change="handleEditorEntityChange">
+                    <option v-for="option in createEntityOptions" :key="option" :value="option">
+                      {{ entityName(option) }}
+                    </option>
+                  </select>
+                </label>
+
+                <label v-if="isCreatingRecord" class="field-stack field-stack--half">
+                  <span>{{ tp("createModeLabel") }}</span>
+                  <input :value="tp('createModeValue', { entity: editorEntityLabel })" disabled />
+                </label>
+
                 <PlanningCustomerSelect
+                  v-if="editorUsesCustomer"
                   v-model="draft.customer_id"
                   class="field-stack--half"
                   :label="tp('fieldsCustomer')"
@@ -287,19 +306,59 @@
                   :no-match-text="tp('customerNoMatch')"
                 />
 
-                <template v-if="entityKey === 'requirement_type'">
+                <template v-if="isCreatingRecord && editorEntityKey === 'trade_fair_zone'">
+                  <label class="field-stack field-stack--half">
+                    <span>{{ tp("fieldsTradeFairParent") }}</span>
+                    <select v-model="createTradeFairParentId">
+                      <option value="">{{ tp("parentTradeFairPlaceholder") }}</option>
+                      <option v-for="record in tradeFairParentOptions" :key="record.id" :value="record.id">
+                        {{ recordTitle(record) }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ tp("fieldsZoneTypeCode") }}</span>
+                    <input v-model="zoneDraft.zone_type_code" required />
+                  </label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsZoneCode") }}</span><input v-model="zoneDraft.zone_code" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="zoneDraft.label" required /></label>
+                  <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="zoneDraft.notes" rows="3" /></label>
+                </template>
+
+                <template v-else-if="isCreatingRecord && editorEntityKey === 'patrol_checkpoint'">
+                  <label class="field-stack field-stack--half">
+                    <span>{{ tp("fieldsPatrolRouteParent") }}</span>
+                    <select v-model="createPatrolRouteParentId">
+                      <option value="">{{ tp("parentPatrolRoutePlaceholder") }}</option>
+                      <option v-for="record in patrolRouteParentOptions" :key="record.id" :value="record.id">
+                        {{ recordTitle(record) }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsSequenceNo") }}</span><input v-model="checkpointDraft.sequence_no" type="number" min="1" required /></label>
+                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsCheckpointCode") }}</span><input v-model="checkpointDraft.checkpoint_code" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="checkpointDraft.label" required /></label>
+                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsLatitude") }}</span><input v-model="checkpointDraft.latitude" type="number" step="0.000001" required /></label>
+                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsLongitude") }}</span><input v-model="checkpointDraft.longitude" type="number" step="0.000001" required /></label>
+                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsScanTypeCode") }}</span><input v-model="checkpointDraft.scan_type_code" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsExpectedTokenValue") }}</span><input v-model="checkpointDraft.expected_token_value" /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsMinimumDwellSeconds") }}</span><input v-model="checkpointDraft.minimum_dwell_seconds" type="number" min="0" required /></label>
+                  <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="checkpointDraft.notes" rows="3" /></label>
+                </template>
+
+                <template v-else-if="editorEntityKey === 'requirement_type'">
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsCode") }}</span><input v-model="draft.code" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="draft.label" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsDefaultPlanningMode") }}</span><input v-model="draft.default_planning_mode_code" required /></label>
                 </template>
 
-                <template v-if="entityKey === 'equipment_item'">
+                <template v-else-if="editorEntityKey === 'equipment_item'">
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsCode") }}</span><input v-model="draft.code" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="draft.label" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsUnitOfMeasure") }}</span><input v-model="draft.unit_of_measure_code" required /></label>
                 </template>
 
-                <template v-if="entityKey === 'site'">
+                <template v-else-if="editorEntityKey === 'site'">
                   <label class="planning-admin-site-primary-field field-stack field-stack--half"><span>{{ tp("fieldsSiteNo") }}</span><input v-model="draft.site_no" required /></label>
                   <label class="planning-admin-site-primary-field field-stack field-stack--half"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
                   <PlanningAddressSelect
@@ -340,14 +399,24 @@
                   <label class="planning-admin-checkbox planning-admin-checkbox--inline field-stack--wide"><input v-model="draft.watchbook_enabled" type="checkbox" /><span>{{ tp("fieldsWatchbookEnabled") }}</span></label>
                 </template>
 
-                <template v-if="entityKey === 'event_venue'">
+                <template v-else-if="editorEntityKey === 'event_venue'">
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsVenueNo") }}</span><input v-model="draft.venue_no" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
-                  <label class="field-stack field-stack--half">
-                    <span>{{ tp("fieldsAddressId") }}</span>
-                    <input v-model="draft.address_id" />
-                    <small class="field-help">{{ tp("fieldsAddressIdHelp") }}</small>
-                  </label>
+                  <PlanningAddressSelect
+                    v-model="draft.address_id"
+                    wrapper-class="field-stack--half"
+                    :customer-id="draft.customer_id"
+                    :label="tp('fieldsAddressId')"
+                    :options="siteAddressOptions"
+                    :loading="siteAddressLookupLoading"
+                    :disabled="loading.action"
+                    :error="siteAddressLookupError"
+                    :search-placeholder="tp('fieldsAddressSearchPlaceholder')"
+                    :loading-text="tp('fieldsAddressLoading')"
+                    :empty-text="tp('fieldsAddressEmpty')"
+                    :customer-required-text="tp('fieldsAddressCustomerRequired')"
+                    :no-match-text="tp('fieldsAddressNoMatch')"
+                  />
                   <label class="field-stack field-stack--third">
                     <span>{{ tp("fieldsTimezone") }}</span>
                     <Select
@@ -370,15 +439,33 @@
                   </div>
                 </template>
 
-                <template v-if="entityKey === 'trade_fair'">
+                <template v-else-if="editorEntityKey === 'trade_fair'">
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsFairNo") }}</span><input v-model="draft.fair_no" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
-                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsVenueId") }}</span><input v-model="draft.venue_id" /></label>
                   <label class="field-stack field-stack--half">
-                    <span>{{ tp("fieldsAddressId") }}</span>
-                    <input v-model="draft.address_id" />
-                    <small class="field-help">{{ tp("fieldsAddressIdHelp") }}</small>
+                    <span>{{ tp("fieldsVenueId") }}</span>
+                    <select v-model="draft.venue_id">
+                      <option value="">{{ tp("none") }}</option>
+                      <option v-for="record in filteredVenueOptions" :key="record.id" :value="record.id">
+                        {{ recordTitle(record) }}
+                      </option>
+                    </select>
                   </label>
+                  <PlanningAddressSelect
+                    v-model="draft.address_id"
+                    wrapper-class="field-stack--half"
+                    :customer-id="draft.customer_id"
+                    :label="tp('fieldsAddressId')"
+                    :options="siteAddressOptions"
+                    :loading="siteAddressLookupLoading"
+                    :disabled="loading.action"
+                    :error="siteAddressLookupError"
+                    :search-placeholder="tp('fieldsAddressSearchPlaceholder')"
+                    :loading-text="tp('fieldsAddressLoading')"
+                    :empty-text="tp('fieldsAddressEmpty')"
+                    :customer-required-text="tp('fieldsAddressCustomerRequired')"
+                    :no-match-text="tp('fieldsAddressNoMatch')"
+                  />
                   <label class="field-stack field-stack--third">
                     <span>{{ tp("fieldsTimezone") }}</span>
                     <Select
@@ -403,35 +490,66 @@
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsEndDate") }}</span><input v-model="draft.end_date" type="date" required /></label>
                 </template>
 
-                <template v-if="entityKey === 'patrol_route'">
+                <template v-else-if="editorEntityKey === 'patrol_route'">
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsRouteNo") }}</span><input v-model="draft.route_no" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
-                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsSiteId") }}</span><input v-model="draft.site_id" /></label>
-                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsMeetingAddressId") }}</span><input v-model="draft.meeting_address_id" /></label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ tp("fieldsSiteId") }}</span>
+                    <select v-model="draft.site_id">
+                      <option value="">{{ tp("none") }}</option>
+                      <option v-for="record in filteredSiteOptions" :key="record.id" :value="record.id">
+                        {{ recordTitle(record) }}
+                      </option>
+                    </select>
+                  </label>
+                  <PlanningAddressSelect
+                    v-model="draft.meeting_address_id"
+                    wrapper-class="field-stack--half"
+                    :customer-id="draft.customer_id"
+                    :label="tp('fieldsMeetingAddressId')"
+                    :options="siteAddressOptions"
+                    :loading="siteAddressLookupLoading"
+                    :disabled="loading.action"
+                    :error="siteAddressLookupError"
+                    :search-placeholder="tp('fieldsAddressSearchPlaceholder')"
+                    :loading-text="tp('fieldsAddressLoading')"
+                    :empty-text="tp('fieldsAddressEmpty')"
+                    :customer-required-text="tp('fieldsAddressCustomerRequired')"
+                    :no-match-text="tp('fieldsAddressNoMatch')"
+                  />
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsStartPointText") }}</span><input v-model="draft.start_point_text" /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsEndPointText") }}</span><input v-model="draft.end_point_text" /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsTravelPolicyCode") }}</span><input v-model="draft.travel_policy_code" /></label>
                 </template>
 
-                <label class="field-stack field-stack--wide">
+                <label v-if="visibleStatus" class="field-stack field-stack--half">
+                  <span>{{ tp("status") }}</span>
+                  <select v-model="draft.status">
+                    <option v-for="status in statusOptions" :key="status" :value="status">{{ tp(`status${status.charAt(0).toUpperCase()}${status.slice(1)}`) }}</option>
+                  </select>
+                </label>
+
+                <label v-if="!isPlanningChildEntity(editorEntityKey)" class="field-stack field-stack--wide">
                   <span>{{ tp("fieldsNotes") }}</span>
                   <textarea v-model="draft.notes" rows="4" />
                 </label>
+
+                <p v-if="childCreateBlockedMessage" class="field-help field-stack--wide">{{ childCreateBlockedMessage }}</p>
 
                 <div class="cta-row field-stack--wide planning-admin-form-actions">
                   <button
                     class="cta-button"
                     type="submit"
-                    :disabled="!actionState.canCreate && !actionState.canEdit"
+                    :disabled="(!actionState.canCreate && !actionState.canEdit) || !!childCreateBlockedMessage"
                   >
                     {{ tp("actionsSaveRecord") }}
                   </button>
                   <button
                     class="cta-button cta-secondary"
                     type="button"
-                    @click="resetDraft"
+                    @click="isCreatingRecord ? cancelCreateRecord() : resetDraft()"
                   >
-                    {{ tp("actionsResetRecord") }}
+                    {{ isCreatingRecord ? tp("actionsCancelCreate") : tp("actionsResetRecord") }}
                   </button>
                 </div>
               </div>
@@ -569,14 +687,21 @@ import {
   updateTradeFairZone,
 } from "@/api/planningAdmin";
 import {
+  buildPlanningDirtySnapshot,
   buildPlanningImportTemplate,
   derivePlanningActionState,
   formatPlanningCustomerOption,
+  isPlanningChildEntity,
   mapPlanningApiMessage,
+  normalizePlanningEditorEntity,
   parseOptionalCoordinate,
+  PLANNING_CREATE_ENTITY_OPTIONS,
   PLANNING_ENTITY_OPTIONS,
+  PLANNING_STATUS_OPTIONS,
+  resolvePlanningBrowseEntity,
   resolvePlanningRouteContext,
   resolveInitialMapCenter,
+  validatePlanningCreateDraft,
 } from "@/features/planning/planningAdmin.helpers.js";
 import { planningAdminMessages } from "@/i18n/planningAdmin.messages";
 import { useAuthStore } from "@/stores/auth";
@@ -597,14 +722,19 @@ const loading = reactive({ list: false, detail: false, action: false });
 const feedback = reactive({ tone: "neutral", title: "", message: "" });
 const filters = reactive({ search: "", customer_id: "", lifecycle_status: "", include_archived: false });
 const entityOptions = PLANNING_ENTITY_OPTIONS;
+const createEntityOptions = PLANNING_CREATE_ENTITY_OPTIONS;
 const entityKey = ref("site");
+const editorEntityKey = ref("site");
+const previousEditorEntityKey = ref("site");
 const records = ref([]);
 const selectedRecordId = ref("");
 const selectedRecord = ref(null);
+const previousSelectedRecordId = ref("");
 const browsePanelTab = ref("filters");
 const tradeFairZones = ref([]);
 const patrolCheckpoints = ref([]);
 const isCreatingRecord = ref(false);
+const savedCreateSnapshot = ref("");
 const editingZoneId = ref("");
 const editingCheckpointId = ref("");
 const pendingImportFile = ref(null);
@@ -616,6 +746,12 @@ const customerLookupError = ref("");
 const siteAddressOptions = ref([]);
 const siteAddressLookupLoading = ref(false);
 const siteAddressLookupError = ref("");
+const venueOptions = ref([]);
+const siteOptions = ref([]);
+const tradeFairParentOptions = ref([]);
+const patrolRouteParentOptions = ref([]);
+const createTradeFairParentId = ref("");
+const createPatrolRouteParentId = ref("");
 const locationPickerOpen = ref(false);
 const locationPickerStartPoint = ref({
   lat: 51.662973,
@@ -652,6 +788,7 @@ const draft = reactive({
   start_point_text: "",
   end_point_text: "",
   travel_policy_code: "",
+  status: "active",
 });
 
 const zoneDraft = reactive({ zone_type_code: "", zone_code: "", label: "", notes: "", version_no: 0 });
@@ -677,6 +814,7 @@ const actionState = computed(() => derivePlanningActionState(effectiveRole.value
 const canRead = computed(() => actionState.value.canRead);
 const currentLocale = computed(() => (localeStore.locale === "en" ? "en" : "de"));
 const entityLabel = computed(() => entityName(entityKey.value));
+const editorEntityLabel = computed(() => entityName(editorEntityKey.value));
 const browsePanelTabs = computed(() => [
   { id: "filters", label: tp("filtersTitle") },
   { id: "import", label: tp("importTitle") },
@@ -686,6 +824,37 @@ const timezoneOptions = computed(() =>
     label: timezone,
     value: timezone,
   })),
+);
+const statusOptions = PLANNING_STATUS_OPTIONS;
+const editorUsesCustomer = computed(() => !isPlanningChildEntity(editorEntityKey.value));
+const visibleStatus = computed(() => !isPlanningChildEntity(editorEntityKey.value));
+const currentDirtySnapshot = computed(() =>
+  buildPlanningDirtySnapshot({
+    checkpointDraft,
+    draft,
+    editorEntityKey: editorEntityKey.value,
+    isCreatingRecord: isCreatingRecord.value,
+    parentPatrolRouteId: createPatrolRouteParentId.value,
+    parentTradeFairId: createTradeFairParentId.value,
+    selectedRecordId: selectedRecordId.value,
+    zoneDraft,
+  }),
+);
+const isDirty = computed(() => currentDirtySnapshot.value !== savedCreateSnapshot.value);
+const childCreateBlockedMessage = computed(() => {
+  if (editorEntityKey.value === "trade_fair_zone" && !createTradeFairParentId.value) {
+    return tp("validationTradeFairParentRequired");
+  }
+  if (editorEntityKey.value === "patrol_checkpoint" && !createPatrolRouteParentId.value) {
+    return tp("validationPatrolRouteParentRequired");
+  }
+  return "";
+});
+const filteredVenueOptions = computed(() =>
+  venueOptions.value.filter((record) => !draft.customer_id || record.customer_id === draft.customer_id),
+);
+const filteredSiteOptions = computed(() =>
+  siteOptions.value.filter((record) => !draft.customer_id || record.customer_id === draft.customer_id),
 );
 
 function tp(key, params = {}) {
@@ -704,7 +873,9 @@ function entityName(key) {
       site: "entitySite",
       event_venue: "entityEventVenue",
       trade_fair: "entityTradeFair",
+      trade_fair_zone: "entityTradeFairZone",
       patrol_route: "entityPatrolRoute",
+      patrol_checkpoint: "entityPatrolCheckpoint",
     }[key],
   );
 }
@@ -714,8 +885,8 @@ function resolveCustomerLabel(customerId) {
   return customer ? formatPlanningCustomerOption(customer) : customerId || tp("none");
 }
 
-function isSiteEntityActive() {
-  return entityKey.value === "site";
+function usesAddressSelection(entity = editorEntityKey.value) {
+  return ["site", "event_venue", "trade_fair", "patrol_route"].includes(entity);
 }
 
 function getSupportedTimezones() {
@@ -898,6 +1069,7 @@ function resetDraft() {
     start_point_text: "",
     end_point_text: "",
     travel_policy_code: "",
+    status: "active",
   });
 }
 
@@ -924,6 +1096,17 @@ function resetCheckpointDraft() {
     version_no: 0,
   });
   editingCheckpointId.value = "";
+}
+
+function markCleanState() {
+  savedCreateSnapshot.value = currentDirtySnapshot.value;
+}
+
+function confirmDiscardChanges() {
+  if (!isDirty.value) {
+    return true;
+  }
+  return window.confirm(tp("confirmDiscardChanges"));
 }
 
 function recordTitle(record) {
@@ -957,7 +1140,12 @@ function syncDraft(record) {
     start_point_text: record.start_point_text || "",
     end_point_text: record.end_point_text || "",
     travel_policy_code: record.travel_policy_code || "",
+    status: record.status || "active",
   });
+  editorEntityKey.value = entityKey.value;
+  createTradeFairParentId.value = "";
+  createPatrolRouteParentId.value = "";
+  markCleanState();
 }
 
 function buildRecordPayload() {
@@ -966,13 +1154,13 @@ function buildRecordPayload() {
     customer_id: draft.customer_id,
     notes: draft.notes || null,
   };
-  if (entityKey.value === "requirement_type") {
+  if (editorEntityKey.value === "requirement_type") {
     return { ...base, code: draft.code, label: draft.label, default_planning_mode_code: draft.default_planning_mode_code };
   }
-  if (entityKey.value === "equipment_item") {
+  if (editorEntityKey.value === "equipment_item") {
     return { ...base, code: draft.code, label: draft.label, unit_of_measure_code: draft.unit_of_measure_code };
   }
-  if (entityKey.value === "site") {
+  if (editorEntityKey.value === "site") {
     return {
       ...base,
       site_no: draft.site_no,
@@ -982,9 +1170,10 @@ function buildRecordPayload() {
       latitude: draft.latitude || null,
       longitude: draft.longitude || null,
       watchbook_enabled: draft.watchbook_enabled,
+      status: draft.status || undefined,
     };
   }
-  if (entityKey.value === "event_venue") {
+  if (editorEntityKey.value === "event_venue") {
     return {
       ...base,
       venue_no: draft.venue_no,
@@ -993,9 +1182,10 @@ function buildRecordPayload() {
       timezone: draft.timezone || null,
       latitude: draft.latitude || null,
       longitude: draft.longitude || null,
+      status: draft.status || undefined,
     };
   }
-  if (entityKey.value === "trade_fair") {
+  if (editorEntityKey.value === "trade_fair") {
     return {
       ...base,
       fair_no: draft.fair_no,
@@ -1007,6 +1197,7 @@ function buildRecordPayload() {
       longitude: draft.longitude || null,
       start_date: draft.start_date,
       end_date: draft.end_date,
+      status: draft.status || undefined,
     };
   }
   return {
@@ -1018,6 +1209,34 @@ function buildRecordPayload() {
     start_point_text: draft.start_point_text || null,
     end_point_text: draft.end_point_text || null,
     travel_policy_code: draft.travel_policy_code || null,
+    status: draft.status || undefined,
+  };
+}
+
+function buildZonePayload() {
+  return {
+    tenant_id: resolvedTenantScopeId.value,
+    trade_fair_id: createTradeFairParentId.value || selectedRecord.value?.id,
+    zone_type_code: zoneDraft.zone_type_code.trim(),
+    zone_code: zoneDraft.zone_code.trim(),
+    label: zoneDraft.label.trim(),
+    notes: zoneDraft.notes?.trim() ? zoneDraft.notes.trim() : null,
+  };
+}
+
+function buildCheckpointPayload() {
+  return {
+    tenant_id: resolvedTenantScopeId.value,
+    patrol_route_id: createPatrolRouteParentId.value || selectedRecord.value?.id,
+    sequence_no: Number(checkpointDraft.sequence_no),
+    checkpoint_code: checkpointDraft.checkpoint_code.trim(),
+    label: checkpointDraft.label.trim(),
+    latitude: checkpointDraft.latitude,
+    longitude: checkpointDraft.longitude,
+    scan_type_code: checkpointDraft.scan_type_code.trim(),
+    expected_token_value: checkpointDraft.expected_token_value?.trim() ? checkpointDraft.expected_token_value.trim() : null,
+    minimum_dwell_seconds: Number(checkpointDraft.minimum_dwell_seconds),
+    notes: checkpointDraft.notes?.trim() ? checkpointDraft.notes.trim() : null,
   };
 }
 
@@ -1041,7 +1260,7 @@ async function refreshCustomerOptions() {
 }
 
 async function refreshSiteAddressOptions() {
-  if (!isSiteEntityActive()) {
+  if (!usesAddressSelection()) {
     siteAddressOptions.value = [];
     siteAddressLookupError.value = "";
     siteAddressLookupLoading.value = false;
@@ -1065,24 +1284,59 @@ async function refreshSiteAddressOptions() {
       requestedCustomerId,
       accessToken.value,
     );
-    if (draft.customer_id !== requestedCustomerId || !isSiteEntityActive()) {
+    if (draft.customer_id !== requestedCustomerId || !usesAddressSelection()) {
       return;
     }
     siteAddressOptions.value = addressLinks.filter((entry) => entry.status !== "archived");
     if (draft.address_id && !siteAddressOptions.value.some((entry) => entry.address_id === draft.address_id)) {
       draft.address_id = "";
     }
+    if (
+      draft.meeting_address_id &&
+      !siteAddressOptions.value.some((entry) => entry.address_id === draft.meeting_address_id)
+    ) {
+      draft.meeting_address_id = "";
+    }
   } catch {
-    if (draft.customer_id !== requestedCustomerId || !isSiteEntityActive()) {
+    if (draft.customer_id !== requestedCustomerId || !usesAddressSelection()) {
       return;
     }
     siteAddressOptions.value = [];
     siteAddressLookupError.value = tp("addressLoadError");
     draft.address_id = "";
+    draft.meeting_address_id = "";
   } finally {
-    if (draft.customer_id === requestedCustomerId && isSiteEntityActive()) {
+    if (draft.customer_id === requestedCustomerId && usesAddressSelection()) {
       siteAddressLookupLoading.value = false;
     }
+  }
+}
+
+async function refreshReferenceRecords() {
+  if (!resolvedTenantScopeId.value || !accessToken.value || !canRead.value) {
+    venueOptions.value = [];
+    siteOptions.value = [];
+    tradeFairParentOptions.value = [];
+    patrolRouteParentOptions.value = [];
+    return;
+  }
+
+  try {
+    const [sites, venues, fairs, routes] = await Promise.all([
+      listPlanningRecords("site", resolvedTenantScopeId.value, accessToken.value, {}),
+      listPlanningRecords("event_venue", resolvedTenantScopeId.value, accessToken.value, {}),
+      listPlanningRecords("trade_fair", resolvedTenantScopeId.value, accessToken.value, {}),
+      listPlanningRecords("patrol_route", resolvedTenantScopeId.value, accessToken.value, {}),
+    ]);
+    siteOptions.value = sites;
+    venueOptions.value = venues;
+    tradeFairParentOptions.value = fairs;
+    patrolRouteParentOptions.value = routes;
+  } catch {
+    venueOptions.value = [];
+    siteOptions.value = [];
+    tradeFairParentOptions.value = [];
+    patrolRouteParentOptions.value = [];
   }
 }
 
@@ -1108,8 +1362,9 @@ async function refreshRecords() {
   }
 }
 
-async function selectRecord(recordId) {
+async function selectRecord(recordId, options = {}) {
   if (!resolvedTenantScopeId.value || !accessToken.value) return;
+  if (!options.force && !confirmDiscardChanges()) return;
   loading.detail = true;
   try {
     selectedRecord.value = await getPlanningRecord(entityKey.value, resolvedTenantScopeId.value, recordId, accessToken.value);
@@ -1124,6 +1379,7 @@ async function selectRecord(recordId) {
       : [];
     resetZoneDraft();
     resetCheckpointDraft();
+    previousSelectedRecordId.value = recordId;
   } catch (error) {
     handleError(error);
   } finally {
@@ -1132,13 +1388,53 @@ async function selectRecord(recordId) {
 }
 
 function startCreateRecord() {
+  if (!confirmDiscardChanges()) return;
   isCreatingRecord.value = true;
+  editorEntityKey.value = normalizePlanningEditorEntity(entityKey.value);
+  previousSelectedRecordId.value = selectedRecordId.value;
   selectedRecord.value = null;
   selectedRecordId.value = "";
   tradeFairZones.value = [];
   patrolCheckpoints.value = [];
   resetDraft();
+  resetZoneDraft();
+  resetCheckpointDraft();
   draft.customer_id = filters.customer_id || "";
+  createTradeFairParentId.value = "";
+  createPatrolRouteParentId.value = "";
+  markCleanState();
+}
+
+function cancelCreateRecord() {
+  if (!confirmDiscardChanges()) return;
+  isCreatingRecord.value = false;
+  editorEntityKey.value = entityKey.value;
+  resetDraft();
+  resetZoneDraft();
+  resetCheckpointDraft();
+  createTradeFairParentId.value = "";
+  createPatrolRouteParentId.value = "";
+  if (previousSelectedRecordId.value) {
+    void selectRecord(previousSelectedRecordId.value, { force: true });
+    return;
+  }
+  selectedRecord.value = null;
+  selectedRecordId.value = "";
+  markCleanState();
+}
+
+function handleEditorEntityChange() {
+  if (!confirmDiscardChanges()) {
+    editorEntityKey.value = previousEditorEntityKey.value;
+    return;
+  }
+  resetDraft();
+  resetZoneDraft();
+  resetCheckpointDraft();
+  draft.customer_id = filters.customer_id || "";
+  createTradeFairParentId.value = "";
+  createPatrolRouteParentId.value = "";
+  markCleanState();
 }
 
 async function openLocationPicker() {
@@ -1181,25 +1477,77 @@ function applyPickedLocation(payload) {
 
 async function submitRecord() {
   if (!resolvedTenantScopeId.value || !accessToken.value) return;
+  const validationKey = validatePlanningCreateDraft({
+    checkpointDraft,
+    draft,
+    editorEntityKey: editorEntityKey.value,
+    parentPatrolRouteId: createPatrolRouteParentId.value,
+    parentTradeFairId: createTradeFairParentId.value,
+    zoneDraft,
+  });
+  if (validationKey) {
+    setFeedback("error", tp("errorTitle"), tp(validationKey));
+    return;
+  }
   loading.action = true;
   try {
+    if (isCreatingRecord.value && editorEntityKey.value === "trade_fair_zone") {
+      const createdZone = await createTradeFairZone(
+        resolvedTenantScopeId.value,
+        createTradeFairParentId.value,
+        accessToken.value,
+        buildZonePayload(),
+      );
+      entityKey.value = "trade_fair";
+      editorEntityKey.value = "trade_fair";
+      await refreshRecords();
+      await selectRecord(createTradeFairParentId.value, { force: true });
+      selectZone(createdZone);
+      isCreatingRecord.value = false;
+      setFeedback("success", tp("successTitle"), tp("childSaved"));
+      markCleanState();
+      return;
+    }
+
+    if (isCreatingRecord.value && editorEntityKey.value === "patrol_checkpoint") {
+      const createdCheckpoint = await createPatrolCheckpoint(
+        resolvedTenantScopeId.value,
+        createPatrolRouteParentId.value,
+        accessToken.value,
+        buildCheckpointPayload(),
+      );
+      entityKey.value = "patrol_route";
+      editorEntityKey.value = "patrol_route";
+      await refreshRecords();
+      await selectRecord(createPatrolRouteParentId.value, { force: true });
+      selectCheckpoint(createdCheckpoint);
+      isCreatingRecord.value = false;
+      setFeedback("success", tp("successTitle"), tp("childSaved"));
+      markCleanState();
+      return;
+    }
+
     const payload = buildRecordPayload();
     if (isCreatingRecord.value || !selectedRecord.value) {
-      selectedRecord.value = await createPlanningRecord(entityKey.value, resolvedTenantScopeId.value, accessToken.value, payload);
+      selectedRecord.value = await createPlanningRecord(editorEntityKey.value, resolvedTenantScopeId.value, accessToken.value, payload);
       selectedRecordId.value = selectedRecord.value.id;
+      entityKey.value = resolvePlanningBrowseEntity(editorEntityKey.value);
+      editorEntityKey.value = entityKey.value;
       isCreatingRecord.value = false;
+      await refreshRecords();
     } else {
       selectedRecord.value = await updatePlanningRecord(
-        entityKey.value,
+        editorEntityKey.value,
         resolvedTenantScopeId.value,
         selectedRecord.value.id,
         accessToken.value,
         { ...payload, version_no: selectedRecord.value.version_no },
       );
+      await refreshRecords();
     }
     syncDraft(selectedRecord.value);
-    await refreshRecords();
     setFeedback("success", tp("successTitle"), tp("recordSaved"));
+    markCleanState();
   } catch (error) {
     handleError(error);
   } finally {
@@ -1300,15 +1648,20 @@ async function submitCheckpoint() {
 }
 
 function changeEntity() {
+  if (!confirmDiscardChanges()) return;
   selectedRecord.value = null;
   selectedRecordId.value = "";
   isCreatingRecord.value = false;
+  editorEntityKey.value = entityKey.value;
   resetDraft();
   resetZoneDraft();
   resetCheckpointDraft();
   resetImportTemplate();
   tradeFairZones.value = [];
   patrolCheckpoints.value = [];
+  createTradeFairParentId.value = "";
+  createPatrolRouteParentId.value = "";
+  markCleanState();
   void refreshRecords();
 }
 
@@ -1383,20 +1736,32 @@ function applyPlanningRouteContext() {
 }
 
 watch(
+  () => editorEntityKey.value,
+  (nextValue, previousValue) => {
+    if (nextValue !== previousValue) {
+      previousEditorEntityKey.value = previousValue;
+    }
+  },
+);
+
+watch(
   () => [resolvedTenantScopeId.value, accessToken.value, canRead.value],
   async () => {
     await refreshCustomerOptions();
+    await refreshReferenceRecords();
     await refreshRecords();
   },
 );
 
 watch(
-  () => [entityKey.value, draft.customer_id],
-  async ([nextEntityKey]) => {
-    if (nextEntityKey !== "site") {
+  () => [editorEntityKey.value, draft.customer_id],
+  async () => {
+    if (!usesAddressSelection()) {
       siteAddressOptions.value = [];
       siteAddressLookupError.value = "";
       siteAddressLookupLoading.value = false;
+      draft.address_id = "";
+      draft.meeting_address_id = "";
       return;
     }
     await refreshSiteAddressOptions();
@@ -1415,8 +1780,10 @@ watch(
 onMounted(async () => {
   resetImportTemplate();
   await refreshCustomerOptions();
+  await refreshReferenceRecords();
   applyPlanningRouteContext();
   await refreshRecords();
+  markCleanState();
 });
 </script>
 

@@ -2,15 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildPlanningDirtySnapshot,
   buildPlanningImportTemplate,
   derivePlanningActionState,
+  isPlanningChildEntity,
+  normalizePlanningEditorEntity,
   formatPlanningAddressOption,
   filterPlanningCustomerOptions,
   formatPlanningCustomerOption,
   mapPlanningApiMessage,
+  resolvePlanningBrowseEntity,
   parseOptionalCoordinate,
   resolvePlanningRouteContext,
   resolveInitialMapCenter,
+  validatePlanningCreateDraft,
 } from "./planningAdmin.helpers.js";
 
 test("derivePlanningActionState grants dispatcher planning write access", () => {
@@ -118,4 +123,178 @@ test("resolvePlanningRouteContext keeps only supported entity and customer query
     resolvePlanningRouteContext({ entity: "unknown", customer_id: 7 }),
     { entity: null, customerId: "" },
   );
+});
+
+test("planning editor entity normalization maps child create flows back to their browse parent", () => {
+  assert.equal(normalizePlanningEditorEntity("trade_fair_zone"), "trade_fair_zone");
+  assert.equal(resolvePlanningBrowseEntity("trade_fair_zone"), "trade_fair");
+  assert.equal(resolvePlanningBrowseEntity("patrol_checkpoint"), "patrol_route");
+  assert.equal(isPlanningChildEntity("trade_fair_zone"), true);
+  assert.equal(isPlanningChildEntity("site"), false);
+});
+
+test("planning create validation blocks child entities without parents and fair date regressions", () => {
+  assert.equal(
+    validatePlanningCreateDraft({
+      editorEntityKey: "trade_fair_zone",
+      draft: {},
+      zoneDraft: { zone_type_code: "security", zone_code: "A1", label: "North", notes: "" },
+      checkpointDraft: {},
+      parentTradeFairId: "",
+      parentPatrolRouteId: "",
+    }),
+    "validationTradeFairParentRequired",
+  );
+  assert.equal(
+    validatePlanningCreateDraft({
+      editorEntityKey: "patrol_checkpoint",
+      draft: {},
+      zoneDraft: {},
+      checkpointDraft: {
+        sequence_no: 0,
+        checkpoint_code: "",
+        label: "",
+        latitude: "",
+        longitude: "",
+        scan_type_code: "",
+        minimum_dwell_seconds: -1,
+      },
+      parentTradeFairId: "",
+      parentPatrolRouteId: "",
+    }),
+    "validationPatrolRouteParentRequired",
+  );
+  assert.equal(
+    validatePlanningCreateDraft({
+      editorEntityKey: "trade_fair",
+      draft: {
+        customer_id: "customer-1",
+        fair_no: "FAIR-1",
+        name: "Expo",
+        start_date: "2026-05-10",
+        end_date: "2026-05-09",
+      },
+      zoneDraft: {},
+      checkpointDraft: {},
+      parentTradeFairId: "",
+      parentPatrolRouteId: "",
+    }),
+    "validationTradeFairDateRange",
+  );
+});
+
+test("planning create validation covers top-level entities with entity-specific required fields", () => {
+  assert.equal(
+    validatePlanningCreateDraft({
+      editorEntityKey: "requirement_type",
+      draft: { customer_id: "", code: "", label: "", default_planning_mode_code: "" },
+      zoneDraft: {},
+      checkpointDraft: {},
+      parentTradeFairId: "",
+      parentPatrolRouteId: "",
+    }),
+    "validationCustomerRequired",
+  );
+  assert.equal(
+    validatePlanningCreateDraft({
+      editorEntityKey: "equipment_item",
+      draft: { customer_id: "customer-1", code: "RADIO", label: "", unit_of_measure_code: "" },
+      zoneDraft: {},
+      checkpointDraft: {},
+      parentTradeFairId: "",
+      parentPatrolRouteId: "",
+    }),
+    "validationLabelRequired",
+  );
+  assert.equal(
+    validatePlanningCreateDraft({
+      editorEntityKey: "site",
+      draft: { customer_id: "customer-1", site_no: "", name: "" },
+      zoneDraft: {},
+      checkpointDraft: {},
+      parentTradeFairId: "",
+      parentPatrolRouteId: "",
+    }),
+    "validationSiteNoRequired",
+  );
+  assert.equal(
+    validatePlanningCreateDraft({
+      editorEntityKey: "patrol_route",
+      draft: { customer_id: "customer-1", route_no: "ROUTE-1", name: "" },
+      zoneDraft: {},
+      checkpointDraft: {},
+      parentTradeFairId: "",
+      parentPatrolRouteId: "",
+    }),
+    "validationNameRequired",
+  );
+});
+
+test("planning create validation accepts valid site and valid child drafts", () => {
+  assert.equal(
+    validatePlanningCreateDraft({
+      editorEntityKey: "site",
+      draft: { customer_id: "customer-1", site_no: "SITE-1", name: "North Gate" },
+      zoneDraft: {},
+      checkpointDraft: {},
+      parentTradeFairId: "",
+      parentPatrolRouteId: "",
+    }),
+    null,
+  );
+  assert.equal(
+    validatePlanningCreateDraft({
+      editorEntityKey: "trade_fair_zone",
+      draft: {},
+      zoneDraft: { zone_type_code: "hall", zone_code: "A1", label: "Hall A", notes: "" },
+      checkpointDraft: {},
+      parentTradeFairId: "fair-1",
+      parentPatrolRouteId: "",
+    }),
+    null,
+  );
+  assert.equal(
+    validatePlanningCreateDraft({
+      editorEntityKey: "patrol_checkpoint",
+      draft: {},
+      zoneDraft: {},
+      checkpointDraft: {
+        sequence_no: 1,
+        checkpoint_code: "CP-1",
+        label: "Front Gate",
+        latitude: "51.5",
+        longitude: "8.1",
+        scan_type_code: "qr",
+        minimum_dwell_seconds: 0,
+      },
+      parentTradeFairId: "",
+      parentPatrolRouteId: "route-1",
+    }),
+    null,
+  );
+});
+
+test("planning dirty snapshot changes when create context changes", () => {
+  const initial = buildPlanningDirtySnapshot({
+    editorEntityKey: "site",
+    isCreatingRecord: true,
+    selectedRecordId: "",
+    parentTradeFairId: "",
+    parentPatrolRouteId: "",
+    draft: { customer_id: "", site_no: "" },
+    zoneDraft: { zone_code: "" },
+    checkpointDraft: { checkpoint_code: "" },
+  });
+  const changed = buildPlanningDirtySnapshot({
+    editorEntityKey: "site",
+    isCreatingRecord: true,
+    selectedRecordId: "",
+    parentTradeFairId: "",
+    parentPatrolRouteId: "",
+    draft: { customer_id: "customer-1", site_no: "" },
+    zoneDraft: { zone_code: "" },
+    checkpointDraft: { checkpoint_code: "" },
+  });
+
+  assert.notEqual(initial, changed);
 });
