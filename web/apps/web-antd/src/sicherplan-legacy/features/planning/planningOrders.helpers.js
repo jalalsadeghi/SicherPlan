@@ -17,8 +17,19 @@ export const PLANNING_ORDER_PERMISSION_MATRIX = {
     "planning.record.read",
     "planning.record.write",
   ],
-  accounting: [],
-  controller_qm: [],
+  // The product wording expects an account-manager/commercial role on P-02.
+  // The current repo role model does not expose one yet, so `accounting` is
+  // the nearest implemented commercial role and keeps full page capability.
+  accounting: [
+    "planning.order.read",
+    "planning.order.write",
+    "planning.record.read",
+    "planning.record.write",
+  ],
+  controller_qm: [
+    "planning.order.read",
+    "planning.record.read",
+  ],
   employee_user: [],
   customer_user: [],
   subcontractor_user: [],
@@ -128,6 +139,12 @@ export function formatPlanningOrderReferenceOption(entityKey, record) {
     const siteNo = typeof record.site_no === "string" ? record.site_no.trim() : "";
     const name = typeof record.name === "string" ? record.name.trim() : "";
     return [siteNo, name].filter(Boolean).join(" — ") || record.id || "";
+  }
+
+  if (entityKey === "equipment_item") {
+    const code = typeof record.code === "string" ? record.code.trim() : "";
+    const label = typeof record.label === "string" ? record.label.trim() : "";
+    return [code, label].filter(Boolean).join(" — ") || record.id || "";
   }
 
   if (entityKey === "trade_fair") {

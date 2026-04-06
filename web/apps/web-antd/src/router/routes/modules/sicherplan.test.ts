@@ -47,4 +47,28 @@ describe('sicherplan route authority', () => {
       '/portal/customer/history',
     ]);
   });
+
+  it('wires planning-orders to the correct module and role set', () => {
+    const operationsSection = sicherplanRoutes.find(
+      (route) => route.name === 'SicherPlanOperationsSection',
+    );
+    const planningOrdersRoute = operationsSection?.children?.find(
+      (route) => route.name === 'SicherPlanPlanningOrders',
+    );
+
+    expect(operationsSection?.meta?.authority).toEqual([
+      'tenant_admin',
+      'dispatcher',
+      'accounting',
+      'controller_qm',
+    ]);
+    expect(planningOrdersRoute?.path).toBe('/admin/planning-orders');
+    expect(planningOrdersRoute?.meta?.moduleKey).toBe('planning-orders');
+    expect(planningOrdersRoute?.meta?.authority).toEqual([
+      'tenant_admin',
+      'dispatcher',
+      'accounting',
+      'controller_qm',
+    ]);
+  });
 });

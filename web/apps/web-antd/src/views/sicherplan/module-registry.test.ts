@@ -37,6 +37,16 @@ describe('module registry wrapper flags', () => {
     expect(planningOrders.showWorkspaceSectionHeader).toBe(false);
   });
 
+  it('keeps planning-orders available to the implemented commercial role and controller read-only route audience', () => {
+    const planningOrders = moduleRegistry['planning-orders']!;
+    expect(planningOrders.allowedRoles).toEqual([
+      'tenant_admin',
+      'dispatcher',
+      'accounting',
+      'controller_qm',
+    ]);
+  });
+
   it('keeps the planning-shifts page intro while removing the workspace section header', () => {
     const planningShifts = moduleRegistry['planning-shifts']!;
     expect(planningShifts.showPageIntro).toBeUndefined();

@@ -17,6 +17,7 @@ const registrySource = readFileSync(registryPath, "utf8");
 test("planning-orders uses the customer-style master detail shell", () => {
   assert.match(source, /data-testid="planning-orders-master-detail-layout"/);
   assert.match(source, /data-testid="planning-orders-list-section"/);
+  assert.match(source, /data-testid="planning-orders-record-list-section"/);
   assert.match(source, /data-testid="planning-orders-detail-workspace"/);
   assert.match(source, /grid-template-columns:\s*minmax\(320px, 420px\) minmax\(0, 1fr\)/);
   assert.match(source, /class="module-card planning-orders-panel planning-orders-list-panel"/);
@@ -91,6 +92,31 @@ test("planning-orders order form uses domain-aligned controls", () => {
   assert.match(source, /:value="orderDraft\.patrol_route_id \|\| undefined"[\s\S]*show-search/);
   assert.match(source, /v-model="orderDraft\.release_state"/);
   assert.doesNotMatch(source, /v-model="orderDraft\.status"/);
+});
+
+test("planning-orders overview exposes independent order child sections", () => {
+  assert.match(source, /data-testid="planning-orders-order-equipment-lines"/);
+  assert.match(source, /data-testid="planning-orders-order-requirement-lines"/);
+  assert.match(source, /submitEquipmentLine/);
+  assert.match(source, /submitRequirementLine/);
+  assert.match(source, /listOrderEquipmentLines/);
+  assert.match(source, /listOrderRequirementLines/);
+});
+
+test("planning-orders keeps planning-record browsing in the left workspace", () => {
+  assert.match(source, /v-model="planningRecordFilters\.planning_mode_code"/);
+  assert.match(source, /v-model="planningRecordFilters\.planning_from"/);
+  assert.match(source, /v-model="planningRecordFilters\.planning_to"/);
+  assert.match(source, /planningListOrderRequired/);
+  assert.match(source, /planningListEmpty/);
+  assert.match(source, /@click="selectPlanningRecord\(record\.id\)"/);
+});
+
+test("planning-orders enforces read-only fieldsets for controller_qm-style access", () => {
+  assert.match(source, /<fieldset class="planning-orders-fieldset" :disabled="!actionState\.canWriteOrders \|\| loading\.action">/);
+  assert.match(source, /<fieldset class="planning-orders-fieldset" :disabled="!actionState\.canWritePlanning \|\| loading\.action">/);
+  assert.match(source, /<fieldset class="planning-orders-fieldset" :disabled="!actionState\.canManageOrderDocs \|\| loading\.action">/);
+  assert.match(source, /<fieldset class="planning-orders-fieldset" :disabled="!actionState\.canManagePlanningDocs \|\| loading\.action">/);
 });
 
 test("planning-orders detail form uses friendly labels and inline placeholders", () => {
@@ -169,7 +195,7 @@ test("planning-record selectors reuse the correct lookup sources", () => {
   assert.match(source, /listPlanningCatalogRecords\(\s*"trade_fair"/);
   assert.match(source, /listPlanningCatalogRecords\(\s*"patrol_route"/);
   assert.match(source, /await listTradeFairZones\(tenantScopeId\.value, tradeFairId, accessToken\.value\)/);
-  assert.match(source, /listPlanningRecords\(tenantScopeId\.value, accessToken\.value, \{ order_id: selectedOrderId\.value \}\)/);
+  assert.match(source, /listPlanningRecords\(tenantScopeId\.value, accessToken\.value, \{[\s\S]*order_id: selectedOrderId\.value[\s\S]*planning_mode_code: planningRecordFilters\.planning_mode_code/);
 });
 
 test("planning-orders exposes inline setup links, add buttons, and real create modals", () => {

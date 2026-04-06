@@ -10,6 +10,43 @@ export interface PlanningDocumentRead {
   metadata_json?: Record<string, unknown>;
 }
 
+export interface PlanningCatalogRecordRead {
+  id: string;
+  tenant_id: string;
+  customer_id?: string | null;
+  code?: string | null;
+  label?: string | null;
+  name?: string | null;
+  status?: string | null;
+}
+
+export interface OrderEquipmentLineRead {
+  id: string;
+  tenant_id: string;
+  order_id: string;
+  equipment_item_id: string;
+  required_qty: number;
+  notes: string | null;
+  status: string;
+  version_no: number;
+  archived_at: string | null;
+}
+
+export interface OrderRequirementLineRead {
+  id: string;
+  tenant_id: string;
+  order_id: string;
+  requirement_type_id: string;
+  function_type_id: string | null;
+  qualification_type_id: string | null;
+  min_qty: number;
+  target_qty: number;
+  notes: string | null;
+  status: string;
+  version_no: number;
+  archived_at: string | null;
+}
+
 export interface CustomerOrderListItem {
   id: string;
   tenant_id: string;
@@ -190,6 +227,52 @@ export function setCustomerOrderReleaseState(tenantId: string, orderId: string, 
     `/api/planning/tenants/${tenantId}/ops/orders/${orderId}/release-state`,
     accessToken,
     { method: "POST", body: payload },
+  );
+}
+
+export function listOrderEquipmentLines(tenantId: string, orderId: string, accessToken: string) {
+  return request<OrderEquipmentLineRead[]>(
+    `/api/planning/tenants/${tenantId}/ops/orders/${orderId}/equipment-lines`,
+    accessToken,
+  );
+}
+
+export function createOrderEquipmentLine(tenantId: string, orderId: string, accessToken: string, payload: Record<string, unknown>) {
+  return request<OrderEquipmentLineRead>(
+    `/api/planning/tenants/${tenantId}/ops/orders/${orderId}/equipment-lines`,
+    accessToken,
+    { method: "POST", body: payload },
+  );
+}
+
+export function updateOrderEquipmentLine(tenantId: string, orderId: string, rowId: string, accessToken: string, payload: Record<string, unknown>) {
+  return request<OrderEquipmentLineRead>(
+    `/api/planning/tenants/${tenantId}/ops/orders/${orderId}/equipment-lines/${rowId}`,
+    accessToken,
+    { method: "PATCH", body: payload },
+  );
+}
+
+export function listOrderRequirementLines(tenantId: string, orderId: string, accessToken: string) {
+  return request<OrderRequirementLineRead[]>(
+    `/api/planning/tenants/${tenantId}/ops/orders/${orderId}/requirement-lines`,
+    accessToken,
+  );
+}
+
+export function createOrderRequirementLine(tenantId: string, orderId: string, accessToken: string, payload: Record<string, unknown>) {
+  return request<OrderRequirementLineRead>(
+    `/api/planning/tenants/${tenantId}/ops/orders/${orderId}/requirement-lines`,
+    accessToken,
+    { method: "POST", body: payload },
+  );
+}
+
+export function updateOrderRequirementLine(tenantId: string, orderId: string, rowId: string, accessToken: string, payload: Record<string, unknown>) {
+  return request<OrderRequirementLineRead>(
+    `/api/planning/tenants/${tenantId}/ops/orders/${orderId}/requirement-lines/${rowId}`,
+    accessToken,
+    { method: "PATCH", body: payload },
   );
 }
 

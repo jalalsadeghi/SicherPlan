@@ -42,6 +42,14 @@
             :no-match-text="tp('customerNoMatch')"
           />
           <label class="field-stack">
+            <span>{{ tp("filtersLifecycleStatus") }}</span>
+            <select v-model="orderFilters.lifecycle_status">
+              <option value="">{{ tp("filtersLifecycleStatus") }}</option>
+              <option value="active">{{ tp("statusActive") }}</option>
+              <option value="inactive">{{ tp("statusInactive") }}</option>
+            </select>
+          </label>
+          <label class="field-stack">
             <span>{{ tp("filtersReleaseState") }}</span>
             <select v-model="orderFilters.release_state">
               <option value="">{{ tp("fieldsReleaseState") }}</option>
@@ -49,6 +57,14 @@
               <option value="release_ready">{{ tp("statusReleaseReady") }}</option>
               <option value="released">{{ tp("statusReleased") }}</option>
             </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("filtersServiceFrom") }}</span>
+            <input v-model="orderFilters.service_from" type="date" :max="orderFilters.service_to || undefined" />
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("filtersServiceTo") }}</span>
+            <input v-model="orderFilters.service_to" type="date" :min="orderFilters.service_from || undefined" />
           </label>
         </div>
 
@@ -58,8 +74,8 @@
         </label>
 
         <div class="cta-row">
-          <button class="cta-button" type="button" @click="refreshOrders">{{ tp("actionsRefresh") }}</button>
-          <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreateOrder" @click="startCreateOrder">{{ tp("actionsNewOrder") }}</button>
+          <button class="cta-button" type="button" :disabled="loading.orders || loading.action" @click="refreshOrders">{{ tp("actionsRefresh") }}</button>
+          <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreateOrder || loading.orders || loading.action" @click="startCreateOrder">{{ tp("actionsNewOrder") }}</button>
         </div>
 
         <div v-if="orders.length" class="planning-orders-list">
@@ -79,6 +95,61 @@
           </button>
         </div>
         <p v-else class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
+
+        <section class="planning-orders-section planning-orders-records-list" data-testid="planning-orders-record-list-section">
+          <div class="planning-orders-panel__header">
+            <div>
+              <p class="eyebrow">{{ tp("sectionPlanningList") }}</p>
+              <h3>{{ tp("planningTitle") }}</h3>
+            </div>
+            <StatusBadge :status="loading.planning ? 'inactive' : selectedOrderId ? 'active' : 'draft'" />
+          </div>
+
+          <div class="planning-orders-form-grid">
+            <label class="field-stack">
+              <span>{{ tp("filtersPlanningMode") }}</span>
+              <select v-model="planningRecordFilters.planning_mode_code" :disabled="!selectedOrderId">
+                <option value="">{{ tp("filtersPlanningMode") }}</option>
+                <option value="event">{{ tp("modeEvent") }}</option>
+                <option value="site">{{ tp("modeSite") }}</option>
+                <option value="trade_fair">{{ tp("modeTradeFair") }}</option>
+                <option value="patrol">{{ tp("modePatrol") }}</option>
+              </select>
+            </label>
+            <label class="field-stack">
+              <span>{{ tp("filtersPlanningFrom") }}</span>
+              <input v-model="planningRecordFilters.planning_from" type="date" :disabled="!selectedOrderId" :max="planningRecordFilters.planning_to || undefined" />
+            </label>
+            <label class="field-stack">
+              <span>{{ tp("filtersPlanningTo") }}</span>
+              <input v-model="planningRecordFilters.planning_to" type="date" :disabled="!selectedOrderId" :min="planningRecordFilters.planning_from || undefined" />
+            </label>
+          </div>
+
+          <div class="cta-row">
+            <button class="cta-button cta-secondary" type="button" :disabled="!selectedOrderId || loading.planning || loading.action" @click="refreshPlanningRecords">{{ tp("actionsRefreshPlanning") }}</button>
+            <button class="cta-button" type="button" :disabled="!actionState.canCreatePlanning || !selectedOrderId || loading.planning || loading.action" @click="startCreatePlanning">{{ tp("actionsNewPlanning") }}</button>
+          </div>
+
+          <p v-if="!selectedOrderId" class="field-help">{{ tp("planningListOrderRequired") }}</p>
+          <div v-else-if="planningRecords.length" class="planning-orders-list">
+            <button
+              v-for="record in planningRecords"
+              :key="record.id"
+              type="button"
+              class="planning-orders-row"
+              :class="{ selected: record.id === selectedPlanningRecordId }"
+              @click="selectPlanningRecord(record.id)"
+            >
+              <div>
+                <strong>{{ record.name }}</strong>
+                <span>{{ planningModeText(record.planning_mode_code) }}</span>
+              </div>
+              <StatusBadge :status="record.release_state" />
+            </button>
+          </div>
+          <p v-else class="planning-orders-list-empty">{{ tp("planningListEmpty") }}</p>
+        </section>
       </section>
 
       <section
@@ -126,6 +197,7 @@
 
           <section v-show="activeDetailTab === 'overview'" class="planning-orders-tab-panel" data-testid="planning-orders-tab-panel-overview">
             <form class="planning-orders-form" @submit.prevent="submitOrder">
+              <fieldset class="planning-orders-fieldset" :disabled="!actionState.canWriteOrders || loading.action">
               <div class="planning-orders-form-grid">
                 <PlanningCustomerSelect
                   v-model="orderDraft.customer_id"
@@ -242,7 +314,136 @@
                 <button class="cta-button" type="submit" :disabled="!actionState.canWriteOrders">{{ tp("actionsSave") }}</button>
                 <button class="cta-button cta-secondary" type="button" @click="resetOrderDraft">{{ tp("actionsReset") }}</button>
               </div>
+              </fieldset>
             </form>
+
+            <section class="planning-orders-section" data-testid="planning-orders-order-equipment-lines">
+              <div class="planning-orders-panel__header">
+                <div>
+                  <h3>{{ tp("sectionOrderEquipmentLines") }}</h3>
+                  <p class="field-help">{{ tp("sectionOrderEquipmentLinesLead") }}</p>
+                </div>
+              </div>
+              <template v-if="selectedOrder">
+                <div v-if="orderEquipmentLines.length" class="planning-orders-line-list">
+                  <button
+                    v-for="line in orderEquipmentLines"
+                    :key="line.id"
+                    type="button"
+                    class="planning-orders-row"
+                    :class="{ selected: line.id === selectedEquipmentLineId }"
+                    @click="selectEquipmentLine(line.id)"
+                  >
+                    <div>
+                      <strong>{{ equipmentItemLabel(line.equipment_item_id) }}</strong>
+                      <span>{{ tpf("equipmentLineQtyLabel", { quantity: String(line.required_qty) }) }}</span>
+                    </div>
+                    <StatusBadge :status="line.status" />
+                  </button>
+                </div>
+                <p v-else class="planning-orders-list-empty">{{ tp("equipmentLinesEmpty") }}</p>
+                <form class="planning-orders-form" @submit.prevent="submitEquipmentLine">
+                  <fieldset class="planning-orders-fieldset" :disabled="!actionState.canWriteOrders || loading.action">
+                  <div class="planning-orders-form-grid">
+                    <label class="field-stack">
+                      <span>{{ tp("fieldsEquipmentItem") }}</span>
+                      <Select
+                        :value="equipmentLineDraft.equipment_item_id || undefined"
+                        show-search
+                        class="planning-admin-select"
+                        popup-class-name="planning-admin-select-dropdown"
+                        :options="equipmentItemSelectOptions"
+                        :loading="equipmentItemLookupLoading"
+                        :disabled="loading.action || !selectedOrder.customer_id"
+                        :filter-option="filterSelectOption"
+                        :placeholder="equipmentItemPlaceholder"
+                        @change="handleEquipmentItemChange"
+                      />
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ tp("fieldsRequiredQty") }}</span>
+                      <input v-model.number="equipmentLineDraft.required_qty" type="number" min="1" />
+                    </label>
+                    <label class="field-stack field-stack--wide">
+                      <span>{{ tp("fieldsNotes") }}</span>
+                      <textarea v-model="equipmentLineDraft.notes" rows="2" />
+                    </label>
+                  </div>
+                  <div class="cta-row">
+                    <button class="cta-button" type="submit" :disabled="!actionState.canWriteOrders">{{ tp("actionsSaveEquipmentLine") }}</button>
+                    <button class="cta-button cta-secondary" type="button" @click="resetEquipmentLineDraft">{{ tp("actionsReset") }}</button>
+                  </div>
+                  </fieldset>
+                </form>
+              </template>
+              <p v-else class="field-help">{{ tp("orderChildrenRequireSave") }}</p>
+            </section>
+
+            <section class="planning-orders-section" data-testid="planning-orders-order-requirement-lines">
+              <div class="planning-orders-panel__header">
+                <div>
+                  <h3>{{ tp("sectionOrderRequirementLines") }}</h3>
+                  <p class="field-help">{{ tp("sectionOrderRequirementLinesLead") }}</p>
+                </div>
+              </div>
+              <template v-if="selectedOrder">
+                <div v-if="orderRequirementLines.length" class="planning-orders-line-list">
+                  <button
+                    v-for="line in orderRequirementLines"
+                    :key="line.id"
+                    type="button"
+                    class="planning-orders-row"
+                    :class="{ selected: line.id === selectedRequirementLineId }"
+                    @click="selectRequirementLine(line.id)"
+                  >
+                    <div>
+                      <strong>{{ requirementTypeLabel(line.requirement_type_id) }}</strong>
+                      <span>{{ tpf("requirementLineQtyLabel", { minQty: String(line.min_qty), targetQty: String(line.target_qty) }) }}</span>
+                    </div>
+                    <StatusBadge :status="line.status" />
+                  </button>
+                </div>
+                <p v-else class="planning-orders-list-empty">{{ tp("requirementLinesEmpty") }}</p>
+                <form class="planning-orders-form" @submit.prevent="submitRequirementLine">
+                  <fieldset class="planning-orders-fieldset" :disabled="!actionState.canWriteOrders || loading.action">
+                  <div class="planning-orders-form-grid">
+                    <label class="field-stack">
+                      <span>{{ tp("fieldsRequirementType") }}</span>
+                      <Select
+                        :value="requirementLineDraft.requirement_type_id || undefined"
+                        show-search
+                        class="planning-admin-select"
+                        popup-class-name="planning-admin-select-dropdown"
+                        :options="requirementTypeSelectOptions"
+                        :loading="requirementTypeLookupLoading"
+                        :disabled="loading.action || !selectedOrder.customer_id"
+                        :filter-option="filterSelectOption"
+                        :placeholder="requirementTypePlaceholder"
+                        @change="handleRequirementLineRequirementTypeChange"
+                      />
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ tp("fieldsMinQty") }}</span>
+                      <input v-model.number="requirementLineDraft.min_qty" type="number" min="0" />
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ tp("fieldsTargetQty") }}</span>
+                      <input v-model.number="requirementLineDraft.target_qty" type="number" min="0" />
+                    </label>
+                    <label class="field-stack field-stack--wide">
+                      <span>{{ tp("fieldsNotes") }}</span>
+                      <textarea v-model="requirementLineDraft.notes" rows="2" />
+                    </label>
+                  </div>
+                  <div class="cta-row">
+                    <button class="cta-button" type="submit" :disabled="!actionState.canWriteOrders">{{ tp("actionsSaveRequirementLine") }}</button>
+                    <button class="cta-button cta-secondary" type="button" @click="resetRequirementLineDraft">{{ tp("actionsReset") }}</button>
+                  </div>
+                  </fieldset>
+                </form>
+              </template>
+              <p v-else class="field-help">{{ tp("orderChildrenRequireSave") }}</p>
+            </section>
           </section>
 
           <section
@@ -325,6 +526,7 @@
             </div>
             <p v-else class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
             <form class="planning-orders-form" @submit.prevent="submitOrderAttachment">
+              <fieldset class="planning-orders-fieldset" :disabled="!actionState.canManageOrderDocs || loading.action">
               <div class="planning-orders-form-grid">
                 <label class="field-stack"><span>{{ tp("fieldsDocumentTitle") }}</span><input v-model="orderAttachmentDraft.title" required /></label>
                 <label class="field-stack"><span>{{ tp("fieldsDocumentLabel") }}</span><input v-model="orderAttachmentDraft.label" /></label>
@@ -333,8 +535,10 @@
               <div class="cta-row">
                 <button class="cta-button" type="submit" :disabled="!actionState.canManageOrderDocs || !orderAttachmentDraft.content_base64">{{ tp("actionsUploadDocument") }}</button>
               </div>
+              </fieldset>
             </form>
             <form class="planning-orders-form" @submit.prevent="linkExistingOrderDocument">
+              <fieldset class="planning-orders-fieldset" :disabled="!actionState.canManageOrderDocs || loading.action">
               <div class="planning-orders-form-grid">
                 <label class="field-stack"><span>{{ tp("fieldsDocumentId") }}</span><input v-model="orderAttachmentLink.document_id" /></label>
                 <label class="field-stack"><span>{{ tp("fieldsDocumentLabel") }}</span><input v-model="orderAttachmentLink.label" /></label>
@@ -342,6 +546,7 @@
               <div class="cta-row">
                 <button class="cta-button cta-secondary" type="submit" :disabled="!actionState.canManageOrderDocs">{{ tp("actionsLinkDocument") }}</button>
               </div>
+              </fieldset>
             </form>
           </section>
 
@@ -356,7 +561,7 @@
                 <p class="eyebrow">{{ tp("sectionPlanningList") }}</p>
                 <h3>{{ tp("planningTitle") }}</h3>
               </div>
-              <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreatePlanning" @click="startCreatePlanning">{{ tp("actionsNewPlanning") }}</button>
+              <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreatePlanning || !selectedOrderId" @click="startCreatePlanning">{{ tp("actionsNewPlanning") }}</button>
             </div>
             <div v-if="planningRecords.length" class="planning-orders-list">
               <button
@@ -377,6 +582,7 @@
             <p v-else class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
 
             <form class="planning-orders-form" @submit.prevent="submitPlanningRecord">
+              <fieldset class="planning-orders-fieldset" :disabled="!actionState.canWritePlanning || loading.action">
               <div class="planning-orders-form-grid">
                 <label class="field-stack">
                   <span>{{ tp("fieldsPlanningMode") }}</span>
@@ -609,6 +815,7 @@
                 <button class="cta-button" type="submit" :disabled="!actionState.canWritePlanning">{{ tp("actionsSave") }}</button>
                 <button class="cta-button cta-secondary" type="button" @click="resetPlanningDraft">{{ tp("actionsReset") }}</button>
               </div>
+              </fieldset>
             </form>
 
             <section v-if="selectedPlanningRecord" class="planning-orders-section">
@@ -641,6 +848,7 @@
               </div>
               <p v-else class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
               <form class="planning-orders-form" @submit.prevent="submitPlanningAttachment">
+                <fieldset class="planning-orders-fieldset" :disabled="!actionState.canManagePlanningDocs || loading.action">
                 <div class="planning-orders-form-grid">
                   <label class="field-stack"><span>{{ tp("fieldsDocumentTitle") }}</span><input v-model="planningAttachmentDraft.title" required /></label>
                   <label class="field-stack"><span>{{ tp("fieldsDocumentLabel") }}</span><input v-model="planningAttachmentDraft.label" /></label>
@@ -649,8 +857,10 @@
                 <div class="cta-row">
                   <button class="cta-button" type="submit" :disabled="!actionState.canManagePlanningDocs || !planningAttachmentDraft.content_base64">{{ tp("actionsUploadDocument") }}</button>
                 </div>
+                </fieldset>
               </form>
               <form class="planning-orders-form" @submit.prevent="linkExistingPlanningDocument">
+                <fieldset class="planning-orders-fieldset" :disabled="!actionState.canManagePlanningDocs || loading.action">
                 <div class="planning-orders-form-grid">
                   <label class="field-stack"><span>{{ tp("fieldsDocumentId") }}</span><input v-model="planningAttachmentLink.document_id" /></label>
                   <label class="field-stack"><span>{{ tp("fieldsDocumentLabel") }}</span><input v-model="planningAttachmentLink.label" /></label>
@@ -658,6 +868,7 @@
                 <div class="cta-row">
                   <button class="cta-button cta-secondary" type="submit" :disabled="!actionState.canManagePlanningDocs">{{ tp("actionsLinkDocument") }}</button>
                 </div>
+                </fieldset>
               </form>
             </section>
           </section>
@@ -766,6 +977,8 @@ import {
 } from "@/api/planningAdmin";
 import {
   createCustomerOrder,
+  createOrderEquipmentLine,
+  createOrderRequirementLine,
   createOrderAttachment,
   createPlanningRecord,
   createPlanningRecordAttachment,
@@ -776,6 +989,8 @@ import {
   linkOrderAttachment,
   linkPlanningRecordAttachment,
   listCustomerOrders,
+  listOrderEquipmentLines,
+  listOrderRequirementLines,
   listOrderAttachments,
   listPlanningDispatcherCandidates,
   listPlanningRecordAttachments,
@@ -783,11 +998,16 @@ import {
   setCustomerOrderReleaseState,
   setPlanningRecordReleaseState,
   updateCustomerOrder,
+  updateOrderEquipmentLine,
+  updateOrderRequirementLine,
   updatePlanningRecord,
   type CustomerOrderListItem,
   type CustomerOrderRead,
+  type OrderEquipmentLineRead,
+  type OrderRequirementLineRead,
   type PlanningDispatcherCandidateRead,
   type PlanningCommercialLinkRead,
+  type PlanningCatalogRecordRead,
   type PlanningRecordListItem,
   type PlanningRecordRead,
   type PlanningDocumentRead,
@@ -819,7 +1039,20 @@ const router = useRouter();
 const { showFeedbackToast } = useSicherPlanFeedback();
 
 const loading = reactive({ orders: false, orderDetail: false, planning: false, action: false });
-const orderFilters = reactive({ search: "", customer_id: "", release_state: "", include_archived: false });
+const orderFilters = reactive({
+  search: "",
+  customer_id: "",
+  lifecycle_status: "",
+  release_state: "",
+  service_from: "",
+  service_to: "",
+  include_archived: false,
+});
+const planningRecordFilters = reactive({
+  planning_mode_code: "",
+  planning_from: "",
+  planning_to: "",
+});
 const customerOptions = ref<CustomerListItem[]>([]);
 const customerLookupLoading = ref(false);
 const customerLookupError = ref("");
@@ -841,6 +1074,9 @@ const siteLookupError = ref("");
 const tradeFairOptions = ref<PlanningListItem[]>([]);
 const tradeFairLookupLoading = ref(false);
 const tradeFairLookupError = ref("");
+const equipmentItemOptions = ref<PlanningCatalogRecordRead[]>([]);
+const equipmentItemLookupLoading = ref(false);
+const equipmentItemLookupError = ref("");
 const tradeFairZoneOptions = ref<TradeFairZoneRead[]>([]);
 const tradeFairZoneLookupLoading = ref(false);
 const tradeFairZoneLookupError = ref("");
@@ -866,10 +1102,14 @@ const patrolRouteModal = reactive({
 });
 const orders = ref<CustomerOrderListItem[]>([]);
 const planningRecords = ref<PlanningRecordListItem[]>([]);
+const orderEquipmentLines = ref<OrderEquipmentLineRead[]>([]);
+const orderRequirementLines = ref<OrderRequirementLineRead[]>([]);
 const orderAttachments = ref<PlanningDocumentRead[]>([]);
 const planningAttachments = ref<PlanningDocumentRead[]>([]);
 const selectedOrderId = ref("");
 const selectedPlanningRecordId = ref("");
+const selectedEquipmentLineId = ref("");
+const selectedRequirementLineId = ref("");
 const selectedOrder = ref<CustomerOrderRead | null>(null);
 const selectedPlanningRecord = ref<PlanningRecordRead | null>(null);
 const selectedOrderCommercial = ref<PlanningCommercialLinkRead | null>(null);
@@ -911,6 +1151,8 @@ const orderAttachmentDraft = reactive({ title: "", label: "", file_name: "", con
 const planningAttachmentDraft = reactive({ title: "", label: "", file_name: "", content_type: "", content_base64: "" });
 const orderAttachmentLink = reactive({ document_id: "", label: "" });
 const planningAttachmentLink = reactive({ document_id: "", label: "" });
+const equipmentLineDraft = reactive({ equipment_item_id: "", required_qty: 1, notes: "" });
+const requirementLineDraft = reactive({ requirement_type_id: "", min_qty: 0, target_qty: 1, notes: "" });
 
 const tenantScopeId = computed(() => authStore.tenantScopeId || authStore.sessionUser?.tenant_id || "");
 const accessToken = computed(() => authStore.accessToken);
@@ -948,6 +1190,12 @@ const planningCustomerId = computed(() => selectedOrder.value?.customer_id || or
 const dispatcherSelectOptions = computed(() =>
   dispatcherOptions.value.map((row) => ({
     label: formatPlanningOrderReferenceOption("dispatcher_user", row),
+    value: row.id,
+  })),
+);
+const equipmentItemSelectOptions = computed(() =>
+  filterPlanningOrderOptionsByCustomer(equipmentItemOptions.value, selectedOrder.value?.customer_id || orderDraft.customer_id).map((row) => ({
+    label: formatPlanningOrderReferenceOption("equipment_item", row),
     value: row.id,
   })),
 );
@@ -1055,6 +1303,12 @@ const patrolRouteDetailPlaceholder = computed(() => {
   if (patrolRouteLookupLoading.value) return tp("patrolRouteLoading");
   if (!patrolRouteLookupError.value && !patrolRouteSelectOptions.value.length) return tp("patrolRouteEmpty");
   return tp("patrolRouteDetailPlaceholder");
+});
+const equipmentItemPlaceholder = computed(() => {
+  if (!selectedOrder.value?.customer_id && !orderDraft.customer_id) return tp("equipmentItemCustomerRequired");
+  if (equipmentItemLookupLoading.value) return tp("equipmentItemLoading");
+  if (!equipmentItemLookupError.value && !equipmentItemSelectOptions.value.length) return tp("equipmentItemEmpty");
+  return tp("equipmentItemPlaceholder");
 });
 const requirementTypeSetupMissing = computed(() =>
   hasPlanningOrderSetupGap({
@@ -1253,6 +1507,25 @@ function resetOrderDraft() {
   });
 }
 
+function resetEquipmentLineDraft() {
+  selectedEquipmentLineId.value = "";
+  Object.assign(equipmentLineDraft, {
+    equipment_item_id: "",
+    required_qty: 1,
+    notes: "",
+  });
+}
+
+function resetRequirementLineDraft() {
+  selectedRequirementLineId.value = "";
+  Object.assign(requirementLineDraft, {
+    requirement_type_id: "",
+    min_qty: 0,
+    target_qty: 1,
+    notes: "",
+  });
+}
+
 function resetPlanningDraft() {
   planningValidationState.attempted = false;
   Object.assign(planningDraft, {
@@ -1285,6 +1558,25 @@ function syncOrderDraft(order: CustomerOrderRead) {
     security_concept_text: order.security_concept_text ?? "",
     notes: order.notes ?? "",
     release_state: order.release_state,
+  });
+}
+
+function syncEquipmentLineDraft(line: OrderEquipmentLineRead) {
+  selectedEquipmentLineId.value = line.id;
+  Object.assign(equipmentLineDraft, {
+    equipment_item_id: line.equipment_item_id,
+    required_qty: line.required_qty,
+    notes: line.notes ?? "",
+  });
+}
+
+function syncRequirementLineDraft(line: OrderRequirementLineRead) {
+  selectedRequirementLineId.value = line.id;
+  Object.assign(requirementLineDraft, {
+    requirement_type_id: line.requirement_type_id,
+    min_qty: line.min_qty,
+    target_qty: line.target_qty,
+    notes: line.notes ?? "",
   });
 }
 
@@ -1475,6 +1767,14 @@ function handlePatrolRouteClear() {
   orderDraft.patrol_route_id = "";
 }
 
+function handleEquipmentItemChange(value: string | number | undefined) {
+  equipmentLineDraft.equipment_item_id = typeof value === "string" ? value : "";
+}
+
+function handleRequirementLineRequirementTypeChange(value: string | number | undefined) {
+  requirementLineDraft.requirement_type_id = typeof value === "string" ? value : "";
+}
+
 function handlePlanningDispatcherChange(value: string | number | undefined) {
   planningDraft.dispatcher_user_id = typeof value === "string" ? value : "";
 }
@@ -1530,6 +1830,14 @@ function formatOrderCustomerLabel(customerId: string) {
   ) || customerId;
 }
 
+function requirementTypeLabel(requirementTypeId: string) {
+  return requirementTypeSelectOptions.value.find((row) => row.value === requirementTypeId)?.label || requirementTypeId;
+}
+
+function equipmentItemLabel(equipmentItemId: string) {
+  return equipmentItemSelectOptions.value.find((row) => row.value === equipmentItemId)?.label || equipmentItemId;
+}
+
 function validateOrderServiceWindow() {
   if (!orderDraft.service_from || !orderDraft.service_to) {
     return true;
@@ -1567,12 +1875,14 @@ async function refreshOrderReferenceOptions(customerId: string) {
     eventVenueOptions.value = [];
     siteOptions.value = [];
     tradeFairOptions.value = [];
+    equipmentItemOptions.value = [];
     tradeFairZoneOptions.value = [];
     requirementTypeLookupError.value = "";
     patrolRouteLookupError.value = "";
     eventVenueLookupError.value = "";
     siteLookupError.value = "";
     tradeFairLookupError.value = "";
+    equipmentItemLookupError.value = "";
     tradeFairZoneLookupError.value = "";
     if (orderDraft.requirement_type_id) {
       orderDraft.requirement_type_id = "";
@@ -1687,6 +1997,26 @@ async function refreshOrderReferenceOptions(customerId: string) {
     planningDraft.trade_fair_detail.trade_fair_id = "";
   } finally {
     tradeFairLookupLoading.value = false;
+  }
+
+  equipmentItemLookupLoading.value = true;
+  equipmentItemLookupError.value = "";
+  try {
+    equipmentItemOptions.value = await listPlanningCatalogRecords(
+      "equipment_item",
+      tenantScopeId.value,
+      accessToken.value,
+      { customer_id: customerId },
+    ) as PlanningCatalogRecordRead[];
+    if (!equipmentItemOptions.value.some((row) => row.id === equipmentLineDraft.equipment_item_id)) {
+      equipmentLineDraft.equipment_item_id = "";
+    }
+  } catch {
+    equipmentItemOptions.value = [];
+    equipmentItemLookupError.value = tp("equipmentItemLoadError");
+    equipmentLineDraft.equipment_item_id = "";
+  } finally {
+    equipmentItemLookupLoading.value = false;
   }
 }
 
@@ -1843,6 +2173,10 @@ async function selectOrder(orderId: string) {
     isCreatingOrder.value = false;
     selectedOrder.value = await getCustomerOrder(tenantScopeId.value, orderId, accessToken.value);
     syncOrderDraft(selectedOrder.value);
+    orderEquipmentLines.value = await listOrderEquipmentLines(tenantScopeId.value, orderId, accessToken.value);
+    orderRequirementLines.value = await listOrderRequirementLines(tenantScopeId.value, orderId, accessToken.value);
+    resetEquipmentLineDraft();
+    resetRequirementLineDraft();
     orderAttachments.value = await listOrderAttachments(tenantScopeId.value, orderId, accessToken.value);
     selectedOrderCommercial.value = await getOrderCommercialLink(tenantScopeId.value, orderId, accessToken.value);
     await refreshPlanningRecords();
@@ -1861,11 +2195,17 @@ function startCreateOrder() {
   planningRecords.value = [];
   selectedPlanningRecord.value = null;
   selectedPlanningRecordId.value = "";
+  selectedEquipmentLineId.value = "";
+  selectedRequirementLineId.value = "";
+  orderEquipmentLines.value = [];
+  orderRequirementLines.value = [];
   orderAttachments.value = [];
   planningAttachments.value = [];
   selectedOrderCommercial.value = null;
   selectedPlanningCommercial.value = null;
   resetOrderDraft();
+  resetEquipmentLineDraft();
+  resetRequirementLineDraft();
 }
 
 async function submitOrder() {
@@ -1969,7 +2309,12 @@ async function refreshPlanningRecords() {
   if (!tenantScopeId.value || !accessToken.value || !selectedOrderId.value || !actionState.value.canReadPlanning) return;
   loading.planning = true;
   try {
-    planningRecords.value = await listPlanningRecords(tenantScopeId.value, accessToken.value, { order_id: selectedOrderId.value });
+    planningRecords.value = await listPlanningRecords(tenantScopeId.value, accessToken.value, {
+      order_id: selectedOrderId.value,
+      planning_mode_code: planningRecordFilters.planning_mode_code,
+      planning_from: planningRecordFilters.planning_from,
+      planning_to: planningRecordFilters.planning_to,
+    });
     if (selectedPlanningRecordId.value) {
       const stillSelected = planningRecords.value.find((row) => row.id === selectedPlanningRecordId.value);
       if (!stillSelected) {
@@ -1983,6 +2328,104 @@ async function refreshPlanningRecords() {
     handleError(error);
   } finally {
     loading.planning = false;
+  }
+}
+
+function selectEquipmentLine(lineId: string) {
+  const line = orderEquipmentLines.value.find((row) => row.id === lineId);
+  if (!line) {
+    return;
+  }
+  syncEquipmentLineDraft(line);
+}
+
+function selectRequirementLine(lineId: string) {
+  const line = orderRequirementLines.value.find((row) => row.id === lineId);
+  if (!line) {
+    return;
+  }
+  syncRequirementLineDraft(line);
+}
+
+async function submitEquipmentLine() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedOrder.value) return;
+  if (!equipmentLineDraft.equipment_item_id || equipmentLineDraft.required_qty < 1) {
+    setFeedback("error", tp("errorTitle"), tp("equipmentLineInvalid"));
+    return;
+  }
+  loading.action = true;
+  try {
+    if (selectedEquipmentLineId.value) {
+      await updateOrderEquipmentLine(
+        tenantScopeId.value,
+        selectedOrder.value.id,
+        selectedEquipmentLineId.value,
+        accessToken.value,
+        {
+          equipment_item_id: equipmentLineDraft.equipment_item_id,
+          required_qty: equipmentLineDraft.required_qty,
+          notes: equipmentLineDraft.notes || null,
+          version_no: orderEquipmentLines.value.find((line) => line.id === selectedEquipmentLineId.value)?.version_no,
+        },
+      );
+    } else {
+      await createOrderEquipmentLine(tenantScopeId.value, selectedOrder.value.id, accessToken.value, {
+        tenant_id: tenantScopeId.value,
+        order_id: selectedOrder.value.id,
+        equipment_item_id: equipmentLineDraft.equipment_item_id,
+        required_qty: equipmentLineDraft.required_qty,
+        notes: equipmentLineDraft.notes || null,
+      });
+    }
+    orderEquipmentLines.value = await listOrderEquipmentLines(tenantScopeId.value, selectedOrder.value.id, accessToken.value);
+    resetEquipmentLineDraft();
+    setFeedback("success", tp("successTitle"), tp("equipmentLineSaved"));
+  } catch (error) {
+    handleError(error);
+  } finally {
+    loading.action = false;
+  }
+}
+
+async function submitRequirementLine() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedOrder.value) return;
+  if (!requirementLineDraft.requirement_type_id || requirementLineDraft.min_qty < 0 || requirementLineDraft.target_qty < requirementLineDraft.min_qty) {
+    setFeedback("error", tp("errorTitle"), tp("requirementLineInvalid"));
+    return;
+  }
+  loading.action = true;
+  try {
+    if (selectedRequirementLineId.value) {
+      await updateOrderRequirementLine(
+        tenantScopeId.value,
+        selectedOrder.value.id,
+        selectedRequirementLineId.value,
+        accessToken.value,
+        {
+          requirement_type_id: requirementLineDraft.requirement_type_id,
+          min_qty: requirementLineDraft.min_qty,
+          target_qty: requirementLineDraft.target_qty,
+          notes: requirementLineDraft.notes || null,
+          version_no: orderRequirementLines.value.find((line) => line.id === selectedRequirementLineId.value)?.version_no,
+        },
+      );
+    } else {
+      await createOrderRequirementLine(tenantScopeId.value, selectedOrder.value.id, accessToken.value, {
+        tenant_id: tenantScopeId.value,
+        order_id: selectedOrder.value.id,
+        requirement_type_id: requirementLineDraft.requirement_type_id,
+        min_qty: requirementLineDraft.min_qty,
+        target_qty: requirementLineDraft.target_qty,
+        notes: requirementLineDraft.notes || null,
+      });
+    }
+    orderRequirementLines.value = await listOrderRequirementLines(tenantScopeId.value, selectedOrder.value.id, accessToken.value);
+    resetRequirementLineDraft();
+    setFeedback("success", tp("successTitle"), tp("requirementLineSaved"));
+  } catch (error) {
+    handleError(error);
+  } finally {
+    loading.action = false;
   }
 }
 
@@ -2160,6 +2603,16 @@ watch(
 );
 
 watch(
+  () => [planningRecordFilters.planning_mode_code, planningRecordFilters.planning_from, planningRecordFilters.planning_to, selectedOrderId.value] as const,
+  async ([, , , orderId]) => {
+    if (!orderId) {
+      return;
+    }
+    await refreshPlanningRecords();
+  },
+);
+
+watch(
   () => planningDraft.trade_fair_detail.trade_fair_id,
   async (tradeFairId) => {
     await refreshTradeFairZoneOptions(tradeFairId);
@@ -2180,6 +2633,7 @@ watch(
 .planning-orders-page,
 .planning-orders-form,
 .planning-orders-list,
+.planning-orders-line-list,
 .planning-orders-doc-list,
 .planning-orders-section,
 .planning-orders-panel,
@@ -2238,6 +2692,19 @@ watch(
 
 .planning-orders-form {
   gap: 1.1rem;
+}
+
+.planning-orders-fieldset {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+  display: grid;
+  gap: 1.1rem;
+}
+
+.planning-orders-fieldset:disabled {
+  opacity: 0.86;
 }
 
 .planning-orders-section {

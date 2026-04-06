@@ -19,10 +19,14 @@ import {
   validatePlanningRecordDraft,
 } from "./planningOrders.helpers.js";
 
-test("dispatcher can manage orders and planning records", () => {
+test("dispatcher and accounting can manage orders while controller_qm stays read-only", () => {
   assert.equal(hasPlanningOrderPermission("dispatcher", "planning.order.write"), true);
   assert.equal(hasPlanningOrderPermission("dispatcher", "planning.record.write"), true);
-  assert.equal(hasPlanningOrderPermission("accounting", "planning.order.read"), false);
+  assert.equal(hasPlanningOrderPermission("accounting", "planning.order.read"), true);
+  assert.equal(hasPlanningOrderPermission("accounting", "planning.record.write"), true);
+  assert.equal(hasPlanningOrderPermission("controller_qm", "planning.order.read"), true);
+  assert.equal(hasPlanningOrderPermission("controller_qm", "planning.order.write"), false);
+  assert.equal(hasPlanningOrderPermission("controller_qm", "planning.record.write"), false);
 });
 
 test("action state follows selected order and planning record", () => {
@@ -32,6 +36,18 @@ test("action state follows selected order and planning record", () => {
   assert.equal(state.canCreatePlanning, true);
   assert.equal(state.canEditPlanning, true);
   assert.equal(state.canManagePlanningDocs, true);
+});
+
+test("read-only action state disables editing, release, and attachments", () => {
+  const state = derivePlanningOrderActionState("controller_qm", { id: "order-1" }, { id: "plan-1" });
+  assert.equal(state.canReadOrders, true);
+  assert.equal(state.canReadPlanning, true);
+  assert.equal(state.canWriteOrders, false);
+  assert.equal(state.canWritePlanning, false);
+  assert.equal(state.canTransitionOrder, false);
+  assert.equal(state.canTransitionPlanning, false);
+  assert.equal(state.canManageOrderDocs, false);
+  assert.equal(state.canManagePlanningDocs, false);
 });
 
 test("api message mapping covers planning-specific errors", () => {
@@ -72,6 +88,10 @@ test("planning-order reference options use business labels", () => {
   assert.equal(
     formatPlanningOrderReferenceOption("site", { id: "site-1", site_no: "SITE-4", name: "Werkstor" }),
     "SITE-4 — Werkstor",
+  );
+  assert.equal(
+    formatPlanningOrderReferenceOption("equipment_item", { id: "equip-1", code: "RAD-1", label: "Radio" }),
+    "RAD-1 — Radio",
   );
   assert.equal(
     formatPlanningOrderReferenceOption("trade_fair", { id: "fair-1", fair_no: "FAIR-9", name: "Expo Ost" }),

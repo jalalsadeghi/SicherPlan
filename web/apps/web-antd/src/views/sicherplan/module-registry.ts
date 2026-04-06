@@ -211,6 +211,7 @@ export const moduleRegistry: Record<string, ModuleConfig> = {
     workspaceDescriptionKey: 'sicherplan.ui.modules.planning.workspace',
   },
   'planning-orders': {
+    allowedRoles: ['tenant_admin', 'dispatcher', 'accounting', 'controller_qm'],
     badges: [
       { key: 'Order Backbone', tone: 'success' },
       { key: 'Commercial Context', tone: 'default' },

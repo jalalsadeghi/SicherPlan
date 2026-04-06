@@ -148,7 +148,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     meta: {
-      authority: ['tenant_admin', 'dispatcher', 'controller_qm'],
+      authority: ['tenant_admin', 'dispatcher', 'accounting', 'controller_qm'],
       icon: 'lucide:map',
       order: -6,
       title: $t('sicherplan.navigation.operations'),
@@ -174,7 +174,7 @@ const routes: RouteRecordRaw[] = [
         path: '/admin/planning-orders',
         component: AdminModuleView,
         meta: {
-          authority: ['tenant_admin', 'dispatcher', 'controller_qm'],
+          authority: ['tenant_admin', 'dispatcher', 'accounting', 'controller_qm'],
           icon: 'lucide:clipboard-list',
           moduleKey: 'planning-orders',
           title: $t('sicherplan.admin.planningOrders'),
