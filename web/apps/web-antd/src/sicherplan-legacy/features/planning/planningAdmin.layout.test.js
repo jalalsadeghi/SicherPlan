@@ -30,6 +30,12 @@ test("browse records keeps both panels mounted with v-show and leaves results be
   );
 });
 
+test("planning master-detail layout pins panels and list content to the top when detail height grows", () => {
+  assert.match(source, /\.planning-admin-grid \{[\s\S]*align-items: start;/);
+  assert.match(source, /\.planning-admin-panel,\n\.planning-admin-list-panel,\n\.planning-admin-detail \{[\s\S]*align-content: start;/);
+  assert.match(source, /\.planning-admin-list \{[\s\S]*align-content: start;[\s\S]*grid-auto-rows: max-content;/);
+});
+
 test("site address field is clearly labeled as an optional address record id", () => {
   assert.match(source, /<PlanningAddressSelect[\s\S]*tp\('fieldsAddressId'\)/);
   assert.match(source, /tp\('fieldsAddressSearchPlaceholder'\)/);

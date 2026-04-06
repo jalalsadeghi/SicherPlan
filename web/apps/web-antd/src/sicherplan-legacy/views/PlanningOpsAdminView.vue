@@ -1996,6 +1996,7 @@ onMounted(async () => {
 
 .planning-admin-grid {
   grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  align-items: start;
 }
 
 .planning-admin-panel,
@@ -2046,8 +2047,15 @@ onMounted(async () => {
   gap: 1rem;
 }
 
+.planning-admin-panel,
+.planning-admin-list-panel,
 .planning-admin-detail {
   align-content: start;
+}
+
+.planning-admin-list {
+  align-content: start;
+  grid-auto-rows: max-content;
 }
 
 .planning-admin-summary {

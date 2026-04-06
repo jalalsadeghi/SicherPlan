@@ -1,73 +1,83 @@
 You are working in the SicherPlan repository.
 
-Bug to fix
-----------
-Creating a second Trade Fair zone returns HTTP 500, but the zone is actually persisted.
-Observed backend error:
-TypeError: Object of type TradeFair is not JSON serializable
+Goal
+----
+Fix a frontend layout/styling regression in the Planning master-data page for trade fairs.
 
-Relevant files
---------------
-- backend/app/modules/planning/service.py
-- backend/app/modules/planning/models.py
-- backend/app/modules/planning/repository.py
-- backend/app/modules/iam/audit_repository.py
-- backend/tests/modules/planning/test_ops_master_foundation.py
+Observed bug
+------------
+In `PlanningOpsAdminView.vue`, the page looks correct before selecting a trade fair.
+After selecting a trade fair record such as `FAIR-001`, the left "Browse records" panel no longer stays pinned to the top, the `Filter records` / `CSV import` tab buttons look visually wrong, and the `planning-admin-list` container becomes unnaturally squared/stretched.
+
+Scope
+-----
+Frontend only. Do not change backend code.
+
+Primary file
+------------
+- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOpsAdminView.vue`
+
+Related reference
+-----------------
+- `web/apps/web-antd/src/sicherplan-legacy/components/shared/InternalCardTabs.vue`
 
 Diagnosis
 ---------
-`PlanningService.create_trade_fair_zone()` creates the row successfully, then records an audit event using:
-    after_json=self._snapshot(row)
+This is a layout issue in the page-level CSS, triggered only after a record is selected and the detail pane becomes much taller.
 
-`_snapshot()` currently builds a dict from `row.__dict__` and excludes only a hard-coded set of relationship names.
-For `TradeFairZone`, the SQLAlchemy relationship `trade_fair` is not excluded.
-That means the audit payload can contain a live ORM object (`TradeFair`), which later fails JSON serialization when the audit repository writes the JSON column.
+In `PlanningOpsAdminView.vue`:
+- `.planning-admin-grid` is a CSS grid container but does not explicitly set `align-items: start`.
+- `.planning-admin-panel` and `.planning-admin-list` are grid containers, but they also do not explicitly pin content to the top with `align-content: start`.
+- When the detail column grows after selecting a trade fair, the left panel stretches to the row height and its inner grid content is distributed/stretched, which makes:
+  - the browse panel appear vertically displaced,
+  - the tab strip look off,
+  - and the list area / single selected record look blocky or squared.
 
-Additionally, the planning repository commits the new zone before the audit repository commits the audit row, so the API returns 500 even though the zone was already saved.
+What to change
+--------------
+Apply a minimal, targeted CSS fix in `PlanningOpsAdminView.vue` so that:
+1. The two-column grid aligns panels at the top instead of stretching them vertically.
+2. The left browse panel keeps its natural height/content flow after a record is selected.
+3. The record list keeps a natural stacked layout and does not visually stretch when there is only one item.
+4. Existing mobile behavior remains intact.
 
-What to implement
------------------
-1. Fix `PlanningService._snapshot()` so it is generic and JSON-safe:
-   - Do NOT build the snapshot from `row.__dict__`.
-   - Use SQLAlchemy inspection to include only mapped column attributes, never relationship attributes.
-   - Serialize values recursively into JSON-safe primitives:
-     - Decimal -> string
-     - datetime/date/time -> ISO string
-     - UUID -> string
-     - Enum -> value or string
-     - dict/list/tuple -> recurse
-     - None/bool/int/float/str -> keep as-is
-   - The helper must work for all planning models, not only TradeFairZone.
+Recommended implementation direction
+------------------------------------
+In the scoped `<style>` block of `PlanningOpsAdminView.vue`:
 
-2. Keep the current API behavior and response schema unchanged.
-   - Successful zone creation must return success instead of 500.
-   - Do not change endpoint contracts unless strictly necessary.
+- Update `.planning-admin-grid` to explicitly align items to the start:
+  - `align-items: start;`
 
-3. Add regression tests in:
-   `backend/tests/modules/planning/test_ops_master_foundation.py`
-   Include at least:
-   - a test that creates a trade fair and then creates a trade fair zone with audit enabled, asserting:
-     - no exception
-     - one audit event is recorded
-     - `after_json` contains only JSON-safe values
-     - `trade_fair` relationship object is not present in `after_json`
-   - a second test for another relationship-bearing planning entity that uses the same snapshot path, preferably patrol checkpoint, to prevent the same bug class from returning.
+- Ensure the left browse panel and generic panel grids do not distribute content vertically:
+  - add `align-content: start;` to `.planning-admin-list-panel`
+  - optionally also add `align-content: start;` to `.planning-admin-panel` if needed, but do not break the detail pane
 
-4. Keep the fix minimal and production-safe.
-   - Avoid broad refactors of transaction boundaries in this patch unless required for the tests.
-   - Focus on the serialization bug and regression coverage first.
+- Ensure `.planning-admin-list` does not stretch its rows unnaturally:
+  - add `align-content: start;`
+  - add `grid-auto-rows: max-content;`
+
+- Preserve the existing rounded/pill appearance of `InternalCardTabs`; do not rewrite `InternalCardTabs.vue` unless strictly necessary.
+
+Important constraints
+---------------------
+- Keep the fix localized to this view unless a shared style bug is proven.
+- Do not regress the selected detail view, the trade-fair zones section, or the patrol checkpoints section.
+- Do not remove the existing responsive breakpoint behavior.
+- Do not introduce hardcoded heights.
 
 Acceptance criteria
 -------------------
-- POST /ops/trade-fairs/{trade_fair_id}/zones returns success for valid payloads.
-- No `TypeError: Object of type TradeFair is not JSON serializable`.
-- Audit rows are still written.
-- Existing tests pass.
-- New regression tests pass.
+- Before selection: page still looks unchanged and correct.
+- After selecting a trade fair record:
+  - the left "Browse records" panel remains top-aligned,
+  - `Filter records` and `CSV import` keep their intended pill/tab styling,
+  - the browse list remains visually natural and does not become squared/stretched,
+  - the detail pane still expands normally.
+- Mobile layout under the existing media query still works.
 
-After coding
-------------
-Run the most relevant tests and report:
-- what changed
-- which tests were run
-- whether any follow-up transaction-hardening work is still recommended
+Deliverable
+-----------
+Make the code change and provide a concise summary of:
+- the root cause,
+- the exact CSS selectors changed,
+- and why the fix only appeared after selecting a record.
