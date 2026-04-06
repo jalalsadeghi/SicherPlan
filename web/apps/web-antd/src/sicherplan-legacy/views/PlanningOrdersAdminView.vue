@@ -644,6 +644,7 @@
                   />
                   <p v-if="dispatcherLookupError" class="field-help">{{ dispatcherLookupError }}</p>
                   <p v-else-if="!dispatcherLookupLoading && !dispatcherSelectOptions.length" class="field-help">{{ tp("dispatcherEmpty") }}</p>
+                  <p class="field-help">{{ tp("dispatcherIamHint") }}</p>
                 </label>
                 <label class="field-stack">
                   <span>{{ tp("fieldsParentPlanningRecordId") }}</span>
@@ -1158,6 +1159,7 @@ const tenantScopeId = computed(() => authStore.tenantScopeId || authStore.sessio
 const accessToken = computed(() => authStore.accessToken);
 const currentLocale = computed(() => (localeStore.locale === "en" ? "en" : "de"));
 const effectiveRole = computed(() => authStore.effectiveRole);
+const currentSessionUserId = computed(() => authStore.sessionUser?.id || "");
 const actionState = computed(() =>
   derivePlanningOrderActionState(effectiveRole.value, selectedOrder.value, selectedPlanningRecord.value),
 );
@@ -1783,6 +1785,16 @@ function clearPlanningDispatcher() {
   planningDraft.dispatcher_user_id = "";
 }
 
+function applyDefaultDispatcherForNewPlanning() {
+  if (!isCreatingPlanning.value || planningDraft.dispatcher_user_id || !currentSessionUserId.value) {
+    return;
+  }
+  const currentUserCandidate = dispatcherOptions.value.find((row) => row.id === currentSessionUserId.value);
+  if (currentUserCandidate) {
+    planningDraft.dispatcher_user_id = currentUserCandidate.id;
+  }
+}
+
 function handleParentPlanningRecordChange(value: string | number | undefined) {
   planningDraft.parent_planning_record_id = typeof value === "string" ? value : "";
 }
@@ -2024,7 +2036,6 @@ async function refreshDispatcherOptions() {
   if (!tenantScopeId.value || !accessToken.value || !actionState.value.canReadPlanning) {
     dispatcherOptions.value = [];
     dispatcherLookupError.value = "";
-    planningDraft.dispatcher_user_id = "";
     return;
   }
 
@@ -2035,10 +2046,10 @@ async function refreshDispatcherOptions() {
     if (!dispatcherOptions.value.some((row) => row.id === planningDraft.dispatcher_user_id)) {
       planningDraft.dispatcher_user_id = "";
     }
+    applyDefaultDispatcherForNewPlanning();
   } catch {
     dispatcherOptions.value = [];
     dispatcherLookupError.value = tp("dispatcherLoadError");
-    planningDraft.dispatcher_user_id = "";
   } finally {
     dispatcherLookupLoading.value = false;
   }
@@ -2437,6 +2448,7 @@ function startCreatePlanning() {
   selectedPlanningCommercial.value = null;
   planningValidationState.attempted = false;
   resetPlanningDraft();
+  applyDefaultDispatcherForNewPlanning();
 }
 
 async function selectPlanningRecord(planningRecordId: string) {

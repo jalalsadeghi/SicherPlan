@@ -32,7 +32,17 @@ class FakePlanningRecordRepository(FakeCustomerOrderRepository):
     def __post_init__(self) -> None:
         super().__post_init__()
         now = datetime.now(UTC)
-        self.user_accounts["dispatcher-1"] = SimpleNamespace(id="dispatcher-1", tenant_id=self.tenant_id, status="active", created_at=now, updated_at=now)
+        self.user_accounts["dispatcher-1"] = SimpleNamespace(
+            id="dispatcher-1",
+            tenant_id=self.tenant_id,
+            username="dispatcher.one",
+            email="dispatcher.one@example.invalid",
+            full_name="Dispatcher One",
+            status="active",
+            archived_at=None,
+            created_at=now,
+            updated_at=now,
+        )
 
     def get_user_account(self, tenant_id: str, user_id: str):
         row = self.user_accounts.get(user_id)
@@ -45,6 +55,10 @@ class FakePlanningRecordRepository(FakeCustomerOrderRepository):
         for user in sorted(self.user_accounts.values(), key=lambda row: row.id):
             if user.tenant_id != tenant_id:
                 continue
+            if getattr(user, "status", "active") != "active":
+                continue
+            if getattr(user, "archived_at", None) is not None:
+                continue
             rows.append(
                 SimpleNamespace(
                     id=user.id,
@@ -54,6 +68,7 @@ class FakePlanningRecordRepository(FakeCustomerOrderRepository):
                     full_name=getattr(user, "full_name", user.id),
                     status=user.status,
                     role_keys=["dispatcher"],
+                    archived_at=getattr(user, "archived_at", None),
                 )
             )
         return rows
@@ -444,6 +459,7 @@ class PlanningRecordServiceTests(unittest.TestCase):
             email="dispatch.two@example.com",
             full_name="Dispatch Two",
             status="active",
+            archived_at=None,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
@@ -454,6 +470,90 @@ class PlanningRecordServiceTests(unittest.TestCase):
         self.assertEqual(rows[1].full_name, "Dispatch Two")
         self.assertEqual(rows[1].email, "dispatch.two@example.com")
         self.assertEqual(rows[1].role_keys, ["dispatcher"])
+
+    def test_dispatcher_candidates_exclude_other_tenant_inactive_and_archived_users(self) -> None:
+        now = datetime.now(UTC)
+        self.repository.user_accounts["other-tenant"] = SimpleNamespace(
+            id="other-tenant",
+            tenant_id="tenant-2",
+            username="other.tenant",
+            email="other@example.com",
+            full_name="Other Tenant",
+            status="active",
+            archived_at=None,
+            created_at=now,
+            updated_at=now,
+        )
+        self.repository.user_accounts["inactive-user"] = SimpleNamespace(
+            id="inactive-user",
+            tenant_id="tenant-1",
+            username="inactive.user",
+            email="inactive@example.com",
+            full_name="Inactive User",
+            status="inactive",
+            archived_at=None,
+            created_at=now,
+            updated_at=now,
+        )
+        self.repository.user_accounts["archived-user"] = SimpleNamespace(
+            id="archived-user",
+            tenant_id="tenant-1",
+            username="archived.user",
+            email="archived@example.com",
+            full_name="Archived User",
+            status="active",
+            archived_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+
+        rows = self.service.list_dispatcher_candidates("tenant-1", self.actor)
+
+        self.assertEqual([row.id for row in rows], ["dispatcher-1"])
+
+    def test_current_tenant_admin_is_added_as_dispatcher_candidate_when_valid(self) -> None:
+        now = datetime.now(UTC)
+        self.repository.user_accounts["user-1"] = SimpleNamespace(
+            id="user-1",
+            tenant_id="tenant-1",
+            username="tenant.admin",
+            email="tenant.admin@example.com",
+            full_name="Tenant Admin",
+            status="active",
+            archived_at=None,
+            created_at=now,
+            updated_at=now,
+        )
+        original_list_dispatchers = self.repository.list_dispatcher_candidates
+
+        def list_without_actor(tenant_id: str):
+            return [row for row in original_list_dispatchers(tenant_id) if row.id != "user-1"]
+
+        self.repository.list_dispatcher_candidates = list_without_actor  # type: ignore[method-assign]
+
+        rows = self.service.list_dispatcher_candidates("tenant-1", self.actor)
+
+        actor_row = next(row for row in rows if row.id == "user-1")
+        self.assertEqual(actor_row.full_name, "Tenant Admin")
+        self.assertIn("tenant_admin", actor_row.role_keys)
+
+    def test_current_tenant_admin_fallback_skips_inactive_user(self) -> None:
+        now = datetime.now(UTC)
+        self.repository.user_accounts["user-1"] = SimpleNamespace(
+            id="user-1",
+            tenant_id="tenant-1",
+            username="tenant.admin",
+            email="tenant.admin@example.com",
+            full_name="Tenant Admin",
+            status="inactive",
+            archived_at=None,
+            created_at=now,
+            updated_at=now,
+        )
+
+        rows = self.service.list_dispatcher_candidates("tenant-1", self.actor)
+
+        self.assertFalse(any(row.id == "user-1" for row in rows))
 
 
 if __name__ == "__main__":

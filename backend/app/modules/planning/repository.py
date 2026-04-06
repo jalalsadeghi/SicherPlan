@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -194,6 +194,7 @@ class SqlAlchemyPlanningRepository:
         return self.session.scalars(statement).one_or_none()
 
     def list_dispatcher_candidates(self, tenant_id: str) -> list[PlanningDispatcherCandidateRead]:
+        now = datetime.now(UTC)
         statement = (
             select(UserAccount, Role.key)
             .join(UserRoleAssignment, UserRoleAssignment.user_account_id == UserAccount.id)
@@ -201,10 +202,13 @@ class SqlAlchemyPlanningRepository:
             .where(
                 UserAccount.tenant_id == tenant_id,
                 UserAccount.archived_at.is_(None),
+                UserAccount.status == "active",
                 UserRoleAssignment.tenant_id == tenant_id,
                 UserRoleAssignment.archived_at.is_(None),
                 UserRoleAssignment.status == "active",
                 UserRoleAssignment.scope_type.in_(("tenant", "branch", "mandate")),
+                or_(UserRoleAssignment.valid_from.is_(None), UserRoleAssignment.valid_from <= now),
+                or_(UserRoleAssignment.valid_until.is_(None), UserRoleAssignment.valid_until >= now),
                 Role.key.in_(("platform_admin", "tenant_admin", "dispatcher", "controller_qm", "accounting")),
             )
             .order_by(func.lower(UserAccount.full_name), func.lower(UserAccount.username))
@@ -221,6 +225,7 @@ class SqlAlchemyPlanningRepository:
                     full_name=user.full_name,
                     status=user.status,
                     role_keys=[],
+                    archived_at=user.archived_at,
                 )
             if role_key not in candidates[user.id].role_keys:
                 candidates[user.id].role_keys.append(role_key)

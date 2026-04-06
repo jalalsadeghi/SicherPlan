@@ -198,6 +198,18 @@ test("planning-record selectors reuse the correct lookup sources", () => {
   assert.match(source, /listPlanningRecords\(tenantScopeId\.value, accessToken\.value, \{[\s\S]*order_id: selectedOrderId\.value[\s\S]*planning_mode_code: planningRecordFilters\.planning_mode_code/);
 });
 
+test("planning-record dispatcher selector shows IAM guidance and defaults only for new records", () => {
+  assert.match(source, /<p class="field-help">{{ tp\("dispatcherIamHint"\) }}<\/p>/);
+  assert.match(source, /const currentSessionUserId = computed\(\(\) => authStore\.sessionUser\?\.id \|\| ""\);/);
+  assert.match(source, /function applyDefaultDispatcherForNewPlanning\(\) \{/);
+  assert.match(source, /if \(!isCreatingPlanning\.value \|\| planningDraft\.dispatcher_user_id \|\| !currentSessionUserId\.value\) \{/);
+  assert.match(source, /const currentUserCandidate = dispatcherOptions\.value\.find\(\(row\) => row\.id === currentSessionUserId\.value\);/);
+  assert.match(source, /planningDraft\.dispatcher_user_id = currentUserCandidate\.id;/);
+  assert.match(source, /function startCreatePlanning\(\) \{[\s\S]*resetPlanningDraft\(\);[\s\S]*applyDefaultDispatcherForNewPlanning\(\);/s);
+  assert.match(source, /async function refreshDispatcherOptions\(\) \{[\s\S]*catch \{[\s\S]*dispatcherOptions\.value = \[\];[\s\S]*dispatcherLookupError\.value = tp\("dispatcherLoadError"\);/s);
+  assert.doesNotMatch(source, /async function refreshDispatcherOptions\(\) \{[\s\S]*catch \{[\s\S]*planningDraft\.dispatcher_user_id = ""/s);
+});
+
 test("planning-orders exposes inline setup links, add buttons, and real create modals", () => {
   assert.match(source, /@click="openPlanningSetup\('requirement_type'\)"/);
   assert.match(source, /@click="openPlanningSetup\('patrol_route'\)"/);

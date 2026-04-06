@@ -75,6 +75,7 @@ class PlanningRecordDocumentRepository(Protocol):
 
 
 class PlanningRecordService:
+    DISPATCHER_ROLE_KEYS = frozenset({"platform_admin", "tenant_admin", "dispatcher", "controller_qm", "accounting"})
     MODES = frozenset({"event", "site", "trade_fair", "patrol"})
     RELEASE_STATES = frozenset({"draft", "release_ready", "released"})
     RELEASE_TRANSITIONS = {
@@ -103,8 +104,14 @@ class PlanningRecordService:
     def list_planning_records(self, tenant_id: str, filters: PlanningRecordFilter, _actor: RequestAuthorizationContext) -> list[PlanningRecordListItem]:
         return [PlanningRecordListItem.model_validate(row) for row in self.repository.list_planning_records(tenant_id, filters)]
 
-    def list_dispatcher_candidates(self, tenant_id: str, _actor: RequestAuthorizationContext) -> list[PlanningDispatcherCandidateRead]:
-        return self.repository.list_dispatcher_candidates(tenant_id)
+    def list_dispatcher_candidates(self, tenant_id: str, actor: RequestAuthorizationContext) -> list[PlanningDispatcherCandidateRead]:
+        candidates = self.repository.list_dispatcher_candidates(tenant_id)
+        if any(candidate.id == actor.user_id for candidate in candidates):
+            return candidates
+        actor_candidate = self._build_actor_dispatcher_candidate(tenant_id, actor)
+        if actor_candidate is None:
+            return candidates
+        return [*candidates, actor_candidate]
 
     def get_planning_record(self, tenant_id: str, planning_record_id: str, _actor: RequestAuthorizationContext) -> PlanningRecordRead:
         return self._read(self._require_record(tenant_id, planning_record_id))
@@ -397,8 +404,33 @@ class PlanningRecordService:
     def _validate_dispatcher(self, tenant_id: str, dispatcher_user_id: str | None) -> None:
         if dispatcher_user_id is None:
             return
-        if self.repository.get_user_account(tenant_id, dispatcher_user_id) is None:
+        user = self.repository.get_user_account(tenant_id, dispatcher_user_id)
+        if user is None or user.archived_at is not None or user.status != "active":
             raise self._not_found("dispatcher_user")
+
+    def _build_actor_dispatcher_candidate(
+        self,
+        tenant_id: str,
+        actor: RequestAuthorizationContext,
+    ) -> PlanningDispatcherCandidateRead | None:
+        if actor.tenant_id != tenant_id:
+            return None
+        actor_role_keys = sorted(role_key for role_key in actor.role_keys if role_key in self.DISPATCHER_ROLE_KEYS)
+        if not actor_role_keys:
+            return None
+        user = self.repository.get_user_account(tenant_id, actor.user_id)
+        if user is None or user.archived_at is not None or user.status != "active":
+            return None
+        return PlanningDispatcherCandidateRead(
+            id=user.id,
+            tenant_id=user.tenant_id,
+            username=user.username,
+            email=user.email,
+            full_name=user.full_name,
+            status=user.status,
+            role_keys=actor_role_keys,
+            archived_at=user.archived_at,
+        )
 
     @staticmethod
     def _validate_window(planning_from, planning_to) -> None:  # noqa: ANN001

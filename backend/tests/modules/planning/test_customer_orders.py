@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
@@ -318,6 +319,9 @@ class CustomerOrderServiceTests(unittest.TestCase):
         self.requirement_type_id = requirement.id
         self.actor = _context("planning.order.read", "planning.order.write")
 
+    def assert_json_safe(self, value: object) -> None:
+        json.dumps(value)
+
     def test_create_order_rejects_invalid_window(self) -> None:
         with self.assertRaises(ApiException) as captured:
             self.service.create_order(
@@ -399,6 +403,42 @@ class CustomerOrderServiceTests(unittest.TestCase):
             self.service.create_order_equipment_line("tenant-1", order.id, payload, self.actor)
         self.assertEqual(captured.exception.message_key, "errors.planning.order_equipment.duplicate_item")
 
+    def test_create_equipment_line_writes_json_safe_audit_event(self) -> None:
+        order = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="ORD-EQUIP-AUDIT",
+                title="Objekt Nord",
+                service_category_code="site_security",
+                service_from=date(2026, 6, 1),
+                service_to=date(2026, 6, 2),
+            ),
+            self.actor,
+        )
+
+        line = self.service.create_order_equipment_line(
+            "tenant-1",
+            order.id,
+            OrderEquipmentLineCreate(
+                tenant_id="tenant-1",
+                order_id=order.id,
+                equipment_item_id=self.equipment_item_id,
+                required_qty=2,
+                notes="Funkgeraete",
+            ),
+            self.actor,
+        )
+
+        self.assertEqual(line.required_qty, 2)
+        event = self.audit_repository.audit_events[-1]
+        self.assertEqual(event.event_type, "planning.order_equipment.created")
+        self.assertEqual(event.after_json["equipment_item_id"], self.equipment_item_id)
+        self.assertNotIn("equipment_item", event.after_json)
+        self.assert_json_safe(event.after_json)
+
     def test_requirement_line_rejects_invalid_qty_window(self) -> None:
         order = self.service.create_order(
             "tenant-1",
@@ -428,6 +468,75 @@ class CustomerOrderServiceTests(unittest.TestCase):
                 self.actor,
             )
         self.assertEqual(captured.exception.message_key, "errors.planning.order_requirement_line.invalid_qty_window")
+
+    def test_create_requirement_line_writes_json_safe_audit_event(self) -> None:
+        order = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="ORD-REQ-AUDIT",
+                title="Messe",
+                service_category_code="event_security",
+                service_from=date(2026, 7, 1),
+                service_to=date(2026, 7, 3),
+            ),
+            self.actor,
+        )
+
+        line = self.service.create_order_requirement_line(
+            "tenant-1",
+            order.id,
+            OrderRequirementLineCreate(
+                tenant_id="tenant-1",
+                order_id=order.id,
+                requirement_type_id=self.requirement_type_id,
+                function_type_id="function-1",
+                qualification_type_id="qualification-1",
+                min_qty=1,
+                target_qty=3,
+                notes="Objektschutz",
+            ),
+            self.actor,
+        )
+
+        self.assertEqual(line.target_qty, 3)
+        event = self.audit_repository.audit_events[-1]
+        self.assertEqual(event.event_type, "planning.order_requirement_line.created")
+        self.assertEqual(event.after_json["requirement_type_id"], self.requirement_type_id)
+        self.assertEqual(event.after_json["function_type_id"], "function-1")
+        self.assertEqual(event.after_json["qualification_type_id"], "qualification-1")
+        self.assertNotIn("requirement_type", event.after_json)
+        self.assertNotIn("function_type", event.after_json)
+        self.assertNotIn("qualification_type", event.after_json)
+        self.assert_json_safe(event.after_json)
+
+    def test_snapshot_excludes_relationship_objects_and_stays_json_safe(self) -> None:
+        requirement_line = self.repository.create_order_requirement_line(
+            "tenant-1",
+            OrderRequirementLineCreate(
+                tenant_id="tenant-1",
+                order_id="order-1",
+                requirement_type_id=self.requirement_type_id,
+                function_type_id="function-1",
+                qualification_type_id="qualification-1",
+                min_qty=0,
+                target_qty=2,
+                notes="Snapshot check",
+            ),
+            "user-1",
+        )
+
+        snapshot = self.service._snapshot(requirement_line)
+
+        self.assertEqual(snapshot["requirement_type_id"], self.requirement_type_id)
+        self.assertEqual(snapshot["function_type_id"], "function-1")
+        self.assertEqual(snapshot["qualification_type_id"], "qualification-1")
+        self.assertNotIn("requirement_type", snapshot)
+        self.assertNotIn("function_type", snapshot)
+        self.assertNotIn("qualification_type", snapshot)
+        self.assert_json_safe(snapshot)
 
     def test_create_attachment_links_document_to_order(self) -> None:
         order = self.service.create_order(

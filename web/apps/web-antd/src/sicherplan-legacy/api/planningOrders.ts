@@ -111,6 +111,7 @@ export interface PlanningDispatcherCandidateRead {
   full_name: string;
   status: string;
   role_keys: string[];
+  archived_at?: string | null;
 }
 
 export interface PlanningCommercialIssueRead {
