@@ -581,7 +581,31 @@
             </div>
             <p v-else class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
 
-            <form class="planning-orders-form" @submit.prevent="submitPlanningRecord">
+            <nav
+              v-if="selectedPlanningRecord || isCreatingPlanning"
+              class="planning-orders-tabs planning-orders-tabs--nested"
+              :aria-label="tp('planningRecordDetailTabsAria')"
+              data-testid="planning-records-detail-tabs"
+            >
+              <button
+                v-for="tab in planningDetailTabs"
+                :key="tab.id"
+                type="button"
+                class="planning-orders-tab planning-orders-tab--nested"
+                :class="{ active: tab.id === activePlanningDetailTab }"
+                :data-testid="`planning-records-tab-${tab.id}`"
+                @click="activePlanningDetailTab = tab.id"
+              >
+                {{ tab.label }}
+              </button>
+            </nav>
+
+            <form
+              v-show="activePlanningDetailTab === 'overview'"
+              class="planning-orders-form"
+              data-testid="planning-records-tab-panel-overview"
+              @submit.prevent="submitPlanningRecord"
+            >
               <fieldset class="planning-orders-fieldset" :disabled="!actionState.canWritePlanning || loading.action">
               <div class="planning-orders-form-grid">
                 <label class="field-stack">
@@ -819,7 +843,12 @@
               </fieldset>
             </form>
 
-            <section v-if="selectedPlanningRecord" class="planning-orders-section">
+            <section
+              v-if="selectedPlanningRecord"
+              v-show="activePlanningDetailTab === 'commercial'"
+              class="planning-orders-section planning-orders-tab-panel planning-orders-tab-panel--nested"
+              data-testid="planning-records-tab-panel-commercial"
+            >
               <div class="planning-orders-panel__header"><h3>{{ tp("sectionCommercial") }}</h3></div>
               <p :class="selectedPlanningCommercial?.is_release_ready ? 'planning-orders-state--good' : 'planning-orders-state--bad'">
                 {{ selectedPlanningCommercial?.is_release_ready ? tp("commercialReady") : tp("commercialBlocked") }}
@@ -830,7 +859,12 @@
               <p v-if="selectedPlanningCommercial?.warning_issues?.length" class="planning-orders-state--warn">{{ tp("commercialWarnings") }}</p>
             </section>
 
-            <section v-if="selectedPlanningRecord" class="planning-orders-section">
+            <section
+              v-if="selectedPlanningRecord"
+              v-show="activePlanningDetailTab === 'release'"
+              class="planning-orders-section planning-orders-tab-panel planning-orders-tab-panel--nested"
+              data-testid="planning-records-tab-panel-release"
+            >
               <div class="planning-orders-panel__header"><h3>{{ tp("sectionPlanningRelease") }}</h3></div>
               <div class="cta-row">
                 <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canTransitionPlanning" @click="transitionPlanning('draft')">{{ tp("actionsBackToDraft") }}</button>
@@ -839,7 +873,12 @@
               </div>
             </section>
 
-            <section v-if="selectedPlanningRecord" class="planning-orders-section">
+            <section
+              v-if="selectedPlanningRecord"
+              v-show="activePlanningDetailTab === 'documents'"
+              class="planning-orders-section planning-orders-tab-panel planning-orders-tab-panel--nested"
+              data-testid="planning-records-tab-panel-documents"
+            >
               <div class="planning-orders-panel__header"><h3>{{ tp("sectionPlanningDocuments") }}</h3></div>
               <div v-if="planningAttachments.length" class="planning-orders-doc-list">
                 <div v-for="document in planningAttachments" :key="document.id" class="planning-orders-doc-row">
@@ -1118,6 +1157,7 @@ const selectedPlanningCommercial = ref<PlanningCommercialLinkRead | null>(null);
 const isCreatingOrder = ref(false);
 const isCreatingPlanning = ref(false);
 const activeDetailTab = ref("overview");
+const activePlanningDetailTab = ref("overview");
 
 const orderDraft = reactive({
   customer_id: "",
@@ -1350,6 +1390,19 @@ const orderDetailTabs = computed(() => {
     { id: "release", label: tp("tabRelease") },
     { id: "documents", label: tp("tabDocuments") },
     { id: "planning_records", label: tp("tabPlanningRecords") },
+  ];
+});
+const planningHasSavedRecord = computed(() => Boolean(selectedPlanningRecord.value && !isCreatingPlanning.value));
+const planningDetailTabs = computed(() => {
+  const tabs = [{ id: "overview", label: tp("tabOverview") }];
+  if (!planningHasSavedRecord.value) {
+    return tabs;
+  }
+  return [
+    ...tabs,
+    { id: "commercial", label: tp("tabCommercial") },
+    { id: "release", label: tp("tabRelease") },
+    { id: "documents", label: tp("tabDocuments") },
   ];
 });
 const orderValidationErrors = computed(() => validatePlanningOrderDraft(orderDraft));
@@ -2329,6 +2382,7 @@ async function refreshPlanningRecords() {
     if (selectedPlanningRecordId.value) {
       const stillSelected = planningRecords.value.find((row) => row.id === selectedPlanningRecordId.value);
       if (!stillSelected) {
+        activePlanningDetailTab.value = "overview";
         selectedPlanningRecordId.value = "";
         selectedPlanningRecord.value = null;
         planningAttachments.value = [];
@@ -2442,6 +2496,7 @@ async function submitRequirementLine() {
 
 function startCreatePlanning() {
   isCreatingPlanning.value = true;
+  activePlanningDetailTab.value = "overview";
   selectedPlanningRecordId.value = "";
   selectedPlanningRecord.value = null;
   planningAttachments.value = [];
@@ -2455,6 +2510,7 @@ async function selectPlanningRecord(planningRecordId: string) {
   if (!tenantScopeId.value || !accessToken.value) return;
   loading.planning = true;
   try {
+    activePlanningDetailTab.value = "overview";
     selectedPlanningRecordId.value = planningRecordId;
     isCreatingPlanning.value = false;
     selectedPlanningRecord.value = await getPlanningRecord(tenantScopeId.value, planningRecordId, accessToken.value);
@@ -2639,6 +2695,15 @@ watch(
     }
   },
 );
+
+watch(
+  () => planningHasSavedRecord.value,
+  (hasSavedRecord) => {
+    if (!hasSavedRecord && activePlanningDetailTab.value !== "overview") {
+      activePlanningDetailTab.value = "overview";
+    }
+  },
+);
 </script>
 
 <style scoped>
@@ -2733,6 +2798,10 @@ watch(
   gap: 0.75rem;
 }
 
+.planning-orders-tabs--nested {
+  margin-top: 0.5rem;
+}
+
 .planning-orders-tab {
   border: 1px solid color-mix(in srgb, var(--sp-color-border-soft) 80%, transparent);
   border-radius: 999px;
@@ -2754,6 +2823,10 @@ watch(
   background: color-mix(in srgb, var(--sp-color-primary-muted) 72%, white 28%);
   color: var(--sp-color-primary-strong);
   box-shadow: 0 0 0 1px rgb(40 170 170 / 15%);
+}
+
+.planning-orders-tab--nested {
+  padding: 0.58rem 0.92rem;
 }
 
 .planning-orders-tab:focus-visible {

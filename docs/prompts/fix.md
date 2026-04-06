@@ -1,78 +1,96 @@
 You are working in the repository `jalalsadeghi/SicherPlan`.
 
-Problem:
-On `admin/planning-orders`, the `Dispatcher` select inside the `Planning records for order` form does not reliably show the current tenant-scoped authenticated admin user, even when the user is logged in as Tenant Admin. The Dispatcher dropdown should be populated from tenant IAM users, not from planning setup master data.
-
-Relevant files to inspect:
-- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue`
-- `web/apps/web-antd/src/sicherplan-legacy/api/planningOrders.ts`
-- `backend/app/modules/planning/router.py`
-- `backend/app/modules/planning/planning_record_service.py`
-- `backend/app/modules/planning/repository.py`
-- any IAM models/services/routes involved in tenant user creation and role assignment
-- tests under `backend/tests/modules/planning/` and any relevant frontend tests
-
-Observed current behavior from repo:
-- Frontend loads dispatcher options via `listPlanningDispatcherCandidates(...)`
-- API endpoint is `/api/planning/tenants/{tenant_id}/ops/planning-records/dispatcher-candidates`
-- Backend repository currently filters candidates to tenant users with:
-  - same `tenant_id`
-  - active/non-archived `UserAccount`
-  - active/non-archived `UserRoleAssignment`
-  - scope_type in (`tenant`, `branch`, `mandate`)
-  - role key in (`platform_admin`, `tenant_admin`, `dispatcher`, `controller_qm`, `accounting`)
-
 Goal:
-Make the Dispatcher selector robust and predictable so that a valid current Tenant Admin user is selectable without requiring any planning-side manual setup.
+Improve the UI structure of the `admin/planning-orders` page so that the content inside the main `Planning records` tab is split into nested subtabs instead of rendering all planning-record sections in one long stacked block.
 
-Tasks:
-1. Verify the current end-to-end data flow for Dispatcher candidates:
-   - frontend select
-   - frontend API helper
-   - planning router endpoint
-   - planning record service
-   - repository query
+Current problem:
+In `PlanningOrdersAdminView.vue`, the top-level order detail tabs already exist:
+- overview
+- commercial
+- release
+- documents
+- planning_records
 
-2. Fix the likely failure cases:
-   A. If the current authenticated tenant admin is missing because the repository query is too restrictive, adjust the query safely.
-   B. If the current authenticated tenant admin exists in session/auth context but is absent from the candidate API result due to IAM bootstrap gaps, add a safe fallback path so the current user can still appear as a selectable candidate when:
-      - they belong to the same tenant
-      - their session is valid
-      - they hold a planning-relevant admin/operator role
-   C. Do NOT expose users from other tenants.
-   D. Do NOT expose inactive or archived users.
+However, inside the `planning_records` tab, the selected planning record form is followed by:
+- Commercial readiness
+- Planning release
+- Planning documents
 
-3. Improve frontend behavior:
-   - If the candidate list is empty, show a clear inline hint that Dispatcher values come from tenant IAM users.
-   - If the current authenticated user is valid and present, optionally preselect them when creating a new planning record and `dispatcher_user_id` is empty.
-   - If the API fails, keep the field usable with a clear error state and avoid silent failure.
+These sections are currently rendered one below another, which makes the detail workspace crowded and hard to use.
 
-4. Improve backend/API behavior:
-   - Keep `dispatcher-candidates` tenant-safe.
-   - Ensure the response contains enough label information for the select (`full_name`, `username`, `email`, `role_keys`).
-   - If appropriate, add a dedicated helper that validates whether a session user is eligible as a dispatcher candidate.
+Required UX target:
+Inside the top-level `Planning records` tab, introduce a second-level tab system for the selected planning record, similar to the order-level detail tabs.
 
-5. Add/update tests:
-   - candidate list includes active tenant admin users
-   - candidate list excludes other tenants
-   - candidate list excludes archived/inactive users
-   - current tenant admin appears when valid
-   - frontend shows the IAM hint when no candidates exist
-   - optional auto-default to current user works only for new records
+Nested planning-record tabs should be:
+1. overview
+2. commercial
+3. release
+4. documents
 
-6. UX copy requirement:
-   Add a short helper text near Dispatcher similar to:
-   “Dispatcher options come from Tenant Users & IAM. Create or activate a tenant-scoped admin/dispatcher user there.”
+Behavior requirements:
+- Keep the current master-detail layout.
+- Keep the planning-record list visible at the top of the `Planning records` tab.
+- Show the nested planning-record tabs only when:
+  - a planning record is selected, or
+  - a new planning record is being created.
+- For a new unsaved planning record, show only the nested `overview` tab.
+- For an existing saved planning record, show:
+  - overview
+  - commercial
+  - release
+  - documents
+- Preserve current API usage and backend contracts. This should be a frontend-only refactor unless a tiny test helper change is needed.
+- Do NOT change the planning-record backend endpoints.
+- Do NOT change business logic for saving, releasing, attachments, or commercial readiness. Only reorganize the rendering and state handling.
 
-Constraints:
-- Do not invent unrelated new modules.
-- Do not move Dispatcher creation into Planning Setup.
-- Preserve tenant isolation and auditability.
-- Prefer minimal, focused changes.
-- Keep coding style consistent with the repo.
+Files to inspect and modify:
+- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue`
+- `web/apps/web-antd/src/sicherplan-legacy/api/planningOrders.ts` (read only unless typing support is needed)
+- `web/apps/web-antd/src/sicherplan-legacy/i18n/planningOrders.messages.ts` (or the equivalent messages file)
+- add/update a frontend test if the repo already has view/layout tests for this page
 
-Deliverables:
-- Short summary of root cause
-- Changed files list
-- Explanation of whether the fix was data-only, backend, frontend, or mixed
-- Notes about any remaining IAM bootstrap limitation
+Implementation guidance:
+1. Add a new state variable for nested planning tabs, for example:
+   - `activePlanningDetailTab`
+2. Add a computed tab list for planning-record detail, for example:
+   - always `overview`
+   - plus `commercial`, `release`, `documents` when the selected planning record already exists
+3. Inside the existing top-level `planning_records` tab panel:
+   - keep the header and planning-record list
+   - keep the New planning button
+   - insert a nested tab bar below the list/header and above the planning-record form/sections
+4. Move current planning-record sections into nested panels:
+   - form + mode details => nested `overview`
+   - commercial readiness => nested `commercial`
+   - planning release actions => nested `release`
+   - planning documents upload/link/list => nested `documents`
+5. Reuse the current tab styling if possible.
+   - If needed, add a second-level modifier class such as:
+     - `planning-orders-tabs planning-orders-tabs--nested`
+     - `planning-orders-tab planning-orders-tab--nested`
+6. Preserve existing `data-testid` values where possible, and add new ones for nested tabs:
+   - `planning-records-tab-overview`
+   - `planning-records-tab-commercial`
+   - `planning-records-tab-release`
+   - `planning-records-tab-documents`
+   - matching tab panels as well
+7. Reset nested tab state safely:
+   - when switching to a different planning record, default to nested `overview`
+   - when starting `New planning`, default to nested `overview`
+   - when the selected planning record is cleared, do not leave a stale nested tab selected
+8. Keep accessibility:
+   - nested `<nav>` with clear aria-label like `Planning record detail sections`
+   - buttons remain keyboard accessible
+
+Acceptance criteria:
+- Inside the main `Planning records` tab, the planning-record detail no longer appears as one long stacked block.
+- Existing planning records show nested tabs for overview/commercial/release/documents.
+- New planning records show only the overview tab until first save.
+- No backend behavior changes.
+- Save/release/document/commercial actions still work exactly as before.
+
+Output format:
+- Short summary of the UI problem
+- Files changed
+- Explanation of the nested-tab state model
+- Note whether any tests were added or updated

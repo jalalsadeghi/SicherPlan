@@ -112,6 +112,26 @@ test("planning-orders keeps planning-record browsing in the left workspace", () 
   assert.match(source, /@click="selectPlanningRecord\(record\.id\)"/);
 });
 
+test("planning-record detail workspace uses nested tabs inside the planning-records tab", () => {
+  assert.match(source, /data-testid="planning-orders-tab-panel-planning-records"/);
+  assert.match(source, /data-testid="planning-records-detail-tabs"/);
+  assert.match(source, /:aria-label="tp\('planningRecordDetailTabsAria'\)"/);
+  assert.match(source, /:data-testid="`planning-records-tab-\$\{tab\.id\}`"/);
+  assert.match(source, /data-testid="planning-records-tab-panel-overview"/);
+  assert.match(source, /data-testid="planning-records-tab-panel-commercial"/);
+  assert.match(source, /data-testid="planning-records-tab-panel-release"/);
+  assert.match(source, /data-testid="planning-records-tab-panel-documents"/);
+  assert.match(source, /const activePlanningDetailTab = ref\("overview"\)/);
+  assert.match(source, /const planningDetailTabs = computed\(\(\) => \{/);
+  assert.match(source, /if \(!planningHasSavedRecord\.value\) \{\s*return tabs;/);
+  assert.match(source, /v-show="activePlanningDetailTab === 'overview'"/);
+  assert.match(source, /v-show="activePlanningDetailTab === 'commercial'"/);
+  assert.match(source, /v-show="activePlanningDetailTab === 'release'"/);
+  assert.match(source, /v-show="activePlanningDetailTab === 'documents'"/);
+  assert.match(source, /function startCreatePlanning\(\) \{[\s\S]*activePlanningDetailTab\.value = "overview";/s);
+  assert.match(source, /async function selectPlanningRecord\(planningRecordId: string\) \{[\s\S]*activePlanningDetailTab\.value = "overview";/s);
+});
+
 test("planning-orders enforces read-only fieldsets for controller_qm-style access", () => {
   assert.match(source, /<fieldset class="planning-orders-fieldset" :disabled="!actionState\.canWriteOrders \|\| loading\.action">/);
   assert.match(source, /<fieldset class="planning-orders-fieldset" :disabled="!actionState\.canWritePlanning \|\| loading\.action">/);
