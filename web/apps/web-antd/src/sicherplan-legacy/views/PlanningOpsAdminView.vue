@@ -336,10 +336,15 @@
                   </label>
                   <label class="field-stack field-stack--third"><span>{{ tp("fieldsSequenceNo") }}</span><input v-model="checkpointDraft.sequence_no" type="number" min="1" required /></label>
                   <label class="field-stack field-stack--third"><span>{{ tp("fieldsCheckpointCode") }}</span><input v-model="checkpointDraft.checkpoint_code" required /></label>
-                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="checkpointDraft.label" required /></label>
-                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsLatitude") }}</span><input v-model="checkpointDraft.latitude" type="number" step="0.000001" required /></label>
-                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsLongitude") }}</span><input v-model="checkpointDraft.longitude" type="number" step="0.000001" required /></label>
-                  <label class="field-stack field-stack--third"><span>{{ tp("fieldsScanTypeCode") }}</span><input v-model="checkpointDraft.scan_type_code" required /></label>
+                  <label class="field-stack field-stack--wide"><span>{{ tp("fieldsLabel") }}</span><input v-model="checkpointDraft.label" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsLatitude") }}</span><input v-model="checkpointDraft.latitude" type="number" step="0.000001" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsLongitude") }}</span><input v-model="checkpointDraft.longitude" type="number" step="0.000001" required /></label>
+                  <div class="planning-admin-map-action field-stack--wide">
+                    <button class="cta-button cta-secondary" type="button" @click="openLocationPicker('checkpoint')">
+                      {{ tp("actionsPickOnMap") }}
+                    </button>
+                  </div>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsScanTypeCode") }}</span><input v-model="checkpointDraft.scan_type_code" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsExpectedTokenValue") }}</span><input v-model="checkpointDraft.expected_token_value" /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsMinimumDwellSeconds") }}</span><input v-model="checkpointDraft.minimum_dwell_seconds" type="number" min="0" required /></label>
                   <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="checkpointDraft.notes" rows="3" /></label>
@@ -618,10 +623,15 @@
               <div class="planning-admin-form-grid planning-admin-form-grid--detail">
                 <label class="field-stack field-stack--third"><span>{{ tp("fieldsSequenceNo") }}</span><input v-model="checkpointDraft.sequence_no" type="number" min="1" required /></label>
                 <label class="field-stack field-stack--third"><span>{{ tp("fieldsCheckpointCode") }}</span><input v-model="checkpointDraft.checkpoint_code" required /></label>
-                <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="checkpointDraft.label" required /></label>
-                <label class="field-stack field-stack--third"><span>{{ tp("fieldsLatitude") }}</span><input v-model="checkpointDraft.latitude" type="number" step="0.000001" required /></label>
-                <label class="field-stack field-stack--third"><span>{{ tp("fieldsLongitude") }}</span><input v-model="checkpointDraft.longitude" type="number" step="0.000001" required /></label>
-                <label class="field-stack field-stack--third"><span>{{ tp("fieldsScanTypeCode") }}</span><input v-model="checkpointDraft.scan_type_code" required /></label>
+                <label class="field-stack field-stack--wide"><span>{{ tp("fieldsLabel") }}</span><input v-model="checkpointDraft.label" required /></label>
+                <label class="field-stack field-stack--half"><span>{{ tp("fieldsLatitude") }}</span><input v-model="checkpointDraft.latitude" type="number" step="0.000001" required /></label>
+                <label class="field-stack field-stack--half"><span>{{ tp("fieldsLongitude") }}</span><input v-model="checkpointDraft.longitude" type="number" step="0.000001" required /></label>
+                <div class="planning-admin-map-action field-stack--wide">
+                  <button class="cta-button cta-secondary" type="button" @click="openLocationPicker('checkpoint')">
+                    {{ tp("actionsPickOnMap") }}
+                  </button>
+                </div>
+                <label class="field-stack field-stack--half"><span>{{ tp("fieldsScanTypeCode") }}</span><input v-model="checkpointDraft.scan_type_code" required /></label>
                 <label class="field-stack field-stack--half"><span>{{ tp("fieldsExpectedTokenValue") }}</span><input v-model="checkpointDraft.expected_token_value" /></label>
                 <label class="field-stack field-stack--half"><span>{{ tp("fieldsMinimumDwellSeconds") }}</span><input v-model="checkpointDraft.minimum_dwell_seconds" type="number" min="0" required /></label>
                 <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="checkpointDraft.notes" rows="3" /></label>
@@ -693,8 +703,8 @@
 
     <PlanningLocationPickerModal
       v-model:open="locationPickerOpen"
-      :latitude="draft.latitude"
-      :longitude="draft.longitude"
+      :latitude="locationPickerLatitude"
+      :longitude="locationPickerLongitude"
       :initial-center="locationPickerStartPoint"
       :start-point-label="locationPickerStartPoint.label"
       :title="tp('mapPickerTitle')"
@@ -811,6 +821,7 @@ const createPatrolRouteParentId = ref("");
 const addressCreateModalOpen = ref(false);
 const addressCreateTargetField = ref("address_id");
 const locationPickerOpen = ref(false);
+const locationPickerTarget = ref("record");
 const locationPickerStartPoint = ref({
   lat: 51.662973,
   lng: 8.174013,
@@ -936,6 +947,12 @@ const filteredVenueOptions = computed(() =>
 );
 const filteredSiteOptions = computed(() =>
   siteOptions.value.filter((record) => !draft.customer_id || record.customer_id === draft.customer_id),
+);
+const locationPickerLatitude = computed(() =>
+  locationPickerTarget.value === "checkpoint" ? checkpointDraft.latitude : draft.latitude,
+);
+const locationPickerLongitude = computed(() =>
+  locationPickerTarget.value === "checkpoint" ? checkpointDraft.longitude : draft.longitude,
 );
 
 function tp(key, params = {}) {
@@ -1624,12 +1641,13 @@ function handleEditorEntityChange() {
   markCleanState();
 }
 
-async function openLocationPicker() {
+async function openLocationPicker(target = "record") {
+  locationPickerTarget.value = target;
   const customerStartPoint = await resolveCustomerStartPoint();
   const fallback = buildBerlinStartPoint();
   const resolvedCenter = resolveInitialMapCenter({
-    currentLatitude: draft.latitude,
-    currentLongitude: draft.longitude,
+    currentLatitude: locationPickerLatitude.value,
+    currentLongitude: locationPickerLongitude.value,
     customerCoordinates:
       customerStartPoint?.source === "customer-coordinates"
         ? { lat: customerStartPoint.lat, lng: customerStartPoint.lng }
@@ -1658,6 +1676,11 @@ async function openLocationPicker() {
 }
 
 function applyPickedLocation(payload) {
+  if (locationPickerTarget.value === "checkpoint") {
+    checkpointDraft.latitude = payload.latitude;
+    checkpointDraft.longitude = payload.longitude;
+    return;
+  }
   draft.latitude = payload.latitude;
   draft.longitude = payload.longitude;
 }

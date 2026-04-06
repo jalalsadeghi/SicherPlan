@@ -91,6 +91,30 @@ test("planning setup address picker refresh is shared across all address-backed 
   assert.match(source, /\(\) => \[editorEntityKey\.value, draft\.customer_id\]/);
 });
 
+test("planning checkpoint forms reuse the shared map picker with a checkpoint target", () => {
+  assert.match(source, /openLocationPicker\('checkpoint'\)/);
+  assert.match(source, /const locationPickerTarget = ref\("record"\)/);
+  assert.match(source, /const locationPickerLatitude = computed\(\(\) =>\s*locationPickerTarget\.value === "checkpoint" \? checkpointDraft\.latitude : draft\.latitude/s);
+  assert.match(source, /const locationPickerLongitude = computed\(\(\) =>\s*locationPickerTarget\.value === "checkpoint" \? checkpointDraft\.longitude : draft\.longitude/s);
+  assert.match(source, /async function openLocationPicker\(target = "record"\) \{\s*locationPickerTarget\.value = target/s);
+  assert.match(source, /currentLatitude: locationPickerLatitude\.value/);
+  assert.match(source, /currentLongitude: locationPickerLongitude\.value/);
+  assert.match(source, /if \(locationPickerTarget\.value === "checkpoint"\) \{\s*checkpointDraft\.latitude = payload\.latitude;\s*checkpointDraft\.longitude = payload\.longitude;/s);
+  assert.match(source, /:latitude="locationPickerLatitude"/);
+  assert.match(source, /:longitude="locationPickerLongitude"/);
+});
+
+test("planning checkpoint forms align label full-width and keep latitude/longitude on the same row", () => {
+  assert.match(source, /editorEntityKey === 'patrol_checkpoint'[\s\S]*field-stack field-stack--third"><span>\{\{ tp\("fieldsSequenceNo"\) \}\}<\/span><input v-model="checkpointDraft\.sequence_no"/);
+  assert.match(source, /editorEntityKey === 'patrol_checkpoint'[\s\S]*field-stack field-stack--third"><span>\{\{ tp\("fieldsCheckpointCode"\) \}\}<\/span><input v-model="checkpointDraft\.checkpoint_code"/);
+  assert.match(source, /editorEntityKey === 'patrol_checkpoint'[\s\S]*field-stack field-stack--wide"><span>\{\{ tp\("fieldsLabel"\) \}\}<\/span><input v-model="checkpointDraft\.label"/);
+  assert.match(source, /editorEntityKey === 'patrol_checkpoint'[\s\S]*field-stack field-stack--half"><span>\{\{ tp\("fieldsLatitude"\) \}\}<\/span><input v-model="checkpointDraft\.latitude"/);
+  assert.match(source, /editorEntityKey === 'patrol_checkpoint'[\s\S]*field-stack field-stack--half"><span>\{\{ tp\("fieldsLongitude"\) \}\}<\/span><input v-model="checkpointDraft\.longitude"/);
+  assert.match(source, /entityKey === 'patrol_route' && selectedRecord && !isCreatingRecord[\s\S]*field-stack field-stack--wide"><span>\{\{ tp\("fieldsLabel"\) \}\}<\/span><input v-model="checkpointDraft\.label"/);
+  assert.match(source, /entityKey === 'patrol_route' && selectedRecord && !isCreatingRecord[\s\S]*field-stack field-stack--half"><span>\{\{ tp\("fieldsLatitude"\) \}\}<\/span><input v-model="checkpointDraft\.latitude"/);
+  assert.match(source, /entityKey === 'patrol_route' && selectedRecord && !isCreatingRecord[\s\S]*field-stack field-stack--half"><span>\{\{ tp\("fieldsLongitude"\) \}\}<\/span><input v-model="checkpointDraft\.longitude"/);
+});
+
 test("planning setup supports inline shared-address creation modal for all address-backed entities", () => {
   assert.match(source, /<Modal[\s\S]*v-model:open="addressCreateModalOpen"[\s\S]*tp\('addressCreateModalTitle'\)/);
   assert.match(source, /v-model="addressDirectoryDraft\.street_line_1"/);
