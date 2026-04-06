@@ -20,6 +20,8 @@ test("planning-orders uses the customer-style master detail shell", () => {
   assert.match(source, /data-testid="planning-orders-detail-workspace"/);
   assert.match(source, /grid-template-columns:\s*minmax\(320px, 420px\) minmax\(0, 1fr\)/);
   assert.match(source, /class="module-card planning-orders-panel planning-orders-list-panel"/);
+  assert.doesNotMatch(source, /v-if="feedback\.message"/);
+  assert.doesNotMatch(source, /class="planning-orders-feedback"/);
 });
 
 test("planning-orders no longer renders the local hero and scope chrome", () => {
@@ -30,7 +32,14 @@ test("planning-orders no longer renders the local hero and scope chrome", () => 
 
 test("planning-orders detail area uses the refined card sections", () => {
   assert.match(source, /\.planning-orders-section\s*\{[\s\S]*border-radius:\s*18px/);
-  assert.match(source, /\.planning-orders-feedback\s*\{[\s\S]*border-radius:\s*18px/);
+  assert.doesNotMatch(source, /\.planning-orders-feedback\s*\{/);
+});
+
+test("planning-orders uses the shared bottom-right toast feedback composable", () => {
+  assert.match(source, /useSicherPlanFeedback/);
+  assert.match(source, /const \{ showFeedbackToast \} = useSicherPlanFeedback\(\)/);
+  assert.match(source, /function setFeedback\(tone: string, title: string, message: string\) \{[\s\S]*showFeedbackToast\(\{[\s\S]*key: "planning-orders-feedback"/);
+  assert.doesNotMatch(source, /function clearFeedback\(/);
 });
 
 test("planning-orders detail workspace uses local customer-style tabs", () => {

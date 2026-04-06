@@ -1,184 +1,147 @@
-You are working in the public repository jalalsadeghi/SicherPlan.
+You are working in the public repository:
+jalalsadeghi/SicherPlan
 
 Goal:
-Audit and standardize the "Create a new record" experience in the Planning Setup admin page (admin/planning), implemented in the legacy Vben web app. The target page is the P-01 Planning Setup workspace, not Orders/Planning Records, Shift Planning, or Staffing Coverage.
+Bring the "Create new address" workflow from admin/customers into admin/planning for all planning entities that use the "Address record ID (optional)" select/search field.
 
-Primary file to inspect:
+Context:
+In the current planning admin page, the user can select an existing customer address via the address select/search component, which is good.
+However, there is no way to create a new address inline when the required address does not yet exist.
+This must be fixed by reusing the UX pattern already implemented in admin/customers:
+- a button next to the address-link editor
+- opening a dialog/modal
+- creating a new shared address for the currently selected customer
+- refreshing the planning address options
+- auto-selecting the newly created address after success
+
+Reference implementations to inspect first:
 - web/apps/web-antd/src/sicherplan-legacy/views/PlanningOpsAdminView.vue
+- web/apps/web-antd/src/sicherplan-legacy/components/planning/PlanningAddressSelect.vue
+- web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
+- web/apps/web-antd/src/sicherplan-legacy/api/customers.ts
 
-Also inspect any related files that drive this page, especially under:
-- web/apps/web-antd/src/sicherplan-legacy/features/planning/
-- web/apps/web-antd/src/sicherplan-legacy/components/
-- web/apps/web-antd/src/sicherplan-legacy/api/
-- web/apps/web-antd/src/sicherplan-legacy/i18n/
-- any existing tests for admin workspace layout / create flows
-
-Reference UX pattern:
-- Use the same admin workspace pattern already used by the other legacy admin pages such as EmployeeAdminView and CustomerAdminView:
-  - list/search panel on the left
-  - detail/editor panel on the right
-  - create/edit mode clearly visible
-  - save/cancel actions always obvious
-  - no child-resource editing before the parent record exists
-  - only show fields relevant to the selected record type
-
-Important domain rule:
-This page is P-01 Planning Setup and must support multiple planning setup record families with entity-specific forms:
-- requirement type
-- equipment item
+Primary planning entities that must support this:
 - site
-- event venue
-- trade fair
-- trade fair zone
-- patrol route
-- patrol checkpoint
+- event_venue
+- trade_fair
+- patrol_route
 
-Problem to fix:
-The current "Create a new record" flow in the Detail view is not sufficiently standardized unless it behaves like a proper entity-aware admin editor. Fix the page so that the create-new experience is consistent, safe, and aligned with the documented planning model.
+Important constraint:
+Do not invent a second address-creation workflow.
+Reuse the customer-address creation flow and API pattern already used in admin/customers.
 
-Implement these requirements:
+What to implement:
 
-1) Create mode architecture
-- When the user clicks "Create a new record", open a clean draft detail editor in the right-hand detail panel.
-- Show a clear create mode state in the header, e.g. "New record" + selected record family.
-- Add explicit Save and Cancel actions.
-- Add dirty-state handling so unsaved edits are not silently lost.
-- Do not show update-only actions in create mode.
+1) Add "Create new address" action in planning
+In PlanningOpsAdminView.vue, for every address-using planning form:
+- site -> address_id
+- event_venue -> address_id
+- trade_fair -> address_id
+- patrol_route -> meeting_address_id and/or address-related selector used there
 
-2) Entity-aware create flow
-- Add a record-family selector at the start of create mode, OR separate create actions that directly open the correct schema.
-- The detail form must switch schema based on record family.
-- Never use one generic flat form for all planning setup entities.
+Add a secondary button near the address select field:
+- label: "Create new address"
+- disabled when no customer is selected
+- disabled while create-address action is in progress
 
-3) Field grouping and visibility
-Use clear sections and only show the fields relevant to the selected entity.
+The action must open a modal dialog, not navigate away.
 
-Expected minimum behavior by entity:
+2) Reuse the existing customers-style modal pattern
+Mirror the existing admin/customers address create modal UX as closely as possible:
+- modal backdrop
+- modal card
+- address fields:
+  - street_line_1
+  - street_line_2
+  - postal_code
+  - city
+  - state
+  - country_code
+- primary action: create address
+- secondary action: cancel
 
-A. Requirement type
-- code
-- label
-- default_planning_mode_code
-- status
-- notes (optional)
+Do not make the user leave admin/planning to create an address.
 
-B. Equipment item
-- code
-- label
-- unit_of_measure_code
-- status
-- notes (optional)
+3) Create address for the currently selected customer
+When the modal opens:
+- it must know which customer is currently selected in the planning draft
+- if there is no selected customer, the action must stay disabled or show a clear validation/help message
 
-C. Site
-- site_no
-- customer_id
-- name
-- address fields or address picker
-- latitude / longitude where available
-- timezone
-- watchbook_enabled
-- status if supported
+On submit:
+- use the same shared-address create API already used in admin/customers
+- create the address under the currently selected customer
+- keep the implementation tenant-scoped and access-token aware
+- after success:
+  - refresh the planning address options for that customer
+  - set the newly created address as the selected value in the relevant planning field
+  - close the modal
+  - show success feedback using the shared toast system, not a fixed inline alert
 
-D. Event venue
-- venue_no
-- customer_id
-- name
-- address fields or address picker
-- latitude / longitude
-- status if supported
+4) Keep PlanningAddressSelect focused
+Do not overload PlanningAddressSelect.vue with full modal/business logic unless there is a very clean reason.
+Prefer one of these approaches:
+- keep PlanningAddressSelect as the select/search field only, and render the "Create new address" button + modal in PlanningOpsAdminView.vue
+OR
+- create a thin wrapper component around PlanningAddressSelect if that results in cleaner code
 
-E. Trade fair
-- fair_no
-- customer_id
-- name
-- address fields or address picker
-- start_date
-- end_date
-- status if supported
+But avoid duplicating large chunks of address-create code multiple times.
 
-F. Trade fair zone
-- trade_fair_id (required parent)
-- zone_type_code
-- zone_code
-- label
-- notes (optional)
+5) Make the flow entity-aware
+The new address creation must work correctly in these cases:
+- creating a new site
+- editing an existing site
+- creating a new event venue
+- editing an existing event venue
+- creating a new trade fair
+- editing an existing trade fair
+- creating a new patrol route
+- editing an existing patrol route
 
-G. Patrol route
-- route_no
-- customer_id
-- site_id (optional)
-- name
-- start_point_text
-- end_point_text
-- travel_policy_code
-- status
+It must always write back to the correct field:
+- address_id for site/event_venue/trade_fair
+- meeting_address_id (or whichever field is actually used) for patrol_route
 
-H. Patrol checkpoint
-- patrol_route_id (required parent)
-- sequence_no
-- checkpoint_code
-- label
-- latitude / longitude
-- scan_type_code
-- expected_token
-- min_dwell_seconds
-- notes (optional)
+6) Validation and UX requirements
+- If no customer is selected, the button must not open a broken modal.
+- Show a clear helper text or disabled reason when customer selection is required first.
+- Preserve the existing select/search behavior.
+- Keep layout and styling consistent with the legacy admin workspace design.
+- Preserve mobile/responsive behavior.
+- Do not regress existing create/edit flows.
 
-4) Parent-child safety
-- A trade fair zone must not be creatable without a selected/saved parent trade fair.
-- A patrol checkpoint must not be creatable without a selected/saved parent patrol route.
-- In create mode, if the selected entity is a child entity, require parent selection first.
-- If parent selection is impossible in the current context, disable Save and show a clear validation message.
+7) Feedback behavior
+Use the existing shared toast feedback pattern already used by admin/customers:
+- success toast after address creation
+- error toast on failure
+- bottom-right placement
+- auto-dismiss
+Do not introduce a persistent fixed alert banner.
 
-5) Save lifecycle
-- On first save, call the correct create endpoint for the selected entity type.
-- After successful save:
-  - switch the editor from create mode to edit mode
-  - keep the saved record selected in the list
-  - enable any valid post-save sections or actions
-- Child collections, location projection panels, and dependent read-only cards must remain hidden or disabled until the parent record exists.
-
-6) Validation
-Implement explicit client-side validation before submit:
-- required code/identifier fields
-- required label/name fields
-- start_date <= end_date for trade fair
-- positive / sensible checkpoint sequence and dwell values
-- required parent references for zone/checkpoint
-- no invalid mixed field submissions from other entity types
-
-7) UX consistency
-- Keep the page consistent with the rest of the legacy admin workspace design.
-- Avoid mixing P-01 data with P-02/P-03/P-04 concepts.
-- Do not expose release-state, shift-visibility, dispatch, staffing, or actuals controls in this page.
-- Keep labels and helper text consistent with existing i18n patterns.
-- Preserve tenant-scoped and role-scoped behavior.
-
-8) Technical cleanup
-- Extract entity-specific form schemas/config into a planning form config/composable instead of keeping a giant conditional template in one file.
-- Remove dead or duplicated create-form code paths if they exist.
-- Keep the implementation readable and testable.
+8) Code cleanup
+- Extract shared address-create draft/reset helpers if needed
+- Avoid copy-pasting large customer-page blocks verbatim without adaptation
+- Keep the planning page readable
+- Remove dead code if any temporary address-create attempts already exist
 
 9) Tests
-Add or update tests covering:
-- create requirement type
-- create equipment item
-- create site
-- create trade fair with date validation
-- block zone creation without parent trade fair
-- block checkpoint creation without parent route
-- hide post-save-only sections during initial create mode
-- save success switches to edit mode and keeps selection stable
-- cancel create resets draft state cleanly
+Add or update tests covering at least:
+- "Create new address" button appears for address-enabled planning entities
+- button is disabled when no customer is selected
+- clicking the button opens the modal
+- submitting valid address data calls the shared-address create API
+- after success, the address options refresh and the new address becomes selected
+- modal closes after successful create
+- error path shows toast feedback and keeps modal open if appropriate
 
 10) Deliverables
 Return:
-- the code changes
-- the tests
-- a short summary of what was fixed
-- a short list of any assumptions or follow-up gaps
+- code changes
+- updated tests
+- a short summary of which planning entity forms now support inline address creation
+- any assumptions made about patrol-route address field mapping
 
-Constraints:
-- Stay within the current web app architecture.
-- Prefer minimal, focused refactoring over broad unrelated rewrites.
-- Do not change behavior of P-02, P-03, or P-04 while fixing P-01.
+Technical guidance:
+- Prefer reusing the same API method already used in CustomerAdminView for shared customer addresses
+- Keep tenant scope and access token handling consistent with the existing planning page conventions
+- Reuse the same modal field structure and address payload shape from admin/customers where possible
+- Do not change unrelated planning business logic

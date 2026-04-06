@@ -14,6 +14,13 @@ test("browse records card uses internal tabs and keeps area shared above them", 
   assert.doesNotMatch(source, /<p class="eyebrow">\{\{ tp\("importTitle"\) \}\}<\/p>/);
 });
 
+test("planning workspace no longer renders the fixed inline feedback banner", () => {
+  assert.doesNotMatch(source, /v-if="feedback\.message"/);
+  assert.doesNotMatch(source, /class="planning-admin-feedback"/);
+  assert.doesNotMatch(source, /actionsClearFeedback/);
+  assert.doesNotMatch(source, /function clearFeedback\(/);
+});
+
 test("browse records keeps both panels mounted with v-show and leaves results below the tabs", () => {
   assert.match(source, /id="planning-browse-panel-filters"[\s\S]*v-show="browsePanelTab === 'filters'"/);
   assert.match(source, /id="planning-browse-panel-import"[\s\S]*v-show="browsePanelTab === 'import'"/);
@@ -27,6 +34,9 @@ test("site address field is clearly labeled as an optional address record id", (
   assert.match(source, /<PlanningAddressSelect[\s\S]*tp\('fieldsAddressId'\)/);
   assert.match(source, /tp\('fieldsAddressSearchPlaceholder'\)/);
   assert.match(source, /tp\('fieldsAddressCustomerRequired'\)/);
+  assert.match(source, /tp\("actionsCreateSharedAddress"\)/);
+  assert.match(source, /@click="openAddressCreateModal\('address_id'\)"/);
+  assert.match(source, /:disabled="!draft\.customer_id \|\| loading\.sharedAddress"/);
 });
 
 test("site number and name use the same explicit field wrapper class", () => {
@@ -69,4 +79,34 @@ test("planning setup address picker refresh is shared across all address-backed 
   assert.match(source, /function usesAddressSelection\(entity = editorEntityKey\.value\)/);
   assert.match(source, /\["site", "event_venue", "trade_fair", "patrol_route"\]\.includes\(entity\)/);
   assert.match(source, /\(\) => \[editorEntityKey\.value, draft\.customer_id\]/);
+});
+
+test("planning setup supports inline shared-address creation modal for all address-backed entities", () => {
+  assert.match(source, /<Modal[\s\S]*v-model:open="addressCreateModalOpen"[\s\S]*tp\('addressCreateModalTitle'\)/);
+  assert.match(source, /v-model="addressDirectoryDraft\.street_line_1"/);
+  assert.match(source, /v-model="addressDirectoryDraft\.postal_code"/);
+  assert.match(source, /v-model="addressDirectoryDraft\.city"/);
+  assert.match(source, /v-model="addressDirectoryDraft\.country_code"/);
+  assert.match(source, /@click="submitAddressDirectoryEntry"/);
+  assert.match(source, /@click="closeAddressCreateModal"/);
+  assert.match(source, /@click="openAddressCreateModal\('meeting_address_id'\)"/);
+});
+
+test("planning list loading state drives the header badge and action disabling", () => {
+  assert.match(source, /<StatusBadge :status="loading\.list \? 'inactive' : 'active'"/);
+  assert.match(source, /:disabled="loading\.list \|\| loading\.action \|\| !canRead" @click="refreshRecords"/);
+  assert.match(source, /:disabled="!actionState\.canCreate \|\| loading\.list \|\| loading\.action"/);
+  assert.match(source, /:disabled="!actionState\.canImport \|\| loading\.list \|\| loading\.action"/);
+});
+
+test("planning failures and successful saves use unified feedback instead of browser alerts", () => {
+  assert.match(source, /useSicherPlanFeedback/);
+  assert.match(source, /const \{ showFeedbackToast \} = useSicherPlanFeedback\(\)/);
+  assert.match(source, /function setFeedback\(tone, title, message\) \{[\s\S]*showFeedbackToast\(\{[\s\S]*key: "planning-admin-feedback"/);
+  assert.match(source, /await createCustomerAvailableAddress\(/);
+  assert.match(source, /await refreshSiteAddressOptions\(\);[\s\S]*draft\[addressCreateTargetField\.value\] = created\.id/s);
+  assert.match(source, /closeAddressCreateModal\(\);[\s\S]*setFeedback\("success", tp\("successTitle"\), tp\("addressCreated"\)\)/s);
+  assert.match(source, /setFeedback\("error", tp\("errorTitle"\), tp\(key\)\)/);
+  assert.match(source, /setFeedback\("success", tp\("successTitle"\), tp\("recordSaved"\)\)/);
+  assert.doesNotMatch(source, /alert\(/);
 });

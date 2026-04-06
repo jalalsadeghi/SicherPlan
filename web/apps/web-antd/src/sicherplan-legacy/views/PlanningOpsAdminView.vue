@@ -1,18 +1,6 @@
 <template>
   <section class="planning-admin-page">
     <section
-      v-if="feedback.message"
-      class="planning-admin-feedback"
-      :data-tone="feedback.tone"
-    >
-      <div>
-        <strong>{{ feedback.title }}</strong>
-        <span>{{ feedback.message }}</span>
-      </div>
-      <button type="button" @click="clearFeedback">{{ tp("actionsClearFeedback") }}</button>
-    </section>
-
-    <section
       v-if="!resolvedTenantScopeId || !accessToken"
       class="module-card planning-admin-empty"
     >
@@ -28,11 +16,11 @@
       <h3>{{ tp("permissionMissingBody") }}</h3>
     </section>
 
-    <div
-      v-else
-      class="planning-admin-grid"
-      data-testid="planning-master-detail-layout"
-    >
+    <template v-else>
+      <div
+        class="planning-admin-grid"
+        data-testid="planning-master-detail-layout"
+      >
       <section class="module-card planning-admin-panel planning-admin-list-panel">
         <div class="planning-admin-panel__header">
           <div>
@@ -47,7 +35,7 @@
           <div class="planning-admin-shared-context">
             <label class="field-stack">
               <span>{{ tp("entityLabel") }}</span>
-              <select v-model="entityKey" @change="changeEntity">
+              <select v-model="entityKey" :disabled="loading.list || loading.action" @change="changeEntity">
                 <option v-for="option in entityOptions" :key="option" :value="option">
                   {{ entityName(option) }}
                 </option>
@@ -78,7 +66,7 @@
             <div class="planning-admin-filter-stack">
               <label class="field-stack">
                 <span>{{ tp("search") }}</span>
-                <input v-model="filters.search" :placeholder="tp('searchPlaceholder')" />
+                <input v-model="filters.search" :disabled="loading.list || loading.action" :placeholder="tp('searchPlaceholder')" />
               </label>
 
               <PlanningCustomerSelect
@@ -86,7 +74,7 @@
                 :label="tp('fieldsCustomer')"
                 :options="customerOptions"
                 :loading="customerLookupLoading"
-                :disabled="loading.list"
+                :disabled="loading.list || loading.action"
                 :error="customerLookupError"
                 :search-placeholder="tp('customerSearchPlaceholder')"
                 :empty-option-label="tp('allCustomers')"
@@ -97,7 +85,7 @@
 
               <label class="field-stack">
                 <span>{{ tp("status") }}</span>
-                <select v-model="filters.lifecycle_status">
+                <select v-model="filters.lifecycle_status" :disabled="loading.list || loading.action">
                   <option value="">{{ tp("allStatuses") }}</option>
                   <option value="active">{{ tp("statusActive") }}</option>
                   <option value="inactive">{{ tp("statusInactive") }}</option>
@@ -107,18 +95,18 @@
             </div>
 
             <label class="planning-admin-checkbox">
-              <input v-model="filters.include_archived" type="checkbox" />
+              <input v-model="filters.include_archived" :disabled="loading.list || loading.action" type="checkbox" />
               <span>{{ tp("includeArchived") }}</span>
             </label>
 
             <div class="cta-row">
-              <button class="cta-button" type="button" @click="refreshRecords">
+              <button class="cta-button" type="button" :disabled="loading.list || loading.action || !canRead" @click="refreshRecords">
                 {{ tp("actionsSearch") }}
               </button>
               <button
                 class="cta-button cta-secondary"
                 type="button"
-                :disabled="!actionState.canCreate"
+                :disabled="!actionState.canCreate || loading.list || loading.action"
                 @click="startCreateRecord"
               >
                 {{ tp("actionsNewRecord") }}
@@ -139,7 +127,7 @@
             <input
               type="file"
               accept=".csv,text/csv"
-              :disabled="!actionState.canImport"
+              :disabled="!actionState.canImport || loading.list || loading.action"
               @change="onImportSelected"
             />
 
@@ -147,7 +135,7 @@
               <button
                 class="cta-button cta-secondary"
                 type="button"
-                :disabled="!pendingImportFile || !actionState.canImport"
+                :disabled="!pendingImportFile || !actionState.canImport || loading.list || loading.action"
                 @click="loadImportFile"
               >
                 {{ tp("actionsLoadImportFile") }}
@@ -155,7 +143,7 @@
               <button
                 class="cta-button cta-secondary"
                 type="button"
-                :disabled="!actionState.canImport"
+                :disabled="!actionState.canImport || loading.list || loading.action"
                 @click="resetImportTemplate"
               >
                 {{ tp("actionsResetImportTemplate") }}
@@ -167,7 +155,7 @@
               <textarea
                 v-model="importDraft.csv_text"
                 rows="6"
-                :disabled="!actionState.canImport"
+                :disabled="!actionState.canImport || loading.list || loading.action"
               />
             </label>
 
@@ -175,7 +163,7 @@
               <input
                 v-model="importDraft.continue_on_error"
                 type="checkbox"
-                :disabled="!actionState.canImport"
+                :disabled="!actionState.canImport || loading.list || loading.action"
               />
               <span>{{ tp("importContinueOnError") }}</span>
             </label>
@@ -184,7 +172,7 @@
               <button
                 class="cta-button"
                 type="button"
-                :disabled="!actionState.canImport"
+                :disabled="!actionState.canImport || loading.list || loading.action"
                 @click="runImportDryRun"
               >
                 {{ tp("actionsImportDryRun") }}
@@ -192,7 +180,7 @@
               <button
                 class="cta-button cta-secondary"
                 type="button"
-                :disabled="!actionState.canImport"
+                :disabled="!actionState.canImport || loading.list || loading.action"
                 @click="runImportExecute"
               >
                 {{ tp("actionsImportExecute") }}
@@ -376,6 +364,17 @@
                     :customer-required-text="tp('fieldsAddressCustomerRequired')"
                     :no-match-text="tp('fieldsAddressNoMatch')"
                   />
+                  <div class="field-stack field-stack--half planning-admin-address-actions">
+                    <button
+                      class="cta-button cta-secondary"
+                      type="button"
+                      :disabled="!draft.customer_id || loading.sharedAddress"
+                      @click="openAddressCreateModal('address_id')"
+                    >
+                      {{ tp("actionsCreateSharedAddress") }}
+                    </button>
+                    <p v-if="addressCreateDisabledReason" class="field-help">{{ addressCreateDisabledReason }}</p>
+                  </div>
                   <label class="field-stack field-stack--third">
                     <span>{{ tp("fieldsTimezone") }}</span>
                     <Select
@@ -417,6 +416,17 @@
                     :customer-required-text="tp('fieldsAddressCustomerRequired')"
                     :no-match-text="tp('fieldsAddressNoMatch')"
                   />
+                  <div class="field-stack field-stack--half planning-admin-address-actions">
+                    <button
+                      class="cta-button cta-secondary"
+                      type="button"
+                      :disabled="!draft.customer_id || loading.sharedAddress"
+                      @click="openAddressCreateModal('address_id')"
+                    >
+                      {{ tp("actionsCreateSharedAddress") }}
+                    </button>
+                    <p v-if="addressCreateDisabledReason" class="field-help">{{ addressCreateDisabledReason }}</p>
+                  </div>
                   <label class="field-stack field-stack--third">
                     <span>{{ tp("fieldsTimezone") }}</span>
                     <Select
@@ -466,6 +476,17 @@
                     :customer-required-text="tp('fieldsAddressCustomerRequired')"
                     :no-match-text="tp('fieldsAddressNoMatch')"
                   />
+                  <div class="field-stack field-stack--half planning-admin-address-actions">
+                    <button
+                      class="cta-button cta-secondary"
+                      type="button"
+                      :disabled="!draft.customer_id || loading.sharedAddress"
+                      @click="openAddressCreateModal('address_id')"
+                    >
+                      {{ tp("actionsCreateSharedAddress") }}
+                    </button>
+                    <p v-if="addressCreateDisabledReason" class="field-help">{{ addressCreateDisabledReason }}</p>
+                  </div>
                   <label class="field-stack field-stack--third">
                     <span>{{ tp("fieldsTimezone") }}</span>
                     <Select
@@ -517,6 +538,17 @@
                     :customer-required-text="tp('fieldsAddressCustomerRequired')"
                     :no-match-text="tp('fieldsAddressNoMatch')"
                   />
+                  <div class="field-stack field-stack--half planning-admin-address-actions">
+                    <button
+                      class="cta-button cta-secondary"
+                      type="button"
+                      :disabled="!draft.customer_id || loading.sharedAddress"
+                      @click="openAddressCreateModal('meeting_address_id')"
+                    >
+                      {{ tp("actionsCreateSharedAddress") }}
+                    </button>
+                    <p v-if="addressCreateDisabledReason" class="field-help">{{ addressCreateDisabledReason }}</p>
+                  </div>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsStartPointText") }}</span><input v-model="draft.start_point_text" /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsEndPointText") }}</span><input v-model="draft.end_point_text" /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsTravelPolicyCode") }}</span><input v-model="draft.travel_policy_code" /></label>
@@ -639,7 +671,58 @@
           <p>{{ tp("detailEmptyBody") }}</p>
         </section>
       </section>
-    </div>
+      </div>
+    </template>
+
+    <Modal
+      v-model:open="addressCreateModalOpen"
+      :title="tp('addressCreateModalTitle')"
+      :footer="null"
+      destroy-on-close
+    >
+      <section class="planning-admin-address-modal">
+        <p class="field-help">{{ tp("addressCreateModalLead") }}</p>
+        <div class="planning-admin-form-grid planning-admin-form-grid--detail">
+          <label class="field-stack field-stack--wide">
+            <span>{{ tp("fieldsStreetLine1") }}</span>
+            <input v-model="addressDirectoryDraft.street_line_1" />
+          </label>
+          <label class="field-stack field-stack--wide">
+            <span>{{ tp("fieldsStreetLine2") }}</span>
+            <input v-model="addressDirectoryDraft.street_line_2" />
+          </label>
+          <label class="field-stack field-stack--third">
+            <span>{{ tp("fieldsPostalCode") }}</span>
+            <input v-model="addressDirectoryDraft.postal_code" />
+          </label>
+          <label class="field-stack field-stack--third">
+            <span>{{ tp("fieldsCity") }}</span>
+            <input v-model="addressDirectoryDraft.city" />
+          </label>
+          <label class="field-stack field-stack--third">
+            <span>{{ tp("fieldsCountryCode") }}</span>
+            <input v-model="addressDirectoryDraft.country_code" maxlength="2" />
+          </label>
+          <label class="field-stack field-stack--half">
+            <span>{{ tp("fieldsState") }}</span>
+            <input v-model="addressDirectoryDraft.state" />
+          </label>
+        </div>
+        <div class="cta-row">
+          <button
+            class="cta-button"
+            type="button"
+            :disabled="loading.sharedAddress"
+            @click="submitAddressDirectoryEntry"
+          >
+            {{ tp("actionsCreateSharedAddress") }}
+          </button>
+          <button class="cta-button cta-secondary" type="button" :disabled="loading.sharedAddress" @click="closeAddressCreateModal">
+            {{ tp("actionsCancel") }}
+          </button>
+        </div>
+      </section>
+    </Modal>
 
     <PlanningLocationPickerModal
       v-model:open="locationPickerOpen"
@@ -663,14 +746,20 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
-import { Select } from "ant-design-vue";
+import { Modal, Select } from "ant-design-vue";
 
 import StatusBadge from "@/components/StatusBadge.vue";
 import PlanningAddressSelect from "@/components/planning/PlanningAddressSelect.vue";
 import PlanningCustomerSelect from "@/components/planning/PlanningCustomerSelect.vue";
 import PlanningLocationPickerModal from "@/components/planning/PlanningLocationPickerModal.vue";
 import InternalCardTabs from "@/components/shared/InternalCardTabs.vue";
-import { getCustomer, listCustomerAddresses, listCustomers } from "@/api/customers";
+import {
+  createCustomerAvailableAddress,
+  getCustomer,
+  listCustomerAddresses,
+  listCustomers,
+} from "@/api/customers";
+import { useSicherPlanFeedback } from "@/composables/useSicherPlanFeedback";
 import {
   createPatrolCheckpoint,
   createPlanningRecord,
@@ -717,9 +806,9 @@ defineProps({
 const authStore = useAuthStore();
 const localeStore = useLocaleStore();
 const route = useRoute();
+const { showFeedbackToast } = useSicherPlanFeedback();
 
-const loading = reactive({ list: false, detail: false, action: false });
-const feedback = reactive({ tone: "neutral", title: "", message: "" });
+const loading = reactive({ list: false, detail: false, action: false, sharedAddress: false });
 const filters = reactive({ search: "", customer_id: "", lifecycle_status: "", include_archived: false });
 const entityOptions = PLANNING_ENTITY_OPTIONS;
 const createEntityOptions = PLANNING_CREATE_ENTITY_OPTIONS;
@@ -752,6 +841,8 @@ const tradeFairParentOptions = ref([]);
 const patrolRouteParentOptions = ref([]);
 const createTradeFairParentId = ref("");
 const createPatrolRouteParentId = ref("");
+const addressCreateModalOpen = ref(false);
+const addressCreateTargetField = ref("address_id");
 const locationPickerOpen = ref(false);
 const locationPickerStartPoint = ref({
   lat: 51.662973,
@@ -762,6 +853,7 @@ const locationPickerStartPoint = ref({
 
 const customerLocationCache = new Map();
 const geocodeCache = new Map();
+const stagedPlanningAddressDirectoryByCustomer = reactive({});
 
 const draft = reactive({
   customer_id: "",
@@ -789,6 +881,15 @@ const draft = reactive({
   end_point_text: "",
   travel_policy_code: "",
   status: "active",
+});
+
+const addressDirectoryDraft = reactive({
+  street_line_1: "",
+  street_line_2: "",
+  postal_code: "",
+  city: "",
+  state: "",
+  country_code: "DE",
 });
 
 const zoneDraft = reactive({ zone_type_code: "", zone_code: "", label: "", notes: "", version_no: 0 });
@@ -850,6 +951,9 @@ const childCreateBlockedMessage = computed(() => {
   }
   return "";
 });
+const addressCreateDisabledReason = computed(() =>
+  draft.customer_id ? "" : tp("addressCreateCustomerRequired"),
+);
 const filteredVenueOptions = computed(() =>
   venueOptions.value.filter((record) => !draft.customer_id || record.customer_id === draft.customer_id),
 );
@@ -1034,13 +1138,78 @@ function recordCustomerSummary(record) {
 }
 
 function setFeedback(tone, title, message) {
-  feedback.tone = tone;
-  feedback.title = title;
-  feedback.message = message;
+  showFeedbackToast({
+    key: "planning-admin-feedback",
+    message,
+    title,
+    tone,
+  });
 }
 
-function clearFeedback() {
-  setFeedback("neutral", "", "");
+function resetAddressDirectoryDraft() {
+  Object.assign(addressDirectoryDraft, {
+    street_line_1: "",
+    street_line_2: "",
+    postal_code: "",
+    city: "",
+    state: "",
+    country_code: "DE",
+  });
+}
+
+function normalizeAddressDirectoryDraft() {
+  return {
+    street_line_1: addressDirectoryDraft.street_line_1.trim(),
+    street_line_2: addressDirectoryDraft.street_line_2.trim() || null,
+    postal_code: addressDirectoryDraft.postal_code.trim(),
+    city: addressDirectoryDraft.city.trim(),
+    state: addressDirectoryDraft.state.trim() || null,
+    country_code: addressDirectoryDraft.country_code.trim().toUpperCase(),
+  };
+}
+
+function buildPlanningAddressOption(address) {
+  return {
+    address_id: address.id,
+    status: "active",
+    address: {
+      id: address.id,
+      street_line_1: address.street_line_1,
+      street_line_2: address.street_line_2 ?? null,
+      postal_code: address.postal_code,
+      city: address.city,
+      state: address.state ?? null,
+      country_code: address.country_code,
+    },
+  };
+}
+
+function mergePlanningAddressOptions(addressLinks = [], stagedAddresses = []) {
+  const merged = new Map();
+  for (const entry of addressLinks) {
+    if (entry?.address_id) {
+      merged.set(entry.address_id, entry);
+    }
+  }
+  for (const address of stagedAddresses) {
+    const entry = buildPlanningAddressOption(address);
+    merged.set(entry.address_id, entry);
+  }
+  return [...merged.values()];
+}
+
+function openAddressCreateModal(fieldKey) {
+  if (!draft.customer_id || loading.sharedAddress) {
+    return;
+  }
+  addressCreateTargetField.value = fieldKey;
+  resetAddressDirectoryDraft();
+  addressCreateModalOpen.value = true;
+}
+
+function closeAddressCreateModal() {
+  addressCreateModalOpen.value = false;
+  resetAddressDirectoryDraft();
 }
 
 function resetDraft() {
@@ -1272,6 +1441,7 @@ async function refreshSiteAddressOptions() {
     siteAddressLookupError.value = "";
     siteAddressLookupLoading.value = false;
     draft.address_id = "";
+    draft.meeting_address_id = "";
     return;
   }
 
@@ -1287,7 +1457,10 @@ async function refreshSiteAddressOptions() {
     if (draft.customer_id !== requestedCustomerId || !usesAddressSelection()) {
       return;
     }
-    siteAddressOptions.value = addressLinks.filter((entry) => entry.status !== "archived");
+    siteAddressOptions.value = mergePlanningAddressOptions(
+      addressLinks.filter((entry) => entry.status !== "archived"),
+      stagedPlanningAddressDirectoryByCustomer[requestedCustomerId] ?? [],
+    );
     if (draft.address_id && !siteAddressOptions.value.some((entry) => entry.address_id === draft.address_id)) {
       draft.address_id = "";
     }
@@ -1337,6 +1510,40 @@ async function refreshReferenceRecords() {
     siteOptions.value = [];
     tradeFairParentOptions.value = [];
     patrolRouteParentOptions.value = [];
+  }
+}
+
+async function submitAddressDirectoryEntry() {
+  if (!resolvedTenantScopeId.value || !accessToken.value || !draft.customer_id) {
+    return;
+  }
+
+  const payload = normalizeAddressDirectoryDraft();
+  if (!payload.street_line_1 || !payload.postal_code || !payload.city || !payload.country_code) {
+    setFeedback("error", tp("errorTitle"), tp("addressCreateValidation"));
+    return;
+  }
+
+  loading.sharedAddress = true;
+  try {
+    const created = await createCustomerAvailableAddress(
+      resolvedTenantScopeId.value,
+      draft.customer_id,
+      accessToken.value,
+      payload,
+    );
+    stagedPlanningAddressDirectoryByCustomer[draft.customer_id] = [
+      ...(stagedPlanningAddressDirectoryByCustomer[draft.customer_id] ?? []),
+      created,
+    ];
+    await refreshSiteAddressOptions();
+    draft[addressCreateTargetField.value] = created.id;
+    closeAddressCreateModal();
+    setFeedback("success", tp("successTitle"), tp("addressCreated"));
+  } catch (error) {
+    handleError(error);
+  } finally {
+    loading.sharedAddress = false;
   }
 }
 
@@ -1399,6 +1606,7 @@ function startCreateRecord() {
   resetDraft();
   resetZoneDraft();
   resetCheckpointDraft();
+  closeAddressCreateModal();
   draft.customer_id = filters.customer_id || "";
   createTradeFairParentId.value = "";
   createPatrolRouteParentId.value = "";
@@ -1412,6 +1620,7 @@ function cancelCreateRecord() {
   resetDraft();
   resetZoneDraft();
   resetCheckpointDraft();
+  closeAddressCreateModal();
   createTradeFairParentId.value = "";
   createPatrolRouteParentId.value = "";
   if (previousSelectedRecordId.value) {
@@ -1431,6 +1640,7 @@ function handleEditorEntityChange() {
   resetDraft();
   resetZoneDraft();
   resetCheckpointDraft();
+  closeAddressCreateModal();
   draft.customer_id = filters.customer_id || "";
   createTradeFairParentId.value = "";
   createPatrolRouteParentId.value = "";
@@ -1656,6 +1866,7 @@ function changeEntity() {
   resetDraft();
   resetZoneDraft();
   resetCheckpointDraft();
+  closeAddressCreateModal();
   resetImportTemplate();
   tradeFairZones.value = [];
   patrolCheckpoints.value = [];
@@ -1756,6 +1967,9 @@ watch(
 watch(
   () => [editorEntityKey.value, draft.customer_id],
   async () => {
+    if (!draft.customer_id && addressCreateModalOpen.value) {
+      closeAddressCreateModal();
+    }
     if (!usesAddressSelection()) {
       siteAddressOptions.value = [];
       siteAddressLookupError.value = "";
@@ -1798,8 +2012,7 @@ onMounted(async () => {
 .planning-admin-shared-context,
 .planning-admin-filter-stack,
 .planning-admin-tab-panel,
-.planning-admin-list,
-.planning-admin-feedback {
+.planning-admin-list {
   display: grid;
   gap: 1rem;
 }
@@ -1903,8 +2116,7 @@ onMounted(async () => {
 
 .planning-admin-row__body span,
 .planning-admin-list-empty,
-.planning-admin-empty,
-.planning-admin-feedback span {
+.planning-admin-empty {
   color: var(--sp-color-text-secondary);
 }
 
@@ -1912,27 +2124,6 @@ onMounted(async () => {
   border: 1px solid var(--sp-color-border-soft);
   border-radius: 12px;
   padding: 0.75rem 1rem;
-}
-
-.planning-admin-feedback {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.9rem 1rem;
-  border-radius: 18px;
-  background: var(--sp-color-primary-muted);
-  color: var(--sp-color-primary-strong);
-}
-
-.planning-admin-feedback[data-tone="error"] {
-  background: color-mix(in srgb, var(--sp-color-primary-muted) 45%, #ffb4a6);
-  color: color-mix(in srgb, var(--sp-color-primary-strong) 60%, #6a1d00);
-}
-
-.planning-admin-feedback[data-tone="success"] {
-  background: color-mix(in srgb, var(--sp-color-primary-muted) 32%, #dcfce7);
-  color: color-mix(in srgb, var(--sp-color-primary-strong) 65%, #14532d);
 }
 
 .planning-admin-form-grid--detail {
@@ -2056,6 +2247,15 @@ onMounted(async () => {
 
 .planning-admin-checkbox--inline {
   grid-column: 1 / -1;
+}
+
+.planning-admin-address-actions {
+  align-content: start;
+}
+
+.planning-admin-address-modal {
+  display: grid;
+  gap: 1rem;
 }
 
 .field-stack--wide {

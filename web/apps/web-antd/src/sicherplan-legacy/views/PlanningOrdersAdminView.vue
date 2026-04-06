@@ -1,13 +1,5 @@
 <template>
   <section class="planning-orders-page">
-    <section v-if="feedback.message" class="planning-orders-feedback" :data-tone="feedback.tone">
-      <div>
-        <strong>{{ feedback.title }}</strong>
-        <span>{{ feedback.message }}</span>
-      </div>
-      <button type="button" @click="clearFeedback">{{ tp("actionsClearFeedback") }}</button>
-    </section>
-
     <section v-if="!tenantScopeId || !accessToken" class="module-card planning-orders-empty">
       <p class="eyebrow">{{ tp("missingScopeTitle") }}</p>
       <h3>{{ tp("missingScopeBody") }}</h3>
@@ -764,6 +756,7 @@ import { useRouter } from "vue-router";
 import StatusBadge from "@/components/StatusBadge.vue";
 import PlanningCustomerSelect from "@/components/planning/PlanningCustomerSelect.vue";
 import { listCustomers, type CustomerListItem } from "@/api/customers";
+import { useSicherPlanFeedback } from "@/composables/useSicherPlanFeedback";
 import {
   createPlanningRecord as createPlanningCatalogRecord,
   listPlanningRecords as listPlanningCatalogRecords,
@@ -823,8 +816,8 @@ import { useAuthStore } from "@/stores/auth";
 const authStore = useAuthStore();
 const localeStore = useLocaleStore();
 const router = useRouter();
+const { showFeedbackToast } = useSicherPlanFeedback();
 
-const feedback = reactive({ tone: "neutral", title: "", message: "" });
 const loading = reactive({ orders: false, orderDetail: false, planning: false, action: false });
 const orderFilters = reactive({ search: "", customer_id: "", release_state: "", include_archived: false });
 const customerOptions = ref<CustomerListItem[]>([]);
@@ -1211,13 +1204,12 @@ function tpf(key: keyof typeof planningOrdersMessages.de, values: Record<string,
 }
 
 function setFeedback(tone: string, title: string, message: string) {
-  feedback.tone = tone;
-  feedback.title = title;
-  feedback.message = message;
-}
-
-function clearFeedback() {
-  setFeedback("neutral", "", "");
+  showFeedbackToast({
+    key: "planning-orders-feedback",
+    message,
+    title,
+    tone: tone as "error" | "info" | "neutral" | "success" | "warning",
+  });
 }
 
 function resetRequirementTypeModal() {
@@ -2444,27 +2436,6 @@ watch(
   gap: 1rem;
 }
 
-.planning-orders-feedback {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.9rem 1rem;
-  border-radius: 18px;
-  background: var(--sp-color-primary-muted);
-  color: var(--sp-color-primary-strong);
-}
-
-.planning-orders-feedback[data-tone="error"] {
-  background: color-mix(in srgb, var(--sp-color-primary-muted) 45%, #ffb4a6);
-  color: color-mix(in srgb, var(--sp-color-primary-strong) 60%, #6a1d00);
-}
-
-.planning-orders-feedback[data-tone="success"] {
-  background: color-mix(in srgb, var(--sp-color-primary-muted) 32%, #dcfce7);
-  color: color-mix(in srgb, var(--sp-color-primary-strong) 65%, #14532d);
-}
-
 .planning-orders-checkbox {
   align-items: center;
   display: flex;
@@ -2535,8 +2506,7 @@ watch(
     grid-template-columns: 1fr;
   }
 
-  .planning-orders-list-panel,
-  .planning-orders-feedback {
+  .planning-orders-list-panel {
     position: static;
     flex-direction: column;
     align-items: stretch;

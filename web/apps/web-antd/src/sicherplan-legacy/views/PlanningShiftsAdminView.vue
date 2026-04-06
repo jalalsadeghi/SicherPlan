@@ -8,14 +8,6 @@
       </div>
     </section>
 
-    <section v-if="feedback.message" class="planning-orders-feedback" :data-tone="feedback.tone">
-      <div>
-        <strong>{{ feedback.title }}</strong>
-        <span>{{ feedback.message }}</span>
-      </div>
-      <button type="button" @click="clearFeedback">{{ tp("actionsClearFeedback") }}</button>
-    </section>
-
     <section v-if="!tenantScopeId || !accessToken" class="module-card planning-orders-empty">
       <p class="eyebrow">{{ tp("missingScopeTitle") }}</p>
       <h3>{{ tp("missingScopeBody") }}</h3>
@@ -400,6 +392,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
 
+import { useSicherPlanFeedback } from "@/composables/useSicherPlanFeedback";
 import { listPlanningRecords, type PlanningRecordListItem } from "@/api/planningOrders";
 import {
   createShift,
@@ -441,6 +434,7 @@ const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
 
 const authStore = useAuthStore();
 const localeStore = useLocaleStore();
+const { showFeedbackToast } = useSicherPlanFeedback();
 const currentLocale = computed(() => (localeStore.locale === "en" ? "en" : "de"));
 const role = computed(() => authStore.effectiveRole || "tenant_admin");
 const tenantScopeId = ref(authStore.tenantScopeId || "");
@@ -470,7 +464,6 @@ const boardFilters = reactive<any>({
   date_to: toDateTimeLocal(new Date(Date.UTC(2026, 3, 8, 0, 0))),
   release_state: "",
 });
-const feedback = reactive({ tone: "info", title: "", message: "" });
 const activeWorkspaceTab = ref("templates");
 const workspaceTabs = computed(() => [
   { id: "templates", label: tp("templatesTitle") },
@@ -524,15 +517,12 @@ function tp(key: keyof typeof planningShiftsMessages.de) {
 }
 
 function setFeedback(tone: string, title: string, message: string) {
-  feedback.tone = tone;
-  feedback.title = title;
-  feedback.message = message;
-}
-
-function clearFeedback() {
-  feedback.tone = "info";
-  feedback.title = "";
-  feedback.message = "";
+  showFeedbackToast({
+    key: "planning-shifts-feedback",
+    message,
+    title,
+    tone: tone as "error" | "info" | "neutral" | "success" | "warning",
+  });
 }
 
 function createEmptyTemplateDraft() {
@@ -926,7 +916,6 @@ watch(
 
 .planning-shifts-hero,
 .planning-shifts-panel,
-.planning-orders-feedback,
 .planning-orders-empty {
   border-radius: 18px;
   border: 1px solid var(--sp-color-border);
@@ -1150,7 +1139,6 @@ watch(
   color: var(--sp-color-text-secondary);
 }
 
-.planning-orders-feedback,
 .planning-orders-empty {
   display: flex;
   justify-content: space-between;
@@ -1169,7 +1157,6 @@ watch(
   .planning-shifts-hero,
   .planning-shifts-panel__header,
   .planning-orders-panel__header,
-  .planning-orders-feedback,
   .planning-orders-empty {
     flex-direction: column;
     align-items: stretch;
