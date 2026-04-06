@@ -34,9 +34,11 @@ test("site address field is clearly labeled as an optional address record id", (
   assert.match(source, /<PlanningAddressSelect[\s\S]*tp\('fieldsAddressId'\)/);
   assert.match(source, /tp\('fieldsAddressSearchPlaceholder'\)/);
   assert.match(source, /tp\('fieldsAddressCustomerRequired'\)/);
-  assert.match(source, /tp\("actionsCreateSharedAddress"\)/);
-  assert.match(source, /@click="openAddressCreateModal\('address_id'\)"/);
+  assert.match(source, /planning-admin-form-section__header--split/);
+  assert.match(source, /<div v-if="showAddressCreateAction" class="planning-admin-form-section__actions">/);
+  assert.match(source, /@click="openAddressCreateModal\(currentAddressFieldKey\)"/);
   assert.match(source, /:disabled="!draft\.customer_id \|\| loading\.sharedAddress"/);
+  assert.doesNotMatch(source, /planning-admin-address-actions/);
 });
 
 test("site number and name use the same explicit field wrapper class", () => {
@@ -56,6 +58,8 @@ test("create mode exposes entity-aware header, family selector, and cancel actio
   assert.match(source, /tp\("detailCreateLead", \{ entity: editorEntityLabel \}\)/);
   assert.match(source, /<select v-model="editorEntityKey" @change="handleEditorEntityChange">/);
   assert.match(source, /isCreatingRecord \? tp\("actionsCancelCreate"\) : tp\("actionsResetRecord"\)/);
+  assert.doesNotMatch(source, /tp\("createModeLabel"\)/);
+  assert.doesNotMatch(source, /tp\('createModeValue'/);
 });
 
 test("create mode blocks child entity saves without a selected parent and hides post-save child sections", () => {
@@ -89,7 +93,10 @@ test("planning setup supports inline shared-address creation modal for all addre
   assert.match(source, /v-model="addressDirectoryDraft\.country_code"/);
   assert.match(source, /@click="submitAddressDirectoryEntry"/);
   assert.match(source, /@click="closeAddressCreateModal"/);
-  assert.match(source, /@click="openAddressCreateModal\('meeting_address_id'\)"/);
+  assert.match(source, /const currentAddressFieldKey = computed\(\(\) => \{/);
+  assert.match(source, /\["site", "event_venue", "trade_fair"\]\.includes\(editorEntityKey\.value\)/);
+  assert.match(source, /editorEntityKey\.value === "patrol_route"/);
+  assert.match(source, /const showAddressCreateAction = computed\(\(\) => !!currentAddressFieldKey\.value\)/);
 });
 
 test("planning list loading state drives the header badge and action disabling", () => {

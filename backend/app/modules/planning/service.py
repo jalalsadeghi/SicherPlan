@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime, time
+from decimal import Decimal
+from enum import Enum
 from typing import Protocol
+from uuid import UUID
+
+from sqlalchemy import inspect as sa_inspect
 
 from app.errors import ApiException
 from app.modules.core.models import Address
@@ -614,11 +620,31 @@ class PlanningService:
 
     @staticmethod
     def _snapshot(row) -> dict[str, object]:
+        mapper = sa_inspect(row).mapper
         return {
-            key: value
-            for key, value in row.__dict__.items()
-            if not key.startswith("_") and key not in {"customer", "address", "zones", "checkpoints", "venue", "site", "meeting_address"}
+            attribute.key: PlanningService._json_safe_value(getattr(row, attribute.key))
+            for attribute in mapper.column_attrs
         }
+
+    @classmethod
+    def _json_safe_value(cls, value: object) -> object:
+        if value is None or isinstance(value, bool | int | float | str):
+            return value
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, datetime | date | time):
+            return value.isoformat()
+        if isinstance(value, UUID):
+            return str(value)
+        if isinstance(value, Enum):
+            return cls._json_safe_value(value.value)
+        if isinstance(value, dict):
+            return {str(key): cls._json_safe_value(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [cls._json_safe_value(item) for item in value]
+        if isinstance(value, tuple):
+            return [cls._json_safe_value(item) for item in value]
+        return value
 
     def _record_event(
         self,

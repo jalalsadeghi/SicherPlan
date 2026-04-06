@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
@@ -15,7 +16,7 @@ from app.modules.customers.models import Customer
 from app.modules.iam.audit_service import AuditService
 from app.modules.iam.auth_schemas import AuthenticatedRoleScope
 from app.modules.iam.authz import RequestAuthorizationContext
-from app.modules.planning.models import EventVenue, PatrolRoute, RequirementType, Site, TradeFair
+from app.modules.planning.models import EventVenue, PatrolCheckpoint, PatrolRoute, RequirementType, Site, TradeFair, TradeFairZone
 from app.modules.planning.schemas import (
     EquipmentItemCreate,
     OpsMasterFilter,
@@ -319,21 +320,18 @@ class FakePlanningRepository:
         return None
 
     def create_trade_fair_zone(self, tenant_id: str, payload: TradeFairZoneCreate, actor_user_id: str | None):
-        row = type("TradeFairZoneStub", (), {})()
-        row.id = str(uuid4())
-        row.tenant_id = tenant_id
-        row.trade_fair_id = payload.trade_fair_id
-        row.zone_type_code = payload.zone_type_code
-        row.zone_code = payload.zone_code
-        row.label = payload.label
-        row.notes = payload.notes
-        row.status = "active"
-        row.version_no = 1
-        row.created_at = datetime.now(UTC)
-        row.updated_at = row.created_at
-        row.created_by_user_id = actor_user_id
-        row.updated_by_user_id = actor_user_id
-        row.archived_at = None
+        row = TradeFairZone(
+            tenant_id=tenant_id,
+            trade_fair_id=payload.trade_fair_id,
+            zone_type_code=payload.zone_type_code,
+            zone_code=payload.zone_code,
+            label=payload.label,
+            notes=payload.notes,
+            created_by_user_id=actor_user_id,
+            updated_by_user_id=actor_user_id,
+        )
+        self._stamp(row)
+        row.trade_fair = self.trade_fairs[payload.trade_fair_id]
         self.trade_fair_zones[row.id] = row
         return row
 
@@ -412,26 +410,23 @@ class FakePlanningRepository:
         return None
 
     def create_patrol_checkpoint(self, tenant_id: str, payload: PatrolCheckpointCreate, actor_user_id: str | None):
-        row = type("PatrolCheckpointStub", (), {})()
-        row.id = str(uuid4())
-        row.tenant_id = tenant_id
-        row.patrol_route_id = payload.patrol_route_id
-        row.sequence_no = payload.sequence_no
-        row.checkpoint_code = payload.checkpoint_code
-        row.label = payload.label
-        row.latitude = payload.latitude
-        row.longitude = payload.longitude
-        row.scan_type_code = payload.scan_type_code
-        row.expected_token_value = payload.expected_token_value
-        row.minimum_dwell_seconds = payload.minimum_dwell_seconds
-        row.notes = payload.notes
-        row.status = "active"
-        row.version_no = 1
-        row.created_at = datetime.now(UTC)
-        row.updated_at = row.created_at
-        row.created_by_user_id = actor_user_id
-        row.updated_by_user_id = actor_user_id
-        row.archived_at = None
+        row = PatrolCheckpoint(
+            tenant_id=tenant_id,
+            patrol_route_id=payload.patrol_route_id,
+            sequence_no=payload.sequence_no,
+            checkpoint_code=payload.checkpoint_code,
+            label=payload.label,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            scan_type_code=payload.scan_type_code,
+            expected_token_value=payload.expected_token_value,
+            minimum_dwell_seconds=payload.minimum_dwell_seconds,
+            notes=payload.notes,
+            created_by_user_id=actor_user_id,
+            updated_by_user_id=actor_user_id,
+        )
+        self._stamp(row)
+        row.patrol_route = self.patrol_routes[payload.patrol_route_id]
         self.patrol_checkpoints[row.id] = row
         return row
 
@@ -489,6 +484,9 @@ class PlanningOpsMasterFoundationTests(unittest.TestCase):
         self.service = PlanningService(self.repository, audit_service=AuditService(self.audit_repository))
         self.context = _context("planning.ops.read", "planning.ops.write")
 
+    def assert_json_safe(self, value) -> None:  # noqa: ANN001
+        json.dumps(value)
+
     def test_create_requirement_type_rejects_duplicate_code(self) -> None:
         payload = RequirementTypeCreate(
             tenant_id="tenant-1",
@@ -543,6 +541,78 @@ class PlanningOpsMasterFoundationTests(unittest.TestCase):
         self.assertEqual(event.after_json["longitude"], "8.174013")
         self.assertEqual(event.after_json["id"], row.id)
         self.assertIsInstance(event.after_json["created_at"], str)
+        self.assert_json_safe(event.after_json)
+
+    def test_create_trade_fair_zone_records_json_safe_audit_without_trade_fair_relationship(self) -> None:
+        fair = self.repository.create_trade_fair(
+            "tenant-1",
+            TradeFairCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                fair_no="F-201",
+                name="Expo Nord",
+                start_date=date(2026, 6, 1),
+                end_date=date(2026, 6, 3),
+            ),
+            "user-1",
+        )
+        payload = TradeFairZoneCreate(
+            tenant_id="tenant-1",
+            trade_fair_id=fair.id,
+            zone_type_code="hall",
+            zone_code="B2",
+            label="Halle B2",
+            notes="West wing",
+        )
+
+        zone = self.service.create_trade_fair_zone("tenant-1", fair.id, payload, self.context)
+
+        self.assertEqual(zone.trade_fair_id, fair.id)
+        self.assertEqual(len(self.audit_repository.audit_events), 1)
+        event = self.audit_repository.audit_events[0]
+        self.assertEqual(event.event_type, "planning.trade_fair_zone.created")
+        self.assertNotIn("trade_fair", event.after_json)
+        self.assertEqual(event.after_json["trade_fair_id"], fair.id)
+        self.assertEqual(event.after_json["zone_code"], "B2")
+        self.assertIsInstance(event.after_json["created_at"], str)
+        self.assert_json_safe(event.after_json)
+
+    def test_create_patrol_checkpoint_records_json_safe_audit_without_patrol_route_relationship(self) -> None:
+        route = self.repository.create_patrol_route(
+            "tenant-1",
+            PatrolRouteCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                route_no="R-201",
+                name="Route 201",
+            ),
+            "user-1",
+        )
+        payload = PatrolCheckpointCreate(
+            tenant_id="tenant-1",
+            patrol_route_id=route.id,
+            sequence_no=2,
+            checkpoint_code="CP-201",
+            label="South gate",
+            latitude=Decimal("52.510000"),
+            longitude=Decimal("13.410000"),
+            scan_type_code="qr",
+            expected_token_value="gate-201",
+            minimum_dwell_seconds=15,
+            notes="Second checkpoint",
+        )
+
+        checkpoint = self.service.create_patrol_checkpoint("tenant-1", route.id, payload, self.context)
+
+        self.assertEqual(checkpoint.patrol_route_id, route.id)
+        self.assertEqual(len(self.audit_repository.audit_events), 1)
+        event = self.audit_repository.audit_events[0]
+        self.assertEqual(event.event_type, "planning.patrol_checkpoint.created")
+        self.assertNotIn("patrol_route", event.after_json)
+        self.assertEqual(event.after_json["patrol_route_id"], route.id)
+        self.assertEqual(event.after_json["latitude"], "52.510000")
+        self.assertEqual(event.after_json["longitude"], "13.410000")
+        self.assert_json_safe(event.after_json)
 
     def test_trade_fair_rejects_invalid_date_window(self) -> None:
         payload = TradeFairCreate(

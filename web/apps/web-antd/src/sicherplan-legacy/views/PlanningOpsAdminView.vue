@@ -257,9 +257,25 @@
             </section>
 
             <section class="planning-admin-form-section">
-              <div class="planning-admin-form-section__header">
-                <p v-if="isCreatingRecord" class="field-help">{{ tp("newRecordLead") }}</p>
-                <p v-if="isCreatingRecord && isDirty" class="field-help planning-admin-dirty-help">{{ tp("dirtyStateHint") }}</p>
+              <div
+                class="planning-admin-form-section__header"
+                :class="{ 'planning-admin-form-section__header--split': showAddressCreateAction }"
+              >
+                <div>
+                  <p v-if="isCreatingRecord" class="field-help">{{ tp("newRecordLead") }}</p>
+                  <p v-if="isCreatingRecord && isDirty" class="field-help planning-admin-dirty-help">{{ tp("dirtyStateHint") }}</p>
+                </div>
+                <div v-if="showAddressCreateAction" class="planning-admin-form-section__actions">
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    :disabled="!draft.customer_id || loading.sharedAddress"
+                    @click="openAddressCreateModal(currentAddressFieldKey)"
+                  >
+                    {{ tp("actionsCreateSharedAddress") }}
+                  </button>
+                  <p v-if="addressCreateDisabledReason" class="field-help">{{ addressCreateDisabledReason }}</p>
+                </div>
               </div>
 
               <div class="planning-admin-form-grid planning-admin-form-grid--detail">
@@ -270,11 +286,6 @@
                       {{ entityName(option) }}
                     </option>
                   </select>
-                </label>
-
-                <label v-if="isCreatingRecord" class="field-stack field-stack--half">
-                  <span>{{ tp("createModeLabel") }}</span>
-                  <input :value="tp('createModeValue', { entity: editorEntityLabel })" disabled />
                 </label>
 
                 <PlanningCustomerSelect
@@ -359,22 +370,11 @@
                     :disabled="loading.action"
                     :error="siteAddressLookupError"
                     :search-placeholder="tp('fieldsAddressSearchPlaceholder')"
-                    :loading-text="tp('fieldsAddressLoading')"
-                    :empty-text="tp('fieldsAddressEmpty')"
-                    :customer-required-text="tp('fieldsAddressCustomerRequired')"
-                    :no-match-text="tp('fieldsAddressNoMatch')"
-                  />
-                  <div class="field-stack field-stack--half planning-admin-address-actions">
-                    <button
-                      class="cta-button cta-secondary"
-                      type="button"
-                      :disabled="!draft.customer_id || loading.sharedAddress"
-                      @click="openAddressCreateModal('address_id')"
-                    >
-                      {{ tp("actionsCreateSharedAddress") }}
-                    </button>
-                    <p v-if="addressCreateDisabledReason" class="field-help">{{ addressCreateDisabledReason }}</p>
-                  </div>
+                  :loading-text="tp('fieldsAddressLoading')"
+                  :empty-text="tp('fieldsAddressEmpty')"
+                  :customer-required-text="tp('fieldsAddressCustomerRequired')"
+                  :no-match-text="tp('fieldsAddressNoMatch')"
+                />
                   <label class="field-stack field-stack--third">
                     <span>{{ tp("fieldsTimezone") }}</span>
                     <Select
@@ -411,22 +411,11 @@
                     :disabled="loading.action"
                     :error="siteAddressLookupError"
                     :search-placeholder="tp('fieldsAddressSearchPlaceholder')"
-                    :loading-text="tp('fieldsAddressLoading')"
-                    :empty-text="tp('fieldsAddressEmpty')"
-                    :customer-required-text="tp('fieldsAddressCustomerRequired')"
-                    :no-match-text="tp('fieldsAddressNoMatch')"
-                  />
-                  <div class="field-stack field-stack--half planning-admin-address-actions">
-                    <button
-                      class="cta-button cta-secondary"
-                      type="button"
-                      :disabled="!draft.customer_id || loading.sharedAddress"
-                      @click="openAddressCreateModal('address_id')"
-                    >
-                      {{ tp("actionsCreateSharedAddress") }}
-                    </button>
-                    <p v-if="addressCreateDisabledReason" class="field-help">{{ addressCreateDisabledReason }}</p>
-                  </div>
+                  :loading-text="tp('fieldsAddressLoading')"
+                  :empty-text="tp('fieldsAddressEmpty')"
+                  :customer-required-text="tp('fieldsAddressCustomerRequired')"
+                  :no-match-text="tp('fieldsAddressNoMatch')"
+                />
                   <label class="field-stack field-stack--third">
                     <span>{{ tp("fieldsTimezone") }}</span>
                     <Select
@@ -471,22 +460,11 @@
                     :disabled="loading.action"
                     :error="siteAddressLookupError"
                     :search-placeholder="tp('fieldsAddressSearchPlaceholder')"
-                    :loading-text="tp('fieldsAddressLoading')"
-                    :empty-text="tp('fieldsAddressEmpty')"
-                    :customer-required-text="tp('fieldsAddressCustomerRequired')"
-                    :no-match-text="tp('fieldsAddressNoMatch')"
-                  />
-                  <div class="field-stack field-stack--half planning-admin-address-actions">
-                    <button
-                      class="cta-button cta-secondary"
-                      type="button"
-                      :disabled="!draft.customer_id || loading.sharedAddress"
-                      @click="openAddressCreateModal('address_id')"
-                    >
-                      {{ tp("actionsCreateSharedAddress") }}
-                    </button>
-                    <p v-if="addressCreateDisabledReason" class="field-help">{{ addressCreateDisabledReason }}</p>
-                  </div>
+                  :loading-text="tp('fieldsAddressLoading')"
+                  :empty-text="tp('fieldsAddressEmpty')"
+                  :customer-required-text="tp('fieldsAddressCustomerRequired')"
+                  :no-match-text="tp('fieldsAddressNoMatch')"
+                />
                   <label class="field-stack field-stack--third">
                     <span>{{ tp("fieldsTimezone") }}</span>
                     <Select
@@ -533,22 +511,11 @@
                     :disabled="loading.action"
                     :error="siteAddressLookupError"
                     :search-placeholder="tp('fieldsAddressSearchPlaceholder')"
-                    :loading-text="tp('fieldsAddressLoading')"
-                    :empty-text="tp('fieldsAddressEmpty')"
-                    :customer-required-text="tp('fieldsAddressCustomerRequired')"
-                    :no-match-text="tp('fieldsAddressNoMatch')"
-                  />
-                  <div class="field-stack field-stack--half planning-admin-address-actions">
-                    <button
-                      class="cta-button cta-secondary"
-                      type="button"
-                      :disabled="!draft.customer_id || loading.sharedAddress"
-                      @click="openAddressCreateModal('meeting_address_id')"
-                    >
-                      {{ tp("actionsCreateSharedAddress") }}
-                    </button>
-                    <p v-if="addressCreateDisabledReason" class="field-help">{{ addressCreateDisabledReason }}</p>
-                  </div>
+                  :loading-text="tp('fieldsAddressLoading')"
+                  :empty-text="tp('fieldsAddressEmpty')"
+                  :customer-required-text="tp('fieldsAddressCustomerRequired')"
+                  :no-match-text="tp('fieldsAddressNoMatch')"
+                />
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsStartPointText") }}</span><input v-model="draft.start_point_text" /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsEndPointText") }}</span><input v-model="draft.end_point_text" /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsTravelPolicyCode") }}</span><input v-model="draft.travel_policy_code" /></label>
@@ -929,6 +896,16 @@ const timezoneOptions = computed(() =>
 const statusOptions = PLANNING_STATUS_OPTIONS;
 const editorUsesCustomer = computed(() => !isPlanningChildEntity(editorEntityKey.value));
 const visibleStatus = computed(() => !isPlanningChildEntity(editorEntityKey.value));
+const currentAddressFieldKey = computed(() => {
+  if (["site", "event_venue", "trade_fair"].includes(editorEntityKey.value)) {
+    return "address_id";
+  }
+  if (editorEntityKey.value === "patrol_route") {
+    return "meeting_address_id";
+  }
+  return "";
+});
+const showAddressCreateAction = computed(() => !!currentAddressFieldKey.value);
 const currentDirtySnapshot = computed(() =>
   buildPlanningDirtySnapshot({
     checkpointDraft,
@@ -2046,6 +2023,18 @@ onMounted(async () => {
   gap: 0.25rem;
 }
 
+.planning-admin-form-section__header--split {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 1rem;
+}
+
+.planning-admin-form-section__actions {
+  display: grid;
+  justify-items: end;
+  gap: 0.42rem;
+}
+
 .planning-admin-shared-context {
   gap: 0.75rem;
 }
@@ -2247,10 +2236,6 @@ onMounted(async () => {
 
 .planning-admin-checkbox--inline {
   grid-column: 1 / -1;
-}
-
-.planning-admin-address-actions {
-  align-content: start;
 }
 
 .planning-admin-address-modal {
