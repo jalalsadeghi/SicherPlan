@@ -39,8 +39,8 @@ from app.modules.platform_services.integration_models import ImportExportJob
 
 
 IMPORT_HEADERS = {
-    "requirement_type": ("customer_id", "code", "label", "default_planning_mode_code", "description", "status"),
-    "equipment_item": ("customer_id", "code", "label", "unit_of_measure_code", "description", "status"),
+    "requirement_type": ("code", "label", "default_planning_mode_code", "description", "status"),
+    "equipment_item": ("code", "label", "unit_of_measure_code", "description", "status"),
     "site": ("customer_id", "site_no", "name", "address_id", "timezone", "latitude", "longitude", "watchbook_enabled", "notes", "status"),
     "event_venue": ("customer_id", "venue_no", "name", "address_id", "timezone", "latitude", "longitude", "notes", "status"),
     "trade_fair": ("customer_id", "venue_id", "fair_no", "name", "address_id", "timezone", "latitude", "longitude", "start_date", "end_date", "notes", "status"),
@@ -297,7 +297,6 @@ class PlanningOpsService:
         if entity_key == "requirement_type":
             return RequirementTypeCreate(
                 tenant_id=tenant_id,
-                customer_id=self._required(data, "customer_id"),
                 code=self._required(data, "code"),
                 label=self._required(data, "label"),
                 default_planning_mode_code=self._required(data, "default_planning_mode_code"),
@@ -306,7 +305,6 @@ class PlanningOpsService:
         if entity_key == "equipment_item":
             return EquipmentItemCreate(
                 tenant_id=tenant_id,
-                customer_id=self._required(data, "customer_id"),
                 code=self._required(data, "code"),
                 label=self._required(data, "label"),
                 unit_of_measure_code=self._required(data, "unit_of_measure_code"),

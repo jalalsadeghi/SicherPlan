@@ -177,48 +177,48 @@
 
         <template v-if="isCreatingOrder || selectedOrder">
           <nav
-            v-if="orderDetailTabs.length"
+            v-if="mainDetailTabs.length"
             class="planning-orders-tabs"
             aria-label="Planning order detail sections"
-            data-testid="planning-orders-detail-tabs"
+            data-testid="planning-orders-main-tabs"
           >
             <button
-              v-for="tab in orderDetailTabs"
+              v-for="tab in mainDetailTabs"
               :key="tab.id"
               type="button"
               class="planning-orders-tab"
-              :class="{ active: tab.id === activeDetailTab }"
-              :data-testid="`planning-orders-tab-${tab.id}`"
-              @click="activeDetailTab = tab.id"
+              :class="{ active: tab.id === activeMainTab }"
+              :data-testid="`planning-orders-main-tab-${tab.id}`"
+              @click="activeMainTab = tab.id"
             >
               {{ tab.label }}
             </button>
           </nav>
 
-          <section v-show="activeDetailTab === 'overview'" class="planning-orders-tab-panel" data-testid="planning-orders-tab-panel-overview">
+          <section v-show="activeMainTab === 'order'" class="planning-orders-tab-panel" data-testid="planning-orders-tab-panel-order">
             <nav
               v-if="isCreatingOrder || selectedOrder"
               class="planning-orders-tabs planning-orders-tabs--nested"
               :aria-label="tp('orderOverviewDetailTabsAria')"
-              data-testid="planning-orders-overview-tabs"
+              data-testid="planning-orders-order-tabs"
             >
               <button
-                v-for="tab in orderOverviewTabs"
+                v-for="tab in orderTabs"
                 :key="tab.id"
                 type="button"
                 class="planning-orders-tab planning-orders-tab--nested"
-                :class="{ active: tab.id === activeOrderOverviewTab }"
-                :data-testid="`planning-orders-overview-tab-${tab.id}`"
-                @click="activeOrderOverviewTab = tab.id"
+                :class="{ active: tab.id === activeOrderTab }"
+                :data-testid="`planning-orders-order-tab-${tab.id}`"
+                @click="activeOrderTab = tab.id"
               >
                 {{ tab.label }}
               </button>
             </nav>
 
             <form
-              v-show="activeOrderOverviewTab === 'order_details'"
+              v-show="activeOrderTab === 'order_details'"
               class="planning-orders-form"
-              data-testid="planning-orders-overview-panel-order_details"
+              data-testid="planning-orders-order-panel-order_details"
               @submit.prevent="submitOrder"
             >
               <fieldset class="planning-orders-fieldset" :disabled="!actionState.canWriteOrders || loading.action">
@@ -258,7 +258,7 @@
                     popup-class-name="planning-admin-select-dropdown"
                     :options="requirementTypeSelectOptions"
                     :loading="requirementTypeLookupLoading"
-                    :disabled="loading.action || !orderDraft.customer_id"
+                    :disabled="loading.action"
                     :filter-option="filterSelectOption"
                     :placeholder="requirementTypePlaceholder"
                     :status="requirementTypeLookupError || requirementTypeFieldInvalid ? 'error' : undefined"
@@ -342,9 +342,9 @@
             </form>
 
             <section
-              v-show="activeOrderOverviewTab === 'equipment_lines'"
+              v-show="activeOrderTab === 'equipment_lines'"
               class="planning-orders-section planning-orders-tab-panel planning-orders-tab-panel--nested"
-              data-testid="planning-orders-overview-panel-equipment_lines"
+              data-testid="planning-orders-order-panel-equipment_lines"
             >
               <div class="planning-orders-panel__header">
                 <div>
@@ -382,7 +382,7 @@
                         popup-class-name="planning-admin-select-dropdown"
                         :options="equipmentItemSelectOptions"
                         :loading="equipmentItemLookupLoading"
-                        :disabled="loading.action || !selectedOrder.customer_id"
+                        :disabled="loading.action"
                         :filter-option="filterSelectOption"
                         :placeholder="equipmentItemPlaceholder"
                         @change="handleEquipmentItemChange"
@@ -408,9 +408,9 @@
             </section>
 
             <section
-              v-show="activeOrderOverviewTab === 'requirement_lines'"
+              v-show="activeOrderTab === 'requirement_lines'"
               class="planning-orders-section planning-orders-tab-panel planning-orders-tab-panel--nested"
-              data-testid="planning-orders-overview-panel-requirement_lines"
+              data-testid="planning-orders-order-panel-requirement_lines"
             >
               <div class="planning-orders-panel__header">
                 <div>
@@ -448,7 +448,7 @@
                         popup-class-name="planning-admin-select-dropdown"
                         :options="requirementTypeSelectOptions"
                         :loading="requirementTypeLookupLoading"
-                        :disabled="loading.action || !selectedOrder.customer_id"
+                        :disabled="loading.action"
                         :filter-option="filterSelectOption"
                         :placeholder="requirementTypePlaceholder"
                         @change="handleRequirementLineRequirementTypeChange"
@@ -476,143 +476,142 @@
               </template>
               <p v-else class="field-help">{{ tp("orderChildrenRequireSave") }}</p>
             </section>
-          </section>
+            <section
+              v-if="selectedOrder"
+              v-show="activeOrderTab === 'commercial'"
+              class="planning-orders-section planning-orders-tab-panel planning-orders-tab-panel--nested"
+              data-testid="planning-orders-order-panel-commercial"
+            >
+              <div class="planning-orders-panel__header"><h3>{{ tp("sectionCommercial") }}</h3></div>
+              <div class="planning-orders-commercial-summary">
+                <p
+                  class="planning-orders-commercial-summary__headline"
+                  :class="selectedOrderCommercial?.is_release_ready ? 'planning-orders-state--good' : hasCommercialBlockingIssues ? 'planning-orders-state--bad' : 'planning-orders-state--warn'"
+                >
+                  {{ tp(commercialSummaryKey) }}
+                </p>
+                <p class="field-help">
+                  {{ tpf(commercialContextKey, { customerLabel: commercialCustomerLabel }) }}
+                </p>
+                <p v-if="showCommercialFixHint" class="field-help">
+                  {{
+                    selectedOrderCustomerLabel
+                      ? tpf("commercialFixHint", { customerLabel: selectedOrderCustomerLabel })
+                      : tp("commercialFixHintFallback")
+                  }}
+                </p>
+                <p v-else-if="showCommercialReviewHint" class="field-help">
+                  {{ tpf("commercialReviewHint", { customerLabel: commercialCustomerLabel }) }}
+                </p>
+                <div v-if="showCommercialSettingsCta" class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" @click="openCustomerCommercialSettings">
+                    {{ tp("commercialActionOpenCustomerCommercial") }}
+                  </button>
+                </div>
+              </div>
+              <div v-if="hasCommercialBlockingIssues" class="planning-orders-commercial-block">
+                <strong>{{ tp("commercialBlockingListTitle") }}</strong>
+                <ul class="planning-orders-issues planning-orders-issues--blocking">
+                  <li v-for="issue in orderCommercialBlockingIssues" :key="issue.code">
+                    {{ resolveCommercialIssueMessage(issue.code) }}
+                  </li>
+                </ul>
+              </div>
+              <div v-if="hasCommercialWarningIssues" class="planning-orders-commercial-block">
+                <strong class="planning-orders-state--warn">{{ tp("commercialWarningsListTitle") }}</strong>
+                <ul class="planning-orders-issues planning-orders-issues--warning">
+                  <li v-for="issue in orderCommercialWarningIssues" :key="issue.code">
+                    {{ resolveCommercialIssueMessage(issue.code) }}
+                  </li>
+                </ul>
+              </div>
+            </section>
 
-          <section
-            v-if="selectedOrder"
-            v-show="activeDetailTab === 'commercial'"
-            class="planning-orders-tab-panel planning-orders-section"
-            data-testid="planning-orders-tab-panel-commercial"
-          >
-            <div class="planning-orders-panel__header"><h3>{{ tp("sectionCommercial") }}</h3></div>
-            <div class="planning-orders-commercial-summary">
-              <p
-                class="planning-orders-commercial-summary__headline"
-                :class="selectedOrderCommercial?.is_release_ready ? 'planning-orders-state--good' : hasCommercialBlockingIssues ? 'planning-orders-state--bad' : 'planning-orders-state--warn'"
-              >
-                {{ tp(commercialSummaryKey) }}
-              </p>
-              <p class="field-help">
-                {{ tpf(commercialContextKey, { customerLabel: commercialCustomerLabel }) }}
-              </p>
-              <p v-if="showCommercialFixHint" class="field-help">
-                {{
-                  selectedOrderCustomerLabel
-                    ? tpf("commercialFixHint", { customerLabel: selectedOrderCustomerLabel })
-                    : tp("commercialFixHintFallback")
-                }}
-              </p>
-              <p v-else-if="showCommercialReviewHint" class="field-help">
-                {{ tpf("commercialReviewHint", { customerLabel: commercialCustomerLabel }) }}
-              </p>
-              <div v-if="showCommercialSettingsCta" class="cta-row">
-                <button class="cta-button cta-secondary" type="button" @click="openCustomerCommercialSettings">
-                  {{ tp("commercialActionOpenCustomerCommercial") }}
+            <section
+              v-if="selectedOrder"
+              v-show="activeOrderTab === 'release'"
+              class="planning-orders-section planning-orders-tab-panel planning-orders-tab-panel--nested"
+              data-testid="planning-orders-order-panel-release"
+            >
+              <div class="planning-orders-panel__header"><h3>{{ tp("sectionOrderRelease") }}</h3></div>
+              <div class="cta-row">
+                <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canTransitionOrder" @click="transitionOrder('draft')">{{ tp("actionsBackToDraft") }}</button>
+                <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canTransitionOrder" @click="transitionOrder('release_ready')">{{ tp("actionsReleaseReady") }}</button>
+                <button class="cta-button" type="button" :disabled="!actionState.canTransitionOrder" @click="transitionOrder('released')">{{ tp("actionsReleased") }}</button>
+              </div>
+            </section>
+
+            <section
+              v-if="selectedOrder"
+              v-show="activeOrderTab === 'documents'"
+              class="planning-orders-section planning-orders-tab-panel planning-orders-tab-panel--nested"
+              data-testid="planning-orders-order-panel-documents"
+            >
+              <div class="planning-orders-panel__header"><h3>{{ tp("sectionOrderDocuments") }}</h3></div>
+              <div v-if="orderAttachments.length" class="planning-orders-doc-list">
+                <button
+                  v-for="document in orderAttachments"
+                  :key="document.id"
+                  type="button"
+                  class="planning-orders-doc-row planning-orders-doc-button"
+                  :class="{ selected: document.id === selectedOrderDocumentId }"
+                  @click="selectOrderDocument(document.id)"
+                >
+                  <strong>{{ document.title }}</strong>
+                  <span>{{ document.id }}</span>
+                  <span>{{ tp("fieldsCurrentVersion") }} {{ document.current_version_no }} · {{ document.status }}</span>
                 </button>
               </div>
-            </div>
-            <div v-if="hasCommercialBlockingIssues" class="planning-orders-commercial-block">
-              <strong>{{ tp("commercialBlockingListTitle") }}</strong>
-              <ul class="planning-orders-issues planning-orders-issues--blocking">
-                <li v-for="issue in orderCommercialBlockingIssues" :key="issue.code">
-                  {{ resolveCommercialIssueMessage(issue.code) }}
-                </li>
-              </ul>
-            </div>
-            <div v-if="hasCommercialWarningIssues" class="planning-orders-commercial-block">
-              <strong class="planning-orders-state--warn">{{ tp("commercialWarningsListTitle") }}</strong>
-              <ul class="planning-orders-issues planning-orders-issues--warning">
-                <li v-for="issue in orderCommercialWarningIssues" :key="issue.code">
-                  {{ resolveCommercialIssueMessage(issue.code) }}
-                </li>
-              </ul>
-            </div>
-          </section>
-
-          <section
-            v-if="selectedOrder"
-            v-show="activeDetailTab === 'release'"
-            class="planning-orders-tab-panel planning-orders-section"
-            data-testid="planning-orders-tab-panel-release"
-          >
-            <div class="planning-orders-panel__header"><h3>{{ tp("sectionOrderRelease") }}</h3></div>
-            <div class="cta-row">
-              <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canTransitionOrder" @click="transitionOrder('draft')">{{ tp("actionsBackToDraft") }}</button>
-              <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canTransitionOrder" @click="transitionOrder('release_ready')">{{ tp("actionsReleaseReady") }}</button>
-              <button class="cta-button" type="button" :disabled="!actionState.canTransitionOrder" @click="transitionOrder('released')">{{ tp("actionsReleased") }}</button>
-            </div>
-          </section>
-
-          <section
-            v-if="selectedOrder"
-            v-show="activeDetailTab === 'documents'"
-            class="planning-orders-tab-panel planning-orders-section"
-            data-testid="planning-orders-tab-panel-documents"
-          >
-            <div class="planning-orders-panel__header"><h3>{{ tp("sectionOrderDocuments") }}</h3></div>
-            <div v-if="orderAttachments.length" class="planning-orders-doc-list">
-              <button
-                v-for="document in orderAttachments"
-                :key="document.id"
-                type="button"
-                class="planning-orders-doc-row planning-orders-doc-button"
-                :class="{ selected: document.id === selectedOrderDocumentId }"
-                @click="selectOrderDocument(document.id)"
-              >
-                <strong>{{ document.title }}</strong>
-                <span>{{ document.id }}</span>
-                <span>{{ tp("fieldsCurrentVersion") }} {{ document.current_version_no }} · {{ document.status }}</span>
-              </button>
-            </div>
-            <p v-else class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
-            <section class="planning-orders-subsection planning-orders-doc-detail" data-testid="planning-orders-order-document-detail">
-              <div class="planning-orders-panel__header"><h3>{{ tp("tabDocuments") }}</h3></div>
-              <template v-if="selectedOrderDocument">
+              <p v-else class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
+              <section class="planning-orders-subsection planning-orders-doc-detail" data-testid="planning-orders-order-document-detail">
+                <div class="planning-orders-panel__header"><h3>{{ tp("tabDocuments") }}</h3></div>
+                <template v-if="selectedOrderDocument">
+                  <div class="planning-orders-form-grid">
+                    <label class="field-stack"><span>{{ tp("fieldsDocumentTitle") }}</span><input :value="selectedOrderDocument.title" readonly /></label>
+                    <label class="field-stack"><span>{{ tp("fieldsDocumentId") }}</span><input :value="selectedOrderDocument.id" readonly /></label>
+                    <label class="field-stack"><span>{{ tp("fieldsCurrentVersion") }}</span><input :value="selectedOrderDocument.current_version_no" readonly /></label>
+                    <label class="field-stack"><span>{{ tp("fieldsStatus") }}</span><input :value="selectedOrderDocument.status" readonly /></label>
+                    <label class="field-stack field-stack--wide"><span>{{ tp("fieldsSourceLabel") }}</span><input :value="selectedOrderDocument.source_label || '-'" readonly /></label>
+                  </div>
+                  <div class="cta-row">
+                    <button class="cta-button" type="button" @click="downloadOrderDocumentSelection">{{ tp("actionsDownloadCurrentVersion") }}</button>
+                    <button class="cta-button cta-secondary" type="button" @click="copyOrderDocumentId">{{ tp("actionsCopyDocumentId") }}</button>
+                    <button class="cta-button cta-secondary" type="button" @click="clearOrderDocumentSelection">{{ tp("actionsClearDocumentSelection") }}</button>
+                  </div>
+                </template>
+                <p v-else class="field-help">{{ tp("documentSelectionEmpty") }}</p>
+              </section>
+              <form class="planning-orders-form" @submit.prevent="submitOrderAttachment">
+                <fieldset class="planning-orders-fieldset" :disabled="!actionState.canManageOrderDocs || loading.action">
                 <div class="planning-orders-form-grid">
-                  <label class="field-stack"><span>{{ tp("fieldsDocumentTitle") }}</span><input :value="selectedOrderDocument.title" readonly /></label>
-                  <label class="field-stack"><span>{{ tp("fieldsDocumentId") }}</span><input :value="selectedOrderDocument.id" readonly /></label>
-                  <label class="field-stack"><span>{{ tp("fieldsCurrentVersion") }}</span><input :value="selectedOrderDocument.current_version_no" readonly /></label>
-                  <label class="field-stack"><span>{{ tp("fieldsStatus") }}</span><input :value="selectedOrderDocument.status" readonly /></label>
-                  <label class="field-stack field-stack--wide"><span>{{ tp("fieldsSourceLabel") }}</span><input :value="selectedOrderDocument.source_label || '-'" readonly /></label>
+                  <label class="field-stack"><span>{{ tp("fieldsDocumentTitle") }}</span><input v-model="orderAttachmentDraft.title" required /></label>
+                  <label class="field-stack"><span>{{ tp("fieldsDocumentLabel") }}</span><input v-model="orderAttachmentDraft.label" /></label>
+                  <label class="field-stack"><span>{{ tp("fieldsDocumentFile") }}</span><input type="file" @change="onOrderAttachmentSelected" /></label>
                 </div>
                 <div class="cta-row">
-                  <button class="cta-button" type="button" @click="downloadOrderDocumentSelection">{{ tp("actionsDownloadCurrentVersion") }}</button>
-                  <button class="cta-button cta-secondary" type="button" @click="copyOrderDocumentId">{{ tp("actionsCopyDocumentId") }}</button>
-                  <button class="cta-button cta-secondary" type="button" @click="clearOrderDocumentSelection">{{ tp("actionsClearDocumentSelection") }}</button>
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageOrderDocs || !orderAttachmentDraft.content_base64">{{ tp("actionsUploadDocument") }}</button>
                 </div>
-              </template>
-              <p v-else class="field-help">{{ tp("documentSelectionEmpty") }}</p>
+                </fieldset>
+              </form>
+              <form class="planning-orders-form" @submit.prevent="linkExistingOrderDocument">
+                <fieldset class="planning-orders-fieldset" :disabled="!actionState.canManageOrderDocs || loading.action">
+                <div class="planning-orders-form-grid">
+                  <label class="field-stack"><span>{{ tp("fieldsDocumentId") }}</span><input v-model="orderAttachmentLink.document_id" /></label>
+                  <label class="field-stack"><span>{{ tp("fieldsDocumentLabel") }}</span><input v-model="orderAttachmentLink.label" /></label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="submit" :disabled="!actionState.canManageOrderDocs">{{ tp("actionsLinkDocument") }}</button>
+                </div>
+                </fieldset>
+              </form>
             </section>
-            <form class="planning-orders-form" @submit.prevent="submitOrderAttachment">
-              <fieldset class="planning-orders-fieldset" :disabled="!actionState.canManageOrderDocs || loading.action">
-              <div class="planning-orders-form-grid">
-                <label class="field-stack"><span>{{ tp("fieldsDocumentTitle") }}</span><input v-model="orderAttachmentDraft.title" required /></label>
-                <label class="field-stack"><span>{{ tp("fieldsDocumentLabel") }}</span><input v-model="orderAttachmentDraft.label" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsDocumentFile") }}</span><input type="file" @change="onOrderAttachmentSelected" /></label>
-              </div>
-              <div class="cta-row">
-                <button class="cta-button" type="submit" :disabled="!actionState.canManageOrderDocs || !orderAttachmentDraft.content_base64">{{ tp("actionsUploadDocument") }}</button>
-              </div>
-              </fieldset>
-            </form>
-            <form class="planning-orders-form" @submit.prevent="linkExistingOrderDocument">
-              <fieldset class="planning-orders-fieldset" :disabled="!actionState.canManageOrderDocs || loading.action">
-              <div class="planning-orders-form-grid">
-                <label class="field-stack"><span>{{ tp("fieldsDocumentId") }}</span><input v-model="orderAttachmentLink.document_id" /></label>
-                <label class="field-stack"><span>{{ tp("fieldsDocumentLabel") }}</span><input v-model="orderAttachmentLink.label" /></label>
-              </div>
-              <div class="cta-row">
-                <button class="cta-button cta-secondary" type="submit" :disabled="!actionState.canManageOrderDocs">{{ tp("actionsLinkDocument") }}</button>
-              </div>
-              </fieldset>
-            </form>
           </section>
 
           <section
             v-if="selectedOrder"
-            v-show="activeDetailTab === 'planning_records'"
+            v-show="activeMainTab === 'planning_records'"
             class="planning-orders-tab-panel planning-orders-section"
-            data-testid="planning-orders-tab-panel-planning-records"
+            data-testid="planning-orders-main-panel-planning_records"
           >
             <div class="planning-orders-panel__header">
               <div>
@@ -1142,7 +1141,7 @@ import {
   buildPlanningSetupLocation,
   derivePlanningOrderActionState,
   derivePlanningOrderSubmitBlockReason,
-  filterPlanningOrderOptionsByCustomer,
+  filterPlanningOrderOptionsByScope,
   formatPlanningCommercialIssueFallback,
   formatPlanningOrderReferenceOption,
   hasPlanningOrderSetupGap,
@@ -1243,8 +1242,8 @@ const selectedOrderCommercial = ref<PlanningCommercialLinkRead | null>(null);
 const selectedPlanningCommercial = ref<PlanningCommercialLinkRead | null>(null);
 const isCreatingOrder = ref(false);
 const isCreatingPlanning = ref(false);
-const activeDetailTab = ref("overview");
-const activeOrderOverviewTab = ref("order_details");
+const activeMainTab = ref("order");
+const activeOrderTab = ref("order_details");
 const activePlanningDetailTab = ref("overview");
 
 const orderDraft = reactive({
@@ -1305,13 +1304,13 @@ const orderReleaseStateOptions = computed(() => [
   { label: tp("statusReleased"), value: "released" },
 ]);
 const requirementTypeSelectOptions = computed(() =>
-  filterPlanningOrderOptionsByCustomer(requirementTypeOptions.value, orderDraft.customer_id).map((row) => ({
+  filterPlanningOrderOptionsByScope("requirement_type", requirementTypeOptions.value, orderDraft.customer_id).map((row) => ({
     label: formatPlanningOrderReferenceOption("requirement_type", row),
     value: row.id,
   })),
 );
 const patrolRouteSelectOptions = computed(() =>
-  filterPlanningOrderOptionsByCustomer(patrolRouteOptions.value, orderDraft.customer_id).map((row) => ({
+  filterPlanningOrderOptionsByScope("patrol_route", patrolRouteOptions.value, orderDraft.customer_id).map((row) => ({
     label: formatPlanningOrderReferenceOption("patrol_route", row),
     value: row.id,
   })),
@@ -1324,7 +1323,11 @@ const dispatcherSelectOptions = computed(() =>
   })),
 );
 const equipmentItemSelectOptions = computed(() =>
-  filterPlanningOrderOptionsByCustomer(equipmentItemOptions.value, selectedOrder.value?.customer_id || orderDraft.customer_id).map((row) => ({
+  filterPlanningOrderOptionsByScope(
+    "equipment_item",
+    equipmentItemOptions.value,
+    selectedOrder.value?.customer_id || orderDraft.customer_id,
+  ).map((row) => ({
     label: formatPlanningOrderReferenceOption("equipment_item", row),
     value: row.id,
   })),
@@ -1338,19 +1341,19 @@ const parentPlanningRecordOptions = computed(() =>
     })),
 );
 const eventVenueSelectOptions = computed(() =>
-  filterPlanningOrderOptionsByCustomer(eventVenueOptions.value, planningCustomerId.value).map((row) => ({
+  filterPlanningOrderOptionsByScope("event_venue", eventVenueOptions.value, planningCustomerId.value).map((row) => ({
     label: formatPlanningOrderReferenceOption("event_venue", row),
     value: row.id,
   })),
 );
 const siteSelectOptions = computed(() =>
-  filterPlanningOrderOptionsByCustomer(siteOptions.value, planningCustomerId.value).map((row) => ({
+  filterPlanningOrderOptionsByScope("site", siteOptions.value, planningCustomerId.value).map((row) => ({
     label: formatPlanningOrderReferenceOption("site", row),
     value: row.id,
   })),
 );
 const tradeFairSelectOptions = computed(() =>
-  filterPlanningOrderOptionsByCustomer(tradeFairOptions.value, planningCustomerId.value).map((row) => ({
+  filterPlanningOrderOptionsByScope("trade_fair", tradeFairOptions.value, planningCustomerId.value).map((row) => ({
     label: formatPlanningOrderReferenceOption("trade_fair", row),
     value: row.id,
   })),
@@ -1372,9 +1375,6 @@ const selectedPlanningDocument = computed(
   () => planningAttachments.value.find((document) => document.id === selectedPlanningDocumentId.value) ?? null,
 );
 const requirementTypePlaceholder = computed(() => {
-  if (!orderDraft.customer_id) {
-    return tp("requirementTypeCustomerRequired");
-  }
   if (!requirementTypeLookupLoading.value && !requirementTypeLookupError.value && !requirementTypeSelectOptions.value.length) {
     return tp("requirementTypeEmpty");
   }
@@ -1441,7 +1441,6 @@ const patrolRouteDetailPlaceholder = computed(() => {
   return tp("patrolRouteDetailPlaceholder");
 });
 const equipmentItemPlaceholder = computed(() => {
-  if (!selectedOrder.value?.customer_id && !orderDraft.customer_id) return tp("equipmentItemCustomerRequired");
   if (equipmentItemLookupLoading.value) return tp("equipmentItemLoading");
   if (!equipmentItemLookupError.value && !equipmentItemSelectOptions.value.length) return tp("equipmentItemEmpty");
   return tp("equipmentItemPlaceholder");
@@ -1473,7 +1472,11 @@ const missingSetupEntity = computed(() => {
 });
 const showPlanningSetupCta = computed(() => Boolean(missingSetupEntity.value));
 const orderHasSavedRecord = computed(() => Boolean(selectedOrder.value && !isCreatingOrder.value));
-const orderOverviewTabs = computed(() => {
+const mainDetailTabs = computed(() => [
+  { id: "order", label: tp("tabOrder") },
+  { id: "planning_records", label: tp("tabPlanningRecords") },
+]);
+const orderTabs = computed(() => {
   const tabs = [{ id: "order_details", label: tp("tabOrderDetails") }];
   if (!orderHasSavedRecord.value) {
     return tabs;
@@ -1482,19 +1485,9 @@ const orderOverviewTabs = computed(() => {
     ...tabs,
     { id: "equipment_lines", label: tp("tabEquipmentLines") },
     { id: "requirement_lines", label: tp("tabRequirementLines") },
-  ];
-});
-const orderDetailTabs = computed(() => {
-  const tabs = [{ id: "overview", label: tp("tabOverview") }];
-  if (!orderHasSavedRecord.value) {
-    return tabs;
-  }
-  return [
-    ...tabs,
     { id: "commercial", label: tp("tabCommercial") },
     { id: "release", label: tp("tabRelease") },
     { id: "documents", label: tp("tabDocuments") },
-    { id: "planning_records", label: tp("tabPlanningRecords") },
   ];
 });
 const planningHasSavedRecord = computed(() => Boolean(selectedPlanningRecord.value && !isCreatingPlanning.value));
@@ -2337,8 +2330,8 @@ async function selectOrder(orderId: string) {
   if (!tenantScopeId.value || !accessToken.value) return;
   loading.orderDetail = true;
   try {
-    activeDetailTab.value = "overview";
-    activeOrderOverviewTab.value = "order_details";
+    activeMainTab.value = "order";
+    activeOrderTab.value = "order_details";
     selectedOrderId.value = orderId;
     isCreatingOrder.value = false;
     selectedOrder.value = await getCustomerOrder(tenantScopeId.value, orderId, accessToken.value);
@@ -2360,8 +2353,8 @@ async function selectOrder(orderId: string) {
 }
 
 function startCreateOrder() {
-  activeDetailTab.value = "overview";
-  activeOrderOverviewTab.value = "order_details";
+  activeMainTab.value = "order";
+  activeOrderTab.value = "order_details";
   isCreatingOrder.value = true;
   selectedOrder.value = null;
   selectedOrderId.value = "";
@@ -2707,6 +2700,7 @@ async function submitRequirementLine() {
 
 function startCreatePlanning() {
   isCreatingPlanning.value = true;
+  activeMainTab.value = "planning_records";
   activePlanningDetailTab.value = "overview";
   selectedPlanningRecordId.value = "";
   selectedPlanningRecord.value = null;
@@ -2722,6 +2716,7 @@ async function selectPlanningRecord(planningRecordId: string) {
   if (!tenantScopeId.value || !accessToken.value) return;
   loading.planning = true;
   try {
+    activeMainTab.value = "planning_records";
     activePlanningDetailTab.value = "overview";
     selectedPlanningRecordId.value = planningRecordId;
     isCreatingPlanning.value = false;
@@ -2905,11 +2900,8 @@ watch(
 watch(
   () => orderHasSavedRecord.value,
   (hasSavedRecord) => {
-    if (!hasSavedRecord && activeDetailTab.value !== "overview") {
-      activeDetailTab.value = "overview";
-    }
-    if (!hasSavedRecord && activeOrderOverviewTab.value !== "order_details") {
-      activeOrderOverviewTab.value = "order_details";
+    if (!hasSavedRecord && activeOrderTab.value !== "order_details") {
+      activeOrderTab.value = "order_details";
     }
   },
 );

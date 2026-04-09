@@ -20,7 +20,7 @@ class OpsMasterFilter(BaseModel):
 
 class RequirementTypeCreate(BaseModel):
     tenant_id: str
-    customer_id: str
+    customer_id: str | None = None
     code: str
     label: str
     default_planning_mode_code: str
@@ -40,7 +40,7 @@ class RequirementTypeUpdate(BaseModel):
 
 class EquipmentItemCreate(BaseModel):
     tenant_id: str
-    customer_id: str
+    customer_id: str | None = None
     code: str
     label: str
     unit_of_measure_code: str
@@ -60,7 +60,7 @@ class EquipmentItemUpdate(BaseModel):
 
 class SiteCreate(BaseModel):
     tenant_id: str
-    customer_id: str
+    customer_id: str | None
     site_no: str
     name: str
     address_id: str | None = None
@@ -88,7 +88,7 @@ class SiteUpdate(BaseModel):
 
 class EventVenueCreate(BaseModel):
     tenant_id: str
-    customer_id: str
+    customer_id: str | None
     venue_no: str
     name: str
     address_id: str | None = None
@@ -225,7 +225,7 @@ class RequirementTypeListItem(BaseModel):
 
     id: str
     tenant_id: str
-    customer_id: str
+    customer_id: str | None
     code: str
     label: str
     default_planning_mode_code: str
@@ -247,7 +247,7 @@ class EquipmentItemListItem(BaseModel):
 
     id: str
     tenant_id: str
-    customer_id: str
+    customer_id: str | None
     code: str
     label: str
     unit_of_measure_code: str

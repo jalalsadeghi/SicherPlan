@@ -186,6 +186,13 @@ export function filterPlanningOrderOptionsByCustomer(records, customerId) {
   return records.filter((record) => record?.customer_id === customerId);
 }
 
+export function filterPlanningOrderOptionsByScope(entityKey, records, customerId) {
+  if (entityKey === "requirement_type" || entityKey === "equipment_item") {
+    return records;
+  }
+  return filterPlanningOrderOptionsByCustomer(records, customerId);
+}
+
 export function normalizePlanningOrderUuidValue(value) {
   if (typeof value !== "string") {
     return null;

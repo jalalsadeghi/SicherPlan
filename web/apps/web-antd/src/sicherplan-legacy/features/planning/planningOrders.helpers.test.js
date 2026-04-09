@@ -6,7 +6,7 @@ import {
   buildPlanningSetupLocation,
   derivePlanningOrderSubmitBlockReason,
   derivePlanningOrderActionState,
-  filterPlanningOrderOptionsByCustomer,
+  filterPlanningOrderOptionsByScope,
   formatPlanningCommercialIssueFallback,
   formatPlanningOrderReferenceOption,
   hasPlanningOrderSetupGap,
@@ -121,13 +121,18 @@ test("planning-order reference options use business labels", () => {
   );
 });
 
-test("planning-order reference options can be filtered by customer", () => {
+test("planning-order option filtering keeps tenant catalogs global and customer-linked entities scoped", () => {
   const rows = [
     { id: "req-1", customer_id: "customer-1" },
     { id: "req-2", customer_id: "customer-2" },
   ];
-  assert.deepEqual(filterPlanningOrderOptionsByCustomer(rows, "customer-1"), [{ id: "req-1", customer_id: "customer-1" }]);
-  assert.deepEqual(filterPlanningOrderOptionsByCustomer(rows, ""), rows);
+  assert.deepEqual(filterPlanningOrderOptionsByScope("requirement_type", rows, "customer-1"), rows);
+  assert.deepEqual(filterPlanningOrderOptionsByScope("equipment_item", rows, "customer-1"), rows);
+  assert.deepEqual(
+    filterPlanningOrderOptionsByScope("site", rows, "customer-1"),
+    [{ id: "req-1", customer_id: "customer-1" }],
+  );
+  assert.deepEqual(filterPlanningOrderOptionsByScope("trade_fair", rows, ""), rows);
 });
 
 test("planning-order UUID normalization turns blank values into null", () => {

@@ -307,13 +307,13 @@ class CustomerOrderServiceTests(unittest.TestCase):
         )
         equipment = self.repository.create_equipment_item(
             "tenant-1",
-            type("EquipmentPayload", (), {"customer_id": "customer-1", "code": "EQ-1", "label": "Funkgeraet", "unit_of_measure_code": "piece", "description": None})(),
+            type("EquipmentPayload", (), {"customer_id": None, "code": "EQ-1", "label": "Funkgeraet", "unit_of_measure_code": "piece", "description": None})(),
             "user-1",
         )
         self.equipment_item_id = equipment.id
         requirement = self.repository.create_requirement_type(
             "tenant-1",
-            type("RequirementPayload", (), {"customer_id": "customer-1", "code": "REQ-1", "label": "Objektschutz", "default_planning_mode_code": "site", "description": None})(),
+            type("RequirementPayload", (), {"customer_id": None, "code": "REQ-1", "label": "Objektschutz", "default_planning_mode_code": "site", "description": None})(),
             "user-1",
         )
         self.requirement_type_id = requirement.id
@@ -376,6 +376,41 @@ class CustomerOrderServiceTests(unittest.TestCase):
             self.actor,
         )
         self.assertIsNone(order.patrol_route_id)
+
+    def test_create_order_allows_tenant_scoped_requirement_type_across_customers(self) -> None:
+        cross_customer_requirement = self.repository.create_requirement_type(
+            "tenant-1",
+            type(
+                "RequirementPayload",
+                (),
+                {
+                    "customer_id": "customer-2",
+                    "code": "REQ-2",
+                    "label": "Messeschutz",
+                    "default_planning_mode_code": "event",
+                    "description": None,
+                },
+            )(),
+            "user-1",
+        )
+
+        order = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=cross_customer_requirement.id,
+                order_no="ORD-CROSS-REQ",
+                title="Objekt Nord",
+                service_category_code="site_security",
+                service_from=date(2026, 6, 1),
+                service_to=date(2026, 6, 2),
+            ),
+            self.actor,
+        )
+
+        self.assertEqual(order.customer_id, "customer-1")
+        self.assertEqual(order.requirement_type_id, cross_customer_requirement.id)
 
     def test_equipment_line_rejects_duplicate_item(self) -> None:
         order = self.service.create_order(

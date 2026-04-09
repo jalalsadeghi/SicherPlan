@@ -85,6 +85,12 @@ test("planning setup create form uses parent selectors for zones and checkpoints
   assert.match(source, /<label v-if="visibleStatus" class="field-stack field-stack--half">/);
 });
 
+test("planning setup uses explicit customer scope instead of treating every non-child entity as customer-linked", () => {
+  assert.match(source, /isPlanningCustomerScopedEntity/);
+  assert.match(source, /const editorUsesCustomer = computed\(\(\) => isPlanningCustomerScopedEntity\(editorEntityKey\.value\)\)/);
+  assert.doesNotMatch(source, /const editorUsesCustomer = computed\(\(\) => !isPlanningChildEntity\(editorEntityKey\.value\)\)/);
+});
+
 test("planning setup address picker refresh is shared across all address-backed entity families", () => {
   assert.match(source, /function usesAddressSelection\(entity = editorEntityKey\.value\)/);
   assert.match(source, /\["site", "event_venue", "trade_fair", "patrol_route"\]\.includes\(entity\)/);

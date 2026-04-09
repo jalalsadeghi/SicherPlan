@@ -43,34 +43,41 @@ test("planning-orders uses the shared bottom-right toast feedback composable", (
   assert.doesNotMatch(source, /function clearFeedback\(/);
 });
 
-test("planning-orders detail workspace uses local customer-style tabs", () => {
-  assert.match(source, /data-testid="planning-orders-detail-tabs"/);
-  assert.match(source, /:data-testid="`planning-orders-tab-\$\{tab\.id\}`"/);
-  assert.match(source, /data-testid="planning-orders-tab-panel-overview"/);
-  assert.match(source, /data-testid="planning-orders-tab-panel-commercial"/);
-  assert.match(source, /data-testid="planning-orders-tab-panel-release"/);
-  assert.match(source, /data-testid="planning-orders-tab-panel-documents"/);
-  assert.match(source, /data-testid="planning-orders-tab-panel-planning-records"/);
-  assert.match(source, /const activeDetailTab = ref\("overview"\)/);
-  assert.match(source, /const orderDetailTabs = computed\(\(\) => \{/);
-  assert.match(source, /if \(!orderHasSavedRecord\.value\) \{\s*return tabs;/);
+test("planning-orders detail workspace uses main tabs for order and planning records", () => {
+  assert.match(source, /data-testid="planning-orders-main-tabs"/);
+  assert.match(source, /:data-testid="`planning-orders-main-tab-\$\{tab\.id\}`"/);
+  assert.match(source, /data-testid="planning-orders-tab-panel-order"/);
+  assert.match(source, /data-testid="planning-orders-main-panel-planning_records"/);
+  assert.match(source, /const activeMainTab = ref\("order"\)/);
+  assert.match(source, /const mainDetailTabs = computed\(\(\) => \[/);
+  assert.match(source, /tabOrder/);
+  assert.match(source, /tabPlanningRecords/);
+  assert.doesNotMatch(source, /data-testid="planning-orders-tab-panel-commercial"/);
+  assert.doesNotMatch(source, /data-testid="planning-orders-tab-panel-release"/);
+  assert.doesNotMatch(source, /data-testid="planning-orders-tab-panel-documents"/);
 });
 
-test("planning-orders overview uses nested tabs for order details and child lines", () => {
-  assert.match(source, /data-testid="planning-orders-overview-tabs"/);
+test("planning-orders order workspace uses nested tabs for all order sections", () => {
+  assert.match(source, /data-testid="planning-orders-order-tabs"/);
   assert.match(source, /:aria-label="tp\('orderOverviewDetailTabsAria'\)"/);
-  assert.match(source, /:data-testid="`planning-orders-overview-tab-\$\{tab\.id\}`"/);
-  assert.match(source, /data-testid="planning-orders-overview-panel-order_details"/);
-  assert.match(source, /data-testid="planning-orders-overview-panel-equipment_lines"/);
-  assert.match(source, /data-testid="planning-orders-overview-panel-requirement_lines"/);
-  assert.match(source, /const activeOrderOverviewTab = ref\("order_details"\)/);
-  assert.match(source, /const orderOverviewTabs = computed\(\(\) => \{/);
+  assert.match(source, /:data-testid="`planning-orders-order-tab-\$\{tab\.id\}`"/);
+  assert.match(source, /data-testid="planning-orders-order-panel-order_details"/);
+  assert.match(source, /data-testid="planning-orders-order-panel-equipment_lines"/);
+  assert.match(source, /data-testid="planning-orders-order-panel-requirement_lines"/);
+  assert.match(source, /data-testid="planning-orders-order-panel-commercial"/);
+  assert.match(source, /data-testid="planning-orders-order-panel-release"/);
+  assert.match(source, /data-testid="planning-orders-order-panel-documents"/);
+  assert.match(source, /const activeOrderTab = ref\("order_details"\)/);
+  assert.match(source, /const orderTabs = computed\(\(\) => \{/);
   assert.match(source, /if \(!orderHasSavedRecord\.value\) \{\s*return tabs;/);
-  assert.match(source, /v-show="activeOrderOverviewTab === 'order_details'"/);
-  assert.match(source, /v-show="activeOrderOverviewTab === 'equipment_lines'"/);
-  assert.match(source, /v-show="activeOrderOverviewTab === 'requirement_lines'"/);
-  assert.match(source, /async function selectOrder\(orderId: string\) \{[\s\S]*activeOrderOverviewTab\.value = "order_details";/s);
-  assert.match(source, /function startCreateOrder\(\) \{[\s\S]*activeOrderOverviewTab\.value = "order_details";/s);
+  assert.match(source, /v-show="activeOrderTab === 'order_details'"/);
+  assert.match(source, /v-show="activeOrderTab === 'equipment_lines'"/);
+  assert.match(source, /v-show="activeOrderTab === 'requirement_lines'"/);
+  assert.match(source, /v-show="activeOrderTab === 'commercial'"/);
+  assert.match(source, /v-show="activeOrderTab === 'release'"/);
+  assert.match(source, /v-show="activeOrderTab === 'documents'"/);
+  assert.match(source, /async function selectOrder\(orderId: string\) \{[\s\S]*activeMainTab\.value = "order";[\s\S]*activeOrderTab\.value = "order_details";/s);
+  assert.match(source, /function startCreateOrder\(\) \{[\s\S]*activeMainTab\.value = "order";[\s\S]*activeOrderTab\.value = "order_details";/s);
 });
 
 test("planning-orders commercial tab shows customer-specific guidance and readable issue lists", () => {
@@ -109,15 +116,18 @@ test("planning-orders order form uses domain-aligned controls", () => {
   assert.match(source, /:value="orderDraft\.patrol_route_id \|\| undefined"[\s\S]*show-search/);
   assert.match(source, /v-model="orderDraft\.release_state"/);
   assert.doesNotMatch(source, /v-model="orderDraft\.status"/);
+  assert.match(source, /:options="requirementTypeSelectOptions"[\s\S]*:disabled="loading\.action"/);
 });
 
 test("planning-orders overview exposes independent order child sections", () => {
-  assert.match(source, /data-testid="planning-orders-overview-panel-equipment_lines"/);
-  assert.match(source, /data-testid="planning-orders-overview-panel-requirement_lines"/);
+  assert.match(source, /data-testid="planning-orders-order-panel-equipment_lines"/);
+  assert.match(source, /data-testid="planning-orders-order-panel-requirement_lines"/);
   assert.match(source, /submitEquipmentLine/);
   assert.match(source, /submitRequirementLine/);
   assert.match(source, /listOrderEquipmentLines/);
   assert.match(source, /listOrderRequirementLines/);
+  assert.match(source, /:options="equipmentItemSelectOptions"[\s\S]*:disabled="loading\.action"/);
+  assert.match(source, /:options="requirementTypeSelectOptions"[\s\S]*:disabled="loading\.action"/);
 });
 
 test("planning-orders keeps planning-record browsing in the left workspace", () => {
@@ -130,7 +140,7 @@ test("planning-orders keeps planning-record browsing in the left workspace", () 
 });
 
 test("planning-record detail workspace uses nested tabs inside the planning-records tab", () => {
-  assert.match(source, /data-testid="planning-orders-tab-panel-planning-records"/);
+  assert.match(source, /data-testid="planning-orders-main-panel-planning_records"/);
   assert.match(source, /data-testid="planning-records-detail-tabs"/);
   assert.match(source, /:aria-label="tp\('planningRecordDetailTabsAria'\)"/);
   assert.match(source, /:data-testid="`planning-records-tab-\$\{tab\.id\}`"/);
@@ -145,8 +155,8 @@ test("planning-record detail workspace uses nested tabs inside the planning-reco
   assert.match(source, /v-show="activePlanningDetailTab === 'commercial'"/);
   assert.match(source, /v-show="activePlanningDetailTab === 'release'"/);
   assert.match(source, /v-show="activePlanningDetailTab === 'documents'"/);
-  assert.match(source, /function startCreatePlanning\(\) \{[\s\S]*activePlanningDetailTab\.value = "overview";/s);
-  assert.match(source, /async function selectPlanningRecord\(planningRecordId: string\) \{[\s\S]*activePlanningDetailTab\.value = "overview";/s);
+  assert.match(source, /function startCreatePlanning\(\) \{[\s\S]*activeMainTab\.value = "planning_records";[\s\S]*activePlanningDetailTab\.value = "overview";/s);
+  assert.match(source, /async function selectPlanningRecord\(planningRecordId: string\) \{[\s\S]*activeMainTab\.value = "planning_records";[\s\S]*activePlanningDetailTab\.value = "overview";/s);
 });
 
 test("planning-orders enforces read-only fieldsets for controller_qm-style access", () => {
@@ -233,6 +243,12 @@ test("planning-record selectors reuse the correct lookup sources", () => {
   assert.match(source, /listPlanningCatalogRecords\(\s*"patrol_route"/);
   assert.match(source, /await listTradeFairZones\(tenantScopeId\.value, tradeFairId, accessToken\.value\)/);
   assert.match(source, /listPlanningRecords\(tenantScopeId\.value, accessToken\.value, \{[\s\S]*order_id: selectedOrderId\.value[\s\S]*planning_mode_code: planningRecordFilters\.planning_mode_code/);
+  assert.match(source, /filterPlanningOrderOptionsByScope\("requirement_type"/);
+  assert.match(source, /filterPlanningOrderOptionsByScope\([\s\S]*"equipment_item"/);
+  assert.match(source, /filterPlanningOrderOptionsByScope\("event_venue"/);
+  assert.match(source, /filterPlanningOrderOptionsByScope\("site"/);
+  assert.match(source, /filterPlanningOrderOptionsByScope\("trade_fair"/);
+  assert.match(source, /filterPlanningOrderOptionsByScope\("patrol_route"/);
 });
 
 test("planning-record dispatcher selector shows IAM guidance and defaults only for new records", () => {

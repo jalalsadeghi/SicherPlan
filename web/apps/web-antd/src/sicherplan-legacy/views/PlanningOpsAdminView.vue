@@ -757,6 +757,7 @@ import {
   buildPlanningImportTemplate,
   derivePlanningActionState,
   formatPlanningCustomerOption,
+  isPlanningCustomerScopedEntity,
   isPlanningChildEntity,
   mapPlanningApiMessage,
   normalizePlanningEditorEntity,
@@ -905,7 +906,7 @@ const timezoneOptions = computed(() =>
   })),
 );
 const statusOptions = PLANNING_STATUS_OPTIONS;
-const editorUsesCustomer = computed(() => !isPlanningChildEntity(editorEntityKey.value));
+const editorUsesCustomer = computed(() => isPlanningCustomerScopedEntity(editorEntityKey.value));
 const visibleStatus = computed(() => !isPlanningChildEntity(editorEntityKey.value));
 const currentAddressFieldKey = computed(() => {
   if (["site", "event_venue", "trade_fair"].includes(editorEntityKey.value)) {

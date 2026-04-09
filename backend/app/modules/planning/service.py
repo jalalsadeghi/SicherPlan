@@ -124,7 +124,6 @@ class PlanningService:
         return RequirementTypeRead.model_validate(row)
 
     def create_requirement_type(self, tenant_id: str, payload: RequirementTypeCreate, actor: RequestAuthorizationContext) -> RequirementTypeRead:
-        self._validate_customer_path(tenant_id, payload.customer_id)
         if self.repository.find_requirement_type_by_code(tenant_id, payload.code) is not None:
             raise self._duplicate("requirement_type")
         row = self.repository.create_requirement_type(tenant_id, payload, actor.user_id)
@@ -142,8 +141,6 @@ class PlanningService:
         if current is None:
             raise self._not_found("requirement_type")
         before_json = self._snapshot(current)
-        next_customer_id = self._field_value(payload, "customer_id", current.customer_id)
-        self._validate_customer_path(tenant_id, next_customer_id)
         next_code = self._field_value(payload, "code", current.code)
         if self.repository.find_requirement_type_by_code(tenant_id, next_code, exclude_id=row_id) is not None:
             raise self._duplicate("requirement_type")
@@ -163,7 +160,6 @@ class PlanningService:
         return EquipmentItemRead.model_validate(row)
 
     def create_equipment_item(self, tenant_id: str, payload: EquipmentItemCreate, actor: RequestAuthorizationContext) -> EquipmentItemRead:
-        self._validate_customer_path(tenant_id, payload.customer_id)
         if self.repository.find_equipment_item_by_code(tenant_id, payload.code) is not None:
             raise self._duplicate("equipment_item")
         row = self.repository.create_equipment_item(tenant_id, payload, actor.user_id)
@@ -175,8 +171,6 @@ class PlanningService:
         if current is None:
             raise self._not_found("equipment_item")
         before_json = self._snapshot(current)
-        next_customer_id = self._field_value(payload, "customer_id", current.customer_id)
-        self._validate_customer_path(tenant_id, next_customer_id)
         next_code = self._field_value(payload, "code", current.code)
         if self.repository.find_equipment_item_by_code(tenant_id, next_code, exclude_id=row_id) is not None:
             raise self._duplicate("equipment_item")

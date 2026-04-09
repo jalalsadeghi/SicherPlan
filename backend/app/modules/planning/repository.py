@@ -136,6 +136,7 @@ class SqlAlchemyPlanningRepository:
         "Assignment": "assignment",
         "SubcontractorRelease": "subcontractor_release",
     }
+    TENANT_SCOPED_OPS_MODELS = {RequirementType, EquipmentItem}
 
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -1725,7 +1726,11 @@ class SqlAlchemyPlanningRepository:
             statement = statement.where(model.archived_at.is_(None))
         if filters.lifecycle_status is not None:
             statement = statement.where(model.status == filters.lifecycle_status)
-        if filters.customer_id is not None and hasattr(model, "customer_id"):
+        if (
+            filters.customer_id is not None
+            and hasattr(model, "customer_id")
+            and model not in self.TENANT_SCOPED_OPS_MODELS
+        ):
             statement = statement.where(model.customer_id == filters.customer_id)
         if filters.search:
             like_term = f"%{filters.search.strip().lower()}%"

@@ -382,8 +382,6 @@ class CustomerOrderService:
         requirement_type = self.repository.get_requirement_type(tenant_id, requirement_type_id)
         if requirement_type is None:
             raise self._not_found("requirement_type")
-        if requirement_type.customer_id != customer_id:
-            raise ApiException(400, "planning.customer_order.requirement_type_customer_mismatch", "errors.planning.customer_order.requirement_type_customer_mismatch")
         if service_to < service_from:
             raise ApiException(400, "planning.customer_order.invalid_window", "errors.planning.customer_order.invalid_window")
         if patrol_route_id is not None:

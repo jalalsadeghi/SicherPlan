@@ -35,41 +35,49 @@ export const PLANNING_ENTITY_FORM_CONFIG = {
     child: false,
     labelKey: "entityRequirementType",
     parentEntityKey: null,
+    scope: "tenant",
   },
   equipment_item: {
     child: false,
     labelKey: "entityEquipmentItem",
     parentEntityKey: null,
+    scope: "tenant",
   },
   site: {
     child: false,
     labelKey: "entitySite",
     parentEntityKey: null,
+    scope: "customer",
   },
   event_venue: {
     child: false,
     labelKey: "entityEventVenue",
     parentEntityKey: null,
+    scope: "customer",
   },
   trade_fair: {
     child: false,
     labelKey: "entityTradeFair",
     parentEntityKey: null,
+    scope: "customer",
   },
   trade_fair_zone: {
     child: true,
     labelKey: "entityTradeFairZone",
     parentEntityKey: "trade_fair",
+    scope: "child",
   },
   patrol_route: {
     child: false,
     labelKey: "entityPatrolRoute",
     parentEntityKey: null,
+    scope: "customer",
   },
   patrol_checkpoint: {
     child: true,
     labelKey: "entityPatrolCheckpoint",
     parentEntityKey: "patrol_route",
+    scope: "child",
   },
 };
 
@@ -103,6 +111,16 @@ export function resolvePlanningBrowseEntity(entityKey) {
 export function isPlanningChildEntity(entityKey) {
   const config = PLANNING_ENTITY_FORM_CONFIG[normalizePlanningEditorEntity(entityKey)];
   return !!config?.child;
+}
+
+export function isPlanningCustomerScopedEntity(entityKey) {
+  const config = PLANNING_ENTITY_FORM_CONFIG[normalizePlanningEditorEntity(entityKey)];
+  return config?.scope === "customer";
+}
+
+export function isPlanningTenantScopedEntity(entityKey) {
+  const config = PLANNING_ENTITY_FORM_CONFIG[normalizePlanningEditorEntity(entityKey)];
+  return config?.scope === "tenant";
 }
 
 export function validatePlanningCreateDraft({
@@ -141,8 +159,6 @@ export function validatePlanningCreateDraft({
     return null;
   }
 
-  if (!requiredValue(draft.customer_id)) return "validationCustomerRequired";
-
   if (normalizedEntityKey === "requirement_type") {
     if (!requiredValue(draft.code)) return "validationCodeRequired";
     if (!requiredValue(draft.label)) return "validationLabelRequired";
@@ -155,6 +171,10 @@ export function validatePlanningCreateDraft({
     if (!requiredValue(draft.label)) return "validationLabelRequired";
     if (!requiredValue(draft.unit_of_measure_code)) return "validationUnitRequired";
     return null;
+  }
+
+  if (isPlanningCustomerScopedEntity(normalizedEntityKey) && !requiredValue(draft.customer_id)) {
+    return "validationCustomerRequired";
   }
 
   if (normalizedEntityKey === "site") {
@@ -244,8 +264,8 @@ export function mapPlanningApiMessage(messageKey) {
 
 export function buildPlanningImportTemplate(entityKey) {
   const headers = {
-    requirement_type: ["customer_id", "code", "label", "default_planning_mode_code", "description", "status"],
-    equipment_item: ["customer_id", "code", "label", "unit_of_measure_code", "description", "status"],
+    requirement_type: ["code", "label", "default_planning_mode_code", "description", "status"],
+    equipment_item: ["code", "label", "unit_of_measure_code", "description", "status"],
     site: ["customer_id", "site_no", "name", "address_id", "timezone", "latitude", "longitude", "watchbook_enabled", "notes", "status"],
     event_venue: ["customer_id", "venue_no", "name", "address_id", "timezone", "latitude", "longitude", "notes", "status"],
     trade_fair: ["customer_id", "venue_id", "fair_no", "name", "address_id", "timezone", "latitude", "longitude", "start_date", "end_date", "notes", "status"],

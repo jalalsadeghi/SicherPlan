@@ -124,8 +124,6 @@ class FakePlanningRepository:
         rows = [row for row in self.requirement_types.values() if row.tenant_id == tenant_id]
         if not filters.include_archived:
             rows = [row for row in rows if row.archived_at is None]
-        if filters.customer_id:
-            rows = [row for row in rows if row.customer_id == filters.customer_id]
         return sorted(rows, key=lambda row: row.code)
 
     def get_requirement_type(self, tenant_id: str, row_id: str) -> RequirementType | None:
@@ -490,7 +488,7 @@ class PlanningOpsMasterFoundationTests(unittest.TestCase):
     def test_create_requirement_type_rejects_duplicate_code(self) -> None:
         payload = RequirementTypeCreate(
             tenant_id="tenant-1",
-            customer_id="customer-1",
+            customer_id=None,
             code="obj_guard",
             label="Objektschutz",
             default_planning_mode_code="site",
@@ -499,6 +497,39 @@ class PlanningOpsMasterFoundationTests(unittest.TestCase):
         with self.assertRaises(ApiException) as ctx:
             self.service.create_requirement_type("tenant-1", payload, self.context)
         self.assertEqual(ctx.exception.message_key, "errors.planning.requirement_type.duplicate_code")
+
+    def test_requirement_type_create_and_list_are_tenant_scoped(self) -> None:
+        first = self.service.create_requirement_type(
+            "tenant-1",
+            RequirementTypeCreate(
+                tenant_id="tenant-1",
+                customer_id=None,
+                code="obj_guard",
+                label="Objektschutz",
+                default_planning_mode_code="site",
+            ),
+            self.context,
+        )
+        second = self.service.create_requirement_type(
+            "tenant-1",
+            RequirementTypeCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-2",
+                code="event_guard",
+                label="Eventschutz",
+                default_planning_mode_code="event",
+            ),
+            self.context,
+        )
+
+        rows = self.service.list_requirement_types(
+            "tenant-1",
+            OpsMasterFilter(customer_id="customer-1"),
+            self.context,
+        )
+
+        self.assertEqual([row.id for row in rows], [second.id, first.id])
+        self.assertIsNone(rows[1].customer_id)
 
     def test_create_site_requires_existing_customer(self) -> None:
         payload = SiteCreate(tenant_id="tenant-1", customer_id="missing", site_no="S-001", name="Objekt A")

@@ -56,13 +56,13 @@ class RequirementType(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
     )
 
     tenant_id: Mapped[str] = mapped_column(ForeignKey("core.tenant.id", ondelete="RESTRICT"), nullable=False)
-    customer_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
+    customer_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), nullable=True)
     code: Mapped[str] = mapped_column(String(80), nullable=False)
     label: Mapped[str] = mapped_column(String(255), nullable=False)
     default_planning_mode_code: Mapped[str] = mapped_column(String(80), nullable=False)
     description: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
-    customer: Mapped[Customer] = relationship(lazy="selectin")
+    customer: Mapped[Customer | None] = relationship(lazy="selectin")
 
 
 class EquipmentItem(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
@@ -80,13 +80,13 @@ class EquipmentItem(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
     )
 
     tenant_id: Mapped[str] = mapped_column(ForeignKey("core.tenant.id", ondelete="RESTRICT"), nullable=False)
-    customer_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False)
+    customer_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), nullable=True)
     code: Mapped[str] = mapped_column(String(80), nullable=False)
     label: Mapped[str] = mapped_column(String(255), nullable=False)
     unit_of_measure_code: Mapped[str] = mapped_column(String(40), nullable=False)
     description: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
-    customer: Mapped[Customer] = relationship(lazy="selectin")
+    customer: Mapped[Customer | None] = relationship(lazy="selectin")
 
 
 class Site(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):

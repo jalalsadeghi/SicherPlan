@@ -35,6 +35,14 @@ test("buildPlanningImportTemplate returns stable CSV headers", () => {
     buildPlanningImportTemplate("site"),
     "customer_id,site_no,name,address_id,timezone,latitude,longitude,watchbook_enabled,notes,status",
   );
+  assert.equal(
+    buildPlanningImportTemplate("requirement_type"),
+    "code,label,default_planning_mode_code,description,status",
+  );
+  assert.equal(
+    buildPlanningImportTemplate("equipment_item"),
+    "code,label,unit_of_measure_code,description,status",
+  );
 });
 
 test("mapPlanningApiMessage maps import and duplicate errors", () => {
@@ -193,12 +201,12 @@ test("planning create validation covers top-level entities with entity-specific 
       parentTradeFairId: "",
       parentPatrolRouteId: "",
     }),
-    "validationCustomerRequired",
+    "validationCodeRequired",
   );
   assert.equal(
     validatePlanningCreateDraft({
       editorEntityKey: "equipment_item",
-      draft: { customer_id: "customer-1", code: "RADIO", label: "", unit_of_measure_code: "" },
+      draft: { customer_id: "", code: "RADIO", label: "", unit_of_measure_code: "" },
       zoneDraft: {},
       checkpointDraft: {},
       parentTradeFairId: "",
