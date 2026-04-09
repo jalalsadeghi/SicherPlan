@@ -124,6 +124,7 @@ class PlanningService:
         return RequirementTypeRead.model_validate(row)
 
     def create_requirement_type(self, tenant_id: str, payload: RequirementTypeCreate, actor: RequestAuthorizationContext) -> RequirementTypeRead:
+        payload = self._normalize_optional_customer_id(payload)
         if self.repository.find_requirement_type_by_code(tenant_id, payload.code) is not None:
             raise self._duplicate("requirement_type")
         row = self.repository.create_requirement_type(tenant_id, payload, actor.user_id)
@@ -137,6 +138,7 @@ class PlanningService:
         payload: RequirementTypeUpdate,
         actor: RequestAuthorizationContext,
     ) -> RequirementTypeRead:
+        payload = self._normalize_optional_customer_id(payload)
         current = self.repository.get_requirement_type(tenant_id, row_id)
         if current is None:
             raise self._not_found("requirement_type")
@@ -160,6 +162,7 @@ class PlanningService:
         return EquipmentItemRead.model_validate(row)
 
     def create_equipment_item(self, tenant_id: str, payload: EquipmentItemCreate, actor: RequestAuthorizationContext) -> EquipmentItemRead:
+        payload = self._normalize_optional_customer_id(payload)
         if self.repository.find_equipment_item_by_code(tenant_id, payload.code) is not None:
             raise self._duplicate("equipment_item")
         row = self.repository.create_equipment_item(tenant_id, payload, actor.user_id)
@@ -167,6 +170,7 @@ class PlanningService:
         return EquipmentItemRead.model_validate(row)
 
     def update_equipment_item(self, tenant_id: str, row_id: str, payload: EquipmentItemUpdate, actor: RequestAuthorizationContext) -> EquipmentItemRead:
+        payload = self._normalize_optional_customer_id(payload)
         current = self.repository.get_equipment_item(tenant_id, row_id)
         if current is None:
             raise self._not_found("equipment_item")
@@ -593,6 +597,14 @@ class PlanningService:
     def _duplicate(self, resource: str) -> ApiException:
         resource_key = "requirement_type" if resource == "requirement_type" else resource
         return ApiException(409, f"planning.{resource}.duplicate", f"errors.planning.{resource_key}.duplicate_code")
+
+    @staticmethod
+    def _normalize_optional_customer_id(payload):
+        if "customer_id" not in getattr(payload, "model_fields_set", set()):
+            return payload
+        if payload.customer_id != "":
+            return payload
+        return payload.model_copy(update={"customer_id": None})
 
     @staticmethod
     def _field_value(payload, field_name: str, current_value):

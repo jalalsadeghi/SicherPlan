@@ -1315,8 +1315,8 @@ function syncDraft(record) {
 function buildRecordPayload() {
   const base = {
     tenant_id: resolvedTenantScopeId.value,
-    customer_id: draft.customer_id,
     notes: draft.notes || null,
+    ...(editorUsesCustomer.value ? { customer_id: draft.customer_id } : {}),
   };
   if (editorEntityKey.value === "requirement_type") {
     return { ...base, code: draft.code, label: draft.label, default_planning_mode_code: draft.default_planning_mode_code };

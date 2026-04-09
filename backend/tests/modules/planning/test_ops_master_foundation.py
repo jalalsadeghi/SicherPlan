@@ -16,13 +16,15 @@ from app.modules.customers.models import Customer
 from app.modules.iam.audit_service import AuditService
 from app.modules.iam.auth_schemas import AuthenticatedRoleScope
 from app.modules.iam.authz import RequestAuthorizationContext
-from app.modules.planning.models import EventVenue, PatrolCheckpoint, PatrolRoute, RequirementType, Site, TradeFair, TradeFairZone
+from app.modules.planning.models import EquipmentItem, EventVenue, PatrolCheckpoint, PatrolRoute, RequirementType, Site, TradeFair, TradeFairZone
 from app.modules.planning.schemas import (
     EquipmentItemCreate,
+    EquipmentItemUpdate,
     OpsMasterFilter,
     PatrolCheckpointCreate,
     PatrolRouteCreate,
     RequirementTypeCreate,
+    RequirementTypeUpdate,
     SiteCreate,
     TradeFairCreate,
     TradeFairZoneCreate,
@@ -60,7 +62,7 @@ class FakePlanningRepository:
     customers: dict[str, Customer] = field(default_factory=dict)
     addresses: dict[str, Address] = field(default_factory=dict)
     requirement_types: dict[str, RequirementType] = field(default_factory=dict)
-    equipment_items: dict[str, object] = field(default_factory=dict)
+    equipment_items: dict[str, EquipmentItem] = field(default_factory=dict)
     sites: dict[str, Site] = field(default_factory=dict)
     event_venues: dict[str, EventVenue] = field(default_factory=dict)
     trade_fairs: dict[str, TradeFair] = field(default_factory=dict)
@@ -166,33 +168,45 @@ class FakePlanningRepository:
                 return row
         return None
 
-    def list_equipment_items(self, tenant_id: str, filters: OpsMasterFilter) -> list[object]:
-        return []
+    def list_equipment_items(self, tenant_id: str, filters: OpsMasterFilter) -> list[EquipmentItem]:
+        rows = [row for row in self.equipment_items.values() if row.tenant_id == tenant_id]
+        if not filters.include_archived:
+            rows = [row for row in rows if row.archived_at is None]
+        return sorted(rows, key=lambda row: row.code)
 
-    def get_equipment_item(self, tenant_id: str, row_id: str):
-        return None
+    def get_equipment_item(self, tenant_id: str, row_id: str) -> EquipmentItem | None:
+        row = self.equipment_items.get(row_id)
+        if row is None or row.tenant_id != tenant_id:
+            return None
+        return row
 
-    def create_equipment_item(self, tenant_id: str, payload: EquipmentItemCreate, actor_user_id: str | None):
-        row = type("EquipmentStub", (), {})()
-        row.id = str(uuid4())
-        row.tenant_id = tenant_id
-        row.customer_id = payload.customer_id
-        row.code = payload.code
-        row.label = payload.label
-        row.unit_of_measure_code = payload.unit_of_measure_code
-        row.description = payload.description
-        row.status = "active"
-        row.version_no = 1
-        row.created_at = datetime.now(UTC)
-        row.updated_at = row.created_at
-        row.created_by_user_id = actor_user_id
-        row.updated_by_user_id = actor_user_id
-        row.archived_at = None
+    def create_equipment_item(self, tenant_id: str, payload: EquipmentItemCreate, actor_user_id: str | None) -> EquipmentItem:
+        row = EquipmentItem(
+            tenant_id=tenant_id,
+            customer_id=payload.customer_id,
+            code=payload.code,
+            label=payload.label,
+            unit_of_measure_code=payload.unit_of_measure_code,
+            description=payload.description,
+            created_by_user_id=actor_user_id,
+            updated_by_user_id=actor_user_id,
+        )
+        self._stamp(row)
         self.equipment_items[row.id] = row
         return row
 
-    def update_equipment_item(self, tenant_id: str, row_id: str, payload, actor_user_id: str | None):
-        return None
+    def update_equipment_item(self, tenant_id: str, row_id: str, payload, actor_user_id: str | None) -> EquipmentItem | None:
+        row = self.get_equipment_item(tenant_id, row_id)
+        if row is None:
+            return None
+        if payload.version_no != row.version_no:
+            raise ApiException(409, "planning.equipment_item.stale_version", "errors.planning.equipment_item.stale_version")
+        for key, value in payload.model_dump(exclude_unset=True, exclude={"version_no"}).items():
+            setattr(row, key, value)
+        row.version_no += 1
+        row.updated_by_user_id = actor_user_id
+        row.updated_at = datetime.now(UTC)
+        return row
 
     def find_equipment_item_by_code(self, tenant_id: str, code: str, *, exclude_id: str | None = None):
         for row in self.equipment_items.values():
@@ -530,6 +544,90 @@ class PlanningOpsMasterFoundationTests(unittest.TestCase):
 
         self.assertEqual([row.id for row in rows], [second.id, first.id])
         self.assertIsNone(rows[1].customer_id)
+
+    def test_create_requirement_type_normalizes_blank_customer_id_to_none(self) -> None:
+        row = self.service.create_requirement_type(
+            "tenant-1",
+            RequirementTypeCreate(
+                tenant_id="tenant-1",
+                customer_id="",
+                code="blank_customer",
+                label="Blank Customer",
+                default_planning_mode_code="site",
+            ),
+            self.context,
+        )
+        self.assertIsNone(row.customer_id)
+        stored = self.repository.get_requirement_type("tenant-1", row.id)
+        self.assertIsNotNone(stored)
+        self.assertIsNone(stored.customer_id)
+
+    def test_update_requirement_type_normalizes_blank_customer_id_to_none(self) -> None:
+        row = self.service.create_requirement_type(
+            "tenant-1",
+            RequirementTypeCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                code="req_update_blank",
+                label="Update Blank",
+                default_planning_mode_code="site",
+            ),
+            self.context,
+        )
+
+        updated = self.service.update_requirement_type(
+            "tenant-1",
+            row.id,
+            RequirementTypeUpdate(customer_id="", version_no=row.version_no),
+            self.context,
+        )
+
+        self.assertIsNone(updated.customer_id)
+        stored = self.repository.get_requirement_type("tenant-1", row.id)
+        self.assertIsNotNone(stored)
+        self.assertIsNone(stored.customer_id)
+
+    def test_create_equipment_item_normalizes_blank_customer_id_to_none(self) -> None:
+        row = self.service.create_equipment_item(
+            "tenant-1",
+            EquipmentItemCreate(
+                tenant_id="tenant-1",
+                customer_id="",
+                code="radio",
+                label="Radio",
+                unit_of_measure_code="pcs",
+            ),
+            self.context,
+        )
+        self.assertIsNone(row.customer_id)
+        stored = self.repository.get_equipment_item("tenant-1", row.id)
+        self.assertIsNotNone(stored)
+        self.assertIsNone(stored.customer_id)
+
+    def test_update_equipment_item_normalizes_blank_customer_id_to_none(self) -> None:
+        row = self.service.create_equipment_item(
+            "tenant-1",
+            EquipmentItemCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                code="gear",
+                label="Gear",
+                unit_of_measure_code="pcs",
+            ),
+            self.context,
+        )
+
+        updated = self.service.update_equipment_item(
+            "tenant-1",
+            row.id,
+            EquipmentItemUpdate(customer_id="", version_no=row.version_no),
+            self.context,
+        )
+
+        self.assertIsNone(updated.customer_id)
+        stored = self.repository.get_equipment_item("tenant-1", row.id)
+        self.assertIsNotNone(stored)
+        self.assertIsNone(stored.customer_id)
 
     def test_create_site_requires_existing_customer(self) -> None:
         payload = SiteCreate(tenant_id="tenant-1", customer_id="missing", site_no="S-001", name="Objekt A")

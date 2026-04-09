@@ -201,6 +201,27 @@ export function normalizePlanningOrderUuidValue(value) {
   return normalized ? normalized : null;
 }
 
+export function filterVisibleRequirementLines(lines, includeArchived = false) {
+  if (includeArchived) {
+    return lines;
+  }
+  return lines.filter((line) => line?.archived_at == null && line?.status !== "archived");
+}
+
+export function hasDuplicateActiveRequirementLine(lines, requirementTypeId, selectedLineId = "") {
+  const normalizedRequirementTypeId = normalizePlanningOrderUuidValue(requirementTypeId);
+  if (!normalizedRequirementTypeId) {
+    return false;
+  }
+  return lines.some(
+    (line) =>
+      line?.id !== selectedLineId &&
+      line?.requirement_type_id === normalizedRequirementTypeId &&
+      line?.archived_at == null &&
+      line?.status === "active",
+  );
+}
+
 export function validatePlanningOrderDraft(orderDraft) {
   return {
     customer_id: !normalizePlanningOrderUuidValue(orderDraft?.customer_id),

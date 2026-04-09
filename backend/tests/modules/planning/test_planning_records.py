@@ -501,6 +501,49 @@ class PlanningRecordServiceTests(unittest.TestCase):
         self.assertEqual(updated.site_detail.site_id, "site-2")
         self.assertEqual(updated.site_detail.watchbook_scope_note, "Neu")
 
+    def test_update_planning_record_supports_lifecycle_changes(self) -> None:
+        created = self.service.create_planning_record(
+            "tenant-1",
+            PlanningRecordCreate(
+                tenant_id="tenant-1",
+                order_id=self.order_id,
+                planning_mode_code="event",
+                name="Lifecycle Plan",
+                planning_from=date(2026, 9, 1),
+                planning_to=date(2026, 9, 2),
+                event_detail=EventPlanDetailCreate(event_venue_id=self.event_venue_id),
+            ),
+            self.actor,
+        )
+
+        archived = self.service.update_planning_record(
+            "tenant-1",
+            created.id,
+            PlanningRecordUpdate(
+                archived_at=datetime.now(UTC),
+                version_no=created.version_no,
+            ),
+            self.actor,
+        )
+        archived_row = self.repository.get_planning_record("tenant-1", created.id)
+        self.assertIsNotNone(archived_row)
+        self.assertIsNotNone(archived_row.archived_at)
+
+        reactivated = self.service.update_planning_record(
+            "tenant-1",
+            created.id,
+            PlanningRecordUpdate(
+                status="active",
+                archived_at=None,
+                version_no=archived.version_no,
+            ),
+            self.actor,
+        )
+        self.assertEqual(reactivated.status, "active")
+        restored_row = self.repository.get_planning_record("tenant-1", created.id)
+        self.assertIsNotNone(restored_row)
+        self.assertIsNone(restored_row.archived_at)
+
     def test_update_event_record_persists_event_detail_without_relationship_crash(self) -> None:
         created = self.service.create_planning_record(
             "tenant-1",

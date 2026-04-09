@@ -316,7 +316,7 @@ class SqlAlchemyPlanningRepository:
     ) -> RequirementType:
         row = RequirementType(
             tenant_id=tenant_id,
-            customer_id=payload.customer_id,
+            customer_id=self._normalize_optional_uuid_value(payload.customer_id),
             code=payload.code,
             label=payload.label,
             default_planning_mode_code=payload.default_planning_mode_code,
@@ -333,7 +333,14 @@ class SqlAlchemyPlanningRepository:
         payload: RequirementTypeUpdate,
         actor_user_id: str | None,
     ) -> RequirementType | None:
-        return self._update_row(RequirementType, tenant_id, row_id, payload, actor_user_id)
+        return self._update_row(
+            RequirementType,
+            tenant_id,
+            row_id,
+            payload,
+            actor_user_id,
+            normalize_blank_uuid_fields={"customer_id"},
+        )
 
     def find_requirement_type_by_code(self, tenant_id: str, code: str, *, exclude_id: str | None = None) -> RequirementType | None:
         return self._find_by_code(RequirementType, tenant_id, code, exclude_id=exclude_id)
@@ -352,7 +359,7 @@ class SqlAlchemyPlanningRepository:
     ) -> EquipmentItem:
         row = EquipmentItem(
             tenant_id=tenant_id,
-            customer_id=payload.customer_id,
+            customer_id=self._normalize_optional_uuid_value(payload.customer_id),
             code=payload.code,
             label=payload.label,
             unit_of_measure_code=payload.unit_of_measure_code,
@@ -369,7 +376,14 @@ class SqlAlchemyPlanningRepository:
         payload: EquipmentItemUpdate,
         actor_user_id: str | None,
     ) -> EquipmentItem | None:
-        return self._update_row(EquipmentItem, tenant_id, row_id, payload, actor_user_id)
+        return self._update_row(
+            EquipmentItem,
+            tenant_id,
+            row_id,
+            payload,
+            actor_user_id,
+            normalize_blank_uuid_fields={"customer_id"},
+        )
 
     def find_equipment_item_by_code(self, tenant_id: str, code: str, *, exclude_id: str | None = None) -> EquipmentItem | None:
         return self._find_by_code(EquipmentItem, tenant_id, code, exclude_id=exclude_id)
@@ -1775,6 +1789,7 @@ class SqlAlchemyPlanningRepository:
         *,
         extra_options: Sequence[object] = (),
         exclude_fields: set[str] | None = None,
+        normalize_blank_uuid_fields: set[str] | None = None,
     ):
         row = self._get_row(model, tenant_id, row_id, extra_options=extra_options)
         if row is None:
@@ -1784,11 +1799,19 @@ class SqlAlchemyPlanningRepository:
         if exclude_fields:
             excluded.update(exclude_fields)
         for key, value in payload.model_dump(exclude_unset=True, exclude=excluded).items():
+            if normalize_blank_uuid_fields and key in normalize_blank_uuid_fields:
+                value = self._normalize_optional_uuid_value(value)
             setattr(row, key, value)
         row.updated_by_user_id = actor_user_id
         row.version_no += 1
         self._commit_or_raise()
         return self._get_row(model, tenant_id, row_id, extra_options=extra_options) or row
+
+    @staticmethod
+    def _normalize_optional_uuid_value(value: str | None) -> str | None:
+        if value == "":
+            return None
+        return value
 
     def _find_by_code(self, model, tenant_id: str, code: str, *, field_name: str = "code", exclude_id: str | None = None):
         statement = select(model).where(model.tenant_id == tenant_id, getattr(model, field_name) == code)

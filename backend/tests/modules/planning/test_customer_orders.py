@@ -18,6 +18,7 @@ from app.modules.planning.schemas import (
     CustomerOrderUpdate,
     OrderEquipmentLineCreate,
     OrderRequirementLineCreate,
+    OrderRequirementLineUpdate,
 )
 from tests.modules.planning.test_ops_master_foundation import FakePlanningRepository, RecordingAuditRepository, _context
 
@@ -546,6 +547,62 @@ class CustomerOrderServiceTests(unittest.TestCase):
         self.assertNotIn("function_type", event.after_json)
         self.assertNotIn("qualification_type", event.after_json)
         self.assert_json_safe(event.after_json)
+
+    def test_update_requirement_line_supports_lifecycle_changes(self) -> None:
+        order = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="ORD-REQ-LIFE",
+                title="Objekt",
+                service_category_code="site_security",
+                service_from=date(2026, 7, 1),
+                service_to=date(2026, 7, 3),
+            ),
+            self.actor,
+        )
+        line = self.service.create_order_requirement_line(
+            "tenant-1",
+            order.id,
+            OrderRequirementLineCreate(
+                tenant_id="tenant-1",
+                order_id=order.id,
+                requirement_type_id=self.requirement_type_id,
+                min_qty=1,
+                target_qty=2,
+            ),
+            self.actor,
+        )
+
+        archived = self.service.update_order_requirement_line(
+            "tenant-1",
+            order.id,
+            line.id,
+            OrderRequirementLineUpdate(
+                status="archived",
+                archived_at=datetime.now(UTC),
+                version_no=line.version_no,
+            ),
+            self.actor,
+        )
+        self.assertEqual(archived.status, "archived")
+        self.assertIsNotNone(archived.archived_at)
+
+        restored = self.service.update_order_requirement_line(
+            "tenant-1",
+            order.id,
+            line.id,
+            OrderRequirementLineUpdate(
+                status="active",
+                archived_at=None,
+                version_no=archived.version_no,
+            ),
+            self.actor,
+        )
+        self.assertEqual(restored.status, "active")
+        self.assertIsNone(restored.archived_at)
 
     def test_snapshot_excludes_relationship_objects_and_stays_json_safe(self) -> None:
         requirement_line = self.repository.create_order_requirement_line(

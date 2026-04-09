@@ -91,6 +91,11 @@ test("planning setup uses explicit customer scope instead of treating every non-
   assert.doesNotMatch(source, /const editorUsesCustomer = computed\(\(\) => !isPlanningChildEntity\(editorEntityKey\.value\)\)/);
 });
 
+test("planning setup create payload only includes customer_id for customer-scoped entities", () => {
+  assert.match(source, /const base = \{\s*tenant_id: resolvedTenantScopeId\.value,\s*notes: draft\.notes \|\| null,\s*\.\.\.\(editorUsesCustomer\.value \? \{ customer_id: draft\.customer_id \} : \{\}\),\s*\};/s);
+  assert.doesNotMatch(source, /const base = \{\s*tenant_id: resolvedTenantScopeId\.value,\s*customer_id: draft\.customer_id,/s);
+});
+
 test("planning setup address picker refresh is shared across all address-backed entity families", () => {
   assert.match(source, /function usesAddressSelection\(entity = editorEntityKey\.value\)/);
   assert.match(source, /\["site", "event_venue", "trade_fair", "patrol_route"\]\.includes\(entity\)/);

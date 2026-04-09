@@ -1,99 +1,101 @@
 You are working in the SicherPlan monorepo.
 
 Goal:
-Fix the 500 error when updating an existing planning record from P-02 (`/admin/planning-orders`, Planning records > Overview).
+Improve the Planning Record edit experience in P-02 (`/admin/planning-orders`) so the UI clearly reflects the intended domain behavior.
 
-Observed backend failure:
-PATCH /api/planning/tenants/{tenant_id}/ops/planning-records/{planning_record_id}
-raises:
-AttributeError: 'dict' object has no attribute '_sa_instance_state'
+Current situation:
+- Existing planning records can be edited in `Planning records > Overview`
+- But `Planning mode` is disabled for existing records
+- There is no explicit UI action for:
+  - deactivate
+  - reactivate
+  - archive
+- There is also no explanatory UX telling the user why `Planning mode` is locked
+- Users can mistakenly assume this is a broken form
 
-Root cause to fix:
-- Frontend sends nested mode detail payloads on update (`event_detail`, `site_detail`, `trade_fair_detail`, `patrol_detail`).
-- `PlanningRecordService.update_planning_record()` passes the full `PlanningRecordUpdate` payload into `repository.update_planning_record(...)`.
-- `repository._update_row()` blindly iterates through `payload.model_dump(...)` and does `setattr(row, key, value)`.
-- On `PlanningRecord`, the detail fields are SQLAlchemy relationships, so assigning a plain dict to them crashes.
+Important domain rule to preserve:
+- `Planning mode` must remain immutable after creation
+- Do NOT enable in-place editing of `planning_mode_code` for existing planning records
+- Current backend contract (`PlanningRecordUpdate`) does not support updating `planning_mode_code`
+- Existing mode controls which detail structure is valid:
+  - `event_detail`
+  - `site_detail`
+  - `trade_fair_detail`
+  - `patrol_detail`
 
 Relevant files:
-1. `backend/app/modules/planning/planning_record_service.py`
-2. `backend/app/modules/planning/repository.py`
-3. `backend/app/modules/planning/models.py`
-4. `backend/app/modules/planning/schemas.py`
-5. `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue`
+1. `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue`
+2. `backend/app/modules/planning/schemas.py`
+3. `backend/app/modules/planning/router.py`
+4. `backend/app/modules/planning/planning_record_service.py`
+5. any related i18n/test files
 
-Required fix:
-1. Ensure update of an existing planning record never sends nested detail dictionaries into the generic ORM row updater.
-2. Keep the current create flow intact.
-3. Preserve the existing specialized detail update methods:
-   - `update_event_plan_detail`
-   - `update_site_plan_detail`
-   - `update_trade_fair_plan_detail`
-   - `update_patrol_plan_detail`
+Required implementation:
 
-Recommended implementation approach:
-A) In `PlanningRecordService.update_planning_record()`:
-- Split the incoming payload into:
-  - core/scalar planning record fields
-  - mode-specific detail fields
-- Only pass the scalar/core payload to `repository.update_planning_record(...)`
-- Then call `_update_detail_for_mode(...)` with the original detail payload
-- Re-read the record before returning, as the current code already intends
+A) Keep Planning mode immutable
+- Leave `Planning mode` disabled when editing an existing planning record
+- Do NOT implement backend support for changing `planning_mode_code` on update
+- Add inline helper text below the disabled field explaining why:
+  Example intent:
+  - “Planning mode cannot be changed after creation. If you selected the wrong mode, deactivate/archive this planning record and create a new one.”
+- Add i18n keys for this explanation
 
-The scalar/core update payload should include only supported top-level fields such as:
-- `dispatcher_user_id`
-- `name`
-- `planning_from`
-- `planning_to`
-- `notes`
-- `status`
-- `archived_at`
-- `version_no`
+B) Add explicit lifecycle actions for planning records
+Currently `status` is editable via a dropdown, but the UX is weak.
+Improve this by adding clear action buttons for existing planning records:
+- Deactivate (sets `status = inactive`)
+- Reactivate (sets `status = active`)
+- Archive (sets `archived_at` to now, ideally via PATCH update)
+Place these in a clear action row in the planning-record overview or a dedicated lifecycle section.
 
-It must exclude:
-- `event_detail`
-- `site_detail`
-- `trade_fair_detail`
-- `patrol_detail`
+Implementation notes:
+- Reuse existing PATCH `/planning-records/{id}` update flow
+- For deactivate/reactivate:
+  - update `status`
+- For archive:
+  - update `archived_at`
+- Refresh the selected planning record and list after each action
+- Show toast feedback on success/failure
 
-B) Optionally harden repository layer:
-- Add an `exclude_fields` parameter to `_update_row(...)`
-- Use it for `PlanningRecord` updates so relationship payloads can never be assigned by mistake
-- This is optional but preferred as defensive design
+C) Do NOT add hard delete in this task
+- There is currently no DELETE endpoint for planning records
+- Do not introduce destructive hard-delete behavior here
+- If a future delete flow is needed, it should be a separate constrained feature with dependency checks
 
-C) Add regression tests
-Add backend tests that prove:
-1. Updating a site-mode planning record with `site_detail` no longer crashes
-2. Updating an event-mode planning record with `event_detail` no longer crashes
-3. Updating a trade-fair-mode planning record with `trade_fair_detail` no longer crashes
-4. Updating a patrol-mode planning record with `patrol_detail` no longer crashes
-5. Scalar fields like `name`, `planning_from`, `planning_to`, `notes`, `status`, and `dispatcher_user_id` still persist correctly
-6. The specialized detail rows are actually updated, not ignored
+D) Optional but recommended UX improvement
+Add a secondary CTA for mistaken mode selection:
+- “Create replacement planning”
+This should:
+- start a new planning record draft for the same order
+- prefill safe fields like:
+  - name
+  - planning_from
+  - planning_to
+  - dispatcher_user_id
+  - notes
+- but allow selecting a fresh `Planning mode`
+Do NOT auto-copy incompatible mode-specific detail fields.
 
-Important side observation:
-- The current frontend update payload includes `planning_mode_code` and `parent_planning_record_id`
-- But `PlanningRecordUpdate` in `schemas.py` does not currently support those fields
-- Do NOT silently broaden behavior unless intended
-- Either:
-  - keep them unsupported and make the update path ignore them safely, or
-  - explicitly add full backend support if you determine that existing-record editing of those fields is required
-- If you do not add backend support, ensure the frontend does not misleadingly imply that these fields are editable on existing records
-
-Non-goals:
-- Do not redesign P-02
-- Do not change planning record create semantics
-- Do not change release-state behavior
-- Do not change commercial-link logic
-- Do not touch unrelated planning modules
+E) Tests
+Update/add tests to verify:
+1. Existing planning records still show `Planning mode` as disabled
+2. Helper text explains why the field is locked
+3. Deactivate action updates status to `inactive`
+4. Reactivate action updates status to `active`
+5. Archive action updates `archived_at`
+6. No hard delete action is exposed
+7. Existing save/release/document flows are not broken
 
 Acceptance criteria:
-1. PATCH update for existing planning records no longer returns 500
-2. Nested mode detail updates persist correctly
-3. No dict is assigned to SQLAlchemy relationship attributes in generic row update
-4. Existing create flow still works
-5. Tests cover the regression
+1. Users understand that `Planning mode` is intentionally immutable
+2. Users can explicitly deactivate/reactivate/archive an existing planning record
+3. Wrong-mode correction follows a safe workflow (replace, not mutate)
+4. No hard delete is introduced
+5. Tests pass
 
 Deliverables:
-- updated service/repository code
-- regression tests
-- short summary of the root cause and the fix
-- note whether `planning_mode_code` / `parent_planning_record_id` remain unsupported on update or were explicitly implemented
+- updated `PlanningOrdersAdminView.vue`
+- any minimal backend support needed for archive via existing PATCH contract
+- updated i18n strings
+- updated tests
+- short summary of the UX and lifecycle changes

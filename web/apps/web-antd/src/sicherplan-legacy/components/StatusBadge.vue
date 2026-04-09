@@ -15,12 +15,21 @@ const props = defineProps<{
 
 const { t } = useI18n();
 
+const SUPPORTED_STATUSES = new Set([
+  "active",
+  "inactive",
+  "archived",
+  "draft",
+  "release_ready",
+  "released",
+]);
+
 const normalizedStatus = computed(() => {
-  if (props.status === "active" || props.status === "inactive" || props.status === "archived") {
+  if (SUPPORTED_STATUSES.has(props.status)) {
     return props.status;
   }
 
-  return "inactive";
+  return "unknown";
 });
 
 const label = computed(() => t(`coreAdmin.status.${normalizedStatus.value}` as never));
@@ -54,5 +63,21 @@ const label = computed(() => t(`coreAdmin.status.${normalizedStatus.value}` as n
 .status-badge[data-status="archived"] {
   background: color-mix(in srgb, var(--sp-color-danger) 16%, white);
   color: color-mix(in srgb, var(--sp-color-danger) 82%, black);
+}
+
+.status-badge[data-status="draft"],
+.status-badge[data-status="unknown"] {
+  background: color-mix(in srgb, var(--sp-color-surface-card) 92%, transparent);
+  color: color-mix(in srgb, var(--sp-color-text-primary) 88%, black);
+}
+
+.status-badge[data-status="release_ready"] {
+  background: color-mix(in srgb, var(--sp-color-warning) 16%, white);
+  color: color-mix(in srgb, var(--sp-color-warning) 85%, black);
+}
+
+.status-badge[data-status="released"] {
+  background: color-mix(in srgb, var(--sp-color-success) 16%, white);
+  color: color-mix(in srgb, var(--sp-color-success) 75%, black);
 }
 </style>

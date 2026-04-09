@@ -1024,6 +1024,10 @@ export type MessageKey =
   | "coreAdmin.status.active"
   | "coreAdmin.status.inactive"
   | "coreAdmin.status.archived"
+  | "coreAdmin.status.draft"
+  | "coreAdmin.status.release_ready"
+  | "coreAdmin.status.released"
+  | "coreAdmin.status.unknown"
   | "coreAdmin.feedback.success"
   | "coreAdmin.feedback.error"
   | "coreAdmin.feedback.info"
@@ -2819,6 +2823,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.status.active": "Aktiv",
     "coreAdmin.status.inactive": "Inaktiv",
     "coreAdmin.status.archived": "Archiviert",
+    "coreAdmin.status.draft": "Entwurf",
+    "coreAdmin.status.release_ready": "Release Ready",
+    "coreAdmin.status.released": "Freigegeben",
+    "coreAdmin.status.unknown": "Unbekannt",
     "coreAdmin.feedback.success": "Erfolg",
     "coreAdmin.feedback.error": "Fehler",
     "coreAdmin.feedback.info": "Hinweis",
@@ -4691,6 +4699,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.status.active": "Active",
     "coreAdmin.status.inactive": "Inactive",
     "coreAdmin.status.archived": "Archived",
+    "coreAdmin.status.draft": "Draft",
+    "coreAdmin.status.release_ready": "Release Ready",
+    "coreAdmin.status.released": "Released",
+    "coreAdmin.status.unknown": "Unknown",
     "coreAdmin.feedback.success": "Success",
     "coreAdmin.feedback.error": "Error",
     "coreAdmin.feedback.info": "Info",

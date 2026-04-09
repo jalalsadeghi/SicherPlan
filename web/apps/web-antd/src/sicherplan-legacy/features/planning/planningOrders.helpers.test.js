@@ -6,9 +6,11 @@ import {
   buildPlanningSetupLocation,
   derivePlanningOrderSubmitBlockReason,
   derivePlanningOrderActionState,
+  filterVisibleRequirementLines,
   filterPlanningOrderOptionsByScope,
   formatPlanningCommercialIssueFallback,
   formatPlanningOrderReferenceOption,
+  hasDuplicateActiveRequirementLine,
   hasPlanningOrderSetupGap,
   hasPlanningOrderPermission,
   mapPlanningCommercialIssueCode,
@@ -139,6 +141,29 @@ test("planning-order UUID normalization turns blank values into null", () => {
   assert.equal(normalizePlanningOrderUuidValue(""), null);
   assert.equal(normalizePlanningOrderUuidValue("   "), null);
   assert.equal(normalizePlanningOrderUuidValue("route-1"), "route-1");
+});
+
+test("requirement-line visibility hides archived rows by default", () => {
+  const lines = [
+    { id: "line-1", status: "active", archived_at: null },
+    { id: "line-2", status: "inactive", archived_at: null },
+    { id: "line-3", status: "archived", archived_at: "2026-04-09T10:00:00Z" },
+  ];
+  assert.deepEqual(filterVisibleRequirementLines(lines, false).map((line) => line.id), ["line-1", "line-2"]);
+  assert.deepEqual(filterVisibleRequirementLines(lines, true).map((line) => line.id), ["line-1", "line-2", "line-3"]);
+});
+
+test("requirement-line duplicate guard blocks only second active line with same requirement type", () => {
+  const lines = [
+    { id: "line-1", requirement_type_id: "req-1", status: "active", archived_at: null },
+    { id: "line-2", requirement_type_id: "req-1", status: "archived", archived_at: "2026-04-09T10:00:00Z" },
+    { id: "line-3", requirement_type_id: "req-2", status: "active", archived_at: null },
+  ];
+  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-1"), true);
+  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-1", "line-1"), false);
+  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-2"), true);
+  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-3"), false);
+  assert.equal(hasDuplicateActiveRequirementLine(lines, ""), false);
 });
 
 test("planning-order draft validation blocks missing required selects only", () => {

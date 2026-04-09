@@ -25,6 +25,16 @@ test("planning-orders uses the customer-style master detail shell", () => {
   assert.doesNotMatch(source, /class="planning-orders-feedback"/);
 });
 
+test("planning-orders row badges stay bound to real release states and the header badge is contextual", () => {
+  assert.match(source, /<StatusBadge :status="order\.release_state" \/>/);
+  assert.match(source, /<StatusBadge :status="record\.release_state" \/>/);
+  assert.match(source, /const detailHeaderBadgeStatus = computed\(\(\) => \{/);
+  assert.match(source, /if \(activeMainTab\.value === "planning_records"\) \{\s*return selectedPlanningRecord\.value\?\.release_state \|\| "";/s);
+  assert.match(source, /return selectedOrder\.value\?\.release_state \|\| "";/);
+  assert.match(source, /<StatusBadge v-if="detailHeaderBadgeStatus" :status="detailHeaderBadgeStatus" \/>/);
+  assert.doesNotMatch(source, /<StatusBadge v-if="selectedOrder" :status="selectedOrder\.release_state" \/>/);
+});
+
 test("planning-orders no longer renders the local hero and scope chrome", () => {
   assert.doesNotMatch(source, /planning-orders-hero/);
   assert.doesNotMatch(source, /planning-orders-scope/);
@@ -119,6 +129,13 @@ test("planning-orders order form uses domain-aligned controls", () => {
   assert.match(source, /:options="requirementTypeSelectOptions"[\s\S]*:disabled="loading\.action"/);
 });
 
+test("planning-orders requirement type and patrol route actions are not wrapped in interactive labels", () => {
+  assert.match(source, /<div class="field-stack">[\s\S]*id="planning-orders-requirement-type-label"[\s\S]*@mousedown\.stop[\s\S]*@click\.stop="openRequirementTypeModal"[\s\S]*:aria-labelledby="'planning-orders-requirement-type-label'"/s);
+  assert.match(source, /<div class="field-stack">[\s\S]*id="planning-orders-patrol-route-label"[\s\S]*@mousedown\.stop[\s\S]*@click\.stop="openPatrolRouteModal"[\s\S]*:aria-labelledby="'planning-orders-patrol-route-label'"/s);
+  assert.doesNotMatch(source, /<label class="field-stack">\s*<div class="planning-orders-field-header">\s*<span id="planning-orders-requirement-type-label"/s);
+  assert.doesNotMatch(source, /<label class="field-stack">\s*<div class="planning-orders-field-header">\s*<span id="planning-orders-patrol-route-label"/s);
+});
+
 test("planning-orders overview exposes independent order child sections", () => {
   assert.match(source, /data-testid="planning-orders-order-panel-equipment_lines"/);
   assert.match(source, /data-testid="planning-orders-order-panel-requirement_lines"/);
@@ -128,6 +145,27 @@ test("planning-orders overview exposes independent order child sections", () => 
   assert.match(source, /listOrderRequirementLines/);
   assert.match(source, /:options="equipmentItemSelectOptions"[\s\S]*:disabled="loading\.action"/);
   assert.match(source, /:options="requirementTypeSelectOptions"[\s\S]*:disabled="loading\.action"/);
+});
+
+test("planning-orders requirement lines support lifecycle actions, archived toggle, and duplicate guard", () => {
+  assert.match(source, /const includeArchivedRequirementLines = ref\(false\)/);
+  assert.match(source, /const selectedRequirementLine = computed\(/);
+  assert.match(source, /const visibleRequirementLines = computed\(\(\) =>[\s\S]*filterVisibleRequirementLines\(orderRequirementLines\.value, includeArchivedRequirementLines\.value\)/s);
+  assert.match(source, /v-model="includeArchivedRequirementLines"/);
+  assert.match(source, /tp\("includeArchivedRequirementLines"\)/);
+  assert.match(source, /v-for="line in visibleRequirementLines"/);
+  assert.match(source, /tp\("requirementLineLifecycleHint"\)/);
+  assert.match(source, /tp\("actionsDeactivateRequirementLine"\)/);
+  assert.match(source, /tp\("actionsArchiveRequirementLine"\)/);
+  assert.match(source, /tp\("actionsRestoreRequirementLine"\)/);
+  assert.match(source, /async function deactivateRequirementLine\(\)/);
+  assert.match(source, /async function archiveRequirementLine\(\)/);
+  assert.match(source, /async function restoreRequirementLine\(\)/);
+  assert.match(source, /status: "inactive"/);
+  assert.match(source, /status: "archived", archived_at: new Date\(\)\.toISOString\(\)/);
+  assert.match(source, /status: "active", archived_at: null/);
+  assert.match(source, /hasDuplicateActiveRequirementLine\(/);
+  assert.match(source, /tp\("requirementLineDuplicateActive"\)/);
 });
 
 test("planning-orders keeps planning-record browsing in the left workspace", () => {
@@ -229,6 +267,24 @@ test("planning-record status is edit-only and no longer sent on create", () => {
   assert.match(source, /if \(includeVersion && selectedPlanningRecord\.value\) \{[\s\S]*payload\.version_no = selectedPlanningRecord\.value\.version_no;[\s\S]*payload\.status = planningDraft\.status \|\| selectedPlanningRecord\.value\.status \|\| "active";/s);
 });
 
+test("planning-record overview explains immutable mode and exposes explicit lifecycle actions", () => {
+  assert.match(source, /<select v-model="planningDraft\.planning_mode_code" :disabled="!isCreatingPlanning">/);
+  assert.match(source, /v-if="!isCreatingPlanning && selectedPlanningRecord" class="field-help">[\s\S]*tp\("planningModeImmutableHelp"\)/s);
+  assert.match(source, /tp\("actionsDeactivatePlanningRecord"\)/);
+  assert.match(source, /tp\("actionsReactivatePlanningRecord"\)/);
+  assert.match(source, /tp\("actionsArchivePlanningRecord"\)/);
+  assert.match(source, /tp\("actionsCreateReplacementPlanning"\)/);
+  assert.match(source, /async function deactivatePlanningRecord\(\)/);
+  assert.match(source, /async function reactivatePlanningRecord\(\)/);
+  assert.match(source, /async function archivePlanningRecord\(\)/);
+  assert.match(source, /status: "inactive"/);
+  assert.match(source, /status: "active"/);
+  assert.match(source, /archived_at: new Date\(\)\.toISOString\(\)/);
+  assert.match(source, /function startReplacementPlanning\(\)/);
+  assert.match(source, /function prefillReplacementPlanningDraft\(\)/);
+  assert.doesNotMatch(source, /Delete planning/i);
+});
+
 test("planning-record update payload excludes unsupported mode and parent top-level fields", () => {
   assert.match(source, /function buildPlanningPayload\(includeVersion = false\) \{/);
   assert.match(source, /const payload: Record<string, unknown> = \{[\s\S]*dispatcher_user_id:[\s\S]*name:[\s\S]*planning_from:[\s\S]*planning_to:[\s\S]*notes:/s);
@@ -272,8 +328,8 @@ test("planning-record dispatcher selector shows IAM guidance and defaults only f
 test("planning-orders exposes inline setup links, add buttons, and real create modals", () => {
   assert.match(source, /@click="openPlanningSetup\('requirement_type'\)"/);
   assert.match(source, /@click="openPlanningSetup\('patrol_route'\)"/);
-  assert.match(source, /@click="openRequirementTypeModal"/);
-  assert.match(source, /@click="openPatrolRouteModal"/);
+  assert.match(source, /@mousedown\.stop[\s\S]*@click\.stop="openRequirementTypeModal"/);
+  assert.match(source, /@mousedown\.stop[\s\S]*@click\.stop="openPatrolRouteModal"/);
   assert.match(source, /v-model:open="requirementTypeModal\.open"/);
   assert.match(source, /v-model:open="patrolRouteModal\.open"/);
   assert.match(source, /@ok="submitRequirementTypeModal"/);
