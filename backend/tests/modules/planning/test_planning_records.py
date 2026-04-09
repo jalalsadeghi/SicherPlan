@@ -11,10 +11,17 @@ from app.modules.iam.audit_service import AuditService
 from app.modules.planning.planning_record_service import PlanningRecordService
 from app.modules.planning.schemas import (
     EventPlanDetailCreate,
+    EventPlanDetailUpdate,
+    PatrolPlanDetailCreate,
+    PatrolPlanDetailUpdate,
     PlanningRecordCreate,
     PlanningRecordFilter,
     PlanningRecordReleaseStateUpdate,
+    PlanningRecordUpdate,
     SitePlanDetailCreate,
+    SitePlanDetailUpdate,
+    TradeFairPlanDetailCreate,
+    TradeFairPlanDetailUpdate,
 )
 from tests.modules.planning.test_customer_orders import FakeCustomerOrderRepository, FakeOrderDocumentRepository
 from tests.modules.planning.test_ops_master_foundation import RecordingAuditRepository, _context
@@ -147,7 +154,12 @@ class FakePlanningRecordRepository(FakeCustomerOrderRepository):
             return None
         if payload.version_no != row.version_no:
             raise ApiException(409, "planning.planning_record.stale_version", "errors.planning.planning_record.stale_version")
-        for key, value in payload.model_dump(exclude_unset=True, exclude={"version_no", "event_detail", "site_detail", "trade_fair_detail", "patrol_detail"}).items():
+        if any(
+            key in payload.model_dump(exclude_unset=True)
+            for key in ("event_detail", "site_detail", "trade_fair_detail", "patrol_detail")
+        ):
+            raise AttributeError("'dict' object has no attribute '_sa_instance_state'")
+        for key, value in payload.model_dump(exclude_unset=True, exclude={"version_no"}).items():
             setattr(row, key, value)
         row.version_no += 1
         row.updated_at = datetime.now(UTC)
@@ -450,6 +462,147 @@ class PlanningRecordServiceTests(unittest.TestCase):
         )
         self.assertEqual(row.release_state, "release_ready")
         self.assertEqual(len(filtered), 1)
+
+    def test_update_site_record_persists_scalar_and_site_detail_without_relationship_crash(self) -> None:
+        created = self.service.create_planning_record(
+            "tenant-1",
+            PlanningRecordCreate(
+                tenant_id="tenant-1",
+                order_id=self.order_id,
+                planning_mode_code="site",
+                name="Site Plan",
+                planning_from=date(2026, 9, 1),
+                planning_to=date(2026, 9, 2),
+                site_detail=SitePlanDetailCreate(site_id=self.site_id, watchbook_scope_note="Alt"),
+            ),
+            self.actor,
+        )
+        self.repository.sites["site-2"] = SimpleNamespace(id="site-2", tenant_id="tenant-1", customer_id="customer-1")
+
+        updated = self.service.update_planning_record(
+            "tenant-1",
+            created.id,
+            PlanningRecordUpdate(
+                dispatcher_user_id="dispatcher-1",
+                name="Site Plan Updated",
+                planning_from=date(2026, 9, 2),
+                planning_to=date(2026, 9, 3),
+                notes="Neue Notiz",
+                status="inactive",
+                version_no=created.version_no,
+                site_detail=SitePlanDetailUpdate(site_id="site-2", watchbook_scope_note="Neu"),
+            ),
+            self.actor,
+        )
+
+        self.assertEqual(updated.name, "Site Plan Updated")
+        self.assertEqual(updated.dispatcher_user_id, "dispatcher-1")
+        self.assertEqual(updated.status, "inactive")
+        self.assertEqual(updated.site_detail.site_id, "site-2")
+        self.assertEqual(updated.site_detail.watchbook_scope_note, "Neu")
+
+    def test_update_event_record_persists_event_detail_without_relationship_crash(self) -> None:
+        created = self.service.create_planning_record(
+            "tenant-1",
+            PlanningRecordCreate(
+                tenant_id="tenant-1",
+                order_id=self.order_id,
+                planning_mode_code="event",
+                name="Event Plan",
+                planning_from=date(2026, 9, 1),
+                planning_to=date(2026, 9, 2),
+                event_detail=EventPlanDetailCreate(event_venue_id=self.event_venue_id, setup_note="Alt"),
+            ),
+            self.actor,
+        )
+        self.repository.event_venues["venue-2"] = SimpleNamespace(id="venue-2", tenant_id="tenant-1", customer_id="customer-1")
+
+        updated = self.service.update_planning_record(
+            "tenant-1",
+            created.id,
+            PlanningRecordUpdate(
+                name="Event Plan Updated",
+                version_no=created.version_no,
+                event_detail=EventPlanDetailUpdate(event_venue_id="venue-2", setup_note="Neu"),
+            ),
+            self.actor,
+        )
+
+        self.assertEqual(updated.name, "Event Plan Updated")
+        self.assertEqual(updated.event_detail.event_venue_id, "venue-2")
+        self.assertEqual(updated.event_detail.setup_note, "Neu")
+
+    def test_update_trade_fair_record_persists_trade_fair_detail_without_relationship_crash(self) -> None:
+        created = self.service.create_planning_record(
+            "tenant-1",
+            PlanningRecordCreate(
+                tenant_id="tenant-1",
+                order_id=self.order_id,
+                planning_mode_code="trade_fair",
+                name="Fair Plan",
+                planning_from=date(2026, 9, 1),
+                planning_to=date(2026, 9, 2),
+                trade_fair_detail=TradeFairPlanDetailCreate(
+                    trade_fair_id=self.trade_fair_id,
+                    trade_fair_zone_id=self.trade_fair_zone_id,
+                    stand_note="Alt",
+                ),
+            ),
+            self.actor,
+        )
+        self.repository.trade_fairs["fair-2"] = SimpleNamespace(id="fair-2", tenant_id="tenant-1", customer_id="customer-1")
+        self.repository.trade_fair_zones["zone-2"] = SimpleNamespace(id="zone-2", tenant_id="tenant-1", trade_fair_id="fair-2")
+
+        updated = self.service.update_planning_record(
+            "tenant-1",
+            created.id,
+            PlanningRecordUpdate(
+                name="Fair Plan Updated",
+                version_no=created.version_no,
+                trade_fair_detail=TradeFairPlanDetailUpdate(
+                    trade_fair_id="fair-2",
+                    trade_fair_zone_id="zone-2",
+                    stand_note="Neu",
+                ),
+            ),
+            self.actor,
+        )
+
+        self.assertEqual(updated.name, "Fair Plan Updated")
+        self.assertEqual(updated.trade_fair_detail.trade_fair_id, "fair-2")
+        self.assertEqual(updated.trade_fair_detail.trade_fair_zone_id, "zone-2")
+        self.assertEqual(updated.trade_fair_detail.stand_note, "Neu")
+
+    def test_update_patrol_record_persists_patrol_detail_without_relationship_crash(self) -> None:
+        created = self.service.create_planning_record(
+            "tenant-1",
+            PlanningRecordCreate(
+                tenant_id="tenant-1",
+                order_id=self.order_id,
+                planning_mode_code="patrol",
+                name="Patrol Plan",
+                planning_from=date(2026, 9, 1),
+                planning_to=date(2026, 9, 2),
+                patrol_detail=PatrolPlanDetailCreate(patrol_route_id=self.patrol_route_id, execution_note="Alt"),
+            ),
+            self.actor,
+        )
+        self.repository.patrol_routes["route-2"] = SimpleNamespace(id="route-2", tenant_id="tenant-1", customer_id="customer-1")
+
+        updated = self.service.update_planning_record(
+            "tenant-1",
+            created.id,
+            PlanningRecordUpdate(
+                notes="Patrol note",
+                version_no=created.version_no,
+                patrol_detail=PatrolPlanDetailUpdate(patrol_route_id="route-2", execution_note="Neu"),
+            ),
+            self.actor,
+        )
+
+        self.assertEqual(updated.notes, "Patrol note")
+        self.assertEqual(updated.patrol_detail.patrol_route_id, "route-2")
+        self.assertEqual(updated.patrol_detail.execution_note, "Neu")
 
     def test_lists_dispatcher_candidates_with_readable_labels(self) -> None:
         self.repository.user_accounts["dispatcher-2"] = SimpleNamespace(

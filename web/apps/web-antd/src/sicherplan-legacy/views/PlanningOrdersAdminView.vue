@@ -2233,15 +2233,17 @@ async function refreshTradeFairZoneOptions(tradeFairId: string) {
 function buildPlanningPayload(includeVersion = false) {
   const payload: Record<string, unknown> = {
     tenant_id: tenantScopeId.value,
-    order_id: selectedOrderId.value,
     dispatcher_user_id: planningDraft.dispatcher_user_id || null,
-    parent_planning_record_id: planningDraft.parent_planning_record_id || null,
-    planning_mode_code: planningDraft.planning_mode_code,
     name: planningDraft.name,
     planning_from: planningDraft.planning_from,
     planning_to: planningDraft.planning_to,
     notes: planningDraft.notes || null,
   };
+  if (!includeVersion) {
+    payload.order_id = selectedOrderId.value;
+    payload.parent_planning_record_id = planningDraft.parent_planning_record_id || null;
+    payload.planning_mode_code = planningDraft.planning_mode_code;
+  }
   if (planningDraft.planning_mode_code === "event") {
     payload.event_detail = {
       event_venue_id: planningDraft.event_detail.event_venue_id,

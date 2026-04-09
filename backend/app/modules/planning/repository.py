@@ -929,7 +929,14 @@ class SqlAlchemyPlanningRepository:
         return self._create_row(row)
 
     def update_planning_record(self, tenant_id: str, planning_record_id: str, payload: PlanningRecordUpdate, actor_user_id: str | None) -> PlanningRecord | None:
-        return self._update_row(PlanningRecord, tenant_id, planning_record_id, payload, actor_user_id)
+        return self._update_row(
+            PlanningRecord,
+            tenant_id,
+            planning_record_id,
+            payload,
+            actor_user_id,
+            exclude_fields={"event_detail", "site_detail", "trade_fair_detail", "patrol_detail"},
+        )
 
     def save_planning_record(self, row: PlanningRecord) -> PlanningRecord:
         self._commit_or_raise()
@@ -1767,12 +1774,16 @@ class SqlAlchemyPlanningRepository:
         actor_user_id: str | None,
         *,
         extra_options: Sequence[object] = (),
+        exclude_fields: set[str] | None = None,
     ):
         row = self._get_row(model, tenant_id, row_id, extra_options=extra_options)
         if row is None:
             return None
         self._assert_version(row.version_no, payload.version_no, model.__name__)
-        for key, value in payload.model_dump(exclude_unset=True, exclude={"version_no"}).items():
+        excluded = {"version_no"}
+        if exclude_fields:
+            excluded.update(exclude_fields)
+        for key, value in payload.model_dump(exclude_unset=True, exclude=excluded).items():
             setattr(row, key, value)
         row.updated_by_user_id = actor_user_id
         row.version_no += 1

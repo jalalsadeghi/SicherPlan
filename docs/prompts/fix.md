@@ -1,125 +1,99 @@
 You are working in the SicherPlan monorepo.
 
 Goal:
-Align Planning Setup scoping with the documented product design.
+Fix the 500 error when updating an existing planning record from P-02 (`/admin/planning-orders`, Planning records > Overview).
 
-Authoritative business rule from project docs:
-- `Requirement types` and `Equipment catalog` are reusable tenant-level catalogs.
-- `Sites`, `Event venues`, `Trade fairs`, and `Patrol routes` are customer-linked operational master data.
-- `Trade fair zones` belong to a trade fair.
-- `Patrol checkpoints` belong to a patrol route.
+Observed backend failure:
+PATCH /api/planning/tenants/{tenant_id}/ops/planning-records/{planning_record_id}
+raises:
+AttributeError: 'dict' object has no attribute '_sa_instance_state'
 
-Current implementation drift to fix:
-- The current repo requires `customer_id` for `ops.requirement_type` and `ops.equipment_item`.
-- P-01 (`admin/planning`) shows customer selection for these two entities.
-- P-02 (`admin/planning-orders`) filters requirement types and equipment by selected customer.
-- Order-service currently enforces requirement-type/customer matching.
-- This behavior is not aligned with the uploaded design documents.
+Root cause to fix:
+- Frontend sends nested mode detail payloads on update (`event_detail`, `site_detail`, `trade_fair_detail`, `patrol_detail`).
+- `PlanningRecordService.update_planning_record()` passes the full `PlanningRecordUpdate` payload into `repository.update_planning_record(...)`.
+- `repository._update_row()` blindly iterates through `payload.model_dump(...)` and does `setattr(row, key, value)`.
+- On `PlanningRecord`, the detail fields are SQLAlchemy relationships, so assigning a plain dict to them crashes.
 
-Target behavior:
-1. Tenant-level, define once and reuse everywhere in tenant:
-   - Requirement types
-   - Equipment catalog
-2. Customer-linked:
-   - Sites
-   - Event venues
-   - Trade fairs
-   - Patrol routes
-3. Child entities remain unchanged:
-   - Trade fair zones under trade fairs
-   - Patrol checkpoints under patrol routes
+Relevant files:
+1. `backend/app/modules/planning/planning_record_service.py`
+2. `backend/app/modules/planning/repository.py`
+3. `backend/app/modules/planning/models.py`
+4. `backend/app/modules/planning/schemas.py`
+5. `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue`
 
-Required changes
+Required fix:
+1. Ensure update of an existing planning record never sends nested detail dictionaries into the generic ORM row updater.
+2. Keep the current create flow intact.
+3. Preserve the existing specialized detail update methods:
+   - `update_event_plan_detail`
+   - `update_site_plan_detail`
+   - `update_trade_fair_plan_detail`
+   - `update_patrol_plan_detail`
 
-A) Backend/domain alignment
-Inspect and update the relevant planning backend files, especially:
-- `backend/app/modules/planning/models.py`
-- `backend/app/modules/planning/schemas.py`
-- `backend/app/modules/planning/service.py`
-- `backend/app/modules/planning/ops_service.py`
-- `backend/app/modules/planning/order_service.py`
-- any related repository layer files
-- add a new Alembic migration
+Recommended implementation approach:
+A) In `PlanningRecordService.update_planning_record()`:
+- Split the incoming payload into:
+  - core/scalar planning record fields
+  - mode-specific detail fields
+- Only pass the scalar/core payload to `repository.update_planning_record(...)`
+- Then call `_update_detail_for_mode(...)` with the original detail payload
+- Re-read the record before returning, as the current code already intends
 
-Implement this rule:
-- `ops.requirement_type` and `ops.equipment_item` must behave as tenant-scoped catalogs, not customer-scoped records.
-- Remove customer-scoping behavior from those two entities.
-- Keep customer-scoping for `site`, `event_venue`, `trade_fair`, and `patrol_route`.
+The scalar/core update payload should include only supported top-level fields such as:
+- `dispatcher_user_id`
+- `name`
+- `planning_from`
+- `planning_to`
+- `notes`
+- `status`
+- `archived_at`
+- `version_no`
 
-Migration strategy:
-- Add a safe migration that removes the requirement that `customer_id` must be set for `requirement_type` and `equipment_item`.
-- Prefer backward-compatible migration behavior.
-- If dropping the column completely is too invasive for this iteration, make it nullable and stop using it in business logic and UI.
-- Preserve existing data.
-- Because code uniqueness is already tenant-level, do not introduce duplicate-code regressions.
+It must exclude:
+- `event_detail`
+- `site_detail`
+- `trade_fair_detail`
+- `patrol_detail`
 
-Business logic changes:
-- Remove requirement-type/customer mismatch validation from order creation/update logic.
-- Ensure equipment items are treated as tenant-wide catalog items.
-- Keep customer-bound validation for site/event venue/trade fair/patrol route.
+B) Optionally harden repository layer:
+- Add an `exclude_fields` parameter to `_update_row(...)`
+- Use it for `PlanningRecord` updates so relationship payloads can never be assigned by mistake
+- This is optional but preferred as defensive design
 
-B) P-01 Planning Setup UI
-Inspect and update:
-- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOpsAdminView.vue`
-- any related helper/i18n/test files
+C) Add regression tests
+Add backend tests that prove:
+1. Updating a site-mode planning record with `site_detail` no longer crashes
+2. Updating an event-mode planning record with `event_detail` no longer crashes
+3. Updating a trade-fair-mode planning record with `trade_fair_detail` no longer crashes
+4. Updating a patrol-mode planning record with `patrol_detail` no longer crashes
+5. Scalar fields like `name`, `planning_from`, `planning_to`, `notes`, `status`, and `dispatcher_user_id` still persist correctly
+6. The specialized detail rows are actually updated, not ignored
 
-Implement:
-- Requirement types and equipment items must no longer require customer selection in the form.
-- Sites, event venues, trade fairs, and patrol routes must still require customer selection.
-- Replace generic “all non-child entities use customer” logic with an explicit scoping model, for example:
-  - tenant-scoped entities
-  - customer-scoped entities
-  - child entities
+Important side observation:
+- The current frontend update payload includes `planning_mode_code` and `parent_planning_record_id`
+- But `PlanningRecordUpdate` in `schemas.py` does not currently support those fields
+- Do NOT silently broaden behavior unless intended
+- Either:
+  - keep them unsupported and make the update path ignore them safely, or
+  - explicitly add full backend support if you determine that existing-record editing of those fields is required
+- If you do not add backend support, ensure the frontend does not misleadingly imply that these fields are editable on existing records
 
-Also update:
-- import template / CSV expectations if they currently require customer_id for requirement_type or equipment_item
-- validation messages if needed
-- relevant tests
+Non-goals:
+- Do not redesign P-02
+- Do not change planning record create semantics
+- Do not change release-state behavior
+- Do not change commercial-link logic
+- Do not touch unrelated planning modules
 
-C) P-02 Orders & Planning Records UI
-Inspect and update:
-- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue`
-- `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningOrders.helpers.js`
-- related tests / i18n files
+Acceptance criteria:
+1. PATCH update for existing planning records no longer returns 500
+2. Nested mode detail updates persist correctly
+3. No dict is assigned to SQLAlchemy relationship attributes in generic row update
+4. Existing create flow still works
+5. Tests cover the regression
 
-Implement:
-- Requirement type selector must show all tenant-level requirement types, regardless of selected customer.
-- Equipment item selector must show all tenant-level equipment items, regardless of selected customer.
-- Keep customer filtering for:
-  - event venues
-  - sites
-  - trade fairs
-  - patrol routes
-- Do not change the current customer filtering for customer-linked operational entities.
-
-D) Tests
-Update or add tests for:
-- tenant-scoped requirement types in P-01
-- tenant-scoped equipment catalog in P-01
-- P-02 requirement type selector no longer filtered by customer
-- P-02 equipment selector no longer filtered by customer
-- customer-linked entities still filtered by customer
-- order-service no longer rejects tenant-level requirement types because of customer mismatch
-
-Acceptance criteria
-1. I can create one requirement type once in the tenant and reuse it for multiple customers’ orders.
-2. I can create one equipment item once in the tenant and reuse it for multiple customers’ orders.
-3. Sites, event venues, trade fairs, and patrol routes remain customer-linked.
-4. Trade fair zones and patrol checkpoints remain child entities.
-5. P-01 no longer asks for customer on requirement type / equipment item.
-6. P-02 still filters location-like entities by customer, but not requirement types or equipment items.
-7. No regression in planning order creation, equipment lines, requirement lines, or planning-record creation.
-8. Alembic migration is included and application/tests pass.
-
-Implementation notes
-- Keep changes domain-driven and minimal.
-- Do not redesign unrelated screens.
-- Do not loosen authorization rules.
-- Keep naming and style consistent with existing SicherPlan patterns.
-
-Deliverables
-- code changes
-- migration
-- updated tests
-- short summary of what changed
-- any remaining compatibility notes
+Deliverables:
+- updated service/repository code
+- regression tests
+- short summary of the root cause and the fix
+- note whether `planning_mode_code` / `parent_planning_record_id` remain unsupported on update or were explicitly implemented

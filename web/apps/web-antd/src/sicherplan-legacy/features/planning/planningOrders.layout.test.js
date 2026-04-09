@@ -229,6 +229,12 @@ test("planning-record status is edit-only and no longer sent on create", () => {
   assert.match(source, /if \(includeVersion && selectedPlanningRecord\.value\) \{[\s\S]*payload\.version_no = selectedPlanningRecord\.value\.version_no;[\s\S]*payload\.status = planningDraft\.status \|\| selectedPlanningRecord\.value\.status \|\| "active";/s);
 });
 
+test("planning-record update payload excludes unsupported mode and parent top-level fields", () => {
+  assert.match(source, /function buildPlanningPayload\(includeVersion = false\) \{/);
+  assert.match(source, /const payload: Record<string, unknown> = \{[\s\S]*dispatcher_user_id:[\s\S]*name:[\s\S]*planning_from:[\s\S]*planning_to:[\s\S]*notes:/s);
+  assert.match(source, /if \(!includeVersion\) \{[\s\S]*payload\.order_id = selectedOrderId\.value;[\s\S]*payload\.parent_planning_record_id = planningDraft\.parent_planning_record_id \|\| null;[\s\S]*payload\.planning_mode_code = planningDraft\.planning_mode_code;/s);
+});
+
 test("planning-record trade-fair zone selector depends on selected trade fair", () => {
   assert.match(source, /watch\(\s*\(\) => planningDraft\.trade_fair_detail\.trade_fair_id,/);
   assert.match(source, /await refreshTradeFairZoneOptions\(tradeFairId\);/);

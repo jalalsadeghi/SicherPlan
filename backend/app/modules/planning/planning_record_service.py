@@ -157,7 +157,8 @@ class PlanningRecordService:
         if self.repository.find_planning_record_by_name(tenant_id, current.order_id, next_name, exclude_id=planning_record_id) is not None:
             raise ApiException(409, "planning.planning_record.duplicate_name", "errors.planning.planning_record.duplicate_name")
         self._validate_detail_payloads(tenant_id, order, current.planning_mode_code, payload)
-        row = self.repository.update_planning_record(tenant_id, planning_record_id, payload, actor.user_id)
+        core_payload = self._core_update_payload(payload)
+        row = self.repository.update_planning_record(tenant_id, planning_record_id, core_payload, actor.user_id)
         if row is None:
             raise self._not_found("planning_record")
         self._update_detail_for_mode(tenant_id, planning_record_id, current.planning_mode_code, payload)
@@ -478,6 +479,20 @@ class PlanningRecordService:
     @staticmethod
     def _field_value(payload, field_name: str, current_value):
         return payload.model_dump(exclude_unset=True).get(field_name, current_value)
+
+    @staticmethod
+    def _core_update_payload(payload: PlanningRecordUpdate) -> PlanningRecordUpdate:
+        core_fields = {
+            "dispatcher_user_id",
+            "name",
+            "planning_from",
+            "planning_to",
+            "notes",
+            "status",
+            "archived_at",
+            "version_no",
+        }
+        return PlanningRecordUpdate(**{key: value for key, value in payload.model_dump(exclude_unset=True).items() if key in core_fields})
 
     def _not_found(self, resource: str) -> ApiException:
         return ApiException(404, f"planning.{resource}.not_found", f"errors.planning.{resource}.not_found")
