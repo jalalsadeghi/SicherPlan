@@ -43,7 +43,10 @@
             <p class="eyebrow">{{ tp("templatesTitle") }}</p>
             <h3>{{ tp("templatesTitle") }}</h3>
           </div>
-          <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreateTemplate" @click="startCreateTemplate">{{ tp("actionsCreateTemplate") }}</button>
+          <div class="cta-row">
+            <button class="cta-button cta-secondary" type="button" @click="refreshTemplates">{{ tp("actionsRefresh") }}</button>
+            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreateTemplate" @click="startCreateTemplate">{{ tp("actionsCreateTemplate") }}</button>
+          </div>
         </div>
         <div class="planning-orders-list">
           <button
@@ -244,6 +247,29 @@
           </div>
         </form>
         <form v-if="selectedSeriesId" class="planning-orders-form" @submit.prevent="submitException">
+          <div class="planning-orders-panel__header">
+            <div>
+              <p class="eyebrow">{{ tp("exceptionsTitle") }}</p>
+              <h4>{{ tp("exceptionsTitle") }}</h4>
+            </div>
+            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageExceptions" @click="startCreateException">{{ tp("actionsNewException") }}</button>
+          </div>
+          <div v-if="seriesExceptions.length" class="planning-orders-list">
+            <button
+              v-for="exception in seriesExceptions"
+              :key="exception.id"
+              type="button"
+              class="planning-orders-row"
+              :class="{ selected: exception.id === selectedExceptionId }"
+              @click="selectException(exception.id)"
+            >
+              <div>
+                <strong>{{ exception.exception_date }}</strong>
+                <span>{{ exception.action_code === 'override' ? tp('exceptionOverride') : tp('exceptionSkip') }}</span>
+              </div>
+            </button>
+          </div>
+          <p v-else class="planning-orders-list-empty">{{ tp("exceptionsEmpty") }}</p>
           <div class="planning-orders-form-grid">
             <label class="field-stack"><span>{{ tp("fieldsOccurrenceDate") }}</span><input v-model="exceptionDraft.exception_date" type="date" required /></label>
             <label class="field-stack">
@@ -258,7 +284,10 @@
             <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="exceptionDraft.notes" rows="2" /></label>
           </div>
           <div class="cta-row">
-            <button class="cta-button cta-secondary" type="submit" :disabled="!actionState.canManageExceptions">{{ tp("actionsCreateException") }}</button>
+            <button class="cta-button cta-secondary" type="submit" :disabled="!actionState.canManageExceptions">
+              {{ selectedExceptionId ? tp("actionsUpdateException") : tp("actionsCreateException") }}
+            </button>
+            <button class="cta-button cta-secondary" type="button" @click="resetExceptionDraft">{{ tp("actionsReset") }}</button>
           </div>
         </form>
       </section>
@@ -326,15 +355,15 @@
             <label class="field-stack"><span>{{ tp("fieldsMeetingPoint") }}</span><input v-model="shiftDraft.meeting_point" /></label>
             <label class="field-stack"><span>{{ tp("fieldsLocationText") }}</span><input v-model="shiftDraft.location_text" /></label>
             <label class="field-stack"><span>{{ tp("fieldsReleaseState") }}</span>
-              <select v-model="shiftDraft.release_state">
+              <select v-model="shiftDraft.release_state" :disabled="Boolean(selectedShiftId)">
                 <option value="draft">{{ tp("statusDraft") }}</option>
                 <option value="release_ready">{{ tp("statusReleaseReady") }}</option>
                 <option value="released">{{ tp("statusReleased") }}</option>
               </select>
             </label>
             <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="shiftDraft.notes" rows="2" /></label>
-            <label class="planning-orders-checkbox"><input v-model="shiftDraft.customer_visible_flag" type="checkbox" /><span>{{ tp("fieldsVisibilityCustomer") }}</span></label>
-            <label class="planning-orders-checkbox"><input v-model="shiftDraft.subcontractor_visible_flag" type="checkbox" /><span>{{ tp("fieldsVisibilitySubcontractor") }}</span></label>
+            <label class="planning-orders-checkbox"><input v-model="shiftDraft.customer_visible_flag" type="checkbox" :disabled="Boolean(selectedShiftId)" /><span>{{ tp("fieldsVisibilityCustomer") }}</span></label>
+            <label class="planning-orders-checkbox"><input v-model="shiftDraft.subcontractor_visible_flag" type="checkbox" :disabled="Boolean(selectedShiftId)" /><span>{{ tp("fieldsVisibilitySubcontractor") }}</span></label>
             <label class="planning-orders-checkbox"><input v-model="shiftDraft.stealth_mode_flag" type="checkbox" /><span>{{ tp("fieldsVisibilityStealth") }}</span></label>
           </div>
           <div class="cta-row">
@@ -342,6 +371,49 @@
             <button class="cta-button cta-secondary" type="button" @click="resetShiftDraft">{{ tp("actionsReset") }}</button>
           </div>
         </form>
+        <section v-if="selectedShiftId && selectedShiftDiagnostics" class="planning-orders-form planning-shifts-release-panel" data-testid="planning-shifts-release-panel">
+          <div class="planning-orders-panel__header">
+            <div>
+              <p class="eyebrow">{{ tp("releaseSectionTitle") }}</p>
+              <h4>{{ tp("releaseSectionTitle") }}</h4>
+            </div>
+            <button class="cta-button cta-secondary" type="button" @click="refreshSelectedShift">{{ tp("actionsRefresh") }}</button>
+          </div>
+          <div class="planning-shifts-release-grid">
+            <div class="planning-shifts-release-stat">
+              <strong>{{ tp("fieldsReleaseState") }}</strong>
+              <span>{{ releaseStateLabel(selectedShiftDiagnostics.release_state) }}</span>
+            </div>
+            <div class="planning-shifts-release-stat">
+              <strong>{{ tp("releaseBlockingCount") }}</strong>
+              <span>{{ selectedShiftDiagnostics.blocking_count }}</span>
+            </div>
+            <div class="planning-shifts-release-stat">
+              <strong>{{ tp("releaseWarningCount") }}</strong>
+              <span>{{ selectedShiftDiagnostics.warning_count }}</span>
+            </div>
+          </div>
+          <div class="planning-shifts-release-actions">
+            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canEditShift" @click="changeShiftReleaseState('draft')">{{ tp("actionsSetDraft") }}</button>
+            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canEditShift" @click="changeShiftReleaseState('release_ready')">{{ tp("actionsSetReleaseReady") }}</button>
+            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canEditShift" @click="changeShiftReleaseState('released')">{{ tp("actionsSetReleased") }}</button>
+          </div>
+          <div class="planning-shifts-release-actions">
+            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canEditShift" @click="updateSelectedShiftVisibility(true, selectedShiftDiagnostics.subcontractor_visible_flag)">{{ tp("actionsShowCustomer") }}</button>
+            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canEditShift" @click="updateSelectedShiftVisibility(selectedShiftDiagnostics.customer_visible_flag, true)">{{ tp("actionsShowSubcontractor") }}</button>
+            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canEditShift" @click="updateSelectedShiftVisibility(false, false)">{{ tp("actionsHideExternal") }}</button>
+          </div>
+          <p class="field-help">{{ tp("releaseVisibilityHelp") }}</p>
+          <div v-if="selectedShiftDiagnostics.issues.length" class="planning-shifts-release-issues">
+            <strong>{{ tp("releaseDiagnosticsTitle") }}</strong>
+            <ul>
+              <li v-for="issue in selectedShiftDiagnostics.issues" :key="`${issue.scope}-${issue.code}-${issue.message}`">
+                {{ issue.message || issue.code }}
+              </li>
+            </ul>
+          </div>
+          <p v-else class="field-help">{{ tp("releaseDiagnosticsEmpty") }}</p>
+        </section>
       </section>
 
       <section
@@ -390,7 +462,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 
 import { useSicherPlanFeedback } from "@/composables/useSicherPlanFeedback";
 import { listPlanningRecords, type PlanningRecordListItem } from "@/api/planningOrders";
@@ -401,28 +473,42 @@ import {
   createShiftSeriesException,
   createShiftTemplate,
   generateShiftSeries,
+  getShift,
   getShiftPlan,
+  getShiftReleaseDiagnostics,
+  getShiftSeries,
+  getShiftTemplate,
   listBoardShifts,
   listShiftPlans,
+  listShiftSeriesExceptions,
   listShiftSeries,
   listShiftTemplates,
   listShifts,
+  setShiftReleaseState,
   updateShift,
   updateShiftPlan,
   updateShiftSeries,
+  updateShiftSeriesException,
   updateShiftTemplate,
+  updateShiftVisibility,
   copyShiftSlice,
   type PlanningBoardShiftListItem,
   type ShiftListItem,
+  type ShiftRead,
+  type ShiftReleaseDiagnosticsRead,
   type ShiftPlanListItem,
+  type ShiftSeriesExceptionRead,
   type ShiftSeriesListItem,
+  type ShiftSeriesRead,
   type ShiftTemplateListItem,
+  type ShiftTemplateRead,
   PlanningShiftsApiError,
 } from "@/api/planningShifts";
 import { planningShiftsMessages } from "@/i18n/planningShifts.messages";
 import { useAuthStore } from "@/stores/auth";
 import { useLocaleStore } from "@/stores/locale";
 import {
+  buildShiftCopyPayload,
   derivePlanningShiftActionState,
   mapPlanningShiftApiMessage,
   recurrenceLabel,
@@ -446,10 +532,13 @@ const shiftPlans = ref<ShiftPlanListItem[]>([]);
 const seriesRows = ref<ShiftSeriesListItem[]>([]);
 const shifts = ref<ShiftListItem[]>([]);
 const boardRows = ref<PlanningBoardShiftListItem[]>([]);
+const seriesExceptions = ref<ShiftSeriesExceptionRead[]>([]);
+const selectedShiftDiagnostics = ref<ShiftReleaseDiagnosticsRead | null>(null);
 
 const selectedTemplateId = ref("");
 const selectedShiftPlanId = ref("");
 const selectedSeriesId = ref("");
+const selectedExceptionId = ref("");
 const selectedShiftId = ref("");
 const planFilters = reactive<any>({ planning_record_id: "" });
 
@@ -624,16 +713,18 @@ function resetSeriesDraft() {
   Object.assign(seriesDraft, createEmptySeriesDraft());
 }
 
+function resetExceptionDraft() {
+  Object.assign(exceptionDraft, createEmptyExceptionDraft());
+}
+
 function resetShiftDraft() {
   Object.assign(shiftDraft, createEmptyShiftDraft());
 }
 
-function selectTemplate(templateId: string) {
+async function selectTemplate(templateId: string) {
   selectedTemplateId.value = templateId;
-  const row = templates.value.find((entry) => entry.id === templateId);
-  if (row) {
-    Object.assign(templateDraft, { ...row, tenant_id: tenantScopeId.value, meeting_point: "", location_text: "", notes: "" });
-  }
+  const row = await getShiftTemplate(tenantScopeId.value, templateId, accessToken.value);
+  assignTemplateDraft(row);
 }
 
 async function selectShiftPlan(shiftPlanId: string) {
@@ -641,31 +732,58 @@ async function selectShiftPlan(shiftPlanId: string) {
   await refreshPlanDetails();
 }
 
-function selectSeries(seriesId: string) {
+async function selectSeries(seriesId: string) {
   selectedSeriesId.value = seriesId;
-  const row = seriesRows.value.find((entry) => entry.id === seriesId);
-  if (row) {
-    Object.assign(seriesDraft, { ...row, tenant_id: tenantScopeId.value });
-  }
+  await refreshSeriesDetails();
 }
 
-function selectShift(shiftId: string) {
-  selectedShiftId.value = shiftId;
-  const row = shifts.value.find((entry) => entry.id === shiftId);
+function selectException(exceptionId: string) {
+  selectedExceptionId.value = exceptionId;
+  const row = seriesExceptions.value.find((entry) => entry.id === exceptionId);
   if (row) {
-    Object.assign(shiftDraft, {
+    Object.assign(exceptionDraft, {
       ...row,
       tenant_id: tenantScopeId.value,
-      starts_at: normalizeDateTimeLocal(row.starts_at),
-      ends_at: normalizeDateTimeLocal(row.ends_at),
+      override_local_start_time: row.override_local_start_time || "",
+      override_local_end_time: row.override_local_end_time || "",
+      notes: row.notes || "",
     });
   }
 }
 
+async function selectShift(shiftId: string) {
+  selectedShiftId.value = shiftId;
+  await refreshSelectedShift();
+}
+
 function startCreateTemplate() { resetTemplateDraft(); selectedTemplateId.value = ""; }
-function startCreatePlan() { resetShiftPlanDraft(); selectedShiftPlanId.value = ""; seriesRows.value = []; shifts.value = []; }
-function startCreateSeries() { resetSeriesDraft(); selectedSeriesId.value = ""; }
-function startCreateShift() { resetShiftDraft(); selectedShiftId.value = ""; }
+function startCreatePlan() {
+  resetShiftPlanDraft();
+  selectedShiftPlanId.value = "";
+  selectedSeriesId.value = "";
+  selectedExceptionId.value = "";
+  selectedShiftId.value = "";
+  seriesRows.value = [];
+  seriesExceptions.value = [];
+  shifts.value = [];
+  selectedShiftDiagnostics.value = null;
+}
+function startCreateSeries() {
+  resetSeriesDraft();
+  resetExceptionDraft();
+  selectedSeriesId.value = "";
+  selectedExceptionId.value = "";
+  seriesExceptions.value = [];
+}
+function startCreateException() {
+  resetExceptionDraft();
+  selectedExceptionId.value = "";
+}
+function startCreateShift() {
+  resetShiftDraft();
+  selectedShiftId.value = "";
+  selectedShiftDiagnostics.value = null;
+}
 
 async function refreshTemplates() {
   templates.value = await listShiftTemplates(tenantScopeId.value, accessToken.value, {});
@@ -690,6 +808,39 @@ async function refreshPlanDetails() {
   seriesRows.value = await listShiftSeries(tenantScopeId.value, selectedShiftPlanId.value, accessToken.value);
   shifts.value = await listShifts(tenantScopeId.value, accessToken.value, { ...shiftFilters, shift_plan_id: selectedShiftPlanId.value });
   Object.assign(shiftPlanDraft, { ...plan, tenant_id: tenantScopeId.value });
+  if (selectedSeriesId.value && !seriesRows.value.some((entry) => entry.id === selectedSeriesId.value)) {
+    selectedSeriesId.value = "";
+    selectedExceptionId.value = "";
+    seriesExceptions.value = [];
+  }
+  if (selectedShiftId.value && !shifts.value.some((entry) => entry.id === selectedShiftId.value)) {
+    selectedShiftId.value = "";
+    selectedShiftDiagnostics.value = null;
+  }
+}
+
+async function refreshSeriesDetails() {
+  if (!selectedSeriesId.value) return;
+  const [series, exceptions] = await Promise.all([
+    getShiftSeries(tenantScopeId.value, selectedSeriesId.value, accessToken.value),
+    listShiftSeriesExceptions(tenantScopeId.value, selectedSeriesId.value, accessToken.value),
+  ]);
+  assignSeriesDraft(series);
+  seriesExceptions.value = exceptions;
+  if (selectedExceptionId.value && !exceptions.some((entry) => entry.id === selectedExceptionId.value)) {
+    selectedExceptionId.value = "";
+    resetExceptionDraft();
+  }
+}
+
+async function refreshSelectedShift() {
+  if (!selectedShiftId.value) return;
+  const [shift, diagnostics] = await Promise.all([
+    getShift(tenantScopeId.value, selectedShiftId.value, accessToken.value),
+    getShiftReleaseDiagnostics(tenantScopeId.value, selectedShiftId.value, accessToken.value),
+  ]);
+  assignShiftDraft(shift);
+  selectedShiftDiagnostics.value = diagnostics;
 }
 
 async function refreshShifts() {
@@ -707,13 +858,20 @@ async function refreshBoard() {
 
 async function submitTemplate() {
   try {
-    templateDraft.tenant_id = tenantScopeId.value;
+    const payload = {
+      ...templateDraft,
+      tenant_id: tenantScopeId.value,
+    };
     if (selectedTemplateId.value) {
-      await updateShiftTemplate(tenantScopeId.value, selectedTemplateId.value, accessToken.value, templateDraft);
+      await updateShiftTemplate(tenantScopeId.value, selectedTemplateId.value, accessToken.value, payload);
     } else {
-      await createShiftTemplate(tenantScopeId.value, accessToken.value, templateDraft);
+      const created = await createShiftTemplate(tenantScopeId.value, accessToken.value, payload);
+      selectedTemplateId.value = created.id;
     }
     await refreshTemplates();
+    if (selectedTemplateId.value) {
+      await selectTemplate(selectedTemplateId.value);
+    }
     setFeedback("success", tp("successTitle"), tp("saved"));
   } catch (error) {
     handleApiError(error);
@@ -722,11 +880,14 @@ async function submitTemplate() {
 
 async function submitShiftPlan() {
   try {
-    shiftPlanDraft.tenant_id = tenantScopeId.value;
+    const payload = {
+      ...shiftPlanDraft,
+      tenant_id: tenantScopeId.value,
+    };
     if (selectedShiftPlanId.value) {
-      await updateShiftPlan(tenantScopeId.value, selectedShiftPlanId.value, accessToken.value, shiftPlanDraft);
+      await updateShiftPlan(tenantScopeId.value, selectedShiftPlanId.value, accessToken.value, payload);
     } else {
-      const created = await createShiftPlan(tenantScopeId.value, accessToken.value, shiftPlanDraft);
+      const created = await createShiftPlan(tenantScopeId.value, accessToken.value, payload);
       selectedShiftPlanId.value = created.id;
     }
     await refreshPlans();
@@ -739,18 +900,20 @@ async function submitShiftPlan() {
 
 async function submitSeries() {
   try {
-    seriesDraft.tenant_id = tenantScopeId.value;
-    seriesDraft.shift_plan_id = selectedShiftPlanId.value;
-    if (!seriesDraft.shift_template_id && selectedTemplateId.value) {
-      seriesDraft.shift_template_id = selectedTemplateId.value;
-    }
+    const payload = {
+      ...seriesDraft,
+      tenant_id: tenantScopeId.value,
+      shift_plan_id: selectedShiftPlanId.value,
+      shift_template_id: seriesDraft.shift_template_id || selectedTemplateId.value || "",
+    };
     if (selectedSeriesId.value) {
-      await updateShiftSeries(tenantScopeId.value, selectedSeriesId.value, accessToken.value, seriesDraft);
+      await updateShiftSeries(tenantScopeId.value, selectedSeriesId.value, accessToken.value, payload);
     } else {
-      const created = await createShiftSeries(tenantScopeId.value, selectedShiftPlanId.value, accessToken.value, seriesDraft);
+      const created = await createShiftSeries(tenantScopeId.value, selectedShiftPlanId.value, accessToken.value, payload);
       selectedSeriesId.value = created.id;
     }
     seriesRows.value = await listShiftSeries(tenantScopeId.value, selectedShiftPlanId.value, accessToken.value);
+    await refreshSeriesDetails();
     setFeedback("success", tp("successTitle"), tp("saved"));
   } catch (error) {
     handleApiError(error);
@@ -772,9 +935,17 @@ async function generateSelectedSeries() {
 async function submitException() {
   if (!selectedSeriesId.value) return;
   try {
-    exceptionDraft.tenant_id = tenantScopeId.value;
-    await createShiftSeriesException(tenantScopeId.value, selectedSeriesId.value, accessToken.value, exceptionDraft);
-    seriesRows.value = await listShiftSeries(tenantScopeId.value, selectedShiftPlanId.value, accessToken.value);
+    const payload = {
+      ...exceptionDraft,
+      tenant_id: tenantScopeId.value,
+    };
+    if (selectedExceptionId.value) {
+      await updateShiftSeriesException(tenantScopeId.value, selectedExceptionId.value, accessToken.value, payload);
+    } else {
+      const created = await createShiftSeriesException(tenantScopeId.value, selectedSeriesId.value, accessToken.value, payload);
+      selectedExceptionId.value = created.id;
+    }
+    await refreshSeriesDetails();
     setFeedback("success", tp("successTitle"), tp("saved"));
   } catch (error) {
     handleApiError(error);
@@ -784,17 +955,24 @@ async function submitException() {
 async function submitShift() {
   if (!selectedShiftPlanId.value) return;
   try {
-    shiftDraft.tenant_id = tenantScopeId.value;
-    shiftDraft.shift_plan_id = selectedShiftPlanId.value;
-    shiftDraft.starts_at = fromDateTimeLocal(shiftDraft.starts_at);
-    shiftDraft.ends_at = fromDateTimeLocal(shiftDraft.ends_at);
+    const payload = {
+      ...shiftDraft,
+      tenant_id: tenantScopeId.value,
+      shift_plan_id: selectedShiftPlanId.value,
+      starts_at: fromDateTimeLocal(shiftDraft.starts_at),
+      ends_at: fromDateTimeLocal(shiftDraft.ends_at),
+    };
     if (selectedShiftId.value) {
-      await updateShift(tenantScopeId.value, selectedShiftId.value, accessToken.value, shiftDraft);
+      await updateShift(tenantScopeId.value, selectedShiftId.value, accessToken.value, payload);
     } else {
-      await createShift(tenantScopeId.value, accessToken.value, shiftDraft);
+      const created = await createShift(tenantScopeId.value, accessToken.value, payload);
+      selectedShiftId.value = created.id;
     }
     await refreshShifts();
     await refreshBoard();
+    if (selectedShiftId.value) {
+      await refreshSelectedShift();
+    }
     setFeedback("success", tp("successTitle"), tp("saved"));
   } catch (error) {
     handleApiError(error);
@@ -812,17 +990,48 @@ async function copyOneWeek() {
 async function executeCopy(deltaDays: number) {
   if (!selectedShiftPlanId.value || !shiftFilters.date_from) return;
   try {
-    const source = shiftFilters.date_from;
-    const target = addDays(source, deltaDays);
-    await copyShiftSlice(tenantScopeId.value, selectedShiftPlanId.value, accessToken.value, {
-      source_from: source,
-      source_to: source,
-      target_from: target,
-      duplicate_mode: "skip_existing",
-    });
+    await copyShiftSlice(
+      tenantScopeId.value,
+      selectedShiftPlanId.value,
+      accessToken.value,
+      buildShiftCopyPayload(shiftFilters.date_from, deltaDays),
+    );
     await refreshShifts();
     await refreshBoard();
     setFeedback("success", tp("successTitle"), tp("copied"));
+  } catch (error) {
+    handleApiError(error);
+  }
+}
+
+async function changeShiftReleaseState(releaseState: string) {
+  if (!selectedShiftId.value) return;
+  try {
+    await setShiftReleaseState(tenantScopeId.value, selectedShiftId.value, accessToken.value, {
+      release_state: releaseState,
+      version_no: shiftDraft.version_no,
+    });
+    await refreshShifts();
+    await refreshBoard();
+    await refreshSelectedShift();
+    setFeedback("success", tp("successTitle"), tp("saved"));
+  } catch (error) {
+    handleApiError(error);
+  }
+}
+
+async function updateSelectedShiftVisibility(customerVisibleFlag: boolean, subcontractorVisibleFlag: boolean) {
+  if (!selectedShiftId.value) return;
+  try {
+    await updateShiftVisibility(tenantScopeId.value, selectedShiftId.value, accessToken.value, {
+      customer_visible_flag: customerVisibleFlag,
+      subcontractor_visible_flag: subcontractorVisibleFlag,
+      version_no: shiftDraft.version_no,
+    });
+    await refreshShifts();
+    await refreshBoard();
+    await refreshSelectedShift();
+    setFeedback("success", tp("successTitle"), tp("saved"));
   } catch (error) {
     handleApiError(error);
   }
@@ -838,6 +1047,13 @@ function recurrenceLabelText(value: string) {
   const key = recurrenceLabel(value);
   if (key === "daily") return tp("recurrenceDaily");
   if (key === "weekly") return tp("recurrenceWeekly");
+  return value;
+}
+
+function releaseStateLabel(value: string) {
+  if (value === "draft") return tp("statusDraft");
+  if (value === "release_ready") return tp("statusReleaseReady");
+  if (value === "released") return tp("statusReleased");
   return value;
 }
 
@@ -873,10 +1089,39 @@ function toDateTimeLocal(value: Date) {
   return value.toISOString().slice(0, 16);
 }
 
-function addDays(value: string, delta: number) {
-  const parsed = new Date(`${value}T00:00:00Z`);
-  parsed.setUTCDate(parsed.getUTCDate() + delta);
-  return parsed.toISOString().slice(0, 10);
+function assignTemplateDraft(row: ShiftTemplateRead) {
+  Object.assign(templateDraft, {
+    ...row,
+    tenant_id: tenantScopeId.value,
+    meeting_point: row.meeting_point || "",
+    location_text: row.location_text || "",
+    notes: row.notes || "",
+  });
+}
+
+function assignSeriesDraft(row: ShiftSeriesRead) {
+  Object.assign(seriesDraft, {
+    ...row,
+    tenant_id: tenantScopeId.value,
+    shift_template_id: row.shift_template_id || "",
+    weekday_mask: normalizeWeekdayMask(row.weekday_mask),
+    notes: row.notes || "",
+    shift_type_code: row.shift_type_code || "",
+    meeting_point: row.meeting_point || "",
+    location_text: row.location_text || "",
+  });
+}
+
+function assignShiftDraft(row: ShiftRead) {
+  Object.assign(shiftDraft, {
+    ...row,
+    tenant_id: tenantScopeId.value,
+    starts_at: normalizeDateTimeLocal(row.starts_at),
+    ends_at: normalizeDateTimeLocal(row.ends_at),
+    notes: row.notes || "",
+    meeting_point: row.meeting_point || "",
+    location_text: row.location_text || "",
+  });
 }
 
 watch(
@@ -901,6 +1146,17 @@ watch(
   },
   { immediate: true },
 );
+
+onMounted(async () => {
+  if (!tenantScopeId.value || !accessToken.value || !canRead.value) {
+    return;
+  }
+  try {
+    await Promise.all([refreshTemplates(), refreshPlanningRecords(), refreshPlans(), refreshBoard()]);
+  } catch (error) {
+    handleApiError(error);
+  }
+});
 </script>
 
 <style scoped>
@@ -1073,6 +1329,41 @@ watch(
   gap: 0.75rem;
 }
 
+.planning-shifts-release-panel {
+  gap: 1rem;
+}
+
+.planning-shifts-release-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.planning-shifts-release-stat {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: color-mix(in srgb, var(--sp-color-surface-card) 92%, white);
+}
+
+.planning-shifts-release-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.planning-shifts-release-issues {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.planning-shifts-release-issues ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
 .planning-orders-row {
   display: flex;
   justify-content: space-between;
@@ -1164,7 +1455,8 @@ watch(
 
   .planning-orders-form-grid,
   .planning-shifts-form-grid,
-  .planning-shifts-form-grid--controls {
+  .planning-shifts-form-grid--controls,
+  .planning-shifts-release-grid {
     grid-template-columns: 1fr;
   }
 }

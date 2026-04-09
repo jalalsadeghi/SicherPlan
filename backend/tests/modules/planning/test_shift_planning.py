@@ -627,6 +627,158 @@ class ShiftPlanningServiceTests(unittest.TestCase):
             )
         self.assertEqual(captured.exception.message_key, "errors.planning.shift_plan.invalid_workforce_scope")
 
+    def test_manual_shift_outside_shift_plan_window_is_rejected(self) -> None:
+        with self.assertRaises(ApiException) as captured:
+            self.service.create_shift(
+                "tenant-1",
+                type(
+                    "Payload",
+                    (),
+                    {
+                        "tenant_id": "tenant-1",
+                        "shift_plan_id": self.shift_plan.id,
+                        "shift_series_id": None,
+                        "occurrence_date": date(2026, 5, 1),
+                        "starts_at": datetime(2026, 5, 1, 8, 0, tzinfo=UTC),
+                        "ends_at": datetime(2026, 5, 1, 16, 0, tzinfo=UTC),
+                        "break_minutes": 30,
+                        "shift_type_code": "day",
+                        "location_text": "Berlin",
+                        "meeting_point": "Tor A",
+                        "release_state": "draft",
+                        "customer_visible_flag": False,
+                        "subcontractor_visible_flag": False,
+                        "stealth_mode_flag": False,
+                        "source_kind_code": "manual",
+                        "notes": None,
+                    },
+                )(),
+                _context("planning.shift.write"),
+            )
+        self.assertEqual(captured.exception.message_key, "errors.planning.shift.plan_window_mismatch")
+
+    def test_shift_update_outside_shift_plan_window_is_rejected(self) -> None:
+        shift = self.service.create_shift(
+            "tenant-1",
+            type(
+                "Payload",
+                (),
+                {
+                    "tenant_id": "tenant-1",
+                    "shift_plan_id": self.shift_plan.id,
+                    "shift_series_id": None,
+                    "occurrence_date": date(2026, 4, 10),
+                    "starts_at": datetime(2026, 4, 10, 8, 0, tzinfo=UTC),
+                    "ends_at": datetime(2026, 4, 10, 16, 0, tzinfo=UTC),
+                    "break_minutes": 30,
+                    "shift_type_code": "day",
+                    "location_text": "Berlin",
+                    "meeting_point": "Tor A",
+                    "release_state": "draft",
+                    "customer_visible_flag": False,
+                    "subcontractor_visible_flag": False,
+                    "stealth_mode_flag": False,
+                    "source_kind_code": "manual",
+                    "notes": None,
+                },
+            )(),
+            _context("planning.shift.write"),
+        )
+
+        with self.assertRaises(ApiException) as captured:
+            self.service.update_shift(
+                "tenant-1",
+                shift.id,
+                type(
+                    "Payload",
+                    (),
+                    {
+                        "starts_at": datetime(2026, 5, 1, 8, 0, tzinfo=UTC),
+                        "ends_at": datetime(2026, 5, 1, 16, 0, tzinfo=UTC),
+                        "version_no": shift.version_no,
+                        "model_dump": lambda self, **kwargs: {
+                            "starts_at": self.starts_at,
+                            "ends_at": self.ends_at,
+                            "version_no": self.version_no,
+                        },
+                    },
+                )(),
+                _context("planning.shift.write"),
+            )
+        self.assertEqual(captured.exception.message_key, "errors.planning.shift.plan_window_mismatch")
+
+    def test_draft_shift_cannot_be_customer_visible(self) -> None:
+        with self.assertRaises(ApiException) as captured:
+            self.service.create_shift(
+                "tenant-1",
+                type(
+                    "Payload",
+                    (),
+                    {
+                        "tenant_id": "tenant-1",
+                        "shift_plan_id": self.shift_plan.id,
+                        "shift_series_id": None,
+                        "occurrence_date": date(2026, 4, 10),
+                        "starts_at": datetime(2026, 4, 10, 8, 0, tzinfo=UTC),
+                        "ends_at": datetime(2026, 4, 10, 16, 0, tzinfo=UTC),
+                        "break_minutes": 30,
+                        "shift_type_code": "day",
+                        "location_text": "Berlin",
+                        "meeting_point": "Tor A",
+                        "release_state": "draft",
+                        "customer_visible_flag": True,
+                        "subcontractor_visible_flag": False,
+                        "stealth_mode_flag": False,
+                        "source_kind_code": "manual",
+                        "notes": None,
+                    },
+                )(),
+                _context("planning.shift.write"),
+            )
+        self.assertEqual(captured.exception.message_key, "errors.planning.shift.visibility_requires_release")
+
+    def test_copy_slice_rejects_target_shift_outside_plan_window(self) -> None:
+        self.service.create_shift(
+            "tenant-1",
+            type(
+                "Payload",
+                (),
+                {
+                    "tenant_id": "tenant-1",
+                    "shift_plan_id": self.shift_plan.id,
+                    "shift_series_id": None,
+                    "occurrence_date": date(2026, 4, 30),
+                    "starts_at": datetime(2026, 4, 30, 8, 0, tzinfo=UTC),
+                    "ends_at": datetime(2026, 4, 30, 16, 0, tzinfo=UTC),
+                    "break_minutes": 30,
+                    "shift_type_code": "day",
+                    "location_text": "Berlin",
+                    "meeting_point": "Tor A",
+                    "release_state": "draft",
+                    "customer_visible_flag": False,
+                    "subcontractor_visible_flag": False,
+                    "stealth_mode_flag": False,
+                    "source_kind_code": "manual",
+                    "notes": None,
+                },
+            )(),
+            _context("planning.shift.write"),
+        )
+
+        with self.assertRaises(ApiException) as captured:
+            self.service.copy_shift_slice(
+                "tenant-1",
+                self.shift_plan.id,
+                ShiftCopyRequest(
+                    source_from=date(2026, 4, 30),
+                    source_to=date(2026, 4, 30),
+                    target_from=date(2026, 5, 1),
+                    duplicate_mode="skip_existing",
+                ),
+                _context("planning.shift.write"),
+            )
+        self.assertEqual(captured.exception.message_key, "errors.planning.shift.plan_window_mismatch")
+
     def test_board_projection_returns_minimal_shift_rows(self) -> None:
         self.service.create_shift(
             "tenant-1",
@@ -645,7 +797,7 @@ class ShiftPlanningServiceTests(unittest.TestCase):
                     "location_text": "Berlin",
                     "meeting_point": "Tor A",
                     "release_state": "release_ready",
-                    "customer_visible_flag": True,
+                    "customer_visible_flag": False,
                     "subcontractor_visible_flag": False,
                     "stealth_mode_flag": False,
                     "source_kind_code": "manual",

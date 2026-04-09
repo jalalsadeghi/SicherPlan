@@ -452,8 +452,17 @@ class ShiftPlanningService:
 
     def create_shift(self, tenant_id: str, payload: ShiftCreate, actor: RequestAuthorizationContext) -> ShiftRead:
         self._require_tenant_scope(tenant_id, payload.tenant_id)
-        self._require_shift_plan(tenant_id, payload.shift_plan_id)
-        self._validate_shift_payload(payload.starts_at, payload.ends_at, payload.break_minutes, payload.release_state)
+        shift_plan = self._require_shift_plan(tenant_id, payload.shift_plan_id)
+        planning_record = self._require_planning_record(tenant_id, shift_plan.planning_record_id)
+        self._validate_shift_payload(
+            payload.starts_at,
+            payload.ends_at,
+            payload.break_minutes,
+            payload.release_state,
+            payload.customer_visible_flag,
+            payload.subcontractor_visible_flag,
+        )
+        self._validate_shift_window(shift_plan, planning_record, payload.starts_at, payload.ends_at)
         duplicate = self.repository.find_shift_duplicate(
             tenant_id,
             payload.shift_plan_id,
@@ -479,13 +488,25 @@ class ShiftPlanningService:
 
     def update_shift(self, tenant_id: str, shift_id: str, payload: ShiftUpdate, actor: RequestAuthorizationContext) -> ShiftRead:
         current = self._require_shift(tenant_id, shift_id)
+        shift_plan = self._require_shift_plan(tenant_id, current.shift_plan_id)
+        planning_record = self._require_planning_record(tenant_id, shift_plan.planning_record_id)
         before_json = self._snapshot(current)
         next_starts_at = self._field_value(payload, "starts_at", current.starts_at)
         next_ends_at = self._field_value(payload, "ends_at", current.ends_at)
         next_break = self._field_value(payload, "break_minutes", current.break_minutes)
         next_release = self._field_value(payload, "release_state", current.release_state)
         next_type = self._field_value(payload, "shift_type_code", current.shift_type_code)
-        self._validate_shift_payload(next_starts_at, next_ends_at, next_break, next_release)
+        next_customer_visible = self._field_value(payload, "customer_visible_flag", current.customer_visible_flag)
+        next_subcontractor_visible = self._field_value(payload, "subcontractor_visible_flag", current.subcontractor_visible_flag)
+        self._validate_shift_payload(
+            next_starts_at,
+            next_ends_at,
+            next_break,
+            next_release,
+            next_customer_visible,
+            next_subcontractor_visible,
+        )
+        self._validate_shift_window(shift_plan, planning_record, next_starts_at, next_ends_at)
         duplicate = self.repository.find_shift_duplicate(
             tenant_id,
             current.shift_plan_id,
@@ -513,6 +534,7 @@ class ShiftPlanningService:
 
     def copy_shift_slice(self, tenant_id: str, shift_plan_id: str, payload: ShiftCopyRequest, actor: RequestAuthorizationContext) -> ShiftCopyResult:
         shift_plan = self._require_shift_plan(tenant_id, shift_plan_id)
+        planning_record = self._require_planning_record(tenant_id, shift_plan.planning_record_id)
         if payload.duplicate_mode not in self.COPY_DUPLICATE_MODES:
             raise ApiException(400, "planning.shift.copy.invalid_duplicate_mode", "errors.planning.shift.copy.invalid_duplicate_mode")
         if payload.source_to < payload.source_from:
@@ -534,6 +556,7 @@ class ShiftPlanningService:
                 continue
             target_start = source_row.starts_at + timedelta(days=delta_days)
             target_end = source_row.ends_at + timedelta(days=delta_days)
+            self._validate_shift_window(shift_plan, planning_record, target_start, target_end)
             duplicate = self.repository.find_shift_duplicate(
                 tenant_id,
                 shift_plan_id,
@@ -560,8 +583,8 @@ class ShiftPlanningService:
                     location_text=source_row.location_text,
                     meeting_point=source_row.meeting_point,
                     release_state="draft",
-                    customer_visible_flag=source_row.customer_visible_flag,
-                    subcontractor_visible_flag=source_row.subcontractor_visible_flag,
+                    customer_visible_flag=False,
+                    subcontractor_visible_flag=False,
                     stealth_mode_flag=source_row.stealth_mode_flag,
                     source_kind_code="copied",
                     notes=source_row.notes if hasattr(source_row, "notes") else None,
@@ -648,12 +671,36 @@ class ShiftPlanningService:
                 raise ApiException(400, "planning.shift_series_exception.override_times_required", "errors.planning.shift_series_exception.override_times_required")
             self._validate_template_times(override_local_start_time, override_local_end_time)
 
-    def _validate_shift_payload(self, starts_at: datetime, ends_at: datetime, break_minutes: int, release_state: str) -> None:
+    def _validate_shift_payload(
+        self,
+        starts_at: datetime,
+        ends_at: datetime,
+        break_minutes: int,
+        release_state: str,
+        customer_visible_flag: bool,
+        subcontractor_visible_flag: bool,
+    ) -> None:
         if ends_at <= starts_at:
             raise ApiException(400, "planning.shift.invalid_window", "errors.planning.shift.invalid_window")
         if break_minutes < 0:
             raise ApiException(400, "planning.shift.invalid_break_minutes", "errors.planning.shift.invalid_break_minutes")
         self._require_release_state(release_state, "shift")
+        if (customer_visible_flag or subcontractor_visible_flag) and release_state != "released":
+            raise ApiException(409, "planning.shift.visibility_requires_release", "errors.planning.shift.visibility_requires_release")
+
+    @staticmethod
+    def _validate_shift_window(
+        shift_plan: ShiftPlan,
+        planning_record: PlanningRecord,
+        starts_at: datetime,
+        ends_at: datetime,
+    ) -> None:
+        start_date = starts_at.date()
+        end_date = ends_at.date()
+        if start_date < shift_plan.planning_from or end_date > shift_plan.planning_to:
+            raise ApiException(400, "planning.shift.plan_window_mismatch", "errors.planning.shift.plan_window_mismatch")
+        if start_date < planning_record.planning_from or end_date > planning_record.planning_to:
+            raise ApiException(400, "planning.shift.plan_window_mismatch", "errors.planning.shift.plan_window_mismatch")
 
     @staticmethod
     def _validate_template_times(start: time, end: time) -> None:

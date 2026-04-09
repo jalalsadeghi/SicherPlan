@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  addDaysToIsoDate,
+  buildShiftCopyPayload,
   derivePlanningShiftActionState,
   hasPlanningShiftPermission,
   mapPlanningShiftApiMessage,
@@ -23,9 +25,20 @@ test("action state depends on selected entities", () => {
 
 test("message mapping and labels are stable", () => {
   assert.equal(mapPlanningShiftApiMessage("errors.planning.shift.copy.duplicate_conflict"), "copyDuplicateConflict");
+  assert.equal(mapPlanningShiftApiMessage("errors.planning.shift.visibility_requires_release"), "visibilityRequiresRelease");
   assert.equal(recurrenceLabel("weekly"), "weekly");
   assert.deepEqual(
     visibilitySummary({ customer_visible_flag: true, subcontractor_visible_flag: false, stealth_mode_flag: true }),
     { customer: true, subcontractor: false, stealth: true },
   );
+});
+
+test("copy payload spans full requested range", () => {
+  assert.equal(addDaysToIsoDate("2026-04-10", 6), "2026-04-16");
+  assert.deepEqual(buildShiftCopyPayload("2026-04-10", 7), {
+    source_from: "2026-04-10",
+    source_to: "2026-04-16",
+    target_from: "2026-04-17",
+    duplicate_mode: "skip_existing",
+  });
 });

@@ -47,6 +47,7 @@ export interface ShiftSeriesExceptionRead {
   subcontractor_visible_flag?: boolean | null;
   stealth_mode_flag?: boolean | null;
   notes?: string | null;
+  version_no?: number;
 }
 
 export interface ShiftSeriesListItem {
@@ -100,7 +101,34 @@ export interface ShiftListItem {
 }
 
 export interface ShiftRead extends ShiftListItem {
+  released_at: string | null;
+  released_by_user_id: string | null;
   notes?: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by_user_id: string | null;
+  updated_by_user_id: string | null;
+  archived_at: string | null;
+}
+
+export interface ShiftReleaseDiagnosticsIssue {
+  scope: string;
+  code: string;
+  severity: string;
+  message: string;
+  metadata_json?: Record<string, unknown>;
+}
+
+export interface ShiftReleaseDiagnosticsRead {
+  tenant_id: string;
+  shift_id: string;
+  release_state: string;
+  customer_visible_flag: boolean;
+  subcontractor_visible_flag: boolean;
+  employee_visible: boolean;
+  blocking_count: number;
+  warning_count: number;
+  issues: ShiftReleaseDiagnosticsIssue[];
 }
 
 export interface ShiftPlanRead extends ShiftPlanListItem {
@@ -195,6 +223,10 @@ export function createShiftTemplate(tenantId: string, accessToken: string, paylo
   return request<ShiftTemplateRead>(`/api/planning/tenants/${tenantId}/ops/shift-templates`, accessToken, { method: "POST", body: payload });
 }
 
+export function getShiftTemplate(tenantId: string, templateId: string, accessToken: string) {
+  return request<ShiftTemplateRead>(`/api/planning/tenants/${tenantId}/ops/shift-templates/${templateId}`, accessToken);
+}
+
 export function updateShiftTemplate(tenantId: string, templateId: string, accessToken: string, payload: Record<string, unknown>) {
   return request<ShiftTemplateRead>(`/api/planning/tenants/${tenantId}/ops/shift-templates/${templateId}`, accessToken, { method: "PATCH", body: payload });
 }
@@ -223,6 +255,10 @@ export function createShiftSeries(tenantId: string, shiftPlanId: string, accessT
   return request<ShiftSeriesRead>(`/api/planning/tenants/${tenantId}/ops/shift-plans/${shiftPlanId}/series`, accessToken, { method: "POST", body: payload });
 }
 
+export function getShiftSeries(tenantId: string, shiftSeriesId: string, accessToken: string) {
+  return request<ShiftSeriesRead>(`/api/planning/tenants/${tenantId}/ops/shift-series/${shiftSeriesId}`, accessToken);
+}
+
 export function updateShiftSeries(tenantId: string, shiftSeriesId: string, accessToken: string, payload: Record<string, unknown>) {
   return request<ShiftSeriesRead>(`/api/planning/tenants/${tenantId}/ops/shift-series/${shiftSeriesId}`, accessToken, { method: "PATCH", body: payload });
 }
@@ -233,6 +269,10 @@ export function generateShiftSeries(tenantId: string, shiftSeriesId: string, acc
 
 export function createShiftSeriesException(tenantId: string, shiftSeriesId: string, accessToken: string, payload: Record<string, unknown>) {
   return request<ShiftSeriesExceptionRead>(`/api/planning/tenants/${tenantId}/ops/shift-series/${shiftSeriesId}/exceptions`, accessToken, { method: "POST", body: payload });
+}
+
+export function listShiftSeriesExceptions(tenantId: string, shiftSeriesId: string, accessToken: string) {
+  return request<ShiftSeriesExceptionRead[]>(`/api/planning/tenants/${tenantId}/ops/shift-series/${shiftSeriesId}/exceptions`, accessToken);
 }
 
 export function updateShiftSeriesException(tenantId: string, rowId: string, accessToken: string, payload: Record<string, unknown>) {
@@ -247,8 +287,24 @@ export function createShift(tenantId: string, accessToken: string, payload: Reco
   return request<ShiftRead>(`/api/planning/tenants/${tenantId}/ops/shifts`, accessToken, { method: "POST", body: payload });
 }
 
+export function getShift(tenantId: string, shiftId: string, accessToken: string) {
+  return request<ShiftRead>(`/api/planning/tenants/${tenantId}/ops/shifts/${shiftId}`, accessToken);
+}
+
+export function getShiftReleaseDiagnostics(tenantId: string, shiftId: string, accessToken: string) {
+  return request<ShiftReleaseDiagnosticsRead>(`/api/planning/tenants/${tenantId}/ops/shifts/${shiftId}/release-diagnostics`, accessToken);
+}
+
 export function updateShift(tenantId: string, shiftId: string, accessToken: string, payload: Record<string, unknown>) {
   return request<ShiftRead>(`/api/planning/tenants/${tenantId}/ops/shifts/${shiftId}`, accessToken, { method: "PATCH", body: payload });
+}
+
+export function setShiftReleaseState(tenantId: string, shiftId: string, accessToken: string, payload: Record<string, unknown>) {
+  return request<ShiftRead>(`/api/planning/tenants/${tenantId}/ops/shifts/${shiftId}/release-state`, accessToken, { method: "POST", body: payload });
+}
+
+export function updateShiftVisibility(tenantId: string, shiftId: string, accessToken: string, payload: Record<string, unknown>) {
+  return request<ShiftRead>(`/api/planning/tenants/${tenantId}/ops/shifts/${shiftId}/visibility`, accessToken, { method: "POST", body: payload });
 }
 
 export function copyShiftSlice(tenantId: string, shiftPlanId: string, accessToken: string, payload: Record<string, unknown>) {

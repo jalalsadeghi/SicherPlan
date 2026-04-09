@@ -1,101 +1,125 @@
-You are working in the SicherPlan monorepo.
+You are working in the repository `jalalsadeghi/SicherPlan`.
 
 Goal:
-Improve the Planning Record edit experience in P-02 (`/admin/planning-orders`) so the UI clearly reflects the intended domain behavior.
+Harden and complete `P-03 / Shift Planning` so that a Tenant Administrator can safely enter, edit, validate, and prepare shift-planning data for UAT without losing existing field values or bypassing intended release controls.
 
-Current situation:
-- Existing planning records can be edited in `Planning records > Overview`
-- But `Planning mode` is disabled for existing records
-- There is no explicit UI action for:
-  - deactivate
-  - reactivate
-  - archive
-- There is also no explanatory UX telling the user why `Planning mode` is locked
-- Users can mistakenly assume this is a broken form
+Context:
+- The backend already exposes shift-planning APIs for:
+  - shift templates
+  - shift plans
+  - shift series
+  - shift series exceptions
+  - shifts
+  - release diagnostics
+  - release-state transitions
+  - visibility updates
+  - copy slice
+  - board preview
+- The current frontend page is:
+  - `web/apps/web-antd/src/sicherplan-legacy/views/PlanningShiftsAdminView.vue`
+- The current frontend API wrapper is:
+  - `web/apps/web-antd/src/sicherplan-legacy/api/planningShifts.ts`
+- The current helper file is:
+  - `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningShifts.helpers.js`
+- The current backend service is:
+  - `backend/app/modules/planning/shift_service.py`
 
-Important domain rule to preserve:
-- `Planning mode` must remain immutable after creation
-- Do NOT enable in-place editing of `planning_mode_code` for existing planning records
-- Current backend contract (`PlanningRecordUpdate`) does not support updating `planning_mode_code`
-- Existing mode controls which detail structure is valid:
-  - `event_detail`
-  - `site_detail`
-  - `trade_fair_detail`
-  - `patrol_detail`
+Problems to fix:
+1. Unsafe editing of existing records:
+   - Existing templates, series, and shifts are currently edited from list-item data instead of full read models.
+   - This can overwrite fields that are not present in list responses (for example notes, meeting_point, location_text, default_break_minutes, shift_type_code).
+2. Missing release workflow controls in the UI:
+   - The page does not expose release diagnostics, dedicated release-state transitions, or dedicated visibility updates.
+   - Release/visibility is currently mixed into the generic shift edit form.
+3. Incomplete exception management:
+   - The UI can create series exceptions but does not list existing exceptions or support selecting/editing them properly.
+4. Missing initial data loading:
+   - The view does not reliably load templates / planning records / board data on initial mount.
+   - Templates tab has no refresh action.
+5. Missing backend window validation for manual shifts:
+   - Manual shift create/update must be validated against the owning shift plan window (and parent planning record window if applicable).
+6. Broken “Copy Week” behavior:
+   - Current UI copy logic uses a single source day even for the “Copy Week” button.
+7. Visibility rules must be enforced consistently:
+   - A shift must not become customer-visible or subcontractor-visible unless it is in `released` state and passes release diagnostics.
 
-Relevant files:
-1. `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue`
-2. `backend/app/modules/planning/schemas.py`
-3. `backend/app/modules/planning/router.py`
-4. `backend/app/modules/planning/planning_record_service.py`
-5. any related i18n/test files
+Required changes:
 
-Required implementation:
+A. Frontend API wrapper (`planningShifts.ts`)
+Add missing typed API functions for:
+- `getShiftTemplate`
+- `getShiftSeries`
+- `listShiftSeriesExceptions`
+- `getShift`
+- `getShiftReleaseDiagnostics`
+- `setShiftReleaseState`
+- `updateShiftVisibility`
 
-A) Keep Planning mode immutable
-- Leave `Planning mode` disabled when editing an existing planning record
-- Do NOT implement backend support for changing `planning_mode_code` on update
-- Add inline helper text below the disabled field explaining why:
-  Example intent:
-  - “Planning mode cannot be changed after creation. If you selected the wrong mode, deactivate/archive this planning record and create a new one.”
-- Add i18n keys for this explanation
+Keep existing naming and error-handling conventions.
 
-B) Add explicit lifecycle actions for planning records
-Currently `status` is editable via a dropdown, but the UX is weak.
-Improve this by adding clear action buttons for existing planning records:
-- Deactivate (sets `status = inactive`)
-- Reactivate (sets `status = active`)
-- Archive (sets `archived_at` to now, ideally via PATCH update)
-Place these in a clear action row in the planning-record overview or a dedicated lifecycle section.
+B. Frontend view (`PlanningShiftsAdminView.vue`)
+1. Initial loading:
+   - Load templates, planning records, and initial board data on mount.
+   - Add a refresh action to the Templates tab.
+2. Safe editing:
+   - When selecting an existing template, fetch full template detail via `getShiftTemplate`.
+   - When selecting an existing series, fetch full series detail via `getShiftSeries`.
+   - When selecting an existing shift, fetch full shift detail via `getShift`.
+   - Populate the edit drafts from full read models, not list items.
+3. Series exceptions:
+   - Show the current exception list for the selected series.
+   - Allow selecting an exception and updating it through the existing update endpoint.
+4. Release workflow:
+   - Add a dedicated “Release & Visibility” section for the selected shift.
+   - Show `release diagnostics` (blocking/warning counts and issue list).
+   - Use dedicated `setShiftReleaseState` actions instead of only editing `release_state` inline.
+   - Use dedicated `updateShiftVisibility` actions instead of silently persisting visibility flags through generic update.
+5. Copy logic:
+   - Replace the current day/week copy shortcuts with correct behavior.
+   - “Copy Day” should copy exactly one source day.
+   - “Copy Week” should copy a 7-day slice.
+   - Make source range and target start explicit in the UI.
+   - Disable copy actions when required inputs are missing.
+6. Keep the page usable for tenant_admin role and preserve existing styling patterns.
 
-Implementation notes:
-- Reuse existing PATCH `/planning-records/{id}` update flow
-- For deactivate/reactivate:
-  - update `status`
-- For archive:
-  - update `archived_at`
-- Refresh the selected planning record and list after each action
-- Show toast feedback on success/failure
+C. Backend service (`shift_service.py`)
+1. Add explicit validation that manual shift create/update stays within:
+   - owning `shift_plan.planning_from/planning_to`
+   - and, where relevant, the parent `planning_record` window
+2. Add the same window validation to `copy_shift_slice` for target shifts.
+3. Enforce visibility rules consistently:
+   - if `customer_visible_flag` or `subcontractor_visible_flag` is true, the shift must already be `released`
+   - otherwise reject with a validation error
+4. Do not break generated-series behavior.
 
-C) Do NOT add hard delete in this task
-- There is currently no DELETE endpoint for planning records
-- Do not introduce destructive hard-delete behavior here
-- If a future delete flow is needed, it should be a separate constrained feature with dependency checks
-
-D) Optional but recommended UX improvement
-Add a secondary CTA for mistaken mode selection:
-- “Create replacement planning”
-This should:
-- start a new planning record draft for the same order
-- prefill safe fields like:
-  - name
-  - planning_from
-  - planning_to
-  - dispatcher_user_id
-  - notes
-- but allow selecting a fresh `Planning mode`
-Do NOT auto-copy incompatible mode-specific detail fields.
-
-E) Tests
-Update/add tests to verify:
-1. Existing planning records still show `Planning mode` as disabled
-2. Helper text explains why the field is locked
-3. Deactivate action updates status to `inactive`
-4. Reactivate action updates status to `active`
-5. Archive action updates `archived_at`
-6. No hard delete action is exposed
-7. Existing save/release/document flows are not broken
+D. Tests
+Add or update tests to cover:
+1. Editing an existing template preserves `meeting_point`, `location_text`, and `notes`
+2. Editing an existing series preserves `default_break_minutes`, `shift_type_code`, `meeting_point`, `location_text`, and `notes`
+3. Editing an existing shift preserves `notes`
+4. Existing series exceptions are listed and can be updated
+5. Release diagnostics are shown before release actions
+6. Manual shift outside plan window is rejected
+7. Copy Week copies a 7-day slice, not a single day shifted by +7
+8. Draft shifts cannot be made customer-visible/subcontractor-visible
 
 Acceptance criteria:
-1. Users understand that `Planning mode` is intentionally immutable
-2. Users can explicitly deactivate/reactivate/archive an existing planning record
-3. Wrong-mode correction follows a safe workflow (replace, not mutate)
-4. No hard delete is introduced
-5. Tests pass
+- P-03 remains mounted and passes existing smoke tests
+- Tenant Admin can:
+  - create template
+  - create shift plan
+  - create series
+  - generate shifts
+  - create/edit manual shifts safely
+  - inspect diagnostics
+  - change release state through dedicated actions
+  - manage visibility through dedicated actions
+  - list and edit exceptions
+  - copy day/week slices correctly
+- No existing detail fields are lost when editing previously saved template/series/shift rows
 
-Deliverables:
-- updated `PlanningOrdersAdminView.vue`
-- any minimal backend support needed for archive via existing PATCH contract
-- updated i18n strings
-- updated tests
-- short summary of the UX and lifecycle changes
+Implementation notes:
+- Follow existing repository conventions
+- Prefer minimal, targeted changes over broad rewrites
+- Preserve current route paths, naming style, and feedback-toast behavior
+- After coding, update or add tests and ensure they pass
