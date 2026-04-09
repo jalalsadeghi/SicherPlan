@@ -118,6 +118,7 @@ from app.modules.planning.schemas import (
     ShiftReleaseValidationRead,
     ShiftTemplateCreate,
     ShiftTemplateListItem,
+    ShiftTypeOptionRead,
     ShiftTemplateRead,
     ShiftTemplateUpdate,
     ShiftUpdate,
@@ -1127,6 +1128,15 @@ def list_shift_templates(
     service: Annotated[ShiftPlanningService, Depends(get_shift_planning_service)],
 ) -> list[ShiftTemplateListItem]:
     return service.list_shift_templates(str(tenant_id), filters, context)
+
+
+@router.get("/shift-type-options", response_model=list[ShiftTypeOptionRead])
+def list_shift_type_options(
+    tenant_id: UUID,
+    context: Annotated[RequestAuthorizationContext, Depends(require_permission_only("planning.shift.read"))],
+    service: Annotated[ShiftPlanningService, Depends(get_shift_planning_service)],
+) -> list[ShiftTypeOptionRead]:
+    return service.list_shift_type_options(str(tenant_id), context)
 
 
 @router.post("/shift-templates", response_model=ShiftTemplateRead, status_code=status.HTTP_201_CREATED)

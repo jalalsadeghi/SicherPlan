@@ -6,6 +6,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import PlanningShiftsAdminView from "../../views/PlanningShiftsAdminView.vue";
 
 const {
+  listShiftTypeOptionsMock,
   listShiftTemplatesMock,
   getShiftTemplateMock,
   listShiftPlansMock,
@@ -16,6 +17,10 @@ const {
   getShiftMock,
   getShiftReleaseDiagnosticsMock,
 } = vi.hoisted(() => ({
+  listShiftTypeOptionsMock: vi.fn(async () => [
+    { code: "site_day", label: "Site Day" },
+    { code: "site_night", label: "Site Night" },
+  ]),
   listShiftTemplatesMock: vi.fn(async () => [
   {
     id: "template-1",
@@ -210,6 +215,7 @@ vi.mock("@/api/planningShifts", () => ({
   listShiftPlans: listShiftPlansMock,
   listShiftSeries: listShiftSeriesMock,
   listShiftSeriesExceptions: listShiftSeriesExceptionsMock,
+  listShiftTypeOptions: listShiftTypeOptionsMock,
   listShiftTemplates: listShiftTemplatesMock,
   listShifts: listShiftsMock,
   setShiftReleaseState: vi.fn(async () => ({})),
@@ -289,10 +295,13 @@ describe("PlanningShiftsAdminView", () => {
 
   it("renders structured planning-shifts controls instead of the old raw text fields", async () => {
     const wrapper = mount(PlanningShiftsAdminView);
+    await flushPromises();
 
     expect(wrapper.text()).toContain("Select planning record");
     expect(wrapper.text()).toContain("All visibility states");
     expect(wrapper.text()).toContain("All release states");
+    expect(listShiftTypeOptionsMock).toHaveBeenCalledWith("tenant-1", "token-1");
+    expect(wrapper.html()).not.toMatch(/Shift type<\/span><input/);
 
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     expect(wrapper.text()).toContain("Select shift template");
@@ -306,6 +315,18 @@ describe("PlanningShiftsAdminView", () => {
     expect(wrapper.html()).toContain('data-testid="planning-shifts-weekday-picker"');
   });
 
+  it("keeps legacy shift type values visible in the controlled select", async () => {
+    const wrapper = mount(PlanningShiftsAdminView);
+    await flushPromises();
+
+    await wrapper.get(".planning-orders-row").trigger("click");
+    await flushPromises();
+
+    const templateSelect = wrapper.findAll('[data-testid="planning-shifts-tab-panel-templates"] select').at(0);
+    expect(templateSelect?.html()).toContain("day (legacy)");
+    expect((templateSelect?.element as HTMLSelectElement).value).toBe("day");
+  });
+
   it("loads full template detail instead of using the list row only", async () => {
     const wrapper = mount(PlanningShiftsAdminView);
     await flushPromises();
@@ -315,7 +336,11 @@ describe("PlanningShiftsAdminView", () => {
 
     expect(getShiftTemplateMock).toHaveBeenCalledWith("tenant-1", "template-1", "token-1");
     expect((wrapper.get('[data-testid="planning-shifts-tab-panel-templates"] textarea').element as HTMLTextAreaElement).value).toBe("Template detail note");
-    expect((wrapper.findAll('[data-testid="planning-shifts-tab-panel-templates"] input').at(7)?.element as HTMLInputElement).value).toBe("Berlin Mitte");
+    expect(
+      wrapper
+        .findAll('[data-testid="planning-shifts-tab-panel-templates"] input')
+        .some((entry) => (entry.element as HTMLInputElement).value === "Berlin Mitte"),
+    ).toBe(true);
   });
 
   it("lists existing series exceptions and loads them back into the editor", async () => {

@@ -237,6 +237,11 @@ class SqlAlchemyPlanningRepository:
         row = self.session.scalars(statement).one_or_none()
         return row.value_json if row is not None else None
 
+    def get_tenant_setting_json(self, tenant_id: str, key: str) -> object | None:
+        statement = select(TenantSetting).where(TenantSetting.tenant_id == tenant_id, TenantSetting.key == key)
+        row = self.session.scalars(statement).one_or_none()
+        return row.value_json if row is not None else None
+
     def get_employee(self, tenant_id: str, employee_id: str):
         from app.modules.employees.models import Employee
 

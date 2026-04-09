@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
@@ -27,6 +28,7 @@ from tests.modules.planning.test_planning_records import FakePlanningRecordRepos
 
 @dataclass
 class FakeShiftPlanningRepository(FakePlanningRecordRepository):
+    tenant_settings: dict[tuple[str, str], object] = field(default_factory=dict)
     shift_templates: dict[str, ShiftTemplate] = field(default_factory=dict)
     shift_plans: dict[str, ShiftPlan] = field(default_factory=dict)
     shift_series_rows: dict[str, ShiftSeries] = field(default_factory=dict)
@@ -43,6 +45,9 @@ class FakeShiftPlanningRepository(FakePlanningRecordRepository):
         row.updated_at = now
         row.version_no = getattr(row, "version_no", 0) or 1
         row.status = getattr(row, "status", None) or "active"
+
+    def get_tenant_setting_json(self, tenant_id: str, key: str):
+        return self.tenant_settings.get((tenant_id, key))
 
     def list_shift_templates(self, tenant_id: str, filters: OpsMasterFilter) -> list[ShiftTemplate]:
         rows = [row for row in self.shift_templates.values() if row.tenant_id == tenant_id]
@@ -456,7 +461,7 @@ class ShiftPlanningServiceTests(unittest.TestCase):
                 local_start_time=time(8, 0),
                 local_end_time=time(16, 0),
                 default_break_minutes=30,
-                shift_type_code="day",
+                shift_type_code="site_day",
                 meeting_point="Tor A",
                 location_text="Berlin Mitte",
             ),
@@ -504,6 +509,96 @@ class ShiftPlanningServiceTests(unittest.TestCase):
         self.assertEqual(rows[0].starts_at.tzinfo, UTC)
         self.assertTrue(rows[0].customer_visible_flag)
         self.assertEqual(rows[0].break_minutes, 30)
+
+    def test_shift_type_options_fall_back_when_setting_missing(self) -> None:
+        options = self.service.list_shift_type_options("tenant-1", _context("planning.shift.read"))
+
+        self.assertEqual(options[0].code, "site_day")
+        self.assertGreaterEqual(len(options), 7)
+
+    def test_shift_type_options_use_tenant_setting_when_present(self) -> None:
+        self.repository.tenant_settings[("tenant-1", self.service.SHIFT_TYPE_OPTIONS_KEY)] = [
+            {"code": "custom_day", "label": "Custom Day"},
+            {"code": "custom_night", "label": "Custom Night"},
+        ]
+
+        options = self.service.list_shift_type_options("tenant-1", _context("planning.shift.read"))
+
+        self.assertEqual([option.code for option in options], ["custom_day", "custom_night"])
+
+    def test_shift_type_options_fall_back_when_setting_is_invalid(self) -> None:
+        self.repository.tenant_settings[("tenant-1", self.service.SHIFT_TYPE_OPTIONS_KEY)] = {"options": "invalid"}
+
+        options = self.service.list_shift_type_options("tenant-1", _context("planning.shift.read"))
+
+        self.assertEqual(options[0].code, "site_day")
+
+    def test_shift_template_rejects_unknown_shift_type_code(self) -> None:
+        with self.assertRaises(ApiException) as captured:
+            self.service.create_shift_template(
+                "tenant-1",
+                ShiftTemplateCreate(
+                    tenant_id="tenant-1",
+                    code="TPL-BAD",
+                    label="Bad",
+                    local_start_time=time(8, 0),
+                    local_end_time=time(16, 0),
+                    default_break_minutes=30,
+                    shift_type_code="unknown_code",
+                ),
+                _context("planning.shift.write"),
+            )
+        self.assertEqual(captured.exception.message_key, "errors.planning.shift_template.invalid_shift_type_code")
+
+    def test_shift_series_rejects_unknown_shift_type_code(self) -> None:
+        with self.assertRaises(ApiException) as captured:
+            self.service.create_shift_series(
+                "tenant-1",
+                ShiftSeriesCreate(
+                    tenant_id="tenant-1",
+                    shift_plan_id=self.shift_plan.id,
+                    shift_template_id=self.template.id,
+                    label="Bad series",
+                    recurrence_code="daily",
+                    interval_count=1,
+                    timezone="Europe/Berlin",
+                    date_from=date(2026, 4, 1),
+                    date_to=date(2026, 4, 2),
+                    shift_type_code="unknown_code",
+                ),
+                _context("planning.shift.write"),
+            )
+        self.assertEqual(captured.exception.message_key, "errors.planning.shift_series.invalid_shift_type_code")
+
+    def test_shift_rejects_unknown_shift_type_code(self) -> None:
+        with self.assertRaises(ApiException) as captured:
+            self.service.create_shift(
+                "tenant-1",
+                type(
+                    "Payload",
+                    (),
+                    {
+                        "tenant_id": "tenant-1",
+                        "shift_plan_id": self.shift_plan.id,
+                        "shift_series_id": None,
+                        "occurrence_date": date(2026, 4, 10),
+                        "starts_at": datetime(2026, 4, 10, 8, 0, tzinfo=UTC),
+                        "ends_at": datetime(2026, 4, 10, 16, 0, tzinfo=UTC),
+                        "break_minutes": 30,
+                        "shift_type_code": "unknown_code",
+                        "location_text": "Berlin",
+                        "meeting_point": "Tor A",
+                        "release_state": "draft",
+                        "customer_visible_flag": False,
+                        "subcontractor_visible_flag": False,
+                        "stealth_mode_flag": False,
+                        "source_kind_code": "manual",
+                        "notes": None,
+                    },
+                )(),
+                _context("planning.shift.write"),
+            )
+        self.assertEqual(captured.exception.message_key, "errors.planning.shift.invalid_shift_type_code")
 
     def test_weekly_generation_respects_weekday_mask_and_skip_exception(self) -> None:
         series = self.service.create_shift_series(
@@ -556,7 +651,7 @@ class ShiftPlanningServiceTests(unittest.TestCase):
                     "starts_at": datetime(2026, 4, 2, 8, 0, tzinfo=UTC),
                     "ends_at": datetime(2026, 4, 2, 16, 0, tzinfo=UTC),
                     "break_minutes": 30,
-                    "shift_type_code": "day",
+                    "shift_type_code": "site_day",
                     "location_text": "Berlin",
                     "meeting_point": "Tor A",
                     "release_state": "draft",
@@ -582,7 +677,7 @@ class ShiftPlanningServiceTests(unittest.TestCase):
                     "starts_at": datetime(2026, 4, 9, 8, 0, tzinfo=UTC),
                     "ends_at": datetime(2026, 4, 9, 16, 0, tzinfo=UTC),
                     "break_minutes": 30,
-                    "shift_type_code": "day",
+                    "shift_type_code": "site_day",
                     "location_text": "Berlin",
                     "meeting_point": "Tor A",
                     "release_state": "draft",
@@ -627,6 +722,33 @@ class ShiftPlanningServiceTests(unittest.TestCase):
             )
         self.assertEqual(captured.exception.message_key, "errors.planning.shift_plan.invalid_workforce_scope")
 
+    def test_shift_plan_create_writes_json_safe_audit_snapshot(self) -> None:
+        audit_count_before = len(self.audit_repository.audit_events)
+
+        row = self.service.create_shift_plan(
+            "tenant-1",
+            ShiftPlanCreate(
+                tenant_id="tenant-1",
+                planning_record_id=self.shift_plan.planning_record_id,
+                name="Audit-safe plan",
+                workforce_scope_code="internal",
+                planning_from=date(2026, 4, 2),
+                planning_to=date(2026, 4, 5),
+            ),
+            _context("planning.shift.write"),
+        )
+
+        self.assertEqual(row.name, "Audit-safe plan")
+        self.assertEqual(len(self.audit_repository.audit_events), audit_count_before + 1)
+        event = self.audit_repository.audit_events[-1]
+        self.assertEqual(event.event_type, "planning.shift_plan.created")
+        self.assertIsInstance(event.after_json["planning_from"], str)
+        self.assertIsInstance(event.after_json["planning_to"], str)
+        self.assertIsInstance(event.after_json["created_at"], str)
+        self.assertEqual(event.after_json["planning_from"], "2026-04-02")
+        self.assertEqual(event.after_json["planning_to"], "2026-04-05")
+        json.dumps(event.after_json)
+
     def test_manual_shift_outside_shift_plan_window_is_rejected(self) -> None:
         with self.assertRaises(ApiException) as captured:
             self.service.create_shift(
@@ -642,7 +764,7 @@ class ShiftPlanningServiceTests(unittest.TestCase):
                         "starts_at": datetime(2026, 5, 1, 8, 0, tzinfo=UTC),
                         "ends_at": datetime(2026, 5, 1, 16, 0, tzinfo=UTC),
                         "break_minutes": 30,
-                        "shift_type_code": "day",
+                        "shift_type_code": "site_day",
                         "location_text": "Berlin",
                         "meeting_point": "Tor A",
                         "release_state": "draft",
@@ -671,7 +793,7 @@ class ShiftPlanningServiceTests(unittest.TestCase):
                     "starts_at": datetime(2026, 4, 10, 8, 0, tzinfo=UTC),
                     "ends_at": datetime(2026, 4, 10, 16, 0, tzinfo=UTC),
                     "break_minutes": 30,
-                    "shift_type_code": "day",
+                    "shift_type_code": "site_day",
                     "location_text": "Berlin",
                     "meeting_point": "Tor A",
                     "release_state": "draft",
@@ -722,7 +844,7 @@ class ShiftPlanningServiceTests(unittest.TestCase):
                         "starts_at": datetime(2026, 4, 10, 8, 0, tzinfo=UTC),
                         "ends_at": datetime(2026, 4, 10, 16, 0, tzinfo=UTC),
                         "break_minutes": 30,
-                        "shift_type_code": "day",
+                        "shift_type_code": "site_day",
                         "location_text": "Berlin",
                         "meeting_point": "Tor A",
                         "release_state": "draft",
@@ -751,7 +873,7 @@ class ShiftPlanningServiceTests(unittest.TestCase):
                     "starts_at": datetime(2026, 4, 30, 8, 0, tzinfo=UTC),
                     "ends_at": datetime(2026, 4, 30, 16, 0, tzinfo=UTC),
                     "break_minutes": 30,
-                    "shift_type_code": "day",
+                    "shift_type_code": "site_day",
                     "location_text": "Berlin",
                     "meeting_point": "Tor A",
                     "release_state": "draft",
@@ -793,7 +915,7 @@ class ShiftPlanningServiceTests(unittest.TestCase):
                     "starts_at": datetime(2026, 4, 3, 8, 0, tzinfo=UTC),
                     "ends_at": datetime(2026, 4, 3, 16, 0, tzinfo=UTC),
                     "break_minutes": 30,
-                    "shift_type_code": "day",
+                    "shift_type_code": "site_day",
                     "location_text": "Berlin",
                     "meeting_point": "Tor A",
                     "release_state": "release_ready",

@@ -1,125 +1,82 @@
-You are working in the repository `jalalsadeghi/SicherPlan`.
+You are working in the SicherPlan repository on the current main branch.
 
 Goal:
-Harden and complete `P-03 / Shift Planning` so that a Tenant Administrator can safely enter, edit, validate, and prepare shift-planning data for UAT without losing existing field values or bypassing intended release controls.
+Fix the backend bug that causes POST /api/planning/tenants/{tenant_id}/ops/shift-plans to fail with HTTP 500 during audit-event creation, and make sure valid Shift Plan creation succeeds cleanly so the UI can continue into Shift Series creation without false follow-on errors.
 
-Context:
-- The backend already exposes shift-planning APIs for:
-  - shift templates
-  - shift plans
-  - shift series
-  - shift series exceptions
-  - shifts
-  - release diagnostics
-  - release-state transitions
-  - visibility updates
-  - copy slice
-  - board preview
-- The current frontend page is:
-  - `web/apps/web-antd/src/sicherplan-legacy/views/PlanningShiftsAdminView.vue`
-- The current frontend API wrapper is:
-  - `web/apps/web-antd/src/sicherplan-legacy/api/planningShifts.ts`
-- The current helper file is:
-  - `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningShifts.helpers.js`
-- The current backend service is:
-  - `backend/app/modules/planning/shift_service.py`
+Observed behavior:
+- The UI later shows “The series falls outside the shift-plan window.”
+- But the backend traceback clearly shows a 500 in create_shift_plan, inside:
+  backend/app/modules/planning/shift_service.py
+  -> ShiftPlanningService.create_shift_plan()
+  -> self._record_event(... after_json=self._snapshot(row))
+  -> backend/app/modules/iam/audit_service.py
+  -> backend/app/modules/iam/audit_repository.py
+  -> session.commit()
+  -> psycopg JSON serialization crash
+- This strongly suggests the audit payload contains non-JSON-serializable values (date/datetime/time/UUID/etc.).
 
-Problems to fix:
-1. Unsafe editing of existing records:
-   - Existing templates, series, and shifts are currently edited from list-item data instead of full read models.
-   - This can overwrite fields that are not present in list responses (for example notes, meeting_point, location_text, default_break_minutes, shift_type_code).
-2. Missing release workflow controls in the UI:
-   - The page does not expose release diagnostics, dedicated release-state transitions, or dedicated visibility updates.
-   - Release/visibility is currently mixed into the generic shift edit form.
-3. Incomplete exception management:
-   - The UI can create series exceptions but does not list existing exceptions or support selecting/editing them properly.
-4. Missing initial data loading:
-   - The view does not reliably load templates / planning records / board data on initial mount.
-   - Templates tab has no refresh action.
-5. Missing backend window validation for manual shifts:
-   - Manual shift create/update must be validated against the owning shift plan window (and parent planning record window if applicable).
-6. Broken “Copy Week” behavior:
-   - Current UI copy logic uses a single source day even for the “Copy Week” button.
-7. Visibility rules must be enforced consistently:
-   - A shift must not become customer-visible or subcontractor-visible unless it is in `released` state and passes release diagnostics.
+Important code references:
+- backend/app/modules/planning/shift_service.py
+- backend/app/modules/planning/order_service.py
+- backend/app/modules/planning/planning_record_service.py
+- backend/app/modules/iam/audit_models.py
+- backend/app/modules/iam/audit_repository.py
+- backend/app/modules/planning/repository.py
+- web/apps/web-antd/src/sicherplan-legacy/views/PlanningShiftsAdminView.vue
 
-Required changes:
+Root-cause hypothesis to verify and fix:
+- ShiftPlanningService._snapshot() currently returns raw row.__dict__ values.
+- AuditEvent.before_json / after_json / metadata_json are JSONB fields.
+- Raw SQLAlchemy model attributes can include Python date/datetime/time/UUID/Enum or other non-JSON-safe values.
+- CustomerOrderService._snapshot() already contains a safer recursive serializer. Reuse that approach or extract a shared helper.
 
-A. Frontend API wrapper (`planningShifts.ts`)
-Add missing typed API functions for:
-- `getShiftTemplate`
-- `getShiftSeries`
-- `listShiftSeriesExceptions`
-- `getShift`
-- `getShiftReleaseDiagnostics`
-- `setShiftReleaseState`
-- `updateShiftVisibility`
+What to do:
+1. Reproduce the failing path for Shift Plan creation.
+2. Fix backend/app/modules/planning/shift_service.py so audit snapshots are JSON-safe.
+   - Replace the current _snapshot() implementation with a recursive serializer that converts:
+     - datetime/date/time -> ISO 8601 strings
+     - UUID -> string
+     - Decimal -> string
+     - Enum -> its value (then serialize recursively)
+     - dict/list/tuple/set -> recursively JSON-safe structures
+   - Skip SQLAlchemy internals and any non-serializable relationship objects.
+3. Prefer a small shared helper if it improves consistency.
+   - If practical, extract a reusable JSON-safe snapshot helper and use it in:
+     - backend/app/modules/planning/shift_service.py
+     - backend/app/modules/planning/planning_record_service.py
+   - Keep the scope tight; do not refactor unrelated modules.
+4. Keep business validation semantics unchanged.
+   - Do NOT relax the actual “shift plan window must fit planning record window” rule.
+   - The fix is for the false 500/audit crash, not for bypassing domain validation.
+5. Add regression tests.
+   At minimum add tests that prove:
+   - creating a valid Shift Plan no longer returns 500 when audit is enabled
+   - the resulting audit event is stored successfully with JSON-safe after_json
+   - date/datetime values in the snapshot are serialized as strings
+   - planning_record_service audit snapshots are also safe if you touched that file
+6. Make sure the API now returns the correct domain error only when the window is genuinely invalid.
+7. Run the relevant tests and provide a short report with:
+   - changed files
+   - root cause
+   - why the fix works
+   - exact test commands and results
 
-Keep existing naming and error-handling conventions.
+Implementation constraints:
+- Preserve existing API contracts.
+- Preserve current release/validation rules.
+- Do not disable audit logging.
+- Do not add broad try/except wrappers that hide real errors.
+- Keep the patch production-grade and minimal.
 
-B. Frontend view (`PlanningShiftsAdminView.vue`)
-1. Initial loading:
-   - Load templates, planning records, and initial board data on mount.
-   - Add a refresh action to the Templates tab.
-2. Safe editing:
-   - When selecting an existing template, fetch full template detail via `getShiftTemplate`.
-   - When selecting an existing series, fetch full series detail via `getShiftSeries`.
-   - When selecting an existing shift, fetch full shift detail via `getShift`.
-   - Populate the edit drafts from full read models, not list items.
-3. Series exceptions:
-   - Show the current exception list for the selected series.
-   - Allow selecting an exception and updating it through the existing update endpoint.
-4. Release workflow:
-   - Add a dedicated “Release & Visibility” section for the selected shift.
-   - Show `release diagnostics` (blocking/warning counts and issue list).
-   - Use dedicated `setShiftReleaseState` actions instead of only editing `release_state` inline.
-   - Use dedicated `updateShiftVisibility` actions instead of silently persisting visibility flags through generic update.
-5. Copy logic:
-   - Replace the current day/week copy shortcuts with correct behavior.
-   - “Copy Day” should copy exactly one source day.
-   - “Copy Week” should copy a 7-day slice.
-   - Make source range and target start explicit in the UI.
-   - Disable copy actions when required inputs are missing.
-6. Keep the page usable for tenant_admin role and preserve existing styling patterns.
+Suggested acceptance criteria:
+- POST /ops/shift-plans with a valid payload succeeds without HTTP 500.
+- Audit rows are created successfully.
+- No psycopg JSON serialization error occurs during audit commit.
+- Creating a Shift Series afterwards is no longer blocked by this backend failure.
+- Real window-mismatch errors still behave as proper business validation, not as 500s.
 
-C. Backend service (`shift_service.py`)
-1. Add explicit validation that manual shift create/update stays within:
-   - owning `shift_plan.planning_from/planning_to`
-   - and, where relevant, the parent `planning_record` window
-2. Add the same window validation to `copy_shift_slice` for target shifts.
-3. Enforce visibility rules consistently:
-   - if `customer_visible_flag` or `subcontractor_visible_flag` is true, the shift must already be `released`
-   - otherwise reject with a validation error
-4. Do not break generated-series behavior.
+Before coding:
+- Briefly summarize the root cause and list the files you will touch.
 
-D. Tests
-Add or update tests to cover:
-1. Editing an existing template preserves `meeting_point`, `location_text`, and `notes`
-2. Editing an existing series preserves `default_break_minutes`, `shift_type_code`, `meeting_point`, `location_text`, and `notes`
-3. Editing an existing shift preserves `notes`
-4. Existing series exceptions are listed and can be updated
-5. Release diagnostics are shown before release actions
-6. Manual shift outside plan window is rejected
-7. Copy Week copies a 7-day slice, not a single day shifted by +7
-8. Draft shifts cannot be made customer-visible/subcontractor-visible
-
-Acceptance criteria:
-- P-03 remains mounted and passes existing smoke tests
-- Tenant Admin can:
-  - create template
-  - create shift plan
-  - create series
-  - generate shifts
-  - create/edit manual shifts safely
-  - inspect diagnostics
-  - change release state through dedicated actions
-  - manage visibility through dedicated actions
-  - list and edit exceptions
-  - copy day/week slices correctly
-- No existing detail fields are lost when editing previously saved template/series/shift rows
-
-Implementation notes:
-- Follow existing repository conventions
-- Prefer minimal, targeted changes over broad rewrites
-- Preserve current route paths, naming style, and feedback-toast behavior
-- After coding, update or add tests and ensure they pass
+After coding:
+- Show the exact tests you ran and whether they passed.

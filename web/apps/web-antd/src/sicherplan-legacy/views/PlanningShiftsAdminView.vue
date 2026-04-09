@@ -71,7 +71,16 @@
             <label class="field-stack"><span>{{ tp("fieldsStartTime") }}</span><input v-model="templateDraft.local_start_time" type="time" required /></label>
             <label class="field-stack"><span>{{ tp("fieldsEndTime") }}</span><input v-model="templateDraft.local_end_time" type="time" required /></label>
             <label class="field-stack"><span>{{ tp("fieldsBreakMinutes") }}</span><input v-model.number="templateDraft.default_break_minutes" type="number" min="0" /></label>
-            <label class="field-stack"><span>{{ tp("fieldsShiftType") }}</span><input v-model="templateDraft.shift_type_code" required /></label>
+            <label class="field-stack">
+              <span>{{ tp("fieldsShiftType") }}</span>
+              <select v-model="templateDraft.shift_type_code" required :disabled="loadingShiftTypeOptions || !templateShiftTypeOptions.length">
+                <option value="" disabled>{{ shiftTypePlaceholderLabel }}</option>
+                <option v-for="option in templateShiftTypeOptions" :key="option.code" :value="option.code">
+                  {{ option.label }}
+                </option>
+              </select>
+              <span v-if="shiftTypeHelpLabel" class="field-help">{{ shiftTypeHelpLabel }}</span>
+            </label>
             <label class="field-stack"><span>{{ tp("fieldsMeetingPoint") }}</span><input v-model="templateDraft.meeting_point" /></label>
             <label class="field-stack"><span>{{ tp("fieldsLocationText") }}</span><input v-model="templateDraft.location_text" /></label>
             <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="templateDraft.notes" rows="2" /></label>
@@ -232,7 +241,16 @@
                 <option value="released">{{ tp("statusReleased") }}</option>
               </select>
             </label>
-            <label class="field-stack"><span>{{ tp("fieldsShiftType") }}</span><input v-model="seriesDraft.shift_type_code" /></label>
+            <label class="field-stack">
+              <span>{{ tp("fieldsShiftType") }}</span>
+              <select v-model="seriesDraft.shift_type_code" :disabled="loadingShiftTypeOptions || !seriesShiftTypeOptions.length">
+                <option value="">{{ tp("shiftTypeOptionalPlaceholder") }}</option>
+                <option v-for="option in seriesShiftTypeOptions" :key="option.code" :value="option.code">
+                  {{ option.label }}
+                </option>
+              </select>
+              <span v-if="shiftTypeHelpLabel" class="field-help">{{ shiftTypeHelpLabel }}</span>
+            </label>
             <label class="field-stack"><span>{{ tp("fieldsMeetingPoint") }}</span><input v-model="seriesDraft.meeting_point" /></label>
             <label class="field-stack"><span>{{ tp("fieldsLocationText") }}</span><input v-model="seriesDraft.location_text" /></label>
             <label class="field-stack"><span>{{ tp("fieldsBreakMinutes") }}</span><input v-model.number="seriesDraft.default_break_minutes" type="number" min="0" /></label>
@@ -351,7 +369,16 @@
               <span class="field-help">{{ tp("fieldsLocalDateTimeHelp") }}</span>
             </label>
             <label class="field-stack"><span>{{ tp("fieldsBreakMinutes") }}</span><input v-model.number="shiftDraft.break_minutes" type="number" min="0" /></label>
-            <label class="field-stack"><span>{{ tp("fieldsShiftType") }}</span><input v-model="shiftDraft.shift_type_code" required /></label>
+            <label class="field-stack">
+              <span>{{ tp("fieldsShiftType") }}</span>
+              <select v-model="shiftDraft.shift_type_code" required :disabled="loadingShiftTypeOptions || !shiftShiftTypeOptions.length">
+                <option value="" disabled>{{ shiftTypePlaceholderLabel }}</option>
+                <option v-for="option in shiftShiftTypeOptions" :key="option.code" :value="option.code">
+                  {{ option.label }}
+                </option>
+              </select>
+              <span v-if="shiftTypeHelpLabel" class="field-help">{{ shiftTypeHelpLabel }}</span>
+            </label>
             <label class="field-stack"><span>{{ tp("fieldsMeetingPoint") }}</span><input v-model="shiftDraft.meeting_point" /></label>
             <label class="field-stack"><span>{{ tp("fieldsLocationText") }}</span><input v-model="shiftDraft.location_text" /></label>
             <label class="field-stack"><span>{{ tp("fieldsReleaseState") }}</span>
@@ -478,6 +505,7 @@ import {
   getShiftReleaseDiagnostics,
   getShiftSeries,
   getShiftTemplate,
+  listShiftTypeOptions,
   listBoardShifts,
   listShiftPlans,
   listShiftSeriesExceptions,
@@ -500,6 +528,7 @@ import {
   type ShiftSeriesExceptionRead,
   type ShiftSeriesListItem,
   type ShiftSeriesRead,
+  type ShiftTypeOption,
   type ShiftTemplateListItem,
   type ShiftTemplateRead,
   PlanningShiftsApiError,
@@ -508,7 +537,9 @@ import { planningShiftsMessages } from "@/i18n/planningShifts.messages";
 import { useAuthStore } from "@/stores/auth";
 import { useLocaleStore } from "@/stores/locale";
 import {
+  buildShiftTypeOptions,
   buildShiftCopyPayload,
+  DEFAULT_SHIFT_TYPE_OPTIONS,
   derivePlanningShiftActionState,
   mapPlanningShiftApiMessage,
   recurrenceLabel,
@@ -534,6 +565,8 @@ const shifts = ref<ShiftListItem[]>([]);
 const boardRows = ref<PlanningBoardShiftListItem[]>([]);
 const seriesExceptions = ref<ShiftSeriesExceptionRead[]>([]);
 const selectedShiftDiagnostics = ref<ShiftReleaseDiagnosticsRead | null>(null);
+const shiftTypeOptions = ref<ShiftTypeOption[]>([]);
+const loadingShiftTypeOptions = ref(false);
 
 const selectedTemplateId = ref("");
 const selectedShiftPlanId = ref("");
@@ -567,6 +600,21 @@ const planningRecordOptions = computed(() =>
     id: record.id,
     label: `${record.name} · ${record.planning_from} - ${record.planning_to}`,
   })),
+);
+const templateShiftTypeOptions = computed(() =>
+  buildShiftTypeOptions(shiftTypeOptions.value, templateDraft.shift_type_code, tp("shiftTypeLegacySuffix")),
+);
+const seriesShiftTypeOptions = computed(() =>
+  buildShiftTypeOptions(shiftTypeOptions.value, seriesDraft.shift_type_code, tp("shiftTypeLegacySuffix")),
+);
+const shiftShiftTypeOptions = computed(() =>
+  buildShiftTypeOptions(shiftTypeOptions.value, shiftDraft.shift_type_code, tp("shiftTypeLegacySuffix")),
+);
+const shiftTypePlaceholderLabel = computed(() =>
+  loadingShiftTypeOptions.value ? tp("shiftTypeLoading") : tp("shiftTypePlaceholder"),
+);
+const shiftTypeHelpLabel = computed(() =>
+  loadingShiftTypeOptions.value ? tp("shiftTypeLoading") : shiftTypeOptions.value.length ? "" : tp("shiftTypeUnavailable"),
 );
 const weekdayOptions = computed(() => [
   { index: 0, label: tp("weekdayMon") },
@@ -622,7 +670,7 @@ function createEmptyTemplateDraft() {
     local_start_time: "08:00",
     local_end_time: "16:00",
     default_break_minutes: 30,
-    shift_type_code: "day",
+    shift_type_code: DEFAULT_SHIFT_TYPE_OPTIONS[0]?.code || "",
     meeting_point: "",
     location_text: "",
     notes: "",
@@ -688,7 +736,7 @@ function createEmptyShiftDraft() {
     starts_at: "",
     ends_at: "",
     break_minutes: 30,
-    shift_type_code: "day",
+    shift_type_code: DEFAULT_SHIFT_TYPE_OPTIONS[0]?.code || "",
     location_text: "",
     meeting_point: "",
     notes: "",
@@ -787,6 +835,16 @@ function startCreateShift() {
 
 async function refreshTemplates() {
   templates.value = await listShiftTemplates(tenantScopeId.value, accessToken.value, {});
+}
+
+async function refreshShiftTypeOptions() {
+  loadingShiftTypeOptions.value = true;
+  try {
+    const options = await listShiftTypeOptions(tenantScopeId.value, accessToken.value);
+    shiftTypeOptions.value = options.length ? options : DEFAULT_SHIFT_TYPE_OPTIONS;
+  } finally {
+    loadingShiftTypeOptions.value = false;
+  }
 }
 
 async function refreshPlanningRecords() {
@@ -1096,6 +1154,7 @@ function assignTemplateDraft(row: ShiftTemplateRead) {
     meeting_point: row.meeting_point || "",
     location_text: row.location_text || "",
     notes: row.notes || "",
+    shift_type_code: row.shift_type_code || "",
   });
 }
 
@@ -1119,6 +1178,7 @@ function assignShiftDraft(row: ShiftRead) {
     starts_at: normalizeDateTimeLocal(row.starts_at),
     ends_at: normalizeDateTimeLocal(row.ends_at),
     notes: row.notes || "",
+    shift_type_code: row.shift_type_code || "",
     meeting_point: row.meeting_point || "",
     location_text: row.location_text || "",
   });
@@ -1152,7 +1212,7 @@ onMounted(async () => {
     return;
   }
   try {
-    await Promise.all([refreshTemplates(), refreshPlanningRecords(), refreshPlans(), refreshBoard()]);
+    await Promise.all([refreshShiftTypeOptions(), refreshTemplates(), refreshPlanningRecords(), refreshPlans(), refreshBoard()]);
   } catch (error) {
     handleApiError(error);
   }

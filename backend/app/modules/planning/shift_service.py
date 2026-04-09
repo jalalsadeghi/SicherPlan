@@ -4,8 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from decimal import Decimal
+from enum import Enum
 from typing import Protocol
+from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.exc import NoInspectionAvailable
 
 from app.errors import ApiException
 from app.modules.iam.audit_service import AuditActor, AuditService
@@ -39,6 +45,7 @@ from app.modules.planning.schemas import (
     ShiftSeriesUpdate,
     ShiftTemplateCreate,
     ShiftTemplateListItem,
+    ShiftTypeOptionRead,
     ShiftTemplateRead,
     ShiftTemplateUpdate,
     ShiftUpdate,
@@ -47,6 +54,7 @@ from app.modules.planning.schemas import (
 
 
 class ShiftPlanningRepository(Protocol):
+    def get_tenant_setting_json(self, tenant_id: str, key: str) -> object | None: ...
     def get_planning_record(self, tenant_id: str, planning_record_id: str) -> PlanningRecord | None: ...
     def list_shift_templates(self, tenant_id: str, filters: OpsMasterFilter) -> list[ShiftTemplate]: ...
     def get_shift_template(self, tenant_id: str, row_id: str) -> ShiftTemplate | None: ...
@@ -97,12 +105,23 @@ class _OccurrenceValues:
 
 
 class ShiftPlanningService:
+    SHIFT_TYPE_OPTIONS_KEY = "planning.shift_type_options"
     WORKFORCE_SCOPES = frozenset({"internal", "subcontractor", "mixed"})
     RELEASE_STATES = frozenset({"draft", "release_ready", "released"})
     SERIES_RECURRENCE_CODES = frozenset({"daily", "weekly"})
     SERIES_EXCEPTION_ACTIONS = frozenset({"skip", "override"})
     COPY_DUPLICATE_MODES = frozenset({"skip_existing", "fail"})
     VISIBILITY_STATES = frozenset({"customer", "subcontractor", "stealth"})
+    _SKIP_SNAPSHOT_VALUE = object()
+    DEFAULT_SHIFT_TYPE_OPTIONS = (
+        {"code": "site_day", "label": "Site Day"},
+        {"code": "site_night", "label": "Site Night"},
+        {"code": "reception_day", "label": "Reception Day"},
+        {"code": "event_main", "label": "Event Main"},
+        {"code": "fair_day", "label": "Trade Fair Day"},
+        {"code": "patrol_evening", "label": "Patrol Evening"},
+        {"code": "patrol_night", "label": "Patrol Night"},
+    )
 
     def __init__(
         self,
@@ -123,12 +142,16 @@ class ShiftPlanningService:
     ) -> list[ShiftTemplateListItem]:
         return [ShiftTemplateListItem.model_validate(row) for row in self.repository.list_shift_templates(tenant_id, filters)]
 
+    def list_shift_type_options(self, tenant_id: str, _actor: RequestAuthorizationContext) -> list[ShiftTypeOptionRead]:
+        return [ShiftTypeOptionRead.model_validate(option) for option in self._effective_shift_type_options(tenant_id)]
+
     def get_shift_template(self, tenant_id: str, template_id: str, _actor: RequestAuthorizationContext) -> ShiftTemplateRead:
         return ShiftTemplateRead.model_validate(self._require_template(tenant_id, template_id))
 
     def create_shift_template(self, tenant_id: str, payload: ShiftTemplateCreate, actor: RequestAuthorizationContext) -> ShiftTemplateRead:
         self._require_tenant_scope(tenant_id, payload.tenant_id)
         self._validate_template_times(payload.local_start_time, payload.local_end_time)
+        self._validate_shift_type_code(tenant_id, payload.shift_type_code, "shift_template")
         if self.repository.find_shift_template_by_code(tenant_id, payload.code) is not None:
             raise ApiException(409, "planning.shift_template.duplicate_code", "errors.planning.shift_template.duplicate_code")
         row = self.repository.create_shift_template(tenant_id, payload, actor.user_id)
@@ -147,7 +170,9 @@ class ShiftPlanningService:
         next_code = self._field_value(payload, "code", current.code)
         next_start = self._field_value(payload, "local_start_time", current.local_start_time)
         next_end = self._field_value(payload, "local_end_time", current.local_end_time)
+        next_shift_type = self._field_value(payload, "shift_type_code", current.shift_type_code)
         self._validate_template_times(next_start, next_end)
+        self._validate_shift_type_code(tenant_id, next_shift_type, "shift_template")
         if self.repository.find_shift_template_by_code(tenant_id, next_code, exclude_id=template_id) is not None:
             raise ApiException(409, "planning.shift_template.duplicate_code", "errors.planning.shift_template.duplicate_code")
         row = self.repository.update_shift_template(tenant_id, template_id, payload, actor.user_id)
@@ -205,6 +230,7 @@ class ShiftPlanningService:
         self._require_tenant_scope(tenant_id, payload.tenant_id)
         shift_plan = self._require_shift_plan(tenant_id, payload.shift_plan_id)
         self._require_template(tenant_id, payload.shift_template_id)
+        self._validate_optional_shift_type_code(tenant_id, payload.shift_type_code, "shift_series")
         self._validate_shift_series_payload(shift_plan, payload)
         row = self.repository.create_shift_series(tenant_id, payload, actor.user_id)
         self._record_event(actor, "planning.shift_series.created", "ops.shift_series", row.id, tenant_id, after_json=self._snapshot(row))
@@ -237,6 +263,7 @@ class ShiftPlanningService:
             release_state=self._field_value(payload, "release_state", current.release_state),
             notes=self._field_value(payload, "notes", current.notes),
         )
+        self._validate_optional_shift_type_code(tenant_id, candidate.shift_type_code, "shift_series")
         self._validate_shift_series_payload(shift_plan, candidate)
         row = self.repository.update_shift_series(tenant_id, shift_series_id, payload, actor.user_id)
         if row is None:
@@ -454,6 +481,7 @@ class ShiftPlanningService:
         self._require_tenant_scope(tenant_id, payload.tenant_id)
         shift_plan = self._require_shift_plan(tenant_id, payload.shift_plan_id)
         planning_record = self._require_planning_record(tenant_id, shift_plan.planning_record_id)
+        self._validate_shift_type_code(tenant_id, payload.shift_type_code, "shift")
         self._validate_shift_payload(
             payload.starts_at,
             payload.ends_at,
@@ -498,6 +526,7 @@ class ShiftPlanningService:
         next_type = self._field_value(payload, "shift_type_code", current.shift_type_code)
         next_customer_visible = self._field_value(payload, "customer_visible_flag", current.customer_visible_flag)
         next_subcontractor_visible = self._field_value(payload, "subcontractor_visible_flag", current.subcontractor_visible_flag)
+        self._validate_shift_type_code(tenant_id, next_type, "shift")
         self._validate_shift_payload(
             next_starts_at,
             next_ends_at,
@@ -702,6 +731,52 @@ class ShiftPlanningService:
         if start_date < planning_record.planning_from or end_date > planning_record.planning_to:
             raise ApiException(400, "planning.shift.plan_window_mismatch", "errors.planning.shift.plan_window_mismatch")
 
+    def _effective_shift_type_options(self, tenant_id: str) -> list[dict[str, str]]:
+        setting_json = self.repository.get_tenant_setting_json(tenant_id, self.SHIFT_TYPE_OPTIONS_KEY)
+        normalized = self._normalize_shift_type_options(setting_json)
+        if normalized:
+            return normalized
+        return [dict(option) for option in self.DEFAULT_SHIFT_TYPE_OPTIONS]
+
+    @staticmethod
+    def _normalize_shift_type_options(setting_json: object | None) -> list[dict[str, str]]:
+        raw_options = setting_json
+        if isinstance(setting_json, dict):
+            raw_options = setting_json.get("options")
+        if not isinstance(raw_options, list):
+            return []
+        normalized: list[dict[str, str]] = []
+        seen_codes: set[str] = set()
+        for item in raw_options:
+            if not isinstance(item, dict):
+                continue
+            code = item.get("code")
+            label = item.get("label")
+            if not isinstance(code, str) or not code.strip():
+                continue
+            if not isinstance(label, str) or not label.strip():
+                continue
+            normalized_code = code.strip()
+            if normalized_code in seen_codes:
+                continue
+            normalized.append({"code": normalized_code, "label": label.strip()})
+            seen_codes.add(normalized_code)
+        return normalized
+
+    def _validate_optional_shift_type_code(self, tenant_id: str, shift_type_code: str | None, resource_kind: str) -> None:
+        if shift_type_code is None:
+            return
+        self._validate_shift_type_code(tenant_id, shift_type_code, resource_kind)
+
+    def _validate_shift_type_code(self, tenant_id: str, shift_type_code: str, resource_kind: str) -> None:
+        allowed_codes = {option["code"] for option in self._effective_shift_type_options(tenant_id)}
+        if shift_type_code not in allowed_codes:
+            raise ApiException(
+                400,
+                f"planning.{resource_kind}.invalid_shift_type_code",
+                f"errors.planning.{resource_kind}.invalid_shift_type_code",
+            )
+
     @staticmethod
     def _validate_template_times(start: time, end: time) -> None:
         if start == end:
@@ -867,9 +942,62 @@ class ShiftPlanningService:
     def _not_found(self, resource: str) -> ApiException:
         return ApiException(404, f"planning.{resource}.not_found", f"errors.planning.{resource}.not_found")
 
-    @staticmethod
-    def _snapshot(row) -> dict[str, object]:
-        return {key: value for key, value in row.__dict__.items() if not key.startswith("_")}
+    @classmethod
+    def _snapshot(cls, row) -> dict[str, object]:
+        try:
+            mapper = sa_inspect(row).mapper
+        except NoInspectionAvailable:
+            source_items = vars(row).items()
+        else:
+            source_items = ((attribute.key, getattr(row, attribute.key)) for attribute in mapper.column_attrs)
+
+        snapshot: dict[str, object] = {}
+        for key, value in source_items:
+            if key.startswith("_"):
+                continue
+            serialized = cls._json_safe_snapshot_value(value)
+            if serialized is cls._SKIP_SNAPSHOT_VALUE:
+                continue
+            snapshot[key] = serialized
+        return snapshot
+
+    @classmethod
+    def _json_safe_snapshot_value(cls, value: object) -> object:
+        if value is None or isinstance(value, bool | int | float | str):
+            return value
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, datetime | date | time):
+            return value.isoformat()
+        if isinstance(value, UUID):
+            return str(value)
+        if isinstance(value, Enum):
+            return cls._json_safe_snapshot_value(value.value)
+        if isinstance(value, dict):
+            result: dict[str, object] = {}
+            for key, item in value.items():
+                serialized = cls._json_safe_snapshot_value(item)
+                if serialized is cls._SKIP_SNAPSHOT_VALUE:
+                    continue
+                result[str(key)] = serialized
+            return result
+        if isinstance(value, list | tuple):
+            result: list[object] = []
+            for item in value:
+                serialized = cls._json_safe_snapshot_value(item)
+                if serialized is cls._SKIP_SNAPSHOT_VALUE:
+                    continue
+                result.append(serialized)
+            return result
+        if isinstance(value, set):
+            result: list[object] = []
+            for item in sorted(value, key=repr):
+                serialized = cls._json_safe_snapshot_value(item)
+                if serialized is cls._SKIP_SNAPSHOT_VALUE:
+                    continue
+                result.append(serialized)
+            return result
+        return cls._SKIP_SNAPSHOT_VALUE
 
     def _record_event(
         self,

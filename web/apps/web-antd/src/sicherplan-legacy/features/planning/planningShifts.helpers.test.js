@@ -2,8 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildShiftTypeOptions,
   addDaysToIsoDate,
   buildShiftCopyPayload,
+  DEFAULT_SHIFT_TYPE_OPTIONS,
   derivePlanningShiftActionState,
   hasPlanningShiftPermission,
   mapPlanningShiftApiMessage,
@@ -41,4 +43,12 @@ test("copy payload spans full requested range", () => {
     target_from: "2026-04-17",
     duplicate_mode: "skip_existing",
   });
+});
+
+test("shift type options keep legacy values editable and fall back to defaults", () => {
+  assert.deepEqual(buildShiftTypeOptions([], "", "(legacy)"), DEFAULT_SHIFT_TYPE_OPTIONS);
+  assert.deepEqual(buildShiftTypeOptions([{ code: "site_day", label: "Site Day" }], "legacy_code", "(legacy)"), [
+    { code: "site_day", label: "Site Day" },
+    { code: "legacy_code", label: "legacy_code (legacy)" },
+  ]);
 });

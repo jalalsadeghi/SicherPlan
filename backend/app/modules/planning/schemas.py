@@ -969,6 +969,11 @@ class ShiftTemplateRead(ShiftTemplateListItem):
     archived_at: datetime | None
 
 
+class ShiftTypeOptionRead(BaseModel):
+    code: str
+    label: str
+
+
 class ShiftPlanFilter(BaseModel):
     planning_record_id: str | None = None
     workforce_scope_code: str | None = None

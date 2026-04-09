@@ -19,6 +19,11 @@ export interface ShiftTemplateRead extends ShiftTemplateListItem {
   notes: string | null;
 }
 
+export interface ShiftTypeOption {
+  code: string;
+  label: string;
+}
+
 export interface ShiftPlanListItem {
   id: string;
   tenant_id: string;
@@ -217,6 +222,10 @@ function queryString(params: Record<string, unknown>) {
 
 export function listShiftTemplates(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
   return request<ShiftTemplateListItem[]>(`/api/planning/tenants/${tenantId}/ops/shift-templates${queryString(filters)}`, accessToken);
+}
+
+export function listShiftTypeOptions(tenantId: string, accessToken: string) {
+  return request<ShiftTypeOption[]>(`/api/planning/tenants/${tenantId}/ops/shift-type-options`, accessToken);
 }
 
 export function createShiftTemplate(tenantId: string, accessToken: string, payload: Record<string, unknown>) {

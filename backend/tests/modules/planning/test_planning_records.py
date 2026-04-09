@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
@@ -339,6 +340,12 @@ class PlanningRecordServiceTests(unittest.TestCase):
         self.assertEqual(row.planning_mode_code, "event")
         self.assertEqual(row.event_detail.event_venue_id, self.event_venue_id)
         self.assertEqual(len(self.audit_repository.audit_events), 1)
+        event = self.audit_repository.audit_events[-1]
+        self.assertIsInstance(event.after_json["planning_from"], str)
+        self.assertIsInstance(event.after_json["planning_to"], str)
+        self.assertIsInstance(event.after_json["created_at"], str)
+        self.assertNotIn("event_detail", event.after_json)
+        json.dumps(event.after_json)
 
     def test_rejects_mismatched_detail_payload(self) -> None:
         with self.assertRaises(ApiException) as captured:

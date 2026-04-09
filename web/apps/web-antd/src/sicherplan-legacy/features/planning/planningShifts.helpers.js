@@ -9,6 +9,16 @@ export const PLANNING_SHIFT_PERMISSION_MATRIX = {
   subcontractor_user: [],
 };
 
+export const DEFAULT_SHIFT_TYPE_OPTIONS = [
+  { code: "site_day", label: "Site Day" },
+  { code: "site_night", label: "Site Night" },
+  { code: "reception_day", label: "Reception Day" },
+  { code: "event_main", label: "Event Main" },
+  { code: "fair_day", label: "Trade Fair Day" },
+  { code: "patrol_evening", label: "Patrol Evening" },
+  { code: "patrol_night", label: "Patrol Night" },
+];
+
 export function hasPlanningShiftPermission(role, permissionKey) {
   return (PLANNING_SHIFT_PERMISSION_MATRIX[role] ?? []).includes(permissionKey);
 }
@@ -39,12 +49,15 @@ export function mapPlanningShiftApiMessage(messageKey) {
     "errors.iam.authorization.scope_denied": "permissionDenied",
     "errors.planning.shift_template.duplicate_code": "templateDuplicateCode",
     "errors.planning.shift_template.invalid_time_range": "templateInvalidTimeRange",
+    "errors.planning.shift_template.invalid_shift_type_code": "invalidShiftTypeCode",
     "errors.planning.shift_plan.invalid_workforce_scope": "invalidWorkforceScope",
     "errors.planning.shift_plan.record_window_mismatch": "planWindowMismatch",
     "errors.planning.shift.invalid_window": "shiftInvalidWindow",
     "errors.planning.shift.plan_window_mismatch": "shiftPlanWindowMismatch",
+    "errors.planning.shift.invalid_shift_type_code": "invalidShiftTypeCode",
     "errors.planning.shift.visibility_requires_release": "visibilityRequiresRelease",
     "errors.planning.shift_series.invalid_weekday_mask": "invalidWeekdayMask",
+    "errors.planning.shift_series.invalid_shift_type_code": "invalidShiftTypeCode",
     "errors.planning.shift_series.plan_window_mismatch": "seriesPlanWindowMismatch",
     "errors.planning.shift_series.invalid_timezone": "invalidTimezone",
     "errors.planning.shift_series_exception.override_times_required": "exceptionOverrideRequired",
@@ -55,6 +68,20 @@ export function mapPlanningShiftApiMessage(messageKey) {
     "errors.planning.shift_board.invalid_window": "invalidBoardWindow",
   };
   return map[messageKey] ?? "error";
+}
+
+export function buildShiftTypeOptions(baseOptions, currentCode, legacyLabelSuffix) {
+  const options = Array.isArray(baseOptions) && baseOptions.length ? [...baseOptions] : [...DEFAULT_SHIFT_TYPE_OPTIONS];
+  if (!currentCode || options.some((option) => option.code === currentCode)) {
+    return options;
+  }
+  return [
+    ...options,
+    {
+      code: currentCode,
+      label: `${currentCode} ${legacyLabelSuffix}`.trim(),
+    },
+  ];
 }
 
 export function addDaysToIsoDate(value, delta) {
