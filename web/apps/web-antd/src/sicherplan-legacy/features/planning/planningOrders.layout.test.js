@@ -56,6 +56,23 @@ test("planning-orders detail workspace uses local customer-style tabs", () => {
   assert.match(source, /if \(!orderHasSavedRecord\.value\) \{\s*return tabs;/);
 });
 
+test("planning-orders overview uses nested tabs for order details and child lines", () => {
+  assert.match(source, /data-testid="planning-orders-overview-tabs"/);
+  assert.match(source, /:aria-label="tp\('orderOverviewDetailTabsAria'\)"/);
+  assert.match(source, /:data-testid="`planning-orders-overview-tab-\$\{tab\.id\}`"/);
+  assert.match(source, /data-testid="planning-orders-overview-panel-order_details"/);
+  assert.match(source, /data-testid="planning-orders-overview-panel-equipment_lines"/);
+  assert.match(source, /data-testid="planning-orders-overview-panel-requirement_lines"/);
+  assert.match(source, /const activeOrderOverviewTab = ref\("order_details"\)/);
+  assert.match(source, /const orderOverviewTabs = computed\(\(\) => \{/);
+  assert.match(source, /if \(!orderHasSavedRecord\.value\) \{\s*return tabs;/);
+  assert.match(source, /v-show="activeOrderOverviewTab === 'order_details'"/);
+  assert.match(source, /v-show="activeOrderOverviewTab === 'equipment_lines'"/);
+  assert.match(source, /v-show="activeOrderOverviewTab === 'requirement_lines'"/);
+  assert.match(source, /async function selectOrder\(orderId: string\) \{[\s\S]*activeOrderOverviewTab\.value = "order_details";/s);
+  assert.match(source, /function startCreateOrder\(\) \{[\s\S]*activeOrderOverviewTab\.value = "order_details";/s);
+});
+
 test("planning-orders commercial tab shows customer-specific guidance and readable issue lists", () => {
   assert.match(source, /commercialSummaryKey/);
   assert.match(source, /commercialContextKey/);
@@ -95,8 +112,8 @@ test("planning-orders order form uses domain-aligned controls", () => {
 });
 
 test("planning-orders overview exposes independent order child sections", () => {
-  assert.match(source, /data-testid="planning-orders-order-equipment-lines"/);
-  assert.match(source, /data-testid="planning-orders-order-requirement-lines"/);
+  assert.match(source, /data-testid="planning-orders-overview-panel-equipment_lines"/);
+  assert.match(source, /data-testid="planning-orders-overview-panel-requirement_lines"/);
   assert.match(source, /submitEquipmentLine/);
   assert.match(source, /submitRequirementLine/);
   assert.match(source, /listOrderEquipmentLines/);
@@ -244,6 +261,30 @@ test("planning-orders exposes inline setup links, add buttons, and real create m
 test("planning-orders groups service dates and release state into one desktop row", () => {
   assert.match(source, /class="planning-orders-form-row planning-orders-form-row--triple"/);
   assert.match(source, /\.planning-orders-form-row--triple\s*\{[\s\S]*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/);
+});
+
+test("planning-orders document tabs use selectable rows and inline action panels", () => {
+  assert.match(source, /const selectedOrderDocumentId = ref\(""\)/);
+  assert.match(source, /const selectedPlanningDocumentId = ref\(""\)/);
+  assert.match(source, /const selectedOrderDocument = computed\(/);
+  assert.match(source, /const selectedPlanningDocument = computed\(/);
+  assert.match(source, /@click="selectOrderDocument\(document\.id\)"/);
+  assert.match(source, /@click="selectPlanningDocument\(document\.id\)"/);
+  assert.match(source, /class="planning-orders-doc-row planning-orders-doc-button"/);
+  assert.match(source, /:class="\{ selected: document\.id === selectedOrderDocumentId \}"/);
+  assert.match(source, /:class="\{ selected: document\.id === selectedPlanningDocumentId \}"/);
+  assert.match(source, /data-testid="planning-orders-order-document-detail"/);
+  assert.match(source, /data-testid="planning-orders-planning-document-detail"/);
+  assert.match(source, /downloadOrderDocumentSelection/);
+  assert.match(source, /downloadPlanningDocumentSelection/);
+  assert.match(source, /copyOrderDocumentId/);
+  assert.match(source, /copyPlanningDocumentId/);
+  assert.match(source, /clearOrderDocumentSelection/);
+  assert.match(source, /clearPlanningDocumentSelection/);
+  assert.match(source, /tp\("actionsDownloadCurrentVersion"\)/);
+  assert.match(source, /tp\("actionsCopyDocumentId"\)/);
+  assert.match(source, /tp\("actionsClearDocumentSelection"\)/);
+  assert.match(source, /tp\("documentSelectionEmpty"\)/);
 });
 
 test("planning-orders wrapper skips the extra workspace block but keeps the shared intro", () => {

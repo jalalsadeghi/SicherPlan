@@ -23,6 +23,7 @@ test("planningOrders api exposes all documented order endpoint groups", () => {
   assert.match(source, /export function listOrderAttachments/);
   assert.match(source, /export function createOrderAttachment/);
   assert.match(source, /export function linkOrderAttachment/);
+  assert.match(source, /export async function downloadPlanningDocument/);
   assert.match(source, /export function getOrderCommercialLink/);
 });
 

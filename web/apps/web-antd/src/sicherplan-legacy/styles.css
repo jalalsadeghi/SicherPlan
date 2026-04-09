@@ -250,7 +250,9 @@ a {
 }
 
 .cta-secondary {
-  background: var(--sp-color-primary-strong);
+  background: color-mix(in srgb, var(--sp-color-surface-page) 76%, white 24%);
+  color: rgba(50, 54, 57, 0.88);
+  border: 1px solid var(--sp-color-border-soft);
 }
 
 .hero-panel {

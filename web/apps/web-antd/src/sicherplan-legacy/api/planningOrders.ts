@@ -375,3 +375,36 @@ export function getPlanningRecordCommercialLink(tenantId: string, planningRecord
     accessToken,
   );
 }
+
+export async function downloadPlanningDocument(
+  tenantId: string,
+  documentId: string,
+  versionNo: number,
+  accessToken: string,
+) {
+  const response = await fetch(
+    `${webAppConfig.apiBaseUrl}/api/platform/tenants/${tenantId}/documents/${documentId}/versions/${versionNo}/download`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "X-Request-Id": generateRequestId(),
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as unknown;
+    if (isApiErrorEnvelope(payload)) {
+      throw new PlanningOrdersApiError(response.status, payload.error);
+    }
+    throw new PlanningOrdersApiError(response.status, {
+      message_key: response.status === 404 ? "errors.platform.http_not_found" : "errors.platform.internal",
+      details: {},
+    });
+  }
+
+  return {
+    blob: await response.blob(),
+    fileName: response.headers.get("Content-Disposition")?.match(/filename=\"?([^\";]+)\"?/i)?.[1] ?? `document-${documentId}`,
+  };
+}

@@ -196,7 +196,31 @@
           </nav>
 
           <section v-show="activeDetailTab === 'overview'" class="planning-orders-tab-panel" data-testid="planning-orders-tab-panel-overview">
-            <form class="planning-orders-form" @submit.prevent="submitOrder">
+            <nav
+              v-if="isCreatingOrder || selectedOrder"
+              class="planning-orders-tabs planning-orders-tabs--nested"
+              :aria-label="tp('orderOverviewDetailTabsAria')"
+              data-testid="planning-orders-overview-tabs"
+            >
+              <button
+                v-for="tab in orderOverviewTabs"
+                :key="tab.id"
+                type="button"
+                class="planning-orders-tab planning-orders-tab--nested"
+                :class="{ active: tab.id === activeOrderOverviewTab }"
+                :data-testid="`planning-orders-overview-tab-${tab.id}`"
+                @click="activeOrderOverviewTab = tab.id"
+              >
+                {{ tab.label }}
+              </button>
+            </nav>
+
+            <form
+              v-show="activeOrderOverviewTab === 'order_details'"
+              class="planning-orders-form"
+              data-testid="planning-orders-overview-panel-order_details"
+              @submit.prevent="submitOrder"
+            >
               <fieldset class="planning-orders-fieldset" :disabled="!actionState.canWriteOrders || loading.action">
               <div class="planning-orders-form-grid">
                 <PlanningCustomerSelect
@@ -317,7 +341,11 @@
               </fieldset>
             </form>
 
-            <section class="planning-orders-section" data-testid="planning-orders-order-equipment-lines">
+            <section
+              v-show="activeOrderOverviewTab === 'equipment_lines'"
+              class="planning-orders-section planning-orders-tab-panel planning-orders-tab-panel--nested"
+              data-testid="planning-orders-overview-panel-equipment_lines"
+            >
               <div class="planning-orders-panel__header">
                 <div>
                   <h3>{{ tp("sectionOrderEquipmentLines") }}</h3>
@@ -379,7 +407,11 @@
               <p v-else class="field-help">{{ tp("orderChildrenRequireSave") }}</p>
             </section>
 
-            <section class="planning-orders-section" data-testid="planning-orders-order-requirement-lines">
+            <section
+              v-show="activeOrderOverviewTab === 'requirement_lines'"
+              class="planning-orders-section planning-orders-tab-panel planning-orders-tab-panel--nested"
+              data-testid="planning-orders-overview-panel-requirement_lines"
+            >
               <div class="planning-orders-panel__header">
                 <div>
                   <h3>{{ tp("sectionOrderRequirementLines") }}</h3>
@@ -519,12 +551,38 @@
           >
             <div class="planning-orders-panel__header"><h3>{{ tp("sectionOrderDocuments") }}</h3></div>
             <div v-if="orderAttachments.length" class="planning-orders-doc-list">
-              <div v-for="document in orderAttachments" :key="document.id" class="planning-orders-doc-row">
+              <button
+                v-for="document in orderAttachments"
+                :key="document.id"
+                type="button"
+                class="planning-orders-doc-row planning-orders-doc-button"
+                :class="{ selected: document.id === selectedOrderDocumentId }"
+                @click="selectOrderDocument(document.id)"
+              >
                 <strong>{{ document.title }}</strong>
                 <span>{{ document.id }}</span>
-              </div>
+                <span>{{ tp("fieldsCurrentVersion") }} {{ document.current_version_no }} · {{ document.status }}</span>
+              </button>
             </div>
             <p v-else class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
+            <section class="planning-orders-subsection planning-orders-doc-detail" data-testid="planning-orders-order-document-detail">
+              <div class="planning-orders-panel__header"><h3>{{ tp("tabDocuments") }}</h3></div>
+              <template v-if="selectedOrderDocument">
+                <div class="planning-orders-form-grid">
+                  <label class="field-stack"><span>{{ tp("fieldsDocumentTitle") }}</span><input :value="selectedOrderDocument.title" readonly /></label>
+                  <label class="field-stack"><span>{{ tp("fieldsDocumentId") }}</span><input :value="selectedOrderDocument.id" readonly /></label>
+                  <label class="field-stack"><span>{{ tp("fieldsCurrentVersion") }}</span><input :value="selectedOrderDocument.current_version_no" readonly /></label>
+                  <label class="field-stack"><span>{{ tp("fieldsStatus") }}</span><input :value="selectedOrderDocument.status" readonly /></label>
+                  <label class="field-stack field-stack--wide"><span>{{ tp("fieldsSourceLabel") }}</span><input :value="selectedOrderDocument.source_label || '-'" readonly /></label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" @click="downloadOrderDocumentSelection">{{ tp("actionsDownloadCurrentVersion") }}</button>
+                  <button class="cta-button cta-secondary" type="button" @click="copyOrderDocumentId">{{ tp("actionsCopyDocumentId") }}</button>
+                  <button class="cta-button cta-secondary" type="button" @click="clearOrderDocumentSelection">{{ tp("actionsClearDocumentSelection") }}</button>
+                </div>
+              </template>
+              <p v-else class="field-help">{{ tp("documentSelectionEmpty") }}</p>
+            </section>
             <form class="planning-orders-form" @submit.prevent="submitOrderAttachment">
               <fieldset class="planning-orders-fieldset" :disabled="!actionState.canManageOrderDocs || loading.action">
               <div class="planning-orders-form-grid">
@@ -881,12 +939,38 @@
             >
               <div class="planning-orders-panel__header"><h3>{{ tp("sectionPlanningDocuments") }}</h3></div>
               <div v-if="planningAttachments.length" class="planning-orders-doc-list">
-                <div v-for="document in planningAttachments" :key="document.id" class="planning-orders-doc-row">
+                <button
+                  v-for="document in planningAttachments"
+                  :key="document.id"
+                  type="button"
+                  class="planning-orders-doc-row planning-orders-doc-button"
+                  :class="{ selected: document.id === selectedPlanningDocumentId }"
+                  @click="selectPlanningDocument(document.id)"
+                >
                   <strong>{{ document.title }}</strong>
                   <span>{{ document.id }}</span>
-                </div>
+                  <span>{{ tp("fieldsCurrentVersion") }} {{ document.current_version_no }} · {{ document.status }}</span>
+                </button>
               </div>
               <p v-else class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
+              <section class="planning-orders-subsection planning-orders-doc-detail" data-testid="planning-orders-planning-document-detail">
+                <div class="planning-orders-panel__header"><h3>{{ tp("tabDocuments") }}</h3></div>
+                <template v-if="selectedPlanningDocument">
+                  <div class="planning-orders-form-grid">
+                    <label class="field-stack"><span>{{ tp("fieldsDocumentTitle") }}</span><input :value="selectedPlanningDocument.title" readonly /></label>
+                    <label class="field-stack"><span>{{ tp("fieldsDocumentId") }}</span><input :value="selectedPlanningDocument.id" readonly /></label>
+                    <label class="field-stack"><span>{{ tp("fieldsCurrentVersion") }}</span><input :value="selectedPlanningDocument.current_version_no" readonly /></label>
+                    <label class="field-stack"><span>{{ tp("fieldsStatus") }}</span><input :value="selectedPlanningDocument.status" readonly /></label>
+                    <label class="field-stack field-stack--wide"><span>{{ tp("fieldsSourceLabel") }}</span><input :value="selectedPlanningDocument.source_label || '-'" readonly /></label>
+                  </div>
+                  <div class="cta-row">
+                    <button class="cta-button" type="button" @click="downloadPlanningDocumentSelection">{{ tp("actionsDownloadCurrentVersion") }}</button>
+                    <button class="cta-button cta-secondary" type="button" @click="copyPlanningDocumentId">{{ tp("actionsCopyDocumentId") }}</button>
+                    <button class="cta-button cta-secondary" type="button" @click="clearPlanningDocumentSelection">{{ tp("actionsClearDocumentSelection") }}</button>
+                  </div>
+                </template>
+                <p v-else class="field-help">{{ tp("documentSelectionEmpty") }}</p>
+              </section>
               <form class="planning-orders-form" @submit.prevent="submitPlanningAttachment">
                 <fieldset class="planning-orders-fieldset" :disabled="!actionState.canManagePlanningDocs || loading.action">
                 <div class="planning-orders-form-grid">
@@ -1037,6 +1121,7 @@ import {
   listPlanningRecords,
   setCustomerOrderReleaseState,
   setPlanningRecordReleaseState,
+  downloadPlanningDocument,
   updateCustomerOrder,
   updateOrderEquipmentLine,
   updateOrderRequirementLine,
@@ -1146,6 +1231,8 @@ const orderEquipmentLines = ref<OrderEquipmentLineRead[]>([]);
 const orderRequirementLines = ref<OrderRequirementLineRead[]>([]);
 const orderAttachments = ref<PlanningDocumentRead[]>([]);
 const planningAttachments = ref<PlanningDocumentRead[]>([]);
+const selectedOrderDocumentId = ref("");
+const selectedPlanningDocumentId = ref("");
 const selectedOrderId = ref("");
 const selectedPlanningRecordId = ref("");
 const selectedEquipmentLineId = ref("");
@@ -1157,6 +1244,7 @@ const selectedPlanningCommercial = ref<PlanningCommercialLinkRead | null>(null);
 const isCreatingOrder = ref(false);
 const isCreatingPlanning = ref(false);
 const activeDetailTab = ref("overview");
+const activeOrderOverviewTab = ref("order_details");
 const activePlanningDetailTab = ref("overview");
 
 const orderDraft = reactive({
@@ -1277,6 +1365,12 @@ const planningStatusOptions = computed(() => [
   { label: tp("statusActive"), value: "active" },
   { label: tp("statusInactive"), value: "inactive" },
 ]);
+const selectedOrderDocument = computed(
+  () => orderAttachments.value.find((document) => document.id === selectedOrderDocumentId.value) ?? null,
+);
+const selectedPlanningDocument = computed(
+  () => planningAttachments.value.find((document) => document.id === selectedPlanningDocumentId.value) ?? null,
+);
 const requirementTypePlaceholder = computed(() => {
   if (!orderDraft.customer_id) {
     return tp("requirementTypeCustomerRequired");
@@ -1379,6 +1473,17 @@ const missingSetupEntity = computed(() => {
 });
 const showPlanningSetupCta = computed(() => Boolean(missingSetupEntity.value));
 const orderHasSavedRecord = computed(() => Boolean(selectedOrder.value && !isCreatingOrder.value));
+const orderOverviewTabs = computed(() => {
+  const tabs = [{ id: "order_details", label: tp("tabOrderDetails") }];
+  if (!orderHasSavedRecord.value) {
+    return tabs;
+  }
+  return [
+    ...tabs,
+    { id: "equipment_lines", label: tp("tabEquipmentLines") },
+    { id: "requirement_lines", label: tp("tabRequirementLines") },
+  ];
+});
 const orderDetailTabs = computed(() => {
   const tabs = [{ id: "overview", label: tp("tabOverview") }];
   if (!orderHasSavedRecord.value) {
@@ -2233,6 +2338,7 @@ async function selectOrder(orderId: string) {
   loading.orderDetail = true;
   try {
     activeDetailTab.value = "overview";
+    activeOrderOverviewTab.value = "order_details";
     selectedOrderId.value = orderId;
     isCreatingOrder.value = false;
     selectedOrder.value = await getCustomerOrder(tenantScopeId.value, orderId, accessToken.value);
@@ -2242,6 +2348,8 @@ async function selectOrder(orderId: string) {
     resetEquipmentLineDraft();
     resetRequirementLineDraft();
     orderAttachments.value = await listOrderAttachments(tenantScopeId.value, orderId, accessToken.value);
+    clearOrderDocumentSelection();
+    clearPlanningDocumentSelection();
     selectedOrderCommercial.value = await getOrderCommercialLink(tenantScopeId.value, orderId, accessToken.value);
     await refreshPlanningRecords();
   } catch (error) {
@@ -2253,6 +2361,7 @@ async function selectOrder(orderId: string) {
 
 function startCreateOrder() {
   activeDetailTab.value = "overview";
+  activeOrderOverviewTab.value = "order_details";
   isCreatingOrder.value = true;
   selectedOrder.value = null;
   selectedOrderId.value = "";
@@ -2265,6 +2374,8 @@ function startCreateOrder() {
   orderRequirementLines.value = [];
   orderAttachments.value = [];
   planningAttachments.value = [];
+  clearOrderDocumentSelection();
+  clearPlanningDocumentSelection();
   selectedOrderCommercial.value = null;
   selectedPlanningCommercial.value = null;
   resetOrderDraft();
@@ -2341,6 +2452,7 @@ async function submitOrderAttachment() {
       label: orderAttachmentDraft.label || null,
     });
     orderAttachments.value = await listOrderAttachments(tenantScopeId.value, selectedOrder.value.id, accessToken.value);
+    clearOrderDocumentSelection();
     Object.assign(orderAttachmentDraft, { title: "", label: "", file_name: "", content_type: "", content_base64: "" });
     setFeedback("success", tp("successTitle"), tp("documentUploaded"));
   } catch (error) {
@@ -2360,6 +2472,7 @@ async function linkExistingOrderDocument() {
       label: orderAttachmentLink.label || null,
     });
     orderAttachments.value = await listOrderAttachments(tenantScopeId.value, selectedOrder.value.id, accessToken.value);
+    clearOrderDocumentSelection();
     Object.assign(orderAttachmentLink, { document_id: "", label: "" });
     setFeedback("success", tp("successTitle"), tp("documentLinked"));
   } catch (error) {
@@ -2386,6 +2499,7 @@ async function refreshPlanningRecords() {
         selectedPlanningRecordId.value = "";
         selectedPlanningRecord.value = null;
         planningAttachments.value = [];
+        clearPlanningDocumentSelection();
         selectedPlanningCommercial.value = null;
       }
     }
@@ -2410,6 +2524,103 @@ function selectRequirementLine(lineId: string) {
     return;
   }
   syncRequirementLineDraft(line);
+}
+
+function selectOrderDocument(documentId: string) {
+  selectedOrderDocumentId.value = documentId;
+}
+
+function clearOrderDocumentSelection() {
+  selectedOrderDocumentId.value = "";
+}
+
+function selectPlanningDocument(documentId: string) {
+  selectedPlanningDocumentId.value = documentId;
+}
+
+function clearPlanningDocumentSelection() {
+  selectedPlanningDocumentId.value = "";
+}
+
+function buildDocumentDownloadName(document: PlanningDocumentRead) {
+  const normalizedTitle = (document.title || "").trim().replace(/[\\/:*?"<>|]+/g, "-");
+  return normalizedTitle || `document-${document.id}`;
+}
+
+function triggerBlobDownload(blob: Blob, fileName: string) {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+async function copyTextToClipboard(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const input = document.createElement("input");
+  input.value = value;
+  document.body.append(input);
+  input.select();
+  document.execCommand("copy");
+  input.remove();
+}
+
+async function downloadOrderDocumentSelection() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedOrderDocument.value) return;
+  try {
+    const file = await downloadPlanningDocument(
+      tenantScopeId.value,
+      selectedOrderDocument.value.id,
+      selectedOrderDocument.value.current_version_no,
+      accessToken.value,
+    );
+    triggerBlobDownload(file.blob, file.fileName || buildDocumentDownloadName(selectedOrderDocument.value));
+    setFeedback("success", tp("successTitle"), tp("documentDownloadStarted"));
+  } catch {
+    setFeedback("error", tp("errorTitle"), tp("documentDownloadFailed"));
+  }
+}
+
+async function downloadPlanningDocumentSelection() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedPlanningDocument.value) return;
+  try {
+    const file = await downloadPlanningDocument(
+      tenantScopeId.value,
+      selectedPlanningDocument.value.id,
+      selectedPlanningDocument.value.current_version_no,
+      accessToken.value,
+    );
+    triggerBlobDownload(file.blob, file.fileName || buildDocumentDownloadName(selectedPlanningDocument.value));
+    setFeedback("success", tp("successTitle"), tp("documentDownloadStarted"));
+  } catch {
+    setFeedback("error", tp("errorTitle"), tp("documentDownloadFailed"));
+  }
+}
+
+async function copyOrderDocumentId() {
+  if (!selectedOrderDocument.value) return;
+  try {
+    await copyTextToClipboard(selectedOrderDocument.value.id);
+    setFeedback("success", tp("successTitle"), tp("documentIdCopied"));
+  } catch {
+    setFeedback("error", tp("errorTitle"), tp("documentCopyFailed"));
+  }
+}
+
+async function copyPlanningDocumentId() {
+  if (!selectedPlanningDocument.value) return;
+  try {
+    await copyTextToClipboard(selectedPlanningDocument.value.id);
+    setFeedback("success", tp("successTitle"), tp("documentIdCopied"));
+  } catch {
+    setFeedback("error", tp("errorTitle"), tp("documentCopyFailed"));
+  }
 }
 
 async function submitEquipmentLine() {
@@ -2500,6 +2711,7 @@ function startCreatePlanning() {
   selectedPlanningRecordId.value = "";
   selectedPlanningRecord.value = null;
   planningAttachments.value = [];
+  clearPlanningDocumentSelection();
   selectedPlanningCommercial.value = null;
   planningValidationState.attempted = false;
   resetPlanningDraft();
@@ -2516,6 +2728,7 @@ async function selectPlanningRecord(planningRecordId: string) {
     selectedPlanningRecord.value = await getPlanningRecord(tenantScopeId.value, planningRecordId, accessToken.value);
     syncPlanningDraft(selectedPlanningRecord.value);
     planningAttachments.value = await listPlanningRecordAttachments(tenantScopeId.value, planningRecordId, accessToken.value);
+    clearPlanningDocumentSelection();
     selectedPlanningCommercial.value = await getPlanningRecordCommercialLink(
       tenantScopeId.value,
       planningRecordId,
@@ -2600,6 +2813,7 @@ async function submitPlanningAttachment() {
       label: planningAttachmentDraft.label || null,
     });
     planningAttachments.value = await listPlanningRecordAttachments(tenantScopeId.value, selectedPlanningRecord.value.id, accessToken.value);
+    clearPlanningDocumentSelection();
     Object.assign(planningAttachmentDraft, { title: "", label: "", file_name: "", content_type: "", content_base64: "" });
     setFeedback("success", tp("successTitle"), tp("documentUploaded"));
   } catch (error) {
@@ -2619,6 +2833,7 @@ async function linkExistingPlanningDocument() {
       label: planningAttachmentLink.label || null,
     });
     planningAttachments.value = await listPlanningRecordAttachments(tenantScopeId.value, selectedPlanningRecord.value.id, accessToken.value);
+    clearPlanningDocumentSelection();
     Object.assign(planningAttachmentLink, { document_id: "", label: "" });
     setFeedback("success", tp("successTitle"), tp("documentLinked"));
   } catch (error) {
@@ -2693,6 +2908,9 @@ watch(
     if (!hasSavedRecord && activeDetailTab.value !== "overview") {
       activeDetailTab.value = "overview";
     }
+    if (!hasSavedRecord && activeOrderOverviewTab.value !== "order_details") {
+      activeOrderOverviewTab.value = "order_details";
+    }
   },
 );
 
@@ -2757,6 +2975,23 @@ watch(
 .planning-orders-row.selected {
   border-color: var(--sp-color-primary);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 40%, transparent);
+}
+
+.planning-orders-doc-button {
+  cursor: pointer;
+  display: grid;
+  gap: 0.35rem;
+  text-align: left;
+  width: 100%;
+}
+
+.planning-orders-doc-button.selected {
+  border-color: var(--sp-color-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 40%, transparent);
+}
+
+.planning-orders-doc-detail {
+  gap: 1rem;
 }
 
 .planning-orders-row span,
