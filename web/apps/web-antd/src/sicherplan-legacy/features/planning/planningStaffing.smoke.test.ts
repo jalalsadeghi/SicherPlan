@@ -272,7 +272,9 @@ describe("PlanningStaffingCoverageView", () => {
     const wrapper = await mountView();
 
     expect(wrapper.find('[data-testid="planning-staffing-workspace"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain("Sessionbasierter Scope");
+    expect(wrapper.text()).toContain("Filter und Scope");
+    expect(wrapper.text()).not.toContain("Staffing-Validierungen");
+    expect(wrapper.text()).not.toContain("Sessionbasierter Scope");
     expect(wrapper.text()).not.toContain("Bearer-Token");
     expect(mocks.listStaffingCoverageMock).toHaveBeenCalledWith("tenant-1", "token-1", expect.any(Object));
   });

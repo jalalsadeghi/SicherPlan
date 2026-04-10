@@ -1,33 +1,5 @@
 <template>
   <section class="planning-staffing-page">
-    <section class="module-card planning-staffing-hero">
-      <div>
-        <p class="eyebrow">{{ tp("eyebrow") }}</p>
-        <h2>{{ tp("title") }}</h2>
-        <p class="planning-staffing-lead">{{ tp("lead") }}</p>
-        <div class="planning-staffing-meta">
-          <span class="planning-staffing-meta__pill">{{ tp("roleLabel") }}: {{ role }}</span>
-          <span class="planning-staffing-meta__pill">{{ tp("tenantScopeLabel") }}: {{ tenantScopeId || tp("scopeUnavailable") }}</span>
-          <span class="planning-staffing-meta__pill">{{ tp("permissionRead") }}: {{ actionState.canReadCoverage ? "on" : "off" }}</span>
-          <span class="planning-staffing-meta__pill">{{ tp("permissionWrite") }}: {{ actionState.canWriteStaffing ? "on" : "off" }}</span>
-          <span class="planning-staffing-meta__pill">{{ tp("permissionOverride") }}: {{ actionState.canOverrideValidation ? "on" : "off" }}</span>
-        </div>
-      </div>
-
-      <div class="module-card planning-staffing-scope">
-        <p class="eyebrow">{{ tp("sessionTitle") }}</p>
-        <h3>{{ tp("sessionBody") }}</h3>
-        <p class="field-help">{{ tp("sessionHint") }}</p>
-        <div class="cta-row">
-          <button class="cta-button cta-secondary" type="button" :disabled="loading || !actionState.canRefresh" @click="refreshAll">
-            {{ tp("refresh") }}
-          </button>
-          <a class="cta-button cta-secondary" href="/admin/employees">{{ tp("openEmployeesAdmin") }}</a>
-          <a class="cta-button cta-secondary" href="/admin/subcontractors">{{ tp("openSubcontractorsAdmin") }}</a>
-        </div>
-      </div>
-    </section>
-
     <section v-if="feedback.message" class="planning-staffing-feedback" :data-tone="feedback.tone">
       <div>
         <strong>{{ feedback.title }}</strong>
@@ -52,10 +24,17 @@
           <div>
             <p class="eyebrow">{{ tp("filtersTitle") }}</p>
             <h3>{{ tp("filtersTitle") }}</h3>
+            <p class="planning-staffing-panel__lead">
+              {{ tp("roleLabel") }}: {{ role }} · {{ tp("tenantScopeLabel") }}: {{ tenantScopeId || tp("scopeUnavailable") }}
+            </p>
           </div>
-          <button class="cta-button cta-secondary" type="button" :disabled="loading" @click="refreshAll">
-            {{ tp("refresh") }}
-          </button>
+          <div class="cta-row planning-staffing-panel__actions">
+            <button class="cta-button cta-secondary" type="button" :disabled="loading" @click="refreshAll">
+              {{ tp("refresh") }}
+            </button>
+            <a class="cta-button cta-secondary" href="/admin/employees">{{ tp("openEmployeesAdmin") }}</a>
+            <a class="cta-button cta-secondary" href="/admin/subcontractors">{{ tp("openSubcontractorsAdmin") }}</a>
+          </div>
         </div>
         <div class="planning-staffing-filter-grid">
           <label class="field-stack">
@@ -96,6 +75,12 @@
               <option value="confirmed_only">confirmed_only</option>
             </select>
           </label>
+        </div>
+
+        <div class="planning-staffing-meta">
+          <span class="planning-staffing-meta__pill">{{ tp("permissionRead") }}: {{ actionState.canReadCoverage ? "on" : "off" }}</span>
+          <span class="planning-staffing-meta__pill">{{ tp("permissionWrite") }}: {{ actionState.canWriteStaffing ? "on" : "off" }}</span>
+          <span class="planning-staffing-meta__pill">{{ tp("permissionOverride") }}: {{ actionState.canOverrideValidation ? "on" : "off" }}</span>
         </div>
 
         <div class="planning-staffing-summary">
@@ -1121,13 +1106,7 @@ onBeforeUnmount(() => {
 
 .planning-staffing-grid {
   align-items: start;
-  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1fr) minmax(420px, 1.35fr);
-}
-
-.planning-staffing-hero {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 0.95fr) minmax(320px, 1fr) minmax(420px, 1.35fr);
 }
 
 .planning-staffing-meta,
@@ -1163,18 +1142,114 @@ onBeforeUnmount(() => {
   background: #fff;
 }
 
+.planning-staffing-panel {
+  align-content: start;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.05);
+}
+
+.planning-staffing-panel__header {
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.planning-staffing-panel__lead {
+  color: rgba(15, 23, 42, 0.72);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  margin: 0.35rem 0 0;
+}
+
+.planning-staffing-panel__actions {
+  justify-content: flex-end;
+}
+
+.planning-staffing-filter-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.planning-staffing-filter-grid :deep(.field-stack),
+.planning-staffing-filter-grid .field-stack,
+.planning-staffing-subpanel .field-stack {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.planning-staffing-filter-grid :deep(.field-stack > span),
+.planning-staffing-filter-grid .field-stack > span,
+.planning-staffing-subpanel .field-stack > span {
+  color: rgba(15, 23, 42, 0.72);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.planning-staffing-filter-grid input,
+.planning-staffing-filter-grid select,
+.planning-staffing-filter-grid textarea,
+.planning-staffing-subpanel input,
+.planning-staffing-subpanel select,
+.planning-staffing-subpanel textarea {
+  appearance: none;
+  background: rgba(248, 250, 252, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 14px;
+  color: rgb(15, 23, 42);
+  font: inherit;
+  min-height: 2.85rem;
+  padding: 0.75rem 0.9rem;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  width: 100%;
+}
+
+.planning-staffing-filter-grid textarea,
+.planning-staffing-subpanel textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.planning-staffing-filter-grid input[type="checkbox"],
+.planning-staffing-subpanel input[type="checkbox"] {
+  accent-color: rgb(40, 170, 170);
+  min-height: auto;
+  min-width: 1.1rem;
+  padding: 0;
+  width: 1.1rem;
+}
+
+.planning-staffing-filter-grid input:focus,
+.planning-staffing-filter-grid select:focus,
+.planning-staffing-filter-grid textarea:focus,
+.planning-staffing-subpanel input:focus,
+.planning-staffing-subpanel select:focus,
+.planning-staffing-subpanel textarea:focus {
+  background: #fff;
+  border-color: rgba(40, 170, 170, 0.9);
+  box-shadow: 0 0 0 4px rgba(40, 170, 170, 0.14);
+  outline: none;
+}
+
 .planning-staffing-row,
 .planning-staffing-demand-group {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
   text-align: left;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .planning-staffing-row.selected,
 .planning-staffing-demand-group.selected {
   border-color: rgb(40, 170, 170);
   box-shadow: 0 0 0 1px rgba(40, 170, 170, 0.2);
+}
+
+.planning-staffing-row:hover,
+.planning-staffing-demand-group:hover {
+  border-color: rgba(40, 170, 170, 0.45);
+  transform: translateY(-1px);
 }
 
 .planning-staffing-demand-group,
@@ -1184,7 +1259,6 @@ onBeforeUnmount(() => {
   gap: 0.35rem;
 }
 
-.planning-staffing-scope,
 .planning-staffing-empty {
   display: grid;
   gap: 0.75rem;
@@ -1226,11 +1300,19 @@ onBeforeUnmount(() => {
   .planning-staffing-grid {
     grid-template-columns: 1fr;
   }
+
+  .planning-staffing-filter-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 900px) {
-  .planning-staffing-hero {
+  .planning-staffing-filter-grid {
     grid-template-columns: 1fr;
+  }
+
+  .planning-staffing-panel__actions {
+    justify-content: flex-start;
   }
 }
 </style>

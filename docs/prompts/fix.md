@@ -1,98 +1,105 @@
-You are working in the SicherPlan repository.
+You are working in the latest SicherPlan repository state.
 
-Task goal:
-Align `/admin/planning-staffing` with the documented `P-04 — Staffing Board & Coverage` workspace so it becomes a real session-aware, role-scoped staffing board, not just a partial coverage monitor.
+Goal:
+Refine the UI of `/admin/planning-staffing` so the page becomes cleaner and visually consistent, without removing the real P-04 staffing functionality.
 
 Before coding:
-1. Read `AGENTS.md`.
-2. Find the relevant story/task ID in `docs/sprint/*.md` or `docs/prompts/*.md`.
-3. If no official task ID exists for this page, state that explicitly in your summary and do not invent a fake backlog ID.
-4. Use source-of-truth order exactly as defined in `AGENTS.md`.
+1. Read `AGENTS.md` and keep the change narrow.
+2. Inspect these files first:
+   - `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
+   - `web/apps/web-antd/src/views/sicherplan/module-registry.ts`
+   - the module shell / wrapper file that renders the extra `Workspace` section for admin modules
+   - `web/apps/web-antd/src/router/routes/modules/sicherplan.ts`
+   - `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
+3. Verify the currently rendered strings/areas:
+   - top box headed by `Staffing validations`
+   - outer wrapper box headed by `Workspace`
+   - the `Filters and scope` panel
 
-Files to inspect first:
-- `web/apps/web-antd/src/router/routes/modules/sicherplan.ts`
-- `web/apps/web-antd/src/views/sicherplan/module-registry.ts`
-- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
-- `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
-- `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.helpers.js`
-- `backend/app/modules/planning/router.py`
-- `backend/app/modules/planning/staffing_service.py`
-- any related planning schemas/models/tests needed for safe alignment
+Business constraint:
+P-04 must remain a real staffing board and coverage workspace.
+Do NOT remove actual staffing functionality such as:
+- shift coverage list
+- demand groups
+- assignments
+- staffing assign / unassign / substitute actions
+- shift/assignment validation logic
+- override flow
+- coverage summary
+Only remove or restyle non-essential UI chrome.
 
-Business/documentation intent you must preserve:
-- `P-04 Staffing Board & Coverage` is not just a report page.
-- It must cover board shifts, demand groups, teams, team members, assignments, assignment validations/overrides, staffing-board assign/unassign/substitute actions, and staffing coverage views.
-- Coverage is a release gate, not just a color indicator.
-- Planning must stay role-scoped and tenant-scoped.
-- Do not expose HR-private data.
-- Do not bypass `finance.actual_record` or alter downstream finance truth.
-- Keep DE-first / EN-secondary i18n parity for any new UI strings.
+Required changes:
+A. Remove the top decorative hero block from `PlanningStaffingCoverageView.vue`, including the box headed by `Staffing validations` and the nested session/scope promo box.
+   - Keep functional feedback/error messaging if it is still useful.
+   - Do NOT remove the real validation panels inside the selected shift / selected assignment detail area.
 
-Current issues you must verify and fix:
-1. The current page hardcodes `role = "dispatcher"` instead of using the real authenticated user role/claims.
-2. The current page requires manual tenant scope and access token input and stores them in localStorage instead of using the app session/tenant context.
-3. Route authority, helper permission matrix, and documented role scope are inconsistent, especially around `controller_qm` and the documented field-operations role.
-4. The current front-end staffing page is only partial relative to the documented P-04 scope.
-5. The module-registry import path for `PlanningStaffingCoverageView.vue` must resolve correctly inside the actual repo tree.
+B. Remove the extra `Workspace` box/header for `/admin/planning-staffing`.
+   - Prefer a clean module-shell configuration fix over CSS hacks.
+   - If this comes from module config, update the planning-staffing module entry accordingly.
+   - Scope this change to this page only; do not accidentally affect unrelated modules.
 
-Required implementation outcome:
-A. Remove manual tenant/access-token entry from `/admin/planning-staffing`.
-B. Use the existing authenticated app session and tenant scope from the main web app.
-C. Remove any hardcoded role assumptions and derive permissions from the real session/auth state.
-D. Make route/module/helper permission behavior consistent.
-E. At minimum, support these P-04 behaviors directly in the workspace:
-   - shift coverage list
-   - demand-group level coverage breakdown
-   - assignment detail + validations
-   - override creation with audited reason
-   - staffing assign / unassign / substitute actions using existing backend endpoints
-   - reload/refresh behavior after staffing actions
-F. If team/team-member or subcontractor-release management is not handled elsewhere in the current UX, either:
-   - expose them in this workspace, or
-   - add explicit, clear handoff links/actions to the correct adjacent workspace
-   Do not leave the user without an actionable path.
-G. Preserve privacy and role-scoped visibility.
-H. Keep the change set narrow and do not do unrelated refactors.
+C. Improve `Filters and scope` styling so it looks like a finished admin form card.
+   At minimum:
+   - clear card structure and spacing
+   - consistent header/body layout
+   - styled labels
+   - styled inputs/selects/textarea/checkbox
+   - proper padding, borders, radii, focus states, and vertical rhythm
+   - clean responsive grid behavior
+   - alignment consistent with the rest of the page
 
-Role-access requirement:
-- Validate the intended access against the project docs before changing role guards.
-- If `controller_qm` should NOT use P-04 according to the docs, remove that access consistently from route/module/helper behavior.
-- If you find a valid reason to keep `controller_qm`, implement a deliberate read-only oversight mode with no staffing write, override, dispatch, or release actions, and explain that choice in your final summary.
-- If a field-operations role exists in the current auth model, align access with the documented P-04 role scope.
+D. Audit the whole `/admin/planning-staffing` page for visual consistency and tighten styles where needed:
+   - summary cards
+   - list/detail card spacing
+   - selected row state
+   - CTA rows and wrapping
+   - empty-state spacing
+   - subpanel spacing
+   - mobile/tablet breakpoints
+Do not redesign the whole module; keep it consistent with the existing SicherPlan admin style.
 
-Technical expectations:
-- Fix import/path consistency for the planning staffing view.
-- Extend `planningStaffing.ts` with the missing typed API wrappers needed by the UI.
-- Refactor `PlanningStaffingCoverageView.vue` into maintainable pieces if needed, but stay narrow in scope.
-- Render demand-group shortages and coverage state at a level that makes staffing decisions actionable.
-- Do not regress existing outputs/dispatch/validation behavior unless a correction is required.
+E. Keep backend/API behavior unchanged unless a compile/runtime issue requires a tiny compatibility fix.
 
-Tests and validation:
-- Add or update tests for:
-  - permission gating by role
-  - session-based tenant/auth context usage
-  - read-only vs write action visibility
-  - assign/unassign/substitute flows refreshing board/coverage data
-  - import-path/module-resolution sanity where applicable
-- Run the relevant build/typecheck/lint/tests before finishing.
-- Verify that `/admin/planning-staffing` renders without manual token entry.
-- Verify tenant scoping and role scoping.
-- Verify the final result is consistent with the documented P-04 workspace intent.
+Implementation guidance:
+- First identify whether the `Workspace` title/description comes from the module shell, module registry config, or page composition.
+- First identify whether `Staffing validations` is part of the page’s top hero section or a deeper functional section.
+- Remove only the decorative top-level version.
+- For the filter panel, prefer real component/page styling improvements instead of hiding defects with one-off margins.
+- If there are shared utility classes for admin forms/cards in the repo, reuse them.
+- Avoid `display: none` hacks unless there is no cleaner page-scoped option.
 
-Important self-check:
-Before finalizing, challenge your own solution and verify that:
-- you did not silently keep the hardcoded-role bug
-- you did not leave manual token/scope entry in place
-- you did not keep route/helper/docs role mismatches unresolved
-- you did not claim P-04 completeness while still omitting core staffing-board actions
-- you did not introduce HR/privacy leakage
-- you did not overreach into unrelated modules
+Validation requirements:
+1. `/admin/planning-staffing` must no longer show:
+   - the top `Staffing validations` box
+   - the extra `Workspace` wrapper box/header
+2. The page must still show and preserve:
+   - filters
+   - coverage summary
+   - shift list
+   - shift detail
+   - demand groups
+   - assignments
+   - real validation/override functionality in the detail area
+3. `Filters and scope` must look intentionally styled and visually consistent.
+4. Route and module registration must still work.
+5. Run relevant checks available in the repo:
+   - typecheck
+   - lint
+   - focused tests if present
+   - build or page smoke validation if available
+
+Self-check before finalizing:
+- Confirm you did NOT remove the actual validation logic required by P-04.
+- Confirm you removed only the decorative `Staffing validations` hero box.
+- Confirm the extra `Workspace` wrapper is gone because of a proper config/composition fix, not a brittle hack.
+- Confirm the filter area now has proper visual styling.
+- Confirm no unrelated admin modules were changed unintentionally.
 
 Final response format:
-1. Short implementation summary
+1. Short summary
 2. Exact files changed
-3. Which inconsistencies you confirmed
-4. What you changed and why
-5. What tests/validation you ran and their results
-6. Remaining assumptions or blockers
-7. A brief self-validation section explaining why the result now matches the documented P-04 behavior
+3. What caused the `Workspace` box
+4. What caused the `Staffing validations` box
+5. What styling improvements were made
+6. What checks you ran
+7. Self-validation result

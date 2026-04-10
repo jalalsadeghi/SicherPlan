@@ -56,6 +56,7 @@ describe('module registry wrapper flags', () => {
   it('limits planning-staffing to the implemented staffing roles', () => {
     const staffing = moduleRegistry['planning-staffing']!;
     expect(staffing.allowedRoles).toEqual(['tenant_admin', 'dispatcher']);
+    expect(staffing.showWorkspaceSectionHeader).toBe(false);
   });
 
   it('keeps customers unavailable to platform admin in the shared module registry', () => {
