@@ -177,6 +177,36 @@
           </div>
           <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreateSeries" @click="startCreateSeries">{{ tp("actionsCreateSeries") }}</button>
         </div>
+        <div
+          class="planning-shifts-series-context"
+          :class="{ 'planning-shifts-series-context--warning': !selectedShiftPlanRow }"
+          data-testid="planning-shifts-series-context"
+        >
+          <label class="field-stack field-stack--wide">
+            <span>{{ tp("fieldsShiftPlan") }}</span>
+            <select
+              v-model="selectedShiftPlanId"
+              data-testid="planning-shifts-series-plan-select"
+              :disabled="!shiftPlans.length"
+              @change="changeSeriesShiftPlan"
+            >
+              <option value="">{{ shiftPlans.length ? tp("seriesSelectPlanFirst") : tp("seriesNoPlansAvailable") }}</option>
+              <option v-for="plan in shiftPlans" :key="plan.id" :value="plan.id">
+                {{ plan.name }} · {{ plan.planning_from }} - {{ plan.planning_to }}
+              </option>
+            </select>
+          </label>
+          <div v-if="selectedShiftPlanRow">
+            <strong>{{ tp("seriesSelectedPlanLabel") }}</strong>
+            <p>{{ selectedShiftPlanRow.name }}</p>
+            <p class="field-help">
+              {{ tp("seriesSelectedPlanWindow") }}: {{ selectedShiftPlanRow.planning_from }} - {{ selectedShiftPlanRow.planning_to }}
+              · {{ tp("seriesSelectedPlanWorkforce") }}: {{ workforceLabel(selectedShiftPlanRow.workforce_scope_code) }}
+            </p>
+          </div>
+          <p v-else class="field-help">{{ shiftPlans.length ? tp("seriesSelectPlanFirst") : tp("seriesNoPlansAvailable") }}</p>
+          <button class="cta-button cta-secondary" type="button" @click="activeWorkspaceTab = 'plans'">{{ tp("actionsOpenPlansTab") }}</button>
+        </div>
         <div class="planning-orders-list">
           <button
             v-for="series in seriesRows"
@@ -263,6 +293,7 @@
             <button class="cta-button" type="submit" :disabled="!actionState.canCreateSeries">{{ tp("actionsSave") }}</button>
             <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canGenerateSeries" @click="generateSelectedSeries">{{ tp("actionsGenerate") }}</button>
           </div>
+          <p v-if="!selectedShiftPlanRow" class="field-help">{{ shiftPlans.length ? tp("seriesSelectPlanFirst") : tp("seriesNoPlansAvailable") }}</p>
         </form>
         <form v-if="selectedSeriesId" class="planning-orders-form" @submit.prevent="submitException">
           <div class="planning-orders-panel__header">
@@ -321,6 +352,36 @@
             <h3>{{ tp("shiftsTitle") }}</h3>
           </div>
           <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreateShift" @click="startCreateShift">{{ tp("actionsCreateShift") }}</button>
+        </div>
+        <div
+          class="planning-shifts-series-context"
+          :class="{ 'planning-shifts-series-context--warning': !selectedShiftPlanRow }"
+          data-testid="planning-shifts-shifts-context"
+        >
+          <label class="field-stack field-stack--wide">
+            <span>{{ tp("fieldsShiftPlan") }}</span>
+            <select
+              v-model="selectedShiftPlanId"
+              data-testid="planning-shifts-shifts-plan-select"
+              :disabled="!shiftPlans.length"
+              @change="changeShiftTabPlan"
+            >
+              <option value="">{{ shiftPlans.length ? tp("seriesSelectPlanFirst") : tp("seriesNoPlansAvailable") }}</option>
+              <option v-for="plan in shiftPlans" :key="plan.id" :value="plan.id">
+                {{ plan.name }} · {{ plan.planning_from }} - {{ plan.planning_to }}
+              </option>
+            </select>
+          </label>
+          <div v-if="selectedShiftPlanRow">
+            <strong>{{ tp("seriesSelectedPlanLabel") }}</strong>
+            <p>{{ selectedShiftPlanRow.name }}</p>
+            <p class="field-help">
+              {{ tp("seriesSelectedPlanWindow") }}: {{ selectedShiftPlanRow.planning_from }} - {{ selectedShiftPlanRow.planning_to }}
+              · {{ tp("seriesSelectedPlanWorkforce") }}: {{ workforceLabel(selectedShiftPlanRow.workforce_scope_code) }}
+            </p>
+          </div>
+          <p v-else class="field-help">{{ shiftPlans.length ? tp("seriesSelectPlanFirst") : tp("seriesNoPlansAvailable") }}</p>
+          <button class="cta-button cta-secondary" type="button" @click="activeWorkspaceTab = 'plans'">{{ tp("actionsOpenPlansTab") }}</button>
         </div>
         <div class="planning-orders-form-grid">
           <label class="field-stack"><span>{{ tp("filtersDateFrom") }}</span><input v-model="shiftFilters.date_from" type="date" /></label>
@@ -543,6 +604,7 @@ import {
   derivePlanningShiftActionState,
   mapPlanningShiftApiMessage,
   recurrenceLabel,
+  resolveSelectedShiftPlanId,
 } from "@/features/planning/planningShifts.helpers";
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
@@ -595,6 +657,7 @@ const workspaceTabs = computed(() => [
   { id: "board", label: tp("boardTitle") },
 ]);
 const shiftTemplateOptions = computed(() => templates.value);
+const selectedShiftPlanRow = computed(() => shiftPlans.value.find((plan) => plan.id === selectedShiftPlanId.value) || null);
 const planningRecordOptions = computed(() =>
   planningRecords.value.map((record) => ({
     id: record.id,
@@ -780,6 +843,24 @@ async function selectShiftPlan(shiftPlanId: string) {
   await refreshPlanDetails();
 }
 
+async function changeSeriesShiftPlan() {
+  if (!selectedShiftPlanId.value) {
+    clearPlanSelectionContext();
+    return;
+  }
+  await refreshPlanDetails();
+  startCreateSeries();
+}
+
+async function changeShiftTabPlan() {
+  if (!selectedShiftPlanId.value) {
+    clearPlanSelectionContext();
+    return;
+  }
+  await refreshPlanDetails();
+  startCreateShift();
+}
+
 async function selectSeries(seriesId: string) {
   selectedSeriesId.value = seriesId;
   await refreshSeriesDetails();
@@ -807,14 +888,7 @@ async function selectShift(shiftId: string) {
 function startCreateTemplate() { resetTemplateDraft(); selectedTemplateId.value = ""; }
 function startCreatePlan() {
   resetShiftPlanDraft();
-  selectedShiftPlanId.value = "";
-  selectedSeriesId.value = "";
-  selectedExceptionId.value = "";
-  selectedShiftId.value = "";
-  seriesRows.value = [];
-  seriesExceptions.value = [];
-  shifts.value = [];
-  selectedShiftDiagnostics.value = null;
+  clearPlanSelectionContext();
 }
 function startCreateSeries() {
   resetSeriesDraft();
@@ -858,6 +932,12 @@ async function refreshPlans() {
   ]);
   planningRecords.value = records;
   shiftPlans.value = plans;
+  const nextShiftPlanId = resolveSelectedShiftPlanId(selectedShiftPlanId.value, plans);
+  if (!nextShiftPlanId) {
+    clearPlanSelectionContext();
+    return;
+  }
+  selectedShiftPlanId.value = nextShiftPlanId;
 }
 
 async function refreshPlanDetails() {
@@ -957,6 +1037,10 @@ async function submitShiftPlan() {
 }
 
 async function submitSeries() {
+  if (!selectedShiftPlanId.value) {
+    setFeedback("error", tp("errorTitle"), tp("seriesMissingPlanSubmit"));
+    return;
+  }
   try {
     const payload = {
       ...seriesDraft,
@@ -1011,7 +1095,10 @@ async function submitException() {
 }
 
 async function submitShift() {
-  if (!selectedShiftPlanId.value) return;
+  if (!selectedShiftPlanId.value) {
+    setFeedback("error", tp("errorTitle"), tp("shiftsMissingPlanSubmit"));
+    return;
+  }
   try {
     const payload = {
       ...shiftDraft,
@@ -1135,6 +1222,17 @@ function handleApiError(error: unknown) {
   setFeedback("error", tp("errorTitle"), tp(mapPlanningShiftApiMessage(messageKey) as keyof typeof planningShiftsMessages.de));
 }
 
+function clearPlanSelectionContext() {
+  selectedShiftPlanId.value = "";
+  selectedSeriesId.value = "";
+  selectedExceptionId.value = "";
+  selectedShiftId.value = "";
+  seriesRows.value = [];
+  seriesExceptions.value = [];
+  shifts.value = [];
+  selectedShiftDiagnostics.value = null;
+}
+
 function normalizeDateTimeLocal(value: string) {
   return value.slice(0, 16);
 }
@@ -1248,6 +1346,26 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.planning-shifts-series-context {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--primary-color, rgb(40,170,170)) 18%, white);
+  background: color-mix(in srgb, var(--primary-color, rgb(40,170,170)) 6%, white);
+}
+
+.planning-shifts-series-context p {
+  margin: 0.25rem 0 0;
+}
+
+.planning-shifts-series-context--warning {
+  border-color: color-mix(in srgb, #d97706 45%, white);
+  background: color-mix(in srgb, #f59e0b 10%, white);
 }
 
 .planning-shifts-weekday-chip {
@@ -1508,7 +1626,8 @@ onMounted(async () => {
   .planning-shifts-hero,
   .planning-shifts-panel__header,
   .planning-orders-panel__header,
-  .planning-orders-empty {
+  .planning-orders-empty,
+  .planning-shifts-series-context {
     flex-direction: column;
     align-items: stretch;
   }

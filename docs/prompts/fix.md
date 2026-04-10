@@ -1,82 +1,85 @@
-You are working in the SicherPlan repository on the current main branch.
+Task: Fix hidden shift-plan context in the Shift Planning UI for the “Series and exceptions” workflow.
 
-Goal:
-Fix the backend bug that causes POST /api/planning/tenants/{tenant_id}/ops/shift-plans to fail with HTTP 500 during audit-event creation, and make sure valid Shift Plan creation succeeds cleanly so the UI can continue into Shift Series creation without false follow-on errors.
+Repository:
+jalalsadeghi/SicherPlan
 
-Observed behavior:
-- The UI later shows “The series falls outside the shift-plan window.”
-- But the backend traceback clearly shows a 500 in create_shift_plan, inside:
-  backend/app/modules/planning/shift_service.py
-  -> ShiftPlanningService.create_shift_plan()
-  -> self._record_event(... after_json=self._snapshot(row))
-  -> backend/app/modules/iam/audit_service.py
-  -> backend/app/modules/iam/audit_repository.py
-  -> session.commit()
-  -> psycopg JSON serialization crash
-- This strongly suggests the audit payload contains non-JSON-serializable values (date/datetime/time/UUID/etc.).
+Problem statement:
+In the current Shift Planning page, the Series form does not show which Shift Plan the series will be created under.
+The component relies on an implicit selectedShiftPlanId from the Plans tab. This is hidden context and causes operator confusion.
+The current UI renders a Shift template selector as the first visible field, but there is no visible Shift plan field or summary.
+The submitSeries() flow injects shift_plan_id from selectedShiftPlanId, so the backend path works, but the user cannot verify the selected plan in the form.
 
-Important code references:
-- backend/app/modules/planning/shift_service.py
-- backend/app/modules/planning/order_service.py
-- backend/app/modules/planning/planning_record_service.py
-- backend/app/modules/iam/audit_models.py
-- backend/app/modules/iam/audit_repository.py
-- backend/app/modules/planning/repository.py
+Observed current behavior:
+- A user must first select a Shift Plan in the Plans tab.
+- Then the Series tab becomes usable.
+- The Series form does not visibly show the selected Shift Plan.
+- Save may be enabled, but the selected plan is not visible.
+- This is a UX/state-visibility issue, not primarily a backend issue.
+
+Your job:
+Implement a robust frontend fix so the selected Shift Plan is clearly visible and selectable/confirmable in the Series workflow.
+
+Primary goals:
+1. In the Series tab, add a clearly visible “Shift plan” field or context card above the Series form.
+2. The user must be able to see which Shift Plan is currently active before saving a series.
+3. For new series creation, the UI must prevent accidental submission when no Shift Plan is selected.
+4. The behavior must remain compatible with the existing API:
+   - listShiftSeries(tenantId, shiftPlanId, ...)
+   - createShiftSeries(tenantId, shiftPlanId, ..., payload)
+5. Do not break existing create/edit/generate flows.
+
+Recommended implementation approach:
+- In PlanningShiftsAdminView.vue:
+  - Add a visible “Shift plan” selector or a read-only context field in the Series tab.
+  - Reuse shiftPlans / selectedShiftPlanId state already present.
+  - For best UX, prefer a real select in the Series tab bound to selectedShiftPlanId.
+  - When the selected shift plan changes from this selector:
+    - refresh plan details
+    - reload the series list for the new plan
+    - clear selectedSeriesId and selectedExceptionId if they no longer belong to the selected plan
+    - reset exception draft when needed
+- Keep submitSeries() using the selectedShiftPlanId path parameter unless you find a stronger refactor that stays API-compatible.
+- Show an inline help message if no shift plan is selected, instead of relying on hidden state.
+- Disable Save and Generate in the Series tab when no shift plan is selected.
+- Also review the Shifts tab for the same hidden dependency pattern and fix it if the same UX issue exists there, but do not expand scope unnecessarily if that creates risk.
+
+Files to inspect first:
 - web/apps/web-antd/src/sicherplan-legacy/views/PlanningShiftsAdminView.vue
+- web/apps/web-antd/src/sicherplan-legacy/features/planning/planningShifts.helpers.js
+- web/apps/web-antd/src/sicherplan-legacy/api/planningShifts.ts
+- web/apps/web-antd/src/sicherplan-legacy/i18n/planningShifts.messages.ts
+- web/apps/web-antd/src/sicherplan-legacy/features/planning/planningShifts.smoke.test.ts
 
-Root-cause hypothesis to verify and fix:
-- ShiftPlanningService._snapshot() currently returns raw row.__dict__ values.
-- AuditEvent.before_json / after_json / metadata_json are JSONB fields.
-- Raw SQLAlchemy model attributes can include Python date/datetime/time/UUID/Enum or other non-JSON-safe values.
-- CustomerOrderService._snapshot() already contains a safer recursive serializer. Reuse that approach or extract a shared helper.
+Acceptance criteria:
+1. In the Series tab, the current Shift Plan is visible to the user.
+2. A tenant admin can intentionally choose/confirm the Shift Plan from inside the Series workflow.
+3. The Series form cannot be submitted without a valid selected Shift Plan.
+4. Existing create/edit/generate behavior still works.
+5. Smoke/integration tests are updated to cover the new visible shift-plan context.
+6. The patch is minimal, readable, and consistent with the existing page architecture.
 
-What to do:
-1. Reproduce the failing path for Shift Plan creation.
-2. Fix backend/app/modules/planning/shift_service.py so audit snapshots are JSON-safe.
-   - Replace the current _snapshot() implementation with a recursive serializer that converts:
-     - datetime/date/time -> ISO 8601 strings
-     - UUID -> string
-     - Decimal -> string
-     - Enum -> its value (then serialize recursively)
-     - dict/list/tuple/set -> recursively JSON-safe structures
-   - Skip SQLAlchemy internals and any non-serializable relationship objects.
-3. Prefer a small shared helper if it improves consistency.
-   - If practical, extract a reusable JSON-safe snapshot helper and use it in:
-     - backend/app/modules/planning/shift_service.py
-     - backend/app/modules/planning/planning_record_service.py
-   - Keep the scope tight; do not refactor unrelated modules.
-4. Keep business validation semantics unchanged.
-   - Do NOT relax the actual “shift plan window must fit planning record window” rule.
-   - The fix is for the false 500/audit crash, not for bypassing domain validation.
-5. Add regression tests.
-   At minimum add tests that prove:
-   - creating a valid Shift Plan no longer returns 500 when audit is enabled
-   - the resulting audit event is stored successfully with JSON-safe after_json
-   - date/datetime values in the snapshot are serialized as strings
-   - planning_record_service audit snapshots are also safe if you touched that file
-6. Make sure the API now returns the correct domain error only when the window is genuinely invalid.
-7. Run the relevant tests and provide a short report with:
-   - changed files
-   - root cause
-   - why the fix works
-   - exact test commands and results
+Testing requirements:
+- Add or update tests to verify:
+  - the Series tab visibly shows Shift Plan context
+  - changing the Shift Plan updates the series list context correctly
+  - Save is disabled or blocked when no Shift Plan is selected
+  - no regression in current series creation flow
+- Run the relevant frontend tests and report the exact results.
 
-Implementation constraints:
-- Preserve existing API contracts.
-- Preserve current release/validation rules.
-- Do not disable audit logging.
-- Do not add broad try/except wrappers that hide real errors.
-- Keep the patch production-grade and minimal.
+Important:
+Before coding, validate my diagnosis against the current code and explain whether the issue is:
+- purely hidden frontend state
+- a state synchronization issue
+- or something broader
 
-Suggested acceptance criteria:
-- POST /ops/shift-plans with a valid payload succeeds without HTTP 500.
-- Audit rows are created successfully.
-- No psycopg JSON serialization error occurs during audit commit.
-- Creating a Shift Series afterwards is no longer blocked by this backend failure.
-- Real window-mismatch errors still behave as proper business validation, not as 500s.
+After coding, do a self-review and explicitly check:
+- whether the fix introduces stale selection bugs
+- whether series editing across different plans can become inconsistent
+- whether any i18n keys or tests are missing
 
-Before coding:
-- Briefly summarize the root cause and list the files you will touch.
-
-After coding:
-- Show the exact tests you ran and whether they passed.
+Output format:
+1. Brief diagnosis
+2. Files changed
+3. Patch summary
+4. Test results
+5. Self-review / risk check

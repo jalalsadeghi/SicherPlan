@@ -10,6 +10,7 @@ import {
   hasPlanningShiftPermission,
   mapPlanningShiftApiMessage,
   recurrenceLabel,
+  resolveSelectedShiftPlanId,
   visibilitySummary,
 } from "./planningShifts.helpers.js";
 
@@ -23,6 +24,7 @@ test("action state depends on selected entities", () => {
   assert.equal(state.canCreateSeries, true);
   assert.equal(state.canGenerateSeries, true);
   assert.equal(state.canEditShift, true);
+  assert.equal(derivePlanningShiftActionState("tenant_admin", null, null, null).canCreateSeries, false);
 });
 
 test("message mapping and labels are stable", () => {
@@ -51,4 +53,11 @@ test("shift type options keep legacy values editable and fall back to defaults",
     { code: "site_day", label: "Site Day" },
     { code: "legacy_code", label: "legacy_code (legacy)" },
   ]);
+});
+
+test("shift-plan selection keeps explicit choice and auto-selects a sole visible plan", () => {
+  assert.equal(resolveSelectedShiftPlanId("plan-2", [{ id: "plan-1" }, { id: "plan-2" }]), "plan-2");
+  assert.equal(resolveSelectedShiftPlanId("", [{ id: "plan-1" }]), "plan-1");
+  assert.equal(resolveSelectedShiftPlanId("", [{ id: "plan-1" }, { id: "plan-2" }]), "");
+  assert.equal(resolveSelectedShiftPlanId("missing", [{ id: "plan-1" }], "plan-1"), "plan-1");
 });

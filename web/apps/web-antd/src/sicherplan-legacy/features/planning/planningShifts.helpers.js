@@ -42,6 +42,20 @@ export function derivePlanningShiftActionState(role, selectedShiftPlan, selected
   };
 }
 
+export function resolveSelectedShiftPlanId(currentSelectedId, visiblePlans, preferredId = "") {
+  const plans = Array.isArray(visiblePlans) ? visiblePlans : [];
+  if (preferredId && plans.some((plan) => plan?.id === preferredId)) {
+    return preferredId;
+  }
+  if (currentSelectedId && plans.some((plan) => plan?.id === currentSelectedId)) {
+    return currentSelectedId;
+  }
+  if (plans.length === 1 && plans[0]?.id) {
+    return plans[0].id;
+  }
+  return "";
+}
+
 export function mapPlanningShiftApiMessage(messageKey) {
   const map = {
     "errors.iam.auth.invalid_access_token": "authRequired",

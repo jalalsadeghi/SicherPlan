@@ -1,14 +1,18 @@
 // @vitest-environment happy-dom
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 
 import PlanningShiftsAdminView from "../../views/PlanningShiftsAdminView.vue";
 
 const {
+  createShiftPlanMock,
+  createShiftSeriesMock,
+  showFeedbackToastMock,
   listShiftTypeOptionsMock,
   listShiftTemplatesMock,
   getShiftTemplateMock,
+  getShiftPlanMock,
   listShiftPlansMock,
   listShiftSeriesMock,
   getShiftSeriesMock,
@@ -17,6 +21,9 @@ const {
   getShiftMock,
   getShiftReleaseDiagnosticsMock,
 } = vi.hoisted(() => ({
+  createShiftPlanMock: vi.fn(async () => ({ id: "plan-1" })),
+  createShiftSeriesMock: vi.fn(async () => ({ id: "series-1" })),
+  showFeedbackToastMock: vi.fn(),
   listShiftTypeOptionsMock: vi.fn(async () => [
     { code: "site_day", label: "Site Day" },
     { code: "site_night", label: "Site Night" },
@@ -186,18 +193,7 @@ const {
     { scope: "shift", code: "note", severity: "warning", message: "Review meeting point" },
   ],
   })),
-}));
-
-vi.mock("@/api/planningShifts", () => ({
-  copyShiftSlice: vi.fn(async () => ({})),
-  createShift: vi.fn(async () => ({ id: "shift-1" })),
-  createShiftPlan: vi.fn(async () => ({ id: "plan-1" })),
-  createShiftSeries: vi.fn(async () => ({ id: "series-1" })),
-  createShiftSeriesException: vi.fn(async () => ({ id: "exception-1" })),
-  createShiftTemplate: vi.fn(async () => ({ id: "template-1" })),
-  generateShiftSeries: vi.fn(async () => ({})),
-  getShift: getShiftMock,
-  getShiftPlan: vi.fn(async () => ({
+  getShiftPlanMock: vi.fn(async () => ({
     id: "plan-1",
     tenant_id: "tenant-1",
     planning_record_id: "planning-1",
@@ -208,6 +204,18 @@ vi.mock("@/api/planningShifts", () => ({
     remarks: "",
     version_no: 1,
   })),
+}));
+
+vi.mock("@/api/planningShifts", () => ({
+  copyShiftSlice: vi.fn(async () => ({})),
+  createShift: vi.fn(async () => ({ id: "shift-1" })),
+  createShiftPlan: createShiftPlanMock,
+  createShiftSeries: createShiftSeriesMock,
+  createShiftSeriesException: vi.fn(async () => ({ id: "exception-1" })),
+  createShiftTemplate: vi.fn(async () => ({ id: "template-1" })),
+  generateShiftSeries: vi.fn(async () => ({})),
+  getShift: getShiftMock,
+  getShiftPlan: getShiftPlanMock,
   getShiftReleaseDiagnostics: getShiftReleaseDiagnosticsMock,
   getShiftSeries: getShiftSeriesMock,
   getShiftTemplate: getShiftTemplateMock,
@@ -228,6 +236,12 @@ vi.mock("@/api/planningShifts", () => ({
   PlanningShiftsApiError: class PlanningShiftsApiError extends Error {
     messageKey = "";
   },
+}));
+
+vi.mock("@/composables/useSicherPlanFeedback", () => ({
+  useSicherPlanFeedback: () => ({
+    showFeedbackToast: showFeedbackToastMock,
+  }),
 }));
 
 vi.mock("@/api/planningOrders", () => ({
@@ -265,6 +279,29 @@ vi.mock("@/stores/locale", () => ({
 }));
 
 describe("PlanningShiftsAdminView", () => {
+  beforeEach(() => {
+    createShiftPlanMock.mockClear();
+    createShiftSeriesMock.mockClear();
+    showFeedbackToastMock.mockClear();
+    getShiftPlanMock.mockClear();
+    listShiftSeriesMock.mockClear();
+    listShiftsMock.mockClear();
+    listShiftPlansMock.mockReset();
+    listShiftPlansMock.mockResolvedValue([
+      {
+        id: "plan-1",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        name: "Plan 1",
+        workforce_scope_code: "internal",
+        planning_from: "2026-04-01",
+        planning_to: "2026-04-07",
+        status: "active",
+        version_no: 1,
+      },
+    ]);
+  });
+
   it("mounts without setup crash and renders shift-planning sections", () => {
     const wrapper = mount(PlanningShiftsAdminView);
 
@@ -305,6 +342,9 @@ describe("PlanningShiftsAdminView", () => {
 
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     expect(wrapper.text()).toContain("Select shift template");
+    expect(wrapper.text()).toContain("Plan 1");
+    expect((wrapper.get('[data-testid="planning-shifts-series-plan-select"]').element as HTMLSelectElement).value).toBe("plan-1");
+    expect((wrapper.get('[data-testid="planning-shifts-tab-panel-series"] button[type="submit"]').element as HTMLButtonElement).disabled).toBe(false);
     expect(wrapper.html()).not.toContain('data-testid="planning-shifts-weekday-picker"');
 
     const recurrenceSelect = wrapper
@@ -313,6 +353,68 @@ describe("PlanningShiftsAdminView", () => {
     await recurrenceSelect?.setValue("weekly");
 
     expect(wrapper.html()).toContain('data-testid="planning-shifts-weekday-picker"');
+  });
+
+  it("shows a visible explanation and keeps series save disabled when no shift plan is selected", async () => {
+    listShiftPlansMock.mockResolvedValueOnce([]);
+
+    const wrapper = mount(PlanningShiftsAdminView);
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="planning-shifts-series-context"]').text()).toContain("No Shift Plan is available yet");
+    expect((wrapper.get('[data-testid="planning-shifts-tab-panel-series"] button[type="submit"]').element as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("lets the operator change the active shift plan from inside the series workflow", async () => {
+    listShiftPlansMock.mockResolvedValueOnce([
+      {
+        id: "plan-1",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        name: "Plan 1",
+        workforce_scope_code: "internal",
+        planning_from: "2026-04-01",
+        planning_to: "2026-04-07",
+        status: "active",
+        version_no: 1,
+      },
+      {
+        id: "plan-2",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        name: "Plan 2",
+        workforce_scope_code: "mixed",
+        planning_from: "2026-04-08",
+        planning_to: "2026-04-14",
+        status: "active",
+        version_no: 1,
+      },
+    ]);
+    getShiftPlanMock.mockResolvedValueOnce({
+      id: "plan-2",
+      tenant_id: "tenant-1",
+      planning_record_id: "planning-1",
+      name: "Plan 2",
+      workforce_scope_code: "mixed",
+      planning_from: "2026-04-08",
+      planning_to: "2026-04-14",
+      remarks: "",
+      version_no: 1,
+    });
+
+    const wrapper = mount(PlanningShiftsAdminView);
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-shifts-series-plan-select"]').setValue("plan-2");
+    await flushPromises();
+
+    expect(getShiftPlanMock).toHaveBeenCalledWith("tenant-1", "plan-2", "token-1");
+    expect(listShiftSeriesMock).toHaveBeenCalledWith("tenant-1", "plan-2", "token-1");
+    expect(wrapper.get('[data-testid="planning-shifts-series-context"]').text()).toContain("Plan 2");
   });
 
   it("keeps legacy shift type values visible in the controlled select", async () => {
@@ -363,6 +465,102 @@ describe("PlanningShiftsAdminView", () => {
     expect((wrapper.findAll('[data-testid="planning-shifts-tab-panel-series"] textarea').at(1)?.element as HTMLTextAreaElement).value).toBe("Exception detail note");
   });
 
+  it("keeps the created shift plan selected when switching to the series tab", async () => {
+    listShiftPlansMock.mockResolvedValue([
+      {
+        id: "plan-99",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        name: "Fresh plan",
+        workforce_scope_code: "mixed",
+        planning_from: "2026-04-02",
+        planning_to: "2026-04-06",
+        status: "active",
+        version_no: 1,
+      },
+    ]);
+    createShiftPlanMock.mockResolvedValueOnce({ id: "plan-99" });
+    getShiftPlanMock.mockResolvedValueOnce({
+      id: "plan-99",
+      tenant_id: "tenant-1",
+      planning_record_id: "planning-1",
+      name: "Fresh plan",
+      workforce_scope_code: "mixed",
+      planning_from: "2026-04-02",
+      planning_to: "2026-04-06",
+      remarks: "",
+      version_no: 1,
+    });
+
+    const wrapper = mount(PlanningShiftsAdminView);
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-plans"] .planning-orders-panel__header .cta-button').trigger("click");
+    await flushPromises();
+
+    const planInputs = wrapper.findAll('[data-testid="planning-shifts-tab-panel-plans"] input');
+    await planInputs.at(0)?.setValue("Fresh plan");
+    await planInputs.at(1)?.setValue("2026-04-02");
+    await planInputs.at(2)?.setValue("2026-04-06");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-plans"] form').trigger("submit");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await flushPromises();
+
+    expect(createShiftPlanMock).toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="planning-shifts-series-context"]').text()).toContain("Fresh plan");
+    expect((wrapper.get('[data-testid="planning-shifts-tab-panel-series"] button[type="submit"]').element as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shows a clear error and avoids the API call when series save runs without a selected shift plan", async () => {
+    listShiftPlansMock.mockResolvedValueOnce([]);
+
+    const wrapper = mount(PlanningShiftsAdminView);
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] form').trigger("submit");
+    await flushPromises();
+
+    expect(createShiftSeriesMock).not.toHaveBeenCalled();
+    expect(showFeedbackToastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tone: "error",
+        message: "A series can only be saved after a Shift Plan is selected.",
+      }),
+    );
+  });
+
+  it("uses the selected shift plan id for a valid series creation request", async () => {
+    const wrapper = mount(PlanningShiftsAdminView);
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await flushPromises();
+
+    const textInputs = wrapper
+      .findAll('[data-testid="planning-shifts-tab-panel-series"] input')
+      .filter((entry) => entry.attributes("type") !== "number");
+    await wrapper.findAll('[data-testid="planning-shifts-tab-panel-series"] select').at(1)?.setValue("template-1");
+    await textInputs.at(0)?.setValue("Weekday follow-up");
+    await textInputs.at(2)?.setValue("2026-04-01");
+    await textInputs.at(3)?.setValue("2026-04-05");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] form').trigger("submit");
+    await flushPromises();
+
+    expect(createShiftSeriesMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "plan-1",
+      "token-1",
+      expect.objectContaining({
+        tenant_id: "tenant-1",
+        shift_plan_id: "plan-1",
+        shift_template_id: "template-1",
+        label: "Weekday follow-up",
+      }),
+    );
+  });
+
   it("shows release diagnostics for the selected shift", async () => {
     const wrapper = mount(PlanningShiftsAdminView);
     await flushPromises();
@@ -379,5 +577,15 @@ describe("PlanningShiftsAdminView", () => {
     expect(wrapper.find('[data-testid="planning-shifts-release-panel"]').exists()).toBe(true);
     expect(wrapper.text()).toContain("Assignments missing");
     expect(wrapper.text()).toContain("Review meeting point");
+  });
+
+  it("shows the active shift plan selector in the shifts tab too", async () => {
+    const wrapper = mount(PlanningShiftsAdminView);
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-shifts"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="planning-shifts-shifts-plan-select"]').exists()).toBe(true);
+    expect((wrapper.get('[data-testid="planning-shifts-shifts-plan-select"]').element as HTMLSelectElement).value).toBe("plan-1");
   });
 });
