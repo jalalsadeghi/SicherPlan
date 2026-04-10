@@ -53,6 +53,11 @@ describe('module registry wrapper flags', () => {
     expect(planningShifts.showWorkspaceSectionHeader).toBe(false);
   });
 
+  it('limits planning-staffing to the implemented staffing roles', () => {
+    const staffing = moduleRegistry['planning-staffing']!;
+    expect(staffing.allowedRoles).toEqual(['tenant_admin', 'dispatcher']);
+  });
+
   it('keeps customers unavailable to platform admin in the shared module registry', () => {
     const customers = moduleRegistry.customers!;
     expect(customers.allowedRoles).toEqual([

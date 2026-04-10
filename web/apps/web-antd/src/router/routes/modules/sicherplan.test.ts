@@ -71,4 +71,20 @@ describe('sicherplan route authority', () => {
       'controller_qm',
     ]);
   });
+
+  it('keeps planning-staffing aligned to the implemented staffing roles only', () => {
+    const operationsSection = sicherplanRoutes.find(
+      (route) => route.name === 'SicherPlanOperationsSection',
+    );
+    const staffingRoute = operationsSection?.children?.find(
+      (route) => route.name === 'SicherPlanPlanningStaffing',
+    );
+
+    expect(staffingRoute?.path).toBe('/admin/planning-staffing');
+    expect(staffingRoute?.meta?.moduleKey).toBe('planning-staffing');
+    expect(staffingRoute?.meta?.authority).toEqual([
+      'tenant_admin',
+      'dispatcher',
+    ]);
+  });
 });

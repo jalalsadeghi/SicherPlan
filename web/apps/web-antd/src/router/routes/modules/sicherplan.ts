@@ -196,7 +196,7 @@ const routes: RouteRecordRaw[] = [
         path: '/admin/planning-staffing',
         component: AdminModuleView,
         meta: {
-          authority: ['tenant_admin', 'dispatcher', 'controller_qm'],
+          authority: ['tenant_admin', 'dispatcher'],
           icon: 'lucide:users-round',
           moduleKey: 'planning-staffing',
           title: $t('sicherplan.admin.planningStaffing'),

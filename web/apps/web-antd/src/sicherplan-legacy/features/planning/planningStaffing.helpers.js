@@ -27,6 +27,11 @@ export function derivePlanningStaffingActionState(role, selectedShift, selectedA
     canRecordOverride: canOverrideValidation && !!selectedAssignment && !!selectedIssue && selectedIssue.override_allowed === true,
     canManageRelease: canWriteStaffing && !!selectedShift,
     canDispatch: canWriteStaffing && !!selectedShift,
+    canAssign: canWriteStaffing && !!selectedShift,
+    canUnassign: canWriteStaffing && !!selectedAssignment,
+    canSubstitute: canWriteStaffing && !!selectedAssignment,
+    canInspectTeams: canReadCoverage && !!selectedShift,
+    canInspectSubcontractorReleases: canReadCoverage && !!selectedShift,
   };
 }
 
@@ -37,6 +42,7 @@ export function mapPlanningStaffingApiMessage(messageKey) {
     "errors.iam.authorization.scope_denied": "permissionDenied",
     "errors.planning.staffing.scope_mismatch": "scopeMismatch",
     "errors.planning.assignment.blocked_by_validation": "assignmentBlocked",
+    "errors.planning.assignment.stale_version": "assignmentStaleVersion",
     "errors.planning.assignment_validation.override_not_allowed": "overrideNotAllowed",
     "errors.planning.assignment_validation.rule_not_found": "ruleNotFound",
     "errors.planning.shift.blocked_by_validation": "releaseBlocked",
@@ -137,4 +143,18 @@ export function dispatchAudienceLabel(audienceCode) {
     subcontractor_release: "subcontractors",
   };
   return map[audienceCode] ?? audienceCode;
+}
+
+export function buildStaffingMemberOptions(teamMembers, teamId) {
+  return (teamMembers || []).filter((member) => !teamId || member.team_id === teamId);
+}
+
+export function resolveSelectedDemandGroupId(shift, selectedDemandGroupId) {
+  const demandGroups = shift?.demand_groups ?? [];
+  if (!demandGroups.length) {
+    return "";
+  }
+  return demandGroups.some((row) => row.id === selectedDemandGroupId || row.demand_group_id === selectedDemandGroupId)
+    ? selectedDemandGroupId
+    : (demandGroups[0].id ?? demandGroups[0].demand_group_id ?? "");
 }

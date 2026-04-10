@@ -266,6 +266,7 @@ export const moduleRegistry: Record<string, ModuleConfig> = {
     workspaceDescriptionKey: 'sicherplan.ui.modules.planningShifts.workspace',
   },
   'planning-staffing': {
+    allowedRoles: ['tenant_admin', 'dispatcher'],
     badges: [
       { key: 'Coverage', tone: 'success' },
       { key: 'Availability Read', tone: 'default' },

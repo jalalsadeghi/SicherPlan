@@ -1,103 +1,98 @@
-You are working in the latest SicherPlan repo.
+You are working in the SicherPlan repository.
 
-Goal
-Implement a standard modal-based editor for Shift Templates in:
-web/apps/web-antd/src/sicherplan-legacy/views/PlanningShiftsAdminView.vue
+Task goal:
+Align `/admin/planning-staffing` with the documented `P-04 — Staffing Board & Coverage` workspace so it becomes a real session-aware, role-scoped staffing board, not just a partial coverage monitor.
 
-Current behavior
-- In the "templates" tab of admin/planning-shifts, the template create/edit form is rendered inline below the template list.
-- Clicking "New template" currently resets the draft inline.
-- Clicking an existing template row currently loads the template into the same inline form.
+Before coding:
+1. Read `AGENTS.md`.
+2. Find the relevant story/task ID in `docs/sprint/*.md` or `docs/prompts/*.md`.
+3. If no official task ID exists for this page, state that explicitly in your summary and do not invent a fake backlog ID.
+4. Use source-of-truth order exactly as defined in `AGENTS.md`.
 
-Target behavior
-- Move the Shift Template create/edit form into a dialog/modal.
-- The modal must open when:
-  1) the user clicks "New template"
-  2) the user clicks an existing template row
-- The modal must support both create and edit using the existing draft/submission logic.
-- Do NOT change backend APIs, request payloads, endpoint contracts, or data model behavior.
-- Keep all current create/update behavior intact.
-- Keep the template list visible in the tab; only the editor moves into the modal.
+Files to inspect first:
+- `web/apps/web-antd/src/router/routes/modules/sicherplan.ts`
+- `web/apps/web-antd/src/views/sicherplan/module-registry.ts`
+- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
+- `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
+- `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.helpers.js`
+- `backend/app/modules/planning/router.py`
+- `backend/app/modules/planning/staffing_service.py`
+- any related planning schemas/models/tests needed for safe alignment
 
-Implementation requirements
-1. Reuse the project’s existing modal pattern and styling conventions already used elsewhere in the repo.
-   - Prefer ant-design-vue Modal, matching the existing repo style.
-   - Keep the UX consistent with existing SicherPlan admin pages.
+Business/documentation intent you must preserve:
+- `P-04 Staffing Board & Coverage` is not just a report page.
+- It must cover board shifts, demand groups, teams, team members, assignments, assignment validations/overrides, staffing-board assign/unassign/substitute actions, and staffing coverage views.
+- Coverage is a release gate, not just a color indicator.
+- Planning must stay role-scoped and tenant-scoped.
+- Do not expose HR-private data.
+- Do not bypass `finance.actual_record` or alter downstream finance truth.
+- Keep DE-first / EN-secondary i18n parity for any new UI strings.
 
-2. Refactor minimally and safely.
-   - Extract as little logic as necessary.
-   - Avoid broad rewrites.
-   - Preserve existing functions where possible:
-     - startCreateTemplate
-     - selectTemplate
-     - submitTemplate
-     - resetTemplateDraft
-   - Add modal open/close state and helper methods as needed.
+Current issues you must verify and fix:
+1. The current page hardcodes `role = "dispatcher"` instead of using the real authenticated user role/claims.
+2. The current page requires manual tenant scope and access token input and stores them in localStorage instead of using the app session/tenant context.
+3. Route authority, helper permission matrix, and documented role scope are inconsistent, especially around `controller_qm` and the documented field-operations role.
+4. The current front-end staffing page is only partial relative to the documented P-04 scope.
+5. The module-registry import path for `PlanningStaffingCoverageView.vue` must resolve correctly inside the actual repo tree.
 
-3. Required UX behavior
-   - "New template" opens the modal in create mode with a clean draft.
-   - Clicking a template row opens the modal in edit mode with that template loaded.
-   - Modal title should clearly reflect mode:
-     - "New shift template" for create
-     - "Edit shift template" for edit
-   - On successful save:
-     - close the modal
-     - refresh the template list
-     - keep the saved/selected template highlighted in the list when appropriate
-   - On cancel:
-     - close the modal
-     - do not accidentally mutate the saved template state
-   - Add a footer or action row with:
-     - Save
-     - Reset
-     - Cancel
-   - Preserve field validation and required fields exactly as today.
+Required implementation outcome:
+A. Remove manual tenant/access-token entry from `/admin/planning-staffing`.
+B. Use the existing authenticated app session and tenant scope from the main web app.
+C. Remove any hardcoded role assumptions and derive permissions from the real session/auth state.
+D. Make route/module/helper permission behavior consistent.
+E. At minimum, support these P-04 behaviors directly in the workspace:
+   - shift coverage list
+   - demand-group level coverage breakdown
+   - assignment detail + validations
+   - override creation with audited reason
+   - staffing assign / unassign / substitute actions using existing backend endpoints
+   - reload/refresh behavior after staffing actions
+F. If team/team-member or subcontractor-release management is not handled elsewhere in the current UX, either:
+   - expose them in this workspace, or
+   - add explicit, clear handoff links/actions to the correct adjacent workspace
+   Do not leave the user without an actionable path.
+G. Preserve privacy and role-scoped visibility.
+H. Keep the change set narrow and do not do unrelated refactors.
 
-4. Accessibility and testability
-   - Add stable test ids for the modal and key actions, for example:
-     - planning-shifts-template-modal
-     - planning-shifts-template-modal-save
-     - planning-shifts-template-modal-cancel
-   - Ensure keyboard/accessibility defaults from Modal are preserved.
-   - Do not break embedded mode or other workspace tabs.
+Role-access requirement:
+- Validate the intended access against the project docs before changing role guards.
+- If `controller_qm` should NOT use P-04 according to the docs, remove that access consistently from route/module/helper behavior.
+- If you find a valid reason to keep `controller_qm`, implement a deliberate read-only oversight mode with no staffing write, override, dispatch, or release actions, and explain that choice in your final summary.
+- If a field-operations role exists in the current auth model, align access with the documented P-04 role scope.
 
-5. Layout cleanup
-   - Remove the inline template form from the templates tab after moving it into the modal.
-   - Keep the list section and actions row clean and compact.
+Technical expectations:
+- Fix import/path consistency for the planning staffing view.
+- Extend `planningStaffing.ts` with the missing typed API wrappers needed by the UI.
+- Refactor `PlanningStaffingCoverageView.vue` into maintainable pieces if needed, but stay narrow in scope.
+- Render demand-group shortages and coverage state at a level that makes staffing decisions actionable.
+- Do not regress existing outputs/dispatch/validation behavior unless a correction is required.
 
-6. Tests
-   Update or extend:
-   web/apps/web-antd/src/sicherplan-legacy/features/planning/planningShifts.smoke.test.ts
+Tests and validation:
+- Add or update tests for:
+  - permission gating by role
+  - session-based tenant/auth context usage
+  - read-only vs write action visibility
+  - assign/unassign/substitute flows refreshing board/coverage data
+  - import-path/module-resolution sanity where applicable
+- Run the relevant build/typecheck/lint/tests before finishing.
+- Verify that `/admin/planning-staffing` renders without manual token entry.
+- Verify tenant scoping and role scoping.
+- Verify the final result is consistent with the documented P-04 workspace intent.
 
-   Add/adjust tests to cover at least:
-   - clicking "New template" opens the modal
-   - clicking an existing template row opens the modal in edit mode
-   - modal contains the expected form fields
-   - cancel closes the modal
-   - successful save closes the modal
-   - the old inline template form is no longer rendered in the templates tab
+Important self-check:
+Before finalizing, challenge your own solution and verify that:
+- you did not silently keep the hardcoded-role bug
+- you did not leave manual token/scope entry in place
+- you did not keep route/helper/docs role mismatches unresolved
+- you did not claim P-04 completeness while still omitting core staffing-board actions
+- you did not introduce HR/privacy leakage
+- you did not overreach into unrelated modules
 
-7. Guardrails
-   - No backend changes
-   - No API contract changes
-   - No unrelated refactors in plans/series/shifts/board tabs
-   - Keep code style aligned with existing file patterns
-   - Keep TypeScript/Vue style consistent with surrounding code
-
-Deliverables
-1. Implement the modal-based template editor
-2. Update tests
-3. Briefly summarize:
-   - files changed
-   - why the solution is safe/minimal
-   - any edge cases considered
-
-Before finalizing
-Please self-check your solution critically and validate it against the current codebase:
-- confirm you did not break the existing template create/edit flow
-- confirm the modal opens from both entry points
-- confirm no inline template editor remains
-- confirm tests reflect the new behavior
-- confirm the implementation matches existing repo modal conventions rather than inventing a new pattern
-
-If you find a better or safer implementation detail than the prompt suggests, use it — but explain why in the final summary.
+Final response format:
+1. Short implementation summary
+2. Exact files changed
+3. Which inconsistencies you confirmed
+4. What you changed and why
+5. What tests/validation you ran and their results
+6. Remaining assumptions or blockers
+7. A brief self-validation section explaining why the result now matches the documented P-04 behavior

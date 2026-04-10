@@ -43,7 +43,7 @@
             <p class="eyebrow">{{ tp("templatesTitle") }}</p>
             <h3>{{ tp("templatesTitle") }}</h3>
           </div>
-          <div class="cta-row">
+          <div class="cta-row planning-shifts-header-actions">
             <button class="cta-button cta-secondary" type="button" @click="refreshTemplates">{{ tp("actionsRefresh") }}</button>
             <button
               class="cta-button cta-secondary"
@@ -84,7 +84,18 @@
             <p class="eyebrow">{{ tp("plansTitle") }}</p>
             <h3>{{ tp("plansTitle") }}</h3>
           </div>
-          <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreatePlan" @click="startCreatePlan">{{ tp("actionsCreatePlan") }}</button>
+          <div class="cta-row planning-shifts-header-actions">
+            <button class="cta-button cta-secondary" type="button" @click="refreshPlans">{{ tp("actionsRefresh") }}</button>
+            <button
+              class="cta-button cta-secondary"
+              data-testid="planning-shifts-create-plan"
+              type="button"
+              :disabled="!actionState.canCreatePlan"
+              @click="startCreatePlan"
+            >
+              {{ tp("actionsCreatePlan") }}
+            </button>
+          </div>
         </div>
         <div class="planning-orders-form-grid">
           <label class="field-stack">
@@ -96,9 +107,6 @@
               </option>
             </select>
           </label>
-        </div>
-        <div class="cta-row">
-          <button class="cta-button cta-secondary" type="button" @click="refreshPlans">{{ tp("actionsRefresh") }}</button>
         </div>
         <div class="planning-orders-list">
           <button
@@ -116,35 +124,6 @@
           </button>
         </div>
         <p v-if="!shiftPlans.length" class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
-        <form class="planning-orders-form" @submit.prevent="submitShiftPlan">
-          <div class="planning-orders-form-grid">
-            <label class="field-stack">
-              <span>{{ tp("fieldsPlanningRecordId") }}</span>
-              <select v-model="shiftPlanDraft.planning_record_id" required>
-                <option value="" disabled>{{ tp("planningRecordPlaceholder") }}</option>
-                <option v-for="record in planningRecordOptions" :key="record.id" :value="record.id">
-                  {{ record.label }}
-                </option>
-              </select>
-            </label>
-            <label class="field-stack"><span>{{ tp("fieldsName") }}</span><input v-model="shiftPlanDraft.name" required /></label>
-            <label class="field-stack">
-              <span>{{ tp("fieldsWorkforceScope") }}</span>
-              <select v-model="shiftPlanDraft.workforce_scope_code">
-                <option value="internal">{{ tp("workforceInternal") }}</option>
-                <option value="subcontractor">{{ tp("workforceSubcontractor") }}</option>
-                <option value="mixed">{{ tp("workforceMixed") }}</option>
-              </select>
-            </label>
-            <label class="field-stack"><span>{{ tp("fieldsPlanningFrom") }}</span><input v-model="shiftPlanDraft.planning_from" type="date" required /></label>
-            <label class="field-stack"><span>{{ tp("fieldsPlanningTo") }}</span><input v-model="shiftPlanDraft.planning_to" type="date" required /></label>
-            <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="shiftPlanDraft.remarks" rows="2" /></label>
-          </div>
-          <div class="cta-row">
-            <button class="cta-button" type="submit" :disabled="!actionState.canCreatePlan">{{ tp("actionsSave") }}</button>
-            <button class="cta-button cta-secondary" type="button" @click="resetShiftPlanDraft">{{ tp("actionsReset") }}</button>
-          </div>
-        </form>
       </section>
 
       <section
@@ -205,78 +184,6 @@
           </button>
         </div>
         <p v-if="!seriesRows.length" class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
-        <form class="planning-orders-form" @submit.prevent="submitSeries">
-          <div class="planning-orders-form-grid">
-            <label class="field-stack">
-              <span>{{ tp("fieldsShiftTemplateId") }}</span>
-              <select v-model="seriesDraft.shift_template_id" required>
-                <option value="" disabled>{{ tp("shiftTemplatePlaceholder") }}</option>
-                <option v-for="template in shiftTemplateOptions" :key="template.id" :value="template.id">
-                  {{ template.label }}
-                </option>
-              </select>
-            </label>
-            <label class="field-stack"><span>{{ tp("fieldsLabel") }}</span><input v-model="seriesDraft.label" required /></label>
-            <label class="field-stack">
-              <span>{{ tp("fieldsRecurrence") }}</span>
-              <select v-model="seriesDraft.recurrence_code">
-                <option value="daily">{{ tp("recurrenceDaily") }}</option>
-                <option value="weekly">{{ tp("recurrenceWeekly") }}</option>
-              </select>
-            </label>
-            <label class="field-stack"><span>{{ tp("fieldsInterval") }}</span><input v-model.number="seriesDraft.interval_count" type="number" min="1" /></label>
-            <div v-if="seriesUsesWeeklyRecurrence" class="field-stack field-stack--wide">
-              <span>{{ tp("fieldsWeekdayMask") }}</span>
-              <div class="planning-shifts-weekday-picker" data-testid="planning-shifts-weekday-picker">
-                <button
-                  v-for="day in weekdayOptions"
-                  :key="day.index"
-                  type="button"
-                  class="planning-shifts-weekday-chip"
-                  :class="{ active: isWeekdaySelected(day.index) }"
-                  @click="toggleWeekday(day.index)"
-                >
-                  {{ day.label }}
-                </button>
-              </div>
-            </div>
-            <label class="field-stack">
-              <span>{{ tp("fieldsTimezone") }}</span>
-              <input v-model="seriesDraft.timezone" list="planning-shifts-timezones" required />
-            </label>
-            <label class="field-stack"><span>{{ tp("fieldsPlanningFrom") }}</span><input v-model="seriesDraft.date_from" type="date" required /></label>
-            <label class="field-stack"><span>{{ tp("fieldsPlanningTo") }}</span><input v-model="seriesDraft.date_to" type="date" required /></label>
-            <label class="field-stack"><span>{{ tp("fieldsReleaseState") }}</span>
-              <select v-model="seriesDraft.release_state">
-                <option value="draft">{{ tp("statusDraft") }}</option>
-                <option value="release_ready">{{ tp("statusReleaseReady") }}</option>
-                <option value="released">{{ tp("statusReleased") }}</option>
-              </select>
-            </label>
-            <label class="field-stack">
-              <span>{{ tp("fieldsShiftType") }}</span>
-              <select v-model="seriesDraft.shift_type_code" :disabled="loadingShiftTypeOptions || !seriesShiftTypeOptions.length">
-                <option value="">{{ tp("shiftTypeOptionalPlaceholder") }}</option>
-                <option v-for="option in seriesShiftTypeOptions" :key="option.code" :value="option.code">
-                  {{ option.label }}
-                </option>
-              </select>
-              <span v-if="shiftTypeHelpLabel" class="field-help">{{ shiftTypeHelpLabel }}</span>
-            </label>
-            <label class="field-stack"><span>{{ tp("fieldsMeetingPoint") }}</span><input v-model="seriesDraft.meeting_point" /></label>
-            <label class="field-stack"><span>{{ tp("fieldsLocationText") }}</span><input v-model="seriesDraft.location_text" /></label>
-            <label class="field-stack"><span>{{ tp("fieldsBreakMinutes") }}</span><input v-model.number="seriesDraft.default_break_minutes" type="number" min="0" /></label>
-            <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="seriesDraft.notes" rows="2" /></label>
-            <label class="planning-orders-checkbox"><input v-model="seriesDraft.customer_visible_flag" type="checkbox" /><span>{{ tp("fieldsVisibilityCustomer") }}</span></label>
-            <label class="planning-orders-checkbox"><input v-model="seriesDraft.subcontractor_visible_flag" type="checkbox" /><span>{{ tp("fieldsVisibilitySubcontractor") }}</span></label>
-            <label class="planning-orders-checkbox"><input v-model="seriesDraft.stealth_mode_flag" type="checkbox" /><span>{{ tp("fieldsVisibilityStealth") }}</span></label>
-          </div>
-          <div class="cta-row">
-            <button class="cta-button" type="submit" :disabled="!actionState.canCreateSeries">{{ tp("actionsSave") }}</button>
-            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canGenerateSeries" @click="generateSelectedSeries">{{ tp("actionsGenerate") }}</button>
-          </div>
-          <p v-if="!selectedShiftPlanRow" class="field-help">{{ shiftPlans.length ? tp("seriesSelectPlanFirst") : tp("seriesNoPlansAvailable") }}</p>
-        </form>
         <form v-if="selectedSeriesId" class="planning-orders-form" @submit.prevent="submitException">
           <div class="planning-orders-panel__header">
             <div>
@@ -530,6 +437,126 @@
     </div>
 
     <Modal
+      v-model:open="seriesModalOpen"
+      :title="selectedSeriesId ? tp('seriesModalEditTitle') : tp('seriesModalCreateTitle')"
+      :footer="null"
+      @cancel="closeSeriesModal"
+    >
+      <form class="planning-orders-form planning-shifts-series-modal" data-testid="planning-shifts-series-modal" @submit.prevent="submitSeries">
+        <div class="planning-orders-form-grid">
+          <label class="field-stack">
+            <span>{{ tp("fieldsShiftTemplateId") }}</span>
+            <select v-model="seriesDraft.shift_template_id" required>
+              <option value="" disabled>{{ tp("shiftTemplatePlaceholder") }}</option>
+              <option v-for="template in shiftTemplateOptions" :key="template.id" :value="template.id">
+                {{ template.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack"><span>{{ tp("fieldsLabel") }}</span><input v-model="seriesDraft.label" required /></label>
+          <label class="field-stack">
+            <span>{{ tp("fieldsRecurrence") }}</span>
+            <select v-model="seriesDraft.recurrence_code">
+              <option value="daily">{{ tp("recurrenceDaily") }}</option>
+              <option value="weekly">{{ tp("recurrenceWeekly") }}</option>
+            </select>
+          </label>
+          <label class="field-stack"><span>{{ tp("fieldsInterval") }}</span><input v-model.number="seriesDraft.interval_count" type="number" min="1" /></label>
+          <div v-if="seriesUsesWeeklyRecurrence" class="field-stack field-stack--wide">
+            <span>{{ tp("fieldsWeekdayMask") }}</span>
+            <div class="planning-shifts-weekday-picker" data-testid="planning-shifts-weekday-picker">
+              <button
+                v-for="day in weekdayOptions"
+                :key="day.index"
+                type="button"
+                class="planning-shifts-weekday-chip"
+                :class="{ active: isWeekdaySelected(day.index) }"
+                @click="toggleWeekday(day.index)"
+              >
+                {{ day.label }}
+              </button>
+            </div>
+          </div>
+          <label class="field-stack">
+            <span>{{ tp("fieldsTimezone") }}</span>
+            <input v-model="seriesDraft.timezone" list="planning-shifts-timezones" required />
+          </label>
+          <label class="field-stack"><span>{{ tp("fieldsPlanningFrom") }}</span><input v-model="seriesDraft.date_from" type="date" required /></label>
+          <label class="field-stack"><span>{{ tp("fieldsPlanningTo") }}</span><input v-model="seriesDraft.date_to" type="date" required /></label>
+          <label class="field-stack"><span>{{ tp("fieldsReleaseState") }}</span>
+            <select v-model="seriesDraft.release_state">
+              <option value="draft">{{ tp("statusDraft") }}</option>
+              <option value="release_ready">{{ tp("statusReleaseReady") }}</option>
+              <option value="released">{{ tp("statusReleased") }}</option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("fieldsShiftType") }}</span>
+            <select v-model="seriesDraft.shift_type_code" :disabled="loadingShiftTypeOptions || !seriesShiftTypeOptions.length">
+              <option value="">{{ tp("shiftTypeOptionalPlaceholder") }}</option>
+              <option v-for="option in seriesShiftTypeOptions" :key="option.code" :value="option.code">
+                {{ option.label }}
+              </option>
+            </select>
+            <span v-if="shiftTypeHelpLabel" class="field-help">{{ shiftTypeHelpLabel }}</span>
+          </label>
+          <label class="field-stack"><span>{{ tp("fieldsMeetingPoint") }}</span><input v-model="seriesDraft.meeting_point" /></label>
+          <label class="field-stack"><span>{{ tp("fieldsLocationText") }}</span><input v-model="seriesDraft.location_text" /></label>
+          <label class="field-stack"><span>{{ tp("fieldsBreakMinutes") }}</span><input v-model.number="seriesDraft.default_break_minutes" type="number" min="0" /></label>
+          <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="seriesDraft.notes" rows="2" /></label>
+          <label class="planning-orders-checkbox"><input v-model="seriesDraft.customer_visible_flag" type="checkbox" /><span>{{ tp("fieldsVisibilityCustomer") }}</span></label>
+          <label class="planning-orders-checkbox"><input v-model="seriesDraft.subcontractor_visible_flag" type="checkbox" /><span>{{ tp("fieldsVisibilitySubcontractor") }}</span></label>
+          <label class="planning-orders-checkbox"><input v-model="seriesDraft.stealth_mode_flag" type="checkbox" /><span>{{ tp("fieldsVisibilityStealth") }}</span></label>
+        </div>
+        <div class="cta-row">
+          <button class="cta-button" data-testid="planning-shifts-series-modal-save" type="submit" :disabled="!actionState.canCreateSeries">{{ tp("actionsSave") }}</button>
+          <button class="cta-button cta-secondary" type="button" @click="resetSeriesDraft">{{ tp("actionsReset") }}</button>
+          <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canGenerateSeries" @click="generateSelectedSeries">{{ tp("actionsGenerate") }}</button>
+          <button class="cta-button cta-secondary" data-testid="planning-shifts-series-modal-cancel" type="button" @click="closeSeriesModal">{{ tp("actionsCancel") }}</button>
+        </div>
+        <p v-if="!selectedShiftPlanRow" class="field-help">{{ shiftPlans.length ? tp("seriesSelectPlanFirst") : tp("seriesNoPlansAvailable") }}</p>
+      </form>
+    </Modal>
+
+    <Modal
+      v-model:open="shiftPlanModalOpen"
+      :title="selectedShiftPlanId ? tp('planModalEditTitle') : tp('planModalCreateTitle')"
+      :footer="null"
+      @cancel="closeShiftPlanModal"
+    >
+      <form class="planning-orders-form planning-shifts-plan-modal" data-testid="planning-shifts-plan-modal" @submit.prevent="submitShiftPlan">
+        <div class="planning-orders-form-grid">
+          <label class="field-stack">
+            <span>{{ tp("fieldsPlanningRecordId") }}</span>
+            <select v-model="shiftPlanDraft.planning_record_id" required>
+              <option value="" disabled>{{ tp("planningRecordPlaceholder") }}</option>
+              <option v-for="record in planningRecordOptions" :key="record.id" :value="record.id">
+                {{ record.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack"><span>{{ tp("fieldsName") }}</span><input v-model="shiftPlanDraft.name" required /></label>
+          <label class="field-stack">
+            <span>{{ tp("fieldsWorkforceScope") }}</span>
+            <select v-model="shiftPlanDraft.workforce_scope_code">
+              <option value="internal">{{ tp("workforceInternal") }}</option>
+              <option value="subcontractor">{{ tp("workforceSubcontractor") }}</option>
+              <option value="mixed">{{ tp("workforceMixed") }}</option>
+            </select>
+          </label>
+          <label class="field-stack"><span>{{ tp("fieldsPlanningFrom") }}</span><input v-model="shiftPlanDraft.planning_from" type="date" required /></label>
+          <label class="field-stack"><span>{{ tp("fieldsPlanningTo") }}</span><input v-model="shiftPlanDraft.planning_to" type="date" required /></label>
+          <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="shiftPlanDraft.remarks" rows="2" /></label>
+        </div>
+        <div class="cta-row">
+          <button class="cta-button" data-testid="planning-shifts-plan-modal-save" type="submit" :disabled="!actionState.canCreatePlan">{{ tp("actionsSave") }}</button>
+          <button class="cta-button cta-secondary" type="button" @click="resetShiftPlanDraft">{{ tp("actionsReset") }}</button>
+          <button class="cta-button cta-secondary" data-testid="planning-shifts-plan-modal-cancel" type="button" @click="closeShiftPlanModal">{{ tp("actionsCancel") }}</button>
+        </div>
+      </form>
+    </Modal>
+
+    <Modal
       v-model:open="templateModalOpen"
       :title="selectedTemplateId ? tp('templateModalEditTitle') : tp('templateModalCreateTitle')"
       :footer="null"
@@ -649,6 +676,8 @@ const seriesExceptions = ref<ShiftSeriesExceptionRead[]>([]);
 const selectedShiftDiagnostics = ref<ShiftReleaseDiagnosticsRead | null>(null);
 const shiftTypeOptions = ref<ShiftTypeOption[]>([]);
 const loadingShiftTypeOptions = ref(false);
+const seriesModalOpen = ref(false);
+const shiftPlanModalOpen = ref(false);
 const templateModalOpen = ref(false);
 
 const selectedTemplateId = ref("");
@@ -863,6 +892,7 @@ async function selectTemplate(templateId: string) {
 async function selectShiftPlan(shiftPlanId: string) {
   selectedShiftPlanId.value = shiftPlanId;
   await refreshPlanDetails();
+  shiftPlanModalOpen.value = true;
 }
 
 async function changeSeriesShiftPlan() {
@@ -886,6 +916,7 @@ async function changeShiftTabPlan() {
 async function selectSeries(seriesId: string) {
   selectedSeriesId.value = seriesId;
   await refreshSeriesDetails();
+  seriesModalOpen.value = true;
 }
 
 function selectException(exceptionId: string) {
@@ -915,6 +946,7 @@ function startCreateTemplate() {
 function startCreatePlan() {
   resetShiftPlanDraft();
   clearPlanSelectionContext();
+  shiftPlanModalOpen.value = true;
 }
 function startCreateSeries() {
   resetSeriesDraft();
@@ -922,6 +954,7 @@ function startCreateSeries() {
   selectedSeriesId.value = "";
   selectedExceptionId.value = "";
   seriesExceptions.value = [];
+  seriesModalOpen.value = true;
 }
 function startCreateException() {
   resetExceptionDraft();
@@ -1061,10 +1094,15 @@ async function submitShiftPlan() {
     }
     await refreshPlans();
     await refreshPlanDetails();
+    shiftPlanModalOpen.value = false;
     setFeedback("success", tp("successTitle"), tp("saved"));
   } catch (error) {
     handleApiError(error);
   }
+}
+
+function closeShiftPlanModal() {
+  shiftPlanModalOpen.value = false;
 }
 
 async function submitSeries() {
@@ -1087,10 +1125,15 @@ async function submitSeries() {
     }
     seriesRows.value = await listShiftSeries(tenantScopeId.value, selectedShiftPlanId.value, accessToken.value);
     await refreshSeriesDetails();
+    seriesModalOpen.value = false;
     setFeedback("success", tp("successTitle"), tp("saved"));
   } catch (error) {
     handleApiError(error);
   }
+}
+
+function closeSeriesModal() {
+  seriesModalOpen.value = false;
 }
 
 async function generateSelectedSeries() {
@@ -1576,6 +1619,14 @@ onBeforeUnmount(() => {
 .planning-orders-panel__header > div {
   display: grid;
   gap: 0.25rem;
+}
+
+.planning-orders-panel__header > .planning-shifts-header-actions,
+.planning-shifts-panel__header > .planning-shifts-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .planning-orders-form {

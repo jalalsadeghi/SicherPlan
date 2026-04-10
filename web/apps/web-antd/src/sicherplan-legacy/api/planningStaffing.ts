@@ -45,6 +45,7 @@ export interface StaffingBoardAssignmentItem {
   assignment_status_code: string;
   assignment_source_code: string;
   confirmed_at: null | string;
+  version_no: number;
 }
 
 export interface StaffingBoardDemandGroupItem {
@@ -79,6 +80,90 @@ export interface StaffingBoardShiftItem {
   meeting_point: null | string;
   demand_groups: StaffingBoardDemandGroupItem[];
   assignments: StaffingBoardAssignmentItem[];
+}
+
+export interface TeamMemberRead {
+  id: string;
+  tenant_id: string;
+  team_id: string;
+  employee_id: null | string;
+  subcontractor_worker_id: null | string;
+  role_label: null | string;
+  is_team_lead: boolean;
+  valid_from: string;
+  valid_to: null | string;
+  status: string;
+  version_no: number;
+  notes: null | string;
+}
+
+export interface TeamRead {
+  id: string;
+  tenant_id: string;
+  planning_record_id: null | string;
+  shift_id: null | string;
+  name: string;
+  role_label: null | string;
+  status: string;
+  version_no: number;
+  notes: null | string;
+  members: TeamMemberRead[];
+}
+
+export interface SubcontractorReleaseRead {
+  id: string;
+  tenant_id: string;
+  shift_id: string;
+  demand_group_id: null | string;
+  subcontractor_id: string;
+  released_qty: number;
+  release_status_code: string;
+  released_at: null | string;
+  revoked_at: null | string;
+  status: string;
+  version_no: number;
+  remarks: null | string;
+}
+
+export interface StaffingAssignCommand {
+  tenant_id: string;
+  shift_id: string;
+  demand_group_id: string;
+  team_id?: null | string;
+  employee_id?: null | string;
+  subcontractor_worker_id?: null | string;
+  assignment_source_code?: string;
+  offered_at?: null | string;
+  confirmed_at?: null | string;
+  remarks?: null | string;
+}
+
+export interface StaffingUnassignCommand {
+  tenant_id: string;
+  assignment_id: string;
+  version_no: number;
+  remarks?: null | string;
+}
+
+export interface StaffingSubstituteCommand {
+  tenant_id: string;
+  assignment_id: string;
+  version_no: number;
+  replacement_team_id?: null | string;
+  replacement_employee_id?: null | string;
+  replacement_subcontractor_worker_id?: null | string;
+  assignment_source_code?: string;
+  remarks?: null | string;
+}
+
+export interface StaffingCommandResult {
+  tenant_id: string;
+  shift_id: string;
+  assignment_id: null | string;
+  outcome_code: string;
+  validation_codes: string[];
+  conflict_code: null | string;
+  assignment: null | StaffingBoardAssignmentItem;
 }
 
 export interface PlanningValidationResult {
@@ -206,7 +291,11 @@ function generateRequestId() {
 }
 
 function isApiErrorEnvelope(payload: unknown): payload is { error: { message_key: string; details: Record<string, unknown> } } {
-  return Boolean(payload && typeof payload === "object" && "error" in payload && typeof payload.error?.message_key === "string");
+  if (!payload || typeof payload !== "object" || !("error" in payload)) {
+    return false;
+  }
+  const error = (payload as { error?: { message_key?: unknown } }).error;
+  return typeof error?.message_key === "string";
 }
 
 async function request<T>(path: string, accessToken: string, init: RequestInit = {}): Promise<T> {
@@ -257,6 +346,27 @@ export function listStaffingCoverage(tenantId: string, accessToken: string, filt
 export function listStaffingBoard(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
   return request<StaffingBoardShiftItem[]>(
     `/api/planning/tenants/${tenantId}/ops/staffing-board${queryString(filters)}`,
+    accessToken,
+  );
+}
+
+export function listTeams(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
+  return request<TeamRead[]>(
+    `/api/planning/tenants/${tenantId}/ops/teams${queryString(filters)}`,
+    accessToken,
+  );
+}
+
+export function listTeamMembers(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
+  return request<TeamMemberRead[]>(
+    `/api/planning/tenants/${tenantId}/ops/team-members${queryString(filters)}`,
+    accessToken,
+  );
+}
+
+export function listSubcontractorReleases(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
+  return request<SubcontractorReleaseRead[]>(
+    `/api/planning/tenants/${tenantId}/ops/subcontractor-releases${queryString(filters)}`,
     accessToken,
   );
 }
@@ -318,6 +428,30 @@ export function previewShiftDispatchMessage(
 ) {
   return request<PlanningDispatchPreviewRead>(
     `/api/planning/tenants/${tenantId}/ops/shifts/${shiftId}/dispatch-preview`,
+    accessToken,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function assignStaffing(tenantId: string, accessToken: string, payload: StaffingAssignCommand) {
+  return request<StaffingCommandResult>(
+    `/api/planning/tenants/${tenantId}/ops/staffing-board/assign`,
+    accessToken,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function unassignStaffing(tenantId: string, accessToken: string, payload: StaffingUnassignCommand) {
+  return request<StaffingCommandResult>(
+    `/api/planning/tenants/${tenantId}/ops/staffing-board/unassign`,
+    accessToken,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function substituteStaffing(tenantId: string, accessToken: string, payload: StaffingSubstituteCommand) {
+  return request<StaffingCommandResult>(
+    `/api/planning/tenants/${tenantId}/ops/staffing-board/substitute`,
     accessToken,
     { method: "POST", body: JSON.stringify(payload) },
   );

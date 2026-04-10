@@ -6,6 +6,8 @@
         <h2>{{ tp("title") }}</h2>
         <p class="planning-staffing-lead">{{ tp("lead") }}</p>
         <div class="planning-staffing-meta">
+          <span class="planning-staffing-meta__pill">{{ tp("roleLabel") }}: {{ role }}</span>
+          <span class="planning-staffing-meta__pill">{{ tp("tenantScopeLabel") }}: {{ tenantScopeId || tp("scopeUnavailable") }}</span>
           <span class="planning-staffing-meta__pill">{{ tp("permissionRead") }}: {{ actionState.canReadCoverage ? "on" : "off" }}</span>
           <span class="planning-staffing-meta__pill">{{ tp("permissionWrite") }}: {{ actionState.canWriteStaffing ? "on" : "off" }}</span>
           <span class="planning-staffing-meta__pill">{{ tp("permissionOverride") }}: {{ actionState.canOverrideValidation ? "on" : "off" }}</span>
@@ -13,18 +15,15 @@
       </div>
 
       <div class="module-card planning-staffing-scope">
-        <label class="field-stack">
-          <span>{{ tp("scopeLabel") }}</span>
-          <input v-model="tenantScopeInput" :placeholder="tp('scopePlaceholder')" />
-        </label>
-        <label class="field-stack">
-          <span>{{ tp("tokenLabel") }}</span>
-          <input v-model="accessTokenInput" type="password" :placeholder="tp('tokenPlaceholder')" />
-        </label>
-        <p class="field-help">{{ tp("tokenHelp") }}</p>
+        <p class="eyebrow">{{ tp("sessionTitle") }}</p>
+        <h3>{{ tp("sessionBody") }}</h3>
+        <p class="field-help">{{ tp("sessionHint") }}</p>
         <div class="cta-row">
-          <button class="cta-button" type="button" @click="rememberScopeAndToken">{{ tp("remember") }}</button>
-          <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canRefresh || loading" @click="refreshAll">{{ tp("refresh") }}</button>
+          <button class="cta-button cta-secondary" type="button" :disabled="loading || !actionState.canRefresh" @click="refreshAll">
+            {{ tp("refresh") }}
+          </button>
+          <a class="cta-button cta-secondary" href="/admin/employees">{{ tp("openEmployeesAdmin") }}</a>
+          <a class="cta-button cta-secondary" href="/admin/subcontractors">{{ tp("openSubcontractorsAdmin") }}</a>
         </div>
       </div>
     </section>
@@ -47,8 +46,17 @@
       <h3>{{ tp("missingPermissionBody") }}</h3>
     </section>
 
-    <div v-else class="planning-staffing-grid">
+    <div v-else class="planning-staffing-grid" data-testid="planning-staffing-workspace">
       <section class="module-card planning-staffing-panel">
+        <div class="planning-staffing-panel__header">
+          <div>
+            <p class="eyebrow">{{ tp("filtersTitle") }}</p>
+            <h3>{{ tp("filtersTitle") }}</h3>
+          </div>
+          <button class="cta-button cta-secondary" type="button" :disabled="loading" @click="refreshAll">
+            {{ tp("refresh") }}
+          </button>
+        </div>
         <div class="planning-staffing-filter-grid">
           <label class="field-stack">
             <span>{{ tp("filtersWindowFrom") }}</span>
@@ -162,6 +170,122 @@
           <section class="module-card planning-staffing-subpanel">
             <div class="planning-staffing-panel__header">
               <div>
+                <p class="eyebrow">{{ tp("demandGroupsTitle") }}</p>
+                <h4>{{ tp("demandGroupsTitle") }}</h4>
+              </div>
+            </div>
+            <div v-if="selectedBoardShift?.demand_groups?.length" class="planning-staffing-demand-groups" data-testid="planning-staffing-demand-group-list">
+              <button
+                v-for="group in selectedBoardShift.demand_groups"
+                :key="group.id"
+                type="button"
+                class="planning-staffing-demand-group"
+                :class="{ selected: group.id === selectedDemandGroupId }"
+                @click="selectedDemandGroupId = group.id"
+              >
+                <strong>{{ formatDemandGroup(group) }}</strong>
+                <span>{{ tp("columnMin") }} {{ group.min_qty }} · {{ tp("columnTarget") }} {{ group.target_qty }}</span>
+                <span>{{ tp("columnAssigned") }} {{ group.assigned_count }} · {{ tp("columnConfirmed") }} {{ group.confirmed_count }}</span>
+              </button>
+            </div>
+            <p v-else class="planning-staffing-list-empty">{{ tp("demandGroupsEmpty") }}</p>
+          </section>
+
+          <section class="module-card planning-staffing-subpanel">
+            <div class="planning-staffing-panel__header">
+              <div>
+                <p class="eyebrow">{{ tp("staffingActionsTitle") }}</p>
+                <h4>{{ tp("staffingActionsTitle") }}</h4>
+              </div>
+              <span class="field-help">{{ tp("staffingActionsHint") }}</span>
+            </div>
+            <div class="planning-staffing-filter-grid">
+              <label class="field-stack">
+                <span>{{ tp("fieldsDemandGroup") }}</span>
+                <select v-model="selectedDemandGroupId">
+                  <option value="">{{ tp("demandGroupPlaceholder") }}</option>
+                  <option v-for="group in selectedBoardShift?.demand_groups ?? []" :key="group.id" :value="group.id">
+                    {{ formatDemandGroup(group) }}
+                  </option>
+                </select>
+              </label>
+              <label class="field-stack">
+                <span>{{ tp("fieldsActorKind") }}</span>
+                <select v-model="staffingDraft.actor_kind">
+                  <option value="team">{{ tp("actorKindTeam") }}</option>
+                  <option value="employee">{{ tp("actorKindEmployee") }}</option>
+                  <option value="subcontractor_worker">{{ tp("actorKindSubcontractorWorker") }}</option>
+                </select>
+              </label>
+              <label class="field-stack">
+                <span>{{ tp("fieldsTeam") }}</span>
+                <select v-model="staffingDraft.team_id" data-testid="planning-staffing-team-select">
+                  <option value="">{{ tp("teamPlaceholder") }}</option>
+                  <option v-for="team in shiftTeams" :key="team.id" :value="team.id">
+                    {{ team.name }}
+                  </option>
+                </select>
+              </label>
+              <label v-if="staffingDraft.actor_kind !== 'team'" class="field-stack">
+                <span>{{ staffingDraft.actor_kind === 'employee' ? tp("fieldsEmployee") : tp("fieldsSubcontractorWorker") }}</span>
+                <select v-model="staffingDraft.member_ref">
+                  <option value="">{{ tp("memberPlaceholder") }}</option>
+                  <option v-for="member in selectableTeamMembers" :key="member.id" :value="member.id">
+                    {{ formatMember(member) }}
+                  </option>
+                </select>
+              </label>
+              <label class="field-stack">
+                <span>{{ tp("fieldsAssignmentSource") }}</span>
+                <select v-model="staffingDraft.assignment_source_code">
+                  <option value="dispatcher">dispatcher</option>
+                  <option value="manual">manual</option>
+                  <option value="subcontractor_release">subcontractor_release</option>
+                </select>
+              </label>
+              <label class="field-stack">
+                <span>{{ tp("fieldsConfirmNow") }}</span>
+                <input v-model="staffingDraft.confirm_now" type="checkbox" />
+              </label>
+              <label class="field-stack field-stack--wide">
+                <span>{{ tp("fieldsRemarks") }}</span>
+                <textarea v-model="staffingDraft.remarks" rows="2" />
+              </label>
+            </div>
+            <div class="cta-row">
+              <button
+                class="cta-button"
+                data-testid="planning-staffing-assign-action"
+                type="button"
+                :disabled="!canSubmitAssign || loading"
+                @click="submitAssign"
+              >
+                {{ tp("assignAction") }}
+              </button>
+              <button
+                class="cta-button cta-secondary"
+                data-testid="planning-staffing-substitute-action"
+                type="button"
+                :disabled="!canSubmitSubstitute || loading"
+                @click="submitSubstitute"
+              >
+                {{ tp("substituteAction") }}
+              </button>
+              <button
+                class="cta-button cta-secondary"
+                data-testid="planning-staffing-unassign-action"
+                type="button"
+                :disabled="!selectedAssignment || !actionState.canUnassign || loading"
+                @click="submitUnassign"
+              >
+                {{ tp("unassignAction") }}
+              </button>
+            </div>
+          </section>
+
+          <section class="module-card planning-staffing-subpanel">
+            <div class="planning-staffing-panel__header">
+              <div>
                 <p class="eyebrow">{{ tp("validationTitle") }}</p>
                 <h4>{{ tp("validationTitle") }}</h4>
               </div>
@@ -204,6 +328,11 @@
               </button>
             </div>
             <p v-else class="planning-staffing-list-empty">{{ tp("assignmentsEmpty") }}</p>
+            <div v-if="selectedAssignment" class="planning-staffing-metrics">
+              <span>{{ tp("fieldsDemandGroup") }}: {{ selectedAssignment.demand_group_id }}</span>
+              <span>{{ tp("fieldsVersion") }}: {{ selectedAssignment.version_no }}</span>
+              <span>{{ tp("fieldsTeam") }}: {{ selectedAssignment.team_id || tp("unassignedLabel") }}</span>
+            </div>
           </section>
 
           <section class="module-card planning-staffing-subpanel">
@@ -262,14 +391,43 @@
           <section class="module-card planning-staffing-subpanel">
             <div class="planning-staffing-panel__header">
               <div>
+                <p class="eyebrow">{{ tp("teamReleaseTitle") }}</p>
+                <h4>{{ tp("teamReleaseTitle") }}</h4>
+              </div>
+            </div>
+            <div class="planning-staffing-support-grid">
+              <article class="planning-staffing-support-card">
+                <strong>{{ tp("teamsTitle") }}</strong>
+                <p v-if="shiftTeams.length" class="planning-staffing-support-list">
+                  <span v-for="team in shiftTeams" :key="team.id">{{ team.name }} · {{ team.members.length }}</span>
+                </p>
+                <p v-else class="planning-staffing-list-empty">{{ tp("teamsEmpty") }}</p>
+              </article>
+              <article class="planning-staffing-support-card">
+                <strong>{{ tp("subcontractorReleasesTitle") }}</strong>
+                <p v-if="subcontractorReleases.length" class="planning-staffing-support-list">
+                  <span v-for="release in subcontractorReleases" :key="release.id">{{ release.subcontractor_id }} · {{ release.released_qty }}</span>
+                </p>
+                <p v-else class="planning-staffing-list-empty">{{ tp("subcontractorReleasesEmpty") }}</p>
+              </article>
+            </div>
+            <div class="cta-row">
+              <a class="cta-button cta-secondary" href="/admin/employees">{{ tp("openEmployeesAdmin") }}</a>
+              <a class="cta-button cta-secondary" href="/admin/subcontractors">{{ tp("openSubcontractorsAdmin") }}</a>
+            </div>
+          </section>
+
+          <section class="module-card planning-staffing-subpanel">
+            <div class="planning-staffing-panel__header">
+              <div>
                 <p class="eyebrow">{{ tp("outputsTitle") }}</p>
                 <h4>{{ tp("outputsTitle") }}</h4>
               </div>
               <div class="cta-row">
-                <button class="cta-button cta-secondary" type="button" :disabled="!selectedShiftId || loading" @click="generateOutput('internal')">
+                <button class="cta-button cta-secondary" type="button" :disabled="!selectedShiftId || loading || !actionState.canManageRelease" @click="generateOutput('internal')">
                   {{ tp("generateInternalOutput") }}
                 </button>
-                <button class="cta-button cta-secondary" type="button" :disabled="!selectedShiftId || loading" @click="generateOutput('customer')">
+                <button class="cta-button cta-secondary" type="button" :disabled="!selectedShiftId || loading || !actionState.canManageRelease" @click="generateOutput('customer')">
                   {{ tp("generateCustomerOutput") }}
                 </button>
               </div>
@@ -296,10 +454,10 @@
               <label><input v-model="dispatchAudienceSubcontractors" type="checkbox" /> {{ tp("dispatchAudienceSubcontractors") }}</label>
             </div>
             <div class="cta-row">
-              <button class="cta-button cta-secondary" type="button" :disabled="!selectedShiftId || loading" @click="loadDispatchPreview">
+              <button class="cta-button cta-secondary" type="button" :disabled="!selectedShiftId || loading || !actionState.canDispatch" @click="loadDispatchPreview">
                 {{ tp("dispatchPreviewAction") }}
               </button>
-              <button class="cta-button" type="button" :disabled="!selectedShiftId || loading" @click="queueDispatch">
+              <button class="cta-button" type="button" :disabled="!selectedShiftId || loading || !actionState.canDispatch" @click="queueDispatch">
                 {{ tp("dispatchQueueAction") }}
               </button>
             </div>
@@ -343,33 +501,49 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 
+import { useAuthStore as usePrimaryAuthStore } from "#/store";
 import {
+  assignStaffing,
   createAssignmentValidationOverride,
   generateShiftOutput,
   getAssignmentValidations,
-  listShiftOutputs,
-  previewShiftDispatchMessage,
-  queueShiftDispatchMessage,
   getShiftReleaseValidations,
   listAssignmentValidationOverrides,
+  listShiftOutputs,
   listStaffingBoard,
   listStaffingCoverage,
+  listSubcontractorReleases,
+  listTeamMembers,
+  listTeams,
+  previewShiftDispatchMessage,
+  queueShiftDispatchMessage,
+  substituteStaffing,
+  unassignStaffing,
   PlanningStaffingApiError,
   type AssignmentValidationRead,
   type CoverageShiftItem,
   type PlanningDispatchPreviewRead,
   type PlanningOutputDocumentRead,
   type ShiftReleaseValidationRead,
+  type StaffingBoardAssignmentItem,
+  type StaffingBoardDemandGroupItem,
   type StaffingBoardShiftItem,
+  type SubcontractorReleaseRead,
+  type TeamMemberRead,
+  type TeamRead,
 } from "@/api/planningStaffing";
 import { planningStaffingMessages } from "@/i18n/planningStaffing.messages";
+import { useAuthStore } from "@/stores/auth";
+import { useLocaleStore } from "@/stores/locale";
 import {
   actorLabel,
+  buildStaffingMemberOptions,
   coverageTone,
   derivePlanningStaffingActionState,
   mapPlanningStaffingApiMessage,
+  resolveSelectedDemandGroupId,
   summarizeCoverage,
   summarizeValidations,
   validationTone,
@@ -388,15 +562,22 @@ const RULE_TEXT_MAP = {
   minimum_staffing: "ruleMinimumStaffing",
 } as const;
 
-const currentLocale = ref<"de" | "en">("de");
-const role = ref("dispatcher");
-const tenantScopeInput = ref(globalThis.localStorage?.getItem("planning-staffing.tenant") ?? "");
-const accessTokenInput = ref(globalThis.localStorage?.getItem("planning-staffing.token") ?? "");
-const tenantScopeId = ref(tenantScopeInput.value.trim());
-const accessToken = ref(accessTokenInput.value.trim());
+const primaryAuthStore = usePrimaryAuthStore();
+const authStore = useAuthStore();
+const localeStore = useLocaleStore();
+
+const currentLocale = computed<"de" | "en">(() => (localeStore.locale === "en" ? "en" : "de"));
+const role = computed(() => authStore.effectiveRole || "tenant_admin");
+const tenantScopeId = computed(() => authStore.effectiveTenantScopeId || authStore.tenantScopeId || "");
+const accessToken = computed(() => authStore.effectiveAccessToken || authStore.accessToken || "");
+
 const coverageRows = ref<CoverageShiftItem[]>([]);
 const boardRows = ref<StaffingBoardShiftItem[]>([]);
+const shiftTeams = ref<TeamRead[]>([]);
+const teamMembers = ref<TeamMemberRead[]>([]);
+const subcontractorReleases = ref<SubcontractorReleaseRead[]>([]);
 const selectedShiftId = ref("");
+const selectedDemandGroupId = ref("");
 const selectedAssignmentId = ref("");
 const shiftValidations = ref<ShiftReleaseValidationRead | null>(null);
 const assignmentValidations = ref<AssignmentValidationRead | null>(null);
@@ -418,6 +599,14 @@ const filters = reactive({
   workforce_scope_code: "",
   confirmation_state: "",
 });
+const staffingDraft = reactive({
+  actor_kind: "team",
+  team_id: "",
+  member_ref: "",
+  assignment_source_code: "dispatcher",
+  confirm_now: false,
+  remarks: "",
+});
 
 function tp(key: keyof typeof planningStaffingMessages.de) {
   return planningStaffingMessages[currentLocale.value][key] ?? planningStaffingMessages.de[key] ?? key;
@@ -425,13 +614,31 @@ function tp(key: keyof typeof planningStaffingMessages.de) {
 
 const selectedShift = computed(() => coverageRows.value.find((row) => row.shift_id === selectedShiftId.value) ?? null);
 const selectedBoardShift = computed(() => boardRows.value.find((row) => row.id === selectedShiftId.value) ?? null);
+const selectedAssignment = computed<StaffingBoardAssignmentItem | null>(
+  () => selectedBoardShift.value?.assignments.find((row) => row.id === selectedAssignmentId.value) ?? null,
+);
+const selectedDemandGroup = computed<StaffingBoardDemandGroupItem | null>(
+  () => selectedBoardShift.value?.demand_groups.find((row) => row.id === selectedDemandGroupId.value) ?? null,
+);
 const selectedIssue = computed(() => assignmentValidations.value?.issues.find((issue) => issue.rule_code === overrideRuleCode.value) ?? null);
 const actionState = computed(() =>
-  derivePlanningStaffingActionState(role.value, selectedShift.value, selectedAssignmentId.value ? { id: selectedAssignmentId.value } : null, selectedIssue.value),
+  derivePlanningStaffingActionState(role.value, selectedShift.value, selectedAssignment.value, selectedIssue.value),
 );
 const summary = computed(() => summarizeCoverage(coverageRows.value));
 const shiftValidationSummary = computed(() => summarizeValidations(shiftValidations.value));
 const assignmentValidationSummary = computed(() => summarizeValidations(assignmentValidations.value));
+const selectableTeamMembers = computed(() => buildStaffingMemberOptions(teamMembers.value, staffingDraft.team_id));
+const selectedMember = computed(() => selectableTeamMembers.value.find((member) => member.id === staffingDraft.member_ref) ?? null);
+const canSubmitAssign = computed(() => {
+  if (!actionState.value.canAssign || !selectedShiftId.value || !selectedDemandGroupId.value) {
+    return false;
+  }
+  if (staffingDraft.actor_kind === "team") {
+    return Boolean(staffingDraft.team_id);
+  }
+  return Boolean(staffingDraft.team_id && staffingDraft.member_ref && selectedMember.value);
+});
+const canSubmitSubstitute = computed(() => canSubmitAssign.value && actionState.value.canSubstitute && !!selectedAssignment.value);
 
 function clearFeedback() {
   feedback.message = "";
@@ -443,13 +650,6 @@ function setFeedback(tone: string, title: string, message: string) {
   feedback.tone = tone;
   feedback.title = title;
   feedback.message = message;
-}
-
-function rememberScopeAndToken() {
-  tenantScopeId.value = tenantScopeInput.value.trim();
-  accessToken.value = accessTokenInput.value.trim();
-  globalThis.localStorage?.setItem("planning-staffing.tenant", tenantScopeId.value);
-  globalThis.localStorage?.setItem("planning-staffing.token", accessToken.value);
 }
 
 function statusKey(state: string) {
@@ -471,6 +671,107 @@ function queryFilters() {
   return { ...filters };
 }
 
+function staffingFilters() {
+  return {
+    shift_id: selectedShiftId.value,
+    planning_record_id: filters.planning_record_id,
+  };
+}
+
+function resetStaffingDraft() {
+  staffingDraft.actor_kind = "team";
+  staffingDraft.team_id = "";
+  staffingDraft.member_ref = "";
+  staffingDraft.assignment_source_code = "dispatcher";
+  staffingDraft.confirm_now = false;
+  staffingDraft.remarks = "";
+}
+
+function formatDemandGroup(group: StaffingBoardDemandGroupItem | null) {
+  if (!group) {
+    return "";
+  }
+  return [group.function_type_id, group.qualification_type_id].filter(Boolean).join(" · ");
+}
+
+function formatMember(member: TeamMemberRead) {
+  if (member.employee_id) {
+    return `employee:${member.employee_id}`;
+  }
+  if (member.subcontractor_worker_id) {
+    return `worker:${member.subcontractor_worker_id}`;
+  }
+  return member.id;
+}
+
+async function handleAuthExpired() {
+  authStore.clearSession();
+  try {
+    primaryAuthStore.clearSessionState();
+    await primaryAuthStore.redirectToLogin("/admin/planning-staffing");
+  } catch {
+    // Keep inline feedback visible if redirect bootstrap is unavailable.
+  }
+}
+
+function handleApiError(error: unknown) {
+  if (error instanceof PlanningStaffingApiError) {
+    const key = mapPlanningStaffingApiMessage(error.messageKey);
+    if (key === "authRequired") {
+      void handleAuthExpired();
+    }
+    setFeedback("error", tp("title"), tp(key as keyof typeof planningStaffingMessages.de));
+    return;
+  }
+  setFeedback("error", tp("title"), tp("error"));
+}
+
+async function ensureStaffingSessionReady() {
+  authStore.syncFromPrimarySession();
+  if (!authStore.effectiveAccessToken && !authStore.refreshToken) {
+    return false;
+  }
+  try {
+    await authStore.ensureSessionReady();
+    return Boolean(authStore.effectiveAccessToken);
+  } catch {
+    await handleAuthExpired();
+    return false;
+  }
+}
+
+function dispatchAudienceCodes() {
+  const codes: string[] = [];
+  if (dispatchAudienceEmployees.value) {
+    codes.push("assigned_employees");
+  }
+  if (dispatchAudienceSubcontractors.value) {
+    codes.push("subcontractor_release");
+  }
+  return codes;
+}
+
+async function refreshSupportingData() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
+    shiftTeams.value = [];
+    teamMembers.value = [];
+    subcontractorReleases.value = [];
+    return;
+  }
+  const [teams, members, releases] = await Promise.all([
+    listTeams(tenantScopeId.value, accessToken.value, staffingFilters()),
+    listTeamMembers(tenantScopeId.value, accessToken.value, staffingFilters()),
+    listSubcontractorReleases(tenantScopeId.value, accessToken.value, staffingFilters()),
+  ]);
+  shiftTeams.value = teams;
+  teamMembers.value = members;
+  subcontractorReleases.value = releases;
+  if (!shiftTeams.value.some((team) => team.id === staffingDraft.team_id)) {
+    staffingDraft.team_id = "";
+    staffingDraft.member_ref = "";
+  }
+}
+
 async function refreshAll() {
   clearFeedback();
   if (!tenantScopeId.value || !accessToken.value) {
@@ -488,12 +789,16 @@ async function refreshAll() {
       selectedShiftId.value = coverageRows.value[0]?.shift_id ?? "";
     }
     if (!selectedShiftId.value) {
+      selectedDemandGroupId.value = "";
+      selectedAssignmentId.value = "";
       shiftValidations.value = null;
       assignmentValidations.value = null;
       assignmentOverrides.value = [];
       shiftOutputs.value = [];
       dispatchPreview.value = null;
-      selectedAssignmentId.value = "";
+      shiftTeams.value = [];
+      teamMembers.value = [];
+      subcontractorReleases.value = [];
       return;
     }
     await loadSelectedShiftDetails();
@@ -508,8 +813,14 @@ async function loadSelectedShiftDetails() {
   if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
     return;
   }
-  shiftValidations.value = await getShiftReleaseValidations(tenantScopeId.value, accessToken.value, selectedShiftId.value);
-  shiftOutputs.value = await listShiftOutputs(tenantScopeId.value, accessToken.value, selectedShiftId.value);
+  const [validations, outputs] = await Promise.all([
+    getShiftReleaseValidations(tenantScopeId.value, accessToken.value, selectedShiftId.value),
+    listShiftOutputs(tenantScopeId.value, accessToken.value, selectedShiftId.value),
+    refreshSupportingData(),
+  ]);
+  shiftValidations.value = validations;
+  shiftOutputs.value = outputs;
+  selectedDemandGroupId.value = resolveSelectedDemandGroupId(selectedBoardShift.value, selectedDemandGroupId.value);
   const boardShift = selectedBoardShift.value;
   if (!boardShift?.assignments?.length) {
     selectedAssignmentId.value = "";
@@ -518,20 +829,120 @@ async function loadSelectedShiftDetails() {
     return;
   }
   if (!boardShift.assignments.some((row) => row.id === selectedAssignmentId.value)) {
-    selectedAssignmentId.value = boardShift.assignments[0].id;
+    selectedAssignmentId.value = boardShift.assignments[0]!.id;
   }
   await loadSelectedAssignmentDetails();
 }
 
-function dispatchAudienceCodes() {
-  const codes = [];
-  if (dispatchAudienceEmployees.value) {
-    codes.push("assigned_employees");
+async function loadSelectedAssignmentDetails() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedAssignmentId.value) {
+    assignmentValidations.value = null;
+    assignmentOverrides.value = [];
+    return;
   }
-  if (dispatchAudienceSubcontractors.value) {
-    codes.push("subcontractor_release");
+  const [validations, overrides] = await Promise.all([
+    getAssignmentValidations(tenantScopeId.value, accessToken.value, selectedAssignmentId.value),
+    listAssignmentValidationOverrides(tenantScopeId.value, accessToken.value, selectedAssignmentId.value),
+  ]);
+  assignmentValidations.value = validations;
+  assignmentOverrides.value = overrides;
+  if (overrideRuleCode.value && !validations.issues.some((issue) => issue.rule_code === overrideRuleCode.value && issue.override_allowed)) {
+    cancelOverride();
   }
-  return codes;
+}
+
+function buildAssignPayload() {
+  return {
+    tenant_id: tenantScopeId.value,
+    shift_id: selectedShiftId.value,
+    demand_group_id: selectedDemandGroupId.value,
+    team_id: staffingDraft.team_id || null,
+    employee_id:
+      staffingDraft.actor_kind === "employee"
+        ? (selectedMember.value?.employee_id ?? null)
+        : null,
+    subcontractor_worker_id:
+      staffingDraft.actor_kind === "subcontractor_worker"
+        ? (selectedMember.value?.subcontractor_worker_id ?? null)
+        : null,
+    assignment_source_code: staffingDraft.assignment_source_code,
+    confirmed_at: staffingDraft.confirm_now ? new Date().toISOString() : null,
+    remarks: staffingDraft.remarks.trim() || null,
+  };
+}
+
+async function submitAssign() {
+  if (!tenantScopeId.value || !accessToken.value || !canSubmitAssign.value) {
+    return;
+  }
+  clearFeedback();
+  try {
+    const result = await assignStaffing(tenantScopeId.value, accessToken.value, buildAssignPayload());
+    if (result.outcome_code === "blocked") {
+      setFeedback("error", tp("staffingActionsTitle"), tp("assignmentBlocked"));
+      await loadSelectedShiftDetails();
+      return;
+    }
+    selectedAssignmentId.value = result.assignment_id ?? "";
+    resetStaffingDraft();
+    await refreshAll();
+  } catch (error) {
+    handleApiError(error);
+  }
+}
+
+async function submitUnassign() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedAssignment.value) {
+    return;
+  }
+  clearFeedback();
+  try {
+    await unassignStaffing(tenantScopeId.value, accessToken.value, {
+      tenant_id: tenantScopeId.value,
+      assignment_id: selectedAssignment.value.id,
+      version_no: selectedAssignment.value.version_no,
+      remarks: staffingDraft.remarks.trim() || null,
+    });
+    selectedAssignmentId.value = "";
+    await refreshAll();
+  } catch (error) {
+    handleApiError(error);
+  }
+}
+
+async function submitSubstitute() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedAssignment.value || !canSubmitSubstitute.value) {
+    return;
+  }
+  clearFeedback();
+  try {
+    const result = await substituteStaffing(tenantScopeId.value, accessToken.value, {
+      tenant_id: tenantScopeId.value,
+      assignment_id: selectedAssignment.value.id,
+      version_no: selectedAssignment.value.version_no,
+      replacement_team_id: staffingDraft.team_id || null,
+      replacement_employee_id:
+        staffingDraft.actor_kind === "employee"
+          ? (selectedMember.value?.employee_id ?? null)
+          : null,
+      replacement_subcontractor_worker_id:
+        staffingDraft.actor_kind === "subcontractor_worker"
+          ? (selectedMember.value?.subcontractor_worker_id ?? null)
+          : null,
+      assignment_source_code: staffingDraft.assignment_source_code,
+      remarks: staffingDraft.remarks.trim() || null,
+    });
+    if (result.outcome_code === "blocked") {
+      setFeedback("error", tp("staffingActionsTitle"), tp("assignmentBlocked"));
+      await loadSelectedShiftDetails();
+      return;
+    }
+    selectedAssignmentId.value = result.assignment_id ?? "";
+    resetStaffingDraft();
+    await refreshAll();
+  } catch (error) {
+    handleApiError(error);
+  }
 }
 
 async function loadDispatchPreview() {
@@ -569,23 +980,6 @@ async function generateOutput(audienceCode: "customer" | "internal") {
   shiftOutputs.value = await listShiftOutputs(tenantScopeId.value, accessToken.value, selectedShiftId.value);
 }
 
-async function loadSelectedAssignmentDetails() {
-  if (!tenantScopeId.value || !accessToken.value || !selectedAssignmentId.value) {
-    assignmentValidations.value = null;
-    assignmentOverrides.value = [];
-    return;
-  }
-  const [validations, overrides] = await Promise.all([
-    getAssignmentValidations(tenantScopeId.value, accessToken.value, selectedAssignmentId.value),
-    listAssignmentValidationOverrides(tenantScopeId.value, accessToken.value, selectedAssignmentId.value),
-  ]);
-  assignmentValidations.value = validations;
-  assignmentOverrides.value = overrides;
-  if (overrideRuleCode.value && !validations.issues.some((issue) => issue.rule_code === overrideRuleCode.value && issue.override_allowed)) {
-    cancelOverride();
-  }
-}
-
 function startOverride(ruleCode: string) {
   overrideRuleCode.value = ruleCode;
   overrideReason.value = "";
@@ -619,13 +1013,25 @@ async function submitOverride() {
   }
 }
 
-function handleApiError(error: unknown) {
-  if (error instanceof PlanningStaffingApiError) {
-    const key = mapPlanningStaffingApiMessage(error.messageKey);
-    setFeedback("error", tp("title"), tp(key));
+async function recoverSessionAndRefresh() {
+  if (document.visibilityState === "hidden") {
     return;
   }
-  setFeedback("error", tp("title"), tp("error"));
+  const ready = await ensureStaffingSessionReady();
+  if (!ready || !actionState.value.canReadCoverage) {
+    return;
+  }
+  await refreshAll();
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === "visible") {
+    void recoverSessionAndRefresh();
+  }
+}
+
+function handleWindowFocus() {
+  void recoverSessionAndRefresh();
 }
 
 watch(selectedShiftId, async () => {
@@ -647,6 +1053,56 @@ watch(selectedAssignmentId, async () => {
     }
   }
 });
+
+watch(
+  selectedBoardShift,
+  (shift) => {
+    selectedDemandGroupId.value = resolveSelectedDemandGroupId(shift, selectedDemandGroupId.value);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => staffingDraft.team_id,
+  () => {
+    if (!selectableTeamMembers.value.some((member) => member.id === staffingDraft.member_ref)) {
+      staffingDraft.member_ref = "";
+    }
+  },
+);
+
+watch(
+  () => [authStore.effectiveRole, authStore.effectiveTenantScopeId, authStore.effectiveAccessToken, authStore.sessionUser?.id ?? ""],
+  ([nextRole, nextTenantScopeId, nextAccessToken], [prevRole, prevTenantScopeId, prevAccessToken]) => {
+    if (!nextRole || !nextTenantScopeId || !nextAccessToken) {
+      return;
+    }
+    if (
+      nextRole === prevRole
+      && nextTenantScopeId === prevTenantScopeId
+      && nextAccessToken === prevAccessToken
+    ) {
+      return;
+    }
+    void refreshAll();
+  },
+);
+
+onMounted(async () => {
+  authStore.syncFromPrimarySession();
+  const sessionReady = await ensureStaffingSessionReady();
+  if (!sessionReady || !tenantScopeId.value || !accessToken.value || !actionState.value.canReadCoverage) {
+    return;
+  }
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  window.addEventListener("focus", handleWindowFocus);
+  await refreshAll();
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
+  window.removeEventListener("focus", handleWindowFocus);
+});
 </script>
 
 <style scoped>
@@ -656,13 +1112,16 @@ watch(selectedAssignmentId, async () => {
 .planning-staffing-summary,
 .planning-staffing-detail,
 .planning-staffing-metrics,
-.planning-staffing-issues {
+.planning-staffing-issues,
+.planning-staffing-demand-groups,
+.planning-staffing-support-grid {
   display: grid;
   gap: 1rem;
 }
 
 .planning-staffing-grid {
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  align-items: start;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1fr) minmax(420px, 1.35fr);
 }
 
 .planning-staffing-hero {
@@ -674,7 +1133,8 @@ watch(selectedAssignmentId, async () => {
 .planning-staffing-meta,
 .planning-staffing-metrics,
 .planning-staffing-panel__header,
-.planning-staffing-summary {
+.planning-staffing-summary,
+.planning-staffing-support-list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
@@ -685,7 +1145,9 @@ watch(selectedAssignmentId, async () => {
 .planning-staffing-meta__pill,
 .planning-staffing-state,
 .planning-staffing-summary__card,
-.planning-staffing-issue {
+.planning-staffing-issue,
+.planning-staffing-support-card,
+.planning-staffing-demand-group {
   border: 1px solid rgba(40, 170, 170, 0.18);
   border-radius: 16px;
   padding: 0.75rem 0.9rem;
@@ -693,28 +1155,39 @@ watch(selectedAssignmentId, async () => {
 }
 
 .planning-staffing-row,
-.planning-staffing-subpanel {
+.planning-staffing-subpanel,
+.planning-staffing-feedback {
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 18px;
   padding: 1rem;
   background: #fff;
 }
 
-.planning-staffing-row {
+.planning-staffing-row,
+.planning-staffing-demand-group {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
   text-align: left;
 }
 
-.planning-staffing-row.selected {
+.planning-staffing-row.selected,
+.planning-staffing-demand-group.selected {
   border-color: rgb(40, 170, 170);
   box-shadow: 0 0 0 1px rgba(40, 170, 170, 0.2);
 }
 
+.planning-staffing-demand-group,
+.planning-staffing-support-card,
 .planning-staffing-issue {
   display: grid;
   gap: 0.35rem;
+}
+
+.planning-staffing-scope,
+.planning-staffing-empty {
+  display: grid;
+  gap: 0.75rem;
 }
 
 .planning-staffing-issue[data-tone="good"],
@@ -733,14 +1206,26 @@ watch(selectedAssignmentId, async () => {
 
 .planning-staffing-issue[data-tone="bad"],
 .planning-staffing-state[data-tone="bad"],
-.planning-staffing-summary__card[data-tone="bad"] {
+.planning-staffing-summary__card[data-tone="bad"],
+.planning-staffing-feedback[data-tone="error"] {
   background: rgba(220, 38, 38, 0.12);
   border-color: rgba(220, 38, 38, 0.24);
 }
 
-.planning-staffing-issue[data-tone="neutral"] {
+.planning-staffing-issue[data-tone="neutral"],
+.planning-staffing-feedback[data-tone="good"] {
   background: rgba(15, 23, 42, 0.04);
   border-color: rgba(15, 23, 42, 0.12);
+}
+
+.field-stack--wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1180px) {
+  .planning-staffing-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {
