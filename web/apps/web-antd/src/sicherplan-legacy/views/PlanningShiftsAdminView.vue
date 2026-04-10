@@ -45,7 +45,15 @@
           </div>
           <div class="cta-row">
             <button class="cta-button cta-secondary" type="button" @click="refreshTemplates">{{ tp("actionsRefresh") }}</button>
-            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreateTemplate" @click="startCreateTemplate">{{ tp("actionsCreateTemplate") }}</button>
+            <button
+              class="cta-button cta-secondary"
+              data-testid="planning-shifts-create-template"
+              type="button"
+              :disabled="!actionState.canCreateTemplate"
+              @click="startCreateTemplate"
+            >
+              {{ tp("actionsCreateTemplate") }}
+            </button>
           </div>
         </div>
         <div class="planning-orders-list">
@@ -64,32 +72,6 @@
           </button>
         </div>
         <p v-if="!templates.length" class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
-        <form class="planning-orders-form" @submit.prevent="submitTemplate">
-          <div class="planning-orders-form-grid">
-            <label class="field-stack"><span>{{ tp("fieldsCode") }}</span><input v-model="templateDraft.code" required /></label>
-            <label class="field-stack"><span>{{ tp("fieldsLabel") }}</span><input v-model="templateDraft.label" required /></label>
-            <label class="field-stack"><span>{{ tp("fieldsStartTime") }}</span><input v-model="templateDraft.local_start_time" type="time" required /></label>
-            <label class="field-stack"><span>{{ tp("fieldsEndTime") }}</span><input v-model="templateDraft.local_end_time" type="time" required /></label>
-            <label class="field-stack"><span>{{ tp("fieldsBreakMinutes") }}</span><input v-model.number="templateDraft.default_break_minutes" type="number" min="0" /></label>
-            <label class="field-stack">
-              <span>{{ tp("fieldsShiftType") }}</span>
-              <select v-model="templateDraft.shift_type_code" required :disabled="loadingShiftTypeOptions || !templateShiftTypeOptions.length">
-                <option value="" disabled>{{ shiftTypePlaceholderLabel }}</option>
-                <option v-for="option in templateShiftTypeOptions" :key="option.code" :value="option.code">
-                  {{ option.label }}
-                </option>
-              </select>
-              <span v-if="shiftTypeHelpLabel" class="field-help">{{ shiftTypeHelpLabel }}</span>
-            </label>
-            <label class="field-stack"><span>{{ tp("fieldsMeetingPoint") }}</span><input v-model="templateDraft.meeting_point" /></label>
-            <label class="field-stack"><span>{{ tp("fieldsLocationText") }}</span><input v-model="templateDraft.location_text" /></label>
-            <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="templateDraft.notes" rows="2" /></label>
-          </div>
-          <div class="cta-row">
-            <button class="cta-button" type="submit" :disabled="!actionState.canCreateTemplate">{{ tp("actionsSave") }}</button>
-            <button class="cta-button cta-secondary" type="button" @click="resetTemplateDraft">{{ tp("actionsReset") }}</button>
-          </div>
-        </form>
       </section>
 
       <section
@@ -546,12 +528,49 @@
         <option v-for="timezone in timezoneSuggestions" :key="timezone" :value="timezone" />
       </datalist>
     </div>
+
+    <Modal
+      v-model:open="templateModalOpen"
+      :title="selectedTemplateId ? tp('templateModalEditTitle') : tp('templateModalCreateTitle')"
+      :footer="null"
+      @cancel="closeTemplateModal"
+    >
+      <form class="planning-orders-form planning-shifts-template-modal" data-testid="planning-shifts-template-modal" @submit.prevent="submitTemplate">
+        <div class="planning-orders-form-grid">
+          <label class="field-stack"><span>{{ tp("fieldsCode") }}</span><input v-model="templateDraft.code" required /></label>
+          <label class="field-stack"><span>{{ tp("fieldsLabel") }}</span><input v-model="templateDraft.label" required /></label>
+          <label class="field-stack"><span>{{ tp("fieldsStartTime") }}</span><input v-model="templateDraft.local_start_time" type="time" required /></label>
+          <label class="field-stack"><span>{{ tp("fieldsEndTime") }}</span><input v-model="templateDraft.local_end_time" type="time" required /></label>
+          <label class="field-stack"><span>{{ tp("fieldsBreakMinutes") }}</span><input v-model.number="templateDraft.default_break_minutes" type="number" min="0" /></label>
+          <label class="field-stack">
+            <span>{{ tp("fieldsShiftType") }}</span>
+            <select v-model="templateDraft.shift_type_code" required :disabled="loadingShiftTypeOptions || !templateShiftTypeOptions.length">
+              <option value="" disabled>{{ shiftTypePlaceholderLabel }}</option>
+              <option v-for="option in templateShiftTypeOptions" :key="option.code" :value="option.code">
+                {{ option.label }}
+              </option>
+            </select>
+            <span v-if="shiftTypeHelpLabel" class="field-help">{{ shiftTypeHelpLabel }}</span>
+          </label>
+          <label class="field-stack"><span>{{ tp("fieldsMeetingPoint") }}</span><input v-model="templateDraft.meeting_point" /></label>
+          <label class="field-stack"><span>{{ tp("fieldsLocationText") }}</span><input v-model="templateDraft.location_text" /></label>
+          <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="templateDraft.notes" rows="2" /></label>
+        </div>
+        <div class="cta-row">
+          <button class="cta-button" data-testid="planning-shifts-template-modal-save" type="submit" :disabled="!actionState.canCreateTemplate">{{ tp("actionsSave") }}</button>
+          <button class="cta-button cta-secondary" type="button" @click="resetTemplateDraft">{{ tp("actionsReset") }}</button>
+          <button class="cta-button cta-secondary" data-testid="planning-shifts-template-modal-cancel" type="button" @click="closeTemplateModal">{{ tp("actionsCancel") }}</button>
+        </div>
+      </form>
+    </Modal>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { Modal } from "ant-design-vue";
 
+import { useAuthStore as usePrimaryAuthStore } from "#/store";
 import { useSicherPlanFeedback } from "@/composables/useSicherPlanFeedback";
 import { listPlanningRecords, type PlanningRecordListItem } from "@/api/planningOrders";
 import {
@@ -611,13 +630,14 @@ const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
   embedded: false,
 });
 
+const primaryAuthStore = usePrimaryAuthStore();
 const authStore = useAuthStore();
 const localeStore = useLocaleStore();
 const { showFeedbackToast } = useSicherPlanFeedback();
 const currentLocale = computed(() => (localeStore.locale === "en" ? "en" : "de"));
 const role = computed(() => authStore.effectiveRole || "tenant_admin");
-const tenantScopeId = ref(authStore.tenantScopeId || "");
-const accessToken = ref(authStore.accessToken || "");
+const tenantScopeId = computed(() => authStore.effectiveTenantScopeId || authStore.tenantScopeId || "");
+const accessToken = computed(() => authStore.effectiveAccessToken || authStore.accessToken || "");
 
 const templates = ref<ShiftTemplateListItem[]>([]);
 const planningRecords = ref<PlanningRecordListItem[]>([]);
@@ -629,6 +649,7 @@ const seriesExceptions = ref<ShiftSeriesExceptionRead[]>([]);
 const selectedShiftDiagnostics = ref<ShiftReleaseDiagnosticsRead | null>(null);
 const shiftTypeOptions = ref<ShiftTypeOption[]>([]);
 const loadingShiftTypeOptions = ref(false);
+const templateModalOpen = ref(false);
 
 const selectedTemplateId = ref("");
 const selectedShiftPlanId = ref("");
@@ -836,6 +857,7 @@ async function selectTemplate(templateId: string) {
   selectedTemplateId.value = templateId;
   const row = await getShiftTemplate(tenantScopeId.value, templateId, accessToken.value);
   assignTemplateDraft(row);
+  templateModalOpen.value = true;
 }
 
 async function selectShiftPlan(shiftPlanId: string) {
@@ -885,7 +907,11 @@ async function selectShift(shiftId: string) {
   await refreshSelectedShift();
 }
 
-function startCreateTemplate() { resetTemplateDraft(); selectedTemplateId.value = ""; }
+function startCreateTemplate() {
+  resetTemplateDraft();
+  selectedTemplateId.value = "";
+  templateModalOpen.value = true;
+}
 function startCreatePlan() {
   resetShiftPlanDraft();
   clearPlanSelectionContext();
@@ -1010,10 +1036,15 @@ async function submitTemplate() {
     if (selectedTemplateId.value) {
       await selectTemplate(selectedTemplateId.value);
     }
+    templateModalOpen.value = false;
     setFeedback("success", tp("successTitle"), tp("saved"));
   } catch (error) {
     handleApiError(error);
   }
+}
+
+function closeTemplateModal() {
+  templateModalOpen.value = false;
 }
 
 async function submitShiftPlan() {
@@ -1219,7 +1250,96 @@ function toggleWeekday(index: number) {
 
 function handleApiError(error: unknown) {
   const messageKey = error instanceof PlanningShiftsApiError ? error.messageKey : "error";
+  if (messageKey === "errors.iam.auth.invalid_access_token" || messageKey === "errors.iam.auth.invalid_refresh_token") {
+    void handleAuthExpired();
+  }
   setFeedback("error", tp("errorTitle"), tp(mapPlanningShiftApiMessage(messageKey) as keyof typeof planningShiftsMessages.de));
+}
+
+async function handleAuthExpired() {
+  authStore.clearSession();
+  try {
+    primaryAuthStore.clearSessionState();
+    await primaryAuthStore.redirectToLogin("/admin/planning-shifts");
+  } catch {
+    // Keep the current page feedback visible even if redirect bootstrap is unavailable.
+  }
+}
+
+async function ensureShiftSessionReady() {
+  authStore.syncFromPrimarySession();
+  if (!authStore.effectiveAccessToken && !authStore.refreshToken) {
+    return false;
+  }
+
+  try {
+    await authStore.ensureSessionReady();
+    return Boolean(authStore.effectiveAccessToken);
+  } catch {
+    await handleAuthExpired();
+    return false;
+  }
+}
+
+async function refreshActiveWorkspaceData() {
+  if (!tenantScopeId.value || !accessToken.value || !canRead.value) {
+    return;
+  }
+
+  if (activeWorkspaceTab.value === "templates") {
+    await refreshTemplates();
+    return;
+  }
+  if (activeWorkspaceTab.value === "plans") {
+    await refreshPlans();
+    return;
+  }
+  if (activeWorkspaceTab.value === "series") {
+    await refreshPlans();
+    if (selectedShiftPlanId.value) {
+      seriesRows.value = await listShiftSeries(tenantScopeId.value, selectedShiftPlanId.value, accessToken.value);
+      if (selectedSeriesId.value) {
+        seriesExceptions.value = await listShiftSeriesExceptions(tenantScopeId.value, selectedSeriesId.value, accessToken.value);
+      }
+    }
+    return;
+  }
+  if (activeWorkspaceTab.value === "shifts") {
+    await refreshPlans();
+    if (selectedShiftPlanId.value) {
+      await refreshShifts();
+    }
+    if (selectedShiftId.value) {
+      selectedShiftDiagnostics.value = await getShiftReleaseDiagnostics(tenantScopeId.value, selectedShiftId.value, accessToken.value);
+    }
+    return;
+  }
+  await refreshBoard();
+}
+
+async function recoverSessionAndRefreshActiveTab() {
+  if (document.visibilityState === "hidden") {
+    return;
+  }
+  const ready = await ensureShiftSessionReady();
+  if (!ready) {
+    return;
+  }
+  try {
+    await refreshActiveWorkspaceData();
+  } catch (error) {
+    handleApiError(error);
+  }
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === "visible") {
+    void recoverSessionAndRefreshActiveTab();
+  }
+}
+
+function handleWindowFocus() {
+  void recoverSessionAndRefreshActiveTab();
 }
 
 function clearPlanSelectionContext() {
@@ -1305,15 +1425,41 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => [authStore.effectiveRole, authStore.effectiveTenantScopeId, authStore.effectiveAccessToken, authStore.sessionUser?.id ?? ""],
+  ([nextRole, nextTenantScopeId, nextAccessToken], [prevRole, prevTenantScopeId, prevAccessToken]) => {
+    if (!nextRole || !nextTenantScopeId || !nextAccessToken) {
+      return;
+    }
+    if (
+      nextRole === prevRole
+      && nextTenantScopeId === prevTenantScopeId
+      && nextAccessToken === prevAccessToken
+    ) {
+      return;
+    }
+    void refreshActiveWorkspaceData();
+  },
+);
+
 onMounted(async () => {
-  if (!tenantScopeId.value || !accessToken.value || !canRead.value) {
+  authStore.syncFromPrimarySession();
+  const sessionReady = await ensureShiftSessionReady();
+  if (!sessionReady || !tenantScopeId.value || !accessToken.value || !canRead.value) {
     return;
   }
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  window.addEventListener("focus", handleWindowFocus);
   try {
     await Promise.all([refreshShiftTypeOptions(), refreshTemplates(), refreshPlanningRecords(), refreshPlans(), refreshBoard()]);
   } catch (error) {
     handleApiError(error);
   }
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
+  window.removeEventListener("focus", handleWindowFocus);
 });
 </script>
 

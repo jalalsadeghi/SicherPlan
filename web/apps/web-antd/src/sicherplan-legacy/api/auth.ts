@@ -64,6 +64,10 @@ export interface CurrentSessionResponse {
   };
 }
 
+export interface RefreshSessionResponse {
+  session: SessionTokenPair;
+}
+
 export interface CustomerPortalContextRead {
   tenant_id: string;
   user_id: string;
@@ -240,6 +244,15 @@ export function login(payload: LoginPayload) {
 
 export function getCurrentSession(accessToken: string) {
   return request<CurrentSessionResponse>("/api/auth/me", { accessToken });
+}
+
+export function refreshSession(refreshToken: string) {
+  return request<RefreshSessionResponse>("/api/auth/refresh", {
+    method: "POST",
+    body: {
+      refresh_token: refreshToken,
+    },
+  });
 }
 
 export function logout(accessToken: string) {

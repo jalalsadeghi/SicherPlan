@@ -1,4 +1,6 @@
-import { webAppConfig } from "@/config/env";
+import { AuthApiError } from "@/api/auth";
+
+import { legacySessionRequest } from "./sessionRequest";
 
 export interface ShiftTemplateListItem {
   id: string;
@@ -164,6 +166,14 @@ export interface PlanningBoardShiftListItem {
   meeting_point: string | null;
 }
 
+export interface ShiftCopyResult {
+  source_from: string;
+  source_to: string;
+  target_from: string;
+  copied_count: number;
+  skipped_count: number;
+}
+
 export class PlanningShiftsApiError extends Error {
   status: number;
   messageKey: string;
@@ -182,20 +192,40 @@ function generateRequestId() {
 }
 
 function isApiErrorEnvelope(payload: unknown): payload is { error: { message_key: string; details: Record<string, unknown> } } {
-  return Boolean(payload && typeof payload === "object" && "error" in payload && typeof payload.error?.message_key === "string");
+  if (!payload || typeof payload !== "object" || !("error" in payload)) {
+    return false;
+  }
+  const error = (payload as { error?: unknown }).error;
+  return Boolean(error && typeof error === "object" && "message_key" in error && typeof (error as { message_key?: unknown }).message_key === "string");
 }
 
-async function request<T>(path: string, accessToken: string, options: RequestInit & { body?: unknown } = {}): Promise<T> {
-  const response = await fetch(`${webAppConfig.apiBaseUrl}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-      "X-Request-Id": generateRequestId(),
-      ...(options.headers ?? {}),
-    },
-    body: options.body == null ? undefined : JSON.stringify(options.body),
-  });
+async function request<T>(
+  path: string,
+  accessToken: string,
+  options: Omit<RequestInit, "body"> & { body?: unknown } = {},
+): Promise<T> {
+  let response: Response;
+  try {
+    const { body, ...requestOptions } = options;
+    response = await legacySessionRequest(path, {
+      ...requestOptions,
+      accessToken,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Request-Id": generateRequestId(),
+        ...(options.headers ?? {}),
+      },
+      jsonBody: body,
+    });
+  } catch (error) {
+    if (error instanceof AuthApiError) {
+      throw new PlanningShiftsApiError(error.statusCode, {
+        message_key: error.messageKey,
+        details: error.details,
+      });
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     const payload = await response.json().catch(() => null);

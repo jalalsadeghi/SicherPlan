@@ -2,12 +2,16 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent, h } from "vue";
 
 import PlanningShiftsAdminView from "../../views/PlanningShiftsAdminView.vue";
 
 const {
   createShiftPlanMock,
   createShiftSeriesMock,
+  createShiftTemplateMock,
+  ensureSessionReadyMock,
+  redirectToLoginMock,
   showFeedbackToastMock,
   listShiftTypeOptionsMock,
   listShiftTemplatesMock,
@@ -20,9 +24,14 @@ const {
   listShiftsMock,
   getShiftMock,
   getShiftReleaseDiagnosticsMock,
+  updateShiftTemplateMock,
 } = vi.hoisted(() => ({
   createShiftPlanMock: vi.fn(async () => ({ id: "plan-1" })),
   createShiftSeriesMock: vi.fn(async () => ({ id: "series-1" })),
+  createShiftTemplateMock: vi.fn(async () => ({ id: "template-1" })),
+  updateShiftTemplateMock: vi.fn(async () => ({})),
+  ensureSessionReadyMock: vi.fn(async () => ({ id: "user-1" })),
+  redirectToLoginMock: vi.fn(async () => {}),
   showFeedbackToastMock: vi.fn(),
   listShiftTypeOptionsMock: vi.fn(async () => [
     { code: "site_day", label: "Site Day" },
@@ -212,7 +221,7 @@ vi.mock("@/api/planningShifts", () => ({
   createShiftPlan: createShiftPlanMock,
   createShiftSeries: createShiftSeriesMock,
   createShiftSeriesException: vi.fn(async () => ({ id: "exception-1" })),
-  createShiftTemplate: vi.fn(async () => ({ id: "template-1" })),
+  createShiftTemplate: createShiftTemplateMock,
   generateShiftSeries: vi.fn(async () => ({})),
   getShift: getShiftMock,
   getShiftPlan: getShiftPlanMock,
@@ -231,7 +240,7 @@ vi.mock("@/api/planningShifts", () => ({
   updateShiftPlan: vi.fn(async () => ({})),
   updateShiftSeriesException: vi.fn(async () => ({})),
   updateShiftSeries: vi.fn(async () => ({})),
-  updateShiftTemplate: vi.fn(async () => ({})),
+  updateShiftTemplate: updateShiftTemplateMock,
   updateShiftVisibility: vi.fn(async () => ({})),
   PlanningShiftsApiError: class PlanningShiftsApiError extends Error {
     messageKey = "";
@@ -267,8 +276,22 @@ vi.mock("@/api/planningOrders", () => ({
 vi.mock("@/stores/auth", () => ({
   useAuthStore: () => ({
     effectiveRole: "tenant_admin",
+    effectiveTenantScopeId: "tenant-1",
+    effectiveAccessToken: "token-1",
     tenantScopeId: "tenant-1",
     accessToken: "token-1",
+    refreshToken: "refresh-1",
+    sessionUser: { id: "user-1" },
+    syncFromPrimarySession: vi.fn(),
+    ensureSessionReady: ensureSessionReadyMock,
+    clearSession: vi.fn(),
+  }),
+}));
+
+vi.mock("#/store", () => ({
+  useAuthStore: () => ({
+    clearSessionState: vi.fn(),
+    redirectToLogin: redirectToLoginMock,
   }),
 }));
 
@@ -278,10 +301,45 @@ vi.mock("@/stores/locale", () => ({
   }),
 }));
 
+vi.mock("ant-design-vue", () => ({
+  Modal: defineComponent({
+    name: "AntdModalStub",
+    props: {
+      open: {
+        type: Boolean,
+        default: false,
+      },
+      title: {
+        type: String,
+        default: "",
+      },
+    },
+    setup(props, { slots }) {
+      return () =>
+        props.open
+          ? h("section", { class: "ant-modal-stub" }, [
+              props.title ? h("h3", props.title) : null,
+              slots.default?.(),
+            ])
+          : null;
+    },
+  }),
+}));
+
+function mountView(options: Record<string, unknown> = {}) {
+  return mount(PlanningShiftsAdminView, {
+    ...(options as object),
+  });
+}
+
 describe("PlanningShiftsAdminView", () => {
   beforeEach(() => {
     createShiftPlanMock.mockClear();
     createShiftSeriesMock.mockClear();
+    createShiftTemplateMock.mockClear();
+    updateShiftTemplateMock.mockClear();
+    ensureSessionReadyMock.mockClear();
+    redirectToLoginMock.mockClear();
     showFeedbackToastMock.mockClear();
     getShiftPlanMock.mockClear();
     listShiftSeriesMock.mockClear();
@@ -303,7 +361,7 @@ describe("PlanningShiftsAdminView", () => {
   });
 
   it("mounts without setup crash and renders shift-planning sections", () => {
-    const wrapper = mount(PlanningShiftsAdminView);
+    const wrapper = mountView();
 
     expect(wrapper.text()).toContain("Shift templates");
     expect(wrapper.text()).toContain("Shift plans");
@@ -316,7 +374,7 @@ describe("PlanningShiftsAdminView", () => {
   });
 
   it("suppresses the inner hero in embedded mode but keeps workspace tabs", () => {
-    const wrapper = mount(PlanningShiftsAdminView, {
+    const wrapper = mountView({
       props: {
         embedded: true,
       },
@@ -331,7 +389,7 @@ describe("PlanningShiftsAdminView", () => {
   });
 
   it("renders structured planning-shifts controls instead of the old raw text fields", async () => {
-    const wrapper = mount(PlanningShiftsAdminView);
+    const wrapper = mountView();
     await flushPromises();
 
     expect(wrapper.text()).toContain("Select planning record");
@@ -358,7 +416,7 @@ describe("PlanningShiftsAdminView", () => {
   it("shows a visible explanation and keeps series save disabled when no shift plan is selected", async () => {
     listShiftPlansMock.mockResolvedValueOnce([]);
 
-    const wrapper = mount(PlanningShiftsAdminView);
+    const wrapper = mountView();
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     await flushPromises();
@@ -404,7 +462,7 @@ describe("PlanningShiftsAdminView", () => {
       version_no: 1,
     });
 
-    const wrapper = mount(PlanningShiftsAdminView);
+    const wrapper = mountView();
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     await flushPromises();
@@ -417,36 +475,76 @@ describe("PlanningShiftsAdminView", () => {
     expect(wrapper.get('[data-testid="planning-shifts-series-context"]').text()).toContain("Plan 2");
   });
 
-  it("keeps legacy shift type values visible in the controlled select", async () => {
-    const wrapper = mount(PlanningShiftsAdminView);
+  it("opens the template modal from the new-template action and removes the old inline editor", async () => {
+    const wrapper = mountView();
     await flushPromises();
 
-    await wrapper.get(".planning-orders-row").trigger("click");
+    expect(wrapper.find('[data-testid="planning-shifts-tab-panel-templates"] form').exists()).toBe(false);
+
+    await wrapper.get('[data-testid="planning-shifts-create-template"]').trigger("click");
     await flushPromises();
 
-    const templateSelect = wrapper.findAll('[data-testid="planning-shifts-tab-panel-templates"] select').at(0);
-    expect(templateSelect?.html()).toContain("day (legacy)");
-    expect((templateSelect?.element as HTMLSelectElement).value).toBe("day");
+    expect(wrapper.find('[data-testid="planning-shifts-template-modal"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("New shift template");
+    expect(wrapper.find('[data-testid="planning-shifts-template-modal-save"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-shifts-template-modal-cancel"]').exists()).toBe(true);
   });
 
-  it("loads full template detail instead of using the list row only", async () => {
-    const wrapper = mount(PlanningShiftsAdminView);
+  it("opens the template modal in edit mode from a template row and keeps legacy shift type values visible", async () => {
+    const wrapper = mountView();
     await flushPromises();
 
     await wrapper.get(".planning-orders-row").trigger("click");
     await flushPromises();
 
     expect(getShiftTemplateMock).toHaveBeenCalledWith("tenant-1", "template-1", "token-1");
-    expect((wrapper.get('[data-testid="planning-shifts-tab-panel-templates"] textarea').element as HTMLTextAreaElement).value).toBe("Template detail note");
+    expect(wrapper.find('[data-testid="planning-shifts-template-modal"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("Edit shift template");
+    expect((wrapper.get('[data-testid="planning-shifts-template-modal"] textarea').element as HTMLTextAreaElement).value).toBe("Template detail note");
     expect(
       wrapper
-        .findAll('[data-testid="planning-shifts-tab-panel-templates"] input')
+        .findAll('[data-testid="planning-shifts-template-modal"] input')
         .some((entry) => (entry.element as HTMLInputElement).value === "Berlin Mitte"),
     ).toBe(true);
+    const templateSelect = wrapper.findAll('[data-testid="planning-shifts-template-modal"] select').at(0);
+    expect(templateSelect?.html()).toContain("day (legacy)");
+    expect((templateSelect?.element as HTMLSelectElement).value).toBe("day");
+  });
+
+  it("closes the template modal on cancel", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-shifts-create-template"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-template-modal-cancel"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="planning-shifts-template-modal"]').exists()).toBe(false);
+  });
+
+  it("closes the template modal after a successful save", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-shifts-create-template"]').trigger("click");
+    await flushPromises();
+
+    const modalInputs = wrapper.findAll('[data-testid="planning-shifts-template-modal"] input');
+    await modalInputs.at(0)?.setValue("TPL-NEW");
+    await modalInputs.at(1)?.setValue("New template");
+    await modalInputs.at(2)?.setValue("08:00");
+    await modalInputs.at(3)?.setValue("16:00");
+    await wrapper.findAll('[data-testid="planning-shifts-template-modal"] select').at(0)?.setValue("site_day");
+    await wrapper.get('[data-testid="planning-shifts-template-modal"]').trigger("submit");
+    await flushPromises();
+
+    expect(createShiftTemplateMock).toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="planning-shifts-template-modal"]').exists()).toBe(false);
   });
 
   it("lists existing series exceptions and loads them back into the editor", async () => {
-    const wrapper = mount(PlanningShiftsAdminView);
+    const wrapper = mountView();
     await flushPromises();
 
     await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
@@ -492,7 +590,7 @@ describe("PlanningShiftsAdminView", () => {
       version_no: 1,
     });
 
-    const wrapper = mount(PlanningShiftsAdminView);
+    const wrapper = mountView();
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
     await flushPromises();
@@ -517,7 +615,7 @@ describe("PlanningShiftsAdminView", () => {
   it("shows a clear error and avoids the API call when series save runs without a selected shift plan", async () => {
     listShiftPlansMock.mockResolvedValueOnce([]);
 
-    const wrapper = mount(PlanningShiftsAdminView);
+    const wrapper = mountView();
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] form').trigger("submit");
@@ -533,7 +631,7 @@ describe("PlanningShiftsAdminView", () => {
   });
 
   it("uses the selected shift plan id for a valid series creation request", async () => {
-    const wrapper = mount(PlanningShiftsAdminView);
+    const wrapper = mountView();
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     await flushPromises();
@@ -562,7 +660,7 @@ describe("PlanningShiftsAdminView", () => {
   });
 
   it("shows release diagnostics for the selected shift", async () => {
-    const wrapper = mount(PlanningShiftsAdminView);
+    const wrapper = mountView();
     await flushPromises();
 
     await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
@@ -580,12 +678,32 @@ describe("PlanningShiftsAdminView", () => {
   });
 
   it("shows the active shift plan selector in the shifts tab too", async () => {
-    const wrapper = mount(PlanningShiftsAdminView);
+    const wrapper = mountView();
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-tab-shifts"]').trigger("click");
     await flushPromises();
 
     expect(wrapper.find('[data-testid="planning-shifts-shifts-plan-select"]').exists()).toBe(true);
     expect((wrapper.get('[data-testid="planning-shifts-shifts-plan-select"]').element as HTMLSelectElement).value).toBe("plan-1");
+  });
+
+  it("recovers the session and refreshes the active tab when the page becomes visible again", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await flushPromises();
+    listShiftSeriesMock.mockClear();
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+
+    document.dispatchEvent(new Event("visibilitychange"));
+    await flushPromises();
+
+    expect(ensureSessionReadyMock).toHaveBeenCalled();
+    expect(listShiftSeriesMock).toHaveBeenCalledWith("tenant-1", "plan-1", "token-1");
+    wrapper.unmount();
   });
 });

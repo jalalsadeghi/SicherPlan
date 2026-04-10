@@ -8,6 +8,7 @@ import {
   getSubcontractorPortalContext,
   login,
   logout,
+  refreshSession,
   type AuthenticatedUser,
   type CustomerPortalContextRead,
   type LoginPayload,
@@ -184,6 +185,16 @@ function resolveTenantScopeIdForRole(
   return sessionUser?.tenant_id ?? "";
 }
 
+function syncPrimaryTokens(accessToken: string, refreshToken: string) {
+  try {
+    const accessStore = useAccessStore();
+    accessStore.setAccessToken(accessToken || null);
+    accessStore.setRefreshToken(refreshToken || null);
+  } catch {
+    // Ignore primary-store sync when it is not available in tests or isolated legacy entry points.
+  }
+}
+
 export const useAuthStore = defineStore("sicherplan-legacy-auth", {
   state: () => ({
     activeRole: readStoredRole() as AppRole,
@@ -294,10 +305,20 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       persistString(SESSION_ID_STORAGE_KEY, this.sessionId);
       persistJson(SESSION_USER_STORAGE_KEY, this.sessionUser);
       persistString(TENANT_SCOPE_STORAGE_KEY, this.tenantScopeId);
+      syncPrimaryTokens(this.accessToken, this.refreshToken);
 
       if (typeof window !== "undefined") {
         window.localStorage.setItem(ROLE_STORAGE_KEY, this.activeRole);
       }
+    },
+    updateSessionTokens(payload: { access_token: string; refresh_token: string; session_id: string }) {
+      this.accessToken = payload.access_token;
+      this.refreshToken = payload.refresh_token;
+      this.sessionId = payload.session_id;
+      persistString(ACCESS_TOKEN_STORAGE_KEY, this.accessToken);
+      persistString(REFRESH_TOKEN_STORAGE_KEY, this.refreshToken);
+      persistString(SESSION_ID_STORAGE_KEY, this.sessionId);
+      syncPrimaryTokens(this.accessToken, this.refreshToken);
     },
     clearPortalCustomerContext() {
       this.portalCustomerContext = null;
@@ -320,6 +341,49 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       persistString(SESSION_ID_STORAGE_KEY, "");
       persistString(TENANT_SCOPE_STORAGE_KEY, "");
       persistJson(SESSION_USER_STORAGE_KEY, null);
+      syncPrimaryTokens("", "");
+    },
+    async refreshSessionTokens() {
+      this.syncFromPrimarySession();
+
+      const refreshTokenValue = this.refreshToken.trim();
+      if (!refreshTokenValue) {
+        this.clearSession();
+        throw new AuthApiError(401, {
+          code: "iam.auth.invalid_refresh_token",
+          message_key: "errors.iam.auth.invalid_refresh_token",
+          request_id: "",
+          details: {},
+        });
+      }
+
+      try {
+        const response = await refreshSession(refreshTokenValue);
+        this.updateSessionTokens(response.session);
+        return response.session.access_token;
+      } catch (error) {
+        this.clearSession();
+        throw error;
+      }
+    },
+    async ensureSessionReady() {
+      this.syncFromPrimarySession();
+
+      if (!this.effectiveAccessToken && this.refreshToken) {
+        await this.refreshSessionTokens();
+      }
+
+      if (!this.effectiveAccessToken) {
+        this.clearSession();
+        return null;
+      }
+
+      if (this.sessionUser) {
+        return this.sessionUser;
+      }
+
+      await this.loadCurrentSession();
+      return this.sessionUser;
     },
     async loginCustomerPortal(payload: LoginPayload) {
       const response = await login(payload);
@@ -330,8 +394,11 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       this.syncFromPrimarySession();
 
       if (!this.effectiveAccessToken) {
-        this.clearSession();
-        return null;
+        if (!this.refreshToken) {
+          this.clearSession();
+          return null;
+        }
+        await this.refreshSessionTokens();
       }
 
       try {
@@ -353,10 +420,34 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
         }
         return response;
       } catch (error) {
-        if (error instanceof AuthApiError && error.statusCode === 401) {
-          this.clearSession();
+        const canRetryWithRefresh =
+          error instanceof AuthApiError
+          && error.statusCode === 401
+          && Boolean(this.refreshToken);
+        if (!canRetryWithRefresh) {
+          if (error instanceof AuthApiError && error.statusCode === 401) {
+            this.clearSession();
+          }
+          throw error;
         }
-        throw error;
+        await this.refreshSessionTokens();
+        const response = await getCurrentSession(this.effectiveAccessToken);
+        this.accessToken = this.effectiveAccessToken;
+        this.sessionUser = response.user;
+        this.sessionId = response.session.id;
+        this.activeRole = pickSessionRole(response.user) ?? this.activeRole;
+        this.tenantScopeId = resolveTenantScopeIdForRole(
+          this.activeRole,
+          response.user,
+          this.tenantScopeId,
+        );
+        persistJson(SESSION_USER_STORAGE_KEY, this.sessionUser);
+        persistString(SESSION_ID_STORAGE_KEY, this.sessionId);
+        persistString(TENANT_SCOPE_STORAGE_KEY, this.tenantScopeId);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(ROLE_STORAGE_KEY, this.activeRole);
+        }
+        return response;
       }
     },
     async loadCustomerPortalContext() {

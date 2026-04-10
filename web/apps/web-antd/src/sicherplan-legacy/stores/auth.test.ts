@@ -5,6 +5,13 @@ import { createPinia, setActivePinia } from 'pinia';
 
 const primaryAccessState = {
   accessToken: '',
+  refreshToken: '',
+  setAccessToken: vi.fn((token: null | string) => {
+    primaryAccessState.accessToken = token ?? '';
+  }),
+  setRefreshToken: vi.fn((token: null | string) => {
+    primaryAccessState.refreshToken = token ?? '';
+  }),
 };
 
 const primaryUserState = {
@@ -17,14 +24,21 @@ vi.mock('@vben/stores', () => ({
 }));
 
 const getCurrentSession = vi.fn();
+const refreshSession = vi.fn();
 
 vi.mock('../api/auth', () => ({
   AuthApiError: class AuthApiError extends Error {
     statusCode: number;
+    code: string;
+    messageKey: string;
+    details: Record<string, unknown>;
 
-    constructor(statusCode: number) {
+    constructor(statusCode: number, payload?: { code?: string; details?: Record<string, unknown>; message_key?: string }) {
       super(`auth:${statusCode}`);
       this.statusCode = statusCode;
+      this.code = payload?.code ?? '';
+      this.messageKey = payload?.message_key ?? '';
+      this.details = payload?.details ?? {};
     }
   },
   getCurrentSession,
@@ -32,6 +46,7 @@ vi.mock('../api/auth', () => ({
   getSubcontractorPortalContext: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
+  refreshSession,
 }));
 
 function makeSessionTokenPair(accessToken: string, refreshToken: string, sessionId: string) {
@@ -63,8 +78,12 @@ describe('legacy auth tenant scope resolution', () => {
     setActivePinia(createPinia());
     window.localStorage.clear();
     primaryAccessState.accessToken = '';
+    primaryAccessState.refreshToken = '';
+    primaryAccessState.setAccessToken.mockClear();
+    primaryAccessState.setRefreshToken.mockClear();
     primaryUserState.userInfo = null;
     getCurrentSession.mockReset();
+    refreshSession.mockReset();
   });
 
   it('uses the authenticated tenant for tenant admin even when remembered scope is stale', async () => {
@@ -241,5 +260,55 @@ describe('legacy auth tenant scope resolution', () => {
 
     expect(store.tenantScopeId).toBe('tenant-1');
     expect(store.effectiveTenantScopeId).toBe('tenant-1');
+  });
+
+  it('refreshes legacy session tokens and syncs them into the primary access store', async () => {
+    const { useAuthStore } = await import('./auth');
+    const store = useAuthStore();
+
+    store.refreshToken = 'refresh-1';
+    refreshSession.mockResolvedValue({
+      session: makeSessionTokenPair('fresh-access', 'refresh-2', 'session-2'),
+    });
+
+    const accessToken = await store.refreshSessionTokens();
+
+    expect(accessToken).toBe('fresh-access');
+    expect(store.accessToken).toBe('fresh-access');
+    expect(store.refreshToken).toBe('refresh-2');
+    expect(store.sessionId).toBe('session-2');
+    expect(primaryAccessState.setAccessToken).toHaveBeenCalledWith('fresh-access');
+    expect(primaryAccessState.setRefreshToken).toHaveBeenCalledWith('refresh-2');
+  });
+
+  it('ensureSessionReady refreshes first when only a refresh token is left', async () => {
+    const { useAuthStore } = await import('./auth');
+    const store = useAuthStore();
+
+    store.refreshToken = 'refresh-1';
+    refreshSession.mockResolvedValue({
+      session: makeSessionTokenPair('fresh-access', 'refresh-2', 'session-2'),
+    });
+    getCurrentSession.mockResolvedValue({
+      user: {
+        id: 'user-1',
+        tenant_id: 'tenant-1',
+        username: 'tenant-admin',
+        email: 'tenant-admin@example.invalid',
+        full_name: 'Tenant Admin',
+        locale: 'de',
+        timezone: 'Europe/Berlin',
+        is_platform_user: false,
+        roles: [makeRoleScope('tenant_admin', 'tenant')],
+      },
+      session: { id: 'session-2' },
+    });
+
+    const sessionUser = await store.ensureSessionReady();
+
+    expect(refreshSession).toHaveBeenCalledWith('refresh-1');
+    expect(getCurrentSession).toHaveBeenCalledWith('fresh-access');
+    expect(sessionUser?.id).toBe('user-1');
+    expect(store.sessionUser?.id).toBe('user-1');
   });
 });
