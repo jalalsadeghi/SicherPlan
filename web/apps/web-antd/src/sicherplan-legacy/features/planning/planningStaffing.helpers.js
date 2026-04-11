@@ -60,9 +60,18 @@ export function coverageTone(coverageState) {
       return "good";
     case "yellow":
       return "warn";
+    case "setup_required":
+      return "bad";
     default:
       return "bad";
   }
+}
+
+export function resolvePlanningStaffingCoverageState(coverageState, demandGroups) {
+  if (!Array.isArray(demandGroups) || demandGroups.length === 0) {
+    return "setup_required";
+  }
+  return coverageState;
 }
 
 export function validationTone(severity) {
@@ -79,10 +88,11 @@ export function validationTone(severity) {
 export function summarizeCoverage(rows) {
   return rows.reduce(
     (summary, row) => {
+      const resolvedState = resolvePlanningStaffingCoverageState(row.coverage_state, row.demand_groups);
       summary.total += 1;
-      if (row.coverage_state === "green") {
+      if (resolvedState === "green") {
         summary.green += 1;
-      } else if (row.coverage_state === "yellow") {
+      } else if (resolvedState === "yellow") {
         summary.yellow += 1;
       } else {
         summary.red += 1;

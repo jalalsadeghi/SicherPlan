@@ -1,143 +1,122 @@
 You are working in the SicherPlan repository.
 
+First read:
+1. `AGENTS.md`
+2. the relevant sprint doc under `docs/sprint/`
+3. any existing prompt/task doc under `docs/prompts/` related to planning / staffing
+
+Traceability requirement:
+- Find the correct story/task ID for this fix.
+- If no official task ID exists, state that explicitly in the final summary instead of inventing one.
+
 Task goal:
-Apply a small, focused UI polish pass to `/admin/planning-staffing` in the `PlanningStaffingCoverageView.vue` workspace.
+Fix the `/admin/planning-staffing` experience around shifts that appear in "Shift coverage" but have no demand groups, so the page behavior matches the documented P-04 Staffing Board & Coverage intent and the backend planning model.
 
-This task has two parts:
+Known observed runtime behavior:
+- A shift appears in "Shift coverage".
+- In "Shift detail", the same shift shows:
+  - `Min: 0`
+  - `Target: 0`
+  - `Assigned: 0`
+  - `Confirmed: 0`
+  - `Partner release: 0`
+  - no demand groups
+  - staffing actions fieldset disabled
+  - buttons Assign / Substitute / Remove disabled
+  - blocked-state message explaining that staffing actions require at least one demand group
+- This means the shift is visible in coverage, but cannot be staffed.
 
-PART A — Filters and scope
-1. The three filter selects should have clear placeholder behavior:
-   - Planning mode
-   - Workforce scope
-   - Confirmation state
-2. The placeholders should make it obvious that these controls are selects and that no filter is currently chosen.
+Important repo/state discrepancy to verify:
+- The current `main` branch may still contain an older `PlanningStaffingCoverageView.vue` that requires manual tenant scope and access token input.
+- The current `main` branch `planningStaffing.ts` may not yet expose demand-group/team/staffing-board command wrappers even though the backend/API supports them.
+- Verify whether the running UI is ahead of `main`, or whether `main` is the source of truth to bring up to parity.
 
-PART B — Shift coverage
-1. The `Shift coverage` panel should no longer be excessively wide.
-2. Its visual dimensions should be aligned more closely with the `Filters and scope` card, instead of stretching disproportionately across the workspace.
-3. The clickable row/button items inside `Shift coverage` currently feel vertically cramped.
-   Add proper top/bottom spacing so the list items do not look stuck together.
+Files to inspect first:
+- `AGENTS.md`
+- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
+- `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
+- `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.helpers.js`
+- `backend/app/modules/planning/router.py`
+- `backend/app/modules/planning/staffing_service.py`
+- planning schemas/types related to:
+  - `CoverageShiftItem`
+  - `StaffingBoardShiftItem`
+  - `DemandGroup*`
+  - `StaffingAssignCommand`
+  - `StaffingSubstituteCommand`
+  - `StaffingUnassignCommand`
 
-This is a narrow UI refinement task.
-Do NOT change staffing logic, filters logic, API contracts, auth/session flow, permission behavior, or page information architecture beyond what is necessary for these UI fixes.
+Business/documentation rules you must preserve:
+- P-04 is a real staffing board, not just a passive report.
+- P-04 should cover board shifts, demand groups, teams, team members, assignments, validations, overrides, staffing-board actions, and coverage views.
+- Demand groups are required staffing slots on a shift.
+- Assignments must stay tied to a concrete employee or subcontractor worker, with team remaining contextual unless the backend intentionally supports something broader.
+- Coverage is a release gate, not just a dashboard color.
+- Do not expose HR-private data.
+- Preserve tenant scope and role scope.
+- Preserve DE-first / EN-secondary i18n.
 
-Before coding:
-1. Read `AGENTS.md`.
-2. Inspect the latest implementation of:
-   - `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
-3. Check if there is an exact sprint/task reference in `docs/sprint/*.md` or `docs/prompts/*.md`.
-4. If there is no exact task for this refinement, state that explicitly in the final summary and keep the change tightly scoped.
-
-Current issues to verify:
-- The three filter selects do not communicate their placeholder / unselected state clearly enough.
-- The `Shift coverage` panel is visually too wide relative to the left filter card.
-- The coverage-result buttons/rows need more vertical breathing room.
-- The page should remain responsive after these changes.
+What to verify technically:
+1. Why shifts with zero demand groups still appear in "Shift coverage".
+2. Whether the current backend coverage logic returns `yellow` for `min_qty = 0`, `target_qty = 0`, `assigned = 0`, `released = 0`.
+3. Whether that behavior is intentional or misleading for the documented product meaning.
+4. Whether the current front-end gives the user any real path to create or manage demand groups from P-04.
+5. Whether the checked-in front-end is behind the running HTML behavior.
 
 Required implementation outcome:
+A. Do NOT enable staffing actions for shifts that have no demand groups.
+B. Do NOT silently classify no-demand-group shifts as normal actionable staffing warnings without explanation.
+C. Implement one of these clearly justified solutions:
+   - preferred: introduce an explicit UI state such as `setup_required` / `no_demand_groups`
+   - acceptable: keep the shift visible but render a clear reason badge/message and exclude it from normal staffing-action expectations
+   - acceptable only if justified: move such shifts into a separate "needs setup" bucket
+D. Add a clear user path when a shift has no demand groups:
+   - inline demand-group create/edit in P-04, OR
+   - a strong explicit CTA/link/handoff to the correct place where demand groups are maintained
+   Do not leave the user stranded with only disabled controls.
+E. If P-04 is supposed to support demand-group management according to the project docs, wire the front-end to the existing demand-group endpoints.
+F. If staffing-board assign/substitute/unassign commands are not yet wired in the checked-in front-end, add the missing typed API wrappers and connect them safely.
+G. Keep team selection contextual; assignment must still target a concrete employee or subcontractor worker unless backend semantics prove otherwise.
+H. Reconcile the checked-in page with the actual intended auth/session model:
+   - if manual tenant/token input is obsolete, remove it and use real app session context
+   - if it is still intentionally required on `main`, explain why in the final summary
 
-A. Filter select placeholders
-- For these three controls:
-  - Planning mode
-  - Workforce scope
-  - Confirmation state
-- ensure there is a clear default placeholder option/value when nothing is selected.
-- The placeholder text should be explicit and user-friendly, for example:
-  - Select planning mode
-  - Select workforce scope
-  - Select confirmation state
-- Keep DE-first / EN-secondary parity if the page uses translation keys.
-- Preserve existing filter contract behavior:
-  - unselected still maps to “no filter”
-  - selected values still map to the same backend/API values as before
-- Do not replace these native selects with an unrelated new component unless the repo already has an established pattern and the change remains very small.
+Specific behavioral expectations after the fix:
+- A shift with no demand groups should not look like a normal staffable item with ordinary yellow coverage.
+- The detail panel should clearly explain what is missing.
+- The user should be able to reach the correct demand-group creation/edit action.
+- Assign/Substitute/Remove should only become actionable when:
+  - a selected shift exists
+  - demand groups exist
+  - the relevant actor/member prerequisites are satisfied
+  - role/permission checks pass
 
-B. Shift coverage panel width
-- Reduce the excessive width of the `Shift coverage` panel.
-- Make it visually closer in dimension to the `Filters and scope` card.
-- Do this in a layout-safe way:
-  - adjust the page grid/column contract deliberately
-  - do not just hardcode an awkward width that breaks responsiveness
-- The middle panel should still be usable and readable.
-- Avoid making the workspace feel broken or forcing unnecessary wrapping in adjacent panels.
+Tests and validation:
+Add or update tests for:
+1. shift with no demand groups => setup-required / blocked state rendered clearly
+2. no-demand-group shift does not expose misleading actionable staffing controls
+3. coverage-state handling for zero-demand shifts is consistent with the chosen product rule
+4. demand-group create/edit CTA or inline action is visible and functional
+5. assign flow remains impossible without `demand_group_id`
+6. assign flow works once a valid demand group and valid actor are selected
+7. substitute/remove remain gated by valid existing assignment state
+8. session/tenant/role scoping remains correct
+9. build, lint, typecheck, and relevant tests pass
 
-C. Shift coverage row/button spacing
-- Improve vertical spacing for the searched/result rows rendered as buttons in the `Shift coverage` list.
-- Ensure the buttons/list items have clear separation from one another.
-- Ensure there is appropriate inner padding and outer gap/margin so the list no longer feels cramped.
-- Keep the current selected state styling intact unless a tiny spacing correction requires minor refinement.
-
-Implementation guidance:
-1. Inspect the main layout classes controlling:
-   - the overall staffing page grid
-   - the filter card
-   - the shift coverage panel
-   - the list/button rows inside shift coverage
-2. For select placeholders:
-   - prefer explicit empty option + placeholder copy + consistent select styling
-   - preserve current v-model behavior and existing filter serialization
-3. For width alignment:
-   - use a deliberate column sizing rule or max-width rule
-   - keep the page responsive on desktop, tablet, and narrower widths
-4. For list spacing:
-   - add clean vertical gap between coverage rows/buttons
-   - review padding inside the button so text and status badge do not feel crowded
-
-Constraints:
-- Do NOT change:
-  - filter semantics
-  - selected shift behavior
-  - staffing commands
-  - assignment logic
-  - validation/override logic
-  - auth/session/tenant scope
-- Do NOT perform a broad redesign of the entire page.
-- Keep the change set narrow and reviewable.
-
-Files to inspect and likely change:
-- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
-
-If additional files are touched, it must be only because a very small shared style/helper is necessary.
-
-Acceptance criteria:
-1. The three filter selects clearly show placeholder state when no value is selected.
-2. Users can immediately recognize them as selects.
-3. The `Shift coverage` panel no longer feels disproportionately wide.
-4. The dimensions now feel visually more balanced relative to `Filters and scope`.
-5. The coverage result rows/buttons have proper vertical spacing.
-6. The page remains responsive.
-7. No filtering or staffing behavior regressed.
-
-Validation and tests:
-- Run the relevant frontend build/typecheck/lint/tests.
-- Add or update a focused UI test only if the repo already has a suitable pattern.
-- If there is no viewport-aware test harness, document manual validation clearly.
-
-Manual validation checklist:
-1. Open `/admin/planning-staffing`.
-2. Confirm the three filter selects show clear placeholders when empty.
-3. Confirm selecting values still works and filtering still behaves as before.
-4. Confirm the `Shift coverage` panel is no longer excessively wide.
-5. Confirm the `Shift coverage` result rows/buttons have better top/bottom spacing.
-6. Confirm the selected row styling still works.
-7. Check wide desktop, medium width, and narrow width layouts.
-8. Confirm no horizontal overflow or broken panel alignment.
-
-Important self-check:
-Before finalizing, challenge your own implementation and verify that:
-- you improved placeholder clarity without changing filter semantics
-- you did not break empty-state filtering
-- you reduced the excessive width of `Shift coverage` in a responsive-safe way
-- you improved row/button spacing without disrupting selected-state behavior
-- you did not introduce unrelated refactors
-- you did not weaken the overall layout consistency of the page
+Important self-check before finishing:
+- Confirm you did not allow assignment without a demand group.
+- Confirm you did not mark no-demand-group shifts as fully covered green unless that is explicitly justified by product docs (it probably is not).
+- Confirm the user is no longer trapped by a disabled form with no next step.
+- Confirm the change matches the documented P-04 page scope.
+- Confirm you did not regress tenant scoping, role scoping, or privacy.
+- Confirm whether `main` was behind the running UI and state that explicitly.
 
 Final response format:
 1. Short implementation summary
-2. Exact files changed
-3. What UI issues you confirmed
-4. What you changed and why
-5. Build/typecheck/lint/test results
-6. Manual validation results
-7. Remaining assumptions or blockers
-8. Self-validation explaining why the page is now cleaner and more balanced without regression
+2. Exact task/story ID used (or explicit note that none existed)
+3. Exact files changed
+4. What you confirmed about the root cause
+5. What you changed and why
+6. Tests and validation results
+7. Any remaining assumptions or branch/runtime mismatch
+8. Self-validation against docs, backend model, and UI behavior

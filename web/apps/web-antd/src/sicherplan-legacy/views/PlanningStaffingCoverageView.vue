@@ -144,9 +144,10 @@
               <strong>{{ row.starts_at }} · {{ row.shift_type_code }}</strong>
               <span>{{ tp("columnOrder") }}: {{ row.order_no }}</span>
               <span>{{ tp("columnPlanning") }}: {{ row.planning_record_name }}</span>
+              <span v-if="rowCoverageState(row) === 'setup_required'" class="field-help">{{ tp("coverageSetupRequiredHint") }}</span>
             </div>
-            <span class="planning-staffing-state" :data-tone="coverageTone(row.coverage_state)">
-              {{ tp(statusKey(row.coverage_state)) }}
+            <span class="planning-staffing-state" :data-tone="coverageTone(rowCoverageState(row))">
+              {{ tp(statusKey(rowCoverageState(row))) }}
             </span>
           </button>
         </div>
@@ -159,8 +160,8 @@
             <p class="eyebrow">{{ tp("detailTitle") }}</p>
             <h3>{{ selectedShift ? `${selectedShift.order_no} · ${selectedShift.shift_type_code}` : tp("detailTitle") }}</h3>
           </div>
-          <span v-if="selectedShift" class="planning-staffing-state" :data-tone="coverageTone(selectedShift.coverage_state)">
-            {{ tp(statusKey(selectedShift.coverage_state)) }}
+          <span v-if="selectedShift" class="planning-staffing-state" :data-tone="coverageTone(rowCoverageState(selectedShift))">
+            {{ tp(statusKey(rowCoverageState(selectedShift))) }}
           </span>
         </div>
 
@@ -194,7 +195,102 @@
                 <span>{{ tp("columnAssigned") }} {{ group.assigned_count }} · {{ tp("columnConfirmed") }} {{ group.confirmed_count }}</span>
               </button>
             </div>
-            <p v-else class="planning-staffing-list-empty">{{ tp("demandGroupsEmpty") }}</p>
+            <div v-else class="planning-staffing-empty">
+              <p class="planning-staffing-list-empty">{{ tp("demandGroupsEmpty") }}</p>
+              <p class="field-help">{{ tp("demandGroupsSetupRequired") }}</p>
+            </div>
+            <div
+              v-if="selectedShift && actionState.canWriteStaffing"
+              class="planning-staffing-demand-group-editor"
+              data-testid="planning-staffing-demand-group-editor"
+            >
+              <div class="planning-staffing-panel__header">
+                <div>
+                  <p class="eyebrow">{{ tp("demandGroupEditorTitle") }}</p>
+                  <h4>{{ editingDemandGroup ? tp("demandGroupEditTitle") : tp("demandGroupCreateTitle") }}</h4>
+                </div>
+                <div class="planning-staffing-panel__actions">
+                  <button
+                    v-if="selectedDemandGroupDetails"
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="planning-staffing-demand-group-edit-selected"
+                    :disabled="loading || savingDemandGroup"
+                    @click="startEditDemandGroup"
+                  >
+                    {{ tp("demandGroupEditSelectedAction") }}
+                  </button>
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="planning-staffing-demand-group-start-create"
+                    :disabled="loading || savingDemandGroup"
+                    @click="startCreateDemandGroup"
+                  >
+                    {{ tp("demandGroupCreateAction") }}
+                  </button>
+                </div>
+              </div>
+              <p v-if="showDemandGroupSetupLead" class="field-help">{{ tp("demandGroupSetupLead") }}</p>
+              <div class="planning-staffing-filter-grid">
+                <label class="field-stack">
+                  <span>{{ tp("demandGroupFunctionType") }}</span>
+                  <select v-model="demandGroupDraft.function_type_id" data-testid="planning-staffing-demand-group-function-type">
+                    <option value="">{{ tp("demandGroupFunctionTypePlaceholder") }}</option>
+                    <option v-for="option in functionTypeOptions" :key="option.id" :value="option.id">
+                      {{ option.label || option.code }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack">
+                  <span>{{ tp("demandGroupQualificationType") }}</span>
+                  <select v-model="demandGroupDraft.qualification_type_id" data-testid="planning-staffing-demand-group-qualification-type">
+                    <option value="">{{ tp("demandGroupQualificationTypePlaceholder") }}</option>
+                    <option v-for="option in qualificationTypeOptions" :key="option.id" :value="option.id">
+                      {{ option.label || option.code }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack">
+                  <span>{{ tp("demandGroupMinQty") }}</span>
+                  <input v-model.number="demandGroupDraft.min_qty" type="number" min="0" step="1" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ tp("demandGroupTargetQty") }}</span>
+                  <input v-model.number="demandGroupDraft.target_qty" type="number" min="0" step="1" />
+                </label>
+                <div class="planning-staffing-confirm-row field-stack--wide">
+                  <label class="planning-staffing-checkbox-row">
+                    <input v-model="demandGroupDraft.mandatory_flag" type="checkbox" />
+                    <span>{{ tp("demandGroupMandatoryFlag") }}</span>
+                  </label>
+                  <p class="field-help">{{ tp("demandGroupMandatoryHint") }}</p>
+                </div>
+                <label class="field-stack field-stack--wide">
+                  <span>{{ tp("demandGroupRemark") }}</span>
+                  <textarea v-model="demandGroupDraft.remark" rows="2" />
+                </label>
+              </div>
+              <div class="cta-row">
+                <button
+                  class="cta-button"
+                  type="button"
+                  data-testid="planning-staffing-demand-group-save"
+                  :disabled="!canSubmitDemandGroup || savingDemandGroup"
+                  @click="submitDemandGroup"
+                >
+                  {{ editingDemandGroup ? tp("demandGroupUpdateAction") : tp("demandGroupSaveAction") }}
+                </button>
+                <button
+                  class="cta-button cta-secondary"
+                  type="button"
+                  :disabled="savingDemandGroup"
+                  @click="resetDemandGroupDraft"
+                >
+                  {{ tp("demandGroupResetAction") }}
+                </button>
+              </div>
+            </div>
           </section>
 
           <section class="module-card planning-staffing-subpanel">
@@ -205,59 +301,65 @@
               </div>
               <span class="field-help">{{ tp("staffingActionsHint") }}</span>
             </div>
-            <div class="planning-staffing-filter-grid">
-              <label class="field-stack">
-                <span>{{ tp("fieldsDemandGroup") }}</span>
-                <select v-model="selectedDemandGroupId">
-                  <option value="">{{ tp("demandGroupPlaceholder") }}</option>
-                  <option v-for="group in selectedBoardShift?.demand_groups ?? []" :key="group.id" :value="group.id">
-                    {{ formatDemandGroup(group) }}
-                  </option>
-                </select>
-              </label>
-              <label class="field-stack">
-                <span>{{ tp("fieldsActorKind") }}</span>
-                <select v-model="staffingDraft.actor_kind">
-                  <option value="team">{{ tp("actorKindTeam") }}</option>
-                  <option value="employee">{{ tp("actorKindEmployee") }}</option>
-                  <option value="subcontractor_worker">{{ tp("actorKindSubcontractorWorker") }}</option>
-                </select>
-              </label>
-              <label class="field-stack">
-                <span>{{ tp("fieldsTeam") }}</span>
-                <select v-model="staffingDraft.team_id" data-testid="planning-staffing-team-select">
-                  <option value="">{{ tp("teamPlaceholder") }}</option>
-                  <option v-for="team in shiftTeams" :key="team.id" :value="team.id">
-                    {{ team.name }}
-                  </option>
-                </select>
-              </label>
-              <label v-if="staffingDraft.actor_kind !== 'team'" class="field-stack">
-                <span>{{ staffingDraft.actor_kind === 'employee' ? tp("fieldsEmployee") : tp("fieldsSubcontractorWorker") }}</span>
-                <select v-model="staffingDraft.member_ref">
-                  <option value="">{{ tp("memberPlaceholder") }}</option>
-                  <option v-for="member in selectableTeamMembers" :key="member.id" :value="member.id">
-                    {{ formatMember(member) }}
-                  </option>
-                </select>
-              </label>
-              <label class="field-stack">
-                <span>{{ tp("fieldsAssignmentSource") }}</span>
-                <select v-model="staffingDraft.assignment_source_code">
-                  <option value="dispatcher">dispatcher</option>
-                  <option value="manual">manual</option>
-                  <option value="subcontractor_release">subcontractor_release</option>
-                </select>
-              </label>
-              <label class="field-stack">
-                <span>{{ tp("fieldsConfirmNow") }}</span>
-                <input v-model="staffingDraft.confirm_now" type="checkbox" />
-              </label>
-              <label class="field-stack field-stack--wide">
-                <span>{{ tp("fieldsRemarks") }}</span>
-                <textarea v-model="staffingDraft.remarks" rows="2" />
-              </label>
-            </div>
+            <p v-if="!hasSelectedDemandGroups" class="planning-staffing-list-empty">{{ tp("staffingActionsDemandGroupRequired") }}</p>
+            <fieldset class="planning-staffing-fieldset" :disabled="!hasSelectedDemandGroups">
+              <div class="planning-staffing-filter-grid">
+                <label class="field-stack">
+                  <span>{{ tp("fieldsDemandGroup") }}</span>
+                  <select v-model="selectedDemandGroupId">
+                    <option value="">{{ tp("demandGroupPlaceholder") }}</option>
+                    <option v-for="group in selectedBoardShift?.demand_groups ?? []" :key="group.id" :value="group.id">
+                      {{ formatDemandGroup(group) }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack">
+                  <span>{{ tp("fieldsActorKind") }}</span>
+                  <select v-model="staffingDraft.actor_kind" data-testid="planning-staffing-actor-kind-select">
+                    <option value="employee">{{ tp("actorKindEmployee") }}</option>
+                    <option value="subcontractor_worker">{{ tp("actorKindSubcontractorWorker") }}</option>
+                  </select>
+                </label>
+                <label class="field-stack">
+                  <span>{{ tp("fieldsTeam") }}</span>
+                  <select v-model="staffingDraft.team_id" data-testid="planning-staffing-team-select">
+                    <option value="">{{ tp("teamContextPlaceholder") }}</option>
+                    <option v-for="team in shiftTeams" :key="team.id" :value="team.id">
+                      {{ team.name }}
+                    </option>
+                  </select>
+                  <p class="field-help">{{ tp("fieldsTeamContextHint") }}</p>
+                </label>
+                <label class="field-stack">
+                  <span>{{ staffingDraft.actor_kind === 'employee' ? tp("fieldsEmployee") : tp("fieldsSubcontractorWorker") }}</span>
+                  <select v-model="staffingDraft.member_ref" data-testid="planning-staffing-member-select">
+                    <option value="">{{ tp("memberPlaceholder") }}</option>
+                    <option v-for="member in selectableTeamMembers" :key="member.id" :value="member.id">
+                      {{ formatMember(member) }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack">
+                  <span>{{ tp("fieldsAssignmentSource") }}</span>
+                  <select v-model="staffingDraft.assignment_source_code">
+                    <option value="dispatcher">dispatcher</option>
+                    <option value="manual">manual</option>
+                    <option value="subcontractor_release">subcontractor_release</option>
+                  </select>
+                </label>
+                <label class="field-stack field-stack--wide">
+                  <span>{{ tp("fieldsRemarks") }}</span>
+                  <textarea v-model="staffingDraft.remarks" rows="2" />
+                </label>
+                <div v-if="showImmediateConfirmationControl" class="planning-staffing-confirm-row field-stack--wide">
+                  <label class="planning-staffing-checkbox-row">
+                    <input v-model="staffingDraft.confirm_now" type="checkbox" data-testid="planning-staffing-confirm-now" />
+                    <span>{{ tp("fieldsConfirmAtCreation") }}</span>
+                  </label>
+                  <p class="field-help">{{ tp("fieldsConfirmAtCreationHint") }}</p>
+                </div>
+              </div>
+            </fieldset>
             <div class="cta-row">
               <button
                 class="cta-button"
@@ -511,10 +613,18 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { Select } from "ant-design-vue";
 
 import { useAuthStore as usePrimaryAuthStore } from "#/store";
+import {
+  listFunctionTypes,
+  listQualificationTypes,
+  type FunctionTypeRead,
+  type QualificationTypeRead,
+} from "@/api/employeeAdmin";
 import { listPlanningRecords, type PlanningRecordListItem } from "@/api/planningOrders";
 import {
   assignStaffing,
+  createDemandGroup,
   createAssignmentValidationOverride,
+  listDemandGroups,
   generateShiftOutput,
   getAssignmentValidations,
   getShiftReleaseValidations,
@@ -529,9 +639,11 @@ import {
   queueShiftDispatchMessage,
   substituteStaffing,
   unassignStaffing,
+  updateDemandGroup,
   PlanningStaffingApiError,
   type AssignmentValidationRead,
   type CoverageShiftItem,
+  type DemandGroupRead,
   type PlanningDispatchPreviewRead,
   type PlanningOutputDocumentRead,
   type ShiftReleaseValidationRead,
@@ -554,6 +666,7 @@ import {
   derivePlanningStaffingActionState,
   mapPlanningStaffingApiMessage,
   normalizePlanningStaffingLookupDate,
+  resolvePlanningStaffingCoverageState,
   resolveSelectedDemandGroupId,
   summarizeCoverage,
   summarizeValidations,
@@ -584,6 +697,9 @@ const accessToken = computed(() => authStore.effectiveAccessToken || authStore.a
 
 const coverageRows = ref<CoverageShiftItem[]>([]);
 const boardRows = ref<StaffingBoardShiftItem[]>([]);
+const demandGroupRows = ref<DemandGroupRead[]>([]);
+const functionTypeOptions = ref<FunctionTypeRead[]>([]);
+const qualificationTypeOptions = ref<QualificationTypeRead[]>([]);
 const shiftTeams = ref<TeamRead[]>([]);
 const teamMembers = ref<TeamMemberRead[]>([]);
 const subcontractorReleases = ref<SubcontractorReleaseRead[]>([]);
@@ -601,6 +717,7 @@ const overrideRuleCode = ref("");
 const overrideReason = ref("");
 const loading = ref(false);
 const savingOverride = ref(false);
+const savingDemandGroup = ref(false);
 const planningRecordOptions = ref<PlanningRecordListItem[]>([]);
 const planningRecordLookupLoading = ref(false);
 const planningRecordLookupError = ref("");
@@ -615,12 +732,23 @@ const filters = reactive({
   confirmation_state: "",
 });
 const staffingDraft = reactive({
-  actor_kind: "team",
+  actor_kind: "employee",
   team_id: "",
   member_ref: "",
   assignment_source_code: "dispatcher",
   confirm_now: false,
   remarks: "",
+});
+const demandGroupDraft = reactive({
+  id: "",
+  function_type_id: "",
+  qualification_type_id: "",
+  min_qty: 1,
+  target_qty: 1,
+  mandatory_flag: true,
+  sort_order: 100,
+  remark: "",
+  version_no: null as null | number,
 });
 
 function tp(key: keyof typeof planningStaffingMessages.de) {
@@ -631,6 +759,9 @@ const selectedShift = computed(() => coverageRows.value.find((row) => row.shift_
 const selectedBoardShift = computed(() => boardRows.value.find((row) => row.id === selectedShiftId.value) ?? null);
 const selectedAssignment = computed<StaffingBoardAssignmentItem | null>(
   () => selectedBoardShift.value?.assignments.find((row) => row.id === selectedAssignmentId.value) ?? null,
+);
+const selectedDemandGroupDetails = computed<DemandGroupRead | null>(
+  () => demandGroupRows.value.find((row) => row.id === selectedDemandGroupId.value) ?? null,
 );
 const selectedDemandGroup = computed<StaffingBoardDemandGroupItem | null>(
   () => selectedBoardShift.value?.demand_groups.find((row) => row.id === selectedDemandGroupId.value) ?? null,
@@ -653,14 +784,26 @@ const selectedPlanningRecordOptionLabel = computed(
 );
 const selectableTeamMembers = computed(() => buildStaffingMemberOptions(teamMembers.value, staffingDraft.team_id));
 const selectedMember = computed(() => selectableTeamMembers.value.find((member) => member.id === staffingDraft.member_ref) ?? null);
-const canSubmitAssign = computed(() => {
-  if (!actionState.value.canAssign || !selectedShiftId.value || !selectedDemandGroupId.value) {
+const hasSelectedDemandGroups = computed(() => Boolean(selectedBoardShift.value?.demand_groups?.length));
+const editingDemandGroup = computed(() => Boolean(demandGroupDraft.id));
+const showDemandGroupSetupLead = computed(() => Boolean(selectedShiftId.value && !hasSelectedDemandGroups.value));
+const showImmediateConfirmationControl = computed(() => actionState.value.canAssign && !selectedAssignment.value && hasSelectedDemandGroups.value);
+const canSubmitDemandGroup = computed(() => {
+  if (!actionState.value.canWriteStaffing || !selectedShiftId.value || !demandGroupDraft.function_type_id) {
     return false;
   }
-  if (staffingDraft.actor_kind === "team") {
-    return Boolean(staffingDraft.team_id);
+  const minQty = Number(demandGroupDraft.min_qty);
+  const targetQty = Number(demandGroupDraft.target_qty);
+  if (!Number.isInteger(minQty) || !Number.isInteger(targetQty) || minQty < 0 || targetQty < minQty) {
+    return false;
   }
-  return Boolean(staffingDraft.team_id && staffingDraft.member_ref && selectedMember.value);
+  return true;
+});
+const canSubmitAssign = computed(() => {
+  if (!actionState.value.canAssign || !selectedShiftId.value || !selectedDemandGroupId.value || !hasSelectedDemandGroups.value) {
+    return false;
+  }
+  return Boolean(staffingDraft.member_ref && selectedMember.value);
 });
 const canSubmitSubstitute = computed(() => canSubmitAssign.value && actionState.value.canSubstitute && !!selectedAssignment.value);
 
@@ -677,6 +820,9 @@ function setFeedback(tone: string, title: string, message: string) {
 }
 
 function statusKey(state: string) {
+  if (state === "setup_required") {
+    return "statusSetupRequired";
+  }
   if (state === "green") {
     return "statusGreen";
   }
@@ -695,6 +841,13 @@ function queryFilters() {
   return { ...filters };
 }
 
+function rowCoverageState(row: CoverageShiftItem | null) {
+  if (!row) {
+    return "red";
+  }
+  return resolvePlanningStaffingCoverageState(row.coverage_state, row.demand_groups);
+}
+
 const planningRecordLookupCache = new Map<string, PlanningRecordListItem[]>();
 let planningRecordLookupRequestId = 0;
 let planningRecordLookupTimer: ReturnType<typeof setTimeout> | null = null;
@@ -707,12 +860,43 @@ function staffingFilters() {
 }
 
 function resetStaffingDraft() {
-  staffingDraft.actor_kind = "team";
+  staffingDraft.actor_kind = "employee";
   staffingDraft.team_id = "";
   staffingDraft.member_ref = "";
   staffingDraft.assignment_source_code = "dispatcher";
   staffingDraft.confirm_now = false;
   staffingDraft.remarks = "";
+}
+
+function resetDemandGroupDraft() {
+  demandGroupDraft.id = "";
+  demandGroupDraft.function_type_id = "";
+  demandGroupDraft.qualification_type_id = "";
+  demandGroupDraft.min_qty = 1;
+  demandGroupDraft.target_qty = 1;
+  demandGroupDraft.mandatory_flag = true;
+  demandGroupDraft.sort_order = 100;
+  demandGroupDraft.remark = "";
+  demandGroupDraft.version_no = null;
+}
+
+function startCreateDemandGroup() {
+  resetDemandGroupDraft();
+}
+
+function startEditDemandGroup() {
+  if (!selectedDemandGroupDetails.value) {
+    return;
+  }
+  demandGroupDraft.id = selectedDemandGroupDetails.value.id;
+  demandGroupDraft.function_type_id = selectedDemandGroupDetails.value.function_type_id || "";
+  demandGroupDraft.qualification_type_id = selectedDemandGroupDetails.value.qualification_type_id || "";
+  demandGroupDraft.min_qty = selectedDemandGroupDetails.value.min_qty;
+  demandGroupDraft.target_qty = selectedDemandGroupDetails.value.target_qty;
+  demandGroupDraft.mandatory_flag = selectedDemandGroupDetails.value.mandatory_flag;
+  demandGroupDraft.sort_order = selectedDemandGroupDetails.value.sort_order;
+  demandGroupDraft.remark = selectedDemandGroupDetails.value.remark || "";
+  demandGroupDraft.version_no = selectedDemandGroupDetails.value.version_no;
 }
 
 function formatDemandGroup(group: StaffingBoardDemandGroupItem | null) {
@@ -853,16 +1037,19 @@ function dispatchAudienceCodes() {
 
 async function refreshSupportingData() {
   if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
+    demandGroupRows.value = [];
     shiftTeams.value = [];
     teamMembers.value = [];
     subcontractorReleases.value = [];
     return;
   }
-  const [teams, members, releases] = await Promise.all([
+  const [demandGroups, teams, members, releases] = await Promise.all([
+    listDemandGroups(tenantScopeId.value, accessToken.value, staffingFilters()),
     listTeams(tenantScopeId.value, accessToken.value, staffingFilters()),
     listTeamMembers(tenantScopeId.value, accessToken.value, staffingFilters()),
     listSubcontractorReleases(tenantScopeId.value, accessToken.value, staffingFilters()),
   ]);
+  demandGroupRows.value = demandGroups;
   shiftTeams.value = teams;
   teamMembers.value = members;
   subcontractorReleases.value = releases;
@@ -870,6 +1057,20 @@ async function refreshSupportingData() {
     staffingDraft.team_id = "";
     staffingDraft.member_ref = "";
   }
+}
+
+async function loadDemandGroupCatalogOptions() {
+  if (!tenantScopeId.value || !accessToken.value) {
+    functionTypeOptions.value = [];
+    qualificationTypeOptions.value = [];
+    return;
+  }
+  const [functionTypes, qualificationTypes] = await Promise.all([
+    listFunctionTypes(tenantScopeId.value, accessToken.value),
+    listQualificationTypes(tenantScopeId.value, accessToken.value),
+  ]);
+  functionTypeOptions.value = functionTypes.filter((row) => row.status === "active" && row.archived_at == null);
+  qualificationTypeOptions.value = qualificationTypes.filter((row) => row.status === "active" && row.archived_at == null);
 }
 
 async function refreshAll() {
@@ -948,6 +1149,46 @@ async function loadSelectedAssignmentDetails() {
   assignmentOverrides.value = overrides;
   if (overrideRuleCode.value && !validations.issues.some((issue) => issue.rule_code === overrideRuleCode.value && issue.override_allowed)) {
     cancelOverride();
+  }
+}
+
+async function submitDemandGroup() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value || !canSubmitDemandGroup.value) {
+    return;
+  }
+  clearFeedback();
+  savingDemandGroup.value = true;
+  try {
+    const payload = {
+      tenant_id: tenantScopeId.value,
+      shift_id: selectedShiftId.value,
+      function_type_id: demandGroupDraft.function_type_id,
+      qualification_type_id: demandGroupDraft.qualification_type_id || null,
+      min_qty: Number(demandGroupDraft.min_qty),
+      target_qty: Number(demandGroupDraft.target_qty),
+      mandatory_flag: demandGroupDraft.mandatory_flag,
+      sort_order: demandGroupDraft.sort_order,
+      remark: demandGroupDraft.remark.trim() || null,
+    };
+    const result = demandGroupDraft.id
+      ? await updateDemandGroup(tenantScopeId.value, accessToken.value, demandGroupDraft.id, {
+          function_type_id: payload.function_type_id,
+          qualification_type_id: payload.qualification_type_id,
+          min_qty: payload.min_qty,
+          target_qty: payload.target_qty,
+          mandatory_flag: payload.mandatory_flag,
+          sort_order: payload.sort_order,
+          remark: payload.remark,
+          version_no: demandGroupDraft.version_no,
+        })
+      : await createDemandGroup(tenantScopeId.value, accessToken.value, payload);
+    selectedDemandGroupId.value = result.id;
+    resetDemandGroupDraft();
+    await refreshAll();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    savingDemandGroup.value = false;
   }
 }
 
@@ -1159,8 +1400,20 @@ watch(
   selectedBoardShift,
   (shift) => {
     selectedDemandGroupId.value = resolveSelectedDemandGroupId(shift, selectedDemandGroupId.value);
+    if (!shift?.demand_groups?.length) {
+      resetDemandGroupDraft();
+    }
   },
   { immediate: true },
+);
+
+watch(
+  selectedDemandGroupDetails,
+  (group) => {
+    if (group && demandGroupDraft.id === group.id) {
+      startEditDemandGroup();
+    }
+  },
 );
 
 watch(
@@ -1168,6 +1421,15 @@ watch(
   () => {
     if (!selectableTeamMembers.value.some((member) => member.id === staffingDraft.member_ref)) {
       staffingDraft.member_ref = "";
+    }
+  },
+);
+
+watch(
+  selectedAssignmentId,
+  () => {
+    if (selectedAssignment.value) {
+      staffingDraft.confirm_now = false;
     }
   },
 );
@@ -1195,8 +1457,11 @@ watch(
     if (!nextTenantScopeId || !nextAccessToken) {
       planningRecordOptions.value = [];
       planningRecordLookupError.value = "";
+      functionTypeOptions.value = [];
+      qualificationTypeOptions.value = [];
       return;
     }
+    void loadDemandGroupCatalogOptions();
     schedulePlanningRecordLookup();
   },
 );
@@ -1209,6 +1474,7 @@ onMounted(async () => {
   }
   document.addEventListener("visibilitychange", handleVisibilityChange);
   window.addEventListener("focus", handleWindowFocus);
+  await loadDemandGroupCatalogOptions();
   await refreshAll();
 });
 
@@ -1230,6 +1496,7 @@ onBeforeUnmount(() => {
 .planning-staffing-metrics,
 .planning-staffing-issues,
 .planning-staffing-demand-groups,
+.planning-staffing-demand-group-editor,
 .planning-staffing-support-grid {
   display: grid;
   gap: 1rem;
@@ -1422,6 +1689,34 @@ onBeforeUnmount(() => {
 .planning-staffing-subpanel textarea {
   min-height: 6rem;
   resize: vertical;
+}
+
+.planning-staffing-fieldset {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.planning-staffing-confirm-row {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.planning-staffing-checkbox-row {
+  align-items: center;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 0.65rem;
+  min-height: 2.85rem;
+  width: fit-content;
+}
+
+.planning-staffing-checkbox-row > span {
+  color: rgb(15, 23, 42);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .planning-staffing-filter-grid input[type="checkbox"],

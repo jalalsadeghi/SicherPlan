@@ -13,6 +13,7 @@ import {
   mapPlanningStaffingApiMessage,
   normalizePlanningStaffingLookupDate,
   releaseTone,
+  resolvePlanningStaffingCoverageState,
   resolveSelectedDemandGroupId,
   summarizeCoverage,
   summarizeValidations,
@@ -57,6 +58,7 @@ test("coverage and validation tones stay derived from normalized states", () => 
   assert.equal(coverageTone("green"), "good");
   assert.equal(coverageTone("yellow"), "warn");
   assert.equal(coverageTone("red"), "bad");
+  assert.equal(coverageTone("setup_required"), "bad");
   assert.equal(validationTone("block"), "bad");
   assert.equal(validationTone("warn"), "warn");
   assert.equal(validationTone("info"), "neutral");
@@ -67,7 +69,11 @@ test("coverage and validation tones stay derived from normalized states", () => 
 
 test("coverage and validation summaries remain thin client helpers", () => {
   assert.deepEqual(
-    summarizeCoverage([{ coverage_state: "green" }, { coverage_state: "yellow" }, { coverage_state: "red" }]),
+    summarizeCoverage([
+      { coverage_state: "green", demand_groups: [{}] },
+      { coverage_state: "yellow", demand_groups: [{}] },
+      { coverage_state: "yellow", demand_groups: [] },
+    ]),
     { green: 1, red: 1, total: 3, yellow: 1 },
   );
   assert.deepEqual(
@@ -80,6 +86,12 @@ test("coverage and validation summaries remain thin client helpers", () => {
     }),
     { blocking: 1, warnings: 1, infos: 1, overrideable: 1 },
   );
+});
+
+test("coverage state falls back to setup_required when a shift has no demand groups", () => {
+  assert.equal(resolvePlanningStaffingCoverageState("yellow", []), "setup_required");
+  assert.equal(resolvePlanningStaffingCoverageState("green", null), "setup_required");
+  assert.equal(resolvePlanningStaffingCoverageState("yellow", [{}]), "yellow");
 });
 
 test("api message mapping keeps auth, release, and override states explicit", () => {

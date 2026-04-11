@@ -61,6 +61,49 @@ export interface StaffingBoardDemandGroupItem {
   released_partner_qty: number;
 }
 
+export interface DemandGroupRead {
+  id: string;
+  tenant_id: string;
+  shift_id: string;
+  function_type_id: string;
+  qualification_type_id: null | string;
+  min_qty: number;
+  target_qty: number;
+  mandatory_flag: boolean;
+  sort_order: number;
+  remark: null | string;
+  status: string;
+  version_no: number;
+  created_at: string;
+  updated_at: string;
+  archived_at: null | string;
+}
+
+export interface DemandGroupCreate {
+  tenant_id: string;
+  shift_id: string;
+  function_type_id: string;
+  qualification_type_id?: null | string;
+  min_qty: number;
+  target_qty: number;
+  mandatory_flag?: boolean;
+  sort_order?: number;
+  remark?: null | string;
+}
+
+export interface DemandGroupUpdate {
+  function_type_id?: null | string;
+  qualification_type_id?: null | string;
+  min_qty?: null | number;
+  target_qty?: null | number;
+  mandatory_flag?: null | boolean;
+  sort_order?: null | number;
+  remark?: null | string;
+  status?: null | string;
+  archived_at?: null | string;
+  version_no?: null | number;
+}
+
 export interface StaffingBoardShiftItem {
   id: string;
   tenant_id: string;
@@ -354,6 +397,29 @@ export function listTeams(tenantId: string, accessToken: string, filters: Record
   return request<TeamRead[]>(
     `/api/planning/tenants/${tenantId}/ops/teams${queryString(filters)}`,
     accessToken,
+  );
+}
+
+export function listDemandGroups(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
+  return request<DemandGroupRead[]>(
+    `/api/planning/tenants/${tenantId}/ops/demand-groups${queryString(filters)}`,
+    accessToken,
+  );
+}
+
+export function createDemandGroup(tenantId: string, accessToken: string, payload: DemandGroupCreate) {
+  return request<DemandGroupRead>(
+    `/api/planning/tenants/${tenantId}/ops/demand-groups`,
+    accessToken,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function updateDemandGroup(tenantId: string, accessToken: string, demandGroupId: string, payload: DemandGroupUpdate) {
+  return request<DemandGroupRead>(
+    `/api/planning/tenants/${tenantId}/ops/demand-groups/${demandGroupId}`,
+    accessToken,
+    { method: "PATCH", body: JSON.stringify(payload) },
   );
 }
 
