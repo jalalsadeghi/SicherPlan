@@ -1,122 +1,145 @@
 You are working in the SicherPlan repository.
 
-First read:
-1. `AGENTS.md`
-2. the relevant sprint doc under `docs/sprint/`
-3. any existing prompt/task doc under `docs/prompts/` related to planning / staffing
-
-Traceability requirement:
-- Find the correct story/task ID for this fix.
-- If no official task ID exists, state that explicitly in the final summary instead of inventing one.
+Before any code changes:
+1. Read `AGENTS.md`.
+2. Open the relevant sprint file under `docs/sprint/`.
+3. Check whether a planning/staffing task prompt already exists under `docs/prompts/`.
+4. Anchor this work to the correct story/task ID.
+5. Keep the change set narrow and focused on the Demand groups UX refactor inside `/admin/planning-staffing`.
 
 Task goal:
-Fix the `/admin/planning-staffing` experience around shifts that appear in "Shift coverage" but have no demand groups, so the page behavior matches the documented P-04 Staffing Board & Coverage intent and the backend planning model.
+Refactor the Demand groups area inside the "Shift detail" box on `/admin/planning-staffing` so that:
+- the demand-group list remains visible inline on the page
+- the create/edit form is moved into a dialog/modal
+- clicking `New demand group` opens the dialog in create mode
+- clicking a demand-group row in `planning-staffing-demand-groups` opens the dialog in edit mode
+- the inline button `Edit selected demand group` is removed from the page
 
-Known observed runtime behavior:
-- A shift appears in "Shift coverage".
-- In "Shift detail", the same shift shows:
-  - `Min: 0`
-  - `Target: 0`
-  - `Assigned: 0`
-  - `Confirmed: 0`
-  - `Partner release: 0`
-  - no demand groups
-  - staffing actions fieldset disabled
-  - buttons Assign / Substitute / Remove disabled
-  - blocked-state message explaining that staffing actions require at least one demand group
-- This means the shift is visible in coverage, but cannot be staffed.
+Current UX problem:
+The current Demand groups section mixes:
+- list of existing demand groups
+- create/edit form
+- duplicate edit button
+all in the same visible area, which makes the Shift detail panel feel crowded.
 
-Important repo/state discrepancy to verify:
-- The current `main` branch may still contain an older `PlanningStaffingCoverageView.vue` that requires manual tenant scope and access token input.
-- The current `main` branch `planningStaffing.ts` may not yet expose demand-group/team/staffing-board command wrappers even though the backend/API supports them.
-- Verify whether the running UI is ahead of `main`, or whether `main` is the source of truth to bring up to parity.
+Desired UX outcome:
+A cleaner Demand groups section where:
+- the page shows the list of demand groups clearly
+- create/edit actions happen in a focused modal dialog
+- edit is triggered directly by clicking a demand-group item
+- the page no longer needs the `Edit selected demand group` button
 
 Files to inspect first:
 - `AGENTS.md`
 - `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
-- `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
-- `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.helpers.js`
-- `backend/app/modules/planning/router.py`
-- `backend/app/modules/planning/staffing_service.py`
-- planning schemas/types related to:
-  - `CoverageShiftItem`
-  - `StaffingBoardShiftItem`
-  - `DemandGroup*`
-  - `StaffingAssignCommand`
-  - `StaffingSubstituteCommand`
-  - `StaffingUnassignCommand`
+- any related type/helper files used by this view
+- any existing dialog/modal pattern already used in the web app
+- any shared form/dialog components already present in the admin shell
 
-Business/documentation rules you must preserve:
-- P-04 is a real staffing board, not just a passive report.
-- P-04 should cover board shifts, demand groups, teams, team members, assignments, validations, overrides, staffing-board actions, and coverage views.
-- Demand groups are required staffing slots on a shift.
-- Assignments must stay tied to a concrete employee or subcontractor worker, with team remaining contextual unless the backend intentionally supports something broader.
-- Coverage is a release gate, not just a dashboard color.
-- Do not expose HR-private data.
-- Preserve tenant scope and role scope.
-- Preserve DE-first / EN-secondary i18n.
-
-What to verify technically:
-1. Why shifts with zero demand groups still appear in "Shift coverage".
-2. Whether the current backend coverage logic returns `yellow` for `min_qty = 0`, `target_qty = 0`, `assigned = 0`, `released = 0`.
-3. Whether that behavior is intentional or misleading for the documented product meaning.
-4. Whether the current front-end gives the user any real path to create or manage demand groups from P-04.
-5. Whether the checked-in front-end is behind the running HTML behavior.
+Important constraints:
+- This is primarily a UI/UX refactor.
+- Do not change backend contracts unless a small compatibility fix is truly required.
+- Do not change planning business rules.
+- Do not change demand-group validation logic, audit behavior, or staffing gating behavior.
+- Preserve tenant scope, role scope, and existing data flows.
+- Preserve existing `data-testid` values where practical, and update tests safely if needed.
+- Keep German as default UI language and English as secondary.
 
 Required implementation outcome:
-A. Do NOT enable staffing actions for shifts that have no demand groups.
-B. Do NOT silently classify no-demand-group shifts as normal actionable staffing warnings without explanation.
-C. Implement one of these clearly justified solutions:
-   - preferred: introduce an explicit UI state such as `setup_required` / `no_demand_groups`
-   - acceptable: keep the shift visible but render a clear reason badge/message and exclude it from normal staffing-action expectations
-   - acceptable only if justified: move such shifts into a separate "needs setup" bucket
-D. Add a clear user path when a shift has no demand groups:
-   - inline demand-group create/edit in P-04, OR
-   - a strong explicit CTA/link/handoff to the correct place where demand groups are maintained
-   Do not leave the user stranded with only disabled controls.
-E. If P-04 is supposed to support demand-group management according to the project docs, wire the front-end to the existing demand-group endpoints.
-F. If staffing-board assign/substitute/unassign commands are not yet wired in the checked-in front-end, add the missing typed API wrappers and connect them safely.
-G. Keep team selection contextual; assignment must still target a concrete employee or subcontractor worker unless backend semantics prove otherwise.
-H. Reconcile the checked-in page with the actual intended auth/session model:
-   - if manual tenant/token input is obsolete, remove it and use real app session context
-   - if it is still intentionally required on `main`, explain why in the final summary
+A. Keep the `planning-staffing-demand-groups` list visible inline in the Shift detail panel.
+B. Remove the always-visible inline demand-group editor form from the page body.
+C. Replace it with a modal/dialog form component or local modal section that supports:
+   - create mode
+   - edit mode
+D. `New demand group` opens the dialog in create mode with a clean form state.
+E. Clicking an existing demand-group row opens the dialog in edit mode with that row loaded.
+F. Remove the visible inline button `Edit selected demand group`.
+G. Preserve the ability to edit the currently selected demand group, but make row click the primary edit trigger.
+H. The dialog title should change by mode:
+   - create mode => `Create demand group`
+   - edit mode => `Edit demand group`
+I. Preserve the current fields and behavior inside the form:
+   - function type
+   - qualification
+   - minimum quantity
+   - target quantity
+   - mandatory checkbox
+   - remark
+   - save/update
+   - reset/cancel behavior as appropriate
+J. After successful save/update:
+   - refresh the demand-group list
+   - refresh shift detail / coverage state if needed
+   - keep the selected shift intact
+   - close the dialog only if that matches the current UX pattern cleanly
+K. If save fails, keep the dialog open and preserve user input where reasonable.
 
-Specific behavioral expectations after the fix:
-- A shift with no demand groups should not look like a normal staffable item with ordinary yellow coverage.
-- The detail panel should clearly explain what is missing.
-- The user should be able to reach the correct demand-group creation/edit action.
-- Assign/Substitute/Remove should only become actionable when:
-  - a selected shift exists
-  - demand groups exist
-  - the relevant actor/member prerequisites are satisfied
-  - role/permission checks pass
+Recommended UX behavior:
+- Clicking `New demand group` => open empty dialog
+- Clicking a row => select it and open edit dialog
+- Provide a clear Cancel/Close action in the dialog
+- Keep the page uncluttered and focused
+- Do not hide important empty-state guidance when there are no demand groups yet
+
+Technical guidance:
+- Prefer an existing modal/dialog pattern already used in the web admin app
+- If none fits, implement a simple local modal cleanly in this view
+- Introduce local state such as:
+  - `isDemandGroupDialogOpen`
+  - `demandGroupDialogMode` (`create` | `edit`)
+  - `editingDemandGroupId`
+- Separate dialog open/close logic cleanly from demand-group form state
+- Avoid duplicating form markup if possible
+- Keep the change maintainable and scoped
+
+Acceptance criteria:
+1. Demand-group create/edit no longer clutters the main page body.
+2. `New demand group` opens a dialog in create mode.
+3. Clicking a demand-group row opens a dialog in edit mode.
+4. `Edit selected demand group` is removed from the visible page UI.
+5. Saving/updating still works correctly.
+6. The list remains visible inline and still shows selection state.
+7. Empty-state messaging remains clear when no demand groups exist.
+8. No staffing logic is broken.
+9. The Shift detail panel is visibly cleaner than before.
 
 Tests and validation:
 Add or update tests for:
-1. shift with no demand groups => setup-required / blocked state rendered clearly
-2. no-demand-group shift does not expose misleading actionable staffing controls
-3. coverage-state handling for zero-demand shifts is consistent with the chosen product rule
-4. demand-group create/edit CTA or inline action is visible and functional
-5. assign flow remains impossible without `demand_group_id`
-6. assign flow works once a valid demand group and valid actor are selected
-7. substitute/remove remain gated by valid existing assignment state
-8. session/tenant/role scoping remains correct
-9. build, lint, typecheck, and relevant tests pass
+- clicking `New demand group` opens create dialog
+- clicking a demand-group row opens edit dialog
+- dialog title changes correctly by mode
+- existing form fields still render in the dialog
+- save in create mode still works
+- save in edit mode still works
+- list refreshes after save/update
+- inline `Edit selected demand group` button is no longer rendered
+- empty-state path still allows create flow correctly
+
+Manual validation checklist:
+- open `/admin/planning-staffing`
+- select a shift
+- verify demand-group list remains visible
+- click `New demand group` and confirm create dialog opens
+- click an existing demand-group row and confirm edit dialog opens
+- confirm save/update still works
+- confirm the Shift detail panel is less crowded
+- confirm no unrelated section layout broke
 
 Important self-check before finishing:
-- Confirm you did not allow assignment without a demand group.
-- Confirm you did not mark no-demand-group shifts as fully covered green unless that is explicitly justified by product docs (it probably is not).
-- Confirm the user is no longer trapped by a disabled form with no next step.
-- Confirm the change matches the documented P-04 page scope.
-- Confirm you did not regress tenant scoping, role scoping, or privacy.
-- Confirm whether `main` was behind the running UI and state that explicitly.
+- Verify the list stayed inline and only the form moved into a dialog
+- Verify `Edit selected demand group` is removed
+- Verify row click really opens edit mode
+- Verify no business logic changed
+- Verify no tenant/role-scope behavior regressed
+- Verify the page is meaningfully less cluttered after the change
+- Challenge your own implementation and confirm that create/edit is now easier, not harder
 
 Final response format:
 1. Short implementation summary
-2. Exact task/story ID used (or explicit note that none existed)
+2. Exact task/story ID used
 3. Exact files changed
-4. What you confirmed about the root cause
-5. What you changed and why
-6. Tests and validation results
-7. Any remaining assumptions or branch/runtime mismatch
-8. Self-validation against docs, backend model, and UI behavior
+4. What UI structure changed
+5. What was intentionally left unchanged
+6. Test results
+7. Manual validation notes
+8. Self-validation against clutter reduction and workflow preservation

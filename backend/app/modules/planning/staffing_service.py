@@ -4,8 +4,14 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
+from decimal import Decimal
+from enum import Enum
 from typing import Protocol
+from uuid import UUID
+
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.exc import NoInspectionAvailable
 
 from app.errors import ApiException
 from app.modules.iam.audit_service import AuditActor, AuditService
@@ -104,6 +110,7 @@ class StaffingService:
     ASSIGNMENT_STATUSES = frozenset({"offered", "assigned", "confirmed", "removed"})
     ASSIGNMENT_SOURCES = frozenset({"dispatcher", "subcontractor_release", "portal_allocation", "manual"})
     RELEASE_STATUSES = frozenset({"draft", "released", "revoked"})
+    _SKIP_SNAPSHOT_VALUE = object()
 
     def __init__(self, repository: StaffingRepository, *, audit_service: AuditService | None = None) -> None:
         self.repository = repository
@@ -845,16 +852,62 @@ class StaffingService:
     def _not_found(self, code: str) -> ApiException:
         return ApiException(404, f"planning.{code}.not_found", f"errors.planning.{code}.not_found")
 
-    def _snapshot(self, row) -> dict[str, object]:  # noqa: ANN001
+    @classmethod
+    def _snapshot(cls, row) -> dict[str, object]:  # noqa: ANN001
+        try:
+            mapper = sa_inspect(row).mapper
+        except NoInspectionAvailable:
+            source_items = vars(row).items()
+        else:
+            source_items = ((attribute.key, getattr(row, attribute.key)) for attribute in mapper.column_attrs)
+
         data: dict[str, object] = {}
-        for key, value in row.__dict__.items():
+        for key, value in source_items:
             if key.startswith("_"):
                 continue
-            if isinstance(value, datetime):
-                data[key] = value.isoformat()
-            else:
-                data[key] = value
+            serialized = cls._json_safe_snapshot_value(value)
+            if serialized is cls._SKIP_SNAPSHOT_VALUE:
+                continue
+            data[key] = serialized
         return data
+
+    @classmethod
+    def _json_safe_snapshot_value(cls, value: object) -> object:
+        if value is None or isinstance(value, bool | int | float | str):
+            return value
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, datetime | date | time):
+            return value.isoformat()
+        if isinstance(value, UUID):
+            return str(value)
+        if isinstance(value, Enum):
+            return cls._json_safe_snapshot_value(value.value)
+        if isinstance(value, dict):
+            result: dict[str, object] = {}
+            for key, item in value.items():
+                serialized = cls._json_safe_snapshot_value(item)
+                if serialized is cls._SKIP_SNAPSHOT_VALUE:
+                    continue
+                result[str(key)] = serialized
+            return result
+        if isinstance(value, list | tuple):
+            result: list[object] = []
+            for item in value:
+                serialized = cls._json_safe_snapshot_value(item)
+                if serialized is cls._SKIP_SNAPSHOT_VALUE:
+                    continue
+                result.append(serialized)
+            return result
+        if isinstance(value, set):
+            result: list[object] = []
+            for item in sorted(value, key=repr):
+                serialized = cls._json_safe_snapshot_value(item)
+                if serialized is cls._SKIP_SNAPSHOT_VALUE:
+                    continue
+                result.append(serialized)
+            return result
+        return cls._SKIP_SNAPSHOT_VALUE
 
     def _record_event(
         self,

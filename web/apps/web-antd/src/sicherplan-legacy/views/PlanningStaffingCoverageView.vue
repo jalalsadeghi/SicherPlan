@@ -173,53 +173,43 @@
             <span>{{ tp("columnConfirmed") }}: {{ selectedShift.confirmed_count }}</span>
             <span>{{ tp("columnReleased") }}: {{ selectedShift.released_partner_qty }}</span>
           </div>
-
-          <section class="module-card planning-staffing-subpanel">
-            <div class="planning-staffing-panel__header">
-              <div>
-                <p class="eyebrow">{{ tp("demandGroupsTitle") }}</p>
-                <h4>{{ tp("demandGroupsTitle") }}</h4>
-              </div>
-            </div>
-            <div v-if="selectedBoardShift?.demand_groups?.length" class="planning-staffing-demand-groups" data-testid="planning-staffing-demand-group-list">
-              <button
-                v-for="group in selectedBoardShift.demand_groups"
-                :key="group.id"
-                type="button"
-                class="planning-staffing-demand-group"
-                :class="{ selected: group.id === selectedDemandGroupId }"
-                @click="selectedDemandGroupId = group.id"
-              >
-                <strong>{{ formatDemandGroup(group) }}</strong>
-                <span>{{ tp("columnMin") }} {{ group.min_qty }} · {{ tp("columnTarget") }} {{ group.target_qty }}</span>
-                <span>{{ tp("columnAssigned") }} {{ group.assigned_count }} · {{ tp("columnConfirmed") }} {{ group.confirmed_count }}</span>
-              </button>
-            </div>
-            <div v-else class="planning-staffing-empty">
-              <p class="planning-staffing-list-empty">{{ tp("demandGroupsEmpty") }}</p>
-              <p class="field-help">{{ tp("demandGroupsSetupRequired") }}</p>
-            </div>
-            <div
-              v-if="selectedShift && actionState.canWriteStaffing"
-              class="planning-staffing-demand-group-editor"
-              data-testid="planning-staffing-demand-group-editor"
+          <nav
+            class="planning-staffing-tabs"
+            role="tablist"
+            :aria-label="tp('detailTabsAriaLabel')"
+            data-testid="planning-staffing-detail-tabs"
+          >
+            <button
+              v-for="tab in shiftDetailTabs"
+              :id="`planning-staffing-tab-${tab.id}`"
+              :key="tab.id"
+              type="button"
+              class="planning-staffing-tab"
+              :class="{ active: tab.id === activeShiftDetailTab }"
+              role="tab"
+              :aria-selected="tab.id === activeShiftDetailTab"
+              :aria-controls="`planning-staffing-panel-${tab.id}`"
+              @click="activeShiftDetailTab = tab.id"
             >
+              {{ tp(tab.labelKey) }}
+            </button>
+          </nav>
+
+          <section
+            v-if="activeShiftDetailTab === 'demand_staffing'"
+            class="planning-staffing-tab-panel"
+            :id="'planning-staffing-panel-demand_staffing'"
+            role="tabpanel"
+            :aria-labelledby="'planning-staffing-tab-demand_staffing'"
+            data-testid="planning-staffing-tab-panel-demand-staffing"
+          >
+            <section class="module-card planning-staffing-subpanel">
               <div class="planning-staffing-panel__header">
                 <div>
-                  <p class="eyebrow">{{ tp("demandGroupEditorTitle") }}</p>
-                  <h4>{{ editingDemandGroup ? tp("demandGroupEditTitle") : tp("demandGroupCreateTitle") }}</h4>
+                  <p class="eyebrow">{{ tp("demandGroupsTitle") }}</p>
+                  <h4>{{ tp("demandGroupsTitle") }}</h4>
                 </div>
-                <div class="planning-staffing-panel__actions">
-                  <button
-                    v-if="selectedDemandGroupDetails"
-                    class="cta-button cta-secondary"
-                    type="button"
-                    data-testid="planning-staffing-demand-group-edit-selected"
-                    :disabled="loading || savingDemandGroup"
-                    @click="startEditDemandGroup"
-                  >
-                    {{ tp("demandGroupEditSelectedAction") }}
-                  </button>
+                <div v-if="selectedShift && actionState.canWriteStaffing" class="planning-staffing-panel__actions">
                   <button
                     class="cta-button cta-secondary"
                     type="button"
@@ -231,386 +221,463 @@
                   </button>
                 </div>
               </div>
-              <p v-if="showDemandGroupSetupLead" class="field-help">{{ tp("demandGroupSetupLead") }}</p>
-              <div class="planning-staffing-filter-grid">
-                <label class="field-stack">
-                  <span>{{ tp("demandGroupFunctionType") }}</span>
-                  <select v-model="demandGroupDraft.function_type_id" data-testid="planning-staffing-demand-group-function-type">
-                    <option value="">{{ tp("demandGroupFunctionTypePlaceholder") }}</option>
-                    <option v-for="option in functionTypeOptions" :key="option.id" :value="option.id">
-                      {{ option.label || option.code }}
-                    </option>
-                  </select>
-                </label>
-                <label class="field-stack">
-                  <span>{{ tp("demandGroupQualificationType") }}</span>
-                  <select v-model="demandGroupDraft.qualification_type_id" data-testid="planning-staffing-demand-group-qualification-type">
-                    <option value="">{{ tp("demandGroupQualificationTypePlaceholder") }}</option>
-                    <option v-for="option in qualificationTypeOptions" :key="option.id" :value="option.id">
-                      {{ option.label || option.code }}
-                    </option>
-                  </select>
-                </label>
-                <label class="field-stack">
-                  <span>{{ tp("demandGroupMinQty") }}</span>
-                  <input v-model.number="demandGroupDraft.min_qty" type="number" min="0" step="1" />
-                </label>
-                <label class="field-stack">
-                  <span>{{ tp("demandGroupTargetQty") }}</span>
-                  <input v-model.number="demandGroupDraft.target_qty" type="number" min="0" step="1" />
-                </label>
-                <div class="planning-staffing-confirm-row field-stack--wide">
-                  <label class="planning-staffing-checkbox-row">
-                    <input v-model="demandGroupDraft.mandatory_flag" type="checkbox" />
-                    <span>{{ tp("demandGroupMandatoryFlag") }}</span>
-                  </label>
-                  <p class="field-help">{{ tp("demandGroupMandatoryHint") }}</p>
-                </div>
-                <label class="field-stack field-stack--wide">
-                  <span>{{ tp("demandGroupRemark") }}</span>
-                  <textarea v-model="demandGroupDraft.remark" rows="2" />
-                </label>
+              <div v-if="selectedBoardShift?.demand_groups?.length" class="planning-staffing-demand-groups" data-testid="planning-staffing-demand-group-list">
+                <button
+                  v-for="group in selectedBoardShift.demand_groups"
+                  :key="group.id"
+                  type="button"
+                  class="planning-staffing-demand-group"
+                  :class="{ selected: group.id === selectedDemandGroupId }"
+                  @click="startEditDemandGroup(group.id)"
+                >
+                  <strong>{{ formatDemandGroup(group) }}</strong>
+                  <span>{{ tp("columnMin") }} {{ group.min_qty }} · {{ tp("columnTarget") }} {{ group.target_qty }}</span>
+                  <span>{{ tp("columnAssigned") }} {{ group.assigned_count }} · {{ tp("columnConfirmed") }} {{ group.confirmed_count }}</span>
+                </button>
               </div>
+              <div v-else class="planning-staffing-empty">
+                <p class="planning-staffing-list-empty">{{ tp("demandGroupsEmpty") }}</p>
+                <p class="field-help">{{ tp("demandGroupsSetupRequired") }}</p>
+              </div>
+              <p v-if="showDemandGroupSetupLead" class="field-help">{{ tp("demandGroupSetupLead") }}</p>
+            </section>
+
+            <section class="module-card planning-staffing-subpanel">
+              <div class="planning-staffing-panel__header">
+                <div>
+                  <p class="eyebrow">{{ tp("staffingActionsTitle") }}</p>
+                  <h4>{{ tp("staffingActionsTitle") }}</h4>
+                </div>
+                <span class="field-help">{{ tp("staffingActionsHint") }}</span>
+              </div>
+              <p v-if="!hasSelectedDemandGroups" class="planning-staffing-list-empty">{{ tp("staffingActionsDemandGroupRequired") }}</p>
+              <fieldset class="planning-staffing-fieldset" :disabled="!hasSelectedDemandGroups">
+                <div class="planning-staffing-filter-grid">
+                  <label class="field-stack">
+                    <span>{{ tp("fieldsDemandGroup") }}</span>
+                    <select v-model="selectedDemandGroupId">
+                      <option value="">{{ tp("demandGroupPlaceholder") }}</option>
+                      <option v-for="group in selectedBoardShift?.demand_groups ?? []" :key="group.id" :value="group.id">
+                        {{ formatDemandGroup(group) }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ tp("fieldsActorKind") }}</span>
+                    <select v-model="staffingDraft.actor_kind" data-testid="planning-staffing-actor-kind-select">
+                      <option value="employee">{{ tp("actorKindEmployee") }}</option>
+                      <option value="subcontractor_worker">{{ tp("actorKindSubcontractorWorker") }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ tp("fieldsTeam") }}</span>
+                    <select v-model="staffingDraft.team_id" data-testid="planning-staffing-team-select">
+                      <option value="">{{ tp("teamContextPlaceholder") }}</option>
+                      <option v-for="team in shiftTeams" :key="team.id" :value="team.id">
+                        {{ team.name }}
+                      </option>
+                    </select>
+                    <p class="field-help">{{ tp("fieldsTeamContextHint") }}</p>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ staffingDraft.actor_kind === 'employee' ? tp("fieldsEmployee") : tp("fieldsSubcontractorWorker") }}</span>
+                    <select v-model="staffingDraft.member_ref" data-testid="planning-staffing-member-select">
+                      <option value="">{{ tp("memberPlaceholder") }}</option>
+                      <option v-for="member in selectableTeamMembers" :key="member.id" :value="member.id">
+                        {{ formatMember(member) }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ tp("fieldsAssignmentSource") }}</span>
+                    <select v-model="staffingDraft.assignment_source_code">
+                      <option value="dispatcher">dispatcher</option>
+                      <option value="manual">manual</option>
+                      <option value="subcontractor_release">subcontractor_release</option>
+                    </select>
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ tp("fieldsRemarks") }}</span>
+                    <textarea v-model="staffingDraft.remarks" rows="2" />
+                  </label>
+                  <div v-if="showImmediateConfirmationControl" class="planning-staffing-confirm-row field-stack--wide">
+                    <label class="planning-staffing-checkbox-row">
+                      <input v-model="staffingDraft.confirm_now" type="checkbox" data-testid="planning-staffing-confirm-now" />
+                      <span>{{ tp("fieldsConfirmAtCreation") }}</span>
+                    </label>
+                    <p class="field-help">{{ tp("fieldsConfirmAtCreationHint") }}</p>
+                  </div>
+                </div>
+              </fieldset>
               <div class="cta-row">
                 <button
                   class="cta-button"
+                  data-testid="planning-staffing-assign-action"
                   type="button"
-                  data-testid="planning-staffing-demand-group-save"
-                  :disabled="!canSubmitDemandGroup || savingDemandGroup"
-                  @click="submitDemandGroup"
+                  :disabled="!canSubmitAssign || loading"
+                  @click="submitAssign"
                 >
-                  {{ editingDemandGroup ? tp("demandGroupUpdateAction") : tp("demandGroupSaveAction") }}
+                  {{ tp("assignAction") }}
                 </button>
                 <button
                   class="cta-button cta-secondary"
+                  data-testid="planning-staffing-substitute-action"
                   type="button"
-                  :disabled="savingDemandGroup"
-                  @click="resetDemandGroupDraft"
+                  :disabled="!canSubmitSubstitute || loading"
+                  @click="submitSubstitute"
                 >
-                  {{ tp("demandGroupResetAction") }}
+                  {{ tp("substituteAction") }}
+                </button>
+                <button
+                  class="cta-button cta-secondary"
+                  data-testid="planning-staffing-unassign-action"
+                  type="button"
+                  :disabled="!selectedAssignment || !actionState.canUnassign || loading"
+                  @click="submitUnassign"
+                >
+                  {{ tp("unassignAction") }}
                 </button>
               </div>
-            </div>
+            </section>
           </section>
 
-          <section class="module-card planning-staffing-subpanel">
-            <div class="planning-staffing-panel__header">
-              <div>
-                <p class="eyebrow">{{ tp("staffingActionsTitle") }}</p>
-                <h4>{{ tp("staffingActionsTitle") }}</h4>
-              </div>
-              <span class="field-help">{{ tp("staffingActionsHint") }}</span>
-            </div>
-            <p v-if="!hasSelectedDemandGroups" class="planning-staffing-list-empty">{{ tp("staffingActionsDemandGroupRequired") }}</p>
-            <fieldset class="planning-staffing-fieldset" :disabled="!hasSelectedDemandGroups">
-              <div class="planning-staffing-filter-grid">
-                <label class="field-stack">
-                  <span>{{ tp("fieldsDemandGroup") }}</span>
-                  <select v-model="selectedDemandGroupId">
-                    <option value="">{{ tp("demandGroupPlaceholder") }}</option>
-                    <option v-for="group in selectedBoardShift?.demand_groups ?? []" :key="group.id" :value="group.id">
-                      {{ formatDemandGroup(group) }}
-                    </option>
-                  </select>
-                </label>
-                <label class="field-stack">
-                  <span>{{ tp("fieldsActorKind") }}</span>
-                  <select v-model="staffingDraft.actor_kind" data-testid="planning-staffing-actor-kind-select">
-                    <option value="employee">{{ tp("actorKindEmployee") }}</option>
-                    <option value="subcontractor_worker">{{ tp("actorKindSubcontractorWorker") }}</option>
-                  </select>
-                </label>
-                <label class="field-stack">
-                  <span>{{ tp("fieldsTeam") }}</span>
-                  <select v-model="staffingDraft.team_id" data-testid="planning-staffing-team-select">
-                    <option value="">{{ tp("teamContextPlaceholder") }}</option>
-                    <option v-for="team in shiftTeams" :key="team.id" :value="team.id">
-                      {{ team.name }}
-                    </option>
-                  </select>
-                  <p class="field-help">{{ tp("fieldsTeamContextHint") }}</p>
-                </label>
-                <label class="field-stack">
-                  <span>{{ staffingDraft.actor_kind === 'employee' ? tp("fieldsEmployee") : tp("fieldsSubcontractorWorker") }}</span>
-                  <select v-model="staffingDraft.member_ref" data-testid="planning-staffing-member-select">
-                    <option value="">{{ tp("memberPlaceholder") }}</option>
-                    <option v-for="member in selectableTeamMembers" :key="member.id" :value="member.id">
-                      {{ formatMember(member) }}
-                    </option>
-                  </select>
-                </label>
-                <label class="field-stack">
-                  <span>{{ tp("fieldsAssignmentSource") }}</span>
-                  <select v-model="staffingDraft.assignment_source_code">
-                    <option value="dispatcher">dispatcher</option>
-                    <option value="manual">manual</option>
-                    <option value="subcontractor_release">subcontractor_release</option>
-                  </select>
-                </label>
-                <label class="field-stack field-stack--wide">
-                  <span>{{ tp("fieldsRemarks") }}</span>
-                  <textarea v-model="staffingDraft.remarks" rows="2" />
-                </label>
-                <div v-if="showImmediateConfirmationControl" class="planning-staffing-confirm-row field-stack--wide">
-                  <label class="planning-staffing-checkbox-row">
-                    <input v-model="staffingDraft.confirm_now" type="checkbox" data-testid="planning-staffing-confirm-now" />
-                    <span>{{ tp("fieldsConfirmAtCreation") }}</span>
-                  </label>
-                  <p class="field-help">{{ tp("fieldsConfirmAtCreationHint") }}</p>
-                </div>
-              </div>
-            </fieldset>
-            <div class="cta-row">
-              <button
-                class="cta-button"
-                data-testid="planning-staffing-assign-action"
-                type="button"
-                :disabled="!canSubmitAssign || loading"
-                @click="submitAssign"
-              >
-                {{ tp("assignAction") }}
-              </button>
-              <button
-                class="cta-button cta-secondary"
-                data-testid="planning-staffing-substitute-action"
-                type="button"
-                :disabled="!canSubmitSubstitute || loading"
-                @click="submitSubstitute"
-              >
-                {{ tp("substituteAction") }}
-              </button>
-              <button
-                class="cta-button cta-secondary"
-                data-testid="planning-staffing-unassign-action"
-                type="button"
-                :disabled="!selectedAssignment || !actionState.canUnassign || loading"
-                @click="submitUnassign"
-              >
-                {{ tp("unassignAction") }}
-              </button>
-            </div>
-          </section>
-
-          <section class="module-card planning-staffing-subpanel">
-            <div class="planning-staffing-panel__header">
-              <div>
-                <p class="eyebrow">{{ tp("validationTitle") }}</p>
-                <h4>{{ tp("validationTitle") }}</h4>
-              </div>
-              <div class="planning-staffing-metrics">
-                <span>{{ tp("validationBlock") }}: {{ shiftValidationSummary.blocking }}</span>
-                <span>{{ tp("validationWarn") }}: {{ shiftValidationSummary.warnings }}</span>
-                <span>{{ tp("validationInfo") }}: {{ shiftValidationSummary.infos }}</span>
-                <span>{{ tp("validationOverrideable") }}: {{ shiftValidationSummary.overrideable }}</span>
-              </div>
-            </div>
-            <div v-if="shiftValidations?.issues?.length" class="planning-staffing-issues">
-              <article v-for="issue in shiftValidations.issues" :key="`shift-${issue.rule_code}-${issue.demand_group_id ?? 'all'}`" class="planning-staffing-issue" :data-tone="validationTone(issue.severity)">
-                <strong>{{ ruleText(issue.rule_code) }}</strong>
-                <span>{{ issue.message_key }}</span>
-              </article>
-            </div>
-            <p v-else class="planning-staffing-list-empty">{{ tp("validationEmpty") }}</p>
-          </section>
-
-          <section class="module-card planning-staffing-subpanel">
-            <div class="planning-staffing-panel__header">
-              <div>
-                <p class="eyebrow">{{ tp("assignmentsTitle") }}</p>
-                <h4>{{ tp("assignmentsTitle") }}</h4>
-              </div>
-            </div>
-            <div v-if="selectedBoardShift?.assignments?.length" class="planning-staffing-list">
-              <button
-                v-for="assignment in selectedBoardShift.assignments"
-                :key="assignment.id"
-                type="button"
-                class="planning-staffing-row"
-                :class="{ selected: assignment.id === selectedAssignmentId }"
-                @click="selectedAssignmentId = assignment.id"
-              >
+          <section
+            v-if="activeShiftDetailTab === 'validations'"
+            class="planning-staffing-tab-panel"
+            :id="'planning-staffing-panel-validations'"
+            role="tabpanel"
+            :aria-labelledby="'planning-staffing-tab-validations'"
+            data-testid="planning-staffing-tab-panel-validations"
+          >
+            <section class="module-card planning-staffing-subpanel">
+              <div class="planning-staffing-panel__header">
                 <div>
-                  <strong>{{ actorLabel(assignment) }}</strong>
-                  <span>{{ assignment.assignment_status_code }} · {{ assignment.assignment_source_code }}</span>
+                  <p class="eyebrow">{{ tp("validationTitle") }}</p>
+                  <h4>{{ tp("validationTitle") }}</h4>
                 </div>
-              </button>
-            </div>
-            <p v-else class="planning-staffing-list-empty">{{ tp("assignmentsEmpty") }}</p>
-            <div v-if="selectedAssignment" class="planning-staffing-metrics">
-              <span>{{ tp("fieldsDemandGroup") }}: {{ selectedAssignment.demand_group_id }}</span>
-              <span>{{ tp("fieldsVersion") }}: {{ selectedAssignment.version_no }}</span>
-              <span>{{ tp("fieldsTeam") }}: {{ selectedAssignment.team_id || tp("unassignedLabel") }}</span>
-            </div>
-          </section>
-
-          <section class="module-card planning-staffing-subpanel">
-            <div class="planning-staffing-panel__header">
-              <div>
-                <p class="eyebrow">{{ tp("assignmentValidationTitle") }}</p>
-                <h4>{{ selectedAssignmentId ? selectedAssignmentId : tp("assignmentValidationTitle") }}</h4>
+                <div class="planning-staffing-metrics">
+                  <span>{{ tp("validationBlock") }}: {{ shiftValidationSummary.blocking }}</span>
+                  <span>{{ tp("validationWarn") }}: {{ shiftValidationSummary.warnings }}</span>
+                  <span>{{ tp("validationInfo") }}: {{ shiftValidationSummary.infos }}</span>
+                  <span>{{ tp("validationOverrideable") }}: {{ shiftValidationSummary.overrideable }}</span>
+                </div>
               </div>
-              <div class="planning-staffing-metrics">
-                <span>{{ tp("validationBlock") }}: {{ assignmentValidationSummary.blocking }}</span>
-                <span>{{ tp("validationWarn") }}: {{ assignmentValidationSummary.warnings }}</span>
-                <span>{{ tp("validationInfo") }}: {{ assignmentValidationSummary.infos }}</span>
-                <span>{{ tp("validationOverrideable") }}: {{ assignmentValidationSummary.overrideable }}</span>
+              <div v-if="shiftValidations?.issues?.length" class="planning-staffing-issues">
+                <article v-for="issue in shiftValidations.issues" :key="`shift-${issue.rule_code}-${issue.demand_group_id ?? 'all'}`" class="planning-staffing-issue" :data-tone="validationTone(issue.severity)">
+                  <strong>{{ ruleText(issue.rule_code) }}</strong>
+                  <span>{{ issue.message_key }}</span>
+                </article>
               </div>
-            </div>
+              <p v-else class="planning-staffing-list-empty">{{ tp("validationEmpty") }}</p>
+            </section>
 
-            <div v-if="assignmentValidations?.issues?.length" class="planning-staffing-issues">
-              <article v-for="issue in assignmentValidations.issues" :key="`assignment-${issue.rule_code}`" class="planning-staffing-issue" :data-tone="validationTone(issue.severity)">
-                <div class="planning-staffing-panel__header">
-                  <div>
-                    <strong>{{ ruleText(issue.rule_code) }}</strong>
-                    <span>{{ issue.message_key }}</span>
+            <section class="module-card planning-staffing-subpanel">
+              <div class="planning-staffing-panel__header">
+                <div>
+                  <p class="eyebrow">{{ tp("assignmentValidationTitle") }}</p>
+                  <h4>{{ selectedAssignmentId ? selectedAssignmentId : tp("assignmentValidationTitle") }}</h4>
+                </div>
+                <div class="planning-staffing-metrics">
+                  <span>{{ tp("validationBlock") }}: {{ assignmentValidationSummary.blocking }}</span>
+                  <span>{{ tp("validationWarn") }}: {{ assignmentValidationSummary.warnings }}</span>
+                  <span>{{ tp("validationInfo") }}: {{ assignmentValidationSummary.infos }}</span>
+                  <span>{{ tp("validationOverrideable") }}: {{ assignmentValidationSummary.overrideable }}</span>
+                </div>
+              </div>
+
+              <div v-if="assignmentValidations?.issues?.length" class="planning-staffing-issues">
+                <article v-for="issue in assignmentValidations.issues" :key="`assignment-${issue.rule_code}`" class="planning-staffing-issue" :data-tone="validationTone(issue.severity)">
+                  <div class="planning-staffing-panel__header">
+                    <div>
+                      <strong>{{ ruleText(issue.rule_code) }}</strong>
+                      <span>{{ issue.message_key }}</span>
+                    </div>
+                    <button
+                      v-if="actionState.canOverrideValidation && issue.override_allowed"
+                      class="cta-button cta-secondary"
+                      type="button"
+                      @click="startOverride(issue.rule_code)"
+                    >
+                      {{ tp("overrideAction") }}
+                    </button>
                   </div>
-                  <button
-                    v-if="actionState.canOverrideValidation && issue.override_allowed"
-                    class="cta-button cta-secondary"
-                    type="button"
-                    @click="startOverride(issue.rule_code)"
-                  >
-                    {{ tp("overrideAction") }}
-                  </button>
+                  <span v-if="!issue.override_allowed && issue.severity === 'block'">{{ tp("overrideUnavailable") }}</span>
+                </article>
+              </div>
+              <p v-else class="planning-staffing-list-empty">{{ tp("assignmentValidationEmpty") }}</p>
+            </section>
+
+            <section class="module-card planning-staffing-subpanel">
+              <div class="planning-staffing-panel__header">
+                <div>
+                  <p class="eyebrow">{{ tp("assignmentOverridesTitle") }}</p>
+                  <h4>{{ tp("assignmentOverridesTitle") }}</h4>
                 </div>
-                <span v-if="!issue.override_allowed && issue.severity === 'block'">{{ tp("overrideUnavailable") }}</span>
-              </article>
-            </div>
-            <p v-else class="planning-staffing-list-empty">{{ tp("assignmentValidationEmpty") }}</p>
-          </section>
-
-          <section class="module-card planning-staffing-subpanel">
-            <div class="planning-staffing-panel__header">
-              <div>
-                <p class="eyebrow">{{ tp("assignmentOverridesTitle") }}</p>
-                <h4>{{ tp("assignmentOverridesTitle") }}</h4>
               </div>
-            </div>
-            <div v-if="assignmentOverrides.length" class="planning-staffing-issues">
-              <article v-for="row in assignmentOverrides" :key="row.id" class="planning-staffing-issue" data-tone="neutral">
-                <strong>{{ ruleText(row.rule_code) }}</strong>
-                <span>{{ row.reason_text }}</span>
-                <span>{{ row.created_at }}</span>
-              </article>
-            </div>
-            <p v-else class="planning-staffing-list-empty">{{ tp("assignmentOverridesEmpty") }}</p>
-          </section>
-
-          <section class="module-card planning-staffing-subpanel">
-            <div class="planning-staffing-panel__header">
-              <div>
-                <p class="eyebrow">{{ tp("teamReleaseTitle") }}</p>
-                <h4>{{ tp("teamReleaseTitle") }}</h4>
+              <div v-if="assignmentOverrides.length" class="planning-staffing-issues">
+                <article v-for="row in assignmentOverrides" :key="row.id" class="planning-staffing-issue" data-tone="neutral">
+                  <strong>{{ ruleText(row.rule_code) }}</strong>
+                  <span>{{ row.reason_text }}</span>
+                  <span>{{ row.created_at }}</span>
+                </article>
               </div>
-            </div>
-            <div class="planning-staffing-support-grid">
-              <article class="planning-staffing-support-card">
-                <strong>{{ tp("teamsTitle") }}</strong>
-                <p v-if="shiftTeams.length" class="planning-staffing-support-list">
-                  <span v-for="team in shiftTeams" :key="team.id">{{ team.name }} · {{ team.members.length }}</span>
-                </p>
-                <p v-else class="planning-staffing-list-empty">{{ tp("teamsEmpty") }}</p>
-              </article>
-              <article class="planning-staffing-support-card">
-                <strong>{{ tp("subcontractorReleasesTitle") }}</strong>
-                <p v-if="subcontractorReleases.length" class="planning-staffing-support-list">
-                  <span v-for="release in subcontractorReleases" :key="release.id">{{ release.subcontractor_id }} · {{ release.released_qty }}</span>
-                </p>
-                <p v-else class="planning-staffing-list-empty">{{ tp("subcontractorReleasesEmpty") }}</p>
-              </article>
-            </div>
-            <div class="cta-row">
-              <a class="cta-button cta-secondary" href="/admin/employees">{{ tp("openEmployeesAdmin") }}</a>
-              <a class="cta-button cta-secondary" href="/admin/subcontractors">{{ tp("openSubcontractorsAdmin") }}</a>
-            </div>
+              <p v-else class="planning-staffing-list-empty">{{ tp("assignmentOverridesEmpty") }}</p>
+            </section>
+
+            <section v-if="overrideRuleCode" class="module-card planning-staffing-subpanel">
+              <div class="planning-staffing-panel__header">
+                <div>
+                  <p class="eyebrow">{{ tp("overrideTitle") }}</p>
+                  <h4>{{ ruleText(overrideRuleCode) }}</h4>
+                </div>
+              </div>
+              <label class="field-stack">
+                <span>{{ tp("overrideReasonLabel") }}</span>
+                <textarea v-model="overrideReason" rows="4" :placeholder="tp('overrideReasonPlaceholder')" />
+              </label>
+              <p class="field-help">{{ tp("overrideHint") }}</p>
+              <div class="cta-row">
+                <button class="cta-button" type="button" :disabled="!actionState.canOverrideValidation || overrideReason.trim().length < 3 || savingOverride" @click="submitOverride">
+                  {{ tp("overrideAction") }}
+                </button>
+                <button class="cta-button cta-secondary" type="button" :disabled="savingOverride" @click="cancelOverride">
+                  {{ tp("clearFeedback") }}
+                </button>
+              </div>
+            </section>
           </section>
 
-          <section class="module-card planning-staffing-subpanel">
-            <div class="planning-staffing-panel__header">
-              <div>
-                <p class="eyebrow">{{ tp("outputsTitle") }}</p>
-                <h4>{{ tp("outputsTitle") }}</h4>
+          <section
+            v-if="activeShiftDetailTab === 'assignments'"
+            class="planning-staffing-tab-panel"
+            :id="'planning-staffing-panel-assignments'"
+            role="tabpanel"
+            :aria-labelledby="'planning-staffing-tab-assignments'"
+            data-testid="planning-staffing-tab-panel-assignments"
+          >
+            <section class="module-card planning-staffing-subpanel">
+              <div class="planning-staffing-panel__header">
+                <div>
+                  <p class="eyebrow">{{ tp("assignmentsTitle") }}</p>
+                  <h4>{{ tp("assignmentsTitle") }}</h4>
+                </div>
+              </div>
+              <div v-if="selectedBoardShift?.assignments?.length" class="planning-staffing-list">
+                <button
+                  v-for="assignment in selectedBoardShift.assignments"
+                  :key="assignment.id"
+                  type="button"
+                  class="planning-staffing-row"
+                  :class="{ selected: assignment.id === selectedAssignmentId }"
+                  @click="selectedAssignmentId = assignment.id"
+                >
+                  <div>
+                    <strong>{{ actorLabel(assignment) }}</strong>
+                    <span>{{ assignment.assignment_status_code }} · {{ assignment.assignment_source_code }}</span>
+                  </div>
+                </button>
+              </div>
+              <p v-else class="planning-staffing-list-empty">{{ tp("assignmentsEmpty") }}</p>
+              <div v-if="selectedAssignment" class="planning-staffing-metrics">
+                <span>{{ tp("fieldsDemandGroup") }}: {{ selectedAssignment.demand_group_id }}</span>
+                <span>{{ tp("fieldsVersion") }}: {{ selectedAssignment.version_no }}</span>
+                <span>{{ tp("fieldsTeam") }}: {{ selectedAssignment.team_id || tp("unassignedLabel") }}</span>
+              </div>
+            </section>
+          </section>
+
+          <section
+            v-if="activeShiftDetailTab === 'teams_releases'"
+            class="planning-staffing-tab-panel"
+            :id="'planning-staffing-panel-teams_releases'"
+            role="tabpanel"
+            :aria-labelledby="'planning-staffing-tab-teams_releases'"
+            data-testid="planning-staffing-tab-panel-teams-releases"
+          >
+            <section class="module-card planning-staffing-subpanel">
+              <div class="planning-staffing-panel__header">
+                <div>
+                  <p class="eyebrow">{{ tp("teamReleaseTitle") }}</p>
+                  <h4>{{ tp("teamReleaseTitle") }}</h4>
+                </div>
+              </div>
+              <div class="planning-staffing-support-grid">
+                <article class="planning-staffing-support-card">
+                  <strong>{{ tp("teamsTitle") }}</strong>
+                  <p v-if="shiftTeams.length" class="planning-staffing-support-list">
+                    <span v-for="team in shiftTeams" :key="team.id">{{ team.name }} · {{ team.members.length }}</span>
+                  </p>
+                  <p v-else class="planning-staffing-list-empty">{{ tp("teamsEmpty") }}</p>
+                </article>
+                <article class="planning-staffing-support-card">
+                  <strong>{{ tp("subcontractorReleasesTitle") }}</strong>
+                  <p v-if="subcontractorReleases.length" class="planning-staffing-support-list">
+                    <span v-for="release in subcontractorReleases" :key="release.id">{{ release.subcontractor_id }} · {{ release.released_qty }}</span>
+                  </p>
+                  <p v-else class="planning-staffing-list-empty">{{ tp("subcontractorReleasesEmpty") }}</p>
+                </article>
               </div>
               <div class="cta-row">
-                <button class="cta-button cta-secondary" type="button" :disabled="!selectedShiftId || loading || !actionState.canManageRelease" @click="generateOutput('internal')">
-                  {{ tp("generateInternalOutput") }}
-                </button>
-                <button class="cta-button cta-secondary" type="button" :disabled="!selectedShiftId || loading || !actionState.canManageRelease" @click="generateOutput('customer')">
-                  {{ tp("generateCustomerOutput") }}
-                </button>
+                <a class="cta-button cta-secondary" href="/admin/employees">{{ tp("openEmployeesAdmin") }}</a>
+                <a class="cta-button cta-secondary" href="/admin/subcontractors">{{ tp("openSubcontractorsAdmin") }}</a>
               </div>
-            </div>
-            <div v-if="shiftOutputs.length" class="planning-staffing-issues">
-              <article v-for="output in shiftOutputs" :key="output.document_id" class="planning-staffing-issue" data-tone="neutral">
-                <strong>{{ output.title }}</strong>
-                <span>{{ output.variant_code }} · {{ output.audience_code }}</span>
-                <span>{{ output.file_name }}</span>
-              </article>
-            </div>
-            <p v-else class="planning-staffing-list-empty">{{ tp("outputsEmpty") }}</p>
+            </section>
           </section>
 
-          <section class="module-card planning-staffing-subpanel">
-            <div class="planning-staffing-panel__header">
-              <div>
-                <p class="eyebrow">{{ tp("dispatchTitle") }}</p>
-                <h4>{{ tp("dispatchTitle") }}</h4>
+          <section
+            v-if="activeShiftDetailTab === 'outputs_dispatch'"
+            class="planning-staffing-tab-panel"
+            :id="'planning-staffing-panel-outputs_dispatch'"
+            role="tabpanel"
+            :aria-labelledby="'planning-staffing-tab-outputs_dispatch'"
+            data-testid="planning-staffing-tab-panel-outputs-dispatch"
+          >
+            <section class="module-card planning-staffing-subpanel">
+              <div class="planning-staffing-panel__header">
+                <div>
+                  <p class="eyebrow">{{ tp("outputsTitle") }}</p>
+                  <h4>{{ tp("outputsTitle") }}</h4>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" :disabled="!selectedShiftId || loading || !actionState.canManageRelease" @click="generateOutput('internal')">
+                    {{ tp("generateInternalOutput") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" :disabled="!selectedShiftId || loading || !actionState.canManageRelease" @click="generateOutput('customer')">
+                    {{ tp("generateCustomerOutput") }}
+                  </button>
+                </div>
               </div>
-            </div>
-            <div class="cta-row">
-              <label><input v-model="dispatchAudienceEmployees" type="checkbox" /> {{ tp("dispatchAudienceEmployees") }}</label>
-              <label><input v-model="dispatchAudienceSubcontractors" type="checkbox" /> {{ tp("dispatchAudienceSubcontractors") }}</label>
-            </div>
-            <div class="cta-row">
-              <button class="cta-button cta-secondary" type="button" :disabled="!selectedShiftId || loading || !actionState.canDispatch" @click="loadDispatchPreview">
-                {{ tp("dispatchPreviewAction") }}
-              </button>
-              <button class="cta-button" type="button" :disabled="!selectedShiftId || loading || !actionState.canDispatch" @click="queueDispatch">
-                {{ tp("dispatchQueueAction") }}
-              </button>
-            </div>
-            <div v-if="dispatchPreview" class="planning-staffing-issues">
-              <article class="planning-staffing-issue" :data-tone="dispatchPreview.redacted ? 'warn' : 'neutral'">
-                <strong>{{ dispatchPreview.subject_preview || tp("dispatchTitle") }}</strong>
-                <span>{{ dispatchPreview.body_preview }}</span>
-                <span>{{ tp("dispatchRecipients") }}: {{ dispatchPreview.recipients.length }}</span>
-              </article>
-            </div>
-            <p v-else class="planning-staffing-list-empty">{{ tp("dispatchPreviewEmpty") }}</p>
-          </section>
+              <div v-if="shiftOutputs.length" class="planning-staffing-issues">
+                <article v-for="output in shiftOutputs" :key="output.document_id" class="planning-staffing-issue" data-tone="neutral">
+                  <strong>{{ output.title }}</strong>
+                  <span>{{ output.variant_code }} · {{ output.audience_code }}</span>
+                  <span>{{ output.file_name }}</span>
+                </article>
+              </div>
+              <p v-else class="planning-staffing-list-empty">{{ tp("outputsEmpty") }}</p>
+            </section>
 
-          <section v-if="overrideRuleCode" class="module-card planning-staffing-subpanel">
-            <div class="planning-staffing-panel__header">
-              <div>
-                <p class="eyebrow">{{ tp("overrideTitle") }}</p>
-                <h4>{{ ruleText(overrideRuleCode) }}</h4>
+            <section class="module-card planning-staffing-subpanel">
+              <div class="planning-staffing-panel__header">
+                <div>
+                  <p class="eyebrow">{{ tp("dispatchTitle") }}</p>
+                  <h4>{{ tp("dispatchTitle") }}</h4>
+                </div>
               </div>
-            </div>
-            <label class="field-stack">
-              <span>{{ tp("overrideReasonLabel") }}</span>
-              <textarea v-model="overrideReason" rows="4" :placeholder="tp('overrideReasonPlaceholder')" />
-            </label>
-            <p class="field-help">{{ tp("overrideHint") }}</p>
-            <div class="cta-row">
-              <button class="cta-button" type="button" :disabled="!actionState.canOverrideValidation || overrideReason.trim().length < 3 || savingOverride" @click="submitOverride">
-                {{ tp("overrideAction") }}
-              </button>
-              <button class="cta-button cta-secondary" type="button" :disabled="savingOverride" @click="cancelOverride">
-                {{ tp("clearFeedback") }}
-              </button>
-            </div>
+              <div class="cta-row">
+                <label><input v-model="dispatchAudienceEmployees" type="checkbox" /> {{ tp("dispatchAudienceEmployees") }}</label>
+                <label><input v-model="dispatchAudienceSubcontractors" type="checkbox" /> {{ tp("dispatchAudienceSubcontractors") }}</label>
+              </div>
+              <div class="cta-row">
+                <button class="cta-button cta-secondary" type="button" :disabled="!selectedShiftId || loading || !actionState.canDispatch" @click="loadDispatchPreview">
+                  {{ tp("dispatchPreviewAction") }}
+                </button>
+                <button class="cta-button" type="button" :disabled="!selectedShiftId || loading || !actionState.canDispatch" @click="queueDispatch">
+                  {{ tp("dispatchQueueAction") }}
+                </button>
+              </div>
+              <div v-if="dispatchPreview" class="planning-staffing-issues">
+                <article class="planning-staffing-issue" :data-tone="dispatchPreview.redacted ? 'warn' : 'neutral'">
+                  <strong>{{ dispatchPreview.subject_preview || tp("dispatchTitle") }}</strong>
+                  <span>{{ dispatchPreview.body_preview }}</span>
+                  <span>{{ tp("dispatchRecipients") }}: {{ dispatchPreview.recipients.length }}</span>
+                </article>
+              </div>
+              <p v-else class="planning-staffing-list-empty">{{ tp("dispatchPreviewEmpty") }}</p>
+            </section>
           </section>
         </template>
 
         <p v-else class="planning-staffing-list-empty">{{ tp("noSelection") }}</p>
       </section>
     </div>
+
+    <Modal
+      v-model:open="demandGroupDialogOpen"
+      :title="editingDemandGroup ? tp('demandGroupEditTitle') : tp('demandGroupCreateTitle')"
+      :footer="null"
+      @cancel="closeDemandGroupDialog"
+    >
+      <form
+        v-if="selectedShift && actionState.canWriteStaffing"
+        class="planning-staffing-demand-group-editor"
+        data-testid="planning-staffing-demand-group-editor"
+        @submit.prevent="submitDemandGroup"
+      >
+        <div class="planning-staffing-filter-grid">
+          <label class="field-stack">
+            <span>{{ tp("demandGroupFunctionType") }}</span>
+            <select v-model="demandGroupDraft.function_type_id" data-testid="planning-staffing-demand-group-function-type">
+              <option value="">{{ tp("demandGroupFunctionTypePlaceholder") }}</option>
+              <option v-for="option in functionTypeOptions" :key="option.id" :value="option.id">
+                {{ option.label || option.code }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("demandGroupQualificationType") }}</span>
+            <select v-model="demandGroupDraft.qualification_type_id" data-testid="planning-staffing-demand-group-qualification-type">
+              <option value="">{{ tp("demandGroupQualificationTypePlaceholder") }}</option>
+              <option v-for="option in qualificationTypeOptions" :key="option.id" :value="option.id">
+                {{ option.label || option.code }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("demandGroupMinQty") }}</span>
+            <input v-model.number="demandGroupDraft.min_qty" type="number" min="0" step="1" />
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("demandGroupTargetQty") }}</span>
+            <input v-model.number="demandGroupDraft.target_qty" type="number" min="0" step="1" />
+          </label>
+          <div class="planning-staffing-confirm-row field-stack--wide">
+            <label class="planning-staffing-checkbox-row">
+              <input v-model="demandGroupDraft.mandatory_flag" type="checkbox" />
+              <span>{{ tp("demandGroupMandatoryFlag") }}</span>
+            </label>
+            <p class="field-help">{{ tp("demandGroupMandatoryHint") }}</p>
+          </div>
+          <label class="field-stack field-stack--wide">
+            <span>{{ tp("demandGroupRemark") }}</span>
+            <textarea v-model="demandGroupDraft.remark" rows="2" />
+          </label>
+        </div>
+        <div class="cta-row">
+          <button
+            class="cta-button"
+            type="submit"
+            data-testid="planning-staffing-demand-group-save"
+            :disabled="!canSubmitDemandGroup || savingDemandGroup"
+          >
+            {{ editingDemandGroup ? tp("demandGroupUpdateAction") : tp("demandGroupSaveAction") }}
+          </button>
+          <button
+            class="cta-button cta-secondary"
+            type="button"
+            :disabled="savingDemandGroup"
+            @click="resetDemandGroupDraft"
+          >
+            {{ tp("demandGroupResetAction") }}
+          </button>
+          <button
+            class="cta-button cta-secondary"
+            type="button"
+            data-testid="planning-staffing-demand-group-modal-cancel"
+            :disabled="savingDemandGroup"
+            @click="closeDemandGroupDialog"
+          >
+            {{ tp("demandGroupCancelAction") }}
+          </button>
+        </div>
+      </form>
+    </Modal>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import { Select } from "ant-design-vue";
+import { Modal, Select } from "ant-design-vue";
 
 import { useAuthStore as usePrimaryAuthStore } from "#/store";
 import {
@@ -706,6 +773,8 @@ const subcontractorReleases = ref<SubcontractorReleaseRead[]>([]);
 const selectedShiftId = ref("");
 const selectedDemandGroupId = ref("");
 const selectedAssignmentId = ref("");
+const demandGroupDialogOpen = ref(false);
+const activeShiftDetailTab = ref<"demand_staffing" | "validations" | "assignments" | "teams_releases" | "outputs_dispatch">("demand_staffing");
 const shiftValidations = ref<ShiftReleaseValidationRead | null>(null);
 const assignmentValidations = ref<AssignmentValidationRead | null>(null);
 const assignmentOverrides = ref<any[]>([]);
@@ -754,6 +823,14 @@ const demandGroupDraft = reactive({
 function tp(key: keyof typeof planningStaffingMessages.de) {
   return planningStaffingMessages[currentLocale.value][key] ?? planningStaffingMessages.de[key] ?? key;
 }
+
+const shiftDetailTabs = [
+  { id: "demand_staffing", labelKey: "detailTabDemandStaffing" },
+  { id: "validations", labelKey: "detailTabValidations" },
+  { id: "assignments", labelKey: "detailTabAssignments" },
+  { id: "teams_releases", labelKey: "detailTabTeamsReleases" },
+  { id: "outputs_dispatch", labelKey: "detailTabOutputsDispatch" },
+] as const;
 
 const selectedShift = computed(() => coverageRows.value.find((row) => row.shift_id === selectedShiftId.value) ?? null);
 const selectedBoardShift = computed(() => boardRows.value.find((row) => row.id === selectedShiftId.value) ?? null);
@@ -882,21 +959,30 @@ function resetDemandGroupDraft() {
 
 function startCreateDemandGroup() {
   resetDemandGroupDraft();
+  demandGroupDialogOpen.value = true;
 }
 
-function startEditDemandGroup() {
-  if (!selectedDemandGroupDetails.value) {
+function startEditDemandGroup(demandGroupId = selectedDemandGroupId.value) {
+  const demandGroup = demandGroupRows.value.find((row) => row.id === demandGroupId) ?? null;
+  if (!demandGroup) {
     return;
   }
-  demandGroupDraft.id = selectedDemandGroupDetails.value.id;
-  demandGroupDraft.function_type_id = selectedDemandGroupDetails.value.function_type_id || "";
-  demandGroupDraft.qualification_type_id = selectedDemandGroupDetails.value.qualification_type_id || "";
-  demandGroupDraft.min_qty = selectedDemandGroupDetails.value.min_qty;
-  demandGroupDraft.target_qty = selectedDemandGroupDetails.value.target_qty;
-  demandGroupDraft.mandatory_flag = selectedDemandGroupDetails.value.mandatory_flag;
-  demandGroupDraft.sort_order = selectedDemandGroupDetails.value.sort_order;
-  demandGroupDraft.remark = selectedDemandGroupDetails.value.remark || "";
-  demandGroupDraft.version_no = selectedDemandGroupDetails.value.version_no;
+  selectedDemandGroupId.value = demandGroup.id;
+  demandGroupDraft.id = demandGroup.id;
+  demandGroupDraft.function_type_id = demandGroup.function_type_id || "";
+  demandGroupDraft.qualification_type_id = demandGroup.qualification_type_id || "";
+  demandGroupDraft.min_qty = demandGroup.min_qty;
+  demandGroupDraft.target_qty = demandGroup.target_qty;
+  demandGroupDraft.mandatory_flag = demandGroup.mandatory_flag;
+  demandGroupDraft.sort_order = demandGroup.sort_order;
+  demandGroupDraft.remark = demandGroup.remark || "";
+  demandGroupDraft.version_no = demandGroup.version_no;
+  demandGroupDialogOpen.value = true;
+}
+
+function closeDemandGroupDialog() {
+  demandGroupDialogOpen.value = false;
+  resetDemandGroupDraft();
 }
 
 function formatDemandGroup(group: StaffingBoardDemandGroupItem | null) {
@@ -1183,8 +1269,8 @@ async function submitDemandGroup() {
         })
       : await createDemandGroup(tenantScopeId.value, accessToken.value, payload);
     selectedDemandGroupId.value = result.id;
-    resetDemandGroupDraft();
     await refreshAll();
+    closeDemandGroupDialog();
   } catch (error) {
     handleApiError(error);
   } finally {
@@ -1377,6 +1463,10 @@ function handleWindowFocus() {
 }
 
 watch(selectedShiftId, async () => {
+  activeShiftDetailTab.value = "demand_staffing";
+  if (demandGroupDialogOpen.value) {
+    closeDemandGroupDialog();
+  }
   if (!loading.value) {
     try {
       await loadSelectedShiftDetails();
@@ -1619,6 +1709,37 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
+.planning-staffing-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.planning-staffing-tab {
+  appearance: none;
+  border: 1px solid rgba(40, 170, 170, 0.2);
+  border-radius: 999px;
+  background: rgba(40, 170, 170, 0.08);
+  color: rgba(15, 23, 42, 0.82);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 0.65rem 1rem;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.planning-staffing-tab.active {
+  background: rgba(40, 170, 170, 0.18);
+  border-color: rgba(40, 170, 170, 0.45);
+  color: rgb(17, 94, 89);
+}
+
+.planning-staffing-tab-panel {
+  display: grid;
+  gap: 1rem;
+}
+
 .planning-staffing-filter-grid :deep(.field-stack),
 .planning-staffing-filter-grid .field-stack,
 .planning-staffing-subpanel .field-stack {
@@ -1698,6 +1819,11 @@ onBeforeUnmount(() => {
   padding: 0;
 }
 
+.planning-staffing-demand-groups {
+  align-content: start;
+  margin-block: 0.35rem 0.65rem;
+}
+
 .planning-staffing-confirm-row {
   display: grid;
   gap: 0.45rem;
@@ -1709,7 +1835,23 @@ onBeforeUnmount(() => {
   display: inline-flex;
   gap: 0.65rem;
   min-height: 2.85rem;
+  min-width: 0;
   width: fit-content;
+}
+
+.planning-staffing-checkbox-row input[type="checkbox"] {
+  appearance: auto;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  flex: 0 0 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  min-height: 1.1rem;
+  min-width: 1.1rem;
+  padding: 0;
+  width: 1.1rem;
 }
 
 .planning-staffing-checkbox-row > span {
@@ -1722,9 +1864,11 @@ onBeforeUnmount(() => {
 .planning-staffing-filter-grid input[type="checkbox"],
 .planning-staffing-subpanel input[type="checkbox"] {
   accent-color: rgb(40, 170, 170);
+  appearance: auto;
   min-height: auto;
-  min-width: 1.1rem;
   padding: 0;
+  min-width: 1.1rem;
+  vertical-align: middle;
   width: 1.1rem;
 }
 

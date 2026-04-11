@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time
+import json
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -13,6 +14,7 @@ from app.modules.planning.schemas import (
     AssignmentCreate,
     CoverageFilter,
     DemandGroupCreate,
+    DemandGroupUpdate,
     ShiftCreate,
     ShiftPlanCreate,
     ShiftTemplateCreate,
@@ -708,6 +710,105 @@ class StaffingServiceTests(unittest.TestCase):
                 _context("planning.staffing.write"),
             )
         self.assertEqual(caught.exception.code, "planning.demand_group.invalid_qty_window")
+
+    def test_create_demand_group_records_json_safe_audit_event(self) -> None:
+        demand = self.service.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(
+                tenant_id="tenant-1",
+                shift_id=self.shift_id,
+                function_type_id="function-1",
+                qualification_type_id="qualification-1",
+                min_qty=1,
+                target_qty=2,
+                remark="Audit check",
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        self.assertEqual(demand.function_type_id, "function-1")
+        event = self.audit_repository.audit_events[-1]
+        self.assertEqual(event.event_type, "planning.demand_group.created")
+        self.assertEqual(event.after_json["function_type_id"], "function-1")
+        self.assertEqual(event.after_json["qualification_type_id"], "qualification-1")
+        self.assertNotIn("function_type", event.after_json)
+        self.assertNotIn("qualification_type", event.after_json)
+        json.dumps(event.after_json)
+
+    def test_demand_group_snapshot_excludes_relationship_objects_and_stays_json_safe(self) -> None:
+        demand = self.repository.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(
+                tenant_id="tenant-1",
+                shift_id=self.shift_id,
+                function_type_id="function-1",
+                qualification_type_id="qualification-1",
+                min_qty=0,
+                target_qty=1,
+            ),
+            "user-1",
+        )
+        demand.function_type = self.repository.function_types["function-1"]
+        demand.qualification_type = self.repository.qualification_types["qualification-1"]
+
+        snapshot = self.service._snapshot(demand)
+
+        self.assertEqual(snapshot["function_type_id"], "function-1")
+        self.assertEqual(snapshot["qualification_type_id"], "qualification-1")
+        self.assertNotIn("function_type", snapshot)
+        self.assertNotIn("qualification_type", snapshot)
+        json.dumps(snapshot)
+
+    def test_update_demand_group_records_json_safe_audit_event(self) -> None:
+        demand = self.service.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(
+                tenant_id="tenant-1",
+                shift_id=self.shift_id,
+                function_type_id="function-1",
+                min_qty=1,
+                target_qty=2,
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        updated = self.service.update_demand_group(
+            "tenant-1",
+            demand.id,
+            DemandGroupUpdate(
+                target_qty=3,
+                qualification_type_id="qualification-1",
+                version_no=demand.version_no,
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        self.assertEqual(updated.target_qty, 3)
+        event = self.audit_repository.audit_events[-1]
+        self.assertEqual(event.event_type, "planning.demand_group.updated")
+        self.assertEqual(event.after_json["qualification_type_id"], "qualification-1")
+        self.assertNotIn("function_type", event.after_json)
+        self.assertNotIn("qualification_type", event.after_json)
+        json.dumps(event.after_json)
+
+    def test_team_audit_snapshot_stays_json_safe_for_related_staffing_entities(self) -> None:
+        team = self.service.create_team(
+            "tenant-1",
+            TeamCreate(
+                tenant_id="tenant-1",
+                planning_record_id=self.planning_record_id,
+                shift_id=self.shift_id,
+                name="Alpha",
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        event = self.audit_repository.audit_events[-1]
+        self.assertEqual(team.name, "Alpha")
+        self.assertEqual(event.event_type, "planning.team.created")
+        self.assertNotIn("members", event.after_json)
+        self.assertNotIn("assignments", event.after_json)
+        json.dumps(event.after_json)
 
     def test_team_member_requires_exactly_one_actor(self) -> None:
         team = self.service.create_team(

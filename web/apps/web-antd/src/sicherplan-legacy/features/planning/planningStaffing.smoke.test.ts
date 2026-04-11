@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent } from "vue";
 
 const sessionState = vi.hoisted(() => ({
   accessToken: "token-1",
@@ -333,11 +334,36 @@ vi.mock("@/api/employeeAdmin", () => ({
   listQualificationTypes: mocks.listQualificationTypesMock,
 }));
 
+vi.mock("ant-design-vue", async () => {
+  const actual = await vi.importActual<typeof import("ant-design-vue")>("ant-design-vue");
+  return {
+    ...actual,
+    Modal: defineComponent({
+      props: {
+        open: { type: Boolean, default: false },
+        title: { type: String, default: "" },
+      },
+      emits: ["cancel", "update:open"],
+      template: `
+        <div v-if="open" class="modal-stub">
+          <strong class="modal-stub__title">{{ title }}</strong>
+          <slot />
+        </div>
+      `,
+    }),
+  };
+});
+
 async function mountView() {
   const { default: PlanningStaffingCoverageView } = await import("../../views/PlanningStaffingCoverageView.vue");
   const wrapper = mount(PlanningStaffingCoverageView);
   await flushPromises();
   return wrapper;
+}
+
+async function clickDetailTab(wrapper: Awaited<ReturnType<typeof mountView>>, tabId: string) {
+  await wrapper.get(`#planning-staffing-tab-${tabId}`).trigger("click");
+  await flushPromises();
 }
 
 describe("PlanningStaffingCoverageView", () => {
@@ -619,10 +645,11 @@ describe("PlanningStaffingCoverageView", () => {
     expect(wrapper.text()).toContain("Staffing-Aktionen sind blockiert, bis die Schicht mindestens eine Demand Group hat.");
     expect(wrapper.get('[data-testid="planning-staffing-assign-action"]').attributes("disabled")).toBeDefined();
     expect(wrapper.get('[data-testid="planning-staffing-substitute-action"]').attributes("disabled")).toBeDefined();
-    expect(wrapper.find('[data-testid="planning-staffing-demand-group-editor"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-staffing-demand-group-editor"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-staffing-demand-group-start-create"]').exists()).toBe(true);
   });
 
-  it("creates a demand group inline from the setup-required state", async () => {
+  it("creates a demand group from the setup-required state through the modal", async () => {
     mocks.listStaffingBoardMock.mockResolvedValueOnce([
       {
         id: "shift-1",
@@ -673,8 +700,14 @@ describe("PlanningStaffingCoverageView", () => {
 
     const wrapper = await mountView();
 
+    await wrapper.get('[data-testid="planning-staffing-demand-group-start-create"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get(".modal-stub__title").text()).toContain("Demand Group anlegen");
+    expect(wrapper.find('[data-testid="planning-staffing-demand-group-editor"]').exists()).toBe(true);
     await wrapper.get('[data-testid="planning-staffing-demand-group-function-type"]').setValue("func-1");
-    await wrapper.get('[data-testid="planning-staffing-demand-group-save"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-staffing-demand-group-editor"]').trigger("submit");
     await flushPromises();
 
     expect(mocks.createDemandGroupMock).toHaveBeenCalledWith(
@@ -688,6 +721,7 @@ describe("PlanningStaffingCoverageView", () => {
       }),
     );
     expect(mocks.listStaffingBoardMock.mock.calls.length).toBeGreaterThan(1);
+    expect(wrapper.find('[data-testid="planning-staffing-demand-group-editor"]').exists()).toBe(false);
   });
 
   it("maps planning-record select change and clear back to filters.planning_record_id", async () => {
@@ -714,5 +748,92 @@ describe("PlanningStaffingCoverageView", () => {
       "token-1",
       expect.objectContaining({ planning_record_id: "" }),
     );
+  });
+
+  it("shows demand and staffing as the default detail tab while keeping summary metrics visible", async () => {
+    const wrapper = await mountView();
+
+    expect(wrapper.get('[data-testid="planning-staffing-detail-tabs"]').text()).toContain("Bedarf und Staffing");
+    expect(wrapper.find('[data-testid="planning-staffing-tab-panel-demand-staffing"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-staffing-tab-panel-validations"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Min: 1");
+    expect(wrapper.text()).toContain("Ziel: 2");
+    expect(wrapper.find('[data-testid="planning-staffing-demand-group-editor"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-staffing-demand-group-edit-selected"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-staffing-demand-group-start-create"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-staffing-assign-action"]').exists()).toBe(true);
+  });
+
+  it("opens the demand-group modal in edit mode when a list row is clicked", async () => {
+    const wrapper = await mountView();
+
+    await wrapper.get(".planning-staffing-demand-group").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get(".modal-stub__title").text()).toContain("Demand Group bearbeiten");
+    expect(wrapper.find('[data-testid="planning-staffing-demand-group-editor"]').exists()).toBe(true);
+    expect((wrapper.get('[data-testid="planning-staffing-demand-group-function-type"]').element as HTMLSelectElement).value).toBe("func-1");
+    expect(wrapper.get('[data-testid="planning-staffing-demand-group-editor"]').text()).toContain("Demand Group als verpflichtend markieren");
+    expect(wrapper.find('[data-testid="planning-staffing-demand-group-modal-cancel"]').exists()).toBe(true);
+  });
+
+  it("updates a demand group from the modal after clicking a row", async () => {
+    const wrapper = await mountView();
+
+    await wrapper.get(".planning-staffing-demand-group").trigger("click");
+    await flushPromises();
+    await wrapper.get('input[type="number"]').setValue("2");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-staffing-demand-group-editor"]').trigger("submit");
+    await flushPromises();
+
+    expect(mocks.updateDemandGroupMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "token-1",
+      "dg-1",
+      expect.objectContaining({
+        min_qty: 2,
+      }),
+    );
+    expect(wrapper.find('[data-testid="planning-staffing-demand-group-editor"]').exists()).toBe(false);
+  });
+
+  it("switches to validations without hiding the always-visible shift summary", async () => {
+    mocks.getShiftReleaseValidationsMock.mockResolvedValueOnce({
+      blocking_count: 1,
+      warning_count: 0,
+      info_count: 0,
+      issues: [{ rule_code: "minimum_staffing", severity: "block", message_key: "validation.minimum_staffing", override_allowed: false, demand_group_id: null }],
+    } as any);
+
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "validations");
+
+    expect(wrapper.get('[data-testid="planning-staffing-tab-panel-validations"]').text()).toContain("Release-Validierungen");
+    expect(wrapper.text()).toContain("Min: 1");
+    expect(wrapper.text()).toContain("Bestaetigt: 1");
+    expect(wrapper.find('[data-testid="planning-staffing-tab-panel-demand-staffing"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-staffing-assign-action"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Mindestbesetzung nicht erreicht");
+  });
+
+  it("shows outputs and dispatch content under the outputs tab", async () => {
+    mocks.listShiftOutputsMock.mockResolvedValueOnce([
+      {
+        document_id: "doc-1",
+        title: "Einsatzplan intern",
+        variant_code: "internal",
+        audience_code: "internal",
+        file_name: "einsatzplan.pdf",
+      },
+    ] as any);
+
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "outputs_dispatch");
+
+    expect(wrapper.get('[data-testid="planning-staffing-tab-panel-outputs-dispatch"]').text()).toContain("Einsatzplaene und Protokolle");
+    expect(wrapper.text()).toContain("Dispatch-Nachrichten");
+    expect(wrapper.text()).toContain("Einsatzplan intern");
+    expect(wrapper.find('[data-testid="planning-staffing-tab-panel-demand-staffing"]').exists()).toBe(false);
   });
 });
