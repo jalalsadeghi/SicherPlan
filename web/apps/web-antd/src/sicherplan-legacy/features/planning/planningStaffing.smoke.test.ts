@@ -307,15 +307,25 @@ describe("PlanningStaffingCoverageView", () => {
 
   it("renders from session context without manual token inputs", async () => {
     const wrapper = await mountView();
+    const firstPanel = wrapper.findAll(".planning-staffing-panel")[0];
 
     expect(wrapper.find('[data-testid="planning-staffing-workspace"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="planning-staffing-planning-record-select"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-staffing-refresh"]').exists()).toBe(true);
     expect(wrapper.text()).toContain("Filter und Scope");
     expect(wrapper.text()).toContain("Planungsdatensatz");
+    expect(wrapper.text()).toContain("Planungsmodus auswaehlen");
+    expect(wrapper.text()).toContain("Workforce-Scope auswaehlen");
+    expect(wrapper.text()).toContain("Bestaetigungsstatus auswaehlen");
     expect(wrapper.text()).not.toContain("Planungsdatensatz-ID");
+    expect(wrapper.text()).not.toContain("Coverage lesen");
+    expect(wrapper.text()).not.toContain("Staffing schreiben");
+    expect(wrapper.text()).not.toContain("Override erfassen");
     expect(wrapper.text()).not.toContain("Staffing-Validierungen");
     expect(wrapper.text()).not.toContain("Sessionbasierter Scope");
     expect(wrapper.text()).not.toContain("Bearer-Token");
+    expect(firstPanel?.text()).not.toContain("Mitarbeiterverwaltung oeffnen");
+    expect(firstPanel?.text()).not.toContain("Subunternehmerverwaltung oeffnen");
     expect(mocks.listStaffingCoverageMock).toHaveBeenCalledWith("tenant-1", "token-1", expect.any(Object));
   });
 

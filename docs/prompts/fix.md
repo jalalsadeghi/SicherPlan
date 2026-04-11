@@ -1,131 +1,143 @@
 You are working in the SicherPlan repository.
 
 Task goal:
-Fix the "Filters and scope" UX in `/admin/planning-staffing` (P-04 Staffing Board & Coverage) by replacing the user-facing `Planning record ID` textbox with a business-friendly planning-record selector and by making the filter/header layout responsive on narrow widths.
+Apply a small, focused UI polish pass to `/admin/planning-staffing` in the `PlanningStaffingCoverageView.vue` workspace.
+
+This task has two parts:
+
+PART A — Filters and scope
+1. The three filter selects should have clear placeholder behavior:
+   - Planning mode
+   - Workforce scope
+   - Confirmation state
+2. The placeholders should make it obvious that these controls are selects and that no filter is currently chosen.
+
+PART B — Shift coverage
+1. The `Shift coverage` panel should no longer be excessively wide.
+2. Its visual dimensions should be aligned more closely with the `Filters and scope` card, instead of stretching disproportionately across the workspace.
+3. The clickable row/button items inside `Shift coverage` currently feel vertically cramped.
+   Add proper top/bottom spacing so the list items do not look stuck together.
+
+This is a narrow UI refinement task.
+Do NOT change staffing logic, filters logic, API contracts, auth/session flow, permission behavior, or page information architecture beyond what is necessary for these UI fixes.
 
 Before coding:
 1. Read `AGENTS.md`.
-2. Find the relevant `US-N-TN` task in `docs/sprint/*.md` or `docs/prompts/*.md`.
-3. If no official task exists for this exact refinement, say that explicitly in your final summary and keep backlog traceability clear.
-4. Keep this change narrowly scoped to the filter/header UX and responsiveness. Do NOT change permissions, auth flow, staffing logic, or backend schemas unless a very small supporting fix is strictly required.
+2. Inspect the latest implementation of:
+   - `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
+3. Check if there is an exact sprint/task reference in `docs/sprint/*.md` or `docs/prompts/*.md`.
+4. If there is no exact task for this refinement, state that explicitly in the final summary and keep the change tightly scoped.
 
-Inspect first:
+Current issues to verify:
+- The three filter selects do not communicate their placeholder / unselected state clearly enough.
+- The `Shift coverage` panel is visually too wide relative to the left filter card.
+- The coverage-result buttons/rows need more vertical breathing room.
+- The page should remain responsive after these changes.
+
+Required implementation outcome:
+
+A. Filter select placeholders
+- For these three controls:
+  - Planning mode
+  - Workforce scope
+  - Confirmation state
+- ensure there is a clear default placeholder option/value when nothing is selected.
+- The placeholder text should be explicit and user-friendly, for example:
+  - Select planning mode
+  - Select workforce scope
+  - Select confirmation state
+- Keep DE-first / EN-secondary parity if the page uses translation keys.
+- Preserve existing filter contract behavior:
+  - unselected still maps to “no filter”
+  - selected values still map to the same backend/API values as before
+- Do not replace these native selects with an unrelated new component unless the repo already has an established pattern and the change remains very small.
+
+B. Shift coverage panel width
+- Reduce the excessive width of the `Shift coverage` panel.
+- Make it visually closer in dimension to the `Filters and scope` card.
+- Do this in a layout-safe way:
+  - adjust the page grid/column contract deliberately
+  - do not just hardcode an awkward width that breaks responsiveness
+- The middle panel should still be usable and readable.
+- Avoid making the workspace feel broken or forcing unnecessary wrapping in adjacent panels.
+
+C. Shift coverage row/button spacing
+- Improve vertical spacing for the searched/result rows rendered as buttons in the `Shift coverage` list.
+- Ensure the buttons/list items have clear separation from one another.
+- Ensure there is appropriate inner padding and outer gap/margin so the list no longer feels cramped.
+- Keep the current selected state styling intact unless a tiny spacing correction requires minor refinement.
+
+Implementation guidance:
+1. Inspect the main layout classes controlling:
+   - the overall staffing page grid
+   - the filter card
+   - the shift coverage panel
+   - the list/button rows inside shift coverage
+2. For select placeholders:
+   - prefer explicit empty option + placeholder copy + consistent select styling
+   - preserve current v-model behavior and existing filter serialization
+3. For width alignment:
+   - use a deliberate column sizing rule or max-width rule
+   - keep the page responsive on desktop, tablet, and narrower widths
+4. For list spacing:
+   - add clean vertical gap between coverage rows/buttons
+   - review padding inside the button so text and status badge do not feel crowded
+
+Constraints:
+- Do NOT change:
+  - filter semantics
+  - selected shift behavior
+  - staffing commands
+  - assignment logic
+  - validation/override logic
+  - auth/session/tenant scope
+- Do NOT perform a broad redesign of the entire page.
+- Keep the change set narrow and reviewable.
+
+Files to inspect and likely change:
 - `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
-- `web/apps/web-antd/src/sicherplan-legacy/api/planningOrders.ts`
-- `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
-- `backend/app/modules/planning/router.py`
-- the actual style source for:
-  - `.planning-staffing-filter-grid`
-  - `.planning-staffing-panel__header`
-  - `.planning-staffing-panel__actions`
-  - `.field-stack`
-  - related filter/header classes
-  This style source may be in the same `.vue` file or in a shared legacy stylesheet.
-- any existing select-search / combobox pattern already used in `web/apps/web-antd`
 
-Current facts you must verify in code before changing anything:
-- `PlanningStaffingCoverageView.vue` currently renders the planning-record filter as a raw textbox bound to `filters.planning_record_id`.
-- The current page already derives role/tenant/token from the auth store. Do not rework auth/session handling.
-- `listPlanningRecords(...)` already exists in `planningOrders.ts`.
-- `PlanningRecordListItem` already provides at least:
-  - `id`
-  - `name`
-  - `planning_mode_code`
-  - `planning_from`
-  - `planning_to`
-  - `release_state`
-  - `status`
-- Backend planning-record list supports filters such as:
-  - `search`
-  - `planning_mode_code`
-  - `planning_from`
-  - `planning_to`
-- Backend staffing-board / coverage filters already support `planning_record_id` and the current date-window filters.
+If additional files are touched, it must be only because a very small shared style/helper is necessary.
 
-Required UX decision:
-- The primary user-facing control must NOT remain a raw textbox.
-- Replace it with a business-friendly select-search / combobox for planning records.
-- Rename the user-visible label from `Planning record ID` to `Planning record` (and the DE equivalent).
-- Keep the underlying selected value mapped to `filters.planning_record_id` so the backend contract remains unchanged.
-- A raw ID paste field is allowed only as a secondary advanced/debug affordance, not as the main control.
-- Default recommendation is a searchable selector. Only fall back to a plain select if you can explicitly justify that choice from repo-wide UI constraints and final usability.
+Acceptance criteria:
+1. The three filter selects clearly show placeholder state when no value is selected.
+2. Users can immediately recognize them as selects.
+3. The `Shift coverage` panel no longer feels disproportionately wide.
+4. The dimensions now feel visually more balanced relative to `Filters and scope`.
+5. The coverage result rows/buttons have proper vertical spacing.
+6. The page remains responsive.
+7. No filtering or staffing behavior regressed.
 
-Planning-record selector requirements:
-- Reuse the existing `listPlanningRecords()` API. Do NOT add a new backend endpoint if it is not necessary.
-- Prefer an existing repo-standard searchable select component/pattern (Vben / web-antd / repo-local). Do NOT add a new dependency just for this.
-- Build option labels from existing list-item data, for example:
-  `name · planning_mode_code · planning_from → planning_to`
-  You may append release/status meta if it improves clarity.
-- Support clear selection = "all planning records".
-- Add loading, empty, and error states.
-- Inspect the backend filter contract carefully and send only supported filters.
-- Important:
-  - planning-record list uses date-based filters
-  - staffing board uses datetime-local filters
-  Convert safely or omit those filters instead of sending unsupported values.
-- Avoid unnecessary network chatter:
-  - debounce remote search if remote search is used
-  - and/or cache the recent option set per tenant scope if appropriate
+Validation and tests:
+- Run the relevant frontend build/typecheck/lint/tests.
+- Add or update a focused UI test only if the repo already has a suitable pattern.
+- If there is no viewport-aware test harness, document manual validation clearly.
 
-Responsive layout requirements:
-- Fix the `Filters and scope` header so CTA buttons wrap cleanly instead of colliding when width shrinks.
-- Fix the filter grid so inputs/selects never overflow, overlap, or break alignment.
-- Ensure `datetime-local`, native selects, text inputs, and the new planning-record selector all become full-width inside their grid cells.
-- Use `min-width: 0` where needed to prevent intrinsic-width overflow.
-- Prefer a responsive grid such as `repeat(auto-fit, minmax(...))` or a clearly equivalent solution.
-- Add at least one narrow-screen breakpoint where the filter area stacks cleanly into a single column if needed.
-- Preserve the current visual language. Do NOT redesign the entire page.
-
-Implementation constraints:
-- Keep `refreshAll()`, `queryFilters()`, and downstream use of `filters.planning_record_id` working exactly as before from the API perspective.
-- Do NOT change backend response shapes unless strictly required.
-- Do NOT refactor unrelated staffing actions, validation logic, dispatch, or overrides.
-- Keep DE-first / EN-secondary text parity for any new labels, placeholders, helper text, or empty states.
-- Prefer a focused change set over broad cleanup.
-
-Suggested implementation direction:
-1. Add planning-record option state and loading state to `PlanningStaffingCoverageView.vue`.
-2. Reuse `listPlanningRecords()` from `planningOrders.ts`.
-3. Map the selected planning-record option back to `filters.planning_record_id`.
-4. Replace the raw textbox with a searchable selector.
-5. Keep an optional advanced raw-ID input only if truly justified.
-6. Update the filter/header styles at their real source so the layout wraps correctly on narrow widths.
-7. Add or update targeted tests.
-
-Tests and validation:
-- Add or update tests for:
-  - planning-record option loading/mapping
-  - selection behavior updating `filters.planning_record_id`
-  - clear behavior resetting `filters.planning_record_id`
-  - supported filter conversion for planning-record lookup
-  - no regression in `refreshAll()` filtering behavior
-- If the repo does not have a viewport-aware UI test harness, do a documented manual responsive verification and say so explicitly.
-- Run the relevant build / lint / typecheck / tests before finishing.
-
-Manual acceptance checks:
-- On `/admin/planning-staffing`, the user can choose a planning record without knowing the raw UUID.
-- The chosen planning record still filters coverage/staffing correctly via `filters.planning_record_id`.
-- On narrower widths, the CTA row wraps cleanly, fields align, and no control overlaps or spills horizontally.
-- The page still uses the existing authenticated session and tenant scope.
+Manual validation checklist:
+1. Open `/admin/planning-staffing`.
+2. Confirm the three filter selects show clear placeholders when empty.
+3. Confirm selecting values still works and filtering still behaves as before.
+4. Confirm the `Shift coverage` panel is no longer excessively wide.
+5. Confirm the `Shift coverage` result rows/buttons have better top/bottom spacing.
+6. Confirm the selected row styling still works.
+7. Check wide desktop, medium width, and narrow width layouts.
+8. Confirm no horizontal overflow or broken panel alignment.
 
 Important self-check:
 Before finalizing, challenge your own implementation and verify that:
-- you did NOT leave the raw planning-record textbox as the primary control
-- you did NOT break the existing `planning_record_id` API contract
-- you did NOT send unsupported datetime values to the planning-record list endpoint
-- you did NOT touch auth/session logic unnecessarily
-- you did NOT leave the header/action row or filter grid broken on narrow screens
-- you did NOT introduce unrelated refactors
+- you improved placeholder clarity without changing filter semantics
+- you did not break empty-state filtering
+- you reduced the excessive width of `Shift coverage` in a responsive-safe way
+- you improved row/button spacing without disrupting selected-state behavior
+- you did not introduce unrelated refactors
+- you did not weaken the overall layout consistency of the page
 
-Required final response format:
+Final response format:
 1. Short implementation summary
 2. Exact files changed
-3. Verified current issues
-4. What changed and why
-5. Test/build/typecheck/lint results
-6. Manual responsive validation result
+3. What UI issues you confirmed
+4. What you changed and why
+5. Build/typecheck/lint/test results
+6. Manual validation results
 7. Remaining assumptions or blockers
-8. Self-validation explaining why:
-   - select-search is the correct control for P-04 here
-   - the responsive layout is now fixed
-   - no unrelated regressions were introduced
+8. Self-validation explaining why the page is now cleaner and more balanced without regression

@@ -28,19 +28,6 @@
               {{ tp("roleLabel") }}: {{ role }} · {{ tp("tenantScopeLabel") }}: {{ tenantScopeId || tp("scopeUnavailable") }}
             </p>
           </div>
-          <div class="cta-row planning-staffing-panel__actions">
-            <button
-              class="cta-button cta-secondary"
-              type="button"
-              data-testid="planning-staffing-refresh"
-              :disabled="loading"
-              @click="refreshAll"
-            >
-              {{ tp("refresh") }}
-            </button>
-            <a class="cta-button cta-secondary" href="/admin/employees">{{ tp("openEmployeesAdmin") }}</a>
-            <a class="cta-button cta-secondary" href="/admin/subcontractors">{{ tp("openSubcontractorsAdmin") }}</a>
-          </div>
         </div>
         <div class="planning-staffing-filter-grid">
           <label class="field-stack">
@@ -81,7 +68,7 @@
           <label class="field-stack">
             <span>{{ tp("filtersPlanningMode") }}</span>
             <select v-model="filters.planning_mode_code">
-              <option value=""></option>
+              <option value="">{{ tp("filtersPlanningModePlaceholder") }}</option>
               <option value="event">event</option>
               <option value="site">site</option>
               <option value="trade_fair">trade_fair</option>
@@ -91,7 +78,7 @@
           <label class="field-stack">
             <span>{{ tp("filtersWorkforceScope") }}</span>
             <select v-model="filters.workforce_scope_code">
-              <option value=""></option>
+              <option value="">{{ tp("filtersWorkforceScopePlaceholder") }}</option>
               <option value="internal">internal</option>
               <option value="subcontractor">subcontractor</option>
               <option value="mixed">mixed</option>
@@ -100,16 +87,21 @@
           <label class="field-stack">
             <span>{{ tp("filtersConfirmation") }}</span>
             <select v-model="filters.confirmation_state">
-              <option value=""></option>
+              <option value="">{{ tp("filtersConfirmationPlaceholder") }}</option>
               <option value="confirmed_only">confirmed_only</option>
             </select>
           </label>
-        </div>
-
-        <div class="planning-staffing-meta">
-          <span class="planning-staffing-meta__pill">{{ tp("permissionRead") }}: {{ actionState.canReadCoverage ? "on" : "off" }}</span>
-          <span class="planning-staffing-meta__pill">{{ tp("permissionWrite") }}: {{ actionState.canWriteStaffing ? "on" : "off" }}</span>
-          <span class="planning-staffing-meta__pill">{{ tp("permissionOverride") }}: {{ actionState.canOverrideValidation ? "on" : "off" }}</span>
+          <div class="planning-staffing-filter-actions field-stack--wide">
+            <button
+              class="cta-button cta-secondary"
+              type="button"
+              data-testid="planning-staffing-refresh"
+              :disabled="loading"
+              @click="refreshAll"
+            >
+              {{ tp("refresh") }}
+            </button>
+          </div>
         </div>
 
         <div class="planning-staffing-summary">
@@ -1245,19 +1237,27 @@ onBeforeUnmount(() => {
 
 .planning-staffing-grid {
   align-items: start;
-  grid-template-columns: minmax(300px, 0.95fr) minmax(320px, 1fr) minmax(420px, 1.35fr);
+  gap: var(--sp-page-gap, 1.25rem);
+  grid-template-columns: minmax(320px, 420px) minmax(300px, 420px) minmax(360px, 1fr);
 }
 
 .planning-staffing-meta,
 .planning-staffing-metrics,
-.planning-staffing-panel__header,
 .planning-staffing-summary,
 .planning-staffing-support-list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+}
+
+.planning-staffing-panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
 }
 
 .planning-staffing-meta__pill,
@@ -1284,13 +1284,23 @@ onBeforeUnmount(() => {
 .planning-staffing-panel {
   align-content: start;
   gap: 1.25rem;
+  min-width: 0;
   padding: 1.25rem;
   box-shadow: 0 20px 44px rgba(15, 23, 42, 0.05);
 }
 
+.planning-staffing-grid > .planning-staffing-panel:first-child {
+  width: 100%;
+  max-width: 420px;
+}
+
+.planning-staffing-grid > .planning-staffing-panel:nth-child(2) {
+  width: 100%;
+  max-width: 420px;
+}
+
 .planning-staffing-panel__header {
-  align-items: flex-start;
-  gap: 1rem;
+  min-width: 0;
 }
 
 .planning-staffing-panel__lead {
@@ -1303,7 +1313,7 @@ onBeforeUnmount(() => {
 .planning-staffing-panel__header--filters {
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .planning-staffing-panel__header--filters > div,
@@ -1319,10 +1329,27 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 0.75rem;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .planning-staffing-filter-grid {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.planning-staffing-panel__header--filters + .planning-staffing-filter-grid {
+  margin-top: 0.2rem;
+}
+
+.planning-staffing-filter-grid + .planning-staffing-summary {
+  margin-top: 0.35rem;
+}
+
+.planning-staffing-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-start;
+  align-items: center;
 }
 
 .planning-staffing-filter-grid :deep(.field-stack),
@@ -1360,6 +1387,23 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
+.planning-staffing-filter-grid select {
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(15, 23, 42, 0.55) 50%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.55) 50%, transparent 50%);
+  background-position:
+    calc(100% - 1.15rem) calc(50% - 0.16rem),
+    calc(100% - 0.8rem) calc(50% - 0.16rem);
+  background-repeat: no-repeat;
+  background-size: 0.42rem 0.42rem, 0.42rem 0.42rem;
+  cursor: pointer;
+  padding-right: 2.4rem;
+}
+
+.planning-staffing-filter-grid select option[value=""] {
+  color: rgba(15, 23, 42, 0.6);
+}
+
 .planning-staffing-filter-grid :deep(.ant-select),
 .planning-staffing-filter-grid :deep(.ant-select-selector),
 .planning-staffing-filter-grid :deep(.ant-select-selection-search),
@@ -1370,6 +1414,7 @@ onBeforeUnmount(() => {
 
 .planning-staffing-filter-grid :deep(.ant-select-selector) {
   align-items: center;
+  display: flex;
   min-height: 2.85rem;
 }
 
@@ -1405,8 +1450,19 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
+  align-items: flex-start;
   text-align: left;
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.planning-staffing-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.planning-staffing-row {
+  padding-top: 1.15rem;
+  padding-bottom: 1.15rem;
 }
 
 .planning-staffing-row.selected,
@@ -1431,6 +1487,18 @@ onBeforeUnmount(() => {
 .planning-staffing-empty {
   display: grid;
   gap: 0.75rem;
+}
+
+.planning-staffing-meta__pill {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+
+.planning-staffing-summary__card {
+  display: grid;
+  flex: 1 1 150px;
+  min-width: 0;
+  gap: 0.35rem;
 }
 
 .planning-staffing-issue[data-tone="good"],
@@ -1468,6 +1536,14 @@ onBeforeUnmount(() => {
 @media (max-width: 1180px) {
   .planning-staffing-grid {
     grid-template-columns: 1fr;
+  }
+
+  .planning-staffing-grid > .planning-staffing-panel:first-child {
+    max-width: none;
+  }
+
+  .planning-staffing-grid > .planning-staffing-panel:nth-child(2) {
+    max-width: none;
   }
 }
 
