@@ -20,7 +20,7 @@
 
     <div v-else class="planning-staffing-grid" data-testid="planning-staffing-workspace">
       <section class="module-card planning-staffing-panel">
-        <div class="planning-staffing-panel__header">
+        <div class="planning-staffing-panel__header planning-staffing-panel__header--filters">
           <div>
             <p class="eyebrow">{{ tp("filtersTitle") }}</p>
             <h3>{{ tp("filtersTitle") }}</h3>
@@ -29,7 +29,13 @@
             </p>
           </div>
           <div class="cta-row planning-staffing-panel__actions">
-            <button class="cta-button cta-secondary" type="button" :disabled="loading" @click="refreshAll">
+            <button
+              class="cta-button cta-secondary"
+              type="button"
+              data-testid="planning-staffing-refresh"
+              :disabled="loading"
+              @click="refreshAll"
+            >
               {{ tp("refresh") }}
             </button>
             <a class="cta-button cta-secondary" href="/admin/employees">{{ tp("openEmployeesAdmin") }}</a>
@@ -47,7 +53,30 @@
           </label>
           <label class="field-stack">
             <span>{{ tp("filtersPlanningRecord") }}</span>
-            <input v-model="filters.planning_record_id" />
+            <Select
+              :value="filters.planning_record_id || undefined"
+              show-search
+              allow-clear
+              class="planning-staffing-select"
+              popup-class-name="planning-staffing-select-dropdown"
+              :loading="planningRecordLookupLoading"
+              :filter-option="false"
+              :options="planningRecordSelectOptions"
+              :placeholder="tp('filtersPlanningRecordPlaceholder')"
+              data-testid="planning-staffing-planning-record-select"
+              @search="handlePlanningRecordSearch"
+              @change="handlePlanningRecordSelection"
+              @clear="clearPlanningRecordSelection"
+            />
+            <p v-if="planningRecordLookupLoading" class="field-help">{{ tp("filtersPlanningRecordLoading") }}</p>
+            <p v-else-if="planningRecordLookupError" class="field-help">{{ planningRecordLookupError }}</p>
+            <p v-else-if="!planningRecordOptions.length" class="field-help">{{ tp("filtersPlanningRecordEmpty") }}</p>
+            <p
+              v-else-if="filters.planning_record_id && !selectedPlanningRecordOptionLabel"
+              class="field-help"
+            >
+              {{ tp("filtersPlanningRecordNoMatch") }}
+            </p>
           </label>
           <label class="field-stack">
             <span>{{ tp("filtersPlanningMode") }}</span>
@@ -487,8 +516,10 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { Select } from "ant-design-vue";
 
 import { useAuthStore as usePrimaryAuthStore } from "#/store";
+import { listPlanningRecords, type PlanningRecordListItem } from "@/api/planningOrders";
 import {
   assignStaffing,
   createAssignmentValidationOverride,
@@ -524,10 +555,13 @@ import { useAuthStore } from "@/stores/auth";
 import { useLocaleStore } from "@/stores/locale";
 import {
   actorLabel,
+  buildPlanningStaffingPlanningRecordLookupFilters,
+  formatPlanningStaffingPlanningRecordOption,
   buildStaffingMemberOptions,
   coverageTone,
   derivePlanningStaffingActionState,
   mapPlanningStaffingApiMessage,
+  normalizePlanningStaffingLookupDate,
   resolveSelectedDemandGroupId,
   summarizeCoverage,
   summarizeValidations,
@@ -575,6 +609,10 @@ const overrideRuleCode = ref("");
 const overrideReason = ref("");
 const loading = ref(false);
 const savingOverride = ref(false);
+const planningRecordOptions = ref<PlanningRecordListItem[]>([]);
+const planningRecordLookupLoading = ref(false);
+const planningRecordLookupError = ref("");
+const planningRecordLookupSearch = ref("");
 const feedback = reactive({ message: "", title: "", tone: "error" });
 const filters = reactive({
   date_from: "2026-04-05T00:00",
@@ -612,6 +650,15 @@ const actionState = computed(() =>
 const summary = computed(() => summarizeCoverage(coverageRows.value));
 const shiftValidationSummary = computed(() => summarizeValidations(shiftValidations.value));
 const assignmentValidationSummary = computed(() => summarizeValidations(assignmentValidations.value));
+const planningRecordSelectOptions = computed(() =>
+  planningRecordOptions.value.map((record) => ({
+    label: formatPlanningStaffingPlanningRecordOption(record),
+    value: record.id,
+  })),
+);
+const selectedPlanningRecordOptionLabel = computed(
+  () => planningRecordSelectOptions.value.find((option) => option.value === filters.planning_record_id)?.label ?? "",
+);
 const selectableTeamMembers = computed(() => buildStaffingMemberOptions(teamMembers.value, staffingDraft.team_id));
 const selectedMember = computed(() => selectableTeamMembers.value.find((member) => member.id === staffingDraft.member_ref) ?? null);
 const canSubmitAssign = computed(() => {
@@ -656,6 +703,10 @@ function queryFilters() {
   return { ...filters };
 }
 
+const planningRecordLookupCache = new Map<string, PlanningRecordListItem[]>();
+let planningRecordLookupRequestId = 0;
+let planningRecordLookupTimer: ReturnType<typeof setTimeout> | null = null;
+
 function staffingFilters() {
   return {
     shift_id: selectedShiftId.value,
@@ -687,6 +738,78 @@ function formatMember(member: TeamMemberRead) {
     return `worker:${member.subcontractor_worker_id}`;
   }
   return member.id;
+}
+
+function buildPlanningRecordLookupCacheKey(search = "") {
+  return JSON.stringify({
+    tenantId: tenantScopeId.value,
+    planningModeCode: filters.planning_mode_code || "",
+    planningFrom: normalizePlanningStaffingLookupDate(filters.date_from) || "",
+    planningTo: normalizePlanningStaffingLookupDate(filters.date_to) || "",
+    search: search.trim(),
+  });
+}
+
+async function loadPlanningRecordOptions(search = "") {
+  if (!tenantScopeId.value || !accessToken.value) {
+    planningRecordOptions.value = [];
+    planningRecordLookupError.value = "";
+    return;
+  }
+  const cacheKey = buildPlanningRecordLookupCacheKey(search);
+  const cached = planningRecordLookupCache.get(cacheKey);
+  if (cached) {
+    planningRecordOptions.value = cached;
+    planningRecordLookupError.value = "";
+    return;
+  }
+  planningRecordLookupLoading.value = true;
+  planningRecordLookupError.value = "";
+  const requestId = ++planningRecordLookupRequestId;
+  try {
+    const rows = await listPlanningRecords(
+      tenantScopeId.value,
+      accessToken.value,
+      buildPlanningStaffingPlanningRecordLookupFilters(filters, search),
+    );
+    if (requestId !== planningRecordLookupRequestId) {
+      return;
+    }
+    planningRecordLookupCache.set(cacheKey, rows);
+    planningRecordOptions.value = rows;
+  } catch {
+    if (requestId !== planningRecordLookupRequestId) {
+      return;
+    }
+    planningRecordOptions.value = [];
+    planningRecordLookupError.value = tp("filtersPlanningRecordLookupError");
+  } finally {
+    if (requestId === planningRecordLookupRequestId) {
+      planningRecordLookupLoading.value = false;
+    }
+  }
+}
+
+function schedulePlanningRecordLookup(search = planningRecordLookupSearch.value) {
+  if (planningRecordLookupTimer) {
+    clearTimeout(planningRecordLookupTimer);
+  }
+  planningRecordLookupTimer = setTimeout(() => {
+    void loadPlanningRecordOptions(search);
+  }, 250);
+}
+
+function handlePlanningRecordSearch(value: string) {
+  planningRecordLookupSearch.value = value;
+  schedulePlanningRecordLookup(value);
+}
+
+function handlePlanningRecordSelection(value: string | undefined) {
+  filters.planning_record_id = typeof value === "string" ? value : "";
+}
+
+function clearPlanningRecordSelection() {
+  filters.planning_record_id = "";
 }
 
 async function handleAuthExpired() {
@@ -1006,6 +1129,7 @@ async function recoverSessionAndRefresh() {
   if (!ready || !actionState.value.canReadCoverage) {
     return;
   }
+  await loadPlanningRecordOptions();
   await refreshAll();
 }
 
@@ -1073,6 +1197,18 @@ watch(
   },
 );
 
+watch(
+  () => [tenantScopeId.value, accessToken.value, filters.planning_mode_code, filters.date_from, filters.date_to],
+  ([nextTenantScopeId, nextAccessToken]) => {
+    if (!nextTenantScopeId || !nextAccessToken) {
+      planningRecordOptions.value = [];
+      planningRecordLookupError.value = "";
+      return;
+    }
+    schedulePlanningRecordLookup();
+  },
+);
+
 onMounted(async () => {
   authStore.syncFromPrimarySession();
   const sessionReady = await ensureStaffingSessionReady();
@@ -1085,6 +1221,9 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  if (planningRecordLookupTimer) {
+    clearTimeout(planningRecordLookupTimer);
+  }
   document.removeEventListener("visibilitychange", handleVisibilityChange);
   window.removeEventListener("focus", handleWindowFocus);
 });
@@ -1161,12 +1300,29 @@ onBeforeUnmount(() => {
   margin: 0.35rem 0 0;
 }
 
+.planning-staffing-panel__header--filters {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.planning-staffing-panel__header--filters > div,
+.planning-staffing-panel__actions,
+.planning-staffing-filter-grid > *,
+.planning-staffing-filter-grid .field-stack,
+.planning-staffing-select {
+  min-width: 0;
+}
+
 .planning-staffing-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   justify-content: flex-end;
 }
 
 .planning-staffing-filter-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .planning-staffing-filter-grid :deep(.field-stack),
@@ -1202,6 +1358,19 @@ onBeforeUnmount(() => {
   padding: 0.75rem 0.9rem;
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
   width: 100%;
+}
+
+.planning-staffing-filter-grid :deep(.ant-select),
+.planning-staffing-filter-grid :deep(.ant-select-selector),
+.planning-staffing-filter-grid :deep(.ant-select-selection-search),
+.planning-staffing-filter-grid :deep(.ant-select-selection-search-input) {
+  min-width: 0;
+  width: 100%;
+}
+
+.planning-staffing-filter-grid :deep(.ant-select-selector) {
+  align-items: center;
+  min-height: 2.85rem;
 }
 
 .planning-staffing-filter-grid textarea,
@@ -1300,13 +1469,13 @@ onBeforeUnmount(() => {
   .planning-staffing-grid {
     grid-template-columns: 1fr;
   }
-
-  .planning-staffing-filter-grid {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 
 @media (max-width: 900px) {
+  .planning-staffing-panel__header--filters {
+    grid-template-columns: 1fr;
+  }
+
   .planning-staffing-filter-grid {
     grid-template-columns: 1fr;
   }

@@ -158,3 +158,42 @@ export function resolveSelectedDemandGroupId(shift, selectedDemandGroupId) {
     ? selectedDemandGroupId
     : (demandGroups[0].id ?? demandGroups[0].demand_group_id ?? "");
 }
+
+export function normalizePlanningStaffingLookupDate(value) {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : undefined;
+}
+
+export function buildPlanningStaffingPlanningRecordLookupFilters(filters, search = "") {
+  const normalizedSearch = typeof search === "string" ? search.trim() : "";
+  const lookupFilters = {
+    planning_mode_code: filters?.planning_mode_code || undefined,
+    planning_from: normalizePlanningStaffingLookupDate(filters?.date_from),
+    planning_to: normalizePlanningStaffingLookupDate(filters?.date_to),
+    search: normalizedSearch || undefined,
+  };
+  return Object.fromEntries(Object.entries(lookupFilters).filter(([, value]) => value !== undefined && value !== ""));
+}
+
+export function formatPlanningStaffingPlanningRecordOption(record) {
+  if (!record) {
+    return "";
+  }
+  const timeWindow = [record.planning_from, record.planning_to].filter(Boolean).join(" -> ");
+  return [
+    record.name || record.id,
+    record.planning_mode_code,
+    timeWindow,
+    record.release_state,
+    record.status,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+}

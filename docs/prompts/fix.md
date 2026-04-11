@@ -1,107 +1,131 @@
-You are working in the latest SicherPlan repository state.
+You are working in the SicherPlan repository.
 
 Task goal:
-Fix the backend 500 error that breaks `/admin/planning-staffing` by aligning the staffing-board / coverage filter contract across router, schemas, service, and repository.
+Fix the "Filters and scope" UX in `/admin/planning-staffing` (P-04 Staffing Board & Coverage) by replacing the user-facing `Planning record ID` textbox with a business-friendly planning-record selector and by making the filter/header layout responsive on narrow widths.
 
-Read first:
-1. `AGENTS.md`
-2. the relevant `docs/sprint/*.md` and `docs/prompts/*.md` item for planning staffing / coverage if it exists
-3. keep the change set narrow and traceable to the correct task/story; if no matching task exists, say so explicitly in your summary
+Before coding:
+1. Read `AGENTS.md`.
+2. Find the relevant `US-N-TN` task in `docs/sprint/*.md` or `docs/prompts/*.md`.
+3. If no official task exists for this exact refinement, say that explicitly in your final summary and keep backlog traceability clear.
+4. Keep this change narrowly scoped to the filter/header UX and responsiveness. Do NOT change permissions, auth flow, staffing logic, or backend schemas unless a very small supporting fix is strictly required.
 
-Files to inspect first:
+Inspect first:
+- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
+- `web/apps/web-antd/src/sicherplan-legacy/api/planningOrders.ts`
+- `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
 - `backend/app/modules/planning/router.py`
-- `backend/app/modules/planning/staffing_service.py`
-- `backend/app/modules/planning/repository.py`
-- `backend/app/modules/planning/schemas.py`
-- tests covering planning staffing / coverage / board endpoints
-- only for context, inspect:
-  - `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
-  - `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
+- the actual style source for:
+  - `.planning-staffing-filter-grid`
+  - `.planning-staffing-panel__header`
+  - `.planning-staffing-panel__actions`
+  - `.field-stack`
+  - related filter/header classes
+  This style source may be in the same `.vue` file or in a shared legacy stylesheet.
+- any existing select-search / combobox pattern already used in `web/apps/web-antd`
 
-Bug to verify:
-The current backend crashes on:
-- `GET /api/planning/tenants/{tenant_id}/ops/coverage?...`
-- `GET /api/planning/tenants/{tenant_id}/ops/staffing-board?...`
+Current facts you must verify in code before changing anything:
+- `PlanningStaffingCoverageView.vue` currently renders the planning-record filter as a raw textbox bound to `filters.planning_record_id`.
+- The current page already derives role/tenant/token from the auth store. Do not rework auth/session handling.
+- `listPlanningRecords(...)` already exists in `planningOrders.ts`.
+- `PlanningRecordListItem` already provides at least:
+  - `id`
+  - `name`
+  - `planning_mode_code`
+  - `planning_from`
+  - `planning_to`
+  - `release_state`
+  - `status`
+- Backend planning-record list supports filters such as:
+  - `search`
+  - `planning_mode_code`
+  - `planning_from`
+  - `planning_to`
+- Backend staffing-board / coverage filters already support `planning_record_id` and the current date-window filters.
 
-Observed traceback shows:
-- `coverage()` calls `staffing_board()`
-- `staffing_board()` calls `repository.list_board_shifts(...)`
-- inside `list_board_shifts`, code dereferences `filters.visibility_state`
-- but the current `StaffingBoardFilter` contract is not aligned, so `filters.visibility_state` is missing and raises `AttributeError`
+Required UX decision:
+- The primary user-facing control must NOT remain a raw textbox.
+- Replace it with a business-friendly select-search / combobox for planning records.
+- Rename the user-visible label from `Planning record ID` to `Planning record` (and the DE equivalent).
+- Keep the underlying selected value mapped to `filters.planning_record_id` so the backend contract remains unchanged.
+- A raw ID paste field is allowed only as a secondary advanced/debug affordance, not as the main control.
+- Default recommendation is a searchable selector. Only fall back to a plain select if you can explicitly justify that choice from repo-wide UI constraints and final usability.
 
-What to verify carefully:
-1. Whether `visibility_state` is missing from `StaffingBoardFilter`
-2. Whether `visibility_state` is missing from `CoverageFilter`
-3. Whether `_staffing_board_filters` and `_coverage_filters` expose that query param
-4. Whether `coverage()` passes visibility through when constructing `StaffingBoardFilter`
-5. Whether there are any other similar filter-field drifts, e.g. fields referenced in repository/service but not guaranteed by the Pydantic filter models
+Planning-record selector requirements:
+- Reuse the existing `listPlanningRecords()` API. Do NOT add a new backend endpoint if it is not necessary.
+- Prefer an existing repo-standard searchable select component/pattern (Vben / web-antd / repo-local). Do NOT add a new dependency just for this.
+- Build option labels from existing list-item data, for example:
+  `name · planning_mode_code · planning_from → planning_to`
+  You may append release/status meta if it improves clarity.
+- Support clear selection = "all planning records".
+- Add loading, empty, and error states.
+- Inspect the backend filter contract carefully and send only supported filters.
+- Important:
+  - planning-record list uses date-based filters
+  - staffing board uses datetime-local filters
+  Convert safely or omit those filters instead of sending unsupported values.
+- Avoid unnecessary network chatter:
+  - debounce remote search if remote search is used
+  - and/or cache the recent option set per tenant scope if appropriate
 
-Required implementation outcome:
-A. Make `visibility_state` a safe, optional, contract-defined filter field for staffing-board logic.
-   - Prefer a constrained type if the repo already uses a pattern for narrow code values, e.g. `Literal["customer", "subcontractor"] | None`
-   - If there is an existing enum / lookup convention already used in this module, follow that instead
+Responsive layout requirements:
+- Fix the `Filters and scope` header so CTA buttons wrap cleanly instead of colliding when width shrinks.
+- Fix the filter grid so inputs/selects never overflow, overlap, or break alignment.
+- Ensure `datetime-local`, native selects, text inputs, and the new planning-record selector all become full-width inside their grid cells.
+- Use `min-width: 0` where needed to prevent intrinsic-width overflow.
+- Prefer a responsive grid such as `repeat(auto-fit, minmax(...))` or a clearly equivalent solution.
+- Add at least one narrow-screen breakpoint where the filter area stacks cleanly into a single column if needed.
+- Preserve the current visual language. Do NOT redesign the entire page.
 
-B. Ensure both endpoints work when `visibility_state` is omitted.
-   - Current UI does not send `visibility_state`
-   - Omitted `visibility_state` must NOT crash
-   - The default behavior should be the current internal/unfiltered staffing board behavior, not a silent semantic change
+Implementation constraints:
+- Keep `refreshAll()`, `queryFilters()`, and downstream use of `filters.planning_record_id` working exactly as before from the API perspective.
+- Do NOT change backend response shapes unless strictly required.
+- Do NOT refactor unrelated staffing actions, validation logic, dispatch, or overrides.
+- Keep DE-first / EN-secondary text parity for any new labels, placeholders, helper text, or empty states.
+- Prefer a focused change set over broad cleanup.
 
-C. If the product/API should support visibility filtering explicitly, expose it consistently:
-   - add it to `StaffingBoardFilter`
-   - add it to `CoverageFilter` if coverage should support the same pass-through
-   - add optional query params in router helpers
-   - pass it through in `coverage()` when building `StaffingBoardFilter`
+Suggested implementation direction:
+1. Add planning-record option state and loading state to `PlanningStaffingCoverageView.vue`.
+2. Reuse `listPlanningRecords()` from `planningOrders.ts`.
+3. Map the selected planning-record option back to `filters.planning_record_id`.
+4. Replace the raw textbox with a searchable selector.
+5. Keep an optional advanced raw-ID input only if truly justified.
+6. Update the filter/header styles at their real source so the layout wraps correctly on narrow widths.
+7. Add or update targeted tests.
 
-D. Make repository-side access robust.
-   - Do not blindly dereference a field that the contract may not provide
-   - Use a clear local variable and guard the visibility predicate cleanly
-   - Preserve existing customer/subcontractor visibility semantics if that filtering is already implemented
+Tests and validation:
+- Add or update tests for:
+  - planning-record option loading/mapping
+  - selection behavior updating `filters.planning_record_id`
+  - clear behavior resetting `filters.planning_record_id`
+  - supported filter conversion for planning-record lookup
+  - no regression in `refreshAll()` filtering behavior
+- If the repo does not have a viewport-aware UI test harness, do a documented manual responsive verification and say so explicitly.
+- Run the relevant build / lint / typecheck / tests before finishing.
 
-E. Audit the rest of the staffing filter contract.
-   - Compare all fields used in repository/service against:
-     - `StaffingBoardFilter`
-     - `CoverageFilter`
-     - `_staffing_board_filters`
-     - `_coverage_filters`
-   - Fix any additional mismatches found in the same narrow change set if they are part of the same root cause
-   - Do NOT do unrelated refactors
+Manual acceptance checks:
+- On `/admin/planning-staffing`, the user can choose a planning record without knowing the raw UUID.
+- The chosen planning record still filters coverage/staffing correctly via `filters.planning_record_id`.
+- On narrower widths, the CTA row wraps cleanly, fields align, and no control overlaps or spills horizontally.
+- The page still uses the existing authenticated session and tenant scope.
 
-Important product guardrails:
-- Keep tenant scoping intact
-- Keep role-scoped visibility intact
-- Do not change finance bridging or anything around `finance.actual_record`
-- Do not broaden portal/customer/subcontractor data visibility
-- Do not require frontend changes just to stop the backend crash unless a tiny type alignment is absolutely necessary
+Important self-check:
+Before finalizing, challenge your own implementation and verify that:
+- you did NOT leave the raw planning-record textbox as the primary control
+- you did NOT break the existing `planning_record_id` API contract
+- you did NOT send unsupported datetime values to the planning-record list endpoint
+- you did NOT touch auth/session logic unnecessarily
+- you did NOT leave the header/action row or filter grid broken on narrow screens
+- you did NOT introduce unrelated refactors
 
-Tests and validation required:
-1. Add/update backend tests for:
-   - `/ops/staffing-board` without `visibility_state` -> returns 200, no AttributeError
-   - `/ops/coverage` without `visibility_state` -> returns 200, no AttributeError
-   - `/ops/staffing-board?visibility_state=customer` -> returns 200 and applies expected visibility predicate
-   - `/ops/staffing-board?visibility_state=subcontractor` -> returns 200 and applies expected visibility predicate
-   - if coverage is meant to support pass-through visibility filtering, test that too
-2. Add at least one regression test specifically proving this bug no longer occurs
-3. Run the relevant test suite / targeted tests / lint or type checks available in the repo
-
-Preferred fix shape:
-- small schema change
-- small router change
-- small service pass-through change
-- robust repository guard
-- regression tests
-
-Self-check before finalizing:
-- Confirm the bug is fixed for both endpoints, not just one
-- Confirm current UI requests without `visibility_state` now work
-- Confirm you did not remove legitimate visibility filtering capability
-- Confirm tenant/role visibility semantics did not broaden
-- Confirm there are no other obvious filter-model mismatches left in this staffing path
-
-Final response format:
+Required final response format:
 1. Short implementation summary
 2. Exact files changed
-3. Root cause confirmed
-4. What was changed in schemas/router/service/repository
-5. Tests run and results
-6. Any additional filter-contract mismatches found
-7. Self-validation summary
+3. Verified current issues
+4. What changed and why
+5. Test/build/typecheck/lint results
+6. Manual responsive validation result
+7. Remaining assumptions or blockers
+8. Self-validation explaining why:
+   - select-search is the correct control for P-04 here
+   - the responsive layout is now fixed
+   - no unrelated regressions were introduced

@@ -3,12 +3,15 @@ import assert from "node:assert/strict";
 
 import {
   actorLabel,
+  buildPlanningStaffingPlanningRecordLookupFilters,
   buildStaffingMemberOptions,
   coverageTone,
   dispatchAudienceLabel,
   derivePlanningStaffingActionState,
+  formatPlanningStaffingPlanningRecordOption,
   hasPlanningStaffingPermission,
   mapPlanningStaffingApiMessage,
+  normalizePlanningStaffingLookupDate,
   releaseTone,
   resolveSelectedDemandGroupId,
   summarizeCoverage,
@@ -109,5 +112,45 @@ test("selected demand group falls back safely to the first visible row", () => {
       "missing",
     ),
     "dg-1",
+  );
+});
+
+test("planning-record lookup filters convert datetime-local values into supported planning date filters", () => {
+  assert.deepEqual(
+    buildPlanningStaffingPlanningRecordLookupFilters(
+      {
+        date_from: "2026-04-05T08:00",
+        date_to: "2026-04-06T19:30",
+        planning_mode_code: "site",
+      },
+      " Nord ",
+    ),
+    {
+      planning_from: "2026-04-05",
+      planning_to: "2026-04-06",
+      planning_mode_code: "site",
+      search: "Nord",
+    },
+  );
+});
+
+test("planning-record lookup date normalization omits invalid or empty values", () => {
+  assert.equal(normalizePlanningStaffingLookupDate(""), undefined);
+  assert.equal(normalizePlanningStaffingLookupDate("not-a-date"), undefined);
+  assert.equal(normalizePlanningStaffingLookupDate("2026-04-05"), "2026-04-05");
+});
+
+test("planning-record options render business-friendly labels", () => {
+  assert.equal(
+    formatPlanningStaffingPlanningRecordOption({
+      id: "planning-1",
+      name: "Messe Nord",
+      planning_mode_code: "trade_fair",
+      planning_from: "2026-04-05",
+      planning_to: "2026-04-06",
+      release_state: "draft",
+      status: "active",
+    }),
+    "Messe Nord | trade_fair | 2026-04-05 -> 2026-04-06 | draft | active",
   );
 });

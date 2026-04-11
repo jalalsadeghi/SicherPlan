@@ -3,8 +3,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 
-import PlanningStaffingCoverageView from "../../views/PlanningStaffingCoverageView.vue";
-
 const sessionState = vi.hoisted(() => ({
   accessToken: "token-1",
   role: "dispatcher",
@@ -110,6 +108,23 @@ const mocks = vi.hoisted(() => ({
     },
   ]),
   listSubcontractorReleasesMock: vi.fn(async () => []),
+  listPlanningRecordsMock: vi.fn(async () => [
+    {
+      id: "planning-1",
+      tenant_id: "tenant-1",
+      order_id: "order-1",
+      parent_planning_record_id: null,
+      dispatcher_user_id: "user-1",
+      planning_mode_code: "site",
+      name: "Planning 1",
+      planning_from: "2026-04-05",
+      planning_to: "2026-04-06",
+      release_state: "draft",
+      released_at: null,
+      status: "active",
+      version_no: 1,
+    },
+  ]),
   listTeamMembersMock: vi.fn(async () => [
     {
       id: "member-1",
@@ -215,7 +230,12 @@ vi.mock("@/api/planningStaffing", () => ({
   },
 }));
 
+vi.mock("@/api/planningOrders", () => ({
+  listPlanningRecords: mocks.listPlanningRecordsMock,
+}));
+
 async function mountView() {
+  const { default: PlanningStaffingCoverageView } = await import("../../views/PlanningStaffingCoverageView.vue");
   const wrapper = mount(PlanningStaffingCoverageView);
   await flushPromises();
   return wrapper;
@@ -230,6 +250,23 @@ describe("PlanningStaffingCoverageView", () => {
       mock.mockClear();
     }
     mocks.ensureSessionReadyMock.mockResolvedValue(true);
+    mocks.listPlanningRecordsMock.mockResolvedValue([
+      {
+        id: "planning-1",
+        tenant_id: "tenant-1",
+        order_id: "order-1",
+        parent_planning_record_id: null,
+        dispatcher_user_id: "user-1",
+        planning_mode_code: "site",
+        name: "Planning 1",
+        planning_from: "2026-04-05",
+        planning_to: "2026-04-06",
+        release_state: "draft",
+        released_at: null,
+        status: "active",
+        version_no: 1,
+      },
+    ]);
     mocks.listStaffingCoverageMock.mockResolvedValue([
       {
         shift_id: "shift-1",
@@ -272,7 +309,10 @@ describe("PlanningStaffingCoverageView", () => {
     const wrapper = await mountView();
 
     expect(wrapper.find('[data-testid="planning-staffing-workspace"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-staffing-planning-record-select"]').exists()).toBe(true);
     expect(wrapper.text()).toContain("Filter und Scope");
+    expect(wrapper.text()).toContain("Planungsdatensatz");
+    expect(wrapper.text()).not.toContain("Planungsdatensatz-ID");
     expect(wrapper.text()).not.toContain("Staffing-Validierungen");
     expect(wrapper.text()).not.toContain("Sessionbasierter Scope");
     expect(wrapper.text()).not.toContain("Bearer-Token");
@@ -309,5 +349,31 @@ describe("PlanningStaffingCoverageView", () => {
     await flushPromises();
     expect(mocks.substituteStaffingMock).toHaveBeenCalledTimes(1);
     expect(mocks.listStaffingBoardMock.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("maps planning-record select change and clear back to filters.planning_record_id", async () => {
+    const wrapper = await mountView();
+    const selects = wrapper.findAllComponents({ name: "ASelect" });
+    const planningRecordSelect = selects[0]!;
+
+    planningRecordSelect.vm.$emit("change", "planning-1");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-staffing-refresh"]').trigger("click");
+
+    expect(mocks.listStaffingCoverageMock).toHaveBeenLastCalledWith(
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({ planning_record_id: "planning-1" }),
+    );
+
+    planningRecordSelect.vm.$emit("clear");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-staffing-refresh"]').trigger("click");
+
+    expect(mocks.listStaffingCoverageMock).toHaveBeenLastCalledWith(
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({ planning_record_id: "" }),
+    );
   });
 });
