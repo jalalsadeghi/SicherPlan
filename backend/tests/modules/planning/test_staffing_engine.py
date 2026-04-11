@@ -551,6 +551,7 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
 
     def list_board_shifts(self, tenant_id: str, filters: StaffingBoardFilter):
         rows = []
+        visibility_state = getattr(filters, "visibility_state", None)
         for shift in self.shifts.values():
             if shift.tenant_id != tenant_id or shift.archived_at is not None:
                 continue
@@ -572,6 +573,12 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
             if filters.workforce_scope_code is not None and shift_plan.workforce_scope_code != filters.workforce_scope_code:
                 continue
             if filters.release_state is not None and shift.release_state != filters.release_state:
+                continue
+            if visibility_state == "customer" and not shift.customer_visible_flag:
+                continue
+            if visibility_state == "subcontractor" and not shift.subcontractor_visible_flag:
+                continue
+            if visibility_state == "stealth" and not shift.stealth_mode_flag:
                 continue
             rows.append(
                 {
@@ -654,7 +661,7 @@ class StaffingServiceTests(unittest.TestCase):
                 local_start_time=time(8, 0),
                 local_end_time=time(16, 0),
                 default_break_minutes=30,
-                shift_type_code="day",
+                shift_type_code="site_day",
             ),
             _context("planning.shift.write"),
         )
@@ -904,6 +911,84 @@ class StaffingServiceTests(unittest.TestCase):
         self.assertEqual(demand_states[yellow.id], "yellow")
         self.assertEqual(demand_states[green.id], "green")
 
+    def test_staffing_board_without_visibility_state_does_not_crash(self) -> None:
+        rows = self.service.staffing_board(
+            "tenant-1",
+            StaffingBoardFilter(
+                date_from=datetime(2026, 4, 5, 0, 0, tzinfo=UTC),
+                date_to=datetime(2026, 4, 6, 0, 0, tzinfo=UTC),
+            ),
+            _context("planning.staffing.read"),
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].id, self.shift_id)
+
+    def test_coverage_without_visibility_state_does_not_crash(self) -> None:
+        rows = self.service.coverage(
+            "tenant-1",
+            CoverageFilter(
+                date_from=datetime(2026, 4, 5, 0, 0, tzinfo=UTC),
+                date_to=datetime(2026, 4, 6, 0, 0, tzinfo=UTC),
+            ),
+            _context("planning.staffing.read"),
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].shift_id, self.shift_id)
+
+    def test_staffing_board_supports_customer_visibility_filter(self) -> None:
+        shift = self.repository.get_shift("tenant-1", self.shift_id)
+        assert shift is not None
+        shift.customer_visible_flag = True
+
+        rows = self.service.staffing_board(
+            "tenant-1",
+            StaffingBoardFilter(
+                date_from=datetime(2026, 4, 5, 0, 0, tzinfo=UTC),
+                date_to=datetime(2026, 4, 6, 0, 0, tzinfo=UTC),
+                visibility_state="customer",
+            ),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].id, self.shift_id)
+
+    def test_staffing_board_supports_subcontractor_visibility_filter(self) -> None:
+        shift = self.repository.get_shift("tenant-1", self.shift_id)
+        assert shift is not None
+        shift.subcontractor_visible_flag = True
+
+        rows = self.service.staffing_board(
+            "tenant-1",
+            StaffingBoardFilter(
+                date_from=datetime(2026, 4, 5, 0, 0, tzinfo=UTC),
+                date_to=datetime(2026, 4, 6, 0, 0, tzinfo=UTC),
+                visibility_state="subcontractor",
+            ),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].id, self.shift_id)
+
+    def test_coverage_passes_visibility_state_through_to_staffing_board(self) -> None:
+        shift = self.repository.get_shift("tenant-1", self.shift_id)
+        assert shift is not None
+        shift.customer_visible_flag = True
+
+        rows = self.service.coverage(
+            "tenant-1",
+            CoverageFilter(
+                date_from=datetime(2026, 4, 5, 0, 0, tzinfo=UTC),
+                date_to=datetime(2026, 4, 6, 0, 0, tzinfo=UTC),
+                visibility_state="customer",
+            ),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].shift_id, self.shift_id)
+
     def test_employee_function_mismatch_blocks_assignment(self) -> None:
         demand = self.service.create_demand_group(
             "tenant-1",
@@ -964,7 +1049,7 @@ class StaffingServiceTests(unittest.TestCase):
                 starts_at=datetime(2026, 4, 6, 8, 0, tzinfo=UTC),
                 ends_at=datetime(2026, 4, 6, 16, 0, tzinfo=UTC),
                 break_minutes=30,
-                shift_type_code="day",
+                shift_type_code="site_day",
                 source_kind_code="manual",
             ),
             _context("planning.shift.write"),
@@ -1100,7 +1185,7 @@ class StaffingServiceTests(unittest.TestCase):
                 starts_at=datetime(2026, 4, 5, 12, 0, tzinfo=UTC),
                 ends_at=datetime(2026, 4, 5, 20, 0, tzinfo=UTC),
                 break_minutes=30,
-                shift_type_code="late",
+                shift_type_code="site_night",
                 source_kind_code="manual",
             ),
             _context("planning.shift.write"),

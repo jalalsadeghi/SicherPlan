@@ -457,6 +457,7 @@ def _staffing_board_filters(
     function_type_id: UUID | None = Query(default=None),
     qualification_type_id: UUID | None = Query(default=None),
     release_state: str | None = Query(default=None),
+    visibility_state: str | None = Query(default=None),
     assignment_status_code: str | None = Query(default=None),
     confirmation_state: str | None = Query(default=None),
 ) -> StaffingBoardFilter:
@@ -472,6 +473,7 @@ def _staffing_board_filters(
         function_type_id=str(function_type_id) if function_type_id else None,
         qualification_type_id=str(qualification_type_id) if qualification_type_id else None,
         release_state=release_state,
+        visibility_state=visibility_state,
         assignment_status_code=assignment_status_code,
         confirmation_state=confirmation_state,
     )
@@ -488,6 +490,7 @@ def _coverage_filters(
     function_type_id: UUID | None = Query(default=None),
     qualification_type_id: UUID | None = Query(default=None),
     release_state: str | None = Query(default=None),
+    visibility_state: str | None = Query(default=None),
     confirmation_state: str | None = Query(default=None),
 ) -> CoverageFilter:
     return CoverageFilter(
@@ -501,6 +504,7 @@ def _coverage_filters(
         function_type_id=str(function_type_id) if function_type_id else None,
         qualification_type_id=str(qualification_type_id) if qualification_type_id else None,
         release_state=release_state,
+        visibility_state=visibility_state,
         confirmation_state=confirmation_state,
     )
 

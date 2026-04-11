@@ -524,6 +524,7 @@ class StaffingService:
             planning_mode_code=filters.planning_mode_code,
             workforce_scope_code=filters.workforce_scope_code,
             release_state=filters.release_state,
+            visibility_state=filters.visibility_state,
             confirmation_state=filters.confirmation_state,
             function_type_id=filters.function_type_id,
             qualification_type_id=filters.qualification_type_id,

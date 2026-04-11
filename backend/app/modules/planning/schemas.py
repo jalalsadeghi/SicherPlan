@@ -1833,6 +1833,7 @@ class StaffingBoardFilter(BaseModel):
     function_type_id: str | None = None
     qualification_type_id: str | None = None
     release_state: str | None = None
+    visibility_state: str | None = None
     assignment_status_code: str | None = None
     confirmation_state: str | None = None
 
@@ -1883,4 +1884,5 @@ class CoverageFilter(BaseModel):
     function_type_id: str | None = None
     qualification_type_id: str | None = None
     release_state: str | None = None
+    visibility_state: str | None = None
     confirmation_state: str | None = None

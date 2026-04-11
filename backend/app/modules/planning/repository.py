@@ -1272,11 +1272,12 @@ class SqlAlchemyPlanningRepository:
             statement = statement.where(Shift.release_state == filters.release_state)
         if filters.lifecycle_status is not None:
             statement = statement.where(Shift.status == filters.lifecycle_status)
-        if filters.visibility_state == "customer":
+        visibility_state = getattr(filters, "visibility_state", None)
+        if visibility_state == "customer":
             statement = statement.where(Shift.customer_visible_flag.is_(True))
-        elif filters.visibility_state == "subcontractor":
+        elif visibility_state == "subcontractor":
             statement = statement.where(Shift.subcontractor_visible_flag.is_(True))
-        elif filters.visibility_state == "stealth":
+        elif visibility_state == "stealth":
             statement = statement.where(Shift.stealth_mode_flag.is_(True))
         if filters.planning_record_id is not None:
             statement = statement.join(ShiftPlan, ShiftPlan.id == Shift.shift_plan_id).where(
@@ -1420,11 +1421,12 @@ class SqlAlchemyPlanningRepository:
             statement = statement.where(ShiftPlan.workforce_scope_code == filters.workforce_scope_code)
         if filters.release_state is not None:
             statement = statement.where(Shift.release_state == filters.release_state)
-        if filters.visibility_state == "customer":
+        visibility_state = getattr(filters, "visibility_state", None)
+        if visibility_state == "customer":
             statement = statement.where(Shift.customer_visible_flag.is_(True))
-        elif filters.visibility_state == "subcontractor":
+        elif visibility_state == "subcontractor":
             statement = statement.where(Shift.subcontractor_visible_flag.is_(True))
-        elif filters.visibility_state == "stealth":
+        elif visibility_state == "stealth":
             statement = statement.where(Shift.stealth_mode_flag.is_(True))
         rows = self.session.execute(statement).mappings().all()
         return [dict(row) for row in rows]
