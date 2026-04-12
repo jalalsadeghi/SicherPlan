@@ -1095,6 +1095,7 @@ export type MessageKey =
   | "customerAdmin.permission.missingBody"
   | "customerAdmin.scope.label"
   | "customerAdmin.scope.placeholder"
+  | "customerAdmin.scope.help"
   | "customerAdmin.scope.missingTitle"
   | "customerAdmin.scope.missingBody"
   | "customerAdmin.token.label"
@@ -2909,9 +2910,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Die aktuelle Rolle darf diese Kundenverwaltung nicht aufrufen. Backend-Berechtigungen bleiben trotzdem verbindlich.",
     "customerAdmin.scope.label": "Mandantenscope",
     "customerAdmin.scope.placeholder": "Tenant UUID eingeben",
+    "customerAdmin.scope.help":
+      "Plattform-Admins können hier gezielt den Mandantenkontext wechseln. Normale interne Rollen verwenden automatisch den Scope aus der angemeldeten Sitzung.",
     "customerAdmin.scope.missingTitle": "Scope oder Sitzung fehlt",
     "customerAdmin.scope.missingBody":
-      "Für die Kunden-API werden ein Mandantenscope und ein gültiges Bearer-Token benötigt.",
+      "Für die Kundenverwaltung ist ein aufgelöster Mandantenkontext aus der Sitzung oder einer expliziten Plattform-Admin-Auswahl erforderlich.",
     "customerAdmin.token.label": "Bearer-Token",
     "customerAdmin.token.placeholder": "Access Token für die Backend-API",
     "customerAdmin.token.help":
@@ -4786,9 +4789,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "The current role is not allowed to open this customer workspace. Backend permissions remain authoritative.",
     "customerAdmin.scope.label": "Tenant scope",
     "customerAdmin.scope.placeholder": "Enter tenant UUID",
+    "customerAdmin.scope.help":
+      "Platform admins can deliberately switch the tenant context here. Normal internal roles use the scope from the authenticated session automatically.",
     "customerAdmin.scope.missingTitle": "Scope or session missing",
     "customerAdmin.scope.missingBody":
-      "The customer API currently needs both a tenant scope and a valid bearer token.",
+      "The customer workspace needs a resolved tenant context from the authenticated session or an explicit platform-admin tenant selection.",
     "customerAdmin.token.label": "Bearer token",
     "customerAdmin.token.placeholder": "Access token for the backend API",
     "customerAdmin.token.help":

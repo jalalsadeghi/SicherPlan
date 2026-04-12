@@ -13,7 +13,7 @@
       </div>
     </section>
 
-    <div v-if="!embedded" class="module-card employee-admin-scope" :class="{ 'employee-admin-scope--embedded': embedded }">
+    <div v-if="!embedded && isPlatformAdmin" class="module-card employee-admin-scope" :class="{ 'employee-admin-scope--embedded': embedded }">
       <label class="field-stack">
         <span>{{ t("employeeAdmin.scope.label") }}</span>
         <input v-model="tenantScopeInput" :disabled="!isPlatformAdmin" :placeholder="t('employeeAdmin.scope.placeholder')" />
@@ -3684,6 +3684,16 @@ watch(
   },
 );
 
+watch(
+  () => [authStore.effectiveRole, authStore.effectiveTenantScopeId] as const,
+  () => {
+    if (!isPlatformAdmin.value) {
+      tenantScopeInput.value = authStore.effectiveTenantScopeId || authStore.tenantScopeId;
+    }
+  },
+  { immediate: true },
+);
+
 function fileToBase64(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -3697,16 +3707,13 @@ function fileToBase64(file: File) {
 }
 
 onMounted(async () => {
-  if (authStore.accessToken && !authStore.sessionUser) {
-    try {
-      await authStore.loadCurrentSession();
-    } catch {
-      // handled by store
-    }
+  authStore.syncFromPrimarySession();
+  try {
+    await authStore.ensureSessionReady();
+  } catch {
+    // handled by store
   }
-  if (!isPlatformAdmin.value) {
-    tenantScopeInput.value = authStore.effectiveTenantScopeId || authStore.tenantScopeId;
-  }
+  tenantScopeInput.value = authStore.effectiveTenantScopeId || authStore.tenantScopeId;
   resetEmployeeDraft();
   await refreshEmployees();
 });

@@ -34,6 +34,24 @@ test("customer workspace keeps desktop master detail layout with detail tabs", (
   assert.match(source, /resolveCustomerAdminRouteContext\(route\.query\)/);
 });
 
+test("customer workspace removes the manual bearer-token gate and only keeps tenant switching for platform admins", () => {
+  assert.match(source, /<div v-if="isPlatformAdmin" class="module-card customer-admin-scope"/);
+  assert.match(source, /<section v-if="!tenantScopeId" class="module-card customer-admin-empty">/);
+  assert.match(source, /const isPlatformAdmin = computed\(\(\) => authStore\.effectiveRole === "platform_admin"\)/);
+  assert.match(source, /const tenantScopeId = computed\(\(\) => authStore\.effectiveTenantScopeId\)/);
+  assert.match(source, /const accessToken = computed\(\(\) => authStore\.effectiveAccessToken \|\| authStore\.accessToken\)/);
+  assert.match(source, /authStore\.syncFromPrimarySession\(\)/);
+  assert.match(source, /await authStore\.ensureSessionReady\(\)/);
+  assert.match(source, /syncCustomerSessionState\(\)/);
+  assert.doesNotMatch(source, /customerAdmin\.token\.label/);
+  assert.doesNotMatch(source, /customerAdmin\.token\.placeholder/);
+  assert.doesNotMatch(source, /customerAdmin\.token\.help/);
+  assert.doesNotMatch(source, /rememberScopeAndToken/);
+  assert.doesNotMatch(source, /accessTokenInput/);
+  assert.doesNotMatch(source, /readStoredAccessToken/);
+  assert.doesNotMatch(source, /ACCESS_TOKEN_STORAGE_KEY/);
+});
+
 test("customer same-record reloads preserve nested tab context with safe fallbacks", () => {
   assert.match(source, /type SelectCustomerOptions = \{/);
   assert.match(source, /preserveDetailTab\?: boolean/);

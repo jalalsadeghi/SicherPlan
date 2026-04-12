@@ -1,8 +1,4 @@
-import { webAppConfig } from "@/config/env";
-import { useAccessStore } from "@vben/stores";
-
-import { refreshTokenApi } from "#/api/core/auth";
-import { useAuthStore as useLegacyAuthStore } from "@/stores/auth";
+import { legacySessionRequest } from "./sessionRequest";
 
 export interface EmployeeListItem {
   id: string;
@@ -571,13 +567,19 @@ function isApiErrorEnvelope(value: unknown): value is ApiErrorEnvelope {
 
 async function request<T>(
   path: string,
-  accessToken: string,
+  _accessToken: string,
   options?: {
     method?: string;
     body?: unknown;
   },
 ): Promise<T> {
-  const response = await performAuthorizedRequest(path, accessToken, options);
+  const response = await legacySessionRequest(path, {
+    headers: {
+      "X-Request-Id": generateRequestId(),
+    },
+    jsonBody: options?.body,
+    method: options?.method ?? "GET",
+  });
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as unknown;
@@ -599,76 +601,6 @@ async function request<T>(
   }
 
   return (await response.json()) as T;
-}
-
-function resolvePrimaryAccessToken() {
-  try {
-    return useAccessStore().accessToken ?? "";
-  } catch {
-    return "";
-  }
-}
-
-async function performAuthorizedRequest(
-  path: string,
-  accessToken: string,
-  options?: {
-    method?: string;
-    body?: unknown;
-  },
-) {
-  const initialToken = resolvePrimaryAccessToken() || accessToken;
-  let response = await performRawRequest(path, initialToken, options);
-
-  if (response.status !== 401) {
-    return response;
-  }
-
-  const refreshedToken = await refreshLegacyEmployeeToken().catch(() => "");
-  if (!refreshedToken || refreshedToken === initialToken) {
-    return response;
-  }
-
-  response = await performRawRequest(path, refreshedToken, options);
-  return response;
-}
-
-async function performRawRequest(
-  path: string,
-  accessToken: string,
-  options?: {
-    method?: string;
-    body?: unknown;
-  },
-) {
-  return fetch(`${webAppConfig.apiBaseUrl}${path}`, {
-    method: options?.method ?? "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-      "X-Request-Id": generateRequestId(),
-    },
-    body: options?.body == null ? undefined : JSON.stringify(options.body),
-  });
-}
-
-async function refreshLegacyEmployeeToken() {
-  const accessStore = useAccessStore();
-  if (!accessStore.refreshToken) {
-    return "";
-  }
-
-  const refreshed = await refreshTokenApi();
-  accessStore.setAccessToken(refreshed.accessToken);
-  accessStore.setRefreshToken(refreshed.refreshToken);
-
-  try {
-    useLegacyAuthStore().syncFromPrimarySession();
-  } catch {
-    // The legacy store may not be initialized in tests or non-legacy entry points.
-  }
-
-  return refreshed.accessToken;
 }
 
 function buildQuery(params: EmployeeListFilters) {
@@ -1213,13 +1145,12 @@ export async function downloadEmployeeDocument(
   tenantId: string,
   documentId: string,
   versionNo: number,
-  accessToken: string,
+  _accessToken: string,
 ) {
-  const response = await fetch(
-    `${webAppConfig.apiBaseUrl}/api/platform/tenants/${tenantId}/documents/${documentId}/versions/${versionNo}/download`,
+  const response = await legacySessionRequest(
+    `/api/platform/tenants/${tenantId}/documents/${documentId}/versions/${versionNo}/download`,
     {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
         "X-Request-Id": generateRequestId(),
       },
     },

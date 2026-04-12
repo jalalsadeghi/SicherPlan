@@ -1,4 +1,4 @@
-import { webAppConfig } from "@/config/env";
+import { legacySessionRequest } from "./sessionRequest";
 
 export type LifecycleStatus = "active" | "inactive" | "archived";
 
@@ -594,20 +594,18 @@ function isApiErrorEnvelope(value: unknown): value is ApiErrorEnvelope {
 
 async function request<T>(
   path: string,
-  accessToken: string,
+  _accessToken?: string,
   options?: {
     method?: string;
     body?: unknown;
   },
 ): Promise<T> {
-  const response = await fetch(`${webAppConfig.apiBaseUrl}${path}`, {
-    method: options?.method ?? "GET",
+  const response = await legacySessionRequest(path, {
     headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
       "X-Request-Id": generateRequestId(),
     },
-    body: options?.body == null ? undefined : JSON.stringify(options.body),
+    jsonBody: options?.body,
+    method: options?.method ?? "GET",
   });
 
   if (!response.ok) {

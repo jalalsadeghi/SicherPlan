@@ -21,22 +21,14 @@
         </div>
       </div>
 
-      <div class="module-card customer-admin-scope">
+      <div v-if="isPlatformAdmin" class="module-card customer-admin-scope">
         <label class="field-stack">
           <span>{{ t("customerAdmin.scope.label") }}</span>
           <input v-model="tenantScopeInput" :placeholder="t('customerAdmin.scope.placeholder')" />
         </label>
-        <label class="field-stack">
-          <span>{{ t("customerAdmin.token.label") }}</span>
-          <input
-            v-model="accessTokenInput"
-            type="password"
-            :placeholder="t('customerAdmin.token.placeholder')"
-          />
-        </label>
-        <p class="field-help">{{ t("customerAdmin.token.help") }}</p>
+        <p class="field-help">{{ t("customerAdmin.scope.help") }}</p>
         <div class="cta-row">
-          <button class="cta-button" type="button" @click="rememberScopeAndToken">
+          <button class="cta-button" type="button" @click="rememberScope">
             {{ t("customerAdmin.actions.rememberScope") }}
           </button>
           <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="handleRefreshCustomers">
@@ -46,7 +38,7 @@
       </div>
     </section>
 
-    <section v-if="!tenantScopeId || !accessToken" class="module-card customer-admin-empty">
+    <section v-if="!tenantScopeId" class="module-card customer-admin-empty">
       <p class="eyebrow">{{ t("customerAdmin.scope.missingTitle") }}</p>
       <h3>{{ t("customerAdmin.scope.missingBody") }}</h3>
     </section>
@@ -123,7 +115,7 @@
           <button
             class="cta-button cta-secondary"
             type="button"
-            :disabled="!canRead || !tenantScopeId || !accessToken"
+            :disabled="!canRead || !tenantScopeId"
             @click="runCustomerExport"
           >
             {{ t("customerAdmin.actions.exportCustomers") }}
@@ -2090,7 +2082,6 @@ const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
   embedded: false,
 });
 
-const ACCESS_TOKEN_STORAGE_KEY = "sicherplan-access-token";
 const { t } = useI18n();
 const authStore = useAuthStore();
 const route = useRoute();
@@ -2123,10 +2114,7 @@ const selectedRateCardId = ref("");
 const editingRateLineId = ref("");
 const editingSurchargeRuleId = ref("");
 const editingEmployeeBlockId = ref("");
-const tenantScopeInput = ref(authStore.tenantScopeId);
-const tenantScopeId = ref(authStore.tenantScopeId);
-const accessTokenInput = ref(readStoredAccessToken());
-const accessToken = ref(readStoredAccessToken());
+const tenantScopeInput = ref(authStore.effectiveTenantScopeId || authStore.tenantScopeId);
 const attemptedHrCatalogBootstrap = ref(false);
 const portalAccessGeneratedPassword = ref("");
 const portalAccessModalOpen = ref(false);
@@ -2331,10 +2319,13 @@ const portalAccessPasswordDraft = reactive({
 
 const actionState = computed(() => deriveCustomerActionState(authStore.activeRole, selectedCustomer.value));
 const commercialActionState = computed(() => deriveCustomerCommercialActionState(authStore.activeRole));
+const isPlatformAdmin = computed(() => authStore.effectiveRole === "platform_admin");
 const canRead = computed(() => actionState.value.canRead);
 const canWrite = computed(() => actionState.value.canCreate);
 const canReadCommercial = computed(() => commercialActionState.value.canReadCommercial);
 const canWriteCommercial = computed(() => commercialActionState.value.canWriteCommercial);
+const tenantScopeId = computed(() => authStore.effectiveTenantScopeId);
+const accessToken = computed(() => authStore.effectiveAccessToken || authStore.accessToken);
 const customerWorkspaceBusy = computed(
   () =>
     loading.customer
@@ -2355,7 +2346,6 @@ const isDevelopmentEnv = computed(() => webAppConfig.env === "development");
 const canBootstrapHrCatalogSamples = computed(() =>
   isDevelopmentEnv.value
   && !!tenantScopeId.value
-  && !!accessToken.value
   && ["platform_admin", "tenant_admin"].includes(authStore.activeRole ?? ""),
 );
 const canManagePortalAccess = computed(() =>
@@ -2687,37 +2677,20 @@ function normalizeSurchargeRegionCode() {
   surchargeRuleDraft.region_code = `${surchargeRuleDraft.region_code ?? ""}`.toUpperCase();
 }
 
-function readStoredAccessToken() {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  return window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) ?? "";
-}
-
-function syncTenantAdminSessionState() {
+function syncCustomerSessionState() {
   const sessionScope = resolveCustomerAdminSessionScope({
     effectiveRole: authStore.effectiveRole,
     effectiveTenantScopeId: authStore.effectiveTenantScopeId,
-    effectiveAccessToken: authStore.effectiveAccessToken,
-    storedAccessToken: accessTokenInput.value,
   });
 
   tenantScopeInput.value = sessionScope.tenantScopeId;
-  tenantScopeId.value = sessionScope.tenantScopeId;
-  accessTokenInput.value = sessionScope.accessToken;
-  accessToken.value = sessionScope.accessToken;
 }
 
-function rememberScopeAndToken() {
+function rememberScope() {
   authStore.setTenantScopeId(tenantScopeInput.value);
-  tenantScopeId.value = authStore.tenantScopeId;
-  accessToken.value = accessTokenInput.value.trim();
   attemptedHrCatalogBootstrap.value = false;
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken.value);
-  }
-  setFeedback("info", t("customerAdmin.feedback.scopeSaved"), t("customerAdmin.feedback.tokenSaved"));
+  syncCustomerSessionState();
+  setFeedback("info", t("customerAdmin.feedback.scopeSaved"), t("customerAdmin.feedback.scopeSaved"));
   void refreshCustomers();
 }
 
@@ -4806,9 +4779,7 @@ watch(
 watch(
   () => [authStore.effectiveRole, authStore.effectiveTenantScopeId, authStore.effectiveAccessToken],
   () => {
-    if (authStore.effectiveRole === "tenant_admin") {
-      syncTenantAdminSessionState();
-    }
+    syncCustomerSessionState();
   },
 );
 
@@ -4824,18 +4795,12 @@ onMounted(() => {
   resetSurchargeRuleDraft();
   resetPortalPrivacyDraft();
   void (async () => {
-    if (
-      authStore.effectiveRole === "tenant_admin" &&
-      authStore.effectiveAccessToken &&
-      !authStore.sessionUser
-    ) {
-      try {
-        await authStore.loadCurrentSession();
-      } catch {
-        // Keep the page usable with whatever session state is already available.
-      }
+    try {
+      await authStore.ensureSessionReady();
+    } catch {
+      // Keep the page usable with whatever session state is already available.
     }
-    syncTenantAdminSessionState();
+    syncCustomerSessionState();
 
     await refreshCustomers();
   })();

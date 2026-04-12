@@ -48,21 +48,18 @@ export function resolveCustomerAdminSectionVisibility({ effectiveRole, embedded 
 }
 
 export function resolveCustomerAdminSessionScope({
-  effectiveAccessToken,
   effectiveRole,
   effectiveTenantScopeId,
-  storedAccessToken,
 }) {
-  if (effectiveRole === "tenant_admin") {
+  const tenantScopeId = typeof effectiveTenantScopeId === "string" ? effectiveTenantScopeId.trim() : "";
+  if (effectiveRole === "tenant_admin" || effectiveRole === "dispatcher" || effectiveRole === "accounting" || effectiveRole === "controller_qm") {
     return {
-      accessToken: typeof effectiveAccessToken === "string" ? effectiveAccessToken.trim() : "",
-      tenantScopeId: typeof effectiveTenantScopeId === "string" ? effectiveTenantScopeId.trim() : "",
+      tenantScopeId,
     };
   }
 
   return {
-    accessToken: typeof storedAccessToken === "string" ? storedAccessToken.trim() : "",
-    tenantScopeId: typeof effectiveTenantScopeId === "string" ? effectiveTenantScopeId.trim() : "",
+    tenantScopeId,
   };
 }
 

@@ -23,8 +23,17 @@ test("employee workspace uses master detail layout and embedded scope is removed
   assert.match(viewSource, /data-testid="employee-master-detail-layout"/);
   assert.match(viewSource, /data-testid="employee-list-section"/);
   assert.match(viewSource, /data-testid="employee-detail-workspace"/);
-  assert.match(viewSource, /v-if="!embedded" class="module-card employee-admin-scope"/);
+  assert.match(viewSource, /v-if="!embedded && isPlatformAdmin" class="module-card employee-admin-scope"/);
   assert.match(viewSource, /\.employee-admin-grid\s*{\s*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(320px,\s*420px\)\s*minmax\(0,\s*1fr\)/);
+});
+
+test("employee workspace resolves tenant scope from session bootstrap for normal users", () => {
+  assert.match(viewSource, /<section v-if="!resolvedTenantScopeId" class="module-card employee-admin-empty">/);
+  assert.match(viewSource, /authStore\.syncFromPrimarySession\(\)/);
+  assert.match(viewSource, /await authStore\.ensureSessionReady\(\)/);
+  assert.match(viewSource, /tenantScopeInput\.value = authStore\.effectiveTenantScopeId \|\| authStore\.tenantScopeId/);
+  assert.match(viewSource, /watch\(\s*\(\) => \[authStore\.effectiveRole, authStore\.effectiveTenantScopeId\] as const/);
+  assert.doesNotMatch(viewSource, /await authStore\.loadCurrentSession\(\)/);
 });
 
 test("employee detail uses top-level tabs and isolated tab panels", () => {
