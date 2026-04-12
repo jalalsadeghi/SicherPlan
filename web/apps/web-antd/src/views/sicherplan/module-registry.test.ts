@@ -68,4 +68,16 @@ describe('module registry wrapper flags', () => {
       'controller_qm',
     ]);
   });
+
+  it('registers workforce catalogs as an employees-domain workforce module', () => {
+    const catalogs = moduleRegistry['workforce-catalogs']!;
+    expect(catalogs.allowedRoles).toEqual([
+      'tenant_admin',
+      'dispatcher',
+      'controller_qm',
+    ]);
+    expect(catalogs.showWorkspaceSectionHeader).toBe(false);
+    expect(catalogs.quickLinks.map((link) => link.to)).toContain('/admin/employees');
+    expect(catalogs.quickLinks.map((link) => link.to)).toContain('/admin/planning-staffing');
+  });
 });

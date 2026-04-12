@@ -134,6 +134,17 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        name: 'SicherPlanWorkforceCatalogs',
+        path: '/admin/workforce-catalogs',
+        component: AdminModuleView,
+        meta: {
+          authority: ['tenant_admin', 'dispatcher', 'controller_qm'],
+          icon: 'lucide:library-big',
+          moduleKey: 'workforce-catalogs',
+          title: $t('sicherplan.admin.workforceCatalogs'),
+        },
+      },
+      {
         name: 'SicherPlanSubcontractors',
         path: '/admin/subcontractors',
         component: AdminModuleView,

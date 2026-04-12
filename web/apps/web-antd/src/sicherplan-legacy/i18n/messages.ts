@@ -676,6 +676,7 @@ export type MessageKey =
   | "employeeAdmin.catalogs.eyebrow"
   | "employeeAdmin.catalogs.title"
   | "employeeAdmin.catalogs.lead"
+  | "employeeAdmin.catalogs.pageLead"
   | "employeeAdmin.catalogs.functionTypesEyebrow"
   | "employeeAdmin.catalogs.functionTypesTitle"
   | "employeeAdmin.catalogs.functionTypesLead"
@@ -692,6 +693,9 @@ export type MessageKey =
   | "employeeAdmin.catalogs.qualificationTypeEditorCreateTitle"
   | "employeeAdmin.catalogs.qualificationTypeEditorEditEyebrow"
   | "employeeAdmin.catalogs.qualificationTypeEditorEditTitle"
+  | "employeeAdmin.catalogs.handoffEyebrow"
+  | "employeeAdmin.catalogs.handoffTitle"
+  | "employeeAdmin.catalogs.handoffLead"
   | "employeeAdmin.catalogs.fields.code"
   | "employeeAdmin.catalogs.fields.label"
   | "employeeAdmin.catalogs.fields.category"
@@ -808,6 +812,7 @@ export type MessageKey =
   | "employeeAdmin.actions.saveQualification"
   | "employeeAdmin.actions.resetQualification"
   | "employeeAdmin.actions.openCatalogs"
+  | "employeeAdmin.actions.manageCatalogs"
   | "employeeAdmin.actions.createFunctionType"
   | "employeeAdmin.actions.saveFunctionType"
   | "employeeAdmin.actions.resetFunctionType"
@@ -2456,6 +2461,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.catalogs.title": "Funktions- und Qualifikationstypen",
     "employeeAdmin.catalogs.lead":
       "Diese Mandantenkataloge gehören zur Mitarbeitendenverwaltung und stehen sofort für die Qualifikationspflege in derselben Arbeitsfläche bereit.",
+    "employeeAdmin.catalogs.pageLead":
+      "Tenant-weite HR-Kataloge bleiben im Employees-Kontext verankert, werden aber als eigener Workforce-Arbeitsbereich verwaltet.",
     "employeeAdmin.catalogs.functionTypesEyebrow": "Funktionstypen",
     "employeeAdmin.catalogs.functionTypesTitle": "Funktionstypen pflegen",
     "employeeAdmin.catalogs.functionTypesLead":
@@ -2474,6 +2481,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.catalogs.qualificationTypeEditorCreateTitle": "Qualifikationstyp anlegen",
     "employeeAdmin.catalogs.qualificationTypeEditorEditEyebrow": "Bearbeitung",
     "employeeAdmin.catalogs.qualificationTypeEditorEditTitle": "Qualifikationstyp aktualisieren",
+    "employeeAdmin.catalogs.handoffEyebrow": "Ausgelagert",
+    "employeeAdmin.catalogs.handoffTitle": "Katalogpflege im Workforce-Bereich öffnen",
+    "employeeAdmin.catalogs.handoffLead":
+      "Funktions- und Qualifikationstypen sind tenant-weite HR-Stammdaten. Die volle Pflegeoberfläche liegt jetzt auf der dedizierten Workforce-Katalogseite.",
     "employeeAdmin.catalogs.fields.code": "Code",
     "employeeAdmin.catalogs.fields.label": "Bezeichnung",
     "employeeAdmin.catalogs.fields.category": "Kategorie",
@@ -2589,6 +2600,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.closeAddressValidity": "Gültigkeit beenden",
     "employeeAdmin.actions.resetAddress": "Adressformular leeren",
     "employeeAdmin.actions.openCatalogs": "Kataloge öffnen",
+    "employeeAdmin.actions.manageCatalogs": "Kataloge verwalten",
     "employeeAdmin.actions.createFunctionType": "Funktionstyp anlegen",
     "employeeAdmin.actions.saveFunctionType": "Funktionstyp speichern",
     "employeeAdmin.actions.resetFunctionType": "Funktionstypformular leeren",
@@ -4406,6 +4418,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.catalogs.title": "Function and qualification types",
     "employeeAdmin.catalogs.lead":
       "These tenant-scoped catalogs belong to the Employees workspace and become available to qualification editing in the same workspace immediately.",
+    "employeeAdmin.catalogs.pageLead":
+      "Tenant-wide HR catalogs remain inside the Employees domain but are managed through a dedicated workforce workspace.",
     "employeeAdmin.catalogs.functionTypesEyebrow": "Function types",
     "employeeAdmin.catalogs.functionTypesTitle": "Manage function types",
     "employeeAdmin.catalogs.functionTypesLead":
@@ -4424,6 +4438,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.catalogs.qualificationTypeEditorCreateTitle": "Create qualification type",
     "employeeAdmin.catalogs.qualificationTypeEditorEditEyebrow": "Edit",
     "employeeAdmin.catalogs.qualificationTypeEditorEditTitle": "Update qualification type",
+    "employeeAdmin.catalogs.handoffEyebrow": "Moved out",
+    "employeeAdmin.catalogs.handoffTitle": "Open catalog administration in the Workforce area",
+    "employeeAdmin.catalogs.handoffLead":
+      "Function and qualification types are tenant-wide HR master data. The full maintenance UI now lives on the dedicated workforce catalogs page.",
     "employeeAdmin.catalogs.fields.code": "Code",
     "employeeAdmin.catalogs.fields.label": "Label",
     "employeeAdmin.catalogs.fields.category": "Category",
@@ -4542,6 +4560,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.closeAddressValidity": "Close validity",
     "employeeAdmin.actions.resetAddress": "Clear address form",
     "employeeAdmin.actions.openCatalogs": "Open catalogs",
+    "employeeAdmin.actions.manageCatalogs": "Manage catalogs",
     "employeeAdmin.actions.createFunctionType": "Create function type",
     "employeeAdmin.actions.saveFunctionType": "Save function type",
     "employeeAdmin.actions.resetFunctionType": "Clear function type form",

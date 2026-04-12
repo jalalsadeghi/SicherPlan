@@ -16,6 +16,7 @@
     "reporting": "Reporting",
     "recruiting": "Recruiting",
     "employees": "Employees",
+    "workforceCatalogs": "Workforce catalogs",
     "subcontractors": "Subcontractors",
     "tenantUsers": "Tenant users",
     "health": "Health & diagnostics"
@@ -186,6 +187,10 @@
       "employees": {
         "description": "Employee administration separates private HR data, operational fields, and import flows inside a workforce structure.",
         "workspace": "The existing employee workspace stays intact and has been aligned to the new page grid."
+      },
+      "workforceCatalogs": {
+        "description": "Function and qualification types remain HR-owned tenant master data and now live in their own workforce workspace.",
+        "workspace": "Catalog administration is separated from the employee file while staying inside the same HR domain context."
       },
       "recruiting": {
         "description": "Recruiting is framed as the workforce intake module for applications, review, and document handling.",

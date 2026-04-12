@@ -73,22 +73,20 @@ test("employee detail uses top-level tabs and isolated tab panels", () => {
 test("employee workspace exposes tenant-scoped catalog management without requiring employee selection", () => {
   assert.match(viewSource, /employeeAdmin\.tabs\.catalogs/);
   assert.match(viewSource, /activeDetailTab === 'catalogs'/);
-  assert.match(viewSource, /data-testid="employee-function-types-section"/);
-  assert.match(viewSource, /data-testid="employee-qualification-types-section"/);
-  assert.match(viewSource, /employee-function-type-record-/);
-  assert.match(viewSource, /employee-qualification-type-record-/);
+  assert.match(viewSource, /data-testid="employee-catalog-handoff"/);
+  assert.match(viewSource, /data-testid="employee-manage-catalogs-cta"/);
   assert.match(viewSource, /isEmployeeDetailTabDisabled\(tab\.id\)/);
   assert.match(viewSource, /return tabId !== "catalogs"/);
   assert.match(viewSource, /data-testid="employee-open-catalogs"/);
   assert.match(viewSource, /loadEmployeeReadinessCatalogs\(\)/);
-  assert.match(viewSource, /createFunctionType\(/);
-  assert.match(viewSource, /updateFunctionType\(/);
-  assert.match(viewSource, /createQualificationType\(/);
-  assert.match(viewSource, /updateQualificationType\(/);
+  assert.match(viewSource, /openWorkforceCatalogs\(\)/);
+  assert.match(viewSource, /router\.push\("\/admin\/workforce-catalogs"\)/);
   assert.match(viewSource, /employeeFunctionTypeOptions = computed\(\(\) =>/);
   assert.match(viewSource, /employeeQualificationTypeOptions = computed\(\(\) =>/);
-  assert.match(viewSource, /await loadEmployeeReadinessCatalogs\(\);[\s\S]*employeeAdmin\.feedback\.functionTypeSaved/);
-  assert.match(viewSource, /await loadEmployeeReadinessCatalogs\(\);[\s\S]*employeeAdmin\.feedback\.qualificationTypeSaved/);
+  assert.doesNotMatch(viewSource, /data-testid="employee-function-types-section"/);
+  assert.doesNotMatch(viewSource, /data-testid="employee-qualification-types-section"/);
+  assert.doesNotMatch(viewSource, /submitFunctionTypeCatalog/);
+  assert.doesNotMatch(viewSource, /submitQualificationTypeCatalog/);
 });
 
 test("employee list rows use structured text stack markup and card row styling", () => {

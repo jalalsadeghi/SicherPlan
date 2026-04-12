@@ -1,135 +1,130 @@
 You are working in the SicherPlan repository.
 
 Goal:
-Add the missing UI management for employee `function types` and `qualification types`
-inside the Employees workspace, so the frontend matches the documented scope and the
-already-existing backend API.
+Fix the missing styling for the Create forms on `/admin/workforce-catalogs` so the
+Function types and Qualification types create sections visually match the existing
+SicherPlan admin UI patterns and do not look unstyled/raw.
 
-Important:
-This is a UI coverage gap fix, not a backend invention task.
-The backend endpoints for these catalogs already exist.
-Do not move this responsibility into Planning or other modules.
+This is a focused UI styling fix.
+Do not change domain behavior, API behavior, auth/session behavior, or page structure
+more than necessary.
 
 Before coding:
 1. Read `AGENTS.md`.
-2. Keep the change set focused on the Employees workspace and its related API wiring.
-3. Do not do unrelated refactors.
-4. Verify the current repo state first and describe exactly what is missing.
+2. Keep the change set narrow and focused on styling/layout for the create forms.
+3. Reuse existing form styling patterns already present in the repo instead of inventing a new visual system.
 
-Files to inspect first:
-Frontend:
-- `web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue`
-- `web/apps/web-antd/src/sicherplan-legacy/api/employeeAdmin.ts`
-- `web/apps/web-antd/src/sicherplan-legacy/features/employees/employeeAdmin.helpers.js`
-- `web/apps/web-antd/src/sicherplan-legacy/i18n/messages.ts`
-- any employee workspace tests
+Start by verifying the actual implementation in the current working tree.
 
-Routing / workspace registration:
-- `web/apps/web-antd/src/views/sicherplan/module-registry.ts`
-- any relevant route/module config for `/admin/employees`
+Files/components to inspect first:
+- the page/component that renders `/admin/workforce-catalogs`
+- any extracted component used for the two catalog forms
+- the stylesheet/scoped styles attached to that page/component
+- nearby UI references with good styling, especially:
+  - `web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue`
+  - `web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue`
+  - any shared form/layout CSS classes used there
 
-Backend contracts already expected to exist:
-- `backend/app/modules/employees/router.py`
-- related employees schemas/services if needed only for contract confirmation
-
-Source-of-truth constraints you must respect:
-- Employees workspace is documented to include:
-  - employee list/detail/lifecycle
-  - availability/absences/etc.
-  - credentials and badge output
-  - function/qualification catalogs
-  - employee qualifications and proofs
-- Data model defines:
-  - `hr.function_type`
-  - `hr.qualification_type`
-- Planning reads these catalogs later; it does not own them.
-- OpenAPI already includes:
-  - GET/POST/PATCH `/api/employees/tenants/{tenant_id}/employees/catalog/function-types`
-  - GET/POST/PATCH `/api/employees/tenants/{tenant_id}/employees/catalog/qualification-types`
+Relevant classes visible in the current HTML:
+- `employee-catalogs-form`
+- `employee-catalogs-panel__header`
+- `employee-catalogs-form-grid`
+- `employee-catalogs-checkbox`
+- `cta-row`
+- `cta-button`
+- `field-stack`
 
 What you must verify first:
-1. The current Employees UI uses function/qualification options in qualification forms but does not expose a real catalog-management UI.
-2. There is no discoverable create/update flow for these catalogs in the current workspace.
-3. The missing UI is the real reason the user cannot create these records.
-4. The backend contracts are already sufficient for a first UI implementation.
+1. The create forms on `/admin/workforce-catalogs` currently render with weak or missing styling for inputs/textarea/checkbox groups/layout.
+2. The page likely has structural markup, but its local styles are missing, incomplete, or not aligned with existing admin form patterns.
+3. Similar forms in Employees/Customers already have better visual treatment that should be reused or mirrored.
 
-Required implementation outcome:
-A. Add a clear, discoverable catalog-management area inside `/admin/employees`.
-B. Support at minimum:
-   - list function types
-   - create function type
-   - edit/update function type
-   - list qualification types
-   - create qualification type
-   - edit/update qualification type
-C. Keep this inside the Employees workspace, not Planning.
-D. Make the catalogs usable immediately by the existing qualifications editor in the same workspace.
-E. Preserve tenant scope, auth/session behavior, and role checks.
-F. Keep HR-private data boundaries intact; these catalogs are tenant-scoped master data, not private employee fields.
-G. Do not rely on the dev/test bootstrap endpoint as the primary UX.
-H. If helpful, add a dedicated tab or subpanel called something like `Catalogs`, with two sections:
-   - Function types
-   - Qualification types
+Required outcome:
+A. Make both create forms visually consistent with the rest of the SicherPlan admin UI.
+B. Style the following clearly:
+   - input fields
+   - textarea fields
+   - checkbox rows/groups
+   - form grid spacing
+   - panel header spacing
+   - form container surface/border/background
+   - create/clear action row spacing and alignment
+C. Preserve responsiveness and avoid breaking the page on smaller widths.
+D. Keep existing class names if practical; prefer adding/fixing styles over unnecessary markup churn.
+E. Use existing visual patterns/tokens from nearby admin pages where possible.
+F. Do not make unrelated visual changes elsewhere in the page.
+G. Do not alter API wiring, form validation logic, or create/update behavior unless absolutely required for the styling fix.
 
-Preferred UX:
-1. Add an Employees detail/workspace sub-area for catalogs that is easy to find.
-2. Each catalog section should show:
-   - existing records
-   - status / active flag if applicable
-   - create/edit form
-3. Recommended fields:
-   Function type:
-   - code
-   - label
-   - category_code
-   - is_active
-   Qualification type:
-   - code
-   - label
-   - qualification_class
-   - requires_valid_until
-   - default_validity_months
-   - is_active (if supported by contract)
-4. After create/update, refresh the options used by the employee qualifications editor so the new catalog entries can be selected immediately.
-5. If the current workspace has no selected employee, the catalog area should still be usable, because catalogs are tenant-scoped master data, not employee-specific records.
+Preferred design direction:
+1. The form should read as a proper admin editor card/panel.
+2. Inputs and textareas should have the same visual treatment as other admin forms:
+   - clear border
+   - padding
+   - radius
+   - focus state
+   - width behavior
+3. Checkbox items should not look like naked browser defaults dropped into the page.
+   - align checkbox + label text cleanly
+   - give consistent spacing
+   - support wrapping for long labels
+4. Grid layout should feel deliberate:
+   - consistent gap between fields
+   - wide fields span appropriately
+   - second checkbox grid for qualification type should align cleanly
+5. Buttons should remain consistent with existing `cta-button` system.
 
-Validation / behavior expectations:
-- clear empty states
-- required-field validation
-- duplicate-code handling based on backend truth
-- explicit save/cancel flows
-- no hidden dependency on selecting an employee first, unless the existing architecture truly forces it (avoid that if possible)
+Implementation guidance:
+1. Find the actual component for `/admin/workforce-catalogs`.
+2. Inspect whether scoped CSS for:
+   - `.employee-catalogs-form`
+   - `.employee-catalogs-form-grid`
+   - `.employee-catalogs-checkbox`
+   - descendant `input`, `textarea`, `select`
+   is missing or insufficient.
+3. Compare against existing styled admin forms in Employees/Customers.
+4. Reuse existing spacing, border, background, radius, and focus patterns where appropriate.
+5. If there is shared CSS worth extracting without widening scope too much, do it only if it clearly reduces duplication and remains low-risk.
+6. Keep the fix maintainable and local.
 
-Tests to add or update:
-1. Employees workspace renders catalog-management UI.
-2. Function types can be listed, created, and updated.
-3. Qualification types can be listed, created, and updated.
-4. Newly created catalog entries appear in the qualification editor options.
-5. Catalog UI works without selecting a specific employee record first.
-6. Tenant-scoped auth/session behavior still works.
-7. No regression to existing employee file editing and qualification proof flows.
+Validation expectations:
+- the two Create forms should no longer look unstyled
+- form controls should align cleanly
+- checkbox groups should look intentional
+- no regression to the record list or edit buttons
+- no regression to dark/light assumptions if the repo supports theme tokens
+- no regression to mobile/narrow width layout
+
+Tests / validation to run:
+1. Run relevant frontend tests for the workforce catalogs page, if present.
+2. Add/update focused tests only if the repo already tests class/state structure for this page.
+3. Run lint/typecheck for touched files.
+4. Manually inspect the rendered structure in source and confirm the styles are actually applied to:
+   - inputs
+   - textarea
+   - checkbox rows
+   - form grids
+5. If available in the repo workflow, generate a quick visual verification or component snapshot.
 
 What not to do:
-- Do not invent new backend endpoints if the existing ones are sufficient.
-- Do not move catalog management into Planning.
-- Do not hide catalog management behind dev/test bootstrap-only behavior.
-- Do not make catalog editing depend on having an employee selected unless unavoidable.
-- Do not refactor the whole Employees workspace.
+- Do not redesign the page.
+- Do not move sections around unless absolutely needed for the styling to work.
+- Do not change business copy/text unnecessarily.
+- Do not add random one-off inline styles.
+- Do not break existing class hooks or test IDs.
 
 Final response format:
 1. Short diagnosis
-2. Exact repo state found
-3. Exact files changed
-4. What catalog-management UI was added
-5. How it connects to the existing qualification editor
-6. Tests/validation run and results
-7. Remaining assumptions
-8. Self-validation summary
+2. Exact component/file(s) changed
+3. Which style gaps were fixed
+4. Whether styles were reused from existing admin patterns or added locally
+5. Tests/validation run and results
+6. Remaining assumptions
+7. Self-validation summary
 
 Extra instruction:
-Challenge your own solution before finalizing.
-Specifically verify:
-- a user can create a function type from `/admin/employees`
-- a user can create a qualification type from `/admin/employees`
-- the newly created entries are selectable in the qualifications editor
+Challenge your own fix before finalizing.
+Specifically verify that:
+- both “Create function type” and “Create qualification type” forms look like real styled admin forms
+- checkbox groups no longer look raw/unstyled
+- the page still feels visually consistent with `admin/employees` and `admin/customers`
 If any of those fail, the fix is incomplete.

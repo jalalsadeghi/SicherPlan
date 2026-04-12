@@ -118,6 +118,7 @@ export const moduleRegistry: Record<string, ModuleConfig> = {
     ],
     quickLinks: [
       { labelKey: 'sicherplan.admin.recruiting', to: '/admin/recruiting' },
+      { labelKey: 'sicherplan.admin.workforceCatalogs', to: '/admin/workforce-catalogs' },
       { labelKey: 'sicherplan.admin.planningStaffing', to: '/admin/planning-staffing' },
       { labelKey: 'sicherplan.admin.reporting', to: '/admin/reporting' },
     ],
@@ -129,6 +130,34 @@ export const moduleRegistry: Record<string, ModuleConfig> = {
     showWorkspaceSectionHeader: false,
     titleKey: 'sicherplan.admin.employees',
     workspaceDescriptionKey: 'sicherplan.ui.modules.employees.workspace',
+  },
+  'workforce-catalogs': {
+    allowedRoles: ['tenant_admin', 'dispatcher', 'controller_qm'],
+    badges: [
+      { key: 'HR Catalogs', tone: 'success' },
+      { key: 'Tenant Master Data', tone: 'default' },
+      { key: 'Planning Read Model', tone: 'warning' },
+    ],
+    component: defineAsyncComponent(() => import('@/views/WorkforceCatalogsAdminView.vue')),
+    descriptionKey: 'sicherplan.ui.modules.workforceCatalogs.description',
+    highlightKeys: [
+      'sicherplan.ui.profiles.workforce.0',
+      'sicherplan.ui.profiles.workforce.1',
+      'sicherplan.ui.profiles.workforce.2',
+    ],
+    quickLinks: [
+      { labelKey: 'sicherplan.admin.employees', to: '/admin/employees' },
+      { labelKey: 'sicherplan.admin.recruiting', to: '/admin/recruiting' },
+      { labelKey: 'sicherplan.admin.planningStaffing', to: '/admin/planning-staffing' },
+    ],
+    stats: [
+      { labelKey: 'sicherplan.ui.stats.scope', valueKey: 'sicherplan.ui.values.tenantScoped' },
+      { labelKey: 'sicherplan.ui.stats.visibility', valueKey: 'sicherplan.ui.values.hrLeastPrivilege' },
+      { labelKey: 'sicherplan.ui.stats.evidence', valueKey: 'sicherplan.ui.values.auditSafe' },
+    ],
+    showWorkspaceSectionHeader: false,
+    titleKey: 'sicherplan.admin.workforceCatalogs',
+    workspaceDescriptionKey: 'sicherplan.ui.modules.workforceCatalogs.workspace',
   },
   recruiting: {
     badges: [

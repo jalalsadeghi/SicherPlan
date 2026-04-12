@@ -16,6 +16,7 @@
     "reporting": "Reporting",
     "recruiting": "Recruiting",
     "employees": "Mitarbeitende",
+    "workforceCatalogs": "Belegschaftskataloge",
     "subcontractors": "Subunternehmer",
     "tenantUsers": "Mandantenbenutzer",
     "health": "Health & Diagnostik"
@@ -186,6 +187,10 @@
       "employees": {
         "description": "Mitarbeitendenverwaltung trennt private HR-Anteile, operative Daten und Importprozesse sauber innerhalb einer Workforce-Struktur.",
         "workspace": "Der bestehende Mitarbeitenden-Workspace bleibt erhalten und ist in das neue Seitenraster eingepasst."
+      },
+      "workforceCatalogs": {
+        "description": "Funktions- und Qualifikationstypen bleiben HR-eigene Mandantenstammdaten und werden als eigener Workforce-Arbeitsbereich gepflegt.",
+        "workspace": "Die Katalogpflege ist aus der Mitarbeitendenakte ausgelagert und bleibt trotzdem im selben HR-Kontext verankert."
       },
       "recruiting": {
         "description": "Recruiting ist als Workforce-Eingangsmodul für Bewerbungen, Sichtung und Dokumente klar abgegrenzt.",

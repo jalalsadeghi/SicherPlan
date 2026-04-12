@@ -87,4 +87,21 @@ describe('sicherplan route authority', () => {
       'dispatcher',
     ]);
   });
+
+  it('adds workforce catalogs as a dedicated workforce child route with employee-domain roles', () => {
+    const workforceSection = sicherplanRoutes.find(
+      (route) => route.name === 'SicherPlanWorkforceSection',
+    );
+    const catalogsRoute = workforceSection?.children?.find(
+      (route) => route.name === 'SicherPlanWorkforceCatalogs',
+    );
+
+    expect(catalogsRoute?.path).toBe('/admin/workforce-catalogs');
+    expect(catalogsRoute?.meta?.moduleKey).toBe('workforce-catalogs');
+    expect(catalogsRoute?.meta?.authority).toEqual([
+      'tenant_admin',
+      'dispatcher',
+      'controller_qm',
+    ]);
+  });
 });
