@@ -11,6 +11,14 @@ const apiPath = resolve(
 const apiSource = readFileSync(apiPath, "utf8");
 
 test("employee admin api exposes readiness management bindings", () => {
+  assert.match(apiSource, /export function listFunctionTypes/);
+  assert.match(apiSource, /export function createFunctionType/);
+  assert.match(apiSource, /export function updateFunctionType/);
+  assert.match(apiSource, /\/catalog\/function-types/);
+  assert.match(apiSource, /export function listQualificationTypes/);
+  assert.match(apiSource, /export function createQualificationType/);
+  assert.match(apiSource, /export function updateQualificationType/);
+  assert.match(apiSource, /\/catalog\/qualification-types/);
   assert.match(apiSource, /export function listEmployeeQualifications/);
   assert.match(apiSource, /\/employees\/qualifications/);
   assert.match(apiSource, /export function uploadEmployeeQualificationProof/);

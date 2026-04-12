@@ -309,6 +309,28 @@ export interface FunctionTypeRead {
   version_no: number;
 }
 
+export interface FunctionTypeCreatePayload {
+  tenant_id: string;
+  code: string;
+  label: string;
+  category?: string | null;
+  description?: string | null;
+  is_active?: boolean;
+  planning_relevant?: boolean;
+}
+
+export interface FunctionTypeUpdatePayload {
+  code?: string | null;
+  label?: string | null;
+  category?: string | null;
+  description?: string | null;
+  is_active?: boolean | null;
+  planning_relevant?: boolean | null;
+  status?: string | null;
+  archived_at?: string | null;
+  version_no?: number | null;
+}
+
 export interface QualificationTypeRead {
   id: string;
   tenant_id: string;
@@ -327,6 +349,36 @@ export interface QualificationTypeRead {
   updated_at: string;
   archived_at: string | null;
   version_no: number;
+}
+
+export interface QualificationTypeCreatePayload {
+  tenant_id: string;
+  code: string;
+  label: string;
+  category?: string | null;
+  description?: string | null;
+  is_active?: boolean;
+  planning_relevant?: boolean;
+  compliance_relevant?: boolean;
+  expiry_required?: boolean;
+  default_validity_days?: number | null;
+  proof_required?: boolean;
+}
+
+export interface QualificationTypeUpdatePayload {
+  code?: string | null;
+  label?: string | null;
+  category?: string | null;
+  description?: string | null;
+  is_active?: boolean | null;
+  planning_relevant?: boolean | null;
+  compliance_relevant?: boolean | null;
+  expiry_required?: boolean | null;
+  default_validity_days?: number | null;
+  proof_required?: boolean | null;
+  status?: string | null;
+  archived_at?: string | null;
+  version_no?: number | null;
 }
 
 export interface EmployeeQualificationRead {
@@ -729,8 +781,54 @@ export function listFunctionTypes(tenantId: string, accessToken: string) {
   return request<FunctionTypeRead[]>(`/api/employees/tenants/${tenantId}/employees/catalog/function-types`, accessToken);
 }
 
+export function createFunctionType(tenantId: string, accessToken: string, payload: FunctionTypeCreatePayload) {
+  return request<FunctionTypeRead>(`/api/employees/tenants/${tenantId}/employees/catalog/function-types`, accessToken, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function updateFunctionType(
+  tenantId: string,
+  functionTypeId: string,
+  accessToken: string,
+  payload: FunctionTypeUpdatePayload,
+) {
+  return request<FunctionTypeRead>(
+    `/api/employees/tenants/${tenantId}/employees/catalog/function-types/${functionTypeId}`,
+    accessToken,
+    {
+      method: "PATCH",
+      body: payload,
+    },
+  );
+}
+
 export function listQualificationTypes(tenantId: string, accessToken: string) {
   return request<QualificationTypeRead[]>(`/api/employees/tenants/${tenantId}/employees/catalog/qualification-types`, accessToken);
+}
+
+export function createQualificationType(tenantId: string, accessToken: string, payload: QualificationTypeCreatePayload) {
+  return request<QualificationTypeRead>(`/api/employees/tenants/${tenantId}/employees/catalog/qualification-types`, accessToken, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function updateQualificationType(
+  tenantId: string,
+  qualificationTypeId: string,
+  accessToken: string,
+  payload: QualificationTypeUpdatePayload,
+) {
+  return request<QualificationTypeRead>(
+    `/api/employees/tenants/${tenantId}/employees/catalog/qualification-types/${qualificationTypeId}`,
+    accessToken,
+    {
+      method: "PATCH",
+      body: payload,
+    },
+  );
 }
 
 export function createEmployeeGroup(tenantId: string, accessToken: string, payload: Record<string, unknown>) {

@@ -186,12 +186,15 @@ function resolveTenantScopeIdForRole(
   role: AppRole,
   sessionUser: AuthenticatedUser | null,
   rememberedTenantScopeId: string,
+  options?: {
+    allowRememberedFallback?: boolean;
+  },
 ): string {
   if (role === "platform_admin") {
     return rememberedTenantScopeId;
   }
 
-  return sessionUser?.tenant_id ?? "";
+  return sessionUser?.tenant_id ?? (options?.allowRememberedFallback ? rememberedTenantScopeId : "");
 }
 
 function syncPrimaryTokens(accessToken: string, refreshToken: string) {
@@ -220,6 +223,7 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       PORTAL_SUBCONTRACTOR_CONTEXT_STORAGE_KEY,
       null,
     ),
+    sessionResolutionInFlight: false,
   }),
   getters: {
     effectiveRole(state): AppRole {
@@ -233,6 +237,10 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
         this.effectiveRole,
         state.sessionUser,
         state.tenantScopeId,
+        {
+          allowRememberedFallback:
+            state.sessionResolutionInFlight || Boolean(state.sessionId && state.accessToken && !state.sessionUser),
+        },
       );
     },
     effectiveAccessToken(state): string {
@@ -247,6 +255,9 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
     isSessionBacked(): boolean {
       return this.hasSession;
     },
+    isSessionResolving(state): boolean {
+      return state.sessionResolutionInFlight;
+    },
   },
   actions: {
     syncFromPrimarySession() {
@@ -260,18 +271,29 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
         && isPortalSessionRole(sessionRole)
         && Boolean(primaryAccessToken)
         && primaryAccessToken !== this.accessToken;
+      const preserveInternalSessionContext =
+        Boolean(this.sessionUser)
+        && !isPortalSessionRole(sessionRole)
+        && !isPortalSessionRole(primaryRole);
 
       if (primaryAccessToken && primaryAccessToken !== this.accessToken && !preservePortalSession) {
         this.accessToken = primaryAccessToken;
         this.refreshToken = primaryRefreshToken;
-        this.sessionId = "";
-        this.sessionUser = null;
-        this.clearPortalCustomerContext();
-        this.clearPortalSubcontractorContext();
         persistString(ACCESS_TOKEN_STORAGE_KEY, this.accessToken);
         persistString(REFRESH_TOKEN_STORAGE_KEY, this.refreshToken);
-        persistString(SESSION_ID_STORAGE_KEY, "");
-        persistJson(SESSION_USER_STORAGE_KEY, null);
+
+        if (preserveInternalSessionContext) {
+          this.clearPortalCustomerContext();
+          this.clearPortalSubcontractorContext();
+        } else {
+          this.sessionId = "";
+          this.sessionUser = null;
+          this.clearPortalCustomerContext();
+          this.clearPortalSubcontractorContext();
+          persistString(SESSION_ID_STORAGE_KEY, "");
+          persistJson(SESSION_USER_STORAGE_KEY, null);
+          this.sessionResolutionInFlight = Boolean(sessionMetadata.sessionId || primaryRefreshToken);
+        }
       }
 
       if (sessionMetadata.sessionId && !this.sessionUser && !this.sessionId) {
@@ -352,6 +374,7 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       this.sessionId = "";
       this.tenantScopeId = "";
       this.sessionUser = null;
+      this.sessionResolutionInFlight = false;
       this.clearPortalCustomerContext();
       this.clearPortalSubcontractorContext();
       persistString(ACCESS_TOKEN_STORAGE_KEY, "");
@@ -378,6 +401,9 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       try {
         const response = await refreshSession(refreshTokenValue);
         this.updateSessionTokens(response.session);
+        if (this.sessionUser) {
+          this.sessionResolutionInFlight = false;
+        }
         return response.session.access_token;
       } catch (error) {
         this.clearSession();
@@ -386,6 +412,10 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
     },
     async ensureSessionReady() {
       this.syncFromPrimarySession();
+
+      if (!this.sessionUser && (this.effectiveAccessToken || this.refreshToken)) {
+        this.sessionResolutionInFlight = true;
+      }
 
       if (!this.effectiveAccessToken && this.refreshToken) {
         await this.refreshSessionTokens();
@@ -397,6 +427,7 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
       }
 
       if (this.sessionUser) {
+        this.sessionResolutionInFlight = false;
         return this.sessionUser;
       }
 
@@ -410,6 +441,7 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
     },
     async loadCurrentSession() {
       this.syncFromPrimarySession();
+      this.sessionResolutionInFlight = true;
 
       if (!this.effectiveAccessToken) {
         if (!this.refreshToken) {
@@ -466,6 +498,8 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
           window.localStorage.setItem(ROLE_STORAGE_KEY, this.activeRole);
         }
         return response;
+      } finally {
+        this.sessionResolutionInFlight = false;
       }
     },
     async loadCustomerPortalContext() {

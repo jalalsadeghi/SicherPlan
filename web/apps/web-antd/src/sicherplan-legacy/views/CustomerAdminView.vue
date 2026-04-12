@@ -38,7 +38,12 @@
       </div>
     </section>
 
-    <section v-if="!tenantScopeId" class="module-card customer-admin-empty">
+    <section v-if="isCustomerSessionResolving && !tenantScopeId" class="module-card customer-admin-empty">
+      <p class="eyebrow">{{ t("customerAdmin.scope.reconcilingTitle") }}</p>
+      <h3>{{ t("customerAdmin.scope.reconcilingBody") }}</h3>
+    </section>
+
+    <section v-else-if="!tenantScopeId" class="module-card customer-admin-empty">
       <p class="eyebrow">{{ t("customerAdmin.scope.missingTitle") }}</p>
       <h3>{{ t("customerAdmin.scope.missingBody") }}</h3>
     </section>
@@ -984,55 +989,105 @@
                   </button>
                 </div>
 
-                <div v-if="commercialProfile?.rate_cards.length" class="customer-admin-list">
-                  <button
+                <div v-if="commercialProfile?.rate_cards.length" class="customer-admin-record-list">
+                  <article
                     v-for="rateCard in commercialProfile.rate_cards"
                     :key="rateCard.id"
-                    type="button"
-                    class="customer-admin-row"
+                    class="customer-admin-record"
                     :class="{ selected: rateCard.id === selectedRateCardId }"
-                    @click="selectedRateCardId = rateCard.id"
+                    :data-testid="`customer-rate-card-record-${rateCard.id}`"
                   >
-                    <div>
-                      <strong>{{ rateCard.rate_kind }}</strong>
-                      <span>{{ rateCard.effective_from }}{{ rateCard.effective_to ? ` → ${rateCard.effective_to}` : "" }}</span>
+                    <button
+                      type="button"
+                      class="customer-admin-record__button"
+                      :data-testid="`customer-rate-card-select-${rateCard.id}`"
+                      @click="selectedRateCardId = rateCard.id"
+                    >
+                      <div class="customer-admin-record__body">
+                        <strong>{{ rateCard.rate_kind }}</strong>
+                        <p>{{ formatRateCardWindow(rateCard) }}</p>
+                        <span class="customer-admin-record__meta">{{ rateCard.currency_code }}</span>
+                      </div>
+                    </button>
+                    <div class="customer-admin-record__actions">
+                      <StatusBadge :status="rateCard.status" />
+                      <button
+                        type="button"
+                        :data-testid="`customer-rate-card-edit-${rateCard.id}`"
+                        :disabled="!commercialActionState.canManageRateCards"
+                        @click="editRateCard(rateCard)"
+                      >
+                        {{ t("customerAdmin.actions.edit") }}
+                      </button>
                     </div>
-                    <StatusBadge :status="rateCard.status" />
-                  </button>
+                  </article>
                 </div>
                 <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.commercial.rateCardsEmpty") }}</p>
 
                 <form class="customer-admin-form" @submit.prevent="submitRateCard">
-                  <div class="customer-admin-form-grid customer-admin-form-grid--detail">
-                    <label class="field-stack field-stack--half">
-                      <span>{{ t("customerAdmin.fields.rateKind") }}</span>
-                      <input v-model="rateCardDraft.rate_kind" :disabled="!commercialActionState.canManageRateCards" />
-                    </label>
-                    <label class="field-stack field-stack--third">
-                      <span>{{ t("customerAdmin.fields.currencyCode") }}</span>
-                      <input v-model="rateCardDraft.currency_code" :disabled="!commercialActionState.canManageRateCards" />
-                    </label>
-                    <label class="field-stack field-stack--half">
-                      <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
-                      <input v-model="rateCardDraft.effective_from" type="date" :disabled="!commercialActionState.canManageRateCards" />
-                    </label>
-                    <label class="field-stack field-stack--half">
-                      <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
-                      <input v-model="rateCardDraft.effective_to" type="date" :disabled="!commercialActionState.canManageRateCards" />
-                    </label>
-                    <label class="field-stack field-stack--wide">
-                      <span>{{ t("customerAdmin.fields.notes") }}</span>
-                      <textarea v-model="rateCardDraft.notes" rows="3" :disabled="!commercialActionState.canManageRateCards" />
-                    </label>
-                  </div>
-                  <div class="cta-row" v-if="commercialActionState.canManageRateCards">
-                    <button class="cta-button" type="submit" :disabled="loading.commercial">
-                      {{ editingRateCardId ? t("customerAdmin.actions.saveRateCard") : t("customerAdmin.actions.createRateCard") }}
-                    </button>
-                    <button class="cta-button cta-secondary" type="button" @click="resetRateCardDraft">
-                      {{ t("customerAdmin.actions.cancel") }}
-                    </button>
-                  </div>
+                  <section class="customer-admin-form-section">
+                    <div class="customer-admin-form-section__header customer-admin-form-section__header--split">
+                      <div>
+                        <p class="eyebrow">
+                          {{ editingRateCardId ? t("customerAdmin.commercial.rateCardEditEyebrow") : t("customerAdmin.commercial.rateCardCreateEyebrow") }}
+                        </p>
+                        <h4>
+                          {{ editingRateCardId ? t("customerAdmin.commercial.rateCardEditTitle") : t("customerAdmin.commercial.rateCardCreateTitle") }}
+                        </h4>
+                        <p class="field-help">{{ t("customerAdmin.commercial.rateCardEditorLead") }}</p>
+                      </div>
+                      <div
+                        v-if="editingRateCardId && selectedRateCard && !selectedRateCard.archived_at && commercialActionState.canManageRateCards"
+                        class="cta-row"
+                      >
+                        <button
+                          class="cta-button cta-secondary"
+                          type="button"
+                          data-testid="customer-rate-card-archive"
+                          @click="archiveRateCard(selectedRateCard)"
+                        >
+                          {{ t("customerAdmin.actions.archive") }}
+                        </button>
+                      </div>
+                    </div>
+                    <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                      <label class="field-stack field-stack--half">
+                        <span>{{ t("customerAdmin.fields.rateKind") }}</span>
+                        <input
+                          v-model="rateCardDraft.rate_kind"
+                          :disabled="!commercialActionState.canManageRateCards"
+                          :placeholder="t('customerAdmin.commercial.rateKindPlaceholder')"
+                          @blur="normalizeRateKindField"
+                        />
+                        <p class="field-help">{{ t("customerAdmin.commercial.rateKindHelp") }}</p>
+                      </label>
+                      <label class="field-stack field-stack--third">
+                        <span>{{ t("customerAdmin.fields.currencyCode") }}</span>
+                        <input v-model="rateCardDraft.currency_code" :disabled="!commercialActionState.canManageRateCards" />
+                      </label>
+                      <label class="field-stack field-stack--half">
+                        <span>{{ t("customerAdmin.fields.effectiveFrom") }}</span>
+                        <input v-model="rateCardDraft.effective_from" type="date" :disabled="!commercialActionState.canManageRateCards" />
+                      </label>
+                      <label class="field-stack field-stack--half">
+                        <span>{{ t("customerAdmin.fields.effectiveTo") }}</span>
+                        <input v-model="rateCardDraft.effective_to" type="date" :disabled="!commercialActionState.canManageRateCards" />
+                        <p class="field-help">{{ t("customerAdmin.commercial.rateCardWindowHelp") }}</p>
+                      </label>
+                      <label class="field-stack field-stack--wide">
+                        <span>{{ t("customerAdmin.fields.notes") }}</span>
+                        <textarea v-model="rateCardDraft.notes" rows="3" :disabled="!commercialActionState.canManageRateCards" />
+                      </label>
+                    </div>
+                    <div class="cta-row" v-if="commercialActionState.canManageRateCards">
+                      <button class="cta-button" type="submit" :disabled="loading.commercial">
+                        {{ editingRateCardId ? t("customerAdmin.actions.saveRateCard") : t("customerAdmin.actions.createRateCard") }}
+                      </button>
+                      <button class="cta-button cta-secondary" type="button" @click="resetRateCardDraft">
+                        {{ t("customerAdmin.actions.cancel") }}
+                      </button>
+                    </div>
+                  </section>
                 </form>
               </section>
 
@@ -2022,6 +2077,7 @@ import {
   deriveCustomerCommercialActionState,
   minutesToTimeInput,
   mapCustomerCommercialApiMessage,
+  normalizeRateKindInput,
   normalizeRateLinePayloadDraft,
   parseWeekdayMask,
   RATE_LINE_BILLING_UNIT_OPTIONS,
@@ -2326,9 +2382,11 @@ const canReadCommercial = computed(() => commercialActionState.value.canReadComm
 const canWriteCommercial = computed(() => commercialActionState.value.canWriteCommercial);
 const tenantScopeId = computed(() => authStore.effectiveTenantScopeId);
 const accessToken = computed(() => authStore.effectiveAccessToken || authStore.accessToken);
+const isCustomerSessionResolving = computed(() => authStore.isSessionResolving);
 const customerWorkspaceBusy = computed(
   () =>
-    loading.customer
+    isCustomerSessionResolving.value
+    || loading.customer
     || loading.contact
     || loading.address
     || loading.commercial
@@ -2341,7 +2399,11 @@ const customerWorkspaceBusy = computed(
     || loading.sharedAddress
     || loading.hrCatalogBootstrap,
 );
-const customerWorkspaceLoadingText = computed(() => (customerWorkspaceBusy.value ? t("workspace.loading.processing") : ""));
+const customerWorkspaceLoadingText = computed(() =>
+  customerWorkspaceBusy.value
+    ? t(isCustomerSessionResolving.value ? "workspace.loading.reconcilingSession" : "workspace.loading.processing")
+    : "",
+);
 const isDevelopmentEnv = computed(() => webAppConfig.env === "development");
 const canBootstrapHrCatalogSamples = computed(() =>
   isDevelopmentEnv.value
@@ -2952,6 +3014,10 @@ function resetRateCardDraft() {
   editingRateCardId.value = "";
 }
 
+function normalizeRateKindField() {
+  rateCardDraft.rate_kind = normalizeRateKindInput(rateCardDraft.rate_kind);
+}
+
 function resetRateLineDraft() {
   rateLineDraft.tenant_id = tenantScopeId.value;
   rateLineDraft.rate_card_id = selectedRateCardId.value;
@@ -3165,6 +3231,10 @@ function editRateCard(rateCard: CustomerRateCardRead) {
   selectedRateCardId.value = rateCard.id;
   resetRateLineDraft();
   resetSurchargeRuleDraft();
+}
+
+function formatRateCardWindow(rateCard: CustomerRateCardRead) {
+  return `${rateCard.effective_from}${rateCard.effective_to ? ` → ${rateCard.effective_to}` : ""}`;
 }
 
 function editRateLine(rateLine: CustomerRateLineRead) {
@@ -3837,6 +3907,7 @@ async function submitRateCard() {
   if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
     return;
   }
+  normalizeRateKindField();
   const validationKey = validateRateCardDraft(rateCardDraft);
   if (validationKey) {
     setFeedback("error", t("customerAdmin.feedback.validation"), t(validationKey as never));
@@ -3874,6 +3945,42 @@ async function submitRateCard() {
     }
     setFeedback("success", t("customerAdmin.feedback.commercialSaved"), t("customerAdmin.commercial.rateCardsTitle"));
     resetRateCardDraft();
+    await refreshCommercialProfile();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    loading.commercial = false;
+  }
+}
+
+async function archiveRateCard(rateCard: CustomerRateCardRead) {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+  if (rateCard.archived_at) {
+    return;
+  }
+  if (!window.confirm(t("customerAdmin.confirm.rateCardArchive"))) {
+    return;
+  }
+
+  loading.commercial = true;
+  try {
+    await updateCustomerRateCard(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      rateCard.id,
+      accessToken.value,
+      {
+        status: "archived",
+        archived_at: new Date().toISOString(),
+        version_no: rateCard.version_no,
+      },
+    );
+    if (editingRateCardId.value === rateCard.id) {
+      resetRateCardDraft();
+    }
+    setFeedback("success", t("customerAdmin.feedback.commercialSaved"), t("customerAdmin.commercial.rateCardsTitle"));
     await refreshCommercialProfile();
   } catch (error) {
     handleApiError(error);
@@ -4181,7 +4288,7 @@ function normalizeRateCardDraft(): CustomerRateCardPayload {
   return {
     tenant_id: tenantScopeId.value,
     customer_id: selectedCustomerId.value,
-    rate_kind: rateCardDraft.rate_kind.trim(),
+    rate_kind: normalizeRateKindInput(rateCardDraft.rate_kind),
     currency_code: rateCardDraft.currency_code.trim().toUpperCase(),
     effective_from: rateCardDraft.effective_from,
     effective_to: emptyToNull(rateCardDraft.effective_to),
@@ -5012,6 +5119,30 @@ onMounted(() => {
 .customer-admin-row.selected {
   border-color: var(--sp-color-primary);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 40%, transparent);
+}
+
+.customer-admin-record.selected {
+  border-color: var(--sp-color-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 40%, transparent);
+}
+
+.customer-admin-record__button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  text-align: left;
+  cursor: pointer;
+  flex: 1 1 auto;
+  color: inherit;
+  font: inherit;
+}
+
+.customer-admin-record__button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+  border-radius: 12px;
 }
 
 .customer-admin-row span,

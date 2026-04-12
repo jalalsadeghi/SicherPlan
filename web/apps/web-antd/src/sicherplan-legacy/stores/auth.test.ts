@@ -137,11 +137,11 @@ describe('legacy auth tenant scope resolution', () => {
     expect(store.effectiveTenantScopeId).toBe('tenant-1');
   });
 
-  it('clears stale legacy session user when the primary token changes', async () => {
+  it('preserves tenant-scoped session context while the primary access token rotates', async () => {
     window.localStorage.setItem('sicherplan-session-user', JSON.stringify({
-      id: 'old-user',
+      id: 'tenant-user',
       tenant_id: 'c867d853-4148-44be-9f50-35e151f9778c',
-      roles: [makeRoleScope('platform_admin', 'tenant')],
+      roles: [makeRoleScope('tenant_admin', 'tenant')],
     }));
     window.localStorage.setItem('sicherplan-session-id', 'old-session');
     window.localStorage.setItem('sicherplan-tenant-scope', 'c867d853-4148-44be-9f50-35e151f9778c');
@@ -154,10 +154,24 @@ describe('legacy auth tenant scope resolution', () => {
 
     store.syncFromPrimarySession();
 
-    expect(store.sessionUser).toBeNull();
-    expect(store.sessionId).toBe('');
+    expect(store.sessionUser?.id).toBe('tenant-user');
+    expect(store.sessionId).toBe('old-session');
     expect(store.accessToken).toBe('new-token');
-    expect(store.effectiveTenantScopeId).toBe('');
+    expect(store.effectiveTenantScopeId).toBe('c867d853-4148-44be-9f50-35e151f9778c');
+    expect(store.isSessionResolving).toBe(false);
+  });
+
+  it('falls back to remembered tenant scope while session resolution is still in flight', async () => {
+    window.localStorage.setItem('sicherplan-tenant-scope', 'tenant-1');
+
+    const { useAuthStore } = await import('./auth');
+    const store = useAuthStore();
+
+    store.sessionResolutionInFlight = true;
+    store.activeRole = 'tenant_admin';
+    store.sessionUser = null;
+
+    expect(store.effectiveTenantScopeId).toBe('tenant-1');
   });
 
   it('preserves an explicit customer portal session when a stale primary token still exists', async () => {

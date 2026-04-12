@@ -10,6 +10,7 @@ import {
   hasCustomerCommercialPermission,
   mapCustomerCommercialApiMessage,
   minutesToTimeInput,
+  normalizeRateKindInput,
   normalizeOptionalScalar,
   normalizeRateLinePayloadDraft,
   parseWeekdayMask,
@@ -112,9 +113,20 @@ test("rate-card and rate-line validation catches missing fields and invalid valu
     "customerAdmin.feedback.rateKindRequired",
   );
   assert.equal(
+    validateRateCardDraft({ rate_kind: "   ", currency_code: "EUR", effective_from: "2026-01-01", effective_to: "" }),
+    "customerAdmin.feedback.rateKindRequired",
+  );
+  assert.equal(
     validateRateLineDraft({ line_kind: "base", billing_unit: "hour", unit_price: "-1", minimum_quantity: "" }),
     "customerAdmin.feedback.invalidUnitPrice",
   );
+});
+
+test("rate-kind normalization trims and lowercases free text without inventing enum values", () => {
+  assert.equal(normalizeRateKindInput("  Guarding  "), "guarding");
+  assert.equal(normalizeRateKindInput(""), "");
+  assert.equal(normalizeRateKindInput("   "), "");
+  assert.equal(normalizeRateKindInput(null), "");
 });
 
 test("optional scalar normalization is safe for strings, numbers, and empty values", () => {

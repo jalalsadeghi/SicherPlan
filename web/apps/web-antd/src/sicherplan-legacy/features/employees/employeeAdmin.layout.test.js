@@ -28,7 +28,8 @@ test("employee workspace uses master detail layout and embedded scope is removed
 });
 
 test("employee workspace resolves tenant scope from session bootstrap for normal users", () => {
-  assert.match(viewSource, /<section v-if="!resolvedTenantScopeId" class="module-card employee-admin-empty">/);
+  assert.match(viewSource, /<section v-if="isEmployeeSessionResolving && !resolvedTenantScopeId" class="module-card employee-admin-empty">/);
+  assert.match(viewSource, /<section v-else-if="!resolvedTenantScopeId" class="module-card employee-admin-empty">/);
   assert.match(viewSource, /authStore\.syncFromPrimarySession\(\)/);
   assert.match(viewSource, /await authStore\.ensureSessionReady\(\)/);
   assert.match(viewSource, /tenantScopeInput\.value = authStore\.effectiveTenantScopeId \|\| authStore\.tenantScopeId/);
@@ -36,13 +37,22 @@ test("employee workspace resolves tenant scope from session bootstrap for normal
   assert.doesNotMatch(viewSource, /await authStore\.loadCurrentSession\(\)/);
 });
 
+test("employee workspace treats auth reconciliation as a loading state instead of hard missing scope", () => {
+  assert.match(viewSource, /const isEmployeeSessionResolving = computed\(\(\) => authStore\.isSessionResolving\)/);
+  assert.match(viewSource, /const employeeWorkspaceBusy = computed\(\(\) => isEmployeeSessionResolving\.value \|\| loading\.action\)/);
+  assert.match(viewSource, /workspace\.loading\.reconcilingSession/);
+  assert.match(viewSource, /employeeAdmin\.scope\.reconcilingTitle/);
+  assert.match(viewSource, /employeeAdmin\.scope\.reconcilingBody/);
+});
+
 test("employee detail uses top-level tabs and isolated tab panels", () => {
   assert.match(viewSource, /<SicherPlanLoadingOverlay[\s\S]*busy-testid="employee-workspace-loading-overlay"/);
   assert.match(viewSource, /:busy="employeeWorkspaceBusy"/);
   assert.match(viewSource, /:text="employeeWorkspaceLoadingText"/);
-  assert.match(viewSource, /const employeeWorkspaceBusy = computed\(\(\) => loading\.action\)/);
-  assert.match(viewSource, /const employeeWorkspaceLoadingText = computed\(\(\) => \(employeeWorkspaceBusy\.value \? t\("workspace\.loading\.processing"\) : ""\)\)/);
+  assert.match(viewSource, /const employeeWorkspaceBusy = computed\(\(\) => isEmployeeSessionResolving\.value \|\| loading\.action\)/);
+  assert.match(viewSource, /const employeeWorkspaceLoadingText = computed\(\(\) =>/);
   assert.match(viewSource, /data-testid="employee-detail-tabs"/);
+  assert.match(viewSource, /data-testid="employee-tab-panel-catalogs"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-overview"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-app-access"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-profile-photo"/);
@@ -58,6 +68,27 @@ test("employee detail uses top-level tabs and isolated tab panels", () => {
   assert.match(viewSource, /preserveActiveTab = false/);
   assert.match(viewSource, /resolveEmployeeDetailTab\(\s*desiredTab,[\s\S]*employeeDetailTabs\.value\.map\(\(tab\) => tab\.id\)/);
   assert.match(viewSource, /selectEmployee\(selectedEmployeeId\.value, \{ preserveActiveTab: true \}\)/);
+});
+
+test("employee workspace exposes tenant-scoped catalog management without requiring employee selection", () => {
+  assert.match(viewSource, /employeeAdmin\.tabs\.catalogs/);
+  assert.match(viewSource, /activeDetailTab === 'catalogs'/);
+  assert.match(viewSource, /data-testid="employee-function-types-section"/);
+  assert.match(viewSource, /data-testid="employee-qualification-types-section"/);
+  assert.match(viewSource, /employee-function-type-record-/);
+  assert.match(viewSource, /employee-qualification-type-record-/);
+  assert.match(viewSource, /isEmployeeDetailTabDisabled\(tab\.id\)/);
+  assert.match(viewSource, /return tabId !== "catalogs"/);
+  assert.match(viewSource, /data-testid="employee-open-catalogs"/);
+  assert.match(viewSource, /loadEmployeeReadinessCatalogs\(\)/);
+  assert.match(viewSource, /createFunctionType\(/);
+  assert.match(viewSource, /updateFunctionType\(/);
+  assert.match(viewSource, /createQualificationType\(/);
+  assert.match(viewSource, /updateQualificationType\(/);
+  assert.match(viewSource, /employeeFunctionTypeOptions = computed\(\(\) =>/);
+  assert.match(viewSource, /employeeQualificationTypeOptions = computed\(\(\) =>/);
+  assert.match(viewSource, /await loadEmployeeReadinessCatalogs\(\);[\s\S]*employeeAdmin\.feedback\.functionTypeSaved/);
+  assert.match(viewSource, /await loadEmployeeReadinessCatalogs\(\);[\s\S]*employeeAdmin\.feedback\.qualificationTypeSaved/);
 });
 
 test("employee list rows use structured text stack markup and card row styling", () => {

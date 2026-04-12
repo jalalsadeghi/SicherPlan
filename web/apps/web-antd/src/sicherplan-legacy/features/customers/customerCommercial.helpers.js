@@ -196,8 +196,12 @@ export function validateBillingProfileDraft(draft) {
   return null;
 }
 
+export function normalizeRateKindInput(value) {
+  return `${value ?? ""}`.trim().toLowerCase();
+}
+
 export function validateRateCardDraft(draft) {
-  if (!`${draft.rate_kind ?? ""}`.trim()) {
+  if (!normalizeRateKindInput(draft.rate_kind)) {
     return "customerAdmin.feedback.rateKindRequired";
   }
   if (!/^[A-Za-z]{3}$/.test(`${draft.currency_code ?? ""}`.trim())) {

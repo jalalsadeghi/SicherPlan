@@ -29,7 +29,12 @@
       </div>
     </div>
 
-    <section v-if="!resolvedTenantScopeId" class="module-card employee-admin-empty">
+    <section v-if="isEmployeeSessionResolving && !resolvedTenantScopeId" class="module-card employee-admin-empty">
+      <p class="eyebrow">{{ t("employeeAdmin.scope.reconcilingTitle") }}</p>
+      <h3>{{ t("employeeAdmin.scope.reconcilingBody") }}</h3>
+    </section>
+
+    <section v-else-if="!resolvedTenantScopeId" class="module-card employee-admin-empty">
       <p class="eyebrow">{{ t("employeeAdmin.scope.missingTitle") }}</p>
       <h3>{{ t("employeeAdmin.scope.missingBody") }}</h3>
     </section>
@@ -194,13 +199,12 @@
         <div class="employee-admin-panel__header">
           <div>
             <p class="eyebrow">{{ t("employeeAdmin.detail.eyebrow") }}</p>
-            <h3>{{ isCreatingEmployee ? t("employeeAdmin.detail.newTitle") : selectedEmployeeLabel }}</h3>
+            <h3>{{ detailWorkspaceTitle }}</h3>
           </div>
           <StatusBadge v-if="selectedEmployee && !isCreatingEmployee" :status="selectedEmployee.status" />
         </div>
 
-        <template v-if="isCreatingEmployee || selectedEmployee">
-          <nav class="employee-admin-tabs" data-testid="employee-detail-tabs" aria-label="Employee detail sections">
+        <nav class="employee-admin-tabs" data-testid="employee-detail-tabs" aria-label="Employee detail sections">
             <button
               v-for="tab in employeeDetailTabs"
               :key="tab.id"
@@ -208,12 +212,230 @@
               class="employee-admin-tab"
               :class="{ active: tab.id === activeDetailTab }"
               :data-testid="`employee-tab-${tab.id}`"
+              :disabled="isEmployeeDetailTabDisabled(tab.id)"
               @click="activeDetailTab = tab.id"
             >
               {{ tab.label }}
             </button>
-          </nav>
+        </nav>
 
+        <section
+          v-if="activeDetailTab === 'catalogs'"
+          class="employee-admin-section employee-admin-tab-panel"
+          data-testid="employee-tab-panel-catalogs"
+        >
+          <section class="employee-admin-editor-intro">
+            <div>
+              <p class="eyebrow">{{ t("employeeAdmin.catalogs.eyebrow") }}</p>
+              <h4>{{ t("employeeAdmin.catalogs.title") }}</h4>
+            </div>
+            <p class="field-help">{{ t("employeeAdmin.catalogs.lead") }}</p>
+          </section>
+
+          <section class="employee-admin-form-section" data-testid="employee-function-types-section">
+            <div class="employee-admin-form-section__header">
+              <div>
+                <p class="eyebrow">{{ t("employeeAdmin.catalogs.functionTypesEyebrow") }}</p>
+                <h4>{{ t("employeeAdmin.catalogs.functionTypesTitle") }}</h4>
+              </div>
+            </div>
+            <p class="field-help">{{ t("employeeAdmin.catalogs.functionTypesLead") }}</p>
+            <div v-if="functionTypes.length" class="employee-admin-record-list">
+              <article
+                v-for="row in functionTypes"
+                :key="row.id"
+                class="employee-admin-record"
+                :class="{ selected: row.id === editingFunctionTypeId }"
+                :data-testid="`employee-function-type-record-${row.id}`"
+              >
+                <button
+                  type="button"
+                  class="employee-admin-record__body employee-admin-record__button"
+                  :data-testid="`employee-function-type-select-${row.id}`"
+                  @click="editFunctionType(row)"
+                >
+                  <strong>{{ row.code }} · {{ row.label }}</strong>
+                  <span class="employee-admin-record__meta">
+                    {{ row.category || t("employeeAdmin.summary.none") }} ·
+                    {{ row.is_active ? t("employeeAdmin.catalogs.activeLabel") : t("employeeAdmin.catalogs.inactiveLabel") }}
+                  </span>
+                </button>
+                <div class="employee-admin-record__actions">
+                  <StatusBadge :status="row.status" />
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    :data-testid="`employee-function-type-edit-${row.id}`"
+                    :disabled="!canManageCatalogs"
+                    @click="editFunctionType(row)"
+                  >
+                    {{ t("employeeAdmin.actions.editFunctionType") }}
+                  </button>
+                </div>
+              </article>
+            </div>
+            <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.catalogs.functionTypesEmpty") }}</p>
+
+            <form class="employee-admin-form employee-admin-inline-form" @submit.prevent="submitFunctionTypeCatalog">
+              <div class="employee-admin-form-section__header">
+                <div>
+                  <p class="eyebrow">
+                    {{ editingFunctionTypeId ? t("employeeAdmin.catalogs.functionTypeEditorEditEyebrow") : t("employeeAdmin.catalogs.functionTypeEditorCreateEyebrow") }}
+                  </p>
+                  <h4>
+                    {{ editingFunctionTypeId ? t("employeeAdmin.catalogs.functionTypeEditorEditTitle") : t("employeeAdmin.catalogs.functionTypeEditorCreateTitle") }}
+                  </h4>
+                </div>
+              </div>
+              <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.catalogs.fields.code") }}</span>
+                  <input v-model="functionTypeDraft.code" :disabled="!canManageCatalogs" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.catalogs.fields.label") }}</span>
+                  <input v-model="functionTypeDraft.label" :disabled="!canManageCatalogs" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.catalogs.fields.category") }}</span>
+                  <input v-model="functionTypeDraft.category" :disabled="!canManageCatalogs" />
+                </label>
+                <label class="field-stack field-stack--wide">
+                  <span>{{ t("employeeAdmin.catalogs.fields.description") }}</span>
+                  <textarea v-model="functionTypeDraft.description" :disabled="!canManageCatalogs" rows="3" />
+                </label>
+              </div>
+              <label class="employee-admin-checkbox">
+                <input v-model="functionTypeDraft.planning_relevant" :disabled="!canManageCatalogs" type="checkbox" />
+                <span>{{ t("employeeAdmin.catalogs.fields.planningRelevant") }}</span>
+              </label>
+              <label class="employee-admin-checkbox">
+                <input v-model="functionTypeDraft.is_active" :disabled="!canManageCatalogs" type="checkbox" />
+                <span>{{ t("employeeAdmin.catalogs.fields.isActive") }}</span>
+              </label>
+              <div class="cta-row">
+                <button class="cta-button" type="submit" :disabled="!canManageCatalogs">
+                  {{ editingFunctionTypeId ? t("employeeAdmin.actions.saveFunctionType") : t("employeeAdmin.actions.createFunctionType") }}
+                </button>
+                <button class="cta-button cta-secondary" type="button" @click="resetFunctionTypeDraft">
+                  {{ t("employeeAdmin.actions.resetFunctionType") }}
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <section class="employee-admin-form-section" data-testid="employee-qualification-types-section">
+            <div class="employee-admin-form-section__header">
+              <div>
+                <p class="eyebrow">{{ t("employeeAdmin.catalogs.qualificationTypesEyebrow") }}</p>
+                <h4>{{ t("employeeAdmin.catalogs.qualificationTypesTitle") }}</h4>
+              </div>
+            </div>
+            <p class="field-help">{{ t("employeeAdmin.catalogs.qualificationTypesLead") }}</p>
+            <div v-if="qualificationTypes.length" class="employee-admin-record-list">
+              <article
+                v-for="row in qualificationTypes"
+                :key="row.id"
+                class="employee-admin-record"
+                :class="{ selected: row.id === editingQualificationTypeId }"
+                :data-testid="`employee-qualification-type-record-${row.id}`"
+              >
+                <button
+                  type="button"
+                  class="employee-admin-record__body employee-admin-record__button"
+                  :data-testid="`employee-qualification-type-select-${row.id}`"
+                  @click="editQualificationTypeCatalog(row)"
+                >
+                  <strong>{{ row.code }} · {{ row.label }}</strong>
+                  <span class="employee-admin-record__meta">
+                    {{ row.category || t("employeeAdmin.summary.none") }} ·
+                    {{ row.is_active ? t("employeeAdmin.catalogs.activeLabel") : t("employeeAdmin.catalogs.inactiveLabel") }}
+                  </span>
+                </button>
+                <div class="employee-admin-record__actions">
+                  <StatusBadge :status="row.status" />
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    :data-testid="`employee-qualification-type-edit-${row.id}`"
+                    :disabled="!canManageCatalogs"
+                    @click="editQualificationTypeCatalog(row)"
+                  >
+                    {{ t("employeeAdmin.actions.editQualificationType") }}
+                  </button>
+                </div>
+              </article>
+            </div>
+            <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.catalogs.qualificationTypesEmpty") }}</p>
+
+            <form class="employee-admin-form employee-admin-inline-form" @submit.prevent="submitQualificationTypeCatalog">
+              <div class="employee-admin-form-section__header">
+                <div>
+                  <p class="eyebrow">
+                    {{ editingQualificationTypeId ? t("employeeAdmin.catalogs.qualificationTypeEditorEditEyebrow") : t("employeeAdmin.catalogs.qualificationTypeEditorCreateEyebrow") }}
+                  </p>
+                  <h4>
+                    {{ editingQualificationTypeId ? t("employeeAdmin.catalogs.qualificationTypeEditorEditTitle") : t("employeeAdmin.catalogs.qualificationTypeEditorCreateTitle") }}
+                  </h4>
+                </div>
+              </div>
+              <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.catalogs.fields.code") }}</span>
+                  <input v-model="qualificationTypeCatalogDraft.code" :disabled="!canManageCatalogs" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.catalogs.fields.label") }}</span>
+                  <input v-model="qualificationTypeCatalogDraft.label" :disabled="!canManageCatalogs" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.catalogs.fields.category") }}</span>
+                  <input v-model="qualificationTypeCatalogDraft.category" :disabled="!canManageCatalogs" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ t("employeeAdmin.catalogs.fields.defaultValidityDays") }}</span>
+                  <input v-model="qualificationTypeCatalogDraft.default_validity_days" :disabled="!canManageCatalogs" inputmode="numeric" />
+                </label>
+                <label class="field-stack field-stack--wide">
+                  <span>{{ t("employeeAdmin.catalogs.fields.description") }}</span>
+                  <textarea v-model="qualificationTypeCatalogDraft.description" :disabled="!canManageCatalogs" rows="3" />
+                </label>
+              </div>
+              <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                <label class="employee-admin-checkbox">
+                  <input v-model="qualificationTypeCatalogDraft.is_active" :disabled="!canManageCatalogs" type="checkbox" />
+                  <span>{{ t("employeeAdmin.catalogs.fields.isActive") }}</span>
+                </label>
+                <label class="employee-admin-checkbox">
+                  <input v-model="qualificationTypeCatalogDraft.planning_relevant" :disabled="!canManageCatalogs" type="checkbox" />
+                  <span>{{ t("employeeAdmin.catalogs.fields.planningRelevant") }}</span>
+                </label>
+                <label class="employee-admin-checkbox">
+                  <input v-model="qualificationTypeCatalogDraft.compliance_relevant" :disabled="!canManageCatalogs" type="checkbox" />
+                  <span>{{ t("employeeAdmin.catalogs.fields.complianceRelevant") }}</span>
+                </label>
+                <label class="employee-admin-checkbox">
+                  <input v-model="qualificationTypeCatalogDraft.expiry_required" :disabled="!canManageCatalogs" type="checkbox" />
+                  <span>{{ t("employeeAdmin.catalogs.fields.expiryRequired") }}</span>
+                </label>
+                <label class="employee-admin-checkbox">
+                  <input v-model="qualificationTypeCatalogDraft.proof_required" :disabled="!canManageCatalogs" type="checkbox" />
+                  <span>{{ t("employeeAdmin.catalogs.fields.proofRequired") }}</span>
+                </label>
+              </div>
+              <div class="cta-row">
+                <button class="cta-button" type="submit" :disabled="!canManageCatalogs">
+                  {{ editingQualificationTypeId ? t("employeeAdmin.actions.saveQualificationType") : t("employeeAdmin.actions.createQualificationType") }}
+                </button>
+                <button class="cta-button cta-secondary" type="button" @click="resetQualificationTypeCatalogDraft">
+                  {{ t("employeeAdmin.actions.resetQualificationType") }}
+                </button>
+              </div>
+            </form>
+          </section>
+        </section>
+
+        <template v-else-if="isCreatingEmployee || selectedEmployee">
           <section
             v-if="activeDetailTab === 'overview'"
             class="employee-admin-section employee-admin-tab-panel"
@@ -1618,6 +1840,11 @@
           <p class="eyebrow">{{ t("employeeAdmin.detail.emptyEyebrow") }}</p>
           <h3>{{ t("employeeAdmin.detail.emptyTitle") }}</h3>
           <p>{{ t("employeeAdmin.detail.emptyBody") }}</p>
+          <div class="cta-row">
+            <button class="cta-button cta-secondary" type="button" data-testid="employee-open-catalogs" @click="activeDetailTab = 'catalogs'">
+              {{ t("employeeAdmin.actions.openCatalogs") }}
+            </button>
+          </div>
         </section>
       </section>
       </div>
@@ -1638,6 +1865,8 @@ import {
   createEmployeeAvailabilityRule,
   createEmployeeCredential,
   createEmployee,
+  createFunctionType,
+  createQualificationType,
   createEmployeeGroup,
   createEmployeeGroupMembership,
   createEmployeeNote,
@@ -1683,7 +1912,9 @@ import {
   type EmployeeQualificationProofUploadPayload,
   type EmployeeQualificationRead,
   type EmployeeQualificationUpdatePayload,
+  type FunctionTypeCreatePayload,
   type FunctionTypeRead,
+  type FunctionTypeUpdatePayload,
   updateEmployee,
   updateEmployeeAddress,
   updateEmployeeAccessUser,
@@ -1694,9 +1925,13 @@ import {
   updateEmployeeGroupMembership,
   updateEmployeeNote,
   updateEmployeeQualification,
+  updateFunctionType,
+  updateQualificationType,
   uploadEmployeePhoto,
   uploadEmployeeQualificationProof,
+  type QualificationTypeCreatePayload,
   type QualificationTypeRead,
+  type QualificationTypeUpdatePayload,
   type EmployeeAccessLinkRead,
   type EmployeeAccessResetPasswordRequest,
   type EmployeeAccessUpdateUserRequest,
@@ -1728,6 +1963,8 @@ import StatusBadge from "@/components/StatusBadge.vue";
 import { useSicherPlanFeedback } from "@/composables/useSicherPlanFeedback";
 import { useI18n } from "@/i18n";
 import {
+  buildEmployeeFunctionTypePayload,
+  buildEmployeeQualificationTypePayload,
   buildEmployeeImportTemplateRows,
   buildEmployeeAbsencePayload,
   buildEmployeeAvailabilityPayload,
@@ -1753,7 +1990,9 @@ import {
   validateEmployeeAddressDraft,
   validateEmployeeAvailabilityDraft,
   validateEmployeeCredentialDraft,
+  validateEmployeeFunctionTypeDraft,
   validateEmployeeQualificationDraft,
+  validateEmployeeQualificationTypeDraft,
 } from "@/features/employees/employeeAdmin.helpers.js";
 import type { MessageKey } from "@/i18n/messages";
 import { useAuthStore } from "@/stores/auth";
@@ -1855,6 +2094,28 @@ const qualificationDraft = reactive({
   notes: "",
 });
 
+const functionTypeDraft = reactive({
+  code: "",
+  label: "",
+  category: "",
+  description: "",
+  is_active: true,
+  planning_relevant: true,
+});
+
+const qualificationTypeCatalogDraft = reactive({
+  code: "",
+  label: "",
+  category: "",
+  description: "",
+  is_active: true,
+  planning_relevant: true,
+  compliance_relevant: false,
+  expiry_required: false,
+  default_validity_days: "",
+  proof_required: false,
+});
+
 const qualificationProofDraft = reactive({
   title: "",
 });
@@ -1950,6 +2211,8 @@ const editingGroupId = ref("");
 const editingMembershipId = ref("");
 const editingAddressId = ref("");
 const editingQualificationId = ref("");
+const editingFunctionTypeId = ref("");
+const editingQualificationTypeId = ref("");
 const editingCredentialId = ref("");
 const editingAvailabilityRuleId = ref("");
 const editingAbsenceId = ref("");
@@ -1975,8 +2238,14 @@ const actionState = computed(() => deriveEmployeeActionState(effectiveRole.value
 const canRead = computed(() => actionState.value.canRead);
 const canWrite = computed(() => actionState.value.canWrite);
 const canReadPrivate = computed(() => actionState.value.canReadPrivate);
-const employeeWorkspaceBusy = computed(() => loading.action);
-const employeeWorkspaceLoadingText = computed(() => (employeeWorkspaceBusy.value ? t("workspace.loading.processing") : ""));
+const canManageCatalogs = computed(() => actionState.value.canManageCatalogs);
+const isEmployeeSessionResolving = computed(() => authStore.isSessionResolving);
+const employeeWorkspaceBusy = computed(() => isEmployeeSessionResolving.value || loading.action);
+const employeeWorkspaceLoadingText = computed(() =>
+  employeeWorkspaceBusy.value
+    ? t(isEmployeeSessionResolving.value ? "workspace.loading.reconcilingSession" : "workspace.loading.processing")
+    : "",
+);
 const resolvedTenantScopeId = computed(() => authStore.effectiveTenantScopeId);
 const hasLinkedAccess = computed(() => !!accessLink.value?.user_id);
 const selectedEmployeeLabel = computed(() =>
@@ -1984,6 +2253,15 @@ const selectedEmployeeLabel = computed(() =>
     ? `${selectedEmployee.value.personnel_no} · ${selectedEmployee.value.first_name} ${selectedEmployee.value.last_name}`
     : t("employeeAdmin.detail.emptyTitle"),
 );
+const detailWorkspaceTitle = computed(() => {
+  if (isCreatingEmployee.value) {
+    return t("employeeAdmin.detail.newTitle");
+  }
+  if (!selectedEmployee.value && activeDetailTab.value === "catalogs") {
+    return t("employeeAdmin.catalogs.workspaceTitle");
+  }
+  return selectedEmployeeLabel.value;
+});
 const currentAddressSummary = computed(() => summarizeCurrentAddress(employeeAddresses.value));
 const employeeAddressTimeline = computed(() =>
   [...employeeAddresses.value].sort((left, right) => {
@@ -2005,6 +2283,12 @@ const selectedQualification = computed(
 );
 const selectedQualificationProofs = computed(() =>
   editingQualificationId.value ? (qualificationProofsById[editingQualificationId.value] ?? []) : [],
+);
+const selectedFunctionTypeCatalog = computed(
+  () => functionTypes.value.find((row) => row.id === editingFunctionTypeId.value) ?? null,
+);
+const selectedQualificationTypeCatalog = computed(
+  () => qualificationTypes.value.find((row) => row.id === editingQualificationTypeId.value) ?? null,
 );
 const employeeFunctionTypeOptions = computed(() =>
   functionTypes.value
@@ -2085,6 +2369,7 @@ const selectedEmployeeMandateLabel = computed(() => {
 const employeeDetailTabs = computed(() => {
   const tabs = [
     { id: "overview", label: t("employeeAdmin.tabs.overview") },
+    { id: "catalogs", label: t("employeeAdmin.tabs.catalogs") },
     { id: "app_access", label: t("employeeAdmin.tabs.appAccess") },
     { id: "profile_photo", label: t("employeeAdmin.tabs.profilePhoto") },
     { id: "qualifications", label: t("employeeAdmin.tabs.qualifications") },
@@ -2129,6 +2414,16 @@ function setFeedback(tone: "error" | "neutral" | "success", title: string, messa
     title,
     tone,
   });
+}
+
+function isEmployeeDetailTabDisabled(tabId: string) {
+  if (isCreatingEmployee.value) {
+    return false;
+  }
+  if (selectedEmployee.value) {
+    return false;
+  }
+  return tabId !== "catalogs";
 }
 
 function resolveEmployeeDocumentErrorMessage(error: unknown) {
@@ -2355,6 +2650,57 @@ function resetQualificationDraft() {
   pendingQualificationProofFile.value = null;
 }
 
+function resetFunctionTypeDraft() {
+  functionTypeDraft.code = "";
+  functionTypeDraft.label = "";
+  functionTypeDraft.category = "";
+  functionTypeDraft.description = "";
+  functionTypeDraft.is_active = true;
+  functionTypeDraft.planning_relevant = true;
+  editingFunctionTypeId.value = "";
+}
+
+function editFunctionType(row: FunctionTypeRead) {
+  editingFunctionTypeId.value = row.id;
+  functionTypeDraft.code = row.code;
+  functionTypeDraft.label = row.label;
+  functionTypeDraft.category = row.category || "";
+  functionTypeDraft.description = row.description || "";
+  functionTypeDraft.is_active = row.is_active;
+  functionTypeDraft.planning_relevant = row.planning_relevant;
+  activeDetailTab.value = "catalogs";
+}
+
+function resetQualificationTypeCatalogDraft() {
+  qualificationTypeCatalogDraft.code = "";
+  qualificationTypeCatalogDraft.label = "";
+  qualificationTypeCatalogDraft.category = "";
+  qualificationTypeCatalogDraft.description = "";
+  qualificationTypeCatalogDraft.is_active = true;
+  qualificationTypeCatalogDraft.planning_relevant = true;
+  qualificationTypeCatalogDraft.compliance_relevant = false;
+  qualificationTypeCatalogDraft.expiry_required = false;
+  qualificationTypeCatalogDraft.default_validity_days = "";
+  qualificationTypeCatalogDraft.proof_required = false;
+  editingQualificationTypeId.value = "";
+}
+
+function editQualificationTypeCatalog(row: QualificationTypeRead) {
+  editingQualificationTypeId.value = row.id;
+  qualificationTypeCatalogDraft.code = row.code;
+  qualificationTypeCatalogDraft.label = row.label;
+  qualificationTypeCatalogDraft.category = row.category || "";
+  qualificationTypeCatalogDraft.description = row.description || "";
+  qualificationTypeCatalogDraft.is_active = row.is_active;
+  qualificationTypeCatalogDraft.planning_relevant = row.planning_relevant;
+  qualificationTypeCatalogDraft.compliance_relevant = row.compliance_relevant;
+  qualificationTypeCatalogDraft.expiry_required = row.expiry_required;
+  qualificationTypeCatalogDraft.default_validity_days =
+    row.default_validity_days == null ? "" : String(row.default_validity_days);
+  qualificationTypeCatalogDraft.proof_required = row.proof_required;
+  activeDetailTab.value = "catalogs";
+}
+
 function resetCredentialDraft() {
   credentialDraft.credential_no = "";
   credentialDraft.credential_type = "";
@@ -2527,6 +2873,8 @@ function startCreateEmployee() {
   resetMembershipDraft();
   resetAddressDraft();
   resetQualificationDraft();
+  resetFunctionTypeDraft();
+  resetQualificationTypeCatalogDraft();
   resetCredentialDraft();
   resetAvailabilityDraft();
   resetAbsenceDraft();
@@ -2624,6 +2972,12 @@ async function loadEmployeeReadinessCatalogs() {
   ]);
   functionTypes.value = functionTypeRows;
   qualificationTypes.value = qualificationTypeRows;
+  if (editingFunctionTypeId.value && !functionTypeRows.some((row) => row.id === editingFunctionTypeId.value)) {
+    resetFunctionTypeDraft();
+  }
+  if (editingQualificationTypeId.value && !qualificationTypeRows.some((row) => row.id === editingQualificationTypeId.value)) {
+    resetQualificationTypeCatalogDraft();
+  }
 }
 
 async function loadQualificationProofs(qualificationId: string) {
@@ -2894,6 +3248,104 @@ async function submitGroup() {
     resetGroupDraft();
     await listSupplementalGroups();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.groupSaved"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
+async function submitFunctionTypeCatalog() {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !canManageCatalogs.value) {
+    return;
+  }
+
+  const validationKey = validateEmployeeFunctionTypeDraft(functionTypeDraft);
+  if (validationKey) {
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(validationKey as never));
+    return;
+  }
+
+  const createPayload: FunctionTypeCreatePayload = buildEmployeeFunctionTypePayload(functionTypeDraft, {
+    tenantId: resolvedTenantScopeId.value,
+  });
+
+  loading.action = true;
+  try {
+    if (editingFunctionTypeId.value && selectedFunctionTypeCatalog.value) {
+      const updatePayload: FunctionTypeUpdatePayload = {
+        code: createPayload.code,
+        label: createPayload.label,
+        category: createPayload.category,
+        description: createPayload.description,
+        is_active: createPayload.is_active,
+        planning_relevant: createPayload.planning_relevant,
+        version_no: selectedFunctionTypeCatalog.value.version_no,
+      };
+      await updateFunctionType(
+        resolvedTenantScopeId.value,
+        editingFunctionTypeId.value,
+        authStore.accessToken,
+        updatePayload,
+      );
+    } else {
+      await createFunctionType(resolvedTenantScopeId.value, authStore.accessToken, createPayload);
+    }
+    resetFunctionTypeDraft();
+    await loadEmployeeReadinessCatalogs();
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.functionTypeSaved"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
+async function submitQualificationTypeCatalog() {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !canManageCatalogs.value) {
+    return;
+  }
+
+  const validationKey = validateEmployeeQualificationTypeDraft(qualificationTypeCatalogDraft);
+  if (validationKey) {
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(validationKey as never));
+    return;
+  }
+
+  const createPayload: QualificationTypeCreatePayload = buildEmployeeQualificationTypePayload(qualificationTypeCatalogDraft, {
+    tenantId: resolvedTenantScopeId.value,
+  });
+
+  loading.action = true;
+  try {
+    if (editingQualificationTypeId.value && selectedQualificationTypeCatalog.value) {
+      const updatePayload: QualificationTypeUpdatePayload = {
+        code: createPayload.code,
+        label: createPayload.label,
+        category: createPayload.category,
+        description: createPayload.description,
+        is_active: createPayload.is_active,
+        planning_relevant: createPayload.planning_relevant,
+        compliance_relevant: createPayload.compliance_relevant,
+        expiry_required: createPayload.expiry_required,
+        default_validity_days: createPayload.default_validity_days,
+        proof_required: createPayload.proof_required,
+        version_no: selectedQualificationTypeCatalog.value.version_no,
+      };
+      await updateQualificationType(
+        resolvedTenantScopeId.value,
+        editingQualificationTypeId.value,
+        authStore.accessToken,
+        updatePayload,
+      );
+    } else {
+      await createQualificationType(resolvedTenantScopeId.value, authStore.accessToken, createPayload);
+    }
+    resetQualificationTypeCatalogDraft();
+    await loadEmployeeReadinessCatalogs();
+    setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.qualificationTypeSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
     setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));

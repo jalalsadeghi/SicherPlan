@@ -32,6 +32,7 @@ export type MessageKey =
   | "shell.stat.modules"
   | "shell.stat.portals"
   | "workspace.loading.processing"
+  | "workspace.loading.reconcilingSession"
   | "module.eyebrow"
   | "module.note.navigation"
   | "module.note.future"
@@ -484,6 +485,8 @@ export type MessageKey =
   | "employeeAdmin.scope.label"
   | "employeeAdmin.scope.placeholder"
   | "employeeAdmin.scope.help"
+  | "employeeAdmin.scope.reconcilingTitle"
+  | "employeeAdmin.scope.reconcilingBody"
   | "employeeAdmin.scope.missingTitle"
   | "employeeAdmin.scope.missingBody"
   | "employeeAdmin.list.eyebrow"
@@ -495,6 +498,7 @@ export type MessageKey =
   | "employeeAdmin.detail.emptyEyebrow"
   | "employeeAdmin.detail.emptyBody"
   | "employeeAdmin.tabs.overview"
+  | "employeeAdmin.tabs.catalogs"
   | "employeeAdmin.tabs.appAccess"
   | "employeeAdmin.tabs.profilePhoto"
   | "employeeAdmin.tabs.qualifications"
@@ -668,6 +672,38 @@ export type MessageKey =
   | "employeeAdmin.qualifications.functionTypeEmptyHint"
   | "employeeAdmin.qualifications.qualificationTypePlaceholder"
   | "employeeAdmin.qualifications.qualificationTypeEmptyHint"
+  | "employeeAdmin.catalogs.workspaceTitle"
+  | "employeeAdmin.catalogs.eyebrow"
+  | "employeeAdmin.catalogs.title"
+  | "employeeAdmin.catalogs.lead"
+  | "employeeAdmin.catalogs.functionTypesEyebrow"
+  | "employeeAdmin.catalogs.functionTypesTitle"
+  | "employeeAdmin.catalogs.functionTypesLead"
+  | "employeeAdmin.catalogs.functionTypesEmpty"
+  | "employeeAdmin.catalogs.qualificationTypesEyebrow"
+  | "employeeAdmin.catalogs.qualificationTypesTitle"
+  | "employeeAdmin.catalogs.qualificationTypesLead"
+  | "employeeAdmin.catalogs.qualificationTypesEmpty"
+  | "employeeAdmin.catalogs.functionTypeEditorCreateEyebrow"
+  | "employeeAdmin.catalogs.functionTypeEditorCreateTitle"
+  | "employeeAdmin.catalogs.functionTypeEditorEditEyebrow"
+  | "employeeAdmin.catalogs.functionTypeEditorEditTitle"
+  | "employeeAdmin.catalogs.qualificationTypeEditorCreateEyebrow"
+  | "employeeAdmin.catalogs.qualificationTypeEditorCreateTitle"
+  | "employeeAdmin.catalogs.qualificationTypeEditorEditEyebrow"
+  | "employeeAdmin.catalogs.qualificationTypeEditorEditTitle"
+  | "employeeAdmin.catalogs.fields.code"
+  | "employeeAdmin.catalogs.fields.label"
+  | "employeeAdmin.catalogs.fields.category"
+  | "employeeAdmin.catalogs.fields.description"
+  | "employeeAdmin.catalogs.fields.isActive"
+  | "employeeAdmin.catalogs.fields.planningRelevant"
+  | "employeeAdmin.catalogs.fields.complianceRelevant"
+  | "employeeAdmin.catalogs.fields.expiryRequired"
+  | "employeeAdmin.catalogs.fields.defaultValidityDays"
+  | "employeeAdmin.catalogs.fields.proofRequired"
+  | "employeeAdmin.catalogs.activeLabel"
+  | "employeeAdmin.catalogs.inactiveLabel"
   | "employeeAdmin.credentials.eyebrow"
   | "employeeAdmin.credentials.title"
   | "employeeAdmin.credentials.lead"
@@ -771,6 +807,15 @@ export type MessageKey =
   | "employeeAdmin.actions.createQualification"
   | "employeeAdmin.actions.saveQualification"
   | "employeeAdmin.actions.resetQualification"
+  | "employeeAdmin.actions.openCatalogs"
+  | "employeeAdmin.actions.createFunctionType"
+  | "employeeAdmin.actions.saveFunctionType"
+  | "employeeAdmin.actions.resetFunctionType"
+  | "employeeAdmin.actions.editFunctionType"
+  | "employeeAdmin.actions.createQualificationType"
+  | "employeeAdmin.actions.saveQualificationType"
+  | "employeeAdmin.actions.resetQualificationType"
+  | "employeeAdmin.actions.editQualificationType"
   | "employeeAdmin.actions.uploadQualificationProof"
   | "employeeAdmin.actions.createCredential"
   | "employeeAdmin.actions.saveCredential"
@@ -862,6 +907,10 @@ export type MessageKey =
   | "employeeAdmin.feedback.invalidTargetMonthlyHours"
   | "employeeAdmin.feedback.functionTypeNotFound"
   | "employeeAdmin.feedback.qualificationTypeNotFound"
+  | "employeeAdmin.feedback.duplicateFunctionTypeCode"
+  | "employeeAdmin.feedback.duplicateQualificationTypeCode"
+  | "employeeAdmin.feedback.catalogRequired"
+  | "employeeAdmin.feedback.invalidQualificationTypeValidity"
   | "employeeAdmin.feedback.invalidQualificationRecordKind"
   | "employeeAdmin.feedback.qualificationTargetRequired"
   | "employeeAdmin.feedback.qualificationInvalidWindow"
@@ -898,6 +947,8 @@ export type MessageKey =
   | "employeeAdmin.feedback.accessFullNameRequired"
   | "employeeAdmin.feedback.accessRoleMissing"
   | "employeeAdmin.feedback.qualificationSaved"
+  | "employeeAdmin.feedback.functionTypeSaved"
+  | "employeeAdmin.feedback.qualificationTypeSaved"
   | "employeeAdmin.feedback.qualificationProofSaved"
   | "employeeAdmin.feedback.credentialSaved"
   | "employeeAdmin.feedback.credentialBadgeIssued"
@@ -1096,6 +1147,8 @@ export type MessageKey =
   | "customerAdmin.scope.label"
   | "customerAdmin.scope.placeholder"
   | "customerAdmin.scope.help"
+  | "customerAdmin.scope.reconcilingTitle"
+  | "customerAdmin.scope.reconcilingBody"
   | "customerAdmin.scope.missingTitle"
   | "customerAdmin.scope.missingBody"
   | "customerAdmin.token.label"
@@ -1298,6 +1351,7 @@ export type MessageKey =
   | "customerAdmin.confirm.reactivate"
   | "customerAdmin.confirm.contactArchive"
   | "customerAdmin.confirm.addressArchive"
+  | "customerAdmin.confirm.rateCardArchive"
   | "customerAdmin.feedback.created"
   | "customerAdmin.feedback.createdNextStep"
   | "customerAdmin.feedback.saved"
@@ -1376,6 +1430,14 @@ export type MessageKey =
   | "customerAdmin.commercial.rateCardsEyebrow"
   | "customerAdmin.commercial.rateCardsTitle"
   | "customerAdmin.commercial.rateCardsEmpty"
+  | "customerAdmin.commercial.rateCardCreateEyebrow"
+  | "customerAdmin.commercial.rateCardCreateTitle"
+  | "customerAdmin.commercial.rateCardEditEyebrow"
+  | "customerAdmin.commercial.rateCardEditTitle"
+  | "customerAdmin.commercial.rateCardEditorLead"
+  | "customerAdmin.commercial.rateKindPlaceholder"
+  | "customerAdmin.commercial.rateKindHelp"
+  | "customerAdmin.commercial.rateCardWindowHelp"
   | "customerAdmin.commercial.pricingTabs.rateCards"
   | "customerAdmin.commercial.rateLinesEyebrow"
   | "customerAdmin.commercial.rateLinesTitle"
@@ -1578,6 +1640,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "shell.stat.modules": "Modulgruppen",
     "shell.stat.portals": "Portalpfade",
     "workspace.loading.processing": "Vorgang wird verarbeitet",
+    "workspace.loading.reconcilingSession": "Sitzung wird abgeglichen",
     "module.eyebrow": "Platzhaltermodul",
     "module.note.navigation":
       "Navigation und Rollenfreigaben sind bereits im Shell-Register hinterlegt.",
@@ -2196,6 +2259,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.scope.placeholder": "Tenant-UUID für Plattform-Admin-Modus",
     "employeeAdmin.scope.help":
       "Plattformadmins können den aktiven Mandanten wechseln; Tenant-Admins bleiben im Sitzungskontext.",
+    "employeeAdmin.scope.reconcilingTitle": "Sitzung wird abgeglichen",
+    "employeeAdmin.scope.reconcilingBody":
+      "Die Mitarbeitendenverwaltung gleicht gerade die Sitzung mit dem aktiven Mandantenkontext ab.",
     "employeeAdmin.scope.missingTitle": "Mandanten-Scope fehlt",
     "employeeAdmin.scope.missingBody":
       "Wählen Sie zuerst einen Mandanten, bevor Mitarbeitende geladen werden.",
@@ -2209,6 +2275,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.detail.emptyBody":
       "Wählen Sie links eine Mitarbeitendenakte aus oder legen Sie eine neue an.",
     "employeeAdmin.tabs.overview": "Überblick",
+    "employeeAdmin.tabs.catalogs": "Kataloge",
     "employeeAdmin.tabs.appAccess": "App-Zugang",
     "employeeAdmin.tabs.profilePhoto": "Profilfoto",
     "employeeAdmin.tabs.qualifications": "Qualifikationen",
@@ -2384,6 +2451,41 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.qualifications.functionTypeEmptyHint": "Für diesen Mandanten sind noch keine Funktionstypen konfiguriert.",
     "employeeAdmin.qualifications.qualificationTypePlaceholder": "Qualifikationstyp auswählen",
     "employeeAdmin.qualifications.qualificationTypeEmptyHint": "Für diesen Mandanten sind noch keine Qualifikationstypen konfiguriert.",
+    "employeeAdmin.catalogs.workspaceTitle": "Funktionen und Qualifikationstypen",
+    "employeeAdmin.catalogs.eyebrow": "Kataloge",
+    "employeeAdmin.catalogs.title": "Funktions- und Qualifikationstypen",
+    "employeeAdmin.catalogs.lead":
+      "Diese Mandantenkataloge gehören zur Mitarbeitendenverwaltung und stehen sofort für die Qualifikationspflege in derselben Arbeitsfläche bereit.",
+    "employeeAdmin.catalogs.functionTypesEyebrow": "Funktionstypen",
+    "employeeAdmin.catalogs.functionTypesTitle": "Funktionstypen pflegen",
+    "employeeAdmin.catalogs.functionTypesLead":
+      "Funktionsfreigaben und spätere Planungsleseprozesse greifen auf diesen HR-Katalog zu.",
+    "employeeAdmin.catalogs.functionTypesEmpty": "Noch keine Funktionstypen konfiguriert.",
+    "employeeAdmin.catalogs.qualificationTypesEyebrow": "Qualifikationstypen",
+    "employeeAdmin.catalogs.qualificationTypesTitle": "Qualifikationstypen pflegen",
+    "employeeAdmin.catalogs.qualificationTypesLead":
+      "Gültigkeit, Nachweispflicht und Planungsrelevanz bleiben direkt im HR-Katalog steuerbar.",
+    "employeeAdmin.catalogs.qualificationTypesEmpty": "Noch keine Qualifikationstypen konfiguriert.",
+    "employeeAdmin.catalogs.functionTypeEditorCreateEyebrow": "Neu",
+    "employeeAdmin.catalogs.functionTypeEditorCreateTitle": "Funktionstyp anlegen",
+    "employeeAdmin.catalogs.functionTypeEditorEditEyebrow": "Bearbeitung",
+    "employeeAdmin.catalogs.functionTypeEditorEditTitle": "Funktionstyp aktualisieren",
+    "employeeAdmin.catalogs.qualificationTypeEditorCreateEyebrow": "Neu",
+    "employeeAdmin.catalogs.qualificationTypeEditorCreateTitle": "Qualifikationstyp anlegen",
+    "employeeAdmin.catalogs.qualificationTypeEditorEditEyebrow": "Bearbeitung",
+    "employeeAdmin.catalogs.qualificationTypeEditorEditTitle": "Qualifikationstyp aktualisieren",
+    "employeeAdmin.catalogs.fields.code": "Code",
+    "employeeAdmin.catalogs.fields.label": "Bezeichnung",
+    "employeeAdmin.catalogs.fields.category": "Kategorie",
+    "employeeAdmin.catalogs.fields.description": "Beschreibung",
+    "employeeAdmin.catalogs.fields.isActive": "Aktiv für neue Zuordnungen",
+    "employeeAdmin.catalogs.fields.planningRelevant": "Für Planung leserelevant",
+    "employeeAdmin.catalogs.fields.complianceRelevant": "Compliance-relevant",
+    "employeeAdmin.catalogs.fields.expiryRequired": "Ablaufdatum erforderlich",
+    "employeeAdmin.catalogs.fields.defaultValidityDays": "Standardgültigkeit in Tagen",
+    "employeeAdmin.catalogs.fields.proofRequired": "Nachweis erforderlich",
+    "employeeAdmin.catalogs.activeLabel": "Aktiv",
+    "employeeAdmin.catalogs.inactiveLabel": "Inaktiv",
     "employeeAdmin.credentials.eyebrow": "Ausweise",
     "employeeAdmin.credentials.title": "Ausweise und Badge-Ausgabe",
     "employeeAdmin.credentials.lead": "Mitarbeitendenausweise bleiben als eigener Bestand mit Gültigkeit, Kennungswert und Badge-Ausgabe verfügbar.",
@@ -2486,9 +2588,18 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.markCurrentAddress": "Als aktuell markieren",
     "employeeAdmin.actions.closeAddressValidity": "Gültigkeit beenden",
     "employeeAdmin.actions.resetAddress": "Adressformular leeren",
+    "employeeAdmin.actions.openCatalogs": "Kataloge öffnen",
+    "employeeAdmin.actions.createFunctionType": "Funktionstyp anlegen",
+    "employeeAdmin.actions.saveFunctionType": "Funktionstyp speichern",
+    "employeeAdmin.actions.resetFunctionType": "Funktionstypformular leeren",
+    "employeeAdmin.actions.editFunctionType": "Funktionstyp bearbeiten",
     "employeeAdmin.actions.createQualification": "Qualifikation anlegen",
     "employeeAdmin.actions.saveQualification": "Qualifikation speichern",
     "employeeAdmin.actions.resetQualification": "Qualifikationsformular leeren",
+    "employeeAdmin.actions.createQualificationType": "Qualifikationstyp anlegen",
+    "employeeAdmin.actions.saveQualificationType": "Qualifikationstyp speichern",
+    "employeeAdmin.actions.resetQualificationType": "Qualifikationstypformular leeren",
+    "employeeAdmin.actions.editQualificationType": "Qualifikationstyp bearbeiten",
     "employeeAdmin.actions.uploadQualificationProof": "Nachweis hochladen",
     "employeeAdmin.actions.createCredential": "Ausweis anlegen",
     "employeeAdmin.actions.saveCredential": "Ausweis speichern",
@@ -2589,6 +2700,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Der gewählte Funktionstyp ist im aktuellen Mandanten nicht verfügbar.",
     "employeeAdmin.feedback.qualificationTypeNotFound":
       "Der gewählte Qualifikationstyp ist im aktuellen Mandanten nicht verfügbar.",
+    "employeeAdmin.feedback.duplicateFunctionTypeCode":
+      "Dieser Funktionstyp-Code ist im Mandanten bereits vergeben.",
+    "employeeAdmin.feedback.duplicateQualificationTypeCode":
+      "Dieser Qualifikationstyp-Code ist im Mandanten bereits vergeben.",
+    "employeeAdmin.feedback.catalogRequired":
+      "Code und Bezeichnung sind für diesen Katalogeintrag erforderlich.",
+    "employeeAdmin.feedback.invalidQualificationTypeValidity":
+      "Die Standardgültigkeit muss leer oder eine positive ganze Zahl sein.",
     "employeeAdmin.feedback.invalidQualificationRecordKind":
       "Die Art des Qualifikationseintrags ist ungültig.",
     "employeeAdmin.feedback.qualificationTargetRequired":
@@ -2657,6 +2776,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Für den verknüpften App-Zugang ist ein Anzeigename erforderlich.",
     "employeeAdmin.feedback.accessRoleMissing":
       "Die Rolle für Mitarbeitendenzugang fehlt im IAM-Katalog.",
+    "employeeAdmin.feedback.functionTypeSaved":
+      "Der Funktionstyp wurde gespeichert.",
+    "employeeAdmin.feedback.qualificationTypeSaved":
+      "Der Qualifikationstyp wurde gespeichert.",
     "employeeAdmin.feedback.qualificationSaved":
       "Die Qualifikation wurde gespeichert.",
     "employeeAdmin.feedback.qualificationProofSaved":
@@ -2912,6 +3035,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.scope.placeholder": "Tenant UUID eingeben",
     "customerAdmin.scope.help":
       "Plattform-Admins können hier gezielt den Mandantenkontext wechseln. Normale interne Rollen verwenden automatisch den Scope aus der angemeldeten Sitzung.",
+    "customerAdmin.scope.reconcilingTitle": "Sitzung wird abgeglichen",
+    "customerAdmin.scope.reconcilingBody":
+      "Die Kundenverwaltung gleicht gerade die Sitzung mit dem aktiven Mandantenkontext ab.",
     "customerAdmin.scope.missingTitle": "Scope oder Sitzung fehlt",
     "customerAdmin.scope.missingBody":
       "Für die Kundenverwaltung ist ein aufgelöster Mandantenkontext aus der Sitzung oder einer expliziten Plattform-Admin-Auswahl erforderlich.",
@@ -3125,6 +3251,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.confirm.reactivate": "Diesen Kunden wieder aktiv setzen?",
     "customerAdmin.confirm.contactArchive": "Diesen Kontakt archivieren?",
     "customerAdmin.confirm.addressArchive": "Diesen Adresslink archivieren?",
+    "customerAdmin.confirm.rateCardArchive": "Diese Preiskarte archivieren?",
     "customerAdmin.feedback.created": "Kunde angelegt",
     "customerAdmin.feedback.createdNextStep": "Kunde angelegt. Als nächsten Schritt Primärkontakt und Register-/Rechnungsadresse pflegen.",
     "customerAdmin.feedback.saved": "Kunde gespeichert",
@@ -3210,6 +3337,17 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.commercial.rateCardsEyebrow": "Preiskarten",
     "customerAdmin.commercial.rateCardsTitle": "Versionierte Preisfenster",
     "customerAdmin.commercial.rateCardsEmpty": "Noch keine Preiskarten hinterlegt.",
+    "customerAdmin.commercial.rateCardCreateEyebrow": "Neue Preiskarte",
+    "customerAdmin.commercial.rateCardCreateTitle": "Preiskarte anlegen",
+    "customerAdmin.commercial.rateCardEditEyebrow": "Ausgewählte Preiskarte",
+    "customerAdmin.commercial.rateCardEditTitle": "Preiskarte bearbeiten",
+    "customerAdmin.commercial.rateCardEditorLead":
+      "Preiskarten bleiben versionierte Preisfenster. Preisart und Gültigkeitsdaten steuern, welche Preiszeilen und Zuschläge darunter gelten.",
+    "customerAdmin.commercial.rateKindPlaceholder": "Preisart aus Ihrem Vertragsmodell eingeben",
+    "customerAdmin.commercial.rateKindHelp":
+      "Für die Preisart gibt es hier keinen festen Katalog. Der Wert bleibt Freitext und wird beim Speichern nur normalisiert.",
+    "customerAdmin.commercial.rateCardWindowHelp":
+      "Leer lassen, wenn dieses Preisfenster offen weiterläuft.",
     "customerAdmin.commercial.pricingTabs.rateCards": "Preiskarten",
     "customerAdmin.commercial.rateLinesEyebrow": "Preiszeilen",
     "customerAdmin.commercial.rateLinesTitle": "Leistungs- und Funktionspreise",
@@ -3449,6 +3587,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "shell.stat.modules": "Module groups",
     "shell.stat.portals": "Portal paths",
     "workspace.loading.processing": "Processing request",
+    "workspace.loading.reconcilingSession": "Reconciling session",
     "module.eyebrow": "Placeholder module",
     "module.note.navigation":
       "Navigation and role visibility are already registered in the shell.",
@@ -4068,6 +4207,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.scope.placeholder": "Tenant UUID for platform-admin mode",
     "employeeAdmin.scope.help":
       "Platform admins may switch the active tenant; tenant admins stay inside the session scope.",
+    "employeeAdmin.scope.reconcilingTitle": "Session is reconciling",
+    "employeeAdmin.scope.reconcilingBody":
+      "The employee workspace is reconciling the session with the active tenant context.",
     "employeeAdmin.scope.missingTitle": "Tenant scope missing",
     "employeeAdmin.scope.missingBody":
       "Choose a tenant before loading employee files.",
@@ -4081,6 +4223,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.detail.emptyBody":
       "Select an employee file on the left or create a new one.",
     "employeeAdmin.tabs.overview": "Overview",
+    "employeeAdmin.tabs.catalogs": "Catalogs",
     "employeeAdmin.tabs.appAccess": "App access",
     "employeeAdmin.tabs.profilePhoto": "Profile photo",
     "employeeAdmin.tabs.qualifications": "Qualifications",
@@ -4258,6 +4401,41 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.qualifications.functionTypeEmptyHint": "No function types are configured for this tenant yet.",
     "employeeAdmin.qualifications.qualificationTypePlaceholder": "Select qualification type",
     "employeeAdmin.qualifications.qualificationTypeEmptyHint": "No qualification types are configured for this tenant yet.",
+    "employeeAdmin.catalogs.workspaceTitle": "Function and qualification types",
+    "employeeAdmin.catalogs.eyebrow": "Catalogs",
+    "employeeAdmin.catalogs.title": "Function and qualification types",
+    "employeeAdmin.catalogs.lead":
+      "These tenant-scoped catalogs belong to the Employees workspace and become available to qualification editing in the same workspace immediately.",
+    "employeeAdmin.catalogs.functionTypesEyebrow": "Function types",
+    "employeeAdmin.catalogs.functionTypesTitle": "Manage function types",
+    "employeeAdmin.catalogs.functionTypesLead":
+      "Function clearances and later planning read-models rely on this HR-owned catalog.",
+    "employeeAdmin.catalogs.functionTypesEmpty": "No function types are configured yet.",
+    "employeeAdmin.catalogs.qualificationTypesEyebrow": "Qualification types",
+    "employeeAdmin.catalogs.qualificationTypesTitle": "Manage qualification types",
+    "employeeAdmin.catalogs.qualificationTypesLead":
+      "Validity defaults, proof requirements, and planning relevance stay controlled directly in the HR catalog.",
+    "employeeAdmin.catalogs.qualificationTypesEmpty": "No qualification types are configured yet.",
+    "employeeAdmin.catalogs.functionTypeEditorCreateEyebrow": "Create",
+    "employeeAdmin.catalogs.functionTypeEditorCreateTitle": "Create function type",
+    "employeeAdmin.catalogs.functionTypeEditorEditEyebrow": "Edit",
+    "employeeAdmin.catalogs.functionTypeEditorEditTitle": "Update function type",
+    "employeeAdmin.catalogs.qualificationTypeEditorCreateEyebrow": "Create",
+    "employeeAdmin.catalogs.qualificationTypeEditorCreateTitle": "Create qualification type",
+    "employeeAdmin.catalogs.qualificationTypeEditorEditEyebrow": "Edit",
+    "employeeAdmin.catalogs.qualificationTypeEditorEditTitle": "Update qualification type",
+    "employeeAdmin.catalogs.fields.code": "Code",
+    "employeeAdmin.catalogs.fields.label": "Label",
+    "employeeAdmin.catalogs.fields.category": "Category",
+    "employeeAdmin.catalogs.fields.description": "Description",
+    "employeeAdmin.catalogs.fields.isActive": "Active for new assignments",
+    "employeeAdmin.catalogs.fields.planningRelevant": "Planning-relevant for read models",
+    "employeeAdmin.catalogs.fields.complianceRelevant": "Compliance-relevant",
+    "employeeAdmin.catalogs.fields.expiryRequired": "Expiry date required",
+    "employeeAdmin.catalogs.fields.defaultValidityDays": "Default validity in days",
+    "employeeAdmin.catalogs.fields.proofRequired": "Proof required",
+    "employeeAdmin.catalogs.activeLabel": "Active",
+    "employeeAdmin.catalogs.inactiveLabel": "Inactive",
     "employeeAdmin.credentials.eyebrow": "Credentials",
     "employeeAdmin.credentials.title": "Credentials and badge output",
     "employeeAdmin.credentials.lead":
@@ -4363,9 +4541,18 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.markCurrentAddress": "Mark as current",
     "employeeAdmin.actions.closeAddressValidity": "Close validity",
     "employeeAdmin.actions.resetAddress": "Clear address form",
+    "employeeAdmin.actions.openCatalogs": "Open catalogs",
+    "employeeAdmin.actions.createFunctionType": "Create function type",
+    "employeeAdmin.actions.saveFunctionType": "Save function type",
+    "employeeAdmin.actions.resetFunctionType": "Clear function type form",
+    "employeeAdmin.actions.editFunctionType": "Edit function type",
     "employeeAdmin.actions.createQualification": "Create qualification",
     "employeeAdmin.actions.saveQualification": "Save qualification",
     "employeeAdmin.actions.resetQualification": "Clear qualification form",
+    "employeeAdmin.actions.createQualificationType": "Create qualification type",
+    "employeeAdmin.actions.saveQualificationType": "Save qualification type",
+    "employeeAdmin.actions.resetQualificationType": "Clear qualification type form",
+    "employeeAdmin.actions.editQualificationType": "Edit qualification type",
     "employeeAdmin.actions.uploadQualificationProof": "Upload proof",
     "employeeAdmin.actions.createCredential": "Create credential",
     "employeeAdmin.actions.saveCredential": "Save credential",
@@ -4467,6 +4654,14 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "The selected function type is not available in this tenant.",
     "employeeAdmin.feedback.qualificationTypeNotFound":
       "The selected qualification type is not available in this tenant.",
+    "employeeAdmin.feedback.duplicateFunctionTypeCode":
+      "This function-type code already exists in the tenant.",
+    "employeeAdmin.feedback.duplicateQualificationTypeCode":
+      "This qualification-type code already exists in the tenant.",
+    "employeeAdmin.feedback.catalogRequired":
+      "Code and label are required for this catalog entry.",
+    "employeeAdmin.feedback.invalidQualificationTypeValidity":
+      "Default validity must be empty or a positive whole number.",
     "employeeAdmin.feedback.invalidQualificationRecordKind":
       "The qualification record kind is invalid.",
     "employeeAdmin.feedback.qualificationTargetRequired":
@@ -4535,6 +4730,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "A full display name is required for the linked app account.",
     "employeeAdmin.feedback.accessRoleMissing":
       "The employee access role is missing from the IAM catalog.",
+    "employeeAdmin.feedback.functionTypeSaved":
+      "The function type was saved.",
+    "employeeAdmin.feedback.qualificationTypeSaved":
+      "The qualification type was saved.",
     "employeeAdmin.feedback.qualificationSaved":
       "The qualification was saved.",
     "employeeAdmin.feedback.qualificationProofSaved":
@@ -4791,6 +4990,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.scope.placeholder": "Enter tenant UUID",
     "customerAdmin.scope.help":
       "Platform admins can deliberately switch the tenant context here. Normal internal roles use the scope from the authenticated session automatically.",
+    "customerAdmin.scope.reconcilingTitle": "Session is reconciling",
+    "customerAdmin.scope.reconcilingBody":
+      "The customer workspace is reconciling the session with the active tenant context.",
     "customerAdmin.scope.missingTitle": "Scope or session missing",
     "customerAdmin.scope.missingBody":
       "The customer workspace needs a resolved tenant context from the authenticated session or an explicit platform-admin tenant selection.",
@@ -5004,6 +5206,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.confirm.reactivate": "Set this customer back to active?",
     "customerAdmin.confirm.contactArchive": "Archive this contact?",
     "customerAdmin.confirm.addressArchive": "Archive this address link?",
+    "customerAdmin.confirm.rateCardArchive": "Archive this rate card?",
     "customerAdmin.feedback.created": "Customer created",
     "customerAdmin.feedback.createdNextStep": "Customer created. Next, add a primary contact and the registered or billing address.",
     "customerAdmin.feedback.saved": "Customer saved",
@@ -5089,6 +5292,17 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.commercial.rateCardsEyebrow": "Rate cards",
     "customerAdmin.commercial.rateCardsTitle": "Versioned pricing windows",
     "customerAdmin.commercial.rateCardsEmpty": "No rate cards configured yet.",
+    "customerAdmin.commercial.rateCardCreateEyebrow": "New rate card",
+    "customerAdmin.commercial.rateCardCreateTitle": "Create rate card",
+    "customerAdmin.commercial.rateCardEditEyebrow": "Selected rate card",
+    "customerAdmin.commercial.rateCardEditTitle": "Edit rate card",
+    "customerAdmin.commercial.rateCardEditorLead":
+      "Rate cards remain versioned pricing windows. The rate kind and effective dates define which rate lines and surcharges sit underneath.",
+    "customerAdmin.commercial.rateKindPlaceholder": "Enter the rate kind from your contract model",
+    "customerAdmin.commercial.rateKindHelp":
+      "There is no fixed catalog for rate kind here. The value stays free text and is only normalized on save.",
+    "customerAdmin.commercial.rateCardWindowHelp":
+      "Leave this empty if the pricing window stays open-ended.",
     "customerAdmin.commercial.pricingTabs.rateCards": "Rate cards",
     "customerAdmin.commercial.rateLinesEyebrow": "Rate lines",
     "customerAdmin.commercial.rateLinesTitle": "Service and function-based prices",

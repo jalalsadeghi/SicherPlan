@@ -7,8 +7,10 @@ import {
   buildEmployeeAvailabilityPayload,
   buildEmployeeCredentialPayload,
   buildEmployeeDocumentUploadPayload,
+  buildEmployeeFunctionTypePayload,
   buildEmployeePrivateProfilePayload,
   buildEmployeeQualificationPayload,
+  buildEmployeeQualificationTypePayload,
   buildWeekdayMask,
   deriveEmployeeActionState,
   EMPLOYEE_AVAILABILITY_RULE_KIND_OPTIONS,
@@ -24,7 +26,9 @@ import {
   validateEmployeeAddressDraft,
   validateEmployeeAvailabilityDraft,
   validateEmployeeCredentialDraft,
+  validateEmployeeFunctionTypeDraft,
   validateEmployeeQualificationDraft,
+  validateEmployeeQualificationTypeDraft,
 } from "./employeeAdmin.helpers.js";
 
 test("tenant admin gets employee write and private access", () => {
@@ -48,9 +52,11 @@ test("action state reflects selected employee and role", () => {
   assert.equal(adminState.canManagePhoto, true);
   assert.equal(adminState.canImport, true);
   assert.equal(adminState.canManageAccess, true);
+  assert.equal(adminState.canManageCatalogs, true);
   assert.equal(dispatcherState.canReadPrivate, false);
   assert.equal(dispatcherState.canWrite, false);
   assert.equal(dispatcherState.canExport, true);
+  assert.equal(dispatcherState.canManageCatalogs, false);
 });
 
 test("api message keys map to localized employee feedback keys", () => {
@@ -268,6 +274,81 @@ test("qualification payload normalizes optional fields and validates target/wind
       valid_until: "2026-12-31",
     }),
     "employeeAdmin.feedback.qualificationTargetRequired",
+  );
+});
+
+test("function-type catalog payload trims values and requires code plus label", () => {
+  assert.deepEqual(
+    buildEmployeeFunctionTypePayload(
+      {
+        code: " SEC_GUARD ",
+        label: " Sicherheitsdienst ",
+        category: " ops ",
+        description: " Nachtwache ",
+        is_active: true,
+        planning_relevant: false,
+      },
+      { tenantId: "tenant-1" },
+    ),
+    {
+      tenant_id: "tenant-1",
+      code: "SEC_GUARD",
+      label: "Sicherheitsdienst",
+      category: "ops",
+      description: "Nachtwache",
+      is_active: true,
+      planning_relevant: false,
+    },
+  );
+
+  assert.equal(
+    validateEmployeeFunctionTypeDraft({
+      code: " ",
+      label: " ",
+    }),
+    "employeeAdmin.feedback.catalogRequired",
+  );
+});
+
+test("qualification-type catalog payload normalizes validity and rejects non-positive values", () => {
+  assert.deepEqual(
+    buildEmployeeQualificationTypePayload(
+      {
+        code: " G34A ",
+        label: " Sachkunde G34a ",
+        category: " security ",
+        description: " Pflichtnachweis ",
+        is_active: true,
+        planning_relevant: true,
+        compliance_relevant: true,
+        expiry_required: true,
+        default_validity_days: " 365 ",
+        proof_required: true,
+      },
+      { tenantId: "tenant-1" },
+    ),
+    {
+      tenant_id: "tenant-1",
+      code: "G34A",
+      label: "Sachkunde G34a",
+      category: "security",
+      description: "Pflichtnachweis",
+      is_active: true,
+      planning_relevant: true,
+      compliance_relevant: true,
+      expiry_required: true,
+      default_validity_days: 365,
+      proof_required: true,
+    },
+  );
+
+  assert.equal(
+    validateEmployeeQualificationTypeDraft({
+      code: "G34A",
+      label: "Sachkunde",
+      default_validity_days: "0",
+    }),
+    "employeeAdmin.feedback.invalidQualificationTypeValidity",
   );
 });
 

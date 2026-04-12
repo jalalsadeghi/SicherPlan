@@ -26,7 +26,7 @@ test("customer workspace keeps desktop master detail layout with detail tabs", (
   assert.match(source, /loading\.employeeBlock/);
   assert.match(source, /loading\.sharedAddress/);
   assert.match(source, /loading\.hrCatalogBootstrap/);
-  assert.match(source, /const customerWorkspaceLoadingText = computed\(\(\) => \(customerWorkspaceBusy\.value \? t\("workspace\.loading\.processing"\) : ""\)\)/);
+  assert.match(source, /const customerWorkspaceLoadingText = computed\(\(\) =>/);
   assert.match(source, /class="customer-admin-grid"/);
   assert.match(source, /data-testid="customer-list-section"/);
   assert.match(source, /data-testid="customer-detail-workspace"/);
@@ -36,10 +36,12 @@ test("customer workspace keeps desktop master detail layout with detail tabs", (
 
 test("customer workspace removes the manual bearer-token gate and only keeps tenant switching for platform admins", () => {
   assert.match(source, /<div v-if="isPlatformAdmin" class="module-card customer-admin-scope"/);
-  assert.match(source, /<section v-if="!tenantScopeId" class="module-card customer-admin-empty">/);
+  assert.match(source, /<section v-if="isCustomerSessionResolving && !tenantScopeId" class="module-card customer-admin-empty">/);
+  assert.match(source, /<section v-else-if="!tenantScopeId" class="module-card customer-admin-empty">/);
   assert.match(source, /const isPlatformAdmin = computed\(\(\) => authStore\.effectiveRole === "platform_admin"\)/);
   assert.match(source, /const tenantScopeId = computed\(\(\) => authStore\.effectiveTenantScopeId\)/);
   assert.match(source, /const accessToken = computed\(\(\) => authStore\.effectiveAccessToken \|\| authStore\.accessToken\)/);
+  assert.match(source, /const isCustomerSessionResolving = computed\(\(\) => authStore\.isSessionResolving\)/);
   assert.match(source, /authStore\.syncFromPrimarySession\(\)/);
   assert.match(source, /await authStore\.ensureSessionReady\(\)/);
   assert.match(source, /syncCustomerSessionState\(\)/);
@@ -50,6 +52,14 @@ test("customer workspace removes the manual bearer-token gate and only keeps ten
   assert.doesNotMatch(source, /accessTokenInput/);
   assert.doesNotMatch(source, /readStoredAccessToken/);
   assert.doesNotMatch(source, /ACCESS_TOKEN_STORAGE_KEY/);
+});
+
+test("customer workspace keeps the draft workspace mounted during session reconciliation", () => {
+  assert.match(source, /isCustomerSessionResolving\.value/);
+  assert.match(source, /workspace\.loading\.reconcilingSession/);
+  assert.match(source, /customerAdmin\.scope\.reconcilingTitle/);
+  assert.match(source, /customerAdmin\.scope\.reconcilingBody/);
+  assert.match(source, /isCustomerSessionResolving\.value\s*\|\|\s*loading\.customer/);
 });
 
 test("customer same-record reloads preserve nested tab context with safe fallbacks", () => {
@@ -94,6 +104,26 @@ test("commercial workspace uses nested sub tabs and isolated panels", () => {
   assert.match(source, /activePricingRulesTab\.value = "rate_cards"/);
   assert.match(source, /activePricingRulesTab\.value = "rate_lines"/);
   assert.match(source, /activePricingRulesTab\.value = "surcharges"/);
+});
+
+test("rate cards expose explicit edit actions and a versioned pricing-window editor", () => {
+  assert.match(source, /data-testid="customer-pricing-rules-panel-rate-cards"/);
+  assert.match(source, /customer-rate-card-record-/);
+  assert.match(source, /customer-rate-card-select-/);
+  assert.match(source, /customer-rate-card-edit-/);
+  assert.match(source, /@click="editRateCard\(rateCard\)"/);
+  assert.match(source, /customerAdmin\.commercial\.rateCardCreateEyebrow/);
+  assert.match(source, /customerAdmin\.commercial\.rateCardEditEyebrow/);
+  assert.match(source, /customerAdmin\.commercial\.rateCardEditorLead/);
+  assert.match(source, /customerAdmin\.commercial\.rateCardWindowHelp/);
+  assert.match(source, /customerAdmin\.commercial\.rateKindPlaceholder/);
+  assert.match(source, /customerAdmin\.commercial\.rateKindHelp/);
+  assert.match(source, /@blur="normalizeRateKindField"/);
+  assert.match(source, /customer-rate-card-archive/);
+  assert.match(source, /archiveRateCard\(selectedRateCard\)/);
+  assert.match(source, /await updateCustomerRateCard\([\s\S]*status: "archived",[\s\S]*archived_at: new Date\(\)\.toISOString\(\),[\s\S]*version_no: rateCard\.version_no/);
+  assert.match(source, /<input[\s\S]*v-model="rateCardDraft\.rate_kind"/);
+  assert.doesNotMatch(source, /<select[^>]*v-model="rateCardDraft\.rate_kind"/);
 });
 
 test("pricing-rule editors use guided select, datalist, numeric, and time controls", () => {

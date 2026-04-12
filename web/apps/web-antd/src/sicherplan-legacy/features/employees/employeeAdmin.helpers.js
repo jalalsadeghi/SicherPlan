@@ -59,6 +59,7 @@ export function deriveEmployeeActionState(role, selectedEmployee) {
     canImport: canWrite,
     canExport: canRead,
     canManageAccess: canWrite && !!selectedEmployee,
+    canManageCatalogs: canWrite,
     canArchive: canWrite && !!selectedEmployee && !archivedAt && status !== "archived",
     canReactivate: canWrite && !!selectedEmployee && status === "inactive" && !archivedAt,
   };
@@ -111,7 +112,12 @@ export function mapEmployeeApiMessage(messageKey) {
     "errors.employees.access.full_name_required": "employeeAdmin.feedback.accessFullNameRequired",
     "errors.employees.access.role_missing": "employeeAdmin.feedback.accessRoleMissing",
     "errors.employees.function_type.not_found": "employeeAdmin.feedback.functionTypeNotFound",
+    "errors.employees.function_type.duplicate_code": "employeeAdmin.feedback.duplicateFunctionTypeCode",
+    "errors.employees.function_type.stale_version": "employeeAdmin.feedback.staleVersion",
     "errors.employees.qualification_type.not_found": "employeeAdmin.feedback.qualificationTypeNotFound",
+    "errors.employees.qualification_type.duplicate_code": "employeeAdmin.feedback.duplicateQualificationTypeCode",
+    "errors.employees.qualification_type.stale_version": "employeeAdmin.feedback.staleVersion",
+    "errors.employees.qualification_type.invalid_validity_days": "employeeAdmin.feedback.invalidQualificationTypeValidity",
     "errors.employees.qualification.not_found": "employeeAdmin.feedback.notFound",
     "errors.employees.qualification.invalid_record_kind": "employeeAdmin.feedback.invalidQualificationRecordKind",
     "errors.employees.qualification.record_target_required": "employeeAdmin.feedback.qualificationTargetRequired",
@@ -295,6 +301,56 @@ export function buildEmployeeQualificationPayload(draft, { tenantId, employeeId 
     granted_internally: Boolean(draft?.granted_internally),
     notes: normalizeOptionalText(draft?.notes),
   };
+}
+
+export function buildEmployeeFunctionTypePayload(draft, { tenantId } = {}) {
+  return {
+    tenant_id: tenantId,
+    code: normalizeOptionalText(draft?.code) || "",
+    label: normalizeOptionalText(draft?.label) || "",
+    category: normalizeOptionalText(draft?.category),
+    description: normalizeOptionalText(draft?.description),
+    is_active: Boolean(draft?.is_active),
+    planning_relevant: Boolean(draft?.planning_relevant),
+  };
+}
+
+export function validateEmployeeFunctionTypeDraft(draft) {
+  if (!normalizeOptionalText(draft?.code) || !normalizeOptionalText(draft?.label)) {
+    return "employeeAdmin.feedback.catalogRequired";
+  }
+  return null;
+}
+
+export function buildEmployeeQualificationTypePayload(draft, { tenantId } = {}) {
+  const defaultValidityDays = normalizeOptionalText(draft?.default_validity_days);
+  return {
+    tenant_id: tenantId,
+    code: normalizeOptionalText(draft?.code) || "",
+    label: normalizeOptionalText(draft?.label) || "",
+    category: normalizeOptionalText(draft?.category),
+    description: normalizeOptionalText(draft?.description),
+    is_active: Boolean(draft?.is_active),
+    planning_relevant: Boolean(draft?.planning_relevant),
+    compliance_relevant: Boolean(draft?.compliance_relevant),
+    expiry_required: Boolean(draft?.expiry_required),
+    default_validity_days: defaultValidityDays == null ? null : Number(defaultValidityDays),
+    proof_required: Boolean(draft?.proof_required),
+  };
+}
+
+export function validateEmployeeQualificationTypeDraft(draft) {
+  if (!normalizeOptionalText(draft?.code) || !normalizeOptionalText(draft?.label)) {
+    return "employeeAdmin.feedback.catalogRequired";
+  }
+  const defaultValidityDays = normalizeOptionalText(draft?.default_validity_days);
+  if (defaultValidityDays != null) {
+    const numeric = Number(defaultValidityDays);
+    if (!Number.isInteger(numeric) || numeric <= 0) {
+      return "employeeAdmin.feedback.invalidQualificationTypeValidity";
+    }
+  }
+  return null;
 }
 
 export function validateEmployeeQualificationDraft(draft) {
