@@ -120,6 +120,7 @@ class AuthService:
         auth_secret: str,
         access_ttl_minutes: int,
         refresh_ttl_minutes: int,
+        remember_me_refresh_ttl_minutes: int | None = None,
         reset_ttl_minutes: int,
         notifier: PasswordResetNotifier,
         extension_hooks: AuthExtensionHooks,
@@ -130,6 +131,7 @@ class AuthService:
         self.auth_secret = auth_secret
         self.access_ttl_minutes = access_ttl_minutes
         self.refresh_ttl_minutes = refresh_ttl_minutes
+        self.remember_me_refresh_ttl_minutes = remember_me_refresh_ttl_minutes
         self.reset_ttl_minutes = reset_ttl_minutes
         self.notifier = notifier
         self.extension_hooks = extension_hooks
@@ -199,7 +201,7 @@ class AuthService:
                 user_account_id=user_account.id,
                 session_token_hash=refresh_token_hash,
                 refresh_token_family=token_urlsafe(18),
-                expires_at=now + timedelta(minutes=self.refresh_ttl_minutes),
+                expires_at=now + timedelta(minutes=self._resolve_refresh_ttl_minutes(payload.remember_me)),
                 last_seen_at=now,
                 device_label=payload.device_label,
                 device_id=payload.device_id,
@@ -253,8 +255,9 @@ class AuthService:
             )
 
         new_refresh_token = token_urlsafe(48)
+        remember_me = bool((session_row.metadata_json or {}).get("remember_me"))
         session_row.session_token_hash = hash_session_token(new_refresh_token)
-        session_row.expires_at = now + timedelta(minutes=self.refresh_ttl_minutes)
+        session_row.expires_at = now + timedelta(minutes=self._resolve_refresh_ttl_minutes(remember_me))
         session_row.last_seen_at = now
         session_row.updated_at = now
         updated = self.repository.update_session(session_row)
@@ -503,6 +506,11 @@ class AuthService:
             user_agent=session_row.user_agent,
             is_current=is_current,
         )
+
+    def _resolve_refresh_ttl_minutes(self, remember_me: bool) -> int:
+        if remember_me and self.remember_me_refresh_ttl_minutes is not None:
+            return self.remember_me_refresh_ttl_minutes
+        return self.refresh_ttl_minutes
 
     @staticmethod
     def _invalid_credentials() -> ApiException:

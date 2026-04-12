@@ -124,6 +124,10 @@ class AppSettings:
     auth_session_secret: str = _get_str("SP_AUTH_SESSION_SECRET", "change-me")
     auth_access_token_ttl_minutes: int = _get_int("SP_AUTH_ACCESS_TOKEN_TTL_MINUTES", 15)
     auth_refresh_token_ttl_minutes: int = _get_int("SP_AUTH_REFRESH_TOKEN_TTL_MINUTES", 10080)
+    auth_remember_me_refresh_token_ttl_minutes: int = _get_int(
+        "SP_AUTH_REMEMBER_ME_REFRESH_TOKEN_TTL_MINUTES",
+        20160,
+    )
     auth_password_reset_token_ttl_minutes: int = _get_int(
         "SP_AUTH_PASSWORD_RESET_TOKEN_TTL_MINUTES",
         30,

@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { useAccessStore, useUserStore } from "@vben/stores";
+import { readStoredAuthSessionMetadata } from "#/store/auth-session";
 
 import {
   AuthApiError,
@@ -29,6 +30,14 @@ const PORTAL_SUBCONTRACTOR_CONTEXT_STORAGE_KEY = "sicherplan-portal-subcontracto
 function readPrimaryAccessToken(): string {
   try {
     return useAccessStore().accessToken ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function readPrimaryRefreshToken(): string {
+  try {
+    return useAccessStore().refreshToken ?? "";
   } catch {
     return "";
   }
@@ -242,8 +251,10 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
   actions: {
     syncFromPrimarySession() {
       const primaryAccessToken = readPrimaryAccessToken();
+      const primaryRefreshToken = readPrimaryRefreshToken();
       const primaryRole = pickRoleFromKeys(readPrimaryRoleKeys());
       const sessionRole = pickSessionRole(this.sessionUser);
+      const sessionMetadata = readStoredAuthSessionMetadata();
       const preservePortalSession =
         Boolean(this.accessToken && this.sessionUser)
         && isPortalSessionRole(sessionRole)
@@ -252,13 +263,20 @@ export const useAuthStore = defineStore("sicherplan-legacy-auth", {
 
       if (primaryAccessToken && primaryAccessToken !== this.accessToken && !preservePortalSession) {
         this.accessToken = primaryAccessToken;
+        this.refreshToken = primaryRefreshToken;
         this.sessionId = "";
         this.sessionUser = null;
         this.clearPortalCustomerContext();
         this.clearPortalSubcontractorContext();
         persistString(ACCESS_TOKEN_STORAGE_KEY, this.accessToken);
+        persistString(REFRESH_TOKEN_STORAGE_KEY, this.refreshToken);
         persistString(SESSION_ID_STORAGE_KEY, "");
         persistJson(SESSION_USER_STORAGE_KEY, null);
+      }
+
+      if (sessionMetadata.sessionId && !this.sessionUser && !this.sessionId) {
+        this.sessionId = sessionMetadata.sessionId;
+        persistString(SESSION_ID_STORAGE_KEY, this.sessionId);
       }
 
       if (primaryRole && primaryRole !== this.activeRole) {

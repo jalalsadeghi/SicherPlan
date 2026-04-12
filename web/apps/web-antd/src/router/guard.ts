@@ -61,6 +61,9 @@ function setupAccessGuard(router: Router) {
 
     // 基本路由，这些路由不需要进入权限拦截
     if (coreRouteNames.includes(to.name as string)) {
+      if (to.path === LOGIN_PATH && accessStore.refreshToken) {
+        await authStore.ensureSessionReady();
+      }
       if (to.path === LOGIN_PATH && accessStore.accessToken) {
         return decodeURIComponent(
           (to.query?.redirect as string) ||
@@ -72,6 +75,10 @@ function setupAccessGuard(router: Router) {
     }
 
     // accessToken 检查
+    if (!accessStore.accessToken) {
+      await authStore.ensureSessionReady();
+    }
+
     if (!accessStore.accessToken) {
       // 明确声明忽略权限访问权限，则可以访问
       if (to.meta.ignoreAccess) {

@@ -296,6 +296,7 @@ class TestAuthFlows(unittest.TestCase):
             auth_secret="test-secret",
             access_ttl_minutes=15,
             refresh_ttl_minutes=60,
+            remember_me_refresh_ttl_minutes=1440,
             reset_ttl_minutes=30,
             notifier=self.notifier,
             extension_hooks=FakeHooks(),
@@ -319,6 +320,12 @@ class TestAuthFlows(unittest.TestCase):
         self.assertTrue(
             self.repository.sessions[login.session.session_id].metadata_json["remember_me"]
         )
+        login_session = self.repository.sessions[login.session.session_id]
+        self.assertGreaterEqual(
+            login_session.expires_at - login_session.issued_at,
+            timedelta(minutes=1439),
+        )
+        login_expiry = login_session.expires_at
 
         context = self.service.authenticate_access_token(login.session.access_token)
         current = self.service.current_session(context)
@@ -330,12 +337,34 @@ class TestAuthFlows(unittest.TestCase):
 
         refreshed = self.service.refresh_session(RefreshRequest(refresh_token=login.session.refresh_token))
         self.assertNotEqual(refreshed.session.refresh_token, login.session.refresh_token)
+        self.assertGreater(
+            self.repository.sessions[login.session.session_id].expires_at,
+            login_expiry,
+        )
 
         logout = self.service.logout(self.service.authenticate_access_token(refreshed.session.access_token))
         self.assertEqual(logout.message_key, "messages.iam.auth.logout_success")
 
         with self.assertRaises(Exception):
             self.service.refresh_session(RefreshRequest(refresh_token=login.session.refresh_token))
+
+    def test_non_remembered_session_keeps_the_shorter_refresh_ttl(self) -> None:
+        login = self.service.login(
+            LoginRequest(
+                tenant_code="nord",
+                identifier="nina",
+                password="CorrectHorseBattery",
+                remember_me=False,
+            ),
+            ip_address="127.0.0.1",
+            user_agent="UnitTest",
+        )
+
+        login_session = self.repository.sessions[login.session.session_id]
+        self.assertLessEqual(
+            login_session.expires_at - login_session.issued_at,
+            timedelta(minutes=61),
+        )
 
     def test_invalid_credentials_and_rate_limit(self) -> None:
         for _ in range(3):
@@ -433,6 +462,7 @@ class TestAuthRouterFunctions(unittest.TestCase):
             auth_secret="test-secret",
             access_ttl_minutes=15,
             refresh_ttl_minutes=60,
+            remember_me_refresh_ttl_minutes=1440,
             reset_ttl_minutes=30,
             notifier=self.notifier,
             extension_hooks=FakeHooks(),

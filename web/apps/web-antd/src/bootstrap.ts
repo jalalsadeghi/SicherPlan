@@ -16,6 +16,7 @@ import { initComponentAdapter } from './adapter/component';
 import { initSetupVbenForm } from './adapter/form';
 import App from './app.vue';
 import { router } from './router';
+import { initializeAuthSessionLifecycle } from './store/auth-session-lifecycle';
 
 async function bootstrap(namespace: string) {
   // 初始化组件适配器
@@ -46,6 +47,8 @@ async function bootstrap(namespace: string) {
 
   // 配置 pinia-tore
   await initStores(app, { namespace });
+
+  await initializeAuthSessionLifecycle();
 
   // 安装权限指令
   registerAccessDirective(app);

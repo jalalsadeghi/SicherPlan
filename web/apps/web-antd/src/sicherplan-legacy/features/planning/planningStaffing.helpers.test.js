@@ -8,11 +8,13 @@ import {
   coverageTone,
   dispatchAudienceLabel,
   derivePlanningStaffingActionState,
+  formatPlanningStaffingDemandGroupLabel,
   formatPlanningStaffingPlanningRecordOption,
   hasPlanningStaffingPermission,
   mapPlanningStaffingApiMessage,
   normalizePlanningStaffingLookupDate,
   releaseTone,
+  resolvePlanningStaffingCatalogLabel,
   resolvePlanningStaffingCoverageState,
   resolveSelectedDemandGroupId,
   summarizeCoverage,
@@ -115,6 +117,37 @@ test("team-member options stay scoped to the selected team", () => {
     { id: "m-2", team_id: "team-2" },
   ];
   assert.deepEqual(buildStaffingMemberOptions(members, "team-1"), [{ id: "m-1", team_id: "team-1" }]);
+});
+
+test("demand-group labels prefer function and qualification labels over raw ids", () => {
+  assert.equal(
+    formatPlanningStaffingDemandGroupLabel(
+      { function_type_id: "func-1", qualification_type_id: "qual-1" },
+      [{ id: "func-1", label: "Security agent", code: "SEC_GUARD" }],
+      [{ id: "qual-1", label: "34a certified", code: "G34A" }],
+    ),
+    "Security agent · 34a certified",
+  );
+});
+
+test("demand-group labels fall back safely when qualification is empty or catalogs are missing", () => {
+  assert.equal(
+    formatPlanningStaffingDemandGroupLabel(
+      { function_type_id: "func-1", qualification_type_id: null },
+      [{ id: "func-1", label: "", code: "SHIFT_SUP" }],
+      [],
+    ),
+    "SHIFT_SUP",
+  );
+  assert.equal(
+    formatPlanningStaffingDemandGroupLabel(
+      { function_type_id: "func-missing", qualification_type_id: "qual-missing" },
+      [],
+      [],
+    ),
+    "func-missing · qual-missing",
+  );
+  assert.equal(resolvePlanningStaffingCatalogLabel([], "func-missing"), "func-missing");
 });
 
 test("selected demand group falls back safely to the first visible row", () => {

@@ -3,7 +3,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  clearStoredAuthSessionMetadata,
+  persistAuthSessionMetadata,
   persistRememberedLoginValues,
+  readStoredAuthSessionMetadata,
   readRememberedLoginValues,
 } from './auth-session';
 
@@ -41,6 +44,40 @@ describe('auth remembered login storage', () => {
       identifier: '',
       rememberMe: false,
       tenantCode: '',
+    });
+  });
+
+  it('stores and reads auth session metadata', () => {
+    persistAuthSessionMetadata({
+      accessTokenExpiresAt: '2026-04-12T10:15:00Z',
+      refreshTokenExpiresAt: '2026-04-19T10:00:00Z',
+      rememberMe: true,
+      sessionId: 'session-1',
+    });
+
+    expect(readStoredAuthSessionMetadata()).toEqual({
+      accessTokenExpiresAt: '2026-04-12T10:15:00Z',
+      refreshTokenExpiresAt: '2026-04-19T10:00:00Z',
+      rememberMe: true,
+      sessionId: 'session-1',
+    });
+  });
+
+  it('clears auth session metadata explicitly', () => {
+    persistAuthSessionMetadata({
+      accessTokenExpiresAt: '2026-04-12T10:15:00Z',
+      refreshTokenExpiresAt: '2026-04-19T10:00:00Z',
+      rememberMe: true,
+      sessionId: 'session-1',
+    });
+
+    clearStoredAuthSessionMetadata();
+
+    expect(readStoredAuthSessionMetadata()).toEqual({
+      accessTokenExpiresAt: '',
+      refreshTokenExpiresAt: '',
+      rememberMe: false,
+      sessionId: '',
     });
   });
 });

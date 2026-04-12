@@ -727,10 +727,11 @@ import { useLocaleStore } from "@/stores/locale";
 import {
   actorLabel,
   buildPlanningStaffingPlanningRecordLookupFilters,
-  formatPlanningStaffingPlanningRecordOption,
   buildStaffingMemberOptions,
   coverageTone,
   derivePlanningStaffingActionState,
+  formatPlanningStaffingDemandGroupLabel,
+  formatPlanningStaffingPlanningRecordOption,
   mapPlanningStaffingApiMessage,
   normalizePlanningStaffingLookupDate,
   resolvePlanningStaffingCoverageState,
@@ -986,10 +987,7 @@ function closeDemandGroupDialog() {
 }
 
 function formatDemandGroup(group: StaffingBoardDemandGroupItem | null) {
-  if (!group) {
-    return "";
-  }
-  return [group.function_type_id, group.qualification_type_id].filter(Boolean).join(" · ");
+  return formatPlanningStaffingDemandGroupLabel(group, functionTypeOptions.value, qualificationTypeOptions.value);
 }
 
 function formatMember(member: TeamMemberRead) {

@@ -1,4 +1,8 @@
 import { useAccessStore } from '@vben/stores';
+import {
+  persistAuthSessionMetadata,
+  readStoredAuthSessionMetadata,
+} from '#/store/auth-session';
 
 import type { SicherPlanCurrentSessionResponse } from './auth.mappers';
 
@@ -262,8 +266,15 @@ export async function getCurrentSessionApi() {
     }
 
     const refreshed = await refreshTokenApi();
+    const sessionMetadata = readStoredAuthSessionMetadata();
     accessStore.setAccessToken(refreshed.accessToken);
     accessStore.setRefreshToken(refreshed.refreshToken);
+    persistAuthSessionMetadata({
+      accessTokenExpiresAt: refreshed.accessTokenExpiresAt,
+      refreshTokenExpiresAt: refreshed.refreshTokenExpiresAt,
+      rememberMe: sessionMetadata.rememberMe,
+      sessionId: refreshed.sessionId,
+    });
 
     return sicherPlanRequest<AuthApi.CurrentSessionResult>('/auth/me', {
       accessToken: refreshed.accessToken,

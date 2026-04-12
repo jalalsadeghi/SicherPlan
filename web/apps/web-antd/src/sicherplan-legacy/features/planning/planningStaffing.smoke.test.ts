@@ -758,6 +758,9 @@ describe("PlanningStaffingCoverageView", () => {
     expect(wrapper.find('[data-testid="planning-staffing-tab-panel-validations"]').exists()).toBe(false);
     expect(wrapper.text()).toContain("Min: 1");
     expect(wrapper.text()).toContain("Ziel: 2");
+    expect(wrapper.get('[data-testid="planning-staffing-demand-group-list"]').text()).toContain("Sicherheitsdienst · G34a");
+    expect(wrapper.get('[data-testid="planning-staffing-tab-panel-demand-staffing"]').text()).not.toContain("func-1 · qual-1");
+    expect(wrapper.get('[data-testid="planning-staffing-tab-panel-demand-staffing"]').html()).toContain(">Sicherheitsdienst · G34a<");
     expect(wrapper.find('[data-testid="planning-staffing-demand-group-editor"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="planning-staffing-demand-group-edit-selected"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="planning-staffing-demand-group-start-create"]').exists()).toBe(true);

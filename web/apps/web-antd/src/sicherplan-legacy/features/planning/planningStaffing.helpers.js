@@ -159,6 +159,23 @@ export function buildStaffingMemberOptions(teamMembers, teamId) {
   return (teamMembers || []).filter((member) => !teamId || member.team_id === teamId);
 }
 
+export function resolvePlanningStaffingCatalogLabel(options, id) {
+  if (!id) {
+    return "";
+  }
+  const option = (options || []).find((row) => row?.id === id);
+  return option?.label || option?.code || id;
+}
+
+export function formatPlanningStaffingDemandGroupLabel(group, functionTypeOptions, qualificationTypeOptions) {
+  if (!group) {
+    return "";
+  }
+  const functionLabel = resolvePlanningStaffingCatalogLabel(functionTypeOptions, group.function_type_id);
+  const qualificationLabel = resolvePlanningStaffingCatalogLabel(qualificationTypeOptions, group.qualification_type_id);
+  return [functionLabel, qualificationLabel].filter(Boolean).join(" · ");
+}
+
 export function resolveSelectedDemandGroupId(shift, selectedDemandGroupId) {
   const demandGroups = shift?.demand_groups ?? [];
   if (!demandGroups.length) {

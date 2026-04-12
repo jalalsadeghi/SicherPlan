@@ -49,6 +49,7 @@ def get_auth_service(
         auth_secret=settings.auth_session_secret,
         access_ttl_minutes=settings.auth_access_token_ttl_minutes,
         refresh_ttl_minutes=settings.auth_refresh_token_ttl_minutes,
+        remember_me_refresh_ttl_minutes=settings.auth_remember_me_refresh_token_ttl_minutes,
         reset_ttl_minutes=settings.auth_password_reset_token_ttl_minutes,
         notifier=LoggingPasswordResetNotifier(),
         extension_hooks=DefaultAuthExtensionHooks(),

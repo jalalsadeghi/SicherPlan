@@ -5,8 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   accessStoreState,
+  getAccessCodesApi,
+  getUserInfoApi,
+  loginApi,
   legacyAuthStoreState,
   logoutApi,
+  refreshTokenApi,
   resetAllStores,
   routerReplace,
   userStoreState,
@@ -29,10 +33,15 @@ const {
     setRememberMe: vi.fn(),
     setRefreshToken: vi.fn(),
   },
+  getAccessCodesApi: vi.fn(),
+  getUserInfoApi: vi.fn(),
+  loginApi: vi.fn(),
   legacyAuthStoreState: {
     clearSession: vi.fn(),
+    syncFromPrimarySession: vi.fn(),
   },
   logoutApi: vi.fn(),
+  refreshTokenApi: vi.fn(),
   resetAllStores: vi.fn(),
   routerReplace: vi.fn(),
   userStoreState: {
@@ -73,10 +82,17 @@ vi.mock('@vben/stores', () => ({
 }));
 
 vi.mock('#/api', () => ({
-  getAccessCodesApi: vi.fn(),
-  getUserInfoApi: vi.fn(),
-  loginApi: vi.fn(),
+  getAccessCodesApi,
+  getUserInfoApi,
+  loginApi,
   logoutApi,
+}));
+
+vi.mock('#/api/core/auth', () => ({
+  refreshTokenApi,
+  resolveLoginErrorMessageKey: vi.fn(
+    () => 'sicherplan.auth.loginErrors.generic',
+  ),
 }));
 
 vi.mock('#/router', () => ({
@@ -117,10 +133,15 @@ describe('auth store logout flow', () => {
     userStoreState.userInfo = { homePath: '/admin/core' };
 
     logoutApi.mockReset();
+    refreshTokenApi.mockReset();
+    loginApi.mockReset();
+    getUserInfoApi.mockReset();
+    getAccessCodesApi.mockReset();
     resetAllStores.mockReset();
     routerReplace.mockReset();
     userStoreState.setUserInfo.mockReset();
     legacyAuthStoreState.clearSession.mockReset();
+    legacyAuthStoreState.syncFromPrimarySession.mockReset();
 
     accessStoreState.setAccessCodes.mockClear();
     accessStoreState.setAccessMenus.mockClear();
@@ -156,5 +177,62 @@ describe('auth store logout flow', () => {
       path: '/auth/login',
       query: {},
     });
+  });
+
+  it('restores a valid refresh-backed session when bootstrap has no access token', async () => {
+    window.localStorage.setItem(
+      'sicherplan.auth.session.metadata',
+      JSON.stringify({
+        accessTokenExpiresAt: '',
+        refreshTokenExpiresAt: '2099-04-12T10:00:00Z',
+        rememberMe: true,
+        sessionId: 'session-1',
+      }),
+    );
+    accessStoreState.accessToken = null;
+    accessStoreState.refreshToken = 'refresh-1';
+    refreshTokenApi.mockResolvedValue({
+      accessToken: 'access-2',
+      accessTokenExpiresAt: '2099-04-12T10:15:00Z',
+      refreshToken: 'refresh-2',
+      refreshTokenExpiresAt: '2099-04-19T10:15:00Z',
+      sessionId: 'session-1',
+    });
+
+    const store = useAuthStore();
+    await expect(store.ensureSessionReady()).resolves.toBe(true);
+
+    expect(refreshTokenApi).toHaveBeenCalledTimes(1);
+    expect(accessStoreState.accessToken).toBe('access-2');
+    expect(accessStoreState.refreshToken).toBe('refresh-2');
+    expect(accessStoreState.rememberMe).toBe(true);
+    expect(legacyAuthStoreState.syncFromPrimarySession).toHaveBeenCalled();
+  });
+
+  it('redirects to login only after refresh truly fails', async () => {
+    window.localStorage.setItem(
+      'sicherplan.auth.session.metadata',
+      JSON.stringify({
+        accessTokenExpiresAt: '',
+        refreshTokenExpiresAt: '2099-04-12T10:00:00Z',
+        rememberMe: false,
+        sessionId: 'session-1',
+      }),
+    );
+    accessStoreState.accessToken = null;
+    accessStoreState.refreshToken = 'refresh-1';
+    refreshTokenApi.mockRejectedValue(new Error('refresh failed'));
+
+    const store = useAuthStore();
+    await expect(
+      store.ensureSessionReady({ redirectOnFailure: true }),
+    ).resolves.toBe(false);
+
+    expect(routerReplace).toHaveBeenCalledWith({
+      path: '/auth/login',
+      query: {},
+    });
+    expect(accessStoreState.accessToken).toBeNull();
+    expect(accessStoreState.refreshToken).toBeNull();
   });
 });

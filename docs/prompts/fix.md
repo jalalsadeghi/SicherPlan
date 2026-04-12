@@ -1,145 +1,117 @@
 You are working in the SicherPlan repository.
 
-Before any code changes:
+Goal:
+Fix the authenticated web session lifecycle so internal users can keep pages like
+`/admin/planning-shifts` and `/admin/employees` open for hours and continue working
+without being unexpectedly redirected to login after short inactivity. Also support the
+business expectation that a user who chose “remember me” should usually still be signed
+in on the next workday, unless the refresh session has truly expired or was revoked.
+
+Before coding:
 1. Read `AGENTS.md`.
-2. Open the relevant sprint file under `docs/sprint/`.
-3. Check whether a planning/staffing task prompt already exists under `docs/prompts/`.
-4. Anchor this work to the correct story/task ID.
-5. Keep the change set narrow and focused on the Demand groups UX refactor inside `/admin/planning-staffing`.
+2. Respect tenant isolation, role scoping, auditability, and safe auth handling.
+3. Keep the change set focused on auth/session lifecycle. Do not do unrelated refactors.
 
-Task goal:
-Refactor the Demand groups area inside the "Shift detail" box on `/admin/planning-staffing` so that:
-- the demand-group list remains visible inline on the page
-- the create/edit form is moved into a dialog/modal
-- clicking `New demand group` opens the dialog in create mode
-- clicking a demand-group row in `planning-staffing-demand-groups` opens the dialog in edit mode
-- the inline button `Edit selected demand group` is removed from the page
+Inspect these areas first:
+Frontend:
+- `web/apps/web-antd/src/api/request.ts`
+- `web/apps/web-antd/src/api/core/auth.ts`
+- `web/apps/web-antd/src/store/auth.ts`
+- `web/apps/web-antd/src/store/auth-session.ts`
+- `web/apps/web-antd/src/router/guard.ts`
+- `web/apps/web-antd/src/sicherplan-legacy/stores/auth.ts`
+- any legacy API utilities used by `admin/planning-shifts` and `admin/employees`
+- any app bootstrap/auth persistence code used by this web app
 
-Current UX problem:
-The current Demand groups section mixes:
-- list of existing demand groups
-- create/edit form
-- duplicate edit button
-all in the same visible area, which makes the Shift detail panel feel crowded.
+Backend:
+- `backend/app/config.py`
+- `backend/app/modules/iam/auth_router.py`
+- `backend/app/modules/iam/auth_service.py`
+- `backend/app/modules/iam/auth_schemas.py`
+- related auth/session tests
 
-Desired UX outcome:
-A cleaner Demand groups section where:
-- the page shows the list of demand groups clearly
-- create/edit actions happen in a focused modal dialog
-- edit is triggered directly by clicking a demand-group item
-- the page no longer needs the `Edit selected demand group` button
+What you must verify first:
+- whether the current backend access token TTL is too short for real admin usage
+- whether refresh-token/session handling is already sufficient in theory but not correctly used by the frontend
+- whether `accessTokenExpiresAt` and `refreshTokenExpiresAt` are returned by the API but ignored or underused by the frontend
+- whether `remember_me` currently affects real session persistence or is mostly a login-form convenience
+- whether legacy pages are bypassing or weakening the main refresh/session flow
 
-Files to inspect first:
-- `AGENTS.md`
-- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
-- any related type/helper files used by this view
-- any existing dialog/modal pattern already used in the web app
-- any shared form/dialog components already present in the admin shell
+Required outcome:
+A. Keep strong security and tenant safety intact.
+B. Do NOT solve this only by making access tokens very long-lived.
+C. Make normal inactivity on open internal admin pages survivable when the refresh session is still valid.
+D. Support safe session restoration on app bootstrap when a valid refresh token exists.
+E. Refresh proactively before access-token expiry and also on window focus / visibility regain.
+F. Use a single-flight refresh strategy so parallel API calls do not trigger refresh races.
+G. Only redirect to login when refresh truly fails, the session is revoked, or the refresh session is expired.
+H. Make “remember me” behave like a real remembered session policy, not just remembered login fields.
 
-Important constraints:
-- This is primarily a UI/UX refactor.
-- Do not change backend contracts unless a small compatibility fix is truly required.
-- Do not change planning business rules.
-- Do not change demand-group validation logic, audit behavior, or staffing gating behavior.
-- Preserve tenant scope, role scope, and existing data flows.
-- Preserve existing `data-testid` values where practical, and update tests safely if needed.
-- Keep German as default UI language and English as secondary.
+Implementation expectations:
 
-Required implementation outcome:
-A. Keep the `planning-staffing-demand-groups` list visible inline in the Shift detail panel.
-B. Remove the always-visible inline demand-group editor form from the page body.
-C. Replace it with a modal/dialog form component or local modal section that supports:
-   - create mode
-   - edit mode
-D. `New demand group` opens the dialog in create mode with a clean form state.
-E. Clicking an existing demand-group row opens the dialog in edit mode with that row loaded.
-F. Remove the visible inline button `Edit selected demand group`.
-G. Preserve the ability to edit the currently selected demand group, but make row click the primary edit trigger.
-H. The dialog title should change by mode:
-   - create mode => `Create demand group`
-   - edit mode => `Edit demand group`
-I. Preserve the current fields and behavior inside the form:
-   - function type
-   - qualification
-   - minimum quantity
-   - target quantity
-   - mandatory checkbox
-   - remark
-   - save/update
-   - reset/cancel behavior as appropriate
-J. After successful save/update:
-   - refresh the demand-group list
-   - refresh shift detail / coverage state if needed
-   - keep the selected shift intact
-   - close the dialog only if that matches the current UX pattern cleanly
-K. If save fails, keep the dialog open and preserve user input where reasonable.
+1. Frontend session lifecycle
+- Persist enough auth-session metadata to know access-token expiry and refresh-token/session expiry.
+- Add a focused session manager / composable / service for:
+  - proactive refresh shortly before access-token expiry
+  - refresh on `visibilitychange` / focus
+  - bootstrap restore of session
+  - single-flight refresh protection
+  - graceful cleanup only after true refresh failure
+- Ensure route guards do not send the user to login just because the access token expired while refresh is still valid.
+- Ensure legacy pages such as `admin/planning-shifts` and `admin/employees` rely on the same central auth/session flow and do not bypass it.
 
-Recommended UX behavior:
-- Clicking `New demand group` => open empty dialog
-- Clicking a row => select it and open edit dialog
-- Provide a clear Cancel/Close action in the dialog
-- Keep the page uncluttered and focused
-- Do not hide important empty-state guidance when there are no demand groups yet
+2. Backend session policy
+- Review the default TTL policy for internal web usage.
+- Keep access tokens short-lived if possible.
+- If needed, improve refresh-session policy so remembered sessions can survive a normal workday boundary.
+- If `remember_me` currently has no effective TTL impact, implement a deliberate policy for it.
+- Preserve logout, revocation, password-reset invalidation, and audit behavior.
 
-Technical guidance:
-- Prefer an existing modal/dialog pattern already used in the web admin app
-- If none fits, implement a simple local modal cleanly in this view
-- Introduce local state such as:
-  - `isDemandGroupDialogOpen`
-  - `demandGroupDialogMode` (`create` | `edit`)
-  - `editingDemandGroupId`
-- Separate dialog open/close logic cleanly from demand-group form state
-- Avoid duplicating form markup if possible
-- Keep the change maintainable and scoped
-
-Acceptance criteria:
-1. Demand-group create/edit no longer clutters the main page body.
-2. `New demand group` opens a dialog in create mode.
-3. Clicking a demand-group row opens a dialog in edit mode.
-4. `Edit selected demand group` is removed from the visible page UI.
-5. Saving/updating still works correctly.
-6. The list remains visible inline and still shows selection state.
-7. Empty-state messaging remains clear when no demand groups exist.
-8. No staffing logic is broken.
-9. The Shift detail panel is visibly cleaner than before.
+3. UX / behavior
+- Users with a valid refresh session should remain signed in after normal inactivity.
+- A remembered session should usually survive until the next workday if security policy allows it.
+- When the session is really invalid, show one clear re-login path instead of confusing repeated redirects.
 
 Tests and validation:
-Add or update tests for:
-- clicking `New demand group` opens create dialog
-- clicking a demand-group row opens edit dialog
-- dialog title changes correctly by mode
-- existing form fields still render in the dialog
-- save in create mode still works
-- save in edit mode still works
-- list refreshes after save/update
-- inline `Edit selected demand group` button is no longer rendered
-- empty-state path still allows create flow correctly
+- Add or update frontend tests for:
+  - session restoration on bootstrap
+  - proactive refresh before access-token expiry
+  - refresh on focus / visibility regain
+  - single-flight refresh behavior
+  - redirect to login only after true refresh failure
+- Add or update backend tests for:
+  - login and refresh TTL behavior
+  - remember-me policy
+  - refresh rotation and revocation
+  - password-reset invalidating active sessions
+- Test specifically against:
+  - `/admin/planning-shifts`
+  - `/admin/employees`
+- Simulate these scenarios:
+  1. idle longer than the access-token TTL while refresh is still valid
+  2. browser refresh / tab restore
+  3. next-day remembered session
+  4. expired refresh token
+  5. revoked session
+- Run relevant lint, typecheck, and tests before finishing.
 
-Manual validation checklist:
-- open `/admin/planning-staffing`
-- select a shift
-- verify demand-group list remains visible
-- click `New demand group` and confirm create dialog opens
-- click an existing demand-group row and confirm edit dialog opens
-- confirm save/update still works
-- confirm the Shift detail panel is less crowded
-- confirm no unrelated section layout broke
-
-Important self-check before finishing:
-- Verify the list stayed inline and only the form moved into a dialog
-- Verify `Edit selected demand group` is removed
-- Verify row click really opens edit mode
-- Verify no business logic changed
-- Verify no tenant/role-scope behavior regressed
-- Verify the page is meaningfully less cluttered after the change
-- Challenge your own implementation and confirm that create/edit is now easier, not harder
+Important self-check:
+Before finalizing, verify that:
+- you did not only increase token TTLs and ignore session-lifecycle gaps
+- you did not leave “remember me” as login-form-only convenience
+- you did not leave legacy pages outside the central refresh/session flow
+- you did not weaken logout, revocation, password-reset security, or auditability
+- you did not introduce duplicate refresh races, refresh loops, or hidden auth state inconsistencies
 
 Final response format:
-1. Short implementation summary
-2. Exact task/story ID used
-3. Exact files changed
-4. What UI structure changed
-5. What was intentionally left unchanged
-6. Test results
-7. Manual validation notes
-8. Self-validation against clutter reduction and workflow preservation
+1. Short diagnosis
+2. Exact files changed
+3. Chosen session policy and why
+4. Frontend changes
+5. Backend changes
+6. Test and validation results
+7. Remaining assumptions or security tradeoffs
+8. Self-validation summary
+
+Extra instruction:
+Do not trust your first fix. After implementing, challenge your own solution and explicitly verify that the user-reported problem is resolved on the two reported pages. If your first idea was “just increase TTL”, reject that as insufficient unless you can prove the session lifecycle is otherwise correct.
