@@ -219,52 +219,7 @@
             </button>
         </nav>
 
-        <section
-          v-if="activeDetailTab === 'catalogs'"
-          class="employee-admin-section employee-admin-tab-panel"
-          data-testid="employee-tab-panel-catalogs"
-        >
-          <section class="employee-admin-editor-intro">
-            <div>
-              <p class="eyebrow">{{ t("employeeAdmin.catalogs.eyebrow") }}</p>
-              <h4>{{ t("employeeAdmin.catalogs.title") }}</h4>
-            </div>
-            <p class="field-help">{{ t("employeeAdmin.catalogs.lead") }}</p>
-          </section>
-          <section class="employee-admin-summary">
-            <article class="employee-admin-summary__card" data-testid="employee-catalog-summary-function-types">
-              <span>{{ t("employeeAdmin.catalogs.functionTypesTitle") }}</span>
-              <strong>{{ functionTypes.length }}</strong>
-            </article>
-            <article class="employee-admin-summary__card" data-testid="employee-catalog-summary-qualification-types">
-              <span>{{ t("employeeAdmin.catalogs.qualificationTypesTitle") }}</span>
-              <strong>{{ qualificationTypes.length }}</strong>
-            </article>
-          </section>
-
-          <section class="employee-admin-form-section" data-testid="employee-catalog-handoff">
-            <div class="employee-admin-form-section__header">
-              <div>
-                <p class="eyebrow">{{ t("employeeAdmin.catalogs.handoffEyebrow") }}</p>
-                <h4>{{ t("employeeAdmin.catalogs.handoffTitle") }}</h4>
-              </div>
-            </div>
-            <p class="field-help">{{ t("employeeAdmin.catalogs.handoffLead") }}</p>
-            <div class="cta-row">
-              <button
-                class="cta-button"
-                type="button"
-                data-testid="employee-manage-catalogs-cta"
-                :disabled="!canRead"
-                @click="openWorkforceCatalogs"
-              >
-                {{ t("employeeAdmin.actions.manageCatalogs") }}
-              </button>
-            </div>
-          </section>
-        </section>
-
-        <template v-else-if="isCreatingEmployee || selectedEmployee">
+        <template v-if="isCreatingEmployee || selectedEmployee">
           <section
             v-if="activeDetailTab === 'overview'"
             class="employee-admin-section employee-admin-tab-panel"
@@ -761,6 +716,18 @@
                       <option v-for="option in employeeQualificationTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
                     </select>
                     <span v-if="employeeQualificationTypeOptions.length === 0" class="field-help">{{ t("employeeAdmin.qualifications.qualificationTypeEmptyHint") }}</span>
+                    <span
+                      v-else-if="selectedQualificationType?.expiry_required && selectedQualificationType?.default_validity_days"
+                      class="field-help"
+                    >
+                      {{ t("employeeAdmin.qualifications.expiryAutofillHint", { days: selectedQualificationType.default_validity_days }) }}
+                    </span>
+                    <span
+                      v-else-if="selectedQualificationType?.expiry_required"
+                      class="field-help"
+                    >
+                      {{ t("employeeAdmin.qualifications.expiryRequiredHint") }}
+                    </span>
                   </label>
                   <label class="field-stack">
                     <span>{{ t("employeeAdmin.fields.certificateNo") }}</span>
@@ -1309,25 +1276,129 @@
 
               <section class="employee-admin-form-section">
                 <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.privateProfile.contactEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.privateProfile.contactTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("employeeAdmin.fields.privateEmail") }}</span>
+                    <input v-model="privateProfileDraft.private_email" :disabled="!actionState.canManagePrivateProfile" type="email" />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("employeeAdmin.fields.privatePhone") }}</span>
+                    <input v-model="privateProfileDraft.private_phone" :disabled="!actionState.canManagePrivateProfile" inputmode="tel" />
+                  </label>
+                </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
                   <p class="eyebrow">{{ t("employeeAdmin.privateProfile.identityEyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.privateProfile.identityTitle") }}</h4>
                 </div>
                 <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("employeeAdmin.fields.birthDate") }}</span>
                     <input v-model="privateProfileDraft.birth_date" :disabled="!actionState.canManagePrivateProfile" type="date" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("employeeAdmin.fields.placeOfBirth") }}</span>
                     <input v-model="privateProfileDraft.place_of_birth" :disabled="!actionState.canManagePrivateProfile" />
                   </label>
-                  <label class="field-stack">
+                  <label class="field-stack field-stack--half">
                     <span>{{ t("employeeAdmin.fields.nationalityCountryCode") }}</span>
                     <input
                       v-model="privateProfileDraft.nationality_country_code"
                       :disabled="!actionState.canManagePrivateProfile"
                       maxlength="2"
+                      autocapitalize="characters"
                     />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("employeeAdmin.fields.maritalStatus") }}</span>
+                    <input v-model="privateProfileDraft.marital_status" :disabled="!actionState.canManagePrivateProfile" />
+                  </label>
+                </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.privateProfile.payrollEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.privateProfile.payrollTitle") }}</h4>
+                </div>
+                <p class="field-help">{{ t("employeeAdmin.privateProfile.payrollLead") }}</p>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("employeeAdmin.fields.taxId") }}</span>
+                    <input v-model="privateProfileDraft.tax_id" :disabled="!actionState.canManagePrivateProfile" />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("employeeAdmin.fields.socialSecurityNo") }}</span>
+                    <input v-model="privateProfileDraft.social_security_no" :disabled="!actionState.canManagePrivateProfile" />
+                  </label>
+                </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.privateProfile.bankingEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.privateProfile.bankingTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.bankAccountHolder") }}</span>
+                    <input v-model="privateProfileDraft.bank_account_holder" :disabled="!actionState.canManagePrivateProfile" />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("employeeAdmin.fields.bankIban") }}</span>
+                    <input
+                      v-model="privateProfileDraft.bank_iban"
+                      :disabled="!actionState.canManagePrivateProfile"
+                      autocapitalize="characters"
+                    />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("employeeAdmin.fields.bankBic") }}</span>
+                    <input
+                      v-model="privateProfileDraft.bank_bic"
+                      :disabled="!actionState.canManagePrivateProfile"
+                      autocapitalize="characters"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.privateProfile.emergencyEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.privateProfile.emergencyTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("employeeAdmin.fields.emergencyContactName") }}</span>
+                    <input v-model="privateProfileDraft.emergency_contact_name" :disabled="!actionState.canManagePrivateProfile" />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("employeeAdmin.fields.emergencyContactPhone") }}</span>
+                    <input
+                      v-model="privateProfileDraft.emergency_contact_phone"
+                      :disabled="!actionState.canManagePrivateProfile"
+                      inputmode="tel"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.privateProfile.notesEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.privateProfile.notesTitle") }}</h4>
+                </div>
+                <p class="field-help">{{ t("employeeAdmin.privateProfile.notesLead") }}</p>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
+                    <textarea v-model="privateProfileDraft.notes" :disabled="!actionState.canManagePrivateProfile" rows="4" />
                   </label>
                 </div>
               </section>
@@ -1375,17 +1446,25 @@
                       {{ currentEmployeeAddress.valid_from }} · {{ currentEmployeeAddress.valid_to || t("employeeAdmin.summary.none") }}
                     </span>
                   </div>
-                  <StatusBadge :status="currentEmployeeAddress.status" />
+                  <div class="employee-admin-record__actions">
+                    <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="editAddress(currentEmployeeAddress)">
+                      {{ t("employeeAdmin.actions.editAddress") }}
+                    </button>
+                    <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="prepareAddressValidityClose(currentEmployeeAddress)">
+                      {{ t("employeeAdmin.actions.closeAddressValidity") }}
+                    </button>
+                    <StatusBadge :status="currentEmployeeAddress.status" />
+                  </div>
                 </div>
                 <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.addresses.currentEmpty") }}</p>
               </section>
 
               <form class="employee-admin-form-section" @submit.prevent="submitAddress">
                 <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.addresses.editorEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.addresses.editorTitle") }}</h4>
+                  <p class="eyebrow">{{ t(addressEditorEyebrowKey as never) }}</p>
+                  <h4>{{ t(addressEditorTitleKey as never) }}</h4>
                 </div>
-                <p class="field-help">{{ t("employeeAdmin.addresses.editorLead") }}</p>
+                <p class="field-help">{{ t(addressEditorLeadKey as never) }}</p>
                 <div class="employee-admin-form-grid employee-admin-form-grid--editor">
                   <label class="field-stack field-stack--wide">
                     <span>{{ t("customerAdmin.fields.streetLine1") }}</span>
@@ -1426,7 +1505,7 @@
                     <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
                     <input
                       v-model="addressDraft.valid_to"
-                      :disabled="!actionState.canManageAddresses || addressDraft.is_current"
+                      :disabled="!actionState.canManageAddresses"
                       type="date"
                     />
                   </label>
@@ -1436,17 +1515,8 @@
                   </label>
                 </div>
                 <div class="employee-admin-checkbox">
-                  <input
-                    v-model="addressDraft.is_current"
-                    :disabled="!actionState.canManageAddresses"
-                    type="checkbox"
-                    @change="onAddressCurrentToggle"
-                  />
-                  <span>{{ t("employeeAdmin.addresses.currentBadge") }}</span>
-                </div>
-                <div class="employee-admin-checkbox">
                   <input v-model="addressDraft.is_primary" :disabled="!actionState.canManageAddresses" type="checkbox" />
-                  <span>{{ t("employeeAdmin.summary.currentAddress") }}</span>
+                  <span>{{ t("employeeAdmin.addresses.primaryLabel") }}</span>
                 </div>
                 <div class="cta-row">
                   <button
@@ -1487,7 +1557,13 @@
                       <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="editAddress(addressRow)">
                         {{ t("employeeAdmin.actions.editAddress") }}
                       </button>
-                      <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="prepareAddressAsCurrent(addressRow)">
+                      <button
+                        v-if="!isEmployeeAddressCurrent(addressRow)"
+                        class="cta-button cta-secondary"
+                        type="button"
+                        :disabled="!actionState.canManageAddresses"
+                        @click="prepareAddressAsCurrent(addressRow)"
+                      >
                         {{ t("employeeAdmin.actions.markCurrentAddress") }}
                       </button>
                       <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="prepareAddressValidityClose(addressRow)">
@@ -1804,12 +1880,14 @@ import {
   normalizeOptionalText,
   parseWeekdayMask,
   resolveEmployeeDetailTab,
+  isEmployeeAddressCurrent,
   summarizeCurrentAddress,
   toLocalDateTimeInput,
   validateEmployeeAbsenceDraft,
   validateEmployeeAddressDraft,
   validateEmployeeAvailabilityDraft,
   validateEmployeeCredentialDraft,
+  validateEmployeePrivateProfileDraft,
   validateEmployeeQualificationDraft,
 } from "@/features/employees/employeeAdmin.helpers.js";
 import type { MessageKey } from "@/i18n/messages";
@@ -1860,9 +1938,20 @@ const employeeDraft = reactive({
 });
 
 const privateProfileDraft = reactive({
+  private_email: "",
+  private_phone: "",
   birth_date: "",
   place_of_birth: "",
   nationality_country_code: "",
+  marital_status: "",
+  tax_id: "",
+  social_security_no: "",
+  bank_account_holder: "",
+  bank_iban: "",
+  bank_bic: "",
+  emergency_contact_name: "",
+  emergency_contact_phone: "",
+  notes: "",
 });
 
 const noteDraft = reactive({
@@ -1896,7 +1985,6 @@ const addressDraft = reactive({
   address_type: "home",
   valid_from: "",
   valid_to: "",
-  is_current: true,
   is_primary: true,
   notes: "",
 });
@@ -1972,6 +2060,8 @@ const accessAttachDraft = reactive({
   email: "",
 });
 
+type AddressEditorMode = "close" | "create" | "edit" | "transition";
+
 const tenantScopeInput = ref(authStore.effectiveTenantScopeId || authStore.tenantScopeId || "");
 const branches = ref<BranchRead[]>([]);
 const mandates = ref<MandateRead[]>([]);
@@ -2007,6 +2097,8 @@ const editingNoteId = ref("");
 const editingGroupId = ref("");
 const editingMembershipId = ref("");
 const editingAddressId = ref("");
+const addressTransitionSourceId = ref("");
+const addressEditorMode = ref<AddressEditorMode>("create");
 const editingQualificationId = ref("");
 const editingCredentialId = ref("");
 const editingAvailabilityRuleId = ref("");
@@ -2051,14 +2143,16 @@ const detailWorkspaceTitle = computed(() => {
   if (isCreatingEmployee.value) {
     return t("employeeAdmin.detail.newTitle");
   }
-  if (!selectedEmployee.value && activeDetailTab.value === "catalogs") {
-    return t("employeeAdmin.catalogs.workspaceTitle");
-  }
   return selectedEmployeeLabel.value;
 });
 const currentAddressSummary = computed(() => summarizeCurrentAddress(employeeAddresses.value));
 const employeeAddressTimeline = computed(() =>
   [...employeeAddresses.value].sort((left, right) => {
+    const leftCurrent = isEmployeeAddressCurrent(left);
+    const rightCurrent = isEmployeeAddressCurrent(right);
+    if (leftCurrent !== rightCurrent) {
+      return leftCurrent ? -1 : 1;
+    }
     const startCompare = right.valid_from.localeCompare(left.valid_from);
     if (startCompare !== 0) {
       return startCompare;
@@ -2067,7 +2161,7 @@ const employeeAddressTimeline = computed(() =>
   }),
 );
 const currentEmployeeAddress = computed(
-  () => [...employeeAddresses.value].filter((row) => !row.archived_at && !row.valid_to).sort((a, b) => a.valid_from.localeCompare(b.valid_from)).at(-1) ?? null,
+  () => [...employeeAddresses.value].filter((row) => isEmployeeAddressCurrent(row)).sort((a, b) => a.valid_from.localeCompare(b.valid_from)).at(-1) ?? null,
 );
 const selectedEmployeeDocument = computed(
   () => employeeDocuments.value.find((document) => document.document_id === selectedEmployeeDocumentId.value) ?? null,
@@ -2087,6 +2181,9 @@ const employeeQualificationTypeOptions = computed(() =>
   qualificationTypes.value
     .filter((row) => row.archived_at == null && row.is_active)
     .map((row) => ({ value: row.id, label: `${row.code} · ${row.label}` })),
+);
+const selectedQualificationType = computed(
+  () => qualificationTypes.value.find((row) => row.id === qualificationDraft.qualification_type_id) ?? null,
 );
 const employeeCredentialTypeOptions = computed(() =>
   EMPLOYEE_CREDENTIAL_TYPE_OPTIONS.map((option) => ({
@@ -2154,10 +2251,45 @@ const selectedEmployeeMandateLabel = computed(() => {
   const mandateId = selectedEmployee.value?.default_mandate_id;
   return mandateId ? mandateLabelMap.value.get(mandateId) ?? mandateId : "";
 });
+const addressEditorEyebrowKey = computed(() => {
+  switch (addressEditorMode.value) {
+    case "close":
+      return "employeeAdmin.addresses.closeEyebrow";
+    case "edit":
+      return "employeeAdmin.addresses.editEyebrow";
+    case "transition":
+      return "employeeAdmin.addresses.transitionEyebrow";
+    default:
+      return "employeeAdmin.addresses.editorEyebrow";
+  }
+});
+const addressEditorTitleKey = computed(() => {
+  switch (addressEditorMode.value) {
+    case "close":
+      return "employeeAdmin.addresses.closeTitle";
+    case "edit":
+      return "employeeAdmin.addresses.editTitle";
+    case "transition":
+      return "employeeAdmin.addresses.transitionTitle";
+    default:
+      return "employeeAdmin.addresses.editorTitle";
+  }
+});
+const addressEditorLeadKey = computed(() => {
+  switch (addressEditorMode.value) {
+    case "close":
+      return "employeeAdmin.addresses.closeLead";
+    case "edit":
+      return "employeeAdmin.addresses.editLead";
+    case "transition":
+      return "employeeAdmin.addresses.transitionLead";
+    default:
+      return "employeeAdmin.addresses.editorLead";
+  }
+});
 const employeeDetailTabs = computed(() => {
   const tabs = [
     { id: "overview", label: t("employeeAdmin.tabs.overview") },
-    { id: "catalogs", label: t("employeeAdmin.tabs.catalogs") },
     { id: "app_access", label: t("employeeAdmin.tabs.appAccess") },
     { id: "profile_photo", label: t("employeeAdmin.tabs.profilePhoto") },
     { id: "qualifications", label: t("employeeAdmin.tabs.qualifications") },
@@ -2205,13 +2337,14 @@ function setFeedback(tone: "error" | "neutral" | "success", title: string, messa
 }
 
 function isEmployeeDetailTabDisabled(tabId: string) {
+  void tabId;
   if (isCreatingEmployee.value) {
     return false;
   }
   if (selectedEmployee.value) {
     return false;
   }
-  return tabId !== "catalogs";
+  return true;
 }
 
 function openWorkforceCatalogs() {
@@ -2345,9 +2478,20 @@ function resetEmployeeDraft() {
 }
 
 function resetPrivateProfileDraft() {
+  privateProfileDraft.private_email = selectedPrivateProfile.value?.private_email || "";
+  privateProfileDraft.private_phone = selectedPrivateProfile.value?.private_phone || "";
   privateProfileDraft.birth_date = selectedPrivateProfile.value?.birth_date || "";
   privateProfileDraft.place_of_birth = selectedPrivateProfile.value?.place_of_birth || "";
   privateProfileDraft.nationality_country_code = selectedPrivateProfile.value?.nationality_country_code || "";
+  privateProfileDraft.marital_status = selectedPrivateProfile.value?.marital_status || "";
+  privateProfileDraft.tax_id = selectedPrivateProfile.value?.tax_id || "";
+  privateProfileDraft.social_security_no = selectedPrivateProfile.value?.social_security_no || "";
+  privateProfileDraft.bank_account_holder = selectedPrivateProfile.value?.bank_account_holder || "";
+  privateProfileDraft.bank_iban = selectedPrivateProfile.value?.bank_iban || "";
+  privateProfileDraft.bank_bic = selectedPrivateProfile.value?.bank_bic || "";
+  privateProfileDraft.emergency_contact_name = selectedPrivateProfile.value?.emergency_contact_name || "";
+  privateProfileDraft.emergency_contact_phone = selectedPrivateProfile.value?.emergency_contact_phone || "";
+  privateProfileDraft.notes = selectedPrivateProfile.value?.notes || "";
 }
 
 function syncEmployeeDraft(employee: EmployeeOperationalRead) {
@@ -2373,9 +2517,20 @@ function syncEmployeeDraft(employee: EmployeeOperationalRead) {
 
 function syncPrivateProfileDraft(profile: EmployeePrivateProfileRead | null) {
   selectedPrivateProfile.value = profile;
+  privateProfileDraft.private_email = profile?.private_email || "";
+  privateProfileDraft.private_phone = profile?.private_phone || "";
   privateProfileDraft.birth_date = profile?.birth_date || "";
   privateProfileDraft.place_of_birth = profile?.place_of_birth || "";
   privateProfileDraft.nationality_country_code = profile?.nationality_country_code || "";
+  privateProfileDraft.marital_status = profile?.marital_status || "";
+  privateProfileDraft.tax_id = profile?.tax_id || "";
+  privateProfileDraft.social_security_no = profile?.social_security_no || "";
+  privateProfileDraft.bank_account_holder = profile?.bank_account_holder || "";
+  privateProfileDraft.bank_iban = profile?.bank_iban || "";
+  privateProfileDraft.bank_bic = profile?.bank_bic || "";
+  privateProfileDraft.emergency_contact_name = profile?.emergency_contact_name || "";
+  privateProfileDraft.emergency_contact_phone = profile?.emergency_contact_phone || "";
+  privateProfileDraft.notes = profile?.notes || "";
 }
 
 function resetNoteDraft() {
@@ -2421,10 +2576,11 @@ function resetAddressDraft() {
   addressDraft.address_type = "home";
   addressDraft.valid_from = "";
   addressDraft.valid_to = "";
-  addressDraft.is_current = true;
   addressDraft.is_primary = true;
   addressDraft.notes = "";
   editingAddressId.value = "";
+  addressTransitionSourceId.value = "";
+  addressEditorMode.value = "create";
 }
 
 function resetQualificationDraft() {
@@ -2533,7 +2689,9 @@ function useEmployeeDocumentForVersion(document: EmployeeDocumentListItemRead) {
 }
 
 function editAddress(row: EmployeeAddressHistoryRead) {
+  addressEditorMode.value = "edit";
   editingAddressId.value = row.id;
+  addressTransitionSourceId.value = "";
   addressDraft.street_line_1 = row.address?.street_line_1 || "";
   addressDraft.street_line_2 = row.address?.street_line_2 || "";
   addressDraft.postal_code = row.address?.postal_code || "";
@@ -2543,27 +2701,31 @@ function editAddress(row: EmployeeAddressHistoryRead) {
   addressDraft.address_type = row.address_type;
   addressDraft.valid_from = row.valid_from;
   addressDraft.valid_to = row.valid_to || "";
-  addressDraft.is_current = !row.valid_to;
   addressDraft.is_primary = row.is_primary;
   addressDraft.notes = row.notes || "";
 }
 
 function prepareAddressAsCurrent(row: EmployeeAddressHistoryRead) {
-  editAddress(row);
-  addressDraft.is_current = true;
+  addressEditorMode.value = "transition";
+  editingAddressId.value = "";
+  addressTransitionSourceId.value = row.id;
+  addressDraft.street_line_1 = row.address?.street_line_1 || "";
+  addressDraft.street_line_2 = row.address?.street_line_2 || "";
+  addressDraft.postal_code = row.address?.postal_code || "";
+  addressDraft.city = row.address?.city || "";
+  addressDraft.state_region = row.address?.state_region || "";
+  addressDraft.country_code = row.address?.country_code || "DE";
+  addressDraft.address_type = row.address_type;
+  addressDraft.valid_from = new Date().toISOString().slice(0, 10);
   addressDraft.valid_to = "";
+  addressDraft.is_primary = row.is_primary;
+  addressDraft.notes = row.notes || "";
 }
 
 function prepareAddressValidityClose(row: EmployeeAddressHistoryRead) {
   editAddress(row);
-  addressDraft.is_current = false;
+  addressEditorMode.value = "close";
   addressDraft.valid_to = row.valid_to || new Date().toISOString().slice(0, 10);
-}
-
-function onAddressCurrentToggle() {
-  if (addressDraft.is_current) {
-    addressDraft.valid_to = "";
-  }
 }
 
 function resetAccessDrafts() {
@@ -2887,6 +3049,12 @@ async function submitPrivateProfile() {
     return;
   }
 
+  const validationKey = validateEmployeePrivateProfileDraft(privateProfileDraft);
+  if (validationKey) {
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(validationKey as never));
+    return;
+  }
+
   loading.action = true;
   try {
     const payload = buildEmployeePrivateProfilePayload(privateProfileDraft, {
@@ -3037,7 +3205,7 @@ function buildEmployeeAddressPayload(): EmployeeAddressHistoryCreatePayload | Em
     },
     address_type: addressDraft.address_type,
     valid_from: addressDraft.valid_from,
-    valid_to: addressDraft.is_current ? null : (addressDraft.valid_to.trim() || null),
+    valid_to: addressDraft.valid_to.trim() || null,
     is_primary: addressDraft.is_primary,
     notes: addressDraft.notes.trim() || null,
   };
@@ -3048,7 +3216,17 @@ async function submitAddress() {
     return;
   }
 
-  const validationKey = validateEmployeeAddressDraft(addressDraft, employeeAddresses.value, editingAddressId.value);
+  const currentSameTypeAddress = employeeAddresses.value.find((row) =>
+    row.id !== addressTransitionSourceId.value && row.address_type === addressDraft.address_type && isEmployeeAddressCurrent(row),
+  );
+  const validationKey = validateEmployeeAddressDraft(
+    addressDraft,
+    employeeAddresses.value,
+    editingAddressId.value,
+    addressEditorMode.value === "transition" && currentSameTypeAddress
+      ? { ignoreRowIds: [currentSameTypeAddress.id] }
+      : undefined,
+  );
   if (validationKey) {
     setFeedback("error", t("employeeAdmin.feedback.titleError"), t(validationKey as never));
     return;
@@ -3056,7 +3234,38 @@ async function submitAddress() {
 
   loading.action = true;
   try {
-    if (editingAddressId.value) {
+    if (addressEditorMode.value === "transition") {
+      const effectiveFrom = addressDraft.valid_from.trim();
+      if (currentSameTypeAddress) {
+        const closeDate = new Date(`${effectiveFrom}T00:00:00Z`);
+        closeDate.setUTCDate(closeDate.getUTCDate() - 1);
+        const closeDateIso = closeDate.toISOString().slice(0, 10);
+        if (closeDateIso < currentSameTypeAddress.valid_from) {
+          setFeedback(
+            "error",
+            t("employeeAdmin.feedback.titleError"),
+            t("employeeAdmin.feedback.addressTransitionEffectiveDate" as never),
+          );
+          return;
+        }
+        await updateEmployeeAddress(
+          resolvedTenantScopeId.value,
+          selectedEmployeeId.value,
+          currentSameTypeAddress.id,
+          authStore.accessToken,
+          {
+            valid_to: closeDateIso,
+            version_no: currentSameTypeAddress.version_no,
+          },
+        );
+      }
+      await createEmployeeAddress(
+        resolvedTenantScopeId.value,
+        selectedEmployeeId.value,
+        authStore.accessToken,
+        buildEmployeeAddressPayload() as EmployeeAddressHistoryCreatePayload,
+      );
+    } else if (editingAddressId.value) {
       const existing = employeeAddresses.value.find((row) => row.id === editingAddressId.value);
       await updateEmployeeAddress(
         resolvedTenantScopeId.value,
@@ -3096,7 +3305,7 @@ async function submitQualification() {
     return;
   }
 
-  const validationKey = validateEmployeeQualificationDraft(qualificationDraft);
+  const validationKey = validateEmployeeQualificationDraft(qualificationDraft, selectedQualificationType.value);
   if (validationKey) {
     setFeedback("error", t("employeeAdmin.feedback.titleError"), t(validationKey as never));
     return;

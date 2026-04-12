@@ -33,6 +33,20 @@ test("employee admin api exposes readiness management bindings", () => {
   assert.match(apiSource, /\/employees\/absences/);
 });
 
+test("employee admin api exposes the full private-profile field contract", () => {
+  assert.match(apiSource, /export interface EmployeePrivateProfileRead[\s\S]*private_email: string \| null;/);
+  assert.match(apiSource, /export interface EmployeePrivateProfileRead[\s\S]*private_phone: string \| null;/);
+  assert.match(apiSource, /export interface EmployeePrivateProfileRead[\s\S]*marital_status: string \| null;/);
+  assert.match(apiSource, /export interface EmployeePrivateProfileRead[\s\S]*tax_id: string \| null;/);
+  assert.match(apiSource, /export interface EmployeePrivateProfileRead[\s\S]*social_security_no: string \| null;/);
+  assert.match(apiSource, /export interface EmployeePrivateProfileRead[\s\S]*bank_account_holder: string \| null;/);
+  assert.match(apiSource, /export interface EmployeePrivateProfileRead[\s\S]*bank_iban: string \| null;/);
+  assert.match(apiSource, /export interface EmployeePrivateProfileRead[\s\S]*bank_bic: string \| null;/);
+  assert.match(apiSource, /export interface EmployeePrivateProfileRead[\s\S]*emergency_contact_name: string \| null;/);
+  assert.match(apiSource, /export interface EmployeePrivateProfileRead[\s\S]*emergency_contact_phone: string \| null;/);
+  assert.match(apiSource, /export interface EmployeePrivateProfileRead[\s\S]*notes: string \| null;/);
+});
+
 test("employee admin api uses the shared legacy session request path without bespoke refresh plumbing", () => {
   assert.match(apiSource, /legacySessionRequest/);
   assert.doesNotMatch(apiSource, /refreshTokenApi/);

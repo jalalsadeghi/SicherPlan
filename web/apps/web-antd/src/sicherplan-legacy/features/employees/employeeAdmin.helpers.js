@@ -123,6 +123,12 @@ export function mapEmployeeApiMessage(messageKey) {
     "errors.employees.qualification.record_target_required": "employeeAdmin.feedback.qualificationTargetRequired",
     "errors.employees.qualification.invalid_window": "employeeAdmin.feedback.qualificationInvalidWindow",
     "errors.employees.qualification.stale_version": "employeeAdmin.feedback.staleVersion",
+    "errors.employees.employee_qualification.not_found": "employeeAdmin.feedback.notFound",
+    "errors.employees.employee_qualification.invalid_kind": "employeeAdmin.feedback.invalidQualificationRecordKind",
+    "errors.employees.employee_qualification.target_mismatch": "employeeAdmin.feedback.qualificationTargetMismatch",
+    "errors.employees.employee_qualification.invalid_window": "employeeAdmin.feedback.qualificationInvalidWindow",
+    "errors.employees.employee_qualification.expiry_required": "employeeAdmin.feedback.qualificationExpiryRequired",
+    "errors.employees.employee_qualification.stale_version": "employeeAdmin.feedback.staleVersion",
     "errors.employees.availability_rule.not_found": "employeeAdmin.feedback.notFound",
     "errors.employees.availability_rule.invalid_kind": "employeeAdmin.feedback.invalidAvailabilityKind",
     "errors.employees.availability_rule.invalid_window": "employeeAdmin.feedback.availabilityInvalidWindow",
@@ -231,13 +237,46 @@ export function buildEmployeePrivateProfilePayload(draft, { tenantId, employeeId
   return {
     tenant_id: tenantId,
     employee_id: employeeId,
+    private_email: normalizeOptionalText(draft?.private_email),
+    private_phone: normalizeOptionalText(draft?.private_phone),
     birth_date: typeof draft?.birth_date === "string" && draft.birth_date.trim() ? draft.birth_date.trim() : null,
-    place_of_birth: typeof draft?.place_of_birth === "string" && draft.place_of_birth.trim() ? draft.place_of_birth.trim() : null,
-    nationality_country_code:
-      typeof draft?.nationality_country_code === "string" && draft.nationality_country_code.trim()
-        ? draft.nationality_country_code.trim().toUpperCase()
-        : null,
+    place_of_birth: normalizeOptionalText(draft?.place_of_birth),
+    nationality_country_code: normalizeOptionalText(draft?.nationality_country_code, { uppercase: true }),
+    marital_status: normalizeOptionalText(draft?.marital_status),
+    tax_id: normalizeOptionalText(draft?.tax_id),
+    social_security_no: normalizeOptionalText(draft?.social_security_no),
+    bank_account_holder: normalizeOptionalText(draft?.bank_account_holder),
+    bank_iban: normalizeCompactCode(draft?.bank_iban, { uppercase: true }),
+    bank_bic: normalizeCompactCode(draft?.bank_bic, { uppercase: true }),
+    emergency_contact_name: normalizeOptionalText(draft?.emergency_contact_name),
+    emergency_contact_phone: normalizeOptionalText(draft?.emergency_contact_phone),
+    notes: normalizeOptionalText(draft?.notes),
   };
+}
+
+export function validateEmployeePrivateProfileDraft(draft) {
+  const privateEmail = normalizeOptionalText(draft?.private_email);
+  if (privateEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(privateEmail)) {
+    return "employeeAdmin.feedback.invalidPrivateEmail";
+  }
+
+  const nationalityCode = normalizeOptionalText(draft?.nationality_country_code, { uppercase: true });
+  if (nationalityCode && nationalityCode.length !== 2) {
+    return "employeeAdmin.feedback.invalidNationalityCountryCode";
+  }
+
+  for (const value of [draft?.private_phone, draft?.emergency_contact_phone]) {
+    const normalized = normalizeOptionalText(value);
+    if (!normalized) {
+      continue;
+    }
+    const digitCount = normalized.replace(/\D/g, "").length;
+    if (digitCount > 0 && digitCount < 6) {
+      return "employeeAdmin.feedback.invalidPrivatePhone";
+    }
+  }
+
+  return "";
 }
 
 export function normalizeOptionalText(value, { uppercase = false } = {}) {
@@ -249,6 +288,11 @@ export function normalizeOptionalText(value, { uppercase = false } = {}) {
     return null;
   }
   return uppercase ? trimmed.toUpperCase() : trimmed;
+}
+
+export function normalizeCompactCode(value, { uppercase = false } = {}) {
+  const normalized = normalizeOptionalText(value, { uppercase });
+  return normalized ? normalized.replace(/\s+/g, "") : null;
 }
 
 export function toLocalDateTimeInput(value) {
@@ -288,12 +332,15 @@ export function parseWeekdayMask(mask) {
 }
 
 export function buildEmployeeQualificationPayload(draft, { tenantId, employeeId } = {}) {
+  const recordKind = normalizeOptionalText(draft?.record_kind) || "qualification";
+  const functionTypeId = normalizeOptionalText(draft?.function_type_id);
+  const qualificationTypeId = normalizeOptionalText(draft?.qualification_type_id);
   return {
     tenant_id: tenantId,
     employee_id: employeeId,
-    record_kind: normalizeOptionalText(draft?.record_kind) || "qualification",
-    function_type_id: normalizeOptionalText(draft?.function_type_id),
-    qualification_type_id: normalizeOptionalText(draft?.qualification_type_id),
+    record_kind: recordKind,
+    function_type_id: recordKind === "function" ? functionTypeId : null,
+    qualification_type_id: recordKind === "qualification" ? qualificationTypeId : null,
     certificate_no: normalizeOptionalText(draft?.certificate_no),
     issued_at: normalizeOptionalText(draft?.issued_at),
     valid_until: normalizeOptionalText(draft?.valid_until),
@@ -353,16 +400,33 @@ export function validateEmployeeQualificationTypeDraft(draft) {
   return null;
 }
 
-export function validateEmployeeQualificationDraft(draft) {
+/**
+ * @param {Record<string, any>} draft
+ * @param {Record<string, any> | null} qualificationType
+ */
+export function validateEmployeeQualificationDraft(draft, qualificationType = null) {
   const recordKind = normalizeOptionalText(draft?.record_kind) || "qualification";
   const validUntil = normalizeOptionalText(draft?.valid_until);
   const issuedAt = normalizeOptionalText(draft?.issued_at);
-  const hasTarget = recordKind === "function"
-    ? !!normalizeOptionalText(draft?.function_type_id)
-    : !!normalizeOptionalText(draft?.qualification_type_id);
+  const functionTypeId = normalizeOptionalText(draft?.function_type_id);
+  const qualificationTypeId = normalizeOptionalText(draft?.qualification_type_id);
+
+  if (recordKind !== "function" && recordKind !== "qualification") {
+    return "employeeAdmin.feedback.invalidQualificationRecordKind";
+  }
+
+  const hasTarget = recordKind === "function" ? !!functionTypeId : !!qualificationTypeId;
 
   if (!hasTarget) {
     return "employeeAdmin.feedback.qualificationTargetRequired";
+  }
+  if (
+    recordKind === "qualification"
+    && qualificationType?.expiry_required
+    && !validUntil
+    && !(issuedAt && Number.isInteger(qualificationType?.default_validity_days) && qualificationType.default_validity_days > 0)
+  ) {
+    return "employeeAdmin.feedback.qualificationExpiryRequired";
   }
   if (issuedAt && validUntil && validUntil < issuedAt) {
     return "employeeAdmin.feedback.qualificationInvalidWindow";
@@ -465,7 +529,7 @@ export function validateEmployeeAbsenceDraft(draft) {
 
 export function summarizeCurrentAddress(addressRows) {
   const currentPrimary = [...(addressRows ?? [])]
-    .filter((row) => !row.archived_at && row.is_primary)
+    .filter((row) => isEmployeeAddressCurrent(row))
     .sort((left, right) => left.valid_from.localeCompare(right.valid_from))
     .at(-1);
 
@@ -482,7 +546,22 @@ export function summarizeCurrentAddress(addressRows) {
     .join(", ");
 }
 
-export function validateEmployeeAddressDraft(addressDraft, existingRows = [], editingAddressId = "") {
+export function isEmployeeAddressCurrent(addressRow, referenceDate = new Date().toISOString().slice(0, 10)) {
+  if (!addressRow || addressRow.archived_at || addressRow.status === "archived") {
+    return false;
+  }
+  const validFrom = typeof addressRow.valid_from === "string" ? addressRow.valid_from : "";
+  const validTo = typeof addressRow.valid_to === "string" ? addressRow.valid_to : "";
+  if (!validFrom) {
+    return false;
+  }
+  if (validFrom > referenceDate) {
+    return false;
+  }
+  return !validTo || validTo >= referenceDate;
+}
+
+export function validateEmployeeAddressDraft(addressDraft, existingRows = [], editingAddressId = "", options = {}) {
   const validFrom = typeof addressDraft?.valid_from === "string" ? addressDraft.valid_from.trim() : "";
   const validTo = typeof addressDraft?.valid_to === "string" ? addressDraft.valid_to.trim() : "";
   const addressType = typeof addressDraft?.address_type === "string" ? addressDraft.address_type.trim() : "";
@@ -490,7 +569,8 @@ export function validateEmployeeAddressDraft(addressDraft, existingRows = [], ed
   const postalCode = typeof addressDraft?.postal_code === "string" ? addressDraft.postal_code.trim() : "";
   const city = typeof addressDraft?.city === "string" ? addressDraft.city.trim() : "";
   const countryCode = typeof addressDraft?.country_code === "string" ? addressDraft.country_code.trim() : "";
-  const nextEnd = addressDraft?.is_current ? "" : validTo;
+  const ignoredIds = new Set(Array.isArray(options?.ignoreRowIds) ? options.ignoreRowIds.filter(Boolean) : []);
+  const nextEnd = validTo;
 
   if (!line1 || !postalCode || !city || !countryCode || !validFrom) {
     return "employeeAdmin.feedback.addressRequired";
@@ -500,7 +580,7 @@ export function validateEmployeeAddressDraft(addressDraft, existingRows = [], ed
   }
 
   const overlaps = (existingRows ?? []).some((row) => {
-    if (!row || row.id === editingAddressId || row.archived_at || row.address_type !== addressType) {
+    if (!row || row.id === editingAddressId || ignoredIds.has(row.id) || row.archived_at || row.address_type !== addressType) {
       return false;
     }
     const rowEnd = row.valid_to || "9999-12-31";

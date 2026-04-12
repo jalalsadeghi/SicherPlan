@@ -52,7 +52,6 @@ test("employee detail uses top-level tabs and isolated tab panels", () => {
   assert.match(viewSource, /const employeeWorkspaceBusy = computed\(\(\) => isEmployeeSessionResolving\.value \|\| loading\.action\)/);
   assert.match(viewSource, /const employeeWorkspaceLoadingText = computed\(\(\) =>/);
   assert.match(viewSource, /data-testid="employee-detail-tabs"/);
-  assert.match(viewSource, /data-testid="employee-tab-panel-catalogs"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-overview"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-app-access"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-profile-photo"/);
@@ -70,19 +69,20 @@ test("employee detail uses top-level tabs and isolated tab panels", () => {
   assert.match(viewSource, /selectEmployee\(selectedEmployeeId\.value, \{ preserveActiveTab: true \}\)/);
 });
 
-test("employee workspace exposes tenant-scoped catalog management without requiring employee selection", () => {
-  assert.match(viewSource, /employeeAdmin\.tabs\.catalogs/);
-  assert.match(viewSource, /activeDetailTab === 'catalogs'/);
-  assert.match(viewSource, /data-testid="employee-catalog-handoff"/);
-  assert.match(viewSource, /data-testid="employee-manage-catalogs-cta"/);
+test("employee workspace removes the redundant catalogs tab and keeps only lightweight handoff navigation", () => {
   assert.match(viewSource, /isEmployeeDetailTabDisabled\(tab\.id\)/);
-  assert.match(viewSource, /return tabId !== "catalogs"/);
   assert.match(viewSource, /data-testid="employee-open-catalogs"/);
   assert.match(viewSource, /loadEmployeeReadinessCatalogs\(\)/);
   assert.match(viewSource, /openWorkforceCatalogs\(\)/);
   assert.match(viewSource, /router\.push\("\/admin\/workforce-catalogs"\)/);
   assert.match(viewSource, /employeeFunctionTypeOptions = computed\(\(\) =>/);
   assert.match(viewSource, /employeeQualificationTypeOptions = computed\(\(\) =>/);
+  assert.match(viewSource, /return true;/);
+  assert.doesNotMatch(viewSource, /employeeAdmin\.tabs\.catalogs/);
+  assert.doesNotMatch(viewSource, /activeDetailTab === 'catalogs'/);
+  assert.doesNotMatch(viewSource, /data-testid="employee-tab-panel-catalogs"/);
+  assert.doesNotMatch(viewSource, /data-testid="employee-catalog-handoff"/);
+  assert.doesNotMatch(viewSource, /data-testid="employee-manage-catalogs-cta"/);
   assert.doesNotMatch(viewSource, /data-testid="employee-function-types-section"/);
   assert.doesNotMatch(viewSource, /data-testid="employee-qualification-types-section"/);
   assert.doesNotMatch(viewSource, /submitFunctionTypeCatalog/);
@@ -122,10 +122,31 @@ test("employee workspace uses shared toast feedback instead of a persistent inli
 
 test("non-overview employee tabs reuse the structured section pattern", () => {
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*employeeAdmin\.privateProfile\.identityEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*employeeAdmin\.privateProfile\.contactEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*employeeAdmin\.privateProfile\.payrollEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*employeeAdmin\.privateProfile\.bankingEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*employeeAdmin\.privateProfile\.emergencyEyebrow/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*employeeAdmin\.privateProfile\.notesEyebrow/);
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*submitPrivateProfile/);
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*getEmployeePrivateProfile/);
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*upsertEmployeePrivateProfile/);
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*updateEmployeePrivateProfile/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.private_email/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.private_phone/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.marital_status/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.tax_id/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.social_security_no/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.bank_account_holder/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.bank_iban/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.bank_bic/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.emergency_contact_name/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.emergency_contact_phone/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.notes/);
+  assert.match(viewSource, /validateEmployeePrivateProfileDraft\(privateProfileDraft\)/);
+  assert.match(viewSource, /syncPrivateProfileDraft\(profile: EmployeePrivateProfileRead \| null\)[\s\S]*privateProfileDraft\.private_email/);
+  assert.match(viewSource, /resetPrivateProfileDraft\(\)[\s\S]*privateProfileDraft\.private_email/);
+  assert.match(viewSource, /buildEmployeePrivateProfilePayload\(privateProfileDraft/);
+  assert.doesNotMatch(viewSource, /privateProfileDraft\.(religion|tax_class|health_insurer|child_allowance|driver_license)/);
   assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*employee-admin-form employee-admin-form--structured[\s\S]*employeeAdmin\.access\.stateCreateEyebrow/);
   assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*v-if="!hasLinkedAccess"[\s\S]*employeeAdmin\.access\.createEyebrow/);
   assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*v-else[\s\S]*employeeAdmin\.access\.manageEyebrow[\s\S]*employeeAdmin\.access\.resetEyebrow[\s\S]*employeeAdmin\.access\.detachEyebrow/);
@@ -138,6 +159,11 @@ test("non-overview employee tabs reuse the structured section pattern", () => {
   assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*uploadEmployeeQualificationProof/);
   assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*employeeAdmin\.qualifications\.functionTypeEmptyHint/);
   assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*employeeAdmin\.qualifications\.qualificationTypeEmptyHint/);
+  assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*employeeAdmin\.qualifications\.expiryRequiredHint/);
+  assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*employeeAdmin\.qualifications\.expiryAutofillHint/);
+  assert.match(viewSource, /selectedQualificationType = computed/);
+  assert.match(viewSource, /validateEmployeeQualificationDraft\(qualificationDraft, selectedQualificationType\.value\)/);
+  assert.match(viewSource, /watch\(\s*\(\) => qualificationDraft\.record_kind,[\s\S]*qualificationDraft\.qualification_type_id = ""[\s\S]*qualificationDraft\.function_type_id = ""/);
   assert.match(viewSource, /employee-tab-panel-credentials[\s\S]*employeeAdmin\.credentials\.registerEyebrow/);
   assert.match(viewSource, /employee-tab-panel-credentials[\s\S]*createEmployeeCredential/);
   assert.match(viewSource, /employee-tab-panel-credentials[\s\S]*updateEmployeeCredential/);
@@ -166,6 +192,13 @@ test("non-overview employee tabs reuse the structured section pattern", () => {
   assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.actions\.editAddress/);
   assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.actions\.markCurrentAddress/);
   assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.actions\.closeAddressValidity/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*addressEditorMode/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*addressEditorEyebrowKey/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*addressEditorTitleKey/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*addressEditorLeadKey/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.addresses\.primaryLabel/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*v-if="!isEmployeeAddressCurrent\(addressRow\)"/);
+  assert.doesNotMatch(viewSource, /addressDraft\.is_current/);
   assert.match(viewSource, /employee-tab-panel-documents[\s\S]*employeeAdmin\.documents\.libraryEyebrow/);
   assert.match(viewSource, /employee-tab-panel-documents[\s\S]*employeeAdmin\.documents\.uploadEyebrow/);
   assert.match(viewSource, /employee-tab-panel-documents[\s\S]*employeeAdmin\.documents\.linkEyebrow/);
@@ -188,9 +221,20 @@ test("employee addresses tab uses admin editor copy and removes released timelin
   assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.addresses\.empty/);
   assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAdmin\.feedback\.addressSaved/);
   assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*employeeAddressTimeline/);
-  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*onAddressCurrentToggle/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*prepareAddressAsCurrent/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*prepareAddressValidityClose/);
+  assert.match(viewSource, /employee-tab-panel-addresses[\s\S]*isEmployeeAddressCurrent\(addressRow\)/);
+  assert.match(viewSource, /currentEmployeeAddress[\s\S]*editAddress\(currentEmployeeAddress\)/);
+  assert.match(viewSource, /currentEmployeeAddress[\s\S]*prepareAddressValidityClose\(currentEmployeeAddress\)/);
+  assert.match(viewSource, /employeeAddressTimeline = computed\(\(\) =>[\s\S]*isEmployeeAddressCurrent/);
+  assert.match(viewSource, /currentEmployeeAddress = computed\(\s*\(\) =>[\s\S]*isEmployeeAddressCurrent/);
+  assert.match(viewSource, /addressTransitionSourceId/);
+  assert.match(viewSource, /addressEditorMode\.value === "transition"/);
+  assert.match(viewSource, /ignoreRowIds: \[currentSameTypeAddress\.id\]/);
+  assert.match(viewSource, /employeeAdmin\.feedback\.addressTransitionEffectiveDate/);
   assert.doesNotMatch(viewSource, /Released address timeline/);
   assert.doesNotMatch(viewSource, /No released address history is available/);
+  assert.doesNotMatch(viewSource, /onAddressCurrentToggle/);
 });
 
 test("employee overview exposes status and extended employment fields", () => {

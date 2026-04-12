@@ -6,6 +6,7 @@ import {
   buildPlanningImportTemplate,
   derivePlanningActionState,
   isPlanningChildEntity,
+  PLANNING_MODE_OPTIONS,
   normalizePlanningEditorEntity,
   formatPlanningAddressOption,
   filterPlanningCustomerOptions,
@@ -42,6 +43,13 @@ test("buildPlanningImportTemplate returns stable CSV headers", () => {
   assert.equal(
     buildPlanningImportTemplate("equipment_item"),
     "code,label,unit_of_measure_code,description,status",
+  );
+});
+
+test("planning mode options expose exactly the four canonical downstream planning values", () => {
+  assert.deepEqual(
+    PLANNING_MODE_OPTIONS.map((option) => option.value),
+    ["event", "site", "trade_fair", "patrol"],
   );
 });
 
@@ -202,6 +210,17 @@ test("planning create validation covers top-level entities with entity-specific 
       parentPatrolRouteId: "",
     }),
     "validationCodeRequired",
+  );
+  assert.equal(
+    validatePlanningCreateDraft({
+      editorEntityKey: "requirement_type",
+      draft: { customer_id: "", code: "REQ-1", label: "Guard", default_planning_mode_code: "legacy_mode" },
+      zoneDraft: {},
+      checkpointDraft: {},
+      parentTradeFairId: "",
+      parentPatrolRouteId: "",
+    }),
+    "validationDefaultPlanningModeInvalid",
   );
   assert.equal(
     validatePlanningCreateDraft({

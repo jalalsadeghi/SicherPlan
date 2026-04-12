@@ -30,6 +30,13 @@ export const PLANNING_STATUS_OPTIONS = [
   "archived",
 ];
 
+export const PLANNING_MODE_OPTIONS = [
+  { value: "event", labelKey: "modeEvent" },
+  { value: "site", labelKey: "modeSite" },
+  { value: "trade_fair", labelKey: "modeTradeFair" },
+  { value: "patrol", labelKey: "modePatrol" },
+];
+
 export const PLANNING_ENTITY_FORM_CONFIG = {
   requirement_type: {
     child: false,
@@ -123,6 +130,10 @@ export function isPlanningTenantScopedEntity(entityKey) {
   return config?.scope === "tenant";
 }
 
+export function isCanonicalPlanningMode(value) {
+  return PLANNING_MODE_OPTIONS.some((option) => option.value === value);
+}
+
 export function validatePlanningCreateDraft({
   checkpointDraft,
   draft,
@@ -163,6 +174,7 @@ export function validatePlanningCreateDraft({
     if (!requiredValue(draft.code)) return "validationCodeRequired";
     if (!requiredValue(draft.label)) return "validationLabelRequired";
     if (!requiredValue(draft.default_planning_mode_code)) return "validationDefaultPlanningModeRequired";
+    if (!isCanonicalPlanningMode(requiredValue(draft.default_planning_mode_code))) return "validationDefaultPlanningModeInvalid";
     return null;
   }
 

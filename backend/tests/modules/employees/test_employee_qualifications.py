@@ -383,6 +383,81 @@ class EmployeeQualificationServiceTest(unittest.TestCase):
         self.assertEqual(assignment.function_type_id, function_type.id)
         self.assertIsNone(assignment.qualification_type_id)
 
+    def test_reported_g34a_qualification_succeeds_without_valid_until(self) -> None:
+        qualification_type = self.service.create_qualification_type(
+            "tenant-1",
+            QualificationTypeCreate(
+                tenant_id="tenant-1",
+                code="G34A",
+                label="34a certified",
+                compliance_relevant=True,
+                proof_required=True,
+                expiry_required=False,
+                default_validity_days=None,
+            ),
+            _context("employees.employee.write"),
+        )
+
+        assignment = self.service.create_employee_qualification(
+            "tenant-1",
+            EmployeeQualificationCreate(
+                tenant_id="tenant-1",
+                employee_id="employee-1",
+                record_kind="qualification",
+                qualification_type_id=qualification_type.id,
+                certificate_no="G34A-EK-2026-031",
+                issued_at=date(2026, 1, 20),
+                valid_until=None,
+                issuing_authority="IHK Köln",
+                granted_internally=False,
+                notes="Eligible for standard guard deployment.",
+            ),
+            _context("employees.employee.write"),
+        )
+
+        self.assertEqual(assignment.record_kind, "qualification")
+        self.assertEqual(assignment.qualification_type_id, qualification_type.id)
+        self.assertIsNone(assignment.function_type_id)
+        self.assertIsNone(assignment.valid_until)
+
+    def test_create_qualification_rejects_stale_function_target_for_qualification_kind(self) -> None:
+        qualification_type = self.service.create_qualification_type(
+            "tenant-1",
+            QualificationTypeCreate(
+                tenant_id="tenant-1",
+                code="G34A",
+                label="34a certified",
+            ),
+            _context("employees.employee.write"),
+        )
+        function_type = self.service.create_function_type(
+            "tenant-1",
+            FunctionTypeCreate(
+                tenant_id="tenant-1",
+                code="SHIFT_LEAD",
+                label="Schichtleitung",
+            ),
+            _context("employees.employee.write"),
+        )
+
+        with self.assertRaises(ApiException) as raised:
+            self.service.create_employee_qualification(
+                "tenant-1",
+                EmployeeQualificationCreate(
+                    tenant_id="tenant-1",
+                    employee_id="employee-1",
+                    record_kind="qualification",
+                    function_type_id=function_type.id,
+                    qualification_type_id=qualification_type.id,
+                    certificate_no="G34A-EK-2026-031",
+                    issued_at=date(2026, 1, 20),
+                    issuing_authority="IHK Köln",
+                ),
+                _context("employees.employee.write"),
+            )
+
+        self.assertEqual(raised.exception.message_key, "errors.employees.employee_qualification.target_mismatch")
+
     def test_update_assignment_rejects_missing_expiry_for_required_type(self) -> None:
         qualification_type = self.service.create_qualification_type(
             "tenant-1",

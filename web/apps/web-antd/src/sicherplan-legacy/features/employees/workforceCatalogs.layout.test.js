@@ -33,4 +33,6 @@ test("workforce catalogs page keeps full create and edit flows for both catalogs
   assert.match(viewSource, /await refreshCatalogs\(\);[\s\S]*employeeAdmin\.feedback\.qualificationTypeSaved/);
   assert.match(viewSource, /workforce-function-type-record-/);
   assert.match(viewSource, /workforce-qualification-type-record-/);
+  assert.doesNotMatch(viewSource, /employee-tab-panel-catalogs/);
+  assert.doesNotMatch(viewSource, /employee-manage-catalogs-cta/);
 });

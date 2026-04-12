@@ -498,7 +498,6 @@ export type MessageKey =
   | "employeeAdmin.detail.emptyEyebrow"
   | "employeeAdmin.detail.emptyBody"
   | "employeeAdmin.tabs.overview"
-  | "employeeAdmin.tabs.catalogs"
   | "employeeAdmin.tabs.appAccess"
   | "employeeAdmin.tabs.profilePhoto"
   | "employeeAdmin.tabs.qualifications"
@@ -553,6 +552,16 @@ export type MessageKey =
   | "employeeAdmin.fields.birthDate"
   | "employeeAdmin.fields.placeOfBirth"
   | "employeeAdmin.fields.nationalityCountryCode"
+  | "employeeAdmin.fields.privateEmail"
+  | "employeeAdmin.fields.privatePhone"
+  | "employeeAdmin.fields.maritalStatus"
+  | "employeeAdmin.fields.taxId"
+  | "employeeAdmin.fields.socialSecurityNo"
+  | "employeeAdmin.fields.bankAccountHolder"
+  | "employeeAdmin.fields.bankIban"
+  | "employeeAdmin.fields.bankBic"
+  | "employeeAdmin.fields.emergencyContactName"
+  | "employeeAdmin.fields.emergencyContactPhone"
   | "employeeAdmin.fields.userId"
   | "employeeAdmin.fields.notes"
   | "employeeAdmin.fields.noteType"
@@ -602,8 +611,20 @@ export type MessageKey =
   | "employeeAdmin.privateProfile.eyebrow"
   | "employeeAdmin.privateProfile.title"
   | "employeeAdmin.privateProfile.lead"
+  | "employeeAdmin.privateProfile.contactEyebrow"
+  | "employeeAdmin.privateProfile.contactTitle"
   | "employeeAdmin.privateProfile.identityEyebrow"
   | "employeeAdmin.privateProfile.identityTitle"
+  | "employeeAdmin.privateProfile.payrollEyebrow"
+  | "employeeAdmin.privateProfile.payrollTitle"
+  | "employeeAdmin.privateProfile.payrollLead"
+  | "employeeAdmin.privateProfile.bankingEyebrow"
+  | "employeeAdmin.privateProfile.bankingTitle"
+  | "employeeAdmin.privateProfile.emergencyEyebrow"
+  | "employeeAdmin.privateProfile.emergencyTitle"
+  | "employeeAdmin.privateProfile.notesEyebrow"
+  | "employeeAdmin.privateProfile.notesTitle"
+  | "employeeAdmin.privateProfile.notesLead"
   | "employeeAdmin.privateProfile.actionsEyebrow"
   | "employeeAdmin.privateProfile.actionsTitle"
   | "employeeAdmin.employmentType.full_time"
@@ -651,9 +672,19 @@ export type MessageKey =
   | "employeeAdmin.addresses.editorEyebrow"
   | "employeeAdmin.addresses.editorTitle"
   | "employeeAdmin.addresses.editorLead"
+  | "employeeAdmin.addresses.editEyebrow"
+  | "employeeAdmin.addresses.editTitle"
+  | "employeeAdmin.addresses.editLead"
+  | "employeeAdmin.addresses.transitionEyebrow"
+  | "employeeAdmin.addresses.transitionTitle"
+  | "employeeAdmin.addresses.transitionLead"
+  | "employeeAdmin.addresses.closeEyebrow"
+  | "employeeAdmin.addresses.closeTitle"
+  | "employeeAdmin.addresses.closeLead"
   | "employeeAdmin.addresses.empty"
   | "employeeAdmin.addresses.typeHome"
   | "employeeAdmin.addresses.typeMailing"
+  | "employeeAdmin.addresses.primaryLabel"
   | "employeeAdmin.addresses.currentBadge"
   | "employeeAdmin.addresses.closedBadge"
   | "employeeAdmin.qualifications.eyebrow"
@@ -672,10 +703,10 @@ export type MessageKey =
   | "employeeAdmin.qualifications.functionTypeEmptyHint"
   | "employeeAdmin.qualifications.qualificationTypePlaceholder"
   | "employeeAdmin.qualifications.qualificationTypeEmptyHint"
-  | "employeeAdmin.catalogs.workspaceTitle"
+  | "employeeAdmin.qualifications.expiryRequiredHint"
+  | "employeeAdmin.qualifications.expiryAutofillHint"
   | "employeeAdmin.catalogs.eyebrow"
   | "employeeAdmin.catalogs.title"
-  | "employeeAdmin.catalogs.lead"
   | "employeeAdmin.catalogs.pageLead"
   | "employeeAdmin.catalogs.functionTypesEyebrow"
   | "employeeAdmin.catalogs.functionTypesTitle"
@@ -693,9 +724,6 @@ export type MessageKey =
   | "employeeAdmin.catalogs.qualificationTypeEditorCreateTitle"
   | "employeeAdmin.catalogs.qualificationTypeEditorEditEyebrow"
   | "employeeAdmin.catalogs.qualificationTypeEditorEditTitle"
-  | "employeeAdmin.catalogs.handoffEyebrow"
-  | "employeeAdmin.catalogs.handoffTitle"
-  | "employeeAdmin.catalogs.handoffLead"
   | "employeeAdmin.catalogs.fields.code"
   | "employeeAdmin.catalogs.fields.label"
   | "employeeAdmin.catalogs.fields.category"
@@ -910,6 +938,9 @@ export type MessageKey =
   | "employeeAdmin.feedback.staleVersion"
   | "employeeAdmin.feedback.invalidTargetWeeklyHours"
   | "employeeAdmin.feedback.invalidTargetMonthlyHours"
+  | "employeeAdmin.feedback.invalidPrivateEmail"
+  | "employeeAdmin.feedback.invalidPrivatePhone"
+  | "employeeAdmin.feedback.invalidNationalityCountryCode"
   | "employeeAdmin.feedback.functionTypeNotFound"
   | "employeeAdmin.feedback.qualificationTypeNotFound"
   | "employeeAdmin.feedback.duplicateFunctionTypeCode"
@@ -918,10 +949,13 @@ export type MessageKey =
   | "employeeAdmin.feedback.invalidQualificationTypeValidity"
   | "employeeAdmin.feedback.invalidQualificationRecordKind"
   | "employeeAdmin.feedback.qualificationTargetRequired"
+  | "employeeAdmin.feedback.qualificationTargetMismatch"
+  | "employeeAdmin.feedback.qualificationExpiryRequired"
   | "employeeAdmin.feedback.qualificationInvalidWindow"
   | "employeeAdmin.feedback.addressRequired"
   | "employeeAdmin.feedback.addressInvalidWindow"
   | "employeeAdmin.feedback.addressOverlap"
+  | "employeeAdmin.feedback.addressTransitionEffectiveDate"
   | "employeeAdmin.feedback.credentialRequired"
   | "employeeAdmin.feedback.invalidCredentialType"
   | "employeeAdmin.feedback.invalidCredentialStatus"
@@ -2280,7 +2314,6 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.detail.emptyBody":
       "Wählen Sie links eine Mitarbeitendenakte aus oder legen Sie eine neue an.",
     "employeeAdmin.tabs.overview": "Überblick",
-    "employeeAdmin.tabs.catalogs": "Kataloge",
     "employeeAdmin.tabs.appAccess": "App-Zugang",
     "employeeAdmin.tabs.profilePhoto": "Profilfoto",
     "employeeAdmin.tabs.qualifications": "Qualifikationen",
@@ -2337,6 +2370,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.fields.birthDate": "Geburtsdatum",
     "employeeAdmin.fields.placeOfBirth": "Geburtsort",
     "employeeAdmin.fields.nationalityCountryCode": "Nationalität-Ländercode",
+    "employeeAdmin.fields.privateEmail": "Private E-Mail",
+    "employeeAdmin.fields.privatePhone": "Privattelefon",
+    "employeeAdmin.fields.maritalStatus": "Familienstand",
+    "employeeAdmin.fields.taxId": "Steuer-ID",
+    "employeeAdmin.fields.socialSecurityNo": "Sozialversicherungsnummer",
+    "employeeAdmin.fields.bankAccountHolder": "Kontoinhaber",
+    "employeeAdmin.fields.bankIban": "IBAN",
+    "employeeAdmin.fields.bankBic": "BIC",
+    "employeeAdmin.fields.emergencyContactName": "Notfallkontakt",
+    "employeeAdmin.fields.emergencyContactPhone": "Telefon Notfallkontakt",
     "employeeAdmin.fields.userId": "Benutzerkonto-ID",
     "employeeAdmin.fields.notes": "Operative Notizen",
     "employeeAdmin.fields.noteType": "Notiztyp",
@@ -2384,10 +2427,22 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.summary.groups": "Gruppen",
     "employeeAdmin.summary.none": "Keine Angabe",
     "employeeAdmin.privateProfile.eyebrow": "Privatprofil",
-    "employeeAdmin.privateProfile.title": "Geburts- und Identitätsdaten",
+    "employeeAdmin.privateProfile.title": "HR-Privatprofil",
     "employeeAdmin.privateProfile.lead": "Diese Angaben liegen im HR-Privatprofil und sind nur mit privater Berechtigung sichtbar.",
+    "employeeAdmin.privateProfile.contactEyebrow": "Kontakt",
+    "employeeAdmin.privateProfile.contactTitle": "Private Kontaktwege",
     "employeeAdmin.privateProfile.identityEyebrow": "Identität",
     "employeeAdmin.privateProfile.identityTitle": "Geburtsdaten und Nationalität",
+    "employeeAdmin.privateProfile.payrollEyebrow": "Abrechnung",
+    "employeeAdmin.privateProfile.payrollTitle": "Abrechnungsrelevante Basisdaten",
+    "employeeAdmin.privateProfile.payrollLead": "Steuer-, Sozial- und Bankdaten können bewusst später ergänzt werden, falls der HR-Prozess noch nicht abgeschlossen ist.",
+    "employeeAdmin.privateProfile.bankingEyebrow": "Banking",
+    "employeeAdmin.privateProfile.bankingTitle": "Kontodaten",
+    "employeeAdmin.privateProfile.emergencyEyebrow": "Notfallkontakt",
+    "employeeAdmin.privateProfile.emergencyTitle": "Kontakt im Notfall",
+    "employeeAdmin.privateProfile.notesEyebrow": "Notizen",
+    "employeeAdmin.privateProfile.notesTitle": "Vertrauliche HR-Notizen",
+    "employeeAdmin.privateProfile.notesLead": "Nur im HR-Privatprofil sichtbare Hinweise, die nicht in die operative Mitarbeitendenakte gehören.",
     "employeeAdmin.privateProfile.actionsEyebrow": "Aktion",
     "employeeAdmin.privateProfile.actionsTitle": "Privatprofil speichern oder zurücksetzen",
     "employeeAdmin.employmentType.full_time": "Vollzeit",
@@ -2434,10 +2489,20 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.addresses.historyTitle": "Aktuelle und frühere Mitarbeitendenadressen",
     "employeeAdmin.addresses.editorEyebrow": "Bearbeitung",
     "employeeAdmin.addresses.editorTitle": "Adresse anlegen oder bearbeiten",
-    "employeeAdmin.addresses.editorLead": "Straße, Ort und Gültigkeitsfenster werden direkt über die Admin-Endpunkte gespeichert.",
+    "employeeAdmin.addresses.editorLead": "Neue Adresshistorie wird mit Start- und optionalem Enddatum direkt über die Admin-Endpunkte gespeichert.",
+    "employeeAdmin.addresses.editEyebrow": "Bearbeitung",
+    "employeeAdmin.addresses.editTitle": "Adresshistorie bearbeiten",
+    "employeeAdmin.addresses.editLead": "Bearbeite den gewählten Verlaufseintrag inklusive Gültigkeitsfenster, ohne die Historienlogik zu verlassen.",
+    "employeeAdmin.addresses.transitionEyebrow": "Wechsel",
+    "employeeAdmin.addresses.transitionTitle": "Historische Adresse als aktuell übernehmen",
+    "employeeAdmin.addresses.transitionLead": "Diese Aktion erstellt ab dem Wirksamkeitsdatum einen neuen aktuellen Verlaufseintrag und beendet bei Bedarf die bisher aktive Adresse desselben Typs.",
+    "employeeAdmin.addresses.closeEyebrow": "Beenden",
+    "employeeAdmin.addresses.closeTitle": "Gültigkeit eines Verlaufseintrags beenden",
+    "employeeAdmin.addresses.closeLead": "Lege ein Enddatum für den gewählten Verlaufseintrag fest. Die aktuelle Adresszusammenfassung wird danach automatisch aus der verbleibenden Historie abgeleitet.",
     "employeeAdmin.addresses.empty": "Keine Adresshistorie vorhanden.",
     "employeeAdmin.addresses.typeHome": "Privatadresse",
     "employeeAdmin.addresses.typeMailing": "Postadresse",
+    "employeeAdmin.addresses.primaryLabel": "Primäradresse dieses Typs",
     "employeeAdmin.addresses.currentBadge": "Aktuell",
     "employeeAdmin.addresses.closedBadge": "Beendet",
     "employeeAdmin.qualifications.eyebrow": "Qualifikationen",
@@ -2456,11 +2521,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.qualifications.functionTypeEmptyHint": "Für diesen Mandanten sind noch keine Funktionstypen konfiguriert.",
     "employeeAdmin.qualifications.qualificationTypePlaceholder": "Qualifikationstyp auswählen",
     "employeeAdmin.qualifications.qualificationTypeEmptyHint": "Für diesen Mandanten sind noch keine Qualifikationstypen konfiguriert.",
-    "employeeAdmin.catalogs.workspaceTitle": "Funktionen und Qualifikationstypen",
+    "employeeAdmin.qualifications.expiryRequiredHint":
+      "Dieser Qualifikationstyp verlangt ein Gültig-bis-Datum. Wenn keine Standardgültigkeit hinterlegt ist, muss es vor dem Speichern gesetzt werden.",
+    "employeeAdmin.qualifications.expiryAutofillHint":
+      "Dieser Qualifikationstyp verlangt eine Laufzeit. Wenn Ausgestellt-am gesetzt ist, kann das Backend Gültig-bis automatisch aus {days} Tagen ableiten.",
     "employeeAdmin.catalogs.eyebrow": "Kataloge",
     "employeeAdmin.catalogs.title": "Funktions- und Qualifikationstypen",
-    "employeeAdmin.catalogs.lead":
-      "Diese Mandantenkataloge gehören zur Mitarbeitendenverwaltung und stehen sofort für die Qualifikationspflege in derselben Arbeitsfläche bereit.",
     "employeeAdmin.catalogs.pageLead":
       "Tenant-weite HR-Kataloge bleiben im Employees-Kontext verankert, werden aber als eigener Workforce-Arbeitsbereich verwaltet.",
     "employeeAdmin.catalogs.functionTypesEyebrow": "Funktionstypen",
@@ -2481,10 +2547,6 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.catalogs.qualificationTypeEditorCreateTitle": "Qualifikationstyp anlegen",
     "employeeAdmin.catalogs.qualificationTypeEditorEditEyebrow": "Bearbeitung",
     "employeeAdmin.catalogs.qualificationTypeEditorEditTitle": "Qualifikationstyp aktualisieren",
-    "employeeAdmin.catalogs.handoffEyebrow": "Ausgelagert",
-    "employeeAdmin.catalogs.handoffTitle": "Katalogpflege im Workforce-Bereich öffnen",
-    "employeeAdmin.catalogs.handoffLead":
-      "Funktions- und Qualifikationstypen sind tenant-weite HR-Stammdaten. Die volle Pflegeoberfläche liegt jetzt auf der dedizierten Workforce-Katalogseite.",
     "employeeAdmin.catalogs.fields.code": "Code",
     "employeeAdmin.catalogs.fields.label": "Bezeichnung",
     "employeeAdmin.catalogs.fields.category": "Kategorie",
@@ -2708,6 +2770,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Die Wochen-Sollstunden müssen null oder positiv sein.",
     "employeeAdmin.feedback.invalidTargetMonthlyHours":
       "Die Monats-Sollstunden müssen null oder positiv sein.",
+    "employeeAdmin.feedback.invalidPrivateEmail":
+      "Die private E-Mail-Adresse ist ungültig. Bitte eine gültige Adresse eingeben.",
+    "employeeAdmin.feedback.invalidPrivatePhone":
+      "Die private Telefonnummer ist zu kurz. Bitte eine vollständige Nummer eingeben.",
+    "employeeAdmin.feedback.invalidNationalityCountryCode":
+      "Der Nationalitäts-Ländercode muss aus genau zwei Zeichen bestehen.",
     "employeeAdmin.feedback.functionTypeNotFound":
       "Der gewählte Funktionstyp ist im aktuellen Mandanten nicht verfügbar.",
     "employeeAdmin.feedback.qualificationTypeNotFound":
@@ -2724,6 +2792,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Die Art des Qualifikationseintrags ist ungültig.",
     "employeeAdmin.feedback.qualificationTargetRequired":
       "Für den gewählten Eintragstyp muss ein passender Funktions- oder Qualifikationstyp gewählt werden.",
+    "employeeAdmin.feedback.qualificationTargetMismatch":
+      "Für den gewählten Eintragstyp darf nur der passende Funktions- oder Qualifikationstyp übermittelt werden.",
+    "employeeAdmin.feedback.qualificationExpiryRequired":
+      "Dieser Qualifikationstyp verlangt ein Gültig-bis-Datum oder ein Ausgestellt-am-Datum mit hinterlegter Standardgültigkeit.",
     "employeeAdmin.feedback.qualificationInvalidWindow":
       "Gültig-bis darf nicht vor Ausgestellt-am liegen.",
     "employeeAdmin.feedback.addressRequired":
@@ -2732,6 +2804,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Gültig-bis darf nicht vor Gültig-ab liegen.",
     "employeeAdmin.feedback.addressOverlap":
       "Die Adresshistorie enthält ein überlappendes Zeitfenster.",
+    "employeeAdmin.feedback.addressTransitionEffectiveDate":
+      "Das Wirksamkeitsdatum liegt vor dem Beginn der aktuell aktiven Adresse dieses Typs.",
     "employeeAdmin.feedback.credentialRequired":
       "Ausweisnummer, Ausweistyp, kodierter Wert und Gültig-ab sind erforderlich.",
     "employeeAdmin.feedback.invalidCredentialType":
@@ -4235,7 +4309,6 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.detail.emptyBody":
       "Select an employee file on the left or create a new one.",
     "employeeAdmin.tabs.overview": "Overview",
-    "employeeAdmin.tabs.catalogs": "Catalogs",
     "employeeAdmin.tabs.appAccess": "App access",
     "employeeAdmin.tabs.profilePhoto": "Profile photo",
     "employeeAdmin.tabs.qualifications": "Qualifications",
@@ -4292,6 +4365,16 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.fields.birthDate": "Birth date",
     "employeeAdmin.fields.placeOfBirth": "Place of birth",
     "employeeAdmin.fields.nationalityCountryCode": "Nationality country code",
+    "employeeAdmin.fields.privateEmail": "Private email",
+    "employeeAdmin.fields.privatePhone": "Private phone",
+    "employeeAdmin.fields.maritalStatus": "Marital status",
+    "employeeAdmin.fields.taxId": "Tax ID",
+    "employeeAdmin.fields.socialSecurityNo": "Social security number",
+    "employeeAdmin.fields.bankAccountHolder": "Bank account holder",
+    "employeeAdmin.fields.bankIban": "Bank IBAN",
+    "employeeAdmin.fields.bankBic": "Bank BIC",
+    "employeeAdmin.fields.emergencyContactName": "Emergency contact name",
+    "employeeAdmin.fields.emergencyContactPhone": "Emergency contact phone",
     "employeeAdmin.fields.userId": "User account ID",
     "employeeAdmin.fields.notes": "Operational notes",
     "employeeAdmin.fields.noteType": "Note type",
@@ -4339,10 +4422,22 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.summary.groups": "Groups",
     "employeeAdmin.summary.none": "Not provided",
     "employeeAdmin.privateProfile.eyebrow": "Private profile",
-    "employeeAdmin.privateProfile.title": "Birth and identity data",
+    "employeeAdmin.privateProfile.title": "HR private profile",
     "employeeAdmin.privateProfile.lead": "These fields live in the HR-private profile and stay visible only for roles with private permissions.",
+    "employeeAdmin.privateProfile.contactEyebrow": "Contact",
+    "employeeAdmin.privateProfile.contactTitle": "Private contact channels",
     "employeeAdmin.privateProfile.identityEyebrow": "Identity",
     "employeeAdmin.privateProfile.identityTitle": "Birth details and nationality",
+    "employeeAdmin.privateProfile.payrollEyebrow": "Payroll basics",
+    "employeeAdmin.privateProfile.payrollTitle": "Payroll-sensitive base fields",
+    "employeeAdmin.privateProfile.payrollLead": "Tax, social-security, and bank data can intentionally be completed later if the HR process is still in progress.",
+    "employeeAdmin.privateProfile.bankingEyebrow": "Banking",
+    "employeeAdmin.privateProfile.bankingTitle": "Bank details",
+    "employeeAdmin.privateProfile.emergencyEyebrow": "Emergency",
+    "employeeAdmin.privateProfile.emergencyTitle": "Emergency contact",
+    "employeeAdmin.privateProfile.notesEyebrow": "Notes",
+    "employeeAdmin.privateProfile.notesTitle": "Confidential HR notes",
+    "employeeAdmin.privateProfile.notesLead": "Use this area for HR-private notes that should not appear in the operational employee file.",
     "employeeAdmin.privateProfile.actionsEyebrow": "Action",
     "employeeAdmin.privateProfile.actionsTitle": "Save or reset the private profile",
     "employeeAdmin.employmentType.full_time": "Full time",
@@ -4389,10 +4484,20 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.addresses.historyTitle": "Current and past employee addresses",
     "employeeAdmin.addresses.editorEyebrow": "Editor",
     "employeeAdmin.addresses.editorTitle": "Create or edit address",
-    "employeeAdmin.addresses.editorLead": "Street, location, and validity dates are saved through the admin employee-address endpoints.",
+    "employeeAdmin.addresses.editorLead": "New address-history rows are stored through the admin employee-address endpoints with a start date and optional end date.",
+    "employeeAdmin.addresses.editEyebrow": "Edit",
+    "employeeAdmin.addresses.editTitle": "Edit address history row",
+    "employeeAdmin.addresses.editLead": "Update the selected history row, including its validity window, without collapsing the history model.",
+    "employeeAdmin.addresses.transitionEyebrow": "Transition",
+    "employeeAdmin.addresses.transitionTitle": "Promote a historical address into the current row",
+    "employeeAdmin.addresses.transitionLead": "This creates a new current history row from the selected address content at the effective date and closes the previously active row of the same type when needed.",
+    "employeeAdmin.addresses.closeEyebrow": "Close validity",
+    "employeeAdmin.addresses.closeTitle": "End a history row",
+    "employeeAdmin.addresses.closeLead": "Set an end date for the selected history row. The current-address summary will then derive automatically from the remaining active history.",
     "employeeAdmin.addresses.empty": "No address history is available.",
     "employeeAdmin.addresses.typeHome": "Home address",
     "employeeAdmin.addresses.typeMailing": "Mailing address",
+    "employeeAdmin.addresses.primaryLabel": "Primary address for this type",
     "employeeAdmin.addresses.currentBadge": "Current",
     "employeeAdmin.addresses.closedBadge": "Closed",
     "employeeAdmin.qualifications.eyebrow": "Qualifications",
@@ -4413,11 +4518,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.qualifications.functionTypeEmptyHint": "No function types are configured for this tenant yet.",
     "employeeAdmin.qualifications.qualificationTypePlaceholder": "Select qualification type",
     "employeeAdmin.qualifications.qualificationTypeEmptyHint": "No qualification types are configured for this tenant yet.",
-    "employeeAdmin.catalogs.workspaceTitle": "Function and qualification types",
+    "employeeAdmin.qualifications.expiryRequiredHint":
+      "This qualification type requires a valid-until date. If no default validity exists, it must be set before saving.",
+    "employeeAdmin.qualifications.expiryAutofillHint":
+      "This qualification type requires expiry tracking. When issued-at is set, the backend can derive valid-until automatically from {days} days.",
     "employeeAdmin.catalogs.eyebrow": "Catalogs",
     "employeeAdmin.catalogs.title": "Function and qualification types",
-    "employeeAdmin.catalogs.lead":
-      "These tenant-scoped catalogs belong to the Employees workspace and become available to qualification editing in the same workspace immediately.",
     "employeeAdmin.catalogs.pageLead":
       "Tenant-wide HR catalogs remain inside the Employees domain but are managed through a dedicated workforce workspace.",
     "employeeAdmin.catalogs.functionTypesEyebrow": "Function types",
@@ -4438,10 +4544,6 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.catalogs.qualificationTypeEditorCreateTitle": "Create qualification type",
     "employeeAdmin.catalogs.qualificationTypeEditorEditEyebrow": "Edit",
     "employeeAdmin.catalogs.qualificationTypeEditorEditTitle": "Update qualification type",
-    "employeeAdmin.catalogs.handoffEyebrow": "Moved out",
-    "employeeAdmin.catalogs.handoffTitle": "Open catalog administration in the Workforce area",
-    "employeeAdmin.catalogs.handoffLead":
-      "Function and qualification types are tenant-wide HR master data. The full maintenance UI now lives on the dedicated workforce catalogs page.",
     "employeeAdmin.catalogs.fields.code": "Code",
     "employeeAdmin.catalogs.fields.label": "Label",
     "employeeAdmin.catalogs.fields.category": "Category",
@@ -4669,6 +4771,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Target weekly hours must be null or positive.",
     "employeeAdmin.feedback.invalidTargetMonthlyHours":
       "Target monthly hours must be null or positive.",
+    "employeeAdmin.feedback.invalidPrivateEmail":
+      "Private email is invalid. Please enter a valid email address.",
+    "employeeAdmin.feedback.invalidPrivatePhone":
+      "Private phone is too short. Please enter a complete number.",
+    "employeeAdmin.feedback.invalidNationalityCountryCode":
+      "Nationality country code must be exactly two characters.",
     "employeeAdmin.feedback.functionTypeNotFound":
       "The selected function type is not available in this tenant.",
     "employeeAdmin.feedback.qualificationTypeNotFound":
@@ -4685,6 +4793,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "The qualification record kind is invalid.",
     "employeeAdmin.feedback.qualificationTargetRequired":
       "The selected record kind requires a matching function type or qualification type.",
+    "employeeAdmin.feedback.qualificationTargetMismatch":
+      "Only the matching function type or qualification type may be sent for the selected record kind.",
+    "employeeAdmin.feedback.qualificationExpiryRequired":
+      "This qualification type requires a valid-until date or an issued-at date with configured default validity.",
     "employeeAdmin.feedback.qualificationInvalidWindow":
       "Valid until must not be earlier than issued on.",
     "employeeAdmin.feedback.addressRequired":
@@ -4693,6 +4805,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Valid until may not be earlier than valid from.",
     "employeeAdmin.feedback.addressOverlap":
       "The address history contains an overlapping validity window.",
+    "employeeAdmin.feedback.addressTransitionEffectiveDate":
+      "The effective date is earlier than the start of the currently active address of this type.",
     "employeeAdmin.feedback.credentialRequired":
       "Credential number, credential type, encoded value, and valid-from are required.",
     "employeeAdmin.feedback.invalidCredentialType":

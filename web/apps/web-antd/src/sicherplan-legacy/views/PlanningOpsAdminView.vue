@@ -353,7 +353,22 @@
                 <template v-else-if="editorEntityKey === 'requirement_type'">
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsCode") }}</span><input v-model="draft.code" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="draft.label" required /></label>
-                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsDefaultPlanningMode") }}</span><input v-model="draft.default_planning_mode_code" required /></label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ tp("fieldsDefaultPlanningMode") }}</span>
+                    <select v-model="draft.default_planning_mode_code" required>
+                      <option
+                        v-for="option in requirementTypePlanningModeOptions"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </option>
+                    </select>
+                    <span class="field-help">{{ tp("fieldsDefaultPlanningModeHelp") }}</span>
+                    <span v-if="hasLegacyRequirementPlanningMode" class="field-help">
+                      {{ tp("fieldsDefaultPlanningModeLegacy", { value: legacyRequirementPlanningModeValue }) }}
+                    </span>
+                  </label>
                 </template>
 
                 <template v-else-if="editorEntityKey === 'equipment_item'">
@@ -757,11 +772,13 @@ import {
   buildPlanningImportTemplate,
   derivePlanningActionState,
   formatPlanningCustomerOption,
+  isCanonicalPlanningMode,
   isPlanningCustomerScopedEntity,
   isPlanningChildEntity,
   mapPlanningApiMessage,
   normalizePlanningEditorEntity,
   parseOptionalCoordinate,
+  PLANNING_MODE_OPTIONS,
   PLANNING_CREATE_ENTITY_OPTIONS,
   PLANNING_ENTITY_OPTIONS,
   PLANNING_STATUS_OPTIONS,
@@ -899,6 +916,28 @@ const browsePanelTabs = computed(() => [
   { id: "filters", label: tp("filtersTitle") },
   { id: "import", label: tp("importTitle") },
 ]);
+const planningModeOptions = computed(() =>
+  PLANNING_MODE_OPTIONS.map((option) => ({
+    label: tp(option.labelKey),
+    value: option.value,
+  })),
+);
+const legacyRequirementPlanningModeValue = computed(() =>
+  editorEntityKey.value === "requirement_type" && draft.default_planning_mode_code && !isCanonicalPlanningMode(draft.default_planning_mode_code)
+    ? draft.default_planning_mode_code
+    : "",
+);
+const hasLegacyRequirementPlanningMode = computed(() => !!legacyRequirementPlanningModeValue.value);
+const requirementTypePlanningModeOptions = computed(() => {
+  const options = [...planningModeOptions.value];
+  if (hasLegacyRequirementPlanningMode.value) {
+    options.push({
+      label: legacyRequirementPlanningModeValue.value,
+      value: legacyRequirementPlanningModeValue.value,
+    });
+  }
+  return options;
+});
 const timezoneOptions = computed(() =>
   getSupportedTimezones().map((timezone) => ({
     label: timezone,

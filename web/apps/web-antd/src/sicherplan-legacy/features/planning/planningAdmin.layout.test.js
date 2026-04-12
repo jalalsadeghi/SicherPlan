@@ -85,6 +85,25 @@ test("planning setup create form uses parent selectors for zones and checkpoints
   assert.match(source, /<label v-if="visibleStatus" class="field-stack field-stack--half">/);
 });
 
+test("requirement type default planning mode uses a constrained select with only canonical modes plus safe legacy fallback", () => {
+  assert.match(source, /editorEntityKey === 'requirement_type'[\s\S]*<select v-model="draft\.default_planning_mode_code" required>/);
+  assert.match(source, /PLANNING_MODE_OPTIONS/);
+  assert.match(source, /const planningModeOptions = computed\(\(\) =>[\s\S]*PLANNING_MODE_OPTIONS\.map/);
+  assert.match(source, /v-for="option in requirementTypePlanningModeOptions"/);
+  assert.match(source, /:value="option\.value"/);
+  assert.match(source, /\{\{ option\.label \}\}/);
+  assert.match(source, /const requirementTypePlanningModeOptions = computed\(\(\) => \{/);
+  assert.match(source, /if \(hasLegacyRequirementPlanningMode\.value\) \{/);
+  assert.match(source, /fieldsDefaultPlanningModeHelp/);
+  assert.match(source, /fieldsDefaultPlanningModeLegacy/);
+  assert.doesNotMatch(source, /editorEntityKey === 'requirement_type'[\s\S]*<input v-model="draft\.default_planning_mode_code"/);
+});
+
+test("requirement type create and edit flows still hydrate and submit default planning mode codes", () => {
+  assert.match(source, /default_planning_mode_code: record\.default_planning_mode_code \|\| "",/);
+  assert.match(source, /editorEntityKey\.value === "requirement_type"[\s\S]*default_planning_mode_code: draft\.default_planning_mode_code/);
+});
+
 test("planning setup uses explicit customer scope instead of treating every non-child entity as customer-linked", () => {
   assert.match(source, /isPlanningCustomerScopedEntity/);
   assert.match(source, /const editorUsesCustomer = computed\(\(\) => isPlanningCustomerScopedEntity\(editorEntityKey\.value\)\)/);

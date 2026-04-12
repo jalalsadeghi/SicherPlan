@@ -17,6 +17,7 @@ import {
   EMPLOYEE_CREDENTIAL_TYPE_OPTIONS,
   EMPLOYEE_DOCUMENT_TYPE_OPTIONS,
   hasEmployeePermission,
+  isEmployeeAddressCurrent,
   mapEmployeeApiMessage,
   parseWeekdayMask,
   resolveEmployeeDetailTab,
@@ -26,6 +27,7 @@ import {
   validateEmployeeAddressDraft,
   validateEmployeeAvailabilityDraft,
   validateEmployeeCredentialDraft,
+  validateEmployeePrivateProfileDraft,
   validateEmployeeFunctionTypeDraft,
   validateEmployeeQualificationDraft,
   validateEmployeeQualificationTypeDraft,
@@ -88,6 +90,14 @@ test("api message keys map to localized employee feedback keys", () => {
     mapEmployeeApiMessage("errors.docs.document_type.not_found"),
     "employeeAdmin.feedback.documentTypeNotConfigured",
   );
+  assert.equal(
+    mapEmployeeApiMessage("errors.employees.employee_qualification.target_mismatch"),
+    "employeeAdmin.feedback.qualificationTargetMismatch",
+  );
+  assert.equal(
+    mapEmployeeApiMessage("errors.employees.employee_qualification.expiry_required"),
+    "employeeAdmin.feedback.qualificationExpiryRequired",
+  );
 });
 
 test("detail tab resolver preserves valid tabs and falls back safely", () => {
@@ -141,23 +151,51 @@ test("employee document upload payload normalizes empty and selected document ty
   assert.equal(seededPayload.document_type_key, "identity_card");
 });
 
-test("current address summary uses latest active primary address", () => {
+test("current address summary derives from the latest active history row, not primary flag alone", () => {
   const summary = summarizeCurrentAddress([
     {
       archived_at: null,
-      is_primary: true,
-      valid_from: "2026-01-01",
+      status: "active",
+      is_primary: false,
+      valid_from: "2025-01-01",
+      valid_to: "2025-12-31",
       address: { street_line_1: "Alt", postal_code: "11111", city: "Berlin" },
     },
     {
       archived_at: null,
-      is_primary: true,
-      valid_from: "2026-05-01",
+      status: "active",
+      is_primary: false,
+      valid_from: "2026-01-01",
+      valid_to: null,
       address: { street_line_1: "Neu", postal_code: "22222", city: "Hamburg" },
     },
   ]);
 
   assert.equal(summary, "Neu, 22222, Hamburg");
+});
+
+test("address current-state helper respects active validity windows", () => {
+  assert.equal(
+    isEmployeeAddressCurrent(
+      { archived_at: null, status: "active", valid_from: "2026-01-01", valid_to: null },
+      "2026-05-01",
+    ),
+    true,
+  );
+  assert.equal(
+    isEmployeeAddressCurrent(
+      { archived_at: null, status: "active", valid_from: "2026-06-01", valid_to: null },
+      "2026-05-01",
+    ),
+    false,
+  );
+  assert.equal(
+    isEmployeeAddressCurrent(
+      { archived_at: null, status: "active", valid_from: "2026-01-01", valid_to: "2026-04-30" },
+      "2026-05-01",
+    ),
+    false,
+  );
 });
 
 test("employee address validation blocks invalid windows and overlap", () => {
@@ -171,7 +209,6 @@ test("employee address validation blocks invalid windows and overlap", () => {
         address_type: "home",
         valid_from: "2026-01-01",
         valid_to: "",
-        is_current: true,
       },
       [],
       "",
@@ -189,7 +226,6 @@ test("employee address validation blocks invalid windows and overlap", () => {
         address_type: "home",
         valid_from: "2026-02-01",
         valid_to: "2026-01-31",
-        is_current: false,
       },
       [],
       "",
@@ -207,7 +243,6 @@ test("employee address validation blocks invalid windows and overlap", () => {
         address_type: "home",
         valid_from: "2026-03-01",
         valid_to: "",
-        is_current: true,
       },
       [{ id: "hist-1", address_type: "home", valid_from: "2026-01-01", valid_to: null, archived_at: null }],
       "",
@@ -216,23 +251,98 @@ test("employee address validation blocks invalid windows and overlap", () => {
   );
 });
 
-test("private profile payload normalizes date and country code", () => {
+test("address validation can ignore the active row that will be closed during a transition", () => {
+  assert.equal(
+    validateEmployeeAddressDraft(
+      {
+        street_line_1: "Musterstrasse 1",
+        postal_code: "10115",
+        city: "Berlin",
+        country_code: "DE",
+        address_type: "home",
+        valid_from: "2026-03-01",
+        valid_to: "",
+      },
+      [{ id: "hist-1", address_type: "home", valid_from: "2026-01-01", valid_to: null, archived_at: null }],
+      "",
+      { ignoreRowIds: ["hist-1"] },
+    ),
+    null,
+  );
+});
+
+test("private profile payload normalizes the full supported contract", () => {
   assert.deepEqual(
     buildEmployeePrivateProfilePayload(
       {
+        private_email: " private@example.com ",
+        private_phone: " +49 171 1234567 ",
         birth_date: "2026-03-01",
         place_of_birth: " Berlin ",
         nationality_country_code: "de",
+        marital_status: " married ",
+        tax_id: " 123456789 ",
+        social_security_no: " 987654321 ",
+        bank_account_holder: " Max Mustermann ",
+        bank_iban: " de02120300000000202051 ",
+        bank_bic: " byla dem1001 ",
+        emergency_contact_name: " Erika Muster ",
+        emergency_contact_phone: " +49 30 555666 ",
+        notes: " vertraulich ",
       },
       { tenantId: "tenant-1", employeeId: "employee-1" },
     ),
     {
       tenant_id: "tenant-1",
       employee_id: "employee-1",
+      private_email: "private@example.com",
+      private_phone: "+49 171 1234567",
       birth_date: "2026-03-01",
       place_of_birth: "Berlin",
       nationality_country_code: "DE",
+      marital_status: "married",
+      tax_id: "123456789",
+      social_security_no: "987654321",
+      bank_account_holder: "Max Mustermann",
+      bank_iban: "DE02120300000000202051",
+      bank_bic: "BYLADEM1001",
+      emergency_contact_name: "Erika Muster",
+      emergency_contact_phone: "+49 30 555666",
+      notes: "vertraulich",
     },
+  );
+});
+
+test("private profile validation rejects malformed email, short phone, and invalid country code", () => {
+  assert.equal(
+    validateEmployeePrivateProfileDraft({
+      private_email: "invalid",
+    }),
+    "employeeAdmin.feedback.invalidPrivateEmail",
+  );
+
+  assert.equal(
+    validateEmployeePrivateProfileDraft({
+      private_phone: "12345",
+    }),
+    "employeeAdmin.feedback.invalidPrivatePhone",
+  );
+
+  assert.equal(
+    validateEmployeePrivateProfileDraft({
+      nationality_country_code: "DEU",
+    }),
+    "employeeAdmin.feedback.invalidNationalityCountryCode",
+  );
+
+  assert.equal(
+    validateEmployeePrivateProfileDraft({
+      private_email: " ok@example.com ",
+      private_phone: "+49 171 1234567",
+      emergency_contact_phone: "030 123456",
+      nationality_country_code: "de",
+    }),
+    "",
   );
 });
 
@@ -266,6 +376,54 @@ test("qualification payload normalizes optional fields and validates target/wind
     },
   );
 
+  assert.deepEqual(
+    buildEmployeeQualificationPayload(
+      {
+        record_kind: "qualification",
+        function_type_id: "fn-stale",
+        qualification_type_id: "qual-1",
+      },
+      { tenantId: "tenant-1", employeeId: "employee-1" },
+    ),
+    {
+      tenant_id: "tenant-1",
+      employee_id: "employee-1",
+      record_kind: "qualification",
+      function_type_id: null,
+      qualification_type_id: "qual-1",
+      certificate_no: null,
+      issued_at: null,
+      valid_until: null,
+      issuing_authority: null,
+      granted_internally: false,
+      notes: null,
+    },
+  );
+
+  assert.deepEqual(
+    buildEmployeeQualificationPayload(
+      {
+        record_kind: "function",
+        function_type_id: "fn-1",
+        qualification_type_id: "qual-stale",
+      },
+      { tenantId: "tenant-1", employeeId: "employee-1" },
+    ),
+    {
+      tenant_id: "tenant-1",
+      employee_id: "employee-1",
+      record_kind: "function",
+      function_type_id: "fn-1",
+      qualification_type_id: null,
+      certificate_no: null,
+      issued_at: null,
+      valid_until: null,
+      issuing_authority: null,
+      granted_internally: false,
+      notes: null,
+    },
+  );
+
   assert.equal(
     validateEmployeeQualificationDraft({
       record_kind: "qualification",
@@ -274,6 +432,32 @@ test("qualification payload normalizes optional fields and validates target/wind
       valid_until: "2026-12-31",
     }),
     "employeeAdmin.feedback.qualificationTargetRequired",
+  );
+
+  assert.equal(
+    validateEmployeeQualificationDraft(
+      {
+        record_kind: "qualification",
+        qualification_type_id: "qual-1",
+        issued_at: "",
+        valid_until: "",
+      },
+      { expiry_required: true, default_validity_days: null },
+    ),
+    "employeeAdmin.feedback.qualificationExpiryRequired",
+  );
+
+  assert.equal(
+    validateEmployeeQualificationDraft(
+      {
+        record_kind: "qualification",
+        qualification_type_id: "qual-1",
+        issued_at: "2026-01-20",
+        valid_until: "",
+      },
+      { expiry_required: true, default_validity_days: 730 },
+    ),
+    null,
   );
 });
 
