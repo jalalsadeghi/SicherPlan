@@ -276,7 +276,7 @@ export function mapPlanningApiMessage(messageKey) {
 
 export function buildPlanningImportTemplate(entityKey) {
   const headers = {
-    requirement_type: ["code", "label", "default_planning_mode_code", "description", "status"],
+    requirement_type: ["code", "label", "default_planning_mode_code", "notes", "status"],
     equipment_item: ["code", "label", "unit_of_measure_code", "description", "status"],
     site: ["customer_id", "site_no", "name", "address_id", "timezone", "latitude", "longitude", "watchbook_enabled", "notes", "status"],
     event_venue: ["customer_id", "venue_no", "name", "address_id", "timezone", "latitude", "longitude", "notes", "status"],

@@ -139,8 +139,8 @@ class TestPlanningOpsImportService(unittest.TestCase):
             entity_key="requirement_type",
             continue_on_error=True,
             csv_content_base64=_csv_base64(
-                "customer_id,code,label,default_planning_mode_code,description,status\n"
-                "customer-1,REQ-01,Objektschutz,standard,Alpha,active\n"
+                "code,label,default_planning_mode_code,notes,status\n"
+                "REQ-01,Objektschutz,site,Alpha,active\n"
             ),
         )
 
@@ -156,6 +156,25 @@ class TestPlanningOpsImportService(unittest.TestCase):
         self.assertEqual(self.document_service.links[0]["owner_type"], "integration.import_export_job")
         self.assertEqual(first.job_status, "completed")
         self.assertEqual(second.job_status, "completed")
+        stored = next(iter(self.repository.requirement_types.values()))
+        self.assertEqual(stored.description, "Alpha")
+
+    def test_execute_accepts_legacy_requirement_type_description_header_alias(self) -> None:
+        payload = PlanningOpsImportExecuteRequest(
+            tenant_id="tenant-1",
+            entity_key="requirement_type",
+            continue_on_error=True,
+            csv_content_base64=_csv_base64(
+                "code,label,default_planning_mode_code,description,status\n"
+                "REQ-LEG,Objektschutz,event,Legacy note,active\n"
+            ),
+        )
+
+        result = self.service.import_execute("tenant-1", payload, self.actor)
+
+        self.assertEqual(result.created_rows, 1)
+        stored = next(iter(self.repository.requirement_types.values()))
+        self.assertEqual(stored.description, "Legacy note")
 
     def test_invalid_headers_raise_api_error(self) -> None:
         payload = PlanningOpsImportDryRunRequest(

@@ -141,7 +141,7 @@ class FakePlanningRepository:
             code=payload.code,
             label=payload.label,
             default_planning_mode_code=payload.default_planning_mode_code,
-            description=payload.description,
+            description=getattr(payload, "notes", getattr(payload, "description", None)),
             created_by_user_id=actor_user_id,
             updated_by_user_id=actor_user_id,
         )
@@ -586,6 +586,55 @@ class PlanningOpsMasterFoundationTests(unittest.TestCase):
         stored = self.repository.get_requirement_type("tenant-1", row.id)
         self.assertIsNotNone(stored)
         self.assertIsNone(stored.customer_id)
+
+    def test_requirement_type_notes_round_trip_uses_notes_api_field_and_description_storage(self) -> None:
+        created = self.service.create_requirement_type(
+            "tenant-1",
+            RequirementTypeCreate(
+                tenant_id="tenant-1",
+                customer_id=None,
+                code="req_notes",
+                label="Notes",
+                default_planning_mode_code="site",
+                notes="Initial note",
+            ),
+            self.context,
+        )
+
+        self.assertEqual(created.notes, "Initial note")
+        stored = self.repository.get_requirement_type("tenant-1", created.id)
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored.description, "Initial note")
+
+        updated = self.service.update_requirement_type(
+            "tenant-1",
+            created.id,
+            RequirementTypeUpdate(notes="Updated note", version_no=created.version_no),
+            self.context,
+        )
+
+        self.assertEqual(updated.notes, "Updated note")
+        reopened = self.service.get_requirement_type("tenant-1", created.id, self.context)
+        self.assertEqual(reopened.notes, "Updated note")
+
+    def test_requirement_type_accepts_legacy_description_alias_without_losing_value(self) -> None:
+        created = self.service.create_requirement_type(
+            "tenant-1",
+            RequirementTypeCreate(
+                tenant_id="tenant-1",
+                customer_id=None,
+                code="req_legacy_notes",
+                label="Legacy Notes",
+                default_planning_mode_code="event",
+                description="Legacy description note",
+            ),
+            self.context,
+        )
+
+        self.assertEqual(created.notes, "Legacy description note")
+        stored = self.repository.get_requirement_type("tenant-1", created.id)
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored.description, "Legacy description note")
 
     def test_create_equipment_item_normalizes_blank_customer_id_to_none(self) -> None:
         row = self.service.create_equipment_item(

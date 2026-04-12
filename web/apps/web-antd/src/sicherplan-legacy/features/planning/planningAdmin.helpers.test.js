@@ -38,7 +38,7 @@ test("buildPlanningImportTemplate returns stable CSV headers", () => {
   );
   assert.equal(
     buildPlanningImportTemplate("requirement_type"),
-    "code,label,default_planning_mode_code,description,status",
+    "code,label,default_planning_mode_code,notes,status",
   );
   assert.equal(
     buildPlanningImportTemplate("equipment_item"),

@@ -39,12 +39,16 @@ from app.modules.platform_services.integration_models import ImportExportJob
 
 
 IMPORT_HEADERS = {
-    "requirement_type": ("code", "label", "default_planning_mode_code", "description", "status"),
+    "requirement_type": ("code", "label", "default_planning_mode_code", "notes", "status"),
     "equipment_item": ("code", "label", "unit_of_measure_code", "description", "status"),
     "site": ("customer_id", "site_no", "name", "address_id", "timezone", "latitude", "longitude", "watchbook_enabled", "notes", "status"),
     "event_venue": ("customer_id", "venue_no", "name", "address_id", "timezone", "latitude", "longitude", "notes", "status"),
     "trade_fair": ("customer_id", "venue_id", "fair_no", "name", "address_id", "timezone", "latitude", "longitude", "start_date", "end_date", "notes", "status"),
     "patrol_route": ("customer_id", "site_id", "meeting_address_id", "route_no", "name", "start_point_text", "end_point_text", "travel_policy_code", "notes", "status"),
+}
+
+LEGACY_IMPORT_HEADERS = {
+    "requirement_type": ("code", "label", "default_planning_mode_code", "description", "status"),
 }
 
 
@@ -176,14 +180,20 @@ class PlanningOpsService:
         except (ValueError, UnicodeDecodeError) as exc:
             raise ApiException(400, "planning.import.invalid_csv", "errors.planning.import.invalid_csv") from exc
         reader = csv.DictReader(io.StringIO(text))
-        if tuple(reader.fieldnames or ()) != headers:
+        fieldnames = tuple(reader.fieldnames or ())
+        accepted_headers = {headers, LEGACY_IMPORT_HEADERS.get(entity_key)}
+        accepted_headers.discard(None)
+        if fieldnames not in accepted_headers:
             raise ApiException(400, "planning.import.invalid_headers", "errors.planning.import.invalid_headers")
         rows: list[ParsedImportRow] = []
         for index, row in enumerate(reader, start=2):
+            normalized = {key: (value or "").strip() for key, value in row.items()}
+            if "description" in normalized and "notes" not in normalized:
+                normalized["notes"] = normalized["description"]
             rows.append(
                 ParsedImportRow(
                     row_no=index,
-                    data={key: (value or "").strip() for key, value in row.items()},
+                    data=normalized,
                 )
             )
         return rows
@@ -300,7 +310,7 @@ class PlanningOpsService:
                 code=self._required(data, "code"),
                 label=self._required(data, "label"),
                 default_planning_mode_code=self._required(data, "default_planning_mode_code"),
-                description=data.get("description") or None,
+                notes=data.get("notes") or data.get("description") or None,
             )
         if entity_key == "equipment_item":
             return EquipmentItemCreate(

@@ -325,7 +325,7 @@ class SqlAlchemyPlanningRepository:
             code=payload.code,
             label=payload.label,
             default_planning_mode_code=payload.default_planning_mode_code,
-            description=payload.description,
+            description=getattr(payload, "notes", getattr(payload, "description", None)),
             created_by_user_id=actor_user_id,
             updated_by_user_id=actor_user_id,
         )

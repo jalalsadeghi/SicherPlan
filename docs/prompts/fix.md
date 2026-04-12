@@ -1,105 +1,70 @@
-You are working in the SicherPlan repository.
+You are working in the SicherPlan monorepo on the latest main branch.
 
-Goal:
-Change the `Default planning mode` field in the Planning Setup create/edit form
-(`/admin/planning`, requirement type editor) from a free textbox to a constrained select
-with the correct canonical planning-mode options.
+Task:
+Fix the admin/planning bug where the "Notes" field for Planning Setup -> Requirement types is saved by the user but does not come back when reopening the record in Edit mode.
 
-This is a focused UI + validation alignment fix.
-Do not broaden scope into unrelated planning refactors.
+Context already observed:
+- In `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOpsAdminView.vue`, the Requirement Type editor uses `draft.notes` for the Notes textarea.
+- The same view hydrates edit state via `syncDraft(record)` and reads `record.notes`.
+- The same view sends `notes` in the base payload used for create/update.
+- In `web/apps/web-antd/src/sicherplan-legacy/api/planningAdmin.ts`, the frontend detail type already expects `notes?: string | null`.
+- In backend planning schemas, RequirementType currently uses `description` instead of `notes`, while sibling planning setup entities use `notes`.
+- This strongly suggests a frontend/backend contract mismatch for `requirement_type`.
 
-Before coding:
-1. Read `AGENTS.md`.
-2. Keep the change set narrow to the Planning Setup form and related API/UI validation.
-3. Verify the current repo state first.
+Your job:
+1. Verify the actual root cause by tracing the full round-trip for `requirement_type`:
+   - frontend form
+   - frontend API typing/client
+   - backend router
+   - backend schemas
+   - service layer
+   - repository/model mapping
+   - any serializer/read-model layer
+   - import/export/template helpers
+2. Apply the fix in the most correct and minimal-safe way.
+3. Prefer the canonical API contract `notes` for requirement_type, to match the UI and sibling planning entities.
+4. Preserve backward compatibility where reasonable:
+   - If legacy payloads or stored data still use `description`, accept/map them safely during the transition.
+   - Do not lose existing persisted values.
+5. Update any import/export/template/header logic for requirement_type so it is consistent with the final contract.
+   - If import currently uses `description`, support legacy aliasing if practical, but standardize outward-facing behavior to `notes`.
+6. Add or update tests to prove the fix.
 
 Files to inspect first:
-Frontend:
-- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningAdminView.vue`
+- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOpsAdminView.vue`
 - `web/apps/web-antd/src/sicherplan-legacy/api/planningAdmin.ts`
-- `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningAdmin.helpers.js`
-- `web/apps/web-antd/src/sicherplan-legacy/i18n/messages.ts`
-- any planning setup tests
-
-Backend contract confirmation:
+- `web/apps/web-antd/src/features/planning/*` or legacy helper files related to planning admin/import templates
 - `backend/app/modules/planning/schemas.py`
-- `backend/app/modules/planning/router.py`
-- any planning service validation if relevant
+- `backend/app/modules/planning/router*.py`
+- `backend/app/modules/planning/service*.py`
+- `backend/app/modules/planning/repository*.py`
+- `backend/app/modules/planning/models*.py`
+- relevant tests under backend and web if present
 
-Source-of-truth constraints:
-- `ops.requirement_type` includes `default_planning_mode_code`
-- The documented planning modes are limited to:
-  - `event`
-  - `site`
-  - `trade_fair`
-  - `patrol`
-- The planning record later uses planning modes aligned with:
-  - event planning
-  - object/site planning
-  - trade fair planning
-  - patrol/route planning
-- Therefore free text for `default_planning_mode_code` is too loose and can create invalid downstream values.
+Acceptance criteria:
+- When a user creates a Requirement Type and fills Notes, the value is persisted.
+- When the same Requirement Type is reopened in Edit mode, the Notes textarea is populated with the saved value.
+- Updating Notes persists the new value and shows it again on the next Edit open.
+- Existing legacy values stored under `description` are not lost.
+- No regression for other Planning Setup entities.
+- Import/export/template behavior for requirement_type is consistent with the final chosen contract.
 
-What you must verify first:
-1. The current Planning Setup UI renders `Default planning mode` as a plain input/textbox.
-2. This field belongs to the `requirement_type` record family specifically.
-3. The current backend schema uses a string type, but product/docs constrain the valid business values.
-4. The downstream planning model is built around only the four canonical planning modes above.
+Implementation guidance:
+- Do not patch only the textarea binding.
+- Fix the contract mismatch at the correct layer(s).
+- If the DB column is still `description`, decide whether:
+  a) API/model mapping to `notes` is enough, or
+  b) a migration/rename is required.
+  Choose the safest option and explain why.
+- Keep changes scoped to this bug unless a nearby inconsistency must be corrected to complete the fix.
 
-Required outcome:
-A. Replace the free textbox for `Default planning mode` with a select for `requirement_type`.
-B. Use canonical backend values exactly:
-   - `event`
-   - `site`
-   - `trade_fair`
-   - `patrol`
-C. Use readable UI labels, for example:
-   - Event
-   - Object / Site
-   - Trade Fair
-   - Patrol / Route
-D. Show this field only when it is relevant to the `requirement_type` editor state.
-E. Preserve create and edit flows for existing requirement types.
-F. Add frontend validation so invalid arbitrary planning-mode strings can no longer be entered from the UI.
-G. Keep auth/session/tenant scope unchanged.
+Validation required:
+After implementing, explicitly validate whether the original hypothesis (“frontend expects `notes`, backend uses `description` for requirement_type”) was correct.
+If it was not fully correct, explain the true root cause and what you changed instead.
 
-Recommended implementation details:
-1. Add a shared options constant/helper for planning mode choices in the planning admin frontend.
-2. Bind the select to `default_planning_mode_code`.
-3. If editing an older record with an unknown/noncanonical stored value:
-   - do not crash
-   - surface a safe fallback state
-   - ideally show the current value and prompt correction, or map it only if there is an explicit safe mapping
-4. Update labels/help text to make clear that this is the default mode used when requirement types feed downstream planning.
-
-Validation/tests to add or update:
-1. `Default planning mode` renders as a select for requirement types.
-2. The select exposes exactly the four canonical values.
-3. Create requirement type submits the correct backend value.
-4. Edit requirement type preserves and updates the correct backend value.
-5. Other planning setup record families are not incorrectly forced to show this field.
-6. Unknown legacy value handling does not break the form.
-
-What not to do:
-- Do not leave this as a textbox.
-- Do not invent additional planning modes not supported by the documented model.
-- Do not rename backend values away from the canonical codes.
-- Do not refactor unrelated planning setup sections.
-
-Final response format:
-1. Short diagnosis
-2. Exact repo state found
-3. Exact files changed
-4. Final option set used for `default_planning_mode_code`
-5. How legacy/unknown values are handled
-6. Tests/validation run and results
-7. Remaining assumptions
-8. Self-validation summary
-
-Extra instruction:
-Challenge your own solution before finalizing.
-Specifically verify:
-- the field is no longer free text
-- the values match the documented planning modes exactly
-- downstream create/edit still works for requirement types
-If any of those fail, the fix is incomplete.
+Please return:
+1. Root-cause summary
+2. Files changed
+3. Why the chosen fix is correct
+4. Tests added/updated
+5. Any compatibility notes or migration notes

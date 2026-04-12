@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.modules.core.schemas import AddressRead
 from app.modules.platform_services.docs_schemas import DocumentRead
@@ -24,7 +24,7 @@ class RequirementTypeCreate(BaseModel):
     code: str
     label: str
     default_planning_mode_code: str
-    description: str | None = None
+    notes: str | None = Field(default=None, validation_alias=AliasChoices("notes", "description"))
 
 
 class RequirementTypeUpdate(BaseModel):
@@ -32,7 +32,7 @@ class RequirementTypeUpdate(BaseModel):
     code: str | None = None
     label: str | None = None
     default_planning_mode_code: str | None = None
-    description: str | None = None
+    notes: str | None = Field(default=None, validation_alias=AliasChoices("notes", "description"))
     status: str | None = None
     archived_at: datetime | None = None
     version_no: int | None = None
@@ -234,7 +234,7 @@ class RequirementTypeListItem(BaseModel):
 
 
 class RequirementTypeRead(RequirementTypeListItem):
-    description: str | None
+    notes: str | None = Field(validation_alias=AliasChoices("notes", "description"))
     created_at: datetime
     updated_at: datetime
     created_by_user_id: str | None

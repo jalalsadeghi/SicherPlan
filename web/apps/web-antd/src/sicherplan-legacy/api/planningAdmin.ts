@@ -49,7 +49,6 @@ export interface PatrolCheckpointRead {
 export interface PlanningDetailRead extends PlanningListItem {
   default_planning_mode_code?: string;
   unit_of_measure_code?: string;
-  description?: string | null;
   address_id?: string | null;
   timezone?: string | null;
   latitude?: string | number | null;
@@ -115,7 +114,11 @@ function isApiErrorEnvelope(payload) {
   return payload && typeof payload === "object" && payload.error && typeof payload.error.message_key === "string";
 }
 
-async function request(path, accessToken, options = {}) {
+async function request(
+  path: string,
+  accessToken: string,
+  options: { method?: string; body?: unknown } = {},
+) {
   const response = await fetch(`${webAppConfig.apiBaseUrl}${path}`, {
     method: options.method ?? "GET",
     headers: {
