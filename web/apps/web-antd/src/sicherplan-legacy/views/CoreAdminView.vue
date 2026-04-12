@@ -535,6 +535,106 @@
               </div>
             </article>
 
+            <article
+              class="core-admin-record core-admin-record--policy"
+              data-testid="core-unit-of-measure-settings"
+              :class="{ 'core-admin-record--highlight': highlightedLookupDomain === UNIT_OF_MEASURE_DOMAIN }"
+            >
+              <div>
+                <p class="eyebrow">{{ t("coreAdmin.settings.unitCatalogEyebrow") }}</p>
+                <strong>{{ t("coreAdmin.settings.unitCatalogTitle") }}</strong>
+                <span>{{ t("coreAdmin.settings.unitCatalogBody") }}</span>
+                <span>{{ UNIT_OF_MEASURE_DOMAIN }}</span>
+              </div>
+            </article>
+
+            <div v-if="unitOfMeasureLookups.length > 0" class="core-admin-list">
+              <article v-for="lookup in unitOfMeasureLookups" :key="lookup.id" class="core-admin-record">
+                <div>
+                  <strong>{{ lookup.code }} · {{ lookup.label }}</strong>
+                  <span>{{ lookup.description || t("coreAdmin.settings.lookupDescriptionEmpty") }}</span>
+                </div>
+                <div class="core-admin-record__actions">
+                  <span class="core-admin-version">
+                    {{ isTenantOwnedLookup(lookup) ? t("coreAdmin.settings.lookupTenantSource") : t("coreAdmin.settings.lookupSystemSource") }}
+                  </span>
+                  <span class="core-admin-version">{{ t("coreAdmin.settings.lookupSortOrder") }} {{ lookup.sort_order }}</span>
+                  <StatusBadge :status="lookup.status" />
+                  <button v-if="isTenantOwnedLookup(lookup)" type="button" @click="editUnitLookup(lookup)">
+                    {{ t("coreAdmin.actions.edit") }}
+                  </button>
+                  <button
+                    v-if="isTenantOwnedLookup(lookup) && lookup.status === 'active'"
+                    type="button"
+                    @click="setLookupStatus(lookup, 'inactive')"
+                  >
+                    {{ t("coreAdmin.actions.deactivate") }}
+                  </button>
+                  <button
+                    v-if="isTenantOwnedLookup(lookup) && lookup.status === 'inactive' && !lookup.archived_at"
+                    type="button"
+                    @click="setLookupStatus(lookup, 'active')"
+                  >
+                    {{ t("coreAdmin.actions.reactivate") }}
+                  </button>
+                  <button
+                    v-if="isTenantOwnedLookup(lookup) && !lookup.archived_at"
+                    type="button"
+                    @click="setLookupStatus(lookup, 'archived')"
+                  >
+                    {{ t("coreAdmin.actions.archive") }}
+                  </button>
+                </div>
+              </article>
+            </div>
+            <p v-else class="core-admin-list-empty">{{ t("coreAdmin.settings.unitCatalogEmpty") }}</p>
+
+            <form class="core-admin-form core-admin-form--detail" @submit.prevent="submitUnitLookup">
+              <div class="core-admin-panel__header">
+                <div>
+                  <p class="eyebrow">
+                    {{ unitLookupDraft.id ? t("coreAdmin.settings.unitCatalogEditEyebrow") : t("coreAdmin.settings.unitCatalogCreateEyebrow") }}
+                  </p>
+                  <h3>
+                    {{ unitLookupDraft.id ? t("coreAdmin.settings.unitCatalogEditTitle") : t("coreAdmin.settings.unitCatalogCreateTitle") }}
+                  </h3>
+                </div>
+              </div>
+
+              <div class="core-admin-form-grid core-admin-form-grid--detail">
+                <label class="field-stack field-stack--half">
+                  <span>{{ t("coreAdmin.fields.lookupCode") }}</span>
+                  <input v-model="unitLookupDraft.code" :disabled="Boolean(unitLookupDraft.id)" required />
+                </label>
+                <label class="field-stack field-stack--half">
+                  <span>{{ t("coreAdmin.fields.lookupLabel") }}</span>
+                  <input v-model="unitLookupDraft.label" required />
+                </label>
+                <label class="field-stack field-stack--half">
+                  <span>{{ t("coreAdmin.fields.lookupSortOrder") }}</span>
+                  <input v-model="unitLookupDraft.sort_order" type="number" min="0" required />
+                </label>
+                <label class="field-stack field-stack--wide">
+                  <span>{{ t("coreAdmin.fields.lookupDescription") }}</span>
+                  <textarea v-model="unitLookupDraft.description" rows="3" />
+                </label>
+              </div>
+
+              <div class="cta-row">
+                <button class="cta-button" type="submit" :disabled="loading.setting">
+                  {{ unitLookupDraft.id ? t("coreAdmin.actions.saveLookup") : t("coreAdmin.actions.createLookup") }}
+                </button>
+                <button
+                  v-if="unitLookupDraft.id"
+                  class="cta-button cta-secondary"
+                  type="button"
+                  @click="resetUnitLookupDraft"
+                >
+                  {{ t("coreAdmin.actions.cancel") }}
+                </button>
+              </div>
+            </form>
+
             <div v-if="settings.length > 0" class="core-admin-list">
               <article v-for="setting in settings" :key="setting.id" class="core-admin-record">
                 <div>
@@ -633,21 +733,25 @@ import StatusBadge from "@/components/StatusBadge.vue";
 import {
   CoreAdminApiError,
   createBranch,
+  createLookupValue,
   createMandate,
   createSetting,
   getTenant,
   listBranches,
+  listLookupValues,
   listMandates,
   listSettings,
   listTenants,
   onboardTenant,
   transitionTenantStatus,
   updateBranch,
+  updateLookupValue,
   updateMandate,
   updateSetting,
   updateTenant,
   type BranchRead,
   type LifecycleStatus,
+  type LookupValueRead,
   type MandateRead,
   type TenantListItem,
   type TenantRead,
@@ -689,6 +793,7 @@ const ACTION_KEYS = {
   settingArchive: "core.admin.setting.archive",
 } as const;
 const CUSTOMER_PORTAL_POLICY_KEY = "customer_portal.policy";
+const UNIT_OF_MEASURE_DOMAIN = "unit_of_measure";
 
 const API_ERROR_KEYS = {
   "errors.core.authorization.forbidden": "coreAdmin.api.errors.authorization.forbidden",
@@ -696,11 +801,16 @@ const API_ERROR_KEYS = {
   "errors.core.branch.not_found": "coreAdmin.api.errors.branch.not_found",
   "errors.core.mandate.not_found": "coreAdmin.api.errors.mandate.not_found",
   "errors.core.tenant_setting.not_found": "coreAdmin.api.errors.setting.not_found",
+  "errors.core.lookup_value.not_found": "coreAdmin.api.errors.lookup.not_found",
   "errors.core.tenant.duplicate_code": "coreAdmin.api.errors.tenant.duplicate_code",
   "errors.core.branch.duplicate_code": "coreAdmin.api.errors.branch.duplicate_code",
   "errors.core.mandate.duplicate_code": "coreAdmin.api.errors.mandate.duplicate_code",
   "errors.core.setting.duplicate_key": "coreAdmin.api.errors.setting.duplicate_key",
   "errors.core.setting.stale_version": "coreAdmin.api.errors.setting.stale_version",
+  "errors.core.lookup_value.duplicate_code": "coreAdmin.api.errors.lookup.duplicate_code",
+  "errors.core.lookup_value.stale_version": "coreAdmin.api.errors.lookup.stale_version",
+  "errors.core.lookup_value.tenant_mismatch": "coreAdmin.api.errors.lookup.tenant_mismatch",
+  "errors.core.lookup_value.unsupported_domain": "coreAdmin.api.errors.lookup.unsupported_domain",
   "errors.core.mandate.invalid_branch_scope": "coreAdmin.api.errors.mandate.invalid_branch_scope",
   "errors.core.lifecycle.archived_record": "coreAdmin.api.errors.lifecycle.archived_record",
   "errors.core.conflict.integrity": "coreAdmin.api.errors.conflict.integrity",
@@ -718,7 +828,14 @@ const selectedTenant = ref<TenantRead | null>(null);
 const branches = ref<BranchRead[]>([]);
 const mandates = ref<MandateRead[]>([]);
 const settings = ref<TenantSettingRead[]>([]);
-const activeDetailTab = ref<"branches" | "mandates" | "overview" | "settings">("overview");
+const unitOfMeasureLookups = ref<LookupValueRead[]>([]);
+const activeDetailTab = ref<"branches" | "mandates" | "overview" | "settings">(
+  readQueryValue(route.query.tab) === "branches" ||
+  readQueryValue(route.query.tab) === "mandates" ||
+  readQueryValue(route.query.tab) === "settings"
+    ? (readQueryValue(route.query.tab) as "branches" | "mandates" | "settings")
+    : "overview",
+);
 
 const tenantFilter = ref(readQueryValue(route.query.filter) ?? "");
 const tenantScopeInput = ref(readQueryValue(route.query.scope) ?? authStore.tenantScopeId);
@@ -796,6 +913,14 @@ const settingDraft = reactive({
   version_no: 0,
   valueJsonText: "{\"mode\":\"light\"}",
 });
+const unitLookupDraft = reactive({
+  id: "",
+  code: "",
+  label: "",
+  description: "",
+  sort_order: 100,
+  version_no: 0,
+});
 
 const effectiveRole = computed(() => authStore.effectiveRole);
 const effectiveAccessToken = computed(() => authStore.effectiveAccessToken);
@@ -827,6 +952,9 @@ const customerWatchbookEntriesEnabled = computed(() => {
   const value = customerPortalPolicySetting.value?.value_json?.customer_watchbook_entries_enabled;
   return value === true;
 });
+const highlightedLookupDomain = computed(() =>
+  readQueryValue(route.query.catalog) === UNIT_OF_MEASURE_DOMAIN ? UNIT_OF_MEASURE_DOMAIN : "",
+);
 
 const coreDetailTabs = computed(() => [
   { id: "overview", label: t("coreAdmin.tabs.overview") },
@@ -855,11 +983,14 @@ function setFeedback(
 }
 
 function syncRouteState() {
+  const highlightedCatalog = readQueryValue(route.query.catalog);
   const query = {
     ...route.query,
     filter: tenantFilter.value || undefined,
     tenant: selectedTenantId.value || undefined,
     scope: scopeState.value.scopeQueryValue,
+    tab: activeDetailTab.value === "overview" ? undefined : activeDetailTab.value,
+    catalog: highlightedCatalog || undefined,
   };
 
   void router.replace({ query });
@@ -901,6 +1032,19 @@ function resetSettingDraft() {
   settingDraft.valueJsonText = "{\"mode\":\"light\"}";
 }
 
+function resetUnitLookupDraft() {
+  unitLookupDraft.id = "";
+  unitLookupDraft.code = "";
+  unitLookupDraft.label = "";
+  unitLookupDraft.description = "";
+  unitLookupDraft.sort_order = 100;
+  unitLookupDraft.version_no = 0;
+}
+
+function isTenantOwnedLookup(row: LookupValueRead) {
+  return !!selectedTenant.value && row.tenant_id === selectedTenant.value.id;
+}
+
 function selectTenant(tenantId: string) {
   selectedTenantId.value = tenantId;
   activeDetailTab.value = "overview";
@@ -916,6 +1060,7 @@ async function refreshAll() {
     branches.value = [];
     mandates.value = [];
     settings.value = [];
+    unitOfMeasureLookups.value = [];
     return;
   }
 
@@ -982,21 +1127,24 @@ async function loadTenantContext(tenantId: string) {
   loading.tenantContext = true;
 
   try {
-    const [tenantRecord, branchRecords, mandateRecords, settingRecords] = await Promise.all([
+    const [tenantRecord, branchRecords, mandateRecords, settingRecords, lookupRecords] = await Promise.all([
       getTenant(effectiveAccessToken.value, tenantId, effectiveRole.value, actorTenantId.value),
       listBranches(effectiveAccessToken.value, tenantId, effectiveRole.value, actorTenantId.value),
       listMandates(effectiveAccessToken.value, tenantId, effectiveRole.value, actorTenantId.value),
       listSettings(effectiveAccessToken.value, tenantId, effectiveRole.value, actorTenantId.value),
+      listLookupValues(effectiveAccessToken.value, tenantId, UNIT_OF_MEASURE_DOMAIN, effectiveRole.value, actorTenantId.value),
     ]);
 
     selectedTenant.value = tenantRecord;
     branches.value = branchRecords;
     mandates.value = mandateRecords;
     settings.value = settingRecords;
+    unitOfMeasureLookups.value = lookupRecords;
     authStore.setTenantScopeId(tenantRecord.id);
     tenantScopeInput.value = effectiveRole.value === "tenant_admin" ? tenantRecord.id : tenantScopeInput.value;
     hydrateTenantDraft();
     resetMandateDraft();
+    resetUnitLookupDraft();
   } catch (error) {
     handleError(error);
   } finally {
@@ -1422,6 +1570,88 @@ async function setCustomerPortalWatchbookEntriesEnabled(enabled: boolean) {
   }
 }
 
+async function submitUnitLookup() {
+  if (!selectedTenant.value) {
+    return;
+  }
+
+  loading.setting = true;
+
+  try {
+    if (unitLookupDraft.id) {
+      await updateLookupValue(
+        effectiveAccessToken.value,
+        selectedTenant.value.id,
+        unitLookupDraft.id,
+        {
+          label: unitLookupDraft.label,
+          description: unitLookupDraft.description || null,
+          sort_order: Number(unitLookupDraft.sort_order),
+          version_no: unitLookupDraft.version_no,
+        },
+        effectiveRole.value,
+        actorTenantId.value,
+      );
+    } else {
+      await createLookupValue(
+        effectiveAccessToken.value,
+        selectedTenant.value.id,
+        {
+          tenant_id: selectedTenant.value.id,
+          domain: UNIT_OF_MEASURE_DOMAIN,
+          code: unitLookupDraft.code,
+          label: unitLookupDraft.label,
+          description: unitLookupDraft.description || null,
+          sort_order: Number(unitLookupDraft.sort_order),
+        },
+        effectiveRole.value,
+        actorTenantId.value,
+      );
+    }
+
+    await loadTenantContext(selectedTenant.value.id);
+    resetUnitLookupDraft();
+    setFeedback("success", t("coreAdmin.feedback.success"), t("coreAdmin.feedback.lookupSaved"));
+  } catch (error) {
+    handleError(error);
+  } finally {
+    loading.setting = false;
+  }
+}
+
+async function setLookupStatus(lookupValue: LookupValueRead, status: LifecycleStatus) {
+  if (!selectedTenant.value || !isTenantOwnedLookup(lookupValue)) {
+    return;
+  }
+
+  loading.setting = true;
+
+  try {
+    await updateLookupValue(
+      effectiveAccessToken.value,
+      selectedTenant.value.id,
+      lookupValue.id,
+      {
+        label: lookupValue.label,
+        description: lookupValue.description,
+        sort_order: lookupValue.sort_order,
+        version_no: lookupValue.version_no,
+        status,
+        archived_at: status === "archived" ? new Date().toISOString() : null,
+      },
+      effectiveRole.value,
+      actorTenantId.value,
+    );
+
+    await loadTenantContext(selectedTenant.value.id);
+    setFeedback("success", t("coreAdmin.feedback.success"), t("coreAdmin.feedback.lookupStatusSaved"));
+  } catch (error) {
+    handleError(error);
+  } finally {
+    loading.setting = false;
+  }
+}
+
 function editBranch(branch: BranchRead) {
   branchDraft.id = branch.id;
   branchDraft.code = branch.code;
@@ -1444,6 +1674,18 @@ function editSetting(setting: TenantSettingRead) {
   settingDraft.key = setting.key;
   settingDraft.version_no = setting.version_no;
   settingDraft.valueJsonText = JSON.stringify(setting.value_json, null, 2);
+}
+
+function editUnitLookup(lookupValue: LookupValueRead) {
+  if (!isTenantOwnedLookup(lookupValue)) {
+    return;
+  }
+  unitLookupDraft.id = lookupValue.id;
+  unitLookupDraft.code = lookupValue.code;
+  unitLookupDraft.label = lookupValue.label;
+  unitLookupDraft.description = lookupValue.description ?? "";
+  unitLookupDraft.sort_order = lookupValue.sort_order;
+  unitLookupDraft.version_no = lookupValue.version_no;
 }
 
 function parseJsonObject(value: string) {
@@ -1497,12 +1739,21 @@ function handleError(error: unknown) {
 }
 
 watch(
-  [tenantFilter, selectedTenantId, tenantScopeInput, () => effectiveRole.value],
+  [tenantFilter, selectedTenantId, tenantScopeInput, () => effectiveRole.value, () => activeDetailTab.value],
   () => {
     syncRouteState();
 
     if (effectiveRole.value === "tenant_admin") {
       tenantScopeInput.value = scopeState.value.scopeFieldValue;
+    }
+  },
+);
+
+watch(
+  () => route.query.tab,
+  (tab) => {
+    if (tab === "branches" || tab === "mandates" || tab === "settings" || tab === "overview") {
+      activeDetailTab.value = tab;
     }
   },
 );

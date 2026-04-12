@@ -93,6 +93,14 @@ export interface PlanningImportExecuteResult extends PlanningImportDryRunResult 
   result_document_ids: string[];
 }
 
+export interface PlanningReferenceOptionRead {
+  id?: string | null;
+  code: string;
+  label: string;
+  description?: string | null;
+  sort_order?: number;
+}
+
 export class PlanningAdminApiError extends Error {
   status: number;
   messageKey: string;
@@ -165,6 +173,10 @@ export function listPlanningRecords(entityKey, tenantId, accessToken, filters) {
 
 export function getPlanningRecord(entityKey, tenantId, recordId, accessToken) {
   return request(`/api/planning/tenants/${tenantId}/ops/${ENTITY_PATHS[entityKey]}/${recordId}`, accessToken);
+}
+
+export function listEquipmentUnitOptions(tenantId, accessToken) {
+  return request(`/api/planning/tenants/${tenantId}/ops/equipment-unit-options`, accessToken);
 }
 
 export function createPlanningRecord(entityKey, tenantId, accessToken, payload) {

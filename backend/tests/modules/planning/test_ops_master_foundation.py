@@ -11,7 +11,7 @@ from sqlalchemy import CheckConstraint
 
 from app.db import Base
 from app.errors import ApiException
-from app.modules.core.models import Address
+from app.modules.core.models import Address, LookupValue
 from app.modules.customers.models import Customer
 from app.modules.iam.audit_service import AuditService
 from app.modules.iam.auth_schemas import AuthenticatedRoleScope
@@ -69,6 +69,7 @@ class FakePlanningRepository:
     patrol_routes: dict[str, PatrolRoute] = field(default_factory=dict)
     trade_fair_zones: dict[str, object] = field(default_factory=dict)
     patrol_checkpoints: dict[str, object] = field(default_factory=dict)
+    lookup_values: list[LookupValue] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         now = datetime.now(UTC)
@@ -121,6 +122,13 @@ class FakePlanningRepository:
 
     def get_address(self, address_id: str) -> Address | None:
         return self.addresses.get(address_id)
+
+    def list_lookup_values(self, tenant_id: str | None, domain: str) -> list[LookupValue]:
+        rows = [
+            row for row in self.lookup_values
+            if row.domain == domain and (tenant_id is None or row.tenant_id in {None, tenant_id})
+        ]
+        return sorted(rows, key=lambda row: (row.sort_order, row.label))
 
     def list_requirement_types(self, tenant_id: str, filters: OpsMasterFilter) -> list[RequirementType]:
         rows = [row for row in self.requirement_types.values() if row.tenant_id == tenant_id]
@@ -187,7 +195,7 @@ class FakePlanningRepository:
             code=payload.code,
             label=payload.label,
             unit_of_measure_code=payload.unit_of_measure_code,
-            description=payload.description,
+            description=getattr(payload, "notes", getattr(payload, "description", None)),
             created_by_user_id=actor_user_id,
             updated_by_user_id=actor_user_id,
         )
@@ -677,6 +685,111 @@ class PlanningOpsMasterFoundationTests(unittest.TestCase):
         stored = self.repository.get_equipment_item("tenant-1", row.id)
         self.assertIsNotNone(stored)
         self.assertIsNone(stored.customer_id)
+
+    def test_equipment_item_notes_round_trip_uses_notes_api_field_and_description_storage(self) -> None:
+        created = self.service.create_equipment_item(
+            "tenant-1",
+            EquipmentItemCreate(
+                tenant_id="tenant-1",
+                customer_id=None,
+                code="eq_notes",
+                label="Funkgeraet",
+                unit_of_measure_code="pcs",
+                notes="Initial equipment note",
+            ),
+            self.context,
+        )
+
+        self.assertEqual(created.notes, "Initial equipment note")
+        stored = self.repository.get_equipment_item("tenant-1", created.id)
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored.description, "Initial equipment note")
+
+        updated = self.service.update_equipment_item(
+            "tenant-1",
+            created.id,
+            EquipmentItemUpdate(notes="Updated equipment note", version_no=created.version_no),
+            self.context,
+        )
+
+        self.assertEqual(updated.notes, "Updated equipment note")
+        reopened = self.service.get_equipment_item("tenant-1", created.id, self.context)
+        self.assertEqual(reopened.notes, "Updated equipment note")
+
+    def test_equipment_item_accepts_legacy_description_alias_without_losing_value(self) -> None:
+        created = self.service.create_equipment_item(
+            "tenant-1",
+            EquipmentItemCreate(
+                tenant_id="tenant-1",
+                customer_id=None,
+                code="eq_legacy_notes",
+                label="Legacy Funkgeraet",
+                unit_of_measure_code="pcs",
+                description="Legacy equipment description",
+            ),
+            self.context,
+        )
+
+        self.assertEqual(created.notes, "Legacy equipment description")
+        stored = self.repository.get_equipment_item("tenant-1", created.id)
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored.description, "Legacy equipment description")
+
+    def test_equipment_item_create_rejects_unknown_unit_of_measure_code(self) -> None:
+        with self.assertRaises(ApiException) as captured:
+            self.service.create_equipment_item(
+                "tenant-1",
+                EquipmentItemCreate(
+                    tenant_id="tenant-1",
+                    customer_id=None,
+                    code="eq_bad_unit",
+                    label="Unbekannt",
+                    unit_of_measure_code="bucket",
+                ),
+                self.context,
+            )
+
+        self.assertEqual(captured.exception.message_key, "errors.planning.equipment_item.invalid_unit_of_measure_code")
+
+    def test_equipment_item_update_allows_unchanged_legacy_unit_of_measure_code(self) -> None:
+        created = self.repository.create_equipment_item(
+            "tenant-1",
+            EquipmentItemCreate(
+                tenant_id="tenant-1",
+                customer_id=None,
+                code="eq_legacy_unit",
+                label="Legacy Funkgeraet",
+                unit_of_measure_code="legacy_each",
+            ),
+            self.context.user_id,
+        )
+
+        updated = self.service.update_equipment_item(
+            "tenant-1",
+            created.id,
+            EquipmentItemUpdate(
+                label="Aktualisiert",
+                unit_of_measure_code="legacy_each",
+                version_no=created.version_no,
+            ),
+            self.context,
+        )
+
+        self.assertEqual(updated.unit_of_measure_code, "legacy_each")
+
+    def test_list_equipment_unit_options_prefers_tenant_lookup_over_system_lookup(self) -> None:
+        self.repository.lookup_values.extend(
+            [
+                LookupValue(tenant_id=None, domain="unit_of_measure", code="pcs", label="Stueck", description=None, sort_order=10),
+                LookupValue(tenant_id=None, domain="unit_of_measure", code="set", label="Satz", description=None, sort_order=20),
+                LookupValue(tenant_id="tenant-1", domain="unit_of_measure", code="set", label="Set (Mandant)", description=None, sort_order=5),
+            ]
+        )
+
+        result = self.service.list_equipment_unit_options("tenant-1", self.context)
+
+        self.assertEqual([option.code for option in result], ["set", "pcs"])
+        self.assertEqual(result[0].label, "Set (Mandant)")
 
     def test_create_site_requires_existing_customer(self) -> None:
         payload = SiteCreate(tenant_id="tenant-1", customer_id="missing", site_no="S-001", name="Objekt A")

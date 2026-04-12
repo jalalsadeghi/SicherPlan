@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db_session
@@ -18,6 +18,9 @@ from app.modules.core.schemas import (
     BranchCreate,
     BranchRead,
     BranchUpdate,
+    LookupValueCreate,
+    LookupValueRead,
+    LookupValueUpdate,
     MandateCreate,
     MandateRead,
     MandateUpdate,
@@ -255,3 +258,46 @@ def update_setting(
 ) -> TenantSettingRead:
     actor = get_admin_actor_context(context)
     return service.update_setting(str(tenant_id), str(setting_id), payload, actor)
+
+
+@router.get("/tenants/{tenant_id}/lookup-values", response_model=list[LookupValueRead])
+def list_lookup_values(
+    tenant_id: UUID,
+    domain: Annotated[str, Query(min_length=1)],
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("core.admin.setting.read", scope="tenant")),
+    ],
+    service: Annotated[CoreAdminService, Depends(get_core_admin_service)],
+) -> list[LookupValueRead]:
+    actor = get_admin_actor_context(context)
+    return service.list_lookup_values(str(tenant_id), domain, actor)
+
+
+@router.post("/tenants/{tenant_id}/lookup-values", response_model=LookupValueRead, status_code=status.HTTP_201_CREATED)
+def create_lookup_value(
+    tenant_id: UUID,
+    payload: LookupValueCreate,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("core.admin.setting.write", scope="tenant")),
+    ],
+    service: Annotated[CoreAdminService, Depends(get_core_admin_service)],
+) -> LookupValueRead:
+    actor = get_admin_actor_context(context)
+    return service.create_lookup_value(str(tenant_id), payload, actor)
+
+
+@router.patch("/tenants/{tenant_id}/lookup-values/{lookup_value_id}", response_model=LookupValueRead)
+def update_lookup_value(
+    tenant_id: UUID,
+    lookup_value_id: UUID,
+    payload: LookupValueUpdate,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("core.admin.setting.write", scope="tenant")),
+    ],
+    service: Annotated[CoreAdminService, Depends(get_core_admin_service)],
+) -> LookupValueRead:
+    actor = get_admin_actor_context(context)
+    return service.update_lookup_value(str(tenant_id), str(lookup_value_id), payload, actor)

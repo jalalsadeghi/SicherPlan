@@ -83,6 +83,15 @@ class TestLookupSeed(unittest.TestCase):
             {"disabled", "standard", "strict"},
         )
 
+    def test_system_seed_includes_unit_of_measure_domain(self) -> None:
+        session = _FakeSession()
+
+        seed_lookup_values(session)
+
+        seeded_codes = {row.code for row in session.rows if row.domain == "unit_of_measure" and row.tenant_id is None}
+
+        self.assertEqual(seeded_codes, {"pcs", "set", "kit", "box", "pallet"})
+
     def test_tenant_seed_only_applies_tenant_extensible_domains(self) -> None:
         session = _FakeSession()
 

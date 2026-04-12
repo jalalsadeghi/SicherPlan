@@ -36,3 +36,12 @@ test("core admin settings expose the customer portal policy toggle", () => {
   assert.match(viewSource, /CUSTOMER_PORTAL_POLICY_KEY = "customer_portal\.policy"/);
   assert.match(viewSource, /setCustomerPortalWatchbookEntriesEnabled\(!customerWatchbookEntriesEnabled\)/);
 });
+
+test("core admin settings expose tenant-scoped unit-of-measure catalog management", () => {
+  assert.match(viewSource, /data-testid="core-unit-of-measure-settings"/);
+  assert.match(viewSource, /UNIT_OF_MEASURE_DOMAIN = "unit_of_measure"/);
+  assert.match(viewSource, /listLookupValues\(effectiveAccessToken\.value, tenantId, UNIT_OF_MEASURE_DOMAIN/);
+  assert.match(viewSource, /submitUnitLookup/);
+  assert.match(viewSource, /createLookupValue\(/);
+  assert.match(viewSource, /updateLookupValue\(/);
+});

@@ -124,6 +124,18 @@ SYSTEM_LOOKUP_DOMAINS: tuple[LookupSeedDomain, ...] = (
             LookupSeedValue("compliance", "Compliance", "Pflichtinformation mit Nachweisbezug", 40),
         ),
     ),
+    LookupSeedDomain(
+        name="unit_of_measure",
+        ownership="system",
+        description="Shared equipment quantity units used by planning equipment catalogs and downstream order quantities.",
+        values=(
+            LookupSeedValue("pcs", "Stueck", "Einzelteil oder einzelnes Geraet", 10),
+            LookupSeedValue("set", "Satz", "Zusammengehoeriger Satz mehrerer Teile", 20),
+            LookupSeedValue("kit", "Kit", "Vorkonfiguriertes Ausruestungsset", 30),
+            LookupSeedValue("box", "Box", "Gebinde oder Boxeinheit", 40),
+            LookupSeedValue("pallet", "Palette", "Paletteneinheit fuer groessere Mengen", 50),
+        ),
+    ),
 )
 
 

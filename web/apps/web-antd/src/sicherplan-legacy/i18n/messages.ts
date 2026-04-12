@@ -1059,6 +1059,8 @@ export type MessageKey =
   | "coreAdmin.actions.saveMandate"
   | "coreAdmin.actions.createSetting"
   | "coreAdmin.actions.saveSetting"
+  | "coreAdmin.actions.createLookup"
+  | "coreAdmin.actions.saveLookup"
   | "coreAdmin.tenants.eyebrow"
   | "coreAdmin.tenants.title"
   | "coreAdmin.tenants.filterPlaceholder"
@@ -1092,6 +1094,18 @@ export type MessageKey =
   | "coreAdmin.settings.customerPortalPolicyDisabled"
   | "coreAdmin.settings.enableCustomerWatchbookFeedback"
   | "coreAdmin.settings.disableCustomerWatchbookFeedback"
+  | "coreAdmin.settings.unitCatalogEyebrow"
+  | "coreAdmin.settings.unitCatalogTitle"
+  | "coreAdmin.settings.unitCatalogBody"
+  | "coreAdmin.settings.unitCatalogEmpty"
+  | "coreAdmin.settings.unitCatalogCreateEyebrow"
+  | "coreAdmin.settings.unitCatalogCreateTitle"
+  | "coreAdmin.settings.unitCatalogEditEyebrow"
+  | "coreAdmin.settings.unitCatalogEditTitle"
+  | "coreAdmin.settings.lookupSystemSource"
+  | "coreAdmin.settings.lookupTenantSource"
+  | "coreAdmin.settings.lookupSortOrder"
+  | "coreAdmin.settings.lookupDescriptionEmpty"
   | "coreAdmin.fields.tenantCode"
   | "coreAdmin.fields.tenantName"
   | "coreAdmin.fields.legalName"
@@ -1111,6 +1125,10 @@ export type MessageKey =
   | "coreAdmin.fields.settingKey"
   | "coreAdmin.fields.settingValue"
   | "coreAdmin.fields.settingValueJson"
+  | "coreAdmin.fields.lookupCode"
+  | "coreAdmin.fields.lookupLabel"
+  | "coreAdmin.fields.lookupDescription"
+  | "coreAdmin.fields.lookupSortOrder"
   | "coreAdmin.status.active"
   | "coreAdmin.status.inactive"
   | "coreAdmin.status.archived"
@@ -1132,6 +1150,8 @@ export type MessageKey =
   | "coreAdmin.feedback.mandateStatusSaved"
   | "coreAdmin.feedback.settingSaved"
   | "coreAdmin.feedback.settingStatusSaved"
+  | "coreAdmin.feedback.lookupSaved"
+  | "coreAdmin.feedback.lookupStatusSaved"
   | "coreAdmin.feedback.scopeRemembered"
   | "coreAdmin.api.errors.authorization.forbidden"
   | "coreAdmin.api.errors.tenant.not_found"
@@ -1143,6 +1163,11 @@ export type MessageKey =
   | "coreAdmin.api.errors.mandate.duplicate_code"
   | "coreAdmin.api.errors.setting.duplicate_key"
   | "coreAdmin.api.errors.setting.stale_version"
+  | "coreAdmin.api.errors.lookup.not_found"
+  | "coreAdmin.api.errors.lookup.duplicate_code"
+  | "coreAdmin.api.errors.lookup.stale_version"
+  | "coreAdmin.api.errors.lookup.tenant_mismatch"
+  | "coreAdmin.api.errors.lookup.unsupported_domain"
   | "coreAdmin.api.errors.mandate.invalid_branch_scope"
   | "coreAdmin.api.errors.lifecycle.archived_record"
   | "coreAdmin.api.errors.conflict.integrity"
@@ -2974,6 +2999,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.actions.saveMandate": "Mandat speichern",
     "coreAdmin.actions.createSetting": "Einstellung anlegen",
     "coreAdmin.actions.saveSetting": "Einstellung speichern",
+    "coreAdmin.actions.createLookup": "Wert anlegen",
+    "coreAdmin.actions.saveLookup": "Wert speichern",
     "coreAdmin.tenants.eyebrow": "Mandantenübersicht",
     "coreAdmin.tenants.title": "Mandanten",
     "coreAdmin.tenants.filterPlaceholder": "Nach Code oder Name filtern",
@@ -3011,6 +3038,19 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.settings.customerPortalPolicyDisabled": "Kundenrückmeldungen deaktiviert",
     "coreAdmin.settings.enableCustomerWatchbookFeedback": "Kundenrückmeldungen aktivieren",
     "coreAdmin.settings.disableCustomerWatchbookFeedback": "Kundenrückmeldungen deaktivieren",
+    "coreAdmin.settings.unitCatalogEyebrow": "Mengeneinheiten",
+    "coreAdmin.settings.unitCatalogTitle": "Mandantenkatalog für Mengeneinheiten",
+    "coreAdmin.settings.unitCatalogBody":
+      "Systemwerte bleiben lesbar. Tenant-Admins ergänzen oder überschreiben hier eigene Mengeneinheiten für Planning Setup.",
+    "coreAdmin.settings.unitCatalogEmpty": "Es sind noch keine Mengeneinheiten verfügbar.",
+    "coreAdmin.settings.unitCatalogCreateEyebrow": "Neue Mengeneinheit",
+    "coreAdmin.settings.unitCatalogCreateTitle": "Mandantenwert anlegen",
+    "coreAdmin.settings.unitCatalogEditEyebrow": "Mengeneinheit bearbeiten",
+    "coreAdmin.settings.unitCatalogEditTitle": "Mandantenwert aktualisieren",
+    "coreAdmin.settings.lookupSystemSource": "Systemwert",
+    "coreAdmin.settings.lookupTenantSource": "Mandantenwert",
+    "coreAdmin.settings.lookupSortOrder": "Sortierung",
+    "coreAdmin.settings.lookupDescriptionEmpty": "Keine Beschreibung hinterlegt.",
     "coreAdmin.fields.tenantCode": "Mandantencode",
     "coreAdmin.fields.tenantName": "Mandantenname",
     "coreAdmin.fields.legalName": "Rechtlicher Name",
@@ -3030,6 +3070,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.fields.settingKey": "Einstellungsschlüssel",
     "coreAdmin.fields.settingValue": "Initialer Einstellungswert (JSON)",
     "coreAdmin.fields.settingValueJson": "JSON-Wert",
+    "coreAdmin.fields.lookupCode": "Code",
+    "coreAdmin.fields.lookupLabel": "Bezeichnung",
+    "coreAdmin.fields.lookupDescription": "Beschreibung",
+    "coreAdmin.fields.lookupSortOrder": "Sortierung",
     "coreAdmin.status.active": "Aktiv",
     "coreAdmin.status.inactive": "Inaktiv",
     "coreAdmin.status.archived": "Archiviert",
@@ -3053,6 +3097,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.feedback.mandateStatusSaved": "Mandatsstatus wurde aktualisiert.",
     "coreAdmin.feedback.settingSaved": "Einstellung wurde gespeichert.",
     "coreAdmin.feedback.settingStatusSaved": "Einstellungsstatus wurde aktualisiert.",
+    "coreAdmin.feedback.lookupSaved": "Mengeneinheit wurde gespeichert.",
+    "coreAdmin.feedback.lookupStatusSaved": "Status der Mengeneinheit wurde aktualisiert.",
     "coreAdmin.feedback.scopeRemembered": "Der Tenant-Scope wurde für den Tenant-Admin-Modus gemerkt.",
     "coreAdmin.api.errors.authorization.forbidden":
       "Diese Rolle darf die angeforderte Core-Administration nicht ausführen.",
@@ -3070,6 +3116,15 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Dieser Einstellungsschlüssel existiert bereits.",
     "coreAdmin.api.errors.setting.stale_version":
       "Die Einstellung wurde zwischenzeitlich geändert. Bitte neu laden und erneut speichern.",
+    "coreAdmin.api.errors.lookup.not_found": "Mengeneinheit nicht gefunden.",
+    "coreAdmin.api.errors.lookup.duplicate_code":
+      "Der Code der Mengeneinheit existiert in diesem Mandanten bereits.",
+    "coreAdmin.api.errors.lookup.stale_version":
+      "Die Mengeneinheit wurde zwischenzeitlich geändert. Bitte neu laden und erneut speichern.",
+    "coreAdmin.api.errors.lookup.tenant_mismatch":
+      "Der Lookup-Wert gehört nicht zu diesem Mandanten.",
+    "coreAdmin.api.errors.lookup.unsupported_domain":
+      "Diese Lookup-Domain wird in Core Admin derzeit nicht gepflegt.",
     "coreAdmin.api.errors.mandate.invalid_branch_scope":
       "Die gewählte Niederlassung gehört nicht zu diesem Mandanten.",
     "coreAdmin.api.errors.lifecycle.archived_record":
@@ -4975,6 +5030,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.actions.saveMandate": "Save mandate",
     "coreAdmin.actions.createSetting": "Create setting",
     "coreAdmin.actions.saveSetting": "Save setting",
+    "coreAdmin.actions.createLookup": "Create value",
+    "coreAdmin.actions.saveLookup": "Save value",
     "coreAdmin.tenants.eyebrow": "Tenant overview",
     "coreAdmin.tenants.title": "Tenants",
     "coreAdmin.tenants.filterPlaceholder": "Filter by code or name",
@@ -5012,6 +5069,19 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.settings.customerPortalPolicyDisabled": "Customer feedback disabled",
     "coreAdmin.settings.enableCustomerWatchbookFeedback": "Enable customer feedback",
     "coreAdmin.settings.disableCustomerWatchbookFeedback": "Disable customer feedback",
+    "coreAdmin.settings.unitCatalogEyebrow": "Units of measure",
+    "coreAdmin.settings.unitCatalogTitle": "Tenant unit catalog",
+    "coreAdmin.settings.unitCatalogBody":
+      "System values remain readable. Tenant admins add or override unit-of-measure options for Planning Setup here.",
+    "coreAdmin.settings.unitCatalogEmpty": "No unit options are available yet.",
+    "coreAdmin.settings.unitCatalogCreateEyebrow": "New unit value",
+    "coreAdmin.settings.unitCatalogCreateTitle": "Create tenant value",
+    "coreAdmin.settings.unitCatalogEditEyebrow": "Edit unit value",
+    "coreAdmin.settings.unitCatalogEditTitle": "Update tenant value",
+    "coreAdmin.settings.lookupSystemSource": "System value",
+    "coreAdmin.settings.lookupTenantSource": "Tenant value",
+    "coreAdmin.settings.lookupSortOrder": "Sort order",
+    "coreAdmin.settings.lookupDescriptionEmpty": "No description provided.",
     "coreAdmin.fields.tenantCode": "Tenant code",
     "coreAdmin.fields.tenantName": "Tenant name",
     "coreAdmin.fields.legalName": "Legal name",
@@ -5031,6 +5101,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.fields.settingKey": "Setting key",
     "coreAdmin.fields.settingValue": "Initial setting value (JSON)",
     "coreAdmin.fields.settingValueJson": "JSON value",
+    "coreAdmin.fields.lookupCode": "Code",
+    "coreAdmin.fields.lookupLabel": "Label",
+    "coreAdmin.fields.lookupDescription": "Description",
+    "coreAdmin.fields.lookupSortOrder": "Sort order",
     "coreAdmin.status.active": "Active",
     "coreAdmin.status.inactive": "Inactive",
     "coreAdmin.status.archived": "Archived",
@@ -5054,6 +5128,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "coreAdmin.feedback.mandateStatusSaved": "Mandate lifecycle state was updated.",
     "coreAdmin.feedback.settingSaved": "Setting was saved.",
     "coreAdmin.feedback.settingStatusSaved": "Setting lifecycle state was updated.",
+    "coreAdmin.feedback.lookupSaved": "Unit value was saved.",
+    "coreAdmin.feedback.lookupStatusSaved": "Unit value lifecycle state was updated.",
     "coreAdmin.feedback.scopeRemembered":
       "The tenant scope was remembered for tenant-admin mode.",
     "coreAdmin.api.errors.authorization.forbidden":
@@ -5072,6 +5148,15 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "This setting key already exists.",
     "coreAdmin.api.errors.setting.stale_version":
       "The setting changed in the meantime. Refresh and save again.",
+    "coreAdmin.api.errors.lookup.not_found": "Unit value not found.",
+    "coreAdmin.api.errors.lookup.duplicate_code":
+      "The unit code already exists in this tenant.",
+    "coreAdmin.api.errors.lookup.stale_version":
+      "The unit value changed in the meantime. Refresh and save again.",
+    "coreAdmin.api.errors.lookup.tenant_mismatch":
+      "The lookup value does not belong to this tenant.",
+    "coreAdmin.api.errors.lookup.unsupported_domain":
+      "This lookup domain is not managed in Core Admin yet.",
     "coreAdmin.api.errors.mandate.invalid_branch_scope":
       "The selected branch does not belong to this tenant.",
     "coreAdmin.api.errors.lifecycle.archived_record":

@@ -9,12 +9,15 @@ from sqlalchemy.orm import Session
 from app.errors import ApiException
 from app.modules.core.config_seed import seed_default_tenant_settings
 from app.modules.core.lookup_seed import seed_lookup_values
-from app.modules.core.models import Branch, Mandate, Tenant, TenantSetting
+from app.modules.core.models import Branch, LookupValue, Mandate, Tenant, TenantSetting
 from app.modules.employees.catalog_seed import seed_baseline_employee_catalogs
 from app.modules.core.schemas import (
     BranchCreate,
     BranchRead,
     BranchUpdate,
+    LookupValueCreate,
+    LookupValueRead,
+    LookupValueUpdate,
     MandateCreate,
     MandateRead,
     MandateUpdate,
@@ -299,7 +302,67 @@ class SqlAlchemyCoreAdminRepository:
         self.session.refresh(setting)
         return TenantSettingRead.model_validate(setting)
 
-    def _tenant_scoped_get(self, model: type[Branch | Mandate | TenantSetting], tenant_id: str, object_id: str):
+    def list_lookup_values(self, tenant_id: str, domain: str) -> list[LookupValueRead]:
+        rows = self.session.scalars(
+            select(LookupValue)
+            .where(
+                LookupValue.domain == domain,
+                LookupValue.archived_at.is_(None),
+                (LookupValue.tenant_id.is_(None)) | (LookupValue.tenant_id == tenant_id),
+            )
+            .order_by(LookupValue.sort_order.asc(), LookupValue.label.asc())
+        ).all()
+        return [LookupValueRead.model_validate(row) for row in rows]
+
+    def create_lookup_value(
+        self,
+        tenant_id: str,
+        payload: LookupValueCreate,
+        actor_user_id: str | None,
+    ) -> LookupValueRead:
+        row = LookupValue(
+            tenant_id=tenant_id,
+            domain=payload.domain,
+            code=payload.code,
+            label=payload.label,
+            description=payload.description,
+            sort_order=payload.sort_order,
+            created_by_user_id=actor_user_id,
+            updated_by_user_id=actor_user_id,
+        )
+        self.session.add(row)
+        self._commit_or_raise()
+        self.session.refresh(row)
+        return LookupValueRead.model_validate(row)
+
+    def update_lookup_value(
+        self,
+        tenant_id: str,
+        lookup_value_id: str,
+        payload: LookupValueUpdate,
+        actor_user_id: str | None,
+    ) -> LookupValueRead | None:
+        row = self._tenant_scoped_get(LookupValue, tenant_id, lookup_value_id)
+        if row is None:
+            return None
+        if payload.version_no is None or payload.version_no != row.version_no:
+            raise ApiException(
+                status_code=409,
+                code="core.conflict.stale_lookup_value_version",
+                message_key="errors.core.lookup_value.stale_version",
+                details={"expected_version_no": row.version_no},
+            )
+        self._apply_update(
+            row,
+            payload,
+            ("label", "description", "sort_order", "status", "archived_at"),
+            actor_user_id,
+        )
+        self._commit_or_raise()
+        self.session.refresh(row)
+        return LookupValueRead.model_validate(row)
+
+    def _tenant_scoped_get(self, model: type[Branch | Mandate | TenantSetting | LookupValue], tenant_id: str, object_id: str):
         statement = select(model).where(model.id == object_id, model.tenant_id == tenant_id)
         return self.session.scalars(statement).one_or_none()
 
@@ -341,6 +404,8 @@ class SqlAlchemyCoreAdminRepository:
             return ApiException(409, "core.conflict.mandate_code", "errors.core.mandate.duplicate_code")
         if "uq_core_tenant_setting_tenant_key" in message:
             return ApiException(409, "core.conflict.setting_key", "errors.core.setting.duplicate_key")
+        if "uq_core_lookup_value_tenant_domain_code" in message:
+            return ApiException(409, "core.conflict.lookup_value_code", "errors.core.lookup_value.duplicate_code")
         if "fk_core_mandate_tenant_branch" in message:
             return ApiException(400, "core.validation.branch_scope", "errors.core.mandate.invalid_branch_scope")
         return ApiException(409, "core.conflict.integrity", "errors.core.conflict.integrity")

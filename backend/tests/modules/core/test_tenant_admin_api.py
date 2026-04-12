@@ -10,8 +10,11 @@ from app.errors import ApiException
 from app.main import create_app
 from app.modules.core.admin_router import (
     create_branch,
+    create_lookup_value,
     get_tenant,
+    list_lookup_values,
     onboard_tenant,
+    update_lookup_value,
     update_setting,
 )
 from app.modules.core.admin_service import AdminActorContext
@@ -20,6 +23,9 @@ from app.modules.iam.authz import RequestAuthorizationContext
 from app.modules.core.schemas import (
     BranchCreate,
     BranchRead,
+    LookupValueCreate,
+    LookupValueRead,
+    LookupValueUpdate,
     MandateCreate,
     MandateRead,
     TenantCreate,
@@ -130,12 +136,40 @@ def _setting_read(
     )
 
 
+def _lookup_read(
+    tenant_id: str | None,
+    lookup_id: str,
+    domain: str,
+    code: str,
+    label: str,
+    version_no: int = 1,
+    status: str = "active",
+) -> LookupValueRead:
+    return LookupValueRead(
+        id=lookup_id,
+        tenant_id=tenant_id,
+        domain=domain,
+        code=code,
+        label=label,
+        description=None,
+        sort_order=100,
+        status=status,
+        version_no=version_no,
+        created_at="2026-03-19T00:00:00Z",
+        updated_at="2026-03-19T00:00:00Z",
+        created_by_user_id=None,
+        updated_by_user_id=None,
+        archived_at=None,
+    )
+
+
 @dataclass
 class FakeCoreAdminService:
     tenant: TenantRead
     branch: BranchRead
     mandate: MandateRead
     setting: TenantSettingRead
+    lookup_value: LookupValueRead
 
     def onboard_tenant(
         self,
@@ -200,6 +234,60 @@ class FakeCoreAdminService:
             version_no=self.setting.version_no + 1,
         )
 
+    def list_lookup_values(
+        self,
+        tenant_id: str,
+        domain: str,
+        actor: AdminActorContext,
+    ) -> list[LookupValueRead]:
+        if domain != self.lookup_value.domain:
+            return []
+        return [self.lookup_value]
+
+    def create_lookup_value(
+        self,
+        tenant_id: str,
+        payload: LookupValueCreate,
+        actor: AdminActorContext,
+    ) -> LookupValueRead:
+        if payload.domain != "unit_of_measure":
+            raise ApiException(
+                400,
+                "core.validation.lookup_value_unsupported_domain",
+                "errors.core.lookup_value.unsupported_domain",
+            )
+        return _lookup_read(
+            tenant_id,
+            str(uuid4()),
+            payload.domain,
+            payload.code,
+            payload.label,
+        )
+
+    def update_lookup_value(
+        self,
+        tenant_id: str,
+        lookup_value_id: str,
+        payload: LookupValueUpdate,
+        actor: AdminActorContext,
+    ) -> LookupValueRead:
+        if payload.version_no != self.lookup_value.version_no:
+            raise ApiException(
+                409,
+                "core.conflict.stale_lookup_value_version",
+                "errors.core.lookup_value.stale_version",
+                {"expected_version_no": self.lookup_value.version_no},
+            )
+        return _lookup_read(
+            tenant_id,
+            lookup_value_id,
+            self.lookup_value.domain,
+            self.lookup_value.code,
+            payload.label or self.lookup_value.label,
+            version_no=self.lookup_value.version_no + 1,
+            status=payload.status or self.lookup_value.status,
+        )
+
 
 class TestTenantAdminApi(unittest.TestCase):
     def setUp(self) -> None:
@@ -246,6 +334,13 @@ class TestTenantAdminApi(unittest.TestCase):
                 self.setting_id,
                 "ui.theme",
                 {"mode": "light"},
+            ),
+            lookup_value=_lookup_read(
+                self.tenant_id,
+                str(uuid4()),
+                "unit_of_measure",
+                "pcs",
+                "Stueck",
             ),
         )
 
@@ -320,6 +415,49 @@ class TestTenantAdminApi(unittest.TestCase):
         )
         self.assertEqual(context.exception.details["expected_version_no"], 1)
 
+    def test_tenant_admin_can_list_lookup_values(self) -> None:
+        result = list_lookup_values(
+            self.tenant_id,  # type: ignore[arg-type]
+            "unit_of_measure",
+            self.actor_tenant,
+            self.fake_service,
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].domain, "unit_of_measure")
+        self.assertEqual(result[0].code, "pcs")
+
+    def test_tenant_admin_can_create_lookup_value(self) -> None:
+        result = create_lookup_value(
+            self.tenant_id,  # type: ignore[arg-type]
+            LookupValueCreate(
+                tenant_id=self.tenant_id,
+                domain="unit_of_measure",
+                code="crate",
+                label="Kiste",
+            ),
+            self.actor_tenant,
+            self.fake_service,
+        )
+        self.assertEqual(result.domain, "unit_of_measure")
+        self.assertEqual(result.code, "crate")
+        self.assertEqual(result.label, "Kiste")
+
+    def test_lookup_value_update_rejects_stale_version(self) -> None:
+        with self.assertRaises(ApiException) as context:
+            update_lookup_value(
+                self.tenant_id,  # type: ignore[arg-type]
+                self.fake_service.lookup_value.id,  # type: ignore[arg-type]
+                LookupValueUpdate(label="Palette", version_no=99),
+                self.actor_tenant,
+                self.fake_service,
+            )
+        self.assertEqual(context.exception.status_code, 409)
+        self.assertEqual(
+            context.exception.code,
+            "core.conflict.stale_lookup_value_version",
+        )
+        self.assertEqual(context.exception.details["expected_version_no"], 1)
+
     def test_core_admin_routes_are_registered(self) -> None:
         app = create_app()
         paths = {route.path for route in app.routes}
@@ -327,6 +465,8 @@ class TestTenantAdminApi(unittest.TestCase):
         self.assertIn("/api/core/admin/tenants/{tenant_id}/branches", paths)
         self.assertIn("/api/core/admin/tenants/{tenant_id}/mandates", paths)
         self.assertIn("/api/core/admin/tenants/{tenant_id}/settings/{setting_id}", paths)
+        self.assertIn("/api/core/admin/tenants/{tenant_id}/lookup-values", paths)
+        self.assertIn("/api/core/admin/tenants/{tenant_id}/lookup-values/{lookup_value_id}", paths)
 
     def test_core_admin_tenant_list_supports_cors_preflight(self) -> None:
         app = create_app()

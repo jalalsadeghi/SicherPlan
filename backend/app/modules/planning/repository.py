@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.errors import ApiException
-from app.modules.core.models import Address, TenantSetting
+from app.modules.core.models import Address, LookupValue, TenantSetting
 from app.modules.customers.models import Customer, CustomerBillingProfile, CustomerInvoiceParty, CustomerRateCard
 from app.modules.customers.models import CustomerEmployeeBlock
 from app.modules.employees.models import EmployeeAbsence, EmployeeQualification, EmployeeTimeAccount, EmployeeTimeAccountTxn, FunctionType, QualificationType
@@ -178,6 +178,23 @@ class SqlAlchemyPlanningRepository:
     def get_address(self, address_id: str) -> Address | None:
         statement = select(Address).where(Address.id == address_id)
         return self.session.scalars(statement).one_or_none()
+
+    def list_lookup_values(self, tenant_id: str | None, domain: str) -> list[LookupValue]:
+        tenant_scope = (
+            or_(LookupValue.tenant_id.is_(None), LookupValue.tenant_id == tenant_id)
+            if tenant_id is not None
+            else LookupValue.tenant_id.is_(None)
+        )
+        statement = (
+            select(LookupValue)
+            .where(
+                LookupValue.domain == domain,
+                LookupValue.archived_at.is_(None),
+                tenant_scope,
+            )
+            .order_by(LookupValue.sort_order.asc(), LookupValue.label.asc())
+        )
+        return list(self.session.scalars(statement).all())
 
     def get_function_type(self, tenant_id: str, function_type_id: str) -> FunctionType | None:
         statement = select(FunctionType).where(FunctionType.tenant_id == tenant_id, FunctionType.id == function_type_id)
@@ -368,7 +385,7 @@ class SqlAlchemyPlanningRepository:
             code=payload.code,
             label=payload.label,
             unit_of_measure_code=payload.unit_of_measure_code,
-            description=payload.description,
+            description=getattr(payload, "notes", getattr(payload, "description", None)),
             created_by_user_id=actor_user_id,
             updated_by_user_id=actor_user_id,
         )

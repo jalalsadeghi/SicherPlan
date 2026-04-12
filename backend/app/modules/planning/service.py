@@ -11,7 +11,7 @@ from uuid import UUID
 from sqlalchemy import inspect as sa_inspect
 
 from app.errors import ApiException
-from app.modules.core.models import Address
+from app.modules.core.models import Address, LookupValue
 from app.modules.customers.models import Customer
 from app.modules.iam.audit_service import AuditActor, AuditService
 from app.modules.iam.authz import RequestAuthorizationContext
@@ -28,6 +28,7 @@ from app.modules.planning.schemas import (
     EventVenueUpdate,
     OpsMasterFilter,
     OperationalGeoPointRead,
+    PlanningReferenceOptionRead,
     PatrolCheckpointCreate,
     PatrolCheckpointGeoPointRead,
     PatrolCheckpointRead,
@@ -61,6 +62,7 @@ from app.modules.planning.schemas import (
 class PlanningRepository(Protocol):
     def get_customer(self, tenant_id: str, customer_id: str) -> Customer | None: ...
     def get_address(self, address_id: str) -> Address | None: ...
+    def list_lookup_values(self, tenant_id: str | None, domain: str) -> list[LookupValue]: ...
     def list_requirement_types(self, tenant_id: str, filters: OpsMasterFilter) -> list[RequirementType]: ...
     def get_requirement_type(self, tenant_id: str, row_id: str) -> RequirementType | None: ...
     def create_requirement_type(self, tenant_id: str, payload: RequirementTypeCreate, actor_user_id: str | None) -> RequirementType: ...
@@ -105,6 +107,15 @@ class PlanningRepository(Protocol):
 
 
 class PlanningService:
+    EQUIPMENT_UNIT_DOMAIN = "unit_of_measure"
+    EQUIPMENT_UNIT_FALLBACK_OPTIONS: tuple[dict[str, object], ...] = (
+        {"code": "pcs", "label": "Stueck", "description": "Einzelteil oder einzelnes Geraet", "sort_order": 10},
+        {"code": "set", "label": "Satz", "description": "Zusammengehoeriger Satz mehrerer Teile", "sort_order": 20},
+        {"code": "kit", "label": "Kit", "description": "Vorkonfiguriertes Ausruestungsset", "sort_order": 30},
+        {"code": "box", "label": "Box", "description": "Gebinde oder Boxeinheit", "sort_order": 40},
+        {"code": "pallet", "label": "Palette", "description": "Paletteneinheit fuer groessere Mengen", "sort_order": 50},
+    )
+
     def __init__(self, repository: PlanningRepository, audit_service: AuditService | None = None) -> None:
         self.repository = repository
         self.audit_service = audit_service
@@ -155,6 +166,26 @@ class PlanningService:
     def list_equipment_items(self, tenant_id: str, filters: OpsMasterFilter, _actor: RequestAuthorizationContext) -> list[EquipmentItemListItem]:
         return [EquipmentItemListItem.model_validate(row) for row in self.repository.list_equipment_items(tenant_id, filters)]
 
+    def list_equipment_unit_options(
+        self,
+        tenant_id: str,
+        _actor: RequestAuthorizationContext,
+    ) -> list[PlanningReferenceOptionRead]:
+        lookup_rows = self.repository.list_lookup_values(tenant_id, self.EQUIPMENT_UNIT_DOMAIN)
+        preferred_rows_by_code: dict[str, LookupValue] = {}
+        for row in lookup_rows:
+            existing = preferred_rows_by_code.get(row.code)
+            if existing is None or (existing.tenant_id is None and row.tenant_id == tenant_id):
+                preferred_rows_by_code[row.code] = row
+
+        if preferred_rows_by_code:
+            return [
+                PlanningReferenceOptionRead.model_validate(row)
+                for row in sorted(preferred_rows_by_code.values(), key=lambda row: (row.sort_order, row.label))
+            ]
+
+        return [PlanningReferenceOptionRead.model_validate(row) for row in self.EQUIPMENT_UNIT_FALLBACK_OPTIONS]
+
     def get_equipment_item(self, tenant_id: str, row_id: str, _actor: RequestAuthorizationContext) -> EquipmentItemRead:
         row = self.repository.get_equipment_item(tenant_id, row_id)
         if row is None:
@@ -165,6 +196,7 @@ class PlanningService:
         payload = self._normalize_optional_customer_id(payload)
         if self.repository.find_equipment_item_by_code(tenant_id, payload.code) is not None:
             raise self._duplicate("equipment_item")
+        self.ensure_equipment_unit_of_measure_code(tenant_id, payload.unit_of_measure_code)
         row = self.repository.create_equipment_item(tenant_id, payload, actor.user_id)
         self._record_event(actor, "planning.equipment_item.created", "ops.equipment_item", row.id, tenant_id, after_json=self._snapshot(row))
         return EquipmentItemRead.model_validate(row)
@@ -178,6 +210,12 @@ class PlanningService:
         next_code = self._field_value(payload, "code", current.code)
         if self.repository.find_equipment_item_by_code(tenant_id, next_code, exclude_id=row_id) is not None:
             raise self._duplicate("equipment_item")
+        next_unit = self._field_value(payload, "unit_of_measure_code", current.unit_of_measure_code)
+        self.ensure_equipment_unit_of_measure_code(
+            tenant_id,
+            next_unit,
+            current_value=current.unit_of_measure_code,
+        )
         row = self.repository.update_equipment_item(tenant_id, row_id, payload, actor.user_id)
         if row is None:
             raise self._not_found("equipment_item")
@@ -537,6 +575,24 @@ class PlanningService:
         if self.repository.get_customer(tenant_id, customer_id) is None:
             raise ApiException(404, "planning.customer.not_found", "errors.planning.customer.not_found")
 
+    def ensure_equipment_unit_of_measure_code(
+        self,
+        tenant_id: str,
+        unit_of_measure_code: str,
+        *,
+        current_value: str | None = None,
+    ) -> None:
+        allowed_codes = {option.code for option in self.list_equipment_unit_options(tenant_id, self._system_actor(tenant_id))}
+        if unit_of_measure_code in allowed_codes:
+            return
+        if current_value is not None and unit_of_measure_code == current_value:
+            return
+        raise ApiException(
+            400,
+            "planning.equipment_item.invalid_unit_of_measure_code",
+            "errors.planning.equipment_item.invalid_unit_of_measure_code",
+        )
+
     def _validate_address(self, address_id: str | None) -> None:
         if address_id is None:
             return
@@ -597,6 +653,18 @@ class PlanningService:
     def _duplicate(self, resource: str) -> ApiException:
         resource_key = "requirement_type" if resource == "requirement_type" else resource
         return ApiException(409, f"planning.{resource}.duplicate", f"errors.planning.{resource_key}.duplicate_code")
+
+    @staticmethod
+    def _system_actor(tenant_id: str) -> RequestAuthorizationContext:
+        return RequestAuthorizationContext(
+            session_id="planning-system",
+            user_id="planning-system",
+            tenant_id=tenant_id,
+            role_keys=frozenset({"tenant_admin"}),
+            permission_keys=frozenset({"planning.ops.read"}),
+            scopes=(),
+            request_id="planning-system",
+        )
 
     @staticmethod
     def _normalize_optional_customer_id(payload):

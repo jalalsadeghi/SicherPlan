@@ -11,6 +11,9 @@ from app.modules.core.schemas import (
     BranchCreate,
     BranchRead,
     BranchUpdate,
+    LookupValueCreate,
+    LookupValueRead,
+    LookupValueUpdate,
     MandateCreate,
     MandateRead,
     MandateUpdate,
@@ -90,9 +93,25 @@ class CoreAdminRepository(Protocol):
         payload: TenantSettingUpdate,
         actor_user_id: str | None,
     ) -> TenantSettingRead | None: ...
+    def list_lookup_values(self, tenant_id: str, domain: str) -> list[LookupValueRead]: ...
+    def create_lookup_value(
+        self,
+        tenant_id: str,
+        payload: LookupValueCreate,
+        actor_user_id: str | None,
+    ) -> LookupValueRead: ...
+    def update_lookup_value(
+        self,
+        tenant_id: str,
+        lookup_value_id: str,
+        payload: LookupValueUpdate,
+        actor_user_id: str | None,
+    ) -> LookupValueRead | None: ...
 
 
 class CoreAdminService:
+    MANAGEABLE_LOOKUP_DOMAINS = frozenset({"unit_of_measure"})
+
     def __init__(self, repository: CoreAdminRepository, audit_service: AuditService | None = None) -> None:
         self.repository = repository
         self.audit_service = audit_service
@@ -328,6 +347,74 @@ class CoreAdminService:
         )
         return setting
 
+    def list_lookup_values(self, tenant_id: str, domain: str, actor: AdminActorContext) -> list[LookupValueRead]:
+        self._ensure_tenant_scope(actor, tenant_id)
+        self._ensure_supported_lookup_domain(domain)
+        return self.repository.list_lookup_values(tenant_id, domain)
+
+    def create_lookup_value(
+        self,
+        tenant_id: str,
+        payload: LookupValueCreate,
+        actor: AdminActorContext,
+    ) -> LookupValueRead:
+        self._ensure_tenant_scope(actor, tenant_id)
+        self._ensure_supported_lookup_domain(payload.domain)
+        if payload.tenant_id not in {None, tenant_id}:
+            raise ApiException(
+                status_code=400,
+                code="core.validation.lookup_value_tenant_mismatch",
+                message_key="errors.core.lookup_value.tenant_mismatch",
+                details={"tenant_id": tenant_id},
+            )
+        lookup_value = self.repository.create_lookup_value(
+            tenant_id,
+            payload.model_copy(update={"tenant_id": tenant_id}),
+            actor.actor_user_id,
+        )
+        self._record_event(
+            actor,
+            event_type="core.lookup_value.created",
+            entity_type="core.lookup_value",
+            entity_id=lookup_value.id,
+            tenant_id=tenant_id,
+            after_json=self._lookup_value_snapshot(lookup_value),
+        )
+        return lookup_value
+
+    def update_lookup_value(
+        self,
+        tenant_id: str,
+        lookup_value_id: str,
+        payload: LookupValueUpdate,
+        actor: AdminActorContext,
+    ) -> LookupValueRead:
+        self._ensure_tenant_scope(actor, tenant_id)
+        before_json = self._lookup_value_snapshot(
+            next(
+                (
+                    row
+                    for row in self.repository.list_lookup_values(tenant_id, "unit_of_measure")
+                    if row.id == lookup_value_id
+                ),
+                None,
+            )
+        )
+        lookup_value = self.repository.update_lookup_value(tenant_id, lookup_value_id, payload, actor.actor_user_id)
+        if lookup_value is None:
+            raise self._not_found("lookup_value")
+        self._ensure_supported_lookup_domain(lookup_value.domain)
+        self._record_event(
+            actor,
+            event_type="core.lookup_value.updated",
+            entity_type="core.lookup_value",
+            entity_id=lookup_value.id,
+            tenant_id=tenant_id,
+            before_json=before_json,
+            after_json=self._lookup_value_snapshot(lookup_value),
+        )
+        return lookup_value
+
     def _ensure_tenant_scope(self, actor: AdminActorContext, tenant_id: str) -> None:
         if actor.is_platform_admin:
             return
@@ -339,6 +426,16 @@ class CoreAdminService:
     def _require_platform_admin(actor: AdminActorContext) -> None:
         if not actor.is_platform_admin:
             raise CoreAdminService._forbidden()
+
+    def _ensure_supported_lookup_domain(self, domain: str) -> None:
+        if domain in self.MANAGEABLE_LOOKUP_DOMAINS:
+            return
+        raise ApiException(
+            status_code=400,
+            code="core.validation.lookup_value_unsupported_domain",
+            message_key="errors.core.lookup_value.unsupported_domain",
+            details={"domain": domain},
+        )
 
     @staticmethod
     def _forbidden() -> ApiException:
@@ -442,4 +539,20 @@ class CoreAdminService:
             "status": setting.status,
             "value_json": setting.value_json,
             "version_no": setting.version_no,
+        }
+
+    @staticmethod
+    def _lookup_value_snapshot(lookup_value: LookupValueRead | None) -> dict[str, object]:
+        if lookup_value is None:
+            return {}
+        return {
+            "id": lookup_value.id,
+            "tenant_id": lookup_value.tenant_id,
+            "domain": lookup_value.domain,
+            "code": lookup_value.code,
+            "label": lookup_value.label,
+            "description": lookup_value.description,
+            "sort_order": lookup_value.sort_order,
+            "status": lookup_value.status,
+            "version_no": lookup_value.version_no,
         }

@@ -40,7 +40,7 @@ from app.modules.platform_services.integration_models import ImportExportJob
 
 IMPORT_HEADERS = {
     "requirement_type": ("code", "label", "default_planning_mode_code", "notes", "status"),
-    "equipment_item": ("code", "label", "unit_of_measure_code", "description", "status"),
+    "equipment_item": ("code", "label", "unit_of_measure_code", "notes", "status"),
     "site": ("customer_id", "site_no", "name", "address_id", "timezone", "latitude", "longitude", "watchbook_enabled", "notes", "status"),
     "event_venue": ("customer_id", "venue_no", "name", "address_id", "timezone", "latitude", "longitude", "notes", "status"),
     "trade_fair": ("customer_id", "venue_id", "fair_no", "name", "address_id", "timezone", "latitude", "longitude", "start_date", "end_date", "notes", "status"),
@@ -49,6 +49,7 @@ IMPORT_HEADERS = {
 
 LEGACY_IMPORT_HEADERS = {
     "requirement_type": ("code", "label", "default_planning_mode_code", "description", "status"),
+    "equipment_item": ("code", "label", "unit_of_measure_code", "description", "status"),
 }
 
 
@@ -206,7 +207,14 @@ class PlanningOpsService:
         actor: RequestAuthorizationContext,
     ) -> PlanningOpsImportRowResult:
         try:
-            self._build_payload(tenant_id, entity_key, row)
+            payload = self._build_payload(tenant_id, entity_key, row)
+            if entity_key == "equipment_item":
+                existing = self.planning_service.repository.find_equipment_item_by_code(tenant_id, payload.code)
+                self.planning_service.ensure_equipment_unit_of_measure_code(
+                    tenant_id,
+                    payload.unit_of_measure_code,
+                    current_value=existing.unit_of_measure_code if existing is not None else None,
+                )
         except ApiException as exc:
             return PlanningOpsImportRowResult(
                 row_no=row.row_no,
@@ -318,7 +326,7 @@ class PlanningOpsService:
                 code=self._required(data, "code"),
                 label=self._required(data, "label"),
                 unit_of_measure_code=self._required(data, "unit_of_measure_code"),
-                description=data.get("description") or None,
+                notes=data.get("notes") or data.get("description") or None,
             )
         if entity_key == "site":
             return SiteCreate(

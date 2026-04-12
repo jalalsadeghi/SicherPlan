@@ -9,7 +9,7 @@ from uuid import uuid4
 from app.errors import ApiException
 from app.modules.iam.audit_service import AuditService
 from app.modules.planning.ops_service import PlanningOpsService
-from app.modules.planning.schemas import PlanningOpsImportDryRunRequest, PlanningOpsImportExecuteRequest
+from app.modules.planning.schemas import EquipmentItemCreate, PlanningOpsImportDryRunRequest, PlanningOpsImportExecuteRequest
 from app.modules.planning.service import PlanningService
 from tests.modules.planning.test_ops_master_foundation import FakePlanningRepository, RecordingAuditRepository, _context
 
@@ -175,6 +175,82 @@ class TestPlanningOpsImportService(unittest.TestCase):
         self.assertEqual(result.created_rows, 1)
         stored = next(iter(self.repository.requirement_types.values()))
         self.assertEqual(stored.description, "Legacy note")
+
+    def test_execute_uses_notes_header_for_equipment_item_and_preserves_storage(self) -> None:
+        payload = PlanningOpsImportExecuteRequest(
+            tenant_id="tenant-1",
+            entity_key="equipment_item",
+            continue_on_error=True,
+            csv_content_base64=_csv_base64(
+                "code,label,unit_of_measure_code,notes,status\n"
+                "EQ-01,Funkgeraet,pcs,Equipment note,active\n"
+            ),
+        )
+
+        result = self.service.import_execute("tenant-1", payload, self.actor)
+
+        self.assertEqual(result.created_rows, 1)
+        stored = next(iter(self.repository.equipment_items.values()))
+        self.assertEqual(stored.description, "Equipment note")
+
+    def test_execute_accepts_legacy_equipment_item_description_header_alias(self) -> None:
+        payload = PlanningOpsImportExecuteRequest(
+            tenant_id="tenant-1",
+            entity_key="equipment_item",
+            continue_on_error=True,
+            csv_content_base64=_csv_base64(
+                "code,label,unit_of_measure_code,description,status\n"
+                "EQ-LEG,Funkgeraet,pcs,Legacy equipment note,active\n"
+            ),
+        )
+
+        result = self.service.import_execute("tenant-1", payload, self.actor)
+
+        self.assertEqual(result.created_rows, 1)
+        stored = next(iter(self.repository.equipment_items.values()))
+        self.assertEqual(stored.description, "Legacy equipment note")
+
+    def test_dry_run_rejects_unknown_equipment_unit_for_new_item(self) -> None:
+        payload = PlanningOpsImportDryRunRequest(
+            tenant_id="tenant-1",
+            entity_key="equipment_item",
+            csv_content_base64=_csv_base64(
+                "code,label,unit_of_measure_code,notes,status\n"
+                "EQ-ERR,Funkgeraet,bucket,Equipment note,active\n"
+            ),
+        )
+
+        result = self.service.import_dry_run("tenant-1", payload, self.actor)
+
+        self.assertEqual(result.invalid_rows, 1)
+        self.assertEqual(result.rows[0].messages, ["errors.planning.equipment_item.invalid_unit_of_measure_code"])
+
+    def test_dry_run_accepts_unchanged_legacy_equipment_unit_for_existing_item(self) -> None:
+        self.repository.create_equipment_item(
+            "tenant-1",
+            EquipmentItemCreate(
+                tenant_id="tenant-1",
+                customer_id=None,
+                code="EQ-LEGACY",
+                label="Legacy Funkgeraet",
+                unit_of_measure_code="legacy_each",
+                notes=None,
+            ),
+            self.actor.user_id,
+        )
+
+        payload = PlanningOpsImportDryRunRequest(
+            tenant_id="tenant-1",
+            entity_key="equipment_item",
+            csv_content_base64=_csv_base64(
+                "code,label,unit_of_measure_code,notes,status\n"
+                "EQ-LEGACY,Funkgeraet,legacy_each,Equipment note,active\n"
+            ),
+        )
+
+        result = self.service.import_dry_run("tenant-1", payload, self.actor)
+
+        self.assertEqual(result.invalid_rows, 0)
 
     def test_invalid_headers_raise_api_error(self) -> None:
         payload = PlanningOpsImportDryRunRequest(

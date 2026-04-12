@@ -1110,8 +1110,8 @@
           </select>
         </label>
         <label class="field-stack">
-          <span>{{ tp("fieldsDescription") }}</span>
-          <textarea v-model="requirementTypeModal.description" rows="3" />
+          <span>{{ tp("fieldsNotes") }}</span>
+          <textarea v-model="requirementTypeModal.notes" rows="3" />
         </label>
       </div>
     </Modal>
@@ -1291,7 +1291,7 @@ const requirementTypeModal = reactive({
   code: "",
   label: "",
   default_planning_mode_code: "site",
-  description: "",
+  notes: "",
 });
 const patrolRouteModal = reactive({
   open: false,
@@ -1747,7 +1747,7 @@ function resetRequirementTypeModal() {
     code: "",
     label: "",
     default_planning_mode_code: "site",
-    description: "",
+    notes: "",
   });
 }
 
@@ -1998,7 +1998,7 @@ async function submitRequirementTypeModal() {
       code: requirementTypeModal.code.trim(),
       label: requirementTypeModal.label.trim(),
       default_planning_mode_code: requirementTypeModal.default_planning_mode_code,
-      description: requirementTypeModal.description.trim() || null,
+      notes: requirementTypeModal.notes.trim() || null,
     });
     await refreshOrderReferenceOptions(orderDraft.customer_id);
     orderDraft.requirement_type_id = created.id;

@@ -374,7 +374,32 @@
                 <template v-else-if="editorEntityKey === 'equipment_item'">
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsCode") }}</span><input v-model="draft.code" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="draft.label" required /></label>
-                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsUnitOfMeasure") }}</span><input v-model="draft.unit_of_measure_code" required /></label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ tp("fieldsUnitOfMeasure") }}</span>
+                    <Select
+                      v-model:value="draft.unit_of_measure_code"
+                      show-search
+                      :options="equipmentUnitSelectOptions"
+                      :loading="equipmentUnitLookupLoading"
+                      :disabled="loading.action"
+                      :placeholder="tp('fieldsUnitOfMeasurePlaceholder')"
+                      :filter-option="filterSelectOption"
+                    />
+                    <span v-if="equipmentUnitLookupError" class="field-help">{{ equipmentUnitLookupError }}</span>
+                    <span v-if="hasLegacyEquipmentUnit" class="field-help">
+                      {{ tp("fieldsUnitOfMeasureLegacy", { value: legacyEquipmentUnitValue }) }}
+                    </span>
+                  </label>
+                  <div v-if="showEquipmentUnitCatalogAction" class="planning-admin-inline-actions">
+                    <button
+                      class="cta-button cta-secondary"
+                      type="button"
+                      data-testid="planning-manage-equipment-units"
+                      @click="openEquipmentUnitCatalogAdmin"
+                    >
+                      {{ tp("actionsManageUnitCatalog") }}
+                    </button>
+                  </div>
                 </template>
 
                 <template v-else-if="editorEntityKey === 'site'">
@@ -736,7 +761,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import { Modal, Select } from "ant-design-vue";
 
@@ -759,6 +784,7 @@ import {
   getPlanningRecord,
   importPlanningDryRun,
   importPlanningExecute,
+  listEquipmentUnitOptions,
   listPatrolCheckpoints,
   listPlanningRecords,
   listTradeFairZones,
@@ -801,6 +827,7 @@ defineProps({
 const authStore = useAuthStore();
 const localeStore = useLocaleStore();
 const route = useRoute();
+const router = useRouter();
 const { showFeedbackToast } = useSicherPlanFeedback();
 
 const loading = reactive({ list: false, detail: false, action: false, sharedAddress: false });
@@ -827,6 +854,9 @@ const lastImportResult = ref(null);
 const customerOptions = ref([]);
 const customerLookupLoading = ref(false);
 const customerLookupError = ref("");
+const equipmentUnitOptions = ref([]);
+const equipmentUnitLookupLoading = ref(false);
+const equipmentUnitLookupError = ref("");
 const siteAddressOptions = ref([]);
 const siteAddressLookupLoading = ref(false);
 const siteAddressLookupError = ref("");
@@ -938,6 +968,24 @@ const requirementTypePlanningModeOptions = computed(() => {
   }
   return options;
 });
+const legacyEquipmentUnitValue = computed(() =>
+  editorEntityKey.value === "equipment_item" &&
+  draft.unit_of_measure_code &&
+  !equipmentUnitOptions.value.some((option) => option.value === draft.unit_of_measure_code)
+    ? draft.unit_of_measure_code
+    : "",
+);
+const hasLegacyEquipmentUnit = computed(() => !!legacyEquipmentUnitValue.value);
+const equipmentUnitSelectOptions = computed(() => {
+  const options = equipmentUnitOptions.value.map((option) => ({ ...option }));
+  if (hasLegacyEquipmentUnit.value) {
+    options.push({
+      label: legacyEquipmentUnitValue.value,
+      value: legacyEquipmentUnitValue.value,
+    });
+  }
+  return options;
+});
 const timezoneOptions = computed(() =>
   getSupportedTimezones().map((timezone) => ({
     label: timezone,
@@ -947,6 +995,12 @@ const timezoneOptions = computed(() =>
 const statusOptions = PLANNING_STATUS_OPTIONS;
 const editorUsesCustomer = computed(() => isPlanningCustomerScopedEntity(editorEntityKey.value));
 const visibleStatus = computed(() => !isPlanningChildEntity(editorEntityKey.value));
+const showEquipmentUnitCatalogAction = computed(
+  () =>
+    editorEntityKey.value === "equipment_item" &&
+    ["tenant_admin", "platform_admin"].includes(effectiveRole.value) &&
+    !!resolvedTenantScopeId.value,
+);
 const currentAddressFieldKey = computed(() => {
   if (["site", "event_venue", "trade_fair"].includes(editorEntityKey.value)) {
     return "address_id";
@@ -1037,6 +1091,21 @@ function getSupportedTimezones() {
 function filterSelectOption(input, option) {
   const label = typeof option?.label === "string" ? option.label : "";
   return label.toLowerCase().includes(String(input).toLowerCase());
+}
+
+function openEquipmentUnitCatalogAdmin() {
+  if (!resolvedTenantScopeId.value) {
+    return;
+  }
+  void router.push({
+    path: "/admin/core",
+    query: {
+      tenant: resolvedTenantScopeId.value,
+      scope: resolvedTenantScopeId.value,
+      tab: "settings",
+      catalog: "unit_of_measure",
+    },
+  });
 }
 
 function buildBerlinStartPoint() {
@@ -1459,6 +1528,29 @@ async function refreshCustomerOptions() {
     customerLookupError.value = tp("customerLoadError");
   } finally {
     customerLookupLoading.value = false;
+  }
+}
+
+async function refreshEquipmentUnitOptions() {
+  if (!resolvedTenantScopeId.value || !accessToken.value || !canRead.value) {
+    equipmentUnitOptions.value = [];
+    equipmentUnitLookupError.value = "";
+    return;
+  }
+
+  equipmentUnitLookupLoading.value = true;
+  equipmentUnitLookupError.value = "";
+  try {
+    const options = await listEquipmentUnitOptions(resolvedTenantScopeId.value, accessToken.value);
+    equipmentUnitOptions.value = options.map((option) => ({
+      label: option.label,
+      value: option.code,
+    }));
+  } catch {
+    equipmentUnitOptions.value = [];
+    equipmentUnitLookupError.value = tp("unitOfMeasureLoadError");
+  } finally {
+    equipmentUnitLookupLoading.value = false;
   }
 }
 
@@ -1999,6 +2091,7 @@ watch(
   () => [resolvedTenantScopeId.value, accessToken.value, canRead.value],
   async () => {
     await refreshCustomerOptions();
+    await refreshEquipmentUnitOptions();
     await refreshReferenceRecords();
     await refreshRecords();
   },
@@ -2034,6 +2127,7 @@ watch(
 onMounted(async () => {
   resetImportTemplate();
   await refreshCustomerOptions();
+  await refreshEquipmentUnitOptions();
   await refreshReferenceRecords();
   applyPlanningRouteContext();
   await refreshRecords();
@@ -2097,6 +2191,13 @@ onMounted(async () => {
   display: grid;
   justify-items: end;
   gap: 0.42rem;
+}
+
+.planning-admin-inline-actions {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-top: 26px;
 }
 
 .planning-admin-shared-context {

@@ -55,6 +55,19 @@ export interface TenantSettingRead {
   archived_at: string | null;
 }
 
+export interface LookupValueRead {
+  id: string;
+  tenant_id: string | null;
+  domain: string;
+  code: string;
+  label: string;
+  description: string | null;
+  sort_order: number;
+  status: LifecycleStatus | string;
+  version_no: number;
+  archived_at: string | null;
+}
+
 export interface TenantOnboardingPayload {
   tenant: {
     code: string;
@@ -143,6 +156,24 @@ export interface TenantSettingCreatePayload {
 
 export interface TenantSettingUpdatePayload {
   value_json?: Record<string, unknown>;
+  version_no: number;
+  status?: LifecycleStatus | string | null;
+  archived_at?: string | null;
+}
+
+export interface LookupValueCreatePayload {
+  tenant_id?: string | null;
+  domain: string;
+  code: string;
+  label: string;
+  description?: string | null;
+  sort_order?: number;
+}
+
+export interface LookupValueUpdatePayload {
+  label?: string | null;
+  description?: string | null;
+  sort_order?: number | null;
   version_no: number;
   status?: LifecycleStatus | string | null;
   archived_at?: string | null;
@@ -419,6 +450,54 @@ export function updateSetting(
   return request<TenantSettingRead>(`/api/core/admin/tenants/${tenantId}/settings/${settingId}`, {
     accessToken,
     method: "PUT",
+    body: payload,
+    role,
+    tenantId: actorTenantId,
+  });
+}
+
+export function listLookupValues(
+  accessToken: string,
+  tenantId: string,
+  domain: string,
+  role: AppRole,
+  actorTenantId?: string | null,
+) {
+  const query = new URLSearchParams({ domain });
+  return request<LookupValueRead[]>(`/api/core/admin/tenants/${tenantId}/lookup-values?${query.toString()}`, {
+    accessToken,
+    role,
+    tenantId: actorTenantId,
+  });
+}
+
+export function createLookupValue(
+  accessToken: string,
+  tenantId: string,
+  payload: LookupValueCreatePayload,
+  role: AppRole,
+  actorTenantId?: string | null,
+) {
+  return request<LookupValueRead>(`/api/core/admin/tenants/${tenantId}/lookup-values`, {
+    accessToken,
+    method: "POST",
+    body: payload,
+    role,
+    tenantId: actorTenantId,
+  });
+}
+
+export function updateLookupValue(
+  accessToken: string,
+  tenantId: string,
+  lookupValueId: string,
+  payload: LookupValueUpdatePayload,
+  role: AppRole,
+  actorTenantId?: string | null,
+) {
+  return request<LookupValueRead>(`/api/core/admin/tenants/${tenantId}/lookup-values/${lookupValueId}`, {
+    accessToken,
+    method: "PATCH",
     body: payload,
     role,
     tenantId: actorTenantId,

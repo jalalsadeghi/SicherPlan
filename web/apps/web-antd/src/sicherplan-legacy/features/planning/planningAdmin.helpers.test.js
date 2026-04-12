@@ -42,8 +42,12 @@ test("buildPlanningImportTemplate returns stable CSV headers", () => {
   );
   assert.equal(
     buildPlanningImportTemplate("equipment_item"),
-    "code,label,unit_of_measure_code,description,status",
+    "code,label,unit_of_measure_code,notes,status",
   );
+});
+
+test("equipment item import template keeps unit_of_measure_code as the canonical controlled field", () => {
+  assert.match(buildPlanningImportTemplate("equipment_item"), /^code,label,unit_of_measure_code,notes,status$/);
 });
 
 test("planning mode options expose exactly the four canonical downstream planning values", () => {
@@ -56,6 +60,10 @@ test("planning mode options expose exactly the four canonical downstream plannin
 test("mapPlanningApiMessage maps import and duplicate errors", () => {
   assert.equal(mapPlanningApiMessage("errors.planning.import.invalid_headers"), "invalidImportHeaders");
   assert.equal(mapPlanningApiMessage("errors.planning.patrol_checkpoint.duplicate_sequence"), "duplicateChild");
+  assert.equal(
+    mapPlanningApiMessage("errors.planning.equipment_item.invalid_unit_of_measure_code"),
+    "validationUnitInvalid",
+  );
 });
 
 test("formatPlanningCustomerOption renders customer number and name together", () => {

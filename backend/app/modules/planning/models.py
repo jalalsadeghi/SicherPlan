@@ -96,6 +96,14 @@ class EquipmentItem(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
 
     customer: Mapped[Customer | None] = relationship(lazy="selectin")
 
+    @property
+    def notes(self) -> str | None:
+        return self.description
+
+    @notes.setter
+    def notes(self, value: str | None) -> None:
+        self.description = value
+
 
 class Site(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
     __tablename__ = "site"

@@ -18,6 +18,16 @@ class OpsMasterFilter(BaseModel):
     include_archived: bool = False
 
 
+class PlanningReferenceOptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str | None = None
+    code: str
+    label: str
+    description: str | None = None
+    sort_order: int = 100
+
+
 class RequirementTypeCreate(BaseModel):
     tenant_id: str
     customer_id: str | None = None
@@ -44,7 +54,7 @@ class EquipmentItemCreate(BaseModel):
     code: str
     label: str
     unit_of_measure_code: str
-    description: str | None = None
+    notes: str | None = Field(default=None, validation_alias=AliasChoices("notes", "description"))
 
 
 class EquipmentItemUpdate(BaseModel):
@@ -52,7 +62,7 @@ class EquipmentItemUpdate(BaseModel):
     code: str | None = None
     label: str | None = None
     unit_of_measure_code: str | None = None
-    description: str | None = None
+    notes: str | None = Field(default=None, validation_alias=AliasChoices("notes", "description"))
     status: str | None = None
     archived_at: datetime | None = None
     version_no: int | None = None
@@ -256,7 +266,7 @@ class EquipmentItemListItem(BaseModel):
 
 
 class EquipmentItemRead(EquipmentItemListItem):
-    description: str | None
+    notes: str | None = Field(validation_alias=AliasChoices("notes", "description"))
     created_at: datetime
     updated_at: datetime
     created_by_user_id: str | None

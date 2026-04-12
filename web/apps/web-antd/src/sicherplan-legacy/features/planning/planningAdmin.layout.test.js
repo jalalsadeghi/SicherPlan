@@ -104,6 +104,20 @@ test("requirement type create and edit flows still hydrate and submit default pl
   assert.match(source, /editorEntityKey\.value === "requirement_type"[\s\S]*default_planning_mode_code: draft\.default_planning_mode_code/);
 });
 
+test("equipment item unit of measure uses a constrained searchable select with safe legacy fallback", () => {
+  assert.match(source, /editorEntityKey === 'equipment_item'[\s\S]*<Select[\s\S]*v-model:value="draft\.unit_of_measure_code"/);
+  assert.match(source, /listEquipmentUnitOptions/);
+  assert.match(source, /const equipmentUnitSelectOptions = computed\(\(\) => \{/);
+  assert.match(source, /const legacyEquipmentUnitValue = computed\(\(\) =>/);
+  assert.match(source, /if \(hasLegacyEquipmentUnit\.value\) \{/);
+  assert.match(source, /fieldsUnitOfMeasurePlaceholder/);
+  assert.match(source, /fieldsUnitOfMeasureLegacy/);
+  assert.match(source, /data-testid="planning-manage-equipment-units"/);
+  assert.match(source, /openEquipmentUnitCatalogAdmin/);
+  assert.doesNotMatch(source, /editorEntityKey === 'equipment_item'[\s\S]*<input v-model="draft\.unit_of_measure_code"/);
+  assert.doesNotMatch(source, /fieldsUnitOfMeasureHelp/);
+});
+
 test("planning setup uses explicit customer scope instead of treating every non-child entity as customer-linked", () => {
   assert.match(source, /isPlanningCustomerScopedEntity/);
   assert.match(source, /const editorUsesCustomer = computed\(\(\) => isPlanningCustomerScopedEntity\(editorEntityKey\.value\)\)/);

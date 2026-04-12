@@ -252,6 +252,7 @@ export function mapPlanningApiMessage(messageKey) {
     "errors.planning.patrol_checkpoint.not_found": "notFound",
     "errors.planning.requirement_type.duplicate_code": "duplicateCode",
     "errors.planning.equipment_item.duplicate_code": "duplicateCode",
+    "errors.planning.equipment_item.invalid_unit_of_measure_code": "validationUnitInvalid",
     "errors.planning.site.duplicate_code": "duplicateCode",
     "errors.planning.event_venue.duplicate_code": "duplicateCode",
     "errors.planning.trade_fair.duplicate_code": "duplicateCode",
@@ -277,7 +278,7 @@ export function mapPlanningApiMessage(messageKey) {
 export function buildPlanningImportTemplate(entityKey) {
   const headers = {
     requirement_type: ["code", "label", "default_planning_mode_code", "notes", "status"],
-    equipment_item: ["code", "label", "unit_of_measure_code", "description", "status"],
+    equipment_item: ["code", "label", "unit_of_measure_code", "notes", "status"],
     site: ["customer_id", "site_no", "name", "address_id", "timezone", "latitude", "longitude", "watchbook_enabled", "notes", "status"],
     event_venue: ["customer_id", "venue_no", "name", "address_id", "timezone", "latitude", "longitude", "notes", "status"],
     trade_fair: ["customer_id", "venue_id", "fair_no", "name", "address_id", "timezone", "latitude", "longitude", "start_date", "end_date", "notes", "status"],

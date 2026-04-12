@@ -85,6 +85,7 @@ from app.modules.planning.schemas import (
     PatrolRouteListItem,
     PatrolRouteRead,
     PatrolRouteUpdate,
+    PlanningReferenceOptionRead,
     RequirementTypeCreate,
     RequirementTypeListItem,
     RequirementTypeRead,
@@ -558,6 +559,15 @@ def list_equipment_items(
     service: Annotated[PlanningService, Depends(get_planning_service)],
 ) -> list[EquipmentItemListItem]:
     return service.list_equipment_items(str(tenant_id), filters, context)
+
+
+@router.get("/equipment-unit-options", response_model=list[PlanningReferenceOptionRead])
+def list_equipment_unit_options(
+    tenant_id: UUID,
+    context: Annotated[RequestAuthorizationContext, Depends(require_permission_only("planning.ops.read"))],
+    service: Annotated[PlanningService, Depends(get_planning_service)],
+) -> list[PlanningReferenceOptionRead]:
+    return service.list_equipment_unit_options(str(tenant_id), context)
 
 
 @router.post("/equipment-items", response_model=EquipmentItemRead, status_code=status.HTTP_201_CREATED)
