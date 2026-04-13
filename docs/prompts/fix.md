@@ -1,124 +1,92 @@
 You are working on the SicherPlan repo.
 
 Task:
-Validate and, if needed, implement planning-level team creation and assignment-to-team linking in the Planning Staffing workspace.
+Validate and correct the "Marital status" field in the Employees > Private profile section.
+
+Goal:
+Decide whether the field should be a free-text textbox or a controlled select, based on the project’s documented source of truth and the current codebase. If the current implementation is wrong, fix it.
+
+Source-of-truth constraints to validate first:
+1. In the implementation-oriented data model, hr.employee_private_profile contains marital_status_code, not a free-text marital_status field.
+2. The platform-wide modeling convention prefers lookup-backed business lists via core.lookup_value for extensible business classifications/codes.
+3. In the proposal, marital status is part of tax/social/family data in the employee personnel file.
+4. HR-private profile fields must remain restricted to authorized HR/payroll roles.
+5. Do not hardcode business/legal wording unless no validated lookup source exists and the fallback is explicitly approved.
+
+What to do first:
+Phase A — Validation
+1. Find the real frontend source file(s) responsible for Employees > Private profile and the Marital status control.
+2. Find the backend DTO/schema/model for employee private profile.
+3. Validate the actual persisted field name:
+   - marital_status_code?
+   - marital_status?
+   - something else?
+4. Validate whether there is already an existing lookup source for marital status, such as:
+   - core.lookup_value domain
+   - workforce catalog endpoint
+   - tenant settings or bootstrap seed
+   - any shared option registry/composable
+5. Print a short validation summary before coding:
+   - exact frontend file(s)
+   - exact backend file(s)
+   - current control type
+   - current payload field
+   - whether an approved lookup source already exists
+
+Decision rule:
+- If the persisted field is a code field such as marital_status_code, implement it as a SELECT, not a textbox.
+- Only keep textbox if validation proves the domain intentionally expects unrestricted free text. That would be surprising and must be explicitly justified in the summary.
+
+Required implementation if validation confirms select is correct:
+1. Replace textbox with a select control in Private profile.
+2. The visible UI must show user-friendly labels.
+3. The saved payload must send the code value.
+4. Load options from the validated source of truth:
+   - existing lookup endpoint/domain if present
+   - existing seeded constants if already approved in backend
+5. Do NOT invent or duplicate a second source of truth for the same options.
+6. Preserve existing role restrictions so only authorized HR/payroll users can edit the field.
+
+Fallback behavior:
+- If a legacy stored value exists that is no longer in active options, still display it safely in read/edit mode with a clear legacy/inactive marker.
+- If no lookup source exists yet, implement the smallest correct backend+frontend change set needed to support a lookup-backed select, but only after clearly stating that this source was missing.
+
+UX expectations:
+1. Label: "Marital status"
+2. Control: select
+3. Optional placeholder: "Select marital status"
+4. Option labels should be clear and business-appropriate
+5. Avoid raw code display in the main UI
+6. If the field is required by payroll/business rules, enforce validation accordingly
+7. If it is optional, allow empty/null cleanly
 
 Important:
-Before changing code, first validate the proposal below against:
-1) current repo code,
-2) current OpenAPI/backend contracts,
-3) the uploaded project source-of-truth docs:
-   - SicherPlan_Implementation_Data_Model_Spec.pdf
-   - SicherPlan API.pdf
-   - SicherPlan_User_Manual_Operational_Handbook.pdf
-   - SicherPlan_Role_Based_Page_Coverage_Map.pdf
-   - SicherPlan_Proposal.pdf
-
-Expected validation points:
-- P-04 / Staffing Board & Coverage is the canonical workspace for teams, team members, assignments, validations, and coverage.
-- A planning-level team is valid when ops.team uses planning_record_id and leaves shift_id null.
-- role_label belongs to ops.team_member, not to ops.team.
-- notes must NOT be assumed on ops.team unless the real backend schema/OpenAPI currently supports it.
-- assignments should be linkable to a team via team_id without breaking existing validation and audit behavior.
-
-What I need from you:
-Phase A — Validation summary
-1. Inspect the current implementation and print a short validation summary:
-   - confirmed assumptions
-   - rejected assumptions
-   - missing backend or frontend pieces
-   - exact files/pages currently responsible for planning staffing
-2. If an equivalent team-management UI already exists somewhere else, DO NOT duplicate it. Reuse and integrate it into the correct workflow.
-
-Phase B — Implement the missing capability if validation confirms it is absent
-Implement planning-level team management in the current staffing workspace.
-
-Target workspace:
-- the current planning staffing route / module used for Staffing Board & Coverage
-- keep it aligned with the current shell/module-registry structure
-
-Required behavior:
-1. Add team CRUD wiring
-   - list teams
-   - create team
-   - read team
-   - update team
-
-2. Add team-member CRUD wiring
-   - list team members
-   - create team member
-   - update team member
-
-3. Support planning-level team creation
-   - required: name
-   - required: planning_record_id
-   - optional: shift_id (null for planning-level team)
-   - optional: team_lead_employee_id OR team_lead_worker_id
-   - exactly one team lead actor max
-   - DO NOT place role_label on the team payload unless backend explicitly requires it
-   - DO NOT send notes unless backend schema confirms support
-
-4. Add UI affordance in the staffing page
-   - a visible action like “Create team” or “Create planning team”
-   - when the user is already filtered by planning_record_id, prefill that value
-   - allow shift to remain empty/null for planning-level teams
-   - show existing teams relevant to the selected planning record
-   - clearly distinguish planning-level teams from shift-level teams
-
-5. Add team-member editor
-   - actor must be either employee OR subcontractor_worker
-   - support role_label on team member
-   - support valid_from / valid_to if backend supports them
-   - prevent invalid mixed actor payloads
-
-6. Add assignment-to-team linking
-   - from the staffing board / assignment detail, allow assigning or changing team_id
-   - preserve all existing assignment validations and override logic
-   - do not bypass qualification/document/customer-block/double-booking rules
-
-7. Preserve guardrails
-   - tenant scoping
-   - role-scoped visibility
-   - audit-safe behavior
-   - no changes that bypass finance.actual_record workflow
-   - no schema invention
-
-Likely code areas to inspect first:
-- current module registry / shell registration for planning staffing
-- current PlanningStaffingCoverageView.vue
-- current planning staffing API wrapper / typed client
-- any legacy planning staffing view still in use
-- any backend DTO/router/schema for planning teams, team members, and assignments
-
-Implementation details:
-- prefer small, localized changes
-- reuse existing composables, modal patterns, form patterns, and action guards
-- keep naming consistent with existing SicherPlan modules
-- if backend DTOs already exist but frontend wrappers are missing, only add missing wrappers
-- if backend endpoints are missing fields needed for planning-level team UX, propose the smallest backend change set and implement it only if clearly necessary
+- Do not hardcode German legal wording unless the repo already uses an approved option list.
+- If you must add seed options because no source exists, first propose the exact domain name and option set, then implement only the smallest approved version.
+- Keep the implementation aligned with current app patterns and existing form components.
 
 Tests:
 Add or update focused tests for:
-- planning-level team creation with planning_record_id and null shift_id
-- team-member creation with role_label
-- linking assignment.team_id
-- rejecting invalid dual-actor team-member payloads
-- preserving existing assignment validation flows
+1. Private profile renders Marital status as a select
+2. Select options load from the validated lookup source
+3. Saving persists marital_status_code, not the label text
+4. Existing legacy/unknown code still renders safely
+5. Unauthorized roles cannot edit HR-private fields
 
-Deliverables:
+Output format:
 1. Validation summary first
 2. Then implementation
-3. Then a final report containing:
+3. Then final report with:
    - changed files
-   - what was missing before
-   - what was added
-   - any backend/schema mismatch found
-   - any field that was intentionally NOT implemented because it was not validated in schema/OpenAPI
-   - short manual test steps
+   - old behavior
+   - new behavior
+   - source of option values
+   - saved payload before/after
+   - any backend/schema/lookup gap found
+   - manual test steps
 
 Acceptance criteria:
-- A dispatcher in Staffing Board & Coverage can create a planning-level team for a selected planning record.
-- The dispatcher can add team members with role_label.
-- Assignments can be linked to that team.
-- Existing staffing coverage, validations, outputs, and dispatch behavior keep working.
-- No unsupported fields are invented.
+- Marital status is implemented as a select if the schema is code-based.
+- UI shows readable labels; backend stores code.
+- HR-private access restrictions remain intact.
+- No duplicate or invented source of truth is introduced without explicit validation.

@@ -6,7 +6,8 @@ from sqlalchemy import Select, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.modules.core.models import Address, Branch, Mandate
+from app.modules.core.models import Address, Branch, LookupValue, Mandate
+from app.modules.core.schemas import LookupValueRead
 from app.modules.employees.models import (
     Employee,
     EmployeeAddressHistory,
@@ -612,6 +613,18 @@ class SqlAlchemyEmployeeRepository:
         self.session.add(row)
         self._commit()
         return self.get_qualification_type(row.tenant_id, row.id) or row
+
+    def list_lookup_values(self, tenant_id: str, domain: str) -> list[LookupValueRead]:
+        rows = self.session.scalars(
+            select(LookupValue)
+            .where(
+                LookupValue.domain == domain,
+                LookupValue.archived_at.is_(None),
+                (LookupValue.tenant_id.is_(None)) | (LookupValue.tenant_id == tenant_id),
+            )
+            .order_by(LookupValue.sort_order.asc(), LookupValue.label.asc())
+        ).all()
+        return [LookupValueRead.model_validate(row) for row in rows]
 
     def list_employee_qualifications(
         self,

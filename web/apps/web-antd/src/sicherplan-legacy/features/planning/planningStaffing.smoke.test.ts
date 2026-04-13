@@ -247,6 +247,27 @@ const mocks = vi.hoisted(() => ({
       version_no: 1,
     },
   ]),
+  getPlanningRecordMock: vi.fn(async () => ({
+    id: "planning-1",
+    tenant_id: "tenant-1",
+    order_id: "order-1",
+    parent_planning_record_id: null,
+    dispatcher_user_id: "user-1",
+    planning_mode_code: "site",
+    name: "Planning 1",
+    planning_from: "2026-04-05",
+    planning_to: "2026-04-06",
+    release_state: "draft",
+    released_at: null,
+    status: "active",
+    version_no: 1,
+    notes: null,
+    order: null,
+    event_detail: null,
+    site_detail: null,
+    trade_fair_detail: null,
+    patrol_detail: null,
+  })),
   listTeamMembersMock: vi.fn(async () => [
     {
       id: "member-1",
@@ -456,6 +477,7 @@ vi.mock("@/api/planningStaffing", () => ({
 }));
 
 vi.mock("@/api/planningOrders", () => ({
+  getPlanningRecord: mocks.getPlanningRecordMock,
   listPlanningRecords: mocks.listPlanningRecordsMock,
 }));
 
@@ -559,6 +581,54 @@ describe("PlanningStaffingCoverageView", () => {
             confirmed_count: 1,
             released_partner_qty: 0,
             coverage_state: "yellow",
+          },
+        ],
+      },
+    ]);
+    mocks.listStaffingBoardMock.mockResolvedValue([
+      {
+        id: "shift-1",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        shift_plan_id: "plan-1",
+        order_id: "order-1",
+        order_no: "ORD-1",
+        planning_record_name: "Planning 1",
+        planning_mode_code: "site",
+        workforce_scope_code: "internal",
+        starts_at: "2026-04-05T08:00:00Z",
+        ends_at: "2026-04-05T16:00:00Z",
+        shift_type_code: "site_day",
+        release_state: "draft",
+        status: "active",
+        location_text: "Berlin",
+        meeting_point: "Gate A",
+        demand_groups: [
+          {
+            id: "dg-1",
+            shift_id: "shift-1",
+            function_type_id: "func-1",
+            qualification_type_id: "qual-1",
+            min_qty: 1,
+            target_qty: 2,
+            mandatory_flag: true,
+            assigned_count: 1,
+            confirmed_count: 1,
+            released_partner_qty: 0,
+          },
+        ],
+        assignments: [
+          {
+            id: "assignment-1",
+            shift_id: "shift-1",
+            demand_group_id: "dg-1",
+            team_id: "team-1",
+            employee_id: "employee-1",
+            subcontractor_worker_id: null,
+            assignment_status_code: "assigned",
+            assignment_source_code: "dispatcher",
+            confirmed_at: null,
+            version_no: 1,
           },
         ],
       },
@@ -981,6 +1051,8 @@ describe("PlanningStaffingCoverageView", () => {
 
     await wrapper.get('[data-testid="planning-staffing-create-planning-team"]').trigger("click");
     await flushPromises();
+    expect((wrapper.get('[data-testid="planning-staffing-team-planning-record"]').element as HTMLInputElement).value).toBe("Planning 1");
+    expect(wrapper.get('[data-testid="planning-staffing-team-editor"]').text()).toContain("ID: planning-1");
     await wrapper.get('[data-testid="planning-staffing-team-name"]').setValue("Planung Alpha");
     await wrapper.get('[data-testid="planning-staffing-team-lead-member"]').setValue("employee-1");
     await wrapper.get('[data-testid="planning-staffing-team-editor"]').trigger("submit");
@@ -1005,6 +1077,96 @@ describe("PlanningStaffingCoverageView", () => {
         employee_id: "employee-1",
         subcontractor_worker_id: null,
         is_team_lead: true,
+      }),
+    );
+  });
+
+  it("keeps planning-team creation available from planning-record context without a selected shift", async () => {
+    mocks.listStaffingCoverageMock.mockResolvedValue([]);
+    mocks.listStaffingBoardMock.mockResolvedValue([]);
+
+    const wrapper = await mountView();
+    const selects = wrapper.findAllComponents({ name: "ASelect" });
+    const planningRecordSelect = selects[0]!;
+
+    planningRecordSelect.vm.$emit("change", "planning-1");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-staffing-refresh"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="planning-staffing-planning-context-panel"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("Planungskontext ohne Schichtauswahl");
+    expect(mocks.listTeamsMock).toHaveBeenLastCalledWith("tenant-1", "token-1", { planning_record_id: "planning-1" });
+
+    await wrapper.get('[data-testid="planning-staffing-create-planning-team-context"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-staffing-team-name"]').setValue("Planung Ohne Schicht");
+    await wrapper.get('[data-testid="planning-staffing-team-editor"]').trigger("submit");
+    await flushPromises();
+
+    expect(mocks.createTeamMock).toHaveBeenLastCalledWith(
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({
+        planning_record_id: "planning-1",
+        shift_id: null,
+        name: "Planung Ohne Schicht",
+      }),
+    );
+  });
+
+  it("resolves and replaces the planning-record UUID with the planning-record name in the team modal when only the id is known initially", async () => {
+    mocks.listStaffingCoverageMock.mockResolvedValue([]);
+    mocks.listStaffingBoardMock.mockResolvedValue([]);
+    mocks.listPlanningRecordsMock.mockResolvedValue([]);
+
+    const wrapper = await mountView();
+    const selects = wrapper.findAllComponents({ name: "ASelect" });
+    const planningRecordSelect = selects[0]!;
+
+    planningRecordSelect.vm.$emit("change", "planning-1");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-staffing-refresh"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-staffing-create-planning-team-context"]').trigger("click");
+    await flushPromises();
+
+    expect((wrapper.get('[data-testid="planning-staffing-team-planning-record"]').element as HTMLInputElement).value).toBe("Planning 1");
+    expect(wrapper.get('[data-testid="planning-staffing-team-editor"]').text()).toContain("ID: planning-1");
+    expect(mocks.getPlanningRecordMock).toHaveBeenCalledWith("tenant-1", "planning-1", "token-1");
+    expect((wrapper.get('[data-testid="planning-staffing-team-planning-record"]').element as HTMLInputElement).value).not.toBe("planning-1");
+  });
+
+  it("does not expose planning-team creation when no planning-record context exists", async () => {
+    mocks.listStaffingCoverageMock.mockResolvedValueOnce([]);
+    mocks.listStaffingBoardMock.mockResolvedValueOnce([]);
+
+    const wrapper = await mountView();
+    await wrapper.get('[data-testid="planning-staffing-refresh"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="planning-staffing-planning-context-panel"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-staffing-create-planning-team-context"]').exists()).toBe(false);
+    expect(mocks.createTeamMock).not.toHaveBeenCalled();
+  });
+
+  it("creates a shift team with the selected shift context", async () => {
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "teams_releases");
+
+    await wrapper.get('[data-testid="planning-staffing-create-shift-team"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-staffing-team-name"]').setValue("Schicht Bravo");
+    await wrapper.get('[data-testid="planning-staffing-team-editor"]').trigger("submit");
+    await flushPromises();
+
+    expect(mocks.createTeamMock).toHaveBeenLastCalledWith(
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({
+        planning_record_id: "planning-1",
+        shift_id: "shift-1",
+        name: "Schicht Bravo",
       }),
     );
   });

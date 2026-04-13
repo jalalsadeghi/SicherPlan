@@ -191,7 +191,7 @@ class EmployeePrivateProfile(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
     birth_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
     place_of_birth: Mapped[str | None] = mapped_column(String(255), nullable=True)
     nationality_country_code: Mapped[str | None] = mapped_column(String(2), nullable=True)
-    marital_status: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    marital_status_code: Mapped[str | None] = mapped_column("marital_status", String(80), nullable=True)
     tax_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
     social_security_no: Mapped[str | None] = mapped_column(String(80), nullable=True)
     bank_account_holder: Mapped[str | None] = mapped_column(String(255), nullable=True)

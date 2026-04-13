@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db.session import get_db_session
+from app.modules.core.schemas import LookupValueRead
 from app.modules.employees.availability_service import EmployeeAvailabilityService
 from app.modules.employees.catalog_seed import seed_sample_employee_catalogs
 from app.modules.employees.compensation_service import EmployeeCompensationService
@@ -308,6 +309,18 @@ def update_group_membership(
     service: Annotated[EmployeeService, Depends(get_employee_service)],
 ) -> EmployeeGroupMemberRead:
     return service.update_group_member(str(tenant_id), str(member_id), payload, context)
+
+
+@router.get("/catalog/private-profile/marital-status-options", response_model=list[LookupValueRead])
+def list_private_profile_marital_status_options(
+    tenant_id: UUID,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("employees.private.read", scope="tenant")),
+    ] = None,
+    service: Annotated[EmployeeService, Depends(get_employee_service)] = None,
+) -> list[LookupValueRead]:
+    return service.list_private_profile_marital_status_options(str(tenant_id), context)
 
 
 @router.get("/{employee_id}/private-profile", response_model=EmployeePrivateProfileRead)

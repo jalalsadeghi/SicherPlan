@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.modules.core.schemas import AddressRead
 
@@ -95,6 +95,8 @@ class EmployeeOperationalRead(EmployeeListItem):
 
 
 class EmployeePrivateProfileCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     tenant_id: str
     employee_id: str
     private_email: str | None = Field(default=None, max_length=255)
@@ -102,7 +104,11 @@ class EmployeePrivateProfileCreate(BaseModel):
     birth_date: date | None = None
     place_of_birth: str | None = Field(default=None, max_length=255)
     nationality_country_code: str | None = Field(default=None, max_length=2)
-    marital_status: str | None = Field(default=None, max_length=80)
+    marital_status_code: str | None = Field(
+        default=None,
+        max_length=80,
+        validation_alias=AliasChoices("marital_status_code", "marital_status"),
+    )
     tax_id: str | None = Field(default=None, max_length=80)
     social_security_no: str | None = Field(default=None, max_length=80)
     bank_account_holder: str | None = Field(default=None, max_length=255)
@@ -114,12 +120,18 @@ class EmployeePrivateProfileCreate(BaseModel):
 
 
 class EmployeePrivateProfileUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     private_email: str | None = Field(default=None, max_length=255)
     private_phone: str | None = Field(default=None, max_length=64)
     birth_date: date | None = None
     place_of_birth: str | None = Field(default=None, max_length=255)
     nationality_country_code: str | None = Field(default=None, max_length=2)
-    marital_status: str | None = Field(default=None, max_length=80)
+    marital_status_code: str | None = Field(
+        default=None,
+        max_length=80,
+        validation_alias=AliasChoices("marital_status_code", "marital_status"),
+    )
     tax_id: str | None = Field(default=None, max_length=80)
     social_security_no: str | None = Field(default=None, max_length=80)
     bank_account_holder: str | None = Field(default=None, max_length=255)
@@ -144,7 +156,7 @@ class EmployeePrivateProfileRead(BaseModel):
     birth_date: date | None
     place_of_birth: str | None
     nationality_country_code: str | None
-    marital_status: str | None
+    marital_status_code: str | None
     tax_id: str | None
     social_security_no: str | None
     bank_account_holder: str | None

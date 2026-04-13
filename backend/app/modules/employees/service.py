@@ -9,6 +9,7 @@ from uuid import UUID
 
 from app.errors import ApiException
 from app.modules.core.models import Address, Branch, Mandate
+from app.modules.core.schemas import LookupValueRead
 from app.modules.employees.models import (
     EMPLOYEE_ADDRESS_TYPES,
     EMPLOYEE_NOTE_TYPES,
@@ -98,6 +99,7 @@ class EmployeeRepository(Protocol):
     def get_mandate(self, tenant_id: str, mandate_id: str) -> Mandate | None: ...
     def get_address(self, address_id: str) -> Address | None: ...
     def create_address(self, row: Address) -> Address: ...
+    def list_lookup_values(self, tenant_id: str, domain: str) -> list[LookupValueRead]: ...
 
 
 class EmployeeService:
@@ -298,6 +300,15 @@ class EmployeeService:
             raise ApiException(404, "employees.private_profile.not_found", "errors.employees.private_profile.not_found")
         return EmployeePrivateProfileRead.model_validate(row)
 
+    def list_private_profile_marital_status_options(
+        self,
+        tenant_id: str,
+        context: RequestAuthorizationContext,
+    ) -> list[LookupValueRead]:
+        self._require_permission(context, "employees.private.read")
+        enforce_scope(context, scope="tenant", tenant_id=tenant_id)
+        return self.repository.list_lookup_values(tenant_id, "marital_status")
+
     def upsert_private_profile(
         self,
         tenant_id: str,
@@ -331,7 +342,7 @@ class EmployeeService:
                     birth_date=payload.birth_date,
                     place_of_birth=self._normalize_optional(payload.place_of_birth),
                     nationality_country_code=self._normalize_optional(payload.nationality_country_code),
-                    marital_status=self._normalize_optional(payload.marital_status),
+                    marital_status_code=self._normalize_optional(payload.marital_status_code),
                     tax_id=self._normalize_optional(payload.tax_id),
                     social_security_no=self._normalize_optional(payload.social_security_no),
                     bank_account_holder=self._normalize_optional(payload.bank_account_holder),
@@ -381,7 +392,7 @@ class EmployeeService:
             payload.nationality_country_code,
             row.nationality_country_code,
         )
-        row.marital_status = self._effective_optional(payload.marital_status, row.marital_status)
+        row.marital_status_code = self._effective_optional(payload.marital_status_code, row.marital_status_code)
         row.tax_id = self._effective_optional(payload.tax_id, row.tax_id)
         row.social_security_no = self._effective_optional(payload.social_security_no, row.social_security_no)
         row.bank_account_holder = self._effective_optional(payload.bank_account_holder, row.bank_account_holder)
@@ -912,7 +923,7 @@ class EmployeeService:
         row.birth_date = payload.birth_date
         row.place_of_birth = self._normalize_optional(payload.place_of_birth)
         row.nationality_country_code = self._normalize_optional(payload.nationality_country_code)
-        row.marital_status = self._normalize_optional(payload.marital_status)
+        row.marital_status_code = self._normalize_optional(payload.marital_status_code)
         row.tax_id = self._normalize_optional(payload.tax_id)
         row.social_security_no = self._normalize_optional(payload.social_security_no)
         row.bank_account_holder = self._normalize_optional(payload.bank_account_holder)
@@ -1165,7 +1176,7 @@ class EmployeeService:
             "birth_date": row.birth_date.isoformat() if row.birth_date else None,
             "place_of_birth": row.place_of_birth,
             "nationality_country_code": row.nationality_country_code,
-            "marital_status": row.marital_status,
+            "marital_status_code": row.marital_status_code,
             "tax_id": row.tax_id,
             "social_security_no": row.social_security_no,
             "bank_account_holder": row.bank_account_holder,

@@ -101,6 +101,18 @@ class TestLookupSeed(unittest.TestCase):
 
         self.assertEqual(seeded_codes, {"object_security", "event_security", "trade_fair_security", "patrol_service"})
 
+    def test_system_seed_includes_marital_status_domain(self) -> None:
+        session = _FakeSession()
+
+        seed_lookup_values(session)
+
+        seeded_codes = {row.code for row in session.rows if row.domain == "marital_status" and row.tenant_id is None}
+
+        self.assertEqual(
+            seeded_codes,
+            {"single", "married", "separated", "divorced", "widowed", "civil_partnership"},
+        )
+
     def test_tenant_seed_only_applies_tenant_extensible_domains(self) -> None:
         session = _FakeSession()
 

@@ -693,6 +693,50 @@
           </section>
         </template>
 
+        <section v-else-if="relevantPlanningRecordId" class="planning-staffing-tab-panel" data-testid="planning-staffing-planning-context-panel">
+          <section class="module-card planning-staffing-subpanel">
+            <div class="planning-staffing-panel__header">
+              <div>
+                <p class="eyebrow">{{ tp("teamReleaseTitle") }}</p>
+                <h4>{{ tp("planningContextTitle") }}</h4>
+                <p class="field-help">{{ tp("planningContextLead") }}</p>
+              </div>
+              <div v-if="actionState.canWriteStaffing" class="planning-staffing-panel__actions">
+                <button
+                  class="cta-button cta-secondary"
+                  type="button"
+                  data-testid="planning-staffing-create-planning-team-context"
+                  :disabled="!relevantPlanningRecordId || savingTeam"
+                  @click="startCreateTeam('planning')"
+                >
+                  {{ tp("createPlanningTeamAction") }}
+                </button>
+              </div>
+            </div>
+            <article class="planning-staffing-issue" data-tone="neutral">
+              <strong>{{ tp("filtersPlanningRecord") }}</strong>
+              <span>{{ selectedPlanningRecordOptionLabel || relevantPlanningRecordId }}</span>
+            </article>
+            <div v-if="availableTeams.length" class="planning-staffing-list">
+              <button
+                v-for="team in availableTeams"
+                :key="team.id"
+                type="button"
+                class="planning-staffing-row"
+                :class="{ selected: team.id === selectedTeamId }"
+                @click="selectedTeamId = team.id"
+              >
+                <div>
+                  <strong>{{ team.name }}</strong>
+                  <span>{{ tp(team.shift_id ? "teamScopeShift" : "teamScopePlanning") }}</span>
+                  <span>{{ tp("teamMemberCount") }}: {{ team.members.length }}</span>
+                </div>
+              </button>
+            </div>
+            <p v-else class="planning-staffing-list-empty">{{ tp("teamsEmptyPlanningContext") }}</p>
+          </section>
+        </section>
+
         <p v-else class="planning-staffing-list-empty">{{ tp("noSelection") }}</p>
       </section>
     </div>
@@ -791,6 +835,14 @@
         @submit.prevent="submitTeam"
       >
         <div class="planning-staffing-filter-grid">
+          <label v-if="teamDraft.scope_kind === 'planning'" class="field-stack field-stack--wide">
+            <span>{{ tp("filtersPlanningRecord") }}</span>
+            <input :value="planningRecordDisplayName || tp('scopeUnavailable')" type="text" disabled data-testid="planning-staffing-team-planning-record" />
+            <p class="field-help">
+              {{ tp("teamPlanningRecordHint") }}
+              <span v-if="relevantPlanningRecordId"> {{ tp("teamPlanningRecordIdHint") }} {{ relevantPlanningRecordId }}</span>
+            </p>
+          </label>
           <label class="field-stack">
             <span>{{ tp("teamNameLabel") }}</span>
             <input v-model="teamDraft.name" type="text" data-testid="planning-staffing-team-name" />
@@ -935,7 +987,12 @@ import {
   type FunctionTypeRead,
   type QualificationTypeRead,
 } from "@/api/employeeAdmin";
-import { listPlanningRecords, type PlanningRecordListItem } from "@/api/planningOrders";
+import {
+  getPlanningRecord,
+  listPlanningRecords,
+  type PlanningRecordListItem,
+  type PlanningRecordRead,
+} from "@/api/planningOrders";
 import {
   assignStaffing,
   createTeam,
@@ -1060,6 +1117,7 @@ const savingTeam = ref(false);
 const savingTeamMember = ref(false);
 const savingAssignmentTeam = ref(false);
 const planningRecordOptions = ref<PlanningRecordListItem[]>([]);
+const resolvedPlanningRecord = ref<null | PlanningRecordRead>(null);
 const planningRecordLookupLoading = ref(false);
 const planningRecordLookupError = ref("");
 const planningRecordLookupSearch = ref("");
@@ -1163,6 +1221,22 @@ const planningRecordSelectOptions = computed(() =>
 const selectedPlanningRecordOptionLabel = computed(
   () => planningRecordSelectOptions.value.find((option) => option.value === filters.planning_record_id)?.label ?? "",
 );
+const selectedPlanningRecordOption = computed(
+  () => planningRecordOptions.value.find((record) => record.id === relevantPlanningRecordId.value) ?? null,
+);
+const planningRecordDisplayName = computed(() => {
+  if (selectedShift.value?.planning_record_name) {
+    return selectedShift.value.planning_record_name;
+  }
+  if (selectedPlanningRecordOption.value?.name) {
+    return selectedPlanningRecordOption.value.name;
+  }
+  if (resolvedPlanningRecord.value?.name) {
+    return resolvedPlanningRecord.value.name;
+  }
+  return relevantPlanningRecordId.value || "";
+});
+const hasPlanningContext = computed(() => Boolean(relevantPlanningRecordId.value));
 const selectableTeamMembers = computed(() => buildStaffingMemberOptions(teamMembers.value, staffingDraft.team_id));
 const selectedMember = computed(() => selectableTeamMembers.value.find((member) => member.id === staffingDraft.member_ref) ?? null);
 const selectedTeamMembers = computed(() => {
@@ -1214,7 +1288,10 @@ const canSubmitAssign = computed(() => {
 });
 const canSubmitSubstitute = computed(() => canSubmitAssign.value && actionState.value.canSubstitute && !!selectedAssignment.value);
 const canSubmitTeam = computed(() => {
-  if (!actionState.value.canWriteStaffing || !relevantPlanningRecordId.value) {
+  if (!hasPlanningContext.value) {
+    return false;
+  }
+  if (!actionState.value.canWriteStaffing) {
     return false;
   }
   return Boolean(teamDraft.name.trim());
@@ -1535,6 +1612,25 @@ async function loadPlanningRecordOptions(search = "") {
   }
 }
 
+async function ensurePlanningRecordResolved() {
+  if (!tenantScopeId.value || !accessToken.value || !relevantPlanningRecordId.value) {
+    resolvedPlanningRecord.value = null;
+    return;
+  }
+  if (selectedShift.value?.planning_record_name || selectedPlanningRecordOption.value?.name) {
+    resolvedPlanningRecord.value = null;
+    return;
+  }
+  if (resolvedPlanningRecord.value?.id === relevantPlanningRecordId.value && resolvedPlanningRecord.value.name) {
+    return;
+  }
+  try {
+    resolvedPlanningRecord.value = await getPlanningRecord(tenantScopeId.value, relevantPlanningRecordId.value, accessToken.value);
+  } catch {
+    resolvedPlanningRecord.value = null;
+  }
+}
+
 function schedulePlanningRecordLookup(search = planningRecordLookupSearch.value) {
   if (planningRecordLookupTimer) {
     clearTimeout(planningRecordLookupTimer);
@@ -1687,9 +1783,7 @@ async function refreshAll() {
       assignmentOverrides.value = [];
       shiftOutputs.value = [];
       dispatchPreview.value = null;
-      planningTeams.value = [];
-      teamMembers.value = [];
-      subcontractorReleases.value = [];
+      await refreshSupportingData();
       return;
     }
     await loadSelectedShiftDetails();
@@ -2180,6 +2274,18 @@ watch(
     void loadDemandGroupCatalogOptions();
     schedulePlanningRecordLookup();
   },
+);
+
+watch(
+  () => [tenantScopeId.value, accessToken.value, relevantPlanningRecordId.value, selectedShift.value?.planning_record_name || selectedPlanningRecordOption.value?.name || ""],
+  ([nextTenantScopeId, nextAccessToken, nextPlanningRecordId]) => {
+    if (!nextTenantScopeId || !nextAccessToken || !nextPlanningRecordId) {
+      resolvedPlanningRecord.value = null;
+      return;
+    }
+    void ensurePlanningRecordResolved();
+  },
+  { immediate: true },
 );
 
 onMounted(async () => {

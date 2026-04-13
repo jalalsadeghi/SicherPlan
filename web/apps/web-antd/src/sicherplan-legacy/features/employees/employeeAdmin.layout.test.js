@@ -131,9 +131,15 @@ test("non-overview employee tabs reuse the structured section pattern", () => {
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*getEmployeePrivateProfile/);
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*upsertEmployeePrivateProfile/);
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*updateEmployeePrivateProfile/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*listEmployeePrivateProfileMaritalStatusOptions/);
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.private_email/);
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.private_phone/);
-  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.marital_status/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.marital_status_code/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*data-testid="employee-private-profile-marital-status-select"/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*<select[\s\S]*v-model="privateProfileDraft\.marital_status_code"/);
+  assert.doesNotMatch(viewSource, /employee-tab-panel-private-profile[\s\S]*<input v-model="privateProfileDraft\.marital_status(?:_code)?"/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*employeeAdmin\.privateProfile\.maritalStatusPlaceholder/);
+  assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*employeeAdmin\.privateProfile\.maritalStatusLegacyHint/);
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.tax_id/);
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.social_security_no/);
   assert.match(viewSource, /employee-tab-panel-private-profile[\s\S]*privateProfileDraft\.bank_account_holder/);

@@ -147,6 +147,19 @@ SYSTEM_LOOKUP_DOMAINS: tuple[LookupSeedDomain, ...] = (
             LookupSeedValue("patrol_service", "Revier- / Patrouillendienst", "Patrouillen-, Revier- oder Alarmfahrdienst", 40),
         ),
     ),
+    LookupSeedDomain(
+        name="marital_status",
+        ownership="system",
+        description="Shared HR-private marital-status catalog used by employee private profiles.",
+        values=(
+            LookupSeedValue("single", "Ledig", "Keine bestehende Ehe oder eingetragene Partnerschaft", 10),
+            LookupSeedValue("married", "Verheiratet", "Verheiratet oder in bestehender Ehe", 20),
+            LookupSeedValue("separated", "Getrennt lebend", "Ehe oder Partnerschaft besteht, gemeinsamer Haushalt aber nicht mehr", 30),
+            LookupSeedValue("divorced", "Geschieden", "Rechtskraeftig geschieden", 40),
+            LookupSeedValue("widowed", "Verwitwet", "Verwitwet nach bestehender Ehe oder Partnerschaft", 50),
+            LookupSeedValue("civil_partnership", "Lebenspartnerschaft", "Eingetragene Lebenspartnerschaft oder gleichgestellte Partnerschaft", 60),
+        ),
+    ),
 )
 
 

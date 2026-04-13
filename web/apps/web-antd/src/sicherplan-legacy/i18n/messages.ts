@@ -627,6 +627,11 @@ export type MessageKey =
   | "employeeAdmin.privateProfile.notesLead"
   | "employeeAdmin.privateProfile.actionsEyebrow"
   | "employeeAdmin.privateProfile.actionsTitle"
+  | "employeeAdmin.privateProfile.maritalStatusPlaceholder"
+  | "employeeAdmin.privateProfile.maritalStatusLoading"
+  | "employeeAdmin.privateProfile.maritalStatusLoadError"
+  | "employeeAdmin.privateProfile.maritalStatusLegacyHint"
+  | "employeeAdmin.privateProfile.maritalStatusLegacyValue"
   | "employeeAdmin.employmentType.full_time"
   | "employeeAdmin.employmentType.part_time"
   | "employeeAdmin.employmentType.mini_job"
@@ -2470,6 +2475,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.privateProfile.notesLead": "Nur im HR-Privatprofil sichtbare Hinweise, die nicht in die operative Mitarbeitendenakte gehören.",
     "employeeAdmin.privateProfile.actionsEyebrow": "Aktion",
     "employeeAdmin.privateProfile.actionsTitle": "Privatprofil speichern oder zurücksetzen",
+    "employeeAdmin.privateProfile.maritalStatusPlaceholder": "Familienstand auswaehlen",
+    "employeeAdmin.privateProfile.maritalStatusLoading": "Familienstaende werden geladen.",
+    "employeeAdmin.privateProfile.maritalStatusLoadError": "Familienstaende konnten nicht geladen werden.",
+    "employeeAdmin.privateProfile.maritalStatusLegacyHint": "Der aktuell gespeicherte Familienstand ist nicht mehr in den aktiven Optionen enthalten und wird als Legacy-Wert angezeigt.",
+    "employeeAdmin.privateProfile.maritalStatusLegacyValue": "Legacy",
     "employeeAdmin.employmentType.full_time": "Vollzeit",
     "employeeAdmin.employmentType.part_time": "Teilzeit",
     "employeeAdmin.employmentType.mini_job": "Minijob",
@@ -4495,6 +4505,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.privateProfile.notesLead": "Use this area for HR-private notes that should not appear in the operational employee file.",
     "employeeAdmin.privateProfile.actionsEyebrow": "Action",
     "employeeAdmin.privateProfile.actionsTitle": "Save or reset the private profile",
+    "employeeAdmin.privateProfile.maritalStatusPlaceholder": "Select marital status",
+    "employeeAdmin.privateProfile.maritalStatusLoading": "Loading marital statuses.",
+    "employeeAdmin.privateProfile.maritalStatusLoadError": "Marital statuses could not be loaded.",
+    "employeeAdmin.privateProfile.maritalStatusLegacyHint": "The currently stored marital status is no longer part of the active options and is shown as a legacy value.",
+    "employeeAdmin.privateProfile.maritalStatusLegacyValue": "legacy",
     "employeeAdmin.employmentType.full_time": "Full time",
     "employeeAdmin.employmentType.part_time": "Part time",
     "employeeAdmin.employmentType.mini_job": "Mini job",

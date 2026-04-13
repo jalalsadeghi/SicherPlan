@@ -242,7 +242,7 @@ export function buildEmployeePrivateProfilePayload(draft, { tenantId, employeeId
     birth_date: typeof draft?.birth_date === "string" && draft.birth_date.trim() ? draft.birth_date.trim() : null,
     place_of_birth: normalizeOptionalText(draft?.place_of_birth),
     nationality_country_code: normalizeOptionalText(draft?.nationality_country_code, { uppercase: true }),
-    marital_status: normalizeOptionalText(draft?.marital_status),
+    marital_status_code: normalizeOptionalText(draft?.marital_status_code),
     tax_id: normalizeOptionalText(draft?.tax_id),
     social_security_no: normalizeOptionalText(draft?.social_security_no),
     bank_account_holder: normalizeOptionalText(draft?.bank_account_holder),

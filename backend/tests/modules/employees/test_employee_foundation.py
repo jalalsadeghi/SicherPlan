@@ -10,6 +10,7 @@ from sqlalchemy import CheckConstraint, Index, UniqueConstraint
 from app.db import Base
 from app.errors import ApiException
 from app.modules.core.models import Address, Branch, Mandate
+from app.modules.core.schemas import LookupValueRead
 from app.modules.employees.models import (
     Employee,
     EmployeeAddressHistory,
@@ -67,6 +68,7 @@ class FakeEmployeeRepository:
     role_assignments: dict[str, UserRoleAssignment] = field(default_factory=dict)
     branches: dict[str, Branch] = field(default_factory=dict)
     mandates: dict[str, Mandate] = field(default_factory=dict)
+    lookup_values: list[LookupValueRead] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.branch = Branch(
@@ -124,6 +126,40 @@ class FakeEmployeeRepository:
         self.branches[self.branch_id] = self.branch
         self.mandates[self.mandate_id] = self.mandate
         self.addresses = {self.address_id: self.address}
+        self.lookup_values = [
+            LookupValueRead(
+                id="lookup-marital-single",
+                tenant_id=None,
+                domain="marital_status",
+                code="single",
+                label="Ledig",
+                description="Keine bestehende Ehe oder eingetragene Partnerschaft",
+                sort_order=10,
+                status="active",
+                version_no=1,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+                created_by_user_id=None,
+                updated_by_user_id=None,
+                archived_at=None,
+            ),
+            LookupValueRead(
+                id="lookup-marital-married",
+                tenant_id=None,
+                domain="marital_status",
+                code="married",
+                label="Verheiratet",
+                description="Verheiratet oder in bestehender Ehe",
+                sort_order=20,
+                status="active",
+                version_no=1,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+                created_by_user_id=None,
+                updated_by_user_id=None,
+                archived_at=None,
+            ),
+        ]
 
     def list_employees(self, tenant_id: str, filters=None) -> list[Employee]:  # noqa: ANN001
         rows = [row for row in self.employees.values() if row.tenant_id == tenant_id]
@@ -340,6 +376,9 @@ class FakeEmployeeRepository:
         self.addresses[row.id] = row
         return row
 
+    def list_lookup_values(self, tenant_id: str, domain: str) -> list[LookupValueRead]:
+        return [row for row in self.lookup_values if row.domain == domain and row.archived_at is None]
+
 
 class TestEmployeeFoundationMetadata(unittest.TestCase):
     def test_expected_employee_tables_are_registered(self) -> None:
@@ -436,6 +475,58 @@ class TestEmployeeService(unittest.TestCase):
         self.assertEqual(operational.target_monthly_hours, 173.2)
         self.assertFalse(hasattr(operational, "tax_id"))
         self.assertEqual(private_profile.tax_id, "DE123")
+
+    def test_private_profile_uses_marital_status_code_and_accepts_legacy_alias(self) -> None:
+        employee = self.service.create_employee(
+            "tenant-1",
+            EmployeeOperationalCreate(
+                tenant_id="tenant-1",
+                personnel_no="EMP-1001C",
+                first_name="Lea",
+                last_name="Sommer",
+            ),
+            _context("employees.employee.write"),
+        )
+
+        created = self.service.upsert_private_profile(
+            "tenant-1",
+            employee.id,
+            EmployeePrivateProfileCreate(
+                tenant_id="tenant-1",
+                employee_id=employee.id,
+                marital_status_code="married",
+            ),
+            _context("employees.private.write"),
+        )
+
+        updated = self.service.update_private_profile(
+            "tenant-1",
+            employee.id,
+            EmployeePrivateProfileUpdate.model_validate(
+                {
+                    "marital_status": "single",
+                    "version_no": created.version_no,
+                }
+            ),
+            _context("employees.private.write"),
+        )
+
+        self.assertEqual(created.marital_status_code, "married")
+        self.assertEqual(updated.marital_status_code, "single")
+
+    def test_private_profile_marital_status_options_require_private_read_permission(self) -> None:
+        rows = self.service.list_private_profile_marital_status_options(
+            "tenant-1",
+            _context("employees.private.read"),
+        )
+
+        self.assertEqual([row.code for row in rows], ["single", "married"])
+
+        with self.assertRaises(ApiException):
+            self.service.list_private_profile_marital_status_options(
+                "tenant-1",
+                _context("employees.employee.read"),
+            )
 
     def test_operational_update_persists_status_and_target_hours(self) -> None:
         employee = self.service.create_employee(

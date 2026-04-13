@@ -1316,7 +1316,29 @@
                   </label>
                   <label class="field-stack field-stack--half">
                     <span>{{ t("employeeAdmin.fields.maritalStatus") }}</span>
-                    <input v-model="privateProfileDraft.marital_status" :disabled="!actionState.canManagePrivateProfile" />
+                    <select
+                      v-model="privateProfileDraft.marital_status_code"
+                      :disabled="!actionState.canManagePrivateProfile || maritalStatusOptionsLoading"
+                      data-testid="employee-private-profile-marital-status-select"
+                    >
+                      <option value="">{{ t("employeeAdmin.privateProfile.maritalStatusPlaceholder") }}</option>
+                      <option
+                        v-for="option in privateProfileMaritalStatusOptions"
+                        :key="option.code"
+                        :value="option.code"
+                      >
+                        {{ option.label }}
+                      </option>
+                    </select>
+                    <p v-if="maritalStatusOptionsLoading" class="field-help">
+                      {{ t("employeeAdmin.privateProfile.maritalStatusLoading") }}
+                    </p>
+                    <p v-else-if="maritalStatusLookupError" class="field-help">
+                      {{ maritalStatusLookupError }}
+                    </p>
+                    <p v-else-if="privateProfileMaritalStatusIsLegacy" class="field-help">
+                      {{ t("employeeAdmin.privateProfile.maritalStatusLegacyHint") }}
+                    </p>
                   </label>
                 </div>
               </section>
@@ -1793,6 +1815,7 @@ import {
   listEmployeeCredentials,
   listEmployeeDocuments,
   listEmployeeGroups,
+  listEmployeePrivateProfileMaritalStatusOptions,
   listEmployeeNotes,
   listEmployeeQualificationProofs,
   listEmployeeQualifications,
@@ -1849,6 +1872,7 @@ import {
   type EmployeeNoteRead,
   type EmployeeOperationalRead,
   type EmployeePrivateProfileRead,
+  type EmployeePrivateProfileMaritalStatusOptionRead,
   type EmployeePrivateProfileUpdatePayload,
   type EmployeePrivateProfileWritePayload,
   type EmployeePhotoRead,
@@ -1943,7 +1967,7 @@ const privateProfileDraft = reactive({
   birth_date: "",
   place_of_birth: "",
   nationality_country_code: "",
-  marital_status: "",
+  marital_status_code: "",
   tax_id: "",
   social_security_no: "",
   bank_account_holder: "",
@@ -2079,6 +2103,9 @@ const employeeAbsences = ref<EmployeeAbsenceRead[]>([]);
 const employeeDocuments = ref<EmployeeDocumentListItemRead[]>([]);
 const functionTypes = ref<FunctionTypeRead[]>([]);
 const qualificationTypes = ref<QualificationTypeRead[]>([]);
+const maritalStatusOptions = ref<EmployeePrivateProfileMaritalStatusOptionRead[]>([]);
+const maritalStatusOptionsLoading = ref(false);
+const maritalStatusLookupError = ref("");
 const qualificationProofsById = reactive<Record<string, EmployeeQualificationProofRead[]>>({});
 const currentPhoto = ref<EmployeePhotoRead | null>(null);
 const accessLink = ref<EmployeeAccessLinkRead | null>(null);
@@ -2240,6 +2267,33 @@ const employeeDocumentTypeOptions = computed(() => [
 ]);
 const branchOptions = computed(() => branches.value.filter((branch) => branch.archived_at == null));
 const mandateOptions = computed(() => mandates.value.filter((mandate) => mandate.archived_at == null));
+const privateProfileMaritalStatusOptions = computed(() => {
+  const options = maritalStatusOptions.value
+    .filter((option) => option.archived_at == null && option.status === "active")
+    .map((option) => ({
+      code: option.code,
+      label: option.label,
+    }));
+  const currentCode = typeof privateProfileDraft.marital_status_code === "string"
+    ? privateProfileDraft.marital_status_code.trim()
+    : "";
+  if (currentCode && !options.some((option) => option.code === currentCode)) {
+    options.push({
+      code: currentCode,
+      label: `${currentCode} (${t("employeeAdmin.privateProfile.maritalStatusLegacyValue")})`,
+    });
+  }
+  return options;
+});
+const privateProfileMaritalStatusIsLegacy = computed(() => {
+  const currentCode = typeof privateProfileDraft.marital_status_code === "string"
+    ? privateProfileDraft.marital_status_code.trim()
+    : "";
+  if (!currentCode) {
+    return false;
+  }
+  return !maritalStatusOptions.value.some((option) => option.code === currentCode && option.archived_at == null && option.status === "active");
+});
 const filteredEmployeeMandates = computed(() => filterMandateOptions(employeeDraft.default_branch_id));
 const branchLabelMap = computed(() => new Map(branchOptions.value.map((branch) => [branch.id, formatStructureLabel(branch)])));
 const mandateLabelMap = computed(() => new Map(mandateOptions.value.map((mandate) => [mandate.id, formatStructureLabel(mandate)])));
@@ -2483,7 +2537,7 @@ function resetPrivateProfileDraft() {
   privateProfileDraft.birth_date = selectedPrivateProfile.value?.birth_date || "";
   privateProfileDraft.place_of_birth = selectedPrivateProfile.value?.place_of_birth || "";
   privateProfileDraft.nationality_country_code = selectedPrivateProfile.value?.nationality_country_code || "";
-  privateProfileDraft.marital_status = selectedPrivateProfile.value?.marital_status || "";
+  privateProfileDraft.marital_status_code = selectedPrivateProfile.value?.marital_status_code || "";
   privateProfileDraft.tax_id = selectedPrivateProfile.value?.tax_id || "";
   privateProfileDraft.social_security_no = selectedPrivateProfile.value?.social_security_no || "";
   privateProfileDraft.bank_account_holder = selectedPrivateProfile.value?.bank_account_holder || "";
@@ -2522,7 +2576,7 @@ function syncPrivateProfileDraft(profile: EmployeePrivateProfileRead | null) {
   privateProfileDraft.birth_date = profile?.birth_date || "";
   privateProfileDraft.place_of_birth = profile?.place_of_birth || "";
   privateProfileDraft.nationality_country_code = profile?.nationality_country_code || "";
-  privateProfileDraft.marital_status = profile?.marital_status || "";
+  privateProfileDraft.marital_status_code = profile?.marital_status_code || "";
   privateProfileDraft.tax_id = profile?.tax_id || "";
   privateProfileDraft.social_security_no = profile?.social_security_no || "";
   privateProfileDraft.bank_account_holder = profile?.bank_account_holder || "";
@@ -2793,6 +2847,8 @@ async function refreshEmployees() {
   if (!resolvedTenantScopeId.value || !authStore.accessToken || !canRead.value) {
     branches.value = [];
     mandates.value = [];
+    maritalStatusOptions.value = [];
+    maritalStatusLookupError.value = "";
     employees.value = [];
     selectedEmployee.value = null;
     return;
@@ -2848,6 +2904,19 @@ async function refreshEmployees() {
     loading.list = false;
   }
 
+  if (canReadPrivate.value) {
+    try {
+      await loadPrivateProfileMaritalStatusOptions();
+    } catch {
+      maritalStatusOptions.value = [];
+      maritalStatusLookupError.value = t("employeeAdmin.privateProfile.maritalStatusLoadError");
+      catalogRefreshFailed = true;
+    }
+  } else {
+    maritalStatusOptions.value = [];
+    maritalStatusLookupError.value = "";
+  }
+
   if (catalogRefreshFailed) {
     setCatalogRefreshWarning();
   }
@@ -2873,6 +2942,27 @@ async function loadEmployeeReadinessCatalogs() {
   ]);
   functionTypes.value = functionTypeRows;
   qualificationTypes.value = qualificationTypeRows;
+}
+
+async function loadPrivateProfileMaritalStatusOptions() {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !canReadPrivate.value) {
+    maritalStatusOptions.value = [];
+    maritalStatusLookupError.value = "";
+    return;
+  }
+  maritalStatusOptionsLoading.value = true;
+  maritalStatusLookupError.value = "";
+  try {
+    maritalStatusOptions.value = await listEmployeePrivateProfileMaritalStatusOptions(
+      resolvedTenantScopeId.value,
+      authStore.accessToken,
+    );
+  } catch {
+    maritalStatusOptions.value = [];
+    maritalStatusLookupError.value = t("employeeAdmin.privateProfile.maritalStatusLoadError");
+  } finally {
+    maritalStatusOptionsLoading.value = false;
+  }
 }
 
 async function loadQualificationProofs(qualificationId: string) {

@@ -39,6 +39,7 @@ class EmployeeRouterPathOrderTest(unittest.TestCase):
 
         for static_path in (
             "/api/employees/tenants/{tenant_id}/employees/groups/catalog",
+            "/api/employees/tenants/{tenant_id}/employees/catalog/private-profile/marital-status-options",
             "/api/employees/tenants/{tenant_id}/employees/availability-rules",
             "/api/employees/tenants/{tenant_id}/employees/absences",
             "/api/employees/tenants/{tenant_id}/employees/leave-balances",
@@ -63,6 +64,13 @@ class EmployeeRouterPathOrderTest(unittest.TestCase):
         tenant_id = str(uuid4())
         employee_id = str(uuid4())
 
+        self.assertEqual(
+            _matched_route_path(
+                "GET",
+                f"/api/employees/tenants/{tenant_id}/employees/catalog/private-profile/marital-status-options",
+            ),
+            "/api/employees/tenants/{tenant_id}/employees/catalog/private-profile/marital-status-options",
+        )
         self.assertEqual(
             _matched_route_path(
                 "GET",

@@ -64,7 +64,7 @@ export interface EmployeePrivateProfileRead {
   birth_date: string | null;
   place_of_birth: string | null;
   nationality_country_code: string | null;
-  marital_status: string | null;
+  marital_status_code: string | null;
   tax_id: string | null;
   social_security_no: string | null;
   bank_account_holder: string | null;
@@ -86,7 +86,7 @@ export interface EmployeePrivateProfileWritePayload {
   birth_date?: string | null;
   place_of_birth?: string | null;
   nationality_country_code?: string | null;
-  marital_status?: string | null;
+  marital_status_code?: string | null;
   tax_id?: string | null;
   social_security_no?: string | null;
   bank_account_holder?: string | null;
@@ -103,7 +103,7 @@ export interface EmployeePrivateProfileUpdatePayload {
   birth_date?: string | null;
   place_of_birth?: string | null;
   nationality_country_code?: string | null;
-  marital_status?: string | null;
+  marital_status_code?: string | null;
   tax_id?: string | null;
   social_security_no?: string | null;
   bank_account_holder?: string | null;
@@ -138,6 +138,19 @@ export interface EmployeeAddressHistoryRead {
     state_region: string | null;
     country_code: string;
   } | null;
+}
+
+export interface EmployeePrivateProfileMaritalStatusOptionRead {
+  id: string;
+  tenant_id: string | null;
+  domain: string;
+  code: string;
+  label: string;
+  description: string | null;
+  sort_order: number;
+  status: string;
+  archived_at: string | null;
+  version_no: number;
 }
 
 export interface EmployeeAddressWriteAddressInput {
@@ -708,6 +721,13 @@ export function updateEmployee(tenantId: string, employeeId: string, accessToken
 
 export function getEmployeePrivateProfile(tenantId: string, employeeId: string, accessToken: string) {
   return request<EmployeePrivateProfileRead>(`/api/employees/tenants/${tenantId}/employees/${employeeId}/private-profile`, accessToken);
+}
+
+export function listEmployeePrivateProfileMaritalStatusOptions(tenantId: string, accessToken: string) {
+  return request<EmployeePrivateProfileMaritalStatusOptionRead[]>(
+    `/api/employees/tenants/${tenantId}/employees/catalog/private-profile/marital-status-options`,
+    accessToken,
+  );
 }
 
 export function upsertEmployeePrivateProfile(
