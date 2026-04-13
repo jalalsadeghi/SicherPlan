@@ -20,6 +20,14 @@ export interface PlanningCatalogRecordRead {
   status?: string | null;
 }
 
+export interface PlanningReferenceOptionRead {
+  id?: string | null;
+  code: string;
+  label: string;
+  description?: string | null;
+  sort_order?: number;
+}
+
 export interface OrderEquipmentLineRead {
   id: string;
   tenant_id: string;
@@ -207,6 +215,13 @@ function queryString(params: Record<string, unknown>) {
 export function listCustomerOrders(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
   return request<CustomerOrderListItem[]>(
     `/api/planning/tenants/${tenantId}/ops/orders${queryString(filters)}`,
+    accessToken,
+  );
+}
+
+export function listServiceCategoryOptions(tenantId: string, accessToken: string) {
+  return request<PlanningReferenceOptionRead[]>(
+    `/api/planning/tenants/${tenantId}/ops/service-category-options`,
     accessToken,
   );
 }

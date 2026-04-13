@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from app.errors import ApiException
+from app.modules.core.models import LookupValue
 from app.modules.iam.audit_service import AuditService
 from app.modules.planning.order_service import CustomerOrderService
 from app.modules.planning.schemas import (
@@ -306,6 +307,14 @@ class CustomerOrderServiceTests(unittest.TestCase):
             document_service=self.document_service,
             audit_service=AuditService(self.audit_repository),
         )
+        self.repository.lookup_values.extend(
+            [
+                LookupValue(tenant_id=None, domain="service_category", code="site", label="Objekt", sort_order=10),
+                LookupValue(tenant_id=None, domain="service_category", code="event", label="Event", sort_order=20),
+                LookupValue(tenant_id=None, domain="service_category", code="patrol", label="Patrouille", sort_order=30),
+                LookupValue(tenant_id=None, domain="service_category", code="guarding", label="Bewachung", sort_order=40),
+            ]
+        )
         equipment = self.repository.create_equipment_item(
             "tenant-1",
             type("EquipmentPayload", (), {"customer_id": None, "code": "EQ-1", "label": "Funkgeraet", "unit_of_measure_code": "piece", "description": None})(),
@@ -333,7 +342,7 @@ class CustomerOrderServiceTests(unittest.TestCase):
                     requirement_type_id=self.requirement_type_id,
                     order_no="ORD-1",
                     title="Objekt Nord",
-                    service_category_code="site_security",
+                    service_category_code="site",
                     service_from=date(2026, 6, 2),
                     service_to=date(2026, 6, 1),
                 ),
@@ -351,7 +360,7 @@ class CustomerOrderServiceTests(unittest.TestCase):
                     requirement_type_id="",
                     order_no="ORD-BLANK-REQ",
                     title="Objekt Nord",
-                    service_category_code="site_security",
+                    service_category_code="site",
                     service_from=date(2026, 6, 1),
                     service_to=date(2026, 6, 2),
                 ),
@@ -359,6 +368,25 @@ class CustomerOrderServiceTests(unittest.TestCase):
             )
         self.assertEqual(captured.exception.status_code, 400)
         self.assertEqual(captured.exception.message_key, "errors.planning.customer_order.invalid_requirement_type_id")
+
+    def test_create_order_rejects_unknown_service_category_code(self) -> None:
+        with self.assertRaises(ApiException) as captured:
+            self.service.create_order(
+                "tenant-1",
+                CustomerOrderCreate(
+                    tenant_id="tenant-1",
+                    customer_id="customer-1",
+                    requirement_type_id=self.requirement_type_id,
+                    order_no="ORD-BAD-SERVICE-CATEGORY",
+                    title="Objekt Nord",
+                    service_category_code="site_security",
+                    service_from=date(2026, 6, 1),
+                    service_to=date(2026, 6, 2),
+                ),
+                self.actor,
+            )
+        self.assertEqual(captured.exception.status_code, 400)
+        self.assertEqual(captured.exception.message_key, "errors.planning.customer_order.invalid_service_category_code")
 
     def test_create_order_allows_blank_optional_patrol_route_id(self) -> None:
         order = self.service.create_order(
@@ -370,7 +398,7 @@ class CustomerOrderServiceTests(unittest.TestCase):
                 patrol_route_id="",
                 order_no="ORD-NO-ROUTE",
                 title="Objekt Nord",
-                service_category_code="site_security",
+                service_category_code="site",
                 service_from=date(2026, 6, 1),
                 service_to=date(2026, 6, 2),
             ),
@@ -403,7 +431,7 @@ class CustomerOrderServiceTests(unittest.TestCase):
                 requirement_type_id=cross_customer_requirement.id,
                 order_no="ORD-CROSS-REQ",
                 title="Objekt Nord",
-                service_category_code="site_security",
+                service_category_code="site",
                 service_from=date(2026, 6, 1),
                 service_to=date(2026, 6, 2),
             ),
@@ -412,6 +440,42 @@ class CustomerOrderServiceTests(unittest.TestCase):
 
         self.assertEqual(order.customer_id, "customer-1")
         self.assertEqual(order.requirement_type_id, cross_customer_requirement.id)
+
+    def test_update_order_allows_unchanged_legacy_service_category_code(self) -> None:
+        legacy_order = self.repository.create_customer_order(
+            "tenant-1",
+            type(
+                "OrderPayload",
+                (),
+                {
+                    "customer_id": "customer-1",
+                    "requirement_type_id": self.requirement_type_id,
+                    "patrol_route_id": None,
+                    "order_no": "ORD-LEGACY-SERVICE-CATEGORY",
+                    "title": "Objekt Nord",
+                    "service_category_code": "site_security",
+                    "security_concept_text": None,
+                    "service_from": date(2026, 6, 1),
+                    "service_to": date(2026, 6, 2),
+                    "release_state": "draft",
+                    "notes": None,
+                },
+            )(),
+            "user-1",
+        )
+
+        updated = self.service.update_order(
+            "tenant-1",
+            legacy_order.id,
+            CustomerOrderUpdate(
+                title="Objekt Nord 2",
+                version_no=legacy_order.version_no,
+            ),
+            self.actor,
+        )
+
+        self.assertEqual(updated.service_category_code, "site_security")
+        self.assertEqual(updated.title, "Objekt Nord 2")
 
     def test_equipment_line_rejects_duplicate_item(self) -> None:
         order = self.service.create_order(
@@ -422,7 +486,7 @@ class CustomerOrderServiceTests(unittest.TestCase):
                 requirement_type_id=self.requirement_type_id,
                 order_no="ORD-2",
                 title="Objekt Nord",
-                service_category_code="site_security",
+                service_category_code="site",
                 service_from=date(2026, 6, 1),
                 service_to=date(2026, 6, 2),
             ),
@@ -448,7 +512,7 @@ class CustomerOrderServiceTests(unittest.TestCase):
                 requirement_type_id=self.requirement_type_id,
                 order_no="ORD-EQUIP-AUDIT",
                 title="Objekt Nord",
-                service_category_code="site_security",
+                service_category_code="site",
                 service_from=date(2026, 6, 1),
                 service_to=date(2026, 6, 2),
             ),
@@ -484,7 +548,7 @@ class CustomerOrderServiceTests(unittest.TestCase):
                 requirement_type_id=self.requirement_type_id,
                 order_no="ORD-3",
                 title="Messe",
-                service_category_code="event_security",
+                service_category_code="event",
                 service_from=date(2026, 7, 1),
                 service_to=date(2026, 7, 3),
             ),
@@ -514,7 +578,7 @@ class CustomerOrderServiceTests(unittest.TestCase):
                 requirement_type_id=self.requirement_type_id,
                 order_no="ORD-REQ-AUDIT",
                 title="Messe",
-                service_category_code="event_security",
+                service_category_code="event",
                 service_from=date(2026, 7, 1),
                 service_to=date(2026, 7, 3),
             ),
@@ -557,7 +621,7 @@ class CustomerOrderServiceTests(unittest.TestCase):
                 requirement_type_id=self.requirement_type_id,
                 order_no="ORD-REQ-LIFE",
                 title="Objekt",
-                service_category_code="site_security",
+                service_category_code="site",
                 service_from=date(2026, 7, 1),
                 service_to=date(2026, 7, 3),
             ),
@@ -673,7 +737,7 @@ class CustomerOrderServiceTests(unittest.TestCase):
                 requirement_type_id=self.requirement_type_id,
                 order_no="ORD-5",
                 title="Objekt Sued",
-                service_category_code="site_security",
+                service_category_code="site",
                 service_from=date(2026, 9, 1),
                 service_to=date(2026, 9, 2),
             ),

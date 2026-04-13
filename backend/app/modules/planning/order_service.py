@@ -39,6 +39,7 @@ from app.modules.platform_services.docs_service import DocumentService
 
 class PlanningOrderRepository(Protocol):
     def get_customer(self, tenant_id: str, customer_id: str) -> Customer | None: ...
+    def list_lookup_values(self, tenant_id: str | None, domain: str): ...  # noqa: ANN001
     def get_requirement_type(self, tenant_id: str, row_id: str) -> RequirementType | None: ...
     def get_patrol_route(self, tenant_id: str, row_id: str) -> PatrolRoute | None: ...
     def get_equipment_item(self, tenant_id: str, row_id: str): ...  # noqa: ANN001
@@ -67,6 +68,13 @@ class PlanningOrderDocumentRepository(Protocol):
 
 class CustomerOrderService:
     _SKIP_SNAPSHOT_VALUE = object()
+    SERVICE_CATEGORY_DOMAIN = "service_category"
+    SERVICE_CATEGORY_FALLBACK_OPTIONS: tuple[dict[str, object], ...] = (
+        {"code": "site", "label": "Objekt", "description": "Objekt- oder Standortleistung", "sort_order": 10},
+        {"code": "event", "label": "Event", "description": "Veranstaltungsbezogene Leistung", "sort_order": 20},
+        {"code": "patrol", "label": "Patrouille", "description": "Patrouillen- oder Revierleistung", "sort_order": 30},
+        {"code": "guarding", "label": "Bewachung", "description": "Allgemeine Bewachungs- oder Sicherheitsleistung", "sort_order": 40},
+    )
     RELEASE_STATES = frozenset({"draft", "release_ready", "released"})
     RELEASE_TRANSITIONS = {
         "draft": {"draft", "release_ready"},
@@ -117,7 +125,15 @@ class CustomerOrderService:
                 "patrol_route_id": self._normalize_optional_order_uuid(payload.patrol_route_id),
             }
         )
-        self._validate_order_payload(tenant_id, payload.customer_id, payload.requirement_type_id, payload.patrol_route_id, payload.service_from, payload.service_to)
+        self._validate_order_payload(
+            tenant_id,
+            payload.customer_id,
+            payload.requirement_type_id,
+            payload.patrol_route_id,
+            payload.service_category_code,
+            payload.service_from,
+            payload.service_to,
+        )
         self._require_release_state(payload.release_state)
         if self.repository.find_customer_order_by_no(tenant_id, payload.order_no) is not None:
             raise ApiException(409, "planning.customer_order.duplicate_number", "errors.planning.customer_order.duplicate_number")
@@ -145,9 +161,19 @@ class CustomerOrderService:
             message_key="errors.planning.customer_order.invalid_requirement_type_id",
         )
         next_patrol_route_id = self._normalize_optional_order_uuid(self._field_value(payload, "patrol_route_id", current.patrol_route_id))
+        next_service_category_code = self._field_value(payload, "service_category_code", current.service_category_code)
         next_service_from = self._field_value(payload, "service_from", current.service_from)
         next_service_to = self._field_value(payload, "service_to", current.service_to)
-        self._validate_order_payload(tenant_id, next_customer_id, next_requirement_type_id, next_patrol_route_id, next_service_from, next_service_to)
+        self._validate_order_payload(
+            tenant_id,
+            next_customer_id,
+            next_requirement_type_id,
+            next_patrol_route_id,
+            next_service_category_code,
+            next_service_from,
+            next_service_to,
+            current_service_category_code=current.service_category_code,
+        )
         payload_updates: dict[str, object | None] = {}
         if "customer_id" in payload.model_fields_set:
             payload_updates["customer_id"] = next_customer_id
@@ -373,8 +399,11 @@ class CustomerOrderService:
         customer_id: str,
         requirement_type_id: str,
         patrol_route_id: str | None,
+        service_category_code: str,
         service_from,
         service_to,
+        *,
+        current_service_category_code: str | None = None,
     ) -> None:
         customer = self.repository.get_customer(tenant_id, customer_id)
         if customer is None:
@@ -382,6 +411,10 @@ class CustomerOrderService:
         requirement_type = self.repository.get_requirement_type(tenant_id, requirement_type_id)
         if requirement_type is None:
             raise self._not_found("requirement_type")
+        self._validate_service_category_code(
+            service_category_code,
+            current_service_category_code=current_service_category_code,
+        )
         if service_to < service_from:
             raise ApiException(400, "planning.customer_order.invalid_window", "errors.planning.customer_order.invalid_window")
         if patrol_route_id is not None:
@@ -390,6 +423,29 @@ class CustomerOrderService:
                 raise self._not_found("patrol_route")
             if patrol_route.customer_id != customer_id:
                 raise ApiException(400, "planning.customer_order.patrol_route_customer_mismatch", "errors.planning.customer_order.patrol_route_customer_mismatch")
+
+    def _validate_service_category_code(
+        self,
+        service_category_code: str,
+        *,
+        current_service_category_code: str | None = None,
+    ) -> None:
+        allowed_codes = {
+            getattr(row, "code", None)
+            for row in self.repository.list_lookup_values(None, self.SERVICE_CATEGORY_DOMAIN)
+        }
+        allowed_codes.discard(None)
+        if not allowed_codes:
+            allowed_codes = {row["code"] for row in self.SERVICE_CATEGORY_FALLBACK_OPTIONS}
+        if service_category_code in allowed_codes:
+            return
+        if current_service_category_code is not None and service_category_code == current_service_category_code:
+            return
+        raise ApiException(
+            400,
+            "planning.customer_order.invalid_service_category_code",
+            "errors.planning.customer_order.invalid_service_category_code",
+        )
 
     def _validate_requirement_line(
         self,

@@ -41,6 +41,18 @@ test("planning-orders no longer renders the local hero and scope chrome", () => 
   assert.doesNotMatch(source, /rememberScopeAndToken/);
 });
 
+test("planning-orders bootstraps legacy auth session and uses effective scope/token before loading references", () => {
+  assert.match(source, /useAuthStore as usePrimaryAuthStore/);
+  assert.match(source, /const primaryAuthStore = usePrimaryAuthStore\(\)/);
+  assert.match(source, /const tenantScopeId = computed\(\(\) => authStore\.effectiveTenantScopeId \|\| authStore\.tenantScopeId \|\| authStore\.sessionUser\?\.tenant_id \|\| ""\)/);
+  assert.match(source, /const accessToken = computed\(\(\) => authStore\.effectiveAccessToken \|\| authStore\.accessToken\)/);
+  assert.match(source, /async function ensurePlanningOrdersSessionReady\(\) \{\s*authStore\.syncFromPrimarySession\(\);[\s\S]*await authStore\.ensureSessionReady\(\);/s);
+  assert.match(source, /async function handleAuthExpired\(\) \{[\s\S]*primaryAuthStore\.clearSessionState\(\);[\s\S]*primaryAuthStore\.redirectToLogin\("\/admin\/planning-orders"\);/s);
+  assert.match(source, /onMounted\(async \(\) => \{[\s\S]*authStore\.syncFromPrimarySession\(\);[\s\S]*ensurePlanningOrdersSessionReady\(\);/s);
+  assert.match(source, /document\.addEventListener\("visibilitychange", handleVisibilityChange\)/);
+  assert.match(source, /window\.addEventListener\("focus", handleWindowFocus\)/);
+});
+
 test("planning-orders detail area uses the refined card sections", () => {
   assert.match(source, /\.planning-orders-section\s*\{[\s\S]*border-radius:\s*18px/);
   assert.doesNotMatch(source, /\.planning-orders-feedback\s*\{/);
@@ -208,9 +220,13 @@ test("planning-orders detail form uses friendly labels and inline placeholders",
   assert.match(source, /tp\('fieldsCustomer'\)/);
   assert.match(source, /tp\("fieldsRequirementType"\)/);
   assert.match(source, /tp\("fieldsPatrolRoute"\)/);
+  assert.match(source, /tp\("fieldsServiceCategory"\)/);
   assert.match(source, /tp\("requirementTypeSetupMissing"\)/);
   assert.match(source, /tp\("patrolRouteSetupMissing"\)/);
-  assert.match(source, /tp\("serviceCategoryManualHelp"\)/);
+  assert.match(source, /:options="serviceCategorySelectOptions"/);
+  assert.match(source, /:placeholder="serviceCategoryPlaceholder"/);
+  assert.match(source, /serviceCategoryLegacyValue/);
+  assert.match(source, /tp\("serviceCategoryRequired"\)/);
   assert.match(source, /tp\("actionsOpenPlanningSetup"\)/);
   assert.match(source, /tp\("actionsAddRequirementType"\)/);
   assert.match(source, /tp\("actionsAddPatrolRoute"\)/);
@@ -218,8 +234,11 @@ test("planning-orders detail form uses friendly labels and inline placeholders",
   assert.match(source, /:placeholder="patrolRoutePlaceholder"/);
   assert.match(source, /:value="orderDraft\.requirement_type_id \|\| undefined"/);
   assert.match(source, /:value="orderDraft\.patrol_route_id \|\| undefined"/);
+  assert.match(source, /:value="orderDraft\.service_category_code \|\| undefined"/);
+  assert.doesNotMatch(source, /fieldsServiceCategory[\s\S]*<input v-model="orderDraft\.service_category_code"/);
   assert.doesNotMatch(source, /tp\("requirementTypeEmpty"\)\s*<\/p>/);
   assert.doesNotMatch(source, /tp\("patrolRouteEmpty"\)\s*<\/p>/);
+  assert.doesNotMatch(source, /serviceCategoryManualHelp/);
 });
 
 test("planning-record detail form replaces raw UUID fields with selectors", () => {

@@ -59,6 +59,16 @@ test("planning setup accepts deep-link entity and customer query context", () =>
   assert.match(source, /entityKey\.value = entity/);
 });
 
+test("planning setup bootstraps legacy auth session before first data load and recovers on visibility return", () => {
+  assert.match(source, /useAuthStore as usePrimaryAuthStore/);
+  assert.match(source, /const primaryAuthStore = usePrimaryAuthStore\(\)/);
+  assert.match(source, /async function ensurePlanningOpsSessionReady\(\) \{\s*authStore\.syncFromPrimarySession\(\);[\s\S]*await authStore\.ensureSessionReady\(\);/s);
+  assert.match(source, /async function handleAuthExpired\(\) \{[\s\S]*primaryAuthStore\.clearSessionState\(\);[\s\S]*primaryAuthStore\.redirectToLogin\("\/admin\/planning"\);/s);
+  assert.match(source, /onMounted\(async \(\) => \{[\s\S]*authStore\.syncFromPrimarySession\(\);[\s\S]*ensurePlanningOpsSessionReady\(\);[\s\S]*refreshPlanningOpsWorkspace\(\);/s);
+  assert.match(source, /document\.addEventListener\("visibilitychange", handleVisibilityChange\)/);
+  assert.match(source, /window\.addEventListener\("focus", handleWindowFocus\)/);
+});
+
 test("create mode exposes entity-aware header, family selector, and cancel action", () => {
   assert.match(source, /tp\("newRecordHeading", \{ entity: editorEntityLabel \}\)/);
   assert.match(source, /tp\("detailCreateLead", \{ entity: editorEntityLabel \}\)/);
@@ -82,7 +92,7 @@ test("planning setup create form uses parent selectors for zones and checkpoints
   assert.match(source, /tp\("fieldsPatrolRouteParent"\)/);
   assert.match(source, /tp\("parentTradeFairPlaceholder"\)/);
   assert.match(source, /tp\("parentPatrolRoutePlaceholder"\)/);
-  assert.match(source, /<label v-if="visibleStatus" class="field-stack field-stack--half">/);
+  assert.match(source, /<label v-if="visibleStatus && editorEntityKey !== 'equipment_item'" class="field-stack field-stack--half">/);
 });
 
 test("requirement type default planning mode uses a constrained select with only canonical modes plus safe legacy fallback", () => {
@@ -116,6 +126,23 @@ test("equipment item unit of measure uses a constrained searchable select with s
   assert.match(source, /openEquipmentUnitCatalogAdmin/);
   assert.doesNotMatch(source, /editorEntityKey === 'equipment_item'[\s\S]*<input v-model="draft\.unit_of_measure_code"/);
   assert.doesNotMatch(source, /fieldsUnitOfMeasureHelp/);
+});
+
+test("equipment item form renders status before unit of measure without changing the shared status field for other entities", () => {
+  assert.match(
+    source,
+    /editorEntityKey === 'equipment_item'[\s\S]*tp\("fieldsLabel"\)[\s\S]*tp\("status"\)[\s\S]*tp\("fieldsUnitOfMeasure"\)[\s\S]*tp\("fieldsNotes"\)/,
+  );
+  assert.match(source, /<label v-if="visibleStatus && editorEntityKey !== 'equipment_item'" class="field-stack field-stack--half">/);
+});
+
+test("equipment item manage-units action shares the main action row and aligns as the right-side secondary action", () => {
+  assert.match(
+    source,
+    /class="cta-row field-stack--wide planning-admin-form-actions"[\s\S]*actionsSaveRecord[\s\S]*actions(?:CancelCreate|ResetRecord)[\s\S]*data-testid="planning-manage-equipment-units"/,
+  );
+  assert.match(source, /\.planning-admin-form-actions__secondary \{\s*margin-left: auto;/);
+  assert.doesNotMatch(source, /planning-admin-inline-actions/);
 });
 
 test("planning setup uses explicit customer scope instead of treating every non-child entity as customer-linked", () => {

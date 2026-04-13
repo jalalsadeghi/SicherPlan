@@ -115,6 +115,13 @@ class PlanningService:
         {"code": "box", "label": "Box", "description": "Gebinde oder Boxeinheit", "sort_order": 40},
         {"code": "pallet", "label": "Palette", "description": "Paletteneinheit fuer groessere Mengen", "sort_order": 50},
     )
+    SERVICE_CATEGORY_DOMAIN = "service_category"
+    SERVICE_CATEGORY_FALLBACK_OPTIONS: tuple[dict[str, object], ...] = (
+        {"code": "site", "label": "Objekt", "description": "Objekt- oder Standortleistung", "sort_order": 10},
+        {"code": "event", "label": "Event", "description": "Veranstaltungsbezogene Leistung", "sort_order": 20},
+        {"code": "patrol", "label": "Patrouille", "description": "Patrouillen- oder Revierleistung", "sort_order": 30},
+        {"code": "guarding", "label": "Bewachung", "description": "Allgemeine Bewachungs- oder Sicherheitsleistung", "sort_order": 40},
+    )
 
     def __init__(self, repository: PlanningRepository, audit_service: AuditService | None = None) -> None:
         self.repository = repository
@@ -185,6 +192,20 @@ class PlanningService:
             ]
 
         return [PlanningReferenceOptionRead.model_validate(row) for row in self.EQUIPMENT_UNIT_FALLBACK_OPTIONS]
+
+    def list_service_category_options(
+        self,
+        tenant_id: str,
+        _actor: RequestAuthorizationContext,
+    ) -> list[PlanningReferenceOptionRead]:
+        lookup_rows = self.repository.list_lookup_values(None, self.SERVICE_CATEGORY_DOMAIN)
+        if lookup_rows:
+            return [
+                PlanningReferenceOptionRead.model_validate(row)
+                for row in sorted(lookup_rows, key=lambda row: (row.sort_order, row.label))
+            ]
+
+        return [PlanningReferenceOptionRead.model_validate(row) for row in self.SERVICE_CATEGORY_FALLBACK_OPTIONS]
 
     def get_equipment_item(self, tenant_id: str, row_id: str, _actor: RequestAuthorizationContext) -> EquipmentItemRead:
         row = self.repository.get_equipment_item(tenant_id, row_id)

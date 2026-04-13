@@ -318,11 +318,30 @@
                   </p>
                 </div>
                 <label class="field-stack"><span>{{ tp("fieldsTitle") }}</span><input v-model="orderDraft.title" required /></label>
-                <label class="field-stack">
-                  <span>{{ tp("fieldsServiceCategory") }}</span>
-                  <input v-model="orderDraft.service_category_code" required />
-                  <p class="field-help">{{ tp("serviceCategoryManualHelp") }}</p>
-                </label>
+                <div class="field-stack">
+                  <span id="planning-orders-service-category-label">{{ tp("fieldsServiceCategory") }}</span>
+                  <Select
+                    :value="orderDraft.service_category_code || undefined"
+                    show-search
+                    class="planning-admin-select"
+                    popup-class-name="planning-admin-select-dropdown"
+                    :options="serviceCategorySelectOptions"
+                    :loading="serviceCategoryLookupLoading"
+                    :disabled="loading.action"
+                    :filter-option="filterSelectOption"
+                    :placeholder="serviceCategoryPlaceholder"
+                    :status="serviceCategoryLookupError || serviceCategoryFieldInvalid ? 'error' : undefined"
+                    :aria-label="tp('fieldsServiceCategory')"
+                    :aria-labelledby="'planning-orders-service-category-label'"
+                    @change="(value) => { orderDraft.service_category_code = typeof value === 'string' ? value : ''; }"
+                  />
+                  <p v-if="serviceCategoryLookupLoading" class="field-help">{{ tp("serviceCategoryLoading") }}</p>
+                  <p v-else-if="serviceCategoryLookupError" class="field-help">{{ serviceCategoryLookupError }}</p>
+                  <p v-else-if="legacyServiceCategoryOption" class="field-help">
+                    {{ tpf("serviceCategoryLegacyValue", { value: legacyServiceCategoryOption.code }) }}
+                  </p>
+                  <p v-else-if="serviceCategoryFieldInvalid" class="field-help">{{ tp("serviceCategoryRequired") }}</p>
+                </div>
                 <div class="planning-orders-form-row planning-orders-form-row--triple">
                   <label class="field-stack"><span>{{ tp("fieldsServiceFrom") }}</span><input v-model="orderDraft.service_from" type="date" :max="orderDraft.service_to || undefined" required /></label>
                   <label class="field-stack"><span>{{ tp("fieldsServiceTo") }}</span><input v-model="orderDraft.service_to" type="date" :min="orderDraft.service_from || undefined" required /></label>
@@ -1159,8 +1178,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 
+import { useAuthStore as usePrimaryAuthStore } from "#/store";
 import { Modal, Select } from "ant-design-vue";
 import { useRouter } from "vue-router";
 
@@ -1192,6 +1212,7 @@ import {
   listOrderEquipmentLines,
   listOrderRequirementLines,
   listOrderAttachments,
+  listServiceCategoryOptions,
   listPlanningDispatcherCandidates,
   listPlanningRecordAttachments,
   listPlanningRecords,
@@ -1209,6 +1230,7 @@ import {
   type PlanningDispatcherCandidateRead,
   type PlanningCommercialLinkRead,
   type PlanningCatalogRecordRead,
+  type PlanningReferenceOptionRead,
   type PlanningRecordListItem,
   type PlanningRecordRead,
   type PlanningDocumentRead,
@@ -1237,6 +1259,7 @@ import { useLocaleStore } from "@/stores/locale";
 import { useAuthStore } from "@/stores/auth";
 
 const authStore = useAuthStore();
+const primaryAuthStore = usePrimaryAuthStore();
 const localeStore = useLocaleStore();
 const router = useRouter();
 const { showFeedbackToast } = useSicherPlanFeedback();
@@ -1265,6 +1288,9 @@ const requirementTypeLookupError = ref("");
 const patrolRouteOptions = ref<PlanningListItem[]>([]);
 const patrolRouteLookupLoading = ref(false);
 const patrolRouteLookupError = ref("");
+const serviceCategoryOptions = ref<PlanningReferenceOptionRead[]>([]);
+const serviceCategoryLookupLoading = ref(false);
+const serviceCategoryLookupError = ref("");
 const dispatcherOptions = ref<PlanningDispatcherCandidateRead[]>([]);
 const dispatcherLookupLoading = ref(false);
 const dispatcherLookupError = ref("");
@@ -1362,8 +1388,8 @@ const planningAttachmentLink = reactive({ document_id: "", label: "" });
 const equipmentLineDraft = reactive({ equipment_item_id: "", required_qty: 1, notes: "" });
 const requirementLineDraft = reactive({ requirement_type_id: "", min_qty: 0, target_qty: 1, notes: "" });
 
-const tenantScopeId = computed(() => authStore.tenantScopeId || authStore.sessionUser?.tenant_id || "");
-const accessToken = computed(() => authStore.accessToken);
+const tenantScopeId = computed(() => authStore.effectiveTenantScopeId || authStore.tenantScopeId || authStore.sessionUser?.tenant_id || "");
+const accessToken = computed(() => authStore.effectiveAccessToken || authStore.accessToken);
 const currentLocale = computed(() => (localeStore.locale === "en" ? "en" : "de"));
 const effectiveRole = computed(() => authStore.effectiveRole);
 const currentSessionUserId = computed(() => authStore.sessionUser?.id || "");
@@ -1383,6 +1409,30 @@ const orderReleaseStateOptions = computed(() => [
   { label: tp("statusReleaseReady"), value: "release_ready" },
   { label: tp("statusReleased"), value: "released" },
 ]);
+const legacyServiceCategoryOption = computed(() => {
+  const currentCode = typeof orderDraft.service_category_code === "string" ? orderDraft.service_category_code.trim() : "";
+  if (!currentCode) {
+    return null;
+  }
+  if (serviceCategoryOptions.value.some((row) => row.code === currentCode)) {
+    return null;
+  }
+  return {
+    code: currentCode,
+    label: currentCode,
+    description: null,
+    sort_order: 9999,
+  };
+});
+const serviceCategorySelectOptions = computed(() => {
+  const rows = legacyServiceCategoryOption.value
+    ? [...serviceCategoryOptions.value, legacyServiceCategoryOption.value]
+    : serviceCategoryOptions.value;
+  return rows.map((row) => ({
+    label: row.label,
+    value: row.code,
+  }));
+});
 const requirementTypeSelectOptions = computed(() =>
   filterPlanningOrderOptionsByScope("requirement_type", requirementTypeOptions.value, orderDraft.customer_id).map((row) => ({
     label: formatPlanningOrderReferenceOption("requirement_type", row),
@@ -1510,6 +1560,18 @@ const patrolRoutePlaceholder = computed(() => {
   }
   return tp("patrolRouteSearchPlaceholder");
 });
+const serviceCategoryPlaceholder = computed(() => {
+  if (serviceCategoryLookupLoading.value) {
+    return tp("serviceCategoryLoading");
+  }
+  if (!serviceCategoryLookupError.value && !serviceCategorySelectOptions.value.length) {
+    return tp("serviceCategoryEmpty");
+  }
+  return tp("serviceCategoryPlaceholder");
+});
+const serviceCategoryFieldInvalid = computed(
+  () => orderValidationState.attempted && orderValidationErrors.value.service_category_code,
+);
 const dispatcherPlaceholder = computed(() => {
   if (dispatcherLookupLoading.value) {
     return tp("dispatcherLoading");
@@ -2170,6 +2232,25 @@ async function refreshCustomerOptions() {
     customerLookupError.value = tp("customerLoadError");
   } finally {
     customerLookupLoading.value = false;
+  }
+}
+
+async function refreshServiceCategoryOptions() {
+  if (!tenantScopeId.value || !accessToken.value || !actionState.value.canReadOrders) {
+    serviceCategoryOptions.value = [];
+    serviceCategoryLookupError.value = "";
+    return;
+  }
+
+  serviceCategoryLookupLoading.value = true;
+  serviceCategoryLookupError.value = "";
+  try {
+    serviceCategoryOptions.value = await listServiceCategoryOptions(tenantScopeId.value, accessToken.value);
+  } catch {
+    serviceCategoryOptions.value = [];
+    serviceCategoryLookupError.value = tp("serviceCategoryLoadError");
+  } finally {
+    serviceCategoryLookupLoading.value = false;
   }
 }
 
@@ -3090,7 +3171,72 @@ async function linkExistingPlanningDocument() {
 
 function handleError(error: unknown) {
   const messageKey = typeof error === "object" && error && "messageKey" in error ? String(error.messageKey) : "errors.platform.internal";
+  if (messageKey === "errors.iam.auth.invalid_access_token" || messageKey === "errors.iam.auth.invalid_refresh_token") {
+    void handleAuthExpired();
+  }
   setFeedback("error", tp("errorTitle"), tp(mapPlanningOrderApiMessage(messageKey) as keyof typeof planningOrdersMessages.de));
+}
+
+async function handleAuthExpired() {
+  authStore.clearSession();
+  try {
+    primaryAuthStore.clearSessionState();
+    await primaryAuthStore.redirectToLogin("/admin/planning-orders");
+  } catch {
+    // Keep current page feedback visible if redirect bootstrap is unavailable.
+  }
+}
+
+async function ensurePlanningOrdersSessionReady() {
+  authStore.syncFromPrimarySession();
+  if (!authStore.effectiveAccessToken && !authStore.refreshToken) {
+    return false;
+  }
+
+  try {
+    await authStore.ensureSessionReady();
+    return Boolean(authStore.effectiveAccessToken);
+  } catch {
+    await handleAuthExpired();
+    return false;
+  }
+}
+
+async function refreshPlanningOrdersWorkspace() {
+  await Promise.all([
+    refreshCustomerOptions(),
+    refreshServiceCategoryOptions(),
+    refreshDispatcherOptions(),
+  ]);
+}
+
+async function refreshPlanningOrdersData() {
+  await refreshPlanningOrdersWorkspace();
+  await refreshOrders();
+  if (selectedOrderId.value) {
+    await refreshPlanningRecords();
+  }
+}
+
+async function recoverSessionAndRefreshPlanningOrders() {
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+    return;
+  }
+  const ready = await ensurePlanningOrdersSessionReady();
+  if (!ready || !tenantScopeId.value || !accessToken.value || (!actionState.value.canReadOrders && !actionState.value.canReadPlanning)) {
+    return;
+  }
+  await refreshPlanningOrdersData();
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === "visible") {
+    void recoverSessionAndRefreshPlanningOrders();
+  }
+}
+
+function handleWindowFocus() {
+  void recoverSessionAndRefreshPlanningOrders();
 }
 
 watch(
@@ -3115,12 +3261,8 @@ watch(
       dispatcherLookupError.value = "";
       return;
     }
-    await Promise.all([
-      refreshCustomerOptions(),
-      refreshDispatcherOptions(),
-    ]);
+    await refreshPlanningOrdersData();
   },
-  { immediate: true },
 );
 
 watch(
@@ -3164,6 +3306,22 @@ watch(
     }
   },
 );
+
+onMounted(async () => {
+  authStore.syncFromPrimarySession();
+  const sessionReady = await ensurePlanningOrdersSessionReady();
+  if (!sessionReady || !tenantScopeId.value || !accessToken.value || !canReadAnything.value) {
+    return;
+  }
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  window.addEventListener("focus", handleWindowFocus);
+  await refreshPlanningOrdersData();
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
+  window.removeEventListener("focus", handleWindowFocus);
+});
 </script>
 
 <style scoped>

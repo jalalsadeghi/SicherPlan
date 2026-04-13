@@ -570,6 +570,15 @@ def list_equipment_unit_options(
     return service.list_equipment_unit_options(str(tenant_id), context)
 
 
+@router.get("/service-category-options", response_model=list[PlanningReferenceOptionRead])
+def list_service_category_options(
+    tenant_id: UUID,
+    context: Annotated[RequestAuthorizationContext, Depends(require_permission_only("planning.ops.read"))],
+    service: Annotated[PlanningService, Depends(get_planning_service)],
+) -> list[PlanningReferenceOptionRead]:
+    return service.list_service_category_options(str(tenant_id), context)
+
+
 @router.post("/equipment-items", response_model=EquipmentItemRead, status_code=status.HTTP_201_CREATED)
 def create_equipment_item(
     tenant_id: UUID,

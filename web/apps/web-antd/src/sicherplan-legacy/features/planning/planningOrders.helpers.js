@@ -69,6 +69,7 @@ export function mapPlanningOrderApiMessage(messageKey) {
     "errors.planning.customer_order.duplicate_number": "orderDuplicateNumber",
     "errors.planning.customer_order.invalid_customer_id": "customerRequired",
     "errors.planning.customer_order.invalid_requirement_type_id": "requirementTypeRequired",
+    "errors.planning.customer_order.invalid_service_category_code": "serviceCategoryInvalid",
     "errors.planning.customer_order.stale_version": "staleVersion",
     "errors.planning.customer_order.invalid_release_transition": "invalidReleaseTransition",
     "errors.planning.requirement_type.duplicate_code": "planningSetupDuplicateCode",
@@ -226,6 +227,7 @@ export function validatePlanningOrderDraft(orderDraft) {
   return {
     customer_id: !normalizePlanningOrderUuidValue(orderDraft?.customer_id),
     requirement_type_id: !normalizePlanningOrderUuidValue(orderDraft?.requirement_type_id),
+    service_category_code: typeof orderDraft?.service_category_code !== "string" || !orderDraft.service_category_code.trim(),
   };
 }
 
@@ -352,6 +354,9 @@ export function derivePlanningOrderSubmitBlockReason(orderDraft, { requirementTy
   }
   if (validation.requirement_type_id) {
     return "requirementTypeRequired";
+  }
+  if (validation.service_category_code) {
+    return "serviceCategoryRequired";
   }
   return null;
 }

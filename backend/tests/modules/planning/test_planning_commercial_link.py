@@ -89,7 +89,7 @@ class PlanningCommercialLinkServiceTests(unittest.TestCase):
                 requirement_type_id=requirement.id,
                 order_no="ORD-COM-1",
                 title="Commercial linkage order",
-                service_category_code="site_security",
+                service_category_code="site",
                 service_from=date(2026, 10, 1),
                 service_to=date(2026, 10, 3),
             ),

@@ -375,6 +375,12 @@
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsCode") }}</span><input v-model="draft.code" required /></label>
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="draft.label" required /></label>
                   <label class="field-stack field-stack--half">
+                    <span>{{ tp("status") }}</span>
+                    <select v-model="draft.status">
+                      <option v-for="status in statusOptions" :key="status" :value="status">{{ tp(`status${status.charAt(0).toUpperCase()}${status.slice(1)}`) }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack field-stack--half">
                     <span>{{ tp("fieldsUnitOfMeasure") }}</span>
                     <Select
                       v-model:value="draft.unit_of_measure_code"
@@ -390,16 +396,6 @@
                       {{ tp("fieldsUnitOfMeasureLegacy", { value: legacyEquipmentUnitValue }) }}
                     </span>
                   </label>
-                  <div v-if="showEquipmentUnitCatalogAction" class="planning-admin-inline-actions">
-                    <button
-                      class="cta-button cta-secondary"
-                      type="button"
-                      data-testid="planning-manage-equipment-units"
-                      @click="openEquipmentUnitCatalogAdmin"
-                    >
-                      {{ tp("actionsManageUnitCatalog") }}
-                    </button>
-                  </div>
                 </template>
 
                 <template v-else-if="editorEntityKey === 'site'">
@@ -566,7 +562,7 @@
                   <label class="field-stack field-stack--half"><span>{{ tp("fieldsTravelPolicyCode") }}</span><input v-model="draft.travel_policy_code" /></label>
                 </template>
 
-                <label v-if="visibleStatus" class="field-stack field-stack--half">
+                <label v-if="visibleStatus && editorEntityKey !== 'equipment_item'" class="field-stack field-stack--half">
                   <span>{{ tp("status") }}</span>
                   <select v-model="draft.status">
                     <option v-for="status in statusOptions" :key="status" :value="status">{{ tp(`status${status.charAt(0).toUpperCase()}${status.slice(1)}`) }}</option>
@@ -594,6 +590,15 @@
                     @click="isCreatingRecord ? cancelCreateRecord() : resetDraft()"
                   >
                     {{ isCreatingRecord ? tp("actionsCancelCreate") : tp("actionsResetRecord") }}
+                  </button>
+                  <button
+                    v-if="showEquipmentUnitCatalogAction"
+                    class="cta-button cta-secondary planning-admin-form-actions__secondary"
+                    type="button"
+                    data-testid="planning-manage-equipment-units"
+                    @click="openEquipmentUnitCatalogAdmin"
+                  >
+                    {{ tp("actionsManageUnitCatalog") }}
                   </button>
                 </div>
               </div>
@@ -760,9 +765,10 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
+import { useAuthStore as usePrimaryAuthStore } from "#/store";
 import { Modal, Select } from "ant-design-vue";
 
 import StatusBadge from "@/components/StatusBadge.vue";
@@ -825,6 +831,7 @@ defineProps({
 });
 
 const authStore = useAuthStore();
+const primaryAuthStore = usePrimaryAuthStore();
 const localeStore = useLocaleStore();
 const route = useRoute();
 const router = useRouter();
@@ -1091,6 +1098,59 @@ function getSupportedTimezones() {
 function filterSelectOption(input, option) {
   const label = typeof option?.label === "string" ? option.label : "";
   return label.toLowerCase().includes(String(input).toLowerCase());
+}
+
+async function handleAuthExpired() {
+  authStore.clearSession();
+  try {
+    primaryAuthStore.clearSessionState();
+    await primaryAuthStore.redirectToLogin("/admin/planning");
+  } catch {
+    // Keep current page state visible if redirect bootstrap is unavailable.
+  }
+}
+
+async function ensurePlanningOpsSessionReady() {
+  authStore.syncFromPrimarySession();
+  if (!authStore.effectiveAccessToken && !authStore.refreshToken) {
+    return false;
+  }
+
+  try {
+    await authStore.ensureSessionReady();
+    return Boolean(authStore.effectiveAccessToken);
+  } catch {
+    await handleAuthExpired();
+    return false;
+  }
+}
+
+async function refreshPlanningOpsWorkspace() {
+  await refreshCustomerOptions();
+  await refreshEquipmentUnitOptions();
+  await refreshReferenceRecords();
+  await refreshRecords();
+}
+
+async function recoverSessionAndRefreshPlanningOps() {
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+    return;
+  }
+  const ready = await ensurePlanningOpsSessionReady();
+  if (!ready || !resolvedTenantScopeId.value || !accessToken.value || !canRead.value) {
+    return;
+  }
+  await refreshPlanningOpsWorkspace();
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === "visible") {
+    void recoverSessionAndRefreshPlanningOps();
+  }
+}
+
+function handleWindowFocus() {
+  void recoverSessionAndRefreshPlanningOps();
 }
 
 function openEquipmentUnitCatalogAdmin() {
@@ -2049,6 +2109,9 @@ async function runImportExecute() {
 
 function handleError(error) {
   const key = error instanceof PlanningAdminApiError ? mapPlanningApiMessage(error.messageKey) : "error";
+  if (key === "authRequired") {
+    void handleAuthExpired();
+  }
   setFeedback("error", tp("errorTitle"), tp(key));
 }
 
@@ -2090,10 +2153,7 @@ watch(
 watch(
   () => [resolvedTenantScopeId.value, accessToken.value, canRead.value],
   async () => {
-    await refreshCustomerOptions();
-    await refreshEquipmentUnitOptions();
-    await refreshReferenceRecords();
-    await refreshRecords();
+    await refreshPlanningOpsWorkspace();
   },
 );
 
@@ -2125,13 +2185,22 @@ watch(
 );
 
 onMounted(async () => {
+  authStore.syncFromPrimarySession();
+  const sessionReady = await ensurePlanningOpsSessionReady();
+  if (!sessionReady || !resolvedTenantScopeId.value || !accessToken.value || !canRead.value) {
+    return;
+  }
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  window.addEventListener("focus", handleWindowFocus);
   resetImportTemplate();
-  await refreshCustomerOptions();
-  await refreshEquipmentUnitOptions();
-  await refreshReferenceRecords();
+  await refreshPlanningOpsWorkspace();
   applyPlanningRouteContext();
-  await refreshRecords();
   markCleanState();
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
+  window.removeEventListener("focus", handleWindowFocus);
 });
 </script>
 
@@ -2191,13 +2260,6 @@ onMounted(async () => {
   display: grid;
   justify-items: end;
   gap: 0.42rem;
-}
-
-.planning-admin-inline-actions {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  margin-top: 26px;
 }
 
 .planning-admin-shared-context {
@@ -2422,6 +2484,10 @@ onMounted(async () => {
 .planning-admin-map-action,
 .planning-admin-form-actions {
   margin-top: 0.15rem;
+}
+
+.planning-admin-form-actions__secondary {
+  margin-left: auto;
 }
 
 .planning-admin-map-action {

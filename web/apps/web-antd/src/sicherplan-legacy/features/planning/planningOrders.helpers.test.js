@@ -55,6 +55,7 @@ test("read-only action state disables editing, release, and attachments", () => 
 test("api message mapping covers planning-specific errors", () => {
   assert.equal(mapPlanningOrderApiMessage("errors.planning.customer_order.duplicate_number"), "orderDuplicateNumber");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.customer_order.invalid_requirement_type_id"), "requirementTypeRequired");
+  assert.equal(mapPlanningOrderApiMessage("errors.planning.customer_order.invalid_service_category_code"), "serviceCategoryInvalid");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.requirement_type.duplicate_code"), "planningSetupDuplicateCode");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.planning_record.invalid_window"), "planningInvalidWindow");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.planning_record.order_window_mismatch"), "planningOrderWindowMismatch");
@@ -168,16 +169,21 @@ test("requirement-line duplicate guard blocks only second active line with same 
 
 test("planning-order draft validation blocks missing required selects only", () => {
   assert.deepEqual(
-    validatePlanningOrderDraft({ customer_id: "", requirement_type_id: "" }),
-    { customer_id: true, requirement_type_id: true },
+    validatePlanningOrderDraft({ customer_id: "", requirement_type_id: "", service_category_code: "" }),
+    { customer_id: true, requirement_type_id: true, service_category_code: true },
   );
   assert.deepEqual(
-    validatePlanningOrderDraft({ customer_id: "customer-1", requirement_type_id: "" }),
-    { customer_id: false, requirement_type_id: true },
+    validatePlanningOrderDraft({ customer_id: "customer-1", requirement_type_id: "", service_category_code: "" }),
+    { customer_id: false, requirement_type_id: true, service_category_code: true },
   );
   assert.deepEqual(
-    validatePlanningOrderDraft({ customer_id: "customer-1", requirement_type_id: "req-1", patrol_route_id: "" }),
-    { customer_id: false, requirement_type_id: false },
+    validatePlanningOrderDraft({
+      customer_id: "customer-1",
+      requirement_type_id: "req-1",
+      patrol_route_id: "",
+      service_category_code: "site",
+    }),
+    { customer_id: false, requirement_type_id: false, service_category_code: false },
   );
 });
 
@@ -257,17 +263,24 @@ test("planning-order detects missing prerequisite setup data for selected custom
 test("planning-order submit block reason distinguishes missing setup from missing selection", () => {
   assert.equal(
     derivePlanningOrderSubmitBlockReason(
-      { customer_id: "customer-1", requirement_type_id: "" },
+      { customer_id: "customer-1", requirement_type_id: "", service_category_code: "site" },
       { requirementTypeSetupMissing: true },
     ),
     "requirementTypeSetupBlocked",
   );
   assert.equal(
     derivePlanningOrderSubmitBlockReason(
-      { customer_id: "customer-1", requirement_type_id: "" },
+      { customer_id: "customer-1", requirement_type_id: "", service_category_code: "site" },
       { requirementTypeSetupMissing: false },
     ),
     "requirementTypeRequired",
+  );
+  assert.equal(
+    derivePlanningOrderSubmitBlockReason(
+      { customer_id: "customer-1", requirement_type_id: "req-1", service_category_code: "" },
+      { requirementTypeSetupMissing: false },
+    ),
+    "serviceCategoryRequired",
   );
 });
 

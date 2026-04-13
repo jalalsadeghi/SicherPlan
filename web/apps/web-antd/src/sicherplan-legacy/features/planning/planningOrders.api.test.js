@@ -11,6 +11,7 @@ const source = readFileSync(apiPath, "utf8");
 
 test("planningOrders api exposes all documented order endpoint groups", () => {
   assert.match(source, /export function listCustomerOrders/);
+  assert.match(source, /export function listServiceCategoryOptions/);
   assert.match(source, /export function createCustomerOrder/);
   assert.match(source, /export function updateCustomerOrder/);
   assert.match(source, /export function setCustomerOrderReleaseState/);
