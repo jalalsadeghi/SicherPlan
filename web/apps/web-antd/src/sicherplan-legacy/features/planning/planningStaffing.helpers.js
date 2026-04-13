@@ -43,6 +43,8 @@ export function mapPlanningStaffingApiMessage(messageKey) {
     "errors.planning.staffing.scope_mismatch": "scopeMismatch",
     "errors.planning.assignment.blocked_by_validation": "assignmentBlocked",
     "errors.planning.assignment.stale_version": "assignmentStaleVersion",
+    "errors.planning.team_member.invalid_actor_choice": "error",
+    "errors.planning.team_member.duplicate_lead": "error",
     "errors.planning.assignment_validation.override_not_allowed": "overrideNotAllowed",
     "errors.planning.assignment_validation.rule_not_found": "ruleNotFound",
     "errors.planning.shift.blocked_by_validation": "releaseBlocked",

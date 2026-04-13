@@ -1,129 +1,124 @@
-You are working in the SicherPlan monorepo on the latest main branch.
+You are working on the SicherPlan repo.
 
 Task:
-Fix the incomplete `Series exceptions` form in Planning -> Shift planning -> Series and exceptions.
+Validate and, if needed, implement planning-level team creation and assignment-to-team linking in the Planning Staffing workspace.
 
-Problem:
-The current UI only renders:
-- Occurrence date
-- Exception action
-- Override local start time (only when action = override)
-- Override local end time (only when action = override)
-- Notes
+Important:
+Before changing code, first validate the proposal below against:
+1) current repo code,
+2) current OpenAPI/backend contracts,
+3) the uploaded project source-of-truth docs:
+   - SicherPlan_Implementation_Data_Model_Spec.pdf
+   - SicherPlan API.pdf
+   - SicherPlan_User_Manual_Operational_Handbook.pdf
+   - SicherPlan_Role_Based_Page_Coverage_Map.pdf
+   - SicherPlan_Proposal.pdf
 
-But the project model/API for shift series exceptions already support additional fields:
-- `override_break_minutes`
-- `override_shift_type_code`
-- `override_meeting_point`
-- `override_location_text`
-- `customer_visible_flag`
-- `subcontractor_visible_flag`
-- `stealth_mode_flag`
+Expected validation points:
+- P-04 / Staffing Board & Coverage is the canonical workspace for teams, team members, assignments, validations, and coverage.
+- A planning-level team is valid when ops.team uses planning_record_id and leaves shift_id null.
+- role_label belongs to ops.team_member, not to ops.team.
+- notes must NOT be assumed on ops.team unless the real backend schema/OpenAPI currently supports it.
+- assignments should be linkable to a team via team_id without breaking existing validation and audit behavior.
 
-So the current form appears incomplete relative to the actual contract.
+What I need from you:
+Phase A — Validation summary
+1. Inspect the current implementation and print a short validation summary:
+   - confirmed assumptions
+   - rejected assumptions
+   - missing backend or frontend pieces
+   - exact files/pages currently responsible for planning staffing
+2. If an equivalent team-management UI already exists somewhere else, DO NOT duplicate it. Reuse and integrate it into the correct workflow.
 
-What you must verify first:
-1. Confirm that these fields are real supported fields in both backend and frontend API types.
-2. Confirm whether they should be available in the UI.
-3. Validate whether they should be shown:
-   - always, or
-   - only when `action_code === 'override'`
+Phase B — Implement the missing capability if validation confirms it is absent
+Implement planning-level team management in the current staffing workspace.
 
-Known facts already observed:
-- Backend shift series exception schemas include the additional override and visibility fields.
-- Frontend `planningShifts.ts` also includes those fields in `ShiftSeriesExceptionRead`.
-- Current `PlanningShiftsAdminView.vue` form does not render most of them.
+Target workspace:
+- the current planning staffing route / module used for Staffing Board & Coverage
+- keep it aligned with the current shell/module-registry structure
 
-Files to inspect first:
-Frontend
-- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningShiftsAdminView.vue`
-- `web/apps/web-antd/src/sicherplan-legacy/api/planningShifts.ts`
-- `@/features/planning/planningShifts.helpers` if relevant
-- planning-shifts i18n/messages files
+Required behavior:
+1. Add team CRUD wiring
+   - list teams
+   - create team
+   - read team
+   - update team
 
-Backend
-- `backend/app/modules/planning/schemas.py`
-- `backend/app/modules/planning/models.py`
-- any shift-series-exception service/router/repository files if needed
+2. Add team-member CRUD wiring
+   - list team members
+   - create team member
+   - update team member
 
-Your job:
-1. Validate the intended UX logic.
-2. Complete the form so it matches the real contract.
-3. Keep the UX clean and logically conditional.
+3. Support planning-level team creation
+   - required: name
+   - required: planning_record_id
+   - optional: shift_id (null for planning-level team)
+   - optional: team_lead_employee_id OR team_lead_worker_id
+   - exactly one team lead actor max
+   - DO NOT place role_label on the team payload unless backend explicitly requires it
+   - DO NOT send notes unless backend schema confirms support
 
-Preferred UX logic unless validation disproves it:
-- If `action_code === 'skip'`:
-  - keep the form minimal
-  - override-specific fields may remain hidden or collapsed
-  - their values should be cleared/reset safely
-- If `action_code === 'override'`:
-  - show all override-capable fields:
-    - Override Local Start Time
-    - Override Local End Time
-    - Override Break Minutes
-    - Override Shift Type Code
-    - Override Meeting Point
-    - Override Location Text
-    - Customer Visible Flag
-    - Subcontractor Visible Flag
-    - Stealth Mode Flag
-    - Notes
+4. Add UI affordance in the staffing page
+   - a visible action like “Create team” or “Create planning team”
+   - when the user is already filtered by planning_record_id, prefill that value
+   - allow shift to remain empty/null for planning-level teams
+   - show existing teams relevant to the selected planning record
+   - clearly distinguish planning-level teams from shift-level teams
 
-Important implementation details:
-A. Reuse existing shift-type option loading instead of inventing a new source.
-   The override shift type field should use the same option source/pattern already used elsewhere in Shift planning.
-B. Preserve edit round-trip for all fields.
-C. Do not break current `skip` behavior.
-D. Do not force users to fill override-only fields when action is `skip`.
+5. Add team-member editor
+   - actor must be either employee OR subcontractor_worker
+   - support role_label on team member
+   - support valid_from / valid_to if backend supports them
+   - prevent invalid mixed actor payloads
 
-Critical UX requirement for visibility flags:
-The following fields are nullable booleans in the contract:
-- `customer_visible_flag`
-- `subcontractor_visible_flag`
-- `stealth_mode_flag`
+6. Add assignment-to-team linking
+   - from the staffing board / assignment detail, allow assigning or changing team_id
+   - preserve all existing assignment validations and override logic
+   - do not bypass qualification/document/customer-block/double-booking rules
 
-Because they are nullable, do NOT model them as simple two-state checkboxes if that would lose the `null` / “inherit” state.
+7. Preserve guardrails
+   - tenant scoping
+   - role-scoped visibility
+   - audit-safe behavior
+   - no changes that bypass finance.actual_record workflow
+   - no schema invention
 
-Instead, validate and implement a proper nullable UI, for example:
-- `inherit`
-- `yes`
-- `no`
+Likely code areas to inspect first:
+- current module registry / shell registration for planning staffing
+- current PlanningStaffingCoverageView.vue
+- current planning staffing API wrapper / typed client
+- any legacy planning staffing view still in use
+- any backend DTO/router/schema for planning teams, team members, and assignments
 
-This is important because `null` means “no exception-level override”.
+Implementation details:
+- prefer small, localized changes
+- reuse existing composables, modal patterns, form patterns, and action guards
+- keep naming consistent with existing SicherPlan modules
+- if backend DTOs already exist but frontend wrappers are missing, only add missing wrappers
+- if backend endpoints are missing fields needed for planning-level team UX, propose the smallest backend change set and implement it only if clearly necessary
 
-Validation questions you must answer:
-1. Are the missing fields truly part of the supported exception contract?
-2. Should they appear only for `override` exceptions?
-3. How did you preserve nullable behavior for the three visibility fields?
-4. Did you reuse existing shift type option loading?
+Tests:
+Add or update focused tests for:
+- planning-level team creation with planning_record_id and null shift_id
+- team-member creation with role_label
+- linking assignment.team_id
+- rejecting invalid dual-actor team-member payloads
+- preserving existing assignment validation flows
+
+Deliverables:
+1. Validation summary first
+2. Then implementation
+3. Then a final report containing:
+   - changed files
+   - what was missing before
+   - what was added
+   - any backend/schema mismatch found
+   - any field that was intentionally NOT implemented because it was not validated in schema/OpenAPI
+   - short manual test steps
 
 Acceptance criteria:
-1. The `Series exceptions` form matches the real supported exception contract.
-2. For `skip`, the form remains minimal and valid.
-3. For `override`, the missing fields are available.
-4. `override_shift_type_code` uses the existing shift type option source.
-5. Nullable visibility flags are represented safely without losing `null`.
-6. Existing create/edit/get round-trip still works.
-7. No unrelated shift-planning behavior is changed.
-
-Tests to add/update:
-- frontend test for `skip` mode showing only the appropriate fields
-- frontend test for `override` mode showing the full override field set
-- frontend test for nullable visibility flag behavior
-- round-trip test for edit mode hydrating all exception fields
-- backend/integration test only if needed to align with the actual API contract
-
-What not to do:
-- Do not expose all override fields unconditionally if the UX becomes confusing and the model clearly distinguishes `skip` vs `override`
-- Do not use simple checkboxes for nullable visibility flags if that destroys the inherit state
-- Do not add new data sources for shift types
-- Do not refactor unrelated shift-planning tabs
-
-Required output:
-1. Confirmed root cause
-2. Confirmed UI rule: always visible vs override-only
-3. Files changed
-4. Exact fields added
-5. How nullable visibility flags were implemented
-6. Tests added/updated
-7. Final self-check confirming you validated the proposal against the real contract instead of assuming
+- A dispatcher in Staffing Board & Coverage can create a planning-level team for a selected planning record.
+- The dispatcher can add team members with role_label.
+- Assignments can be linked to that team.
+- Existing staffing coverage, validations, outputs, and dispatch behavior keep working.
+- No unsupported fields are invented.

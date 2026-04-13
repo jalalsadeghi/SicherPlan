@@ -273,8 +273,8 @@
                     <span>{{ tp("fieldsTeam") }}</span>
                     <select v-model="staffingDraft.team_id" data-testid="planning-staffing-team-select">
                       <option value="">{{ tp("teamContextPlaceholder") }}</option>
-                      <option v-for="team in shiftTeams" :key="team.id" :value="team.id">
-                        {{ team.name }}
+                      <option v-for="team in availableTeams" :key="team.id" :value="team.id">
+                        {{ formatTeam(team) }}
                       </option>
                     </select>
                     <p class="field-help">{{ tp("fieldsTeamContextHint") }}</p>
@@ -481,7 +481,30 @@
               <div v-if="selectedAssignment" class="planning-staffing-metrics">
                 <span>{{ tp("fieldsDemandGroup") }}: {{ selectedAssignment.demand_group_id }}</span>
                 <span>{{ tp("fieldsVersion") }}: {{ selectedAssignment.version_no }}</span>
-                <span>{{ tp("fieldsTeam") }}: {{ selectedAssignment.team_id || tp("unassignedLabel") }}</span>
+                <span>{{ tp("fieldsTeam") }}: {{ assignmentTeamLabel(selectedAssignment.team_id) }}</span>
+              </div>
+              <div v-if="selectedAssignment" class="planning-staffing-filter-grid">
+                <label class="field-stack field-stack--wide">
+                  <span>{{ tp("assignmentTeamLinkLabel") }}</span>
+                  <select v-model="assignmentTeamId" data-testid="planning-staffing-assignment-team-select">
+                    <option value="">{{ tp("assignmentTeamLinkPlaceholder") }}</option>
+                    <option v-for="team in availableTeams" :key="team.id" :value="team.id">
+                      {{ formatTeam(team) }}
+                    </option>
+                  </select>
+                  <p class="field-help">{{ tp("assignmentTeamLinkHint") }}</p>
+                </label>
+              </div>
+              <div v-if="selectedAssignment" class="cta-row">
+                <button
+                  class="cta-button cta-secondary"
+                  type="button"
+                  data-testid="planning-staffing-assignment-team-save"
+                  :disabled="!canSubmitAssignmentTeam || savingAssignmentTeam"
+                  @click="submitAssignmentTeamUpdate"
+                >
+                  {{ tp("assignmentTeamLinkAction") }}
+                </button>
               </div>
             </section>
           </section>
@@ -500,14 +523,96 @@
                   <p class="eyebrow">{{ tp("teamReleaseTitle") }}</p>
                   <h4>{{ tp("teamReleaseTitle") }}</h4>
                 </div>
+                <div v-if="actionState.canWriteStaffing" class="planning-staffing-panel__actions">
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="planning-staffing-create-planning-team"
+                    :disabled="!relevantPlanningRecordId || savingTeam"
+                    @click="startCreateTeam('planning')"
+                  >
+                    {{ tp("createPlanningTeamAction") }}
+                  </button>
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="planning-staffing-create-shift-team"
+                    :disabled="!selectedShiftId || savingTeam"
+                    @click="startCreateTeam('shift')"
+                  >
+                    {{ tp("createShiftTeamAction") }}
+                  </button>
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="planning-staffing-edit-team"
+                    :disabled="!selectedTeamId || savingTeam"
+                    @click="startEditTeam()"
+                  >
+                    {{ tp("editTeamAction") }}
+                  </button>
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="planning-staffing-create-team-member"
+                    :disabled="!selectedTeamId || savingTeamMember"
+                    @click="startCreateTeamMember()"
+                  >
+                    {{ tp("createTeamMemberAction") }}
+                  </button>
+                </div>
               </div>
               <div class="planning-staffing-support-grid">
                 <article class="planning-staffing-support-card">
                   <strong>{{ tp("teamsTitle") }}</strong>
-                  <p v-if="shiftTeams.length" class="planning-staffing-support-list">
-                    <span v-for="team in shiftTeams" :key="team.id">{{ team.name }} · {{ team.members.length }}</span>
-                  </p>
+                  <div v-if="availableTeams.length" class="planning-staffing-list">
+                    <button
+                      v-for="team in availableTeams"
+                      :key="team.id"
+                      type="button"
+                      class="planning-staffing-row"
+                      :class="{ selected: team.id === selectedTeamId }"
+                      @click="selectedTeamId = team.id"
+                    >
+                      <div>
+                        <strong>{{ team.name }}</strong>
+                        <span>{{ tp(team.shift_id ? "teamScopeShift" : "teamScopePlanning") }}</span>
+                        <span>{{ tp("teamMemberCount") }}: {{ team.members.length }}</span>
+                      </div>
+                    </button>
+                  </div>
                   <p v-else class="planning-staffing-list-empty">{{ tp("teamsEmpty") }}</p>
+                  <div v-if="selectedTeam" class="planning-staffing-issues">
+                    <article class="planning-staffing-issue" data-tone="neutral">
+                      <strong>{{ selectedTeam.name }}</strong>
+                      <span>{{ tp(selectedTeam.shift_id ? "teamScopeShift" : "teamScopePlanning") }}</span>
+                      <span v-if="selectedTeam.role_label">{{ selectedTeam.role_label }}</span>
+                      <span v-if="selectedTeam.notes">{{ selectedTeam.notes }}</span>
+                    </article>
+                    <article
+                      v-for="member in selectedTeamMembers"
+                      :key="member.id"
+                      class="planning-staffing-issue"
+                      data-tone="neutral"
+                    >
+                      <div class="planning-staffing-panel__header">
+                        <div>
+                          <strong>{{ formatMember(member) }}</strong>
+                          <span>{{ member.role_label || tp("teamMemberRolePlaceholder") }}</span>
+                          <span v-if="member.is_team_lead">{{ tp("teamLeadBadge") }}</span>
+                        </div>
+                        <button
+                          v-if="actionState.canWriteStaffing"
+                          class="cta-button cta-secondary"
+                          type="button"
+                          :data-testid="`planning-staffing-edit-team-member-${member.id}`"
+                          @click="startEditTeamMember(member.id)"
+                        >
+                          {{ tp("editTeamMemberAction") }}
+                        </button>
+                      </div>
+                    </article>
+                  </div>
                 </article>
                 <article class="planning-staffing-support-card">
                   <strong>{{ tp("subcontractorReleasesTitle") }}</strong>
@@ -672,6 +777,148 @@
         </div>
       </form>
     </Modal>
+
+    <Modal
+      v-model:open="teamDialogOpen"
+      :title="editingTeam ? tp('teamEditTitle') : tp('teamCreateTitle')"
+      :footer="null"
+      @cancel="closeTeamDialog"
+    >
+      <form
+        v-if="actionState.canWriteStaffing"
+        class="planning-staffing-demand-group-editor"
+        data-testid="planning-staffing-team-editor"
+        @submit.prevent="submitTeam"
+      >
+        <div class="planning-staffing-filter-grid">
+          <label class="field-stack">
+            <span>{{ tp("teamNameLabel") }}</span>
+            <input v-model="teamDraft.name" type="text" data-testid="planning-staffing-team-name" />
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("teamScopeLabel") }}</span>
+            <select v-model="teamDraft.scope_kind" data-testid="planning-staffing-team-scope">
+              <option value="planning">{{ tp("teamScopePlanning") }}</option>
+              <option value="shift" :disabled="!selectedShiftId">{{ tp("teamScopeShift") }}</option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("teamRoleLabel") }}</span>
+            <input v-model="teamDraft.role_label" type="text" />
+          </label>
+          <label class="field-stack field-stack--wide">
+            <span>{{ tp("teamNotesLabel") }}</span>
+            <textarea v-model="teamDraft.notes" rows="2" />
+          </label>
+          <label v-if="!editingTeam" class="field-stack">
+            <span>{{ tp("teamLeadActorLabel") }}</span>
+            <select v-model="teamDraft.lead_actor_kind" data-testid="planning-staffing-team-lead-actor-kind">
+              <option value="employee">{{ tp("actorKindEmployee") }}</option>
+              <option value="subcontractor_worker">{{ tp("actorKindSubcontractorWorker") }}</option>
+            </select>
+          </label>
+          <label v-if="!editingTeam" class="field-stack">
+            <span>{{ tp("teamLeadMemberLabel") }}</span>
+            <select v-model="teamDraft.lead_member_ref" data-testid="planning-staffing-team-lead-member">
+              <option value="">{{ tp("teamLeadMemberPlaceholder") }}</option>
+              <option v-for="option in teamLeadOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+        </div>
+        <div class="cta-row">
+          <button
+            class="cta-button"
+            type="submit"
+            data-testid="planning-staffing-team-save"
+            :disabled="!canSubmitTeam || savingTeam"
+          >
+            {{ editingTeam ? tp("teamUpdateAction") : tp("teamSaveAction") }}
+          </button>
+          <button class="cta-button cta-secondary" type="button" :disabled="savingTeam" @click="closeTeamDialog">
+            {{ tp("demandGroupCancelAction") }}
+          </button>
+        </div>
+      </form>
+    </Modal>
+
+    <Modal
+      v-model:open="teamMemberDialogOpen"
+      :title="editingTeamMember ? tp('teamMemberEditTitle') : tp('teamMemberCreateTitle')"
+      :footer="null"
+      @cancel="closeTeamMemberDialog"
+    >
+      <form
+        v-if="actionState.canWriteStaffing"
+        class="planning-staffing-demand-group-editor"
+        data-testid="planning-staffing-team-member-editor"
+        @submit.prevent="submitTeamMember"
+      >
+        <div class="planning-staffing-filter-grid">
+          <label class="field-stack">
+            <span>{{ tp("fieldsTeam") }}</span>
+            <select v-model="teamMemberDraft.team_id" data-testid="planning-staffing-team-member-team">
+              <option value="">{{ tp("teamPlaceholder") }}</option>
+              <option v-for="team in availableTeams" :key="team.id" :value="team.id">
+                {{ formatTeam(team) }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("fieldsActorKind") }}</span>
+            <select v-model="teamMemberDraft.actor_kind" data-testid="planning-staffing-team-member-actor-kind">
+              <option value="employee">{{ tp("actorKindEmployee") }}</option>
+              <option value="subcontractor_worker">{{ tp("actorKindSubcontractorWorker") }}</option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("teamMemberActorLabel") }}</span>
+            <select v-model="teamMemberDraft.member_ref" data-testid="planning-staffing-team-member-member">
+              <option value="">{{ tp("teamMemberActorPlaceholder") }}</option>
+              <option v-for="option in teamMemberActorOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("teamMemberRoleLabel") }}</span>
+            <input v-model="teamMemberDraft.role_label" type="text" data-testid="planning-staffing-team-member-role-label" />
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("teamMemberValidFromLabel") }}</span>
+            <input v-model="teamMemberDraft.valid_from" type="datetime-local" />
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("teamMemberValidToLabel") }}</span>
+            <input v-model="teamMemberDraft.valid_to" type="datetime-local" />
+          </label>
+          <div class="planning-staffing-confirm-row field-stack--wide">
+            <label class="planning-staffing-checkbox-row">
+              <input v-model="teamMemberDraft.is_team_lead" type="checkbox" />
+              <span>{{ tp("teamMemberLeadLabel") }}</span>
+            </label>
+          </div>
+          <label class="field-stack field-stack--wide">
+            <span>{{ tp("teamMemberNotesLabel") }}</span>
+            <textarea v-model="teamMemberDraft.notes" rows="2" />
+          </label>
+        </div>
+        <div class="cta-row">
+          <button
+            class="cta-button"
+            type="submit"
+            data-testid="planning-staffing-team-member-save"
+            :disabled="!canSubmitTeamMember || savingTeamMember"
+          >
+            {{ editingTeamMember ? tp("teamMemberUpdateAction") : tp("teamMemberSaveAction") }}
+          </button>
+          <button class="cta-button cta-secondary" type="button" :disabled="savingTeamMember" @click="closeTeamMemberDialog">
+            {{ tp("demandGroupCancelAction") }}
+          </button>
+        </div>
+      </form>
+    </Modal>
   </section>
 </template>
 
@@ -681,16 +928,21 @@ import { Modal, Select } from "ant-design-vue";
 
 import { useAuthStore as usePrimaryAuthStore } from "#/store";
 import {
+  listEmployees,
   listFunctionTypes,
   listQualificationTypes,
+  type EmployeeListItem,
   type FunctionTypeRead,
   type QualificationTypeRead,
 } from "@/api/employeeAdmin";
 import { listPlanningRecords, type PlanningRecordListItem } from "@/api/planningOrders";
 import {
   assignStaffing,
+  createTeam,
+  createTeamMember,
   createDemandGroup,
   createAssignmentValidationOverride,
+  getTeam,
   listDemandGroups,
   generateShiftOutput,
   getAssignmentValidations,
@@ -706,8 +958,12 @@ import {
   queueShiftDispatchMessage,
   substituteStaffing,
   unassignStaffing,
+  updateAssignment,
   updateDemandGroup,
+  updateTeam,
+  updateTeamMember,
   PlanningStaffingApiError,
+  type AssignmentUpdate,
   type AssignmentValidationRead,
   type CoverageShiftItem,
   type DemandGroupRead,
@@ -718,10 +974,16 @@ import {
   type StaffingBoardDemandGroupItem,
   type StaffingBoardShiftItem,
   type SubcontractorReleaseRead,
+  type TeamCreate,
+  type TeamMemberCreate,
   type TeamMemberRead,
   type TeamRead,
 } from "@/api/planningStaffing";
 import { planningStaffingMessages } from "@/i18n/planningStaffing.messages";
+import {
+  listSubcontractorWorkers,
+  type SubcontractorWorkerListItem,
+} from "@/api/subcontractors";
 import { useAuthStore } from "@/stores/auth";
 import { useLocaleStore } from "@/stores/locale";
 import {
@@ -768,13 +1030,19 @@ const boardRows = ref<StaffingBoardShiftItem[]>([]);
 const demandGroupRows = ref<DemandGroupRead[]>([]);
 const functionTypeOptions = ref<FunctionTypeRead[]>([]);
 const qualificationTypeOptions = ref<QualificationTypeRead[]>([]);
-const shiftTeams = ref<TeamRead[]>([]);
+const planningTeams = ref<TeamRead[]>([]);
 const teamMembers = ref<TeamMemberRead[]>([]);
+const employeeOptions = ref<EmployeeListItem[]>([]);
+const subcontractorWorkerOptions = ref<SubcontractorWorkerListItem[]>([]);
 const subcontractorReleases = ref<SubcontractorReleaseRead[]>([]);
 const selectedShiftId = ref("");
 const selectedDemandGroupId = ref("");
 const selectedAssignmentId = ref("");
+const selectedTeamId = ref("");
+const assignmentTeamId = ref("");
 const demandGroupDialogOpen = ref(false);
+const teamDialogOpen = ref(false);
+const teamMemberDialogOpen = ref(false);
 const activeShiftDetailTab = ref<"demand_staffing" | "validations" | "assignments" | "teams_releases" | "outputs_dispatch">("demand_staffing");
 const shiftValidations = ref<ShiftReleaseValidationRead | null>(null);
 const assignmentValidations = ref<AssignmentValidationRead | null>(null);
@@ -788,6 +1056,9 @@ const overrideReason = ref("");
 const loading = ref(false);
 const savingOverride = ref(false);
 const savingDemandGroup = ref(false);
+const savingTeam = ref(false);
+const savingTeamMember = ref(false);
+const savingAssignmentTeam = ref(false);
 const planningRecordOptions = ref<PlanningRecordListItem[]>([]);
 const planningRecordLookupLoading = ref(false);
 const planningRecordLookupError = ref("");
@@ -820,6 +1091,28 @@ const demandGroupDraft = reactive({
   remark: "",
   version_no: null as null | number,
 });
+const teamDraft = reactive({
+  id: "",
+  name: "",
+  scope_kind: "planning",
+  role_label: "",
+  notes: "",
+  lead_actor_kind: "employee",
+  lead_member_ref: "",
+  version_no: null as null | number,
+});
+const teamMemberDraft = reactive({
+  id: "",
+  team_id: "",
+  actor_kind: "employee",
+  member_ref: "",
+  role_label: "",
+  is_team_lead: false,
+  valid_from: "",
+  valid_to: "",
+  notes: "",
+  version_no: null as null | number,
+});
 
 function tp(key: keyof typeof planningStaffingMessages.de) {
   return planningStaffingMessages[currentLocale.value][key] ?? planningStaffingMessages.de[key] ?? key;
@@ -835,6 +1128,16 @@ const shiftDetailTabs = [
 
 const selectedShift = computed(() => coverageRows.value.find((row) => row.shift_id === selectedShiftId.value) ?? null);
 const selectedBoardShift = computed(() => boardRows.value.find((row) => row.id === selectedShiftId.value) ?? null);
+const relevantPlanningRecordId = computed(() => selectedShift.value?.planning_record_id || filters.planning_record_id || "");
+const availableTeams = computed(() =>
+  planningTeams.value.filter(
+    (team) =>
+      team.planning_record_id === relevantPlanningRecordId.value
+      && (team.shift_id == null || team.shift_id === selectedShiftId.value),
+  ),
+);
+const shiftTeams = computed(() => availableTeams.value.filter((team) => team.shift_id === selectedShiftId.value));
+const selectedTeam = computed(() => availableTeams.value.find((team) => team.id === selectedTeamId.value) ?? null);
 const selectedAssignment = computed<StaffingBoardAssignmentItem | null>(
   () => selectedBoardShift.value?.assignments.find((row) => row.id === selectedAssignmentId.value) ?? null,
 );
@@ -862,8 +1165,34 @@ const selectedPlanningRecordOptionLabel = computed(
 );
 const selectableTeamMembers = computed(() => buildStaffingMemberOptions(teamMembers.value, staffingDraft.team_id));
 const selectedMember = computed(() => selectableTeamMembers.value.find((member) => member.id === staffingDraft.member_ref) ?? null);
+const selectedTeamMembers = computed(() => {
+  if (selectedTeam.value?.members?.length) {
+    return selectedTeam.value.members;
+  }
+  return teamMembers.value.filter((member) => member.team_id === selectedTeamId.value);
+});
+const employeeMemberOptions = computed(() =>
+  employeeOptions.value.map((employee) => ({
+    label: formatEmployee(employee),
+    value: employee.id,
+  })),
+);
+const subcontractorWorkerMemberOptions = computed(() =>
+  subcontractorWorkerOptions.value.map((worker) => ({
+    label: formatSubcontractorWorker(worker),
+    value: worker.id,
+  })),
+);
+const teamLeadOptions = computed(() =>
+  teamDraft.lead_actor_kind === "subcontractor_worker" ? subcontractorWorkerMemberOptions.value : employeeMemberOptions.value,
+);
+const teamMemberActorOptions = computed(() =>
+  teamMemberDraft.actor_kind === "subcontractor_worker" ? subcontractorWorkerMemberOptions.value : employeeMemberOptions.value,
+);
 const hasSelectedDemandGroups = computed(() => Boolean(selectedBoardShift.value?.demand_groups?.length));
 const editingDemandGroup = computed(() => Boolean(demandGroupDraft.id));
+const editingTeam = computed(() => Boolean(teamDraft.id));
+const editingTeamMember = computed(() => Boolean(teamMemberDraft.id));
 const showDemandGroupSetupLead = computed(() => Boolean(selectedShiftId.value && !hasSelectedDemandGroups.value));
 const showImmediateConfirmationControl = computed(() => actionState.value.canAssign && !selectedAssignment.value && hasSelectedDemandGroups.value);
 const canSubmitDemandGroup = computed(() => {
@@ -884,6 +1213,24 @@ const canSubmitAssign = computed(() => {
   return Boolean(staffingDraft.member_ref && selectedMember.value);
 });
 const canSubmitSubstitute = computed(() => canSubmitAssign.value && actionState.value.canSubstitute && !!selectedAssignment.value);
+const canSubmitTeam = computed(() => {
+  if (!actionState.value.canWriteStaffing || !relevantPlanningRecordId.value) {
+    return false;
+  }
+  return Boolean(teamDraft.name.trim());
+});
+const canSubmitTeamMember = computed(() => {
+  if (!actionState.value.canWriteStaffing || !teamMemberDraft.team_id || !teamMemberDraft.member_ref || !teamMemberDraft.valid_from) {
+    return false;
+  }
+  return true;
+});
+const canSubmitAssignmentTeam = computed(() => {
+  if (!actionState.value.canWriteStaffing || !selectedAssignment.value) {
+    return false;
+  }
+  return assignmentTeamId.value !== (selectedAssignment.value.team_id || "");
+});
 
 function clearFeedback() {
   feedback.message = "";
@@ -946,6 +1293,30 @@ function resetStaffingDraft() {
   staffingDraft.remarks = "";
 }
 
+function resetTeamDraft() {
+  teamDraft.id = "";
+  teamDraft.name = "";
+  teamDraft.scope_kind = selectedShiftId.value ? "shift" : "planning";
+  teamDraft.role_label = "";
+  teamDraft.notes = "";
+  teamDraft.lead_actor_kind = "employee";
+  teamDraft.lead_member_ref = "";
+  teamDraft.version_no = null;
+}
+
+function resetTeamMemberDraft() {
+  teamMemberDraft.id = "";
+  teamMemberDraft.team_id = selectedTeamId.value || "";
+  teamMemberDraft.actor_kind = "employee";
+  teamMemberDraft.member_ref = "";
+  teamMemberDraft.role_label = "";
+  teamMemberDraft.is_team_lead = false;
+  teamMemberDraft.valid_from = normalizeDateTimeLocal(selectedShift.value?.starts_at) || filters.date_from;
+  teamMemberDraft.valid_to = "";
+  teamMemberDraft.notes = "";
+  teamMemberDraft.version_no = null;
+}
+
 function resetDemandGroupDraft() {
   demandGroupDraft.id = "";
   demandGroupDraft.function_type_id = "";
@@ -992,12 +1363,126 @@ function formatDemandGroup(group: StaffingBoardDemandGroupItem | null) {
 
 function formatMember(member: TeamMemberRead) {
   if (member.employee_id) {
-    return `employee:${member.employee_id}`;
+    return formatEmployee(employeeOptions.value.find((row) => row.id === member.employee_id)) || `employee:${member.employee_id}`;
   }
   if (member.subcontractor_worker_id) {
-    return `worker:${member.subcontractor_worker_id}`;
+    return formatSubcontractorWorker(subcontractorWorkerOptions.value.find((row) => row.id === member.subcontractor_worker_id))
+      || `worker:${member.subcontractor_worker_id}`;
   }
   return member.id;
+}
+
+function formatEmployee(employee?: EmployeeListItem | null) {
+  if (!employee) {
+    return "";
+  }
+  return [employee.personnel_no, `${employee.first_name} ${employee.last_name}`.trim()].filter(Boolean).join(" · ");
+}
+
+function formatSubcontractorWorker(worker?: SubcontractorWorkerListItem | null) {
+  if (!worker) {
+    return "";
+  }
+  return [worker.worker_no, `${worker.first_name} ${worker.last_name}`.trim()].filter(Boolean).join(" · ");
+}
+
+function formatTeam(team: TeamRead | null) {
+  if (!team) {
+    return "";
+  }
+  return `${team.name} · ${tp(team.shift_id ? "teamScopeShift" : "teamScopePlanning")}`;
+}
+
+function assignmentTeamLabel(teamId: null | string) {
+  if (!teamId) {
+    return tp("unassignedLabel");
+  }
+  return formatTeam(availableTeams.value.find((team) => team.id === teamId) ?? planningTeams.value.find((team) => team.id === teamId) ?? null) || teamId;
+}
+
+function normalizeDateTimeLocal(value?: null | string) {
+  if (!value) {
+    return "";
+  }
+  return value.slice(0, 16);
+}
+
+function toIsoDateTime(value: string) {
+  return value ? new Date(value).toISOString() : null;
+}
+
+function teamScopePayload() {
+  return {
+    planning_record_id: relevantPlanningRecordId.value || null,
+    shift_id: teamDraft.scope_kind === "shift" ? (selectedShiftId.value || null) : null,
+  };
+}
+
+function selectedActorPayload(actorKind: string, memberRef: string) {
+  return {
+    employee_id: actorKind === "employee" ? (memberRef || null) : null,
+    subcontractor_worker_id: actorKind === "subcontractor_worker" ? (memberRef || null) : null,
+  };
+}
+
+function startCreateTeam(scopeKind: "planning" | "shift" = "planning") {
+  resetTeamDraft();
+  teamDraft.scope_kind = scopeKind;
+  teamDialogOpen.value = true;
+}
+
+async function startEditTeam(teamId = selectedTeamId.value) {
+  if (!tenantScopeId.value || !accessToken.value || !teamId) {
+    return;
+  }
+  const team = await getTeam(tenantScopeId.value, accessToken.value, teamId);
+  selectedTeamId.value = team.id;
+  teamDraft.id = team.id;
+  teamDraft.name = team.name;
+  teamDraft.scope_kind = team.shift_id ? "shift" : "planning";
+  teamDraft.role_label = team.role_label || "";
+  teamDraft.notes = team.notes || "";
+  teamDraft.lead_actor_kind = "employee";
+  teamDraft.lead_member_ref = "";
+  teamDraft.version_no = team.version_no;
+  teamDialogOpen.value = true;
+}
+
+function closeTeamDialog() {
+  teamDialogOpen.value = false;
+  resetTeamDraft();
+}
+
+function startCreateTeamMember(teamId = selectedTeamId.value) {
+  if (!teamId) {
+    return;
+  }
+  resetTeamMemberDraft();
+  teamMemberDraft.team_id = teamId;
+  teamMemberDialogOpen.value = true;
+}
+
+function startEditTeamMember(memberId: string) {
+  const member = teamMembers.value.find((row) => row.id === memberId) ?? selectedTeamMembers.value.find((row) => row.id === memberId);
+  if (!member) {
+    return;
+  }
+  teamMemberDraft.id = member.id;
+  teamMemberDraft.team_id = member.team_id;
+  teamMemberDraft.actor_kind = member.subcontractor_worker_id ? "subcontractor_worker" : "employee";
+  teamMemberDraft.member_ref = member.employee_id || member.subcontractor_worker_id || "";
+  teamMemberDraft.role_label = member.role_label || "";
+  teamMemberDraft.is_team_lead = member.is_team_lead;
+  teamMemberDraft.valid_from = normalizeDateTimeLocal(member.valid_from);
+  teamMemberDraft.valid_to = normalizeDateTimeLocal(member.valid_to);
+  teamMemberDraft.notes = member.notes || "";
+  teamMemberDraft.version_no = member.version_no;
+  teamMemberDialogOpen.value = true;
+}
+
+function closeTeamMemberDialog() {
+  teamMemberDialogOpen.value = false;
+  resetTeamMemberDraft();
 }
 
 function buildPlanningRecordLookupCacheKey(search = "") {
@@ -1120,26 +1605,47 @@ function dispatchAudienceCodes() {
 }
 
 async function refreshSupportingData() {
-  if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
+  if (!tenantScopeId.value || !accessToken.value || !relevantPlanningRecordId.value) {
     demandGroupRows.value = [];
-    shiftTeams.value = [];
+    planningTeams.value = [];
     teamMembers.value = [];
+    employeeOptions.value = [];
+    subcontractorWorkerOptions.value = [];
     subcontractorReleases.value = [];
     return;
   }
-  const [demandGroups, teams, members, releases] = await Promise.all([
-    listDemandGroups(tenantScopeId.value, accessToken.value, staffingFilters()),
-    listTeams(tenantScopeId.value, accessToken.value, staffingFilters()),
-    listTeamMembers(tenantScopeId.value, accessToken.value, staffingFilters()),
-    listSubcontractorReleases(tenantScopeId.value, accessToken.value, staffingFilters()),
+  const [demandGroups, teams, members, releases, employees] = await Promise.all([
+    selectedShiftId.value
+      ? listDemandGroups(tenantScopeId.value, accessToken.value, staffingFilters())
+      : Promise.resolve([]),
+    listTeams(tenantScopeId.value, accessToken.value, { planning_record_id: relevantPlanningRecordId.value }),
+    listTeamMembers(tenantScopeId.value, accessToken.value, {}),
+    selectedShiftId.value
+      ? listSubcontractorReleases(tenantScopeId.value, accessToken.value, staffingFilters())
+      : Promise.resolve([]),
+    listEmployees(tenantScopeId.value, accessToken.value, { status: "active" }),
   ]);
+  const workerRows = releases.length
+    ? (
+        await Promise.all(
+          [...new Set(releases.map((row) => row.subcontractor_id).filter(Boolean))].map((subcontractorId) =>
+            listSubcontractorWorkers(tenantScopeId.value, subcontractorId, accessToken.value, { status: "active" }),
+          ),
+        )
+      ).flat()
+    : [];
   demandGroupRows.value = demandGroups;
-  shiftTeams.value = teams;
+  planningTeams.value = teams;
   teamMembers.value = members;
+  employeeOptions.value = employees.filter((row) => row.archived_at == null && row.status === "active");
+  subcontractorWorkerOptions.value = workerRows.filter((row) => row.archived_at == null && row.status === "active");
   subcontractorReleases.value = releases;
-  if (!shiftTeams.value.some((team) => team.id === staffingDraft.team_id)) {
+  if (!availableTeams.value.some((team) => team.id === staffingDraft.team_id)) {
     staffingDraft.team_id = "";
     staffingDraft.member_ref = "";
+  }
+  if (!availableTeams.value.some((team) => team.id === selectedTeamId.value)) {
+    selectedTeamId.value = availableTeams.value[0]?.id ?? "";
   }
 }
 
@@ -1181,7 +1687,7 @@ async function refreshAll() {
       assignmentOverrides.value = [];
       shiftOutputs.value = [];
       dispatchPreview.value = null;
-      shiftTeams.value = [];
+      planningTeams.value = [];
       teamMembers.value = [];
       subcontractorReleases.value = [];
       return;
@@ -1370,6 +1876,114 @@ async function submitSubstitute() {
   }
 }
 
+async function submitTeam() {
+  if (!tenantScopeId.value || !accessToken.value || !canSubmitTeam.value) {
+    return;
+  }
+  clearFeedback();
+  savingTeam.value = true;
+  try {
+    const payload: TeamCreate = {
+      tenant_id: tenantScopeId.value,
+      name: teamDraft.name.trim(),
+      role_label: teamDraft.role_label.trim() || null,
+      notes: teamDraft.notes.trim() || null,
+      ...teamScopePayload(),
+    };
+    const team = teamDraft.id
+      ? await updateTeam(tenantScopeId.value, accessToken.value, teamDraft.id, {
+          ...teamScopePayload(),
+          name: payload.name,
+          role_label: payload.role_label,
+          notes: payload.notes,
+          version_no: teamDraft.version_no,
+        })
+      : await createTeam(tenantScopeId.value, accessToken.value, payload);
+    if (!teamDraft.id && teamDraft.lead_member_ref) {
+      const actorPayload = selectedActorPayload(teamDraft.lead_actor_kind, teamDraft.lead_member_ref);
+      await createTeamMember(tenantScopeId.value, accessToken.value, {
+        tenant_id: tenantScopeId.value,
+        team_id: team.id,
+        ...actorPayload,
+        role_label: tp("teamLeadDefaultRole"),
+        is_team_lead: true,
+        valid_from: toIsoDateTime(normalizeDateTimeLocal(selectedShift.value?.starts_at) || filters.date_from) || new Date().toISOString(),
+        valid_to: null,
+        notes: null,
+      });
+    }
+    selectedTeamId.value = team.id;
+    staffingDraft.team_id = team.id;
+    await refreshSupportingData();
+    closeTeamDialog();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    savingTeam.value = false;
+  }
+}
+
+async function submitTeamMember() {
+  if (!tenantScopeId.value || !accessToken.value || !canSubmitTeamMember.value) {
+    return;
+  }
+  clearFeedback();
+  savingTeamMember.value = true;
+  try {
+    const actorPayload = selectedActorPayload(teamMemberDraft.actor_kind, teamMemberDraft.member_ref);
+    const payload: TeamMemberCreate = {
+      tenant_id: tenantScopeId.value,
+      team_id: teamMemberDraft.team_id,
+      ...actorPayload,
+      role_label: teamMemberDraft.role_label.trim() || null,
+      is_team_lead: teamMemberDraft.is_team_lead,
+      valid_from: toIsoDateTime(teamMemberDraft.valid_from) || new Date().toISOString(),
+      valid_to: toIsoDateTime(teamMemberDraft.valid_to),
+      notes: teamMemberDraft.notes.trim() || null,
+    };
+    if (teamMemberDraft.id) {
+      await updateTeamMember(tenantScopeId.value, accessToken.value, teamMemberDraft.id, {
+        ...actorPayload,
+        role_label: payload.role_label,
+        is_team_lead: payload.is_team_lead,
+        valid_from: payload.valid_from,
+        valid_to: payload.valid_to,
+        notes: payload.notes,
+        version_no: teamMemberDraft.version_no,
+      });
+    } else {
+      await createTeamMember(tenantScopeId.value, accessToken.value, payload);
+    }
+    selectedTeamId.value = teamMemberDraft.team_id;
+    await refreshSupportingData();
+    closeTeamMemberDialog();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    savingTeamMember.value = false;
+  }
+}
+
+async function submitAssignmentTeamUpdate() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedAssignment.value || !canSubmitAssignmentTeam.value) {
+    return;
+  }
+  clearFeedback();
+  savingAssignmentTeam.value = true;
+  try {
+    const payload: AssignmentUpdate = {
+      team_id: assignmentTeamId.value || null,
+      version_no: selectedAssignment.value.version_no,
+    };
+    await updateAssignment(tenantScopeId.value, accessToken.value, selectedAssignment.value.id, payload);
+    await refreshAll();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    savingAssignmentTeam.value = false;
+  }
+}
+
 async function loadDispatchPreview() {
   if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
     return;
@@ -1518,8 +2132,22 @@ watch(
   () => {
     if (selectedAssignment.value) {
       staffingDraft.confirm_now = false;
+      assignmentTeamId.value = selectedAssignment.value.team_id || "";
     }
   },
+);
+
+watch(
+  availableTeams,
+  (teams) => {
+    if (!teams.some((team) => team.id === selectedTeamId.value)) {
+      selectedTeamId.value = teams[0]?.id ?? "";
+    }
+    if (!teams.some((team) => team.id === assignmentTeamId.value)) {
+      assignmentTeamId.value = selectedAssignment.value?.team_id || "";
+    }
+  },
+  { immediate: true },
 );
 
 watch(

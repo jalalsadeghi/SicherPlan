@@ -153,6 +153,51 @@ export interface TeamRead {
   members: TeamMemberRead[];
 }
 
+export interface TeamCreate {
+  tenant_id: string;
+  planning_record_id?: null | string;
+  shift_id?: null | string;
+  name: string;
+  role_label?: null | string;
+  notes?: null | string;
+}
+
+export interface TeamUpdate {
+  planning_record_id?: null | string;
+  shift_id?: null | string;
+  name?: null | string;
+  role_label?: null | string;
+  notes?: null | string;
+  status?: null | string;
+  archived_at?: null | string;
+  version_no?: null | number;
+}
+
+export interface TeamMemberCreate {
+  tenant_id: string;
+  team_id: string;
+  employee_id?: null | string;
+  subcontractor_worker_id?: null | string;
+  role_label?: null | string;
+  is_team_lead?: boolean;
+  valid_from: string;
+  valid_to?: null | string;
+  notes?: null | string;
+}
+
+export interface TeamMemberUpdate {
+  employee_id?: null | string;
+  subcontractor_worker_id?: null | string;
+  role_label?: null | string;
+  is_team_lead?: null | boolean;
+  valid_from?: null | string;
+  valid_to?: null | string;
+  notes?: null | string;
+  status?: null | string;
+  archived_at?: null | string;
+  version_no?: null | number;
+}
+
 export interface SubcontractorReleaseRead {
   id: string;
   tenant_id: string;
@@ -316,6 +361,20 @@ export interface PlanningOutputGenerateRequest {
   regenerate?: boolean;
 }
 
+export interface AssignmentUpdate {
+  team_id?: null | string;
+  employee_id?: null | string;
+  subcontractor_worker_id?: null | string;
+  assignment_status_code?: null | string;
+  assignment_source_code?: null | string;
+  offered_at?: null | string;
+  confirmed_at?: null | string;
+  remarks?: null | string;
+  status?: null | string;
+  archived_at?: null | string;
+  version_no?: null | number;
+}
+
 export class PlanningStaffingApiError extends Error {
   status: number;
   messageKey: string;
@@ -400,6 +459,29 @@ export function listTeams(tenantId: string, accessToken: string, filters: Record
   );
 }
 
+export function createTeam(tenantId: string, accessToken: string, payload: TeamCreate) {
+  return request<TeamRead>(
+    `/api/planning/tenants/${tenantId}/ops/teams`,
+    accessToken,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function getTeam(tenantId: string, accessToken: string, teamId: string) {
+  return request<TeamRead>(
+    `/api/planning/tenants/${tenantId}/ops/teams/${teamId}`,
+    accessToken,
+  );
+}
+
+export function updateTeam(tenantId: string, accessToken: string, teamId: string, payload: TeamUpdate) {
+  return request<TeamRead>(
+    `/api/planning/tenants/${tenantId}/ops/teams/${teamId}`,
+    accessToken,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+}
+
 export function listDemandGroups(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
   return request<DemandGroupRead[]>(
     `/api/planning/tenants/${tenantId}/ops/demand-groups${queryString(filters)}`,
@@ -430,6 +512,22 @@ export function listTeamMembers(tenantId: string, accessToken: string, filters: 
   );
 }
 
+export function createTeamMember(tenantId: string, accessToken: string, payload: TeamMemberCreate) {
+  return request<TeamMemberRead>(
+    `/api/planning/tenants/${tenantId}/ops/team-members`,
+    accessToken,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function updateTeamMember(tenantId: string, accessToken: string, teamMemberId: string, payload: TeamMemberUpdate) {
+  return request<TeamMemberRead>(
+    `/api/planning/tenants/${tenantId}/ops/team-members/${teamMemberId}`,
+    accessToken,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+}
+
 export function listSubcontractorReleases(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
   return request<SubcontractorReleaseRead[]>(
     `/api/planning/tenants/${tenantId}/ops/subcontractor-releases${queryString(filters)}`,
@@ -448,6 +546,14 @@ export function getAssignmentValidations(tenantId: string, accessToken: string, 
   return request<AssignmentValidationRead>(
     `/api/planning/tenants/${tenantId}/ops/assignments/${assignmentId}/validations`,
     accessToken,
+  );
+}
+
+export function updateAssignment(tenantId: string, accessToken: string, assignmentId: string, payload: AssignmentUpdate) {
+  return request<StaffingBoardAssignmentItem>(
+    `/api/planning/tenants/${tenantId}/ops/assignments/${assignmentId}`,
+    accessToken,
+    { method: "PATCH", body: JSON.stringify(payload) },
   );
 }
 

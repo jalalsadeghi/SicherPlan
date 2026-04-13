@@ -12,6 +12,7 @@ from app.modules.iam.audit_service import AuditService
 from app.modules.planning.models import Assignment, AssignmentValidationOverride, DemandGroup, Shift, ShiftPlan, ShiftTemplate, SubcontractorRelease, Team, TeamMember
 from app.modules.planning.schemas import (
     AssignmentCreate,
+    AssignmentUpdate,
     CoverageFilter,
     DemandGroupCreate,
     DemandGroupUpdate,
@@ -972,6 +973,83 @@ class StaffingServiceTests(unittest.TestCase):
                 _context("planning.staffing.write"),
             )
         self.assertEqual(caught.exception.code, "planning.team_member.duplicate_lead")
+
+    def test_planning_level_team_creation_allows_null_shift(self) -> None:
+        team = self.service.create_team(
+            "tenant-1",
+            TeamCreate(
+                tenant_id="tenant-1",
+                planning_record_id=self.planning_record_id,
+                shift_id=None,
+                name="Planning Alpha",
+                role_label="Coordination",
+                notes="Shared planning team",
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        self.assertEqual(team.planning_record_id, self.planning_record_id)
+        self.assertIsNone(team.shift_id)
+        self.assertEqual(team.role_label, "Coordination")
+        self.assertEqual(team.notes, "Shared planning team")
+
+    def test_team_member_role_label_round_trips(self) -> None:
+        team = self.service.create_team(
+            "tenant-1",
+            TeamCreate(tenant_id="tenant-1", planning_record_id=self.planning_record_id, shift_id=None, name="Planning Alpha"),
+            _context("planning.staffing.write"),
+        )
+
+        member = self.service.create_team_member(
+            "tenant-1",
+            TeamMemberCreate(
+                tenant_id="tenant-1",
+                team_id=team.id,
+                employee_id="employee-1",
+                role_label="Springer",
+                valid_from=datetime(2026, 4, 5, 8, 0, tzinfo=UTC),
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        self.assertEqual(member.role_label, "Springer")
+
+    def test_assignment_can_be_linked_to_team_via_patch(self) -> None:
+        demand = self.service.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(
+                tenant_id="tenant-1",
+                shift_id=self.shift_id,
+                function_type_id="function-1",
+                min_qty=1,
+                target_qty=1,
+            ),
+            _context("planning.staffing.write"),
+        )
+        team = self.service.create_team(
+            "tenant-1",
+            TeamCreate(tenant_id="tenant-1", planning_record_id=self.planning_record_id, shift_id=None, name="Planning Alpha"),
+            _context("planning.staffing.write"),
+        )
+        assignment = self.service.create_assignment(
+            "tenant-1",
+            AssignmentCreate(
+                tenant_id="tenant-1",
+                shift_id=self.shift_id,
+                demand_group_id=demand.id,
+                employee_id="employee-1",
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        updated = self.service.update_assignment(
+            "tenant-1",
+            assignment.id,
+            AssignmentUpdate(team_id=team.id, version_no=assignment.version_no),
+            _context("planning.staffing.write"),
+        )
+
+        self.assertEqual(updated.team_id, team.id)
 
     def test_coverage_derives_red_yellow_and_green_states(self) -> None:
         red = self.service.create_demand_group(
