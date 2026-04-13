@@ -209,16 +209,66 @@
           </div>
           <p v-else class="planning-orders-list-empty">{{ tp("exceptionsEmpty") }}</p>
           <div class="planning-orders-form-grid">
-            <label class="field-stack"><span>{{ tp("fieldsOccurrenceDate") }}</span><input v-model="exceptionDraft.exception_date" type="date" required /></label>
+            <label class="field-stack"><span>{{ tp("fieldsOccurrenceDate") }}</span><input v-model="exceptionDraft.exception_date" data-testid="planning-shifts-exception-date" type="date" required /></label>
             <label class="field-stack">
               <span>{{ tp("fieldsActionCode") }}</span>
-              <select v-model="exceptionDraft.action_code">
+              <select v-model="exceptionDraft.action_code" data-testid="planning-shifts-exception-action">
                 <option value="skip">{{ tp("exceptionSkip") }}</option>
                 <option value="override">{{ tp("exceptionOverride") }}</option>
               </select>
             </label>
-            <label v-if="exceptionRequiresOverrideTimes" class="field-stack"><span>{{ tp("fieldsOverrideStart") }}</span><input v-model="exceptionDraft.override_local_start_time" type="time" required /></label>
-            <label v-if="exceptionRequiresOverrideTimes" class="field-stack"><span>{{ tp("fieldsOverrideEnd") }}</span><input v-model="exceptionDraft.override_local_end_time" type="time" required /></label>
+            <template v-if="exceptionRequiresOverrideTimes">
+              <label class="field-stack"><span>{{ tp("fieldsOverrideStart") }}</span><input v-model="exceptionDraft.override_local_start_time" data-testid="planning-shifts-exception-override-start" type="time" required /></label>
+              <label class="field-stack"><span>{{ tp("fieldsOverrideEnd") }}</span><input v-model="exceptionDraft.override_local_end_time" data-testid="planning-shifts-exception-override-end" type="time" required /></label>
+              <label class="field-stack">
+                <span>{{ tp("fieldsOverrideBreakMinutes") }}</span>
+                <input
+                  v-model="exceptionDraft.override_break_minutes"
+                  data-testid="planning-shifts-exception-override-break"
+                  type="number"
+                  min="0"
+                  inputmode="numeric"
+                />
+              </label>
+              <label class="field-stack">
+                <span>{{ tp("fieldsOverrideShiftType") }}</span>
+                <select
+                  v-model="exceptionDraft.override_shift_type_code"
+                  data-testid="planning-shifts-exception-override-shift-type"
+                >
+                  <option value="">{{ tp("shiftTypeOptionalPlaceholder") }}</option>
+                  <option v-for="option in exceptionShiftTypeOptions" :key="option.code" :value="option.code">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+              <label class="field-stack"><span>{{ tp("fieldsOverrideMeetingPoint") }}</span><input v-model="exceptionDraft.override_meeting_point" data-testid="planning-shifts-exception-override-meeting-point" type="text" /></label>
+              <label class="field-stack"><span>{{ tp("fieldsOverrideLocationText") }}</span><input v-model="exceptionDraft.override_location_text" data-testid="planning-shifts-exception-override-location-text" type="text" /></label>
+              <label class="field-stack">
+                <span>{{ tp("fieldsVisibilityCustomer") }}</span>
+                <select v-model="exceptionDraft.customer_visible_state" data-testid="planning-shifts-exception-customer-visibility">
+                  <option v-for="option in nullableVisibilityOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+              <label class="field-stack">
+                <span>{{ tp("fieldsVisibilitySubcontractor") }}</span>
+                <select v-model="exceptionDraft.subcontractor_visible_state" data-testid="planning-shifts-exception-subcontractor-visibility">
+                  <option v-for="option in nullableVisibilityOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+              <label class="field-stack">
+                <span>{{ tp("fieldsVisibilityStealth") }}</span>
+                <select v-model="exceptionDraft.stealth_mode_state" data-testid="planning-shifts-exception-stealth-visibility">
+                  <option v-for="option in nullableVisibilityOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+            </template>
             <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="exceptionDraft.notes" rows="2" /></label>
           </div>
           <div class="cta-row">
@@ -720,6 +770,9 @@ const templateShiftTypeOptions = computed(() =>
 const seriesShiftTypeOptions = computed(() =>
   buildShiftTypeOptions(shiftTypeOptions.value, seriesDraft.shift_type_code, tp("shiftTypeLegacySuffix")),
 );
+const exceptionShiftTypeOptions = computed(() =>
+  buildShiftTypeOptions(shiftTypeOptions.value, exceptionDraft.override_shift_type_code, tp("shiftTypeLegacySuffix")),
+);
 const shiftShiftTypeOptions = computed(() =>
   buildShiftTypeOptions(shiftTypeOptions.value, shiftDraft.shift_type_code, tp("shiftTypeLegacySuffix")),
 );
@@ -742,6 +795,11 @@ const visibilityStateOptions = computed(() => [
   { value: "customer", label: tp("visibilityCustomer") },
   { value: "subcontractor", label: tp("visibilitySubcontractor") },
   { value: "stealth", label: tp("visibilityStealth") },
+]);
+const nullableVisibilityOptions = computed(() => [
+  { value: "inherit", label: tp("visibilityInherit") },
+  { value: "yes", label: tp("yes") },
+  { value: "no", label: tp("no") },
 ]);
 const releaseStateOptions = computed(() => [
   { value: "draft", label: tp("statusDraft") },
@@ -836,6 +894,13 @@ function createEmptyExceptionDraft() {
     action_code: "skip",
     override_local_start_time: "",
     override_local_end_time: "",
+    override_break_minutes: "",
+    override_shift_type_code: "",
+    override_meeting_point: "",
+    override_location_text: "",
+    customer_visible_state: "inherit",
+    subcontractor_visible_state: "inherit",
+    stealth_mode_state: "inherit",
     notes: "",
   };
 }
@@ -928,6 +993,13 @@ function selectException(exceptionId: string) {
       tenant_id: tenantScopeId.value,
       override_local_start_time: row.override_local_start_time || "",
       override_local_end_time: row.override_local_end_time || "",
+      override_break_minutes: row.override_break_minutes ?? "",
+      override_shift_type_code: row.override_shift_type_code || "",
+      override_meeting_point: row.override_meeting_point || "",
+      override_location_text: row.override_location_text || "",
+      customer_visible_state: toNullableVisibilityState(row.customer_visible_flag),
+      subcontractor_visible_state: toNullableVisibilityState(row.subcontractor_visible_flag),
+      stealth_mode_state: toNullableVisibilityState(row.stealth_mode_flag),
       notes: row.notes || "",
     });
   }
@@ -1152,8 +1224,19 @@ async function submitException() {
   if (!selectedSeriesId.value) return;
   try {
     const payload = {
-      ...exceptionDraft,
       tenant_id: tenantScopeId.value,
+      exception_date: exceptionDraft.exception_date,
+      action_code: exceptionDraft.action_code,
+      override_local_start_time: exceptionRequiresOverrideTimes.value ? normalizeOptionalText(exceptionDraft.override_local_start_time) : null,
+      override_local_end_time: exceptionRequiresOverrideTimes.value ? normalizeOptionalText(exceptionDraft.override_local_end_time) : null,
+      override_break_minutes: exceptionRequiresOverrideTimes.value ? normalizeOptionalNumber(exceptionDraft.override_break_minutes) : null,
+      override_shift_type_code: exceptionRequiresOverrideTimes.value ? normalizeOptionalText(exceptionDraft.override_shift_type_code) : null,
+      override_meeting_point: exceptionRequiresOverrideTimes.value ? normalizeOptionalText(exceptionDraft.override_meeting_point) : null,
+      override_location_text: exceptionRequiresOverrideTimes.value ? normalizeOptionalText(exceptionDraft.override_location_text) : null,
+      customer_visible_flag: exceptionRequiresOverrideTimes.value ? fromNullableVisibilityState(exceptionDraft.customer_visible_state) : null,
+      subcontractor_visible_flag: exceptionRequiresOverrideTimes.value ? fromNullableVisibilityState(exceptionDraft.subcontractor_visible_state) : null,
+      stealth_mode_flag: exceptionRequiresOverrideTimes.value ? fromNullableVisibilityState(exceptionDraft.stealth_mode_state) : null,
+      notes: normalizeOptionalText(exceptionDraft.notes),
     };
     if (selectedExceptionId.value) {
       await updateShiftSeriesException(tenantScopeId.value, selectedExceptionId.value, accessToken.value, payload);
@@ -1166,6 +1249,42 @@ async function submitException() {
   } catch (error) {
     handleApiError(error);
   }
+}
+
+function normalizeOptionalText(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized || null;
+}
+
+function normalizeOptionalNumber(value: unknown) {
+  if (value === "" || value === null || value === undefined) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toNullableVisibilityState(value: boolean | null | undefined) {
+  if (value === true) {
+    return "yes";
+  }
+  if (value === false) {
+    return "no";
+  }
+  return "inherit";
+}
+
+function fromNullableVisibilityState(value: string) {
+  if (value === "yes") {
+    return true;
+  }
+  if (value === "no") {
+    return false;
+  }
+  return null;
 }
 
 async function submitShift() {
@@ -1463,6 +1582,13 @@ watch(
     if (value !== "override") {
       exceptionDraft.override_local_start_time = "";
       exceptionDraft.override_local_end_time = "";
+      exceptionDraft.override_break_minutes = "";
+      exceptionDraft.override_shift_type_code = "";
+      exceptionDraft.override_meeting_point = "";
+      exceptionDraft.override_location_text = "";
+      exceptionDraft.customer_visible_state = "inherit";
+      exceptionDraft.subcontractor_visible_state = "inherit";
+      exceptionDraft.stealth_mode_state = "inherit";
     }
   },
   { immediate: true },

@@ -7,6 +7,7 @@ import { defineComponent, h } from "vue";
 import PlanningShiftsAdminView from "../../views/PlanningShiftsAdminView.vue";
 
 const {
+  createShiftSeriesExceptionMock,
   createShiftPlanMock,
   createShiftSeriesMock,
   createShiftTemplateMock,
@@ -25,13 +26,16 @@ const {
   getShiftMock,
   getShiftReleaseDiagnosticsMock,
   updateShiftPlanMock,
+  updateShiftSeriesExceptionMock,
   updateShiftSeriesMock,
   updateShiftTemplateMock,
 } = vi.hoisted(() => ({
+  createShiftSeriesExceptionMock: vi.fn(async () => ({ id: "exception-1" })),
   createShiftPlanMock: vi.fn(async () => ({ id: "plan-1" })),
   createShiftSeriesMock: vi.fn(async () => ({ id: "series-1" })),
   createShiftTemplateMock: vi.fn(async () => ({ id: "template-1" })),
   updateShiftPlanMock: vi.fn(async () => ({})),
+  updateShiftSeriesExceptionMock: vi.fn(async () => ({})),
   updateShiftSeriesMock: vi.fn(async () => ({})),
   updateShiftTemplateMock: vi.fn(async () => ({})),
   ensureSessionReadyMock: vi.fn(async () => ({ id: "user-1" })),
@@ -138,6 +142,13 @@ const {
     action_code: "override",
     override_local_start_time: "10:00:00",
     override_local_end_time: "18:00:00",
+    override_break_minutes: 45,
+    override_shift_type_code: "site_night",
+    override_meeting_point: "South gate",
+    override_location_text: "Berlin South",
+    customer_visible_flag: true,
+    subcontractor_visible_flag: false,
+    stealth_mode_flag: null,
     notes: "Exception detail note",
     version_no: 1,
   },
@@ -224,7 +235,7 @@ vi.mock("@/api/planningShifts", () => ({
   createShift: vi.fn(async () => ({ id: "shift-1" })),
   createShiftPlan: createShiftPlanMock,
   createShiftSeries: createShiftSeriesMock,
-  createShiftSeriesException: vi.fn(async () => ({ id: "exception-1" })),
+  createShiftSeriesException: createShiftSeriesExceptionMock,
   createShiftTemplate: createShiftTemplateMock,
   generateShiftSeries: vi.fn(async () => ({})),
   getShift: getShiftMock,
@@ -242,7 +253,7 @@ vi.mock("@/api/planningShifts", () => ({
   setShiftReleaseState: vi.fn(async () => ({})),
   updateShift: vi.fn(async () => ({})),
   updateShiftPlan: updateShiftPlanMock,
-  updateShiftSeriesException: vi.fn(async () => ({})),
+  updateShiftSeriesException: updateShiftSeriesExceptionMock,
   updateShiftSeries: updateShiftSeriesMock,
   updateShiftTemplate: updateShiftTemplateMock,
   updateShiftVisibility: vi.fn(async () => ({})),
@@ -338,10 +349,12 @@ function mountView(options: Record<string, unknown> = {}) {
 
 describe("PlanningShiftsAdminView", () => {
   beforeEach(() => {
+    createShiftSeriesExceptionMock.mockClear();
     createShiftPlanMock.mockClear();
     createShiftSeriesMock.mockClear();
     createShiftTemplateMock.mockClear();
     updateShiftPlanMock.mockClear();
+    updateShiftSeriesExceptionMock.mockClear();
     updateShiftSeriesMock.mockClear();
     updateShiftTemplateMock.mockClear();
     ensureSessionReadyMock.mockClear();
@@ -679,6 +692,136 @@ describe("PlanningShiftsAdminView", () => {
     expect(wrapper.text()).toContain("Series exceptions");
     expect(wrapper.text()).toContain("2026-04-03");
     expect((wrapper.find('[data-testid="planning-shifts-tab-panel-series"] textarea').element as HTMLTextAreaElement).value).toBe("Exception detail note");
+    expect((wrapper.get('[data-testid="planning-shifts-exception-override-break"]').element as HTMLInputElement).value).toBe("45");
+    expect((wrapper.get('[data-testid="planning-shifts-exception-override-shift-type"]').element as HTMLSelectElement).value).toBe("site_night");
+    expect((wrapper.get('[data-testid="planning-shifts-exception-customer-visibility"]').element as HTMLSelectElement).value).toBe("yes");
+    expect((wrapper.get('[data-testid="planning-shifts-exception-subcontractor-visibility"]').element as HTMLSelectElement).value).toBe("no");
+    expect((wrapper.get('[data-testid="planning-shifts-exception-stealth-visibility"]').element as HTMLSelectElement).value).toBe("inherit");
+  });
+
+  it("keeps the exception form minimal in skip mode", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-plans"] .planning-orders-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-row').trigger("click");
+    await flushPromises();
+
+    expect((wrapper.get('[data-testid="planning-shifts-exception-action"]').element as HTMLSelectElement).value).toBe("skip");
+    expect(wrapper.text()).not.toContain("Override break minutes");
+    expect(wrapper.find('[data-testid="planning-shifts-exception-override-break"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-shifts-exception-override-shift-type"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-shifts-exception-customer-visibility"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-shifts-exception-subcontractor-visibility"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-shifts-exception-stealth-visibility"]').exists()).toBe(false);
+  });
+
+  it("shows the full override field set for override exceptions", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-plans"] .planning-orders-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-row').trigger("click");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-shifts-exception-action"]').setValue("override");
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("Override break minutes");
+    expect(wrapper.text()).toContain("Override shift type");
+    expect(wrapper.text()).toContain("Override meeting point");
+    expect(wrapper.text()).toContain("Override location text");
+    expect(wrapper.find('[data-testid="planning-shifts-exception-override-break"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-shifts-exception-override-shift-type"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-shifts-exception-customer-visibility"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-shifts-exception-subcontractor-visibility"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-shifts-exception-stealth-visibility"]').exists()).toBe(true);
+  });
+
+  it("preserves nullable visibility flags and clears override-only fields when switching back to skip", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-plans"] .planning-orders-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-row').trigger("click");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-shifts-exception-action"]').setValue("override");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-exception-customer-visibility"]').setValue("yes");
+    await wrapper.get('[data-testid="planning-shifts-exception-subcontractor-visibility"]').setValue("no");
+    await wrapper.get('[data-testid="planning-shifts-exception-stealth-visibility"]').setValue("inherit");
+    await wrapper.get('[data-testid="planning-shifts-exception-override-break"]').setValue("15");
+    await wrapper.get('[data-testid="planning-shifts-exception-override-shift-type"]').setValue("site_day");
+
+    await wrapper.get('[data-testid="planning-shifts-exception-action"]').setValue("skip");
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="planning-shifts-exception-override-break"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-shifts-exception-customer-visibility"]').exists()).toBe(false);
+
+    await wrapper.get('[data-testid="planning-shifts-exception-action"]').setValue("override");
+    await flushPromises();
+
+    expect((wrapper.get('[data-testid="planning-shifts-exception-customer-visibility"]').element as HTMLSelectElement).value).toBe("inherit");
+    expect((wrapper.get('[data-testid="planning-shifts-exception-subcontractor-visibility"]').element as HTMLSelectElement).value).toBe("inherit");
+    expect((wrapper.get('[data-testid="planning-shifts-exception-stealth-visibility"]').element as HTMLSelectElement).value).toBe("inherit");
+    expect((wrapper.get('[data-testid="planning-shifts-exception-override-break"]').element as HTMLInputElement).value).toBe("");
+    expect((wrapper.get('[data-testid="planning-shifts-exception-override-shift-type"]').element as HTMLSelectElement).value).toBe("");
+  });
+
+  it("submits override exception payloads with nullable visibility flags and reused shift-type options", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-plans"] .planning-orders-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-row').trigger("click");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-shifts-exception-action"]').setValue("override");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-exception-date"]').setValue("2026-04-05");
+    await wrapper.get('[data-testid="planning-shifts-exception-override-start"]').setValue("09:00");
+    await wrapper.get('[data-testid="planning-shifts-exception-override-end"]').setValue("17:00");
+    await wrapper.get('[data-testid="planning-shifts-exception-override-break"]').setValue("30");
+    await wrapper.get('[data-testid="planning-shifts-exception-override-shift-type"]').setValue("site_night");
+    await wrapper.get('[data-testid="planning-shifts-exception-override-meeting-point"]').setValue("Gate B");
+    await wrapper.get('[data-testid="planning-shifts-exception-override-location-text"]').setValue("Berlin West");
+    await wrapper.get('[data-testid="planning-shifts-exception-customer-visibility"]').setValue("yes");
+    await wrapper.get('[data-testid="planning-shifts-exception-subcontractor-visibility"]').setValue("no");
+    await wrapper.get('[data-testid="planning-shifts-exception-stealth-visibility"]').setValue("inherit");
+
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] form').trigger("submit");
+    await flushPromises();
+
+    expect(createShiftSeriesExceptionMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "series-1",
+      "token-1",
+      expect.objectContaining({
+        exception_date: "2026-04-05",
+        action_code: "override",
+        override_break_minutes: 30,
+        override_shift_type_code: "site_night",
+        override_meeting_point: "Gate B",
+        override_location_text: "Berlin West",
+        customer_visible_flag: true,
+        subcontractor_visible_flag: false,
+        stealth_mode_flag: null,
+      }),
+    );
   });
 
   it("keeps the created shift plan selected when switching to the series tab", async () => {

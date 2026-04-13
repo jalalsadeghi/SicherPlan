@@ -1,107 +1,129 @@
 You are working in the SicherPlan monorepo on the latest main branch.
 
 Task:
-Fix the duplicate-validation logic for Planning -> admin/planning-orders -> Orders & planning -> Requirement lines.
+Fix the incomplete `Series exceptions` form in Planning -> Shift planning -> Series and exceptions.
 
-Current broken behavior:
-The UI blocks creation of a second active requirement line in the same order when the `requirement_type_id` is the same, even if `function_type_id` and `qualification_type_id` are different.
+Problem:
+The current UI only renders:
+- Occurrence date
+- Exception action
+- Override local start time (only when action = override)
+- Override local end time (only when action = override)
+- Notes
 
-Concrete real-world example that should be allowed:
-Existing line:
-- Requirement Type: OBJECT_GUARD
-- Function Type: SEC_GUARD
-- Qualification Type: G34A
-- Min Qty: 2
-- Target Qty: 2
+But the project model/API for shift series exceptions already support additional fields:
+- `override_break_minutes`
+- `override_shift_type_code`
+- `override_meeting_point`
+- `override_location_text`
+- `customer_visible_flag`
+- `subcontractor_visible_flag`
+- `stealth_mode_flag`
 
-New line the user is trying to add:
-- Requirement Type: OBJECT_GUARD
-- Function Type: SHIFT_SUP
-- Qualification Type: FIRST_AID
-- Min Qty: 1
-- Target Qty: 1
+So the current form appears incomplete relative to the actual contract.
 
-Current UI error:
-"An active requirement line for this requirement type already exists in this order."
+What you must verify first:
+1. Confirm that these fields are real supported fields in both backend and frontend API types.
+2. Confirm whether they should be available in the UI.
+3. Validate whether they should be shown:
+   - always, or
+   - only when `action_code === 'override'`
 
-Why this looks wrong:
-- The backend model for `order_requirement_line` includes:
-  - `requirement_type_id`
-  - `function_type_id`
-  - `qualification_type_id`
-- The backend schemas also include those fields.
-- The frontend API type `OrderRequirementLineRead` includes those fields.
-- But the frontend duplicate guard appears to check only `requirement_type_id`.
+Known facts already observed:
+- Backend shift series exception schemas include the additional override and visibility fields.
+- Frontend `planningShifts.ts` also includes those fields in `ShiftSeriesExceptionRead`.
+- Current `PlanningShiftsAdminView.vue` form does not render most of them.
 
 Files to inspect first:
 Frontend
-- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue`
-- `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningOrders.helpers.js`
-- `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningOrders.helpers.test.js`
-- `web/apps/web-antd/src/sicherplan-legacy/api/planningOrders.ts`
+- `web/apps/web-antd/src/sicherplan-legacy/views/PlanningShiftsAdminView.vue`
+- `web/apps/web-antd/src/sicherplan-legacy/api/planningShifts.ts`
+- `@/features/planning/planningShifts.helpers` if relevant
+- planning-shifts i18n/messages files
 
 Backend
-- `backend/app/modules/planning/models.py`
 - `backend/app/modules/planning/schemas.py`
-- `backend/app/modules/planning/order_service.py`
-- `backend/app/modules/planning/repository.py`
-- any backend tests for customer orders / requirement lines
+- `backend/app/modules/planning/models.py`
+- any shift-series-exception service/router/repository files if needed
 
 Your job:
-1. Validate the real intended uniqueness rule for order requirement lines.
-2. Fix the bug so that multiple active requirement lines with the same `requirement_type_id` are allowed when their staffing profile differs.
-3. Make frontend and backend behavior consistent.
+1. Validate the intended UX logic.
+2. Complete the form so it matches the real contract.
+3. Keep the UX clean and logically conditional.
 
-Validation rule to test explicitly:
-Determine whether uniqueness should be based on:
-A. `requirement_type_id` only  ❌ likely wrong
-B. tuple of (`requirement_type_id`, `function_type_id`, `qualification_type_id`) ✅ likely correct
-C. no duplicate rule at all
-You must validate and justify the choice.
+Preferred UX logic unless validation disproves it:
+- If `action_code === 'skip'`:
+  - keep the form minimal
+  - override-specific fields may remain hidden or collapsed
+  - their values should be cleared/reset safely
+- If `action_code === 'override'`:
+  - show all override-capable fields:
+    - Override Local Start Time
+    - Override Local End Time
+    - Override Break Minutes
+    - Override Shift Type Code
+    - Override Meeting Point
+    - Override Location Text
+    - Customer Visible Flag
+    - Subcontractor Visible Flag
+    - Stealth Mode Flag
+    - Notes
 
-Preferred outcome unless validation disproves it:
-- Allow multiple active requirement lines for the same `requirement_type_id`
-- Block only exact active duplicates of the same staffing tuple:
-  (`requirement_type_id`, `function_type_id`, `qualification_type_id`)
-- Treat archived lines as non-blocking
-- Preserve edit behavior for the currently selected line
+Important implementation details:
+A. Reuse existing shift-type option loading instead of inventing a new source.
+   The override shift type field should use the same option source/pattern already used elsewhere in Shift planning.
+B. Preserve edit round-trip for all fields.
+C. Do not break current `skip` behavior.
+D. Do not force users to fill override-only fields when action is `skip`.
 
-Important implementation guidance:
-A. Fix the frontend duplicate guard in `planningOrders.helpers.js`.
-B. Update helper tests accordingly.
-C. Check whether backend currently enforces no uniqueness at all.
-D. If backend does not enforce the intended tuple rule, add the smallest correct backend validation so the API and UI stay consistent.
-E. Be careful with nullable `function_type_id` / `qualification_type_id`.
-   Two lines should count as exact duplicates only if all three tuple values match after normalization, including null handling.
-F. Do not block valid combinations that differ in function or qualification.
+Critical UX requirement for visibility flags:
+The following fields are nullable booleans in the contract:
+- `customer_visible_flag`
+- `subcontractor_visible_flag`
+- `stealth_mode_flag`
+
+Because they are nullable, do NOT model them as simple two-state checkboxes if that would lose the `null` / “inherit” state.
+
+Instead, validate and implement a proper nullable UI, for example:
+- `inherit`
+- `yes`
+- `no`
+
+This is important because `null` means “no exception-level override”.
+
+Validation questions you must answer:
+1. Are the missing fields truly part of the supported exception contract?
+2. Should they appear only for `override` exceptions?
+3. How did you preserve nullable behavior for the three visibility fields?
+4. Did you reuse existing shift type option loading?
 
 Acceptance criteria:
-1. The user can create both of these lines in the same order:
-   - OBJECT_GUARD + SEC_GUARD + G34A
-   - OBJECT_GUARD + SHIFT_SUP + FIRST_AID
-2. The UI no longer throws the old error for that case.
-3. Exact duplicate active tuples are handled consistently according to the final validated rule.
-4. Archived lines do not block creation.
-5. Editing an existing line does not falsely trip duplicate validation against itself.
-6. Frontend and backend rules are aligned.
+1. The `Series exceptions` form matches the real supported exception contract.
+2. For `skip`, the form remains minimal and valid.
+3. For `override`, the missing fields are available.
+4. `override_shift_type_code` uses the existing shift type option source.
+5. Nullable visibility flags are represented safely without losing `null`.
+6. Existing create/edit/get round-trip still works.
+7. No unrelated shift-planning behavior is changed.
 
 Tests to add/update:
-- frontend helper test proving same requirement type with different function/qualification is allowed
-- frontend helper test proving exact active duplicate tuple is blocked if that is the chosen rule
-- backend test for create/update behavior of requirement lines under the validated uniqueness rule
-- compatibility test for archived lines and self-edit scenarios
+- frontend test for `skip` mode showing only the appropriate fields
+- frontend test for `override` mode showing the full override field set
+- frontend test for nullable visibility flag behavior
+- round-trip test for edit mode hydrating all exception fields
+- backend/integration test only if needed to align with the actual API contract
 
 What not to do:
-- Do not keep the duplicate rule based only on `requirement_type_id`
-- Do not remove the duplicate rule entirely without validating whether exact tuple duplicates should still be blocked
-- Do not change unrelated order/planning behavior
-- Do not make function/qualification required unless the domain already requires them
+- Do not expose all override fields unconditionally if the UX becomes confusing and the model clearly distinguishes `skip` vs `override`
+- Do not use simple checkboxes for nullable visibility flags if that destroys the inherit state
+- Do not add new data sources for shift types
+- Do not refactor unrelated shift-planning tabs
 
 Required output:
-1. Confirmed intended uniqueness rule
-2. Root cause
+1. Confirmed root cause
+2. Confirmed UI rule: always visible vs override-only
 3. Files changed
-4. Exact fix made
-5. Null-handling / archived-line handling
+4. Exact fields added
+5. How nullable visibility flags were implemented
 6. Tests added/updated
-7. Final self-check confirming you validated the proposal instead of assuming it
+7. Final self-check confirming you validated the proposal against the real contract instead of assuming
