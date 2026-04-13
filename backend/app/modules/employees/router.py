@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db.session import get_db_session
+from app.modules.core.lookup_seed import seed_lookup_values
 from app.modules.core.schemas import LookupValueRead
 from app.modules.employees.availability_service import EmployeeAvailabilityService
 from app.modules.employees.catalog_seed import seed_sample_employee_catalogs
@@ -123,6 +124,7 @@ router = APIRouter(prefix="/api/employees/tenants/{tenant_id}/employees", tags=[
 def get_employee_service(
     session: Annotated[Session, Depends(get_db_session)],
 ) -> EmployeeService:
+    seed_lookup_values(session)
     return EmployeeService(
         SqlAlchemyEmployeeRepository(session),
         audit_service=AuditService(SqlAlchemyAuditRepository(session)),

@@ -90,10 +90,19 @@ class CoreAdminRepositoryHrBaselineTest(unittest.TestCase):
             tenant_id=result.tenant.id,
             actor_user_id="user-1",
         )
-        seed_lookup_values_mock.assert_called_once_with(
-            session,
-            tenant_id=result.tenant.id,
-            actor_user_id="user-1",
+        self.assertEqual(seed_lookup_values_mock.call_count, 2)
+        self.assertEqual(
+            seed_lookup_values_mock.call_args_list[0].kwargs,
+            {
+                "actor_user_id": "user-1",
+            },
+        )
+        self.assertEqual(
+            seed_lookup_values_mock.call_args_list[1].kwargs,
+            {
+                "tenant_id": result.tenant.id,
+                "actor_user_id": "user-1",
+            },
         )
         seed_baseline_employee_catalogs_mock.assert_called_once_with(
             session,

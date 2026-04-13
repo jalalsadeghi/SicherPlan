@@ -99,6 +99,11 @@ class SqlAlchemyCoreAdminRepository:
 
         seed_lookup_values(
             self.session,
+            actor_user_id=actor_user_id,
+        )
+
+        seed_lookup_values(
+            self.session,
             tenant_id=tenant.id,
             actor_user_id=actor_user_id,
         )
