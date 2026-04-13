@@ -484,6 +484,46 @@
                       />
                     </label>
                     <label class="field-stack">
+                      <span>{{ tp("fieldsFunctionType") }}</span>
+                      <Select
+                        :value="requirementLineDraft.function_type_id || undefined"
+                        show-search
+                        allow-clear
+                        class="planning-admin-select"
+                        popup-class-name="planning-admin-select-dropdown"
+                        :options="functionTypeSelectOptions"
+                        :loading="functionTypeLookupLoading"
+                        :disabled="loading.action || (!functionTypeSelectOptions.length && !requirementLineDraft.function_type_id)"
+                        :filter-option="filterSelectOption"
+                        :placeholder="functionTypePlaceholder"
+                        @change="handleRequirementLineFunctionTypeChange"
+                        @clear="clearRequirementLineFunctionType"
+                      />
+                      <p v-if="functionTypeLookupLoading" class="field-help">{{ tp("functionTypeLoading") }}</p>
+                      <p v-else-if="functionTypeLookupError" class="field-help">{{ functionTypeLookupError }}</p>
+                      <p v-else-if="!functionTypeSelectOptions.length" class="field-help">{{ tp("functionTypeEmpty") }}</p>
+                    </label>
+                    <label class="field-stack">
+                      <span>{{ tp("fieldsQualificationType") }}</span>
+                      <Select
+                        :value="requirementLineDraft.qualification_type_id || undefined"
+                        show-search
+                        allow-clear
+                        class="planning-admin-select"
+                        popup-class-name="planning-admin-select-dropdown"
+                        :options="qualificationTypeSelectOptions"
+                        :loading="qualificationTypeLookupLoading"
+                        :disabled="loading.action || (!qualificationTypeSelectOptions.length && !requirementLineDraft.qualification_type_id)"
+                        :filter-option="filterSelectOption"
+                        :placeholder="qualificationTypePlaceholder"
+                        @change="handleRequirementLineQualificationTypeChange"
+                        @clear="clearRequirementLineQualificationType"
+                      />
+                      <p v-if="qualificationTypeLookupLoading" class="field-help">{{ tp("qualificationTypeLoading") }}</p>
+                      <p v-else-if="qualificationTypeLookupError" class="field-help">{{ qualificationTypeLookupError }}</p>
+                      <p v-else-if="!qualificationTypeSelectOptions.length" class="field-help">{{ tp("qualificationTypeEmpty") }}</p>
+                    </label>
+                    <label class="field-stack">
                       <span>{{ tp("fieldsMinQty") }}</span>
                       <input v-model.number="requirementLineDraft.min_qty" type="number" min="0" />
                     </label>
@@ -1187,6 +1227,12 @@ import { useRouter } from "vue-router";
 import StatusBadge from "@/components/StatusBadge.vue";
 import PlanningCustomerSelect from "@/components/planning/PlanningCustomerSelect.vue";
 import { listCustomers, type CustomerListItem } from "@/api/customers";
+import {
+  listFunctionTypes,
+  listQualificationTypes,
+  type FunctionTypeRead,
+  type QualificationTypeRead,
+} from "@/api/employeeAdmin";
 import { useSicherPlanFeedback } from "@/composables/useSicherPlanFeedback";
 import {
   createPlanningRecord as createPlanningCatalogRecord,
@@ -1291,6 +1337,12 @@ const patrolRouteLookupError = ref("");
 const serviceCategoryOptions = ref<PlanningReferenceOptionRead[]>([]);
 const serviceCategoryLookupLoading = ref(false);
 const serviceCategoryLookupError = ref("");
+const functionTypeOptions = ref<FunctionTypeRead[]>([]);
+const functionTypeLookupLoading = ref(false);
+const functionTypeLookupError = ref("");
+const qualificationTypeOptions = ref<QualificationTypeRead[]>([]);
+const qualificationTypeLookupLoading = ref(false);
+const qualificationTypeLookupError = ref("");
 const dispatcherOptions = ref<PlanningDispatcherCandidateRead[]>([]);
 const dispatcherLookupLoading = ref(false);
 const dispatcherLookupError = ref("");
@@ -1386,7 +1438,14 @@ const planningAttachmentDraft = reactive({ title: "", label: "", file_name: "", 
 const orderAttachmentLink = reactive({ document_id: "", label: "" });
 const planningAttachmentLink = reactive({ document_id: "", label: "" });
 const equipmentLineDraft = reactive({ equipment_item_id: "", required_qty: 1, notes: "" });
-const requirementLineDraft = reactive({ requirement_type_id: "", min_qty: 0, target_qty: 1, notes: "" });
+const requirementLineDraft = reactive({
+  requirement_type_id: "",
+  function_type_id: "",
+  qualification_type_id: "",
+  min_qty: 0,
+  target_qty: 1,
+  notes: "",
+});
 
 const tenantScopeId = computed(() => authStore.effectiveTenantScopeId || authStore.tenantScopeId || authStore.sessionUser?.tenant_id || "");
 const accessToken = computed(() => authStore.effectiveAccessToken || authStore.accessToken);
@@ -1445,6 +1504,36 @@ const patrolRouteSelectOptions = computed(() =>
     value: row.id,
   })),
 );
+const functionTypeSelectOptions = computed(() => {
+  const options = new Map(
+    functionTypeOptions.value.map((row) => [
+      row.id,
+      { label: [row.code, row.label].filter(Boolean).join(" — "), value: row.id },
+    ]),
+  );
+  if (requirementLineDraft.function_type_id && !options.has(requirementLineDraft.function_type_id)) {
+    options.set(requirementLineDraft.function_type_id, {
+      label: requirementLineDraft.function_type_id,
+      value: requirementLineDraft.function_type_id,
+    });
+  }
+  return [...options.values()];
+});
+const qualificationTypeSelectOptions = computed(() => {
+  const options = new Map(
+    qualificationTypeOptions.value.map((row) => [
+      row.id,
+      { label: [row.code, row.label].filter(Boolean).join(" — "), value: row.id },
+    ]),
+  );
+  if (requirementLineDraft.qualification_type_id && !options.has(requirementLineDraft.qualification_type_id)) {
+    options.set(requirementLineDraft.qualification_type_id, {
+      label: requirementLineDraft.qualification_type_id,
+      value: requirementLineDraft.qualification_type_id,
+    });
+  }
+  return [...options.values()];
+});
 const planningCustomerId = computed(() => selectedOrder.value?.customer_id || orderDraft.customer_id || "");
 const dispatcherSelectOptions = computed(() =>
   dispatcherOptions.value.map((row) => ({
@@ -1568,6 +1657,16 @@ const serviceCategoryPlaceholder = computed(() => {
     return tp("serviceCategoryEmpty");
   }
   return tp("serviceCategoryPlaceholder");
+});
+const functionTypePlaceholder = computed(() => {
+  if (functionTypeLookupLoading.value) return tp("functionTypeLoading");
+  if (!functionTypeLookupError.value && !functionTypeSelectOptions.value.length) return tp("functionTypeEmpty");
+  return tp("functionTypePlaceholder");
+});
+const qualificationTypePlaceholder = computed(() => {
+  if (qualificationTypeLookupLoading.value) return tp("qualificationTypeLoading");
+  if (!qualificationTypeLookupError.value && !qualificationTypeSelectOptions.value.length) return tp("qualificationTypeEmpty");
+  return tp("qualificationTypePlaceholder");
 });
 const serviceCategoryFieldInvalid = computed(
   () => orderValidationState.attempted && orderValidationErrors.value.service_category_code,
@@ -1856,6 +1955,8 @@ function resetRequirementLineDraft() {
   selectedRequirementLineId.value = "";
   Object.assign(requirementLineDraft, {
     requirement_type_id: "",
+    function_type_id: "",
+    qualification_type_id: "",
     min_qty: 0,
     target_qty: 1,
     notes: "",
@@ -1913,6 +2014,8 @@ function syncRequirementLineDraft(line: OrderRequirementLineRead) {
   }
   Object.assign(requirementLineDraft, {
     requirement_type_id: line.requirement_type_id,
+    function_type_id: line.function_type_id ?? "",
+    qualification_type_id: line.qualification_type_id ?? "",
     min_qty: line.min_qty,
     target_qty: line.target_qty,
     notes: line.notes ?? "",
@@ -2132,6 +2235,22 @@ function handleRequirementLineRequirementTypeChange(value: string | number | und
   requirementLineDraft.requirement_type_id = typeof value === "string" ? value : "";
 }
 
+function handleRequirementLineFunctionTypeChange(value: string | number | undefined) {
+  requirementLineDraft.function_type_id = typeof value === "string" ? value : "";
+}
+
+function clearRequirementLineFunctionType() {
+  requirementLineDraft.function_type_id = "";
+}
+
+function handleRequirementLineQualificationTypeChange(value: string | number | undefined) {
+  requirementLineDraft.qualification_type_id = typeof value === "string" ? value : "";
+}
+
+function clearRequirementLineQualificationType() {
+  requirementLineDraft.qualification_type_id = "";
+}
+
 function handlePlanningDispatcherChange(value: string | number | undefined) {
   planningDraft.dispatcher_user_id = typeof value === "string" ? value : "";
 }
@@ -2251,6 +2370,39 @@ async function refreshServiceCategoryOptions() {
     serviceCategoryLookupError.value = tp("serviceCategoryLoadError");
   } finally {
     serviceCategoryLookupLoading.value = false;
+  }
+}
+
+async function refreshRequirementLineCatalogOptions() {
+  if (!tenantScopeId.value || !accessToken.value || !actionState.value.canReadOrders) {
+    functionTypeOptions.value = [];
+    qualificationTypeOptions.value = [];
+    functionTypeLookupError.value = "";
+    qualificationTypeLookupError.value = "";
+    return;
+  }
+
+  functionTypeLookupLoading.value = true;
+  qualificationTypeLookupLoading.value = true;
+  functionTypeLookupError.value = "";
+  qualificationTypeLookupError.value = "";
+
+  try {
+    functionTypeOptions.value = await listFunctionTypes(tenantScopeId.value, accessToken.value);
+  } catch {
+    functionTypeOptions.value = [];
+    functionTypeLookupError.value = tp("functionTypeLoadError");
+  } finally {
+    functionTypeLookupLoading.value = false;
+  }
+
+  try {
+    qualificationTypeOptions.value = await listQualificationTypes(tenantScopeId.value, accessToken.value);
+  } catch {
+    qualificationTypeOptions.value = [];
+    qualificationTypeLookupError.value = tp("qualificationTypeLoadError");
+  } finally {
+    qualificationTypeLookupLoading.value = false;
   }
 }
 
@@ -2891,6 +3043,8 @@ async function submitRequirementLine() {
     hasDuplicateActiveRequirementLine(
       orderRequirementLines.value,
       requirementLineDraft.requirement_type_id,
+      requirementLineDraft.function_type_id,
+      requirementLineDraft.qualification_type_id,
       selectedRequirementLineId.value,
     )
   ) {
@@ -2907,6 +3061,8 @@ async function submitRequirementLine() {
         accessToken.value,
         {
           requirement_type_id: requirementLineDraft.requirement_type_id,
+          function_type_id: requirementLineDraft.function_type_id || null,
+          qualification_type_id: requirementLineDraft.qualification_type_id || null,
           min_qty: requirementLineDraft.min_qty,
           target_qty: requirementLineDraft.target_qty,
           notes: requirementLineDraft.notes || null,
@@ -2918,6 +3074,8 @@ async function submitRequirementLine() {
         tenant_id: tenantScopeId.value,
         order_id: selectedOrder.value.id,
         requirement_type_id: requirementLineDraft.requirement_type_id,
+        function_type_id: requirementLineDraft.function_type_id || null,
+        qualification_type_id: requirementLineDraft.qualification_type_id || null,
         min_qty: requirementLineDraft.min_qty,
         target_qty: requirementLineDraft.target_qty,
         notes: requirementLineDraft.notes || null,
@@ -3206,6 +3364,7 @@ async function refreshPlanningOrdersWorkspace() {
   await Promise.all([
     refreshCustomerOptions(),
     refreshServiceCategoryOptions(),
+    refreshRequirementLineCatalogOptions(),
     refreshDispatcherOptions(),
   ]);
 }

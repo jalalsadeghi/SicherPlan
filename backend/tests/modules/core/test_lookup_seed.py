@@ -99,7 +99,7 @@ class TestLookupSeed(unittest.TestCase):
 
         seeded_codes = {row.code for row in session.rows if row.domain == "service_category" and row.tenant_id is None}
 
-        self.assertEqual(seeded_codes, {"site", "event", "patrol", "guarding"})
+        self.assertEqual(seeded_codes, {"object_security", "event_security", "trade_fair_security", "patrol_service"})
 
     def test_tenant_seed_only_applies_tenant_extensible_domains(self) -> None:
         session = _FakeSession()

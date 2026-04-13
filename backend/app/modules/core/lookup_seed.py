@@ -141,10 +141,10 @@ SYSTEM_LOOKUP_DOMAINS: tuple[LookupSeedDomain, ...] = (
         ownership="system",
         description="Shared planning service categories for order-level commercial and operational classification.",
         values=(
-            LookupSeedValue("site", "Objekt", "Objekt- oder Standortleistung", 10),
-            LookupSeedValue("event", "Event", "Veranstaltungsbezogene Leistung", 20),
-            LookupSeedValue("patrol", "Patrouille", "Patrouillen- oder Revierleistung", 30),
-            LookupSeedValue("guarding", "Bewachung", "Allgemeine Bewachungs- oder Sicherheitsleistung", 40),
+            LookupSeedValue("object_security", "Objektschutz", "Objekt- oder standortbezogene Sicherheitsleistung", 10),
+            LookupSeedValue("event_security", "Veranstaltungsschutz", "Veranstaltungsbezogene Sicherheitsleistung", 20),
+            LookupSeedValue("trade_fair_security", "Messebewachung", "Messe- oder standbezogene Sicherheitsleistung", 30),
+            LookupSeedValue("patrol_service", "Revier- / Patrouillendienst", "Patrouillen-, Revier- oder Alarmfahrdienst", 40),
         ),
     ),
 )

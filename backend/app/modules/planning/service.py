@@ -117,10 +117,30 @@ class PlanningService:
     )
     SERVICE_CATEGORY_DOMAIN = "service_category"
     SERVICE_CATEGORY_FALLBACK_OPTIONS: tuple[dict[str, object], ...] = (
-        {"code": "site", "label": "Objekt", "description": "Objekt- oder Standortleistung", "sort_order": 10},
-        {"code": "event", "label": "Event", "description": "Veranstaltungsbezogene Leistung", "sort_order": 20},
-        {"code": "patrol", "label": "Patrouille", "description": "Patrouillen- oder Revierleistung", "sort_order": 30},
-        {"code": "guarding", "label": "Bewachung", "description": "Allgemeine Bewachungs- oder Sicherheitsleistung", "sort_order": 40},
+        {
+            "code": "object_security",
+            "label": "Objektschutz",
+            "description": "Objekt- oder standortbezogene Sicherheitsleistung",
+            "sort_order": 10,
+        },
+        {
+            "code": "event_security",
+            "label": "Veranstaltungsschutz",
+            "description": "Veranstaltungsbezogene Sicherheitsleistung",
+            "sort_order": 20,
+        },
+        {
+            "code": "trade_fair_security",
+            "label": "Messebewachung",
+            "description": "Messe- oder standbezogene Sicherheitsleistung",
+            "sort_order": 30,
+        },
+        {
+            "code": "patrol_service",
+            "label": "Revier- / Patrouillendienst",
+            "description": "Patrouillen-, Revier- oder Alarmfahrdienst",
+            "sort_order": 40,
+        },
     )
 
     def __init__(self, repository: PlanningRepository, audit_service: AuditService | None = None) -> None:
@@ -198,14 +218,29 @@ class PlanningService:
         tenant_id: str,
         _actor: RequestAuthorizationContext,
     ) -> list[PlanningReferenceOptionRead]:
-        lookup_rows = self.repository.list_lookup_values(None, self.SERVICE_CATEGORY_DOMAIN)
-        if lookup_rows:
-            return [
-                PlanningReferenceOptionRead.model_validate(row)
-                for row in sorted(lookup_rows, key=lambda row: (row.sort_order, row.label))
-            ]
+        canonical_by_code = {
+            row["code"]: row
+            for row in self.SERVICE_CATEGORY_FALLBACK_OPTIONS
+        }
+        lookup_rows = [
+            row
+            for row in self.repository.list_lookup_values(None, self.SERVICE_CATEGORY_DOMAIN)
+            if row.code in canonical_by_code
+        ]
+        preferred_rows_by_code: dict[str, LookupValue] = {}
+        for row in lookup_rows:
+            existing = preferred_rows_by_code.get(row.code)
+            if existing is None:
+                preferred_rows_by_code[row.code] = row
 
-        return [PlanningReferenceOptionRead.model_validate(row) for row in self.SERVICE_CATEGORY_FALLBACK_OPTIONS]
+        resolved_rows: list[PlanningReferenceOptionRead] = []
+        for fallback in self.SERVICE_CATEGORY_FALLBACK_OPTIONS:
+            lookup_row = preferred_rows_by_code.get(fallback["code"])
+            resolved_rows.append(
+                PlanningReferenceOptionRead.model_validate(lookup_row or fallback)
+            )
+
+        return resolved_rows
 
     def get_equipment_item(self, tenant_id: str, row_id: str, _actor: RequestAuthorizationContext) -> EquipmentItemRead:
         row = self.repository.get_equipment_item(tenant_id, row_id)

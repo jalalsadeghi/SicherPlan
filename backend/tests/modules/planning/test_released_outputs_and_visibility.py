@@ -161,7 +161,7 @@ class ReleasedOutputsAndVisibilityTests(unittest.TestCase):
                 patrol_route_id=None,
                 order_no="ORD-1",
                 title="Order",
-                service_category_code="guarding",
+                service_category_code="object_security",
                 security_concept_text=None,
                 service_from=date(2026, 4, 1),
                 service_to=date(2026, 4, 5),
@@ -190,7 +190,7 @@ class ReleasedOutputsAndVisibilityTests(unittest.TestCase):
                 label="Day",
                 local_start_time=datetime(2026, 4, 1, 8, 0, tzinfo=UTC).timetz(),
                 local_end_time=datetime(2026, 4, 1, 16, 0, tzinfo=UTC).timetz(),
-                shift_type_code="guard",
+                shift_type_code="site_day",
             ),
             actor,
         )

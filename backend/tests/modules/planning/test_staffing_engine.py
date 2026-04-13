@@ -625,7 +625,7 @@ class StaffingServiceTests(unittest.TestCase):
                 "patrol_route_id": None,
                 "order_no": "ORD-1",
                 "title": "Objektschutz",
-                "service_category_code": "site",
+                "service_category_code": "object_security",
                 "security_concept_text": None,
                 "service_from": date(2026, 4, 1),
                 "service_to": date(2026, 4, 30),

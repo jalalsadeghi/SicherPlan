@@ -157,6 +157,16 @@ test("planning-orders overview exposes independent order child sections", () => 
   assert.match(source, /listOrderRequirementLines/);
   assert.match(source, /:options="equipmentItemSelectOptions"[\s\S]*:disabled="loading\.action"/);
   assert.match(source, /:options="requirementTypeSelectOptions"[\s\S]*:disabled="loading\.action"/);
+  assert.match(source, /fieldsFunctionType/);
+  assert.match(source, /fieldsQualificationType/);
+  assert.match(source, /:options="functionTypeSelectOptions"[\s\S]*show-search[\s\S]*allow-clear/s);
+  assert.match(source, /:options="qualificationTypeSelectOptions"[\s\S]*show-search[\s\S]*allow-clear/s);
+  assert.match(source, /listFunctionTypes/);
+  assert.match(source, /listQualificationTypes/);
+  assert.match(source, /function_type_id: requirementLineDraft\.function_type_id \|\| null/);
+  assert.match(source, /qualification_type_id: requirementLineDraft\.qualification_type_id \|\| null/);
+  assert.match(source, /functionTypePlaceholder/);
+  assert.match(source, /qualificationTypePlaceholder/);
 });
 
 test("planning-orders requirement lines support lifecycle actions, archived toggle, and duplicate guard", () => {
@@ -176,8 +186,9 @@ test("planning-orders requirement lines support lifecycle actions, archived togg
   assert.match(source, /status: "inactive"/);
   assert.match(source, /status: "archived", archived_at: new Date\(\)\.toISOString\(\)/);
   assert.match(source, /status: "active", archived_at: null/);
-  assert.match(source, /hasDuplicateActiveRequirementLine\(/);
+  assert.match(source, /hasDuplicateActiveRequirementLine\([\s\S]*requirementLineDraft\.requirement_type_id[\s\S]*requirementLineDraft\.function_type_id[\s\S]*requirementLineDraft\.qualification_type_id[\s\S]*selectedRequirementLineId\.value/s);
   assert.match(source, /tp\("requirementLineDuplicateActive"\)/);
+  assert.match(source, /function syncRequirementLineDraft\(line: OrderRequirementLineRead\) \{[\s\S]*function_type_id: line\.function_type_id \?\? ""[\s\S]*qualification_type_id: line\.qualification_type_id \?\? ""/s);
 });
 
 test("planning-orders keeps planning-record browsing in the left workspace", () => {

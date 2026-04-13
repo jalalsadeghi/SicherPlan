@@ -791,6 +791,37 @@ class PlanningOpsMasterFoundationTests(unittest.TestCase):
         self.assertEqual([option.code for option in result], ["set", "pcs"])
         self.assertEqual(result[0].label, "Set (Mandant)")
 
+    def test_list_service_category_options_returns_only_canonical_codes(self) -> None:
+        self.repository.lookup_values.extend(
+            [
+                LookupValue(tenant_id=None, domain="service_category", code="site", label="Objekt", description=None, sort_order=5),
+                LookupValue(
+                    tenant_id=None,
+                    domain="service_category",
+                    code="object_security",
+                    label="Objektschutz",
+                    description="Objekt- oder standortbezogene Sicherheitsleistung",
+                    sort_order=10,
+                ),
+                LookupValue(
+                    tenant_id=None,
+                    domain="service_category",
+                    code="event_security",
+                    label="Veranstaltungsschutz",
+                    description="Veranstaltungsbezogene Sicherheitsleistung",
+                    sort_order=20,
+                ),
+            ]
+        )
+
+        result = self.service.list_service_category_options("tenant-1", self.context)
+
+        self.assertEqual(
+            [option.code for option in result],
+            ["object_security", "event_security", "trade_fair_security", "patrol_service"],
+        )
+        self.assertNotIn("site", [option.code for option in result])
+
     def test_create_site_requires_existing_customer(self) -> None:
         payload = SiteCreate(tenant_id="tenant-1", customer_id="missing", site_no="S-001", name="Objekt A")
         with self.assertRaises(ApiException) as ctx:

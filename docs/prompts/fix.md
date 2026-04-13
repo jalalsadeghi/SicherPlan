@@ -1,116 +1,107 @@
 You are working in the SicherPlan monorepo on the latest main branch.
 
 Task:
-Validate and improve the `Service category` field in Planning -> admin/planning-orders -> Order details.
+Fix the duplicate-validation logic for Planning -> admin/planning-orders -> Orders & planning -> Requirement lines.
 
-Problem statement:
-The current `Service category` field is rendered as a plain text input, but the project model uses the name `service_category_code`, which suggests a controlled code field rather than arbitrary free text.
+Current broken behavior:
+The UI blocks creation of a second active requirement line in the same order when the `requirement_type_id` is the same, even if `function_type_id` and `qualification_type_id` are different.
 
-What you must determine first:
-1. Should `Service category` remain a textbox, or should it become a select/searchable select?
-2. If it should become a select, should its options come from:
-   - a seeded lookup/catalog, or
-   - a tenant-managed catalog that users must maintain first?
-3. Validate this against the project’s existing architecture and docs instead of assuming.
+Concrete real-world example that should be allowed:
+Existing line:
+- Requirement Type: OBJECT_GUARD
+- Function Type: SEC_GUARD
+- Qualification Type: G34A
+- Min Qty: 2
+- Target Qty: 2
 
-Key facts already observed:
-- `ops.customer_order` stores `service_category_code` as a code field.
-- `CustomerOrderCreate` / `CustomerOrderUpdate` also use `service_category_code`.
-- The current UI still renders it as a free text input in `PlanningOrdersAdminView.vue`.
-- The docs separate `service category` on the order from `planning mode` on the planning record.
-- The project architecture prefers stable business dictionaries in `core.lookup_value`.
-- Current lookup seeds include domains like `legal_form`, `invoice_layout`, `invoice_delivery_method`, `dunning_policy`, `unit_of_measure`, etc.
-- There is currently no confirmed existing lookup domain for `service_category`.
-- Core admin currently exposes tenant management for `unit_of_measure`, not for `service_category`.
+New line the user is trying to add:
+- Requirement Type: OBJECT_GUARD
+- Function Type: SHIFT_SUP
+- Qualification Type: FIRST_AID
+- Min Qty: 1
+- Target Qty: 1
+
+Current UI error:
+"An active requirement line for this requirement type already exists in this order."
+
+Why this looks wrong:
+- The backend model for `order_requirement_line` includes:
+  - `requirement_type_id`
+  - `function_type_id`
+  - `qualification_type_id`
+- The backend schemas also include those fields.
+- The frontend API type `OrderRequirementLineRead` includes those fields.
+- But the frontend duplicate guard appears to check only `requirement_type_id`.
 
 Files to inspect first:
 Frontend
 - `web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue`
+- `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningOrders.helpers.js`
+- `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningOrders.helpers.test.js`
 - `web/apps/web-antd/src/sicherplan-legacy/api/planningOrders.ts`
-- any planning-order helper/i18n files
 
 Backend
 - `backend/app/modules/planning/models.py`
 - `backend/app/modules/planning/schemas.py`
-- `backend/app/modules/planning/service.py`
+- `backend/app/modules/planning/order_service.py`
 - `backend/app/modules/planning/repository.py`
+- any backend tests for customer orders / requirement lines
 
-Lookup / seed / admin
-- `backend/app/modules/core/lookup_seed.py`
-- `backend/app/modules/core/admin_service.py`
-- `backend/app/modules/core/admin_repository.py`
-- `web/apps/web-antd/src/sicherplan-legacy/views/CoreAdminView.vue`
-- any core admin API/schema files related to lookup values
+Your job:
+1. Validate the real intended uniqueness rule for order requirement lines.
+2. Fix the bug so that multiple active requirement lines with the same `requirement_type_id` are allowed when their staffing profile differs.
+3. Make frontend and backend behavior consistent.
 
-Supporting docs to align with
-- `docs/engineering/lookup-seeding.md`
-- `docs/configuration/go-live-seed-baseline.md`
-- any migration/template docs referencing `service_category_code`
+Validation rule to test explicitly:
+Determine whether uniqueness should be based on:
+A. `requirement_type_id` only  ❌ likely wrong
+B. tuple of (`requirement_type_id`, `function_type_id`, `qualification_type_id`) ✅ likely correct
+C. no duplicate rule at all
+You must validate and justify the choice.
 
-Validation rules you must apply:
-A. Do not automatically equate `service_category_code` with `planning_mode_code`.
-   They are related but not proven to be identical.
-B. If the field is truly a code field, prefer a controlled selector over free text.
-C. If no existing catalog exists yet, design the smallest correct catalog path instead of leaving the field as raw free text.
-D. Preserve backward compatibility for already-saved free-text values.
+Preferred outcome unless validation disproves it:
+- Allow multiple active requirement lines for the same `requirement_type_id`
+- Block only exact active duplicates of the same staffing tuple:
+  (`requirement_type_id`, `function_type_id`, `qualification_type_id`)
+- Treat archived lines as non-blocking
+- Preserve edit behavior for the currently selected line
 
-Preferred target direction unless validation disproves it:
-- Convert `Service category` from textbox to select/searchable select.
-- Back it with a lookup-driven option source.
-- Add a proper initial seed/catalog for service categories.
-- Make the management path explicit if tenant-managed behavior is the right architectural choice.
-
-Important design decision you must make and justify:
-Choose one of these and explain why:
-1. `service_category` should be a platform-managed lookup domain with system seed values.
-2. `service_category` should be a tenant-extensible lookup domain with tenant-owned values.
-3. `service_category` should remain free text.
-You must justify the choice using the current docs, data model, and lookup governance.
-
-My default recommendation for you to validate:
-- This should be a select, not a textbox.
-- It should not depend on the order form user typing arbitrary codes.
-- It should start from a seeded catalog.
-- Only if the business semantics clearly require tenant-specific customization should it become tenant-extensible.
-
-If you conclude it should be a select, implement:
-1. a lookup/catalog source for service categories
-2. a selector UI in Order details
-3. proper placeholder text
-4. safe handling for legacy stored values not present in the option set
-5. any needed seed additions
-6. any needed admin path additions, but only if your ownership decision requires them
-
-Backward compatibility requirements:
-- Existing records with legacy free-text `service_category_code` values must still open in Edit mode.
-- If a stored value is not in the current option set, it must remain visible/selectable so records are not broken.
-- Do not silently destroy or remap existing values without explicit migration logic.
-
-Do NOT do these:
-- Do not hardcode a random static list in the component without proper ownership reasoning.
-- Do not force `service_category_code` to equal `planning_mode_code` without proof.
-- Do not change unrelated planning fields.
-- Do not break existing orders.
+Important implementation guidance:
+A. Fix the frontend duplicate guard in `planningOrders.helpers.js`.
+B. Update helper tests accordingly.
+C. Check whether backend currently enforces no uniqueness at all.
+D. If backend does not enforce the intended tuple rule, add the smallest correct backend validation so the API and UI stay consistent.
+E. Be careful with nullable `function_type_id` / `qualification_type_id`.
+   Two lines should count as exact duplicates only if all three tuple values match after normalization, including null handling.
+F. Do not block valid combinations that differ in function or qualification.
 
 Acceptance criteria:
-1. Codex explicitly states whether textbox or select is correct.
-2. Codex explicitly states whether the option source should be seeded lookup or tenant-maintained catalog.
-3. If select is correct, the UI uses a proper selector instead of raw text.
-4. Legacy stored values still open safely in Edit mode.
-5. The chosen solution fits the existing lookup governance.
-6. Tests are added/updated appropriately.
+1. The user can create both of these lines in the same order:
+   - OBJECT_GUARD + SEC_GUARD + G34A
+   - OBJECT_GUARD + SHIFT_SUP + FIRST_AID
+2. The UI no longer throws the old error for that case.
+3. Exact duplicate active tuples are handled consistently according to the final validated rule.
+4. Archived lines do not block creation.
+5. Editing an existing line does not falsely trip duplicate validation against itself.
+6. Frontend and backend rules are aligned.
 
 Tests to add/update:
-- backend tests for service_category_code create/get/update behavior under the chosen model
-- lookup seed / admin tests if a new domain is introduced
-- frontend test for Order details field behavior
-- compatibility test for legacy stored values not in the current option list
+- frontend helper test proving same requirement type with different function/qualification is allowed
+- frontend helper test proving exact active duplicate tuple is blocked if that is the chosen rule
+- backend test for create/update behavior of requirement lines under the validated uniqueness rule
+- compatibility test for archived lines and self-edit scenarios
+
+What not to do:
+- Do not keep the duplicate rule based only on `requirement_type_id`
+- Do not remove the duplicate rule entirely without validating whether exact tuple duplicates should still be blocked
+- Do not change unrelated order/planning behavior
+- Do not make function/qualification required unless the domain already requires them
 
 Required output:
-1. Validation result: textbox vs select
-2. Validation result: seeded lookup vs tenant-managed catalog
-3. Why that decision is correct
-4. Files changed
-5. Compatibility handling
+1. Confirmed intended uniqueness rule
+2. Root cause
+3. Files changed
+4. Exact fix made
+5. Null-handling / archived-line handling
 6. Tests added/updated
-7. Final self-check confirming you validated the recommendation instead of assuming it
+7. Final self-check confirming you validated the proposal instead of assuming it

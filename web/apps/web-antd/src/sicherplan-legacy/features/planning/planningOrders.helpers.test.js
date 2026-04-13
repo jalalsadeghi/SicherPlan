@@ -56,6 +56,7 @@ test("api message mapping covers planning-specific errors", () => {
   assert.equal(mapPlanningOrderApiMessage("errors.planning.customer_order.duplicate_number"), "orderDuplicateNumber");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.customer_order.invalid_requirement_type_id"), "requirementTypeRequired");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.customer_order.invalid_service_category_code"), "serviceCategoryInvalid");
+  assert.equal(mapPlanningOrderApiMessage("errors.planning.order_requirement_line.duplicate_tuple"), "requirementLineDuplicateActive");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.requirement_type.duplicate_code"), "planningSetupDuplicateCode");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.planning_record.invalid_window"), "planningInvalidWindow");
   assert.equal(mapPlanningOrderApiMessage("errors.planning.planning_record.order_window_mismatch"), "planningOrderWindowMismatch");
@@ -154,17 +155,48 @@ test("requirement-line visibility hides archived rows by default", () => {
   assert.deepEqual(filterVisibleRequirementLines(lines, true).map((line) => line.id), ["line-1", "line-2", "line-3"]);
 });
 
-test("requirement-line duplicate guard blocks only second active line with same requirement type", () => {
+test("requirement-line duplicate guard blocks only exact active tuple duplicates", () => {
   const lines = [
-    { id: "line-1", requirement_type_id: "req-1", status: "active", archived_at: null },
-    { id: "line-2", requirement_type_id: "req-1", status: "archived", archived_at: "2026-04-09T10:00:00Z" },
-    { id: "line-3", requirement_type_id: "req-2", status: "active", archived_at: null },
+    {
+      id: "line-1",
+      requirement_type_id: "req-1",
+      function_type_id: "function-1",
+      qualification_type_id: "qualification-1",
+      status: "active",
+      archived_at: null,
+    },
+    {
+      id: "line-2",
+      requirement_type_id: "req-1",
+      function_type_id: "function-1",
+      qualification_type_id: "qualification-1",
+      status: "archived",
+      archived_at: "2026-04-09T10:00:00Z",
+    },
+    {
+      id: "line-3",
+      requirement_type_id: "req-1",
+      function_type_id: "function-2",
+      qualification_type_id: "qualification-1",
+      status: "active",
+      archived_at: null,
+    },
+    {
+      id: "line-4",
+      requirement_type_id: "req-1",
+      function_type_id: null,
+      qualification_type_id: "",
+      status: "active",
+      archived_at: null,
+    },
   ];
-  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-1"), true);
-  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-1", "line-1"), false);
-  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-2"), true);
-  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-3"), false);
-  assert.equal(hasDuplicateActiveRequirementLine(lines, ""), false);
+  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-1", "function-1", "qualification-1"), true);
+  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-1", "function-1", "qualification-1", "line-1"), false);
+  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-1", "function-2", "qualification-1"), true);
+  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-1", "function-9", "qualification-1"), false);
+  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-1", "", null), true);
+  assert.equal(hasDuplicateActiveRequirementLine(lines, "req-3", "", ""), false);
+  assert.equal(hasDuplicateActiveRequirementLine(lines, "", "", ""), false);
 });
 
 test("planning-order draft validation blocks missing required selects only", () => {

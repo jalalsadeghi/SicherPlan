@@ -70,6 +70,7 @@ export function mapPlanningOrderApiMessage(messageKey) {
     "errors.planning.customer_order.invalid_customer_id": "customerRequired",
     "errors.planning.customer_order.invalid_requirement_type_id": "requirementTypeRequired",
     "errors.planning.customer_order.invalid_service_category_code": "serviceCategoryInvalid",
+    "errors.planning.order_requirement_line.duplicate_tuple": "requirementLineDuplicateActive",
     "errors.planning.customer_order.stale_version": "staleVersion",
     "errors.planning.customer_order.invalid_release_transition": "invalidReleaseTransition",
     "errors.planning.requirement_type.duplicate_code": "planningSetupDuplicateCode",
@@ -209,15 +210,25 @@ export function filterVisibleRequirementLines(lines, includeArchived = false) {
   return lines.filter((line) => line?.archived_at == null && line?.status !== "archived");
 }
 
-export function hasDuplicateActiveRequirementLine(lines, requirementTypeId, selectedLineId = "") {
+export function hasDuplicateActiveRequirementLine(
+  lines,
+  requirementTypeId,
+  functionTypeId = "",
+  qualificationTypeId = "",
+  selectedLineId = "",
+) {
   const normalizedRequirementTypeId = normalizePlanningOrderUuidValue(requirementTypeId);
+  const normalizedFunctionTypeId = normalizePlanningOrderUuidValue(functionTypeId);
+  const normalizedQualificationTypeId = normalizePlanningOrderUuidValue(qualificationTypeId);
   if (!normalizedRequirementTypeId) {
     return false;
   }
   return lines.some(
     (line) =>
       line?.id !== selectedLineId &&
-      line?.requirement_type_id === normalizedRequirementTypeId &&
+      normalizePlanningOrderUuidValue(line?.requirement_type_id) === normalizedRequirementTypeId &&
+      normalizePlanningOrderUuidValue(line?.function_type_id) === normalizedFunctionTypeId &&
+      normalizePlanningOrderUuidValue(line?.qualification_type_id) === normalizedQualificationTypeId &&
       line?.archived_at == null &&
       line?.status === "active",
   );

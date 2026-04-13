@@ -84,7 +84,7 @@
   "customer_number": "K-1001",
   "requirement_type_code": "event_security",
   "title": "Fruehjahrsmesse Eingang Nord",
-  "service_category_code": "event",
+  "service_category_code": "event_security",
   "service_from": "2026-04-15",
   "service_to": "2026-04-20"
 }

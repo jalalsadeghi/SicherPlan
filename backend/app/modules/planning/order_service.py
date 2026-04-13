@@ -70,10 +70,30 @@ class CustomerOrderService:
     _SKIP_SNAPSHOT_VALUE = object()
     SERVICE_CATEGORY_DOMAIN = "service_category"
     SERVICE_CATEGORY_FALLBACK_OPTIONS: tuple[dict[str, object], ...] = (
-        {"code": "site", "label": "Objekt", "description": "Objekt- oder Standortleistung", "sort_order": 10},
-        {"code": "event", "label": "Event", "description": "Veranstaltungsbezogene Leistung", "sort_order": 20},
-        {"code": "patrol", "label": "Patrouille", "description": "Patrouillen- oder Revierleistung", "sort_order": 30},
-        {"code": "guarding", "label": "Bewachung", "description": "Allgemeine Bewachungs- oder Sicherheitsleistung", "sort_order": 40},
+        {
+            "code": "object_security",
+            "label": "Objektschutz",
+            "description": "Objekt- oder standortbezogene Sicherheitsleistung",
+            "sort_order": 10,
+        },
+        {
+            "code": "event_security",
+            "label": "Veranstaltungsschutz",
+            "description": "Veranstaltungsbezogene Sicherheitsleistung",
+            "sort_order": 20,
+        },
+        {
+            "code": "trade_fair_security",
+            "label": "Messebewachung",
+            "description": "Messe- oder standbezogene Sicherheitsleistung",
+            "sort_order": 30,
+        },
+        {
+            "code": "patrol_service",
+            "label": "Revier- / Patrouillendienst",
+            "description": "Patrouillen-, Revier- oder Alarmfahrdienst",
+            "sort_order": 40,
+        },
     )
     RELEASE_STATES = frozenset({"draft", "release_ready", "released"})
     RELEASE_TRANSITIONS = {
@@ -278,6 +298,13 @@ class CustomerOrderService:
     ) -> OrderRequirementLineRead:
         self._require_order_match(tenant_id, order_id, payload.order_id)
         self._validate_requirement_line(tenant_id, payload.requirement_type_id, payload.function_type_id, payload.qualification_type_id, payload.min_qty, payload.target_qty)
+        self._validate_requirement_line_duplicate(
+            tenant_id,
+            order_id,
+            payload.requirement_type_id,
+            payload.function_type_id,
+            payload.qualification_type_id,
+        )
         row = self.repository.create_order_requirement_line(tenant_id, payload, actor.user_id)
         self._record_event(actor, "planning.order_requirement_line.created", "ops.order_requirement_line", row.id, tenant_id, after_json=self._snapshot(row))
         return OrderRequirementLineRead.model_validate(row)
@@ -306,6 +333,14 @@ class CustomerOrderService:
             next_qualification_type_id,
             next_min_qty,
             next_target_qty,
+        )
+        self._validate_requirement_line_duplicate(
+            tenant_id,
+            order_id,
+            next_requirement_type_id,
+            next_function_type_id,
+            next_qualification_type_id,
+            exclude_id=row_id,
         )
         before_json = self._snapshot(current)
         row = self.repository.update_order_requirement_line(tenant_id, row_id, payload, actor.user_id)
@@ -430,13 +465,15 @@ class CustomerOrderService:
         *,
         current_service_category_code: str | None = None,
     ) -> None:
+        canonical_codes = {row["code"] for row in self.SERVICE_CATEGORY_FALLBACK_OPTIONS}
         allowed_codes = {
             getattr(row, "code", None)
             for row in self.repository.list_lookup_values(None, self.SERVICE_CATEGORY_DOMAIN)
+            if getattr(row, "code", None) in canonical_codes
         }
         allowed_codes.discard(None)
         if not allowed_codes:
-            allowed_codes = {row["code"] for row in self.SERVICE_CATEGORY_FALLBACK_OPTIONS}
+            allowed_codes = canonical_codes
         if service_category_code in allowed_codes:
             return
         if current_service_category_code is not None and service_category_code == current_service_category_code:
@@ -464,6 +501,32 @@ class CustomerOrderService:
             raise self._not_found("qualification_type")
         if min_qty > target_qty:
             raise ApiException(400, "planning.order_requirement_line.invalid_qty_window", "errors.planning.order_requirement_line.invalid_qty_window")
+
+    def _validate_requirement_line_duplicate(
+        self,
+        tenant_id: str,
+        order_id: str,
+        requirement_type_id: str,
+        function_type_id: str | None,
+        qualification_type_id: str | None,
+        *,
+        exclude_id: str | None = None,
+    ) -> None:
+        for row in self.repository.list_order_requirement_lines(tenant_id, order_id):
+            if row.id == exclude_id:
+                continue
+            if row.archived_at is not None or row.status == "archived":
+                continue
+            if (
+                row.requirement_type_id == requirement_type_id
+                and row.function_type_id == function_type_id
+                and row.qualification_type_id == qualification_type_id
+            ):
+                raise ApiException(
+                    409,
+                    "planning.order_requirement_line.duplicate_tuple",
+                    "errors.planning.order_requirement_line.duplicate_tuple",
+                )
 
     def _require_order(self, tenant_id: str, order_id: str) -> CustomerOrder:
         row = self.repository.get_customer_order(tenant_id, order_id)
