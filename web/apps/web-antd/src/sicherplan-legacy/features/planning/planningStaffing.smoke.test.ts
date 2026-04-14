@@ -1350,7 +1350,14 @@ describe("PlanningStaffingCoverageView", () => {
     const wrapper = await mountView();
     await clickDetailTab(wrapper, "assignments");
 
-    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    const assignmentRow = wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]');
+    expect(assignmentRow.classes()).toContain("planning-staffing-row--assignment");
+    expect(assignmentRow.classes()).toContain("selected");
+    expect(assignmentRow.find(".planning-staffing-assignment-row__title").text()).toContain("Alex Muster");
+    expect(assignmentRow.find(".planning-staffing-assignment-row__detail").text()).toContain("Sicherheitsdienst");
+    expect(assignmentRow.find(".planning-staffing-assignment-row__meta").text()).toContain("assigned");
+
+    await assignmentRow.trigger("click");
     await flushPromises();
 
     expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(true);

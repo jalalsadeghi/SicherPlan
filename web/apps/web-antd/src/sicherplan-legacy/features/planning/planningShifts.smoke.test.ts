@@ -422,7 +422,7 @@ describe("PlanningShiftsAdminView", () => {
     expect((wrapper.get('[data-testid="planning-shifts-series-plan-select"]').element as HTMLSelectElement).value).toBe("plan-1");
     expect(wrapper.find('[data-testid="planning-shifts-series-modal"]').exists()).toBe(false);
 
-    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-panel__header .cta-button').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-panel__header .cta-button').trigger("click");
     await flushPromises();
 
     expect(wrapper.text()).toContain("Select shift template");
@@ -446,7 +446,7 @@ describe("PlanningShiftsAdminView", () => {
     await flushPromises();
 
     expect(wrapper.get('[data-testid="planning-shifts-series-context"]').text()).toContain("No Shift Plan is available yet");
-    expect((wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-panel__header .cta-button').element as HTMLButtonElement).disabled).toBe(true);
+    expect((wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-panel__header .cta-button').element as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("lets the operator change the active shift plan from inside the series workflow", async () => {
@@ -561,7 +561,7 @@ describe("PlanningShiftsAdminView", () => {
 
     expect(wrapper.find('[data-testid="planning-shifts-tab-panel-series"] form').exists()).toBe(false);
 
-    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-panel__header .cta-button').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-panel__header .cta-button').trigger("click");
     await flushPromises();
 
     expect(wrapper.find('[data-testid="planning-shifts-series-modal"]').exists()).toBe(true);
@@ -570,7 +570,7 @@ describe("PlanningShiftsAdminView", () => {
     expect(wrapper.find('[data-testid="planning-shifts-series-modal-cancel"]').exists()).toBe(true);
   });
 
-  it("opens the series modal in edit mode from a series row and keeps exception workflow inline", async () => {
+  it("selects a series row without opening the edit modal or exceptions panel", async () => {
     const wrapper = mountView();
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
@@ -579,14 +579,35 @@ describe("PlanningShiftsAdminView", () => {
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     await flushPromises();
 
-    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-row').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').trigger("click");
     await flushPromises();
 
-    expect(getShiftSeriesMock).toHaveBeenCalledWith("tenant-1", "series-1", "token-1");
-    expect(wrapper.find('[data-testid="planning-shifts-series-modal"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain("Edit series");
-    expect((wrapper.get('[data-testid="planning-shifts-series-modal"] textarea').element as HTMLTextAreaElement).value).toBe("Series detail note");
-    expect(wrapper.text()).toContain("Series exceptions");
+    expect(wrapper.find('[data-testid="planning-shifts-series-modal"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-shifts-exceptions-panel"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').classes()).toContain("selected");
+    expect(wrapper.find('[data-testid="planning-shifts-series-actions"]').exists()).toBe(true);
+  });
+
+  it("uses series-specific structure classes for the series list and exception editor", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-plans"] .planning-orders-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await flushPromises();
+
+    const seriesPanel = wrapper.get('[data-testid="planning-shifts-tab-panel-series"]');
+    expect(seriesPanel.find(".planning-shifts-series-panel__header").exists()).toBe(true);
+    expect(seriesPanel.find(".planning-shifts-series-list").exists()).toBe(true);
+    expect(seriesPanel.find(".planning-shifts-series-row").classes()).toContain("planning-orders-row");
+    await seriesPanel.get(".planning-shifts-series-row").trigger("click");
+    await flushPromises();
+
+    expect(seriesPanel.find(".planning-shifts-exception-form").exists()).toBe(false);
+    expect(seriesPanel.find(".planning-shifts-series-actions").exists()).toBe(true);
+    expect(seriesPanel.find(".planning-shifts-exceptions-panel__header").exists()).toBe(false);
+    expect(seriesPanel.find(".planning-shifts-exceptions-list").exists()).toBe(false);
   });
 
   it("closes the series modal on cancel without clearing the selected series", async () => {
@@ -598,13 +619,15 @@ describe("PlanningShiftsAdminView", () => {
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     await flushPromises();
 
-    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-row').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-edit-series"]').trigger("click");
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-series-modal-cancel"]').trigger("click");
     await flushPromises();
 
     expect(wrapper.find('[data-testid="planning-shifts-series-modal"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain("Series exceptions");
+    expect(wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').classes()).toContain("selected");
   });
 
   it("closes the plan modal on cancel", async () => {
@@ -619,6 +642,28 @@ describe("PlanningShiftsAdminView", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-testid="planning-shifts-plan-modal"]').exists()).toBe(false);
+  });
+
+  it("opens the series modal in edit mode only from the explicit edit action", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-plans"] .planning-orders-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-testid="planning-shifts-series-modal"]').exists()).toBe(false);
+
+    await wrapper.get('[data-testid="planning-shifts-edit-series"]').trigger("click");
+    await flushPromises();
+
+    expect(getShiftSeriesMock).toHaveBeenCalledWith("tenant-1", "series-1", "token-1");
+    expect(wrapper.find('[data-testid="planning-shifts-series-modal"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("Edit series");
+    expect((wrapper.get('[data-testid="planning-shifts-series-modal"] textarea').element as HTMLTextAreaElement).value).toBe("Series detail note");
   });
 
   it("opens the template modal in edit mode from a template row and keeps legacy shift type values visible", async () => {
@@ -674,7 +719,7 @@ describe("PlanningShiftsAdminView", () => {
     expect(wrapper.find('[data-testid="planning-shifts-template-modal"]').exists()).toBe(false);
   });
 
-  it("lists existing series exceptions and loads them back into the editor", async () => {
+  it("shows exceptions only from the explicit toggle and opens listed exceptions in the modal", async () => {
     const wrapper = mountView();
     await flushPromises();
 
@@ -682,21 +727,46 @@ describe("PlanningShiftsAdminView", () => {
     await wrapper.get('[data-testid="planning-shifts-tab-panel-plans"] .planning-orders-row').trigger("click");
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
-    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-row').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').trigger("click");
     await flushPromises();
-    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-form .planning-orders-row').trigger("click");
+    expect(wrapper.find('[data-testid="planning-shifts-exceptions-panel"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="planning-shifts-toggle-exceptions"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-testid="planning-shifts-exceptions-panel"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-exception-row').trigger("click");
     await flushPromises();
 
     expect(getShiftSeriesMock).toHaveBeenCalledWith("tenant-1", "series-1", "token-1");
     expect(listShiftSeriesExceptionsMock).toHaveBeenCalledWith("tenant-1", "series-1", "token-1");
     expect(wrapper.text()).toContain("Series exceptions");
     expect(wrapper.text()).toContain("2026-04-03");
-    expect((wrapper.find('[data-testid="planning-shifts-tab-panel-series"] textarea').element as HTMLTextAreaElement).value).toBe("Exception detail note");
+    expect(wrapper.find('[data-testid="planning-shifts-exception-modal"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("Edit series exception");
+    expect((wrapper.find('[data-testid="planning-shifts-exception-modal"] textarea').element as HTMLTextAreaElement).value).toBe("Exception detail note");
     expect((wrapper.get('[data-testid="planning-shifts-exception-override-break"]').element as HTMLInputElement).value).toBe("45");
     expect((wrapper.get('[data-testid="planning-shifts-exception-override-shift-type"]').element as HTMLSelectElement).value).toBe("site_night");
     expect((wrapper.get('[data-testid="planning-shifts-exception-customer-visibility"]').element as HTMLSelectElement).value).toBe("yes");
     expect((wrapper.get('[data-testid="planning-shifts-exception-subcontractor-visibility"]').element as HTMLSelectElement).value).toBe("no");
     expect((wrapper.get('[data-testid="planning-shifts-exception-stealth-visibility"]').element as HTMLSelectElement).value).toBe("inherit");
+  });
+
+  it("hides the exceptions panel again from the explicit toggle", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-plans"] .planning-orders-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').trigger("click");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-shifts-toggle-exceptions"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-testid="planning-shifts-exceptions-panel"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="planning-shifts-toggle-exceptions"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-testid="planning-shifts-exceptions-panel"]').exists()).toBe(false);
   });
 
   it("keeps the exception form minimal in skip mode", async () => {
@@ -707,9 +777,14 @@ describe("PlanningShiftsAdminView", () => {
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     await flushPromises();
-    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-row').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-toggle-exceptions"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-exceptions-panel__header .cta-button').trigger("click");
     await flushPromises();
 
+    expect(wrapper.find('[data-testid="planning-shifts-exception-modal"]').exists()).toBe(true);
     expect((wrapper.get('[data-testid="planning-shifts-exception-action"]').element as HTMLSelectElement).value).toBe("skip");
     expect(wrapper.text()).not.toContain("Override break minutes");
     expect(wrapper.find('[data-testid="planning-shifts-exception-override-break"]').exists()).toBe(false);
@@ -727,7 +802,11 @@ describe("PlanningShiftsAdminView", () => {
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     await flushPromises();
-    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-row').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-toggle-exceptions"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-exceptions-panel__header .cta-button').trigger("click");
     await flushPromises();
 
     await wrapper.get('[data-testid="planning-shifts-exception-action"]').setValue("override");
@@ -752,7 +831,11 @@ describe("PlanningShiftsAdminView", () => {
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     await flushPromises();
-    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-row').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-toggle-exceptions"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-exceptions-panel__header .cta-button').trigger("click");
     await flushPromises();
 
     await wrapper.get('[data-testid="planning-shifts-exception-action"]').setValue("override");
@@ -787,7 +870,11 @@ describe("PlanningShiftsAdminView", () => {
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     await flushPromises();
-    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-row').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-toggle-exceptions"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-exceptions-panel__header .cta-button').trigger("click");
     await flushPromises();
 
     await wrapper.get('[data-testid="planning-shifts-exception-action"]').setValue("override");
@@ -803,7 +890,7 @@ describe("PlanningShiftsAdminView", () => {
     await wrapper.get('[data-testid="planning-shifts-exception-subcontractor-visibility"]').setValue("no");
     await wrapper.get('[data-testid="planning-shifts-exception-stealth-visibility"]').setValue("inherit");
 
-    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] form').trigger("submit");
+    await wrapper.get('[data-testid="planning-shifts-exception-modal"]').trigger("submit");
     await flushPromises();
 
     expect(createShiftSeriesExceptionMock).toHaveBeenCalledWith(
@@ -822,6 +909,59 @@ describe("PlanningShiftsAdminView", () => {
         stealth_mode_flag: null,
       }),
     );
+    expect(wrapper.find('[data-testid="planning-shifts-exception-modal"]').exists()).toBe(false);
+  });
+
+  it("opens the exception modal in create mode from the new-exception action and keeps the tab body compact", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-plans"] .planning-orders-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-exception-form').exists()).toBe(false);
+    await wrapper.get('[data-testid="planning-shifts-toggle-exceptions"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-exceptions-panel__header .cta-button').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="planning-shifts-exception-modal"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("New series exception");
+    expect((wrapper.get('[data-testid="planning-shifts-exception-action"]').element as HTMLSelectElement).value).toBe("skip");
+    expect((wrapper.get('[data-testid="planning-shifts-exception-date"]').element as HTMLInputElement).value).toBe("");
+  });
+
+  it("resets and cancels safely inside the exception modal", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-plans"]').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-plans"] .planning-orders-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-toggle-exceptions"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-exceptions-panel__header .cta-button').trigger("click");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-shifts-exception-action"]').setValue("override");
+    await wrapper.get('[data-testid="planning-shifts-exception-date"]').setValue("2026-04-05");
+    await wrapper.get('[data-testid="planning-shifts-exception-override-break"]').setValue("30");
+    await wrapper.get('[data-testid="planning-shifts-exception-modal-reset"]').trigger("click");
+    await flushPromises();
+
+    expect((wrapper.get('[data-testid="planning-shifts-exception-action"]').element as HTMLSelectElement).value).toBe("skip");
+    expect((wrapper.get('[data-testid="planning-shifts-exception-date"]').element as HTMLInputElement).value).toBe("");
+
+    await wrapper.get('[data-testid="planning-shifts-exception-modal-cancel"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="planning-shifts-exception-modal"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-exception-form').exists()).toBe(false);
   });
 
   it("keeps the created shift plan selected when switching to the series tab", async () => {
@@ -871,7 +1011,7 @@ describe("PlanningShiftsAdminView", () => {
 
     expect(createShiftPlanMock).toHaveBeenCalled();
     expect(wrapper.get('[data-testid="planning-shifts-series-context"]').text()).toContain("Fresh plan");
-    expect((wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-panel__header .cta-button').element as HTMLButtonElement).disabled).toBe(false);
+    expect((wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-panel__header .cta-button').element as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("closes the plan modal after a successful edit save", async () => {
@@ -907,7 +1047,7 @@ describe("PlanningShiftsAdminView", () => {
     const wrapper = mountView();
     await flushPromises();
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
-    expect((wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-panel__header .cta-button').element as HTMLButtonElement).disabled).toBe(true);
+    expect((wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-panel__header .cta-button').element as HTMLButtonElement).disabled).toBe(true);
 
     expect(createShiftSeriesMock).not.toHaveBeenCalled();
     expect(wrapper.get('[data-testid="planning-shifts-series-context"]').text()).toContain("No Shift Plan is available yet. Create one in the Shift Plans tab first.");
@@ -919,7 +1059,7 @@ describe("PlanningShiftsAdminView", () => {
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     await flushPromises();
 
-    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-panel__header .cta-button').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-panel__header .cta-button').trigger("click");
     await flushPromises();
 
     const textInputs = wrapper
@@ -955,7 +1095,9 @@ describe("PlanningShiftsAdminView", () => {
     await wrapper.get('[data-testid="planning-shifts-tab-series"]').trigger("click");
     await flushPromises();
 
-    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-orders-row').trigger("click");
+    await wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="planning-shifts-edit-series"]').trigger("click");
     await flushPromises();
 
     const seriesInputs = wrapper.findAll('[data-testid="planning-shifts-series-modal"] input');
@@ -970,7 +1112,7 @@ describe("PlanningShiftsAdminView", () => {
       expect.objectContaining({ label: "Weekday series updated" }),
     );
     expect(wrapper.find('[data-testid="planning-shifts-series-modal"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain("Series exceptions");
+    expect(wrapper.get('[data-testid="planning-shifts-tab-panel-series"] .planning-shifts-series-row').classes()).toContain("selected");
   });
 
   it("shows release diagnostics for the selected shift", async () => {

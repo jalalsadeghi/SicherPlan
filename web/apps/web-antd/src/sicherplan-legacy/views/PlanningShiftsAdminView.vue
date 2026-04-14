@@ -128,10 +128,10 @@
 
       <section
         v-show="activeWorkspaceTab === 'series'"
-        class="module-card planning-shifts-panel planning-shifts-tab-panel"
+        class="module-card planning-shifts-panel planning-shifts-tab-panel planning-shifts-series-panel"
         data-testid="planning-shifts-tab-panel-series"
       >
-        <div class="planning-orders-panel__header">
+        <div class="planning-shifts-panel__header planning-shifts-series-panel__header">
           <div>
             <p class="eyebrow">{{ tp("seriesTitle") }}</p>
             <h3>{{ tp("seriesTitle") }}</h3>
@@ -168,116 +168,67 @@
           <p v-else class="field-help">{{ shiftPlans.length ? tp("seriesSelectPlanFirst") : tp("seriesNoPlansAvailable") }}</p>
           <button class="cta-button cta-secondary" type="button" @click="activeWorkspaceTab = 'plans'">{{ tp("actionsOpenPlansTab") }}</button>
         </div>
-        <div class="planning-orders-list">
+        <div class="planning-orders-list planning-shifts-series-list">
           <button
             v-for="series in seriesRows"
             :key="series.id"
             type="button"
-            class="planning-orders-row"
+            class="planning-orders-row planning-shifts-series-row"
             :class="{ selected: series.id === selectedSeriesId }"
             @click="selectSeries(series.id)"
           >
-            <div>
+            <div class="planning-shifts-series-row__body">
               <strong>{{ series.label }}</strong>
               <span>{{ recurrenceLabelText(series.recurrence_code) }}</span>
             </div>
           </button>
         </div>
         <p v-if="!seriesRows.length" class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
-        <form v-if="selectedSeriesId" class="planning-orders-form" @submit.prevent="submitException">
-          <div class="planning-orders-panel__header">
+        <div v-if="selectedSeriesId" class="cta-row planning-shifts-series-actions" data-testid="planning-shifts-series-actions">
+          <button
+            class="cta-button cta-secondary"
+            data-testid="planning-shifts-edit-series"
+            type="button"
+            :disabled="!actionState.canCreateSeries"
+            @click="openSelectedSeriesEditor"
+          >
+            {{ tp("actionsEditSeries") }}
+          </button>
+          <button
+            class="cta-button cta-secondary"
+            data-testid="planning-shifts-toggle-exceptions"
+            type="button"
+            :disabled="!actionState.canManageExceptions"
+            @click="toggleExceptionsPanel"
+          >
+            {{ exceptionsPanelOpen ? tp("actionsHideExceptions") : tp("actionsShowExceptions") }}
+          </button>
+        </div>
+        <section v-if="selectedSeriesId && exceptionsPanelOpen" class="planning-shifts-exceptions-panel" data-testid="planning-shifts-exceptions-panel">
+          <div class="planning-shifts-panel__header planning-shifts-exceptions-panel__header">
             <div>
               <p class="eyebrow">{{ tp("exceptionsTitle") }}</p>
               <h4>{{ tp("exceptionsTitle") }}</h4>
             </div>
             <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageExceptions" @click="startCreateException">{{ tp("actionsNewException") }}</button>
           </div>
-          <div v-if="seriesExceptions.length" class="planning-orders-list">
+          <div v-if="seriesExceptions.length" class="planning-orders-list planning-shifts-exceptions-list">
             <button
               v-for="exception in seriesExceptions"
               :key="exception.id"
               type="button"
-              class="planning-orders-row"
+              class="planning-orders-row planning-shifts-exception-row"
               :class="{ selected: exception.id === selectedExceptionId }"
               @click="selectException(exception.id)"
             >
-              <div>
+              <div class="planning-shifts-exception-row__body">
                 <strong>{{ exception.exception_date }}</strong>
                 <span>{{ exception.action_code === 'override' ? tp('exceptionOverride') : tp('exceptionSkip') }}</span>
               </div>
             </button>
           </div>
           <p v-else class="planning-orders-list-empty">{{ tp("exceptionsEmpty") }}</p>
-          <div class="planning-orders-form-grid">
-            <label class="field-stack"><span>{{ tp("fieldsOccurrenceDate") }}</span><input v-model="exceptionDraft.exception_date" data-testid="planning-shifts-exception-date" type="date" required /></label>
-            <label class="field-stack">
-              <span>{{ tp("fieldsActionCode") }}</span>
-              <select v-model="exceptionDraft.action_code" data-testid="planning-shifts-exception-action">
-                <option value="skip">{{ tp("exceptionSkip") }}</option>
-                <option value="override">{{ tp("exceptionOverride") }}</option>
-              </select>
-            </label>
-            <template v-if="exceptionRequiresOverrideTimes">
-              <label class="field-stack"><span>{{ tp("fieldsOverrideStart") }}</span><input v-model="exceptionDraft.override_local_start_time" data-testid="planning-shifts-exception-override-start" type="time" required /></label>
-              <label class="field-stack"><span>{{ tp("fieldsOverrideEnd") }}</span><input v-model="exceptionDraft.override_local_end_time" data-testid="planning-shifts-exception-override-end" type="time" required /></label>
-              <label class="field-stack">
-                <span>{{ tp("fieldsOverrideBreakMinutes") }}</span>
-                <input
-                  v-model="exceptionDraft.override_break_minutes"
-                  data-testid="planning-shifts-exception-override-break"
-                  type="number"
-                  min="0"
-                  inputmode="numeric"
-                />
-              </label>
-              <label class="field-stack">
-                <span>{{ tp("fieldsOverrideShiftType") }}</span>
-                <select
-                  v-model="exceptionDraft.override_shift_type_code"
-                  data-testid="planning-shifts-exception-override-shift-type"
-                >
-                  <option value="">{{ tp("shiftTypeOptionalPlaceholder") }}</option>
-                  <option v-for="option in exceptionShiftTypeOptions" :key="option.code" :value="option.code">
-                    {{ option.label }}
-                  </option>
-                </select>
-              </label>
-              <label class="field-stack"><span>{{ tp("fieldsOverrideMeetingPoint") }}</span><input v-model="exceptionDraft.override_meeting_point" data-testid="planning-shifts-exception-override-meeting-point" type="text" /></label>
-              <label class="field-stack"><span>{{ tp("fieldsOverrideLocationText") }}</span><input v-model="exceptionDraft.override_location_text" data-testid="planning-shifts-exception-override-location-text" type="text" /></label>
-              <label class="field-stack">
-                <span>{{ tp("fieldsVisibilityCustomer") }}</span>
-                <select v-model="exceptionDraft.customer_visible_state" data-testid="planning-shifts-exception-customer-visibility">
-                  <option v-for="option in nullableVisibilityOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
-              </label>
-              <label class="field-stack">
-                <span>{{ tp("fieldsVisibilitySubcontractor") }}</span>
-                <select v-model="exceptionDraft.subcontractor_visible_state" data-testid="planning-shifts-exception-subcontractor-visibility">
-                  <option v-for="option in nullableVisibilityOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
-              </label>
-              <label class="field-stack">
-                <span>{{ tp("fieldsVisibilityStealth") }}</span>
-                <select v-model="exceptionDraft.stealth_mode_state" data-testid="planning-shifts-exception-stealth-visibility">
-                  <option v-for="option in nullableVisibilityOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
-              </label>
-            </template>
-            <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="exceptionDraft.notes" rows="2" /></label>
-          </div>
-          <div class="cta-row">
-            <button class="cta-button cta-secondary" type="submit" :disabled="!actionState.canManageExceptions">
-              {{ selectedExceptionId ? tp("actionsUpdateException") : tp("actionsCreateException") }}
-            </button>
-            <button class="cta-button cta-secondary" type="button" @click="resetExceptionDraft">{{ tp("actionsReset") }}</button>
-          </div>
-        </form>
+        </section>
       </section>
 
       <section
@@ -358,6 +309,7 @@
         <p v-if="!shifts.length" class="planning-orders-list-empty">{{ tp("listEmpty") }}</p>
         <form class="planning-orders-form" @submit.prevent="submitShift">
           <div class="planning-orders-form-grid">
+            <label class="field-stack"><span>{{ tp("fieldsOccurrenceDate") }}</span><input v-model="exceptionDraft.exception_date" data-testid="planning-shifts-exception-date" type="date" required /></label>
             <label class="field-stack">
               <span>{{ tp("fieldsStartsAtLocal") }}</span>
               <input v-model="shiftDraft.starts_at" type="datetime-local" required />
@@ -569,6 +521,86 @@
     </Modal>
 
     <Modal
+      v-model:open="exceptionModalOpen"
+      :title="selectedExceptionId ? tp('exceptionModalEditTitle') : tp('exceptionModalCreateTitle')"
+      :footer="null"
+      @cancel="closeExceptionModal"
+    >
+      <form class="planning-orders-form planning-shifts-exception-form" data-testid="planning-shifts-exception-modal" @submit.prevent="submitException">
+        <div class="planning-orders-form-grid planning-shifts-exception-form-grid">
+          <label class="field-stack"><span>{{ tp("fieldsOccurrenceDate") }}</span><input v-model="exceptionDraft.exception_date" data-testid="planning-shifts-exception-date" type="date" required /></label>
+          <label class="field-stack">
+            <span>{{ tp("fieldsActionCode") }}</span>
+            <select v-model="exceptionDraft.action_code" data-testid="planning-shifts-exception-action">
+              <option value="skip">{{ tp("exceptionSkip") }}</option>
+              <option value="override">{{ tp("exceptionOverride") }}</option>
+            </select>
+          </label>
+          <template v-if="exceptionRequiresOverrideTimes">
+            <label class="field-stack"><span>{{ tp("fieldsOverrideStart") }}</span><input v-model="exceptionDraft.override_local_start_time" data-testid="planning-shifts-exception-override-start" type="time" required /></label>
+            <label class="field-stack"><span>{{ tp("fieldsOverrideEnd") }}</span><input v-model="exceptionDraft.override_local_end_time" data-testid="planning-shifts-exception-override-end" type="time" required /></label>
+            <label class="field-stack">
+              <span>{{ tp("fieldsOverrideBreakMinutes") }}</span>
+              <input
+                v-model="exceptionDraft.override_break_minutes"
+                data-testid="planning-shifts-exception-override-break"
+                type="number"
+                min="0"
+                inputmode="numeric"
+              />
+            </label>
+            <label class="field-stack">
+              <span>{{ tp("fieldsOverrideShiftType") }}</span>
+              <select
+                v-model="exceptionDraft.override_shift_type_code"
+                data-testid="planning-shifts-exception-override-shift-type"
+              >
+                <option value="">{{ tp("shiftTypeOptionalPlaceholder") }}</option>
+                <option v-for="option in exceptionShiftTypeOptions" :key="option.code" :value="option.code">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+            <label class="field-stack"><span>{{ tp("fieldsOverrideMeetingPoint") }}</span><input v-model="exceptionDraft.override_meeting_point" data-testid="planning-shifts-exception-override-meeting-point" type="text" /></label>
+            <label class="field-stack"><span>{{ tp("fieldsOverrideLocationText") }}</span><input v-model="exceptionDraft.override_location_text" data-testid="planning-shifts-exception-override-location-text" type="text" /></label>
+            <label class="field-stack">
+              <span>{{ tp("fieldsVisibilityCustomer") }}</span>
+              <select v-model="exceptionDraft.customer_visible_state" data-testid="planning-shifts-exception-customer-visibility">
+                <option v-for="option in nullableVisibilityOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+            <label class="field-stack">
+              <span>{{ tp("fieldsVisibilitySubcontractor") }}</span>
+              <select v-model="exceptionDraft.subcontractor_visible_state" data-testid="planning-shifts-exception-subcontractor-visibility">
+                <option v-for="option in nullableVisibilityOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+            <label class="field-stack">
+              <span>{{ tp("fieldsVisibilityStealth") }}</span>
+              <select v-model="exceptionDraft.stealth_mode_state" data-testid="planning-shifts-exception-stealth-visibility">
+                <option v-for="option in nullableVisibilityOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+          </template>
+          <label class="field-stack field-stack--wide"><span>{{ tp("fieldsNotes") }}</span><textarea v-model="exceptionDraft.notes" rows="2" /></label>
+        </div>
+        <div class="cta-row">
+          <button class="cta-button cta-secondary" data-testid="planning-shifts-exception-modal-save" type="submit" :disabled="!actionState.canManageExceptions">
+            {{ selectedExceptionId ? tp("actionsUpdateException") : tp("actionsCreateException") }}
+          </button>
+          <button class="cta-button cta-secondary" data-testid="planning-shifts-exception-modal-reset" type="button" @click="resetExceptionDraft">{{ tp("actionsReset") }}</button>
+          <button class="cta-button cta-secondary" data-testid="planning-shifts-exception-modal-cancel" type="button" @click="closeExceptionModal">{{ tp("actionsCancel") }}</button>
+        </div>
+      </form>
+    </Modal>
+
+    <Modal
       v-model:open="shiftPlanModalOpen"
       :title="selectedShiftPlanId ? tp('planModalEditTitle') : tp('planModalCreateTitle')"
       :footer="null"
@@ -727,6 +759,8 @@ const selectedShiftDiagnostics = ref<ShiftReleaseDiagnosticsRead | null>(null);
 const shiftTypeOptions = ref<ShiftTypeOption[]>([]);
 const loadingShiftTypeOptions = ref(false);
 const seriesModalOpen = ref(false);
+const exceptionModalOpen = ref(false);
+const exceptionsPanelOpen = ref(false);
 const shiftPlanModalOpen = ref(false);
 const templateModalOpen = ref(false);
 
@@ -980,8 +1014,27 @@ async function changeShiftTabPlan() {
 
 async function selectSeries(seriesId: string) {
   selectedSeriesId.value = seriesId;
+  selectedExceptionId.value = "";
+  resetExceptionDraft();
+  exceptionsPanelOpen.value = false;
+}
+
+async function openSelectedSeriesEditor() {
+  if (!selectedSeriesId.value) return;
   await refreshSeriesDetails();
   seriesModalOpen.value = true;
+}
+
+async function toggleExceptionsPanel() {
+  if (!selectedSeriesId.value) return;
+  if (exceptionsPanelOpen.value) {
+    exceptionsPanelOpen.value = false;
+    selectedExceptionId.value = "";
+    resetExceptionDraft();
+    return;
+  }
+  await refreshSeriesExceptions();
+  exceptionsPanelOpen.value = true;
 }
 
 function selectException(exceptionId: string) {
@@ -1002,6 +1055,7 @@ function selectException(exceptionId: string) {
       stealth_mode_state: toNullableVisibilityState(row.stealth_mode_flag),
       notes: row.notes || "",
     });
+    exceptionModalOpen.value = true;
   }
 }
 
@@ -1026,11 +1080,13 @@ function startCreateSeries() {
   selectedSeriesId.value = "";
   selectedExceptionId.value = "";
   seriesExceptions.value = [];
+  exceptionsPanelOpen.value = false;
   seriesModalOpen.value = true;
 }
 function startCreateException() {
   resetExceptionDraft();
   selectedExceptionId.value = "";
+  exceptionModalOpen.value = true;
 }
 function startCreateShift() {
   resetShiftDraft();
@@ -1095,6 +1151,16 @@ async function refreshSeriesDetails() {
     listShiftSeriesExceptions(tenantScopeId.value, selectedSeriesId.value, accessToken.value),
   ]);
   assignSeriesDraft(series);
+  seriesExceptions.value = exceptions;
+  if (selectedExceptionId.value && !exceptions.some((entry) => entry.id === selectedExceptionId.value)) {
+    selectedExceptionId.value = "";
+    resetExceptionDraft();
+  }
+}
+
+async function refreshSeriesExceptions() {
+  if (!selectedSeriesId.value) return;
+  const exceptions = await listShiftSeriesExceptions(tenantScopeId.value, selectedSeriesId.value, accessToken.value);
   seriesExceptions.value = exceptions;
   if (selectedExceptionId.value && !exceptions.some((entry) => entry.id === selectedExceptionId.value)) {
     selectedExceptionId.value = "";
@@ -1208,6 +1274,10 @@ function closeSeriesModal() {
   seriesModalOpen.value = false;
 }
 
+function closeExceptionModal() {
+  exceptionModalOpen.value = false;
+}
+
 async function generateSelectedSeries() {
   if (!selectedSeriesId.value) return;
   try {
@@ -1245,6 +1315,7 @@ async function submitException() {
       selectedExceptionId.value = created.id;
     }
     await refreshSeriesDetails();
+    exceptionModalOpen.value = false;
     setFeedback("success", tp("successTitle"), tp("saved"));
   } catch (error) {
     handleApiError(error);
@@ -1460,7 +1531,7 @@ async function refreshActiveWorkspaceData() {
     await refreshPlans();
     if (selectedShiftPlanId.value) {
       seriesRows.value = await listShiftSeries(tenantScopeId.value, selectedShiftPlanId.value, accessToken.value);
-      if (selectedSeriesId.value) {
+      if (selectedSeriesId.value && exceptionsPanelOpen.value) {
         seriesExceptions.value = await listShiftSeriesExceptions(tenantScopeId.value, selectedSeriesId.value, accessToken.value);
       }
     }
@@ -1508,6 +1579,7 @@ function clearPlanSelectionContext() {
   selectedShiftPlanId.value = "";
   selectedSeriesId.value = "";
   selectedExceptionId.value = "";
+  exceptionsPanelOpen.value = false;
   selectedShiftId.value = "";
   seriesRows.value = [];
   seriesExceptions.value = [];
@@ -1681,6 +1753,60 @@ onBeforeUnmount(() => {
 .planning-shifts-series-context--warning {
   border-color: color-mix(in srgb, #d97706 45%, white);
   background: color-mix(in srgb, #f59e0b 10%, white);
+}
+
+.planning-shifts-series-panel {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.planning-shifts-series-panel__header,
+.planning-shifts-exceptions-panel__header {
+  align-items: center;
+}
+
+.planning-shifts-series-list,
+.planning-shifts-exceptions-list {
+  gap: 0.85rem;
+}
+
+.planning-shifts-series-actions {
+  margin-top: -0.1rem;
+}
+
+.planning-shifts-series-row,
+.planning-shifts-exception-row {
+  position: relative;
+  overflow: hidden;
+}
+
+.planning-shifts-series-row::before,
+.planning-shifts-exception-row::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-color, rgb(40,170,170)) 20%, transparent);
+  transition: background-color 0.18s ease;
+}
+
+.planning-shifts-series-row.selected::before,
+.planning-shifts-exception-row.selected::before {
+  background: var(--primary-color, rgb(40,170,170));
+}
+
+.planning-shifts-series-row__body,
+.planning-shifts-exception-row__body {
+  min-width: 0;
+}
+
+.planning-shifts-exception-form {
+  gap: 1.1rem;
+}
+
+.planning-shifts-exception-form-grid {
+  padding-top: 0;
 }
 
 .planning-shifts-weekday-chip {

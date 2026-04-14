@@ -478,16 +478,17 @@
                   v-for="assignment in selectedBoardShift.assignments"
                   :key="assignment.id"
                   type="button"
-                  class="planning-staffing-row"
+                  class="planning-staffing-row planning-staffing-row--assignment"
                   :data-testid="`planning-staffing-assignment-row-${assignment.id}`"
                   :class="{ selected: assignment.id === selectedAssignmentId }"
                   @click="startEditAssignment(assignment.id)"
                 >
-                  <div>
-                    <strong>{{ formatAssignmentActor(assignment) }}</strong>
-                    <span>{{ formatDemandGroupById(assignment.demand_group_id) }}</span>
-                    <span>{{ assignment.assignment_status_code }} · {{ assignment.assignment_source_code }}</span>
+                  <div class="planning-staffing-assignment-row__body">
+                    <strong class="planning-staffing-assignment-row__title">{{ formatAssignmentActor(assignment) }}</strong>
+                    <span class="planning-staffing-assignment-row__detail">{{ formatDemandGroupById(assignment.demand_group_id) }}</span>
+                    <span class="planning-staffing-assignment-row__meta">{{ assignment.assignment_status_code }} · {{ assignment.assignment_source_code }}</span>
                   </div>
+                  <span class="planning-staffing-assignment-row__marker" aria-hidden="true"></span>
                 </button>
               </div>
               <div v-else class="planning-staffing-empty">
@@ -2952,16 +2953,88 @@ onBeforeUnmount(() => {
   padding-bottom: 1.15rem;
 }
 
+.planning-staffing-row--assignment {
+  align-items: stretch;
+  border-left: 4px solid transparent;
+  border-radius: 18px;
+  padding: 1rem 1rem 1rem 1.1rem;
+}
+
+.planning-staffing-row--assignment .planning-staffing-assignment-row__body {
+  display: grid;
+  gap: 0.24rem;
+  min-width: 0;
+}
+
+.planning-staffing-row--assignment .planning-staffing-assignment-row__title {
+  color: rgb(15, 23, 42);
+  font-size: 0.97rem;
+  font-weight: 700;
+  line-height: 1.35;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.planning-staffing-row--assignment .planning-staffing-assignment-row__detail {
+  color: rgba(15, 23, 42, 0.78);
+  font-size: 0.88rem;
+  line-height: 1.35;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.planning-staffing-row--assignment .planning-staffing-assignment-row__meta {
+  color: rgba(15, 23, 42, 0.56);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.planning-staffing-row--assignment .planning-staffing-assignment-row__marker {
+  align-self: stretch;
+  background: linear-gradient(180deg, rgba(40, 170, 170, 0.16), rgba(40, 170, 170, 0.04));
+  border-radius: 999px;
+  flex: 0 0 0.38rem;
+  min-height: 100%;
+}
+
 .planning-staffing-row.selected,
 .planning-staffing-demand-group.selected {
   border-color: rgb(40, 170, 170);
   box-shadow: 0 0 0 1px rgba(40, 170, 170, 0.2);
 }
 
+.planning-staffing-row--assignment.selected {
+  background: linear-gradient(135deg, rgba(40, 170, 170, 0.12), rgba(255, 255, 255, 0.94));
+  border-left-color: rgb(40, 170, 170);
+  box-shadow:
+    0 0 0 1px rgba(40, 170, 170, 0.24),
+    0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.planning-staffing-row--assignment.selected .planning-staffing-assignment-row__marker {
+  background: linear-gradient(180deg, rgb(40, 170, 170), rgba(40, 170, 170, 0.42));
+}
+
 .planning-staffing-row:hover,
 .planning-staffing-demand-group:hover {
   border-color: rgba(40, 170, 170, 0.45);
   transform: translateY(-1px);
+}
+
+.planning-staffing-row--assignment:hover {
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+.planning-staffing-row--assignment:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(40, 170, 170, 0.2),
+    0 10px 22px rgba(15, 23, 42, 0.08);
 }
 
 .planning-staffing-demand-group,

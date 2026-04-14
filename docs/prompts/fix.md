@@ -1,147 +1,157 @@
 You are working in the public repo `jalalsadeghi/SicherPlan`.
 
 Important working-mode rule:
-The current working tree is already dirty from previous staffing work. Do NOT revert, overwrite, or restyle unrelated changes. Treat the current working tree as the source of truth. Inspect the live file state first, then apply only the minimal safe change needed for modal-based assignment editing.
+The current working tree may already contain dirty changes from previous planning-shifts UI work. Do NOT revert, overwrite, or collapse nearby changes. Treat the current working tree as the source of truth and apply only a focused fix for the Series-tab interaction model.
 
 Task:
-Refactor the Assignments editor in `/admin/planning-staffing` so the assignment form is no longer rendered inline inside the Assignments panel. Instead:
-1. clicking `Create assignment` opens a modal dialog for creating a new assignment
-2. clicking an existing assignment row opens the same modal in edit mode
-3. the page remains cleaner and more compact, while preserving all current staffing behaviors
+Fix the interaction model in `/admin/planning-shifts` → "Shift planning" → "Series and exceptions" so that clicking a series row does NOT simultaneously:
+1. open the edit modal
+2. show/open the Series exceptions area
 
-Primary target:
-- current page/workspace: `P-04 Staffing Board & Coverage`
-- current view file is expected to be the planning staffing coverage view in the SicherPlan web app
-- use the CURRENT working tree file path, not an older clean-repo assumption
+Instead, the user must explicitly choose between two actions:
+- Edit series
+- View / open Series exceptions
 
-Behavioral requirements:
-1. Keep the Assignments tab/panel on the page.
-2. In the panel itself, keep:
-   - panel header
-   - `Create assignment` button
-   - assignment list / rows
-   - compact summary/read-only context if helpful
-3. Move the editable assignment form into a modal dialog.
-4. The same modal must support:
-   - create mode
-   - edit mode
-5. When the user clicks `Create assignment`:
-   - open modal with blank/default draft
-   - title should clearly indicate create mode
-6. When the user clicks an existing assignment row:
-   - open modal with that assignment prefilled
-   - title should clearly indicate edit mode
-7. Preserve the current assignment field set and semantics already present in the live working tree, including:
-   - demand group
-   - actor kind
-   - team link
-   - employee/subcontractor worker member
-   - assignment status
-   - assignment source
-   - offered at
-   - confirmed at
-   - remarks
-8. Preserve business rules already present in the current implementation:
-   - demand group and shift remain stable after creation when that is the existing rule
-   - validations remain visible and usable
-   - remove/unassign remains available for existing assignments
-   - create/update/unassign must still refresh assignment list, board, validations, and coverage correctly
-9. Do not weaken validation or audit behavior.
-10. Do not regress existing assignment workflow tests.
+Problem summary:
+The current behavior couples:
+- selecting a series
+- opening the edit modal
+- opening/showing the exceptions area
 
-Design and UX guidance:
-- Use the same modal/dialog pattern already used elsewhere in this page for demand groups / teams / team members.
-- Prefer consistency over invention.
-- Keep the panel visually compact after refactor.
-- The inline assignment form should be removed from the page once the modal version is in place.
-- If the page currently shows an assignment validation summary and an “Open validations” action, preserve that capability in the most consistent place:
-  - preferably inside the assignment modal for the currently edited record
-  - or in a compact row-level summary if that better matches the current code
-- Use the safest keyboard/interaction behavior:
-  - modal closes on cancel
-  - reset only resets modal draft, not unrelated page state
-  - escape/cancel should not silently discard saved data
-- Preserve or improve accessibility:
-  - clear modal title
-  - correct button labels
-  - stable focus behavior
-  - no broken tab order
+This is confusing. The user should first select a series, then explicitly choose what they want to do.
 
-Implementation constraints:
-- Inspect the current dirty file state first.
-- Keep the change local and minimal.
-- Reuse the current state/draft model if possible.
-- Do not introduce a second conflicting assignment state machine.
-- Do not duplicate backend logic in frontend code.
-- Do not change API contracts unless absolutely required by the current codebase.
-- Prefer adapting existing draft/reset/save flows into modal open/close flows.
+Desired behavior:
+1. Clicking a series row should ONLY select/highlight that series.
+2. After a series is selected, the UI should expose two clear action buttons:
+   - `Edit series`
+   - `Show exceptions` (or `Open exceptions`)
+3. Clicking `Edit series` should open the series modal in edit mode.
+4. Clicking `Show/Open exceptions` should open/show the exceptions area for the selected series.
+5. If the exceptions area is already open, the button may become `Hide exceptions` if that is cleaner and consistent.
+6. The exceptions area must no longer appear automatically just because the row was clicked.
+7. The series modal must no longer open automatically just because the row was clicked.
 
-Expected code-level outcome:
-1. Add modal open/close state for assignment editor.
-2. Add explicit create/edit mode state for assignment editor.
-3. Opening behavior:
-   - `Create assignment` => open modal in create mode
-   - clicking assignment row => open modal in edit mode
-4. Move the existing assignment form markup into the modal.
-5. Keep save/remove/reset/cancel actions inside the modal.
-6. Keep the page-level assignment list outside the modal.
-7. Ensure selected assignment state still behaves correctly after save/remove/update.
-8. If the existing row click only selects the assignment, update it so row click opens the edit dialog.
-   - If selection state is still needed for other tabs/interactions, preserve it while also opening the dialog.
-9. Keep test ids stable where sensible, and add new ones where needed:
-   - create modal open button
-   - assignment modal root
-   - assignment modal save
-   - assignment modal cancel
-   - assignment modal reset
-   - assignment modal remove/unassign
-10. Do not break demand-group, team, or validation modal behavior already in the page.
+Context:
+- Current live implementation is in the planning shifts admin view.
+- The current code path likely has `selectSeries(series.id)` both selecting the series and opening the modal.
+- The exceptions area is likely controlled directly or indirectly by `selectedSeriesId`, causing it to appear immediately after selection.
+- This coupling must be removed.
 
-Validation work required:
-- Inspect and update tests for the current working tree.
-- Add or update tests to verify:
-  1. `Create assignment` opens the modal
-  2. clicking an assignment row opens modal in edit mode
-  3. create mode shows default draft
-  4. edit mode shows prefilled draft from selected assignment
-  5. save still triggers the correct existing create/update path
-  6. remove/unassign still works from modal
-  7. modal close/reset behavior is correct
-  8. page no longer renders the full inline assignment editor after refactor
-- If the repo currently has smoke tests for planning staffing, extend them rather than creating disconnected duplicate tests.
+What to inspect first:
+1. `PlanningShiftsAdminView.vue`
+2. The current `selectSeries` function
+3. The conditions used to render the exceptions section
+4. The current `seriesModalOpen` flow
+5. The current tests in `planningShifts.smoke.test.ts`
 
-Suggested implementation approach:
-- First inspect:
-  - current assignment draft state
-  - current assignment save/update/unassign handlers
-  - current selectedAssignment behavior
-  - existing modal patterns in the same view
-- Then refactor in this order:
-  1. introduce assignment modal state
-  2. extract or move assignment form into modal
-  3. wire create button to open create mode
-  4. wire row click to open edit mode
-  5. keep all current handlers working
-  6. remove obsolete inline form rendering
-  7. update tests
+Recommended solution design:
+Separate these states clearly:
+
+A. Selected series identity
+- keep `selectedSeriesId`
+
+B. Series edit modal visibility
+- controlled independently, e.g. `seriesModalOpen`
+
+C. Exceptions panel visibility
+- controlled independently, e.g. `exceptionsPanelOpen` or similar
+
+Recommended behavior:
+- Row click:
+  - set selected series
+  - load lightweight details if needed
+  - DO NOT open modal
+  - DO NOT auto-open exceptions panel
+- `Edit series` button:
+  - requires selected series
+  - opens modal
+  - loads edit data if needed
+- `Show/Open exceptions` button:
+  - requires selected series
+  - shows the exceptions section/panel
+  - loads exceptions if needed
+- Optional:
+  - `Hide exceptions` closes the exceptions section without clearing the selected series
+
+UI requirements:
+1. Add two explicit action buttons for the selected series workflow.
+2. Place them in a clear, low-friction location, for example:
+   - in the series section header
+   - or in a small action row below the selected series list
+   Choose the most consistent option with the current UI.
+3. Do not overload the row itself with too many actions unless that is already a pattern in this file.
+4. Preserve compactness and clarity.
+
+Behavioral constraints:
+- Do NOT change business logic for:
+  - creating series
+  - editing series
+  - loading series details
+  - loading exceptions
+  - creating/updating exceptions
+  - generating series
+- Do NOT change API contracts
+- Do NOT break the exception modal work if it has already been refactored in the current working tree
+- Do NOT break plan selection or shift selection flows
+
+Important compatibility note:
+The current smoke tests may still encode the old behavior:
+- row click opens edit modal
+- row click also reveals exceptions
+You must update those tests to match the new intended behavior.
+
+Implementation guidance:
+1. Inspect current live state before editing.
+2. Refactor `selectSeries` so it only handles selection (and maybe data preload), not UI branching.
+3. Introduce a separate explicit action for opening the edit modal.
+4. Introduce a separate explicit action for showing exceptions.
+5. Decouple exceptions rendering from mere selection.
+6. Preserve selected-series highlighting.
+7. Keep the UI accessible and keyboard-friendly.
+
+Accessibility requirements:
+- Preserve button semantics for rows and actions
+- Keep keyboard navigation clear
+- Ensure selected state remains visible
+- Ensure action buttons are clearly labeled
+- Ensure focus-visible styles remain usable
+
+Testing guidance:
+Update `planningShifts.smoke.test.ts` to reflect the new behavior.
+
+Add or update tests to verify:
+1. Clicking a series row selects it but does NOT open the edit modal
+2. Clicking a series row does NOT automatically show the exceptions panel
+3. Clicking `Edit series` opens the series modal in edit mode
+4. Clicking `Show/Open exceptions` reveals the exceptions area for the selected series
+5. If implemented, clicking `Hide exceptions` hides the exceptions area
+6. Selected series remains selected after closing the modal
+7. Existing exception workflows still work once exceptions are explicitly opened
+8. No regression to new-series action
+
+Avoid brittle tests based on exact CSS.
+Prefer behavioral assertions using test ids and visible text.
 
 Acceptance criteria:
-- Assignments tab remains available.
-- The page is visually cleaner because the assignment editor is no longer inline.
-- `Create assignment` opens an assignment modal.
-- Clicking an existing assignment opens the same modal in edit mode.
-- Existing behaviors for save/update/remove/validation are preserved.
-- Coverage and staffing refresh still work after mutations.
-- No regression to other planning-staffing modal flows.
-- Tests pass.
+- Series row click no longer performs two actions at once
+- The user now has two explicit choices:
+  - edit series
+  - open/view series exceptions
+- The edit modal opens only when explicitly requested
+- The exceptions area opens only when explicitly requested
+- Selected series highlighting still works
+- Existing planning-shifts workflows remain intact
+- Tests are updated to reflect the new behavior
 
 At the end, provide a concise validation report with these headings:
-1. What changed
+1. What the old coupled behavior was
 2. Which files were changed
-3. How create mode works
-4. How edit mode works
-5. How existing assignment actions were preserved
-6. Which tests were updated or added
-7. Any remaining assumptions or working-tree risks
+3. How selection, edit, and exceptions visibility were decoupled
+4. Where the two explicit action buttons were added
+5. Which tests were updated or added
+6. Any remaining UX follow-ups you recommend
 
-Before coding, explicitly sanity-check the proposal against the current live working tree and say whether any existing dirty changes would conflict with this refactor.
+Before coding, explicitly sanity-check whether the current working tree already contains:
+- a modal-based exception editor
+- recent Series-tab spacing/styling changes
+and confirm that your fix will layer on top of those changes rather than overwrite them.
