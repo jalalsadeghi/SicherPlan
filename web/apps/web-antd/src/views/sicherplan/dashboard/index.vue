@@ -1189,9 +1189,9 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.45rem 0.55rem;
-  border-radius: 0.8rem;
+  gap: 0.25rem;
+  padding: 0.25rem 0.25rem;
+  border-radius: 0.4rem;
   color: inherit;
   text-decoration: none;
   background: rgb(246 248 250 / 0.96);
@@ -1223,8 +1223,8 @@ onBeforeUnmount(() => {
 }
 
 .sp-dashboard__calendar-item-marker {
-  width: 0.55rem;
-  height: 0.55rem;
+  width: 0.35rem;
+  height: 0.35rem;
   border-radius: 999px;
   background: currentColor;
   opacity: 0.78;
@@ -1244,9 +1244,9 @@ onBeforeUnmount(() => {
 
 .sp-dashboard__calendar-item-label {
   color: var(--sp-color-text-primary);
-  font-size: 0.76rem;
+  font-size: 0.55rem;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1;
   min-width: 0;
 }
 
@@ -1277,9 +1277,9 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   width: fit-content;
-  padding: 0.22rem 0.55rem;
+  padding: 0.14rem 0.45rem 0.14rem 0.25rem;
   border-radius: 999px;
-  font-size: 0.76rem;
+  font-size: 0.6rem;
   font-weight: 700;
 }
 
