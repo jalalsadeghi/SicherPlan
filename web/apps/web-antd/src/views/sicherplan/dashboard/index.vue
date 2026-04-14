@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 import { preferences } from '@vben/preferences';
@@ -43,6 +43,10 @@ const userStore = useUserStore();
 
 const loading = ref(false);
 const activeDate = ref(new Date());
+const lastLoadedDashboardKey = ref('');
+const activeDashboardLoadKey = ref('');
+const dashboardBootstrapComplete = ref(false);
+const dashboardSessionWatchArmed = ref(false);
 
 const dashboardData = reactive({
   customers: [] as CustomerListItem[],
@@ -66,6 +70,29 @@ const tenantScopeId = computed(
 const canLoadTenantData = computed(
   () => Boolean(accessToken.value && tenantScopeId.value),
 );
+
+function resetDashboardData() {
+  dashboardData.tenants = [];
+  dashboardData.customers = [];
+  dashboardData.employees = [];
+  dashboardData.subcontractors = [];
+  dashboardData.orders = [];
+  dashboardData.shifts = [];
+  dashboardData.notices = [];
+}
+
+function resolveDashboardLoadKey() {
+  if (!accessToken.value) {
+    return '';
+  }
+  if (isPlatformAdmin.value) {
+    return `platform:${accessToken.value}`;
+  }
+  if (!tenantScopeId.value) {
+    return '';
+  }
+  return `tenant:${tenantScopeId.value}:${accessToken.value}`;
+}
 
 function formatDateLabel(value: Date, options: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat(locale.value, options).format(value);
@@ -102,69 +129,119 @@ function sortByDateDesc<T>(
   });
 }
 
-async function loadDashboard() {
-  if (!accessToken.value) {
+async function loadDashboard(options: { force?: boolean } = {}) {
+  const loadKey = resolveDashboardLoadKey();
+  if (!loadKey) {
     return;
   }
+  if (!options.force) {
+    if (activeDashboardLoadKey.value === loadKey || lastLoadedDashboardKey.value === loadKey) {
+      return;
+    }
+  }
 
+  activeDashboardLoadKey.value = loadKey;
   loading.value = true;
 
-  const [
-    tenantsResult,
-    customersResult,
-    employeesResult,
-    subcontractorsResult,
-    ordersResult,
-    shiftsResult,
-    noticesResult,
-  ] = await Promise.allSettled([
-    isPlatformAdmin.value
-      ? listTenants(accessToken.value, 'platform_admin')
-      : Promise.resolve([] as TenantListItem[]),
-    canLoadTenantData.value
-      ? listCustomers(tenantScopeId.value, accessToken.value, {})
-      : Promise.resolve([] as CustomerListItem[]),
-    canLoadTenantData.value
-      ? listEmployees(tenantScopeId.value, accessToken.value, {})
-      : Promise.resolve([] as EmployeeListItem[]),
-    canLoadTenantData.value
-      ? listSubcontractors(tenantScopeId.value, accessToken.value, {})
-      : Promise.resolve([] as SubcontractorListItem[]),
-    canLoadTenantData.value
-      ? listCustomerOrders(tenantScopeId.value, accessToken.value, {})
-      : Promise.resolve([] as CustomerOrderListItem[]),
-    canLoadTenantData.value
-      ? listShifts(tenantScopeId.value, accessToken.value, {})
-      : Promise.resolve([] as ShiftListItem[]),
-    canLoadTenantData.value
-      ? listAdminNotices(tenantScopeId.value, accessToken.value)
-      : Promise.resolve([] as NoticeListItem[]),
-  ]);
+  try {
+    const [
+      tenantsResult,
+      customersResult,
+      employeesResult,
+      subcontractorsResult,
+      ordersResult,
+      shiftsResult,
+      noticesResult,
+    ] = await Promise.allSettled([
+      isPlatformAdmin.value
+        ? listTenants(accessToken.value, 'platform_admin')
+        : Promise.resolve([] as TenantListItem[]),
+      canLoadTenantData.value
+        ? listCustomers(tenantScopeId.value, accessToken.value, {})
+        : Promise.resolve([] as CustomerListItem[]),
+      canLoadTenantData.value
+        ? listEmployees(tenantScopeId.value, accessToken.value, {})
+        : Promise.resolve([] as EmployeeListItem[]),
+      canLoadTenantData.value
+        ? listSubcontractors(tenantScopeId.value, accessToken.value, {})
+        : Promise.resolve([] as SubcontractorListItem[]),
+      canLoadTenantData.value
+        ? listCustomerOrders(tenantScopeId.value, accessToken.value, {})
+        : Promise.resolve([] as CustomerOrderListItem[]),
+      canLoadTenantData.value
+        ? listShifts(tenantScopeId.value, accessToken.value, {})
+        : Promise.resolve([] as ShiftListItem[]),
+      canLoadTenantData.value
+        ? listAdminNotices(tenantScopeId.value, accessToken.value)
+        : Promise.resolve([] as NoticeListItem[]),
+    ]);
 
-  dashboardData.tenants =
-    tenantsResult.status === 'fulfilled' ? tenantsResult.value : [];
-  dashboardData.customers =
-    customersResult.status === 'fulfilled' ? customersResult.value : [];
-  dashboardData.employees =
-    employeesResult.status === 'fulfilled' ? employeesResult.value : [];
-  dashboardData.subcontractors =
-    subcontractorsResult.status === 'fulfilled'
-      ? subcontractorsResult.value
-      : [];
-  dashboardData.orders =
-    ordersResult.status === 'fulfilled'
-      ? sortByDateDesc(ordersResult.value, getOrderDate)
-      : [];
-  dashboardData.shifts =
-    shiftsResult.status === 'fulfilled'
-      ? sortByDateDesc(shiftsResult.value, getShiftDate)
-      : [];
-  dashboardData.notices =
-    noticesResult.status === 'fulfilled'
-      ? sortByDateDesc(noticesResult.value, (notice) => notice.published_at)
-      : [];
+    dashboardData.tenants =
+      tenantsResult.status === 'fulfilled' ? tenantsResult.value : [];
+    dashboardData.customers =
+      customersResult.status === 'fulfilled' ? customersResult.value : [];
+    dashboardData.employees =
+      employeesResult.status === 'fulfilled' ? employeesResult.value : [];
+    dashboardData.subcontractors =
+      subcontractorsResult.status === 'fulfilled'
+        ? subcontractorsResult.value
+        : [];
+    dashboardData.orders =
+      ordersResult.status === 'fulfilled'
+        ? sortByDateDesc(ordersResult.value, getOrderDate)
+        : [];
+    dashboardData.shifts =
+      shiftsResult.status === 'fulfilled'
+        ? sortByDateDesc(shiftsResult.value, getShiftDate)
+        : [];
+    dashboardData.notices =
+      noticesResult.status === 'fulfilled'
+        ? sortByDateDesc(noticesResult.value, (notice) => notice.published_at)
+        : [];
+    lastLoadedDashboardKey.value = loadKey;
+  } finally {
+    loading.value = false;
+    if (activeDashboardLoadKey.value === loadKey) {
+      activeDashboardLoadKey.value = '';
+    }
+  }
+}
 
-  loading.value = false;
+async function ensureDashboardSessionReady() {
+  legacyAuthStore.syncFromPrimarySession();
+  if (!accessToken.value && !legacyAuthStore.refreshToken) {
+    return false;
+  }
+  try {
+    await legacyAuthStore.ensureSessionReady();
+    return Boolean(accessToken.value);
+  } catch {
+    return false;
+  }
+}
+
+async function recoverSessionAndLoadDashboard() {
+  if (!dashboardBootstrapComplete.value) {
+    return;
+  }
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+    return;
+  }
+  const sessionReady = await ensureDashboardSessionReady();
+  if (!sessionReady) {
+    return;
+  }
+  await loadDashboard();
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    void recoverSessionAndLoadDashboard();
+  }
+}
+
+function handleWindowFocus() {
+  void recoverSessionAndLoadDashboard();
 }
 
 const topBadges = computed(() =>
@@ -414,7 +491,51 @@ function shiftCalendar(direction: 'next' | 'prev') {
 }
 
 onMounted(() => {
-  void loadDashboard();
+  legacyAuthStore.syncFromPrimarySession();
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('focus', handleWindowFocus);
+  void (async () => {
+    try {
+      const sessionReady = await ensureDashboardSessionReady();
+      if (!sessionReady) {
+        return;
+      }
+      await loadDashboard();
+    } finally {
+      dashboardBootstrapComplete.value = true;
+      await nextTick();
+      dashboardSessionWatchArmed.value = true;
+    }
+  })();
+});
+
+watch(
+  () =>
+    [
+      accessToken.value,
+      tenantScopeId.value,
+      isPlatformAdmin.value,
+      legacyAuthStore.effectiveRole,
+      legacyAuthStore.sessionUser?.tenant_id,
+    ] as const,
+  async () => {
+    if (!dashboardBootstrapComplete.value || !dashboardSessionWatchArmed.value) {
+      return;
+    }
+    const loadKey = resolveDashboardLoadKey();
+    if (!loadKey) {
+      lastLoadedDashboardKey.value = '';
+      activeDashboardLoadKey.value = '';
+      resetDashboardData();
+      return;
+    }
+    await loadDashboard();
+  },
+);
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  window.removeEventListener('focus', handleWindowFocus);
 });
 </script>
 

@@ -6,7 +6,7 @@ from datetime import date, datetime
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-from app.modules.core.schemas import AddressRead
+from app.modules.core.schemas import AddressCreate, AddressRead
 
 
 class EmployeeFilter(BaseModel):

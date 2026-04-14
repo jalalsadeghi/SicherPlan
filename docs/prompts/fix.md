@@ -1,157 +1,106 @@
 You are working in the public repo `jalalsadeghi/SicherPlan`.
 
 Important working-mode rule:
-The current working tree may already contain dirty changes from previous planning-shifts UI work. Do NOT revert, overwrite, or collapse nearby changes. Treat the current working tree as the source of truth and apply only a focused fix for the Series-tab interaction model.
+Treat the current working tree as the source of truth. Do NOT revert unrelated changes or perform broad refactors. Apply only a focused fix for the initial-load problem on `/admin/dashboard`.
 
 Task:
-Fix the interaction model in `/admin/planning-shifts` → "Shift planning" → "Series and exceptions" so that clicking a series row does NOT simultaneously:
-1. open the edit modal
-2. show/open the Series exceptions area
+Fix the SicherPlan admin dashboard so that data loads correctly when the user lands directly on `/admin/dashboard` immediately after login.
 
-Instead, the user must explicitly choose between two actions:
-- Edit series
-- View / open Series exceptions
+Observed bug:
+When the user logs in and is redirected directly to `/admin/dashboard`, the dashboard initially shows no data.
+If the user navigates to another admin page such as Customers and then comes back to Dashboard, the data appears.
+This means the dashboard is mounting before session/auth context is fully ready and is not retrying or reacting when session state becomes available.
 
-Problem summary:
-The current behavior couples:
-- selecting a series
-- opening the edit modal
-- opening/showing the exceptions area
+What I want:
+The dashboard must load its data correctly on the first direct entry after login, without requiring the user to visit another page first.
 
-This is confusing. The user should first select a series, then explicitly choose what they want to do.
+Current code facts to inspect first:
+1. Route `/admin/dashboard` is wired to the SicherPlan dashboard view.
+2. The dashboard view currently loads data on `onMounted`.
+3. `loadDashboard()` currently depends on access token / tenant scope.
+4. The legacy auth store already exposes session helpers such as:
+   - `syncFromPrimarySession()`
+   - `ensureSessionReady()`
+5. Other planning/admin views already use a more resilient session-ready pattern with:
+   - initial sync
+   - ensure-session logic
+   - refresh on visibility/focus
+   - session/reactivity watchers
 
-Desired behavior:
-1. Clicking a series row should ONLY select/highlight that series.
-2. After a series is selected, the UI should expose two clear action buttons:
-   - `Edit series`
-   - `Show exceptions` (or `Open exceptions`)
-3. Clicking `Edit series` should open the series modal in edit mode.
-4. Clicking `Show/Open exceptions` should open/show the exceptions area for the selected series.
-5. If the exceptions area is already open, the button may become `Hide exceptions` if that is cleaner and consistent.
-6. The exceptions area must no longer appear automatically just because the row was clicked.
-7. The series modal must no longer open automatically just because the row was clicked.
+Before coding, verify these facts in the live working tree and use them as the basis for the fix.
 
-Context:
-- Current live implementation is in the planning shifts admin view.
-- The current code path likely has `selectSeries(series.id)` both selecting the series and opening the modal.
-- The exceptions area is likely controlled directly or indirectly by `selectedSeriesId`, causing it to appear immediately after selection.
-- This coupling must be removed.
+Recommended fix direction:
+Adopt the same session-ready pattern already used in the more robust SicherPlan admin views, but keep the change minimal and dashboard-specific.
 
-What to inspect first:
-1. `PlanningShiftsAdminView.vue`
-2. The current `selectSeries` function
-3. The conditions used to render the exceptions section
-4. The current `seriesModalOpen` flow
-5. The current tests in `planningShifts.smoke.test.ts`
+Implementation requirements:
+1. In the dashboard view, do not rely on a single raw `onMounted(loadDashboard)` call.
+2. First synchronize/resolve session state before attempting the first dashboard load.
+3. Re-run dashboard loading once auth/session context becomes available.
+4. Ensure the dashboard reacts when:
+   - access token becomes available
+   - tenant scope becomes available
+   - session user / role context becomes available
+5. Avoid duplicate uncontrolled reload loops.
+6. Preserve current dashboard UI and data shape; this is a loading-timing fix, not a redesign.
 
-Recommended solution design:
-Separate these states clearly:
+Suggested approach:
+1. Inspect the dashboard view and identify:
+   - current access token source
+   - current tenant scope source
+   - current `onMounted` logic
+2. Reuse the legacy auth store helpers already present in the repo.
+3. Implement a resilient initialization flow, for example:
+   - sync from primary session
+   - ensure session ready
+   - only then load dashboard
+4. Add a guarded watcher for the auth/session values that matter so the dashboard can load once they become available after redirect.
+5. Optionally mirror the existing focus/visibility refresh pattern used elsewhere if that fits the current dashboard architecture cleanly.
+6. Keep the solution minimal, readable, and consistent with current admin views.
 
-A. Selected series identity
-- keep `selectedSeriesId`
+Important constraints:
+- Do NOT change dashboard business content, cards, or routing structure unless necessary for the fix.
+- Do NOT introduce a broad shared abstraction unless clearly needed.
+- Do NOT break platform-admin vs tenant-admin behavior.
+- Do NOT create repeated API floods from uncontrolled watchers.
+- Keep loading state sane even if one or more data calls fail.
+- Preserve current Promise.allSettled behavior unless there is a strong reason to change it.
 
-B. Series edit modal visibility
-- controlled independently, e.g. `seriesModalOpen`
+What to validate functionally:
+1. Direct login -> redirect to `/admin/dashboard` -> dashboard data appears on first load
+2. Hard refresh on `/admin/dashboard` with a valid persisted session -> dashboard data appears
+3. Platform admin dashboard still works
+4. Tenant-scoped dashboard still works
+5. No need to visit `/admin/customers` or another page as a workaround anymore
 
-C. Exceptions panel visibility
-- controlled independently, e.g. `exceptionsPanelOpen` or similar
+Testing requirements:
+Add or update tests for the dashboard view.
+At minimum cover:
+1. Dashboard does not remain empty when auth/session is resolved after mount
+2. Dashboard triggers loading once session becomes ready
+3. Dashboard does not require a second route navigation to populate
+4. No uncontrolled duplicate loads
+5. Existing quick actions / cards still render once data is loaded
 
-Recommended behavior:
-- Row click:
-  - set selected series
-  - load lightweight details if needed
-  - DO NOT open modal
-  - DO NOT auto-open exceptions panel
-- `Edit series` button:
-  - requires selected series
-  - opens modal
-  - loads edit data if needed
-- `Show/Open exceptions` button:
-  - requires selected series
-  - shows the exceptions section/panel
-  - loads exceptions if needed
-- Optional:
-  - `Hide exceptions` closes the exceptions section without clearing the selected series
+If there is no existing dashboard test file, add a focused smoke or behavior test near the dashboard view.
+Prefer behavior tests over brittle implementation-detail tests.
 
-UI requirements:
-1. Add two explicit action buttons for the selected series workflow.
-2. Place them in a clear, low-friction location, for example:
-   - in the series section header
-   - or in a small action row below the selected series list
-   Choose the most consistent option with the current UI.
-3. Do not overload the row itself with too many actions unless that is already a pattern in this file.
-4. Preserve compactness and clarity.
-
-Behavioral constraints:
-- Do NOT change business logic for:
-  - creating series
-  - editing series
-  - loading series details
-  - loading exceptions
-  - creating/updating exceptions
-  - generating series
-- Do NOT change API contracts
-- Do NOT break the exception modal work if it has already been refactored in the current working tree
-- Do NOT break plan selection or shift selection flows
-
-Important compatibility note:
-The current smoke tests may still encode the old behavior:
-- row click opens edit modal
-- row click also reveals exceptions
-You must update those tests to match the new intended behavior.
-
-Implementation guidance:
-1. Inspect current live state before editing.
-2. Refactor `selectSeries` so it only handles selection (and maybe data preload), not UI branching.
-3. Introduce a separate explicit action for opening the edit modal.
-4. Introduce a separate explicit action for showing exceptions.
-5. Decouple exceptions rendering from mere selection.
-6. Preserve selected-series highlighting.
-7. Keep the UI accessible and keyboard-friendly.
-
-Accessibility requirements:
-- Preserve button semantics for rows and actions
-- Keep keyboard navigation clear
-- Ensure selected state remains visible
-- Ensure action buttons are clearly labeled
-- Ensure focus-visible styles remain usable
-
-Testing guidance:
-Update `planningShifts.smoke.test.ts` to reflect the new behavior.
-
-Add or update tests to verify:
-1. Clicking a series row selects it but does NOT open the edit modal
-2. Clicking a series row does NOT automatically show the exceptions panel
-3. Clicking `Edit series` opens the series modal in edit mode
-4. Clicking `Show/Open exceptions` reveals the exceptions area for the selected series
-5. If implemented, clicking `Hide exceptions` hides the exceptions area
-6. Selected series remains selected after closing the modal
-7. Existing exception workflows still work once exceptions are explicitly opened
-8. No regression to new-series action
-
-Avoid brittle tests based on exact CSS.
-Prefer behavioral assertions using test ids and visible text.
+A good test scenario:
+- mount dashboard with auth/session initially incomplete
+- then simulate session becoming available through the same store pattern used in the app
+- assert dashboard load runs and content appears
 
 Acceptance criteria:
-- Series row click no longer performs two actions at once
-- The user now has two explicit choices:
-  - edit series
-  - open/view series exceptions
-- The edit modal opens only when explicitly requested
-- The exceptions area opens only when explicitly requested
-- Selected series highlighting still works
-- Existing planning-shifts workflows remain intact
-- Tests are updated to reflect the new behavior
+- The dashboard loads on first direct entry after login
+- The workaround “go to Customers and come back” is no longer needed
+- The fix is localized and consistent with existing SicherPlan session-handling patterns
+- Tests cover the regression
 
 At the end, provide a concise validation report with these headings:
-1. What the old coupled behavior was
+1. Root cause found
 2. Which files were changed
-3. How selection, edit, and exceptions visibility were decoupled
-4. Where the two explicit action buttons were added
-5. Which tests were updated or added
-6. Any remaining UX follow-ups you recommend
+3. What initialization/session-loading logic was added or changed
+4. How duplicate loads were prevented
+5. Which tests were added or updated
+6. Any remaining assumptions or follow-up risks
 
-Before coding, explicitly sanity-check whether the current working tree already contains:
-- a modal-based exception editor
-- recent Series-tab spacing/styling changes
-and confirm that your fix will layer on top of those changes rather than overwrite them.
+Before coding, explicitly compare the dashboard’s current session-loading behavior with one of the working admin views that already uses `syncFromPrimarySession()` / `ensureSessionReady()` and state clearly what was missing in the dashboard.
