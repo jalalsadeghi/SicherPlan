@@ -1248,8 +1248,10 @@ describe("PlanningStaffingCoverageView", () => {
     await clickDetailTab(wrapper, "assignments");
 
     expect(wrapper.text()).toContain("Planung Alpha");
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
     await wrapper.get('[data-testid="planning-staffing-assignment-team-select"]').setValue("team-shift-1");
-    await wrapper.get('[data-testid="planning-staffing-assignment-save"]').trigger("click");
+    await wrapper.get('[data-testid="planning-staffing-assignment-modal"]').trigger("submit");
     await flushPromises();
 
     expect(mocks.updateAssignmentMock).toHaveBeenCalledWith(
@@ -1302,6 +1304,7 @@ describe("PlanningStaffingCoverageView", () => {
 
     expect(wrapper.text()).toContain("Fuer diese Schicht gibt es noch keine Zuweisungen.");
     await wrapper.get('[data-testid="planning-staffing-empty-create-assignment"]').trigger("click");
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(true);
     await wrapper.get('[data-testid="planning-staffing-assignment-demand-group"]').setValue("dg-1");
     await wrapper.get('[data-testid="planning-staffing-assignment-team-select"]').setValue("team-1");
     await wrapper.get('[data-testid="planning-staffing-assignment-member-select"]').setValue("employee-1");
@@ -1310,7 +1313,7 @@ describe("PlanningStaffingCoverageView", () => {
     await wrapper.get('[data-testid="planning-staffing-assignment-offered-at"]').setValue("2026-04-05T07:15");
     await wrapper.get('[data-testid="planning-staffing-assignment-confirmed-at"]').setValue("2026-04-05T07:45");
     await wrapper.get('[data-testid="planning-staffing-assignment-remarks"]').setValue("Direkt angelegt");
-    await wrapper.get('[data-testid="planning-staffing-assignment-save"]').trigger("click");
+    await wrapper.get('[data-testid="planning-staffing-assignment-modal"]').trigger("submit");
     await flushPromises();
 
     expect(mocks.createAssignmentMock).toHaveBeenCalledWith(
@@ -1327,5 +1330,62 @@ describe("PlanningStaffingCoverageView", () => {
         remarks: "Direkt angelegt",
       }),
     );
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(false);
+  });
+
+  it("opens the assignment modal in create mode from the assignments panel", async () => {
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="planning-staffing-start-assignment-create"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(true);
+    expect(wrapper.get(".modal-stub__title").text()).toContain("Zuweisung anlegen");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-status"]').element as HTMLSelectElement).value).toBe("assigned");
+  });
+
+  it("opens the assignment modal in edit mode when an assignment row is clicked", async () => {
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(true);
+    expect(wrapper.get(".modal-stub__title").text()).toContain("Zuweisung bearbeiten");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-demand-group"]').element as HTMLSelectElement).value).toBe("dg-1");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-member-select"]').element as HTMLSelectElement).value).toBe("employee-1");
+  });
+
+  it("resets and cancels the assignment modal without changing unrelated page state", async () => {
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-remarks"]').setValue("Geaendert");
+    await wrapper.get('[data-testid="planning-staffing-assignment-modal-reset"]').trigger("click");
+    await flushPromises();
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-remarks"]').element as HTMLTextAreaElement).value).toBe("Bestehende Zuweisung");
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-modal-cancel"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-staffing-tab-panel-assignments"] [data-testid=\"planning-staffing-assignment-member-select\"]').exists()).toBe(false);
+  });
+
+  it("keeps unassign available from the assignment modal", async () => {
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-modal-remove"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.unassignStaffingMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(false);
   });
 });

@@ -479,8 +479,9 @@
                   :key="assignment.id"
                   type="button"
                   class="planning-staffing-row"
+                  :data-testid="`planning-staffing-assignment-row-${assignment.id}`"
                   :class="{ selected: assignment.id === selectedAssignmentId }"
-                  @click="selectedAssignmentId = assignment.id"
+                  @click="startEditAssignment(assignment.id)"
                 >
                   <div>
                     <strong>{{ formatAssignmentActor(assignment) }}</strong>
@@ -504,82 +505,12 @@
                   </button>
                 </div>
               </div>
-              <div v-if="assignmentEditorVisible" class="planning-staffing-metrics">
-                <span>{{ tp("assignmentShiftLabel") }}: {{ selectedShift?.order_no || selectedShiftId }}</span>
-                <span>{{ tp("fieldsVersion") }}: {{ assignmentDraft.version_no ?? 0 }}</span>
-                <span>{{ tp("fieldsTeam") }}: {{ assignmentTeamLabel(assignmentDraft.team_id || null) }}</span>
+              <div v-if="selectedAssignment" class="planning-staffing-metrics">
+                <span>{{ tp("fieldsDemandGroup") }}: {{ formatDemandGroupById(selectedAssignment.demand_group_id) }}</span>
+                <span>{{ tp("fieldsVersion") }}: {{ selectedAssignmentDetails?.version_no ?? selectedAssignment.version_no }}</span>
+                <span>{{ tp("fieldsTeam") }}: {{ assignmentTeamLabel(selectedAssignment.team_id) }}</span>
               </div>
-              <div v-if="assignmentEditorVisible" class="planning-staffing-filter-grid">
-                <label class="field-stack">
-                  <span>{{ tp("fieldsDemandGroup") }}</span>
-                  <select
-                    v-model="assignmentDraft.demand_group_id"
-                    data-testid="planning-staffing-assignment-demand-group"
-                    :disabled="assignmentEditorMode === 'edit'"
-                  >
-                    <option value="">{{ tp("demandGroupPlaceholder") }}</option>
-                    <option v-for="group in selectedBoardShift?.demand_groups ?? []" :key="group.id" :value="group.id">
-                      {{ formatDemandGroup(group) }}
-                    </option>
-                  </select>
-                  <p v-if="assignmentEditorMode === 'edit'" class="field-help">{{ tp("assignmentDemandGroupLockedHint") }}</p>
-                </label>
-                <label class="field-stack">
-                  <span>{{ tp("fieldsActorKind") }}</span>
-                  <select v-model="assignmentDraft.actor_kind" data-testid="planning-staffing-assignment-actor-kind">
-                    <option value="employee">{{ tp("actorKindEmployee") }}</option>
-                    <option value="subcontractor_worker">{{ tp("actorKindSubcontractorWorker") }}</option>
-                  </select>
-                </label>
-                <label class="field-stack field-stack--wide">
-                  <span>{{ tp("assignmentTeamLinkLabel") }}</span>
-                  <select v-model="assignmentDraft.team_id" data-testid="planning-staffing-assignment-team-select">
-                    <option value="">{{ tp("assignmentTeamLinkPlaceholder") }}</option>
-                    <option v-for="team in availableTeams" :key="team.id" :value="team.id">
-                      {{ formatTeam(team) }}
-                    </option>
-                  </select>
-                  <p class="field-help">{{ tp("assignmentTeamLinkHint") }}</p>
-                </label>
-                <label class="field-stack">
-                  <span>{{ assignmentDraft.actor_kind === 'employee' ? tp("fieldsEmployee") : tp("fieldsSubcontractorWorker") }}</span>
-                  <select v-model="assignmentDraft.member_ref" data-testid="planning-staffing-assignment-member-select">
-                    <option value="">{{ tp("memberPlaceholder") }}</option>
-                    <option v-for="option in assignmentActorOptions" :key="option.value" :value="option.value">
-                      {{ option.label }}
-                    </option>
-                  </select>
-                </label>
-                <label class="field-stack">
-                  <span>{{ tp("assignmentStatusLabel") }}</span>
-                  <select v-model="assignmentDraft.assignment_status_code" data-testid="planning-staffing-assignment-status">
-                    <option v-for="option in assignmentStatusOptions" :key="option.value" :value="option.value">
-                      {{ tp(option.labelKey) }}
-                    </option>
-                  </select>
-                </label>
-                <label class="field-stack">
-                  <span>{{ tp("fieldsAssignmentSource") }}</span>
-                  <select v-model="assignmentDraft.assignment_source_code" data-testid="planning-staffing-assignment-source">
-                    <option v-for="option in assignmentSourceOptions" :key="option.value" :value="option.value">
-                      {{ tp(option.labelKey) }}
-                    </option>
-                  </select>
-                </label>
-                <label class="field-stack">
-                  <span>{{ tp("assignmentOfferedAtLabel") }}</span>
-                  <input v-model="assignmentDraft.offered_at" type="datetime-local" data-testid="planning-staffing-assignment-offered-at" />
-                </label>
-                <label class="field-stack">
-                  <span>{{ tp("assignmentConfirmedAtLabel") }}</span>
-                  <input v-model="assignmentDraft.confirmed_at" type="datetime-local" data-testid="planning-staffing-assignment-confirmed-at" />
-                </label>
-                <label class="field-stack field-stack--wide">
-                  <span>{{ tp("fieldsRemarks") }}</span>
-                  <textarea v-model="assignmentDraft.remarks" rows="3" data-testid="planning-staffing-assignment-remarks" />
-                </label>
-              </div>
-              <div v-if="assignmentEditorVisible" class="planning-staffing-assignment-validation-summary">
+              <div v-if="selectedAssignment" class="planning-staffing-assignment-validation-summary">
                 <span>{{ tp("validationBlock") }}: {{ assignmentValidationSummary.blocking }}</span>
                 <span>{{ tp("validationWarn") }}: {{ assignmentValidationSummary.warnings }}</span>
                 <span>{{ tp("validationInfo") }}: {{ assignmentValidationSummary.infos }}</span>
@@ -591,36 +522,6 @@
                   @click="activeShiftDetailTab = 'validations'"
                 >
                   {{ tp("assignmentOpenValidationsAction") }}
-                </button>
-              </div>
-              <div v-if="assignmentEditorVisible" class="cta-row">
-                <button
-                  class="cta-button"
-                  type="button"
-                  data-testid="planning-staffing-assignment-save"
-                  :disabled="!canSubmitAssignmentEditor || assignmentEditorSaving"
-                  @click="submitAssignmentEditor"
-                >
-                  {{ tp(assignmentEditorMode === 'edit' ? 'assignmentUpdateAction' : 'assignmentCreateAction') }}
-                </button>
-                <button
-                  class="cta-button cta-secondary"
-                  type="button"
-                  data-testid="planning-staffing-assignment-reset"
-                  :disabled="assignmentEditorSaving"
-                  @click="resetAssignmentEditor"
-                >
-                  {{ tp("assignmentResetAction") }}
-                </button>
-                <button
-                  v-if="selectedAssignmentId"
-                  class="cta-button cta-secondary"
-                  type="button"
-                  data-testid="planning-staffing-assignment-unassign"
-                  :disabled="!actionState.canUnassign || assignmentEditorSaving"
-                  @click="submitUnassign"
-                >
-                  {{ tp("unassignAction") }}
                 </button>
               </div>
             </section>
@@ -857,6 +758,148 @@
         <p v-else class="planning-staffing-list-empty">{{ tp("noSelection") }}</p>
       </section>
     </div>
+
+    <Modal
+      v-model:open="assignmentDialogOpen"
+      :title="tp(assignmentEditorMode === 'edit' ? 'assignmentEditTitle' : 'assignmentCreateTitle')"
+      :footer="null"
+      @cancel="closeAssignmentDialog"
+    >
+      <form
+        v-if="selectedShift && actionState.canWriteStaffing"
+        class="planning-staffing-demand-group-editor"
+        data-testid="planning-staffing-assignment-modal"
+        @submit.prevent="submitAssignmentEditor"
+      >
+        <div class="planning-staffing-metrics">
+          <span>{{ tp("assignmentShiftLabel") }}: {{ selectedShift?.order_no || selectedShiftId }}</span>
+          <span>{{ tp("fieldsVersion") }}: {{ assignmentDraft.version_no ?? 0 }}</span>
+          <span>{{ tp("fieldsTeam") }}: {{ assignmentTeamLabel(assignmentDraft.team_id || null) }}</span>
+        </div>
+        <div class="planning-staffing-filter-grid">
+          <label class="field-stack">
+            <span>{{ tp("fieldsDemandGroup") }}</span>
+            <select
+              v-model="assignmentDraft.demand_group_id"
+              data-testid="planning-staffing-assignment-demand-group"
+              :disabled="assignmentEditorMode === 'edit'"
+            >
+              <option value="">{{ tp("demandGroupPlaceholder") }}</option>
+              <option v-for="group in selectedBoardShift?.demand_groups ?? []" :key="group.id" :value="group.id">
+                {{ formatDemandGroup(group) }}
+              </option>
+            </select>
+            <p v-if="assignmentEditorMode === 'edit'" class="field-help">{{ tp("assignmentDemandGroupLockedHint") }}</p>
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("fieldsActorKind") }}</span>
+            <select v-model="assignmentDraft.actor_kind" data-testid="planning-staffing-assignment-actor-kind">
+              <option value="employee">{{ tp("actorKindEmployee") }}</option>
+              <option value="subcontractor_worker">{{ tp("actorKindSubcontractorWorker") }}</option>
+            </select>
+          </label>
+          <label class="field-stack field-stack--wide">
+            <span>{{ tp("assignmentTeamLinkLabel") }}</span>
+            <select v-model="assignmentDraft.team_id" data-testid="planning-staffing-assignment-team-select">
+              <option value="">{{ tp("assignmentTeamLinkPlaceholder") }}</option>
+              <option v-for="team in availableTeams" :key="team.id" :value="team.id">
+                {{ formatTeam(team) }}
+              </option>
+            </select>
+            <p class="field-help">{{ tp("assignmentTeamLinkHint") }}</p>
+          </label>
+          <label class="field-stack">
+            <span>{{ assignmentDraft.actor_kind === 'employee' ? tp("fieldsEmployee") : tp("fieldsSubcontractorWorker") }}</span>
+            <select v-model="assignmentDraft.member_ref" data-testid="planning-staffing-assignment-member-select">
+              <option value="">{{ tp("memberPlaceholder") }}</option>
+              <option v-for="option in assignmentActorOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("assignmentStatusLabel") }}</span>
+            <select v-model="assignmentDraft.assignment_status_code" data-testid="planning-staffing-assignment-status">
+              <option v-for="option in assignmentStatusOptions" :key="option.value" :value="option.value">
+                {{ tp(option.labelKey) }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("fieldsAssignmentSource") }}</span>
+            <select v-model="assignmentDraft.assignment_source_code" data-testid="planning-staffing-assignment-source">
+              <option v-for="option in assignmentSourceOptions" :key="option.value" :value="option.value">
+                {{ tp(option.labelKey) }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("assignmentOfferedAtLabel") }}</span>
+            <input v-model="assignmentDraft.offered_at" type="datetime-local" data-testid="planning-staffing-assignment-offered-at" />
+          </label>
+          <label class="field-stack">
+            <span>{{ tp("assignmentConfirmedAtLabel") }}</span>
+            <input v-model="assignmentDraft.confirmed_at" type="datetime-local" data-testid="planning-staffing-assignment-confirmed-at" />
+          </label>
+          <label class="field-stack field-stack--wide">
+            <span>{{ tp("fieldsRemarks") }}</span>
+            <textarea v-model="assignmentDraft.remarks" rows="3" data-testid="planning-staffing-assignment-remarks" />
+          </label>
+        </div>
+        <div v-if="selectedAssignmentId" class="planning-staffing-assignment-validation-summary">
+          <span>{{ tp("validationBlock") }}: {{ assignmentValidationSummary.blocking }}</span>
+          <span>{{ tp("validationWarn") }}: {{ assignmentValidationSummary.warnings }}</span>
+          <span>{{ tp("validationInfo") }}: {{ assignmentValidationSummary.infos }}</span>
+          <button
+            class="cta-button cta-secondary"
+            type="button"
+            data-testid="planning-staffing-open-assignment-validations"
+            :disabled="!selectedAssignmentId"
+            @click="activeShiftDetailTab = 'validations'"
+          >
+            {{ tp("assignmentOpenValidationsAction") }}
+          </button>
+        </div>
+        <div class="cta-row">
+          <button
+            class="cta-button"
+            type="submit"
+            data-testid="planning-staffing-assignment-modal-save"
+            :disabled="!canSubmitAssignmentEditor || assignmentEditorSaving"
+          >
+            {{ tp(assignmentEditorMode === 'edit' ? 'assignmentUpdateAction' : 'assignmentCreateAction') }}
+          </button>
+          <button
+            class="cta-button cta-secondary"
+            type="button"
+            data-testid="planning-staffing-assignment-modal-reset"
+            :disabled="assignmentEditorSaving"
+            @click="resetAssignmentEditor"
+          >
+            {{ tp("assignmentResetAction") }}
+          </button>
+          <button
+            v-if="selectedAssignmentId"
+            class="cta-button cta-secondary"
+            type="button"
+            data-testid="planning-staffing-assignment-modal-remove"
+            :disabled="!actionState.canUnassign || assignmentEditorSaving"
+            @click="submitUnassign"
+          >
+            {{ tp("unassignAction") }}
+          </button>
+          <button
+            class="cta-button cta-secondary"
+            type="button"
+            data-testid="planning-staffing-assignment-modal-cancel"
+            :disabled="assignmentEditorSaving"
+            @click="closeAssignmentDialog"
+          >
+            {{ tp("assignmentCancelAction") }}
+          </button>
+        </div>
+      </form>
+    </Modal>
 
     <Modal
       v-model:open="demandGroupDialogOpen"
@@ -1229,6 +1272,8 @@ const selectedDemandGroupId = ref("");
 const selectedAssignmentId = ref("");
 const selectedTeamId = ref("");
 const demandGroupDialogOpen = ref(false);
+const assignmentDialogOpen = ref(false);
+const assignmentDialogMode = ref<"create" | "edit">("create");
 const teamDialogOpen = ref(false);
 const teamMemberDialogOpen = ref(false);
 const activeShiftDetailTab = ref<"demand_staffing" | "validations" | "assignments" | "teams_releases" | "outputs_dispatch">("demand_staffing");
@@ -1451,8 +1496,7 @@ const canSubmitTeamMember = computed(() => {
   }
   return true;
 });
-const assignmentEditorMode = computed(() => (assignmentDraft.id ? "edit" : "create"));
-const assignmentEditorVisible = computed(() => Boolean(selectedShiftId.value));
+const assignmentEditorMode = computed(() => assignmentDialogMode.value);
 const canSubmitAssignmentEditor = computed(() => {
   if (!actionState.value.canWriteStaffing || !selectedShiftId.value || !assignmentDraft.demand_group_id || !assignmentDraft.member_ref) {
     return false;
@@ -1565,9 +1609,21 @@ function populateAssignmentDraft(assignment: AssignmentRead) {
 }
 
 function startCreateAssignment() {
+  assignmentDialogMode.value = "create";
   selectedAssignmentId.value = "";
   selectedAssignmentDetails.value = null;
   resetAssignmentDraft();
+  assignmentDialogOpen.value = true;
+}
+
+async function startEditAssignment(assignmentId = selectedAssignmentId.value) {
+  if (!assignmentId) {
+    return;
+  }
+  assignmentDialogMode.value = "edit";
+  selectedAssignmentId.value = assignmentId;
+  await loadSelectedAssignmentDetails();
+  assignmentDialogOpen.value = true;
 }
 
 function resetAssignmentEditor() {
@@ -1576,6 +1632,11 @@ function resetAssignmentEditor() {
     return;
   }
   resetAssignmentDraft();
+}
+
+function closeAssignmentDialog() {
+  assignmentDialogOpen.value = false;
+  resetAssignmentEditor();
 }
 
 function resetTeamDraft() {
@@ -2112,6 +2173,7 @@ async function submitAssignmentEditor() {
       selectedAssignmentId.value = assignment.id;
     }
     await refreshAll();
+    assignmentDialogOpen.value = false;
   } catch (error) {
     handleApiError(error);
   } finally {
@@ -2213,6 +2275,7 @@ async function submitUnassign() {
     });
     selectedAssignmentId.value = "";
     await refreshAll();
+    assignmentDialogOpen.value = false;
   } catch (error) {
     handleApiError(error);
   }

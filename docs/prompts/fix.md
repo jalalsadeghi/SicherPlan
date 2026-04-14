@@ -1,90 +1,147 @@
 You are working in the public repo `jalalsadeghi/SicherPlan`.
 
+Important working-mode rule:
+The current working tree is already dirty from previous staffing work. Do NOT revert, overwrite, or restyle unrelated changes. Treat the current working tree as the source of truth. Inspect the live file state first, then apply only the minimal safe change needed for modal-based assignment editing.
+
 Task:
-Fix the missing `Sort Order` field in the "Create demand group" / "Edit demand group" modal of the Staffing Coverage page and validate whether demand groups are actually ordered by that value.
+Refactor the Assignments editor in `/admin/planning-staffing` so the assignment form is no longer rendered inline inside the Assignments panel. Instead:
+1. clicking `Create assignment` opens a modal dialog for creating a new assignment
+2. clicking an existing assignment row opens the same modal in edit mode
+3. the page remains cleaner and more compact, while preserving all current staffing behaviors
 
-Context:
-- Route/page: `/admin/planning-staffing`
-- Current view file:
-  `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
-- Current API client file:
-  `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
-- Current smoke test file:
-  `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.smoke.test.ts`
+Primary target:
+- current page/workspace: `P-04 Staffing Board & Coverage`
+- current view file is expected to be the planning staffing coverage view in the SicherPlan web app
+- use the CURRENT working tree file path, not an older clean-repo assumption
 
-Observed inconsistency:
-- The demand-group modal UI currently renders:
-  - function_type_id
-  - qualification_type_id
-  - min_qty
-  - target_qty
-  - mandatory_flag
-  - remark
-- But the implementation already carries `sort_order` in the current contract:
-  - `DemandGroupRead.sort_order`
-  - `DemandGroupCreate.sort_order?`
-  - `DemandGroupUpdate.sort_order?`
-- The view state also already contains:
-  - `demandGroupDraft.sort_order = 100`
-  - reset logic restores it to 100
-  - edit logic loads it from an existing demand group
-  - submit logic sends it in create/update payloads
-- Therefore the form is currently incomplete: the field exists in the implementation contract but is not exposed in the modal.
+Behavioral requirements:
+1. Keep the Assignments tab/panel on the page.
+2. In the panel itself, keep:
+   - panel header
+   - `Create assignment` button
+   - assignment list / rows
+   - compact summary/read-only context if helpful
+3. Move the editable assignment form into a modal dialog.
+4. The same modal must support:
+   - create mode
+   - edit mode
+5. When the user clicks `Create assignment`:
+   - open modal with blank/default draft
+   - title should clearly indicate create mode
+6. When the user clicks an existing assignment row:
+   - open modal with that assignment prefilled
+   - title should clearly indicate edit mode
+7. Preserve the current assignment field set and semantics already present in the live working tree, including:
+   - demand group
+   - actor kind
+   - team link
+   - employee/subcontractor worker member
+   - assignment status
+   - assignment source
+   - offered at
+   - confirmed at
+   - remarks
+8. Preserve business rules already present in the current implementation:
+   - demand group and shift remain stable after creation when that is the existing rule
+   - validations remain visible and usable
+   - remove/unassign remains available for existing assignments
+   - create/update/unassign must still refresh assignment list, board, validations, and coverage correctly
+9. Do not weaken validation or audit behavior.
+10. Do not regress existing assignment workflow tests.
 
-Important design guidance:
-- Treat `sort_order` as an implementation/UI ordering field, not as a replacement for core demand-group semantics.
-- Keep the existing behavior and payload contract unless inspection proves the current repo has intentionally deprecated the field.
-- Do not guess. Inspect first.
-
-What to do:
-1. Inspect the current demand-group modal in `PlanningStaffingCoverageView.vue`.
-2. Add a numeric input for `sort_order` to both create and edit flows.
-3. Bind it to `demandGroupDraft.sort_order`.
-4. Keep the default value at `100`, matching the current draft/reset behavior.
-5. Validate it as an integer, preferably `>= 0`.
-6. Ensure create and update continue to send `sort_order` in the payload.
-7. Add a short field help text explaining that it controls the ordering of demand groups in staffing views/outputs.
-8. Inspect whether the UI currently displays demand groups in stable sort order.
-   - If backend already returns them sorted, document that and do not duplicate sorting unnecessarily.
-   - If backend ordering is not guaranteed, apply a safe frontend sort by:
-     1. `sort_order` ascending
-     2. function label/code
-     3. id as final fallback
-9. Verify the same ordering logic is used consistently wherever demand groups are rendered or selected in this page.
-10. Update or add tests in `planningStaffing.smoke.test.ts` to cover:
-    - default `sort_order` value
-    - visible field in create modal
-    - visible field in edit modal
-    - submitted create payload contains edited `sort_order`
-    - submitted update payload contains edited `sort_order`
-    - rendered demand-group order respects `sort_order` if frontend fallback sorting is needed
-
-Acceptance criteria:
-- The demand-group modal visibly contains a `Sort Order` field.
-- A user can create a demand group with:
-  - Function Type: SHIFT_SUP
-  - Qualification Type: empty
-  - Min Qty: 1
-  - Target Qty: 1
-  - Mandatory Flag: true
-  - Sort Order: 100
-  - Remark: Shift supervisor coverage for Objekt Süd day shift.
-- Edit mode shows the current `sort_order` of an existing demand group.
-- Create/update payloads include `sort_order`.
-- The page uses deterministic ordering for demand groups.
-- No regression to existing demand-group create/update behavior.
+Design and UX guidance:
+- Use the same modal/dialog pattern already used elsewhere in this page for demand groups / teams / team members.
+- Prefer consistency over invention.
+- Keep the panel visually compact after refactor.
+- The inline assignment form should be removed from the page once the modal version is in place.
+- If the page currently shows an assignment validation summary and an “Open validations” action, preserve that capability in the most consistent place:
+  - preferably inside the assignment modal for the currently edited record
+  - or in a compact row-level summary if that better matches the current code
+- Use the safest keyboard/interaction behavior:
+  - modal closes on cancel
+  - reset only resets modal draft, not unrelated page state
+  - escape/cancel should not silently discard saved data
+- Preserve or improve accessibility:
+  - clear modal title
+  - correct button labels
+  - stable focus behavior
+  - no broken tab order
 
 Implementation constraints:
-- Keep the change minimal and consistent with the existing SicherPlan/Vben styling and form patterns.
-- Reuse the existing modal, grid, field-stack, and CTA styles.
-- Do not introduce a breaking API change.
-- Do not remove `sort_order` from the contract unless you can prove from the inspected repo that the field is obsolete everywhere and update all dependent code/tests accordingly.
+- Inspect the current dirty file state first.
+- Keep the change local and minimal.
+- Reuse the current state/draft model if possible.
+- Do not introduce a second conflicting assignment state machine.
+- Do not duplicate backend logic in frontend code.
+- Do not change API contracts unless absolutely required by the current codebase.
+- Prefer adapting existing draft/reset/save flows into modal open/close flows.
 
-Required validation report at the end:
-Provide a concise report with these headings:
-1. What was inconsistent
+Expected code-level outcome:
+1. Add modal open/close state for assignment editor.
+2. Add explicit create/edit mode state for assignment editor.
+3. Opening behavior:
+   - `Create assignment` => open modal in create mode
+   - clicking assignment row => open modal in edit mode
+4. Move the existing assignment form markup into the modal.
+5. Keep save/remove/reset/cancel actions inside the modal.
+6. Keep the page-level assignment list outside the modal.
+7. Ensure selected assignment state still behaves correctly after save/remove/update.
+8. If the existing row click only selects the assignment, update it so row click opens the edit dialog.
+   - If selection state is still needed for other tabs/interactions, preserve it while also opening the dialog.
+9. Keep test ids stable where sensible, and add new ones where needed:
+   - create modal open button
+   - assignment modal root
+   - assignment modal save
+   - assignment modal cancel
+   - assignment modal reset
+   - assignment modal remove/unassign
+10. Do not break demand-group, team, or validation modal behavior already in the page.
+
+Validation work required:
+- Inspect and update tests for the current working tree.
+- Add or update tests to verify:
+  1. `Create assignment` opens the modal
+  2. clicking an assignment row opens modal in edit mode
+  3. create mode shows default draft
+  4. edit mode shows prefilled draft from selected assignment
+  5. save still triggers the correct existing create/update path
+  6. remove/unassign still works from modal
+  7. modal close/reset behavior is correct
+  8. page no longer renders the full inline assignment editor after refactor
+- If the repo currently has smoke tests for planning staffing, extend them rather than creating disconnected duplicate tests.
+
+Suggested implementation approach:
+- First inspect:
+  - current assignment draft state
+  - current assignment save/update/unassign handlers
+  - current selectedAssignment behavior
+  - existing modal patterns in the same view
+- Then refactor in this order:
+  1. introduce assignment modal state
+  2. extract or move assignment form into modal
+  3. wire create button to open create mode
+  4. wire row click to open edit mode
+  5. keep all current handlers working
+  6. remove obsolete inline form rendering
+  7. update tests
+
+Acceptance criteria:
+- Assignments tab remains available.
+- The page is visually cleaner because the assignment editor is no longer inline.
+- `Create assignment` opens an assignment modal.
+- Clicking an existing assignment opens the same modal in edit mode.
+- Existing behaviors for save/update/remove/validation are preserved.
+- Coverage and staffing refresh still work after mutations.
+- No regression to other planning-staffing modal flows.
+- Tests pass.
+
+At the end, provide a concise validation report with these headings:
+1. What changed
 2. Which files were changed
-3. Why exposing `sort_order` is correct for the current repo
-4. Whether backend already guarantees ordering or frontend fallback sorting was added
-5. Which tests were updated or added
-6. Any remaining mismatch between design docs and implementation
+3. How create mode works
+4. How edit mode works
+5. How existing assignment actions were preserved
+6. Which tests were updated or added
+7. Any remaining assumptions or working-tree risks
+
+Before coding, explicitly sanity-check the proposal against the current live working tree and say whether any existing dirty changes would conflict with this refactor.
