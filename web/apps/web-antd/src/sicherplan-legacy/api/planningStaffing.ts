@@ -48,6 +48,26 @@ export interface StaffingBoardAssignmentItem {
   version_no: number;
 }
 
+export interface AssignmentRead {
+  id: string;
+  tenant_id: string;
+  shift_id: string;
+  demand_group_id: string;
+  team_id: null | string;
+  employee_id: null | string;
+  subcontractor_worker_id: null | string;
+  assignment_status_code: string;
+  assignment_source_code: string;
+  offered_at: null | string;
+  confirmed_at: null | string;
+  remarks: null | string;
+  status: string;
+  version_no: number;
+  created_at: string;
+  updated_at: string;
+  archived_at: null | string;
+}
+
 export interface StaffingBoardDemandGroupItem {
   id: string;
   shift_id: string;
@@ -220,6 +240,20 @@ export interface StaffingAssignCommand {
   team_id?: null | string;
   employee_id?: null | string;
   subcontractor_worker_id?: null | string;
+  assignment_source_code?: string;
+  offered_at?: null | string;
+  confirmed_at?: null | string;
+  remarks?: null | string;
+}
+
+export interface AssignmentCreate {
+  tenant_id: string;
+  shift_id: string;
+  demand_group_id: string;
+  team_id?: null | string;
+  employee_id?: null | string;
+  subcontractor_worker_id?: null | string;
+  assignment_status_code?: string;
   assignment_source_code?: string;
   offered_at?: null | string;
   confirmed_at?: null | string;
@@ -549,8 +583,23 @@ export function getAssignmentValidations(tenantId: string, accessToken: string, 
   );
 }
 
+export function getAssignment(tenantId: string, accessToken: string, assignmentId: string) {
+  return request<AssignmentRead>(
+    `/api/planning/tenants/${tenantId}/ops/assignments/${assignmentId}`,
+    accessToken,
+  );
+}
+
+export function createAssignment(tenantId: string, accessToken: string, payload: AssignmentCreate) {
+  return request<AssignmentRead>(
+    `/api/planning/tenants/${tenantId}/ops/assignments`,
+    accessToken,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
 export function updateAssignment(tenantId: string, accessToken: string, assignmentId: string, payload: AssignmentUpdate) {
-  return request<StaffingBoardAssignmentItem>(
+  return request<AssignmentRead>(
     `/api/planning/tenants/${tenantId}/ops/assignments/${assignmentId}`,
     accessToken,
     { method: "PATCH", body: JSON.stringify(payload) },

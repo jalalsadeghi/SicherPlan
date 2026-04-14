@@ -20,6 +20,25 @@ const mocks = vi.hoisted(() => ({
     conflict_code: null,
     assignment: null,
   })),
+  createAssignmentMock: vi.fn(async (_tenantId, _token, payload) => ({
+    id: "assignment-created",
+    tenant_id: "tenant-1",
+    shift_id: payload.shift_id,
+    demand_group_id: payload.demand_group_id,
+    team_id: payload.team_id ?? null,
+    employee_id: payload.employee_id ?? null,
+    subcontractor_worker_id: payload.subcontractor_worker_id ?? null,
+    assignment_status_code: payload.assignment_status_code ?? "assigned",
+    assignment_source_code: payload.assignment_source_code ?? "dispatcher",
+    offered_at: payload.offered_at ?? null,
+    confirmed_at: payload.confirmed_at ?? null,
+    remarks: payload.remarks ?? null,
+    status: "active",
+    version_no: 1,
+    created_at: "2026-04-05T08:00:00Z",
+    updated_at: "2026-04-05T08:00:00Z",
+    archived_at: null,
+  })),
   createDemandGroupMock: vi.fn(async () => ({
     id: "dg-new",
     tenant_id: "tenant-1",
@@ -65,6 +84,25 @@ const mocks = vi.hoisted(() => ({
   })),
   createAssignmentValidationOverrideMock: vi.fn(async () => ({})),
   ensureSessionReadyMock: vi.fn(async () => true),
+  getAssignmentMock: vi.fn(async () => ({
+    id: "assignment-1",
+    tenant_id: "tenant-1",
+    shift_id: "shift-1",
+    demand_group_id: "dg-1",
+    team_id: "team-1",
+    employee_id: "employee-1",
+    subcontractor_worker_id: null,
+    assignment_status_code: "assigned",
+    assignment_source_code: "dispatcher",
+    offered_at: "2026-04-05T07:30:00Z",
+    confirmed_at: null,
+    remarks: "Bestehende Zuweisung",
+    status: "active",
+    version_no: 1,
+    created_at: "2026-04-05T07:30:00Z",
+    updated_at: "2026-04-05T07:30:00Z",
+    archived_at: null,
+  })),
   listAssignmentValidationOverridesMock: vi.fn(async () => []),
   listDemandGroupsMock: vi.fn(async () => [
     {
@@ -436,11 +474,13 @@ vi.mock("@/stores/locale", () => ({
 
 vi.mock("@/api/planningStaffing", () => ({
   assignStaffing: mocks.assignStaffingMock,
+  createAssignment: mocks.createAssignmentMock,
   createTeam: mocks.createTeamMock,
   createTeamMember: mocks.createTeamMemberMock,
   createDemandGroup: mocks.createDemandGroupMock,
   createAssignmentValidationOverride: mocks.createAssignmentValidationOverrideMock,
   generateShiftOutput: vi.fn(async () => ({})),
+  getAssignment: mocks.getAssignmentMock,
   getTeam: vi.fn(async () => ({
     id: "team-1",
     tenant_id: "tenant-1",
@@ -910,7 +950,9 @@ describe("PlanningStaffingCoverageView", () => {
 
     expect(wrapper.get(".modal-stub__title").text()).toContain("Demand Group anlegen");
     expect(wrapper.find('[data-testid="planning-staffing-demand-group-editor"]').exists()).toBe(true);
+    expect((wrapper.get('[data-testid="planning-staffing-demand-group-sort-order"]').element as HTMLInputElement).value).toBe("100");
     await wrapper.get('[data-testid="planning-staffing-demand-group-function-type"]').setValue("func-1");
+    await wrapper.get('[data-testid="planning-staffing-demand-group-sort-order"]').setValue("120");
     await flushPromises();
     await wrapper.get('[data-testid="planning-staffing-demand-group-editor"]').trigger("submit");
     await flushPromises();
@@ -923,6 +965,7 @@ describe("PlanningStaffingCoverageView", () => {
         shift_id: "shift-1",
         function_type_id: "func-1",
         qualification_type_id: null,
+        sort_order: 120,
       }),
     );
     expect(mocks.listStaffingBoardMock.mock.calls.length).toBeGreaterThan(1);
@@ -981,6 +1024,7 @@ describe("PlanningStaffingCoverageView", () => {
     expect(wrapper.get(".modal-stub__title").text()).toContain("Demand Group bearbeiten");
     expect(wrapper.find('[data-testid="planning-staffing-demand-group-editor"]').exists()).toBe(true);
     expect((wrapper.get('[data-testid="planning-staffing-demand-group-function-type"]').element as HTMLSelectElement).value).toBe("func-1");
+    expect((wrapper.get('[data-testid="planning-staffing-demand-group-sort-order"]').element as HTMLInputElement).value).toBe("100");
     expect(wrapper.get('[data-testid="planning-staffing-demand-group-editor"]').text()).toContain("Demand Group als verpflichtend markieren");
     expect(wrapper.find('[data-testid="planning-staffing-demand-group-modal-cancel"]').exists()).toBe(true);
   });
@@ -990,7 +1034,9 @@ describe("PlanningStaffingCoverageView", () => {
 
     await wrapper.get(".planning-staffing-demand-group").trigger("click");
     await flushPromises();
-    await wrapper.get('input[type="number"]').setValue("2");
+    const numberInputs = wrapper.findAll('input[type="number"]');
+    await numberInputs[0]!.setValue("2");
+    await wrapper.get('[data-testid="planning-staffing-demand-group-sort-order"]').setValue("80");
     await flushPromises();
     await wrapper.get('[data-testid="planning-staffing-demand-group-editor"]').trigger("submit");
     await flushPromises();
@@ -1001,6 +1047,7 @@ describe("PlanningStaffingCoverageView", () => {
       "dg-1",
       expect.objectContaining({
         min_qty: 2,
+        sort_order: 80,
       }),
     );
     expect(wrapper.find('[data-testid="planning-staffing-demand-group-editor"]').exists()).toBe(false);
@@ -1202,14 +1249,83 @@ describe("PlanningStaffingCoverageView", () => {
 
     expect(wrapper.text()).toContain("Planung Alpha");
     await wrapper.get('[data-testid="planning-staffing-assignment-team-select"]').setValue("team-shift-1");
-    await wrapper.get('[data-testid="planning-staffing-assignment-team-save"]').trigger("click");
+    await wrapper.get('[data-testid="planning-staffing-assignment-save"]').trigger("click");
     await flushPromises();
 
     expect(mocks.updateAssignmentMock).toHaveBeenCalledWith(
       "tenant-1",
       "token-1",
       "assignment-1",
-      { team_id: "team-shift-1", version_no: 1 },
+      expect.objectContaining({ team_id: "team-shift-1", version_no: 1 }),
+    );
+  });
+
+  it("creates an assignment from the assignments tab through the direct assignments API", async () => {
+    mocks.listStaffingBoardMock.mockResolvedValueOnce([
+      {
+        id: "shift-1",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        shift_plan_id: "plan-1",
+        order_id: "order-1",
+        order_no: "ORD-1",
+        planning_record_name: "Planning 1",
+        planning_mode_code: "site",
+        workforce_scope_code: "internal",
+        starts_at: "2026-04-05T08:00:00Z",
+        ends_at: "2026-04-05T16:00:00Z",
+        shift_type_code: "site_day",
+        release_state: "draft",
+        status: "active",
+        location_text: "Berlin",
+        meeting_point: "Gate A",
+        demand_groups: [
+          {
+            id: "dg-1",
+            shift_id: "shift-1",
+            function_type_id: "func-1",
+            qualification_type_id: "qual-1",
+            min_qty: 1,
+            target_qty: 2,
+            mandatory_flag: true,
+            assigned_count: 0,
+            confirmed_count: 0,
+            released_partner_qty: 0,
+          },
+        ],
+        assignments: [],
+      },
+    ]);
+
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+
+    expect(wrapper.text()).toContain("Fuer diese Schicht gibt es noch keine Zuweisungen.");
+    await wrapper.get('[data-testid="planning-staffing-empty-create-assignment"]').trigger("click");
+    await wrapper.get('[data-testid="planning-staffing-assignment-demand-group"]').setValue("dg-1");
+    await wrapper.get('[data-testid="planning-staffing-assignment-team-select"]').setValue("team-1");
+    await wrapper.get('[data-testid="planning-staffing-assignment-member-select"]').setValue("employee-1");
+    await wrapper.get('[data-testid="planning-staffing-assignment-status"]').setValue("confirmed");
+    await wrapper.get('[data-testid="planning-staffing-assignment-source"]').setValue("manual");
+    await wrapper.get('[data-testid="planning-staffing-assignment-offered-at"]').setValue("2026-04-05T07:15");
+    await wrapper.get('[data-testid="planning-staffing-assignment-confirmed-at"]').setValue("2026-04-05T07:45");
+    await wrapper.get('[data-testid="planning-staffing-assignment-remarks"]').setValue("Direkt angelegt");
+    await wrapper.get('[data-testid="planning-staffing-assignment-save"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.createAssignmentMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({
+        shift_id: "shift-1",
+        demand_group_id: "dg-1",
+        team_id: "team-1",
+        employee_id: "employee-1",
+        subcontractor_worker_id: null,
+        assignment_status_code: "confirmed",
+        assignment_source_code: "manual",
+        remarks: "Direkt angelegt",
+      }),
     );
   });
 });

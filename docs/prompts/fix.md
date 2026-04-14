@@ -1,145 +1,90 @@
-You are working on the SicherPlan repo.
+You are working in the public repo `jalalsadeghi/SicherPlan`.
 
 Task:
-Fix the empty "Marital status" select in Employees > Private profile.
+Fix the missing `Sort Order` field in the "Create demand group" / "Edit demand group" modal of the Staffing Coverage page and validate whether demand groups are actually ordered by that value.
 
-Observed problem:
-The UI now renders Marital status as a select, but the dropdown contains only the placeholder:
-"Select marital status"
-and no actual options.
+Context:
+- Route/page: `/admin/planning-staffing`
+- Current view file:
+  `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
+- Current API client file:
+  `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
+- Current smoke test file:
+  `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.smoke.test.ts`
 
-Important:
-Do NOT patch this by hardcoding frontend-only options unless you prove there is no validated backend source.
-First validate the real root cause.
+Observed inconsistency:
+- The demand-group modal UI currently renders:
+  - function_type_id
+  - qualification_type_id
+  - min_qty
+  - target_qty
+  - mandatory_flag
+  - remark
+- But the implementation already carries `sort_order` in the current contract:
+  - `DemandGroupRead.sort_order`
+  - `DemandGroupCreate.sort_order?`
+  - `DemandGroupUpdate.sort_order?`
+- The view state also already contains:
+  - `demandGroupDraft.sort_order = 100`
+  - reset logic restores it to 100
+  - edit logic loads it from an existing demand group
+  - submit logic sends it in create/update payloads
+- Therefore the form is currently incomplete: the field exists in the implementation contract but is not exposed in the modal.
 
-Source-of-truth to respect:
-1. The implementation-oriented model expects a code-based private-profile field for marital status, not unrestricted free text.
-2. The platform’s general modeling rule prefers lookup-backed business lists through core.lookup_value.
-3. HR/private-profile fields must stay role-restricted.
-4. The UI should show readable labels, but save the code.
+Important design guidance:
+- Treat `sort_order` as an implementation/UI ordering field, not as a replacement for core demand-group semantics.
+- Keep the existing behavior and payload contract unless inspection proves the current repo has intentionally deprecated the field.
+- Do not guess. Inspect first.
 
-Phase A — Validation first
-Inspect the actual checked-out code and determine exactly why the select options are empty.
-
-Validate all of the following:
-
-1. Frontend
-- Find the exact select control in EmployeeAdminView.vue or the real component currently used.
-- Find how marital-status options are loaded:
-  - on mount?
-  - on employee selection?
-  - on opening private profile?
-- Find the API function used by the frontend to fetch options.
-- Check the expected response shape in the frontend mapping.
-
-2. Backend
-- Find the route for marital-status options, if present.
-- Find the service/repository query that returns lookup options.
-- Validate whether the query is incorrectly filtering only by tenant_id and therefore excluding system lookup rows.
-- Validate whether the domain name is exactly marital_status.
-- Validate whether the endpoint is returning:
-  - []
-  - wrong shape
-  - wrong labels
-  - authorization error swallowed by frontend
-  - 404 due to route mismatch
-
-3. Data layer
-- Check whether lookup seed/backfill actually inserted marital_status rows into the running DB.
-- Confirm whether marital_status is intended as:
-  - system lookup domain (tenant_id null), or
-  - tenant-specific domain
-- If it is system-owned, confirm the query includes system rows and optional tenant overrides correctly.
-- Check whether dev/test/bootstrap/startup/onboarding actually runs the seed logic for this domain.
-
-4. Runtime verification
-- Verify the actual network request from frontend to backend.
-- Verify the actual backend response payload.
-- Verify the actual DB rows for domain marital_status.
-
-Before coding, print a short validation summary with:
-- exact frontend file(s)
-- exact backend file(s)
-- exact route/path
-- actual response payload
-- whether the problem is:
-  a) empty DB seed
-  b) wrong lookup query scope
-  c) frontend mapping mismatch
-  d) route mismatch / old backend running
-  e) authorization issue
-  f) some combination
-
-Most likely root causes to explicitly test:
-1. system lookup rows exist, but backend query filters only tenant_id = current tenant and ignores system rows
-2. marital_status seed exists in code, but seed/backfill never ran against the active database
-3. frontend expects a different response shape than the backend returns
-
-Phase B — Fix the root cause properly
-
-Required fix rules:
-1. Keep Marital status as a select.
-2. Do not revert to textbox.
-3. Use backend-backed options as source of truth.
-4. Save marital_status_code, not label text.
-5. Preserve HR/private-profile permission restrictions.
-
-If the issue is wrong lookup query scope:
-- fix the query so system rows are included
-- if tenant overrides are supported, merge tenant-specific rows over system defaults in a deterministic way
-- keep sort_order stable
-
-If the issue is missing seed/backfill:
-- implement the smallest safe idempotent fix so existing environments get marital_status rows
-- do not rely on “fresh DB only” behavior
-- make sure the solution works for already-running local environments too
-
-If the issue is frontend mapping mismatch:
-- fix the response adapter only
-- do not duplicate the source of truth
-- keep labels readable and values code-based
-
-If the issue is route mismatch:
-- align frontend and backend on one canonical path
-- remove dead/unused wiring
-
-Testing requirements:
-Add/update focused tests for:
-1. marital-status options endpoint returns expected rows
-2. system lookup rows are returned correctly even when tenant_id is present in request context
-3. select renders real options in Employee private profile
-4. saved payload uses marital_status_code
-5. existing private-profile permissions remain enforced
-
-Manual verification required:
-After the fix, verify:
-1. Open /admin/employees
-2. Open Private profile
-3. Open Marital status select
-4. Confirm these options are visible with readable labels:
-   - single
-   - married
-   - separated
-   - divorced
-   - widowed
-   - civil_partnership
-   or the exact validated approved set from backend
-5. Save one value
-6. Reopen and confirm round-trip persistence
-
-Output format:
-1. Validation summary first
-2. Then implementation
-3. Then final report with:
-   - root cause
-   - changed files
-   - DB/seed impact
-   - API response before/after
-   - frontend behavior before/after
-   - exact manual test result
+What to do:
+1. Inspect the current demand-group modal in `PlanningStaffingCoverageView.vue`.
+2. Add a numeric input for `sort_order` to both create and edit flows.
+3. Bind it to `demandGroupDraft.sort_order`.
+4. Keep the default value at `100`, matching the current draft/reset behavior.
+5. Validate it as an integer, preferably `>= 0`.
+6. Ensure create and update continue to send `sort_order` in the payload.
+7. Add a short field help text explaining that it controls the ordering of demand groups in staffing views/outputs.
+8. Inspect whether the UI currently displays demand groups in stable sort order.
+   - If backend already returns them sorted, document that and do not duplicate sorting unnecessarily.
+   - If backend ordering is not guaranteed, apply a safe frontend sort by:
+     1. `sort_order` ascending
+     2. function label/code
+     3. id as final fallback
+9. Verify the same ordering logic is used consistently wherever demand groups are rendered or selected in this page.
+10. Update or add tests in `planningStaffing.smoke.test.ts` to cover:
+    - default `sort_order` value
+    - visible field in create modal
+    - visible field in edit modal
+    - submitted create payload contains edited `sort_order`
+    - submitted update payload contains edited `sort_order`
+    - rendered demand-group order respects `sort_order` if frontend fallback sorting is needed
 
 Acceptance criteria:
-- The Marital status select is populated with real options.
-- The options come from the validated backend source of truth.
-- The UI stores code, not label.
-- No frontend-only hardcoded workaround is introduced unless explicitly justified and approved as temporary.
+- The demand-group modal visibly contains a `Sort Order` field.
+- A user can create a demand group with:
+  - Function Type: SHIFT_SUP
+  - Qualification Type: empty
+  - Min Qty: 1
+  - Target Qty: 1
+  - Mandatory Flag: true
+  - Sort Order: 100
+  - Remark: Shift supervisor coverage for Objekt Süd day shift.
+- Edit mode shows the current `sort_order` of an existing demand group.
+- Create/update payloads include `sort_order`.
+- The page uses deterministic ordering for demand groups.
+- No regression to existing demand-group create/update behavior.
+
+Implementation constraints:
+- Keep the change minimal and consistent with the existing SicherPlan/Vben styling and form patterns.
+- Reuse the existing modal, grid, field-stack, and CTA styles.
+- Do not introduce a breaking API change.
+- Do not remove `sort_order` from the contract unless you can prove from the inspected repo that the field is obsolete everywhere and update all dependent code/tests accordingly.
+
+Required validation report at the end:
+Provide a concise report with these headings:
+1. What was inconsistent
+2. Which files were changed
+3. Why exposing `sort_order` is correct for the current repo
+4. Whether backend already guarantees ordering or frontend fallback sorting was added
+5. Which tests were updated or added
+6. Any remaining mismatch between design docs and implementation

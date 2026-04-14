@@ -461,6 +461,17 @@
                   <p class="eyebrow">{{ tp("assignmentsTitle") }}</p>
                   <h4>{{ tp("assignmentsTitle") }}</h4>
                 </div>
+                <div class="planning-staffing-panel__actions">
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="planning-staffing-start-assignment-create"
+                    :disabled="!selectedShiftId || !actionState.canWriteStaffing || assignmentEditorSaving"
+                    @click="startCreateAssignment"
+                  >
+                    {{ tp("assignmentCreateAction") }}
+                  </button>
+                </div>
               </div>
               <div v-if="selectedBoardShift?.assignments?.length" class="planning-staffing-list">
                 <button
@@ -472,21 +483,57 @@
                   @click="selectedAssignmentId = assignment.id"
                 >
                   <div>
-                    <strong>{{ actorLabel(assignment) }}</strong>
+                    <strong>{{ formatAssignmentActor(assignment) }}</strong>
+                    <span>{{ formatDemandGroupById(assignment.demand_group_id) }}</span>
                     <span>{{ assignment.assignment_status_code }} · {{ assignment.assignment_source_code }}</span>
                   </div>
                 </button>
               </div>
-              <p v-else class="planning-staffing-list-empty">{{ tp("assignmentsEmpty") }}</p>
-              <div v-if="selectedAssignment" class="planning-staffing-metrics">
-                <span>{{ tp("fieldsDemandGroup") }}: {{ selectedAssignment.demand_group_id }}</span>
-                <span>{{ tp("fieldsVersion") }}: {{ selectedAssignment.version_no }}</span>
-                <span>{{ tp("fieldsTeam") }}: {{ assignmentTeamLabel(selectedAssignment.team_id) }}</span>
+              <div v-else class="planning-staffing-empty">
+                <p class="planning-staffing-list-empty">{{ tp("assignmentsEmpty") }}</p>
+                <p class="field-help">{{ tp("assignmentsEmptyLead") }}</p>
+                <div class="cta-row">
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="planning-staffing-empty-create-assignment"
+                    :disabled="!selectedShiftId || !actionState.canWriteStaffing || !selectedBoardShift?.demand_groups?.length"
+                    @click="startCreateAssignment"
+                  >
+                    {{ tp("assignmentCreateAction") }}
+                  </button>
+                </div>
               </div>
-              <div v-if="selectedAssignment" class="planning-staffing-filter-grid">
+              <div v-if="assignmentEditorVisible" class="planning-staffing-metrics">
+                <span>{{ tp("assignmentShiftLabel") }}: {{ selectedShift?.order_no || selectedShiftId }}</span>
+                <span>{{ tp("fieldsVersion") }}: {{ assignmentDraft.version_no ?? 0 }}</span>
+                <span>{{ tp("fieldsTeam") }}: {{ assignmentTeamLabel(assignmentDraft.team_id || null) }}</span>
+              </div>
+              <div v-if="assignmentEditorVisible" class="planning-staffing-filter-grid">
+                <label class="field-stack">
+                  <span>{{ tp("fieldsDemandGroup") }}</span>
+                  <select
+                    v-model="assignmentDraft.demand_group_id"
+                    data-testid="planning-staffing-assignment-demand-group"
+                    :disabled="assignmentEditorMode === 'edit'"
+                  >
+                    <option value="">{{ tp("demandGroupPlaceholder") }}</option>
+                    <option v-for="group in selectedBoardShift?.demand_groups ?? []" :key="group.id" :value="group.id">
+                      {{ formatDemandGroup(group) }}
+                    </option>
+                  </select>
+                  <p v-if="assignmentEditorMode === 'edit'" class="field-help">{{ tp("assignmentDemandGroupLockedHint") }}</p>
+                </label>
+                <label class="field-stack">
+                  <span>{{ tp("fieldsActorKind") }}</span>
+                  <select v-model="assignmentDraft.actor_kind" data-testid="planning-staffing-assignment-actor-kind">
+                    <option value="employee">{{ tp("actorKindEmployee") }}</option>
+                    <option value="subcontractor_worker">{{ tp("actorKindSubcontractorWorker") }}</option>
+                  </select>
+                </label>
                 <label class="field-stack field-stack--wide">
                   <span>{{ tp("assignmentTeamLinkLabel") }}</span>
-                  <select v-model="assignmentTeamId" data-testid="planning-staffing-assignment-team-select">
+                  <select v-model="assignmentDraft.team_id" data-testid="planning-staffing-assignment-team-select">
                     <option value="">{{ tp("assignmentTeamLinkPlaceholder") }}</option>
                     <option v-for="team in availableTeams" :key="team.id" :value="team.id">
                       {{ formatTeam(team) }}
@@ -494,16 +541,86 @@
                   </select>
                   <p class="field-help">{{ tp("assignmentTeamLinkHint") }}</p>
                 </label>
+                <label class="field-stack">
+                  <span>{{ assignmentDraft.actor_kind === 'employee' ? tp("fieldsEmployee") : tp("fieldsSubcontractorWorker") }}</span>
+                  <select v-model="assignmentDraft.member_ref" data-testid="planning-staffing-assignment-member-select">
+                    <option value="">{{ tp("memberPlaceholder") }}</option>
+                    <option v-for="option in assignmentActorOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack">
+                  <span>{{ tp("assignmentStatusLabel") }}</span>
+                  <select v-model="assignmentDraft.assignment_status_code" data-testid="planning-staffing-assignment-status">
+                    <option v-for="option in assignmentStatusOptions" :key="option.value" :value="option.value">
+                      {{ tp(option.labelKey) }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack">
+                  <span>{{ tp("fieldsAssignmentSource") }}</span>
+                  <select v-model="assignmentDraft.assignment_source_code" data-testid="planning-staffing-assignment-source">
+                    <option v-for="option in assignmentSourceOptions" :key="option.value" :value="option.value">
+                      {{ tp(option.labelKey) }}
+                    </option>
+                  </select>
+                </label>
+                <label class="field-stack">
+                  <span>{{ tp("assignmentOfferedAtLabel") }}</span>
+                  <input v-model="assignmentDraft.offered_at" type="datetime-local" data-testid="planning-staffing-assignment-offered-at" />
+                </label>
+                <label class="field-stack">
+                  <span>{{ tp("assignmentConfirmedAtLabel") }}</span>
+                  <input v-model="assignmentDraft.confirmed_at" type="datetime-local" data-testid="planning-staffing-assignment-confirmed-at" />
+                </label>
+                <label class="field-stack field-stack--wide">
+                  <span>{{ tp("fieldsRemarks") }}</span>
+                  <textarea v-model="assignmentDraft.remarks" rows="3" data-testid="planning-staffing-assignment-remarks" />
+                </label>
               </div>
-              <div v-if="selectedAssignment" class="cta-row">
+              <div v-if="assignmentEditorVisible" class="planning-staffing-assignment-validation-summary">
+                <span>{{ tp("validationBlock") }}: {{ assignmentValidationSummary.blocking }}</span>
+                <span>{{ tp("validationWarn") }}: {{ assignmentValidationSummary.warnings }}</span>
+                <span>{{ tp("validationInfo") }}: {{ assignmentValidationSummary.infos }}</span>
                 <button
                   class="cta-button cta-secondary"
                   type="button"
-                  data-testid="planning-staffing-assignment-team-save"
-                  :disabled="!canSubmitAssignmentTeam || savingAssignmentTeam"
-                  @click="submitAssignmentTeamUpdate"
+                  data-testid="planning-staffing-open-assignment-validations"
+                  :disabled="!selectedAssignmentId"
+                  @click="activeShiftDetailTab = 'validations'"
                 >
-                  {{ tp("assignmentTeamLinkAction") }}
+                  {{ tp("assignmentOpenValidationsAction") }}
+                </button>
+              </div>
+              <div v-if="assignmentEditorVisible" class="cta-row">
+                <button
+                  class="cta-button"
+                  type="button"
+                  data-testid="planning-staffing-assignment-save"
+                  :disabled="!canSubmitAssignmentEditor || assignmentEditorSaving"
+                  @click="submitAssignmentEditor"
+                >
+                  {{ tp(assignmentEditorMode === 'edit' ? 'assignmentUpdateAction' : 'assignmentCreateAction') }}
+                </button>
+                <button
+                  class="cta-button cta-secondary"
+                  type="button"
+                  data-testid="planning-staffing-assignment-reset"
+                  :disabled="assignmentEditorSaving"
+                  @click="resetAssignmentEditor"
+                >
+                  {{ tp("assignmentResetAction") }}
+                </button>
+                <button
+                  v-if="selectedAssignmentId"
+                  class="cta-button cta-secondary"
+                  type="button"
+                  data-testid="planning-staffing-assignment-unassign"
+                  :disabled="!actionState.canUnassign || assignmentEditorSaving"
+                  @click="submitUnassign"
+                >
+                  {{ tp("unassignAction") }}
                 </button>
               </div>
             </section>
@@ -780,6 +897,17 @@
             <span>{{ tp("demandGroupTargetQty") }}</span>
             <input v-model.number="demandGroupDraft.target_qty" type="number" min="0" step="1" />
           </label>
+          <label class="field-stack">
+            <span>{{ tp("demandGroupSortOrder") }}</span>
+            <input
+              v-model.number="demandGroupDraft.sort_order"
+              type="number"
+              min="0"
+              step="1"
+              data-testid="planning-staffing-demand-group-sort-order"
+            />
+            <p class="field-help">{{ tp("demandGroupSortOrderHint") }}</p>
+          </label>
           <div class="planning-staffing-confirm-row field-stack--wide">
             <label class="planning-staffing-checkbox-row">
               <input v-model="demandGroupDraft.mandatory_flag" type="checkbox" />
@@ -995,10 +1123,12 @@ import {
 } from "@/api/planningOrders";
 import {
   assignStaffing,
+  createAssignment,
   createTeam,
   createTeamMember,
   createDemandGroup,
   createAssignmentValidationOverride,
+  getAssignment,
   getTeam,
   listDemandGroups,
   generateShiftOutput,
@@ -1019,6 +1149,8 @@ import {
   updateDemandGroup,
   updateTeam,
   updateTeamMember,
+  type AssignmentCreate,
+  type AssignmentRead,
   PlanningStaffingApiError,
   type AssignmentUpdate,
   type AssignmentValidationRead,
@@ -1096,7 +1228,6 @@ const selectedShiftId = ref("");
 const selectedDemandGroupId = ref("");
 const selectedAssignmentId = ref("");
 const selectedTeamId = ref("");
-const assignmentTeamId = ref("");
 const demandGroupDialogOpen = ref(false);
 const teamDialogOpen = ref(false);
 const teamMemberDialogOpen = ref(false);
@@ -1104,6 +1235,7 @@ const activeShiftDetailTab = ref<"demand_staffing" | "validations" | "assignment
 const shiftValidations = ref<ShiftReleaseValidationRead | null>(null);
 const assignmentValidations = ref<AssignmentValidationRead | null>(null);
 const assignmentOverrides = ref<any[]>([]);
+const selectedAssignmentDetails = ref<AssignmentRead | null>(null);
 const shiftOutputs = ref<PlanningOutputDocumentRead[]>([]);
 const dispatchPreview = ref<PlanningDispatchPreviewRead | null>(null);
 const dispatchAudienceEmployees = ref(true);
@@ -1115,7 +1247,7 @@ const savingOverride = ref(false);
 const savingDemandGroup = ref(false);
 const savingTeam = ref(false);
 const savingTeamMember = ref(false);
-const savingAssignmentTeam = ref(false);
+const assignmentEditorSaving = ref(false);
 const planningRecordOptions = ref<PlanningRecordListItem[]>([]);
 const resolvedPlanningRecord = ref<null | PlanningRecordRead>(null);
 const planningRecordLookupLoading = ref(false);
@@ -1137,6 +1269,19 @@ const staffingDraft = reactive({
   assignment_source_code: "dispatcher",
   confirm_now: false,
   remarks: "",
+});
+const assignmentDraft = reactive({
+  id: "",
+  demand_group_id: "",
+  actor_kind: "employee",
+  team_id: "",
+  member_ref: "",
+  assignment_status_code: "assigned",
+  assignment_source_code: "dispatcher",
+  offered_at: "",
+  confirmed_at: "",
+  remarks: "",
+  version_no: null as null | number,
 });
 const demandGroupDraft = reactive({
   id: "",
@@ -1263,6 +1408,9 @@ const teamLeadOptions = computed(() =>
 const teamMemberActorOptions = computed(() =>
   teamMemberDraft.actor_kind === "subcontractor_worker" ? subcontractorWorkerMemberOptions.value : employeeMemberOptions.value,
 );
+const assignmentActorOptions = computed(() =>
+  assignmentDraft.actor_kind === "subcontractor_worker" ? subcontractorWorkerMemberOptions.value : employeeMemberOptions.value,
+);
 const hasSelectedDemandGroups = computed(() => Boolean(selectedBoardShift.value?.demand_groups?.length));
 const editingDemandGroup = computed(() => Boolean(demandGroupDraft.id));
 const editingTeam = computed(() => Boolean(teamDraft.id));
@@ -1275,7 +1423,8 @@ const canSubmitDemandGroup = computed(() => {
   }
   const minQty = Number(demandGroupDraft.min_qty);
   const targetQty = Number(demandGroupDraft.target_qty);
-  if (!Number.isInteger(minQty) || !Number.isInteger(targetQty) || minQty < 0 || targetQty < minQty) {
+  const sortOrder = Number(demandGroupDraft.sort_order);
+  if (!Number.isInteger(minQty) || !Number.isInteger(targetQty) || !Number.isInteger(sortOrder) || minQty < 0 || targetQty < minQty || sortOrder < 0) {
     return false;
   }
   return true;
@@ -1302,12 +1451,29 @@ const canSubmitTeamMember = computed(() => {
   }
   return true;
 });
-const canSubmitAssignmentTeam = computed(() => {
-  if (!actionState.value.canWriteStaffing || !selectedAssignment.value) {
+const assignmentEditorMode = computed(() => (assignmentDraft.id ? "edit" : "create"));
+const assignmentEditorVisible = computed(() => Boolean(selectedShiftId.value));
+const canSubmitAssignmentEditor = computed(() => {
+  if (!actionState.value.canWriteStaffing || !selectedShiftId.value || !assignmentDraft.demand_group_id || !assignmentDraft.member_ref) {
     return false;
   }
-  return assignmentTeamId.value !== (selectedAssignment.value.team_id || "");
+  if (assignmentEditorMode.value === "edit" && !assignmentDraft.id) {
+    return false;
+  }
+  return true;
 });
+const assignmentStatusOptions = [
+  { value: "offered", labelKey: "assignmentStatusOffered" },
+  { value: "assigned", labelKey: "assignmentStatusAssigned" },
+  { value: "confirmed", labelKey: "assignmentStatusConfirmed" },
+  { value: "removed", labelKey: "assignmentStatusRemoved" },
+] as const;
+const assignmentSourceOptions = [
+  { value: "dispatcher", labelKey: "assignmentSourceDispatcher" },
+  { value: "manual", labelKey: "assignmentSourceManual" },
+  { value: "subcontractor_release", labelKey: "assignmentSourceSubcontractorRelease" },
+  { value: "portal_allocation", labelKey: "assignmentSourcePortalAllocation" },
+] as const;
 
 function clearFeedback() {
   feedback.message = "";
@@ -1368,6 +1534,48 @@ function resetStaffingDraft() {
   staffingDraft.assignment_source_code = "dispatcher";
   staffingDraft.confirm_now = false;
   staffingDraft.remarks = "";
+}
+
+function resetAssignmentDraft() {
+  assignmentDraft.id = "";
+  assignmentDraft.demand_group_id = selectedDemandGroupId.value || selectedBoardShift.value?.demand_groups?.[0]?.id || "";
+  assignmentDraft.actor_kind = "employee";
+  assignmentDraft.team_id = "";
+  assignmentDraft.member_ref = "";
+  assignmentDraft.assignment_status_code = "assigned";
+  assignmentDraft.assignment_source_code = "dispatcher";
+  assignmentDraft.offered_at = "";
+  assignmentDraft.confirmed_at = "";
+  assignmentDraft.remarks = "";
+  assignmentDraft.version_no = null;
+}
+
+function populateAssignmentDraft(assignment: AssignmentRead) {
+  assignmentDraft.id = assignment.id;
+  assignmentDraft.demand_group_id = assignment.demand_group_id;
+  assignmentDraft.actor_kind = assignment.subcontractor_worker_id ? "subcontractor_worker" : "employee";
+  assignmentDraft.team_id = assignment.team_id || "";
+  assignmentDraft.member_ref = assignment.subcontractor_worker_id || assignment.employee_id || "";
+  assignmentDraft.assignment_status_code = assignment.assignment_status_code;
+  assignmentDraft.assignment_source_code = assignment.assignment_source_code;
+  assignmentDraft.offered_at = normalizeDateTimeLocal(assignment.offered_at);
+  assignmentDraft.confirmed_at = normalizeDateTimeLocal(assignment.confirmed_at);
+  assignmentDraft.remarks = assignment.remarks || "";
+  assignmentDraft.version_no = assignment.version_no;
+}
+
+function startCreateAssignment() {
+  selectedAssignmentId.value = "";
+  selectedAssignmentDetails.value = null;
+  resetAssignmentDraft();
+}
+
+function resetAssignmentEditor() {
+  if (selectedAssignmentDetails.value) {
+    populateAssignmentDraft(selectedAssignmentDetails.value);
+    return;
+  }
+  resetAssignmentDraft();
 }
 
 function resetTeamDraft() {
@@ -1449,6 +1657,20 @@ function formatMember(member: TeamMemberRead) {
   return member.id;
 }
 
+function formatAssignmentActor(assignment: StaffingBoardAssignmentItem | null) {
+  if (!assignment) {
+    return "";
+  }
+  if (assignment.employee_id) {
+    return formatEmployee(employeeOptions.value.find((row) => row.id === assignment.employee_id)) || `employee:${assignment.employee_id}`;
+  }
+  if (assignment.subcontractor_worker_id) {
+    return formatSubcontractorWorker(subcontractorWorkerOptions.value.find((row) => row.id === assignment.subcontractor_worker_id))
+      || `worker:${assignment.subcontractor_worker_id}`;
+  }
+  return actorLabel(assignment);
+}
+
 function formatEmployee(employee?: EmployeeListItem | null) {
   if (!employee) {
     return "";
@@ -1475,6 +1697,15 @@ function assignmentTeamLabel(teamId: null | string) {
     return tp("unassignedLabel");
   }
   return formatTeam(availableTeams.value.find((team) => team.id === teamId) ?? planningTeams.value.find((team) => team.id === teamId) ?? null) || teamId;
+}
+
+function formatDemandGroupById(demandGroupId: string) {
+  const boardGroup = selectedBoardShift.value?.demand_groups.find((row) => row.id === demandGroupId) ?? null;
+  if (boardGroup) {
+    return formatDemandGroup(boardGroup);
+  }
+  const detailGroup = demandGroupRows.value.find((row) => row.id === demandGroupId) ?? null;
+  return detailGroup ? formatPlanningStaffingDemandGroupLabel(detailGroup, functionTypeOptions.value, qualificationTypeOptions.value) : demandGroupId;
 }
 
 function normalizeDateTimeLocal(value?: null | string) {
@@ -1809,6 +2040,8 @@ async function loadSelectedShiftDetails() {
   const boardShift = selectedBoardShift.value;
   if (!boardShift?.assignments?.length) {
     selectedAssignmentId.value = "";
+    selectedAssignmentDetails.value = null;
+    resetAssignmentDraft();
     assignmentValidations.value = null;
     assignmentOverrides.value = [];
     return;
@@ -1821,18 +2054,68 @@ async function loadSelectedShiftDetails() {
 
 async function loadSelectedAssignmentDetails() {
   if (!tenantScopeId.value || !accessToken.value || !selectedAssignmentId.value) {
+    selectedAssignmentDetails.value = null;
     assignmentValidations.value = null;
     assignmentOverrides.value = [];
+    resetAssignmentDraft();
     return;
   }
-  const [validations, overrides] = await Promise.all([
+  const [assignment, validations, overrides] = await Promise.all([
+    getAssignment(tenantScopeId.value, accessToken.value, selectedAssignmentId.value),
     getAssignmentValidations(tenantScopeId.value, accessToken.value, selectedAssignmentId.value),
     listAssignmentValidationOverrides(tenantScopeId.value, accessToken.value, selectedAssignmentId.value),
   ]);
+  selectedAssignmentDetails.value = assignment;
+  populateAssignmentDraft(assignment);
   assignmentValidations.value = validations;
   assignmentOverrides.value = overrides;
   if (overrideRuleCode.value && !validations.issues.some((issue) => issue.rule_code === overrideRuleCode.value && issue.override_allowed)) {
     cancelOverride();
+  }
+}
+
+function assignmentEditorPayload() {
+  return {
+    team_id: assignmentDraft.team_id || null,
+    employee_id: assignmentDraft.actor_kind === "employee" ? (assignmentDraft.member_ref || null) : null,
+    subcontractor_worker_id: assignmentDraft.actor_kind === "subcontractor_worker" ? (assignmentDraft.member_ref || null) : null,
+    assignment_status_code: assignmentDraft.assignment_status_code,
+    assignment_source_code: assignmentDraft.assignment_source_code,
+    offered_at: toIsoDateTime(assignmentDraft.offered_at),
+    confirmed_at: toIsoDateTime(assignmentDraft.confirmed_at),
+    remarks: assignmentDraft.remarks.trim() || null,
+  };
+}
+
+async function submitAssignmentEditor() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value || !canSubmitAssignmentEditor.value) {
+    return;
+  }
+  clearFeedback();
+  assignmentEditorSaving.value = true;
+  try {
+    if (assignmentEditorMode.value === "edit" && assignmentDraft.id) {
+      const payload: AssignmentUpdate = {
+        ...assignmentEditorPayload(),
+        version_no: assignmentDraft.version_no,
+      };
+      const assignment = await updateAssignment(tenantScopeId.value, accessToken.value, assignmentDraft.id, payload);
+      selectedAssignmentId.value = assignment.id;
+    } else {
+      const payload: AssignmentCreate = {
+        tenant_id: tenantScopeId.value,
+        shift_id: selectedShiftId.value,
+        demand_group_id: assignmentDraft.demand_group_id,
+        ...assignmentEditorPayload(),
+      };
+      const assignment = await createAssignment(tenantScopeId.value, accessToken.value, payload);
+      selectedAssignmentId.value = assignment.id;
+    }
+    await refreshAll();
+  } catch (error) {
+    handleApiError(error);
+  } finally {
+    assignmentEditorSaving.value = false;
   }
 }
 
@@ -1851,7 +2134,7 @@ async function submitDemandGroup() {
       min_qty: Number(demandGroupDraft.min_qty),
       target_qty: Number(demandGroupDraft.target_qty),
       mandatory_flag: demandGroupDraft.mandatory_flag,
-      sort_order: demandGroupDraft.sort_order,
+      sort_order: Number(demandGroupDraft.sort_order),
       remark: demandGroupDraft.remark.trim() || null,
     };
     const result = demandGroupDraft.id
@@ -2058,26 +2341,6 @@ async function submitTeamMember() {
   }
 }
 
-async function submitAssignmentTeamUpdate() {
-  if (!tenantScopeId.value || !accessToken.value || !selectedAssignment.value || !canSubmitAssignmentTeam.value) {
-    return;
-  }
-  clearFeedback();
-  savingAssignmentTeam.value = true;
-  try {
-    const payload: AssignmentUpdate = {
-      team_id: assignmentTeamId.value || null,
-      version_no: selectedAssignment.value.version_no,
-    };
-    await updateAssignment(tenantScopeId.value, accessToken.value, selectedAssignment.value.id, payload);
-    await refreshAll();
-  } catch (error) {
-    handleApiError(error);
-  } finally {
-    savingAssignmentTeam.value = false;
-  }
-}
-
 async function loadDispatchPreview() {
   if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
     return;
@@ -2196,6 +2459,9 @@ watch(
   selectedBoardShift,
   (shift) => {
     selectedDemandGroupId.value = resolveSelectedDemandGroupId(shift, selectedDemandGroupId.value);
+    if (!selectedAssignmentId.value) {
+      resetAssignmentDraft();
+    }
     if (!shift?.demand_groups?.length) {
       resetDemandGroupDraft();
     }
@@ -2222,23 +2488,10 @@ watch(
 );
 
 watch(
-  selectedAssignmentId,
-  () => {
-    if (selectedAssignment.value) {
-      staffingDraft.confirm_now = false;
-      assignmentTeamId.value = selectedAssignment.value.team_id || "";
-    }
-  },
-);
-
-watch(
   availableTeams,
   (teams) => {
     if (!teams.some((team) => team.id === selectedTeamId.value)) {
       selectedTeamId.value = teams[0]?.id ?? "";
-    }
-    if (!teams.some((team) => team.id === assignmentTeamId.value)) {
-      assignmentTeamId.value = selectedAssignment.value?.team_id || "";
     }
   },
   { immediate: true },
