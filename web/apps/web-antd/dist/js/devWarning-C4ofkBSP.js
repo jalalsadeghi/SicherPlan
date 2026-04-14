@@ -1,0 +1,1 @@
+import{I as e}from"./useConfigInject-DpO7qD4W.js";var t=((t,n,r)=>{e(t,`[ant-design-vue: ${n}] ${r}`)});export{t};

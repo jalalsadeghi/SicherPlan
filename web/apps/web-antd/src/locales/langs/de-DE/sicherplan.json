@@ -309,6 +309,13 @@
       "next": "Weiter",
       "openPlanning": "Schichtplanung",
       "monthHint": "Schichten und Auftragsdaten werden pro Kalendertag zusammengefasst.",
+      "coverageGood": "Abdeckung grün",
+      "coverageWarn": "Abdeckung Warnung",
+      "coverageBad": "Abdeckung blockiert",
+      "coverageSetupRequired": "Abdeckung Setup erforderlich",
+      "itemTypeOrder": "Auftrag",
+      "itemTypeShift": "Schicht",
+      "more": "mehr",
       "shiftShort": "Schicht",
       "orderShort": "Auftrag"
     },

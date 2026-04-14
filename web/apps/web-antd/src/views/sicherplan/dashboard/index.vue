@@ -20,11 +20,17 @@ import {
 } from '#/sicherplan-legacy/api/planningOrders';
 import { listShifts, type ShiftListItem } from '#/sicherplan-legacy/api/planningShifts';
 import {
+  listStaffingCoverage,
+  type CoverageShiftItem,
+} from '#/sicherplan-legacy/api/planningStaffing';
+import {
   listSubcontractors,
   type SubcontractorListItem,
 } from '#/sicherplan-legacy/api/subcontractors';
-
-import { buildDashboardQuickActions } from './helpers';
+import {
+  coverageTone,
+  resolvePlanningStaffingCoverageState,
+} from '#/sicherplan-legacy/features/planning/planningStaffing.helpers';
 
 defineOptions({ name: 'SicherPlanDashboard' });
 
@@ -33,8 +39,20 @@ interface CalendarCell {
   dayLabel: string;
   inMonth: boolean;
   isToday: boolean;
+  items: CalendarCellItem[];
+  moreCount: number;
   orderCount: number;
   shiftCount: number;
+  key: string;
+  visibleItems: CalendarCellItem[];
+}
+
+interface CalendarCellItem {
+  coverageState: string;
+  key: string;
+  label: string;
+  route: string;
+  tone: 'bad' | 'good' | 'warn';
 }
 
 const accessStore = useAccessStore();
@@ -43,6 +61,7 @@ const userStore = useUserStore();
 
 const loading = ref(false);
 const activeDate = ref(new Date());
+const expandedCalendarDays = ref<string[]>([]);
 const lastLoadedDashboardKey = ref('');
 const activeDashboardLoadKey = ref('');
 const dashboardBootstrapComplete = ref(false);
@@ -54,6 +73,7 @@ const dashboardData = reactive({
   notices: [] as NoticeListItem[],
   orders: [] as CustomerOrderListItem[],
   shifts: [] as ShiftListItem[],
+  staffingCoverage: [] as CoverageShiftItem[],
   subcontractors: [] as SubcontractorListItem[],
   tenants: [] as TenantListItem[],
 });
@@ -70,6 +90,10 @@ const tenantScopeId = computed(
 const canLoadTenantData = computed(
   () => Boolean(accessToken.value && tenantScopeId.value),
 );
+const visibleCalendarMonthKey = computed(() => {
+  const current = activeDate.value;
+  return `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
+});
 
 function resetDashboardData() {
   dashboardData.tenants = [];
@@ -78,6 +102,7 @@ function resetDashboardData() {
   dashboardData.subcontractors = [];
   dashboardData.orders = [];
   dashboardData.shifts = [];
+  dashboardData.staffingCoverage = [];
   dashboardData.notices = [];
 }
 
@@ -91,7 +116,7 @@ function resolveDashboardLoadKey() {
   if (!tenantScopeId.value) {
     return '';
   }
-  return `tenant:${tenantScopeId.value}:${accessToken.value}`;
+  return `tenant:${tenantScopeId.value}:${accessToken.value}:${visibleCalendarMonthKey.value}`;
 }
 
 function formatDateLabel(value: Date, options: Intl.DateTimeFormatOptions) {
@@ -114,6 +139,92 @@ function getOrderDate(order: CustomerOrderListItem) {
 
 function getShiftDate(shift: ShiftListItem) {
   return shift.occurrence_date || shift.starts_at;
+}
+
+function buildCalendarDayKey(value: Date) {
+  return value.toDateString();
+}
+
+function formatTimeLabel(value: string) {
+  const date = new Date(value);
+  return formatDateLabel(date, {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatShiftTypeLabel(value: string) {
+  return value
+    .split(/[_-]+/u)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function truncateCalendarLabel(value: string, maxLength = 24) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+function formatDateTimeLocalValue(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  const hours = String(value.getHours()).padStart(2, '0');
+  const minutes = String(value.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function visibleCalendarMonthStart(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), 1, 0, 0, 0, 0);
+}
+
+function visibleCalendarMonthEnd(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth() + 1, 0, 23, 59, 0, 0);
+}
+
+function extendStaffingLookupEnd(value: string) {
+  const date = new Date(value);
+  date.setDate(date.getDate() + 1);
+  return date;
+}
+
+function buildCoverageShiftLabel(coverageRow: CoverageShiftItem) {
+  const shiftTypeLabel = formatShiftTypeLabel(coverageRow.shift_type_code);
+  const timeWindow = `${formatTimeLabel(coverageRow.starts_at)}-${formatTimeLabel(coverageRow.ends_at)}`;
+  const contextLabel = coverageRow.planning_record_name || coverageRow.location_text || coverageRow.order_no;
+  return truncateCalendarLabel([shiftTypeLabel, timeWindow, contextLabel].filter(Boolean).join(' · '), 36);
+}
+
+function buildCoverageStateLabel(coverageState: string) {
+  switch (coverageState) {
+    case 'green':
+      return $t('sicherplan.dashboardView.calendar.coverageGood');
+    case 'yellow':
+      return $t('sicherplan.dashboardView.calendar.coverageWarn');
+    case 'setup_required':
+      return $t('sicherplan.dashboardView.calendar.coverageSetupRequired');
+    default:
+      return $t('sicherplan.dashboardView.calendar.coverageBad');
+  }
+}
+
+function buildStaffingCoverageRoute(coverageRow: CoverageShiftItem) {
+  const query = new URLSearchParams({
+    date_from: formatDateTimeLocalValue(new Date(coverageRow.starts_at)),
+    date_to: formatDateTimeLocalValue(extendStaffingLookupEnd(coverageRow.ends_at)),
+    planning_record_id: coverageRow.planning_record_id,
+    shift_id: coverageRow.shift_id,
+  });
+  return `/admin/planning-staffing?${query.toString()}`;
+}
+
+function toggleCalendarDay(dayKey: string) {
+  expandedCalendarDays.value = expandedCalendarDays.value.includes(dayKey)
+    ? expandedCalendarDays.value.filter((value) => value !== dayKey)
+    : [...expandedCalendarDays.value, dayKey];
 }
 
 function sortByDateDesc<T>(
@@ -152,6 +263,7 @@ async function loadDashboard(options: { force?: boolean } = {}) {
       ordersResult,
       shiftsResult,
       noticesResult,
+      staffingCoverageResult,
     ] = await Promise.allSettled([
       isPlatformAdmin.value
         ? listTenants(accessToken.value, 'platform_admin')
@@ -174,6 +286,12 @@ async function loadDashboard(options: { force?: boolean } = {}) {
       canLoadTenantData.value
         ? listAdminNotices(tenantScopeId.value, accessToken.value)
         : Promise.resolve([] as NoticeListItem[]),
+      canLoadTenantData.value
+        ? listStaffingCoverage(tenantScopeId.value, accessToken.value, {
+            date_from: formatDateTimeLocalValue(visibleCalendarMonthStart(activeDate.value)),
+            date_to: formatDateTimeLocalValue(visibleCalendarMonthEnd(activeDate.value)),
+          })
+        : Promise.resolve([] as CoverageShiftItem[]),
     ]);
 
     dashboardData.tenants =
@@ -197,6 +315,10 @@ async function loadDashboard(options: { force?: boolean } = {}) {
     dashboardData.notices =
       noticesResult.status === 'fulfilled'
         ? sortByDateDesc(noticesResult.value, (notice) => notice.published_at)
+        : [];
+    dashboardData.staffingCoverage =
+      staffingCoverageResult.status === 'fulfilled'
+        ? staffingCoverageResult.value
         : [];
     lastLoadedDashboardKey.value = loadKey;
   } finally {
@@ -244,20 +366,6 @@ function handleWindowFocus() {
   void recoverSessionAndLoadDashboard();
 }
 
-const topBadges = computed(() =>
-  isPlatformAdmin.value
-    ? [
-        { key: 'Platform Admin', tone: 'success' as const },
-        { key: 'Core Admin', tone: 'default' as const },
-        { key: 'Health Ready', tone: 'warning' as const },
-      ]
-    : [
-        { key: 'Tenant Ops', tone: 'success' as const },
-        { key: 'Planning', tone: 'default' as const },
-        { key: 'Reporting', tone: 'warning' as const },
-      ],
-);
-
 const metricCards = computed(() => {
   const activeTenants = dashboardData.tenants.filter(
     (tenant) => tenant.status === 'active',
@@ -283,13 +391,6 @@ const metricCards = computed(() => {
     },
   ];
 });
-
-const quickActions = computed(() =>
-  buildDashboardQuickActions({
-    isPlatformAdmin: isPlatformAdmin.value,
-    t: $t,
-  }),
-);
 
 const operationsItems = computed(() =>
   isPlatformAdmin.value
@@ -403,16 +504,17 @@ const calendarCells = computed<CalendarCell[]>(() => {
   const firstDay = new Date(year, month, 1);
   const startOffset = (firstDay.getDay() + 6) % 7;
   const startDate = new Date(year, month, 1 - startOffset);
-  const todayKey = new Date().toDateString();
+  const todayKey = buildCalendarDayKey(new Date());
 
   const shiftCountByDay = new Map<string, number>();
+  const calendarItemsByDay = new Map<string, CalendarCellItem[]>();
   dashboardData.shifts.forEach((shift) => {
     const source = getShiftDate(shift);
     if (!source) {
       return;
     }
     const date = new Date(source);
-    const key = date.toDateString();
+    const key = buildCalendarDayKey(date);
     shiftCountByDay.set(key, (shiftCountByDay.get(key) ?? 0) + 1);
   });
 
@@ -423,21 +525,46 @@ const calendarCells = computed<CalendarCell[]>(() => {
       return;
     }
     const date = new Date(source);
-    const key = date.toDateString();
+    const key = buildCalendarDayKey(date);
     orderCountByDay.set(key, (orderCountByDay.get(key) ?? 0) + 1);
+  });
+
+  dashboardData.staffingCoverage.forEach((coverageRow) => {
+    const date = new Date(coverageRow.starts_at);
+    const key = buildCalendarDayKey(date);
+    const resolvedCoverageState = resolvePlanningStaffingCoverageState(
+      coverageRow.coverage_state,
+      coverageRow.demand_groups,
+    );
+    const dayItems = calendarItemsByDay.get(key) ?? [];
+    dayItems.push({
+      coverageState: resolvedCoverageState,
+      key: `coverage:${coverageRow.shift_id}`,
+      label: buildCoverageShiftLabel(coverageRow),
+      route: buildStaffingCoverageRoute(coverageRow),
+      tone: coverageTone(resolvedCoverageState),
+    });
+    calendarItemsByDay.set(key, dayItems);
   });
 
   return Array.from({ length: 35 }, (_, index) => {
     const date = new Date(startDate);
     date.setDate(startDate.getDate() + index);
-    const key = date.toDateString();
+    const key = buildCalendarDayKey(date);
+    const items = calendarItemsByDay.get(key) ?? [];
+    const isExpanded = expandedCalendarDays.value.includes(key);
+    const visibleItems = isExpanded ? items : items.slice(0, 2);
     return {
       date,
       dayLabel: String(date.getDate()),
       inMonth: date.getMonth() === month,
       isToday: key === todayKey,
+      items,
+      key,
+      moreCount: Math.max(items.length - visibleItems.length, 0),
       orderCount: orderCountByDay.get(key) ?? 0,
       shiftCount: shiftCountByDay.get(key) ?? 0,
+      visibleItems,
     };
   });
 });
@@ -488,6 +615,9 @@ function shiftCalendar(direction: 'next' | 'prev') {
   const nextDate = new Date(activeDate.value);
   nextDate.setMonth(nextDate.getMonth() + (direction === 'next' ? 1 : -1));
   activeDate.value = nextDate;
+  if (dashboardBootstrapComplete.value) {
+    void loadDashboard();
+  }
 }
 
 onMounted(() => {
@@ -541,46 +671,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="sp-dashboard">
-    <section class="sp-dashboard__top-row">
-      <Card :bordered="false" class="sp-dashboard__summary-card">
-        <div class="sp-dashboard__summary-head">
-          <div class="sp-dashboard__summary-copy">
-            <p class="sp-dashboard__eyebrow">{{ $t('sicherplan.dashboardView.eyebrow') }}</p>
-            <h1>{{ $t('sicherplan.dashboardView.title') }}</h1>
-            <p>{{ $t('sicherplan.dashboardView.description') }}</p>
-          </div>
-          <div class="sp-dashboard__summary-badges">
-            <Tag
-              v-for="badge in topBadges"
-              :key="badge.key"
-              :color="badge.tone === 'success' ? 'success' : badge.tone === 'warning' ? 'gold' : 'default'"
-              bordered
-            >
-              {{ badge.key }}
-            </Tag>
-          </div>
-        </div>
-      </Card>
-
-      <Card :bordered="false" class="sp-dashboard__action-card">
-        <SectionHeader
-          :description="$t('sicherplan.dashboardView.actions.description')"
-          :title="$t('sicherplan.dashboardView.actions.title')"
-        />
-        <div class="sp-dashboard__action-buttons">
-          <RouterLink
-            v-for="action in quickActions"
-            :key="action.to"
-            :to="action.to"
-          >
-            <Button block :type="action.type">
-              {{ action.label }}
-            </Button>
-          </RouterLink>
-        </div>
-      </Card>
-    </section>
-
     <section class="sp-dashboard__metric-row">
       <Card :bordered="false" class="sp-dashboard__date-card">
         <div class="sp-dashboard__metric-head">
@@ -752,6 +842,34 @@ onBeforeUnmount(() => {
           }"
         >
           <span class="sp-dashboard__calendar-day">{{ cell.dayLabel }}</span>
+          <div
+            v-if="cell.visibleItems.length"
+            class="sp-dashboard__calendar-items"
+          >
+            <RouterLink
+              v-for="item in cell.visibleItems"
+              :key="item.key"
+              :to="item.route"
+              class="sp-dashboard__calendar-item"
+              :class="`sp-dashboard__calendar-item--${item.tone}`"
+              :aria-label="`${buildCoverageStateLabel(item.coverageState)}: ${item.label}`"
+              :title="`${buildCoverageStateLabel(item.coverageState)}: ${item.label}`"
+            >
+              <span
+                aria-hidden="true"
+                class="sp-dashboard__calendar-item-marker"
+              />
+              <span class="sp-dashboard__calendar-item-label">{{ item.label }}</span>
+            </RouterLink>
+            <button
+              v-if="cell.moreCount"
+              type="button"
+              class="sp-dashboard__calendar-more"
+              @click="toggleCalendarDay(cell.key)"
+            >
+              +{{ cell.moreCount }} {{ $t('sicherplan.dashboardView.calendar.more') }}
+            </button>
+          </div>
           <div class="sp-dashboard__calendar-events">
             <span
               v-if="cell.shiftCount"
@@ -790,21 +908,13 @@ onBeforeUnmount(() => {
     var(--sp-page-background);
 }
 
-.sp-dashboard__summary-card,
 .sp-dashboard__date-card,
 .sp-dashboard__metric-card,
-.sp-dashboard__action-card,
 .sp-dashboard__panel-card,
 .sp-dashboard__calendar-card {
   border: 1px solid var(--sp-color-border-soft);
   border-radius: 1.25rem;
   box-shadow: var(--sp-shadow-card);
-}
-
-.sp-dashboard__top-row {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.95fr);
 }
 
 .sp-dashboard__metric-row {
@@ -813,62 +923,16 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(0, 1.15fr) repeat(3, minmax(0, 1fr));
 }
 
-.sp-dashboard__summary-card,
 .sp-dashboard__metric-card,
-.sp-dashboard__action-card,
 .sp-dashboard__panel-card,
 .sp-dashboard__calendar-card {
   background: linear-gradient(180deg, rgb(255 255 255 / 0.96), rgb(255 255 255 / 0.84));
 }
 
-[data-theme='dark'] .sp-dashboard__summary-card,
 [data-theme='dark'] .sp-dashboard__metric-card,
-[data-theme='dark'] .sp-dashboard__action-card,
 [data-theme='dark'] .sp-dashboard__panel-card,
 [data-theme='dark'] .sp-dashboard__calendar-card {
   background: linear-gradient(180deg, rgb(13 24 26 / 0.98), rgb(13 24 26 / 0.9));
-}
-
-.sp-dashboard__summary-card {
-  min-height: 11.5rem;
-  padding: 1.45rem;
-}
-
-.sp-dashboard__summary-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.sp-dashboard__summary-copy h1 {
-  margin: 0;
-  color: var(--sp-color-text-primary);
-  font-size: clamp(1.8rem, 2.6vw, 2.6rem);
-  line-height: 1.06;
-}
-
-.sp-dashboard__summary-copy p:last-child {
-  max-width: 42rem;
-  margin: 0.75rem 0 0;
-  color: var(--sp-color-text-secondary);
-  line-height: 1.6;
-}
-
-.sp-dashboard__eyebrow {
-  margin: 0 0 0.55rem;
-  color: var(--sp-color-primary-strong);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.sp-dashboard__summary-badges {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.5rem;
 }
 
 .sp-dashboard__date-card {
@@ -965,34 +1029,9 @@ onBeforeUnmount(() => {
   box-shadow: none;
 }
 
-.sp-dashboard__action-card,
 .sp-dashboard__panel-card,
 .sp-dashboard__calendar-card {
   padding: 1.25rem;
-}
-
-.sp-dashboard__action-card {
-  display: grid;
-  align-content: start;
-  min-height: 11.5rem;
-}
-
-.sp-dashboard__action-buttons {
-  display: grid;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.sp-dashboard__action-buttons a {
-  display: block;
-}
-
-.sp-dashboard__action-buttons :deep(.ant-btn) {
-  height: 2.6rem;
-  justify-content: flex-start;
-  padding-inline: 1rem;
-  border-radius: 999px;
-  font-weight: 600;
 }
 
 .sp-dashboard__middle-grid {
@@ -1141,6 +1180,93 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
+.sp-dashboard__calendar-items {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.sp-dashboard__calendar-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.8rem;
+  color: inherit;
+  text-decoration: none;
+  background: rgb(246 248 250 / 0.96);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+  border: 1px solid transparent;
+}
+
+.sp-dashboard__calendar-item:hover,
+.sp-dashboard__calendar-item:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgb(40 170 170 / 38%);
+  box-shadow: var(--sp-shadow-card);
+  outline: none;
+}
+
+.sp-dashboard__calendar-item--good {
+  background: rgb(232 248 247 / 0.96);
+}
+
+.sp-dashboard__calendar-item--warn {
+  background: rgb(255 246 223 / 0.98);
+}
+
+.sp-dashboard__calendar-item--bad {
+  background: rgb(252 234 232 / 0.98);
+}
+
+.sp-dashboard__calendar-item-marker {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.78;
+}
+
+.sp-dashboard__calendar-item--good .sp-dashboard__calendar-item-marker {
+  color: rgb(17 119 119);
+}
+
+.sp-dashboard__calendar-item--warn .sp-dashboard__calendar-item-marker {
+  color: rgb(149 97 18);
+}
+
+.sp-dashboard__calendar-item--bad .sp-dashboard__calendar-item-marker {
+  color: rgb(172 54 41);
+}
+
+.sp-dashboard__calendar-item-label {
+  color: var(--sp-color-text-primary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.35;
+  min-width: 0;
+}
+
+.sp-dashboard__calendar-more {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--sp-color-primary-strong);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sp-dashboard__calendar-more:hover,
+.sp-dashboard__calendar-more:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
 .sp-dashboard__calendar-events {
   display: grid;
   gap: 0.45rem;
@@ -1177,11 +1303,35 @@ onBeforeUnmount(() => {
   color: rgb(255 214 117);
 }
 
-@media (max-width: 1280px) {
-  .sp-dashboard__top-row {
-    grid-template-columns: 1fr;
-  }
+[data-theme='dark'] .sp-dashboard__calendar-item {
+  background: rgb(24 33 35 / 0.96);
+}
 
+[data-theme='dark'] .sp-dashboard__calendar-item--good {
+  background: rgb(14 42 43 / 0.98);
+}
+
+[data-theme='dark'] .sp-dashboard__calendar-item--warn {
+  background: rgb(56 43 18 / 0.98);
+}
+
+[data-theme='dark'] .sp-dashboard__calendar-item--bad {
+  background: rgb(70 29 26 / 0.98);
+}
+
+[data-theme='dark'] .sp-dashboard__calendar-item--good .sp-dashboard__calendar-item-marker {
+  color: rgb(126 225 225);
+}
+
+[data-theme='dark'] .sp-dashboard__calendar-item--warn .sp-dashboard__calendar-item-marker {
+  color: rgb(255 214 117);
+}
+
+[data-theme='dark'] .sp-dashboard__calendar-item--bad .sp-dashboard__calendar-item-marker {
+  color: rgb(255 151 136);
+}
+
+@media (max-width: 1280px) {
   .sp-dashboard__metric-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1196,14 +1346,9 @@ onBeforeUnmount(() => {
     padding: 1rem;
   }
 
-  .sp-dashboard__summary-head,
   .sp-dashboard__calendar-topline {
     display: grid;
     grid-template-columns: 1fr;
-  }
-
-  .sp-dashboard__summary-badges {
-    justify-content: flex-start;
   }
 
   .sp-dashboard__metric-row,

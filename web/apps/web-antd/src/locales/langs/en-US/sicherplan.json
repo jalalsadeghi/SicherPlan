@@ -309,6 +309,13 @@
       "next": "Next",
       "openPlanning": "Shift planning",
       "monthHint": "Shifts and order dates are aggregated per calendar day.",
+      "coverageGood": "Coverage good",
+      "coverageWarn": "Coverage warning",
+      "coverageBad": "Coverage blocked",
+      "coverageSetupRequired": "Coverage setup required",
+      "itemTypeOrder": "Order",
+      "itemTypeShift": "Shift",
+      "more": "more",
       "shiftShort": "shift",
       "orderShort": "order"
     },

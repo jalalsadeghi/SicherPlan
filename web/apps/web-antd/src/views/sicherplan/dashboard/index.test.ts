@@ -31,6 +31,42 @@ const mockState = vi.hoisted(() => ({
       service_to: null,
     },
   ]),
+  listStaffingCoverageMock: vi.fn(async () => [
+    {
+      shift_id: 'shift-1',
+      planning_record_id: 'planning-1',
+      shift_plan_id: 'plan-1',
+      order_id: 'order-1',
+      order_no: 'ORD-1',
+      planning_record_name: 'Planning 1',
+      planning_mode_code: 'site',
+      workforce_scope_code: 'internal',
+      starts_at: '2026-04-14T08:00:00Z',
+      ends_at: '2026-04-14T16:00:00Z',
+      shift_type_code: 'site_day',
+      location_text: 'Berlin',
+      meeting_point: 'Gate A',
+      min_required_qty: 1,
+      target_required_qty: 2,
+      assigned_count: 1,
+      confirmed_count: 1,
+      released_partner_qty: 0,
+      coverage_state: 'yellow',
+      demand_groups: [
+        {
+          demand_group_id: 'dg-1',
+          function_type_id: 'func-1',
+          qualification_type_id: null,
+          min_qty: 1,
+          target_qty: 2,
+          assigned_count: 1,
+          confirmed_count: 1,
+          released_partner_qty: 0,
+          coverage_state: 'yellow',
+        },
+      ],
+    },
+  ]),
   listShiftsMock: vi.fn(async () => []),
   listSubcontractorsMock: vi.fn(async () => []),
 }));
@@ -62,6 +98,7 @@ const {
   listCustomerOrdersMock,
   listCustomersMock,
   listEmployeesMock,
+  listStaffingCoverageMock,
   listShiftsMock,
   listSubcontractorsMock,
   listTenantsMock,
@@ -106,6 +143,24 @@ vi.mock('#/sicherplan-legacy/api/planningOrders', () => ({
 
 vi.mock('#/sicherplan-legacy/api/planningShifts', () => ({
   listShifts: listShiftsMock,
+}));
+
+vi.mock('#/sicherplan-legacy/api/planningStaffing', () => ({
+  listStaffingCoverage: listStaffingCoverageMock,
+}));
+
+vi.mock('#/sicherplan-legacy/features/planning/planningStaffing.helpers', () => ({
+  coverageTone: (state: string) => {
+    if (state === 'green') return 'good';
+    if (state === 'yellow') return 'warn';
+    return 'bad';
+  },
+  resolvePlanningStaffingCoverageState: (state: string, demandGroups: unknown[]) => {
+    if (!Array.isArray(demandGroups) || demandGroups.length === 0) {
+      return 'setup_required';
+    }
+    return state;
+  },
 }));
 
 vi.mock('#/sicherplan-legacy/api/subcontractors', () => ({
@@ -181,13 +236,24 @@ async function mountView() {
         RouterLink: defineComponent({
           name: 'RouterLinkStub',
           props: { to: { type: String, required: true } },
-          setup(_, { slots }) {
-            return () => h('a', {}, slots.default?.());
+          setup(props, { slots }) {
+            return () =>
+              h('a', { 'data-to': props.to }, slots.default?.());
           },
         }),
       },
     },
   });
+}
+
+function formatExpectedLocalDateTime(value: string) {
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
 describe('SicherPlan dashboard session loading', () => {
@@ -209,6 +275,7 @@ describe('SicherPlan dashboard session loading', () => {
     listEmployeesMock.mockClear();
     listAdminNoticesMock.mockClear();
     listCustomerOrdersMock.mockClear();
+    listStaffingCoverageMock.mockClear();
     listShiftsMock.mockClear();
     listSubcontractorsMock.mockClear();
   });
@@ -233,7 +300,10 @@ describe('SicherPlan dashboard session loading', () => {
     expect(listCustomersMock).toHaveBeenCalledTimes(1);
     expect(listCustomersMock).toHaveBeenCalledWith('tenant-1', 'token-1', {});
     expect(listCustomerOrdersMock).toHaveBeenCalledTimes(1);
+    expect(listStaffingCoverageMock).toHaveBeenCalledTimes(1);
     expect(wrapper.text()).toContain('Order Alpha');
+    expect(wrapper.text()).not.toContain('sicherplan.dashboardView.title');
+    expect(wrapper.text()).not.toContain('sicherplan.dashboardView.actions.title');
   });
 
   it('loads immediately on first mount when a persisted tenant session already exists', async () => {
@@ -248,7 +318,157 @@ describe('SicherPlan dashboard session loading', () => {
     expect(listEmployeesMock).toHaveBeenCalledTimes(1);
     expect(listSubcontractorsMock).toHaveBeenCalledTimes(1);
     expect(listCustomerOrdersMock).toHaveBeenCalledTimes(1);
+    expect(listStaffingCoverageMock).toHaveBeenCalledTimes(1);
     expect(wrapper.text()).toContain('Order Alpha');
-    expect(wrapper.text()).toContain('sicherplan.dashboardView.actions.title');
+    expect(wrapper.text()).toContain('sicherplan.dashboardView.todayCard.label');
+    expect(wrapper.text()).not.toContain('sicherplan.dashboardView.title');
+    expect(wrapper.text()).not.toContain('sicherplan.dashboardView.actions.title');
+  });
+
+  it('renders real staffing coverage items with coverage tones and expands remaining items on demand', async () => {
+    legacyAuthStoreState.effectiveAccessToken = 'token-1';
+    legacyAuthStoreState.tenantScopeId = 'tenant-1';
+    legacyAuthStoreState.sessionUser = { tenant_id: 'tenant-1' };
+    listCustomerOrdersMock.mockResolvedValueOnce([
+      {
+        id: 'order-1',
+        tenant_id: 'tenant-1',
+        customer_id: 'customer-1',
+        requirement_type_id: 'req-1',
+        patrol_route_id: null,
+        order_no: 'ORD-1',
+        title: 'Objekt Süd',
+        service_category_code: 'object_security',
+        service_from: '2026-04-14',
+        service_to: '2026-04-14',
+        release_state: 'draft',
+        released_at: null,
+        status: 'active',
+        version_no: 1,
+      },
+    ] as any);
+    listShiftsMock.mockResolvedValueOnce([
+      {
+        id: 'shift-1',
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: null,
+        occurrence_date: '2026-04-14',
+        starts_at: '2026-04-14T08:00:00Z',
+        ends_at: '2026-04-14T16:00:00Z',
+        break_minutes: 30,
+        shift_type_code: 'day_shift',
+        location_text: null,
+        meeting_point: null,
+        release_state: 'released',
+        customer_visible_flag: true,
+        subcontractor_visible_flag: true,
+        stealth_mode_flag: false,
+        source_kind_code: 'manual',
+        status: 'active',
+        version_no: 1,
+      },
+    ] as any);
+    listStaffingCoverageMock.mockResolvedValueOnce([
+      {
+        shift_id: 'shift-1',
+        planning_record_id: 'planning-1',
+        shift_plan_id: 'plan-1',
+        order_id: 'order-1',
+        order_no: 'ORD-1',
+        planning_record_name: 'Objekt Süd',
+        planning_mode_code: 'site',
+        workforce_scope_code: 'internal',
+        starts_at: '2026-04-14T08:00:00Z',
+        ends_at: '2026-04-14T16:00:00Z',
+        shift_type_code: 'day_shift',
+        location_text: 'Berlin',
+        meeting_point: 'Gate A',
+        min_required_qty: 1,
+        target_required_qty: 2,
+        assigned_count: 2,
+        confirmed_count: 2,
+        released_partner_qty: 0,
+        coverage_state: 'green',
+        demand_groups: [{ demand_group_id: 'dg-1' }],
+      },
+      {
+        shift_id: 'shift-2',
+        planning_record_id: 'planning-1',
+        shift_plan_id: 'plan-2',
+        order_id: 'order-1',
+        order_no: 'ORD-1',
+        planning_record_name: 'Messe Nord',
+        planning_mode_code: 'site',
+        workforce_scope_code: 'internal',
+        starts_at: '2026-04-14T17:00:00Z',
+        ends_at: '2026-04-14T22:00:00Z',
+        shift_type_code: 'night_shift',
+        location_text: 'Berlin',
+        meeting_point: 'Gate B',
+        min_required_qty: 1,
+        target_required_qty: 2,
+        assigned_count: 1,
+        confirmed_count: 0,
+        released_partner_qty: 0,
+        coverage_state: 'yellow',
+        demand_groups: [{ demand_group_id: 'dg-2' }],
+      },
+      {
+        shift_id: 'shift-3',
+        planning_record_id: 'planning-1',
+        shift_plan_id: 'plan-3',
+        order_id: 'order-1',
+        order_no: 'ORD-1',
+        planning_record_name: 'Patrol West',
+        planning_mode_code: 'site',
+        workforce_scope_code: 'internal',
+        starts_at: '2026-04-14T20:00:00Z',
+        ends_at: '2026-04-14T21:00:00Z',
+        shift_type_code: 'patrol_shift',
+        location_text: 'Berlin',
+        meeting_point: 'Gate C',
+        min_required_qty: 1,
+        target_required_qty: 1,
+        assigned_count: 0,
+        confirmed_count: 0,
+        released_partner_qty: 0,
+        coverage_state: 'red',
+        demand_groups: [],
+      },
+    ] as any);
+
+    wrapper = await mountView();
+    await flushPromises();
+
+    const initialCalendarLinks = wrapper.findAll('.sp-dashboard__calendar-item');
+    expect(initialCalendarLinks).toHaveLength(2);
+    expect(initialCalendarLinks[0]?.text()).toContain('Day Shift');
+    expect(initialCalendarLinks[0]?.attributes('class')).toContain('sp-dashboard__calendar-item--good');
+    expect(initialCalendarLinks[0]?.attributes('data-to')).toContain('/admin/planning-staffing?');
+    expect(initialCalendarLinks[0]?.attributes('data-to')).toContain('shift_id=shift-1');
+    const firstItemQuery = new URLSearchParams(initialCalendarLinks[0]?.attributes('data-to')?.split('?')[1] ?? '');
+    expect(firstItemQuery.get('date_from')).toBe(formatExpectedLocalDateTime('2026-04-14T08:00:00Z'));
+    expect(firstItemQuery.get('date_to')).toBe(formatExpectedLocalDateTime('2026-04-15T16:00:00Z'));
+    expect(initialCalendarLinks[0]?.attributes('aria-label')).toContain('sicherplan.dashboardView.calendar.coverageGood:');
+    expect(initialCalendarLinks[0]?.find('.sp-dashboard__calendar-item-marker').exists()).toBe(true);
+    expect(initialCalendarLinks[1]?.text()).toContain('Night Shift');
+    expect(initialCalendarLinks[1]?.attributes('class')).toContain('sp-dashboard__calendar-item--warn');
+    expect(initialCalendarLinks[1]?.attributes('data-to')).toContain('shift_id=shift-2');
+    expect(initialCalendarLinks[1]?.attributes('aria-label')).toContain('sicherplan.dashboardView.calendar.coverageWarn:');
+
+    const moreButton = wrapper.get('.sp-dashboard__calendar-more');
+    expect(moreButton.text()).toContain('+1 sicherplan.dashboardView.calendar.more');
+
+    await moreButton.trigger('click');
+
+    const expandedCalendarLinks = wrapper.findAll('.sp-dashboard__calendar-item');
+    expect(expandedCalendarLinks).toHaveLength(3);
+    expect(expandedCalendarLinks[2]?.text()).toContain('Patrol Shift');
+    expect(expandedCalendarLinks[2]?.attributes('class')).toContain('sp-dashboard__calendar-item--bad');
+    expect(expandedCalendarLinks[2]?.attributes('aria-label')).toContain('sicherplan.dashboardView.calendar.coverageSetupRequired:');
+    expect(expandedCalendarLinks[2]?.attributes('data-to')).toContain('shift_id=shift-3');
+    const thirdItemQuery = new URLSearchParams(expandedCalendarLinks[2]?.attributes('data-to')?.split('?')[1] ?? '');
+    expect(thirdItemQuery.get('date_to')).toBe(formatExpectedLocalDateTime('2026-04-15T21:00:00Z'));
   });
 });

@@ -1148,6 +1148,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { Modal, Select } from "ant-design-vue";
 
 import { useAuthStore as usePrimaryAuthStore } from "#/store";
@@ -1252,6 +1253,7 @@ const RULE_TEXT_MAP = {
 const primaryAuthStore = usePrimaryAuthStore();
 const authStore = useAuthStore();
 const localeStore = useLocaleStore();
+const route = useRoute();
 
 const currentLocale = computed<"de" | "en">(() => (localeStore.locale === "en" ? "en" : "de"));
 const role = computed(() => authStore.effectiveRole || "tenant_admin");
@@ -1365,6 +1367,40 @@ const teamMemberDraft = reactive({
 
 function tp(key: keyof typeof planningStaffingMessages.de) {
   return planningStaffingMessages[currentLocale.value][key] ?? planningStaffingMessages.de[key] ?? key;
+}
+
+function routeQueryValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return typeof value[0] === "string" ? value[0] : "";
+  }
+  return typeof value === "string" ? value : "";
+}
+
+function applyRouteQueryContext(query = route.query) {
+  let changed = false;
+  const nextDateFrom = routeQueryValue(query.date_from);
+  const nextDateTo = routeQueryValue(query.date_to);
+  const nextPlanningRecordId = routeQueryValue(query.planning_record_id);
+  const nextShiftId = routeQueryValue(query.shift_id);
+
+  if (nextDateFrom && filters.date_from !== nextDateFrom) {
+    filters.date_from = nextDateFrom;
+    changed = true;
+  }
+  if (nextDateTo && filters.date_to !== nextDateTo) {
+    filters.date_to = nextDateTo;
+    changed = true;
+  }
+  if (nextPlanningRecordId && filters.planning_record_id !== nextPlanningRecordId) {
+    filters.planning_record_id = nextPlanningRecordId;
+    changed = true;
+  }
+  if (nextShiftId && selectedShiftId.value !== nextShiftId) {
+    selectedShiftId.value = nextShiftId;
+    changed = true;
+  }
+
+  return changed;
 }
 
 const shiftDetailTabs = [
@@ -2606,6 +2642,7 @@ watch(
 );
 
 onMounted(async () => {
+  applyRouteQueryContext();
   authStore.syncFromPrimarySession();
   const sessionReady = await ensureStaffingSessionReady();
   if (!sessionReady || !tenantScopeId.value || !accessToken.value || !actionState.value.canReadCoverage) {
@@ -2616,6 +2653,17 @@ onMounted(async () => {
   await loadDemandGroupCatalogOptions();
   await refreshAll();
 });
+
+watch(
+  () => route.fullPath,
+  () => {
+    const changed = applyRouteQueryContext();
+    if (!changed || !tenantScopeId.value || !accessToken.value || !actionState.value.canReadCoverage) {
+      return;
+    }
+    void refreshAll();
+  },
+);
 
 onBeforeUnmount(() => {
   if (planningRecordLookupTimer) {

@@ -10,6 +10,11 @@ const sessionState = vi.hoisted(() => ({
   tenantId: "tenant-1",
 }));
 
+const routeState = {
+  fullPath: "/admin/planning-staffing",
+  query: {} as Record<string, unknown>,
+};
+
 const mocks = vi.hoisted(() => ({
   assignStaffingMock: vi.fn(async () => ({
     tenant_id: "tenant-1",
@@ -472,6 +477,10 @@ vi.mock("@/stores/locale", () => ({
   }),
 }));
 
+vi.mock("vue-router", () => ({
+  useRoute: () => routeState,
+}));
+
 vi.mock("@/api/planningStaffing", () => ({
   assignStaffing: mocks.assignStaffingMock,
   createAssignment: mocks.createAssignmentMock,
@@ -568,6 +577,8 @@ describe("PlanningStaffingCoverageView", () => {
     sessionState.role = "dispatcher";
     sessionState.tenantId = "tenant-1";
     sessionState.accessToken = "token-1";
+    routeState.fullPath = "/admin/planning-staffing";
+    routeState.query = {};
     for (const mock of Object.values(mocks)) {
       mock.mockClear();
     }
@@ -699,6 +710,31 @@ describe("PlanningStaffingCoverageView", () => {
     expect(mocks.listStaffingCoverageMock).toHaveBeenCalledWith("tenant-1", "token-1", expect.any(Object));
     expect(mocks.listFunctionTypesMock).toHaveBeenCalledWith("tenant-1", "token-1");
     expect(mocks.listQualificationTypesMock).toHaveBeenCalledWith("tenant-1", "token-1");
+  });
+
+  it("hydrates staffing filters and selected shift from route query context", async () => {
+    routeState.fullPath = "/admin/planning-staffing?date_from=2026-04-14T08:00&date_to=2026-04-14T16:00&planning_record_id=planning-1&shift_id=shift-1";
+    routeState.query = {
+      date_from: "2026-04-14T08:00",
+      date_to: "2026-04-14T16:00",
+      planning_record_id: "planning-1",
+      shift_id: "shift-1",
+    };
+
+    const wrapper = await mountView();
+
+    expect(mocks.listStaffingCoverageMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({
+        date_from: "2026-04-14T08:00",
+        date_to: "2026-04-14T16:00",
+        planning_record_id: "planning-1",
+      }),
+    );
+    expect((wrapper.find('input[type="datetime-local"]').element as HTMLInputElement).value).toBe("2026-04-14T08:00");
+    expect(wrapper.text()).toContain("Planning 1");
+    expect(wrapper.text()).toContain("ORD-1 · site_day");
   });
 
   it("hides the staffing workspace behind permission gating for controller_qm", async () => {
