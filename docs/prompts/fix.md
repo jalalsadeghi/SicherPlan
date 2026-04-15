@@ -1,126 +1,148 @@
 You are working in the public repo `jalalsadeghi/SicherPlan`.
 
 Important working-mode rule:
-Treat the current working tree as the source of truth. Do NOT revert unrelated planning-staffing work. Apply only a focused fix for assignment-creation state handling in `/admin/planning-staffing`.
+Treat the current working tree as the source of truth.
+The user’s live staffing page already has an assignment modal flow and recent loading-overlay work.
+Do NOT revert that work.
+Your task is to reduce the latency of create/edit assignment operations as much as safely possible, by eliminating unnecessary frontend waiting and redundant requests.
 
 Task:
-Fix the `Create assignment` flow in `admin/planning-staffing` so the assignment creation modal/form no longer resets unexpectedly while the user is filling it in.
+Optimize `/admin/planning-staffing` assignment interactions so that:
+1. opening an existing assignment for edit is much faster
+2. creating/saving/updating/removing assignments feels significantly faster
+3. the UI still stays correct and consistent
 
-Observed bug:
-When the user opens `Create assignment`, the modal opens correctly.
-But while filling fields, the form suddenly resets and the user must enter the values again.
-This may repeat multiple times, especially when the shift already has one or more existing assignments.
+Observed UX problem:
+Assignment actions in Staffing Coverage feel too slow:
+- clicking an existing assignment takes too long before edit is ready
+- saving assignment takes too long
+- repeated assignment operations make the page feel heavy and frustrating
 
-Likely root cause to inspect first:
-In the current implementation, the create-assignment draft is still coupled to:
-- `selectedAssignmentId`
-- assignment auto-selection from the assignments list
-- background refresh/watcher logic that repopulates or resets the draft
+Key objective:
+Reduce real waiting time, not just show more spinners.
+Loading feedback is useful, but the main goal is to remove unnecessary work and reduce total round-trips.
 
-Current areas to inspect first:
+What to inspect first:
 1. `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
-   Especially inspect:
-   - `startCreateAssignment()`
-   - `loadSelectedShiftDetails()`
-   - `loadSelectedAssignmentDetails()`
-   - `resetAssignmentDraft()`
-   - `resetAssignmentEditor()`
-   - watcher on `selectedAssignmentId`
-   - watcher on `selectedBoardShift`
-2. `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.smoke.test.ts`
+2. `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
+3. `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.smoke.test.ts`
 
-What is probably happening:
-- create mode clears `selectedAssignmentId`
-- later, detail-loading logic auto-selects the first existing assignment
-- assignment detail loading then repopulates the modal draft from that old assignment
-- selected-board-shift watcher may also reset the draft again when selection is empty
-This causes the create form to lose user-entered values
+Before coding, explicitly map the current request flow for these two scenarios:
+A. clicking an existing assignment row to edit it
+B. clicking Save assignment in create/edit mode
 
-Required behavior after the fix:
-1. Opening `Create assignment` must create a stable draft for create mode
-2. While the create dialog is open, user-entered values must NOT be overwritten by:
-   - background refresh
-   - assignment auto-selection
-   - selected-assignment watcher
-   - selected-board-shift watcher
-3. Existing assignment rows must still open edit mode correctly when the user clicks them
-4. Edit mode may still repopulate from the selected assignment
-5. Create mode must remain independent from existing assignment selection
+You must identify:
+- which requests fire
+- which ones are duplicated
+- which ones are unnecessarily global/heavy
+- which ones can be delayed, skipped, cached, or narrowed
 
-Important design rule:
-Create-mode draft must be isolated from list-selection side effects.
+Known likely issues to validate:
+1. Opening edit mode may fetch assignment-related data more than once because:
+   - explicit edit-opening logic loads details
+   - watcher-based selection logic may load again
+2. Save/create/update may currently trigger a broad `refreshAll()` that refetches much more than assignment flow actually needs
+3. Supporting data such as employees / teams / team members may be getting reloaded even though assignment save does not require them to be refetched
+4. Shift outputs and release validations may be loaded eagerly even when the user is not on those tabs
 
-Recommended implementation direction:
-1. Inspect the current logic that auto-selects the first assignment in `loadSelectedShiftDetails()`
-2. Remove that auto-selection behavior if it still exists
-3. Decouple create-mode draft from `selectedAssignmentId`
-4. Guard watcher-driven draft mutations:
-   - while `assignmentDialogOpen === true` and `assignmentDialogMode === "create"`,
-     do NOT:
-     - auto-populate from an existing assignment
-     - call `resetAssignmentDraft()` because list/board state changed
-5. Make `resetAssignmentEditor()` mode-aware:
-   - in create mode: reset to clean create defaults
-   - in edit mode: restore the selected assignment details
-6. If current code keeps an outside row selection for the list, that is fine,
-   but it must not mutate the create modal draft
-7. If modal-only validation summary / selected-assignment UI currently depends on `selectedAssignmentId`,
-   make sure create mode does not show stale edit-mode state
+Optimization goals:
+1. Open edit modal immediately (or near-immediately), without waiting for all detail requests first
+2. Eliminate duplicate assignment-detail fetches
+3. Replace broad post-save refresh with a targeted refresh strategy
+4. Avoid refetching supporting catalogs/lists unnecessarily
+5. Lazy-load or defer data that is not needed for the active tab
+6. Keep correctness after create/update/remove/substitute
 
-Preferred architectural outcome:
-- user list selection state
-- edit-mode source assignment state
-- create-mode form draft
-must not be treated as the same thing
+Preferred implementation strategy:
+A. Make edit-open fast
+- Do not block modal open on full assignment-detail loading
+- Open modal immediately using the data already available from the selected board assignment where possible
+- Load richer assignment details/validations/overrides in the background if still needed
+- Show modal-local loading state while those details hydrate
 
-If needed, introduce a small dedicated editor-state variable, for example:
-- `assignmentEditorSourceId`
-or equivalent,
-instead of reusing `selectedAssignmentId` for both list selection and create-form lifecycle.
+B. Eliminate duplicate assignment-detail requests
+- Inspect whether `selectedAssignmentId` watcher duplicates explicit detail loading
+- Ensure assignment detail/validation/override fetch happens once per edit-open action
+- Add in-flight deduplication if needed
+
+C. Replace `refreshAll()` after assignment mutations
+- Do NOT use a global full refresh for every create/update/remove if a narrower refresh can do the job
+- Prefer a targeted refresh helper such as:
+  - refresh current shift only
+  - refresh current assignment only
+  - refresh validations only when required
+- If the backend supports filtering `listStaffingCoverage` / `listStaffingBoard` by `shift_id`, use that to narrow the refresh
+- If not, patch local state optimistically from the returned `createAssignment` / `updateAssignment` payload and then do a minimal background reconciliation
+
+D. Do not reload unrelated supporting data on every assignment action
+- `refreshSupportingData()` or equivalent should not run after every assignment create/edit unless the assignment action truly invalidates that data
+- Teams, team members, employees, subcontractor workers, releases, demand groups should only be refreshed when actually necessary
+
+E. Lazy-load non-critical side data
+- Do not reload `listShiftOutputs(...)` on assignment actions unless outputs are actually needed
+- Do not reload shift release validations eagerly unless:
+  - the active tab needs them
+  - or assignment mutation requires them for visible state
+- Keep assignment validations/overrides targeted to the currently edited/selected assignment
+
+F. Add caching where safe
+- Cache assignment details / validations / overrides per assignment id when safe
+- Invalidate or refresh that cache after mutation
+- Do not cache in a way that creates stale incorrect UI
+
+Important correctness constraints:
+- Do not break create mode
+- Do not break edit mode
+- Do not break remove/unassign/substitute
+- Do not break validation visibility where required
+- Do not silently hide backend validation failures
+- Keep selected-assignment behavior user-driven and stable
+
+Performance validation requirements:
+Before and after the fix, explicitly compare the request graph for:
+1. edit existing assignment
+2. save assignment
+
+You must state:
+- request count before
+- request count after
+- which requests were removed, deduplicated, deferred, or narrowed
 
 Testing requirements:
-Update/add tests in:
+Update/add focused tests in:
 `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.smoke.test.ts`
 
-At minimum cover these cases:
-1. opening `Create assignment` with existing assignments present does NOT prefill from an old assignment
-2. while create modal is open, background list/detail refresh does NOT reset user-entered form values
-3. clicking an assignment row still opens edit mode with populated values
-4. create-mode reset button restores create defaults, not old assignment data
-5. canceling create mode closes safely without altering unrelated list state
-6. if the previous tests assumed auto-selected assignment rows, update them to the new intended behavior
+At minimum verify:
+1. clicking an existing assignment no longer triggers duplicate assignment-detail loads
+2. edit modal can open before all detail fetches finish (if that is the chosen solution)
+3. saving assignment no longer causes unrelated supporting-data reloads
+4. assignment save uses targeted refresh or local patching instead of broad refreshAll where appropriate
+5. assignment create/edit/remove still leave the UI correct
+6. request-related mocks show fewer unnecessary calls than before
 
-Suggested regression scenario:
-- mount the view with one existing assignment already in the shift
-- open `Create assignment`
-- type/select multiple fields:
-  - demand_group_id
-  - team_id
-  - member_ref
-  - assignment_status_code
-  - assignment_source_code
-  - offered_at
-  - confirmed_at
-  - remarks
-- trigger whatever refresh path currently causes the reset
-- assert the entered values remain intact in create mode
+Good concrete assertions to add if safe:
+- `getAssignment` / `getAssignmentValidations` / `listAssignmentValidationOverrides` are not called twice for one edit-open click
+- `listEmployees`, `listTeamMembers`, `listShiftOutputs` are not reloaded on every assignment save unless truly necessary
+- assignment list and selected shift state remain correct after mutation
 
 Acceptance criteria:
-- Create assignment form no longer resets unexpectedly
-- Existing assignments no longer overwrite create-mode draft
-- Edit flow still works from list row click
-- Tests cover the regression
+- Edit assignment opens significantly faster
+- Save/create/update/remove assignment feel significantly faster
+- Duplicate and unnecessary requests are removed
+- The user-visible result remains correct
+- Tests cover the optimization and regression risk
 
 At the end, provide a concise validation report with these headings:
 1. Root cause found
-2. Which files were changed
-3. How create-mode draft was isolated
-4. What watcher / refresh behavior was guarded
-5. How edit mode still works
+2. Before/after request flow for edit-open
+3. Before/after request flow for save
+4. Which requests were removed or narrowed
+5. Which files were changed
 6. Which tests were updated or added
-7. Any remaining edge cases to verify manually
+7. Any remaining bottleneck that appears to be backend-side rather than frontend-side
 
-Before coding, explicitly identify:
-- the exact block that auto-selects the first assignment
-- the exact watcher(s) that can reset or repopulate the draft during create mode
-Then implement the safest fix without broad refactoring.
+Before coding, explicitly answer:
+- Which assignment requests are currently duplicated?
+- Which post-save requests are global but do not need to be?
+- Can current APIs be narrowed by `shift_id`, or is local patching the safer route?
+Then implement the safest high-impact optimization.

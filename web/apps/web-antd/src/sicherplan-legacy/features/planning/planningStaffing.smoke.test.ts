@@ -4,6 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent } from "vue";
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, reject, resolve };
+}
+
 const sessionState = vi.hoisted(() => ({
   accessToken: "token-1",
   role: "dispatcher",
@@ -23,7 +33,25 @@ const mocks = vi.hoisted(() => ({
     outcome_code: "assigned",
     validation_codes: [],
     conflict_code: null,
-    assignment: null,
+    assignment: {
+      id: "assignment-new",
+      tenant_id: "tenant-1",
+      shift_id: "shift-1",
+      demand_group_id: "dg-1",
+      team_id: "team-1",
+      employee_id: "employee-1",
+      subcontractor_worker_id: null,
+      assignment_status_code: "assigned",
+      assignment_source_code: "dispatcher",
+      offered_at: null,
+      confirmed_at: null,
+      remarks: null,
+      status: "active",
+      version_no: 1,
+      created_at: "2026-04-05T08:00:00Z",
+      updated_at: "2026-04-05T08:00:00Z",
+      archived_at: null,
+    },
   })),
   createAssignmentMock: vi.fn(async (_tenantId, _token, payload) => ({
     id: "assignment-created",
@@ -381,7 +409,25 @@ const mocks = vi.hoisted(() => ({
     outcome_code: "substituted",
     validation_codes: [],
     conflict_code: null,
-    assignment: null,
+    assignment: {
+      id: "assignment-sub",
+      tenant_id: "tenant-1",
+      shift_id: "shift-1",
+      demand_group_id: "dg-1",
+      team_id: "team-1",
+      employee_id: "employee-1",
+      subcontractor_worker_id: null,
+      assignment_status_code: "assigned",
+      assignment_source_code: "dispatcher",
+      offered_at: null,
+      confirmed_at: null,
+      remarks: null,
+      status: "active",
+      version_no: 1,
+      created_at: "2026-04-05T08:00:00Z",
+      updated_at: "2026-04-05T08:00:00Z",
+      archived_at: null,
+    },
   })),
   updateDemandGroupMock: vi.fn(async () => ({
     id: "dg-1",
@@ -538,6 +584,29 @@ vi.mock("@/api/employeeAdmin", () => ({
 
 vi.mock("@/api/subcontractors", () => ({
   listSubcontractorWorkers: mocks.listSubcontractorWorkersMock,
+}));
+
+vi.mock("@/components/SicherPlanLoadingOverlay.vue", () => ({
+  default: defineComponent({
+    name: "SicherPlanLoadingOverlayStub",
+    props: {
+      ariaLabel: { type: String, default: "" },
+      busy: { type: Boolean, default: false },
+      busyTestid: { type: String, default: "sicherplan-loading-overlay" },
+      text: { type: String, default: "" },
+    },
+    template: `
+      <div
+        class="loading-overlay-stub"
+        :data-testid="busyTestid"
+        :data-busy="busy ? 'true' : 'false'"
+        :aria-label="ariaLabel || text"
+      >
+        <span class="loading-overlay-stub__text">{{ text }}</span>
+        <slot />
+      </div>
+    `,
+  }),
 }));
 
 vi.mock("ant-design-vue", async () => {
@@ -700,6 +769,7 @@ describe("PlanningStaffingCoverageView", () => {
     const firstPanel = wrapper.findAll(".planning-staffing-panel")[0];
 
     expect(wrapper.find('[data-testid="planning-staffing-workspace"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-staffing-workspace-loading-overlay"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="planning-staffing-planning-record-select"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="planning-staffing-refresh"]').exists()).toBe(true);
     expect(wrapper.text()).toContain("Filter und Scope");
@@ -719,6 +789,109 @@ describe("PlanningStaffingCoverageView", () => {
     expect(mocks.listStaffingCoverageMock).toHaveBeenCalledWith("tenant-1", "token-1", expect.any(Object));
     expect(mocks.listFunctionTypesMock).toHaveBeenCalledWith("tenant-1", "token-1");
     expect(mocks.listQualificationTypesMock).toHaveBeenCalledWith("tenant-1", "token-1");
+  });
+
+  it("shows the shared workspace overlay during a blocking staffing refresh and clears it afterwards", async () => {
+    const wrapper = await mountView();
+    const coverageDeferred = createDeferred<any[]>();
+    const boardDeferred = createDeferred<any[]>();
+    mocks.listStaffingCoverageMock.mockImplementationOnce(() => coverageDeferred.promise);
+    mocks.listStaffingBoardMock.mockImplementationOnce(() => boardDeferred.promise);
+
+    await wrapper.get('[data-testid="planning-staffing-refresh"]').trigger("click");
+    await Promise.resolve();
+
+    const overlay = wrapper.get('[data-testid="planning-staffing-workspace-loading-overlay"]');
+    expect(overlay.attributes("data-busy")).toBe("true");
+    expect(overlay.text()).toContain("Staffing-Arbeitsbereich wird geladen.");
+
+    coverageDeferred.resolve([
+      {
+        shift_id: "shift-1",
+        planning_record_id: "planning-1",
+        shift_plan_id: "plan-1",
+        order_id: "order-1",
+        order_no: "ORD-1",
+        planning_record_name: "Planning 1",
+        planning_mode_code: "site",
+        workforce_scope_code: "internal",
+        starts_at: "2026-04-05T08:00:00Z",
+        ends_at: "2026-04-05T16:00:00Z",
+        shift_type_code: "site_day",
+        location_text: "Berlin",
+        meeting_point: "Gate A",
+        min_required_qty: 1,
+        target_required_qty: 2,
+        assigned_count: 1,
+        confirmed_count: 1,
+        released_partner_qty: 0,
+        coverage_state: "yellow",
+        demand_groups: [
+          {
+            demand_group_id: "dg-1",
+            function_type_id: "func-1",
+            qualification_type_id: "qual-1",
+            min_qty: 1,
+            target_qty: 2,
+            assigned_count: 1,
+            confirmed_count: 1,
+            released_partner_qty: 0,
+            coverage_state: "yellow",
+          },
+        ],
+      },
+    ] as any);
+    boardDeferred.resolve([
+      {
+        id: "shift-1",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        shift_plan_id: "plan-1",
+        order_id: "order-1",
+        order_no: "ORD-1",
+        planning_record_name: "Planning 1",
+        planning_mode_code: "site",
+        workforce_scope_code: "internal",
+        starts_at: "2026-04-05T08:00:00Z",
+        ends_at: "2026-04-05T16:00:00Z",
+        shift_type_code: "site_day",
+        release_state: "draft",
+        status: "active",
+        location_text: "Berlin",
+        meeting_point: "Gate A",
+        demand_groups: [
+          {
+            id: "dg-1",
+            shift_id: "shift-1",
+            function_type_id: "func-1",
+            qualification_type_id: "qual-1",
+            min_qty: 1,
+            target_qty: 2,
+            mandatory_flag: true,
+            assigned_count: 1,
+            confirmed_count: 1,
+            released_partner_qty: 0,
+          },
+        ],
+        assignments: [
+          {
+            id: "assignment-1",
+            shift_id: "shift-1",
+            demand_group_id: "dg-1",
+            team_id: "team-1",
+            employee_id: "employee-1",
+            subcontractor_worker_id: null,
+            assignment_status_code: "assigned",
+            assignment_source_code: "dispatcher",
+            confirmed_at: null,
+            version_no: 1,
+          },
+        ],
+      },
+    ] as any);
+    await flushPromises();
+
+    expect(overlay.attributes("data-busy")).toBe("false");
   });
 
   it("hydrates staffing filters and selected shift from route query context", async () => {
@@ -755,8 +928,10 @@ describe("PlanningStaffingCoverageView", () => {
     expect(wrapper.find('[data-testid="planning-staffing-assign-action"]').exists()).toBe(false);
   });
 
-  it("runs assign, unassign, and substitute through the real staffing commands and refreshes coverage", async () => {
+  it("runs assign, unassign, and substitute through the real staffing commands without broad refreshAll reloads", async () => {
     const wrapper = await mountView();
+    const initialCoverageCalls = mocks.listStaffingCoverageMock.mock.calls.length;
+    const initialBoardCalls = mocks.listStaffingBoardMock.mock.calls.length;
     await wrapper.get('[data-testid="planning-staffing-assign-action"]').trigger("click");
     expect(mocks.assignStaffingMock).not.toHaveBeenCalled();
 
@@ -776,10 +951,11 @@ describe("PlanningStaffingCoverageView", () => {
         confirmed_at: null,
       }),
     );
-    expect(mocks.listStaffingCoverageMock.mock.calls.length).toBeGreaterThan(1);
+    expect(mocks.listStaffingCoverageMock).toHaveBeenCalledTimes(initialCoverageCalls);
+    expect(mocks.listStaffingBoardMock).toHaveBeenCalledTimes(initialBoardCalls);
 
     await clickDetailTab(wrapper, "assignments");
-    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-new"]').trigger("click");
     await flushPromises();
     await clickDetailTab(wrapper, "demand_staffing");
 
@@ -788,6 +964,7 @@ describe("PlanningStaffingCoverageView", () => {
     expect(mocks.unassignStaffingMock).toHaveBeenCalledTimes(1);
 
     await clickDetailTab(wrapper, "assignments");
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-row-assignment-new"]').exists()).toBe(false);
     await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
     await flushPromises();
     await clickDetailTab(wrapper, "demand_staffing");
@@ -798,7 +975,10 @@ describe("PlanningStaffingCoverageView", () => {
     await flushPromises();
     expect(mocks.substituteStaffingMock).toHaveBeenCalledTimes(1);
     expect(wrapper.text()).not.toContain("Sofort bestaetigen");
-    expect(mocks.listStaffingBoardMock.mock.calls.length).toBeGreaterThan(1);
+    expect(mocks.listStaffingCoverageMock).toHaveBeenCalledTimes(initialCoverageCalls);
+    expect(mocks.listStaffingBoardMock).toHaveBeenCalledTimes(initialBoardCalls);
+    await clickDetailTab(wrapper, "assignments");
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-row-assignment-sub"]').exists()).toBe(true);
   });
 
   it("sends confirmed_at only for assign when confirmation-at-creation is checked", async () => {
@@ -1391,6 +1571,81 @@ describe("PlanningStaffingCoverageView", () => {
     expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(false);
   });
 
+  it("shows the workspace overlay while the assignment editor is saving and clears it afterwards", async () => {
+    mocks.listStaffingBoardMock.mockResolvedValueOnce([
+      {
+        id: "shift-1",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        shift_plan_id: "plan-1",
+        order_id: "order-1",
+        order_no: "ORD-1",
+        planning_record_name: "Planning 1",
+        planning_mode_code: "site",
+        workforce_scope_code: "internal",
+        starts_at: "2026-04-05T08:00:00Z",
+        ends_at: "2026-04-05T16:00:00Z",
+        shift_type_code: "site_day",
+        release_state: "draft",
+        status: "active",
+        location_text: "Berlin",
+        meeting_point: "Gate A",
+        demand_groups: [
+          {
+            id: "dg-1",
+            shift_id: "shift-1",
+            function_type_id: "func-1",
+            qualification_type_id: "qual-1",
+            min_qty: 1,
+            target_qty: 2,
+            mandatory_flag: true,
+            assigned_count: 0,
+            confirmed_count: 0,
+            released_partner_qty: 0,
+          },
+        ],
+        assignments: [],
+      },
+    ]);
+    const createAssignmentDeferred = createDeferred<any>();
+    mocks.createAssignmentMock.mockImplementationOnce(async () => createAssignmentDeferred.promise);
+
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+    await wrapper.get('[data-testid="planning-staffing-empty-create-assignment"]').trigger("click");
+    await wrapper.get('[data-testid="planning-staffing-assignment-demand-group"]').setValue("dg-1");
+    await wrapper.get('[data-testid="planning-staffing-assignment-member-select"]').setValue("employee-1");
+    await wrapper.get('[data-testid="planning-staffing-assignment-modal"]').trigger("submit");
+    await Promise.resolve();
+
+    const overlay = wrapper.get('[data-testid="planning-staffing-workspace-loading-overlay"]');
+    expect(overlay.attributes("data-busy")).toBe("true");
+    expect(overlay.text()).toContain("Zuweisung wird verarbeitet.");
+
+    createAssignmentDeferred.resolve({
+      id: "assignment-created",
+      tenant_id: "tenant-1",
+      shift_id: "shift-1",
+      demand_group_id: "dg-1",
+      team_id: null,
+      employee_id: "employee-1",
+      subcontractor_worker_id: null,
+      assignment_status_code: "assigned",
+      assignment_source_code: "dispatcher",
+      offered_at: null,
+      confirmed_at: null,
+      remarks: null,
+      status: "active",
+      version_no: 1,
+      created_at: "2026-04-05T08:00:00Z",
+      updated_at: "2026-04-05T08:00:00Z",
+      archived_at: null,
+    } as any);
+    await flushPromises();
+
+    expect(overlay.attributes("data-busy")).toBe("false");
+  });
+
   it("does not auto-select an existing assignment when the assignments tab opens", async () => {
     const wrapper = await mountView();
     await clickDetailTab(wrapper, "assignments");
@@ -1514,6 +1769,69 @@ describe("PlanningStaffingCoverageView", () => {
     expect(wrapper.get(".modal-stub__title").text()).toContain("Zuweisung bearbeiten");
     expect((wrapper.get('[data-testid="planning-staffing-assignment-demand-group"]').element as HTMLSelectElement).value).toBe("dg-1");
     expect((wrapper.get('[data-testid="planning-staffing-assignment-member-select"]').element as HTMLSelectElement).value).toBe("employee-1");
+  });
+
+  it("shows immediate loading feedback when opening an existing assignment before edit data is ready", async () => {
+    const assignmentDeferred = createDeferred<any>();
+    const validationsDeferred = createDeferred<any>();
+    const overridesDeferred = createDeferred<any[]>();
+    mocks.getAssignmentMock.mockImplementationOnce(() => assignmentDeferred.promise);
+    mocks.getAssignmentValidationsMock.mockImplementationOnce(() => validationsDeferred.promise);
+    mocks.listAssignmentValidationOverridesMock.mockImplementationOnce(() => overridesDeferred.promise as Promise<never[]>);
+
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await Promise.resolve();
+
+    expect(wrapper.get('[data-testid="planning-staffing-workspace-loading-overlay"]').attributes("data-busy")).toBe("true");
+    expect(wrapper.get('[data-testid="planning-staffing-workspace-loading-overlay"]').text()).toContain("Zuweisung wird geoeffnet.");
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-modal-loading"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(false);
+
+    assignmentDeferred.resolve({
+      id: "assignment-1",
+      tenant_id: "tenant-1",
+      shift_id: "shift-1",
+      demand_group_id: "dg-1",
+      team_id: "team-1",
+      employee_id: "employee-1",
+      subcontractor_worker_id: null,
+      assignment_status_code: "assigned",
+      assignment_source_code: "dispatcher",
+      offered_at: "2026-04-05T07:30:00Z",
+      confirmed_at: null,
+      remarks: "Bestehende Zuweisung",
+      status: "active",
+      version_no: 1,
+      created_at: "2026-04-05T07:30:00Z",
+      updated_at: "2026-04-05T07:30:00Z",
+      archived_at: null,
+    });
+    validationsDeferred.resolve({ blocking_count: 0, warning_count: 0, info_count: 0, issues: [] });
+    overridesDeferred.resolve([]);
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="planning-staffing-workspace-loading-overlay"]').attributes("data-busy")).toBe("false");
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-modal-loading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(true);
+  });
+
+  it("does not duplicate assignment inspection requests when opening edit mode", async () => {
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+
+    mocks.getAssignmentMock.mockClear();
+    mocks.getAssignmentValidationsMock.mockClear();
+    mocks.listAssignmentValidationOverridesMock.mockClear();
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.getAssignmentMock).toHaveBeenCalledTimes(1);
+    expect(mocks.getAssignmentValidationsMock).toHaveBeenCalledTimes(1);
+    expect(mocks.listAssignmentValidationOverridesMock).toHaveBeenCalledTimes(1);
   });
 
   it("preserves an explicit assignment selection across refresh only when the same assignment still exists", async () => {
@@ -1744,6 +2062,65 @@ describe("PlanningStaffingCoverageView", () => {
     expect((wrapper.get('[data-testid="planning-staffing-assignment-remarks"]').element as HTMLTextAreaElement).value).toBe("");
   });
 
+  it("shows loading feedback and disables repeated save while updating an assignment", async () => {
+    const updateDeferred = createDeferred<any>();
+    mocks.updateAssignmentMock.mockImplementationOnce(async () => updateDeferred.promise);
+
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-modal"]').trigger("submit");
+    await Promise.resolve();
+
+    expect(wrapper.get('[data-testid="planning-staffing-workspace-loading-overlay"]').attributes("data-busy")).toBe("true");
+    expect(wrapper.get('[data-testid="planning-staffing-workspace-loading-overlay"]').text()).toContain("Zuweisung wird verarbeitet.");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-modal-save"]').element as HTMLButtonElement).disabled).toBe(true);
+    expect(mocks.updateAssignmentMock).toHaveBeenCalledTimes(1);
+
+    updateDeferred.resolve({
+      id: "assignment-1",
+      shift_id: "shift-1",
+      demand_group_id: "dg-1",
+      team_id: "team-shift-1",
+      employee_id: "employee-1",
+      subcontractor_worker_id: null,
+      assignment_status_code: "assigned",
+      assignment_source_code: "dispatcher",
+      confirmed_at: null,
+      version_no: 2,
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="planning-staffing-workspace-loading-overlay"]').attributes("data-busy")).toBe("false");
+  });
+
+  it("saves assignment edits without triggering broad staffing or supporting-data reloads", async () => {
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
+
+    const coverageCallsBeforeSave = mocks.listStaffingCoverageMock.mock.calls.length;
+    const boardCallsBeforeSave = mocks.listStaffingBoardMock.mock.calls.length;
+    const employeeCallsBeforeSave = mocks.listEmployeesMock.mock.calls.length;
+    const teamMemberCallsBeforeSave = mocks.listTeamMembersMock.mock.calls.length;
+    const shiftOutputCallsBeforeSave = mocks.listShiftOutputsMock.mock.calls.length;
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-team-select"]').setValue("team-shift-1");
+    await wrapper.get('[data-testid="planning-staffing-assignment-modal"]').trigger("submit");
+    await flushPromises();
+
+    expect(mocks.updateAssignmentMock).toHaveBeenCalledTimes(1);
+    expect(mocks.listStaffingCoverageMock).toHaveBeenCalledTimes(coverageCallsBeforeSave);
+    expect(mocks.listStaffingBoardMock).toHaveBeenCalledTimes(boardCallsBeforeSave);
+    expect(mocks.listEmployeesMock).toHaveBeenCalledTimes(employeeCallsBeforeSave);
+    expect(mocks.listTeamMembersMock).toHaveBeenCalledTimes(teamMemberCallsBeforeSave);
+    expect(mocks.listShiftOutputsMock).toHaveBeenCalledTimes(shiftOutputCallsBeforeSave);
+    expect(wrapper.text()).toContain("Schicht Bravo");
+  });
+
   it("keeps unassign available from the assignment modal", async () => {
     const wrapper = await mountView();
     await clickDetailTab(wrapper, "assignments");
@@ -1755,5 +2132,58 @@ describe("PlanningStaffingCoverageView", () => {
 
     expect(mocks.unassignStaffingMock).toHaveBeenCalledTimes(1);
     expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(false);
+  });
+
+  it("removes an assignment without triggering broad staffing or supporting-data reloads", async () => {
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
+
+    const coverageCallsBeforeRemove = mocks.listStaffingCoverageMock.mock.calls.length;
+    const boardCallsBeforeRemove = mocks.listStaffingBoardMock.mock.calls.length;
+    const employeeCallsBeforeRemove = mocks.listEmployeesMock.mock.calls.length;
+    const teamMemberCallsBeforeRemove = mocks.listTeamMembersMock.mock.calls.length;
+    const shiftOutputCallsBeforeRemove = mocks.listShiftOutputsMock.mock.calls.length;
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-modal-remove"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.unassignStaffingMock).toHaveBeenCalledTimes(1);
+    expect(mocks.listStaffingCoverageMock).toHaveBeenCalledTimes(coverageCallsBeforeRemove);
+    expect(mocks.listStaffingBoardMock).toHaveBeenCalledTimes(boardCallsBeforeRemove);
+    expect(mocks.listEmployeesMock).toHaveBeenCalledTimes(employeeCallsBeforeRemove);
+    expect(mocks.listTeamMembersMock).toHaveBeenCalledTimes(teamMemberCallsBeforeRemove);
+    expect(mocks.listShiftOutputsMock).toHaveBeenCalledTimes(shiftOutputCallsBeforeRemove);
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-row-assignment-1"]').exists()).toBe(false);
+  });
+
+  it("shows loading feedback while removing an assignment", async () => {
+    const unassignDeferred = createDeferred<any>();
+    mocks.unassignStaffingMock.mockImplementationOnce(async () => unassignDeferred.promise);
+
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-modal-remove"]').trigger("click");
+    await Promise.resolve();
+
+    expect(wrapper.get('[data-testid="planning-staffing-workspace-loading-overlay"]').attributes("data-busy")).toBe("true");
+    expect(wrapper.get('[data-testid="planning-staffing-workspace-loading-overlay"]').text()).toContain("Staffing-Arbeitsbereich wird geladen.");
+
+    unassignDeferred.resolve({
+      tenant_id: "tenant-1",
+      shift_id: "shift-1",
+      assignment_id: "assignment-1",
+      outcome_code: "unassigned",
+      validation_codes: [],
+      conflict_code: null,
+      assignment: null,
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="planning-staffing-workspace-loading-overlay"]').attributes("data-busy")).toBe("false");
   });
 });

@@ -18,7 +18,14 @@
       <h3>{{ tp("missingPermissionBody") }}</h3>
     </section>
 
-    <div v-else class="planning-staffing-grid" data-testid="planning-staffing-workspace">
+    <SicherPlanLoadingOverlay
+      v-else
+      :aria-label="planningStaffingWorkspaceLoadingText"
+      :busy="planningStaffingWorkspaceBusy"
+      :text="planningStaffingWorkspaceLoadingText"
+      busy-testid="planning-staffing-workspace-loading-overlay"
+    >
+      <div class="planning-staffing-grid" data-testid="planning-staffing-workspace">
       <section class="module-card planning-staffing-panel">
         <div class="planning-staffing-panel__header planning-staffing-panel__header--filters">
           <div>
@@ -466,7 +473,7 @@
                     class="cta-button cta-secondary"
                     type="button"
                     data-testid="planning-staffing-start-assignment-create"
-                    :disabled="!selectedShiftId || !actionState.canWriteStaffing || assignmentEditorSaving"
+                    :disabled="!selectedShiftId || !actionState.canWriteStaffing || assignmentEditorLoading || assignmentEditorSaving"
                     @click="startCreateAssignment"
                   >
                     {{ tp("assignmentCreateAction") }}
@@ -481,6 +488,7 @@
                   class="planning-staffing-row planning-staffing-row--assignment"
                   :data-testid="`planning-staffing-assignment-row-${assignment.id}`"
                   :class="{ selected: assignment.id === selectedAssignmentId }"
+                  :disabled="assignmentEditorLoading || assignmentEditorSaving"
                   @click="startEditAssignment(assignment.id)"
                 >
                   <div class="planning-staffing-assignment-row__body">
@@ -758,7 +766,8 @@
 
         <p v-else class="planning-staffing-list-empty">{{ tp("noSelection") }}</p>
       </section>
-    </div>
+      </div>
+    </SicherPlanLoadingOverlay>
 
     <Modal
       v-model:open="assignmentDialogOpen"
@@ -766,8 +775,16 @@
       :footer="null"
       @cancel="closeAssignmentDialog"
     >
+      <div
+        v-if="assignmentEditorLoading"
+        class="planning-staffing-loading-state"
+        data-testid="planning-staffing-assignment-modal-loading"
+      >
+        <p class="eyebrow">{{ tp("assignmentEditTitle") }}</p>
+        <h4>{{ tp("workspaceLoadingAssignmentOpen") }}</h4>
+      </div>
       <form
-        v-if="selectedShift && actionState.canWriteStaffing"
+        v-else-if="selectedShift && actionState.canWriteStaffing"
         class="planning-staffing-demand-group-editor"
         data-testid="planning-staffing-assignment-modal"
         @submit.prevent="submitAssignmentEditor"
@@ -1213,6 +1230,7 @@ import {
   type TeamMemberRead,
   type TeamRead,
 } from "@/api/planningStaffing";
+import SicherPlanLoadingOverlay from "@/components/SicherPlanLoadingOverlay.vue";
 import { planningStaffingMessages } from "@/i18n/planningStaffing.messages";
 import {
   listSubcontractorWorkers,
@@ -1295,6 +1313,7 @@ const savingOverride = ref(false);
 const savingDemandGroup = ref(false);
 const savingTeam = ref(false);
 const savingTeamMember = ref(false);
+const assignmentEditorLoading = ref(false);
 const assignmentEditorSaving = ref(false);
 const planningRecordOptions = ref<PlanningRecordListItem[]>([]);
 const resolvedPlanningRecord = ref<null | PlanningRecordRead>(null);
@@ -1537,6 +1556,40 @@ const assignmentEditorMode = computed(() => assignmentDialogMode.value);
 const assignmentCreateDialogActive = computed(
   () => assignmentDialogOpen.value && assignmentDialogMode.value === "create",
 );
+const planningStaffingWorkspaceBusy = computed(
+  () =>
+    loading.value
+    || savingOverride.value
+    || savingDemandGroup.value
+    || savingTeam.value
+    || savingTeamMember.value
+    || assignmentEditorLoading.value
+    || assignmentEditorSaving.value,
+);
+const planningStaffingWorkspaceLoadingText = computed(() => {
+  if (assignmentEditorLoading.value) {
+    return tp("workspaceLoadingAssignmentOpen");
+  }
+  if (assignmentEditorSaving.value) {
+    return tp("workspaceLoadingAssignment");
+  }
+  if (savingDemandGroup.value) {
+    return tp("workspaceLoadingDemandGroup");
+  }
+  if (savingTeam.value) {
+    return tp("workspaceLoadingTeam");
+  }
+  if (savingTeamMember.value) {
+    return tp("workspaceLoadingTeamMember");
+  }
+  if (savingOverride.value) {
+    return tp("workspaceLoadingOverride");
+  }
+  if (loading.value) {
+    return tp("workspaceLoading");
+  }
+  return "";
+});
 const canSubmitAssignmentEditor = computed(() => {
   if (!actionState.value.canWriteStaffing || !selectedShiftId.value || !assignmentDraft.demand_group_id || !assignmentDraft.member_ref) {
     return false;
@@ -1601,6 +1654,10 @@ function rowCoverageState(row: CoverageShiftItem | null) {
 }
 
 const planningRecordLookupCache = new Map<string, PlanningRecordListItem[]>();
+const assignmentDetailCache = new Map<string, AssignmentRead>();
+const assignmentValidationCache = new Map<string, AssignmentValidationRead>();
+const assignmentOverrideCache = new Map<string, any[]>();
+const assignmentInspectionRequests = new Map<string, Promise<void>>();
 let planningRecordLookupRequestId = 0;
 let planningRecordLookupTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -1609,6 +1666,210 @@ function staffingFilters() {
     shift_id: selectedShiftId.value,
     planning_record_id: filters.planning_record_id,
   };
+}
+
+function coverageStateForCounts(
+  minQty: number,
+  targetQty: number,
+  assignedCount: number,
+  confirmedCount: number,
+  releasedPartnerQty: number,
+) {
+  if (targetQty > 0 && assignedCount >= targetQty && confirmedCount >= Math.min(targetQty, assignedCount)) {
+    return "green";
+  }
+  if (assignedCount + releasedPartnerQty >= minQty) {
+    return "yellow";
+  }
+  return "red";
+}
+
+function assignmentIsConfirmed(assignment: Pick<StaffingBoardAssignmentItem, "assignment_status_code" | "confirmed_at">) {
+  return Boolean(assignment.confirmed_at) || assignment.assignment_status_code === "confirmed";
+}
+
+function toBoardAssignmentItem(
+  assignment: AssignmentRead | StaffingBoardAssignmentItem,
+): StaffingBoardAssignmentItem {
+  return {
+    id: assignment.id,
+    shift_id: assignment.shift_id,
+    demand_group_id: assignment.demand_group_id,
+    team_id: assignment.team_id ?? null,
+    employee_id: assignment.employee_id ?? null,
+    subcontractor_worker_id: assignment.subcontractor_worker_id ?? null,
+    assignment_status_code: assignment.assignment_status_code,
+    assignment_source_code: assignment.assignment_source_code,
+    confirmed_at: assignment.confirmed_at ?? null,
+    version_no: assignment.version_no,
+  };
+}
+
+function patchShiftAssignments(
+  shiftId: string,
+  mutateAssignments: (rows: StaffingBoardAssignmentItem[]) => StaffingBoardAssignmentItem[],
+) {
+  let nextBoardShift: StaffingBoardShiftItem | null = null;
+  boardRows.value = boardRows.value.map((row) => {
+    if (row.id !== shiftId) {
+      return row;
+    }
+    const nextAssignments = mutateAssignments([...row.assignments]);
+    const nextDemandGroups = row.demand_groups.map((group) => {
+      const groupAssignments = nextAssignments.filter((assignment) => assignment.demand_group_id === group.id);
+      const assignedCount = groupAssignments.length;
+      const confirmedCount = groupAssignments.filter(assignmentIsConfirmed).length;
+      return {
+        ...group,
+        assigned_count: assignedCount,
+        confirmed_count: confirmedCount,
+      };
+    });
+    nextBoardShift = {
+      ...row,
+      assignments: nextAssignments,
+      demand_groups: nextDemandGroups,
+    };
+    return nextBoardShift;
+  });
+
+  if (!nextBoardShift) {
+    return;
+  }
+
+  coverageRows.value = coverageRows.value.map((row) => {
+    if (row.shift_id !== shiftId) {
+      return row;
+    }
+    const nextCoverageDemandGroups = nextBoardShift!.demand_groups.map((group) => ({
+      demand_group_id: group.id,
+      function_type_id: group.function_type_id,
+      qualification_type_id: group.qualification_type_id,
+      min_qty: group.min_qty,
+      target_qty: group.target_qty,
+      assigned_count: group.assigned_count,
+      confirmed_count: group.confirmed_count,
+      released_partner_qty: group.released_partner_qty,
+      coverage_state: coverageStateForCounts(
+        group.min_qty,
+        group.target_qty,
+        group.assigned_count,
+        group.confirmed_count,
+        group.released_partner_qty,
+      ),
+    }));
+    const assignedCount = filters.confirmation_state === "confirmed_only"
+      ? nextCoverageDemandGroups.reduce((sum, group) => sum + group.confirmed_count, 0)
+      : nextCoverageDemandGroups.reduce((sum, group) => sum + group.assigned_count, 0);
+    const confirmedCount = nextCoverageDemandGroups.reduce((sum, group) => sum + group.confirmed_count, 0);
+    const minRequiredQty = nextCoverageDemandGroups.reduce((sum, group) => sum + group.min_qty, 0);
+    const targetRequiredQty = nextCoverageDemandGroups.reduce((sum, group) => sum + group.target_qty, 0);
+    const releasedPartnerQty = nextCoverageDemandGroups.reduce((sum, group) => sum + group.released_partner_qty, 0);
+    return {
+      ...row,
+      min_required_qty: minRequiredQty,
+      target_required_qty: targetRequiredQty,
+      assigned_count: assignedCount,
+      confirmed_count: confirmedCount,
+      released_partner_qty: releasedPartnerQty,
+      coverage_state: coverageStateForCounts(
+        minRequiredQty,
+        targetRequiredQty,
+        assignedCount,
+        confirmedCount,
+        releasedPartnerQty,
+      ),
+      demand_groups: nextCoverageDemandGroups,
+    };
+  });
+
+  selectedDemandGroupId.value = resolveSelectedDemandGroupId(nextBoardShift, selectedDemandGroupId.value);
+}
+
+function upsertShiftAssignment(assignment: AssignmentRead | StaffingBoardAssignmentItem) {
+  const boardAssignment = toBoardAssignmentItem(assignment);
+  patchShiftAssignments(boardAssignment.shift_id, (rows) => {
+    const nextRows = rows.filter((row) => row.id !== boardAssignment.id);
+    nextRows.push(boardAssignment);
+    return nextRows;
+  });
+}
+
+function removeShiftAssignment(shiftId: string, assignmentId: string) {
+  patchShiftAssignments(shiftId, (rows) => rows.filter((row) => row.id !== assignmentId));
+}
+
+function cacheAssignmentDetail(assignment: AssignmentRead) {
+  assignmentDetailCache.set(assignment.id, assignment);
+}
+
+function invalidateAssignmentInspection(assignmentId: string) {
+  if (!assignmentId) {
+    return;
+  }
+  assignmentDetailCache.delete(assignmentId);
+  assignmentValidationCache.delete(assignmentId);
+  assignmentOverrideCache.delete(assignmentId);
+}
+
+function applyCachedAssignmentInspection(assignmentId: string) {
+  const cachedAssignment = assignmentDetailCache.get(assignmentId) ?? null;
+  const cachedValidations = assignmentValidationCache.get(assignmentId) ?? null;
+  const cachedOverrides = assignmentOverrideCache.get(assignmentId) ?? [];
+  selectedAssignmentDetails.value = cachedAssignment;
+  assignmentValidations.value = cachedValidations;
+  assignmentOverrides.value = cachedOverrides;
+  if (cachedAssignment) {
+    populateAssignmentDraft(cachedAssignment);
+  } else if (!assignmentCreateDialogActive.value) {
+    resetAssignmentDraft();
+  }
+  return Boolean(cachedAssignment);
+}
+
+async function loadSelectedAssignmentMeta() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedAssignmentId.value) {
+    assignmentValidations.value = null;
+    assignmentOverrides.value = [];
+    return;
+  }
+  const assignmentId = selectedAssignmentId.value;
+  const [validations, overrides] = await Promise.all([
+    getAssignmentValidations(tenantScopeId.value, accessToken.value, assignmentId),
+    listAssignmentValidationOverrides(tenantScopeId.value, accessToken.value, assignmentId),
+  ]);
+  if (selectedAssignmentId.value !== assignmentId) {
+    return;
+  }
+  assignmentValidationCache.set(assignmentId, validations);
+  assignmentOverrideCache.set(assignmentId, overrides);
+  assignmentValidations.value = validations;
+  assignmentOverrides.value = overrides;
+}
+
+async function refreshVisibleAssignmentDiagnostics() {
+  if (
+    !selectedAssignmentId.value
+    || (activeShiftDetailTab.value !== "assignments" && activeShiftDetailTab.value !== "validations" && !assignmentDialogOpen.value)
+  ) {
+    return;
+  }
+  try {
+    await loadSelectedAssignmentMeta();
+  } catch {
+    // Keep the optimistic assignment update and avoid blocking the primary mutation path on side data.
+  }
+}
+
+async function refreshVisibleShiftValidations() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value || activeShiftDetailTab.value !== "validations") {
+    return;
+  }
+  try {
+    shiftValidations.value = await getShiftReleaseValidations(tenantScopeId.value, accessToken.value, selectedShiftId.value);
+  } catch {
+    // Keep the visible shift state stable if validation refresh fails in the background.
+  }
 }
 
 function resetStaffingDraft() {
@@ -1657,13 +1918,30 @@ function startCreateAssignment() {
 }
 
 async function startEditAssignment(assignmentId = selectedAssignmentId.value) {
-  if (!assignmentId) {
+  if (!assignmentId || assignmentEditorLoading.value || assignmentEditorSaving.value) {
     return;
   }
   assignmentDialogMode.value = "edit";
-  selectedAssignmentId.value = assignmentId;
-  await loadSelectedAssignmentDetails();
   assignmentDialogOpen.value = true;
+  assignmentEditorLoading.value = true;
+  selectedAssignmentId.value = assignmentId;
+  const hasCachedAssignment = applyCachedAssignmentInspection(assignmentId);
+  if (!hasCachedAssignment) {
+    selectedAssignmentDetails.value = null;
+    assignmentValidations.value = null;
+    assignmentOverrides.value = [];
+  }
+  try {
+    const loadPromise = loadSelectedAssignmentDetails();
+    if (hasCachedAssignment) {
+      assignmentEditorLoading.value = false;
+      void loadPromise;
+      return;
+    }
+    await loadPromise;
+  } finally {
+    assignmentEditorLoading.value = false;
+  }
 }
 
 function resetAssignmentEditor() {
@@ -2169,11 +2447,50 @@ async function loadSelectedAssignmentDetails() {
     }
     return;
   }
-  const [assignment, validations, overrides] = await Promise.all([
-    getAssignment(tenantScopeId.value, accessToken.value, selectedAssignmentId.value),
-    getAssignmentValidations(tenantScopeId.value, accessToken.value, selectedAssignmentId.value),
-    listAssignmentValidationOverrides(tenantScopeId.value, accessToken.value, selectedAssignmentId.value),
-  ]);
+  const assignmentId = selectedAssignmentId.value;
+  const cachedAssignment = assignmentDetailCache.get(assignmentId) ?? null;
+  const cachedValidations = assignmentValidationCache.get(assignmentId) ?? null;
+  const cachedOverrides = assignmentOverrideCache.get(assignmentId) ?? null;
+  if (cachedAssignment) {
+    selectedAssignmentDetails.value = cachedAssignment;
+    populateAssignmentDraft(cachedAssignment);
+  }
+  if (cachedValidations) {
+    assignmentValidations.value = cachedValidations;
+  }
+  if (cachedOverrides) {
+    assignmentOverrides.value = cachedOverrides;
+  }
+  if (cachedAssignment && cachedValidations && cachedOverrides) {
+    return;
+  }
+  let request = assignmentInspectionRequests.get(assignmentId);
+  if (!request) {
+    request = Promise.all([
+      getAssignment(tenantScopeId.value, accessToken.value, assignmentId),
+      getAssignmentValidations(tenantScopeId.value, accessToken.value, assignmentId),
+      listAssignmentValidationOverrides(tenantScopeId.value, accessToken.value, assignmentId),
+    ])
+      .then(([assignment, validations, overrides]) => {
+        assignmentDetailCache.set(assignmentId, assignment);
+        assignmentValidationCache.set(assignmentId, validations);
+        assignmentOverrideCache.set(assignmentId, overrides);
+      })
+      .finally(() => {
+        assignmentInspectionRequests.delete(assignmentId);
+      });
+    assignmentInspectionRequests.set(assignmentId, request);
+  }
+  await request;
+  if (selectedAssignmentId.value !== assignmentId) {
+    return;
+  }
+  const assignment = assignmentDetailCache.get(assignmentId) ?? null;
+  const validations = assignmentValidationCache.get(assignmentId) ?? null;
+  const overrides = assignmentOverrideCache.get(assignmentId) ?? [];
+  if (!assignment || !validations) {
+    return;
+  }
   selectedAssignmentDetails.value = assignment;
   populateAssignmentDraft(assignment);
   assignmentValidations.value = validations;
@@ -2203,13 +2520,13 @@ async function submitAssignmentEditor() {
   clearFeedback();
   assignmentEditorSaving.value = true;
   try {
+    let assignment: AssignmentRead;
     if (assignmentEditorMode.value === "edit" && assignmentDraft.id) {
       const payload: AssignmentUpdate = {
         ...assignmentEditorPayload(),
         version_no: assignmentDraft.version_no,
       };
-      const assignment = await updateAssignment(tenantScopeId.value, accessToken.value, assignmentDraft.id, payload);
-      selectedAssignmentId.value = assignment.id;
+      assignment = await updateAssignment(tenantScopeId.value, accessToken.value, assignmentDraft.id, payload);
     } else {
       const payload: AssignmentCreate = {
         tenant_id: tenantScopeId.value,
@@ -2217,11 +2534,19 @@ async function submitAssignmentEditor() {
         demand_group_id: assignmentDraft.demand_group_id,
         ...assignmentEditorPayload(),
       };
-      const assignment = await createAssignment(tenantScopeId.value, accessToken.value, payload);
-      selectedAssignmentId.value = assignment.id;
+      assignment = await createAssignment(tenantScopeId.value, accessToken.value, payload);
     }
-    await refreshAll();
+    cacheAssignmentDetail(assignment);
+    assignmentValidationCache.delete(assignment.id);
+    assignmentOverrideCache.delete(assignment.id);
+    upsertShiftAssignment(assignment);
+    selectedAssignmentId.value = assignment.id;
+    selectedAssignmentDetails.value = assignment;
+    assignmentValidations.value = null;
+    assignmentOverrides.value = [];
     assignmentDialogOpen.value = false;
+    void refreshVisibleAssignmentDiagnostics();
+    void refreshVisibleShiftValidations();
   } catch (error) {
     handleApiError(error);
   } finally {
@@ -2294,18 +2619,29 @@ async function submitAssign() {
     return;
   }
   clearFeedback();
+  loading.value = true;
   try {
     const result = await assignStaffing(tenantScopeId.value, accessToken.value, buildAssignPayload());
     if (result.outcome_code === "blocked") {
       setFeedback("error", tp("staffingActionsTitle"), tp("assignmentBlocked"));
-      await loadSelectedShiftDetails();
+      void refreshVisibleShiftValidations();
       return;
     }
+    if (result.assignment) {
+      invalidateAssignmentInspection(result.assignment.id);
+      upsertShiftAssignment(result.assignment);
+    }
     selectedAssignmentId.value = result.assignment_id ?? "";
+    selectedAssignmentDetails.value = null;
+    assignmentValidations.value = null;
+    assignmentOverrides.value = [];
     resetStaffingDraft();
-    await refreshAll();
+    void refreshVisibleAssignmentDiagnostics();
+    void refreshVisibleShiftValidations();
   } catch (error) {
     handleApiError(error);
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -2314,18 +2650,28 @@ async function submitUnassign() {
     return;
   }
   clearFeedback();
+  loading.value = true;
   try {
+    const assignmentId = selectedAssignment.value.id;
+    const shiftId = selectedAssignment.value.shift_id;
     await unassignStaffing(tenantScopeId.value, accessToken.value, {
       tenant_id: tenantScopeId.value,
-      assignment_id: selectedAssignment.value.id,
+      assignment_id: assignmentId,
       version_no: selectedAssignment.value.version_no,
       remarks: staffingDraft.remarks.trim() || null,
     });
+    invalidateAssignmentInspection(assignmentId);
+    removeShiftAssignment(shiftId, assignmentId);
     selectedAssignmentId.value = "";
-    await refreshAll();
+    selectedAssignmentDetails.value = null;
+    assignmentValidations.value = null;
+    assignmentOverrides.value = [];
     assignmentDialogOpen.value = false;
+    void refreshVisibleShiftValidations();
   } catch (error) {
     handleApiError(error);
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -2334,6 +2680,7 @@ async function submitSubstitute() {
     return;
   }
   clearFeedback();
+  loading.value = true;
   try {
     const result = await substituteStaffing(tenantScopeId.value, accessToken.value, {
       tenant_id: tenantScopeId.value,
@@ -2353,14 +2700,28 @@ async function submitSubstitute() {
     });
     if (result.outcome_code === "blocked") {
       setFeedback("error", tp("staffingActionsTitle"), tp("assignmentBlocked"));
-      await loadSelectedShiftDetails();
+      void refreshVisibleShiftValidations();
       return;
     }
+    if (selectedAssignment.value) {
+      invalidateAssignmentInspection(selectedAssignment.value.id);
+      removeShiftAssignment(selectedAssignment.value.shift_id, selectedAssignment.value.id);
+    }
+    if (result.assignment) {
+      invalidateAssignmentInspection(result.assignment.id);
+      upsertShiftAssignment(result.assignment);
+    }
     selectedAssignmentId.value = result.assignment_id ?? "";
+    selectedAssignmentDetails.value = null;
+    assignmentValidations.value = null;
+    assignmentOverrides.value = [];
     resetStaffingDraft();
-    await refreshAll();
+    void refreshVisibleAssignmentDiagnostics();
+    void refreshVisibleShiftValidations();
   } catch (error) {
     handleApiError(error);
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -2456,35 +2817,50 @@ async function loadDispatchPreview() {
   if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
     return;
   }
-  dispatchPreview.value = await previewShiftDispatchMessage(tenantScopeId.value, accessToken.value, selectedShiftId.value, {
-    tenant_id: tenantScopeId.value,
-    shift_id: selectedShiftId.value,
-    audience_codes: dispatchAudienceCodes(),
-  });
+  loading.value = true;
+  try {
+    dispatchPreview.value = await previewShiftDispatchMessage(tenantScopeId.value, accessToken.value, selectedShiftId.value, {
+      tenant_id: tenantScopeId.value,
+      shift_id: selectedShiftId.value,
+      audience_codes: dispatchAudienceCodes(),
+    });
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function queueDispatch() {
   if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
     return;
   }
-  await queueShiftDispatchMessage(tenantScopeId.value, accessToken.value, selectedShiftId.value, {
-    tenant_id: tenantScopeId.value,
-    shift_id: selectedShiftId.value,
-    audience_codes: dispatchAudienceCodes(),
-  });
-  setFeedback("good", tp("dispatchTitle"), tp("dispatchQueuedSuccess"));
+  loading.value = true;
+  try {
+    await queueShiftDispatchMessage(tenantScopeId.value, accessToken.value, selectedShiftId.value, {
+      tenant_id: tenantScopeId.value,
+      shift_id: selectedShiftId.value,
+      audience_codes: dispatchAudienceCodes(),
+    });
+    setFeedback("good", tp("dispatchTitle"), tp("dispatchQueuedSuccess"));
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function generateOutput(audienceCode: "customer" | "internal") {
   if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
     return;
   }
-  await generateShiftOutput(tenantScopeId.value, accessToken.value, selectedShiftId.value, {
-    tenant_id: tenantScopeId.value,
-    variant_code: "deployment_plan",
-    audience_code: audienceCode,
-  });
-  shiftOutputs.value = await listShiftOutputs(tenantScopeId.value, accessToken.value, selectedShiftId.value);
+  loading.value = true;
+  try {
+    await generateShiftOutput(tenantScopeId.value, accessToken.value, selectedShiftId.value, {
+      tenant_id: tenantScopeId.value,
+      variant_code: "deployment_plan",
+      audience_code: audienceCode,
+    });
+    shiftOutputs.value = await listShiftOutputs(tenantScopeId.value, accessToken.value, selectedShiftId.value);
+  } finally {
+    loading.value = false;
+  }
 }
 
 function startOverride(ruleCode: string) {
@@ -2557,7 +2933,7 @@ watch(selectedShiftId, async () => {
 });
 
 watch(selectedAssignmentId, async () => {
-  if (!loading.value) {
+  if (!loading.value && !assignmentEditorLoading.value && !assignmentEditorSaving.value) {
     try {
       await loadSelectedAssignmentDetails();
     } catch (error) {
@@ -2739,6 +3115,7 @@ onBeforeUnmount(() => {
 
 .planning-staffing-row,
 .planning-staffing-subpanel,
+.planning-staffing-loading-state,
 .planning-staffing-feedback {
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 18px;
