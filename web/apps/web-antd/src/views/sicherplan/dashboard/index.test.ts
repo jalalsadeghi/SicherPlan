@@ -684,8 +684,8 @@ describe('SicherPlan dashboard session loading', () => {
     expect(initialCalendarLinks[0]?.attributes('data-to')).toContain('/admin/planning-staffing?');
     expect(initialCalendarLinks[0]?.attributes('data-to')).toContain('shift_id=shift-1');
     const firstItemQuery = new URLSearchParams(initialCalendarLinks[0]?.attributes('data-to')?.split('?')[1] ?? '');
-    expect(firstItemQuery.get('date_from')).toBe(formatExpectedLocalDateTime('2026-04-14T08:00:00Z'));
-    expect(firstItemQuery.get('date_to')).toBe(formatExpectedLocalDateTime('2026-04-15T16:00:00Z'));
+    expect(firstItemQuery.get('date_from')).toBe('2026-04-14T00:00');
+    expect(firstItemQuery.get('date_to')).toBe('2026-04-15T00:00');
     expect(initialCalendarLinks[0]?.attributes('aria-label')).toContain('sicherplan.dashboardView.calendar.coverageGood:');
     expect(initialCalendarLinks[0]?.find('.sp-dashboard__calendar-item-marker').exists()).toBe(true);
     expect(initialCalendarLinks[1]?.text()).toContain('Night Shift');
@@ -705,6 +705,7 @@ describe('SicherPlan dashboard session loading', () => {
     expect(expandedCalendarLinks[2]?.attributes('aria-label')).toContain('sicherplan.dashboardView.calendar.coverageSetupRequired:');
     expect(expandedCalendarLinks[2]?.attributes('data-to')).toContain('shift_id=shift-3');
     const thirdItemQuery = new URLSearchParams(expandedCalendarLinks[2]?.attributes('data-to')?.split('?')[1] ?? '');
-    expect(thirdItemQuery.get('date_to')).toBe(formatExpectedLocalDateTime('2026-04-15T21:00:00Z'));
+    expect(thirdItemQuery.get('date_from')).toBe('2026-04-14T00:00');
+    expect(thirdItemQuery.get('date_to')).toBe('2026-04-15T00:00');
   });
 });

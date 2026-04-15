@@ -205,10 +205,15 @@ function resolveCoverageMonthKey() {
   ].join(':');
 }
 
-function extendStaffingLookupEnd(value: string) {
-  const date = new Date(value);
-  date.setDate(date.getDate() + 1);
-  return date;
+function buildCanonicalStaffingWindow(coverageRow: CoverageShiftItem) {
+  const start = new Date(coverageRow.starts_at);
+  const end = new Date(coverageRow.ends_at);
+  const dateFrom = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
+  const dateTo = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1, 0, 0, 0, 0);
+  return {
+    date_from: formatDateTimeLocalValue(dateFrom),
+    date_to: formatDateTimeLocalValue(dateTo),
+  };
 }
 
 function buildCoverageShiftLabel(coverageRow: CoverageShiftItem) {
@@ -232,9 +237,10 @@ function buildCoverageStateLabel(coverageState: string) {
 }
 
 function buildStaffingCoverageRoute(coverageRow: CoverageShiftItem) {
+  const staffingWindow = buildCanonicalStaffingWindow(coverageRow);
   const query = new URLSearchParams({
-    date_from: formatDateTimeLocalValue(new Date(coverageRow.starts_at)),
-    date_to: formatDateTimeLocalValue(extendStaffingLookupEnd(coverageRow.ends_at)),
+    date_from: staffingWindow.date_from,
+    date_to: staffingWindow.date_to,
     planning_record_id: coverageRow.planning_record_id,
     shift_id: coverageRow.shift_id,
   });

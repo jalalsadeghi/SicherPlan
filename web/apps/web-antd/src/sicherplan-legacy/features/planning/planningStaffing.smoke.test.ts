@@ -136,6 +136,34 @@ const mocks = vi.hoisted(() => ({
     updated_at: "2026-04-05T07:30:00Z",
     archived_at: null,
   })),
+  getShiftMock: vi.fn(async () => ({
+    id: "shift-1",
+    tenant_id: "tenant-1",
+    shift_plan_id: "plan-1",
+    shift_series_id: null,
+    occurrence_date: "2026-05-08",
+    starts_at: "2026-05-08T08:00:00Z",
+    ends_at: "2026-05-08T16:00:00Z",
+    break_minutes: 0,
+    shift_type_code: "site_day",
+    location_text: "Berlin",
+    meeting_point: "Gate A",
+    release_state: "draft",
+    customer_visible_flag: false,
+    subcontractor_visible_flag: false,
+    stealth_mode_flag: false,
+    source_kind_code: "manual",
+    status: "active",
+    version_no: 1,
+    released_at: null,
+    released_by_user_id: null,
+    notes: null,
+    created_at: "2026-05-08T07:00:00Z",
+    updated_at: "2026-05-08T07:00:00Z",
+    created_by_user_id: null,
+    updated_by_user_id: null,
+    archived_at: null,
+  })),
   listAssignmentValidationOverridesMock: vi.fn(async () => []),
   listDemandGroupsMock: vi.fn(async () => [
     {
@@ -576,6 +604,10 @@ vi.mock("@/api/planningOrders", () => ({
   listPlanningRecords: mocks.listPlanningRecordsMock,
 }));
 
+vi.mock("@/api/planningShifts", () => ({
+  getShift: mocks.getShiftMock,
+}));
+
 vi.mock("@/api/employeeAdmin", () => ({
   listEmployees: mocks.listEmployeesMock,
   listFunctionTypes: mocks.listFunctionTypesMock,
@@ -894,14 +926,65 @@ describe("PlanningStaffingCoverageView", () => {
     expect(overlay.attributes("data-busy")).toBe("false");
   });
 
-  it("hydrates staffing filters and selected shift from route query context", async () => {
-    routeState.fullPath = "/admin/planning-staffing?date_from=2026-04-14T08:00&date_to=2026-04-14T16:00&planning_record_id=planning-1&shift_id=shift-1";
+  it("normalizes raw deep-link shift windows to the canonical staffing day window before exact hydration", async () => {
+    routeState.fullPath = "/admin/planning-staffing?date_from=2026-05-08T08:00&date_to=2026-05-09T16:00&planning_record_id=planning-1&shift_id=shift-1";
     routeState.query = {
-      date_from: "2026-04-14T08:00",
-      date_to: "2026-04-14T16:00",
+      date_from: "2026-05-08T08:00",
+      date_to: "2026-05-09T16:00",
       planning_record_id: "planning-1",
       shift_id: "shift-1",
     };
+    mocks.listStaffingCoverageMock.mockResolvedValueOnce([]);
+    mocks.listStaffingBoardMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "shift-1",
+          tenant_id: "tenant-1",
+          planning_record_id: "planning-1",
+          shift_plan_id: "plan-1",
+          order_id: "order-1",
+          order_no: "ORD-1",
+          planning_record_name: "Planning 1",
+          planning_mode_code: "site",
+          workforce_scope_code: "internal",
+          starts_at: "2026-05-08T08:00:00Z",
+          ends_at: "2026-05-08T16:00:00Z",
+          shift_type_code: "site_day",
+          release_state: "draft",
+          status: "active",
+          location_text: "Berlin",
+          meeting_point: "Gate A",
+          demand_groups: [
+            {
+              id: "dg-1",
+              shift_id: "shift-1",
+              function_type_id: "func-1",
+              qualification_type_id: "qual-1",
+              min_qty: 1,
+              target_qty: 2,
+              mandatory_flag: true,
+              assigned_count: 1,
+              confirmed_count: 1,
+              released_partner_qty: 0,
+            },
+          ],
+          assignments: [
+            {
+              id: "assignment-1",
+              shift_id: "shift-1",
+              demand_group_id: "dg-1",
+              team_id: "team-1",
+              employee_id: "employee-1",
+              subcontractor_worker_id: null,
+              assignment_status_code: "assigned",
+              assignment_source_code: "dispatcher",
+              confirmed_at: null,
+              version_no: 1,
+            },
+          ],
+        },
+      ]);
 
     const wrapper = await mountView();
 
@@ -909,14 +992,57 @@ describe("PlanningStaffingCoverageView", () => {
       "tenant-1",
       "token-1",
       expect.objectContaining({
-        date_from: "2026-04-14T08:00",
-        date_to: "2026-04-14T16:00",
+        date_from: "2026-05-08T00:00",
+        date_to: "2026-05-09T00:00",
         planning_record_id: "planning-1",
       }),
     );
-    expect((wrapper.find('input[type="datetime-local"]').element as HTMLInputElement).value).toBe("2026-04-14T08:00");
+    expect(mocks.getShiftMock).toHaveBeenCalledWith("tenant-1", "shift-1", "token-1");
+    expect(mocks.listStaffingBoardMock).toHaveBeenNthCalledWith(
+      2,
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({
+        date_from: "2026-05-08T00:00",
+        date_to: "2026-05-09T00:00",
+        planning_record_id: "planning-1",
+        shift_id: "shift-1",
+      }),
+    );
+    expect((wrapper.find('input[type="datetime-local"]').element as HTMLInputElement).value).toBe("2026-05-08T00:00");
     expect(wrapper.text()).toContain("Planning 1");
     expect(wrapper.text()).toContain("ORD-1 · site_day");
+    expect(wrapper.find('[data-testid="planning-staffing-planning-context-panel"]').exists()).toBe(false);
+  });
+
+  it("falls back only after exact deep-link shift hydration fails", async () => {
+    routeState.fullPath = "/admin/planning-staffing?date_from=2026-05-08T08:00&date_to=2026-05-09T16:00&planning_record_id=planning-1&shift_id=shift-missing";
+    routeState.query = {
+      date_from: "2026-05-08T08:00",
+      date_to: "2026-05-09T16:00",
+      planning_record_id: "planning-1",
+      shift_id: "shift-missing",
+    };
+    mocks.listStaffingCoverageMock.mockResolvedValueOnce([]);
+    mocks.listStaffingBoardMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const wrapper = await mountView();
+
+    expect(mocks.listStaffingBoardMock).toHaveBeenNthCalledWith(
+      2,
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({
+        date_from: "2026-05-08T00:00",
+        date_to: "2026-05-09T00:00",
+        planning_record_id: "planning-1",
+        shift_id: "shift-missing",
+      }),
+    );
+    expect(wrapper.find('[data-testid="planning-staffing-planning-context-panel"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("ORD-1 · site_day");
   });
 
   it("hides the staffing workspace behind permission gating for controller_qm", async () => {

@@ -1183,6 +1183,7 @@ import {
   type PlanningRecordListItem,
   type PlanningRecordRead,
 } from "@/api/planningOrders";
+import { getShift } from "@/api/planningShifts";
 import {
   assignStaffing,
   createAssignment,
@@ -1320,6 +1321,8 @@ const resolvedPlanningRecord = ref<null | PlanningRecordRead>(null);
 const planningRecordLookupLoading = ref(false);
 const planningRecordLookupError = ref("");
 const planningRecordLookupSearch = ref("");
+const routeHydrationShiftId = ref("");
+const routeHydrationInFlight = ref(false);
 const feedback = reactive({ message: "", title: "", tone: "error" });
 const filters = reactive({
   date_from: "2026-04-05T00:00",
@@ -1395,6 +1398,26 @@ function routeQueryValue(value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+function formatLocalDateTimeValue(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  const hours = String(value.getHours()).padStart(2, "0");
+  const minutes = String(value.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function canonicalStaffingWindow(startsAt: string, endsAt: string) {
+  const start = new Date(startsAt);
+  const end = new Date(endsAt);
+  const dateFrom = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
+  const dateTo = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1, 0, 0, 0, 0);
+  return {
+    date_from: formatLocalDateTimeValue(dateFrom),
+    date_to: formatLocalDateTimeValue(dateTo),
+  };
+}
+
 function applyRouteQueryContext(query = route.query) {
   let changed = false;
   const nextDateFrom = routeQueryValue(query.date_from);
@@ -1418,6 +1441,7 @@ function applyRouteQueryContext(query = route.query) {
     selectedShiftId.value = nextShiftId;
     changed = true;
   }
+  routeHydrationShiftId.value = nextShiftId || "";
 
   return changed;
 }
@@ -1642,8 +1666,36 @@ function ruleText(ruleCode: string) {
   return key ? tp(key) : ruleCode;
 }
 
-function queryFilters() {
-  return { ...filters };
+function queryFilters(options: { includeShiftId?: boolean; shiftId?: string } = {}) {
+  const query = { ...filters } as Record<string, unknown>;
+  const shiftId = options.shiftId ?? selectedShiftId.value;
+  if (options.includeShiftId && shiftId) {
+    query.shift_id = shiftId;
+  }
+  return query;
+}
+
+function exactShiftBoardFilters(shiftId: string) {
+  return {
+    date_from: filters.date_from,
+    date_to: filters.date_to,
+    planning_record_id: filters.planning_record_id || undefined,
+    shift_id: shiftId,
+  };
+}
+
+async function normalizeRouteHydrationWindow() {
+  if (!routeHydrationShiftId.value || !tenantScopeId.value || !accessToken.value) {
+    return;
+  }
+  try {
+    const shift = await getShift(tenantScopeId.value, routeHydrationShiftId.value, accessToken.value);
+    const canonicalWindow = canonicalStaffingWindow(shift.starts_at, shift.ends_at);
+    filters.date_from = canonicalWindow.date_from;
+    filters.date_to = canonicalWindow.date_to;
+  } catch {
+    // Leave the original route window in place if the exact shift cannot be read.
+  }
 }
 
 function rowCoverageState(row: CoverageShiftItem | null) {
@@ -1682,6 +1734,61 @@ function coverageStateForCounts(
     return "yellow";
   }
   return "red";
+}
+
+function deriveCoverageRowFromBoardShift(boardShift: StaffingBoardShiftItem): CoverageShiftItem {
+  const demandGroups = boardShift.demand_groups.map((group) => ({
+    demand_group_id: group.id,
+    function_type_id: group.function_type_id,
+    qualification_type_id: group.qualification_type_id,
+    min_qty: group.min_qty,
+    target_qty: group.target_qty,
+    assigned_count: group.assigned_count,
+    confirmed_count: group.confirmed_count,
+    released_partner_qty: group.released_partner_qty,
+    coverage_state: coverageStateForCounts(
+      group.min_qty,
+      group.target_qty,
+      group.assigned_count,
+      group.confirmed_count,
+      group.released_partner_qty,
+    ),
+  }));
+  const assignedCount = filters.confirmation_state === "confirmed_only"
+    ? demandGroups.reduce((sum, group) => sum + group.confirmed_count, 0)
+    : demandGroups.reduce((sum, group) => sum + group.assigned_count, 0);
+  const confirmedCount = demandGroups.reduce((sum, group) => sum + group.confirmed_count, 0);
+  const minRequiredQty = demandGroups.reduce((sum, group) => sum + group.min_qty, 0);
+  const targetRequiredQty = demandGroups.reduce((sum, group) => sum + group.target_qty, 0);
+  const releasedPartnerQty = demandGroups.reduce((sum, group) => sum + group.released_partner_qty, 0);
+  return {
+    shift_id: boardShift.id,
+    planning_record_id: boardShift.planning_record_id,
+    shift_plan_id: boardShift.shift_plan_id,
+    order_id: boardShift.order_id,
+    order_no: boardShift.order_no,
+    planning_record_name: boardShift.planning_record_name,
+    planning_mode_code: boardShift.planning_mode_code,
+    workforce_scope_code: boardShift.workforce_scope_code,
+    starts_at: boardShift.starts_at,
+    ends_at: boardShift.ends_at,
+    shift_type_code: boardShift.shift_type_code,
+    location_text: boardShift.location_text,
+    meeting_point: boardShift.meeting_point,
+    min_required_qty: minRequiredQty,
+    target_required_qty: targetRequiredQty,
+    assigned_count: assignedCount,
+    confirmed_count: confirmedCount,
+    released_partner_qty: releasedPartnerQty,
+    coverage_state: coverageStateForCounts(
+      minRequiredQty,
+      targetRequiredQty,
+      assignedCount,
+      confirmedCount,
+      releasedPartnerQty,
+    ),
+    demand_groups: demandGroups,
+  };
 }
 
 function assignmentIsConfirmed(assignment: Pick<StaffingBoardAssignmentItem, "assignment_status_code" | "confirmed_at">) {
@@ -2380,14 +2487,44 @@ async function refreshAll() {
   }
   loading.value = true;
   try {
+    if (routeHydrationShiftId.value) {
+      await normalizeRouteHydrationWindow();
+    }
+    const requestedShiftId = routeHydrationShiftId.value || "";
     const [coverage, board] = await Promise.all([
       listStaffingCoverage(tenantScopeId.value, accessToken.value, queryFilters()),
       listStaffingBoard(tenantScopeId.value, accessToken.value, queryFilters()),
     ]);
-    coverageRows.value = coverage;
-    boardRows.value = board;
-    if (!coverageRows.value.find((row) => row.shift_id === selectedShiftId.value)) {
+    let hydratedBoard = board;
+    let exactShiftBoard = requestedShiftId
+      ? hydratedBoard.find((row) => row.id === requestedShiftId) ?? null
+      : null;
+
+    if (requestedShiftId && !exactShiftBoard) {
+      const exactBoardRows = await listStaffingBoard(
+        tenantScopeId.value,
+        accessToken.value,
+        exactShiftBoardFilters(requestedShiftId),
+      );
+      exactShiftBoard = exactBoardRows.find((row) => row.id === requestedShiftId) ?? null;
+      if (exactShiftBoard && !hydratedBoard.some((row) => row.id === exactShiftBoard?.id)) {
+        hydratedBoard = [exactShiftBoard, ...hydratedBoard];
+      }
+    }
+
+    let hydratedCoverage = coverage;
+    if (exactShiftBoard && !hydratedCoverage.some((row) => row.shift_id === exactShiftBoard?.id)) {
+      hydratedCoverage = [deriveCoverageRowFromBoardShift(exactShiftBoard), ...hydratedCoverage];
+    }
+
+    coverageRows.value = hydratedCoverage;
+    boardRows.value = hydratedBoard;
+    if (requestedShiftId && exactShiftBoard) {
+      selectedShiftId.value = requestedShiftId;
+      routeHydrationShiftId.value = "";
+    } else if (!coverageRows.value.find((row) => row.shift_id === selectedShiftId.value)) {
       selectedShiftId.value = coverageRows.value[0]?.shift_id ?? "";
+      routeHydrationShiftId.value = "";
     }
     if (!selectedShiftId.value) {
       selectedDemandGroupId.value = "";
@@ -2404,6 +2541,7 @@ async function refreshAll() {
   } catch (error) {
     handleApiError(error);
   } finally {
+    routeHydrationInFlight.value = false;
     loading.value = false;
   }
 }
@@ -2923,7 +3061,7 @@ watch(selectedShiftId, async () => {
   if (demandGroupDialogOpen.value) {
     closeDemandGroupDialog();
   }
-  if (!loading.value) {
+  if (!loading.value && !routeHydrationInFlight.value) {
     try {
       await loadSelectedShiftDetails();
     } catch (error) {
@@ -3029,10 +3167,12 @@ watch(
 );
 
 onMounted(async () => {
+  routeHydrationInFlight.value = true;
   applyRouteQueryContext();
   authStore.syncFromPrimarySession();
   const sessionReady = await ensureStaffingSessionReady();
   if (!sessionReady || !tenantScopeId.value || !accessToken.value || !actionState.value.canReadCoverage) {
+    routeHydrationInFlight.value = false;
     return;
   }
   document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -3044,8 +3184,10 @@ onMounted(async () => {
 watch(
   () => route.fullPath,
   () => {
+    routeHydrationInFlight.value = true;
     const changed = applyRouteQueryContext();
     if (!changed || !tenantScopeId.value || !accessToken.value || !actionState.value.canReadCoverage) {
+      routeHydrationInFlight.value = false;
       return;
     }
     void refreshAll();

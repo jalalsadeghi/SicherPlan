@@ -2,147 +2,147 @@ You are working in the public repo `jalalsadeghi/SicherPlan`.
 
 Important working-mode rule:
 Treat the current working tree as the source of truth.
-The user’s live staffing page already has an assignment modal flow and recent loading-overlay work.
-Do NOT revert that work.
-Your task is to reduce the latency of create/edit assignment operations as much as safely possible, by eliminating unnecessary frontend waiting and redundant requests.
+A previous deep-link fix was incomplete and is now proven wrong by live logs.
+Do NOT continue from the assumption that `staffing-board?shift_id=...` alone is valid.
 
 Task:
-Optimize `/admin/planning-staffing` assignment interactions so that:
-1. opening an existing assignment for edit is much faster
-2. creating/saving/updating/removing assignments feels significantly faster
-3. the UI still stays correct and consistent
+Fix `/admin/planning-staffing` deep-link hydration from dashboard calendar links so the intended shift reliably opens and renders.
 
-Observed UX problem:
-Assignment actions in Staffing Coverage feel too slow:
-- clicking an existing assignment takes too long before edit is ready
-- saving assignment takes too long
-- repeated assignment operations make the page feel heavy and frustrating
+Current proven facts from the live system:
+1. The dashboard/staffing deep-link currently uses route query like:
+   - `date_from=2026-05-08T08:00`
+   - `date_to=2026-05-09T16:00`
+   - `planning_record_id=...`
+   - `shift_id=...`
+2. The page still fails to render the intended shift and falls back to empty/planning-context-only UI.
+3. A previous attempted fix changed exact hydration to:
+   - `GET /ops/staffing-board?shift_id=...`
+4. That exact request is INVALID in the real backend and returns 422.
+5. Backend router currently requires:
+   - `date_from: datetime = Query(...)`
+   - `date_to: datetime = Query(...)`
+   on the staffing-board filter dependency.
+6. Therefore, `shift_id` alone is not a valid exact-hydration query for staffing-board.
 
-Key objective:
-Reduce real waiting time, not just show more spinners.
-Loading feedback is useful, but the main goal is to remove unnecessary work and reduce total round-trips.
+You must treat the above as the new ground truth.
 
 What to inspect first:
 1. `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
-2. `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
-3. `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.smoke.test.ts`
+   especially:
+   - `applyRouteQueryContext()`
+   - `queryFilters()`
+   - `refreshAll()`
+   - any exact-shift hydration helper introduced by the previous patch
+   - route watcher
+   - selected shift hydration/fallback logic
+2. `web/apps/web-antd/src/views/sicherplan/dashboard/index.vue`
+   - current dashboard calendar link generation
+3. `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
+4. `web/apps/web-antd/src/sicherplan-legacy/api/planningShifts.ts`
+   - inspect whether `getShift(...)` can help derive canonical timing even if it does not replace staffing-board
+5. `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.smoke.test.ts`
 
-Before coding, explicitly map the current request flow for these two scenarios:
-A. clicking an existing assignment row to edit it
-B. clicking Save assignment in create/edit mode
+Critical debugging requirement:
+You must compare the two real cases:
 
-You must identify:
-- which requests fire
-- which ones are duplicated
-- which ones are unnecessarily global/heavy
-- which ones can be delayed, skipped, cached, or narrowed
+A. Failing route from dashboard:
+- `date_from=2026-05-08T08:00`
+- `date_to=2026-05-09T16:00`
+- `planning_record_id=...`
+- `shift_id=...`
 
-Known likely issues to validate:
-1. Opening edit mode may fetch assignment-related data more than once because:
-   - explicit edit-opening logic loads details
-   - watcher-based selection logic may load again
-2. Save/create/update may currently trigger a broad `refreshAll()` that refetches much more than assignment flow actually needs
-3. Supporting data such as employees / teams / team members may be getting reloaded even though assignment save does not require them to be refetched
-4. Shift outputs and release validations may be loaded eagerly even when the user is not on those tabs
+B. Manually working staffing page state:
+- the same shift opens correctly when the time window is adjusted to a staffing-friendly daily range
 
-Optimization goals:
-1. Open edit modal immediately (or near-immediately), without waiting for all detail requests first
-2. Eliminate duplicate assignment-detail fetches
-3. Replace broad post-save refresh with a targeted refresh strategy
-4. Avoid refetching supporting catalogs/lists unnecessarily
-5. Lazy-load or defer data that is not needed for the active tab
-6. Keep correctness after create/update/remove/substitute
+Your job is to determine the real contract difference between A and B.
 
-Preferred implementation strategy:
-A. Make edit-open fast
-- Do not block modal open on full assignment-detail loading
-- Open modal immediately using the data already available from the selected board assignment where possible
-- Load richer assignment details/validations/overrides in the background if still needed
-- Show modal-local loading state while those details hydrate
+Most likely root cause to verify:
+This is now likely a DATE WINDOW / TIMEZONE / STAFFING DAY semantics bug, not just a missing `shift_id` bug.
 
-B. Eliminate duplicate assignment-detail requests
-- Inspect whether `selectedAssignmentId` watcher duplicates explicit detail loading
-- Ensure assignment detail/validation/override fetch happens once per edit-open action
-- Add in-flight deduplication if needed
+Hypothesis to test:
+- dashboard currently generates a shift-window link
+- staffing page / staffing-board endpoint actually behaves correctly only with a staffing-day window (or another canonical window)
+- therefore exact hydration must use a canonical staffing window, not the raw dashboard shift window and not `shift_id` alone
 
-C. Replace `refreshAll()` after assignment mutations
-- Do NOT use a global full refresh for every create/update/remove if a narrower refresh can do the job
-- Prefer a targeted refresh helper such as:
-  - refresh current shift only
-  - refresh current assignment only
-  - refresh validations only when required
-- If the backend supports filtering `listStaffingCoverage` / `listStaffingBoard` by `shift_id`, use that to narrow the refresh
-- If not, patch local state optimistically from the returned `createAssignment` / `updateAssignment` payload and then do a minimal background reconciliation
+Required fix direction:
+You must find the safest combination of these fixes:
 
-D. Do not reload unrelated supporting data on every assignment action
-- `refreshSupportingData()` or equivalent should not run after every assignment create/edit unless the assignment action truly invalidates that data
-- Teams, team members, employees, subcontractor workers, releases, demand groups should only be refreshed when actually necessary
+1. Canonical staffing window normalization
+   - derive a staffing-compatible date window when `shift_id` is present
+   - this may mean converting the dashboard link or staffing hydration from “shift start/end window” to “day window” or another canonical operational window
+   - do NOT guess: inspect actual backend behavior and compare with the manually working case
 
-E. Lazy-load non-critical side data
-- Do not reload `listShiftOutputs(...)` on assignment actions unless outputs are actually needed
-- Do not reload shift release validations eagerly unless:
-  - the active tab needs them
-  - or assignment mutation requires them for visible state
-- Keep assignment validations/overrides targeted to the currently edited/selected assignment
+2. Correct exact hydration query
+   - if using `staffing-board`, always include the required `date_from` and `date_to`
+   - do not use `shift_id` alone
+   - if exact hydration is needed, combine:
+     - `shift_id`
+     - canonical date window
+     - optionally `planning_record_id` if required and safe
 
-F. Add caching where safe
-- Cache assignment details / validations / overrides per assignment id when safe
-- Invalidate or refresh that cache after mutation
-- Do not cache in a way that creates stale incorrect UI
+3. If necessary, use `getShift(...)` as a helper
+   - not as the final data source for UI
+   - but to derive the correct canonical date window or to confirm the shift’s true timestamps/context
 
-Important correctness constraints:
-- Do not break create mode
-- Do not break edit mode
-- Do not break remove/unassign/substitute
-- Do not break validation visibility where required
-- Do not silently hide backend validation failures
-- Keep selected-assignment behavior user-driven and stable
+4. Fix either or both:
+   - dashboard calendar link generation
+   - staffing page route hydration
+   whichever is necessary for the real contract
 
-Performance validation requirements:
-Before and after the fix, explicitly compare the request graph for:
-1. edit existing assignment
-2. save assignment
+Important implementation rule:
+The staffing page must not fail just because the dashboard passed a raw shift-window query that is not the canonical staffing-board filter shape.
+If needed, the staffing page should normalize that route input before calling the APIs.
 
-You must state:
-- request count before
-- request count after
-- which requests were removed, deduplicated, deferred, or narrowed
+Important fallback rule:
+Only fall back to empty/planning-context-only UI after:
+- canonical deep-link normalization has been attempted
+- exact hydration with valid required filters has been attempted
+- and the target shift still truly cannot be resolved
+
+Do NOT:
+- keep the broken `shift_id`-only staffing-board request
+- rely only on status code 200 without checking response bodies
+- rely only on tests that do not model the real failing route shape
 
 Testing requirements:
-Update/add focused tests in:
+Update/add tests in:
 `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.smoke.test.ts`
 
-At minimum verify:
-1. clicking an existing assignment no longer triggers duplicate assignment-detail loads
-2. edit modal can open before all detail fetches finish (if that is the chosen solution)
-3. saving assignment no longer causes unrelated supporting-data reloads
-4. assignment save uses targeted refresh or local patching instead of broad refreshAll where appropriate
-5. assignment create/edit/remove still leave the UI correct
-6. request-related mocks show fewer unnecessary calls than before
+Add a regression test that models the real scenario:
+1. route query contains:
+   - `date_from=2026-05-08T08:00`
+   - `date_to=2026-05-09T16:00`
+   - `planning_record_id=...`
+   - `shift_id=...`
+2. generic board/coverage calls using that raw route window fail to hydrate the target shift
+3. exact hydration using `shift_id` alone is invalid and must NOT be used
+4. canonical window normalization (or corrected link generation) is applied
+5. the page then successfully hydrates the intended shift
+6. the page renders real shift detail instead of empty/planning-context-only content
 
-Good concrete assertions to add if safe:
-- `getAssignment` / `getAssignmentValidations` / `listAssignmentValidationOverrides` are not called twice for one edit-open click
-- `listEmployees`, `listTeamMembers`, `listShiftOutputs` are not reloaded on every assignment save unless truly necessary
-- assignment list and selected shift state remain correct after mutation
+Also add tests for:
+- no 422-causing `staffing-board?shift_id=...` request path remains
+- canonical date window is used for exact hydration when `shift_id` exists
+- route-driven selected shift is preserved until canonical hydration finishes
 
 Acceptance criteria:
-- Edit assignment opens significantly faster
-- Save/create/update/remove assignment feel significantly faster
-- Duplicate and unnecessary requests are removed
-- The user-visible result remains correct
-- Tests cover the optimization and regression risk
+- The real failing dashboard link now opens the intended shift
+- No invalid `staffing-board?shift_id=...` request is made
+- The page no longer falls back incorrectly
+- The fix matches actual backend contract and live behavior
+- Tests cover the real regression
 
 At the end, provide a concise validation report with these headings:
 1. Root cause found
-2. Before/after request flow for edit-open
-3. Before/after request flow for save
-4. Which requests were removed or narrowed
+2. Why the previous `shift_id`-only fix was wrong
+3. What canonical window rule is now used
+4. Whether the fix was in dashboard link generation, staffing hydration, or both
 5. Which files were changed
 6. Which tests were updated or added
-7. Any remaining bottleneck that appears to be backend-side rather than frontend-side
+7. Any remaining manual checks you recommend
 
 Before coding, explicitly answer:
-- Which assignment requests are currently duplicated?
-- Which post-save requests are global but do not need to be?
-- Can current APIs be narrowed by `shift_id`, or is local patching the safer route?
-Then implement the safest high-impact optimization.
+- What does the 422 response body for `staffing-board?shift_id=...` say?
+- What is the exact difference between the failing dashboard window and the manually working window?
+- Should the canonical fix live in dashboard link generation, staffing hydration, or both?
+Then implement the safest real fix.
