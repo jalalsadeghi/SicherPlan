@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { flushPromises, mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent } from "vue";
 
 const sessionState = vi.hoisted(() => ({
@@ -563,9 +563,12 @@ vi.mock("ant-design-vue", async () => {
 async function mountView() {
   const { default: PlanningStaffingCoverageView } = await import("../../views/PlanningStaffingCoverageView.vue");
   const wrapper = mount(PlanningStaffingCoverageView);
+  mountedWrappers.push(wrapper);
   await flushPromises();
   return wrapper;
 }
+
+const mountedWrappers: VueWrapper[] = [];
 
 async function clickDetailTab(wrapper: Awaited<ReturnType<typeof mountView>>, tabId: string) {
   await wrapper.get(`#planning-staffing-tab-${tabId}`).trigger("click");
@@ -573,6 +576,12 @@ async function clickDetailTab(wrapper: Awaited<ReturnType<typeof mountView>>, ta
 }
 
 describe("PlanningStaffingCoverageView", () => {
+  afterEach(() => {
+    while (mountedWrappers.length) {
+      mountedWrappers.pop()?.unmount();
+    }
+  });
+
   beforeEach(() => {
     sessionState.role = "dispatcher";
     sessionState.tenantId = "tenant-1";
@@ -769,9 +778,19 @@ describe("PlanningStaffingCoverageView", () => {
     );
     expect(mocks.listStaffingCoverageMock.mock.calls.length).toBeGreaterThan(1);
 
+    await clickDetailTab(wrapper, "assignments");
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
+    await clickDetailTab(wrapper, "demand_staffing");
+
     await wrapper.get('[data-testid="planning-staffing-unassign-action"]').trigger("click");
     await flushPromises();
     expect(mocks.unassignStaffingMock).toHaveBeenCalledTimes(1);
+
+    await clickDetailTab(wrapper, "assignments");
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
+    await clickDetailTab(wrapper, "demand_staffing");
 
     await wrapper.get('[data-testid="planning-staffing-team-select"]').setValue("team-1");
     await wrapper.get('[data-testid="planning-staffing-member-select"]').setValue("member-1");
@@ -842,9 +861,12 @@ describe("PlanningStaffingCoverageView", () => {
 
   it("hides the confirmation-at-creation control when acting on an existing assignment", async () => {
     const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
 
+    expect(wrapper.find('[data-testid="planning-staffing-confirm-now"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("Zuweisung jetzt als bestaetigt anlegen");
-    expect(wrapper.text()).not.toContain("Aktiviert setzt beim Zuweisen sofort einen Bestaetigungszeitpunkt.");
   });
 
   it("treats team as optional context and keeps assignment actor concrete", async () => {
@@ -1283,9 +1305,9 @@ describe("PlanningStaffingCoverageView", () => {
     const wrapper = await mountView();
     await clickDetailTab(wrapper, "assignments");
 
-    expect(wrapper.text()).toContain("Planung Alpha");
     await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
     await flushPromises();
+    expect(wrapper.text()).toContain("Planung Alpha");
     await wrapper.get('[data-testid="planning-staffing-assignment-team-select"]').setValue("team-shift-1");
     await wrapper.get('[data-testid="planning-staffing-assignment-modal"]').trigger("submit");
     await flushPromises();
@@ -1369,6 +1391,16 @@ describe("PlanningStaffingCoverageView", () => {
     expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(false);
   });
 
+  it("does not auto-select an existing assignment when the assignments tab opens", async () => {
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+
+    const assignmentRow = wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]');
+    expect(assignmentRow.classes()).not.toContain("selected");
+    expect(wrapper.find(".planning-staffing-assignment-validation-summary").exists()).toBe(false);
+    expect(mocks.getAssignmentMock).not.toHaveBeenCalled();
+  });
+
   it("opens the assignment modal in create mode from the assignments panel", async () => {
     const wrapper = await mountView();
     await clickDetailTab(wrapper, "assignments");
@@ -1388,7 +1420,7 @@ describe("PlanningStaffingCoverageView", () => {
 
     const assignmentRow = wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]');
     expect(assignmentRow.classes()).toContain("planning-staffing-row--assignment");
-    expect(assignmentRow.classes()).toContain("selected");
+    expect(assignmentRow.classes()).not.toContain("selected");
     expect(assignmentRow.find(".planning-staffing-assignment-row__title").text()).toContain("Alex Muster");
     expect(assignmentRow.find(".planning-staffing-assignment-row__detail").text()).toContain("Sicherheitsdienst");
     expect(assignmentRow.find(".planning-staffing-assignment-row__meta").text()).toContain("assigned");
@@ -1396,10 +1428,198 @@ describe("PlanningStaffingCoverageView", () => {
     await assignmentRow.trigger("click");
     await flushPromises();
 
+    expect(assignmentRow.classes()).toContain("selected");
     expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(true);
     expect(wrapper.get(".modal-stub__title").text()).toContain("Zuweisung bearbeiten");
     expect((wrapper.get('[data-testid="planning-staffing-assignment-demand-group"]').element as HTMLSelectElement).value).toBe("dg-1");
     expect((wrapper.get('[data-testid="planning-staffing-assignment-member-select"]').element as HTMLSelectElement).value).toBe("employee-1");
+  });
+
+  it("preserves an explicit assignment selection across refresh only when the same assignment still exists", async () => {
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').classes()).toContain("selected");
+
+    mocks.listStaffingBoardMock.mockResolvedValueOnce([
+      {
+        id: "shift-1",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        shift_plan_id: "plan-1",
+        order_id: "order-1",
+        order_no: "ORD-1",
+        planning_record_name: "Planning 1",
+        planning_mode_code: "site",
+        workforce_scope_code: "internal",
+        starts_at: "2026-04-05T08:00:00Z",
+        ends_at: "2026-04-05T16:00:00Z",
+        shift_type_code: "site_day",
+        release_state: "draft",
+        status: "active",
+        location_text: "Berlin",
+        meeting_point: "Gate A",
+        demand_groups: [
+          {
+            id: "dg-1",
+            shift_id: "shift-1",
+            function_type_id: "func-1",
+            qualification_type_id: "qual-1",
+            min_qty: 1,
+            target_qty: 2,
+            mandatory_flag: true,
+            assigned_count: 1,
+            confirmed_count: 1,
+            released_partner_qty: 0,
+          },
+        ],
+        assignments: [
+          {
+            id: "assignment-1",
+            shift_id: "shift-1",
+            demand_group_id: "dg-1",
+            team_id: "team-1",
+            employee_id: "employee-1",
+            subcontractor_worker_id: null,
+            assignment_status_code: "assigned",
+            assignment_source_code: "dispatcher",
+            confirmed_at: null,
+            version_no: 1,
+          },
+        ],
+      },
+    ]);
+
+    window.dispatchEvent(new Event("focus"));
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').classes()).toContain("selected");
+  });
+
+  it("clears assignment selection after refresh when the selected assignment disappears instead of selecting another row", async () => {
+    mocks.listStaffingBoardMock.mockResolvedValueOnce([
+      {
+        id: "shift-1",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        shift_plan_id: "plan-1",
+        order_id: "order-1",
+        order_no: "ORD-1",
+        planning_record_name: "Planning 1",
+        planning_mode_code: "site",
+        workforce_scope_code: "internal",
+        starts_at: "2026-04-05T08:00:00Z",
+        ends_at: "2026-04-05T16:00:00Z",
+        shift_type_code: "site_day",
+        release_state: "draft",
+        status: "active",
+        location_text: "Berlin",
+        meeting_point: "Gate A",
+        demand_groups: [
+          {
+            id: "dg-1",
+            shift_id: "shift-1",
+            function_type_id: "func-1",
+            qualification_type_id: "qual-1",
+            min_qty: 1,
+            target_qty: 2,
+            mandatory_flag: true,
+            assigned_count: 1,
+            confirmed_count: 1,
+            released_partner_qty: 0,
+          },
+        ],
+        assignments: [
+          {
+            id: "assignment-1",
+            shift_id: "shift-1",
+            demand_group_id: "dg-1",
+            team_id: "team-1",
+            employee_id: "employee-1",
+            subcontractor_worker_id: null,
+            assignment_status_code: "assigned",
+            assignment_source_code: "dispatcher",
+            confirmed_at: null,
+            version_no: 1,
+          },
+          {
+            id: "assignment-2",
+            shift_id: "shift-1",
+            demand_group_id: "dg-1",
+            team_id: "team-shift-1",
+            employee_id: "employee-1",
+            subcontractor_worker_id: null,
+            assignment_status_code: "confirmed",
+            assignment_source_code: "manual",
+            confirmed_at: null,
+            version_no: 1,
+          },
+        ],
+      },
+    ]);
+
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+    await wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').classes()).toContain("selected");
+
+    mocks.listStaffingBoardMock.mockResolvedValueOnce([
+      {
+        id: "shift-1",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        shift_plan_id: "plan-1",
+        order_id: "order-1",
+        order_no: "ORD-1",
+        planning_record_name: "Planning 1",
+        planning_mode_code: "site",
+        workforce_scope_code: "internal",
+        starts_at: "2026-04-05T08:00:00Z",
+        ends_at: "2026-04-05T16:00:00Z",
+        shift_type_code: "site_day",
+        release_state: "draft",
+        status: "active",
+        location_text: "Berlin",
+        meeting_point: "Gate A",
+        demand_groups: [
+          {
+            id: "dg-1",
+            shift_id: "shift-1",
+            function_type_id: "func-1",
+            qualification_type_id: "qual-1",
+            min_qty: 1,
+            target_qty: 2,
+            mandatory_flag: true,
+            assigned_count: 1,
+            confirmed_count: 1,
+            released_partner_qty: 0,
+          },
+        ],
+        assignments: [
+          {
+            id: "assignment-2",
+            shift_id: "shift-1",
+            demand_group_id: "dg-1",
+            team_id: "team-shift-1",
+            employee_id: "employee-1",
+            subcontractor_worker_id: null,
+            assignment_status_code: "confirmed",
+            assignment_source_code: "manual",
+            confirmed_at: null,
+            version_no: 1,
+          },
+        ],
+      },
+    ]);
+
+    window.dispatchEvent(new Event("focus"));
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-2"]').classes()).not.toContain("selected");
+    expect(wrapper.find(".planning-staffing-assignment-validation-summary").exists()).toBe(false);
   });
 
   it("resets and cancels the assignment modal without changing unrelated page state", async () => {

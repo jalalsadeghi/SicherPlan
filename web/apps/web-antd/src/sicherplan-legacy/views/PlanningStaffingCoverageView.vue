@@ -2145,7 +2145,7 @@ async function loadSelectedShiftDetails() {
     return;
   }
   if (!boardShift.assignments.some((row) => row.id === selectedAssignmentId.value)) {
-    selectedAssignmentId.value = boardShift.assignments[0]!.id;
+    selectedAssignmentId.value = "";
   }
   await loadSelectedAssignmentDetails();
 }
