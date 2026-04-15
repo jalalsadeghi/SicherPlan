@@ -39,7 +39,7 @@ export const reportingMessages = {
     dateTo: "Bis",
     customerId: "Kunde",
     subcontractorId: "Partner",
-    employeeId: "Mitarbeitende",
+    employeeId: "Mitarbeiter",
     exportDone: "CSV-Datei wurde heruntergeladen.",
     tableTitle: "Ergebnisse",
     summaryTitle: "Kurzuebersicht",

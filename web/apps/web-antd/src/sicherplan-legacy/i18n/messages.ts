@@ -1732,7 +1732,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "route.admin.recruiting.title": "Recruiting",
     "route.admin.recruiting.description":
       "Bewerbungen prüfen, Interviewschritte dokumentieren und Entscheidungen nachvollziehbar steuern.",
-    "route.admin.employees.title": "Mitarbeitende",
+    "route.admin.employees.title": "Mitarbeiter",
     "route.admin.employees.description":
       "Recruiting, Personalakte, Verfügbarkeit und Qualifikationen.",
     "route.admin.subcontractors.title": "Subunternehmer",
@@ -1763,7 +1763,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "route.portal.customerHistory.title": "Historie",
     "route.portal.subcontractor.title": "Subunternehmerportal",
     "route.portal.subcontractor.description":
-      "Freigegebene Einsätze, Mitarbeitende und Rückmeldungen im freigegebenen Umfang.",
+      "Freigegebene Einsätze, Mitarbeiter und Rückmeldungen im freigegebenen Umfang.",
     "portalSubcontractor.eyebrow": "Partnerzugang",
     "portalSubcontractor.title": "Subunternehmerportal und Scope-Prüfung",
     "portalSubcontractor.lead":
@@ -1848,18 +1848,18 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Kurze Rückmeldung oder ergänzende Notiz für das freigegebene Wachbuch erfassen.",
     "portalSubcontractor.watchbooks.actions.submit": "Eintrag speichern",
     "portalSubcontractor.allocation.eyebrow": "Selbstdisposition",
-    "portalSubcontractor.allocation.title": "Eigene Mitarbeitende auf freigegebene Positionen disponieren",
+    "portalSubcontractor.allocation.title": "Eigene Mitarbeiter auf freigegebene Positionen disponieren",
     "portalSubcontractor.allocation.lead":
-      "Die Auswahl bleibt auf eigene Partner-Mitarbeitende begrenzt. Solange die Planungsfreigabe noch nicht angebunden ist, zeigt das Portal nur Vorschau und ehrliche Validierungsgründe.",
+      "Die Auswahl bleibt auf eigene Partner-Mitarbeiter begrenzt. Solange die Planungsfreigabe noch nicht angebunden ist, zeigt das Portal nur Vorschau und ehrliche Validierungsgründe.",
     "portalSubcontractor.allocation.position": "Freigegebene Position",
-    "portalSubcontractor.allocation.worker": "Eigener Mitarbeitender",
+    "portalSubcontractor.allocation.worker": "Eigener Mitarbeiter",
     "portalSubcontractor.allocation.action": "Aktion",
     "portalSubcontractor.allocation.preview": "Validierung prüfen",
     "portalSubcontractor.allocation.submit": "Disposition bestätigen",
     "portalSubcontractor.allocation.noPositions":
       "Es gibt noch keine freigegebenen Positionen für die Selbstdisposition in diesem Portal.",
     "portalSubcontractor.allocation.noWorkers":
-      "Es sind keine aktiven eigenen Mitarbeitenden für die Selbstdisposition verfügbar.",
+      "Es sind keine aktiven eigenen Mitarbeiter für die Selbstdisposition verfügbar.",
     "portalSubcontractor.allocation.pendingPlanning":
       "Die Planungsfreigabe für echte Zuweisungen ist in diesem Branch noch nicht angebunden. Vorschau und Ergebnis bleiben deshalb explizit unverbindlich.",
     "portalSubcontractor.allocation.validationTitle": "Validierungsfeedback",
@@ -1876,15 +1876,15 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalSubcontractor.allocation.status.blocked_by_validation": "durch Validierung blockiert",
     "portalSubcontractor.allocation.status.planning_contract_unavailable": "Planungsschnittstelle noch nicht verfügbar",
     "portalSubcontractor.workforce.lead":
-      "Portalnutzende pflegen nur eigene Mitarbeitende und deren Nachweise. Interne Finanz-, Audit- und Admin-Felder bleiben ausgeblendet.",
+      "Portalnutzende pflegen nur eigene Mitarbeiter und deren Nachweise. Interne Finanz-, Audit- und Admin-Felder bleiben ausgeblendet.",
     "portalSubcontractor.workforce.boundary":
-      "Diese Selbstbedienungsansicht ist strikt auf den verknüpften Subunternehmer und dessen eigene Mitarbeitende begrenzt.",
-    "portalSubcontractor.workforce.workerList": "Eigene Mitarbeitende",
-    "portalSubcontractor.workforce.empty": "Es sind noch keine eigenen Mitarbeitenden im Portal erfasst.",
-    "portalSubcontractor.workforce.editTitle": "Mitarbeitendenstammdaten bearbeiten",
-    "portalSubcontractor.workforce.saveWorker": "Mitarbeitenden speichern",
+      "Diese Selbstbedienungsansicht ist strikt auf den verknüpften Subunternehmer und dessen eigene Mitarbeiter begrenzt.",
+    "portalSubcontractor.workforce.workerList": "Eigene Mitarbeiter",
+    "portalSubcontractor.workforce.empty": "Es sind noch keine eigenen Mitarbeiter im Portal erfasst.",
+    "portalSubcontractor.workforce.editTitle": "Mitarbeiterstammdaten bearbeiten",
+    "portalSubcontractor.workforce.saveWorker": "Mitarbeiter speichern",
     "portalSubcontractor.workforce.qualificationsTitle": "Qualifikationen und Nachweise",
-    "portalSubcontractor.workforce.noQualifications": "Es sind noch keine Qualifikationen für diesen Mitarbeitenden hinterlegt.",
+    "portalSubcontractor.workforce.noQualifications": "Es sind noch keine Qualifikationen für diesen Mitarbeiter hinterlegt.",
     "portalSubcontractor.workforce.qualificationEditor": "Qualifikation pflegen",
     "portalSubcontractor.workforce.qualificationType": "Qualifikationstyp",
     "portalSubcontractor.workforce.saveQualification": "Qualifikation speichern",
@@ -1919,7 +1919,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "portalSubcontractor.feedback.allocationPositionNotFound":
       "Die freigegebene Position konnte für diesen Partner-Scope nicht gefunden werden.",
     "portalSubcontractor.feedback.allocationWorkerNotFound":
-      "Der ausgewählte Mitarbeitende gehört nicht zum aktuellen Partner-Scope.",
+      "Der ausgewählte Mitarbeiter gehört nicht zum aktuellen Partner-Scope.",
     "portalSubcontractor.feedback.allocationPlanningUnavailable":
       "Die Planungsfreigabe für echte Dispositionen ist noch nicht angebunden.",
     "portalSubcontractor.feedback.allocationBlocked":
@@ -2214,7 +2214,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "recruitingAdmin.summary.desiredRole": "Gewünschte Position",
     "recruitingAdmin.summary.availability": "Verfügbar ab",
     "recruitingAdmin.summary.source": "Quelle",
-    "recruitingAdmin.summary.employeeFile": "Mitarbeitendenakte",
+    "recruitingAdmin.summary.employeeFile": "Mitarbeiterakte",
     "recruitingAdmin.summary.none": "keine Angabe",
     "recruitingAdmin.consent.eyebrow": "Datenschutz",
     "recruitingAdmin.consent.title": "Einwilligungsnachweis",
@@ -2273,7 +2273,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "recruitingAdmin.event.decision": "Entscheidung",
     "recruitingAdmin.event.reopened": "Wiederöffnet",
     "recruitingAdmin.event.ready_for_conversion": "Bereit für Übernahme",
-    "recruitingAdmin.event.converted": "In Mitarbeitendenakte übernommen",
+    "recruitingAdmin.event.converted": "In Mitarbeiterakte übernommen",
     "recruitingAdmin.event.recruiter_note": "Review-Notiz",
     "recruitingAdmin.event.interview_note": "Interviewnotiz",
     "recruitingAdmin.feedback.titleSuccess": "Aktion erfolgreich",
@@ -2299,7 +2299,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "recruitingAdmin.feedback.noteRequired":
       "Für diese Notizaktion ist ein Inhalt erforderlich.",
     "recruitingAdmin.feedback.conversionMissing":
-      "Die zugeordnete Mitarbeitendenakte konnte nicht geladen werden.",
+      "Die zugeordnete Mitarbeiterakte konnte nicht geladen werden.",
     "recruitingAdmin.feedback.documentNotFound":
       "Das angeforderte Bewerbungsdokument konnte nicht geladen werden.",
     "recruitingAdmin.feedback.transitionSaved":
@@ -2314,35 +2314,35 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Bewerbung wirklich ablehnen? Dieser Schritt wird dokumentiert.",
     "recruitingAdmin.common.yes": "Ja",
     "recruitingAdmin.common.no": "Nein",
-    "employeeAdmin.eyebrow": "Mitarbeitende",
-    "employeeAdmin.title": "Mitarbeitendenakte und operative Pflege",
+    "employeeAdmin.eyebrow": "Mitarbeiter",
+    "employeeAdmin.title": "Mitarbeiterakte und operative Pflege",
     "employeeAdmin.lead":
-      "Diese Mitarbeitendenansicht arbeitet direkt gegen die operative HR-API, hält private Bereiche getrennt und nutzt den zentralen Dokumentendienst für Profilfoto und Dateinachweise.",
+      "Diese Mitarbeiteransicht arbeitet direkt gegen die operative HR-API, hält private Bereiche getrennt und nutzt den zentralen Dokumentendienst für Profilfoto und Dateinachweise.",
     "employeeAdmin.permission.read": "Leserecht",
     "employeeAdmin.permission.write": "Schreibrecht",
     "employeeAdmin.permission.privateRead": "HR-Privat lesen",
-    "employeeAdmin.permission.missingTitle": "Mitarbeitenden-Berechtigung fehlt",
+    "employeeAdmin.permission.missingTitle": "Mitarbeiter-Berechtigung fehlt",
     "employeeAdmin.permission.missingBody":
-      "Diese Verwaltungsseite ist nur für Rollen mit Mitarbeitenden-Leserecht verfügbar.",
+      "Diese Verwaltungsseite ist nur für Rollen mit Mitarbeiter-Leserecht verfügbar.",
     "employeeAdmin.scope.label": "Mandanten-Scope",
     "employeeAdmin.scope.placeholder": "Tenant-UUID für Plattform-Admin-Modus",
     "employeeAdmin.scope.help":
       "Plattformadmins können den aktiven Mandanten wechseln; Tenant-Admins bleiben im Sitzungskontext.",
     "employeeAdmin.scope.reconcilingTitle": "Sitzung wird abgeglichen",
     "employeeAdmin.scope.reconcilingBody":
-      "Die Mitarbeitendenverwaltung gleicht gerade die Sitzung mit dem aktiven Mandantenkontext ab.",
+      "Die Mitarbeiterverwaltung gleicht gerade die Sitzung mit dem aktiven Mandantenkontext ab.",
     "employeeAdmin.scope.missingTitle": "Mandanten-Scope fehlt",
     "employeeAdmin.scope.missingBody":
-      "Wählen Sie zuerst einen Mandanten, bevor Mitarbeitende geladen werden.",
+      "Wählen Sie zuerst einen Mandanten, bevor Mitarbeiter geladen werden.",
     "employeeAdmin.list.eyebrow": "Liste",
-    "employeeAdmin.list.title": "Mitarbeitende",
-    "employeeAdmin.list.empty": "Keine Mitarbeitenden für die aktuellen Filter gefunden.",
+    "employeeAdmin.list.title": "Mitarbeiter",
+    "employeeAdmin.list.empty": "Keine Mitarbeiter für die aktuellen Filter gefunden.",
     "employeeAdmin.detail.eyebrow": "Akte",
-    "employeeAdmin.detail.newTitle": "Neue Mitarbeitendenakte",
-    "employeeAdmin.detail.emptyTitle": "Keine Mitarbeitendenakte ausgewählt",
+    "employeeAdmin.detail.newTitle": "Neue Mitarbeiterakte",
+    "employeeAdmin.detail.emptyTitle": "Keine Mitarbeiterakte ausgewählt",
     "employeeAdmin.detail.emptyEyebrow": "Detailansicht",
     "employeeAdmin.detail.emptyBody":
-      "Wählen Sie links eine Mitarbeitendenakte aus oder legen Sie eine neue an.",
+      "Wählen Sie links eine Mitarbeiterakte aus oder legen Sie eine neue an.",
     "employeeAdmin.tabs.overview": "Überblick",
     "employeeAdmin.tabs.appAccess": "App-Zugang",
     "employeeAdmin.tabs.profilePhoto": "Profilfoto",
@@ -2356,9 +2356,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.tabs.addresses": "Adressen",
     "employeeAdmin.tabs.documents": "Dateien",
     "employeeAdmin.form.eyebrow": "Datei",
-    "employeeAdmin.form.title": "Strukturierte Mitarbeitendenakte",
+    "employeeAdmin.form.title": "Strukturierte Mitarbeiterakte",
     "employeeAdmin.form.lead":
-      "Die Mitarbeitendenakte ist in klare Pflegebereiche gegliedert, damit Stammdaten, Zuordnung und Zugangskopplung schneller erfasst werden können.",
+      "Die Mitarbeiterakte ist in klare Pflegebereiche gegliedert, damit Stammdaten, Zuordnung und Zugangskopplung schneller erfasst werden können.",
     "employeeAdmin.form.identityEyebrow": "Grunddaten",
     "employeeAdmin.form.identityTitle": "Identität und Personalnummer",
     "employeeAdmin.form.contactEyebrow": "Kontakt",
@@ -2472,7 +2472,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.privateProfile.emergencyTitle": "Kontakt im Notfall",
     "employeeAdmin.privateProfile.notesEyebrow": "Notizen",
     "employeeAdmin.privateProfile.notesTitle": "Vertrauliche HR-Notizen",
-    "employeeAdmin.privateProfile.notesLead": "Nur im HR-Privatprofil sichtbare Hinweise, die nicht in die operative Mitarbeitendenakte gehören.",
+    "employeeAdmin.privateProfile.notesLead": "Nur im HR-Privatprofil sichtbare Hinweise, die nicht in die operative Mitarbeiterakte gehören.",
     "employeeAdmin.privateProfile.actionsEyebrow": "Aktion",
     "employeeAdmin.privateProfile.actionsTitle": "Privatprofil speichern oder zurücksetzen",
     "employeeAdmin.privateProfile.maritalStatusPlaceholder": "Familienstand auswaehlen",
@@ -2489,7 +2489,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.employmentType.other": "Sonstiges",
     "employeeAdmin.photo.eyebrow": "Profilfoto",
     "employeeAdmin.photo.title": "Foto und Vorschau",
-    "employeeAdmin.photo.alt": "Profilfoto der mitarbeitenden Person",
+    "employeeAdmin.photo.alt": "Profilfoto der Mitarbeiterin oder des Mitarbeiters",
     "employeeAdmin.photo.empty": "Noch kein Profilfoto hinterlegt",
     "employeeAdmin.photo.help": "Das Foto wird über den zentralen Dokumentendienst versioniert.",
     "employeeAdmin.photo.manageEyebrow": "Medien",
@@ -2505,23 +2505,23 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.notes.empty": "Noch keine operativen Notizen vorhanden.",
     "employeeAdmin.groups.eyebrow": "Gruppen",
     "employeeAdmin.groups.title": "Gruppen und Zuordnungen",
-    "employeeAdmin.groups.lead": "Gruppenkatalog und Mitarbeitenden-Zuordnung bleiben getrennt, damit Pflege und Einsatzsteuerung nicht vermischt werden.",
+    "employeeAdmin.groups.lead": "Gruppenkatalog und Mitarbeiter-Zuordnung bleiben getrennt, damit Pflege und Einsatzsteuerung nicht vermischt werden.",
     "employeeAdmin.groups.catalogEyebrow": "Katalog",
     "employeeAdmin.groups.catalogTitle": "Gruppe anlegen oder pflegen",
     "employeeAdmin.groups.assignEyebrow": "Zuordnung",
-    "employeeAdmin.groups.assignTitle": "Mitarbeitenden-Gruppe zuweisen",
+    "employeeAdmin.groups.assignTitle": "Mitarbeiter-Gruppe zuweisen",
     "employeeAdmin.groups.currentEyebrow": "Bestand",
     "employeeAdmin.groups.currentTitle": "Aktive Gruppenzuordnungen",
     "employeeAdmin.groups.empty": "Noch keine Gruppenzuordnungen vorhanden.",
     "employeeAdmin.groups.selectPlaceholder": "Gruppe auswählen",
     "employeeAdmin.addresses.eyebrow": "Adressen",
     "employeeAdmin.addresses.title": "Adresshistorie",
-    "employeeAdmin.addresses.lead": "Aktuelle und frühere Mitarbeitendenadressen werden direkt in dieser Akte gepflegt.",
+    "employeeAdmin.addresses.lead": "Aktuelle und frühere Mitarbeiteradressen werden direkt in dieser Akte gepflegt.",
     "employeeAdmin.addresses.currentEyebrow": "Aktuell",
     "employeeAdmin.addresses.currentTitle": "Aktuelle Adresse",
     "employeeAdmin.addresses.currentEmpty": "Keine aktuelle Adresse vorhanden.",
     "employeeAdmin.addresses.historyEyebrow": "Historie",
-    "employeeAdmin.addresses.historyTitle": "Aktuelle und frühere Mitarbeitendenadressen",
+    "employeeAdmin.addresses.historyTitle": "Aktuelle und frühere Mitarbeiteradressen",
     "employeeAdmin.addresses.editorEyebrow": "Bearbeitung",
     "employeeAdmin.addresses.editorTitle": "Adresse anlegen oder bearbeiten",
     "employeeAdmin.addresses.editorLead": "Neue Adresshistorie wird mit Start- und optionalem Enddatum direkt über die Admin-Endpunkte gespeichert.",
@@ -2542,7 +2542,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.addresses.closedBadge": "Beendet",
     "employeeAdmin.qualifications.eyebrow": "Qualifikationen",
     "employeeAdmin.qualifications.title": "Qualifikationen und Funktionen",
-    "employeeAdmin.qualifications.lead": "Qualifikationen, Funktionsfreigaben und zugehörige Nachweise werden direkt in der Mitarbeitendenakte gepflegt.",
+    "employeeAdmin.qualifications.lead": "Qualifikationen, Funktionsfreigaben und zugehörige Nachweise werden direkt in der Mitarbeiterakte gepflegt.",
     "employeeAdmin.qualifications.registerEyebrow": "Register",
     "employeeAdmin.qualifications.registerTitle": "Bestehende Qualifikationen",
     "employeeAdmin.qualifications.empty": "Noch keine Qualifikationen oder Funktionsfreigaben vorhanden.",
@@ -2596,7 +2596,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.catalogs.inactiveLabel": "Inaktiv",
     "employeeAdmin.credentials.eyebrow": "Ausweise",
     "employeeAdmin.credentials.title": "Ausweise und Badge-Ausgabe",
-    "employeeAdmin.credentials.lead": "Mitarbeitendenausweise bleiben als eigener Bestand mit Gültigkeit, Kennungswert und Badge-Ausgabe verfügbar.",
+    "employeeAdmin.credentials.lead": "Mitarbeiterausweise bleiben als eigener Bestand mit Gültigkeit, Kennungswert und Badge-Ausgabe verfügbar.",
     "employeeAdmin.credentials.registerEyebrow": "Register",
     "employeeAdmin.credentials.registerTitle": "Bestehende Ausweise",
     "employeeAdmin.credentials.empty": "Noch keine Ausweise vorhanden.",
@@ -2609,7 +2609,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.credentialType.work_badge": "Work badge",
     "employeeAdmin.availability.eyebrow": "Verfügbarkeit",
     "employeeAdmin.availability.title": "Verfügbarkeitsregeln",
-    "employeeAdmin.availability.lead": "Zeitfenster, Wiederholung und Wochentagsmuster bleiben direkt in der Mitarbeitendenakte pflegbar.",
+    "employeeAdmin.availability.lead": "Zeitfenster, Wiederholung und Wochentagsmuster bleiben direkt in der Mitarbeiterakte pflegbar.",
     "employeeAdmin.availability.registerEyebrow": "Register",
     "employeeAdmin.availability.registerTitle": "Bestehende Verfügbarkeitsregeln",
     "employeeAdmin.availability.empty": "Noch keine Verfügbarkeitsregeln vorhanden.",
@@ -2621,7 +2621,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.availabilityRuleKind.free_wish": "Freier Wunsch",
     "employeeAdmin.absences.eyebrow": "Abwesenheiten",
     "employeeAdmin.absences.title": "Abwesenheiten und Sperrzeiten",
-    "employeeAdmin.absences.lead": "Abwesenheiten bleiben im privaten Mitarbeitendenbereich und werden hier mit Zeitraum und Notiz gepflegt.",
+    "employeeAdmin.absences.lead": "Abwesenheiten bleiben im privaten Mitarbeiterbereich und werden hier mit Zeitraum und Notiz gepflegt.",
     "employeeAdmin.absences.registerEyebrow": "Register",
     "employeeAdmin.absences.registerTitle": "Bestehende Abwesenheiten",
     "employeeAdmin.absences.empty": "Noch keine Abwesenheiten vorhanden.",
@@ -2632,13 +2632,13 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.documents.lead": "Dokumente und Nachweise bleiben als geordnete Liste mit direktem Download verfügbar.",
     "employeeAdmin.documents.libraryEyebrow": "Ablage",
     "employeeAdmin.documents.libraryTitle": "Verknüpfte Dokumente",
-    "employeeAdmin.documents.empty": "Keine mitarbeitendenbezogenen Dokumente vorhanden.",
+    "employeeAdmin.documents.empty": "Keine mitarbeiterbezogenen Dokumente vorhanden.",
     "employeeAdmin.documents.uploadEyebrow": "Upload",
     "employeeAdmin.documents.uploadTitle": "Neues Dokument hochladen",
-    "employeeAdmin.documents.uploadLead": "Es wird ein neues Dokument erzeugt, versioniert und direkt mit dieser Mitarbeitendenakte verknüpft.",
+    "employeeAdmin.documents.uploadLead": "Es wird ein neues Dokument erzeugt, versioniert und direkt mit dieser Mitarbeiterakte verknüpft.",
     "employeeAdmin.documents.linkEyebrow": "Verknüpfen",
     "employeeAdmin.documents.linkTitle": "Bestehendes Dokument verknüpfen",
-    "employeeAdmin.documents.linkLead": "Vorhandene Dokumente können über ihre Dokument-ID mit dieser Mitarbeitendenakte verknüpft werden.",
+    "employeeAdmin.documents.linkLead": "Vorhandene Dokumente können über ihre Dokument-ID mit dieser Mitarbeiterakte verknüpft werden.",
     "employeeAdmin.documents.versionEyebrow": "Versionen",
     "employeeAdmin.documents.versionTitle": "Neue Dokumentversion hochladen",
     "employeeAdmin.documents.versionLead": "Für bereits verknüpfte Dokumente kann direkt eine neue Version hochgeladen werden.",
@@ -2646,8 +2646,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.documents.selectedVersionTarget": "Ausgewähltes Zieldokument",
     "employeeAdmin.documents.documentTypePlaceholder": "Optionalen Dokumenttyp auswählen",
     "employeeAdmin.documents.documentTypeHelp":
-      "Der Dokumenttyp ist optional. Die Mitarbeitendenbeziehung wird weiterhin über die Dokumentrelation gesteuert.",
-    "employeeAdmin.documents.relation.employee_document": "Mitarbeitendendokument",
+      "Der Dokumenttyp ist optional. Die Mitarbeiterbeziehung wird weiterhin über die Dokumentrelation gesteuert.",
+    "employeeAdmin.documents.relation.employee_document": "Mitarbeiterdokument",
     "employeeAdmin.documents.relation.id_proof": "Identitätsnachweis",
     "employeeAdmin.documents.relation.contract": "Vertrag",
     "employeeAdmin.documents.relation.certificate": "Zertifikat",
@@ -2660,7 +2660,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.documentType.residence_permit": "Aufenthaltstitel",
     "employeeAdmin.documentType.driving_licence": "Fuehrerschein",
     "employeeAdmin.documentType.qualification_certificate": "Qualifikationsnachweis",
-    "employeeAdmin.documentType.employee_misc": "Sonstiges Mitarbeitendendokument",
+    "employeeAdmin.documentType.employee_misc": "Sonstiges Mitarbeiterdokument",
     "employeeAdmin.noteType.operational_note": "Operative Notiz",
     "employeeAdmin.noteType.positive_activity": "Positive Aktivität",
     "employeeAdmin.noteType.reminder": "Erinnerung",
@@ -2668,8 +2668,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.refresh": "Neu laden",
     "employeeAdmin.actions.search": "Suchen",
     "employeeAdmin.actions.clearFeedback": "Hinweis schliessen",
-    "employeeAdmin.actions.newEmployee": "Mitarbeitendenakte anlegen",
-    "employeeAdmin.actions.createEmployee": "Mitarbeitende anlegen",
+    "employeeAdmin.actions.newEmployee": "Mitarbeiterakte anlegen",
+    "employeeAdmin.actions.createEmployee": "Mitarbeiter anlegen",
     "employeeAdmin.actions.saveEmployee": "Akte speichern",
     "employeeAdmin.actions.reset": "Formular zurücksetzen",
     "employeeAdmin.actions.uploadPhoto": "Foto hochladen",
@@ -2739,7 +2739,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.import.executeSummary": "Import abgeschlossen: {total} Zeilen, {created} angelegt, {updated} aktualisiert.",
     "employeeAdmin.import.exportSummary": "Export bereit: {rows} Zeilen, Dokument {documentId}.",
     "employeeAdmin.access.eyebrow": "App-Zugang",
-    "employeeAdmin.access.title": "IAM-Verknüpfung für Mitarbeitenden-App",
+    "employeeAdmin.access.title": "IAM-Verknüpfung für Mitarbeiter-App",
     "employeeAdmin.access.user": "Benutzername",
     "employeeAdmin.access.email": "E-Mail",
     "employeeAdmin.access.enabled": "Zugang aktiv",
@@ -2748,17 +2748,17 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.access.roleAssignment": "Rollenverknüpfung aktiv",
     "employeeAdmin.access.roleAssignmentYes": "Ja",
     "employeeAdmin.access.roleAssignmentNo": "Nein",
-    "employeeAdmin.access.lead": "Jede Mitarbeitendenakte darf genau einen verknüpften App-Zugang haben. Die Oberfläche folgt diesem Ein-Benutzer-Modell jetzt explizit.",
+    "employeeAdmin.access.lead": "Jede Mitarbeiterakte darf genau einen verknüpften App-Zugang haben. Die Oberfläche folgt diesem Ein-Benutzer-Modell jetzt explizit.",
     "employeeAdmin.access.stateCreateEyebrow": "Kein verknüpfter Zugang",
     "employeeAdmin.access.stateCreateTitle": "App-Zugang neu anlegen",
-    "employeeAdmin.access.stateCreateLead": "Lege den einen Login für diese Mitarbeitendenakte an. Sobald ein Zugang verknüpft ist, wechselt der Bereich in den Verwaltungsmodus.",
+    "employeeAdmin.access.stateCreateLead": "Lege den einen Login für diese Mitarbeiterakte an. Sobald ein Zugang verknüpft ist, wechselt der Bereich in den Verwaltungsmodus.",
     "employeeAdmin.access.stateLinkedEyebrow": "Verknüpfter Zugang",
     "employeeAdmin.access.stateLinkedTitle": "Bestehenden App-Zugang verwalten",
-    "employeeAdmin.access.stateLinkedLead": "Für diese Mitarbeitendenakte ist bereits genau ein IAM-Konto verknüpft. Neue Zugangsanlage ist in diesem Zustand bewusst ausgeblendet.",
+    "employeeAdmin.access.stateLinkedLead": "Für diese Mitarbeiterakte ist bereits genau ein IAM-Konto verknüpft. Neue Zugangsanlage ist in diesem Zustand bewusst ausgeblendet.",
     "employeeAdmin.access.createEyebrow": "Neuanlage",
     "employeeAdmin.access.createTitle": "App-Zugang anlegen",
     "employeeAdmin.access.createLead": "Benutzername, E-Mail und Startpasswort werden gemeinsam gepflegt, bevor der einzelne App-Zugang angelegt wird.",
-    "employeeAdmin.access.createHint": "Dieser Zugang wird der einzige Login für diese Mitarbeitendenakte.",
+    "employeeAdmin.access.createHint": "Dieser Zugang wird der einzige Login für diese Mitarbeiterakte.",
     "employeeAdmin.access.reconcileEyebrow": "Abgleich",
     "employeeAdmin.access.reconcileTitle": "Verknüpfung abgleichen",
     "employeeAdmin.access.reconcileLead": "Nur für Reparaturfälle: prüft die bestehende IAM-Verknüpfung und stellt die Mitarbeiterrolle kontrolliert wieder her.",
@@ -2773,7 +2773,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.access.resetLead": "Setzt ein neues Passwort für den verknüpften Zugang und beendet bestehende Sitzungen kontrolliert.",
     "employeeAdmin.access.detachEyebrow": "Trennen",
     "employeeAdmin.access.detachTitle": "Verknüpften Zugang lösen",
-    "employeeAdmin.access.detachLead": "Nutze diese Aktion, wenn das Konto nicht mehr zu dieser Mitarbeitendenakte gehören soll. Für normales Stilllegen ist dies die unterstützte Deaktivierung.",
+    "employeeAdmin.access.detachLead": "Nutze diese Aktion, wenn das Konto nicht mehr zu dieser Mitarbeiterakte gehören soll. Für normales Stilllegen ist dies die unterstützte Deaktivierung.",
     "employeeAdmin.access.advancedEyebrow": "Erweitert",
     "employeeAdmin.access.advancedTitle": "Erweiterte Reparatur- und Migrationswerkzeuge",
     "employeeAdmin.access.advancedLead": "Diese Werkzeuge sind nicht der normale Tagesablauf. Sie sind nur für bestehende Konten, Datenmigration und Reparaturszenarien gedacht.",
@@ -2790,11 +2790,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.access.attachEmail": "Vorhandene E-Mail",
     "employeeAdmin.feedback.titleError": "Aktion fehlgeschlagen",
     "employeeAdmin.feedback.titleSuccess": "Aktion erfolgreich",
-    "employeeAdmin.feedback.authRequired": "Die Mitarbeitendenverwaltung benötigt eine gültige Sitzung.",
+    "employeeAdmin.feedback.authRequired": "Die Mitarbeiterverwaltung benötigt eine gültige Sitzung.",
     "employeeAdmin.feedback.permissionDenied":
-      "Die aktuelle Rolle darf diese Mitarbeitendenaktion nicht ausführen.",
+      "Die aktuelle Rolle darf diese Mitarbeiteraktion nicht ausführen.",
     "employeeAdmin.feedback.notFound":
-      "Die angeforderte Mitarbeitendenakte oder Zuordnung wurde nicht gefunden.",
+      "Die angeforderte Mitarbeiterakte oder Zuordnung wurde nicht gefunden.",
     "employeeAdmin.feedback.duplicatePersonnelNo":
       "Diese Personalnummer existiert im Mandanten bereits.",
     "employeeAdmin.feedback.duplicateGroupCode":
@@ -2834,7 +2834,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.feedback.qualificationInvalidWindow":
       "Gültig-bis darf nicht vor Ausgestellt-am liegen.",
     "employeeAdmin.feedback.addressRequired":
-      "Straße, Postleitzahl, Ort, Ländercode und Gültig-ab sind für die Mitarbeitendenadresse erforderlich.",
+      "Straße, Postleitzahl, Ort, Ländercode und Gültig-ab sind für die Mitarbeiteradresse erforderlich.",
     "employeeAdmin.feedback.addressInvalidWindow":
       "Gültig-bis darf nicht vor Gültig-ab liegen.",
     "employeeAdmin.feedback.addressOverlap":
@@ -2870,7 +2870,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.feedback.absenceInvalidWindow":
       "Das Ende der Abwesenheit darf nicht vor dem Beginn liegen.",
     "employeeAdmin.feedback.absenceOverlap":
-      "Für diese Mitarbeitendenakte existiert bereits eine überlappende aktive Abwesenheit.",
+      "Für diese Mitarbeiterakte existiert bereits eine überlappende aktive Abwesenheit.",
     "employeeAdmin.feedback.reminderDateRequired":
       "Für Erinnerungen muss ein Erinnerungsdatum gesetzt werden.",
     "employeeAdmin.feedback.invalidNoteType":
@@ -2878,7 +2878,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.feedback.photoUploadFailed":
       "Das Profilfoto konnte nicht gespeichert werden.",
     "employeeAdmin.feedback.documentAlreadyLinked":
-      "Dieses Dokument ist bereits mit dieser Mitarbeitendenakte und Relation verknüpft.",
+      "Dieses Dokument ist bereits mit dieser Mitarbeiterakte und Relation verknüpft.",
     "employeeAdmin.feedback.invalidImportCsv":
       "Die Importdatei ist leer oder unlesbar.",
     "employeeAdmin.feedback.invalidImportHeaders":
@@ -2888,15 +2888,15 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.feedback.accessEmailTaken":
       "Die E-Mail-Adresse ist im aktuellen Mandanten bereits vergeben.",
     "employeeAdmin.feedback.accessAlreadyLinked":
-      "Für diese Mitarbeitendenakte ist bereits ein App-Zugang verknüpft.",
+      "Für diese Mitarbeiterakte ist bereits ein App-Zugang verknüpft.",
     "employeeAdmin.feedback.accessAmbiguousMatch":
       "Zum Verknüpfen muss genau ein Benutzer-Suchfeld gefüllt werden.",
     "employeeAdmin.feedback.accessNotLinked":
-      "Für diese Mitarbeitendenakte ist noch kein App-Zugang verknüpft.",
+      "Für diese Mitarbeiterakte ist noch kein App-Zugang verknüpft.",
     "employeeAdmin.feedback.accessFullNameRequired":
       "Für den verknüpften App-Zugang ist ein Anzeigename erforderlich.",
     "employeeAdmin.feedback.accessRoleMissing":
-      "Die Rolle für Mitarbeitendenzugang fehlt im IAM-Katalog.",
+      "Die Rolle für Mitarbeiterzugang fehlt im IAM-Katalog.",
     "employeeAdmin.feedback.functionTypeSaved":
       "Der Funktionstyp wurde gespeichert.",
     "employeeAdmin.feedback.qualificationTypeSaved":
@@ -2914,23 +2914,23 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.feedback.absenceSaved":
       "Die Abwesenheit wurde gespeichert.",
     "employeeAdmin.feedback.employeeSaved":
-      "Die Mitarbeitendenakte wurde gespeichert.",
+      "Die Mitarbeiterakte wurde gespeichert.",
     "employeeAdmin.feedback.noteSaved":
-      "Die Mitarbeitendennotiz wurde gespeichert.",
+      "Die Mitarbeiternotiz wurde gespeichert.",
     "employeeAdmin.feedback.groupSaved":
-      "Die Mitarbeitendengruppe wurde gespeichert.",
+      "Die Mitarbeitergruppe wurde gespeichert.",
     "employeeAdmin.feedback.membershipSaved":
       "Die Gruppenzuordnung wurde gespeichert.",
     "employeeAdmin.feedback.privateProfileSaved":
-      "Das private Mitarbeitendenprofil wurde gespeichert.",
+      "Das private Mitarbeiterprofil wurde gespeichert.",
     "employeeAdmin.feedback.addressSaved":
-      "Die Mitarbeitendenadresse wurde gespeichert.",
+      "Die Mitarbeiteradresse wurde gespeichert.",
     "employeeAdmin.feedback.photoSaved":
       "Das Profilfoto wurde erfolgreich aktualisiert.",
     "employeeAdmin.feedback.documentUploaded":
       "Das Dokument wurde hochgeladen und verknüpft.",
     "employeeAdmin.feedback.documentLinked":
-      "Das Dokument wurde mit der Mitarbeitendenakte verknüpft.",
+      "Das Dokument wurde mit der Mitarbeiterakte verknüpft.",
     "employeeAdmin.feedback.documentVersionSaved":
       "Die neue Dokumentversion wurde gespeichert.",
     "employeeAdmin.feedback.documentTypeNotConfigured":
@@ -2938,25 +2938,25 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.feedback.importDryRunReady":
       "Die Importvorschau wurde erzeugt.",
     "employeeAdmin.feedback.importExecuted":
-      "Der Mitarbeitendenimport wurde ausgeführt.",
+      "Der Mitarbeiterimport wurde ausgeführt.",
     "employeeAdmin.feedback.exportReady":
-      "Der Mitarbeitendenexport wurde erzeugt.",
+      "Der Mitarbeiterexport wurde erzeugt.",
     "employeeAdmin.feedback.accessLinked":
-      "Der Mitarbeitendenzugang wurde verknüpft.",
+      "Der Mitarbeiterzugang wurde verknüpft.",
     "employeeAdmin.feedback.accessUpdated":
       "Die Zugangsdaten des verknüpften IAM-Kontos wurden aktualisiert.",
     "employeeAdmin.feedback.accessPasswordReset":
       "Das Passwort des verknüpften App-Zugangs wurde neu gesetzt.",
     "employeeAdmin.feedback.accessDetached":
-      "Der Mitarbeitendenzugang wurde getrennt.",
+      "Der Mitarbeiterzugang wurde getrennt.",
     "employeeAdmin.feedback.accessReconciled":
       "Die IAM-Verknüpfung wurde abgeglichen.",
     "employeeAdmin.feedback.catalogPartial":
-      "Die Mitarbeitendenliste wurde geladen, aber ergänzende Katalogdaten konnten nicht vollständig aktualisiert werden.",
+      "Die Mitarbeiterliste wurde geladen, aber ergänzende Katalogdaten konnten nicht vollständig aktualisiert werden.",
     "employeeAdmin.feedback.error":
-      "Die Mitarbeitendenaktion konnte nicht abgeschlossen werden.",
+      "Die Mitarbeiteraktion konnte nicht abgeschlossen werden.",
     "employeeAdmin.feedback.routeNotFound":
-      "Der gewünschte Mitarbeitenden-Endpunkt wurde nicht gefunden. Bitte Backend-Route und Proxy prüfen.",
+      "Der gewünschte Mitarbeiter-Endpunkt wurde nicht gefunden. Bitte Backend-Route und Proxy prüfen.",
     "employeeAdmin.feedback.apiDiagnostic":
       "Aktion fehlgeschlagen. Status: {statusCode}, Code: {code}, message_key: {messageKey}, request_id: {requestId}",
     "employeeAdmin.readiness.recordKindQualification": "Qualifikation",
@@ -3211,7 +3211,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.tabs.commercial": "Commercial",
     "customerAdmin.tabs.portal": "Portal",
     "customerAdmin.tabs.history": "Historie",
-    "customerAdmin.tabs.employeeBlocks": "Mitarbeitendensperren",
+    "customerAdmin.tabs.employeeBlocks": "Mitarbeitersperren",
     "customerAdmin.commercial.tabs.billingProfile": "Abrechnungsprofil",
     "customerAdmin.commercial.tabs.invoiceParties": "Rechnungsparteien",
     "customerAdmin.commercial.tabs.pricingRules": "Preisregeln",
@@ -3258,15 +3258,15 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Personennamen bleiben im Kundenportal standardmäßig verborgen. Eine Freigabe ist eng begrenzt, kundenspezifisch und wird auditiert.",
     "customerAdmin.privacy.lastReleasedAt": "Zuletzt freigegeben am",
     "customerAdmin.privacy.lastReleasedBy": "Zuletzt freigegeben durch",
-    "customerAdmin.employeeBlocks.eyebrow": "Mitarbeitendensperren",
-    "customerAdmin.employeeBlocks.title": "Kundenspezifische Mitarbeitendensperren",
+    "customerAdmin.employeeBlocks.eyebrow": "Mitarbeitersperren",
+    "customerAdmin.employeeBlocks.title": "Kundenspezifische Mitarbeitersperren",
     "customerAdmin.employeeBlocks.registerEyebrow": "Sperrregister",
     "customerAdmin.employeeBlocks.registerTitle": "Aktive und geplante Sperren",
     "customerAdmin.employeeBlocks.editorEyebrow": "Sperrpflege",
     "customerAdmin.employeeBlocks.editorTitle": "Sperre erfassen oder aktualisieren",
-    "customerAdmin.employeeBlocks.empty": "Noch keine Kundensperren für Mitarbeitende erfasst.",
+    "customerAdmin.employeeBlocks.empty": "Noch keine Kundensperren für Mitarbeiter erfasst.",
     "customerAdmin.employeeBlocks.capability.pendingEmployees":
-      "Das Mitarbeitendenverzeichnis folgt erst in Sprint 4. Bis dahin bleibt die Sperre auf eine direkte Employee-ID-Referenz begrenzt.",
+      "Das Mitarbeiterverzeichnis folgt erst in Sprint 4. Bis dahin bleibt die Sperre auf eine direkte Employee-ID-Referenz begrenzt.",
     "customerAdmin.addresses.eyebrow": "Adressen",
     "customerAdmin.addresses.title": "Adresslinks",
     "customerAdmin.addresses.lead": "Adressverknüpfungen und ihre Pflege folgen derselben gegliederten Detailstruktur wie die Stammdaten.",
@@ -3352,7 +3352,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.fields.historyEntry": "Historieneintrag",
     "customerAdmin.fields.documentId": "Dokument-ID",
     "customerAdmin.fields.personNamesReleased": "Personennamen im Portal freigeben",
-    "customerAdmin.fields.employeeId": "Mitarbeitenden-ID",
+    "customerAdmin.fields.employeeId": "Mitarbeiter-ID",
     "customerAdmin.fields.reason": "Begründung",
     "customerAdmin.fields.label": "Bezeichnung",
     "customerAdmin.fields.isDefault": "Als Standardadresse markieren",
@@ -3418,7 +3418,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.tokenSaved": "Token aktualisiert und Liste neu geladen.",
     "customerAdmin.feedback.historyAttachmentLinked": "Historienanhang verknüpft",
     "customerAdmin.feedback.documentLinked": "Das Dokument wurde dem Historieneintrag zugeordnet.",
-    "customerAdmin.feedback.employeeBlockSaved": "Mitarbeitendensperre gespeichert",
+    "customerAdmin.feedback.employeeBlockSaved": "Mitarbeitersperre gespeichert",
     "customerAdmin.feedback.employeeBlockSavedBody": "Die kundenspezifische Sperre wurde übernommen.",
     "customerAdmin.feedback.portalPrivacySaved": "Portal-Datenschutz aktualisiert",
     "customerAdmin.feedback.portalAccessCreated": "Portalzugang angelegt",

@@ -15,7 +15,7 @@
     "financeSubcontractorChecks": "Partner-Rechnungsprüfung",
     "reporting": "Reporting",
     "recruiting": "Recruiting",
-    "employees": "Mitarbeitende",
+    "employees": "Mitarbeiter",
     "workforceCatalogs": "Belegschaftskataloge",
     "subcontractors": "Subunternehmer",
     "tenantUsers": "Mandantenbenutzer",
@@ -185,12 +185,12 @@
         "workspace": "Die Kundenarbeitsfläche bleibt operativ nutzbar und ist nun über dieselbe Intro-, Stats- und Governance-Struktur eingebettet."
       },
       "employees": {
-        "description": "Mitarbeitendenverwaltung trennt private HR-Anteile, operative Daten und Importprozesse sauber innerhalb einer Workforce-Struktur.",
-        "workspace": "Der bestehende Mitarbeitenden-Workspace bleibt erhalten und ist in das neue Seitenraster eingepasst."
+        "description": "Mitarbeiterverwaltung trennt private HR-Anteile, operative Daten und Importprozesse sauber innerhalb einer Workforce-Struktur.",
+        "workspace": "Der bestehende Mitarbeiter-Workspace bleibt erhalten und ist in das neue Seitenraster eingepasst."
       },
       "workforceCatalogs": {
         "description": "Funktions- und Qualifikationstypen bleiben HR-eigene Mandantenstammdaten und werden als eigener Workforce-Arbeitsbereich gepflegt.",
-        "workspace": "Die Katalogpflege ist aus der Mitarbeitendenakte ausgelagert und bleibt trotzdem im selben HR-Kontext verankert."
+        "workspace": "Die Katalogpflege ist aus der Mitarbeiterakte ausgelagert und bleibt trotzdem im selben HR-Kontext verankert."
       },
       "recruiting": {
         "description": "Recruiting ist als Workforce-Eingangsmodul für Bewerbungen, Sichtung und Dokumente klar abgegrenzt.",
@@ -276,7 +276,7 @@
       "activeTenants": "Aktive Mandanten",
       "adminSurfaces": "Admin-Flächen",
       "customers": "Kunden",
-      "employees": "Mitarbeitende",
+      "employees": "Mitarbeiter",
       "subcontractors": "Subunternehmer",
       "shifts": "Schichten",
       "orders": "Aufträge",
@@ -527,12 +527,12 @@
     },
     "workforce": {
       "eyebrow": "Partner-Belegschaft",
-      "title": "Mitarbeitende, Nachweise und Ausweise",
-      "lead": "Pflegen Sie die freigegebenen Mitarbeitendenakten des Subunternehmers inklusive CSV-Import, Nachweisen und Ausweisen.",
-      "detailEyebrow": "Mitarbeitendenakte",
-      "newTitle": "Neue Mitarbeitendenakte",
-      "empty": "Für diesen Subunternehmer sind noch keine Mitarbeitenden vorhanden.",
-      "emptyDetail": "Wählen Sie links einen Mitarbeitenden oder legen Sie einen neuen Datensatz an.",
+      "title": "Mitarbeiter, Nachweise und Ausweise",
+      "lead": "Pflegen Sie die freigegebenen Mitarbeiterakten des Subunternehmers inklusive CSV-Import, Nachweisen und Ausweisen.",
+      "detailEyebrow": "Mitarbeiterakte",
+      "newTitle": "Neue Mitarbeiterakte",
+      "empty": "Für diesen Subunternehmer sind noch keine Mitarbeiter vorhanden.",
+      "emptyDetail": "Wählen Sie links einen Mitarbeiter aus oder legen Sie einen neuen Datensatz an.",
       "filters": {
         "search": "Suche",
         "searchPlaceholder": "Nummer, Vorname oder Nachname",
@@ -540,7 +540,7 @@
         "allStatuses": "Alle Stati",
         "readinessStatus": "Einsatzbereitschaft",
         "allReadinessStatuses": "Alle Einsatzstati",
-        "includeArchived": "Archivierte Mitarbeitende anzeigen"
+        "includeArchived": "Archivierte Mitarbeiter anzeigen"
       },
       "summary": {
         "qualifications": "Qualifikationen",
@@ -548,7 +548,7 @@
         "expiredQualifications": "Abgelaufen"
       },
       "fields": {
-        "workerNo": "Mitarbeitendennummer",
+        "workerNo": "Mitarbeiternummer",
         "firstName": "Vorname",
         "lastName": "Nachname",
         "preferredName": "Bevorzugter Name",
@@ -571,9 +571,9 @@
         "linkLabel": "Bezeichnung"
       },
       "actions": {
-        "newWorker": "Neue Mitarbeitende",
-        "createWorker": "Mitarbeitende anlegen",
-        "saveWorker": "Mitarbeitende speichern",
+        "newWorker": "Neuer Mitarbeiter",
+        "createWorker": "Mitarbeiter anlegen",
+        "saveWorker": "Mitarbeiter speichern",
         "createQualification": "Qualifikation anlegen",
         "saveQualification": "Qualifikation speichern",
         "createCredential": "Ausweis anlegen",
@@ -588,7 +588,7 @@
       },
       "lifecycle": {
         "title": "Lifecycle",
-        "help": "Archivierte Mitarbeitende bleiben nachweisbar und können später wieder aktiviert werden."
+        "help": "Archivierte Mitarbeiter bleiben nachweisbar und können später wieder aktiviert werden."
       },
       "readiness": {
         "eyebrow": "Einsatzfreigabe",
@@ -610,7 +610,7 @@
           "missingProofs": "Fehlende Nachweise"
         },
         "issue": {
-          "workerInactive": "Mitarbeitende ist nicht aktiv",
+          "workerInactive": "Mitarbeiter ist nicht aktiv",
           "qualificationExpired": "Qualifikation ist abgelaufen",
           "qualificationExpiring": "Qualifikation laeuft bald ab",
           "qualificationProofMissing": "Pflichtnachweis fehlt",
@@ -621,16 +621,16 @@
       },
       "import": {
         "eyebrow": "Import / Export",
-        "title": "CSV-Austausch für Mitarbeitendenstammdaten",
+        "title": "CSV-Austausch für Mitarbeiterstammdaten",
         "csvLabel": "CSV-Inhalt",
         "continueOnError": "Bei Fehlern mit den restlichen Zeilen fortfahren",
         "dryRunSummary": "Prüfung abgeschlossen: {total} Zeilen, {invalid} ungültig.",
         "executeSummary": "Import abgeschlossen: {total} Zeilen, {created} angelegt, {updated} aktualisiert.",
         "exportSummary": "Export bereit: {rows} Zeilen, Dokument {documentId}.",
         "row": {
-          "createdWorker": "Mitarbeitende angelegt",
-          "updatedWorker": "Mitarbeitende aktualisiert",
-          "missingWorkerNo": "Mitarbeitendennummer fehlt",
+          "createdWorker": "Mitarbeiter angelegt",
+          "updatedWorker": "Mitarbeiter aktualisiert",
+          "missingWorkerNo": "Mitarbeiternummer fehlt",
           "missingFirstName": "Vorname fehlt",
           "missingLastName": "Nachname fehlt",
           "invalidBirthDate": "Geburtsdatum ist ungültig",
@@ -652,14 +652,14 @@
         "empty": "Noch keine Ausweise hinterlegt."
       },
       "feedback": {
-        "workerSaved": "Mitarbeitendenakte gespeichert.",
+        "workerSaved": "Mitarbeiterakte gespeichert.",
         "qualificationSaved": "Qualifikation gespeichert.",
         "credentialSaved": "Ausweis gespeichert.",
         "proofSaved": "Nachweisdokument gespeichert.",
         "proofLinked": "Nachweisdokument verknüpft.",
         "importDryRunReady": "Die Importprüfung ist abgeschlossen.",
-        "importExecuted": "Der Mitarbeitendenimport wurde ausgeführt.",
-        "exportReady": "Der Mitarbeitendenexport wurde erstellt."
+        "importExecuted": "Der Mitarbeiterimport wurde ausgeführt.",
+        "exportReady": "Der Mitarbeiterexport wurde erstellt."
       }
     },
     "feedback": {
@@ -684,8 +684,8 @@
       "historyNotFound": "Der angeforderte Historieneintrag wurde nicht gefunden.",
       "historyTypeInvalid": "Der gewählte Historientyp ist ungültig.",
       "historyContactMissing": "Der referenzierte Kontakt konnte nicht gefunden werden.",
-      "workerNotFound": "Die angeforderte Mitarbeitendenakte wurde nicht gefunden.",
-      "workerDuplicateNumber": "Diese Mitarbeitendennummer ist für den Subunternehmer bereits vergeben.",
+      "workerNotFound": "Die angeforderte Mitarbeiterakte wurde nicht gefunden.",
+      "workerDuplicateNumber": "Diese Mitarbeiternummer ist für den Subunternehmer bereits vergeben.",
       "workerQualificationNotFound": "Die angeforderte Qualifikation wurde nicht gefunden.",
       "workerQualificationTypeMissing": "Der angegebene Qualifikationstyp wurde nicht gefunden oder ist inaktiv.",
       "workerQualificationInvalidWindow": "Das Gültigkeitsfenster der Qualifikation ist ungültig.",

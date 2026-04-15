@@ -51,7 +51,7 @@ export const financePayrollMessages = {
     endMinute: "Endminute",
     percentValue: "Prozent",
     fixedAmount: "Fixbetrag",
-    employeeId: "Mitarbeitenden-ID",
+    employeeId: "Mitarbeiter-ID",
     tariffTableId: "Tariftabelle",
     payCycle: "Pay Cycle",
     currency: "Waehrung",

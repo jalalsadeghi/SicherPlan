@@ -58,7 +58,7 @@ export const financeActualsMessages = {
     billableDelta: "Billing-Minuten Delta",
     customerAdjustmentDelta: "Kundenanpassung Delta",
     replacementActorType: "Ersatz-Akteurtyp",
-    replacementEmployeeId: "Ersatz Mitarbeitenden-ID",
+    replacementEmployeeId: "Ersatz Mitarbeiter-ID",
     addReconciliation: "Reconciliation erfassen",
     allowanceType: "Zulagentyp",
     amountTotal: "Betrag",
