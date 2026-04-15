@@ -1,86 +1,142 @@
 You are working in the public repo `jalalsadeghi/SicherPlan`.
 
 Important working-mode rule:
-Treat the current working tree as the source of truth. Do NOT revert unrelated planning-staffing changes. Apply only a focused behavioral fix for assignment selection state in `/admin/planning-staffing`.
+Treat the current working tree as the source of truth.
+Do NOT revert the existing dashboard calendar item work.
+The committed `main` branch still shows only count pills in the calendar, so the slow cell-item layer is coming from the live/working-tree dashboard changes.
+Your job is to optimize that new layer without removing its functionality.
 
 Task:
-In `admin/planning-staffing` → `Shift detail` → `Assignments`, stop the UI from auto-selecting any existing assignment row.
-An assignment must ONLY become selected when the user explicitly clicks one assignment row, or when a workflow explicitly sets it after create/update/unassign.
+Improve the loading performance of `/admin/dashboard` → `Planning calendar`, specifically the slower item content rendered inside `sp-dashboard__calendar-cell`, while preserving the already-fast `sp-dashboard__calendar-events` count pills.
 
-Problem:
-When entering the Assignments tab for a shift that already has one or more assignments, the current implementation automatically selects one assignment from the list.
-This is not desired.
-The UI must not preselect any assignment just because assignments exist.
+Observed behavior:
+- `sp-dashboard__calendar-events` loads relatively fast
+- the richer content inside the calendar cells loads noticeably slower
+- the dashboard should feel fast immediately, and then hydrate detailed day items efficiently
 
-Current likely cause to inspect first:
-1. `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
-2. Specifically inspect:
-   - `loadSelectedShiftDetails()`
-   - assignment-related watchers
-   - selected assignment state handling
-3. Also inspect current tests in:
-   - `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.smoke.test.ts`
+Performance goal:
+Keep the count pills fast and make the richer day-item content load much faster, with fewer requests, less recomputation, and no unnecessary render-blocking.
 
-Expected behavior after the fix:
-1. When a shift is opened and assignments exist:
-   - no assignment row is selected by default
-   - `selectedAssignmentId` should remain empty unless explicitly set by user action or a workflow result
-2. When the user clicks an assignment row:
-   - that row becomes selected
-   - edit/details/modal behavior can proceed as designed
-3. If the user had explicitly selected an assignment and the page refreshes:
-   - preserve the selection only if that same assignment still exists in the refreshed list
-   - otherwise clear the selection
-4. Do NOT fall back to selecting the first assignment automatically
-5. Create-assignment flow must still work even when no assignment is selected
-6. Validation/assignment side panels must behave safely when `selectedAssignmentId` is empty
+What to inspect first:
+1. The current working-tree dashboard calendar implementation
+   - especially any logic that adds rich day items beyond the committed main-branch count pills
+2. Whether the working tree currently fetches:
+   - `listStaffingCoverage(...)`
+   - `listStaffingBoard(...)`
+   - or even multiple per-day/per-cell calls
+3. How month changes are handled
+4. Whether there is any duplicate fetch caused by watchers / focus refresh / route refresh
+5. Whether cell items are regrouped/recomputed on every render instead of once per fetch
 
-Important design rule:
-Preserve explicit user intent.
-Selection should be:
-- user-driven
-- not list-driven
+Important API guidance:
+Use the lightest sufficient data source.
+For dashboard calendar day items, prefer the coverage endpoint, not the heavier staffing-board endpoint, unless the current working tree proves otherwise.
+Do NOT fetch assignments/board-level detail if the calendar only needs:
+- shift label
+- time window
+- coverage state
+- planning context
+These should come from the coverage payload if available.
 
-Recommended implementation direction:
-1. Inspect the current logic that does:
-   - “if current selected assignment is missing, select the first assignment”
-2. Replace that behavior with:
-   - if current explicit selection still exists, keep it
-   - otherwise clear `selectedAssignmentId`
-3. Make sure refresh flows do not silently reintroduce auto-selection
-4. Keep explicit workflow selection only where justified, for example:
-   - after a successful create, selecting the newly created assignment is acceptable
-   - after editing an already selected assignment, keeping the same selected id is acceptable
-5. Do not break modal behavior for manual row clicks
+Primary optimization strategy:
+1. Render dashboard shell and count pills immediately
+2. Load richer calendar cell items asynchronously after the first paint
+3. Fetch coverage in one bulk request per visible month
+4. Cache results by tenant + visible month
+5. Deduplicate in-flight requests
+6. Group fetched coverage rows by day once, not on every render
+7. Avoid per-cell, per-day, or per-item network calls
 
-Testing requirements:
-Update or add tests in `planningStaffing.smoke.test.ts` to verify:
-1. when assignments exist on initial load, no row is auto-selected
-2. clicking an assignment row selects it
-3. create-assignment flow still works without a preselected existing assignment
-4. explicit selection is preserved across refresh only if the same assignment still exists
-5. if the selected assignment disappears after refresh, selection is cleared instead of falling back to the first row
-6. old tests that assumed preselection are updated to the new intended behavior
+Required implementation direction:
+A. Progressive hydration
+- The calendar grid and `sp-dashboard__calendar-events` should render immediately
+- The detailed cell items should hydrate separately without blocking the whole calendar
 
-Important constraint:
-Do NOT implement a hidden fallback like “select first assignment when opening the assignments tab”.
-The fix must ensure there is no automatic default selection from the assignments list.
+B. Use one monthly bulk fetch
+- When the visible month changes, compute the month window
+- Request coverage once for that month
+- Do NOT issue a request per day or per cell
+
+C. Cache + dedupe
+- Cache coverage results by a stable key such as:
+  `tenantId + monthStart + monthEnd`
+- If the user returns to a month already loaded, reuse cached data
+- If the same request is already in flight, reuse or safely ignore duplicate work
+
+D. Pre-group once
+- After receiving coverage rows, transform them once into a structure like:
+  `Map<dayKey, DashboardCoverageItem[]>`
+- Then let each cell do only O(1) lookup by day key
+- Avoid repeatedly filtering the full coverage array for every cell
+
+E. Use the lightest payload
+- If the current working tree is using `listStaffingBoard(...)` for dashboard cell items, switch to `listStaffingCoverage(...)` unless a proven requirement blocks it
+- Do not use board-level payload when coverage-level payload is enough
+
+F. Avoid extra lookups
+- Build day-item labels directly from available row fields
+- Do not do follow-up fetches per item for names if the coverage row already includes enough display data
+
+G. Prevent stale updates
+- If month changes while a coverage request is in flight:
+  - cancel it if current codebase supports AbortController cleanly
+  - or ignore stale resolution safely
+- Do not let older responses overwrite newer month data
+
+What to look for as likely root causes:
+- per-day/per-cell requests
+- use of `listStaffingBoard(...)` instead of `listStaffingCoverage(...)`
+- repeated full-array filtering for each of 35 cells
+- request duplication from multiple watchers
+- blocking first render on coverage items
+- expensive reactive recomputation instead of one-time grouping
+
+What to preserve:
+- existing count pills in `sp-dashboard__calendar-events`
+- existing click behavior for day items
+- existing color/state semantics
+- existing month navigation behavior
+- existing dashboard visual structure
+
+Testing / validation requirements:
+Add or update focused tests for the working-tree dashboard calendar logic.
+
+At minimum verify:
+1. detailed calendar item loading is decoupled from the initial count-pill render
+2. only one coverage request is made per visible month load
+3. no per-cell or per-day request pattern remains
+4. cached month data is reused when revisiting the same month
+5. stale in-flight responses do not overwrite newer month state
+6. day items are grouped by day once and rendered from that grouped structure
+7. if the previous implementation used staffing-board, confirm the dashboard now uses coverage instead (if safe)
+8. the UI still renders correctly when coverage is empty
+
+Manual validation checklist:
+- open dashboard on a tenant with visible month data
+- confirm count pills appear immediately
+- confirm detailed cell items hydrate shortly after without freezing the page
+- confirm navigating to next/previous month causes at most one coverage request
+- confirm returning to an already visited month is faster due to cache reuse
+- confirm no waterfall of per-day requests in Network
 
 Acceptance criteria:
-- No assignment row is selected automatically when opening a shift with existing assignments
-- Assignment selection happens only after user click or explicit workflow result
-- Refresh preserves explicit valid selection but does not invent a new one
-- Tests reflect the new behavior
+- `sp-dashboard__calendar-events` remains fast
+- `sp-dashboard__calendar-cell` detailed item content loads significantly faster
+- the calendar no longer relies on heavy or repeated requests
+- month-to-month navigation stays responsive
+- the change is local, maintainable, and does not remove existing rich calendar functionality
 
 At the end, provide a concise validation report with these headings:
-1. Where the auto-selection came from
-2. Which files were changed
-3. What the new assignment-selection rule is
-4. How refresh behavior now works
-5. Which tests were updated or added
-6. Any remaining edge cases to verify manually
+1. Root cause found
+2. Which file(s) were changed
+3. Which data source is now used for dashboard cell items
+4. How monthly fetch/caching/deduplication now works
+5. How render-blocking was reduced
+6. Which tests were updated or added
+7. Any remaining edge cases to verify manually
 
-Before coding, explicitly identify:
-- the exact line/block that currently auto-selects the first assignment
-- any tests that currently assume an assignment is preselected
-Then update both code and tests accordingly.
+Before coding, explicitly answer:
+- Is the current working tree using per-cell/per-day requests?
+- Is it using `listStaffingBoard(...)` or `listStaffingCoverage(...)`?
+- Is the rich cell content blocking first render?
+Then implement the safest optimization based on those findings.

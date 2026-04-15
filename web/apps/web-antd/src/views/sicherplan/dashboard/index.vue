@@ -64,8 +64,13 @@ const activeDate = ref(new Date());
 const expandedCalendarDays = ref<string[]>([]);
 const lastLoadedDashboardKey = ref('');
 const activeDashboardLoadKey = ref('');
+const activeCoverageMonthKey = ref('');
+const calendarCoverageItemsByDay = ref<Map<string, CalendarCellItem[]>>(new Map());
 const dashboardBootstrapComplete = ref(false);
 const dashboardSessionWatchArmed = ref(false);
+const coverageRequestVersion = ref(0);
+const coverageMonthCache = new Map<string, Map<string, CalendarCellItem[]>>();
+const coverageMonthRequests = new Map<string, Promise<Map<string, CalendarCellItem[]>>>();
 
 const dashboardData = reactive({
   customers: [] as CustomerListItem[],
@@ -73,7 +78,6 @@ const dashboardData = reactive({
   notices: [] as NoticeListItem[],
   orders: [] as CustomerOrderListItem[],
   shifts: [] as ShiftListItem[],
-  staffingCoverage: [] as CoverageShiftItem[],
   subcontractors: [] as SubcontractorListItem[],
   tenants: [] as TenantListItem[],
 });
@@ -102,8 +106,13 @@ function resetDashboardData() {
   dashboardData.subcontractors = [];
   dashboardData.orders = [];
   dashboardData.shifts = [];
-  dashboardData.staffingCoverage = [];
   dashboardData.notices = [];
+}
+
+function resetCalendarCoverage() {
+  activeCoverageMonthKey.value = '';
+  calendarCoverageItemsByDay.value = new Map();
+  expandedCalendarDays.value = [];
 }
 
 function resolveDashboardLoadKey() {
@@ -116,7 +125,7 @@ function resolveDashboardLoadKey() {
   if (!tenantScopeId.value) {
     return '';
   }
-  return `tenant:${tenantScopeId.value}:${accessToken.value}:${visibleCalendarMonthKey.value}`;
+  return `tenant:${tenantScopeId.value}:${accessToken.value}`;
 }
 
 function formatDateLabel(value: Date, options: Intl.DateTimeFormatOptions) {
@@ -185,6 +194,17 @@ function visibleCalendarMonthEnd(value: Date) {
   return new Date(value.getFullYear(), value.getMonth() + 1, 0, 23, 59, 0, 0);
 }
 
+function resolveCoverageMonthKey() {
+  if (!tenantScopeId.value) {
+    return '';
+  }
+  return [
+    tenantScopeId.value,
+    formatDateTimeLocalValue(visibleCalendarMonthStart(activeDate.value)),
+    formatDateTimeLocalValue(visibleCalendarMonthEnd(activeDate.value)),
+  ].join(':');
+}
+
 function extendStaffingLookupEnd(value: string) {
   const date = new Date(value);
   date.setDate(date.getDate() + 1);
@@ -219,6 +239,78 @@ function buildStaffingCoverageRoute(coverageRow: CoverageShiftItem) {
     shift_id: coverageRow.shift_id,
   });
   return `/admin/planning-staffing?${query.toString()}`;
+}
+
+function buildCalendarCoverageItemsByDay(coverageRows: CoverageShiftItem[]) {
+  const itemsByDay = new Map<string, CalendarCellItem[]>();
+  [...coverageRows]
+    .sort(
+      (left, right) =>
+        new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime(),
+    )
+    .forEach((coverageRow) => {
+      const date = new Date(coverageRow.starts_at);
+      const key = buildCalendarDayKey(date);
+      const resolvedCoverageState = resolvePlanningStaffingCoverageState(
+        coverageRow.coverage_state,
+        coverageRow.demand_groups,
+      );
+      const dayItems = itemsByDay.get(key) ?? [];
+      dayItems.push({
+        coverageState: resolvedCoverageState,
+        key: `coverage:${coverageRow.shift_id}`,
+        label: buildCoverageShiftLabel(coverageRow),
+        route: buildStaffingCoverageRoute(coverageRow),
+        tone: coverageTone(resolvedCoverageState),
+      });
+      itemsByDay.set(key, dayItems);
+    });
+  return itemsByDay;
+}
+
+async function loadCalendarCoverageForVisibleMonth(options: { force?: boolean } = {}) {
+  if (!canLoadTenantData.value) {
+    resetCalendarCoverage();
+    return;
+  }
+  const monthKey = resolveCoverageMonthKey();
+  if (!monthKey) {
+    resetCalendarCoverage();
+    return;
+  }
+
+  activeCoverageMonthKey.value = monthKey;
+  const cachedItems = coverageMonthCache.get(monthKey);
+  if (cachedItems && !options.force) {
+    calendarCoverageItemsByDay.value = cachedItems;
+    return;
+  }
+
+  calendarCoverageItemsByDay.value = cachedItems ?? new Map();
+
+  let request = coverageMonthRequests.get(monthKey);
+  if (!request || options.force) {
+    request = listStaffingCoverage(tenantScopeId.value, accessToken.value, {
+      date_from: formatDateTimeLocalValue(visibleCalendarMonthStart(activeDate.value)),
+      date_to: formatDateTimeLocalValue(visibleCalendarMonthEnd(activeDate.value)),
+    }).then((coverageRows) => buildCalendarCoverageItemsByDay(coverageRows));
+    coverageMonthRequests.set(monthKey, request);
+    void request.finally(() => {
+      if (coverageMonthRequests.get(monthKey) === request) {
+        coverageMonthRequests.delete(monthKey);
+      }
+    });
+  }
+
+  const requestVersion = ++coverageRequestVersion.value;
+  const itemsByDay = await request;
+  coverageMonthCache.set(monthKey, itemsByDay);
+
+  if (requestVersion !== coverageRequestVersion.value || activeCoverageMonthKey.value !== monthKey) {
+    return;
+  }
+
+  calendarCoverageItemsByDay.value = itemsByDay;
 }
 
 function toggleCalendarDay(dayKey: string) {
@@ -263,7 +355,6 @@ async function loadDashboard(options: { force?: boolean } = {}) {
       ordersResult,
       shiftsResult,
       noticesResult,
-      staffingCoverageResult,
     ] = await Promise.allSettled([
       isPlatformAdmin.value
         ? listTenants(accessToken.value, 'platform_admin')
@@ -286,12 +377,6 @@ async function loadDashboard(options: { force?: boolean } = {}) {
       canLoadTenantData.value
         ? listAdminNotices(tenantScopeId.value, accessToken.value)
         : Promise.resolve([] as NoticeListItem[]),
-      canLoadTenantData.value
-        ? listStaffingCoverage(tenantScopeId.value, accessToken.value, {
-            date_from: formatDateTimeLocalValue(visibleCalendarMonthStart(activeDate.value)),
-            date_to: formatDateTimeLocalValue(visibleCalendarMonthEnd(activeDate.value)),
-          })
-        : Promise.resolve([] as CoverageShiftItem[]),
     ]);
 
     dashboardData.tenants =
@@ -316,11 +401,8 @@ async function loadDashboard(options: { force?: boolean } = {}) {
       noticesResult.status === 'fulfilled'
         ? sortByDateDesc(noticesResult.value, (notice) => notice.published_at)
         : [];
-    dashboardData.staffingCoverage =
-      staffingCoverageResult.status === 'fulfilled'
-        ? staffingCoverageResult.value
-        : [];
     lastLoadedDashboardKey.value = loadKey;
+    void loadCalendarCoverageForVisibleMonth();
   } finally {
     loading.value = false;
     if (activeDashboardLoadKey.value === loadKey) {
@@ -354,6 +436,7 @@ async function recoverSessionAndLoadDashboard() {
     return;
   }
   await loadDashboard();
+  await loadCalendarCoverageForVisibleMonth();
 }
 
 function handleVisibilityChange() {
@@ -507,7 +590,6 @@ const calendarCells = computed<CalendarCell[]>(() => {
   const todayKey = buildCalendarDayKey(new Date());
 
   const shiftCountByDay = new Map<string, number>();
-  const calendarItemsByDay = new Map<string, CalendarCellItem[]>();
   dashboardData.shifts.forEach((shift) => {
     const source = getShiftDate(shift);
     if (!source) {
@@ -529,29 +611,11 @@ const calendarCells = computed<CalendarCell[]>(() => {
     orderCountByDay.set(key, (orderCountByDay.get(key) ?? 0) + 1);
   });
 
-  dashboardData.staffingCoverage.forEach((coverageRow) => {
-    const date = new Date(coverageRow.starts_at);
-    const key = buildCalendarDayKey(date);
-    const resolvedCoverageState = resolvePlanningStaffingCoverageState(
-      coverageRow.coverage_state,
-      coverageRow.demand_groups,
-    );
-    const dayItems = calendarItemsByDay.get(key) ?? [];
-    dayItems.push({
-      coverageState: resolvedCoverageState,
-      key: `coverage:${coverageRow.shift_id}`,
-      label: buildCoverageShiftLabel(coverageRow),
-      route: buildStaffingCoverageRoute(coverageRow),
-      tone: coverageTone(resolvedCoverageState),
-    });
-    calendarItemsByDay.set(key, dayItems);
-  });
-
   return Array.from({ length: 35 }, (_, index) => {
     const date = new Date(startDate);
     date.setDate(startDate.getDate() + index);
     const key = buildCalendarDayKey(date);
-    const items = calendarItemsByDay.get(key) ?? [];
+    const items = calendarCoverageItemsByDay.value.get(key) ?? [];
     const isExpanded = expandedCalendarDays.value.includes(key);
     const visibleItems = isExpanded ? items : items.slice(0, 2);
     return {
@@ -615,9 +679,7 @@ function shiftCalendar(direction: 'next' | 'prev') {
   const nextDate = new Date(activeDate.value);
   nextDate.setMonth(nextDate.getMonth() + (direction === 'next' ? 1 : -1));
   activeDate.value = nextDate;
-  if (dashboardBootstrapComplete.value) {
-    void loadDashboard();
-  }
+  expandedCalendarDays.value = [];
 }
 
 onMounted(() => {
@@ -657,9 +719,20 @@ watch(
       lastLoadedDashboardKey.value = '';
       activeDashboardLoadKey.value = '';
       resetDashboardData();
+      resetCalendarCoverage();
       return;
     }
     await loadDashboard();
+  },
+);
+
+watch(
+  visibleCalendarMonthKey,
+  () => {
+    if (!dashboardBootstrapComplete.value || !canLoadTenantData.value) {
+      return;
+    }
+    void loadCalendarCoverageForVisibleMonth();
   },
 );
 

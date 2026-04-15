@@ -4,6 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { defineComponent, h, reactive } from 'vue';
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, reject, resolve };
+}
+
 const mockState = vi.hoisted(() => ({
   accessStoreState: null as any,
   legacyAuthStoreState: null as any,
@@ -246,6 +256,14 @@ async function mountView() {
   });
 }
 
+function getButtonByText(wrapper: VueWrapper<any>, text: string) {
+  const button = wrapper.findAll('button').find((candidate) => candidate.text() === text);
+  if (!button) {
+    throw new Error(`Button not found: ${text}`);
+  }
+  return button;
+}
+
 function formatExpectedLocalDateTime(value: string) {
   const date = new Date(value);
   const year = date.getFullYear();
@@ -323,6 +341,224 @@ describe('SicherPlan dashboard session loading', () => {
     expect(wrapper.text()).toContain('sicherplan.dashboardView.todayCard.label');
     expect(wrapper.text()).not.toContain('sicherplan.dashboardView.title');
     expect(wrapper.text()).not.toContain('sicherplan.dashboardView.actions.title');
+  });
+
+  it('renders count pills before rich calendar items hydrate', async () => {
+    legacyAuthStoreState.effectiveAccessToken = 'token-1';
+    legacyAuthStoreState.tenantScopeId = 'tenant-1';
+    legacyAuthStoreState.sessionUser = { tenant_id: 'tenant-1' };
+    listShiftsMock.mockResolvedValueOnce([
+      {
+        id: 'shift-1',
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: null,
+        occurrence_date: '2026-04-14',
+        starts_at: '2026-04-14T08:00:00Z',
+        ends_at: '2026-04-14T16:00:00Z',
+        break_minutes: 30,
+        shift_type_code: 'day_shift',
+        location_text: null,
+        meeting_point: null,
+        release_state: 'released',
+        customer_visible_flag: true,
+        subcontractor_visible_flag: true,
+        stealth_mode_flag: false,
+        source_kind_code: 'manual',
+        status: 'active',
+        version_no: 1,
+      },
+    ] as any);
+    const coverageDeferred = createDeferred<any[]>();
+    listStaffingCoverageMock.mockImplementationOnce(() => coverageDeferred.promise);
+
+    wrapper = await mountView();
+    await flushPromises();
+
+    expect(wrapper.findAll('.sp-dashboard__calendar-item')).toHaveLength(0);
+    expect(wrapper.text()).toContain('1 sicherplan.dashboardView.calendar.shiftShort');
+    expect(listStaffingCoverageMock).toHaveBeenCalledTimes(1);
+
+    coverageDeferred.resolve([
+      {
+        shift_id: 'shift-1',
+        planning_record_id: 'planning-1',
+        shift_plan_id: 'plan-1',
+        order_id: 'order-1',
+        order_no: 'ORD-1',
+        planning_record_name: 'Planning 1',
+        planning_mode_code: 'site',
+        workforce_scope_code: 'internal',
+        starts_at: '2026-04-14T08:00:00Z',
+        ends_at: '2026-04-14T16:00:00Z',
+        shift_type_code: 'day_shift',
+        location_text: 'Berlin',
+        meeting_point: 'Gate A',
+        min_required_qty: 1,
+        target_required_qty: 2,
+        assigned_count: 1,
+        confirmed_count: 1,
+        released_partner_qty: 0,
+        coverage_state: 'yellow',
+        demand_groups: [{ demand_group_id: 'dg-1' }],
+      },
+    ]);
+    await flushPromises();
+
+    expect(wrapper.findAll('.sp-dashboard__calendar-item')).toHaveLength(1);
+  });
+
+  it('deduplicates in-flight month coverage requests and reuses cached month data when revisiting', async () => {
+    legacyAuthStoreState.effectiveAccessToken = 'token-1';
+    legacyAuthStoreState.tenantScopeId = 'tenant-1';
+    legacyAuthStoreState.sessionUser = { tenant_id: 'tenant-1' };
+    const firstMonthDeferred = createDeferred<any[]>();
+    const nextMonthDeferred = createDeferred<any[]>();
+    listStaffingCoverageMock
+      .mockImplementationOnce(() => firstMonthDeferred.promise)
+      .mockImplementationOnce(() => nextMonthDeferred.promise);
+
+    wrapper = await mountView();
+    await flushPromises();
+
+    expect(listStaffingCoverageMock).toHaveBeenCalledTimes(1);
+    window.dispatchEvent(new Event('focus'));
+    await flushPromises();
+    expect(listStaffingCoverageMock).toHaveBeenCalledTimes(1);
+
+    firstMonthDeferred.resolve([
+      {
+        shift_id: 'shift-1',
+        planning_record_id: 'planning-1',
+        shift_plan_id: 'plan-1',
+        order_id: 'order-1',
+        order_no: 'ORD-1',
+        planning_record_name: 'Planning 1',
+        planning_mode_code: 'site',
+        workforce_scope_code: 'internal',
+        starts_at: '2026-04-14T08:00:00Z',
+        ends_at: '2026-04-14T16:00:00Z',
+        shift_type_code: 'day_shift',
+        location_text: 'Berlin',
+        meeting_point: 'Gate A',
+        min_required_qty: 1,
+        target_required_qty: 2,
+        assigned_count: 1,
+        confirmed_count: 1,
+        released_partner_qty: 0,
+        coverage_state: 'yellow',
+        demand_groups: [{ demand_group_id: 'dg-1' }],
+      },
+    ]);
+    await flushPromises();
+
+    await getButtonByText(wrapper, 'sicherplan.dashboardView.calendar.next').trigger('click');
+    await flushPromises();
+    expect(listStaffingCoverageMock).toHaveBeenCalledTimes(2);
+
+    nextMonthDeferred.resolve([
+      {
+        shift_id: 'shift-2',
+        planning_record_id: 'planning-2',
+        shift_plan_id: 'plan-2',
+        order_id: 'order-2',
+        order_no: 'ORD-2',
+        planning_record_name: 'Planning 2',
+        planning_mode_code: 'site',
+        workforce_scope_code: 'internal',
+        starts_at: '2026-05-14T08:00:00Z',
+        ends_at: '2026-05-14T16:00:00Z',
+        shift_type_code: 'night_shift',
+        location_text: 'Berlin',
+        meeting_point: 'Gate B',
+        min_required_qty: 1,
+        target_required_qty: 2,
+        assigned_count: 1,
+        confirmed_count: 0,
+        released_partner_qty: 0,
+        coverage_state: 'yellow',
+        demand_groups: [{ demand_group_id: 'dg-2' }],
+      },
+    ]);
+    await flushPromises();
+
+    await getButtonByText(wrapper, 'sicherplan.dashboardView.calendar.previous').trigger('click');
+    await flushPromises();
+
+    expect(listStaffingCoverageMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores stale month coverage responses when a newer month resolves later', async () => {
+    legacyAuthStoreState.effectiveAccessToken = 'token-1';
+    legacyAuthStoreState.tenantScopeId = 'tenant-1';
+    legacyAuthStoreState.sessionUser = { tenant_id: 'tenant-1' };
+    const firstMonthDeferred = createDeferred<any[]>();
+    const nextMonthDeferred = createDeferred<any[]>();
+    listStaffingCoverageMock
+      .mockImplementationOnce(() => firstMonthDeferred.promise)
+      .mockImplementationOnce(() => nextMonthDeferred.promise);
+
+    wrapper = await mountView();
+    await flushPromises();
+
+    await getButtonByText(wrapper, 'sicherplan.dashboardView.calendar.next').trigger('click');
+    await flushPromises();
+
+    nextMonthDeferred.resolve([
+      {
+        shift_id: 'shift-2',
+        planning_record_id: 'planning-2',
+        shift_plan_id: 'plan-2',
+        order_id: 'order-2',
+        order_no: 'ORD-2',
+        planning_record_name: 'Planning 2',
+        planning_mode_code: 'site',
+        workforce_scope_code: 'internal',
+        starts_at: '2026-05-14T17:00:00Z',
+        ends_at: '2026-05-14T22:00:00Z',
+        shift_type_code: 'night_shift',
+        location_text: 'Berlin',
+        meeting_point: 'Gate B',
+        min_required_qty: 1,
+        target_required_qty: 2,
+        assigned_count: 1,
+        confirmed_count: 0,
+        released_partner_qty: 0,
+        coverage_state: 'yellow',
+        demand_groups: [{ demand_group_id: 'dg-2' }],
+      },
+    ]);
+    await flushPromises();
+    expect(wrapper.text()).toContain('Night Shift');
+
+    firstMonthDeferred.resolve([
+      {
+        shift_id: 'shift-1',
+        planning_record_id: 'planning-1',
+        shift_plan_id: 'plan-1',
+        order_id: 'order-1',
+        order_no: 'ORD-1',
+        planning_record_name: 'Planning 1',
+        planning_mode_code: 'site',
+        workforce_scope_code: 'internal',
+        starts_at: '2026-04-14T08:00:00Z',
+        ends_at: '2026-04-14T16:00:00Z',
+        shift_type_code: 'day_shift',
+        location_text: 'Berlin',
+        meeting_point: 'Gate A',
+        min_required_qty: 1,
+        target_required_qty: 2,
+        assigned_count: 1,
+        confirmed_count: 1,
+        released_partner_qty: 0,
+        coverage_state: 'green',
+        demand_groups: [{ demand_group_id: 'dg-1' }],
+      },
+    ]);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Night Shift');
+    expect(wrapper.text()).not.toContain('Day Shift');
   });
 
   it('renders real staffing coverage items with coverage tones and expands remaining items on demand', async () => {
