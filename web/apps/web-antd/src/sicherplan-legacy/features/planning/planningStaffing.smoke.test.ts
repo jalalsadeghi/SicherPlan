@@ -1411,7 +1411,88 @@ describe("PlanningStaffingCoverageView", () => {
 
     expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(true);
     expect(wrapper.get(".modal-stub__title").text()).toContain("Zuweisung anlegen");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-demand-group"]').element as HTMLSelectElement).value).toBe("dg-1");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-team-select"]').element as HTMLSelectElement).value).toBe("");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-member-select"]').element as HTMLSelectElement).value).toBe("");
     expect((wrapper.get('[data-testid="planning-staffing-assignment-status"]').element as HTMLSelectElement).value).toBe("assigned");
+  });
+
+  it("keeps create-mode assignment values stable during background refresh when existing assignments are present", async () => {
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+    await wrapper.get('[data-testid="planning-staffing-start-assignment-create"]').trigger("click");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-demand-group"]').setValue("dg-1");
+    await wrapper.get('[data-testid="planning-staffing-assignment-team-select"]').setValue("team-1");
+    await wrapper.get('[data-testid="planning-staffing-assignment-member-select"]').setValue("employee-1");
+    await wrapper.get('[data-testid="planning-staffing-assignment-status"]').setValue("confirmed");
+    await wrapper.get('[data-testid="planning-staffing-assignment-source"]').setValue("manual");
+    await wrapper.get('[data-testid="planning-staffing-assignment-offered-at"]').setValue("2026-04-05T07:15");
+    await wrapper.get('[data-testid="planning-staffing-assignment-confirmed-at"]').setValue("2026-04-05T07:45");
+    await wrapper.get('[data-testid="planning-staffing-assignment-remarks"]').setValue("Stabiler Entwurf");
+
+    mocks.listStaffingBoardMock.mockResolvedValueOnce([
+      {
+        id: "shift-1",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        shift_plan_id: "plan-1",
+        order_id: "order-1",
+        order_no: "ORD-1",
+        planning_record_name: "Planning 1",
+        planning_mode_code: "site",
+        workforce_scope_code: "internal",
+        starts_at: "2026-04-05T08:00:00Z",
+        ends_at: "2026-04-05T16:00:00Z",
+        shift_type_code: "site_day",
+        release_state: "draft",
+        status: "active",
+        location_text: "Berlin",
+        meeting_point: "Gate A",
+        demand_groups: [
+          {
+            id: "dg-1",
+            shift_id: "shift-1",
+            function_type_id: "func-1",
+            qualification_type_id: "qual-1",
+            min_qty: 1,
+            target_qty: 2,
+            mandatory_flag: true,
+            assigned_count: 1,
+            confirmed_count: 1,
+            released_partner_qty: 0,
+          },
+        ],
+        assignments: [
+          {
+            id: "assignment-1",
+            shift_id: "shift-1",
+            demand_group_id: "dg-1",
+            team_id: "team-1",
+            employee_id: "employee-1",
+            subcontractor_worker_id: null,
+            assignment_status_code: "assigned",
+            assignment_source_code: "dispatcher",
+            confirmed_at: null,
+            version_no: 1,
+          },
+        ],
+      },
+    ]);
+
+    window.dispatchEvent(new Event("focus"));
+    await flushPromises();
+
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-demand-group"]').element as HTMLSelectElement).value).toBe("dg-1");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-team-select"]').element as HTMLSelectElement).value).toBe("team-1");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-member-select"]').element as HTMLSelectElement).value).toBe("employee-1");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-status"]').element as HTMLSelectElement).value).toBe("confirmed");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-source"]').element as HTMLSelectElement).value).toBe("manual");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-offered-at"]').element as HTMLInputElement).value).toBe("2026-04-05T07:15");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-confirmed-at"]').element as HTMLInputElement).value).toBe("2026-04-05T07:45");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-remarks"]').element as HTMLTextAreaElement).value).toBe("Stabiler Entwurf");
+    expect(wrapper.get(".modal-stub__title").text()).toContain("Zuweisung anlegen");
   });
 
   it("opens the assignment modal in edit mode when an assignment row is clicked", async () => {
@@ -1637,6 +1718,30 @@ describe("PlanningStaffingCoverageView", () => {
     await flushPromises();
     expect(wrapper.find('[data-testid="planning-staffing-assignment-modal"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="planning-staffing-tab-panel-assignments"] [data-testid=\"planning-staffing-assignment-member-select\"]').exists()).toBe(false);
+  });
+
+  it("resets create-mode assignment editor back to create defaults instead of old assignment values", async () => {
+    const wrapper = await mountView();
+    await clickDetailTab(wrapper, "assignments");
+    await wrapper.get('[data-testid="planning-staffing-start-assignment-create"]').trigger("click");
+    await flushPromises();
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-demand-group"]').setValue("dg-1");
+    await wrapper.get('[data-testid="planning-staffing-assignment-team-select"]').setValue("team-1");
+    await wrapper.get('[data-testid="planning-staffing-assignment-member-select"]').setValue("employee-1");
+    await wrapper.get('[data-testid="planning-staffing-assignment-status"]').setValue("confirmed");
+    await wrapper.get('[data-testid="planning-staffing-assignment-source"]').setValue("manual");
+    await wrapper.get('[data-testid="planning-staffing-assignment-remarks"]').setValue("Entwurf");
+
+    await wrapper.get('[data-testid="planning-staffing-assignment-modal-reset"]').trigger("click");
+    await flushPromises();
+
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-demand-group"]').element as HTMLSelectElement).value).toBe("dg-1");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-team-select"]').element as HTMLSelectElement).value).toBe("");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-member-select"]').element as HTMLSelectElement).value).toBe("");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-status"]').element as HTMLSelectElement).value).toBe("assigned");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-source"]').element as HTMLSelectElement).value).toBe("dispatcher");
+    expect((wrapper.get('[data-testid="planning-staffing-assignment-remarks"]').element as HTMLTextAreaElement).value).toBe("");
   });
 
   it("keeps unassign available from the assignment modal", async () => {

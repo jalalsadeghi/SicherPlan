@@ -1,142 +1,126 @@
 You are working in the public repo `jalalsadeghi/SicherPlan`.
 
 Important working-mode rule:
-Treat the current working tree as the source of truth.
-Do NOT revert the existing dashboard calendar item work.
-The committed `main` branch still shows only count pills in the calendar, so the slow cell-item layer is coming from the live/working-tree dashboard changes.
-Your job is to optimize that new layer without removing its functionality.
+Treat the current working tree as the source of truth. Do NOT revert unrelated planning-staffing work. Apply only a focused fix for assignment-creation state handling in `/admin/planning-staffing`.
 
 Task:
-Improve the loading performance of `/admin/dashboard` → `Planning calendar`, specifically the slower item content rendered inside `sp-dashboard__calendar-cell`, while preserving the already-fast `sp-dashboard__calendar-events` count pills.
+Fix the `Create assignment` flow in `admin/planning-staffing` so the assignment creation modal/form no longer resets unexpectedly while the user is filling it in.
 
-Observed behavior:
-- `sp-dashboard__calendar-events` loads relatively fast
-- the richer content inside the calendar cells loads noticeably slower
-- the dashboard should feel fast immediately, and then hydrate detailed day items efficiently
+Observed bug:
+When the user opens `Create assignment`, the modal opens correctly.
+But while filling fields, the form suddenly resets and the user must enter the values again.
+This may repeat multiple times, especially when the shift already has one or more existing assignments.
 
-Performance goal:
-Keep the count pills fast and make the richer day-item content load much faster, with fewer requests, less recomputation, and no unnecessary render-blocking.
+Likely root cause to inspect first:
+In the current implementation, the create-assignment draft is still coupled to:
+- `selectedAssignmentId`
+- assignment auto-selection from the assignments list
+- background refresh/watcher logic that repopulates or resets the draft
 
-What to inspect first:
-1. The current working-tree dashboard calendar implementation
-   - especially any logic that adds rich day items beyond the committed main-branch count pills
-2. Whether the working tree currently fetches:
-   - `listStaffingCoverage(...)`
-   - `listStaffingBoard(...)`
-   - or even multiple per-day/per-cell calls
-3. How month changes are handled
-4. Whether there is any duplicate fetch caused by watchers / focus refresh / route refresh
-5. Whether cell items are regrouped/recomputed on every render instead of once per fetch
+Current areas to inspect first:
+1. `web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue`
+   Especially inspect:
+   - `startCreateAssignment()`
+   - `loadSelectedShiftDetails()`
+   - `loadSelectedAssignmentDetails()`
+   - `resetAssignmentDraft()`
+   - `resetAssignmentEditor()`
+   - watcher on `selectedAssignmentId`
+   - watcher on `selectedBoardShift`
+2. `web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.smoke.test.ts`
 
-Important API guidance:
-Use the lightest sufficient data source.
-For dashboard calendar day items, prefer the coverage endpoint, not the heavier staffing-board endpoint, unless the current working tree proves otherwise.
-Do NOT fetch assignments/board-level detail if the calendar only needs:
-- shift label
-- time window
-- coverage state
-- planning context
-These should come from the coverage payload if available.
+What is probably happening:
+- create mode clears `selectedAssignmentId`
+- later, detail-loading logic auto-selects the first existing assignment
+- assignment detail loading then repopulates the modal draft from that old assignment
+- selected-board-shift watcher may also reset the draft again when selection is empty
+This causes the create form to lose user-entered values
 
-Primary optimization strategy:
-1. Render dashboard shell and count pills immediately
-2. Load richer calendar cell items asynchronously after the first paint
-3. Fetch coverage in one bulk request per visible month
-4. Cache results by tenant + visible month
-5. Deduplicate in-flight requests
-6. Group fetched coverage rows by day once, not on every render
-7. Avoid per-cell, per-day, or per-item network calls
+Required behavior after the fix:
+1. Opening `Create assignment` must create a stable draft for create mode
+2. While the create dialog is open, user-entered values must NOT be overwritten by:
+   - background refresh
+   - assignment auto-selection
+   - selected-assignment watcher
+   - selected-board-shift watcher
+3. Existing assignment rows must still open edit mode correctly when the user clicks them
+4. Edit mode may still repopulate from the selected assignment
+5. Create mode must remain independent from existing assignment selection
 
-Required implementation direction:
-A. Progressive hydration
-- The calendar grid and `sp-dashboard__calendar-events` should render immediately
-- The detailed cell items should hydrate separately without blocking the whole calendar
+Important design rule:
+Create-mode draft must be isolated from list-selection side effects.
 
-B. Use one monthly bulk fetch
-- When the visible month changes, compute the month window
-- Request coverage once for that month
-- Do NOT issue a request per day or per cell
+Recommended implementation direction:
+1. Inspect the current logic that auto-selects the first assignment in `loadSelectedShiftDetails()`
+2. Remove that auto-selection behavior if it still exists
+3. Decouple create-mode draft from `selectedAssignmentId`
+4. Guard watcher-driven draft mutations:
+   - while `assignmentDialogOpen === true` and `assignmentDialogMode === "create"`,
+     do NOT:
+     - auto-populate from an existing assignment
+     - call `resetAssignmentDraft()` because list/board state changed
+5. Make `resetAssignmentEditor()` mode-aware:
+   - in create mode: reset to clean create defaults
+   - in edit mode: restore the selected assignment details
+6. If current code keeps an outside row selection for the list, that is fine,
+   but it must not mutate the create modal draft
+7. If modal-only validation summary / selected-assignment UI currently depends on `selectedAssignmentId`,
+   make sure create mode does not show stale edit-mode state
 
-C. Cache + dedupe
-- Cache coverage results by a stable key such as:
-  `tenantId + monthStart + monthEnd`
-- If the user returns to a month already loaded, reuse cached data
-- If the same request is already in flight, reuse or safely ignore duplicate work
+Preferred architectural outcome:
+- user list selection state
+- edit-mode source assignment state
+- create-mode form draft
+must not be treated as the same thing
 
-D. Pre-group once
-- After receiving coverage rows, transform them once into a structure like:
-  `Map<dayKey, DashboardCoverageItem[]>`
-- Then let each cell do only O(1) lookup by day key
-- Avoid repeatedly filtering the full coverage array for every cell
+If needed, introduce a small dedicated editor-state variable, for example:
+- `assignmentEditorSourceId`
+or equivalent,
+instead of reusing `selectedAssignmentId` for both list selection and create-form lifecycle.
 
-E. Use the lightest payload
-- If the current working tree is using `listStaffingBoard(...)` for dashboard cell items, switch to `listStaffingCoverage(...)` unless a proven requirement blocks it
-- Do not use board-level payload when coverage-level payload is enough
+Testing requirements:
+Update/add tests in:
+`web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.smoke.test.ts`
 
-F. Avoid extra lookups
-- Build day-item labels directly from available row fields
-- Do not do follow-up fetches per item for names if the coverage row already includes enough display data
+At minimum cover these cases:
+1. opening `Create assignment` with existing assignments present does NOT prefill from an old assignment
+2. while create modal is open, background list/detail refresh does NOT reset user-entered form values
+3. clicking an assignment row still opens edit mode with populated values
+4. create-mode reset button restores create defaults, not old assignment data
+5. canceling create mode closes safely without altering unrelated list state
+6. if the previous tests assumed auto-selected assignment rows, update them to the new intended behavior
 
-G. Prevent stale updates
-- If month changes while a coverage request is in flight:
-  - cancel it if current codebase supports AbortController cleanly
-  - or ignore stale resolution safely
-- Do not let older responses overwrite newer month data
-
-What to look for as likely root causes:
-- per-day/per-cell requests
-- use of `listStaffingBoard(...)` instead of `listStaffingCoverage(...)`
-- repeated full-array filtering for each of 35 cells
-- request duplication from multiple watchers
-- blocking first render on coverage items
-- expensive reactive recomputation instead of one-time grouping
-
-What to preserve:
-- existing count pills in `sp-dashboard__calendar-events`
-- existing click behavior for day items
-- existing color/state semantics
-- existing month navigation behavior
-- existing dashboard visual structure
-
-Testing / validation requirements:
-Add or update focused tests for the working-tree dashboard calendar logic.
-
-At minimum verify:
-1. detailed calendar item loading is decoupled from the initial count-pill render
-2. only one coverage request is made per visible month load
-3. no per-cell or per-day request pattern remains
-4. cached month data is reused when revisiting the same month
-5. stale in-flight responses do not overwrite newer month state
-6. day items are grouped by day once and rendered from that grouped structure
-7. if the previous implementation used staffing-board, confirm the dashboard now uses coverage instead (if safe)
-8. the UI still renders correctly when coverage is empty
-
-Manual validation checklist:
-- open dashboard on a tenant with visible month data
-- confirm count pills appear immediately
-- confirm detailed cell items hydrate shortly after without freezing the page
-- confirm navigating to next/previous month causes at most one coverage request
-- confirm returning to an already visited month is faster due to cache reuse
-- confirm no waterfall of per-day requests in Network
+Suggested regression scenario:
+- mount the view with one existing assignment already in the shift
+- open `Create assignment`
+- type/select multiple fields:
+  - demand_group_id
+  - team_id
+  - member_ref
+  - assignment_status_code
+  - assignment_source_code
+  - offered_at
+  - confirmed_at
+  - remarks
+- trigger whatever refresh path currently causes the reset
+- assert the entered values remain intact in create mode
 
 Acceptance criteria:
-- `sp-dashboard__calendar-events` remains fast
-- `sp-dashboard__calendar-cell` detailed item content loads significantly faster
-- the calendar no longer relies on heavy or repeated requests
-- month-to-month navigation stays responsive
-- the change is local, maintainable, and does not remove existing rich calendar functionality
+- Create assignment form no longer resets unexpectedly
+- Existing assignments no longer overwrite create-mode draft
+- Edit flow still works from list row click
+- Tests cover the regression
 
 At the end, provide a concise validation report with these headings:
 1. Root cause found
-2. Which file(s) were changed
-3. Which data source is now used for dashboard cell items
-4. How monthly fetch/caching/deduplication now works
-5. How render-blocking was reduced
+2. Which files were changed
+3. How create-mode draft was isolated
+4. What watcher / refresh behavior was guarded
+5. How edit mode still works
 6. Which tests were updated or added
 7. Any remaining edge cases to verify manually
 
-Before coding, explicitly answer:
-- Is the current working tree using per-cell/per-day requests?
-- Is it using `listStaffingBoard(...)` or `listStaffingCoverage(...)`?
-- Is the rich cell content blocking first render?
-Then implement the safest optimization based on those findings.
+Before coding, explicitly identify:
+- the exact block that auto-selects the first assignment
+- the exact watcher(s) that can reset or repopulate the draft during create mode
+Then implement the safest fix without broad refactoring.

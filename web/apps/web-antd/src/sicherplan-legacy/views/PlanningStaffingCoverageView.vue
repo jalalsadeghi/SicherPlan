@@ -1534,6 +1534,9 @@ const canSubmitTeamMember = computed(() => {
   return true;
 });
 const assignmentEditorMode = computed(() => assignmentDialogMode.value);
+const assignmentCreateDialogActive = computed(
+  () => assignmentDialogOpen.value && assignmentDialogMode.value === "create",
+);
 const canSubmitAssignmentEditor = computed(() => {
   if (!actionState.value.canWriteStaffing || !selectedShiftId.value || !assignmentDraft.demand_group_id || !assignmentDraft.member_ref) {
     return false;
@@ -1664,6 +1667,10 @@ async function startEditAssignment(assignmentId = selectedAssignmentId.value) {
 }
 
 function resetAssignmentEditor() {
+  if (assignmentEditorMode.value === "create") {
+    resetAssignmentDraft();
+    return;
+  }
   if (selectedAssignmentDetails.value) {
     populateAssignmentDraft(selectedAssignmentDetails.value);
     return;
@@ -2139,7 +2146,9 @@ async function loadSelectedShiftDetails() {
   if (!boardShift?.assignments?.length) {
     selectedAssignmentId.value = "";
     selectedAssignmentDetails.value = null;
-    resetAssignmentDraft();
+    if (!assignmentCreateDialogActive.value) {
+      resetAssignmentDraft();
+    }
     assignmentValidations.value = null;
     assignmentOverrides.value = [];
     return;
@@ -2155,7 +2164,9 @@ async function loadSelectedAssignmentDetails() {
     selectedAssignmentDetails.value = null;
     assignmentValidations.value = null;
     assignmentOverrides.value = [];
-    resetAssignmentDraft();
+    if (!assignmentCreateDialogActive.value) {
+      resetAssignmentDraft();
+    }
     return;
   }
   const [assignment, validations, overrides] = await Promise.all([
@@ -2559,7 +2570,7 @@ watch(
   selectedBoardShift,
   (shift) => {
     selectedDemandGroupId.value = resolveSelectedDemandGroupId(shift, selectedDemandGroupId.value);
-    if (!selectedAssignmentId.value) {
+    if (!selectedAssignmentId.value && !assignmentCreateDialogActive.value) {
       resetAssignmentDraft();
     }
     if (!shift?.demand_groups?.length) {
