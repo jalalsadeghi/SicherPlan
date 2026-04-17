@@ -370,7 +370,11 @@
               <div class="subcontractor-admin-form-grid">
                 <label class="field-stack">
                   <span>{{ t("sicherplan.subcontractors.workforce.fields.qualificationTypeId") }}</span>
-                  <input v-model="qualificationDraft.qualification_type_id" required />
+                  <select v-if="qualificationTypeOptions.length" v-model="qualificationDraft.qualification_type_id" required>
+                    <option value="">{{ t("sicherplan.subcontractors.workforce.fields.qualificationTypePlaceholder") }}</option>
+                    <option v-for="option in qualificationTypeOptionsWithDraft" :key="option.id" :value="option.id">{{ option.label }}</option>
+                  </select>
+                  <input v-else v-model="qualificationDraft.qualification_type_id" required />
                 </label>
                 <label class="field-stack">
                   <span>{{ t("sicherplan.subcontractors.workforce.fields.certificateNo") }}</span>
@@ -489,7 +493,10 @@
                 </label>
                 <label class="field-stack">
                   <span>{{ t("sicherplan.subcontractors.workforce.fields.credentialType") }}</span>
-                  <input v-model="credentialDraft.credential_type" required />
+                  <select v-model="credentialDraft.credential_type" required>
+                    <option value="">{{ t("sicherplan.subcontractors.workforce.fields.credentialTypePlaceholder") }}</option>
+                    <option v-for="option in credentialTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                  </select>
                 </label>
                 <label class="field-stack">
                   <span>{{ t("sicherplan.subcontractors.workforce.fields.encodedValue") }}</span>
@@ -547,6 +554,7 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "@vben/locales";
 
 import StatusBadge from "@/components/StatusBadge.vue";
+import { listQualificationTypes, type QualificationTypeRead } from "@/api/employeeAdmin";
 import {
   createSubcontractorWorker,
   createSubcontractorWorkerCredential,
@@ -578,6 +586,7 @@ import {
   updateSubcontractorWorkerQualification,
   uploadSubcontractorQualificationProof,
 } from "@/api/subcontractors";
+import { EMPLOYEE_CREDENTIAL_TYPE_OPTIONS } from "@/features/employees/employeeAdmin.helpers.js";
 import {
   buildSubcontractorWorkerImportTemplateRows,
   mapSubcontractorApiMessage,
@@ -662,6 +671,7 @@ const proofLinkDraft = reactive({
 const workers = ref<SubcontractorWorkerListItem[]>([]);
 const workerReadinessItems = ref<SubcontractorWorkerReadinessListItem[]>([]);
 const readinessSummary = ref<SubcontractorWorkforceReadinessSummaryRead | null>(null);
+const qualificationTypes = ref<QualificationTypeRead[]>([]);
 const selectedWorker = ref<SubcontractorWorkerRead | null>(null);
 const selectedWorkerReadiness = ref<SubcontractorWorkerReadinessRead | null>(null);
 const selectedWorkerId = ref("");
@@ -682,6 +692,27 @@ const selectedWorkerLabel = computed(() =>
 const importRows = computed(() => lastImportResult.value?.rows ?? importDryRunResult.value?.rows ?? []);
 const selectedQualification = computed<SubcontractorWorkerQualificationRead | null>(
   () => selectedWorker.value?.qualifications.find((row) => row.id === selectedQualificationId.value) ?? null,
+);
+const qualificationTypeOptions = computed(() =>
+  qualificationTypes.value
+    .filter((row) => row.archived_at == null)
+    .map((row) => ({
+      id: row.id,
+      label: [row.code, row.label].filter(Boolean).join(" · "),
+    })),
+);
+const qualificationTypeOptionsWithDraft = computed(() => {
+  const currentValue = qualificationDraft.qualification_type_id.trim();
+  if (!currentValue || qualificationTypeOptions.value.some((option) => option.id === currentValue)) {
+    return qualificationTypeOptions.value;
+  }
+  return [...qualificationTypeOptions.value, { id: currentValue, label: currentValue }];
+});
+const credentialTypeOptions = computed(() =>
+  EMPLOYEE_CREDENTIAL_TYPE_OPTIONS.map((option) => ({
+    value: option.value,
+    label: t(option.labelKey as never),
+  })),
 );
 const workerReadinessMap = computed<Record<string, SubcontractorWorkerReadinessListItem>>(() =>
   Object.fromEntries(workerReadinessItems.value.map((row) => [row.worker_id, row])),
@@ -787,13 +818,13 @@ async function refreshWorkers() {
   loading.list = true;
   try {
     const filters = {
-      search: emptyToNull(workerFilters.search),
-      status: emptyToNull(workerFilters.status),
+      ...(workerFilters.search.trim() ? { search: workerFilters.search.trim() } : {}),
+      ...(workerFilters.status ? { status: workerFilters.status } : {}),
       include_archived: workerFilters.include_archived,
     };
     const readinessFilters = {
       ...filters,
-      readiness_status: emptyToNull(workerFilters.readiness_status),
+      ...(workerFilters.readiness_status ? { readiness_status: workerFilters.readiness_status } : {}),
     };
     const [workerList, readinessList, readinessSummaryValue] = await Promise.all([
       listSubcontractorWorkers(props.tenantId, props.subcontractorId, props.accessToken, filters),
@@ -808,21 +839,41 @@ async function refreshWorkers() {
       const stillVisible = workers.value.some((row) => row.id === selectedWorkerId.value);
       if (stillVisible) {
         await selectWorker(selectedWorkerId.value);
-      } else if (workers.value.length) {
-        await selectWorker(workers.value[0].id);
+      } else {
+        const firstWorker = workers.value[0];
+        if (firstWorker) {
+          await selectWorker(firstWorker.id);
+        } else {
+          selectedWorkerId.value = "";
+          selectedWorker.value = null;
+          selectedWorkerReadiness.value = null;
+        }
+      }
+    } else {
+      const firstWorker = workers.value[0];
+      if (firstWorker) {
+        await selectWorker(firstWorker.id);
       } else {
         selectedWorkerId.value = "";
-        selectedWorker.value = null;
-        selectedWorkerReadiness.value = null;
       }
-    } else if (workers.value.length) {
-      await selectWorker(workers.value[0].id);
     }
   } catch (error) {
     const key = error instanceof SubcontractorAdminApiError ? mapSubcontractorApiMessage(error.messageKey) : "sicherplan.subcontractors.feedback.error";
     setFeedback("error", t("sicherplan.subcontractors.feedback.titleError"), t(key as never));
   } finally {
     loading.list = false;
+  }
+}
+
+async function loadQualificationTypeOptions() {
+  if (!props.tenantId || !props.accessToken) {
+    qualificationTypes.value = [];
+    return;
+  }
+  try {
+    qualificationTypes.value = await listQualificationTypes(props.tenantId, props.accessToken);
+  } catch {
+    qualificationTypes.value = [];
   }
 }
 
@@ -1251,11 +1302,13 @@ watch(
     resetWorkerDraft();
     resetQualificationDraft();
     resetCredentialDraft();
+    void loadQualificationTypeOptions();
     void refreshWorkers();
   },
 );
 
 onMounted(() => {
+  void loadQualificationTypeOptions();
   void refreshWorkers();
 });
 </script>

@@ -7,11 +7,21 @@ const viewPath = resolve(
   process.cwd(),
   "web/apps/web-antd/src/sicherplan-legacy/views/SubcontractorAdminView.vue",
 );
+const workforcePath = resolve(
+  process.cwd(),
+  "web/apps/web-antd/src/sicherplan-legacy/components/SubcontractorWorkforcePanel.vue",
+);
+const apiPath = resolve(
+  process.cwd(),
+  "web/apps/web-antd/src/sicherplan-legacy/api/subcontractors.ts",
+);
 const registryPath = resolve(
   process.cwd(),
   "web/apps/web-antd/src/views/sicherplan/module-registry.ts",
 );
 const source = readFileSync(viewPath, "utf8");
+const workforceSource = readFileSync(workforcePath, "utf8");
+const apiSource = readFileSync(apiPath, "utf8");
 const registrySource = readFileSync(registryPath, "utf8");
 
 test("subcontractor workspace keeps compact master detail layout with detail tabs", () => {
@@ -26,15 +36,43 @@ test("embedded subcontractor view suppresses local hero chrome", () => {
   assert.match(source, /v-if="!props\.embedded" class="module-card subcontractor-admin-hero"/);
 });
 
-test("subcontractor detail workspace exposes customer-style tab panels and placeholders", () => {
+test("subcontractor detail workspace shows only supported tab panels", () => {
   assert.match(source, /data-testid="subcontractor-tab-panel-overview"/);
   assert.match(source, /data-testid="subcontractor-tab-panel-contacts"/);
-  assert.match(source, /data-testid="subcontractor-tab-panel-addresses"/);
-  assert.match(source, /data-testid="subcontractor-tab-panel-commercial"/);
   assert.match(source, /data-testid="subcontractor-tab-panel-scope-release"/);
   assert.match(source, /data-testid="subcontractor-tab-panel-billing"/);
   assert.match(source, /data-testid="subcontractor-tab-panel-history"/);
   assert.match(source, /activeDetailTab === 'workforce'/);
+  assert.doesNotMatch(source, /data-testid="subcontractor-tab-panel-addresses"/);
+  assert.doesNotMatch(source, /data-testid="subcontractor-tab-panel-commercial"/);
+  assert.doesNotMatch(source, /tabs\.addresses/);
+  assert.doesNotMatch(source, /tabs\.commercial/);
+});
+
+test("subcontractor admin uses controlled selectors where real option sources exist", () => {
+  assert.match(source, /listBranches,/);
+  assert.match(source, /listMandates,/);
+  assert.match(source, /listLookupValues,/);
+  assert.match(source, /v-if="branchOptions\.length" v-model="scopeDraft\.branch_id"/);
+  assert.match(source, /v-if="mandateOptions\.length" v-model="scopeDraft\.mandate_id"/);
+  assert.match(source, /v-if="legalFormOptions\.length" v-model="subcontractorDraft\.legal_form_lookup_id"/);
+  assert.match(source, /v-if="subcontractorStatusOptions\.length" v-model="subcontractorDraft\.subcontractor_status_lookup_id"/);
+  assert.match(source, /v-if="invoiceDeliveryMethodOptions\.length" v-model="financeDraft\.invoice_delivery_method_lookup_id"/);
+  assert.match(source, /v-if="invoiceStatusModeOptions\.length" v-model="financeDraft\.invoice_status_mode_lookup_id"/);
+});
+
+test("subcontractor workforce uses qualification and credential selectors instead of free-text IDs", () => {
+  assert.match(workforceSource, /listQualificationTypes/);
+  assert.match(workforceSource, /EMPLOYEE_CREDENTIAL_TYPE_OPTIONS/);
+  assert.match(workforceSource, /<select v-if="qualificationTypeOptions\.length" v-model="qualificationDraft\.qualification_type_id" required>/);
+  assert.match(workforceSource, /<select v-model="credentialDraft\.credential_type" required>/);
+  assert.doesNotMatch(workforceSource, /<input v-model="credentialDraft\.credential_type" required \/>/);
+});
+
+test("subcontractor scope stays aligned with current branch and mandate contract only", () => {
+  assert.match(apiSource, /export interface SubcontractorScopeRead \{[\s\S]*branch_id: string;[\s\S]*mandate_id: string \| null;/);
+  assert.doesNotMatch(apiSource, /site_id/);
+  assert.doesNotMatch(source, /scopeDraft\.site_id/);
 });
 
 test("subcontractor module wrapper skips the extra workspace block", () => {

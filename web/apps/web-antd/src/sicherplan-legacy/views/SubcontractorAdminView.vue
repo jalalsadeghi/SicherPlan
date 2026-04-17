@@ -72,11 +72,19 @@
           </label>
           <label class="field-stack">
             <span>{{ t("sicherplan.subcontractors.fields.branchId") }}</span>
-            <input v-model="filters.branch_id" />
+            <select v-if="branchOptions.length" v-model="filters.branch_id">
+              <option value="">{{ t("sicherplan.subcontractors.filters.allBranches") }}</option>
+              <option v-for="option in branchOptions" :key="option.id" :value="option.id">{{ option.label }}</option>
+            </select>
+            <input v-else v-model="filters.branch_id" />
           </label>
           <label class="field-stack">
             <span>{{ t("sicherplan.subcontractors.fields.mandateId") }}</span>
-            <input v-model="filters.mandate_id" />
+            <select v-if="mandateOptions.length" v-model="filters.mandate_id">
+              <option value="">{{ t("sicherplan.subcontractors.filters.allMandates") }}</option>
+              <option v-for="option in filteredMandateOptions" :key="option.id" :value="option.id">{{ option.label }}</option>
+            </select>
+            <input v-else v-model="filters.mandate_id" />
           </label>
         </div>
 
@@ -193,11 +201,19 @@
               </label>
               <label class="field-stack">
                 <span>{{ t("sicherplan.subcontractors.fields.legalFormLookupId") }}</span>
-                <input v-model="subcontractorDraft.legal_form_lookup_id" />
+                <select v-if="legalFormOptions.length" v-model="subcontractorDraft.legal_form_lookup_id">
+                  <option value="">{{ t("sicherplan.subcontractors.fields.legalFormPlaceholder") }}</option>
+                  <option v-for="option in legalFormOptionsWithDraft" :key="option.id" :value="option.id">{{ option.label }}</option>
+                </select>
+                <input v-else v-model="subcontractorDraft.legal_form_lookup_id" />
               </label>
               <label class="field-stack">
                 <span>{{ t("sicherplan.subcontractors.fields.statusLookupId") }}</span>
-                <input v-model="subcontractorDraft.subcontractor_status_lookup_id" />
+                <select v-if="subcontractorStatusOptions.length" v-model="subcontractorDraft.subcontractor_status_lookup_id">
+                  <option value="">{{ t("sicherplan.subcontractors.fields.statusPlaceholder") }}</option>
+                  <option v-for="option in subcontractorStatusOptionsWithDraft" :key="option.id" :value="option.id">{{ option.label }}</option>
+                </select>
+                <input v-else v-model="subcontractorDraft.subcontractor_status_lookup_id" />
               </label>
               <label class="field-stack">
                 <span>{{ t("sicherplan.subcontractors.fields.managingDirectorName") }}</span>
@@ -320,38 +336,6 @@
           </section>
 
           <section
-            v-if="selectedSubcontractor && !isCreatingSubcontractor && activeDetailTab === 'addresses'"
-            class="subcontractor-admin-section subcontractor-admin-section--placeholder"
-            data-testid="subcontractor-tab-panel-addresses"
-          >
-            <div class="subcontractor-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("sicherplan.subcontractors.placeholders.addresses.eyebrow") }}</p>
-                <h3>{{ t("sicherplan.subcontractors.placeholders.addresses.title") }}</h3>
-              </div>
-            </div>
-            <div class="subcontractor-admin-empty-state">
-              <p>{{ t("sicherplan.subcontractors.placeholders.addresses.body") }}</p>
-            </div>
-          </section>
-
-          <section
-            v-if="selectedSubcontractor && !isCreatingSubcontractor && activeDetailTab === 'commercial'"
-            class="subcontractor-admin-section subcontractor-admin-section--placeholder"
-            data-testid="subcontractor-tab-panel-commercial"
-          >
-            <div class="subcontractor-admin-panel__header">
-              <div>
-                <p class="eyebrow">{{ t("sicherplan.subcontractors.placeholders.commercial.eyebrow") }}</p>
-                <h3>{{ t("sicherplan.subcontractors.placeholders.commercial.title") }}</h3>
-              </div>
-            </div>
-            <div class="subcontractor-admin-empty-state">
-              <p>{{ t("sicherplan.subcontractors.placeholders.commercial.body") }}</p>
-            </div>
-          </section>
-
-          <section
             v-if="selectedSubcontractor && !isCreatingSubcontractor && activeDetailTab === 'scope_release'"
             class="subcontractor-admin-section"
             data-testid="subcontractor-tab-panel-scope-release"
@@ -373,7 +357,7 @@
                 @click="selectScope(scope.id)"
               >
                 <div>
-                  <strong>{{ scope.branch_id }}<template v-if="scope.mandate_id"> / {{ scope.mandate_id }}</template></strong>
+                  <strong>{{ formatScopeLabel(scope.branch_id, scope.mandate_id) }}</strong>
                   <span>{{ scope.valid_from }}<template v-if="scope.valid_to"> → {{ scope.valid_to }}</template></span>
                 </div>
                 <StatusBadge :status="scope.status" />
@@ -385,11 +369,19 @@
               <div class="subcontractor-admin-form-grid">
                 <label class="field-stack">
                   <span>{{ t("sicherplan.subcontractors.fields.branchId") }}</span>
-                  <input v-model="scopeDraft.branch_id" required />
+                  <select v-if="branchOptions.length" v-model="scopeDraft.branch_id" required>
+                    <option value="">{{ t("sicherplan.subcontractors.fields.branchPlaceholder") }}</option>
+                    <option v-for="option in branchOptions" :key="option.id" :value="option.id">{{ option.label }}</option>
+                  </select>
+                  <input v-else v-model="scopeDraft.branch_id" required />
                 </label>
                 <label class="field-stack">
                   <span>{{ t("sicherplan.subcontractors.fields.mandateId") }}</span>
-                  <input v-model="scopeDraft.mandate_id" />
+                  <select v-if="mandateOptions.length" v-model="scopeDraft.mandate_id">
+                    <option value="">{{ t("sicherplan.subcontractors.fields.mandatePlaceholder") }}</option>
+                    <option v-for="option in scopeMandateOptionsWithDraft" :key="option.id" :value="option.id">{{ option.label }}</option>
+                  </select>
+                  <input v-else v-model="scopeDraft.mandate_id" />
                 </label>
                 <label class="field-stack">
                   <span>{{ t("sicherplan.subcontractors.fields.validFrom") }}</span>
@@ -472,11 +464,19 @@
                 </label>
                 <label class="field-stack">
                   <span>{{ t("sicherplan.subcontractors.fields.invoiceDeliveryMethodLookupId") }}</span>
-                  <input v-model="financeDraft.invoice_delivery_method_lookup_id" />
+                  <select v-if="invoiceDeliveryMethodOptions.length" v-model="financeDraft.invoice_delivery_method_lookup_id">
+                    <option value="">{{ t("sicherplan.subcontractors.fields.invoiceDeliveryMethodPlaceholder") }}</option>
+                    <option v-for="option in invoiceDeliveryMethodOptionsWithDraft" :key="option.id" :value="option.id">{{ option.label }}</option>
+                  </select>
+                  <input v-else v-model="financeDraft.invoice_delivery_method_lookup_id" />
                 </label>
                 <label class="field-stack">
                   <span>{{ t("sicherplan.subcontractors.fields.invoiceStatusModeLookupId") }}</span>
-                  <input v-model="financeDraft.invoice_status_mode_lookup_id" />
+                  <select v-if="invoiceStatusModeOptions.length" v-model="financeDraft.invoice_status_mode_lookup_id">
+                    <option value="">{{ t("sicherplan.subcontractors.fields.invoiceStatusModePlaceholder") }}</option>
+                    <option v-for="option in invoiceStatusModeOptionsWithDraft" :key="option.id" :value="option.id">{{ option.label }}</option>
+                  </select>
+                  <input v-else v-model="financeDraft.invoice_status_mode_lookup_id" />
                 </label>
                 <label class="field-stack field-stack--wide">
                   <span>{{ t("sicherplan.subcontractors.fields.billingNote") }}</span>
@@ -636,6 +636,14 @@ import { useI18n } from "@vben/locales";
 
 import StatusBadge from "@/components/StatusBadge.vue";
 import SubcontractorWorkforcePanel from "@/components/SubcontractorWorkforcePanel.vue";
+import {
+  listBranches,
+  listLookupValues,
+  listMandates,
+  type BranchRead,
+  type LookupValueRead,
+  type MandateRead,
+} from "@/api/coreAdmin";
 import { useAuthStore } from "@/stores/auth";
 import {
   addPlatformDocumentVersion,
@@ -805,13 +813,17 @@ const canRead = computed(() => hasSubcontractorPermission(activeRole.value, "sub
 const canWrite = computed(() => hasSubcontractorPermission(activeRole.value, "subcontractors.company.write"));
 const canReadFinance = computed(() => hasSubcontractorPermission(activeRole.value, "subcontractors.finance.read"));
 const canWriteFinance = computed(() => hasSubcontractorPermission(activeRole.value, "subcontractors.finance.write"));
+const actorTenantId = computed(() => {
+  if (activeRole.value === "tenant_admin") {
+    return sessionTenantId.value || authStore.tenantScopeId || null;
+  }
+  return authStore.tenantScopeId || null;
+});
 const actionState = computed(() => deriveSubcontractorActionState(activeRole.value, selectedSubcontractor.value));
 const hasDetailWorkspace = computed(() => isCreatingSubcontractor.value || !!selectedSubcontractor.value);
 const detailTabLabelKeys = {
   overview: "sicherplan.subcontractors.tabs.overview",
   contacts: "sicherplan.subcontractors.tabs.contacts",
-  addresses: "sicherplan.subcontractors.tabs.addresses",
-  commercial: "sicherplan.subcontractors.tabs.commercial",
   scope_release: "sicherplan.subcontractors.tabs.scopeRelease",
   billing: "sicherplan.subcontractors.tabs.billing",
   history: "sicherplan.subcontractors.tabs.history",
@@ -840,6 +852,69 @@ const coordinateSummary = computed(() => {
   }
   return `${selectedSubcontractor.value.latitude}, ${selectedSubcontractor.value.longitude}`;
 });
+const branches = ref<BranchRead[]>([]);
+const mandates = ref<MandateRead[]>([]);
+const legalFormLookups = ref<LookupValueRead[]>([]);
+const subcontractorStatusLookups = ref<LookupValueRead[]>([]);
+const invoiceDeliveryMethodLookups = ref<LookupValueRead[]>([]);
+const invoiceStatusModeLookups = ref<LookupValueRead[]>([]);
+
+const branchOptions = computed(() =>
+  branches.value.map((row) => ({
+    id: row.id,
+    label: [row.code, row.name].filter(Boolean).join(" · "),
+  })),
+);
+const mandateOptions = computed(() =>
+  mandates.value.map((row) => ({
+    id: row.id,
+    branchId: row.branch_id,
+    label: [row.code, row.name].filter(Boolean).join(" · "),
+  })),
+);
+const filteredMandateOptions = computed(() => {
+  if (!filters.branch_id) {
+    return mandateOptions.value;
+  }
+  return mandateOptions.value.filter((row) => row.branchId === filters.branch_id);
+});
+const scopeMandateOptions = computed(() => {
+  if (!scopeDraft.branch_id) {
+    return mandateOptions.value;
+  }
+  return mandateOptions.value.filter((row) => row.branchId === scopeDraft.branch_id);
+});
+
+function mapLookupOptions(rows: LookupValueRead[]) {
+  return rows.map((row) => ({
+    id: row.id,
+    label: row.label || row.code,
+  }));
+}
+
+function withCurrentOption(options: Array<{ id: string; label: string }>, currentValue: string) {
+  const normalized = currentValue.trim();
+  if (!normalized || options.some((option) => option.id === normalized)) {
+    return options;
+  }
+  return [...options, { id: normalized, label: normalized }];
+}
+
+const legalFormOptions = computed(() => mapLookupOptions(legalFormLookups.value));
+const subcontractorStatusOptions = computed(() => mapLookupOptions(subcontractorStatusLookups.value));
+const invoiceDeliveryMethodOptions = computed(() => mapLookupOptions(invoiceDeliveryMethodLookups.value));
+const invoiceStatusModeOptions = computed(() => mapLookupOptions(invoiceStatusModeLookups.value));
+const legalFormOptionsWithDraft = computed(() => withCurrentOption(legalFormOptions.value, subcontractorDraft.legal_form_lookup_id));
+const subcontractorStatusOptionsWithDraft = computed(() =>
+  withCurrentOption(subcontractorStatusOptions.value, subcontractorDraft.subcontractor_status_lookup_id),
+);
+const invoiceDeliveryMethodOptionsWithDraft = computed(() =>
+  withCurrentOption(invoiceDeliveryMethodOptions.value, financeDraft.invoice_delivery_method_lookup_id),
+);
+const invoiceStatusModeOptionsWithDraft = computed(() =>
+  withCurrentOption(invoiceStatusModeOptions.value, financeDraft.invoice_status_mode_lookup_id),
+);
+const scopeMandateOptionsWithDraft = computed(() => withCurrentOption(scopeMandateOptions.value, scopeDraft.mandate_id));
 
 function clearFeedback() {
   feedback.tone = "neutral";
@@ -964,6 +1039,59 @@ function formatHistoryMeta(entry: SubcontractorHistoryEntryRead) {
     .join(" · ");
 }
 
+function formatScopeLabel(branchId: string, mandateId: string | null) {
+  const branchLabel = branchOptions.value.find((option) => option.id === branchId)?.label ?? branchId;
+  if (!mandateId) {
+    return branchLabel;
+  }
+  const mandateLabel = mandateOptions.value.find((option) => option.id === mandateId)?.label ?? mandateId;
+  return `${branchLabel} / ${mandateLabel}`;
+}
+
+async function loadReferenceOptions() {
+  if (!resolvedTenantScopeId.value || !accessToken.value) {
+    branches.value = [];
+    mandates.value = [];
+    legalFormLookups.value = [];
+    subcontractorStatusLookups.value = [];
+    invoiceDeliveryMethodLookups.value = [];
+    invoiceStatusModeLookups.value = [];
+    return;
+  }
+
+  try {
+    const [
+      branchRows,
+      mandateRows,
+      legalFormRows,
+      subcontractorStatusRows,
+      invoiceDeliveryMethodRows,
+      invoiceStatusModeRows,
+    ] = await Promise.all([
+      listBranches(accessToken.value, resolvedTenantScopeId.value, activeRole.value, actorTenantId.value),
+      listMandates(accessToken.value, resolvedTenantScopeId.value, activeRole.value, actorTenantId.value),
+      listLookupValues(accessToken.value, resolvedTenantScopeId.value, "legal_form", activeRole.value, actorTenantId.value),
+      listLookupValues(accessToken.value, resolvedTenantScopeId.value, "subcontractor_status", activeRole.value, actorTenantId.value),
+      listLookupValues(accessToken.value, resolvedTenantScopeId.value, "invoice_delivery_method", activeRole.value, actorTenantId.value),
+      listLookupValues(accessToken.value, resolvedTenantScopeId.value, "invoice_status_mode", activeRole.value, actorTenantId.value),
+    ]);
+
+    branches.value = branchRows.filter((row) => row.archived_at == null);
+    mandates.value = mandateRows.filter((row) => row.archived_at == null);
+    legalFormLookups.value = legalFormRows.filter((row) => row.archived_at == null);
+    subcontractorStatusLookups.value = subcontractorStatusRows.filter((row) => row.archived_at == null);
+    invoiceDeliveryMethodLookups.value = invoiceDeliveryMethodRows.filter((row) => row.archived_at == null);
+    invoiceStatusModeLookups.value = invoiceStatusModeRows.filter((row) => row.archived_at == null);
+  } catch {
+    branches.value = [];
+    mandates.value = [];
+    legalFormLookups.value = [];
+    subcontractorStatusLookups.value = [];
+    invoiceDeliveryMethodLookups.value = [];
+    invoiceStatusModeLookups.value = [];
+  }
+}
+
 async function refreshSubcontractors() {
   if (!resolvedTenantScopeId.value || !accessToken.value || !canRead.value) {
     return;
@@ -971,6 +1099,7 @@ async function refreshSubcontractors() {
 
   loading.list = true;
   try {
+    await loadReferenceOptions();
     subcontractors.value = await listSubcontractors(resolvedTenantScopeId.value, accessToken.value, filters);
     if (selectedSubcontractorId.value) {
       await loadSelectedSubcontractor(selectedSubcontractorId.value);
