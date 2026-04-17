@@ -70,6 +70,13 @@ test("subcontractor overview separates lifecycle status from lookup status and u
   assert.match(source, /fields\.lifecycleStatus/);
   assert.match(source, /fields\.statusLookupHelp/);
   assert.match(source, /data-testid="subcontractor-address-modal"/);
+  assert.match(source, /@click="openAddressCreateModal"/);
+  assert.match(source, /@submit\.prevent="submitAddressOption"/);
+  assert.match(source, /createSubcontractorAddressOption/);
+  assert.match(source, /subcontractorDraft\.address_id = created\.id/);
+  assert.match(source, /class="subcontractor-admin-address-row field-stack--wide"/);
+  assert.match(source, /subcontractor-admin-address-row__field/);
+  assert.match(source, /subcontractor-admin-address-row__action/);
 });
 
 test("subcontractor overview reuses the shared planning map picker for latitude and longitude", () => {

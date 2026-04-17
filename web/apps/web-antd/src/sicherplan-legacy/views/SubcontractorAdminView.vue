@@ -229,16 +229,19 @@
                 <span>{{ t("sicherplan.subcontractors.fields.managingDirectorName") }}</span>
                 <input v-model="subcontractorDraft.managing_director_name" />
               </label>
-              <label class="field-stack">
-                <span>{{ t("sicherplan.subcontractors.fields.addressId") }}</span>
-                <select v-if="addressOptions.length" v-model="subcontractorDraft.address_id">
-                  <option value="">{{ t("sicherplan.subcontractors.fields.addressPlaceholder") }}</option>
-                  <option v-for="option in addressOptionsWithDraft" :key="option.id" :value="option.id">{{ option.label }}</option>
-                </select>
-                <input v-else v-model="subcontractorDraft.address_id" />
-                <div class="cta-row">
+              <div class="subcontractor-admin-address-row field-stack--wide">
+                <label class="field-stack subcontractor-admin-address-row__field">
+                  <span>{{ t("sicherplan.subcontractors.fields.addressId") }}</span>
+                  <select v-if="addressOptions.length" v-model="subcontractorDraft.address_id">
+                    <option value="">{{ t("sicherplan.subcontractors.fields.addressPlaceholder") }}</option>
+                    <option v-for="option in addressOptionsWithDraft" :key="option.id" :value="option.id">{{ option.label }}</option>
+                  </select>
+                  <input v-else v-model="subcontractorDraft.address_id" />
+                </label>
+                <div class="subcontractor-admin-address-row__action">
+                  <span class="subcontractor-admin-address-row__label">{{ t("sicherplan.subcontractors.fields.addressAction") }}</span>
                   <button
-                    class="cta-button cta-secondary"
+                    class="cta-button cta-secondary subcontractor-admin-address-row__button"
                     type="button"
                     :disabled="!selectedSubcontractorId || !actionState.canEdit"
                     @click="openAddressCreateModal"
@@ -246,7 +249,7 @@
                     {{ t("sicherplan.subcontractors.actions.createAddressOption") }}
                   </button>
                 </div>
-              </label>
+              </div>
               <label class="field-stack">
                 <span>{{ t("sicherplan.subcontractors.fields.latitude") }}</span>
                 <input v-model="subcontractorDraft.latitude" type="number" step="0.000001" />
@@ -1997,6 +2000,35 @@ onMounted(async () => {
   color: #17674a;
 }
 
+.subcontractor-admin-address-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 2.2fr) minmax(170px, 0.95fr);
+  gap: 0.9rem;
+  align-items: end;
+}
+
+.subcontractor-admin-address-row__field {
+  min-width: 0;
+}
+
+.subcontractor-admin-address-row__action {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.subcontractor-admin-address-row__label {
+  display: inline-flex;
+  min-height: 1.2rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.subcontractor-admin-address-row__button {
+  width: 100%;
+  justify-content: center;
+}
+
 .subcontractor-admin-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -2034,6 +2066,10 @@ onMounted(async () => {
 
 @media (max-width: 720px) {
   .subcontractor-admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .subcontractor-admin-address-row {
     grid-template-columns: 1fr;
   }
 }

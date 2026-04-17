@@ -412,6 +412,7 @@
       "managingDirectorName": "Geschäftsführung",
       "addressId": "Hauptadresse",
       "addressPlaceholder": "Adresse auswählen",
+      "addressAction": "Adresse anlegen",
       "latitude": "Breitengrad",
       "longitude": "Längengrad",
       "locationPicker": "Kartenposition",

@@ -136,6 +136,8 @@ test("de and en locale files expose subcontractor admin route and page keys", ()
   assert.equal(typeof en.subcontractors.fields.lifecycleStatus, "string");
   assert.equal(typeof de.subcontractors.fields.addressPlaceholder, "string");
   assert.equal(typeof en.subcontractors.fields.addressPlaceholder, "string");
+  assert.equal(typeof de.subcontractors.fields.addressAction, "string");
+  assert.equal(typeof en.subcontractors.fields.addressAction, "string");
   assert.equal(typeof de.subcontractors.fields.locationPicker, "string");
   assert.equal(typeof en.subcontractors.fields.locationPicker, "string");
   assert.equal(typeof de.subcontractors.actions.pickLocationOnMap, "string");

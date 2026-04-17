@@ -412,6 +412,7 @@
       "managingDirectorName": "Managing director",
       "addressId": "Primary address",
       "addressPlaceholder": "Select address",
+      "addressAction": "Create address",
       "latitude": "Latitude",
       "longitude": "Longitude",
       "locationPicker": "Map location",
