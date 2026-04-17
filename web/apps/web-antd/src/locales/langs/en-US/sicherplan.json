@@ -414,6 +414,8 @@
       "addressPlaceholder": "Select address",
       "latitude": "Latitude",
       "longitude": "Longitude",
+      "locationPicker": "Map location",
+      "locationPickerHelp": "Coordinates can still be edited manually. The map selection only writes latitude and longitude.",
       "notes": "Notes",
       "contactName": "Contact name",
       "contactTitle": "Title",
@@ -518,6 +520,7 @@
       "createAddressOption": "Create address",
       "saveAddressOption": "Save address",
       "cancelAddressOption": "Cancel",
+      "pickLocationOnMap": "Pick location on map",
       "createHistoryEntry": "Create history entry",
       "attachHistoryDocument": "Attach document",
       "resetHistory": "Reset history form",
@@ -537,6 +540,15 @@
       "city": "City",
       "state": "State / region",
       "countryCode": "Country code"
+    },
+    "mapPicker": {
+      "title": "Pick location on map",
+      "confirm": "Apply location",
+      "cancel": "Cancel",
+      "help": "Move around Germany, click a point, or drag the marker to the desired location.",
+      "loadError": "The map view could not be loaded. Please use manual coordinate entry for now.",
+      "startDefault": "Start point: default position 51.662973 / 8.174013",
+      "startExisting": "Start point: existing subcontractor coordinates"
     },
     "workforce": {
       "eyebrow": "Partner workforce",

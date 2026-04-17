@@ -72,6 +72,18 @@ test("subcontractor overview separates lifecycle status from lookup status and u
   assert.match(source, /data-testid="subcontractor-address-modal"/);
 });
 
+test("subcontractor overview reuses the shared planning map picker for latitude and longitude", () => {
+  assert.match(source, /import PlanningLocationPickerModal from "@\/components\/planning\/PlanningLocationPickerModal\.vue"/);
+  assert.match(source, /resolveInitialMapCenter/);
+  assert.match(source, /actions\.pickLocationOnMap/);
+  assert.match(source, /v-model:open="locationPickerOpen"/);
+  assert.match(source, /:latitude="subcontractorDraft\.latitude"/);
+  assert.match(source, /:longitude="subcontractorDraft\.longitude"/);
+  assert.match(source, /subcontractorDraft\.latitude = payload\.latitude/);
+  assert.match(source, /subcontractorDraft\.longitude = payload\.longitude/);
+  assert.match(source, /resolvedCenter\.source === "existing-record"/);
+});
+
 test("subcontractor workforce uses qualification and credential selectors instead of free-text IDs", () => {
   assert.match(workforceSource, /listQualificationTypes/);
   assert.match(workforceSource, /EMPLOYEE_CREDENTIAL_TYPE_OPTIONS/);

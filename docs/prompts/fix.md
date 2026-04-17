@@ -1,125 +1,117 @@
 You are working in the public repo `jalalsadeghi/SicherPlan`.
 
 Task:
-Audit and fix `/admin/subcontractors` so the page aligns as closely as possible with the documented S-01 "Subcontractors Workspace" scope and the currently available frontend/backend contracts.
+Add a `Pick location on map` capability to `/admin/subcontractors` → `Overview`, for the `latitude` and `longitude` fields, by reusing the same map-picking UX/pattern already available in the Planning area.
 
 Important working-mode rule:
-Do NOT fake unsupported features.
-If the current repo/backend does not actually expose a supported endpoint for a documented feature, do NOT build a fake UI for it.
-Instead:
-- either hide/remove placeholder UI that pretends the feature exists
-- or leave a clearly documented gap in the validation report
+Do NOT invent a second unrelated map picker if the project already has one in Planning.
+First locate the existing planning implementation and reuse it.
+If it is not yet reusable, extract it into a shared component/composable and then integrate it into Subcontractors.
 
-Reference expectations from project docs:
-S-01 Subcontractors Workspace should cover:
-- subcontractor list/detail/lifecycle
-- contacts
-- scopes
-- finance profile
-- history/attachments
-- workers
-- worker readiness summary/detail
-- qualifications/proofs
-- credentials
-- worker import/export
+Current known facts:
+- In `SubcontractorAdminView.vue`, the Overview form currently exposes:
+  - `latitude`
+  - `longitude`
+  as manual number inputs only
+- The subcontractor API model already supports `latitude` and `longitude`
+- So this feature should mainly be a frontend UX enhancement, not a backend redesign
 
-Data-model expectations:
-- subcontractor scope supports branch_id, mandate_id, and site_id
-- subcontractor finance/commercial model includes more than just a minimal billing note
-- subcontractor rate cards / rate lines exist in the domain model even if not fully implemented in current APIs
-
-What to inspect first:
+Files to inspect first:
 1. `web/apps/web-antd/src/sicherplan-legacy/views/SubcontractorAdminView.vue`
-2. `web/apps/web-antd/src/sicherplan-legacy/components/SubcontractorWorkforcePanel.vue`
-3. `web/apps/web-antd/src/sicherplan-legacy/api/subcontractors.ts`
-4. `web/apps/web-antd/src/sicherplan-legacy/features/subcontractors/subcontractorAdmin.helpers.js`
-5. Any current tests for subcontractor admin / workforce if they exist
+2. `web/apps/web-antd/src/sicherplan-legacy/api/subcontractors.ts`
+3. The Planning page(s) where the existing `Pick location on map` workflow already works
+   - find the exact implementation in the current repo
+   - identify whether it is:
+     - a shared component
+     - a local modal implementation
+     - a composable
+     - a third-party wrapper already in use
 
-Audit and classify each tab/section into one of:
-A. fully supported and properly wired
-B. supported by API but poorly implemented in UI
-C. placeholder only / misleading
-D. documented in model/docs but not actually supported yet by current API
+Required implementation goal:
+In Subcontractors → Overview:
+1. Add a clear action/button near the latitude/longitude fields:
+   - e.g. `Pick location on map`
+2. Clicking it should open a dialog/modal with the same map-based location picking experience already used in Planning
+3. Selecting a location on the map should populate:
+   - `latitude`
+   - `longitude`
+4. Manual editing of latitude/longitude must still remain possible
+5. Reopening the map should initialize from the current lat/lng if available
+6. Canceling the dialog must not change the current form values
 
-Known likely gaps to verify carefully:
-1. `addresses` tab appears to be placeholder-only
-2. `commercial` tab appears to be placeholder-only
-3. scope management currently lacks `site_id`
-4. several important fields are raw ID textboxes rather than controlled select/lookup inputs
-5. finance profile may not expose all currently supported finance fields
-6. rate-card/rate-line domain support may exist in docs/model but not yet in current frontend API
+Important UX and scope rules:
+- This is a lat/lng picker, not full address management
+- Do NOT pretend the address workflow is solved by this feature
+- Do NOT require `address_id` to be valid before using the map picker
+- Keep the current Overview form otherwise intact unless a tiny layout adjustment is needed
 
-Required fix strategy:
-1. Preserve the parts that are already good:
-   - contacts
-   - history/attachments
-   - workforce
-2. Fix real mismatches where the API already supports the feature
-3. Remove or hide misleading placeholder tabs if no real implementation exists yet
-4. Improve unsafe raw-ID entry where official lookup/select data is already available in the repo
-5. Do NOT overbuild undocumented frontend behavior
+Preferred implementation strategy:
+A. Find and reuse the existing planning map picker
+- If there is already a reusable component, use it directly
+- If the planning implementation is embedded in a planning-only view, extract the map dialog/picker into a shared component
 
-High-priority expected fixes:
-A. Scope tab:
-- add `site_id` support end-to-end if current backend supports it
-- update UI draft, payloads, and list rendering accordingly
-- keep validation consistent with “at least one of branch / mandate / site”
+B. Wire it to subcontractor draft state
+- Use `subcontractorDraft.latitude`
+- Use `subcontractorDraft.longitude`
+- Keep string/number conversion safe and explicit
 
-B. Placeholder tabs:
-- inspect whether `addresses` and `commercial` have real backend support in the current repo
-- if yes, implement them properly
-- if no, remove/hide those tabs for now instead of exposing dead placeholders
+C. Initialization behavior
+- If both lat/lng are already present, center marker on that location
+- Otherwise use the same default behavior already used in Planning
+- Do not introduce a different map default unless truly necessary
 
-C. Controlled inputs:
-Where the current repo already has safe lookup sources, replace raw ID textboxes with select/lookup controls for user-facing data entry.
-Examples to inspect:
-- legal form
-- subcontractor status
-- invoice delivery method
-- invoice status mode
-- branch
-- mandate
-- worker qualification type
-- worker credential type
-Do not invent option lists if the repo does not expose them.
+D. Confirm/apply behavior
+- On confirm, write selected coordinates back into the overview form fields
+- Prefer preserving the current field format used by the form/API payload builder
 
-D. Finance/billing section:
-- align visible fields with the actual current backend contract
-- do not expose fields that are not supported
-- do not omit supported fields that are materially important and already available
+E. Keep backend untouched unless absolutely necessary
+- Since API already accepts latitude/longitude, do not add backend changes unless the current map picker requires a tiny helper contract (unlikely)
 
 Important constraints:
-- Do NOT rename routes or break existing API contracts
-- Do NOT add fake commercial/rate-card UI if no current API exists
-- Do NOT leave obviously dead placeholder tabs in a page intended for real data entry
-- Keep the page practical for actual operator use
+- Do NOT duplicate map libraries or add a second map stack if one already exists
+- Do NOT redesign Subcontractor Overview broadly
+- Do NOT mix this with unresolved address-tab work
+- Keep the patch focused and reusable
+
+Validation requirements:
+After implementing, verify:
+1. Overview shows a `Pick location on map` action
+2. Clicking it opens the map dialog
+3. Choosing a point fills latitude and longitude
+4. Existing lat/lng values are respected when reopening
+5. Cancel leaves existing values unchanged
+6. Manual lat/lng editing still works
+7. Subcontractor save still submits correct lat/lng values
 
 Testing requirements:
-Add/update tests for the subcontractor admin page.
+Add/update focused tests.
 At minimum verify:
-1. tabs shown to the user correspond to actually supported features
-2. scope payload can include `site_id` when supported
-3. placeholder tabs are removed/hidden if unsupported
-4. contacts/history/workforce still work
-5. any newly introduced select/lookup inputs submit correct values
+1. the new map-picker action is rendered in Subcontractor Overview
+2. opening the picker updates the draft on confirm
+3. cancel leaves the draft unchanged
+4. existing lat/lng values are passed into the picker initialization if present
+5. no regression to subcontractor save behavior
+
+If the current repo has no existing subcontractor view test file, add a focused smoke/behavior test near the subcontractor admin view.
+Avoid brittle pixel/CSS tests.
 
 Acceptance criteria:
-- `/admin/subcontractors` no longer exposes misleading dead tabs
-- scope management aligns with branch/mandate/site model where supported
-- practical data entry is safer and less raw-ID driven
-- supported features remain working
-- unsupported documented features are clearly identified rather than faked
+- Subcontractors Overview now has the same practical map-picking convenience already available in Planning
+- The implementation reuses or extracts the existing planning map picker instead of duplicating it
+- Latitude/longitude entry becomes much easier for operators
+- Backend contract remains stable
 
 At the end, provide a concise validation report with these headings:
-1. Which sections were already aligned
-2. Which sections were mismatched
-3. Which mismatches were fixed
-4. Which documented features are still not supported by the current API
-5. Which files were changed
+1. Where the existing planning map picker was found
+2. Whether it was reused directly or extracted into a shared component
+3. Which files were changed
+4. How Subcontractor Overview now integrates the picker
+5. How lat/lng values are initialized and saved
 6. Which tests were updated or added
+7. Any remaining address-management limitations that were intentionally left out of scope
 
-Before coding, explicitly list:
-- tabs/sections that are fully backed by current APIs
-- tabs/sections that are placeholders only
-- whether `site_id` is supported by current backend contracts
-Then implement the safest high-value fixes first.
+Before coding, explicitly answer:
+- Where exactly is the current Planning map picker implemented?
+- Can it be reused directly, or must it be extracted first?
+- Does the Subcontractor API already support lat/lng without backend changes?
+Then implement the safest reusable solution.

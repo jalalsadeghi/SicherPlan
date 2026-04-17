@@ -414,6 +414,8 @@
       "addressPlaceholder": "Adresse auswählen",
       "latitude": "Breitengrad",
       "longitude": "Längengrad",
+      "locationPicker": "Kartenposition",
+      "locationPickerHelp": "Koordinaten können weiter manuell bearbeitet werden. Die Kartenwahl übernimmt nur Breitengrad und Längengrad.",
       "notes": "Notizen",
       "contactName": "Kontaktname",
       "contactTitle": "Titel",
@@ -518,6 +520,7 @@
       "createAddressOption": "Adresse anlegen",
       "saveAddressOption": "Adresse speichern",
       "cancelAddressOption": "Abbrechen",
+      "pickLocationOnMap": "Standort auf Karte wählen",
       "createHistoryEntry": "Historieneintrag anlegen",
       "attachHistoryDocument": "Anlage verknüpfen",
       "resetHistory": "Historienformular zurücksetzen",
@@ -537,6 +540,15 @@
       "city": "Ort",
       "state": "Bundesland / Region",
       "countryCode": "Ländercode"
+    },
+    "mapPicker": {
+      "title": "Standort auf Karte wählen",
+      "confirm": "Position übernehmen",
+      "cancel": "Abbrechen",
+      "help": "Verschieben Sie die Karte, klicken Sie einen Punkt an oder ziehen Sie den Marker an die gewünschte Position.",
+      "loadError": "Die Kartenansicht konnte nicht geladen werden. Bitte verwenden Sie vorübergehend die manuelle Koordinateneingabe.",
+      "startDefault": "Startpunkt: Standardposition 51.662973 / 8.174013",
+      "startExisting": "Startpunkt: vorhandene Koordinaten des Subunternehmers"
     },
     "workforce": {
       "eyebrow": "Partner-Belegschaft",

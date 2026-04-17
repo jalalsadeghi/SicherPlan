@@ -255,6 +255,15 @@
                 <span>{{ t("sicherplan.subcontractors.fields.longitude") }}</span>
                 <input v-model="subcontractorDraft.longitude" type="number" step="0.000001" />
               </label>
+              <div class="field-stack field-stack--wide">
+                <span>{{ t("sicherplan.subcontractors.fields.locationPicker") }}</span>
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" @click="openLocationPicker">
+                    {{ t("sicherplan.subcontractors.actions.pickLocationOnMap") }}
+                  </button>
+                </div>
+                <span class="field-help">{{ t("sicherplan.subcontractors.fields.locationPickerHelp") }}</span>
+              </div>
               <label class="field-stack field-stack--wide">
                 <span>{{ t("sicherplan.subcontractors.fields.notes") }}</span>
                 <textarea v-model="subcontractorDraft.notes" rows="4" />
@@ -700,6 +709,22 @@
         </form>
       </div>
     </section>
+
+    <PlanningLocationPickerModal
+      v-model:open="locationPickerOpen"
+      :latitude="subcontractorDraft.latitude"
+      :longitude="subcontractorDraft.longitude"
+      :initial-center="locationPickerStartPoint"
+      :start-point-label="locationPickerStartPoint.label"
+      :title="t('sicherplan.subcontractors.mapPicker.title')"
+      :confirm-text="t('sicherplan.subcontractors.mapPicker.confirm')"
+      :cancel-text="t('sicherplan.subcontractors.mapPicker.cancel')"
+      :helper-text="t('sicherplan.subcontractors.mapPicker.help')"
+      :latitude-label="t('sicherplan.subcontractors.fields.latitude')"
+      :longitude-label="t('sicherplan.subcontractors.fields.longitude')"
+      :load-error-text="t('sicherplan.subcontractors.mapPicker.loadError')"
+      @confirm="applyPickedLocation"
+    />
   </section>
 </template>
 
@@ -709,6 +734,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "@vben/locales";
 
 import StatusBadge from "@/components/StatusBadge.vue";
+import PlanningLocationPickerModal from "@/components/planning/PlanningLocationPickerModal.vue";
 import SubcontractorWorkforcePanel from "@/components/SubcontractorWorkforcePanel.vue";
 import {
   listBranches,
@@ -764,6 +790,7 @@ import {
   summarizePrimaryContact,
   summarizeScopeRows,
 } from "@/features/subcontractors/subcontractorAdmin.helpers.js";
+import { resolveInitialMapCenter } from "@/features/planning/planningAdmin.helpers.js";
 
 const { t } = useI18n();
 const authStore = useAuthStore();
@@ -810,6 +837,7 @@ const activeDetailTab = ref("overview");
 const tenantScopeInput = ref(authStore.tenantScopeId);
 const historyAttachmentFile = ref<File | null>(null);
 const addressCreateModalOpen = ref(false);
+const locationPickerOpen = ref(false);
 
 const subcontractorDraft = reactive({
   subcontractor_number: "",
@@ -884,6 +912,13 @@ const historyDraft = reactive({
 });
 
 const historyAttachmentDraft = reactive({
+  label: "",
+});
+
+const locationPickerStartPoint = ref({
+  lat: 51.662973,
+  lng: 8.174013,
+  zoom: 11,
   label: "",
 });
 
@@ -1165,6 +1200,37 @@ function formatScopeLabel(branchId: string, mandateId: string | null) {
   }
   const mandateLabel = mandateOptions.value.find((option) => option.id === mandateId)?.label ?? mandateId;
   return `${branchLabel} / ${mandateLabel}`;
+}
+
+function openLocationPicker() {
+  const fallback = {
+    lat: 51.662973,
+    lng: 8.174013,
+    zoom: 11,
+    label: t("sicherplan.subcontractors.mapPicker.startDefault"),
+  };
+
+  const resolvedCenter = resolveInitialMapCenter({
+    currentLatitude: subcontractorDraft.latitude,
+    currentLongitude: subcontractorDraft.longitude,
+    fallback,
+  });
+
+  locationPickerStartPoint.value = {
+    lat: resolvedCenter.lat,
+    lng: resolvedCenter.lng,
+    zoom: resolvedCenter.source === "existing-record" ? 14 : fallback.zoom,
+    label:
+      resolvedCenter.source === "existing-record"
+        ? t("sicherplan.subcontractors.mapPicker.startExisting")
+        : fallback.label,
+  };
+  locationPickerOpen.value = true;
+}
+
+function applyPickedLocation(payload: { latitude: string; longitude: string }) {
+  subcontractorDraft.latitude = payload.latitude;
+  subcontractorDraft.longitude = payload.longitude;
 }
 
 async function loadContactUserOptions(subcontractorId: string) {
