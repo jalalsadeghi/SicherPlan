@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db_session
+from app.modules.core.schemas import AddressCreate, AddressRead
 from app.modules.iam.audit_repository import SqlAlchemyAuditRepository
 from app.modules.iam.audit_service import AuditService
 from app.modules.iam.authz import RequestAuthorizationContext, require_authorization, require_permission_only
@@ -18,6 +19,7 @@ from app.modules.platform_services.storage import build_object_storage_adapter
 from app.modules.subcontractors.repository import SqlAlchemySubcontractorRepository
 from app.modules.subcontractors.schemas import (
     SubcontractorContactCreate,
+    SubcontractorContactUserOptionRead,
     SubcontractorContactRead,
     SubcontractorContactUpdate,
     SubcontractorCreate,
@@ -251,6 +253,54 @@ def list_contacts(
     service: Annotated[SubcontractorService, Depends(get_subcontractor_service)],
 ) -> list[SubcontractorContactRead]:
     return service.list_contacts(str(tenant_id), str(subcontractor_id), context)
+
+
+@router.get("/{subcontractor_id}/contact-user-options", response_model=list[SubcontractorContactUserOptionRead])
+def list_contact_user_options(
+    tenant_id: UUID,
+    subcontractor_id: UUID,
+    search: str = Query(default="", max_length=120),
+    limit: int = Query(default=25, ge=1, le=50),
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_permission_only("subcontractors.company.read")),
+    ] = None,
+    service: Annotated[SubcontractorService, Depends(get_subcontractor_service)] = None,
+) -> list[SubcontractorContactUserOptionRead]:
+    return service.list_contact_user_options(
+        str(tenant_id),
+        str(subcontractor_id),
+        context,
+        search=search,
+        limit=limit,
+    )
+
+
+@router.get("/{subcontractor_id}/address-options", response_model=list[AddressRead])
+def list_address_options(
+    tenant_id: UUID,
+    subcontractor_id: UUID,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_permission_only("subcontractors.company.read")),
+    ] = None,
+    service: Annotated[SubcontractorService, Depends(get_subcontractor_service)] = None,
+) -> list[AddressRead]:
+    return service.list_address_options(str(tenant_id), str(subcontractor_id), context)
+
+
+@router.post("/{subcontractor_id}/address-options", response_model=AddressRead, status_code=status.HTTP_201_CREATED)
+def create_address_option(
+    tenant_id: UUID,
+    subcontractor_id: UUID,
+    payload: AddressCreate,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("subcontractors.company.write", scope="tenant")),
+    ] = None,
+    service: Annotated[SubcontractorService, Depends(get_subcontractor_service)] = None,
+) -> AddressRead:
+    return service.create_address_option(str(tenant_id), str(subcontractor_id), payload, context)
 
 
 @router.post("/{subcontractor_id}/contacts", response_model=SubcontractorContactRead, status_code=status.HTTP_201_CREATED)

@@ -70,6 +70,14 @@ export interface SubcontractorFinanceProfileRead {
   version_no: number;
 }
 
+export interface SubcontractorContactUserOptionRead {
+  id: string;
+  username: string;
+  email: string | null;
+  full_name: string | null;
+  status: LifecycleStatus | string;
+}
+
 export interface SubcontractorHistoryAttachmentRead {
   document_id: string;
   title: string;
@@ -468,6 +476,45 @@ export function createSubcontractorContact(
 ) {
   return request<SubcontractorContactRead>(
     `/api/subcontractors/tenants/${tenantId}/subcontractors/${subcontractorId}/contacts`,
+    accessToken,
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
+}
+
+export function listSubcontractorContactUserOptions(
+  tenantId: string,
+  subcontractorId: string,
+  accessToken: string,
+  params: { search?: string; limit?: number } = {},
+) {
+  const query = new URLSearchParams();
+  if (params.search) query.set("search", params.search);
+  if (params.limit != null) query.set("limit", String(params.limit));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<SubcontractorContactUserOptionRead[]>(
+    `/api/subcontractors/tenants/${tenantId}/subcontractors/${subcontractorId}/contact-user-options${suffix}`,
+    accessToken,
+  );
+}
+
+export function listSubcontractorAddressOptions(tenantId: string, subcontractorId: string, accessToken: string) {
+  return request<SubcontractorRead["address"][]>(
+    `/api/subcontractors/tenants/${tenantId}/subcontractors/${subcontractorId}/address-options`,
+    accessToken,
+  );
+}
+
+export function createSubcontractorAddressOption(
+  tenantId: string,
+  subcontractorId: string,
+  accessToken: string,
+  payload: Record<string, unknown>,
+) {
+  return request<NonNullable<SubcontractorRead["address"]>>(
+    `/api/subcontractors/tenants/${tenantId}/subcontractors/${subcontractorId}/address-options`,
     accessToken,
     {
       method: "POST",

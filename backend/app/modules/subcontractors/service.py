@@ -6,6 +6,7 @@ from typing import Protocol
 
 from app.errors import ApiException
 from app.modules.core.models import Address, Branch, LookupValue, Mandate
+from app.modules.core.schemas import AddressCreate, AddressRead
 from app.modules.iam.audit_service import AuditActor, AuditService
 from app.modules.iam.authz import RequestAuthorizationContext
 from app.modules.iam.models import UserAccount
@@ -22,6 +23,7 @@ from app.modules.subcontractors.policy import (
 )
 from app.modules.subcontractors.schemas import (
     SubcontractorContactCreate,
+    SubcontractorContactUserOptionRead,
     SubcontractorContactRead,
     SubcontractorContactUpdate,
     SubcontractorCreate,
@@ -116,7 +118,9 @@ class SubcontractorRepository(Protocol):
     def get_branch(self, tenant_id: str, branch_id: str) -> Branch | None: ...
     def get_mandate(self, tenant_id: str, mandate_id: str) -> Mandate | None: ...
     def get_user_account(self, tenant_id: str, user_id: str) -> UserAccount | None: ...
+    def list_contact_user_options(self, tenant_id: str, search: str = "", limit: int = 25) -> list[UserAccount]: ...
     def get_address(self, address_id: str) -> Address | None: ...
+    def create_address(self, row: Address) -> Address: ...
 
 
 class SubcontractorService:
@@ -220,6 +224,62 @@ class SubcontractorService:
     def list_contacts(self, tenant_id: str, subcontractor_id: str, actor: RequestAuthorizationContext) -> list[SubcontractorContactRead]:
         self._require_subcontractor_for_read(tenant_id, subcontractor_id, actor)
         return [self._serialize_contact(row, actor) for row in self.repository.list_contacts(tenant_id, subcontractor_id)]
+
+    def list_contact_user_options(
+        self,
+        tenant_id: str,
+        subcontractor_id: str,
+        actor: RequestAuthorizationContext,
+        *,
+        search: str = "",
+        limit: int = 25,
+    ) -> list[SubcontractorContactUserOptionRead]:
+        self._require_subcontractor_for_read(tenant_id, subcontractor_id, actor)
+        return [
+            SubcontractorContactUserOptionRead(
+                id=row.id,
+                username=row.username,
+                email=row.email,
+                full_name=row.full_name,
+                status=row.status,
+            )
+            for row in self.repository.list_contact_user_options(tenant_id, search=search, limit=limit)
+        ]
+
+    def list_address_options(self, tenant_id: str, subcontractor_id: str, actor: RequestAuthorizationContext) -> list[AddressRead]:
+        row = self._require_subcontractor_for_read(tenant_id, subcontractor_id, actor)
+        if row.address_id is None:
+            return []
+        address = self.repository.get_address(row.address_id)
+        return [AddressRead.model_validate(address)] if address is not None else []
+
+    def create_address_option(
+        self,
+        tenant_id: str,
+        subcontractor_id: str,
+        payload: AddressCreate,
+        actor: RequestAuthorizationContext,
+    ) -> AddressRead:
+        self._require_subcontractor_for_write(tenant_id, subcontractor_id, actor)
+        normalized = AddressCreate(
+            street_line_1=payload.street_line_1.strip(),
+            street_line_2=payload.street_line_2.strip() if payload.street_line_2 and payload.street_line_2.strip() else None,
+            postal_code=payload.postal_code.strip(),
+            city=payload.city.strip(),
+            state=payload.state.strip() if payload.state and payload.state.strip() else None,
+            country_code=payload.country_code.strip().upper(),
+        )
+        row = self.repository.create_address(
+            Address(
+                street_line_1=normalized.street_line_1,
+                street_line_2=normalized.street_line_2,
+                postal_code=normalized.postal_code,
+                city=normalized.city,
+                state=normalized.state,
+                country_code=normalized.country_code,
+            )
+        )
+        return AddressRead.model_validate(row)
 
     def create_contact(
         self,

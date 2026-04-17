@@ -379,8 +379,6 @@
     "tabs": {
       "overview": "Overview",
       "contacts": "Contacts",
-      "addresses": "Addresses",
-      "commercial": "Commercial",
       "scopeRelease": "Scope Release",
       "billing": "Billing",
       "history": "History",
@@ -406,10 +404,14 @@
       "displayName": "Display name",
       "legalFormLookupId": "Legal form",
       "legalFormPlaceholder": "Select legal form",
-      "statusLookupId": "Partner status",
-      "statusPlaceholder": "Select partner status",
+      "lifecycleStatus": "Lifecycle status",
+      "lifecycleStatusHelp": "Active and inactive are normal edit states. Archived remains action-driven through the archive flow.",
+      "statusLookupId": "Status classification",
+      "statusLookupHelp": "This lookup-backed classification is separate from the lifecycle status.",
+      "statusPlaceholder": "Select status classification",
       "managingDirectorName": "Managing director",
-      "addressId": "Address ID",
+      "addressId": "Primary address",
+      "addressPlaceholder": "Select address",
       "latitude": "Latitude",
       "longitude": "Longitude",
       "notes": "Notes",
@@ -419,7 +421,9 @@
       "contactEmail": "Email",
       "contactPhone": "Phone",
       "contactMobile": "Mobile",
-      "contactUserId": "User-account ID",
+      "contactUserId": "Portal user",
+      "contactUserPlaceholder": "Select user account",
+      "contactUserHelp": "Only required when this contact should receive portal access.",
       "contactNotes": "Contact note",
       "primaryContact": "Primary contact",
       "portalEnabled": "Enable portal access",
@@ -493,18 +497,6 @@
         "lifecycle_event": "Lifecycle event"
       }
     },
-    "placeholders": {
-      "addresses": {
-        "eyebrow": "Address management",
-        "title": "Address maintenance will land in this detail shell",
-        "body": "Address editing will be integrated into this workspace in a later frontend step. Existing backend behavior remains unchanged."
-      },
-      "commercial": {
-        "eyebrow": "Commercial frame",
-        "title": "Additional commercial sections will follow modularly",
-        "body": "Further commercial subcontractor sections will be added into this tabbed workspace later. Current finance and history behavior remains available."
-      }
-    },
     "actions": {
       "rememberScope": "Remember scope",
       "refresh": "Refresh",
@@ -523,6 +515,9 @@
       "createFinance": "Create finance profile",
       "saveFinance": "Save finance profile",
       "resetFinance": "Reset finance form",
+      "createAddressOption": "Create address",
+      "saveAddressOption": "Save address",
+      "cancelAddressOption": "Cancel",
       "createHistoryEntry": "Create history entry",
       "attachHistoryDocument": "Attach document",
       "resetHistory": "Reset history form",
@@ -532,6 +527,16 @@
     "confirm": {
       "archive": "Archive this subcontractor?",
       "reactivate": "Reactivate this subcontractor?"
+    },
+    "addressModal": {
+      "eyebrow": "Address creation",
+      "title": "Create new primary address",
+      "street1": "Street and number",
+      "street2": "Address line 2",
+      "postalCode": "Postal code",
+      "city": "City",
+      "state": "State / region",
+      "countryCode": "Country code"
     },
     "workforce": {
       "eyebrow": "Partner workforce",

@@ -53,12 +53,23 @@ test("subcontractor admin uses controlled selectors where real option sources ex
   assert.match(source, /listBranches,/);
   assert.match(source, /listMandates,/);
   assert.match(source, /listLookupValues,/);
+  assert.match(source, /listSubcontractorAddressOptions,/);
+  assert.match(source, /listSubcontractorContactUserOptions,/);
   assert.match(source, /v-if="branchOptions\.length" v-model="scopeDraft\.branch_id"/);
   assert.match(source, /v-if="mandateOptions\.length" v-model="scopeDraft\.mandate_id"/);
   assert.match(source, /v-if="legalFormOptions\.length" v-model="subcontractorDraft\.legal_form_lookup_id"/);
   assert.match(source, /v-if="subcontractorStatusOptions\.length" v-model="subcontractorDraft\.subcontractor_status_lookup_id"/);
+  assert.match(source, /v-if="addressOptions\.length" v-model="subcontractorDraft\.address_id"/);
+  assert.match(source, /v-if="contactUserOptions\.length" v-model="contactDraft\.user_id"/);
   assert.match(source, /v-if="invoiceDeliveryMethodOptions\.length" v-model="financeDraft\.invoice_delivery_method_lookup_id"/);
   assert.match(source, /v-if="invoiceStatusModeOptions\.length" v-model="financeDraft\.invoice_status_mode_lookup_id"/);
+});
+
+test("subcontractor overview separates lifecycle status from lookup status and uses address modal flow", () => {
+  assert.match(source, /subcontractorDraft\.status/);
+  assert.match(source, /fields\.lifecycleStatus/);
+  assert.match(source, /fields\.statusLookupHelp/);
+  assert.match(source, /data-testid="subcontractor-address-modal"/);
 });
 
 test("subcontractor workforce uses qualification and credential selectors instead of free-text IDs", () => {

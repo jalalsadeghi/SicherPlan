@@ -11,6 +11,7 @@ from sqlalchemy import CheckConstraint, Index
 from app.db import Base
 from app.errors import ApiException
 from app.modules.core.models import Address, Branch, LookupValue, Mandate
+from app.modules.core.schemas import AddressCreate
 from app.modules.iam.audit_service import AuditService
 from app.modules.iam.auth_schemas import AuthenticatedRoleScope
 from app.modules.iam.authz import RequestAuthorizationContext
@@ -480,8 +481,30 @@ class FakeSubcontractorRepository:
             return None
         return row
 
+    def list_contact_user_options(self, tenant_id: str, search: str = "", limit: int = 25) -> list[UserAccount]:
+        if tenant_id != self.tenant_id:
+            return []
+        term = search.strip().lower()
+        rows = [row for row in self.users.values() if row.status == "active" and row.archived_at is None]
+        if term:
+            rows = [
+                row
+                for row in rows
+                if term in row.username.lower()
+                or term in (row.email or "").lower()
+                or term in (row.full_name or "").lower()
+            ]
+        rows.sort(key=lambda row: row.username)
+        return rows[:limit]
+
     def get_address(self, address_id: str) -> Address | None:
         return self.addresses.get(address_id)
+
+    def create_address(self, row: Address) -> Address:
+        if row.id is None:
+            row.id = str(uuid4())
+        self.addresses[row.id] = row
+        return row
 
     def _hydrate(self, row: Subcontractor) -> None:
         row.address = self.addresses.get(row.address_id) if row.address_id else None
@@ -663,6 +686,46 @@ class SubcontractorServiceTest(unittest.TestCase):
         self.assertEqual(len(aggregate.scopes), 1)
         self.assertIsNotNone(aggregate.finance_profile)
         self.assertEqual(len(self.audit_repository.audit_events), 5)
+
+    def test_contact_user_options_and_address_options_are_exposed_for_supported_overview_fields(self) -> None:
+        created = self.service.create_subcontractor(
+            "tenant-1",
+            SubcontractorCreate(
+                tenant_id="tenant-1",
+                subcontractor_number="SUB-1200",
+                legal_name="DomSchild Sicherheitsdienste GmbH",
+                address_id="address-1",
+            ),
+            _context("subcontractors.company.write"),
+        )
+
+        user_options = self.service.list_contact_user_options(
+            "tenant-1",
+            created.id,
+            _context("subcontractors.company.read"),
+            search="portal",
+        )
+        address_options = self.service.list_address_options(
+            "tenant-1",
+            created.id,
+            _context("subcontractors.company.read"),
+        )
+        created_address = self.service.create_address_option(
+            "tenant-1",
+            created.id,
+            AddressCreate(
+                street_line_1="Domplatz 1",
+                postal_code="50667",
+                city="Koeln",
+                country_code="de",
+            ),
+            _context("subcontractors.company.write"),
+        )
+
+        self.assertEqual(user_options[0].id, "user-portal")
+        self.assertEqual(address_options[0].id, "address-1")
+        self.assertEqual(created_address.city, "Koeln")
+        self.assertEqual(created_address.country_code, "DE")
 
     def test_duplicate_number_and_primary_contact_are_rejected(self) -> None:
         created = self.service.create_subcontractor(

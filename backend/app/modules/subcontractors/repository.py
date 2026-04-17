@@ -470,8 +470,36 @@ class SqlAlchemySubcontractorRepository:
         statement = select(UserAccount).where(UserAccount.tenant_id == tenant_id, UserAccount.id == user_id)
         return self.session.scalars(statement).one_or_none()
 
+    def list_contact_user_options(self, tenant_id: str, search: str = "", limit: int = 25) -> list[UserAccount]:
+        statement = (
+            select(UserAccount)
+            .where(
+                UserAccount.tenant_id == tenant_id,
+                UserAccount.archived_at.is_(None),
+                UserAccount.status == "active",
+            )
+            .order_by(UserAccount.username)
+            .limit(limit)
+        )
+        if search.strip():
+            like_term = f"%{search.strip().lower()}%"
+            statement = statement.where(
+                or_(
+                    func.lower(UserAccount.username).like(like_term),
+                    func.lower(func.coalesce(UserAccount.email, "")).like(like_term),
+                    func.lower(func.coalesce(UserAccount.full_name, "")).like(like_term),
+                )
+            )
+        return list(self.session.scalars(statement).all())
+
     def get_address(self, address_id: str) -> Address | None:
         return self.session.get(Address, address_id)
+
+    def create_address(self, row: Address) -> Address:
+        self.session.add(row)
+        self._commit_or_raise()
+        self.session.refresh(row)
+        return row
 
     def list_workers(self, tenant_id: str, subcontractor_id: str, filters: SubcontractorWorkerFilter) -> list[SubcontractorWorker]:
         statement = (

@@ -224,6 +224,14 @@ class SubcontractorRead(SubcontractorListItem):
     finance_profile: SubcontractorFinanceProfileRead | None = None
 
 
+class SubcontractorContactUserOptionRead(BaseModel):
+    id: str
+    username: str
+    email: str | None
+    full_name: str | None
+    status: str
+
+
 class SubcontractorPortalCompanyRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

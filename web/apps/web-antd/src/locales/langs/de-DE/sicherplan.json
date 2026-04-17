@@ -379,8 +379,6 @@
     "tabs": {
       "overview": "Übersicht",
       "contacts": "Kontakte",
-      "addresses": "Adressen",
-      "commercial": "Kaufmännisch",
       "scopeRelease": "Scope-Freigabe",
       "billing": "Abrechnung",
       "history": "Historie",
@@ -406,10 +404,14 @@
       "displayName": "Anzeigename",
       "legalFormLookupId": "Rechtsform",
       "legalFormPlaceholder": "Rechtsform auswählen",
-      "statusLookupId": "Partnerstatus",
-      "statusPlaceholder": "Partnerstatus auswählen",
+      "lifecycleStatus": "Lifecycle-Status",
+      "lifecycleStatusHelp": "Aktiv und inaktiv sind normale Bearbeitungszustände. Archiviert wird weiterhin über die Archivierungsaktion geführt.",
+      "statusLookupId": "Statusklassifikation",
+      "statusLookupHelp": "Diese Lookup-Klassifikation ist fachlich getrennt vom Lifecycle-Status.",
+      "statusPlaceholder": "Statusklassifikation auswählen",
       "managingDirectorName": "Geschäftsführung",
-      "addressId": "Adress-ID",
+      "addressId": "Hauptadresse",
+      "addressPlaceholder": "Adresse auswählen",
       "latitude": "Breitengrad",
       "longitude": "Längengrad",
       "notes": "Notizen",
@@ -419,7 +421,9 @@
       "contactEmail": "E-Mail",
       "contactPhone": "Telefon",
       "contactMobile": "Mobil",
-      "contactUserId": "Benutzerkonto-ID",
+      "contactUserId": "Portalbenutzer",
+      "contactUserPlaceholder": "Benutzerkonto auswählen",
+      "contactUserHelp": "Nur erforderlich, wenn der Kontakt einen Portalzugang erhalten soll.",
       "contactNotes": "Kontaktnotiz",
       "primaryContact": "Primärkontakt",
       "portalEnabled": "Portalzugang aktivieren",
@@ -493,18 +497,6 @@
         "lifecycle_event": "Lifecycle-Ereignis"
       }
     },
-    "placeholders": {
-      "addresses": {
-        "eyebrow": "Adressverwaltung",
-        "title": "Adresspflege folgt im selben Detailrahmen",
-        "body": "Die Adressbearbeitung wird in einer kommenden Ausbaustufe in diese Detailfläche integriert. Die bestehende Backend-Logik bleibt unverändert."
-      },
-      "commercial": {
-        "eyebrow": "Kaufmännischer Rahmen",
-        "title": "Weitere kaufmännische Bereiche folgen modular",
-        "body": "Zusätzliche kaufmännische Subunternehmerbereiche werden später in diese Registeransicht eingebettet. Die aktuelle Finanz- und Historienfunktion bleibt unverändert verfügbar."
-      }
-    },
     "actions": {
       "rememberScope": "Scope merken",
       "refresh": "Neu laden",
@@ -523,6 +515,9 @@
       "createFinance": "Finanzprofil anlegen",
       "saveFinance": "Finanzprofil speichern",
       "resetFinance": "Finanzformular zurücksetzen",
+      "createAddressOption": "Adresse anlegen",
+      "saveAddressOption": "Adresse speichern",
+      "cancelAddressOption": "Abbrechen",
       "createHistoryEntry": "Historieneintrag anlegen",
       "attachHistoryDocument": "Anlage verknüpfen",
       "resetHistory": "Historienformular zurücksetzen",
@@ -532,6 +527,16 @@
     "confirm": {
       "archive": "Soll dieser Subunternehmer archiviert werden?",
       "reactivate": "Soll dieser Subunternehmer wieder aktiviert werden?"
+    },
+    "addressModal": {
+      "eyebrow": "Adressanlage",
+      "title": "Neue Hauptadresse anlegen",
+      "street1": "Straße und Hausnummer",
+      "street2": "Adresszusatz",
+      "postalCode": "PLZ",
+      "city": "Ort",
+      "state": "Bundesland / Region",
+      "countryCode": "Ländercode"
     },
     "workforce": {
       "eyebrow": "Partner-Belegschaft",
