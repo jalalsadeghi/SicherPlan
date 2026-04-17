@@ -52,34 +52,13 @@ test("subcontractor detail workspace shows only supported tab panels", () => {
 test("subcontractor admin uses controlled selectors where real option sources exist", () => {
   assert.match(source, /listBranches,/);
   assert.match(source, /listMandates,/);
-  assert.match(source, /getSubcontractorReferenceData,/);
   assert.match(source, /listLookupValues,/);
-  assert.match(source, /createSubcontractorAvailableAddress,/);
-  assert.match(source, /listSubcontractorContactUserOptions,/);
-  assert.match(source, /<select v-model="subcontractorDraft\.address_id"[\s\S]*:disabled=/);
-  assert.doesNotMatch(source, /<input v-model="subcontractorDraft\.address_id" \/>/);
-  assert.match(source, /data-testid="subcontractor-address-create-modal"/);
   assert.match(source, /v-if="branchOptions\.length" v-model="scopeDraft\.branch_id"/);
   assert.match(source, /v-if="mandateOptions\.length" v-model="scopeDraft\.mandate_id"/);
-  assert.match(source, /referenceData\.value\?\.legal_forms/);
+  assert.match(source, /v-if="legalFormOptions\.length" v-model="subcontractorDraft\.legal_form_lookup_id"/);
   assert.match(source, /v-if="subcontractorStatusOptions\.length" v-model="subcontractorDraft\.subcontractor_status_lookup_id"/);
   assert.match(source, /v-if="invoiceDeliveryMethodOptions\.length" v-model="financeDraft\.invoice_delivery_method_lookup_id"/);
   assert.match(source, /v-if="invoiceStatusModeOptions\.length" v-model="financeDraft\.invoice_status_mode_lookup_id"/);
-  assert.match(source, /"subcontractor_invoice_status_mode"/);
-  assert.match(source, /<select v-model="subcontractorDraft\.legal_form_lookup_id">/);
-  assert.doesNotMatch(source, /<input v-else v-model="subcontractorDraft\.legal_form_lookup_id" \/>/);
-});
-
-test("contact portal linking uses a controlled user selector and local validation", () => {
-  assert.match(source, /v-if="contactDraft\.portal_enabled" class="field-stack">[\s\S]*contactUserSearch/s);
-  assert.match(source, /v-if="contactDraft\.portal_enabled" class="field-stack">[\s\S]*<select v-model="contactDraft\.user_id"/s);
-  assert.doesNotMatch(source, /<input v-model="contactDraft\.user_id" \/>/);
-  assert.match(source, /if \(contactDraft\.portal_enabled && !contactDraft\.user_id\.trim\(\)\) \{/);
-});
-
-test("scope form clears invalid dependent mandate and blocks invalid date window", () => {
-  assert.match(source, /watch\(\s*\(\) => scopeDraft\.branch_id,[\s\S]*scopeDraft\.mandate_id = ""/s);
-  assert.match(source, /if \(scopeDraft\.valid_to && scopeDraft\.valid_to < scopeDraft\.valid_from\) \{/);
 });
 
 test("subcontractor workforce uses qualification and credential selectors instead of free-text IDs", () => {

@@ -406,14 +406,10 @@
       "displayName": "Display name",
       "legalFormLookupId": "Legal form",
       "legalFormPlaceholder": "Select legal form",
-      "legalFormEmptyHint": "No legal forms are available. Check reference data.",
       "statusLookupId": "Partner status",
       "statusPlaceholder": "Select partner status",
       "managingDirectorName": "Managing director",
-      "addressId": "Address",
-      "addressPlaceholder": "Select address",
-      "addressEmptyPlaceholder": "Create address",
-      "addressEmptyHint": "No address is available yet. Create an address first.",
+      "addressId": "Address ID",
       "latitude": "Latitude",
       "longitude": "Longitude",
       "notes": "Notes",
@@ -423,12 +419,7 @@
       "contactEmail": "Email",
       "contactPhone": "Phone",
       "contactMobile": "Mobile",
-      "contactUserId": "Portal user",
-      "contactUserSearch": "Search portal users",
-      "contactUserSearchPlaceholder": "Name, username, or email",
-      "contactUserPlaceholder": "Select user account",
-      "contactUserEmptyPlaceholder": "No matching user account found",
-      "contactUserEmptyHint": "No active user account matched the current filter.",
+      "contactUserId": "User-account ID",
       "contactNotes": "Contact note",
       "primaryContact": "Primary contact",
       "portalEnabled": "Enable portal access",
@@ -502,17 +493,6 @@
         "lifecycle_event": "Lifecycle event"
       }
     },
-    "addresses": {
-      "createModalEyebrow": "Create address",
-      "createModalTitle": "Capture a new subcontractor address",
-      "createModalLead": "Create a new address and link it directly to the company profile.",
-      "streetLine1": "Address line 1",
-      "streetLine2": "Address line 2",
-      "postalCode": "Postal code",
-      "city": "City",
-      "state": "State / region",
-      "countryCode": "Country code"
-    },
     "placeholders": {
       "addresses": {
         "eyebrow": "Address management",
@@ -531,7 +511,6 @@
       "search": "Search",
       "clearFeedback": "Dismiss message",
       "newSubcontractor": "New subcontractor",
-      "createAddress": "Create address",
       "createSubcontractor": "Create subcontractor",
       "saveSubcontractor": "Save subcontractor",
       "reset": "Reset company form",
@@ -548,8 +527,7 @@
       "attachHistoryDocument": "Attach document",
       "resetHistory": "Reset history form",
       "archive": "Archive",
-      "reactivate": "Reactivate",
-      "cancel": "Cancel"
+      "reactivate": "Reactivate"
     },
     "confirm": {
       "archive": "Archive this subcontractor?",
@@ -704,9 +682,6 @@
       "primaryConflict": "Only one primary contact is allowed per subcontractor.",
       "duplicateUserLink": "This user account is already linked to another subcontractor contact.",
       "portalUserRequired": "Portal enablement requires a linked user account.",
-      "scopeInvalidWindow": "The scope validity window is invalid.",
-      "addressCreateValidation": "Street, postal code, city, and country code are required.",
-      "addressSaved": "Address saved.",
       "scopeOverlap": "The scope row overlaps an existing release.",
       "scopeBranchMismatch": "The selected mandate does not belong to the selected branch.",
       "staleVersion": "The record changed in the meantime. Reload and save again.",

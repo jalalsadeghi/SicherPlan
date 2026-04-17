@@ -21,7 +21,6 @@ from app.modules.subcontractors.schemas import (
     SubcontractorContactRead,
     SubcontractorContactUpdate,
     SubcontractorCreate,
-    SubcontractorEligibleUserOptionRead,
     SubcontractorFilter,
     SubcontractorFinanceProfileCreate,
     SubcontractorFinanceProfileRead,
@@ -32,7 +31,6 @@ from app.modules.subcontractors.schemas import (
     SubcontractorHistoryEntryRead,
     SubcontractorLifecycleTransitionRequest,
     SubcontractorListItem,
-    SubcontractorReferenceDataRead,
     SubcontractorRead,
     SubcontractorScopeCreate,
     SubcontractorScopeRead,
@@ -63,7 +61,6 @@ from app.modules.subcontractors.schemas import (
     SubcontractorWorkerUpdate,
     SubcontractorWorkforceReadinessSummaryRead,
 )
-from app.modules.core.schemas import AddressCreate, AddressRead
 from app.modules.subcontractors.collaboration_service import SubcontractorCollaborationService
 from app.modules.subcontractors.ops_service import SubcontractorWorkforceOpsService
 from app.modules.subcontractors.readiness_service import SubcontractorReadinessService
@@ -175,18 +172,6 @@ def list_subcontractors(
     )
 
 
-@router.get("/reference-data", response_model=SubcontractorReferenceDataRead)
-def get_subcontractor_reference_data(
-    tenant_id: UUID,
-    context: Annotated[
-        RequestAuthorizationContext,
-        Depends(require_authorization("subcontractors.company.read", scope="tenant")),
-    ],
-    service: Annotated[SubcontractorService, Depends(get_subcontractor_service)],
-) -> SubcontractorReferenceDataRead:
-    return service.get_reference_data(str(tenant_id), context)
-
-
 @router.post("", response_model=SubcontractorRead, status_code=status.HTTP_201_CREATED)
 def create_subcontractor(
     tenant_id: UUID,
@@ -198,33 +183,6 @@ def create_subcontractor(
     service: Annotated[SubcontractorService, Depends(get_subcontractor_service)],
 ) -> SubcontractorRead:
     return service.create_subcontractor(str(tenant_id), payload, context)
-
-
-@router.get("/contact-user-options", response_model=list[SubcontractorEligibleUserOptionRead])
-def list_subcontractor_contact_user_options(
-    tenant_id: UUID,
-    search: str = Query(default="", max_length=120),
-    limit: int = Query(default=25, ge=1, le=50),
-    context: Annotated[
-        RequestAuthorizationContext,
-        Depends(require_authorization("subcontractors.company.write", scope="tenant")),
-    ] = None,
-    service: Annotated[SubcontractorService, Depends(get_subcontractor_service)] = None,
-) -> list[SubcontractorEligibleUserOptionRead]:
-    return service.list_contact_user_options(str(tenant_id), context, search=search, limit=limit)
-
-
-@router.post("/address-options", response_model=AddressRead, status_code=status.HTTP_201_CREATED)
-def create_subcontractor_available_address(
-    tenant_id: UUID,
-    payload: AddressCreate,
-    context: Annotated[
-        RequestAuthorizationContext,
-        Depends(require_authorization("subcontractors.company.write", scope="tenant")),
-    ],
-    service: Annotated[SubcontractorService, Depends(get_subcontractor_service)],
-) -> AddressRead:
-    return service.create_available_address(str(tenant_id), payload, context)
 
 
 @router.get("/{subcontractor_id}", response_model=SubcontractorRead)

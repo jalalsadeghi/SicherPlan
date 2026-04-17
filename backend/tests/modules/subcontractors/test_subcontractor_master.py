@@ -11,7 +11,6 @@ from sqlalchemy import CheckConstraint, Index
 from app.db import Base
 from app.errors import ApiException
 from app.modules.core.models import Address, Branch, LookupValue, Mandate
-from app.modules.core.schemas import AddressCreate
 from app.modules.iam.audit_service import AuditService
 from app.modules.iam.auth_schemas import AuthenticatedRoleScope
 from app.modules.iam.authz import RequestAuthorizationContext
@@ -463,15 +462,6 @@ class FakeSubcontractorRepository:
     def get_lookup_value(self, lookup_id: str) -> LookupValue | None:
         return self.lookups.get(lookup_id)
 
-    def list_lookup_values(self, tenant_id: str, domain: str) -> list[LookupValue]:
-        rows = [
-            row
-            for row in self.lookups.values()
-            if row.domain == domain and row.archived_at is None and (row.tenant_id is None or row.tenant_id == tenant_id)
-        ]
-        rows.sort(key=lambda row: (row.sort_order, row.label))
-        return rows
-
     def get_branch(self, tenant_id: str, branch_id: str) -> Branch | None:
         row = self.branches.get(branch_id)
         if row is None or row.tenant_id != tenant_id:
@@ -490,30 +480,8 @@ class FakeSubcontractorRepository:
             return None
         return row
 
-    def list_user_accounts(self, tenant_id: str, *, search: str = "", limit: int = 25) -> list[UserAccount]:
-        rows = [
-            row
-            for row in self.users.values()
-            if row.tenant_id == tenant_id and row.archived_at is None and row.status == "active"
-        ]
-        if search.strip():
-            term = search.strip().lower()
-            rows = [
-                row
-                for row in rows
-                if term in row.full_name.lower() or term in row.username.lower() or term in row.email.lower()
-            ]
-        rows.sort(key=lambda row: (row.full_name, row.username))
-        return rows[:limit]
-
     def get_address(self, address_id: str) -> Address | None:
         return self.addresses.get(address_id)
-
-    def create_address(self, row: Address) -> Address:
-        if not getattr(row, "id", None):
-            row.id = str(uuid4())
-        self.addresses[row.id] = row
-        return row
 
     def _hydrate(self, row: Subcontractor) -> None:
         row.address = self.addresses.get(row.address_id) if row.address_id else None
@@ -1167,76 +1135,6 @@ class SubcontractorServiceTest(unittest.TestCase):
         event_types = [payload.event_type for payload in self.audit_repository.audit_events]
         self.assertIn("subcontractors.company.archived", event_types)
         self.assertIn("subcontractors.company.reactivated", event_types)
-
-    def test_contact_user_options_are_tenant_scoped_and_active_only(self) -> None:
-        self.repository.users["user-inactive"] = UserAccount(
-            id="user-inactive",
-            tenant_id="tenant-1",
-            username="inactive-user",
-            email="inactive@example.com",
-            full_name="Inactive User",
-            locale="de",
-            timezone="Europe/Berlin",
-            is_platform_user=False,
-            is_password_login_enabled=True,
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-            version_no=1,
-            status="inactive",
-        )
-        self.repository.users["user-other-tenant"] = UserAccount(
-            id="user-other-tenant",
-            tenant_id="tenant-2",
-            username="foreign-user",
-            email="foreign@example.com",
-            full_name="Foreign User",
-            locale="de",
-            timezone="Europe/Berlin",
-            is_platform_user=False,
-            is_password_login_enabled=True,
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-            version_no=1,
-            status="active",
-        )
-
-        options = self.service.list_contact_user_options(
-            "tenant-1",
-            _context("subcontractors.company.write"),
-            search="portal",
-        )
-
-        self.assertEqual([row.id for row in options], ["user-portal"])
-
-    def test_reference_data_exposes_legal_forms_from_shared_lookup_domain(self) -> None:
-        reference_data = self.service.get_reference_data(
-            "tenant-1",
-            _context("subcontractors.company.read"),
-        )
-
-        self.assertEqual([row.code for row in reference_data.legal_forms], ["gmbh"])
-
-    def test_create_available_address_normalizes_payload(self) -> None:
-        created = self.service.create_available_address(
-            "tenant-1",
-            AddressCreate(
-                street_line_1=" Hauptstrasse 2 ",
-                street_line_2=" 2. OG ",
-                postal_code=" 10117 ",
-                city=" Berlin ",
-                state=" Berlin ",
-                country_code="de",
-            ),
-            _context("subcontractors.company.write"),
-        )
-
-        self.assertEqual(created.street_line_1, "Hauptstrasse 2")
-        self.assertEqual(created.street_line_2, "2. OG")
-        self.assertEqual(created.postal_code, "10117")
-        self.assertEqual(created.city, "Berlin")
-        self.assertEqual(created.state, "Berlin")
-        self.assertEqual(created.country_code, "DE")
-        self.assertIsNotNone(self.repository.get_address(created.id))
 
     def test_metadata_exposes_expected_partner_constraints(self) -> None:
         subcontractor_table = Base.metadata.tables["partner.subcontractor"]

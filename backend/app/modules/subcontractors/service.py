@@ -16,25 +16,20 @@ from app.modules.subcontractors.models import (
     SubcontractorScope,
 )
 from app.modules.subcontractors.policy import (
-    PORTAL_ROLE_KEYS,
     can_read_subcontractor_internal,
     enforce_subcontractor_internal_read_access,
     enforce_subcontractor_internal_write_access,
 )
-from app.modules.core.schemas import AddressCreate, AddressRead
 from app.modules.subcontractors.schemas import (
     SubcontractorContactCreate,
     SubcontractorContactRead,
     SubcontractorContactUpdate,
     SubcontractorCreate,
-    SubcontractorEligibleUserOptionRead,
     SubcontractorFilter,
     SubcontractorFinanceProfileCreate,
     SubcontractorFinanceProfileRead,
     SubcontractorFinanceProfileUpdate,
     SubcontractorListItem,
-    SubcontractorReferenceDataRead,
-    SubcontractorReferenceOptionRead,
     SubcontractorRead,
     SubcontractorScopeCreate,
     SubcontractorScopeRead,
@@ -118,13 +113,10 @@ class SubcontractorRepository(Protocol):
         exclude_id: str | None = None,
     ) -> SubcontractorScope | None: ...
     def get_lookup_value(self, lookup_id: str) -> LookupValue | None: ...
-    def list_lookup_values(self, tenant_id: str, domain: str) -> list[LookupValue]: ...
     def get_branch(self, tenant_id: str, branch_id: str) -> Branch | None: ...
     def get_mandate(self, tenant_id: str, mandate_id: str) -> Mandate | None: ...
     def get_user_account(self, tenant_id: str, user_id: str) -> UserAccount | None: ...
-    def list_user_accounts(self, tenant_id: str, *, search: str = "", limit: int = 25) -> list[UserAccount]: ...
     def get_address(self, address_id: str) -> Address | None: ...
-    def create_address(self, row: Address) -> Address: ...
 
 
 class SubcontractorService:
@@ -155,68 +147,6 @@ class SubcontractorService:
     def get_subcontractor(self, tenant_id: str, subcontractor_id: str, actor: RequestAuthorizationContext) -> SubcontractorRead:
         row = self._require_subcontractor_for_read(tenant_id, subcontractor_id, actor)
         return self._serialize_subcontractor(row, actor)
-
-    def get_reference_data(self, tenant_id: str, actor: RequestAuthorizationContext) -> SubcontractorReferenceDataRead:
-        if not actor.is_platform_admin and actor.tenant_id != tenant_id:
-            raise ApiException(
-                403,
-                "iam.authorization.scope_denied",
-                "errors.iam.authorization.scope_denied",
-                {"tenant_id": tenant_id},
-            )
-        if actor.role_keys & PORTAL_ROLE_KEYS:
-            raise ApiException(
-                403,
-                "subcontractors.authorization.portal_forbidden",
-                "errors.subcontractors.authorization.portal_forbidden",
-            )
-        return SubcontractorReferenceDataRead(
-            legal_forms=[
-                SubcontractorReferenceOptionRead.model_validate(lookup)
-                for lookup in self.repository.list_lookup_values(tenant_id, "legal_form")
-            ]
-        )
-
-    def list_contact_user_options(
-        self,
-        tenant_id: str,
-        actor: RequestAuthorizationContext,
-        *,
-        search: str = "",
-        limit: int = 25,
-    ) -> list[SubcontractorEligibleUserOptionRead]:
-        enforce_subcontractor_internal_write_access(actor, tenant_id=tenant_id)
-        return [
-            SubcontractorEligibleUserOptionRead.model_validate(row)
-            for row in self.repository.list_user_accounts(tenant_id, search=search, limit=limit)
-        ]
-
-    def create_available_address(
-        self,
-        tenant_id: str,
-        payload: AddressCreate,
-        actor: RequestAuthorizationContext,
-    ) -> AddressRead:
-        enforce_subcontractor_internal_write_access(actor, tenant_id=tenant_id)
-        normalized = AddressCreate(
-            street_line_1=payload.street_line_1.strip(),
-            street_line_2=payload.street_line_2.strip() if payload.street_line_2 and payload.street_line_2.strip() else None,
-            postal_code=payload.postal_code.strip(),
-            city=payload.city.strip(),
-            state=payload.state.strip() if payload.state and payload.state.strip() else None,
-            country_code=payload.country_code.strip().upper(),
-        )
-        row = self.repository.create_address(
-            Address(
-                street_line_1=normalized.street_line_1,
-                street_line_2=normalized.street_line_2,
-                postal_code=normalized.postal_code,
-                city=normalized.city,
-                state=normalized.state,
-                country_code=normalized.country_code,
-            )
-        )
-        return AddressRead.model_validate(row)
 
     def create_subcontractor(
         self,

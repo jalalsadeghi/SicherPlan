@@ -458,18 +458,6 @@ class SqlAlchemySubcontractorRepository:
     def get_lookup_value(self, lookup_id: str) -> LookupValue | None:
         return self.session.get(LookupValue, lookup_id)
 
-    def list_lookup_values(self, tenant_id: str, domain: str) -> list[LookupValue]:
-        statement = (
-            select(LookupValue)
-            .where(
-                LookupValue.domain == domain,
-                LookupValue.archived_at.is_(None),
-                or_(LookupValue.tenant_id.is_(None), LookupValue.tenant_id == tenant_id),
-            )
-            .order_by(LookupValue.sort_order.asc(), LookupValue.label.asc())
-        )
-        return list(self.session.scalars(statement).all())
-
     def get_branch(self, tenant_id: str, branch_id: str) -> Branch | None:
         statement = select(Branch).where(Branch.tenant_id == tenant_id, Branch.id == branch_id)
         return self.session.scalars(statement).one_or_none()
@@ -482,32 +470,8 @@ class SqlAlchemySubcontractorRepository:
         statement = select(UserAccount).where(UserAccount.tenant_id == tenant_id, UserAccount.id == user_id)
         return self.session.scalars(statement).one_or_none()
 
-    def list_user_accounts(self, tenant_id: str, *, search: str = "", limit: int = 25) -> list[UserAccount]:
-        statement = select(UserAccount).where(
-            UserAccount.tenant_id == tenant_id,
-            UserAccount.archived_at.is_(None),
-            UserAccount.status == "active",
-        )
-        if search.strip():
-            term = f"%{search.strip()}%"
-            statement = statement.where(
-                or_(
-                    UserAccount.full_name.ilike(term),
-                    UserAccount.username.ilike(term),
-                    UserAccount.email.ilike(term),
-                )
-            )
-        statement = statement.order_by(UserAccount.full_name.asc(), UserAccount.username.asc()).limit(max(1, min(limit, 50)))
-        return list(self.session.scalars(statement).all())
-
     def get_address(self, address_id: str) -> Address | None:
         return self.session.get(Address, address_id)
-
-    def create_address(self, row: Address) -> Address:
-        self.session.add(row)
-        self._commit_or_raise()
-        self.session.refresh(row)
-        return row
 
     def list_workers(self, tenant_id: str, subcontractor_id: str, filters: SubcontractorWorkerFilter) -> list[SubcontractorWorker]:
         statement = (
