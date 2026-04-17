@@ -53,16 +53,43 @@ test("subcontractor admin uses controlled selectors where real option sources ex
   assert.match(source, /listBranches,/);
   assert.match(source, /listMandates,/);
   assert.match(source, /listLookupValues,/);
+  assert.match(source, /getSubcontractorReferenceData,/);
   assert.match(source, /listSubcontractorAddressOptions,/);
   assert.match(source, /listSubcontractorContactUserOptions,/);
-  assert.match(source, /v-if="branchOptions\.length" v-model="scopeDraft\.branch_id"/);
-  assert.match(source, /v-if="mandateOptions\.length" v-model="scopeDraft\.mandate_id"/);
-  assert.match(source, /v-if="legalFormOptions\.length" v-model="subcontractorDraft\.legal_form_lookup_id"/);
+  assert.match(source, /data-testid="subcontractor-scope-branch"/);
+  assert.match(source, /scopeBranchSelectEnabled/);
+  assert.match(source, /data-testid="subcontractor-scope-mandate"/);
+  assert.match(source, /scopeMandateSelectEnabled/);
+  assert.match(source, /scopeMandateOptionsWithDraft/);
+  assert.doesNotMatch(source, /<input v-else v-model="scopeDraft\.branch_id"/);
+  assert.doesNotMatch(source, /<input v-else v-model="scopeDraft\.mandate_id"/);
+  assert.match(source, /data-testid="subcontractor-legal-form"/);
+  assert.match(source, /v-model="subcontractorDraft\.legal_form_lookup_id"/);
+  assert.match(source, /legalFormOptionsWithDraft/);
+  assert.match(source, /legalFormSelectEnabled/);
+  assert.match(source, /getSubcontractorReferenceData\(/);
+  assert.doesNotMatch(source, /<input v-else v-model="subcontractorDraft\.legal_form_lookup_id"/);
   assert.match(source, /v-if="subcontractorStatusOptions\.length" v-model="subcontractorDraft\.subcontractor_status_lookup_id"/);
   assert.match(source, /v-if="addressOptions\.length" v-model="subcontractorDraft\.address_id"/);
   assert.match(source, /v-if="contactUserOptions\.length" v-model="contactDraft\.user_id"/);
   assert.match(source, /v-if="invoiceDeliveryMethodOptions\.length" v-model="financeDraft\.invoice_delivery_method_lookup_id"/);
   assert.match(source, /v-if="invoiceStatusModeOptions\.length" v-model="financeDraft\.invoice_status_mode_lookup_id"/);
+});
+
+test("subcontractor scope filters mandates by branch and clears stale mandate selections", () => {
+  assert.match(source, /const scopeMandateOptions = computed\(\(\) => \{/);
+  assert.match(source, /return mandateOptions\.value\.filter\(\(row\) => row\.branchId === scopeDraft\.branch_id\)/);
+  assert.match(source, /watch\(\s*\(\) => scopeDraft\.branch_id,/);
+  assert.match(source, /const mandateStillValid = scopeMandateOptions\.value\.some\(\(mandate\) => mandate\.id === scopeDraft\.mandate_id\)/);
+  assert.match(source, /scopeDraft\.mandate_id = ""/);
+});
+
+test("subcontractor overview removes the extra legal-form and map helper copy while keeping controls", () => {
+  assert.match(source, /v-if="legalFormHelpKey" class="field-help"/);
+  assert.doesNotMatch(source, /fields\.legalFormHelp"/);
+  assert.match(source, /data-testid="subcontractor-pick-location"/);
+  assert.doesNotMatch(source, /fields\.locationPicker"/);
+  assert.doesNotMatch(source, /fields\.locationPickerHelp"/);
 });
 
 test("subcontractor overview separates lifecycle status from lookup status and uses address modal flow", () => {

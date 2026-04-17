@@ -35,6 +35,7 @@ from app.modules.subcontractors.schemas import (
     SubcontractorHistoryAttachmentLinkCreate,
     SubcontractorHistoryEntryCreate,
     SubcontractorLifecycleTransitionRequest,
+    SubcontractorReferenceDataRead,
     SubcontractorScopeCreate,
     SubcontractorUpdate,
 )
@@ -463,6 +464,15 @@ class FakeSubcontractorRepository:
     def get_lookup_value(self, lookup_id: str) -> LookupValue | None:
         return self.lookups.get(lookup_id)
 
+    def list_lookup_values(self, tenant_id: str, domain: str) -> list[LookupValue]:
+        rows = [
+            row
+            for row in self.lookups.values()
+            if row.domain == domain and (row.tenant_id is None or row.tenant_id == tenant_id)
+        ]
+        rows.sort(key=lambda row: ((row.label or row.code), row.code, row.id))
+        return rows
+
     def get_branch(self, tenant_id: str, branch_id: str) -> Branch | None:
         row = self.branches.get(branch_id)
         if row is None or row.tenant_id != tenant_id:
@@ -686,6 +696,18 @@ class SubcontractorServiceTest(unittest.TestCase):
         self.assertEqual(len(aggregate.scopes), 1)
         self.assertIsNotNone(aggregate.finance_profile)
         self.assertEqual(len(self.audit_repository.audit_events), 5)
+
+    def test_reference_data_exposes_legal_forms_for_subcontractor_overview(self) -> None:
+        reference_data = self.service.get_reference_data(
+            "tenant-1",
+            _context("subcontractors.company.read"),
+        )
+
+        self.assertIsInstance(reference_data, SubcontractorReferenceDataRead)
+        self.assertEqual(len(reference_data.legal_forms), 1)
+        self.assertEqual(reference_data.legal_forms[0].id, "lookup-legal")
+        self.assertEqual(reference_data.legal_forms[0].label, "GmbH")
+        self.assertEqual(reference_data.legal_forms[0].code, "gmbh")
 
     def test_contact_user_options_and_address_options_are_exposed_for_supported_overview_fields(self) -> None:
         created = self.service.create_subcontractor(

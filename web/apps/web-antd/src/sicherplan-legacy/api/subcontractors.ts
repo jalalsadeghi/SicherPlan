@@ -78,6 +78,20 @@ export interface SubcontractorContactUserOptionRead {
   status: LifecycleStatus | string;
 }
 
+export interface SubcontractorReferenceOptionRead {
+  id: string;
+  code: string;
+  label: string;
+  description: string | null;
+  is_active: boolean;
+  status: string;
+  archived_at: string | null;
+}
+
+export interface SubcontractorReferenceDataRead {
+  legal_forms: SubcontractorReferenceOptionRead[];
+}
+
 export interface SubcontractorHistoryAttachmentRead {
   document_id: string;
   title: string;
@@ -418,6 +432,13 @@ export function listSubcontractors(tenantId: string, accessToken: string, params
 
 export function getSubcontractor(tenantId: string, subcontractorId: string, accessToken: string) {
   return request<SubcontractorRead>(`/api/subcontractors/tenants/${tenantId}/subcontractors/${subcontractorId}`, accessToken);
+}
+
+export function getSubcontractorReferenceData(tenantId: string, accessToken: string) {
+  return request<SubcontractorReferenceDataRead>(
+    `/api/subcontractors/tenants/${tenantId}/subcontractors/reference-data`,
+    accessToken,
+  );
 }
 
 export function createSubcontractor(tenantId: string, accessToken: string, payload: Record<string, unknown>) {

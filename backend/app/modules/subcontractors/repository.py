@@ -458,6 +458,17 @@ class SqlAlchemySubcontractorRepository:
     def get_lookup_value(self, lookup_id: str) -> LookupValue | None:
         return self.session.get(LookupValue, lookup_id)
 
+    def list_lookup_values(self, tenant_id: str, domain: str) -> list[LookupValue]:
+        statement = (
+            select(LookupValue)
+            .where(
+                LookupValue.domain == domain,
+                or_(LookupValue.tenant_id.is_(None), LookupValue.tenant_id == tenant_id),
+            )
+            .order_by(LookupValue.label, LookupValue.code, LookupValue.id)
+        )
+        return list(self.session.scalars(statement).all())
+
     def get_branch(self, tenant_id: str, branch_id: str) -> Branch | None:
         statement = select(Branch).where(Branch.tenant_id == tenant_id, Branch.id == branch_id)
         return self.session.scalars(statement).one_or_none()

@@ -33,6 +33,7 @@ from app.modules.subcontractors.schemas import (
     SubcontractorHistoryEntryRead,
     SubcontractorLifecycleTransitionRequest,
     SubcontractorListItem,
+    SubcontractorReferenceDataRead,
     SubcontractorRead,
     SubcontractorScopeCreate,
     SubcontractorScopeRead,
@@ -172,6 +173,18 @@ def list_subcontractors(
         ),
         context,
     )
+
+
+@router.get("/reference-data", response_model=SubcontractorReferenceDataRead)
+def get_reference_data(
+    tenant_id: UUID,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_permission_only("subcontractors.company.read")),
+    ],
+    service: Annotated[SubcontractorService, Depends(get_subcontractor_service)],
+) -> SubcontractorReferenceDataRead:
+    return service.get_reference_data(str(tenant_id), context)
 
 
 @router.post("", response_model=SubcontractorRead, status_code=status.HTTP_201_CREATED)

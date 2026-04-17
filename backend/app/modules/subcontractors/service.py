@@ -17,6 +17,8 @@ from app.modules.subcontractors.models import (
     SubcontractorScope,
 )
 from app.modules.subcontractors.policy import (
+    PORTAL_ROLE_KEYS,
+    SUBCONTRACTOR_PORTAL_BOUNDARY,
     can_read_subcontractor_internal,
     enforce_subcontractor_internal_read_access,
     enforce_subcontractor_internal_write_access,
@@ -32,6 +34,8 @@ from app.modules.subcontractors.schemas import (
     SubcontractorFinanceProfileRead,
     SubcontractorFinanceProfileUpdate,
     SubcontractorListItem,
+    SubcontractorReferenceDataRead,
+    SubcontractorReferenceOptionRead,
     SubcontractorRead,
     SubcontractorScopeCreate,
     SubcontractorScopeRead,
@@ -115,6 +119,7 @@ class SubcontractorRepository(Protocol):
         exclude_id: str | None = None,
     ) -> SubcontractorScope | None: ...
     def get_lookup_value(self, lookup_id: str) -> LookupValue | None: ...
+    def list_lookup_values(self, tenant_id: str, domain: str) -> list[LookupValue]: ...
     def get_branch(self, tenant_id: str, branch_id: str) -> Branch | None: ...
     def get_mandate(self, tenant_id: str, mandate_id: str) -> Mandate | None: ...
     def get_user_account(self, tenant_id: str, user_id: str) -> UserAccount | None: ...
@@ -151,6 +156,16 @@ class SubcontractorService:
     def get_subcontractor(self, tenant_id: str, subcontractor_id: str, actor: RequestAuthorizationContext) -> SubcontractorRead:
         row = self._require_subcontractor_for_read(tenant_id, subcontractor_id, actor)
         return self._serialize_subcontractor(row, actor)
+
+    def get_reference_data(self, tenant_id: str, actor: RequestAuthorizationContext) -> SubcontractorReferenceDataRead:
+        self._enforce_internal_reference_read_access(actor, tenant_id)
+        return SubcontractorReferenceDataRead(
+            legal_forms=[
+                self._serialize_reference_option(row)
+                for row in self.repository.list_lookup_values(tenant_id, "legal_form")
+                if row.archived_at is None
+            ]
+        )
 
     def create_subcontractor(
         self,
@@ -682,6 +697,44 @@ class SubcontractorService:
         if not actor.has_permission("subcontractors.company.write"):
             update["user_id"] = None
         return SubcontractorContactRead.model_validate(row).model_copy(update=update)
+
+    @staticmethod
+    def _enforce_internal_reference_read_access(actor: RequestAuthorizationContext, tenant_id: str) -> None:
+        if actor.is_platform_admin:
+            return
+        if actor.tenant_id != tenant_id:
+            raise ApiException(
+                403,
+                "iam.authorization.scope_denied",
+                "errors.iam.authorization.scope_denied",
+                {"tenant_id": tenant_id},
+            )
+        if actor.role_keys & PORTAL_ROLE_KEYS:
+            raise ApiException(
+                403,
+                "subcontractors.authorization.portal_forbidden",
+                "errors.subcontractors.authorization.portal_forbidden",
+                {"privacy_boundary": SUBCONTRACTOR_PORTAL_BOUNDARY},
+            )
+        if not any(scope.scope_type in {"tenant", "branch", "mandate", "subcontractor"} for scope in actor.scopes):
+            raise ApiException(
+                403,
+                "subcontractors.authorization.internal_scope_required",
+                "errors.subcontractors.authorization.internal_scope_required",
+                {"tenant_id": tenant_id},
+            )
+
+    @staticmethod
+    def _serialize_reference_option(row: LookupValue) -> SubcontractorReferenceOptionRead:
+        return SubcontractorReferenceOptionRead(
+            id=row.id,
+            code=row.code,
+            label=row.label or row.code,
+            description=row.description,
+            is_active=row.status == "active" and row.archived_at is None,
+            status=row.status,
+            archived_at=row.archived_at,
+        )
 
     @staticmethod
     def _subcontractor_snapshot(row: Subcontractor) -> dict[str, object]:

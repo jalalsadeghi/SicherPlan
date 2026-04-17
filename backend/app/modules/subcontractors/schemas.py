@@ -224,6 +224,20 @@ class SubcontractorRead(SubcontractorListItem):
     finance_profile: SubcontractorFinanceProfileRead | None = None
 
 
+class SubcontractorReferenceOptionRead(BaseModel):
+    id: str
+    code: str
+    label: str
+    description: str | None
+    is_active: bool
+    status: str
+    archived_at: datetime | None
+
+
+class SubcontractorReferenceDataRead(BaseModel):
+    legal_forms: list[SubcontractorReferenceOptionRead] = Field(default_factory=list)
+
+
 class SubcontractorContactUserOptionRead(BaseModel):
     id: str
     username: str

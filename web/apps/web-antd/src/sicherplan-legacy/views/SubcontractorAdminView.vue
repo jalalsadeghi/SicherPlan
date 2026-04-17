@@ -95,7 +95,7 @@
 
         <div class="cta-row">
           <button class="cta-button" type="button" @click="refreshSubcontractors">{{ t("sicherplan.subcontractors.actions.search") }}</button>
-          <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreate" @click="startCreateSubcontractor">
+          <button class="cta-button cta-secondary" type="button" data-testid="subcontractor-new" :disabled="!actionState.canCreate" @click="startCreateSubcontractor">
             {{ t("sicherplan.subcontractors.actions.newSubcontractor") }}
           </button>
         </div>
@@ -189,11 +189,11 @@
             <div class="subcontractor-admin-form-grid">
               <label class="field-stack">
                 <span>{{ t("sicherplan.subcontractors.fields.number") }}</span>
-                <input v-model="subcontractorDraft.subcontractor_number" required />
+                <input v-model="subcontractorDraft.subcontractor_number" required data-testid="subcontractor-number" />
               </label>
               <label class="field-stack">
                 <span>{{ t("sicherplan.subcontractors.fields.legalName") }}</span>
-                <input v-model="subcontractorDraft.legal_name" required />
+                <input v-model="subcontractorDraft.legal_name" required data-testid="subcontractor-legal-name" />
               </label>
               <label class="field-stack">
                 <span>{{ t("sicherplan.subcontractors.fields.displayName") }}</span>
@@ -201,11 +201,21 @@
               </label>
               <label class="field-stack">
                 <span>{{ t("sicherplan.subcontractors.fields.legalFormLookupId") }}</span>
-                <select v-if="legalFormOptions.length" v-model="subcontractorDraft.legal_form_lookup_id">
-                  <option value="">{{ t("sicherplan.subcontractors.fields.legalFormPlaceholder") }}</option>
+                <select
+                  v-model="subcontractorDraft.legal_form_lookup_id"
+                  :disabled="!legalFormSelectEnabled"
+                  data-testid="subcontractor-legal-form"
+                >
+                  <option value="">
+                    {{
+                      legalFormOptions.length
+                        ? t("sicherplan.subcontractors.fields.legalFormPlaceholder")
+                        : t("sicherplan.subcontractors.fields.legalFormUnavailablePlaceholder")
+                    }}
+                  </option>
                   <option v-for="option in legalFormOptionsWithDraft" :key="option.id" :value="option.id">{{ option.label }}</option>
                 </select>
-                <input v-else v-model="subcontractorDraft.legal_form_lookup_id" />
+                <span v-if="legalFormHelpKey" class="field-help">{{ t(legalFormHelpKey) }}</span>
               </label>
               <label class="field-stack">
                 <span>{{ t("sicherplan.subcontractors.fields.lifecycleStatus") }}</span>
@@ -232,18 +242,19 @@
               <div class="subcontractor-admin-address-row field-stack--wide">
                 <label class="field-stack subcontractor-admin-address-row__field">
                   <span>{{ t("sicherplan.subcontractors.fields.addressId") }}</span>
-                  <select v-if="addressOptions.length" v-model="subcontractorDraft.address_id">
+                  <select v-if="addressOptions.length" v-model="subcontractorDraft.address_id" data-testid="subcontractor-primary-address">
                     <option value="">{{ t("sicherplan.subcontractors.fields.addressPlaceholder") }}</option>
                     <option v-for="option in addressOptionsWithDraft" :key="option.id" :value="option.id">{{ option.label }}</option>
                   </select>
-                  <input v-else v-model="subcontractorDraft.address_id" />
+                  <input v-else v-model="subcontractorDraft.address_id" data-testid="subcontractor-primary-address" />
                 </label>
                 <div class="subcontractor-admin-address-row__action">
                   <span class="subcontractor-admin-address-row__label">{{ t("sicherplan.subcontractors.fields.addressAction") }}</span>
                   <button
                     class="cta-button cta-secondary subcontractor-admin-address-row__button"
+                    data-testid="subcontractor-create-address"
                     type="button"
-                    :disabled="!selectedSubcontractorId || !actionState.canEdit"
+                    :disabled="!actionState.canCreate && !actionState.canEdit"
                     @click="openAddressCreateModal"
                   >
                     {{ t("sicherplan.subcontractors.actions.createAddressOption") }}
@@ -259,13 +270,11 @@
                 <input v-model="subcontractorDraft.longitude" type="number" step="0.000001" />
               </label>
               <div class="field-stack field-stack--wide">
-                <span>{{ t("sicherplan.subcontractors.fields.locationPicker") }}</span>
                 <div class="cta-row">
-                  <button class="cta-button cta-secondary" type="button" @click="openLocationPicker">
+                  <button class="cta-button cta-secondary" data-testid="subcontractor-pick-location" type="button" @click="openLocationPicker">
                     {{ t("sicherplan.subcontractors.actions.pickLocationOnMap") }}
                   </button>
                 </div>
-                <span class="field-help">{{ t("sicherplan.subcontractors.fields.locationPickerHelp") }}</span>
               </div>
               <label class="field-stack field-stack--wide">
                 <span>{{ t("sicherplan.subcontractors.fields.notes") }}</span>
@@ -274,7 +283,7 @@
             </div>
 
             <div class="cta-row">
-              <button class="cta-button" type="submit" :disabled="!actionState.canCreate && !actionState.canEdit && !isCreatingSubcontractor">
+              <button class="cta-button" type="submit" data-testid="subcontractor-save" :disabled="!actionState.canCreate && !actionState.canEdit && !isCreatingSubcontractor">
                 {{ isCreatingSubcontractor ? t("sicherplan.subcontractors.actions.createSubcontractor") : t("sicherplan.subcontractors.actions.saveSubcontractor") }}
               </button>
               <button class="cta-button cta-secondary" type="button" @click="resetSubcontractorDraft">
@@ -410,19 +419,38 @@
               <div class="subcontractor-admin-form-grid">
                 <label class="field-stack">
                   <span>{{ t("sicherplan.subcontractors.fields.branchId") }}</span>
-                  <select v-if="branchOptions.length" v-model="scopeDraft.branch_id" required>
-                    <option value="">{{ t("sicherplan.subcontractors.fields.branchPlaceholder") }}</option>
+                  <select
+                    v-model="scopeDraft.branch_id"
+                    :disabled="!scopeBranchSelectEnabled"
+                    data-testid="subcontractor-scope-branch"
+                    required
+                  >
+                    <option value="">
+                      {{
+                        branchOptions.length
+                          ? t("sicherplan.subcontractors.fields.branchPlaceholder")
+                          : t("sicherplan.subcontractors.fields.branchUnavailablePlaceholder")
+                      }}
+                    </option>
                     <option v-for="option in branchOptions" :key="option.id" :value="option.id">{{ option.label }}</option>
                   </select>
-                  <input v-else v-model="scopeDraft.branch_id" required />
                 </label>
                 <label class="field-stack">
                   <span>{{ t("sicherplan.subcontractors.fields.mandateId") }}</span>
-                  <select v-if="mandateOptions.length" v-model="scopeDraft.mandate_id">
-                    <option value="">{{ t("sicherplan.subcontractors.fields.mandatePlaceholder") }}</option>
+                  <select
+                    v-model="scopeDraft.mandate_id"
+                    :disabled="!scopeMandateSelectEnabled"
+                    data-testid="subcontractor-scope-mandate"
+                  >
+                    <option value="">
+                      {{
+                        scopeMandateOptions.length || scopeDraft.mandate_id
+                          ? t("sicherplan.subcontractors.fields.mandatePlaceholder")
+                          : t("sicherplan.subcontractors.fields.mandateUnavailablePlaceholder")
+                      }}
+                    </option>
                     <option v-for="option in scopeMandateOptionsWithDraft" :key="option.id" :value="option.id">{{ option.label }}</option>
                   </select>
-                  <input v-else v-model="scopeDraft.mandate_id" />
                 </label>
                 <label class="field-stack">
                   <span>{{ t("sicherplan.subcontractors.fields.validFrom") }}</span>
@@ -680,32 +708,32 @@
           <div class="subcontractor-admin-form-grid">
             <label class="field-stack">
               <span>{{ t("sicherplan.subcontractors.addressModal.street1") }}</span>
-              <input v-model="addressDraft.street_line_1" required />
+              <input v-model="addressDraft.street_line_1" required data-testid="subcontractor-address-street1" />
             </label>
             <label class="field-stack">
               <span>{{ t("sicherplan.subcontractors.addressModal.street2") }}</span>
-              <input v-model="addressDraft.street_line_2" />
+              <input v-model="addressDraft.street_line_2" data-testid="subcontractor-address-street2" />
             </label>
             <label class="field-stack">
               <span>{{ t("sicherplan.subcontractors.addressModal.postalCode") }}</span>
-              <input v-model="addressDraft.postal_code" required />
+              <input v-model="addressDraft.postal_code" required data-testid="subcontractor-address-postal" />
             </label>
             <label class="field-stack">
               <span>{{ t("sicherplan.subcontractors.addressModal.city") }}</span>
-              <input v-model="addressDraft.city" required />
+              <input v-model="addressDraft.city" required data-testid="subcontractor-address-city" />
             </label>
             <label class="field-stack">
               <span>{{ t("sicherplan.subcontractors.addressModal.state") }}</span>
-              <input v-model="addressDraft.state" />
+              <input v-model="addressDraft.state" data-testid="subcontractor-address-state" />
             </label>
             <label class="field-stack">
               <span>{{ t("sicherplan.subcontractors.addressModal.countryCode") }}</span>
-              <input v-model="addressDraft.country_code" maxlength="2" required />
+              <input v-model="addressDraft.country_code" maxlength="2" required data-testid="subcontractor-address-country" />
             </label>
           </div>
           <div class="cta-row">
-            <button class="cta-button" type="submit">{{ t("sicherplan.subcontractors.actions.saveAddressOption") }}</button>
-            <button class="cta-button cta-secondary" type="button" @click="closeAddressCreateModal">
+            <button class="cta-button" type="submit" data-testid="subcontractor-address-save">{{ t("sicherplan.subcontractors.actions.saveAddressOption") }}</button>
+            <button class="cta-button cta-secondary" type="button" data-testid="subcontractor-address-cancel" @click="closeAddressCreateModal">
               {{ t("sicherplan.subcontractors.actions.cancelAddressOption") }}
             </button>
           </div>
@@ -732,7 +760,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 
 import { useI18n } from "@vben/locales";
 
@@ -760,6 +788,7 @@ import {
   downloadSubcontractorDocument,
   getSubcontractor,
   getSubcontractorFinanceProfile,
+  getSubcontractorReferenceData,
   linkSubcontractorHistoryAttachment,
   listSubcontractorAddressOptions,
   listSubcontractorContactUserOptions,
@@ -777,6 +806,7 @@ import {
   type SubcontractorHistoryAttachmentRead,
   type SubcontractorHistoryEntryRead,
   type SubcontractorListItem,
+  type SubcontractorReferenceDataRead,
   type SubcontractorRead,
   type SubcontractorScopeRead,
   SubcontractorAdminApiError,
@@ -981,12 +1011,14 @@ const coordinateSummary = computed(() => {
 });
 const branches = ref<BranchRead[]>([]);
 const mandates = ref<MandateRead[]>([]);
-const legalFormLookups = ref<LookupValueRead[]>([]);
+const subcontractorReferenceData = ref<SubcontractorReferenceDataRead | null>(null);
+const legalFormReferenceLoadFailed = ref(false);
 const subcontractorStatusLookups = ref<LookupValueRead[]>([]);
 const invoiceDeliveryMethodLookups = ref<LookupValueRead[]>([]);
 const invoiceStatusModeLookups = ref<LookupValueRead[]>([]);
 const contactUserOptionRows = ref<SubcontractorContactUserOptionRead[]>([]);
 const addressOptionRows = ref<Array<NonNullable<SubcontractorRead["address"]>>>([]);
+const pendingAddressOptionRows = ref<Array<NonNullable<SubcontractorRead["address"]>>>([]);
 
 const branchOptions = computed(() =>
   branches.value.map((row) => ({
@@ -1029,7 +1061,12 @@ function withCurrentOption(options: Array<{ id: string; label: string }>, curren
   return [...options, { id: normalized, label: normalized }];
 }
 
-const legalFormOptions = computed(() => mapLookupOptions(legalFormLookups.value));
+const legalFormOptions = computed(() =>
+  (subcontractorReferenceData.value?.legal_forms ?? []).map((row) => ({
+    id: row.id,
+    label: row.label || row.code,
+  })),
+);
 const subcontractorStatusOptions = computed(() => mapLookupOptions(subcontractorStatusLookups.value));
 const invoiceDeliveryMethodOptions = computed(() => mapLookupOptions(invoiceDeliveryMethodLookups.value));
 const invoiceStatusModeOptions = computed(() => mapLookupOptions(invoiceStatusModeLookups.value));
@@ -1040,7 +1077,7 @@ const contactUserOptions = computed(() =>
   })),
 );
 const addressOptions = computed(() =>
-  addressOptionRows.value.map((row) => ({
+  [...addressOptionRows.value, ...pendingAddressOptionRows.value].map((row) => ({
     id: row.id,
     label: formatAddressOptionLabel(row),
   })),
@@ -1058,6 +1095,27 @@ const invoiceStatusModeOptionsWithDraft = computed(() =>
 const contactUserOptionsWithDraft = computed(() => withCurrentOption(contactUserOptions.value, contactDraft.user_id));
 const addressOptionsWithDraft = computed(() => withCurrentOption(addressOptions.value, subcontractorDraft.address_id));
 const scopeMandateOptionsWithDraft = computed(() => withCurrentOption(scopeMandateOptions.value, scopeDraft.mandate_id));
+const scopeBranchSelectEnabled = computed(() =>
+  branchOptions.value.length > 0 || !!scopeDraft.branch_id.trim(),
+);
+const scopeMandateSelectEnabled = computed(() =>
+  scopeMandateOptions.value.length > 0 || !!scopeDraft.mandate_id.trim(),
+);
+const legalFormSelectEnabled = computed(() =>
+  legalFormOptions.value.length > 0 || !!subcontractorDraft.legal_form_lookup_id.trim(),
+);
+const legalFormHelpKey = computed(() => {
+  if (legalFormReferenceLoadFailed.value) {
+    return "sicherplan.subcontractors.fields.legalFormHelpUnavailable";
+  }
+  if (
+    subcontractorDraft.legal_form_lookup_id.trim()
+    && !legalFormOptions.value.some((option) => option.id === subcontractorDraft.legal_form_lookup_id.trim())
+  ) {
+    return "sicherplan.subcontractors.fields.legalFormHelpLegacy";
+  }
+  return "";
+});
 
 function clearFeedback() {
   feedback.tone = "neutral";
@@ -1091,6 +1149,18 @@ function serializeDecimal(value: string) {
 
 function formatAddressOptionLabel(address: NonNullable<SubcontractorRead["address"]>) {
   return [address.street_line_1, address.postal_code, address.city, address.country_code].filter(Boolean).join(", ");
+}
+
+function createPendingAddressOptionId() {
+  return `pending-address-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function findPendingAddressOption(addressId: string) {
+  const normalized = addressId.trim();
+  if (!normalized) {
+    return null;
+  }
+  return pendingAddressOptionRows.value.find((row) => row.id === normalized) ?? null;
 }
 
 function resetSubcontractorDraft() {
@@ -1259,6 +1329,7 @@ async function loadAddressOptions(subcontractorId: string) {
     return;
   }
   try {
+    pendingAddressOptionRows.value = [];
     addressOptionRows.value = (await listSubcontractorAddressOptions(
       resolvedTenantScopeId.value,
       subcontractorId,
@@ -1269,11 +1340,28 @@ async function loadAddressOptions(subcontractorId: string) {
   }
 }
 
+async function loadSubcontractorReferenceData() {
+  if (!resolvedTenantScopeId.value || !accessToken.value) {
+    subcontractorReferenceData.value = null;
+    legalFormReferenceLoadFailed.value = false;
+    return;
+  }
+  try {
+    subcontractorReferenceData.value = await getSubcontractorReferenceData(
+      resolvedTenantScopeId.value,
+      accessToken.value,
+    );
+    legalFormReferenceLoadFailed.value = false;
+  } catch {
+    subcontractorReferenceData.value = null;
+    legalFormReferenceLoadFailed.value = true;
+  }
+}
+
 async function loadReferenceOptions() {
   if (!resolvedTenantScopeId.value || !accessToken.value) {
     branches.value = [];
     mandates.value = [];
-    legalFormLookups.value = [];
     subcontractorStatusLookups.value = [];
     invoiceDeliveryMethodLookups.value = [];
     invoiceStatusModeLookups.value = [];
@@ -1284,14 +1372,12 @@ async function loadReferenceOptions() {
     const [
       branchRows,
       mandateRows,
-      legalFormRows,
       subcontractorStatusRows,
       invoiceDeliveryMethodRows,
       invoiceStatusModeRows,
     ] = await Promise.all([
       listBranches(accessToken.value, resolvedTenantScopeId.value, activeRole.value, actorTenantId.value),
       listMandates(accessToken.value, resolvedTenantScopeId.value, activeRole.value, actorTenantId.value),
-      listLookupValues(accessToken.value, resolvedTenantScopeId.value, "legal_form", activeRole.value, actorTenantId.value),
       listLookupValues(accessToken.value, resolvedTenantScopeId.value, "subcontractor_status", activeRole.value, actorTenantId.value),
       listLookupValues(accessToken.value, resolvedTenantScopeId.value, "invoice_delivery_method", activeRole.value, actorTenantId.value),
       listLookupValues(accessToken.value, resolvedTenantScopeId.value, "invoice_status_mode", activeRole.value, actorTenantId.value),
@@ -1299,14 +1385,12 @@ async function loadReferenceOptions() {
 
     branches.value = branchRows.filter((row) => row.archived_at == null);
     mandates.value = mandateRows.filter((row) => row.archived_at == null);
-    legalFormLookups.value = legalFormRows.filter((row) => row.archived_at == null);
     subcontractorStatusLookups.value = subcontractorStatusRows.filter((row) => row.archived_at == null);
     invoiceDeliveryMethodLookups.value = invoiceDeliveryMethodRows.filter((row) => row.archived_at == null);
     invoiceStatusModeLookups.value = invoiceStatusModeRows.filter((row) => row.archived_at == null);
   } catch {
     branches.value = [];
     mandates.value = [];
-    legalFormLookups.value = [];
     subcontractorStatusLookups.value = [];
     invoiceDeliveryMethodLookups.value = [];
     invoiceStatusModeLookups.value = [];
@@ -1320,7 +1404,7 @@ async function refreshSubcontractors() {
 
   loading.list = true;
   try {
-    await loadReferenceOptions();
+    await Promise.all([loadSubcontractorReferenceData(), loadReferenceOptions()]);
     subcontractors.value = await listSubcontractors(resolvedTenantScopeId.value, accessToken.value, filters);
     if (selectedSubcontractorId.value) {
       await loadSelectedSubcontractor(selectedSubcontractorId.value);
@@ -1393,6 +1477,7 @@ function startCreateSubcontractor() {
   selectedHistoryEntryId.value = "";
   contactUserOptionRows.value = [];
   addressOptionRows.value = [];
+  pendingAddressOptionRows.value = [];
   resetSubcontractorDraft();
   resetContactDraft();
   resetScopeDraft();
@@ -1417,6 +1502,7 @@ async function submitSubcontractor() {
 
   loading.saving = true;
   try {
+    const pendingAddress = findPendingAddressOption(subcontractorDraft.address_id);
     const payload = {
       tenant_id: resolvedTenantScopeId.value,
       subcontractor_number: subcontractorDraft.subcontractor_number.trim(),
@@ -1425,7 +1511,7 @@ async function submitSubcontractor() {
       legal_form_lookup_id: serializeNullable(subcontractorDraft.legal_form_lookup_id),
       subcontractor_status_lookup_id: serializeNullable(subcontractorDraft.subcontractor_status_lookup_id),
       managing_director_name: serializeNullable(subcontractorDraft.managing_director_name),
-      address_id: serializeNullable(subcontractorDraft.address_id),
+      address_id: pendingAddress ? null : serializeNullable(subcontractorDraft.address_id),
       latitude: serializeDecimal(subcontractorDraft.latitude),
       longitude: serializeDecimal(subcontractorDraft.longitude),
       notes: serializeNullable(subcontractorDraft.notes),
@@ -1433,6 +1519,26 @@ async function submitSubcontractor() {
 
     if (isCreatingSubcontractor.value) {
       const created = await createSubcontractor(resolvedTenantScopeId.value, accessToken.value, payload);
+      if (pendingAddress) {
+        const persistedAddress = await createSubcontractorAddressOption(
+          resolvedTenantScopeId.value,
+          created.id,
+          accessToken.value,
+          {
+            street_line_1: pendingAddress.street_line_1,
+            street_line_2: pendingAddress.street_line_2,
+            postal_code: pendingAddress.postal_code,
+            city: pendingAddress.city,
+            state: pendingAddress.state,
+            country_code: pendingAddress.country_code,
+          },
+        );
+        await updateSubcontractor(resolvedTenantScopeId.value, created.id, accessToken.value, {
+          address_id: persistedAddress.id,
+          version_no: created.version_no,
+        });
+        pendingAddressOptionRows.value = [];
+      }
       await selectSubcontractor(created.id);
       setFeedback("success", "sicherplan.subcontractors.feedback.saved");
     } else if (selectedSubcontractorId.value) {
@@ -1509,10 +1615,25 @@ function closeAddressCreateModal() {
 }
 
 async function submitAddressOption() {
-  if (!resolvedTenantScopeId.value || !accessToken.value || !selectedSubcontractorId.value) {
+  if (!resolvedTenantScopeId.value || !accessToken.value) {
     return;
   }
   try {
+    if (!selectedSubcontractorId.value) {
+      const pendingAddress = {
+        id: createPendingAddressOptionId(),
+        street_line_1: addressDraft.street_line_1.trim(),
+        street_line_2: serializeNullable(addressDraft.street_line_2),
+        postal_code: addressDraft.postal_code.trim(),
+        city: addressDraft.city.trim(),
+        state: serializeNullable(addressDraft.state),
+        country_code: addressDraft.country_code.trim().toUpperCase(),
+      };
+      pendingAddressOptionRows.value = [...pendingAddressOptionRows.value, pendingAddress];
+      subcontractorDraft.address_id = pendingAddress.id;
+      closeAddressCreateModal();
+      return;
+    }
     const created = await createSubcontractorAddressOption(
       resolvedTenantScopeId.value,
       selectedSubcontractorId.value,
@@ -1774,6 +1895,19 @@ function fileToBase64(file: File) {
     reader.readAsDataURL(file);
   });
 }
+
+watch(
+  () => scopeDraft.branch_id,
+  () => {
+    if (!scopeDraft.mandate_id) {
+      return;
+    }
+    const mandateStillValid = scopeMandateOptions.value.some((mandate) => mandate.id === scopeDraft.mandate_id);
+    if (!mandateStillValid) {
+      scopeDraft.mandate_id = "";
+    }
+  },
+);
 
 onMounted(async () => {
   if (!authStore.tenantScopeId && authStore.sessionUser?.tenant_id) {

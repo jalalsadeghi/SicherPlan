@@ -1,116 +1,93 @@
-You are working in the public repo `jalalsadeghi/SicherPlan`.
-
-Important working-mode rule:
-Treat the current local working tree as the source of truth.
-The public `main` repo still shows an older subcontractor UI, but the current local working tree already contains a `Create address` control in Subcontractors → Overview.
-Do NOT ignore the local implementation state.
-Inspect the live working tree first, then fix the broken behavior and layout.
+You are working in the LOCAL working tree of `jalalsadeghi/SicherPlan`.
 
 Task:
-Fix the `Create address` behavior and layout in `/admin/subcontractors` → `Overview`.
+Fix the `Operational scope` form in `/admin/subcontractors` → `Scope Release` so that:
+- `Branch`
+- `Mandate`
+are rendered as proper select controls, not raw textboxes.
 
-Reported problems:
-1. Clicking `Create address` currently does nothing.
-2. The layout should be improved so that:
-   - `Primary address` becomes slightly narrower
-   - `Create address` sits beside it
-   - together, both controls occupy roughly the current width of the existing `Primary address` field
-   - the form layout stays clean and aligned
+Why this is needed:
+- In the current Subcontractors Scope form, `branch_id` and `mandate_id` are exposed as text inputs.
+- These are reference/entity ids, not user-friendly free-text fields.
+- Elsewhere in the project, the same kind of data is already handled correctly as selects (for example in Employee admin for branch/mandate).
 
-Business context:
-Subcontractor master data should support a real address workflow.
-A dead `Create address` button is misleading and must be fixed.
-The address UX should also remain visually tidy and practical for operator data entry.
+Important rule:
+Do NOT hardcode branch or mandate options.
+Use the real branch/mandate source already available in the project.
 
 What to inspect first:
-1. The current LOCAL working tree version of:
+1. The LOCAL working-tree version of:
    - `web/apps/web-antd/src/sicherplan-legacy/views/SubcontractorAdminView.vue`
-2. Any newly added local state / methods / modal code related to:
-   - `Create address`
-   - address selection
-   - primary address
-3. Existing address-management patterns already implemented elsewhere in the app, especially:
-   - employee address handling in `EmployeeAdminView.vue`
-   - any customer or other address editor/modal patterns
-4. Current subcontractor API support:
-   - whether a real address create/link flow already exists in the current repo or local working tree
-   - whether the button is intended to open a modal/editor/select flow
+2. The current subcontractor scope API contract:
+   - `web/apps/web-antd/src/sicherplan-legacy/api/subcontractors.ts`
+3. Existing working branch/mandate selection patterns elsewhere in the app, especially:
+   - `web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue`
+4. Any shared branch/mandate loaders/helpers already used there, such as:
+   - branch list loading
+   - mandate list loading
+   - mandate filtering by selected branch
+   - structure-label formatting
 
-Critical rule:
-Do NOT leave the button as a dead control.
-If the backend/local API support exists, wire it fully.
-If support does NOT exist yet, the button must not remain clickable without action.
-In that fallback case, replace it with the safest temporary behavior:
-- disabled with explanation
-or
-- hidden
-But only if real implementation is impossible in the current working tree.
+Required implementation:
+1. Replace the raw `Branch` textbox with a select control backed by real branch options
+2. Replace the raw `Mandate` textbox with a select control backed by real mandate options
+3. Load the available branch/mandate options from the existing source already used in the app
+4. Keep the submitted payload unchanged:
+   - still submit `branch_id`
+   - still submit `mandate_id`
+5. Preserve edit mode:
+   - existing saved values must be shown correctly
+6. Filter mandate options by selected branch if that is the existing app pattern
+7. If the selected branch changes and the current mandate is no longer valid, clear the mandate safely
+8. If lookup loading fails, show a safe empty/disabled state rather than a broken control
 
-Preferred implementation direction:
-A. Functional fix
-- Make `Create address` actually open the intended address creation flow
-- Prefer reusing an existing address editor pattern already present in the project
-- If employee/customer address editor exists and is suitable, adapt/reuse it
-- On successful address creation, make sure the new address becomes available to the subcontractor form and can be used as the primary address
+Preferred implementation strategy:
+A. Reuse the Employee/Admin branch+mandate loading pattern
+- do not invent a second inconsistent implementation
+- reuse or extract common helpers if needed
 
-B. Layout fix
-- Create a local layout wrapper specifically for:
-  - `Primary address`
-  - `Create address`
-- Do NOT hack global form spacing
-- Use a small grid/flex layout so:
-  - the address field takes most of the width
-  - the button takes the remaining width
-  - together they visually match one normal wide field row
-- Keep it responsive and clean on narrower screens
+B. Keep the change local
+- only fix the subcontractor scope controls and minimal supporting lookup state
+- do not redesign the entire page
 
-Expected UX result:
-- Clicking `Create address` produces a visible action
-- The user can create/select an address without confusion
-- The overview form remains visually balanced
-- `Primary address` + `Create address` appear as one coherent input/action row
+C. UX consistency
+- branch select should show user-friendly labels
+- mandate select should show user-friendly labels
+- mandate select should behave consistently with selected branch context
 
 Important constraints:
-- Do NOT redesign the whole Overview form
-- Do NOT make raw `address_id` entry the main UX if a better address flow is already intended
-- Keep the patch focused on the address control and its layout
-- Reuse existing project patterns where possible
-
-Validation requirements:
-After implementing, verify:
-1. `Create address` no longer does nothing
-2. Clicking it opens the intended address flow
-3. The resulting address can populate or link back into the subcontractor overview form
-4. `Primary address` and `Create address` now sit side-by-side cleanly
-5. The layout does not break the rest of the form
-6. Responsive layout remains acceptable
+- Do NOT change backend API contracts
+- Do NOT fall back to raw textboxes
+- Do NOT hardcode fake options
+- Keep the patch focused and maintainable
 
 Testing requirements:
-Add or update focused tests for the subcontractor overview address controls.
-At minimum verify:
-1. the `Create address` button is wired to a real action
-2. clicking it opens the modal/editor/flow
-3. successful address creation updates the overview form state
-4. the new address row wrapper/class exists and is scoped locally
-5. no regression to other overview fields
+Add/update tests to verify:
+1. `Branch` is no longer rendered as a textbox in the subcontractor scope form
+2. `Mandate` is no longer rendered as a textbox in the subcontractor scope form
+3. both fields render as selects
+4. selecting a branch updates `scopeDraft.branch_id`
+5. selecting a mandate updates `scopeDraft.mandate_id`
+6. mandate options are filtered by branch if that behavior is implemented
+7. existing saved scope values still render correctly in edit mode
+8. save payload still submits the correct ids
 
 Acceptance criteria:
-- `Create address` is functional
-- the layout is visually correct
-- the patch is local and maintainable
-- dead UI behavior is removed
+- Branch and Mandate in Subcontractors → Scope Release → Operational scope are now selects
+- They use real project data sources
+- The UX is no longer raw-id based
+- Existing create/edit scope behavior remains intact
 
 At the end, provide a concise validation report with these headings:
-1. Why the button was non-functional
-2. Which files were changed
-3. What address flow is now triggered
-4. How the overview form receives the created address
-5. How the `Primary address` + `Create address` layout was fixed
+1. What was wrong before
+2. Which file(s) were changed
+3. Which branch/mandate source was reused
+4. How the two fields now behave in create/edit mode
+5. Whether mandate filtering by branch was implemented
 6. Which tests were updated or added
-7. Any remaining address-management limitations you recommend addressing next
 
 Before coding, explicitly answer:
-- What exact local code currently renders the `Create address` button?
-- Why does its click currently do nothing?
-- Is there already a reusable address editor flow in the codebase, or must one be extracted/adapted?
-Then implement the safest fix.
+- Where is the existing branch/mandate select pattern already implemented in the repo?
+- Which source provides the branch and mandate options there?
+- Can that same source be reused directly in Subcontractors?
+Then implement the safest consistent fix.
