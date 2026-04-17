@@ -406,10 +406,14 @@
       "displayName": "Anzeigename",
       "legalFormLookupId": "Rechtsform",
       "legalFormPlaceholder": "Rechtsform auswählen",
+      "legalFormEmptyHint": "Keine Rechtsformen verfügbar. Bitte Referenzdaten prüfen.",
       "statusLookupId": "Partnerstatus",
       "statusPlaceholder": "Partnerstatus auswählen",
       "managingDirectorName": "Geschäftsführung",
-      "addressId": "Adress-ID",
+      "addressId": "Adresse",
+      "addressPlaceholder": "Adresse auswählen",
+      "addressEmptyPlaceholder": "Adresse anlegen",
+      "addressEmptyHint": "Es ist noch keine Adresse verfügbar. Legen Sie zuerst eine Adresse an.",
       "latitude": "Breitengrad",
       "longitude": "Längengrad",
       "notes": "Notizen",
@@ -419,7 +423,12 @@
       "contactEmail": "E-Mail",
       "contactPhone": "Telefon",
       "contactMobile": "Mobil",
-      "contactUserId": "Benutzerkonto-ID",
+      "contactUserId": "Portalbenutzer",
+      "contactUserSearch": "Portalbenutzer suchen",
+      "contactUserSearchPlaceholder": "Name, Benutzername oder E-Mail",
+      "contactUserPlaceholder": "Benutzerkonto auswählen",
+      "contactUserEmptyPlaceholder": "Kein passendes Benutzerkonto gefunden",
+      "contactUserEmptyHint": "Für den aktuellen Filter wurde kein aktives Benutzerkonto gefunden.",
       "contactNotes": "Kontaktnotiz",
       "primaryContact": "Primärkontakt",
       "portalEnabled": "Portalzugang aktivieren",
@@ -493,6 +502,17 @@
         "lifecycle_event": "Lifecycle-Ereignis"
       }
     },
+    "addresses": {
+      "createModalEyebrow": "Adresse anlegen",
+      "createModalTitle": "Neue Adresse für Subunternehmer erfassen",
+      "createModalLead": "Erstellen Sie eine neue Adresse und verknüpfen Sie sie direkt mit dem Firmenprofil.",
+      "streetLine1": "Adresszeile 1",
+      "streetLine2": "Adresszeile 2",
+      "postalCode": "Postleitzahl",
+      "city": "Ort",
+      "state": "Bundesland / Region",
+      "countryCode": "Ländercode"
+    },
     "placeholders": {
       "addresses": {
         "eyebrow": "Adressverwaltung",
@@ -511,6 +531,7 @@
       "search": "Suchen",
       "clearFeedback": "Meldung schliessen",
       "newSubcontractor": "Neuer Subunternehmer",
+      "createAddress": "Adresse anlegen",
       "createSubcontractor": "Subunternehmer anlegen",
       "saveSubcontractor": "Subunternehmer speichern",
       "reset": "Firmenformular zurücksetzen",
@@ -527,7 +548,8 @@
       "attachHistoryDocument": "Anlage verknüpfen",
       "resetHistory": "Historienformular zurücksetzen",
       "archive": "Archivieren",
-      "reactivate": "Reaktivieren"
+      "reactivate": "Reaktivieren",
+      "cancel": "Abbrechen"
     },
     "confirm": {
       "archive": "Soll dieser Subunternehmer archiviert werden?",
@@ -682,6 +704,9 @@
       "primaryConflict": "Es darf nur einen Primärkontakt pro Subunternehmer geben.",
       "duplicateUserLink": "Dieses Benutzerkonto ist bereits einem anderen Subunternehmerkontakt zugeordnet.",
       "portalUserRequired": "Portalaktivierung benötigt ein verknüpftes Benutzerkonto.",
+      "scopeInvalidWindow": "Das Gültigkeitsfenster der Scope-Zeile ist ungültig.",
+      "addressCreateValidation": "Bitte füllen Sie Straße, Postleitzahl, Ort und Ländercode aus.",
+      "addressSaved": "Adresse gespeichert.",
       "scopeOverlap": "Die Scope-Zeile überschneidet sich mit einer bestehenden Freigabe.",
       "scopeBranchMismatch": "Das angegebene Mandat gehört nicht zur gewählten Niederlassung.",
       "staleVersion": "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden und erneut speichern.",

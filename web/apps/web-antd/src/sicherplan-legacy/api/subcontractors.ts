@@ -292,6 +292,46 @@ export interface SubcontractorWorkerReadinessFilters extends SubcontractorWorker
   issue_severity?: string;
 }
 
+export interface SubcontractorEligibleUserOptionRead {
+  id: string;
+  username: string;
+  email: string;
+  full_name: string;
+  status: string;
+}
+
+export interface SubcontractorAvailableAddressRead {
+  id: string;
+  street_line_1: string;
+  street_line_2: string | null;
+  postal_code: string;
+  city: string;
+  state: string | null;
+  country_code: string;
+}
+
+export interface SubcontractorAvailableAddressCreatePayload {
+  street_line_1: string;
+  street_line_2?: string | null;
+  postal_code: string;
+  city: string;
+  state?: string | null;
+  country_code: string;
+}
+
+export interface SubcontractorReferenceOptionRead {
+  id: string;
+  code: string;
+  label: string;
+  description: string | null;
+  status: string;
+  archived_at: string | null;
+}
+
+export interface SubcontractorReferenceDataRead {
+  legal_forms: SubcontractorReferenceOptionRead[];
+}
+
 interface ApiErrorEnvelope {
   error: {
     code: string;
@@ -408,6 +448,13 @@ export function listSubcontractors(tenantId: string, accessToken: string, params
   return request<SubcontractorListItem[]>(`/api/subcontractors/tenants/${tenantId}/subcontractors${buildQuery(params)}`, accessToken);
 }
 
+export function getSubcontractorReferenceData(tenantId: string, accessToken: string) {
+  return request<SubcontractorReferenceDataRead>(
+    `/api/subcontractors/tenants/${tenantId}/subcontractors/reference-data`,
+    accessToken,
+  );
+}
+
 export function getSubcontractor(tenantId: string, subcontractorId: string, accessToken: string) {
   return request<SubcontractorRead>(`/api/subcontractors/tenants/${tenantId}/subcontractors/${subcontractorId}`, accessToken);
 }
@@ -417,6 +464,40 @@ export function createSubcontractor(tenantId: string, accessToken: string, paylo
     method: "POST",
     body: payload,
   });
+}
+
+export function listSubcontractorContactUserOptions(
+  tenantId: string,
+  accessToken: string,
+  params: { search?: string; limit?: number } = {},
+) {
+  const query = new URLSearchParams();
+  if (params.search?.trim()) {
+    query.set("search", params.search.trim());
+  }
+  if (params.limit) {
+    query.set("limit", String(params.limit));
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<SubcontractorEligibleUserOptionRead[]>(
+    `/api/subcontractors/tenants/${tenantId}/subcontractors/contact-user-options${suffix}`,
+    accessToken,
+  );
+}
+
+export function createSubcontractorAvailableAddress(
+  tenantId: string,
+  accessToken: string,
+  payload: SubcontractorAvailableAddressCreatePayload,
+) {
+  return request<SubcontractorAvailableAddressRead>(
+    `/api/subcontractors/tenants/${tenantId}/subcontractors/address-options`,
+    accessToken,
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
 }
 
 export function updateSubcontractor(

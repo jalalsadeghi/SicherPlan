@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.modules.core.schemas import AddressRead
+from app.modules.core.schemas import AddressCreate, AddressRead
 
 
 class SubcontractorFilter(BaseModel):
@@ -114,6 +114,31 @@ class SubcontractorContactRead(BaseModel):
     status: str
     archived_at: datetime | None
     version_no: int
+
+
+class SubcontractorEligibleUserOptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    username: str
+    email: str
+    full_name: str
+    status: str
+
+
+class SubcontractorReferenceOptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    code: str
+    label: str
+    description: str | None
+    status: str
+    archived_at: datetime | None
+
+
+class SubcontractorReferenceDataRead(BaseModel):
+    legal_forms: list[SubcontractorReferenceOptionRead] = Field(default_factory=list)
 
 
 class SubcontractorScopeCreate(BaseModel):
