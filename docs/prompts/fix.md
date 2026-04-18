@@ -1,49 +1,70 @@
-You are working in the jalalsadeghi/SicherPlan repository.
+You have already implemented the new customer Plans tab in the SicherPlan repository.
 
-Task:
-Make the “Latest plans” list in the customer dashboard visually easier to scan by giving each plan status a colored badge/chip/tag based on its real status.
+Now do a focused hardening + validation pass.
 
-Before coding:
-- Validate what latest_plans[].status actually represents in the current backend contract (for example release_state or another canonical planning status).
-- Inspect whether the repo already has a reusable status->color helper/pattern for planning/order/dashboard lists. Reuse it if it exists; otherwise add a very small local helper.
-- Summarize the validated status mapping before coding.
+IMPORTANT:
+First validate the implementation against the current checked-out branch, not against assumptions from GitHub main.
+Explicitly verify whether the final implementation matches the following proposal:
+- tab id is `plans`
+- tab placement is immediately after Portal and before History
+- same /admin/customers route + query-tab contract is preserved
+- the chosen "plan" source is the correct canonical entity for this branch
+- search is truthful
+- sorting is truthful
+- color semantics are validated against actual serialized values
 
-Relevant files to inspect first:
-- web/apps/web-antd/src/sicherplan-legacy/components/customers/CustomerDashboardTab.vue
-- backend/app/modules/customers/dashboard_service.py
-- any existing status badge/helper pattern in:
-  - web/apps/web-antd/src/views/sicherplan/dashboard/index.vue
-  - planning/order-related views if they already color statuses
+Scope:
+Do NOT add unrelated features.
+Only fix correctness, UX, typing, data-contract, and maintainability issues around the Plans tab.
 
-Desired outcome:
-- Each latest plan row should show a small status badge/tag with consistent color semantics.
-- The rest of the row layout should stay compact and readable.
+Validation and hardening checklist:
 
-Implementation rules:
-- Prefer Ant Design Tag or the nearest existing badge pattern already used in this repo.
-- Map only real statuses that the backend actually returns.
-- Suggested truthful mapping after validation:
-  - released / approved / confirmed -> success / teal/green
-  - draft / pending -> warning / gold
-  - cancelled / archived / rejected -> error / red
-  - unknown / fallback -> default / neutral
-- Do not hard-code statuses that do not exist in the current contract.
-- Keep the raw status text readable; do not replace it with icons only.
-- Keep row layout and click behavior unchanged.
-- Ensure the badge remains legible in dark mode.
-- Expose a stable class/data attribute for testing instead of asserting literal CSS colors.
+1. Domain correctness
+- Re-check whether "plan" in this branch is truly PlanningRecord or CustomerOrder.
+- If your first implementation picked the wrong domain object, correct it now and explain why.
+- Ensure the user-facing list and filters match the actual business meaning already used by the current branch.
 
-Tests:
-- status badge renders for populated latest plans
-- different statuses produce different tones
-- unknown status falls back safely
-- empty state unchanged
+2. Data truthfulness
+- Re-check that registration-date sorting is based on a real created_at field, not an approximation.
+- Re-check that execution-date sorting uses planning_from / planning_to (or the canonical equivalents if the branch uses orders).
+- Re-check that search uses the intended backend filter and not only client-side fuzzy filtering.
 
-Validation request:
-Before finalizing, compare your chosen status mapping against actual values produced by the current latest_plans serializer and explain any adjustment you made.
+3. Status and colors
+- Compare the status/display-state mapping against actual values returned by the real serializer in this branch.
+- Reuse existing repo color patterns where possible.
+- Ensure the colored card/row styles are subtle, accessible, and work in light + dark themes.
+- Expose stable classes or data attributes for testing. Do NOT make tests depend on literal CSS colors.
 
-Output:
-- chosen status mapping
+4. Routing and tab behavior
+- Deep-link `tab=plans` must work.
+- Switching between customers must not leave stale plan data behind.
+- Create mode must still hide the Plans tab.
+- Existing dashboard/overview/portal/history flows must not regress.
+
+5. Performance and DX
+- Ensure no N+1 detail fetching was introduced for the list.
+- If request caching exists, key it correctly by tenant + customer + search + sort.
+- Keep the component reasonably focused; extract tiny helpers/composables if needed, but avoid broad refactors.
+
+6. Permission safety
+- Re-verify that users without the canonical planning read permission cannot see plan data.
+- Ensure the customer workspace does not accidentally broaden access just because the tab sits under Customers.
+
+7. Tests
+Add/fix tests for:
+- permission-restricted state
+- no created_at regression
+- no stale results after switching customer
+- search debounce behavior
+- sort stability
+- unknown status fallback
+- no visual overflow on long titles
+- dark-mode legibility if the branch already has theme tests/patterns
+
+Deliverables:
+- short validation report comparing the final code to the proposal above
+- bug list of what you fixed in the hardening pass
 - changed files
 - test results
+- any real remaining limitation
 Avoid unrelated refactors.

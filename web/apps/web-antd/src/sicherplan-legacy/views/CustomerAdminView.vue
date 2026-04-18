@@ -201,6 +201,13 @@
             @select-tab="activeDetailTab = $event"
           />
 
+          <CustomerPlansTab
+            v-if="selectedCustomer && !isCreatingCustomer && canReadPlans && activeDetailTab === 'plans'"
+            :access-token="accessToken"
+            :customer-id="selectedCustomer.id"
+            :tenant-id="tenantScopeId"
+          />
+
           <section v-if="activeDetailTab === 'overview'" class="customer-admin-tab-panel" data-testid="customer-tab-panel-overview">
             <div v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-summary">
             <article class="customer-admin-summary__card">
@@ -2089,6 +2096,7 @@ import {
 import SicherPlanLoadingOverlay from "@/components/SicherPlanLoadingOverlay.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import CustomerDashboardTab from "@/components/customers/CustomerDashboardTab.vue";
+import CustomerPlansTab from "@/components/customers/CustomerPlansTab.vue";
 import {
   applySurchargeAmountMode,
   buildWeekdayMask,
@@ -2115,6 +2123,7 @@ import {
   validateRateLineDraft,
   validateSurchargeRuleDraft,
 } from "@/features/customers/customerCommercial.helpers.js";
+import { hasPlanningOrderPermission } from "@/features/planning/planningOrders.helpers.js";
 import {
   CUSTOMER_COMMERCIAL_TAB_ORDER,
   buildCustomerDetailTabs,
@@ -2403,6 +2412,7 @@ const canRead = computed(() => actionState.value.canRead);
 const canWrite = computed(() => actionState.value.canCreate);
 const canReadCommercial = computed(() => commercialActionState.value.canReadCommercial);
 const canWriteCommercial = computed(() => commercialActionState.value.canWriteCommercial);
+const canReadPlans = computed(() => hasPlanningOrderPermission(authStore.activeRole, "planning.record.read"));
 const tenantScopeId = computed(() => authStore.effectiveTenantScopeId);
 const accessToken = computed(() => authStore.effectiveAccessToken || authStore.accessToken);
 const isCustomerSessionResolving = computed(() => authStore.isSessionResolving);
@@ -2445,12 +2455,14 @@ const detailTabLabelKeys = {
   addresses: "customerAdmin.tabs.addresses",
   commercial: "customerAdmin.tabs.commercial",
   portal: "customerAdmin.tabs.portal",
+  plans: "customerAdmin.tabs.plans",
   history: "customerAdmin.tabs.history",
   employee_blocks: "customerAdmin.tabs.employeeBlocks",
 } as const;
 const customerDetailTabs = computed(() =>
   buildCustomerDetailTabs({
     canReadCommercial: canReadCommercial.value,
+    canReadPlans: canReadPlans.value,
     hasSelectedCustomer: !!selectedCustomer.value,
     isCreatingCustomer: isCreatingCustomer.value,
   }).map((tabId) => ({
@@ -3544,6 +3556,7 @@ async function selectCustomer(customerId: string, options: SelectCustomerOptions
       await refreshCustomerDashboard();
       activeDetailTab.value = normalizeCustomerDetailTab(desiredDetailTab, {
         canReadCommercial: canReadCommercial.value,
+        canReadPlans: canReadPlans.value,
         hasSelectedCustomer: !!selectedCustomer.value,
         isCreatingCustomer: isCreatingCustomer.value,
       });
@@ -3562,6 +3575,7 @@ async function selectCustomer(customerId: string, options: SelectCustomerOptions
       await refreshCustomerPortalAccess();
       activeDetailTab.value = normalizeCustomerDetailTab(activeDetailTab.value || options.fallbackDetailTab || "dashboard", {
         canReadCommercial: canReadCommercial.value,
+        canReadPlans: canReadPlans.value,
         hasSelectedCustomer: !!selectedCustomer.value,
         isCreatingCustomer: isCreatingCustomer.value,
       });
@@ -4865,6 +4879,7 @@ watch(
     if (selectedCustomer.value?.id === nextContext.customerId) {
       activeDetailTab.value = normalizeCustomerDetailTab(nextContext.detailTab || activeDetailTab.value, {
         canReadCommercial: canReadCommercial.value,
+        canReadPlans: canReadPlans.value,
         hasSelectedCustomer: !!selectedCustomer.value,
         isCreatingCustomer: isCreatingCustomer.value,
       });
@@ -4880,10 +4895,11 @@ watch(
 );
 
 watch(
-  () => [selectedCustomer.value?.id ?? "", isCreatingCustomer.value, canReadCommercial.value],
+  () => [selectedCustomer.value?.id ?? "", isCreatingCustomer.value, canReadCommercial.value, canReadPlans.value],
   () => {
     activeDetailTab.value = normalizeCustomerDetailTab(activeDetailTab.value, {
       canReadCommercial: canReadCommercial.value,
+      canReadPlans: canReadPlans.value,
       hasSelectedCustomer: !!selectedCustomer.value,
       isCreatingCustomer: isCreatingCustomer.value,
     });

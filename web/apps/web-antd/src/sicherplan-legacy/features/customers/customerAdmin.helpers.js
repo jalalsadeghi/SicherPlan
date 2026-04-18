@@ -20,6 +20,7 @@ export const CUSTOMER_DETAIL_TAB_ORDER = [
   "addresses",
   "commercial",
   "portal",
+  "plans",
   "history",
   "employee_blocks",
 ];
@@ -192,7 +193,7 @@ export function resolveCustomerCancelSelection(previousSelectedCustomer) {
     : { isCreatingCustomer: false, selectedCustomerId: "", selectedCustomer: null };
 }
 
-export function buildCustomerDetailTabs({ canReadCommercial, hasSelectedCustomer, isCreatingCustomer }) {
+export function buildCustomerDetailTabs({ canReadCommercial, canReadPlans, hasSelectedCustomer, isCreatingCustomer }) {
   if (isCreatingCustomer) {
     return ["overview"];
   }
@@ -201,7 +202,15 @@ export function buildCustomerDetailTabs({ canReadCommercial, hasSelectedCustomer
     return [];
   }
 
-  return CUSTOMER_DETAIL_TAB_ORDER.filter((tabId) => tabId !== "commercial" || !!canReadCommercial);
+  return CUSTOMER_DETAIL_TAB_ORDER.filter((tabId) => {
+    if (tabId === "commercial") {
+      return !!canReadCommercial;
+    }
+    if (tabId === "plans") {
+      return !!canReadPlans;
+    }
+    return true;
+  });
 }
 
 export function normalizeCustomerDetailTab(activeTab, options) {

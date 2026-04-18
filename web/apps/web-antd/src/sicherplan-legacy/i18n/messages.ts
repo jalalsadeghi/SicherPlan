@@ -1238,8 +1238,33 @@ export type MessageKey =
   | "customerAdmin.tabs.addresses"
   | "customerAdmin.tabs.commercial"
   | "customerAdmin.tabs.portal"
+  | "customerAdmin.tabs.plans"
   | "customerAdmin.tabs.history"
   | "customerAdmin.tabs.employeeBlocks"
+  | "customerAdmin.plans.eyebrow"
+  | "customerAdmin.plans.title"
+  | "customerAdmin.plans.searchPlaceholder"
+  | "customerAdmin.plans.sortLabel"
+  | "customerAdmin.plans.sort.createdAtDesc"
+  | "customerAdmin.plans.sort.createdAtAsc"
+  | "customerAdmin.plans.sort.executionStartDesc"
+  | "customerAdmin.plans.sort.executionStartAsc"
+  | "customerAdmin.plans.sort.executionEndDesc"
+  | "customerAdmin.plans.sort.executionEndAsc"
+  | "customerAdmin.plans.sort.releaseDateDesc"
+  | "customerAdmin.plans.sort.releaseDateAsc"
+  | "customerAdmin.plans.sort.status"
+  | "customerAdmin.plans.emptyTitle"
+  | "customerAdmin.plans.emptyBody"
+  | "customerAdmin.plans.errorTitle"
+  | "customerAdmin.plans.errorBody"
+  | "customerAdmin.plans.displayState.archived"
+  | "customerAdmin.plans.displayState.upcoming"
+  | "customerAdmin.plans.displayState.inProgress"
+  | "customerAdmin.plans.displayState.completed"
+  | "customerAdmin.plans.registrationDate"
+  | "customerAdmin.plans.releaseDate"
+  | "customerAdmin.plans.rawReleaseState"
   | "customerAdmin.dashboard.kpis.tenure"
   | "customerAdmin.dashboard.kpis.plans"
   | "customerAdmin.dashboard.kpis.finance"
@@ -3253,8 +3278,33 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.tabs.addresses": "Adressen",
     "customerAdmin.tabs.commercial": "Commercial",
     "customerAdmin.tabs.portal": "Portal",
+    "customerAdmin.tabs.plans": "Pläne",
     "customerAdmin.tabs.history": "Historie",
     "customerAdmin.tabs.employeeBlocks": "Mitarbeitersperren",
+    "customerAdmin.plans.eyebrow": "Planung",
+    "customerAdmin.plans.title": "Kundenpläne",
+    "customerAdmin.plans.searchPlaceholder": "Planname oder Auftragsnummer suchen",
+    "customerAdmin.plans.sortLabel": "Sortierung",
+    "customerAdmin.plans.sort.createdAtDesc": "Registrierungsdatum absteigend",
+    "customerAdmin.plans.sort.createdAtAsc": "Registrierungsdatum aufsteigend",
+    "customerAdmin.plans.sort.executionStartDesc": "Ausführungsstart absteigend",
+    "customerAdmin.plans.sort.executionStartAsc": "Ausführungsstart aufsteigend",
+    "customerAdmin.plans.sort.executionEndDesc": "Ausführungsende absteigend",
+    "customerAdmin.plans.sort.executionEndAsc": "Ausführungsende aufsteigend",
+    "customerAdmin.plans.sort.releaseDateDesc": "Freigabedatum absteigend",
+    "customerAdmin.plans.sort.releaseDateAsc": "Freigabedatum aufsteigend",
+    "customerAdmin.plans.sort.status": "Status",
+    "customerAdmin.plans.emptyTitle": "Keine Pläne gefunden",
+    "customerAdmin.plans.emptyBody": "Für diesen Kunden liegen aktuell keine passenden Planungsstände vor.",
+    "customerAdmin.plans.errorTitle": "Pläne konnten nicht geladen werden",
+    "customerAdmin.plans.errorBody": "Die kundenbezogenen Planungsstände sind derzeit nicht verfügbar.",
+    "customerAdmin.plans.displayState.archived": "Archiviert",
+    "customerAdmin.plans.displayState.upcoming": "Bevorstehend",
+    "customerAdmin.plans.displayState.inProgress": "In Ausführung",
+    "customerAdmin.plans.displayState.completed": "Abgeschlossen",
+    "customerAdmin.plans.registrationDate": "Registriert",
+    "customerAdmin.plans.releaseDate": "Freigegeben",
+    "customerAdmin.plans.rawReleaseState": "Release-Status",
     "customerAdmin.dashboard.kpis.tenure": "Kundendauer",
     "customerAdmin.dashboard.kpis.plans": "Pläne gesamt",
     "customerAdmin.dashboard.kpis.finance": "Realisierter Vertragswert",
@@ -5336,8 +5386,33 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.tabs.addresses": "Addresses",
     "customerAdmin.tabs.commercial": "Commercial",
     "customerAdmin.tabs.portal": "Portal",
+    "customerAdmin.tabs.plans": "Plans",
     "customerAdmin.tabs.history": "History",
     "customerAdmin.tabs.employeeBlocks": "Employee blocks",
+    "customerAdmin.plans.eyebrow": "Planning",
+    "customerAdmin.plans.title": "Customer plans",
+    "customerAdmin.plans.searchPlaceholder": "Search by plan name or order number",
+    "customerAdmin.plans.sortLabel": "Sort",
+    "customerAdmin.plans.sort.createdAtDesc": "Registration date desc",
+    "customerAdmin.plans.sort.createdAtAsc": "Registration date asc",
+    "customerAdmin.plans.sort.executionStartDesc": "Execution start desc",
+    "customerAdmin.plans.sort.executionStartAsc": "Execution start asc",
+    "customerAdmin.plans.sort.executionEndDesc": "Execution end desc",
+    "customerAdmin.plans.sort.executionEndAsc": "Execution end asc",
+    "customerAdmin.plans.sort.releaseDateDesc": "Release date desc",
+    "customerAdmin.plans.sort.releaseDateAsc": "Release date asc",
+    "customerAdmin.plans.sort.status": "Status",
+    "customerAdmin.plans.emptyTitle": "No plans found",
+    "customerAdmin.plans.emptyBody": "No matching planning records are currently available for this customer.",
+    "customerAdmin.plans.errorTitle": "Plans could not be loaded",
+    "customerAdmin.plans.errorBody": "Customer planning records are currently unavailable.",
+    "customerAdmin.plans.displayState.archived": "Archived",
+    "customerAdmin.plans.displayState.upcoming": "Upcoming",
+    "customerAdmin.plans.displayState.inProgress": "In progress",
+    "customerAdmin.plans.displayState.completed": "Completed",
+    "customerAdmin.plans.registrationDate": "Registered",
+    "customerAdmin.plans.releaseDate": "Released",
+    "customerAdmin.plans.rawReleaseState": "Release state",
     "customerAdmin.dashboard.kpis.tenure": "Customer tenure",
     "customerAdmin.dashboard.kpis.plans": "Total plans",
     "customerAdmin.dashboard.kpis.finance": "Realized contract amount",

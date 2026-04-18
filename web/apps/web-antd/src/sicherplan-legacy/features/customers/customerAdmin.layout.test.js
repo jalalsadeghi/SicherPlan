@@ -84,10 +84,16 @@ test("customer same-record reloads preserve nested tab context with safe fallbac
 
 test("existing customers default to dashboard while create mode stays on overview", () => {
   assert.match(source, /import CustomerDashboardTab from "@\/components\/customers\/CustomerDashboardTab\.vue"/);
+  assert.match(source, /import CustomerPlansTab from "@\/components\/customers\/CustomerPlansTab\.vue"/);
   assert.match(source, /dashboard:\s*"customerAdmin\.tabs\.dashboard"/);
+  assert.match(source, /plans:\s*"customerAdmin\.tabs\.plans"/);
   assert.match(
     source,
     /<CustomerDashboardTab[\s\S]*v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'dashboard'"/,
+  );
+  assert.match(
+    source,
+    /<CustomerPlansTab[\s\S]*v-if="selectedCustomer && !isCreatingCustomer && canReadPlans && activeDetailTab === 'plans'"/,
   );
   assert.match(source, /customerDashboard = ref<CustomerDashboardRead \| null>\(null\)/);
   assert.match(source, /customerDashboardError = ref\(""\)/);
@@ -110,6 +116,12 @@ test("dashboard quick actions reuse existing tab and create handlers", () => {
   assert.match(source, /:can-manage-contacts="actionState\.canManageContacts"/);
   assert.match(source, /:tenant-id="tenantScopeId"/);
   assert.match(source, /:access-token="accessToken"/);
+});
+
+test("plans tab is inserted after portal and before history with planning-record permission gating", () => {
+  assert.match(source, /const canReadPlans = computed\(\(\) => hasPlanningOrderPermission\(authStore\.activeRole, "planning\.record\.read"\)\)/);
+  assert.match(source, /buildCustomerDetailTabs\(\{[\s\S]*canReadCommercial: canReadCommercial\.value,[\s\S]*canReadPlans: canReadPlans\.value,/);
+  assert.match(source, /portal:\s*"customerAdmin\.tabs\.portal",[\s\S]*plans:\s*"customerAdmin\.tabs\.plans",[\s\S]*history:\s*"customerAdmin\.tabs\.history"/);
 });
 
 test("create-mode cancel restores the selected customer through the dashboard default path", () => {

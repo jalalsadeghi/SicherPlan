@@ -833,6 +833,7 @@ class PlanningRecordListItem(BaseModel):
     planning_to: date
     release_state: str
     released_at: datetime | None
+    created_at: datetime
     status: str
     version_no: int
 

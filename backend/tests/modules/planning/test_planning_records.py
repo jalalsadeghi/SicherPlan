@@ -469,6 +469,7 @@ class PlanningRecordServiceTests(unittest.TestCase):
         )
         self.assertEqual(row.release_state, "release_ready")
         self.assertEqual(len(filtered), 1)
+        self.assertIsNotNone(filtered[0].created_at)
 
     def test_update_site_record_persists_scalar_and_site_detail_without_relationship_crash(self) -> None:
         created = self.service.create_planning_record(

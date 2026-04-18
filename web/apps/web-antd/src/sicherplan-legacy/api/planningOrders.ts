@@ -94,6 +94,7 @@ export interface PlanningRecordListItem {
   planning_to: string;
   release_state: string;
   released_at: string | null;
+  created_at: string;
   status: string;
   version_no: number;
 }
