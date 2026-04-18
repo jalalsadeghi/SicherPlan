@@ -120,8 +120,12 @@ test("dashboard quick actions reuse existing tab and create handlers", () => {
 
 test("plans tab is inserted after portal and before history with planning-record permission gating", () => {
   assert.match(source, /const canReadPlans = computed\(\(\) => hasPlanningOrderPermission\(authStore\.activeRole, "planning\.record\.read"\)\)/);
+  assert.match(source, /const canStartCustomerPlanWizard = computed\(\(\) => authStore\.effectiveRole === "tenant_admin"\)/);
   assert.match(source, /buildCustomerDetailTabs\(\{[\s\S]*canReadCommercial: canReadCommercial\.value,[\s\S]*canReadPlans: canReadPlans\.value,/);
   assert.match(source, /portal:\s*"customerAdmin\.tabs\.portal",[\s\S]*plans:\s*"customerAdmin\.tabs\.plans",[\s\S]*history:\s*"customerAdmin\.tabs\.history"/);
+  assert.match(source, /:can-start-new-plan="canStartCustomerPlanWizard"/);
+  assert.match(source, /@start-new-plan="handleStartCustomerNewPlan"/);
+  assert.match(source, /name: "SicherPlanCustomerNewPlan",[\s\S]*customer_id: selectedCustomer\.value\.id/);
 });
 
 test("create-mode cancel restores the selected customer through the dashboard default path", () => {

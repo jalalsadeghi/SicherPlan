@@ -27,6 +27,19 @@ describe('sicherplan route authority', () => {
     ]);
   });
 
+  it('adds the hidden customer new-plan wizard route for tenant admins only', () => {
+    const customersSection = sicherplanRoutes.find(
+      (route) => route.name === 'SicherPlanCustomersSection',
+    );
+    const newPlanRoute = customersSection?.children?.find(
+      (route) => route.name === 'SicherPlanCustomerNewPlan',
+    );
+
+    expect(newPlanRoute?.path).toBe('/admin/customers/new-plan');
+    expect(newPlanRoute?.meta?.authority).toEqual(['tenant_admin']);
+    expect(newPlanRoute?.meta?.hideInMenu).toBe(true);
+  });
+
   it('splits the customer portal into explicit child routes', () => {
     const portalSection = sicherplanRoutes.find(
       (route) => route.name === 'SicherPlanPortal',

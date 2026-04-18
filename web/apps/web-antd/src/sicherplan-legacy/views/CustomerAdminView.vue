@@ -204,8 +204,10 @@
           <CustomerPlansTab
             v-if="selectedCustomer && !isCreatingCustomer && canReadPlans && activeDetailTab === 'plans'"
             :access-token="accessToken"
+            :can-start-new-plan="canStartCustomerPlanWizard"
             :customer-id="selectedCustomer.id"
             :tenant-id="tenantScopeId"
+            @start-new-plan="handleStartCustomerNewPlan"
           />
 
           <section v-if="activeDetailTab === 'overview'" class="customer-admin-tab-panel" data-testid="customer-tab-panel-overview">
@@ -2413,6 +2415,7 @@ const canWrite = computed(() => actionState.value.canCreate);
 const canReadCommercial = computed(() => commercialActionState.value.canReadCommercial);
 const canWriteCommercial = computed(() => commercialActionState.value.canWriteCommercial);
 const canReadPlans = computed(() => hasPlanningOrderPermission(authStore.activeRole, "planning.record.read"));
+const canStartCustomerPlanWizard = computed(() => authStore.effectiveRole === "tenant_admin");
 const tenantScopeId = computed(() => authStore.effectiveTenantScopeId);
 const accessToken = computed(() => authStore.effectiveAccessToken || authStore.accessToken);
 const isCustomerSessionResolving = computed(() => authStore.isSessionResolving);
@@ -3391,6 +3394,18 @@ function handleDashboardCreateContact() {
 function handleDashboardCreateInvoiceParty() {
   activeDetailTab.value = "commercial";
   startCreateInvoiceParty();
+}
+
+function handleStartCustomerNewPlan() {
+  if (!selectedCustomer.value || !canStartCustomerPlanWizard.value) {
+    return;
+  }
+  void router.push({
+    name: "SicherPlanCustomerNewPlan",
+    query: {
+      customer_id: selectedCustomer.value.id,
+    },
+  });
 }
 
 function startCreateRateCard() {

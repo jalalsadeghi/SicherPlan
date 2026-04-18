@@ -1446,6 +1446,7 @@ export type MessageKey =
   | "customerAdmin.actions.search"
   | "customerAdmin.actions.exportCustomers"
   | "customerAdmin.actions.newCustomer"
+  | "customerAdmin.actions.newPlan"
   | "customerAdmin.actions.createCustomer"
   | "customerAdmin.actions.saveCustomer"
   | "customerAdmin.actions.cancel"
@@ -3499,6 +3500,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.search": "Suchen",
     "customerAdmin.actions.exportCustomers": "CSV-Export",
     "customerAdmin.actions.newCustomer": "Neuer Kunde",
+    "customerAdmin.actions.newPlan": "Neuer Plan",
     "customerAdmin.actions.createCustomer": "Kunden anlegen",
     "customerAdmin.actions.saveCustomer": "Kunde speichern",
     "customerAdmin.actions.cancel": "Abbrechen",
@@ -5607,6 +5609,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.search": "Search",
     "customerAdmin.actions.exportCustomers": "CSV export",
     "customerAdmin.actions.newCustomer": "New customer",
+    "customerAdmin.actions.newPlan": "New plan",
     "customerAdmin.actions.createCustomer": "Create customer",
     "customerAdmin.actions.saveCustomer": "Save customer",
     "customerAdmin.actions.cancel": "Cancel",

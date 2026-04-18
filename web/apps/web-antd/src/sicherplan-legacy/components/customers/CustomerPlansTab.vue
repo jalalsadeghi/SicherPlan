@@ -27,8 +27,13 @@ interface PlanListRow extends PlanningRecordListItem {
 
 const props = defineProps<{
   accessToken: string;
+  canStartNewPlan?: boolean;
   customerId: string;
   tenantId: string;
+}>();
+
+const emit = defineEmits<{
+  (event: "start-new-plan"): void;
 }>();
 
 const { t, locale } = useI18n();
@@ -302,30 +307,41 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="customer-plans-tab" data-testid="customer-tab-panel-plans">
-    <div class="customer-plans-tab__intro">
-      <div>
-        <p class="eyebrow">{{ t("customerAdmin.plans.eyebrow") }}</p>
-        <h3>{{ t("customerAdmin.plans.title") }}</h3>
+    <div class="customer-plans-tab__panel">
+      <div class="customer-plans-tab__header">
+        <div class="customer-plans-tab__intro">
+          <p class="eyebrow">{{ t("customerAdmin.plans.eyebrow") }}</p>
+          <h3>{{ t("customerAdmin.plans.title") }}</h3>
+        </div>
+        <button
+          v-if="canStartNewPlan"
+          class="cta-button"
+          type="button"
+          data-testid="customer-plans-new-plan"
+          @click="emit('start-new-plan')"
+        >
+          {{ t("customerAdmin.actions.newPlan") }}
+        </button>
       </div>
-    </div>
 
-    <div class="customer-plans-tab__controls">
-      <label class="field-stack field-stack--wide">
-        <span>{{ t("customerAdmin.filters.search") }}</span>
-        <input
-          v-model="searchInput"
-          :placeholder="t('customerAdmin.plans.searchPlaceholder')"
-          data-testid="customer-plans-search"
-        />
-      </label>
-      <label class="field-stack field-stack--half">
-        <span>{{ t("customerAdmin.plans.sortLabel") }}</span>
-        <select v-model="sortBy" data-testid="customer-plans-sort">
-          <option v-for="option in sortOptions" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </option>
-        </select>
-      </label>
+      <div class="customer-plans-tab__toolbar" data-testid="customer-plans-toolbar">
+        <label class="customer-plans-tab__field customer-plans-tab__field--search">
+          <span>{{ t("customerAdmin.filters.search") }}</span>
+          <input
+            v-model="searchInput"
+            :placeholder="t('customerAdmin.plans.searchPlaceholder')"
+            data-testid="customer-plans-search"
+          />
+        </label>
+        <label class="customer-plans-tab__field customer-plans-tab__field--sort">
+          <span>{{ t("customerAdmin.plans.sortLabel") }}</span>
+          <select v-model="sortBy" data-testid="customer-plans-sort">
+            <option v-for="option in sortOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
+      </div>
     </div>
 
     <div v-if="loading" class="customer-plans-tab__state" data-testid="customer-plans-loading">
@@ -381,10 +397,88 @@ onBeforeUnmount(() => {
   gap: 1rem;
 }
 
-.customer-plans-tab__controls {
+.customer-plans-tab__panel {
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(0, 1.4fr) minmax(14rem, 0.6fr);
+}
+
+.customer-plans-tab__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.customer-plans-tab__intro {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.customer-plans-tab__intro h3,
+.customer-plans-tab__intro p {
+  margin: 0;
+}
+
+.customer-plans-tab__toolbar {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  align-items: end;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 1rem;
+  background: var(--sp-color-surface-card);
+  box-shadow: var(--sp-shadow-card);
+}
+
+.customer-plans-tab__field {
+  display: grid;
+  gap: 0.42rem;
+  min-width: 0;
+  font-size: 0.9rem;
+}
+
+.customer-plans-tab__field--search {
+  min-width: 0;
+}
+
+.customer-plans-tab__field--sort {
+  justify-self: end;
+  width: min(100%, 22rem);
+}
+
+.customer-plans-tab__field span {
+  color: var(--sp-color-text-secondary);
+}
+
+.customer-plans-tab__field input,
+.customer-plans-tab__field select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-card);
+  color: var(--sp-color-text-primary);
+  padding: 0.78rem 0.9rem;
+  font: inherit;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.customer-plans-tab__field input::placeholder {
+  color: var(--sp-color-text-secondary);
+  opacity: 1;
+}
+
+.customer-plans-tab__field input:focus,
+.customer-plans-tab__field select:focus {
+  outline: none;
+  border-color: rgb(40 170 170 / 55%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
 }
 
 .customer-plans-tab__state {
@@ -462,8 +556,13 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 900px) {
-  .customer-plans-tab__controls {
+  .customer-plans-tab__toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .customer-plans-tab__field--sort {
+    justify-self: stretch;
+    width: 100%;
   }
 
   .customer-plans-tab__row-main {

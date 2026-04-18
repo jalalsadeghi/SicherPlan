@@ -97,6 +97,17 @@ const routes: RouteRecordRaw[] = [
           title: $t('sicherplan.admin.customers'),
         },
       },
+      {
+        name: 'SicherPlanCustomerNewPlan',
+        path: '/admin/customers/new-plan',
+        component: () => import('#/views/sicherplan/customers/new-plan.vue'),
+        meta: {
+          authority: ['tenant_admin'],
+          hideInMenu: true,
+          icon: 'lucide:square-pen',
+          title: $t('sicherplan.admin.customerNewPlan'),
+        },
+      },
     ],
   },
   {

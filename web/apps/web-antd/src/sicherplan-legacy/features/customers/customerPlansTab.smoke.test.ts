@@ -90,8 +90,33 @@ describe("CustomerPlansTab", () => {
     const wrapper = mountComponent();
     await flushPromises();
 
+    expect(wrapper.find('[data-testid="customer-plans-toolbar"]').exists()).toBe(true);
     expect(wrapper.text()).toContain("customerAdmin.plans.emptyTitle");
     expect(wrapper.text()).toContain("customerAdmin.plans.emptyBody");
+  });
+
+  it("renders the toolbar with search first and sort second", async () => {
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    const toolbar = wrapper.get('[data-testid="customer-plans-toolbar"]');
+    const fieldClasses = toolbar.findAll("label").map((node) => node.classes().join(" "));
+    expect(fieldClasses).toEqual([
+      "customer-plans-tab__field customer-plans-tab__field--search",
+      "customer-plans-tab__field customer-plans-tab__field--sort",
+    ]);
+  });
+
+  it("shows the New Plan entry point only when explicitly allowed and emits the action", async () => {
+    const wrapper = mountComponent({ canStartNewPlan: true });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-plans-new-plan"]').trigger("click");
+    expect(wrapper.emitted("start-new-plan")).toHaveLength(1);
+
+    const restrictedWrapper = mountComponent({ canStartNewPlan: false });
+    await flushPromises();
+    expect(restrictedWrapper.find('[data-testid="customer-plans-new-plan"]').exists()).toBe(false);
   });
 
   it("debounces search and sends server-backed planning-record filters", async () => {
