@@ -2612,6 +2612,7 @@ onMounted(() => {
       v-model:open="planningCreateModal.open"
       :confirm-loading="planningCreateModal.saving"
       :title="$t('sicherplan.customerPlansWizard.dialogs.planningCreateTitle')"
+      wrap-class-name="sp-customer-plan-wizard-modal"
       @ok="submitPlanningCreateModal"
       @cancel="resetPlanningCreateModal"
     >
@@ -2657,6 +2658,7 @@ onMounted(() => {
       v-model:open="templateModal.open"
       :confirm-loading="templateModal.saving"
       :title="$t('sicherplan.customerPlansWizard.dialogs.templateTitle')"
+      wrap-class-name="sp-customer-plan-wizard-modal"
       @ok="submitTemplateModal"
       @cancel="closeTemplateModal"
     >
@@ -2709,6 +2711,7 @@ onMounted(() => {
       v-model:open="equipmentModal.open"
       :confirm-loading="equipmentModal.saving"
       :title="$t('sicherplan.customerPlansWizard.dialogs.equipmentTitle')"
+      wrap-class-name="sp-customer-plan-wizard-modal"
       @ok="submitEquipmentModal"
       @cancel="resetEquipmentModal"
     >
@@ -2736,6 +2739,7 @@ onMounted(() => {
       v-model:open="requirementModal.open"
       :confirm-loading="requirementModal.saving"
       :title="$t('sicherplan.customerPlansWizard.dialogs.requirementTitle')"
+      wrap-class-name="sp-customer-plan-wizard-modal"
       @ok="submitRequirementModal"
       @cancel="resetRequirementModal"
     >
@@ -2775,18 +2779,95 @@ onMounted(() => {
 .sp-customer-plan-wizard-step__panel {
   display: grid;
   gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 1rem;
+  background: var(--sp-color-surface-card);
+  box-shadow: var(--sp-elevation-sm, 0 10px 30px rgb(15 23 42 / 0.06));
 }
 
 .sp-customer-plan-wizard-step__grid {
   display: grid;
   gap: 0.9rem;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  align-items: start;
 }
 
 .sp-customer-plan-wizard-step__toggle-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.9rem;
+}
+
+.field-stack {
+  display: grid;
+  gap: 0.42rem;
+  min-width: 0;
+  font-size: 0.92rem;
+}
+
+.field-stack span {
+  color: var(--sp-color-text-secondary);
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.field-stack input,
+.field-stack select,
+.field-stack textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0.78rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-page);
+  color: var(--sp-color-text-primary);
+  font: inherit;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.field-stack input[type='file'] {
+  padding: 0.68rem 0.9rem;
+  cursor: pointer;
+}
+
+.field-stack textarea {
+  min-height: 6.5rem;
+  resize: vertical;
+}
+
+.field-stack input:focus,
+.field-stack select:focus,
+.field-stack textarea:focus {
+  outline: none;
+  border-color: rgb(40 170 170 / 55%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
+.field-stack input:disabled,
+.field-stack select:disabled,
+.field-stack textarea:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+  background: color-mix(in srgb, var(--sp-color-surface-page) 72%, var(--sp-color-border-soft));
+}
+
+.field-stack--wide {
+  grid-column: 1 / -1;
+}
+
+.field-help {
+  margin: 0;
+  color: var(--sp-color-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .sp-customer-plan-wizard-step__list {
@@ -2796,13 +2877,45 @@ onMounted(() => {
 
 .sp-customer-plan-wizard-step__list-row {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   padding: 0.8rem 0.9rem;
   border: 1px solid var(--sp-color-border-soft);
-  border-radius: 0.85rem;
+  border-radius: 1rem;
   background: var(--sp-color-surface-page);
   text-align: left;
+  color: var(--sp-color-text-primary);
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.sp-customer-plan-wizard-step__list-row strong,
+.sp-customer-plan-wizard-step__list-row span {
+  min-width: 0;
+}
+
+.sp-customer-plan-wizard-step__list-row strong {
+  font-weight: 700;
+}
+
+.sp-customer-plan-wizard-step__list-row span {
+  color: var(--sp-color-text-secondary);
+  text-align: right;
+}
+
+.sp-customer-plan-wizard-step__list-row:not(.sp-customer-plan-wizard-step__list-row--static) {
+  cursor: pointer;
+}
+
+.sp-customer-plan-wizard-step__list-row:not(.sp-customer-plan-wizard-step__list-row--static):hover,
+.sp-customer-plan-wizard-step__list-row:not(.sp-customer-plan-wizard-step__list-row--static):focus-visible {
+  border-color: rgb(40 170 170 / 38%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 10%);
+  transform: translateY(-1px);
 }
 
 .sp-customer-plan-wizard-step__list-row--static {
@@ -2831,8 +2944,146 @@ onMounted(() => {
   background: var(--sp-color-border-soft);
 }
 
+.planning-admin-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  color: var(--sp-color-text-secondary);
+}
+
+.planning-admin-checkbox input[type='checkbox'],
+.planning-admin-checkbox input[type='radio'] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--sp-color-primary);
+  cursor: pointer;
+}
+
+.planning-admin-checkbox span {
+  font-weight: 500;
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.cta-button {
+  padding: 0.7rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sp-color-primary);
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.cta-button:hover,
+.cta-button:focus-visible {
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+  transform: translateY(-1px);
+}
+
+.cta-button.cta-secondary {
+  border: 1px solid var(--sp-color-border-soft);
+  background: transparent;
+  color: var(--sp-color-text-primary);
+}
+
+.cta-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .sp-customer-plan-wizard-step__modal {
   display: grid;
   gap: 0.85rem;
+}
+
+:deep(.sp-customer-plan-wizard-modal .field-stack) {
+  display: grid;
+  gap: 0.42rem;
+  min-width: 0;
+  font-size: 0.92rem;
+}
+
+:deep(.sp-customer-plan-wizard-modal .field-stack span) {
+  color: var(--sp-color-text-secondary);
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+:deep(.sp-customer-plan-wizard-modal .field-stack input),
+:deep(.sp-customer-plan-wizard-modal .field-stack select),
+:deep(.sp-customer-plan-wizard-modal .field-stack textarea) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0.78rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-page);
+  color: var(--sp-color-text-primary);
+  font: inherit;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+:deep(.sp-customer-plan-wizard-modal .field-stack textarea) {
+  min-height: 6.5rem;
+  resize: vertical;
+}
+
+:deep(.sp-customer-plan-wizard-modal .field-stack input:focus),
+:deep(.sp-customer-plan-wizard-modal .field-stack select:focus),
+:deep(.sp-customer-plan-wizard-modal .field-stack textarea:focus) {
+  outline: none;
+  border-color: rgb(40 170 170 / 55%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
+}
+
+:deep(.sp-customer-plan-wizard-modal .field-stack input:disabled),
+:deep(.sp-customer-plan-wizard-modal .field-stack select:disabled),
+:deep(.sp-customer-plan-wizard-modal .field-stack textarea:disabled) {
+  opacity: 0.72;
+  cursor: not-allowed;
+  background: color-mix(in srgb, var(--sp-color-surface-page) 72%, var(--sp-color-border-soft));
+}
+
+@media (max-width: 960px) {
+  .sp-customer-plan-wizard-step__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field-stack--wide {
+    grid-column: auto;
+  }
+
+  .sp-customer-plan-wizard-step__list-row {
+    flex-direction: column;
+    align-items: start;
+  }
+
+  .sp-customer-plan-wizard-step__list-row span {
+    text-align: left;
+  }
 }
 </style>

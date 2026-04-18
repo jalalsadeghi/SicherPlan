@@ -1,0 +1,55 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+
+const source = fs.readFileSync(
+  path.resolve("web/apps/web-antd/src/views/sicherplan/customers/new-plan-step-content.vue"),
+  "utf8",
+);
+
+test("wizard step content uses wizard field wrappers across implemented steps", () => {
+  assert.match(source, /data-testid="customer-new-plan-step-panel-planning"/);
+  assert.match(source, /data-testid="customer-new-plan-step-panel-order-details"/);
+  assert.match(source, /data-testid="customer-new-plan-step-panel-equipment-lines"/);
+  assert.match(source, /data-testid="customer-new-plan-step-panel-requirement-lines"/);
+  assert.match(source, /data-testid="customer-new-plan-step-panel-order-documents"/);
+  assert.match(source, /data-testid="customer-new-plan-step-panel-planning-record-overview"/);
+  assert.match(source, /data-testid="customer-new-plan-step-panel-planning-record-documents"/);
+  assert.match(source, /data-testid="customer-new-plan-step-panel-shift-plan"/);
+  assert.match(source, /data-testid="customer-new-plan-step-panel-series-exceptions"/);
+  assert.match(source, /class="field-stack"/);
+  assert.match(source, /class="field-stack field-stack--wide"/);
+});
+
+test("wizard step content defines local form-control styling instead of relying on scoped planning views", () => {
+  assert.match(source, /\.field-stack \{/);
+  assert.match(source, /\.field-stack span \{/);
+  assert.match(source, /\.field-stack input,/);
+  assert.match(source, /\.field-stack select,/);
+  assert.match(source, /\.field-stack textarea \{/);
+  assert.match(source, /\.field-help \{/);
+  assert.match(source, /\.cta-row \{/);
+  assert.match(source, /\.cta-button \{/);
+  assert.match(source, /\.cta-button\.cta-secondary \{/);
+  assert.match(source, /\.planning-admin-checkbox \{/);
+  assert.match(source, /\.planning-admin-checkbox input\[type='checkbox'\],/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__grid \{/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__panel \{/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__list-row \{/);
+});
+
+test("teleported modal content gets explicit wizard styling hooks", () => {
+  assert.match(source, /wrap-class-name="sp-customer-plan-wizard-modal"/);
+  assert.match(source, /:deep\(\.sp-customer-plan-wizard-modal \.field-stack\)/);
+  assert.match(source, /:deep\(\.sp-customer-plan-wizard-modal \.field-stack input\)/);
+  assert.match(source, /data-testid="customer-new-plan-new-equipment-dialog"/);
+  assert.match(source, /data-testid="customer-new-plan-new-requirement-dialog"/);
+  assert.match(source, /data-testid="customer-new-plan-new-template-dialog"/);
+});
+
+test("wizard form grid keeps responsive stacking rules", () => {
+  assert.match(source, /grid-template-columns: repeat\(auto-fit, minmax\(14rem, 1fr\)\);/);
+  assert.match(source, /@media \(max-width: 960px\)/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__grid \{\s*grid-template-columns: 1fr;/);
+});
