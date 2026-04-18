@@ -84,6 +84,41 @@ test("subcontractor scope filters mandates by branch and clears stale mandate se
   assert.match(source, /scopeDraft\.mandate_id = ""/);
 });
 
+test("subcontractor scope uses distinct loading, ready, empty, and error placeholder states", () => {
+  assert.match(source, /const structureOptionState = reactive\(\{/);
+  assert.match(source, /loading: false/);
+  assert.match(source, /error: false/);
+  assert.match(source, /const scopeBranchPlaceholderKey = computed\(\(\) => \{/);
+  assert.match(source, /fields\.branchLoadingPlaceholder/);
+  assert.match(source, /fields\.branchPlaceholder/);
+  assert.match(source, /fields\.branchEmptyPlaceholder/);
+  assert.match(source, /fields\.branchUnavailablePlaceholder/);
+  assert.match(source, /const scopeMandatePlaceholderKey = computed\(\(\) => \{/);
+  assert.match(source, /fields\.mandateLoadingPlaceholder/);
+  assert.match(source, /fields\.mandatePlaceholder/);
+  assert.match(source, /fields\.mandateEmptyPlaceholder/);
+  assert.match(source, /fields\.mandateEmptyForBranchPlaceholder/);
+  assert.match(source, /fields\.mandateUnavailablePlaceholder/);
+  assert.match(source, /structureOptionState\.loading = true/);
+  assert.match(source, /structureOptionState\.error = true/);
+  assert.match(source, /structureOptionState\.loading = false/);
+});
+
+test("subcontractor detail loading keeps finance-profile fetch out of the core loader and defers it to Billing", () => {
+  const loadSelectedStart = source.indexOf("async function loadSelectedSubcontractor");
+  const loadSelectedEnd = source.indexOf("async function loadFinanceProfile");
+  assert.notEqual(loadSelectedStart, -1);
+  assert.notEqual(loadSelectedEnd, -1);
+  const loadSelectedSource = source.slice(loadSelectedStart, loadSelectedEnd);
+
+  assert.match(source, /async function loadFinanceProfile\(force = false\)/);
+  assert.match(source, /getSubcontractorFinanceProfile\(/);
+  assert.match(source, /isMissingFinanceProfileError/);
+  assert.match(source, /error instanceof SubcontractorAdminApiError && error\.statusCode === 404/);
+  assert.match(source, /tabId !== "billing"/);
+  assert.doesNotMatch(loadSelectedSource, /getSubcontractorFinanceProfile\(/);
+});
+
 test("subcontractor overview removes the extra legal-form and map helper copy while keeping controls", () => {
   assert.match(source, /v-if="legalFormHelpKey" class="field-help"/);
   assert.doesNotMatch(source, /fields\.legalFormHelp"/);

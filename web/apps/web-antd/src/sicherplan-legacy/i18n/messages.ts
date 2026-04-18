@@ -1232,6 +1232,7 @@ export type MessageKey =
   | "customerAdmin.detail.newTitle"
   | "customerAdmin.detail.workspaceTitle"
   | "customerAdmin.detail.workspaceLead"
+  | "customerAdmin.tabs.dashboard"
   | "customerAdmin.tabs.overview"
   | "customerAdmin.tabs.contacts"
   | "customerAdmin.tabs.addresses"
@@ -1239,6 +1240,39 @@ export type MessageKey =
   | "customerAdmin.tabs.portal"
   | "customerAdmin.tabs.history"
   | "customerAdmin.tabs.employeeBlocks"
+  | "customerAdmin.dashboard.kpis.tenure"
+  | "customerAdmin.dashboard.kpis.plans"
+  | "customerAdmin.dashboard.kpis.finance"
+  | "customerAdmin.dashboard.kpis.standing"
+  | "customerAdmin.dashboard.quickActionsEyebrow"
+  | "customerAdmin.dashboard.quickActionsTitle"
+  | "customerAdmin.dashboard.latestPlansEyebrow"
+  | "customerAdmin.dashboard.latestPlansTitle"
+  | "customerAdmin.dashboard.latestPlansEmptyTitle"
+  | "customerAdmin.dashboard.latestPlansEmptyBody"
+  | "customerAdmin.dashboard.financeRestricted"
+  | "customerAdmin.dashboard.financeUnavailable"
+  | "customerAdmin.dashboard.financeLabels.released_invoice_total"
+  | "customerAdmin.dashboard.financeLabels.released_invoice_total_multi_currency"
+  | "customerAdmin.dashboard.tenureDays"
+  | "customerAdmin.dashboard.tenureMonths"
+  | "customerAdmin.dashboard.tenureYears"
+  | "customerAdmin.dashboard.calendarTitle"
+  | "customerAdmin.dashboard.calendarDescription"
+  | "customerAdmin.dashboard.calendarMonthHint"
+  | "customerAdmin.dashboard.calendarMore"
+  | "customerAdmin.dashboard.calendarPrevious"
+  | "customerAdmin.dashboard.calendarNext"
+  | "customerAdmin.dashboard.calendarPlanShort"
+  | "customerAdmin.dashboard.calendarOrderShort"
+  | "customerAdmin.dashboard.calendarEmptyTitle"
+  | "customerAdmin.dashboard.calendarEmptyBody"
+  | "customerAdmin.dashboard.calendarSummary.plans"
+  | "customerAdmin.dashboard.calendarSummary.released"
+  | "customerAdmin.dashboard.calendarSummary.orders"
+  | "customerAdmin.dashboard.calendarStatus.released"
+  | "customerAdmin.dashboard.calendarStatus.draft"
+  | "customerAdmin.dashboard.calendarStatus.other"
   | "customerAdmin.commercial.tabs.billingProfile"
   | "customerAdmin.commercial.tabs.invoiceParties"
   | "customerAdmin.commercial.tabs.pricingRules"
@@ -3205,6 +3239,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.detail.newTitle": "Neuen Kunden anlegen",
     "customerAdmin.detail.workspaceTitle": "Kundenarbeitsbereich",
     "customerAdmin.detail.workspaceLead": "Die Fachbereiche sind in Tabs getrennt, damit nur der gerade bearbeitete Bereich sichtbar bleibt.",
+    "customerAdmin.tabs.dashboard": "Dashboard",
     "customerAdmin.tabs.overview": "Überblick",
     "customerAdmin.tabs.contacts": "Kontakte",
     "customerAdmin.tabs.addresses": "Adressen",
@@ -3212,6 +3247,43 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.tabs.portal": "Portal",
     "customerAdmin.tabs.history": "Historie",
     "customerAdmin.tabs.employeeBlocks": "Mitarbeitersperren",
+    "customerAdmin.dashboard.kpis.tenure": "Kundendauer",
+    "customerAdmin.dashboard.kpis.plans": "Pläne gesamt",
+    "customerAdmin.dashboard.kpis.finance": "Realisierter Vertragswert",
+    "customerAdmin.dashboard.kpis.standing": "Kundenstanding",
+    "customerAdmin.dashboard.quickActionsEyebrow": "Schnellzugriffe",
+    "customerAdmin.dashboard.quickActionsTitle": "Zum passenden Arbeitsbereich springen",
+    "customerAdmin.dashboard.latestPlansEyebrow": "Planung",
+    "customerAdmin.dashboard.latestPlansTitle": "Letzte 5 Pläne",
+    "customerAdmin.dashboard.latestPlansEmptyTitle": "Noch keine Pläne vorhanden",
+    "customerAdmin.dashboard.latestPlansEmptyBody":
+      "Für diesen Kunden wurden noch keine zugeordneten Planungsstände gefunden.",
+    "customerAdmin.dashboard.financeRestricted": "Eingeschränkt",
+    "customerAdmin.dashboard.financeUnavailable": "Nicht verfügbar",
+    "customerAdmin.dashboard.financeLabels.released_invoice_total": "Freigegebene Rechnungen",
+    "customerAdmin.dashboard.financeLabels.released_invoice_total_multi_currency":
+      "Freigegebene Rechnungen in mehreren Währungen",
+    "customerAdmin.dashboard.tenureDays": "{count} Tage",
+    "customerAdmin.dashboard.tenureMonths": "{count} Monate",
+    "customerAdmin.dashboard.tenureYears": "{count} Jahre",
+    "customerAdmin.dashboard.calendarTitle": "Kundenkalender",
+    "customerAdmin.dashboard.calendarDescription":
+      "Zeigt ausschließlich die Planungsstände dieses Kunden im bekannten Dashboard-Kalendermuster.",
+    "customerAdmin.dashboard.calendarMonthHint": "Monatsansicht für diesen Kunden",
+    "customerAdmin.dashboard.calendarMore": "mehr",
+    "customerAdmin.dashboard.calendarPrevious": "Zurück",
+    "customerAdmin.dashboard.calendarNext": "Weiter",
+    "customerAdmin.dashboard.calendarPlanShort": "PL",
+    "customerAdmin.dashboard.calendarOrderShort": "AUF",
+    "customerAdmin.dashboard.calendarEmptyTitle": "Kein Kalendereintrag vorhanden",
+    "customerAdmin.dashboard.calendarEmptyBody":
+      "Für den aktuellen Zeitraum liegen noch keine kundenbezogenen Planungseinträge vor.",
+    "customerAdmin.dashboard.calendarSummary.plans": "Pläne",
+    "customerAdmin.dashboard.calendarSummary.released": "Freigegeben",
+    "customerAdmin.dashboard.calendarSummary.orders": "Aufträge",
+    "customerAdmin.dashboard.calendarStatus.released": "Freigegeben",
+    "customerAdmin.dashboard.calendarStatus.draft": "Entwurf",
+    "customerAdmin.dashboard.calendarStatus.other": "Weiterer Status",
     "customerAdmin.commercial.tabs.billingProfile": "Abrechnungsprofil",
     "customerAdmin.commercial.tabs.invoiceParties": "Rechnungsparteien",
     "customerAdmin.commercial.tabs.pricingRules": "Preisregeln",
@@ -5242,6 +5314,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.detail.newTitle": "Create a new customer",
     "customerAdmin.detail.workspaceTitle": "Customer workspace",
     "customerAdmin.detail.workspaceLead": "Each business area is isolated behind tabs so only the active workspace stays visible at a time.",
+    "customerAdmin.tabs.dashboard": "Dashboard",
     "customerAdmin.tabs.overview": "Overview",
     "customerAdmin.tabs.contacts": "Contacts",
     "customerAdmin.tabs.addresses": "Addresses",
@@ -5249,6 +5322,43 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.tabs.portal": "Portal",
     "customerAdmin.tabs.history": "History",
     "customerAdmin.tabs.employeeBlocks": "Employee blocks",
+    "customerAdmin.dashboard.kpis.tenure": "Customer tenure",
+    "customerAdmin.dashboard.kpis.plans": "Total plans",
+    "customerAdmin.dashboard.kpis.finance": "Realized contract amount",
+    "customerAdmin.dashboard.kpis.standing": "Customer standing",
+    "customerAdmin.dashboard.quickActionsEyebrow": "Quick actions",
+    "customerAdmin.dashboard.quickActionsTitle": "Jump to the relevant workspace",
+    "customerAdmin.dashboard.latestPlansEyebrow": "Planning",
+    "customerAdmin.dashboard.latestPlansTitle": "Latest 5 plans",
+    "customerAdmin.dashboard.latestPlansEmptyTitle": "No plans yet",
+    "customerAdmin.dashboard.latestPlansEmptyBody":
+      "No linked planning snapshots were found for this customer yet.",
+    "customerAdmin.dashboard.financeRestricted": "Restricted",
+    "customerAdmin.dashboard.financeUnavailable": "Unavailable",
+    "customerAdmin.dashboard.financeLabels.released_invoice_total": "Released invoices",
+    "customerAdmin.dashboard.financeLabels.released_invoice_total_multi_currency":
+      "Released invoices across multiple currencies",
+    "customerAdmin.dashboard.tenureDays": "{count} days",
+    "customerAdmin.dashboard.tenureMonths": "{count} months",
+    "customerAdmin.dashboard.tenureYears": "{count} years",
+    "customerAdmin.dashboard.calendarTitle": "Customer calendar",
+    "customerAdmin.dashboard.calendarDescription":
+      "Shows only this customer's planning entries using the existing dashboard calendar pattern.",
+    "customerAdmin.dashboard.calendarMonthHint": "Month view for this customer",
+    "customerAdmin.dashboard.calendarMore": "more",
+    "customerAdmin.dashboard.calendarPrevious": "Previous",
+    "customerAdmin.dashboard.calendarNext": "Next",
+    "customerAdmin.dashboard.calendarPlanShort": "PL",
+    "customerAdmin.dashboard.calendarOrderShort": "ORD",
+    "customerAdmin.dashboard.calendarEmptyTitle": "No calendar entries yet",
+    "customerAdmin.dashboard.calendarEmptyBody":
+      "No customer-specific planning entries exist for the current period yet.",
+    "customerAdmin.dashboard.calendarSummary.plans": "Plans",
+    "customerAdmin.dashboard.calendarSummary.released": "Released",
+    "customerAdmin.dashboard.calendarSummary.orders": "Orders",
+    "customerAdmin.dashboard.calendarStatus.released": "Released",
+    "customerAdmin.dashboard.calendarStatus.draft": "Draft",
+    "customerAdmin.dashboard.calendarStatus.other": "Other status",
     "customerAdmin.commercial.tabs.billingProfile": "Billing profile",
     "customerAdmin.commercial.tabs.invoiceParties": "Invoice parties",
     "customerAdmin.commercial.tabs.pricingRules": "Pricing rules",

@@ -82,6 +82,41 @@ test("customer same-record reloads preserve nested tab context with safe fallbac
   assert.match(source, /await refreshCustomers\(\{\s*preferredCustomerId: updated\.id,[\s\S]*selectionOptions: buildPreservedCustomerSelectionOptions\(\)/);
 });
 
+test("existing customers default to dashboard while create mode stays on overview", () => {
+  assert.match(source, /import CustomerDashboardTab from "@\/components\/customers\/CustomerDashboardTab\.vue"/);
+  assert.match(source, /dashboard:\s*"customerAdmin\.tabs\.dashboard"/);
+  assert.match(
+    source,
+    /<CustomerDashboardTab[\s\S]*v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'dashboard'"/,
+  );
+  assert.match(source, /customerDashboard = ref<CustomerDashboardRead \| null>\(null\)/);
+  assert.match(source, /customerDashboardError = ref\(""\)/);
+  assert.match(source, /loading = reactive\(\{[\s\S]*dashboard: false,/);
+  assert.match(source, /getCustomerDashboard\(/);
+  assert.match(source, /options\.preferredDetailTab \?\? options\.fallbackDetailTab \?\? "dashboard"/);
+  assert.match(source, /options\.fallbackDetailTab \|\| "dashboard"/);
+  assert.match(source, /startCreateCustomer\(\) \{[\s\S]*activeDetailTab\.value = "overview"/);
+});
+
+test("dashboard quick actions reuse existing tab and create handlers", () => {
+  assert.match(source, /function handleDashboardCreateContact\(\) \{/);
+  assert.match(source, /activeDetailTab\.value = "contacts"/);
+  assert.match(source, /startCreateContact\(\);/);
+  assert.match(source, /function handleDashboardCreateInvoiceParty\(\) \{/);
+  assert.match(source, /activeDetailTab\.value = "commercial"/);
+  assert.match(source, /startCreateInvoiceParty\(\);/);
+  assert.match(source, /:can-read-commercial="canReadCommercial"/);
+  assert.match(source, /:can-write-commercial="canWriteCommercial"/);
+  assert.match(source, /:can-manage-contacts="actionState\.canManageContacts"/);
+});
+
+test("create-mode cancel restores the selected customer through the dashboard default path", () => {
+  assert.match(source, /async function cancelCustomerEdit\(\) \{/);
+  assert.match(source, /await selectCustomer\(selectedCustomer\.value\.id, \{\s*preferredDetailTab: "dashboard",\s*\}\);/);
+  assert.match(source, /startCreateCustomer\(\) \{[\s\S]*activeDetailTab\.value = "overview"/);
+  assert.match(source, /startCreateCustomer\(\) \{[\s\S]*customerDashboard\.value = null;/);
+});
+
 test("customer workspace uses shared toast feedback instead of a persistent inline banner", () => {
   assert.match(source, /useSicherPlanFeedback/);
   assert.match(source, /showFeedbackToast\(\{\s*key:\s*"customer-admin-feedback"/);

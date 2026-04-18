@@ -81,12 +81,57 @@ export interface CustomerRead extends CustomerListItem {
   default_branch_id: string | null;
   default_mandate_id: string | null;
   notes: string | null;
+  created_at: string;
+  updated_at: string;
   portal_person_names_released: boolean;
   portal_person_names_released_at: string | null;
   portal_person_names_released_by_user_id: string | null;
   archived_at: string | null;
   contacts: CustomerContactRead[];
   addresses: CustomerAddressRead[];
+}
+
+export interface CustomerDashboardPlanItemRead {
+  id: string;
+  order_id: string;
+  order_no: string;
+  label: string;
+  status: string;
+  planning_mode_code: string;
+  planning_from: string;
+  planning_to: string;
+  released_at: string | null;
+}
+
+export interface CustomerDashboardPlanningSummaryRead {
+  total_plans_count: number;
+  latest_plans: CustomerDashboardPlanItemRead[];
+}
+
+export interface CustomerDashboardFinanceSummaryRead {
+  visibility: "available" | "restricted" | "unavailable";
+  total_received_amount: string | null;
+  currency_code: string | null;
+  semantic_label: string | null;
+}
+
+export interface CustomerDashboardCalendarItemRead {
+  id: string;
+  source_type: string;
+  source_ref_id: string;
+  order_id: string | null;
+  planning_record_id: string | null;
+  title: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  status: string;
+}
+
+export interface CustomerDashboardRead {
+  customer_id: string;
+  planning_summary: CustomerDashboardPlanningSummaryRead;
+  finance_summary: CustomerDashboardFinanceSummaryRead;
+  calendar_items: CustomerDashboardCalendarItemRead[];
 }
 
 export interface CustomerHistoryEntryRead {
@@ -646,6 +691,13 @@ export function listCustomers(tenantId: string, accessToken: string, params: Cus
 
 export function getCustomer(tenantId: string, customerId: string, accessToken: string) {
   return request<CustomerRead>(`/api/customers/tenants/${tenantId}/customers/${customerId}`, accessToken);
+}
+
+export function getCustomerDashboard(tenantId: string, customerId: string, accessToken: string) {
+  return request<CustomerDashboardRead>(
+    `/api/customers/tenants/${tenantId}/customers/${customerId}/dashboard`,
+    accessToken,
+  );
 }
 
 export function getCustomerReferenceData(tenantId: string, accessToken: string) {

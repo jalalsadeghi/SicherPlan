@@ -238,6 +238,49 @@ class CustomerReferenceDataRead(BaseModel):
     mandates: list[CustomerMandateOptionRead] = Field(default_factory=list)
 
 
+class CustomerDashboardPlanItemRead(BaseModel):
+    id: str
+    order_id: str
+    order_no: str
+    label: str
+    status: str
+    planning_mode_code: str
+    planning_from: date
+    planning_to: date
+    released_at: datetime | None = None
+
+
+class CustomerDashboardPlanningSummaryRead(BaseModel):
+    total_plans_count: int = 0
+    latest_plans: list[CustomerDashboardPlanItemRead] = Field(default_factory=list)
+
+
+class CustomerDashboardFinanceSummaryRead(BaseModel):
+    visibility: str = Field(pattern="^(available|restricted|unavailable)$")
+    total_received_amount: Decimal | None = None
+    currency_code: str | None = None
+    semantic_label: str | None = None
+
+
+class CustomerDashboardCalendarItemRead(BaseModel):
+    id: str
+    source_type: str
+    source_ref_id: str
+    order_id: str | None = None
+    planning_record_id: str | None = None
+    title: str
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    status: str
+
+
+class CustomerDashboardRead(BaseModel):
+    customer_id: str
+    planning_summary: CustomerDashboardPlanningSummaryRead
+    finance_summary: CustomerDashboardFinanceSummaryRead
+    calendar_items: list[CustomerDashboardCalendarItemRead] = Field(default_factory=list)
+
+
 class CustomerPortalCustomerRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

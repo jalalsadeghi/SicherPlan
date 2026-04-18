@@ -14,6 +14,7 @@ export const CUSTOMER_PERMISSION_MATRIX = {
 };
 
 export const CUSTOMER_DETAIL_TAB_ORDER = [
+  "dashboard",
   "overview",
   "contacts",
   "addresses",
@@ -209,7 +210,7 @@ export function normalizeCustomerDetailTab(activeTab, options) {
     return "";
   }
 
-  return tabs.includes(activeTab) ? activeTab : "overview";
+  return tabs.includes(activeTab) ? activeTab : (options?.isCreatingCustomer ? "overview" : "dashboard");
 }
 
 export function normalizeCustomerCommercialTab(activeTab) {

@@ -17,6 +17,7 @@ from app.modules.platform_services.integration_repository import SqlAlchemyInteg
 from app.modules.platform_services.storage import build_object_storage_adapter
 from app.modules.customers.collaboration_service import CustomerCollaborationService
 from app.modules.customers.commercial_service import CustomerCommercialService
+from app.modules.customers.dashboard_service import CustomerDashboardReadService
 from app.modules.customers.ops_service import CustomerOpsService
 from app.modules.customers.repository import SqlAlchemyCustomerRepository
 from app.modules.customers.schemas import (
@@ -31,6 +32,7 @@ from app.modules.customers.schemas import (
     CustomerContactRead,
     CustomerContactUpdate,
     CustomerCreate,
+    CustomerDashboardRead,
     CustomerExportRequest,
     CustomerExportResult,
     CustomerFilter,
@@ -115,6 +117,12 @@ def get_customer_commercial_service(
     )
 
 
+def get_customer_dashboard_read_service(
+    session: Annotated[Session, Depends(get_db_session)],
+) -> CustomerDashboardReadService:
+    return CustomerDashboardReadService(SqlAlchemyCustomerRepository(session))
+
+
 def get_customer_collaboration_service(
     session: Annotated[Session, Depends(get_db_session)],
 ) -> CustomerCollaborationService:
@@ -191,6 +199,19 @@ def get_customer(
     service: Annotated[CustomerService, Depends(get_customer_service)],
 ) -> CustomerRead:
     return service.get_customer(str(tenant_id), str(customer_id), context)
+
+
+@router.get("/{customer_id}/dashboard", response_model=CustomerDashboardRead)
+def get_customer_dashboard(
+    tenant_id: UUID,
+    customer_id: UUID,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("customers.customer.read", scope="tenant")),
+    ],
+    service: Annotated[CustomerDashboardReadService, Depends(get_customer_dashboard_read_service)],
+) -> CustomerDashboardRead:
+    return service.get_dashboard(str(tenant_id), str(customer_id), context)
 
 
 @router.patch("/{customer_id}", response_model=CustomerRead)

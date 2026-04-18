@@ -135,10 +135,22 @@ vi.mock("@/api/coreAdmin", () => ({
 
 vi.mock("@/api/subcontractors", () => ({
   SubcontractorAdminApiError: class MockSubcontractorAdminApiError extends Error {
+    statusCode: number;
+    code: string;
     messageKey: string;
 
-    constructor(messageKey: string) {
+    constructor(
+      statusCodeOrMessageKey: number | string,
+      payload?: { code?: string; message_key?: string },
+    ) {
+      const statusCode = typeof statusCodeOrMessageKey === "number" ? statusCodeOrMessageKey : 500;
+      const messageKey =
+        typeof statusCodeOrMessageKey === "string"
+          ? statusCodeOrMessageKey
+          : payload?.message_key || "errors.platform.internal";
       super(messageKey);
+      this.statusCode = statusCode;
+      this.code = payload?.code || "platform.internal";
       this.messageKey = messageKey;
     }
   },
@@ -489,6 +501,102 @@ describe("SubcontractorAdminView address modal flow", () => {
         mandate_id: "mandate-2",
       }),
     );
+  });
+
+  it("shows neutral ready-state placeholders for scope selects when options are available", async () => {
+    const wrapper = await mountView();
+    await wrapper.find(".subcontractor-admin-row").trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="subcontractor-tab-scope_release"]').trigger("click");
+    await flushPromises();
+
+    const branchSelect = wrapper.get('[data-testid="subcontractor-scope-branch"]').element as HTMLSelectElement;
+    const mandateSelect = wrapper.get('[data-testid="subcontractor-scope-mandate"]').element as HTMLSelectElement;
+    expect(branchSelect.options[0]?.text).toBe("sicherplan.subcontractors.fields.branchPlaceholder");
+    expect(mandateSelect.options[0]?.text).toBe("sicherplan.subcontractors.fields.mandatePlaceholder");
+  });
+
+  it("shows unavailable placeholders only when structure loading fails", async () => {
+    mocks.listBranchesMock.mockRejectedValueOnce(new Error("branch-failed"));
+    mocks.listMandatesMock.mockRejectedValueOnce(new Error("mandate-failed"));
+
+    const wrapper = await mountView();
+    await wrapper.find(".subcontractor-admin-row").trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="subcontractor-tab-scope_release"]').trigger("click");
+    await flushPromises();
+
+    const branchSelect = wrapper.get('[data-testid="subcontractor-scope-branch"]').element as HTMLSelectElement;
+    const mandateSelect = wrapper.get('[data-testid="subcontractor-scope-mandate"]').element as HTMLSelectElement;
+    expect(branchSelect.options[0]?.text).toBe("sicherplan.subcontractors.fields.branchUnavailablePlaceholder");
+    expect(mandateSelect.options[0]?.text).toBe("sicherplan.subcontractors.fields.mandateUnavailablePlaceholder");
+  });
+
+  it("does not eagerly load finance profile when opening overview or scope tabs", async () => {
+    const wrapper = await mountView();
+
+    await wrapper.find(".subcontractor-admin-row").trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    expect(mocks.getSubcontractorFinanceProfileMock).not.toHaveBeenCalled();
+
+    await wrapper.get('[data-testid="subcontractor-tab-scope_release"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.getSubcontractorFinanceProfileMock).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="subcontractor-tab-panel-scope-release"]').exists()).toBe(true);
+  });
+
+  it("treats finance-profile 404 as missing and keeps Billing create-ready without breaking other tabs", async () => {
+    const FinanceError = (await import("@/api/subcontractors")).SubcontractorAdminApiError;
+    mocks.getSubcontractorFinanceProfileMock.mockRejectedValueOnce(
+      new FinanceError(404, {
+        code: "subcontractors.finance_profile.not_found",
+        message_key: "errors.subcontractors.finance_profile.not_found",
+        request_id: "req-finance-404",
+        details: {},
+      }),
+    );
+
+    const wrapper = await mountView();
+    await wrapper.find(".subcontractor-admin-row").trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="subcontractor-tab-scope_release"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="subcontractor-tab-panel-scope-release"]').exists()).toBe(true);
+    expect(wrapper.find(".subcontractor-admin-feedback").exists()).toBe(false);
+
+    await wrapper.get('[data-testid="subcontractor-tab-billing"]').trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    expect(mocks.getSubcontractorFinanceProfileMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('[data-testid="subcontractor-tab-panel-billing"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("sicherplan.subcontractors.actions.createFinance");
+    expect(wrapper.find(".subcontractor-admin-feedback").exists()).toBe(false);
+  });
+
+  it("still surfaces real non-404 finance-profile errors when Billing is opened", async () => {
+    const FinanceError = (await import("@/api/subcontractors")).SubcontractorAdminApiError;
+    mocks.getSubcontractorFinanceProfileMock.mockRejectedValueOnce(
+      new FinanceError(500, {
+        code: "platform.internal_error",
+        message_key: "errors.platform.internal",
+        request_id: "req-finance-500",
+        details: {},
+      }),
+    );
+
+    const wrapper = await mountView();
+    await wrapper.find(".subcontractor-admin-row").trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="subcontractor-tab-billing"]').trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    expect(wrapper.find(".subcontractor-admin-feedback").exists()).toBe(true);
   });
 
   it("preserves existing scope branch and mandate values in edit mode", async () => {

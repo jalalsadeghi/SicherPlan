@@ -57,7 +57,6 @@ test("tenant admin uses session-backed scope and token for customers page", () =
     }),
     {
       tenantScopeId: "tenant-1",
-      accessToken: "token-1",
     },
   );
 });
@@ -215,7 +214,7 @@ test("customer detail tabs default to overview-first and hide commercial without
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    ["overview", "contacts", "addresses", "portal", "history", "employee_blocks"],
+    ["dashboard", "overview", "contacts", "addresses", "portal", "history", "employee_blocks"],
   );
   assert.deepEqual(
     buildCustomerDetailTabs({
@@ -223,11 +222,11 @@ test("customer detail tabs default to overview-first and hide commercial without
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    ["overview", "contacts", "addresses", "commercial", "portal", "history", "employee_blocks"],
+    ["dashboard", "overview", "contacts", "addresses", "commercial", "portal", "history", "employee_blocks"],
   );
 });
 
-test("customer detail tab state falls back to overview and create mode stays on overview only", () => {
+test("customer detail tab state falls back to dashboard for existing customers and create mode stays on overview only", () => {
   assert.equal(
     normalizeCustomerDetailTab("history", {
       canReadCommercial: true,
@@ -250,7 +249,15 @@ test("customer detail tab state falls back to overview and create mode stays on 
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    "overview",
+    "dashboard",
+  );
+  assert.equal(
+    normalizeCustomerDetailTab("", {
+      canReadCommercial: true,
+      hasSelectedCustomer: true,
+      isCreatingCustomer: false,
+    }),
+    "dashboard",
   );
 });
 

@@ -426,11 +426,7 @@
                     required
                   >
                     <option value="">
-                      {{
-                        branchOptions.length
-                          ? t("sicherplan.subcontractors.fields.branchPlaceholder")
-                          : t("sicherplan.subcontractors.fields.branchUnavailablePlaceholder")
-                      }}
+                      {{ t(scopeBranchPlaceholderKey) }}
                     </option>
                     <option v-for="option in branchOptions" :key="option.id" :value="option.id">{{ option.label }}</option>
                   </select>
@@ -443,11 +439,7 @@
                     data-testid="subcontractor-scope-mandate"
                   >
                     <option value="">
-                      {{
-                        scopeMandateOptions.length || scopeDraft.mandate_id
-                          ? t("sicherplan.subcontractors.fields.mandatePlaceholder")
-                          : t("sicherplan.subcontractors.fields.mandateUnavailablePlaceholder")
-                      }}
+                      {{ t(scopeMandatePlaceholderKey) }}
                     </option>
                     <option v-for="option in scopeMandateOptionsWithDraft" :key="option.id" :value="option.id">{{ option.label }}</option>
                   </select>
@@ -856,6 +848,15 @@ const loading = reactive({
   saving: false,
 });
 
+const structureOptionState = reactive({
+  loading: false,
+  error: false,
+});
+const financeProfileState = reactive({
+  loading: false,
+  loadedSubcontractorId: "",
+});
+
 const subcontractors = ref<SubcontractorListItem[]>([]);
 const selectedSubcontractor = ref<SubcontractorRead | null>(null);
 const selectedSubcontractorId = ref("");
@@ -1101,6 +1102,33 @@ const scopeBranchSelectEnabled = computed(() =>
 const scopeMandateSelectEnabled = computed(() =>
   scopeMandateOptions.value.length > 0 || !!scopeDraft.mandate_id.trim(),
 );
+const scopeBranchPlaceholderKey = computed(() => {
+  if (structureOptionState.loading) {
+    return "sicherplan.subcontractors.fields.branchLoadingPlaceholder";
+  }
+  if (structureOptionState.error) {
+    return "sicherplan.subcontractors.fields.branchUnavailablePlaceholder";
+  }
+  if (branchOptions.value.length === 0) {
+    return "sicherplan.subcontractors.fields.branchEmptyPlaceholder";
+  }
+  return "sicherplan.subcontractors.fields.branchPlaceholder";
+});
+const scopeMandatePlaceholderKey = computed(() => {
+  if (structureOptionState.loading) {
+    return "sicherplan.subcontractors.fields.mandateLoadingPlaceholder";
+  }
+  if (structureOptionState.error) {
+    return "sicherplan.subcontractors.fields.mandateUnavailablePlaceholder";
+  }
+  if (scopeDraft.branch_id && scopeMandateOptions.value.length === 0 && !scopeDraft.mandate_id.trim()) {
+    return "sicherplan.subcontractors.fields.mandateEmptyForBranchPlaceholder";
+  }
+  if (mandates.value.length === 0 && !scopeDraft.mandate_id.trim()) {
+    return "sicherplan.subcontractors.fields.mandateEmptyPlaceholder";
+  }
+  return "sicherplan.subcontractors.fields.mandatePlaceholder";
+});
 const legalFormSelectEnabled = computed(() =>
   legalFormOptions.value.length > 0 || !!subcontractorDraft.legal_form_lookup_id.trim(),
 );
@@ -1228,6 +1256,10 @@ function resetFinanceDraft() {
   financeDraft.invoice_status_mode_lookup_id = selected?.invoice_status_mode_lookup_id ?? "";
   financeDraft.billing_note = selected?.billing_note ?? "";
   financeDraft.version_no = selected?.version_no ?? 0;
+}
+
+function isMissingFinanceProfileError(error: unknown) {
+  return error instanceof SubcontractorAdminApiError && error.statusCode === 404;
 }
 
 function resetHistoryDraft() {
@@ -1360,6 +1392,8 @@ async function loadSubcontractorReferenceData() {
 
 async function loadReferenceOptions() {
   if (!resolvedTenantScopeId.value || !accessToken.value) {
+    structureOptionState.loading = false;
+    structureOptionState.error = false;
     branches.value = [];
     mandates.value = [];
     subcontractorStatusLookups.value = [];
@@ -1368,6 +1402,8 @@ async function loadReferenceOptions() {
     return;
   }
 
+  structureOptionState.loading = true;
+  structureOptionState.error = false;
   try {
     const [
       branchRows,
@@ -1389,11 +1425,14 @@ async function loadReferenceOptions() {
     invoiceDeliveryMethodLookups.value = invoiceDeliveryMethodRows.filter((row) => row.archived_at == null);
     invoiceStatusModeLookups.value = invoiceStatusModeRows.filter((row) => row.archived_at == null);
   } catch {
+    structureOptionState.error = true;
     branches.value = [];
     mandates.value = [];
     subcontractorStatusLookups.value = [];
     invoiceDeliveryMethodLookups.value = [];
     invoiceStatusModeLookups.value = [];
+  } finally {
+    structureOptionState.loading = false;
   }
 }
 
@@ -1429,20 +1468,8 @@ async function loadSelectedSubcontractor(subcontractorId: string) {
     historyEntries.value = await listSubcontractorHistory(resolvedTenantScopeId.value, subcontractorId, accessToken.value);
     await Promise.all([loadContactUserOptions(subcontractorId), loadAddressOptions(subcontractorId)]);
     selectedHistoryEntryId.value = historyEntries.value[0]?.id ?? "";
-    if (canReadFinance.value) {
-      try {
-        selectedSubcontractor.value.finance_profile = await getSubcontractorFinanceProfile(
-          resolvedTenantScopeId.value,
-          subcontractorId,
-          accessToken.value,
-        );
-      } catch (error) {
-        if (!(error instanceof SubcontractorAdminApiError) || error.messageKey !== "errors.subcontractors.finance_profile.not_found") {
-          throw error;
-        }
-        selectedSubcontractor.value.finance_profile = null;
-      }
-    }
+    financeProfileState.loadedSubcontractorId =
+      canReadFinance.value && selectedSubcontractor.value.finance_profile ? subcontractorId : "";
     resetSubcontractorDraft();
     resetContactDraft();
     resetScopeDraft();
@@ -1452,6 +1479,60 @@ async function loadSelectedSubcontractor(subcontractorId: string) {
     handleError(error);
   } finally {
     loading.detail = false;
+  }
+}
+
+async function loadFinanceProfile(force = false) {
+  if (
+    !resolvedTenantScopeId.value
+    || !accessToken.value
+    || !selectedSubcontractorId.value
+    || !selectedSubcontractor.value
+    || !canReadFinance.value
+  ) {
+    return;
+  }
+
+  const subcontractorId = selectedSubcontractorId.value;
+  if (!force) {
+    if (financeProfileState.loadedSubcontractorId === subcontractorId) {
+      return;
+    }
+    if (selectedSubcontractor.value.finance_profile) {
+      financeProfileState.loadedSubcontractorId = subcontractorId;
+      resetFinanceDraft();
+      return;
+    }
+  }
+
+  financeProfileState.loading = true;
+  try {
+    const financeProfile = await getSubcontractorFinanceProfile(
+      resolvedTenantScopeId.value,
+      subcontractorId,
+      accessToken.value,
+    );
+    if (!selectedSubcontractor.value || selectedSubcontractorId.value !== subcontractorId) {
+      return;
+    }
+    selectedSubcontractor.value.finance_profile = financeProfile;
+    financeProfileState.loadedSubcontractorId = subcontractorId;
+    resetFinanceDraft();
+  } catch (error) {
+    if (!selectedSubcontractor.value || selectedSubcontractorId.value !== subcontractorId) {
+      return;
+    }
+    if (isMissingFinanceProfileError(error)) {
+      selectedSubcontractor.value.finance_profile = null;
+      financeProfileState.loadedSubcontractorId = subcontractorId;
+      resetFinanceDraft();
+      return;
+    }
+    throw error;
+  } finally {
+    if (selectedSubcontractorId.value === subcontractorId) {
+      financeProfileState.loading = false;
+    }
   }
 }
 
@@ -1724,6 +1805,7 @@ async function submitFinanceProfile() {
     }
 
     await loadSelectedSubcontractor(selectedSubcontractorId.value);
+    financeProfileState.loadedSubcontractorId = selectedSubcontractorId.value;
     setFeedback("success", "sicherplan.subcontractors.feedback.financeSaved");
   } catch (error) {
     handleError(error);
@@ -1905,6 +1987,20 @@ watch(
     const mandateStillValid = scopeMandateOptions.value.some((mandate) => mandate.id === scopeDraft.mandate_id);
     if (!mandateStillValid) {
       scopeDraft.mandate_id = "";
+    }
+  },
+);
+
+watch(
+  () => [activeDetailTab.value, selectedSubcontractorId.value, canReadFinance.value] as const,
+  async ([tabId, subcontractorId, canReadFinanceValue]) => {
+    if (tabId !== "billing" || !subcontractorId || !canReadFinanceValue) {
+      return;
+    }
+    try {
+      await loadFinanceProfile();
+    } catch (error) {
+      handleError(error);
     }
   },
 );

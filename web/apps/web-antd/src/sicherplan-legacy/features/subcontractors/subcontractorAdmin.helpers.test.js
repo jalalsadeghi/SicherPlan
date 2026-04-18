@@ -146,8 +146,18 @@ test("de and en locale files expose subcontractor admin route and page keys", ()
   assert.equal(typeof en.subcontractors.fields.addressAction, "string");
   assert.equal(typeof de.subcontractors.fields.branchUnavailablePlaceholder, "string");
   assert.equal(typeof en.subcontractors.fields.branchUnavailablePlaceholder, "string");
+  assert.equal(typeof de.subcontractors.fields.branchLoadingPlaceholder, "string");
+  assert.equal(typeof en.subcontractors.fields.branchLoadingPlaceholder, "string");
+  assert.equal(typeof de.subcontractors.fields.branchEmptyPlaceholder, "string");
+  assert.equal(typeof en.subcontractors.fields.branchEmptyPlaceholder, "string");
   assert.equal(typeof de.subcontractors.fields.mandateUnavailablePlaceholder, "string");
   assert.equal(typeof en.subcontractors.fields.mandateUnavailablePlaceholder, "string");
+  assert.equal(typeof de.subcontractors.fields.mandateLoadingPlaceholder, "string");
+  assert.equal(typeof en.subcontractors.fields.mandateLoadingPlaceholder, "string");
+  assert.equal(typeof de.subcontractors.fields.mandateEmptyPlaceholder, "string");
+  assert.equal(typeof en.subcontractors.fields.mandateEmptyPlaceholder, "string");
+  assert.equal(typeof de.subcontractors.fields.mandateEmptyForBranchPlaceholder, "string");
+  assert.equal(typeof en.subcontractors.fields.mandateEmptyForBranchPlaceholder, "string");
   assert.equal(typeof de.subcontractors.actions.pickLocationOnMap, "string");
   assert.equal(typeof en.subcontractors.actions.pickLocationOnMap, "string");
   assert.equal(typeof de.subcontractors.mapPicker.title, "string");

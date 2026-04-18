@@ -184,6 +184,21 @@
             </button>
           </nav>
 
+          <CustomerDashboardTab
+            v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'dashboard'"
+            :can-read-commercial="canReadCommercial"
+            :can-write-commercial="canWriteCommercial"
+            :can-manage-contacts="actionState.canManageContacts"
+            :customer="selectedCustomer"
+            :dashboard="customerDashboard"
+            :error="customerDashboardError"
+            :loading="loading.dashboard"
+            :standing="selectedCustomerStanding"
+            @create-contact="handleDashboardCreateContact"
+            @create-invoice-party="handleDashboardCreateInvoiceParty"
+            @select-tab="activeDetailTab = $event"
+          />
+
           <section v-if="activeDetailTab === 'overview'" class="customer-admin-tab-panel" data-testid="customer-tab-panel-overview">
             <div v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-summary">
             <article class="customer-admin-summary__card">
@@ -2017,6 +2032,7 @@ import {
   exportCustomers,
   exportCustomerVCard,
   getCustomer,
+  getCustomerDashboard,
   getCustomerCommercialProfile,
   getCustomerReferenceData,
   getCustomerPortalPrivacy,
@@ -2036,6 +2052,7 @@ import {
   type CustomerContactRead,
   type CustomerCommercialProfileRead,
   type CustomerCreatePayload,
+  type CustomerDashboardRead,
   type CustomerEmployeeBlockCollectionRead,
   type CustomerEmployeeBlockPayload,
   type CustomerEmployeeBlockRead,
@@ -2069,6 +2086,7 @@ import {
 } from "@/api/customers";
 import SicherPlanLoadingOverlay from "@/components/SicherPlanLoadingOverlay.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
+import CustomerDashboardTab from "@/components/customers/CustomerDashboardTab.vue";
 import {
   applySurchargeAmountMode,
   buildWeekdayMask,
@@ -2151,6 +2169,8 @@ const customerPortalAccessAccounts = ref<CustomerPortalAccessListItem[]>([]);
 const customerEmployeeBlocks = ref<CustomerEmployeeBlockRead[]>([]);
 const employeeBlockCapability = ref<CustomerEmployeeBlockCollectionRead["capability"] | null>(null);
 const commercialProfile = ref<CustomerCommercialProfileRead | null>(null);
+const customerDashboard = ref<CustomerDashboardRead | null>(null);
+const customerDashboardError = ref("");
 const portalPrivacy = ref<CustomerPortalPrivacyRead | null>(null);
 const referenceData = ref<CustomerReferenceDataRead | null>(null);
 const availableAddressDirectory = ref<CustomerAvailableAddressRead[]>([]);
@@ -2197,6 +2217,7 @@ const invoicePartyErrorState = reactive<{
 const loading = reactive({
   list: false,
   detail: false,
+  dashboard: false,
   customer: false,
   contact: false,
   address: false,
@@ -2387,6 +2408,7 @@ const customerWorkspaceBusy = computed(
   () =>
     isCustomerSessionResolving.value
     || loading.customer
+    || loading.dashboard
     || loading.contact
     || loading.address
     || loading.commercial
@@ -2415,6 +2437,7 @@ const canManagePortalAccess = computed(() =>
 );
 const hasDetailWorkspace = computed(() => isCreatingCustomer.value || !!selectedCustomer.value);
 const detailTabLabelKeys = {
+  dashboard: "customerAdmin.tabs.dashboard",
   overview: "customerAdmin.tabs.overview",
   contacts: "customerAdmin.tabs.contacts",
   addresses: "customerAdmin.tabs.addresses",
@@ -2578,6 +2601,28 @@ const selectedCustomerRankingLabel = computed(() => {
 const selectedCustomerStatusLabel = computed(() => {
   const lookupId = selectedCustomer.value?.customer_status_lookup_id;
   return lookupId ? referenceMaps.value.customerStatuses.get(lookupId) ?? lookupId : "";
+});
+const selectedCustomerStanding = computed(() => {
+  const label =
+    selectedCustomerRankingLabel.value
+    || selectedCustomerClassificationLabel.value
+    || selectedCustomerStatusLabel.value
+    || t("customerAdmin.summary.none");
+
+  const status = selectedCustomer.value?.status ?? "";
+  const tone =
+    status === "active"
+      ? "good"
+      : status === "inactive"
+        ? "warn"
+        : "bad";
+  return {
+    label,
+    tone,
+  } satisfies {
+    label: string;
+    tone: "bad" | "good" | "warn";
+  };
 });
 const portalAccessAvailableContacts = computed(() =>
   (selectedCustomer.value?.contacts ?? []).filter(
@@ -3291,6 +3336,8 @@ function startCreateCustomer() {
   activeCommercialTab.value = "billing_profile";
   selectedCustomerId.value = "";
   selectedCustomer.value = null;
+  customerDashboard.value = null;
+  customerDashboardError.value = "";
   customerHistory.value = [];
   customerPortalLoginHistory.value = [];
   customerPortalAccessAccounts.value = [];
@@ -3322,6 +3369,16 @@ function startCreateInvoiceParty() {
   resetInvoicePartyDraft();
 }
 
+function handleDashboardCreateContact() {
+  activeDetailTab.value = "contacts";
+  startCreateContact();
+}
+
+function handleDashboardCreateInvoiceParty() {
+  activeDetailTab.value = "commercial";
+  startCreateInvoiceParty();
+}
+
 function startCreateRateCard() {
   activeCommercialTab.value = "pricing_rules";
   activePricingRulesTab.value = "rate_cards";
@@ -3340,7 +3397,7 @@ function startCreateSurchargeRule() {
   resetSurchargeRuleDraft();
 }
 
-function cancelCustomerEdit() {
+async function cancelCustomerEdit() {
   if (!isCreatingCustomer.value && selectedCustomer.value) {
     populateCustomerDraft(selectedCustomer.value);
     return;
@@ -3350,9 +3407,13 @@ function cancelCustomerEdit() {
   selectedCustomerId.value = nextState.selectedCustomerId;
   selectedCustomer.value = nextState.selectedCustomer;
   if (selectedCustomer.value) {
-    populateCustomerDraft(selectedCustomer.value);
+    await selectCustomer(selectedCustomer.value.id, {
+      preferredDetailTab: "dashboard",
+    });
   } else {
     resetCustomerDraft();
+    customerDashboard.value = null;
+    customerDashboardError.value = "";
     customerHistory.value = [];
     customerPortalLoginHistory.value = [];
     customerPortalAccessAccounts.value = [];
@@ -3372,6 +3433,8 @@ async function refreshCustomers(options: RefreshCustomersOptions = {}) {
     referenceData.value = null;
     customers.value = [];
     selectedCustomer.value = null;
+    customerDashboard.value = null;
+    customerDashboardError.value = "";
     customerHistory.value = [];
     customerPortalLoginHistory.value = [];
     customerPortalAccessAccounts.value = [];
@@ -3409,6 +3472,8 @@ async function refreshCustomers(options: RefreshCustomersOptions = {}) {
         await selectCustomer(customers.value[0].id);
       } else {
         selectedCustomer.value = null;
+        customerDashboard.value = null;
+        customerDashboardError.value = "";
         customerHistory.value = [];
         customerPortalLoginHistory.value = [];
         customerPortalAccessAccounts.value = [];
@@ -3440,7 +3505,7 @@ async function selectCustomer(customerId: string, options: SelectCustomerOptions
   try {
     const desiredDetailTab = options.preserveDetailTab
       ? activeDetailTab.value
-      : (options.preferredDetailTab ?? options.fallbackDetailTab ?? "overview");
+      : (options.preferredDetailTab ?? options.fallbackDetailTab ?? "dashboard");
     const desiredCommercialTab = options.preserveCommercialTab
       ? activeCommercialTab.value
       : (options.preferredCommercialTab ?? options.fallbackCommercialTab ?? "billing_profile");
@@ -3472,8 +3537,9 @@ async function selectCustomer(customerId: string, options: SelectCustomerOptions
       closePortalAccessPasswordReset();
       resetPortalPrivacyDraft();
       resetPortalAccessDraft();
-      await refreshAvailableAddresses();
       isCreatingCustomer.value = false;
+      await refreshAvailableAddresses();
+      await refreshCustomerDashboard();
       activeDetailTab.value = normalizeCustomerDetailTab(desiredDetailTab, {
         canReadCommercial: canReadCommercial.value,
         hasSelectedCustomer: !!selectedCustomer.value,
@@ -3492,7 +3558,7 @@ async function selectCustomer(customerId: string, options: SelectCustomerOptions
       await refreshEmployeeBlocks();
       await refreshPortalPrivacy();
       await refreshCustomerPortalAccess();
-      activeDetailTab.value = normalizeCustomerDetailTab(activeDetailTab.value || options.fallbackDetailTab || "overview", {
+      activeDetailTab.value = normalizeCustomerDetailTab(activeDetailTab.value || options.fallbackDetailTab || "dashboard", {
         canReadCommercial: canReadCommercial.value,
         hasSelectedCustomer: !!selectedCustomer.value,
         isCreatingCustomer: isCreatingCustomer.value,
@@ -3516,6 +3582,38 @@ async function selectCustomer(customerId: string, options: SelectCustomerOptions
     handleApiError(error);
   } finally {
     loading.detail = false;
+  }
+}
+
+async function refreshCustomerDashboard() {
+  if (!selectedCustomer.value || !tenantScopeId.value || !accessToken.value || isCreatingCustomer.value) {
+    customerDashboard.value = null;
+    customerDashboardError.value = "";
+    return;
+  }
+
+  loading.dashboard = true;
+  customerDashboard.value = null;
+  customerDashboardError.value = "";
+  try {
+    customerDashboard.value = await getCustomerDashboard(
+      tenantScopeId.value,
+      selectedCustomer.value.id,
+      accessToken.value,
+    );
+  } catch (error) {
+    customerDashboard.value = null;
+    if (error instanceof CustomerAdminApiError) {
+      const feedbackKey =
+        mapCustomerCommercialApiMessage(error.messageKey) !== "customerAdmin.feedback.error"
+          ? mapCustomerCommercialApiMessage(error.messageKey)
+          : mapCustomerApiMessage(error.messageKey);
+      customerDashboardError.value = t(feedbackKey as never);
+    } else {
+      customerDashboardError.value = t("customerAdmin.feedback.error");
+    }
+  } finally {
+    loading.dashboard = false;
   }
 }
 

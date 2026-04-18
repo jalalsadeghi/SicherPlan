@@ -24,6 +24,8 @@ from app.modules.customers.models import (
     CustomerRateLine,
     CustomerSurchargeRule,
 )
+from app.modules.finance.models import CustomerInvoice
+from app.modules.planning.models import CustomerOrder, PlanningRecord
 from app.modules.customers.schemas import (
     CustomerAddressCreate,
     CustomerAddressUpdate,
@@ -138,6 +140,59 @@ class SqlAlchemyCustomerRepository:
             CustomerBillingProfile.customer_id == customer_id,
         )
         return self.session.scalars(statement).one_or_none()
+
+    def count_planning_records_for_customer(self, tenant_id: str, customer_id: str) -> int:
+        statement = (
+            select(func.count(PlanningRecord.id))
+            .select_from(PlanningRecord)
+            .join(
+                CustomerOrder,
+                (CustomerOrder.tenant_id == PlanningRecord.tenant_id) & (CustomerOrder.id == PlanningRecord.order_id),
+            )
+            .where(
+                PlanningRecord.tenant_id == tenant_id,
+                CustomerOrder.customer_id == customer_id,
+                PlanningRecord.archived_at.is_(None),
+            )
+        )
+        return int(self.session.scalar(statement) or 0)
+
+    def list_latest_planning_records_for_customer(
+        self,
+        tenant_id: str,
+        customer_id: str,
+        *,
+        limit: int,
+    ) -> list[PlanningRecord]:
+        statement = (
+            select(PlanningRecord)
+            .join(
+                CustomerOrder,
+                (CustomerOrder.tenant_id == PlanningRecord.tenant_id) & (CustomerOrder.id == PlanningRecord.order_id),
+            )
+            .where(
+                PlanningRecord.tenant_id == tenant_id,
+                CustomerOrder.customer_id == customer_id,
+                PlanningRecord.archived_at.is_(None),
+            )
+            .options(selectinload(PlanningRecord.order))
+            .order_by(PlanningRecord.planning_from.desc(), PlanningRecord.created_at.desc(), PlanningRecord.id.desc())
+            .limit(limit)
+        )
+        return list(self.session.scalars(statement).all())
+
+    def list_released_customer_invoices_for_customer(self, tenant_id: str, customer_id: str) -> list[CustomerInvoice]:
+        statement = (
+            select(CustomerInvoice)
+            .where(
+                CustomerInvoice.tenant_id == tenant_id,
+                CustomerInvoice.customer_id == customer_id,
+                CustomerInvoice.archived_at.is_(None),
+                CustomerInvoice.invoice_status_code.in_(("released", "queued", "sent")),
+            )
+            .order_by(CustomerInvoice.issue_date.desc(), CustomerInvoice.created_at.desc(), CustomerInvoice.id.desc())
+        )
+        return list(self.session.scalars(statement).all())
 
     def create_billing_profile(
         self,

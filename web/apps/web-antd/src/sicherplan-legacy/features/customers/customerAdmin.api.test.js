@@ -15,3 +15,13 @@ test("customer admin api uses the shared legacy session request path instead of 
   assert.doesNotMatch(apiSource, /Authorization:\s*`Bearer/);
   assert.doesNotMatch(apiSource, /fetch\(`\$\{webAppConfig\.apiBaseUrl\}\$\{path\}`/);
 });
+
+test("customer admin api exposes typed customer dashboard support", () => {
+  assert.match(apiSource, /export interface CustomerDashboardRead/);
+  assert.match(apiSource, /export interface CustomerDashboardPlanningSummaryRead/);
+  assert.match(apiSource, /export interface CustomerDashboardFinanceSummaryRead/);
+  assert.match(apiSource, /export interface CustomerDashboardCalendarItemRead/);
+  assert.match(apiSource, /created_at: string;/);
+  assert.match(apiSource, /export function getCustomerDashboard\(tenantId: string, customerId: string, accessToken: string\)/);
+  assert.match(apiSource, /\/api\/customers\/tenants\/\$\{tenantId\}\/customers\/\$\{customerId\}\/dashboard/);
+});

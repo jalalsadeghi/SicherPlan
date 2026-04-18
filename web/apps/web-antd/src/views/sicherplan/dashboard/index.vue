@@ -7,6 +7,7 @@ import { useAccessStore, useUserStore } from '@vben/stores';
 import { Button, Card, Space, Tag } from 'ant-design-vue';
 
 import { $t } from '#/locales';
+import DashboardCalendarPanel from '#/components/sicherplan/dashboard-calendar-panel.vue';
 import EmptyState from '#/components/sicherplan/empty-state.vue';
 import SectionHeader from '#/components/sicherplan/section-header.vue';
 import { useAuthStore as useLegacyAuthStore } from '#/sicherplan-legacy/stores/auth';
@@ -639,6 +640,25 @@ const calendarCells = computed<CalendarCell[]>(() => {
   });
 });
 
+const calendarPanelCells = computed(() =>
+  calendarCells.value.map((cell) => ({
+    dateKey: buildCalendarDayKey(cell.date),
+    dayLabel: cell.dayLabel,
+    inMonth: cell.inMonth,
+    isToday: cell.isToday,
+    moreCount: cell.moreCount,
+    orderCount: cell.orderCount,
+    shiftCount: cell.shiftCount,
+    visibleItems: cell.visibleItems.map((item) => ({
+      key: item.key,
+      label: item.label,
+      route: item.route,
+      tone: item.tone,
+      coverageStateLabel: buildCoverageStateLabel(item.coverageState),
+    })),
+  })),
+);
+
 const monthLabel = computed(() =>
   formatDateLabel(activeDate.value, {
     month: 'long',
@@ -865,107 +885,24 @@ onBeforeUnmount(() => {
       </Card>
     </section>
 
-    <Card :bordered="false" class="sp-dashboard__calendar-card">
-      <div class="sp-dashboard__panel-head">
-        <SectionHeader
-          :description="$t('sicherplan.dashboardView.calendar.description')"
-          :title="$t('sicherplan.dashboardView.calendar.title')"
-        />
-        <Space wrap>
-          <Button @click="shiftCalendar('prev')">
-            {{ $t('sicherplan.dashboardView.calendar.previous') }}
-          </Button>
-          <Button @click="shiftCalendar('next')">
-            {{ $t('sicherplan.dashboardView.calendar.next') }}
-          </Button>
-          <RouterLink to="/admin/planning-shifts">
-            <Button type="primary">
-              {{ $t('sicherplan.dashboardView.calendar.openPlanning') }}
-            </Button>
-          </RouterLink>
-        </Space>
-      </div>
-
-      <div class="sp-dashboard__calendar-topline">
-        <div>
-          <strong>{{ monthLabel }}</strong>
-          <p>{{ $t('sicherplan.dashboardView.calendar.monthHint') }}</p>
-        </div>
-        <div class="sp-dashboard__summary-chips">
-          <div
-            v-for="summary in scheduleSummary"
-            :key="summary.label"
-            class="sp-dashboard__summary-chip"
-          >
-            <span>{{ summary.label }}</span>
-            <strong>{{ summary.value }}</strong>
-          </div>
-        </div>
-      </div>
-
-      <div class="sp-dashboard__calendar-grid">
-        <div
-          v-for="label in weekDayLabels"
-          :key="label"
-          class="sp-dashboard__weekday"
-        >
-          {{ label }}
-        </div>
-        <div
-          v-for="cell in calendarCells"
-          :key="cell.date.toISOString()"
-          class="sp-dashboard__calendar-cell"
-          :class="{
-            'is-muted': !cell.inMonth,
-            'is-today': cell.isToday,
-          }"
-        >
-          <span class="sp-dashboard__calendar-day">{{ cell.dayLabel }}</span>
-          <div
-            v-if="cell.visibleItems.length"
-            class="sp-dashboard__calendar-items"
-          >
-            <RouterLink
-              v-for="item in cell.visibleItems"
-              :key="item.key"
-              :to="item.route"
-              class="sp-dashboard__calendar-item"
-              :class="`sp-dashboard__calendar-item--${item.tone}`"
-              :aria-label="`${buildCoverageStateLabel(item.coverageState)}: ${item.label}`"
-              :title="`${buildCoverageStateLabel(item.coverageState)}: ${item.label}`"
-            >
-              <span
-                aria-hidden="true"
-                class="sp-dashboard__calendar-item-marker"
-              />
-              <span class="sp-dashboard__calendar-item-label">{{ item.label }}</span>
-            </RouterLink>
-            <button
-              v-if="cell.moreCount"
-              type="button"
-              class="sp-dashboard__calendar-more"
-              @click="toggleCalendarDay(cell.key)"
-            >
-              +{{ cell.moreCount }} {{ $t('sicherplan.dashboardView.calendar.more') }}
-            </button>
-          </div>
-          <div class="sp-dashboard__calendar-events">
-            <span
-              v-if="cell.shiftCount"
-              class="sp-dashboard__calendar-pill sp-dashboard__calendar-pill--teal"
-            >
-              {{ cell.shiftCount }} {{ $t('sicherplan.dashboardView.calendar.shiftShort') }}
-            </span>
-            <span
-              v-if="cell.orderCount"
-              class="sp-dashboard__calendar-pill sp-dashboard__calendar-pill--amber"
-            >
-              {{ cell.orderCount }} {{ $t('sicherplan.dashboardView.calendar.orderShort') }}
-            </span>
-          </div>
-        </div>
-      </div>
-    </Card>
+    <DashboardCalendarPanel
+      :action-label="$t('sicherplan.dashboardView.calendar.openPlanning')"
+      action-to="/admin/planning-shifts"
+      :cells="calendarPanelCells"
+      :description="$t('sicherplan.dashboardView.calendar.description')"
+      :month-hint="$t('sicherplan.dashboardView.calendar.monthHint')"
+      :month-label="monthLabel"
+      :more-label="$t('sicherplan.dashboardView.calendar.more')"
+      :next-label="$t('sicherplan.dashboardView.calendar.next')"
+      :order-short-label="$t('sicherplan.dashboardView.calendar.orderShort')"
+      :previous-label="$t('sicherplan.dashboardView.calendar.previous')"
+      :shift-short-label="$t('sicherplan.dashboardView.calendar.shiftShort')"
+      :summary="scheduleSummary"
+      :title="$t('sicherplan.dashboardView.calendar.title')"
+      :week-day-labels="weekDayLabels"
+      @shift-calendar="shiftCalendar"
+      @toggle-day="toggleCalendarDay"
+    />
   </div>
 </template>
 
