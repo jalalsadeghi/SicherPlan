@@ -1,10 +1,23 @@
 <script lang="ts" setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 
-import { Card } from "ant-design-vue";
+import { Card, Tag } from "ant-design-vue";
 
 import EmptyState from "#/components/sicherplan/empty-state.vue";
 import DashboardCalendarPanel from "#/components/sicherplan/dashboard-calendar-panel.vue";
+import {
+  buildCoverageShiftLabel,
+  buildStaffingCoverageRoute,
+} from "#/features/sicherplan/dashboardCoverage.helpers";
+import {
+  listStaffingCoverage,
+  type CoverageFilterParams,
+  type CoverageShiftItem,
+} from "@/api/planningStaffing";
+import {
+  coverageTone,
+  resolvePlanningStaffingCoverageState,
+} from "@/features/planning/planningStaffing.helpers";
 import type {
   CustomerDashboardRead,
   CustomerRead,
@@ -18,7 +31,12 @@ interface StandingSummary {
   tone: "bad" | "good" | "warn";
 }
 
+type CustomerDashboardFinanceTone = "good" | "restricted" | "warn";
+type CustomerDashboardStandingTone = StandingSummary["tone"];
+type LatestPlanStatusTone = "good" | "neutral" | "warn";
+
 interface CalendarCellItem {
+  route: string;
   key: string;
   label: string;
   tone: "bad" | "good" | "warn";
@@ -40,11 +58,13 @@ const props = defineProps<{
   canReadCommercial: boolean;
   canWriteCommercial: boolean;
   canManageContacts: boolean;
+  accessToken: string;
   customer: CustomerRead;
   dashboard: CustomerDashboardRead | null;
   error: string;
   loading: boolean;
   standing: StandingSummary;
+  tenantId: string;
 }>();
 
 const emit = defineEmits<{
@@ -56,6 +76,12 @@ const emit = defineEmits<{
 const { t, locale } = useI18n();
 const activeDate = ref(new Date());
 const expandedDays = ref<string[]>([]);
+const calendarLoading = ref(false);
+const calendarError = ref("");
+const coverageMonthItemsByDay = ref<Map<string, CoverageShiftItem[]>>(new Map());
+const coverageRequestVersion = ref(0);
+const coverageMonthCache = new Map<string, Map<string, CoverageShiftItem[]>>();
+const coverageMonthRequests = new Map<string, Promise<Map<string, CoverageShiftItem[]>>>();
 
 const quickActions = computed(() => {
   const actions: Array<{ id: string; label: string; mode: "action" | "tab"; tabId?: DashboardTabId }> = [
@@ -88,6 +114,29 @@ const actionShortcuts = computed(() => {
 });
 
 const latestPlans = computed(() => props.dashboard?.planning_summary.latest_plans ?? []);
+
+function resolveLatestPlanStatusTone(status: string): LatestPlanStatusTone {
+  switch (status) {
+    case "released":
+      return "good";
+    case "draft":
+    case "release_ready":
+      return "warn";
+    default:
+      return "neutral";
+  }
+}
+
+function resolveLatestPlanTagColor(status: string) {
+  switch (resolveLatestPlanStatusTone(status)) {
+    case "good":
+      return "success";
+    case "warn":
+      return "gold";
+    default:
+      return "default";
+  }
+}
 
 const tenureLabel = computed(() => {
   if (!props.customer.created_at) {
@@ -125,12 +174,31 @@ const financeValue = computed(() => {
   }).format(amount);
 });
 
+const financeTone = computed<CustomerDashboardFinanceTone>(() => {
+  const financeSummary = props.dashboard?.finance_summary;
+  if (financeSummary?.visibility === "restricted") {
+    return "restricted";
+  }
+  if (!financeSummary || financeSummary.visibility === "unavailable") {
+    return "warn";
+  }
+  if (financeSummary.total_received_amount == null || !financeSummary.currency_code) {
+    return "warn";
+  }
+  const amount = Number(financeSummary.total_received_amount);
+  return Number.isFinite(amount) ? "good" : "warn";
+});
+
 const financeMeta = computed(() => {
   const financeSummary = props.dashboard?.finance_summary;
   if (!financeSummary?.semantic_label) {
     return "";
   }
   return t(`customerAdmin.dashboard.financeLabels.${financeSummary.semantic_label}` as never);
+});
+
+const standingTone = computed<CustomerDashboardStandingTone>(() => {
+  return props.standing.tone === "good" || props.standing.tone === "warn" ? props.standing.tone : "bad";
 });
 
 const weekDayLabels = computed(() => {
@@ -146,26 +214,30 @@ const monthLabel = computed(() =>
   new Intl.DateTimeFormat(locale.value, { month: "long", year: "numeric" }).format(activeDate.value),
 );
 
+const coverageRows = computed(() => [...coverageMonthItemsByDay.value.values()].flat());
+
 const calendarSummary = computed(() => {
-  const items = props.dashboard?.calendar_items ?? [];
-  const releasedCount = items.filter((item) => item.status === "released").length;
+  const items = coverageRows.value;
+  const atRiskCount = items.filter(
+    (item) => resolvePlanningStaffingCoverageState(item.coverage_state, item.demand_groups) !== "green",
+  ).length;
   return [
     {
-      label: t("customerAdmin.dashboard.calendarSummary.plans"),
+      label: t("customerAdmin.dashboard.calendarSummary.shifts"),
       value: String(items.length),
-    },
-    {
-      label: t("customerAdmin.dashboard.calendarSummary.released"),
-      value: String(releasedCount),
     },
     {
       label: t("customerAdmin.dashboard.calendarSummary.orders"),
       value: String(new Set(items.map((item) => item.order_id).filter(Boolean)).size),
     },
+    {
+      label: t("customerAdmin.dashboard.calendarSummary.atRisk"),
+      value: String(atRiskCount),
+    },
   ];
 });
 
-const calendarCells = computed<CalendarCell[]>(() => {
+const calendarCells = computed(() => {
   const current = activeDate.value;
   const year = current.getFullYear();
   const month = current.getMonth();
@@ -173,33 +245,20 @@ const calendarCells = computed<CalendarCell[]>(() => {
   const startOffset = (firstDay.getDay() + 6) % 7;
   const startDate = new Date(year, month, 1 - startOffset);
   const todayKey = buildDayKey(new Date());
-  const itemsByDay = new Map<string, Array<{
-    id: string;
-    title: string;
-    status: string;
-    order_id: string | null;
-    starts_at: string | null;
-  }>>();
-
-  for (const item of props.dashboard?.calendar_items ?? []) {
-    if (!item.starts_at) {
-      continue;
-    }
-    const dayKey = buildDayKey(new Date(item.starts_at));
-    itemsByDay.set(dayKey, [...(itemsByDay.get(dayKey) ?? []), item]);
-  }
-
-  return Array.from({ length: 35 }, (_, index) => {
+  return Array.from({ length: 35 }, (_, index): CalendarCell => {
     const date = new Date(startDate);
     date.setDate(startDate.getDate() + index);
     const dayKey = buildDayKey(date);
-    const items = itemsByDay.get(dayKey) ?? [];
+    const items = coverageMonthItemsByDay.value.get(dayKey) ?? [];
     const isExpanded = expandedDays.value.includes(dayKey);
     const visibleItems = (isExpanded ? items : items.slice(0, 2)).map((item) => ({
-      key: item.id,
-      label: truncateLabel(item.title),
-      tone: resolveTone(item.status),
-      coverageStateLabel: resolveStateLabel(item.status),
+      key: item.shift_id,
+      label: buildCoverageShiftLabel(item, locale.value),
+      route: buildStaffingCoverageRoute(item),
+      tone: coverageTone(
+        resolvePlanningStaffingCoverageState(item.coverage_state, item.demand_groups),
+      ) as CalendarCellItem["tone"],
+      coverageStateLabel: resolveStateLabel(item.coverage_state, item.demand_groups),
     }));
     return {
       dateKey: dayKey,
@@ -208,7 +267,7 @@ const calendarCells = computed<CalendarCell[]>(() => {
       isToday: dayKey === todayKey,
       visibleItems,
       moreCount: Math.max(items.length - visibleItems.length, 0),
-      shiftCount: 0,
+      shiftCount: items.length,
       orderCount: new Set(items.map((item) => item.order_id).filter(Boolean)).size,
     };
   });
@@ -218,31 +277,114 @@ function buildDayKey(value: Date) {
   return value.toDateString();
 }
 
-function truncateLabel(value: string, maxLength = 24) {
-  if (value.length <= maxLength) {
-    return value;
+function resolveStateLabel(coverageState: string, demandGroups: CoverageShiftItem["demand_groups"]) {
+  const resolvedState = resolvePlanningStaffingCoverageState(coverageState, demandGroups);
+  if (resolvedState === "green") {
+    return t("customerAdmin.dashboard.calendarStatus.good");
   }
-  return `${value.slice(0, maxLength - 1).trimEnd()}…`;
+  if (resolvedState === "yellow") {
+    return t("customerAdmin.dashboard.calendarStatus.warn");
+  }
+  if (resolvedState === "setup_required") {
+    return t("customerAdmin.dashboard.calendarStatus.setupRequired");
+  }
+  return t("customerAdmin.dashboard.calendarStatus.bad");
 }
 
-function resolveTone(status: string): "bad" | "good" | "warn" {
-  if (status === "released") {
-    return "good";
-  }
-  if (status === "draft") {
-    return "warn";
-  }
-  return "bad";
+function formatDateTimeLocalValue(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  const hours = String(value.getHours()).padStart(2, "0");
+  const minutes = String(value.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-function resolveStateLabel(status: string) {
-  if (status === "released") {
-    return t("customerAdmin.dashboard.calendarStatus.released");
+function visibleCalendarMonthStart(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), 1, 0, 0, 0, 0);
+}
+
+function visibleCalendarMonthEnd(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth() + 1, 0, 23, 59, 0, 0);
+}
+
+function resolveCoverageMonthKey() {
+  if (!props.tenantId || !props.accessToken || !props.customer.id) {
+    return "";
   }
-  if (status === "draft") {
-    return t("customerAdmin.dashboard.calendarStatus.draft");
+  return [
+    props.tenantId,
+    props.customer.id,
+    formatDateTimeLocalValue(visibleCalendarMonthStart(activeDate.value)),
+    formatDateTimeLocalValue(visibleCalendarMonthEnd(activeDate.value)),
+  ].join(":");
+}
+
+function buildCoverageItemsByDay(coverageRows: CoverageShiftItem[]) {
+  const itemsByDay = new Map<string, CoverageShiftItem[]>();
+  [...coverageRows]
+    .sort((left, right) => new Date(left.starts_at).getTime() - new Date(right.starts_at).getTime())
+    .forEach((coverageRow) => {
+      const key = buildDayKey(new Date(coverageRow.starts_at));
+      itemsByDay.set(key, [...(itemsByDay.get(key) ?? []), coverageRow]);
+    });
+  return itemsByDay;
+}
+
+async function loadCoverageForVisibleMonth(options: { force?: boolean } = {}) {
+  const monthKey = resolveCoverageMonthKey();
+  if (!monthKey) {
+    coverageMonthItemsByDay.value = new Map();
+    calendarError.value = "";
+    return;
   }
-  return t("customerAdmin.dashboard.calendarStatus.other");
+
+  const cached = coverageMonthCache.get(monthKey);
+  if (cached && !options.force) {
+    coverageMonthItemsByDay.value = cached;
+    calendarError.value = "";
+    return;
+  }
+
+  coverageMonthItemsByDay.value = cached ?? new Map();
+  calendarLoading.value = true;
+  calendarError.value = "";
+
+  let request = coverageMonthRequests.get(monthKey);
+  if (!request || options.force) {
+    const filters: CoverageFilterParams = {
+      customer_id: props.customer.id,
+      date_from: formatDateTimeLocalValue(visibleCalendarMonthStart(activeDate.value)),
+      date_to: formatDateTimeLocalValue(visibleCalendarMonthEnd(activeDate.value)),
+    };
+    request = listStaffingCoverage(props.tenantId, props.accessToken, filters).then((rows) => buildCoverageItemsByDay(rows));
+    coverageMonthRequests.set(monthKey, request);
+    void request.finally(() => {
+      if (coverageMonthRequests.get(monthKey) === request) {
+        coverageMonthRequests.delete(monthKey);
+      }
+    });
+  }
+
+  const requestVersion = ++coverageRequestVersion.value;
+  try {
+    const itemsByDay = await request;
+    coverageMonthCache.set(monthKey, itemsByDay);
+    if (requestVersion !== coverageRequestVersion.value || resolveCoverageMonthKey() !== monthKey) {
+      return;
+    }
+    coverageMonthItemsByDay.value = itemsByDay;
+  } catch {
+    if (requestVersion !== coverageRequestVersion.value || resolveCoverageMonthKey() !== monthKey) {
+      return;
+    }
+    coverageMonthItemsByDay.value = new Map();
+    calendarError.value = t("customerAdmin.dashboard.calendarLoadError");
+  } finally {
+    if (requestVersion === coverageRequestVersion.value) {
+      calendarLoading.value = false;
+    }
+  }
 }
 
 function shiftCalendar(direction: "next" | "prev") {
@@ -281,6 +423,21 @@ function formatPlanWindow(plan: CustomerDashboardRead["planning_summary"]["lates
     }).format(new Date(value));
   return `${formatDate(plan.planning_from)}${plan.planning_to ? ` → ${formatDate(plan.planning_to)}` : ""}`;
 }
+
+watch(
+  () => [props.customer.id, props.tenantId, props.accessToken],
+  () => {
+    void loadCoverageForVisibleMonth({ force: true });
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [activeDate.value.getFullYear(), activeDate.value.getMonth()],
+  () => {
+    void loadCoverageForVisibleMonth();
+  },
+);
 </script>
 
 <template>
@@ -301,14 +458,24 @@ function formatPlanWindow(plan: CustomerDashboardRead["planning_summary"]["lates
           <span>{{ t("customerAdmin.dashboard.kpis.plans") }}</span>
           <strong>{{ dashboard?.planning_summary.total_plans_count ?? 0 }}</strong>
         </Card>
-        <Card :bordered="false" class="customer-dashboard-tab__kpi-card" data-testid="customer-dashboard-kpi-finance">
+        <Card
+          :bordered="false"
+          class="customer-dashboard-tab__kpi-card customer-dashboard-tab__kpi-card--tone"
+          :data-tone="financeTone"
+          data-testid="customer-dashboard-kpi-finance"
+        >
           <span>{{ t("customerAdmin.dashboard.kpis.finance") }}</span>
-          <strong>{{ financeValue }}</strong>
-          <small v-if="financeMeta">{{ financeMeta }}</small>
+          <strong class="customer-dashboard-tab__kpi-value" :data-tone="financeTone">{{ financeValue }}</strong>
+          <small v-if="financeMeta" class="customer-dashboard-tab__kpi-meta">{{ financeMeta }}</small>
         </Card>
-        <Card :bordered="false" class="customer-dashboard-tab__kpi-card" data-testid="customer-dashboard-kpi-standing">
+        <Card
+          :bordered="false"
+          class="customer-dashboard-tab__kpi-card customer-dashboard-tab__kpi-card--tone"
+          :data-tone="standingTone"
+          data-testid="customer-dashboard-kpi-standing"
+        >
           <span>{{ t("customerAdmin.dashboard.kpis.standing") }}</span>
-          <strong :class="`customer-dashboard-tab__standing customer-dashboard-tab__standing--${standing.tone}`">
+          <strong class="customer-dashboard-tab__standing" :data-tone="standingTone">
             {{ standing.label }}
           </strong>
         </Card>
@@ -332,7 +499,14 @@ function formatPlanWindow(plan: CustomerDashboardRead["planning_summary"]["lates
                 <strong>{{ plan.label }}</strong>
                 <span>{{ formatPlanWindow(plan) }}</span>
               </div>
-              <span>{{ plan.status }}</span>
+              <Tag
+                class="customer-dashboard-tab__status-tag"
+                :color="resolveLatestPlanTagColor(plan.status)"
+                :data-tone="resolveLatestPlanStatusTone(plan.status)"
+                :data-status="plan.status"
+              >
+                {{ plan.status }}
+              </Tag>
             </div>
           </div>
           <EmptyState
@@ -372,28 +546,36 @@ function formatPlanWindow(plan: CustomerDashboardRead["planning_summary"]["lates
         </Card>
       </section>
 
-      <DashboardCalendarPanel
-        :cells="calendarCells"
-        :description="t('customerAdmin.dashboard.calendarDescription')"
-        :month-hint="t('customerAdmin.dashboard.calendarMonthHint')"
-        :month-label="monthLabel"
-        :more-label="t('customerAdmin.dashboard.calendarMore')"
-        :next-label="t('customerAdmin.dashboard.calendarNext')"
-        :order-short-label="t('customerAdmin.dashboard.calendarOrderShort')"
-        :previous-label="t('customerAdmin.dashboard.calendarPrevious')"
-        :shift-short-label="t('customerAdmin.dashboard.calendarPlanShort')"
-        :summary="calendarSummary"
-        :title="t('customerAdmin.dashboard.calendarTitle')"
-        :week-day-labels="weekDayLabels"
-        @shift-calendar="shiftCalendar"
-        @toggle-day="toggleCalendarDay"
-      />
-      <EmptyState
-        v-if="!dashboard?.calendar_items.length"
-        class="customer-dashboard-tab__calendar-empty"
-        :description="t('customerAdmin.dashboard.calendarEmptyBody')"
-        :title="t('customerAdmin.dashboard.calendarEmptyTitle')"
-      />
+      <div v-if="calendarLoading" class="customer-dashboard-tab__state" data-testid="customer-dashboard-calendar-loading">
+        {{ t("workspace.loading.processing") }}
+      </div>
+      <div v-else-if="calendarError" class="customer-dashboard-tab__state" data-testid="customer-dashboard-calendar-error">
+        {{ calendarError }}
+      </div>
+      <template v-else>
+        <DashboardCalendarPanel
+          :cells="calendarCells"
+          :description="t('customerAdmin.dashboard.calendarDescription')"
+          :month-hint="t('customerAdmin.dashboard.calendarMonthHint')"
+          :month-label="monthLabel"
+          :more-label="t('customerAdmin.dashboard.calendarMore')"
+          :next-label="t('customerAdmin.dashboard.calendarNext')"
+          :order-short-label="t('customerAdmin.dashboard.calendarOrderShort')"
+          :previous-label="t('customerAdmin.dashboard.calendarPrevious')"
+          :shift-short-label="t('customerAdmin.dashboard.calendarShiftShort')"
+          :summary="calendarSummary"
+          :title="t('customerAdmin.dashboard.calendarTitle')"
+          :week-day-labels="weekDayLabels"
+          @shift-calendar="shiftCalendar"
+          @toggle-day="toggleCalendarDay"
+        />
+        <EmptyState
+          v-if="!coverageRows.length"
+          class="customer-dashboard-tab__calendar-empty"
+          :description="t('customerAdmin.dashboard.calendarEmptyBody')"
+          :title="t('customerAdmin.dashboard.calendarEmptyTitle')"
+        />
+      </template>
     </template>
   </section>
 </template>
@@ -430,6 +612,21 @@ function formatPlanWindow(plan: CustomerDashboardRead["planning_summary"]["lates
   gap: 0.45rem;
 }
 
+.customer-dashboard-tab__kpi-card--tone {
+  position: relative;
+  overflow: hidden;
+}
+
+.customer-dashboard-tab__kpi-card--tone::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.32rem;
+  border-radius: 1rem 0 0 1rem;
+  background: currentColor;
+  opacity: 0.75;
+}
+
 .customer-dashboard-tab__kpi-card span,
 .customer-dashboard-tab__kpi-card small {
   color: var(--sp-color-text-secondary);
@@ -440,16 +637,68 @@ function formatPlanWindow(plan: CustomerDashboardRead["planning_summary"]["lates
   font-size: 1.35rem;
 }
 
-.customer-dashboard-tab__standing--good {
-  color: rgb(17 119 119);
+.customer-dashboard-tab__kpi-card--tone[data-tone="good"] {
+  color: var(--sp-color-success);
+  border-color: color-mix(in srgb, var(--sp-color-success) 30%, var(--sp-color-border-soft));
+  background: color-mix(in srgb, var(--sp-color-success) 10%, var(--sp-color-surface-card));
 }
 
-.customer-dashboard-tab__standing--warn {
-  color: rgb(149 97 18);
+.customer-dashboard-tab__kpi-card--tone[data-tone="warn"] {
+  color: var(--sp-color-warning);
+  border-color: color-mix(in srgb, var(--sp-color-warning) 32%, var(--sp-color-border-soft));
+  background: color-mix(in srgb, var(--sp-color-warning) 11%, var(--sp-color-surface-card));
 }
 
-.customer-dashboard-tab__standing--bad {
-  color: rgb(172 54 41);
+.customer-dashboard-tab__kpi-card--tone[data-tone="bad"] {
+  color: var(--sp-color-danger);
+  border-color: color-mix(in srgb, var(--sp-color-danger) 30%, var(--sp-color-border-soft));
+  background: color-mix(in srgb, var(--sp-color-danger) 10%, var(--sp-color-surface-card));
+}
+
+.customer-dashboard-tab__kpi-card--tone[data-tone="restricted"] {
+  color: var(--sp-color-primary-strong);
+  border-color: color-mix(in srgb, var(--sp-color-primary-strong) 26%, var(--sp-color-border-soft));
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 24%, var(--sp-color-surface-card));
+}
+
+.customer-dashboard-tab__kpi-value,
+.customer-dashboard-tab__standing {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  line-height: 1.25;
+}
+
+.customer-dashboard-tab__kpi-value[data-tone="good"],
+.customer-dashboard-tab__standing[data-tone="good"] {
+  border-color: color-mix(in srgb, var(--sp-color-success) 34%, transparent);
+  background: color-mix(in srgb, var(--sp-color-success) 14%, transparent);
+}
+
+.customer-dashboard-tab__kpi-value[data-tone="warn"],
+.customer-dashboard-tab__standing[data-tone="warn"] {
+  border-color: color-mix(in srgb, var(--sp-color-warning) 38%, transparent);
+  background: color-mix(in srgb, var(--sp-color-warning) 16%, transparent);
+}
+
+.customer-dashboard-tab__kpi-value[data-tone="bad"],
+.customer-dashboard-tab__standing[data-tone="bad"] {
+  border-color: color-mix(in srgb, var(--sp-color-danger) 34%, transparent);
+  background: color-mix(in srgb, var(--sp-color-danger) 14%, transparent);
+}
+
+.customer-dashboard-tab__kpi-value[data-tone="restricted"],
+.customer-dashboard-tab__standing[data-tone="restricted"] {
+  border-color: color-mix(in srgb, var(--sp-color-primary-strong) 30%, transparent);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 28%, transparent);
+}
+
+.customer-dashboard-tab__kpi-meta {
+  max-width: 100%;
 }
 
 .customer-dashboard-tab__row {
@@ -488,6 +737,12 @@ function formatPlanWindow(plan: CustomerDashboardRead["planning_summary"]["lates
 
 .customer-dashboard-tab__list-row span {
   color: var(--sp-color-text-secondary);
+}
+
+.customer-dashboard-tab__status-tag {
+  flex-shrink: 0;
+  font-weight: 600;
+  text-transform: none;
 }
 
 .customer-dashboard-tab__actions {

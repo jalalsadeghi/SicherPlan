@@ -447,6 +447,7 @@ def _staffing_filters(
 
 
 def _staffing_board_filters(
+    customer_id: UUID | None = Query(default=None),
     planning_record_id: UUID | None = Query(default=None),
     shift_plan_id: UUID | None = Query(default=None),
     shift_id: UUID | None = Query(default=None),
@@ -463,6 +464,7 @@ def _staffing_board_filters(
     confirmation_state: str | None = Query(default=None),
 ) -> StaffingBoardFilter:
     return StaffingBoardFilter(
+        customer_id=str(customer_id) if customer_id else None,
         planning_record_id=str(planning_record_id) if planning_record_id else None,
         shift_plan_id=str(shift_plan_id) if shift_plan_id else None,
         shift_id=str(shift_id) if shift_id else None,
@@ -481,6 +483,7 @@ def _staffing_board_filters(
 
 
 def _coverage_filters(
+    customer_id: UUID | None = Query(default=None),
     planning_record_id: UUID | None = Query(default=None),
     shift_plan_id: UUID | None = Query(default=None),
     order_id: UUID | None = Query(default=None),
@@ -495,6 +498,7 @@ def _coverage_filters(
     confirmation_state: str | None = Query(default=None),
 ) -> CoverageFilter:
     return CoverageFilter(
+        customer_id=str(customer_id) if customer_id else None,
         planning_record_id=str(planning_record_id) if planning_record_id else None,
         shift_plan_id=str(shift_plan_id) if shift_plan_id else None,
         order_id=str(order_id) if order_id else None,

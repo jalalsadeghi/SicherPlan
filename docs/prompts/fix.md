@@ -1,49 +1,49 @@
-You have already implemented the customer dashboard tab feature in the SicherPlan repository.
+You are working in the jalalsadeghi/SicherPlan repository.
 
-Now do a focused hardening pass.
-Do NOT add new features.
-Only fix integration issues, typing gaps, edge cases, permission leaks, and UX rough edges around this feature.
+Task:
+Make the “Latest plans” list in the customer dashboard visually easier to scan by giving each plan status a colored badge/chip/tag based on its real status.
 
-Review and improve:
+Before coding:
+- Validate what latest_plans[].status actually represents in the current backend contract (for example release_state or another canonical planning status).
+- Inspect whether the repo already has a reusable status->color helper/pattern for planning/order/dashboard lists. Reuse it if it exists; otherwise add a very small local helper.
+- Summarize the validated status mapping before coding.
 
-1. Backend
-- endpoint naming consistency
-- schema consistency
-- tenant isolation
-- authorization correctness
-- null/empty handling
-- truthful semantics for the finance aggregate
-- stable ordering and hard limit for latest 5 plans
+Relevant files to inspect first:
+- web/apps/web-antd/src/sicherplan-legacy/components/customers/CustomerDashboardTab.vue
+- backend/app/modules/customers/dashboard_service.py
+- any existing status badge/helper pattern in:
+  - web/apps/web-antd/src/views/sicherplan/dashboard/index.vue
+  - planning/order-related views if they already color statuses
 
-2. Frontend
-- create vs existing customer tab behavior
-- default tab selection logic
-- deep-link tab behavior
-- loading / empty / error states
-- permission-aware finance visibility
-- responsive layout and no visual overflow
-- date / currency formatting consistency
-- i18n completeness
-- test-id consistency
+Desired outcome:
+- Each latest plan row should show a small status badge/tag with consistent color semantics.
+- The rest of the row layout should stay compact and readable.
 
-3. Shared calendar reuse
-- ensure the reused/extracted calendar did not regress the main dashboard
-- keep customer filtering strict and explicit
-- verify no unrelated calendar behavior changed
+Implementation rules:
+- Prefer Ant Design Tag or the nearest existing badge pattern already used in this repo.
+- Map only real statuses that the backend actually returns.
+- Suggested truthful mapping after validation:
+  - released / approved / confirmed -> success / teal/green
+  - draft / pending -> warning / gold
+  - cancelled / archived / rejected -> error / red
+  - unknown / fallback -> default / neutral
+- Do not hard-code statuses that do not exist in the current contract.
+- Keep the raw status text readable; do not replace it with icons only.
+- Keep row layout and click behavior unchanged.
+- Ensure the badge remains legible in dark mode.
+- Expose a stable class/data attribute for testing instead of asserting literal CSS colors.
 
-4. Tests
-- fill missing tests
-- remove brittle assertions
-- add coverage for:
-  - no plans
-  - no finance data
-  - restricted finance user
-  - no calendar items
-  - selected customer switch
-  - create mode reset back to overview only
+Tests:
+- status badge renders for populated latest plans
+- different statuses produce different tones
+- unknown status falls back safely
+- empty state unchanged
+
+Validation request:
+Before finalizing, compare your chosen status mapping against actual values produced by the current latest_plans serializer and explain any adjustment you made.
 
 Output:
-- a short bug list of what you fixed
+- chosen status mapping
 - changed files
-- any remaining known limitation that is real and grounded in current repo constraints
-- avoid unrelated refactors
+- test results
+Avoid unrelated refactors.

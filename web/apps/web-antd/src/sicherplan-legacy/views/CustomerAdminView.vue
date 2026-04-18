@@ -186,6 +186,7 @@
 
           <CustomerDashboardTab
             v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'dashboard'"
+            :access-token="accessToken"
             :can-read-commercial="canReadCommercial"
             :can-write-commercial="canWriteCommercial"
             :can-manage-contacts="actionState.canManageContacts"
@@ -194,6 +195,7 @@
             :error="customerDashboardError"
             :loading="loading.dashboard"
             :standing="selectedCustomerStanding"
+            :tenant-id="tenantScopeId"
             @create-contact="handleDashboardCreateContact"
             @create-invoice-party="handleDashboardCreateInvoiceParty"
             @select-tab="activeDetailTab = $event"

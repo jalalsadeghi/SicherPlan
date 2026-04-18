@@ -35,6 +35,22 @@ export interface CoverageShiftItem {
   demand_groups: CoverageDemandGroupItem[];
 }
 
+export interface CoverageFilterParams {
+  customer_id?: null | string;
+  planning_record_id?: null | string;
+  shift_plan_id?: null | string;
+  order_id?: null | string;
+  date_from: string;
+  date_to: string;
+  planning_mode_code?: null | string;
+  workforce_scope_code?: null | string;
+  function_type_id?: null | string;
+  qualification_type_id?: null | string;
+  release_state?: null | string;
+  visibility_state?: null | string;
+  confirmation_state?: null | string;
+}
+
 export interface StaffingBoardAssignmentItem {
   id: string;
   shift_id: string;
@@ -472,9 +488,9 @@ function queryString(params: Record<string, unknown>) {
   return serialized ? `?${serialized}` : "";
 }
 
-export function listStaffingCoverage(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
+export function listStaffingCoverage(tenantId: string, accessToken: string, filters: CoverageFilterParams) {
   return request<CoverageShiftItem[]>(
-    `/api/planning/tenants/${tenantId}/ops/coverage${queryString(filters)}`,
+    `/api/planning/tenants/${tenantId}/ops/coverage${queryString(filters as Record<string, unknown>)}`,
     accessToken,
   );
 }

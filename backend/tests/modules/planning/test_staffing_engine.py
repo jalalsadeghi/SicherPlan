@@ -571,6 +571,8 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
                 continue
             if filters.order_id is not None and order.id != filters.order_id:
                 continue
+            if getattr(filters, "customer_id", None) is not None and order.customer_id != filters.customer_id:
+                continue
             if filters.planning_mode_code is not None and planning_record.planning_mode_code != filters.planning_mode_code:
                 continue
             if filters.workforce_scope_code is not None and shift_plan.workforce_scope_code != filters.workforce_scope_code:
@@ -1167,6 +1169,58 @@ class StaffingServiceTests(unittest.TestCase):
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].shift_id, self.shift_id)
+
+    def test_staffing_board_supports_customer_filter(self) -> None:
+        rows = self.service.staffing_board(
+            "tenant-1",
+            StaffingBoardFilter(
+                customer_id="customer-1",
+                date_from=datetime(2026, 4, 5, 0, 0, tzinfo=UTC),
+                date_to=datetime(2026, 4, 6, 0, 0, tzinfo=UTC),
+            ),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].id, self.shift_id)
+
+        rows = self.service.staffing_board(
+            "tenant-1",
+            StaffingBoardFilter(
+                customer_id="customer-2",
+                date_from=datetime(2026, 4, 5, 0, 0, tzinfo=UTC),
+                date_to=datetime(2026, 4, 6, 0, 0, tzinfo=UTC),
+            ),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual(rows, [])
+
+    def test_coverage_passes_customer_filter_through_to_staffing_board(self) -> None:
+        rows = self.service.coverage(
+            "tenant-1",
+            CoverageFilter(
+                customer_id="customer-1",
+                date_from=datetime(2026, 4, 5, 0, 0, tzinfo=UTC),
+                date_to=datetime(2026, 4, 6, 0, 0, tzinfo=UTC),
+            ),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].shift_id, self.shift_id)
+
+        rows = self.service.coverage(
+            "tenant-1",
+            CoverageFilter(
+                customer_id="customer-2",
+                date_from=datetime(2026, 4, 5, 0, 0, tzinfo=UTC),
+                date_to=datetime(2026, 4, 6, 0, 0, tzinfo=UTC),
+            ),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual(rows, [])
 
     def test_employee_function_mismatch_blocks_assignment(self) -> None:
         demand = self.service.create_demand_group(

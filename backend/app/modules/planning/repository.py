@@ -1432,6 +1432,8 @@ class SqlAlchemyPlanningRepository:
             statement = statement.where(PlanningRecord.id == filters.planning_record_id)
         if filters.order_id is not None:
             statement = statement.where(CustomerOrder.id == filters.order_id)
+        if getattr(filters, "customer_id", None) is not None:
+            statement = statement.where(CustomerOrder.customer_id == filters.customer_id)
         if filters.planning_mode_code is not None:
             statement = statement.where(PlanningRecord.planning_mode_code == filters.planning_mode_code)
         if filters.workforce_scope_code is not None:

@@ -10,6 +10,10 @@ import { $t } from '#/locales';
 import DashboardCalendarPanel from '#/components/sicherplan/dashboard-calendar-panel.vue';
 import EmptyState from '#/components/sicherplan/empty-state.vue';
 import SectionHeader from '#/components/sicherplan/section-header.vue';
+import {
+  buildCoverageShiftLabel,
+  buildStaffingCoverageRoute,
+} from '#/features/sicherplan/dashboardCoverage.helpers';
 import { useAuthStore as useLegacyAuthStore } from '#/sicherplan-legacy/stores/auth';
 import { listTenants, type TenantListItem } from '#/sicherplan-legacy/api/coreAdmin';
 import { listCustomers, type CustomerListItem } from '#/sicherplan-legacy/api/customers';
@@ -155,29 +159,6 @@ function buildCalendarDayKey(value: Date) {
   return value.toDateString();
 }
 
-function formatTimeLabel(value: string) {
-  const date = new Date(value);
-  return formatDateLabel(date, {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatShiftTypeLabel(value: string) {
-  return value
-    .split(/[_-]+/u)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
-function truncateCalendarLabel(value: string, maxLength = 24) {
-  if (value.length <= maxLength) {
-    return value;
-  }
-  return `${value.slice(0, maxLength - 1).trimEnd()}…`;
-}
-
 function formatDateTimeLocalValue(value: Date) {
   const year = value.getFullYear();
   const month = String(value.getMonth() + 1).padStart(2, '0');
@@ -206,24 +187,6 @@ function resolveCoverageMonthKey() {
   ].join(':');
 }
 
-function buildCanonicalStaffingWindow(coverageRow: CoverageShiftItem) {
-  const start = new Date(coverageRow.starts_at);
-  const end = new Date(coverageRow.ends_at);
-  const dateFrom = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
-  const dateTo = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1, 0, 0, 0, 0);
-  return {
-    date_from: formatDateTimeLocalValue(dateFrom),
-    date_to: formatDateTimeLocalValue(dateTo),
-  };
-}
-
-function buildCoverageShiftLabel(coverageRow: CoverageShiftItem) {
-  const shiftTypeLabel = formatShiftTypeLabel(coverageRow.shift_type_code);
-  const timeWindow = `${formatTimeLabel(coverageRow.starts_at)}-${formatTimeLabel(coverageRow.ends_at)}`;
-  const contextLabel = coverageRow.planning_record_name || coverageRow.location_text || coverageRow.order_no;
-  return truncateCalendarLabel([shiftTypeLabel, timeWindow, contextLabel].filter(Boolean).join(' · '), 36);
-}
-
 function buildCoverageStateLabel(coverageState: string) {
   switch (coverageState) {
     case 'green':
@@ -235,17 +198,6 @@ function buildCoverageStateLabel(coverageState: string) {
     default:
       return $t('sicherplan.dashboardView.calendar.coverageBad');
   }
-}
-
-function buildStaffingCoverageRoute(coverageRow: CoverageShiftItem) {
-  const staffingWindow = buildCanonicalStaffingWindow(coverageRow);
-  const query = new URLSearchParams({
-    date_from: staffingWindow.date_from,
-    date_to: staffingWindow.date_to,
-    planning_record_id: coverageRow.planning_record_id,
-    shift_id: coverageRow.shift_id,
-  });
-  return `/admin/planning-staffing?${query.toString()}`;
 }
 
 function buildCalendarCoverageItemsByDay(coverageRows: CoverageShiftItem[]) {
@@ -266,7 +218,7 @@ function buildCalendarCoverageItemsByDay(coverageRows: CoverageShiftItem[]) {
       dayItems.push({
         coverageState: resolvedCoverageState,
         key: `coverage:${coverageRow.shift_id}`,
-        label: buildCoverageShiftLabel(coverageRow),
+        label: buildCoverageShiftLabel(coverageRow, locale.value),
         route: buildStaffingCoverageRoute(coverageRow),
         tone: coverageTone(resolvedCoverageState),
       });

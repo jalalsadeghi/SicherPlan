@@ -1832,6 +1832,7 @@ class StaffingBoardShiftItem(BaseModel):
 
 
 class StaffingBoardFilter(BaseModel):
+    customer_id: str | None = None
     planning_record_id: str | None = None
     shift_plan_id: str | None = None
     shift_id: str | None = None
@@ -1884,6 +1885,7 @@ class CoverageShiftItem(BaseModel):
 
 
 class CoverageFilter(BaseModel):
+    customer_id: str | None = None
     planning_record_id: str | None = None
     shift_plan_id: str | None = None
     order_id: str | None = None

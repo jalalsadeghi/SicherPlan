@@ -523,6 +523,7 @@ class StaffingService:
 
     def coverage(self, tenant_id: str, filters: CoverageFilter, actor: RequestAuthorizationContext) -> list[CoverageShiftItem]:
         board_filters = StaffingBoardFilter(
+            customer_id=filters.customer_id,
             planning_record_id=filters.planning_record_id,
             shift_plan_id=filters.shift_plan_id,
             order_id=filters.order_id,

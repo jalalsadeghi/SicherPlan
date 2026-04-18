@@ -1263,13 +1263,21 @@ export type MessageKey =
   | "customerAdmin.dashboard.calendarMore"
   | "customerAdmin.dashboard.calendarPrevious"
   | "customerAdmin.dashboard.calendarNext"
+  | "customerAdmin.dashboard.calendarShiftShort"
   | "customerAdmin.dashboard.calendarPlanShort"
   | "customerAdmin.dashboard.calendarOrderShort"
   | "customerAdmin.dashboard.calendarEmptyTitle"
   | "customerAdmin.dashboard.calendarEmptyBody"
+  | "customerAdmin.dashboard.calendarLoadError"
+  | "customerAdmin.dashboard.calendarSummary.shifts"
   | "customerAdmin.dashboard.calendarSummary.plans"
   | "customerAdmin.dashboard.calendarSummary.released"
   | "customerAdmin.dashboard.calendarSummary.orders"
+  | "customerAdmin.dashboard.calendarSummary.atRisk"
+  | "customerAdmin.dashboard.calendarStatus.good"
+  | "customerAdmin.dashboard.calendarStatus.warn"
+  | "customerAdmin.dashboard.calendarStatus.bad"
+  | "customerAdmin.dashboard.calendarStatus.setupRequired"
   | "customerAdmin.dashboard.calendarStatus.released"
   | "customerAdmin.dashboard.calendarStatus.draft"
   | "customerAdmin.dashboard.calendarStatus.other"
@@ -3273,14 +3281,22 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.dashboard.calendarMore": "mehr",
     "customerAdmin.dashboard.calendarPrevious": "Zurück",
     "customerAdmin.dashboard.calendarNext": "Weiter",
+    "customerAdmin.dashboard.calendarShiftShort": "SCH",
     "customerAdmin.dashboard.calendarPlanShort": "PL",
     "customerAdmin.dashboard.calendarOrderShort": "AUF",
     "customerAdmin.dashboard.calendarEmptyTitle": "Kein Kalendereintrag vorhanden",
     "customerAdmin.dashboard.calendarEmptyBody":
       "Für den aktuellen Zeitraum liegen noch keine kundenbezogenen Planungseinträge vor.",
+    "customerAdmin.dashboard.calendarLoadError": "Die kundenbezogene Staffing-Abdeckung konnte nicht geladen werden.",
+    "customerAdmin.dashboard.calendarSummary.shifts": "Schichten",
     "customerAdmin.dashboard.calendarSummary.plans": "Pläne",
     "customerAdmin.dashboard.calendarSummary.released": "Freigegeben",
     "customerAdmin.dashboard.calendarSummary.orders": "Aufträge",
+    "customerAdmin.dashboard.calendarSummary.atRisk": "Mit Risiko",
+    "customerAdmin.dashboard.calendarStatus.good": "Abdeckung gut",
+    "customerAdmin.dashboard.calendarStatus.warn": "Abdeckung Warnung",
+    "customerAdmin.dashboard.calendarStatus.bad": "Abdeckung blockiert",
+    "customerAdmin.dashboard.calendarStatus.setupRequired": "Abdeckung Setup erforderlich",
     "customerAdmin.dashboard.calendarStatus.released": "Freigegeben",
     "customerAdmin.dashboard.calendarStatus.draft": "Entwurf",
     "customerAdmin.dashboard.calendarStatus.other": "Weiterer Status",
@@ -5348,14 +5364,22 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.dashboard.calendarMore": "more",
     "customerAdmin.dashboard.calendarPrevious": "Previous",
     "customerAdmin.dashboard.calendarNext": "Next",
+    "customerAdmin.dashboard.calendarShiftShort": "SH",
     "customerAdmin.dashboard.calendarPlanShort": "PL",
     "customerAdmin.dashboard.calendarOrderShort": "ORD",
     "customerAdmin.dashboard.calendarEmptyTitle": "No calendar entries yet",
     "customerAdmin.dashboard.calendarEmptyBody":
       "No customer-specific planning entries exist for the current period yet.",
+    "customerAdmin.dashboard.calendarLoadError": "Customer staffing coverage could not be loaded.",
+    "customerAdmin.dashboard.calendarSummary.shifts": "Shifts",
     "customerAdmin.dashboard.calendarSummary.plans": "Plans",
     "customerAdmin.dashboard.calendarSummary.released": "Released",
     "customerAdmin.dashboard.calendarSummary.orders": "Orders",
+    "customerAdmin.dashboard.calendarSummary.atRisk": "At risk",
+    "customerAdmin.dashboard.calendarStatus.good": "Coverage good",
+    "customerAdmin.dashboard.calendarStatus.warn": "Coverage warning",
+    "customerAdmin.dashboard.calendarStatus.bad": "Coverage blocked",
+    "customerAdmin.dashboard.calendarStatus.setupRequired": "Coverage setup required",
     "customerAdmin.dashboard.calendarStatus.released": "Released",
     "customerAdmin.dashboard.calendarStatus.draft": "Draft",
     "customerAdmin.dashboard.calendarStatus.other": "Other status",

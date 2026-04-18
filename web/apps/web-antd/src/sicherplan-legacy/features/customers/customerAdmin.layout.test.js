@@ -108,6 +108,8 @@ test("dashboard quick actions reuse existing tab and create handlers", () => {
   assert.match(source, /:can-read-commercial="canReadCommercial"/);
   assert.match(source, /:can-write-commercial="canWriteCommercial"/);
   assert.match(source, /:can-manage-contacts="actionState\.canManageContacts"/);
+  assert.match(source, /:tenant-id="tenantScopeId"/);
+  assert.match(source, /:access-token="accessToken"/);
 });
 
 test("create-mode cancel restores the selected customer through the dashboard default path", () => {

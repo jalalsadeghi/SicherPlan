@@ -1,10 +1,14 @@
 // @vitest-environment happy-dom
 
-import { describe, expect, it, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent } from "vue";
 
 import CustomerDashboardTab from "../../components/customers/CustomerDashboardTab.vue";
+
+const planningStaffingMocks = vi.hoisted(() => ({
+  listStaffingCoverageMock: vi.fn(),
+}));
 
 vi.mock("@/i18n", () => ({
   useI18n: () => ({
@@ -16,6 +20,10 @@ vi.mock("@/i18n", () => ({
       return key;
     },
   }),
+}));
+
+vi.mock("@/api/planningStaffing", () => ({
+  listStaffingCoverage: planningStaffingMocks.listStaffingCoverageMock,
 }));
 
 const CardStub = defineComponent({
@@ -36,9 +44,12 @@ const DashboardCalendarPanelStub = defineComponent({
   name: "DashboardCalendarPanelStub",
   props: {
     cells: { type: Array, required: true },
+    summary: { type: Array, required: true },
     title: { type: String, required: true },
   },
-  template: '<div class="dashboard-calendar-panel-stub">{{ title }}|{{ cells.length }}</div>',
+  emits: ["shift-calendar", "toggle-day"],
+  template:
+    '<div class="dashboard-calendar-panel-stub">{{ title }}|{{ cells.length }}|{{ summary.map((item) => item.label).join(\',\') }}<button class="calendar-next" @click="$emit(\'shift-calendar\', \'next\')" /></div>',
 });
 
 const baseCustomer = {
@@ -68,20 +79,48 @@ function buildDashboard(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function buildCoverageRow(overrides: Record<string, unknown> = {}) {
+  return {
+    shift_id: "shift-1",
+    planning_record_id: "planning-1",
+    shift_plan_id: "shift-plan-1",
+    order_id: "order-1",
+    order_no: "ORD-1",
+    planning_record_name: "Planung A",
+    planning_mode_code: "site",
+    workforce_scope_code: "internal",
+    starts_at: "2026-04-18T08:00:00Z",
+    ends_at: "2026-04-18T16:00:00Z",
+    shift_type_code: "day",
+    location_text: "Koeln",
+    meeting_point: null,
+    min_required_qty: 1,
+    target_required_qty: 2,
+    assigned_count: 1,
+    confirmed_count: 1,
+    released_partner_qty: 0,
+    coverage_state: "green",
+    demand_groups: [],
+    ...overrides,
+  };
+}
+
 function mountComponent(props: Record<string, unknown> = {}) {
   return mount(CustomerDashboardTab, {
     props: {
+      accessToken: "token-1",
       canReadCommercial: true,
       canWriteCommercial: true,
       canManageContacts: true,
       customer: baseCustomer as any,
-      dashboard: buildDashboard(),
+      dashboard: buildDashboard() as any,
       error: "",
       loading: false,
       standing: {
         label: "A",
         tone: "good",
       },
+      tenantId: "tenant-1",
       ...props,
     },
     global: {
@@ -95,6 +134,11 @@ function mountComponent(props: Record<string, unknown> = {}) {
 }
 
 describe("CustomerDashboardTab", () => {
+  beforeEach(() => {
+    planningStaffingMocks.listStaffingCoverageMock.mockReset();
+    planningStaffingMocks.listStaffingCoverageMock.mockResolvedValue([]);
+  });
+
   it("renders restricted finance state without leaking amounts", () => {
     const wrapper = mountComponent({
       dashboard: buildDashboard({
@@ -111,6 +155,7 @@ describe("CustomerDashboardTab", () => {
       "customerAdmin.dashboard.financeRestricted",
     );
     expect(wrapper.get('[data-testid="customer-dashboard-kpi-finance"]').text()).not.toContain("4500.00");
+    expect(wrapper.get('[data-testid="customer-dashboard-kpi-finance"]').attributes("data-tone")).toBe("restricted");
   });
 
   it("renders unavailable finance state cleanly when no finance data exists", () => {
@@ -128,9 +173,55 @@ describe("CustomerDashboardTab", () => {
     expect(wrapper.get('[data-testid="customer-dashboard-kpi-finance"]').text()).toContain(
       "customerAdmin.dashboard.financeUnavailable",
     );
+    expect(wrapper.get('[data-testid="customer-dashboard-kpi-finance"]').attributes("data-tone")).toBe("warn");
   });
 
-  it("renders empty latest-plans and empty calendar states cleanly", () => {
+  it("renders available finance state with the positive tone shell", () => {
+    const wrapper = mountComponent({
+      dashboard: buildDashboard({
+        finance_summary: {
+          visibility: "available",
+          currency_code: "EUR",
+          total_received_amount: "4500.00",
+          semantic_label: "released_invoice_total",
+        },
+      }),
+    });
+
+    expect(wrapper.get('[data-testid="customer-dashboard-kpi-finance"]').attributes("data-tone")).toBe("good");
+    expect(wrapper.get('[data-testid="customer-dashboard-kpi-finance"]').text()).toContain(
+      "customerAdmin.dashboard.financeLabels.released_invoice_total",
+    );
+  });
+
+  it("maps standing tone to lifecycle-driven good, warn, and bad shells", async () => {
+    const wrapper = mountComponent({
+      standing: {
+        label: "A",
+        tone: "good",
+      },
+    });
+
+    expect(wrapper.get('[data-testid="customer-dashboard-kpi-standing"]').attributes("data-tone")).toBe("good");
+
+    await wrapper.setProps({
+      standing: {
+        label: "Review",
+        tone: "warn",
+      },
+    });
+    expect(wrapper.get('[data-testid="customer-dashboard-kpi-standing"]').attributes("data-tone")).toBe("warn");
+
+    await wrapper.setProps({
+      standing: {
+        label: "Archived",
+        tone: "bad",
+      },
+    });
+    expect(wrapper.get('[data-testid="customer-dashboard-kpi-standing"]').attributes("data-tone")).toBe("bad");
+  });
+
+  it("renders empty latest-plans and empty calendar states cleanly", async () => {
     const wrapper = mountComponent({
       dashboard: buildDashboard({
         planning_summary: {
@@ -140,12 +231,133 @@ describe("CustomerDashboardTab", () => {
         calendar_items: [],
       }),
     });
+    await flushPromises();
 
     expect(wrapper.text()).toContain("customerAdmin.dashboard.latestPlansEmptyTitle");
     expect(wrapper.text()).toContain("customerAdmin.dashboard.latestPlansEmptyBody");
     expect(wrapper.text()).toContain("customerAdmin.dashboard.calendarEmptyTitle");
     expect(wrapper.text()).toContain("customerAdmin.dashboard.calendarEmptyBody");
     expect(wrapper.get(".dashboard-calendar-panel-stub").text()).toContain("customerAdmin.dashboard.calendarTitle");
+  });
+
+  it("renders status badges for latest plans with release-state tones", () => {
+    const wrapper = mountComponent({
+      dashboard: buildDashboard({
+        planning_summary: {
+          total_plans_count: 3,
+          latest_plans: [
+            {
+              id: "plan-1",
+              order_id: "order-1",
+              order_no: "ORD-1",
+              label: "Plan Released",
+              status: "released",
+              planning_mode_code: "site",
+              planning_from: "2026-04-18",
+              planning_to: "2026-04-19",
+              released_at: "2026-04-17T10:00:00Z",
+            },
+            {
+              id: "plan-2",
+              order_id: "order-2",
+              order_no: "ORD-2",
+              label: "Plan Ready",
+              status: "release_ready",
+              planning_mode_code: "site",
+              planning_from: "2026-04-20",
+              planning_to: "2026-04-21",
+              released_at: null,
+            },
+            {
+              id: "plan-3",
+              order_id: "order-3",
+              order_no: "ORD-3",
+              label: "Plan Draft",
+              status: "draft",
+              planning_mode_code: "site",
+              planning_from: "2026-04-22",
+              planning_to: "2026-04-23",
+              released_at: null,
+            },
+          ],
+        },
+      }),
+    });
+
+    const tags = wrapper.findAll(".customer-dashboard-tab__status-tag");
+    expect(tags).toHaveLength(3);
+    expect(tags[0]?.attributes("data-tone")).toBe("good");
+    expect(tags[1]?.attributes("data-tone")).toBe("warn");
+    expect(tags[2]?.attributes("data-tone")).toBe("warn");
+  });
+
+  it("falls back safely for unknown latest-plan statuses", () => {
+    const wrapper = mountComponent({
+      dashboard: buildDashboard({
+        planning_summary: {
+          total_plans_count: 1,
+          latest_plans: [
+            {
+              id: "plan-1",
+              order_id: "order-1",
+              order_no: "ORD-1",
+              label: "Plan Unknown",
+              status: "unknown_state",
+              planning_mode_code: "site",
+              planning_from: "2026-04-18",
+              planning_to: "2026-04-19",
+              released_at: null,
+            },
+          ],
+        },
+      }),
+    });
+
+    const tag = wrapper.get(".customer-dashboard-tab__status-tag");
+    expect(tag.attributes("data-tone")).toBe("neutral");
+    expect(tag.text()).toContain("unknown_state");
+  });
+
+  it("no longer reads plan rows as calendar shift items", async () => {
+    const wrapper = mountComponent({
+      dashboard: buildDashboard({
+        calendar_items: [
+          {
+            id: "planning-record:1",
+            source_type: "planning_record",
+            source_ref_id: "planning-1",
+            order_id: "order-1",
+            planning_record_id: "planning-1",
+            title: "Legacy planning row",
+            starts_at: "2026-04-18T00:00:00Z",
+            ends_at: "2026-04-19T00:00:00Z",
+            status: "released",
+          },
+        ],
+      }),
+    });
+    await flushPromises();
+
+    const calendarProps = wrapper.getComponent(DashboardCalendarPanelStub).props("cells") as Array<Record<string, unknown>>;
+    expect(calendarProps.every((cell) => (cell.shiftCount as number) === 0)).toBe(true);
+    expect(wrapper.text()).toContain("customerAdmin.dashboard.calendarEmptyTitle");
+  });
+
+  it("populates shiftCount and orderCount from customer-scoped staffing coverage", async () => {
+    planningStaffingMocks.listStaffingCoverageMock.mockResolvedValue([
+      buildCoverageRow({ shift_id: "shift-1", order_id: "order-1" }),
+      buildCoverageRow({ shift_id: "shift-2", order_id: "order-2", starts_at: "2026-04-18T18:00:00Z", ends_at: "2026-04-18T22:00:00Z", coverage_state: "yellow" }),
+    ]);
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    const calendarProps = wrapper.getComponent(DashboardCalendarPanelStub).props("cells") as Array<Record<string, unknown>>;
+    const populatedCell = calendarProps.find((cell) => (cell.shiftCount as number) === 2);
+    expect(populatedCell).toBeTruthy();
+    expect(populatedCell?.orderCount).toBe(2);
+    expect(wrapper.text()).toContain("customerAdmin.dashboard.calendarSummary.shifts");
+    expect(wrapper.text()).toContain("customerAdmin.dashboard.calendarSummary.atRisk");
   });
 
   it("keeps commercial navigation visible for read users but hides invoice-party creation without write permission", () => {
@@ -159,6 +371,7 @@ describe("CustomerDashboardTab", () => {
   });
 
   it("updates dashboard cards when the selected customer changes", async () => {
+    planningStaffingMocks.listStaffingCoverageMock.mockResolvedValue([buildCoverageRow()]);
     const wrapper = mountComponent({
       customer: {
         ...baseCustomer,
@@ -178,19 +391,52 @@ describe("CustomerDashboardTab", () => {
         ...baseCustomer,
         id: "customer-2",
         created_at: "2026-04-10T12:00:00Z",
-      },
+      } as any,
       dashboard: buildDashboard({
         customer_id: "customer-2",
         planning_summary: {
           total_plans_count: 2,
           latest_plans: [],
         },
-      }),
+      }) as any,
     });
+    await flushPromises();
 
     expect(wrapper.get('[data-testid="customer-dashboard-kpi-plans"]').text()).toContain("2");
     expect(wrapper.get('[data-testid="customer-dashboard-kpi-tenure"]').text()).not.toContain(
       "customerAdmin.dashboard.tenureYears",
+    );
+    expect(planningStaffingMocks.listStaffingCoverageMock).toHaveBeenLastCalledWith(
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({ customer_id: "customer-2" }),
+    );
+  });
+
+  it("reloads coverage when the visible month changes", async () => {
+    planningStaffingMocks.listStaffingCoverageMock.mockResolvedValue([buildCoverageRow()]);
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get(".calendar-next").trigger("click");
+    await flushPromises();
+
+    expect(planningStaffingMocks.listStaffingCoverageMock).toHaveBeenCalledTimes(2);
+    const firstFilters = planningStaffingMocks.listStaffingCoverageMock.mock.calls[0]?.[2];
+    const secondFilters = planningStaffingMocks.listStaffingCoverageMock.mock.calls[1]?.[2];
+    expect(firstFilters.customer_id).toBe("customer-1");
+    expect(secondFilters.customer_id).toBe("customer-1");
+    expect(secondFilters.date_from).not.toBe(firstFilters.date_from);
+  });
+
+  it("keeps the dashboard KPI labels stable while tone styling changes", () => {
+    const wrapper = mountComponent();
+
+    expect(wrapper.get('[data-testid="customer-dashboard-kpi-finance"]').text()).toContain(
+      "customerAdmin.dashboard.kpis.finance",
+    );
+    expect(wrapper.get('[data-testid="customer-dashboard-kpi-standing"]').text()).toContain(
+      "customerAdmin.dashboard.kpis.standing",
     );
   });
 });
