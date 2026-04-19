@@ -21,9 +21,12 @@ test("wizard step content uses wizard field wrappers across implemented steps", 
   assert.match(source, /class="field-stack"/);
   assert.match(source, /class="field-stack field-stack--wide"/);
   assert.match(source, /data-testid="customer-new-plan-planning-create-address-id"/);
+  assert.match(source, /data-testid="customer-new-plan-planning-create-address-action"/);
   assert.match(source, /data-testid="customer-new-plan-planning-create-timezone"/);
   assert.match(source, /data-testid="customer-new-plan-planning-create-latitude"/);
   assert.match(source, /data-testid="customer-new-plan-planning-create-longitude"/);
+  assert.match(source, /data-testid="customer-new-plan-planning-create-pick-on-map"/);
+  assert.match(source, /data-testid="customer-new-plan-planning-address-dialog"/);
   assert.match(source, /data-testid="customer-new-plan-planning-create-status"/);
   assert.match(source, /data-testid="customer-new-plan-trade-fair-zone"/);
 });
@@ -56,8 +59,12 @@ test("teleported modal content gets explicit wizard styling hooks", () => {
 
 test("wizard planning step uses canonical branch-backed selectors and tenant catalog scope", () => {
   assert.match(source, /listCustomerAddresses/);
+  assert.match(source, /createCustomerAvailableAddress/);
+  assert.match(source, /PlanningLocationPickerModal/);
+  assert.match(source, /resolveInitialMapCenter/);
   assert.match(source, /listTradeFairZones/);
   assert.match(source, /planningCreateAddressOptions/);
+  assert.match(source, /planningCreateStagedAddresses/);
   assert.match(source, /tradeFairZoneSelectOptions/);
   assert.match(source, /createPlanningSetupRecord\('requirement_type'/);
   assert.match(source, /createPlanningSetupRecord\('equipment_item'/);
@@ -71,6 +78,8 @@ test("wizard planning step uses canonical branch-backed selectors and tenant cat
   );
   assert.equal(requirementCreateBlock.includes('customer_id: props.customer.id'), false);
   assert.equal(equipmentCreateBlock.includes('customer_id: props.customer.id'), false);
+  assert.match(source, /planningCreateSupportsLocationPicker = computed/);
+  assert.match(source, /planningFamily\.value === 'site' \|\| planningFamily\.value === 'event_venue' \|\| planningFamily\.value === 'trade_fair'/);
 });
 
 test("wizard form grid keeps responsive stacking rules", () => {

@@ -6,7 +6,9 @@ import { Modal } from 'ant-design-vue';
 
 import { $t } from '#/locales';
 import {
+  createCustomerAvailableAddress,
   listCustomerAddresses,
+  type CustomerAvailableAddressRead,
   type CustomerAddressRead,
 } from '#/sicherplan-legacy/api/customers';
 import {
@@ -56,7 +58,11 @@ import {
   hasDuplicateActiveRequirementLine,
   validatePlanningRecordDraft,
 } from '#/sicherplan-legacy/features/planning/planningOrders.helpers';
-import { formatPlanningAddressOption } from '#/sicherplan-legacy/features/planning/planningAdmin.helpers';
+import PlanningLocationPickerModal from '#/sicherplan-legacy/components/planning/PlanningLocationPickerModal.vue';
+import {
+  formatPlanningAddressOption,
+  resolveInitialMapCenter,
+} from '#/sicherplan-legacy/features/planning/planningAdmin.helpers';
 import {
   createShiftPlan,
   createShiftSeries,
@@ -260,6 +266,18 @@ const planningCreateModal = reactive({
   end_point_text: '',
 });
 
+const planningAddressCreateModal = reactive({
+  city: '',
+  country_code: 'DE',
+  error: '',
+  open: false,
+  postal_code: '',
+  saving: false,
+  state: '',
+  street_line_1: '',
+  street_line_2: '',
+});
+
 const requirementModal = reactive({
   code: '',
   default_planning_mode_code: 'site',
@@ -318,8 +336,16 @@ const shiftTypeOptions = ref<ShiftTypeOption[]>([]);
 const seriesRows = ref<any[]>([]);
 const seriesExceptions = ref<ShiftSeriesExceptionRead[]>([]);
 const planningCreateAddressOptions = ref<CustomerAddressRead[]>([]);
+const planningCreateStagedAddresses = ref<CustomerAvailableAddressRead[]>([]);
 const planningCreateAddressLookupLoading = ref(false);
 const planningCreateAddressLookupError = ref('');
+const planningLocationPickerOpen = ref(false);
+const planningLocationPickerStartPoint = ref({
+  label: '',
+  lat: 51.662973,
+  lng: 8.174013,
+  zoom: 11,
+});
 const tradeFairZoneOptions = ref<TradeFairZoneRead[]>([]);
 const tradeFairZoneLookupLoading = ref(false);
 const tradeFairZoneLookupError = ref('');
@@ -452,11 +478,28 @@ const shiftTypeSelectOptions = computed(() =>
 );
 
 const planningCreateAddressSelectOptions = computed(() =>
-  planningCreateAddressOptions.value.map((row) => ({
+  mergePlanningCreateAddressOptions().map((row) => ({
     label: formatPlanningAddressOption(row),
     value: row.address_id,
   })),
 );
+
+const planningCreateAddressFieldKey = computed(() => {
+  if (planningFamily.value === 'patrol_route') {
+    return 'meeting_address_id';
+  }
+  if (planningFamily.value === 'site' || planningFamily.value === 'event_venue' || planningFamily.value === 'trade_fair') {
+    return 'address_id';
+  }
+  return '';
+});
+
+const planningCreateHasAddressField = computed(() => !!planningCreateAddressFieldKey.value);
+const planningCreateSupportsLocationPicker = computed(
+  () => planningFamily.value === 'site' || planningFamily.value === 'event_venue' || planningFamily.value === 'trade_fair',
+);
+const planningLocationPickerLatitude = computed(() => planningCreateModal.latitude);
+const planningLocationPickerLongitude = computed(() => planningCreateModal.longitude);
 
 const tradeFairZoneSelectOptions = computed(() =>
   tradeFairZoneOptions.value.map((row) => ({
@@ -529,6 +572,124 @@ function resetPlanningCreateModal() {
     watchbook_enabled: false,
     end_point_text: '',
   });
+  closePlanningAddressCreateModal();
+  planningLocationPickerOpen.value = false;
+}
+
+function resetPlanningAddressCreateModal() {
+  Object.assign(planningAddressCreateModal, {
+    city: '',
+    country_code: 'DE',
+    error: '',
+    open: false,
+    postal_code: '',
+    saving: false,
+    state: '',
+    street_line_1: '',
+    street_line_2: '',
+  });
+}
+
+function buildPlanningCreateAddressOption(address: CustomerAvailableAddressRead): CustomerAddressRead {
+  return {
+    address: {
+      city: address.city,
+      country_code: address.country_code,
+      id: address.id,
+      postal_code: address.postal_code,
+      state: address.state ?? null,
+      street_line_1: address.street_line_1,
+      street_line_2: address.street_line_2 ?? null,
+    },
+    address_id: address.id,
+    address_type: 'service',
+    archived_at: null,
+    customer_id: props.customer.id,
+    id: `staged-${address.id}`,
+    is_default: false,
+    label: null,
+    status: 'active',
+    tenant_id: props.tenantId,
+    version_no: 1,
+  };
+}
+
+function mergePlanningCreateAddressOptions(addressLinks = planningCreateAddressOptions.value, stagedAddresses = planningCreateStagedAddresses.value) {
+  const merged = new Map<string, CustomerAddressRead>();
+  for (const entry of addressLinks) {
+    if (entry?.address_id) {
+      merged.set(entry.address_id, entry);
+    }
+  }
+  for (const address of stagedAddresses) {
+    merged.set(address.id, buildPlanningCreateAddressOption(address));
+  }
+  return [...merged.values()];
+}
+
+function syncPlanningCreateAddressSelections() {
+  const validAddressIds = new Set(mergePlanningCreateAddressOptions().map((entry) => entry.address_id));
+  if (planningCreateModal.address_id && !validAddressIds.has(planningCreateModal.address_id)) {
+    planningCreateModal.address_id = '';
+  }
+  if (planningCreateModal.meeting_address_id && !validAddressIds.has(planningCreateModal.meeting_address_id)) {
+    planningCreateModal.meeting_address_id = '';
+  }
+}
+
+function openPlanningAddressCreateModal() {
+  if (!planningCreateHasAddressField.value || planningCreateAddressLookupLoading.value || !props.customer.id) {
+    return;
+  }
+  resetPlanningAddressCreateModal();
+  planningAddressCreateModal.open = true;
+}
+
+function closePlanningAddressCreateModal() {
+  resetPlanningAddressCreateModal();
+}
+
+function normalizePlanningAddressCreatePayload() {
+  return {
+    city: planningAddressCreateModal.city.trim(),
+    country_code: planningAddressCreateModal.country_code.trim().toUpperCase(),
+    postal_code: planningAddressCreateModal.postal_code.trim(),
+    state: planningAddressCreateModal.state.trim() || null,
+    street_line_1: planningAddressCreateModal.street_line_1.trim(),
+    street_line_2: planningAddressCreateModal.street_line_2.trim() || null,
+  };
+}
+
+function openPlanningLocationPicker() {
+  if (!planningCreateSupportsLocationPicker.value) {
+    return;
+  }
+  const fallback = {
+    label: $t('sicherplan.customerPlansWizard.mapPicker.startDefault'),
+    lat: 51.662973,
+    lng: 8.174013,
+    zoom: 11,
+  };
+  const resolvedCenter = resolveInitialMapCenter({
+    currentLatitude: planningCreateModal.latitude,
+    currentLongitude: planningCreateModal.longitude,
+    fallback,
+  });
+  planningLocationPickerStartPoint.value = {
+    label:
+      resolvedCenter.source === 'existing-record'
+        ? $t('sicherplan.customerPlansWizard.mapPicker.startExisting')
+        : fallback.label,
+    lat: resolvedCenter.lat,
+    lng: resolvedCenter.lng,
+    zoom: resolvedCenter.source === 'existing-record' ? 14 : fallback.zoom,
+  };
+  planningLocationPickerOpen.value = true;
+}
+
+function applyPlanningLocationSelection(payload: { latitude: string; longitude: string }) {
+  planningCreateModal.latitude = payload.latitude;
+  planningCreateModal.longitude = payload.longitude;
 }
 
 function resetRequirementModal() {
@@ -1012,6 +1173,7 @@ async function loadPlanningEntityOptions() {
 async function loadPlanningCreateReferenceOptions() {
   if (!props.tenantId || !props.accessToken || !props.customer.id) {
     planningCreateAddressOptions.value = [];
+    planningCreateStagedAddresses.value = [];
     planningCreateAddressLookupError.value = '';
     planningCreateAddressLookupLoading.value = false;
     return;
@@ -1020,13 +1182,7 @@ async function loadPlanningCreateReferenceOptions() {
   planningCreateAddressLookupError.value = '';
   try {
     planningCreateAddressOptions.value = await listCustomerAddresses(props.tenantId, props.customer.id, props.accessToken);
-    const validAddressIds = new Set(planningCreateAddressOptions.value.map((entry) => entry.address_id));
-    if (planningCreateModal.address_id && !validAddressIds.has(planningCreateModal.address_id)) {
-      planningCreateModal.address_id = '';
-    }
-    if (planningCreateModal.meeting_address_id && !validAddressIds.has(planningCreateModal.meeting_address_id)) {
-      planningCreateModal.meeting_address_id = '';
-    }
+    syncPlanningCreateAddressSelections();
   } catch {
     planningCreateAddressOptions.value = [];
     planningCreateAddressLookupError.value = $t('sicherplan.customerPlansWizard.errors.addressLoad');
@@ -1034,6 +1190,42 @@ async function loadPlanningCreateReferenceOptions() {
     planningCreateModal.meeting_address_id = '';
   } finally {
     planningCreateAddressLookupLoading.value = false;
+  }
+}
+
+async function submitPlanningAddressCreateModal() {
+  if (!props.tenantId || !props.accessToken || !props.customer.id || !planningCreateAddressFieldKey.value) {
+    return;
+  }
+
+  const payload = normalizePlanningAddressCreatePayload();
+  if (!payload.street_line_1 || !payload.postal_code || !payload.city || !payload.country_code) {
+    planningAddressCreateModal.error = $t('sicherplan.customerPlansWizard.errors.addressCreateValidation');
+    setFeedback('error', planningAddressCreateModal.error);
+    return;
+  }
+
+  planningAddressCreateModal.saving = true;
+  planningAddressCreateModal.error = '';
+  try {
+    const created = await createCustomerAvailableAddress(props.tenantId, props.customer.id, props.accessToken, payload);
+    planningCreateStagedAddresses.value = [
+      ...planningCreateStagedAddresses.value.filter((entry) => entry.id !== created.id),
+      created,
+    ];
+    await loadPlanningCreateReferenceOptions();
+    if (planningCreateAddressFieldKey.value === 'meeting_address_id') {
+      planningCreateModal.meeting_address_id = created.id;
+    } else {
+      planningCreateModal.address_id = created.id;
+    }
+    closePlanningAddressCreateModal();
+    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.addressCreateSuccess'));
+  } catch {
+    planningAddressCreateModal.error = $t('sicherplan.customerPlansWizard.errors.addressCreateFailed');
+    setFeedback('error', planningAddressCreateModal.error);
+  } finally {
+    planningAddressCreateModal.saving = false;
   }
 }
 
@@ -2119,6 +2311,15 @@ watch(
 );
 
 watch(
+  () => props.customer.id,
+  () => {
+    planningCreateStagedAddresses.value = [];
+    closePlanningAddressCreateModal();
+    planningLocationPickerOpen.value = false;
+  },
+);
+
+watch(
   () => [
     props.customer.id,
     props.currentStepId,
@@ -2833,6 +3034,18 @@ onMounted(() => {
             </option>
           </select>
         </label>
+        <div v-if="planningCreateHasAddressField" class="cta-row">
+          <button
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-planning-create-address-action"
+            type="button"
+            :disabled="planningCreateAddressLookupLoading"
+            @click="openPlanningAddressCreateModal"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.createAddress') }}
+          </button>
+          <span class="field-help">{{ $t('sicherplan.customerPlansWizard.addressModal.helper') }}</span>
+        </div>
         <label v-if="planningFamily === 'site' || planningFamily === 'event_venue' || planningFamily === 'trade_fair'" class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.timezone') }}</span>
           <select v-model="planningCreateModal.timezone" data-testid="customer-new-plan-planning-create-timezone">
@@ -2850,6 +3063,17 @@ onMounted(() => {
           <span>{{ $t('sicherplan.customerPlansWizard.forms.longitude') }}</span>
           <input v-model="planningCreateModal.longitude" data-testid="customer-new-plan-planning-create-longitude" type="number" step="0.000001" />
         </label>
+        <div v-if="planningCreateSupportsLocationPicker" class="cta-row">
+          <button
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-planning-create-pick-on-map"
+            type="button"
+            @click="openPlanningLocationPicker"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.pickOnMap') }}
+          </button>
+          <span class="field-help">{{ $t('sicherplan.customerPlansWizard.mapPicker.helper') }}</span>
+        </div>
         <label v-if="planningFamily === 'site'" class="planning-admin-checkbox">
           <input v-model="planningCreateModal.watchbook_enabled" data-testid="customer-new-plan-planning-create-watchbook-enabled" type="checkbox" />
           <span>{{ $t('sicherplan.customerPlansWizard.forms.watchbookEnabled') }}</span>
@@ -2893,6 +3117,79 @@ onMounted(() => {
         </label>
       </div>
     </Modal>
+
+    <Modal
+      v-model:open="planningAddressCreateModal.open"
+      :footer="null"
+      :title="$t('sicherplan.customerPlansWizard.addressModal.title')"
+      wrap-class-name="sp-customer-plan-wizard-modal"
+      @cancel="closePlanningAddressCreateModal"
+    >
+      <div class="sp-customer-plan-wizard-step__modal" data-testid="customer-new-plan-planning-address-dialog">
+        <p class="field-help">{{ $t('sicherplan.customerPlansWizard.addressModal.helper') }}</p>
+        <label class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.addressModal.streetLine1') }}</span>
+          <input v-model="planningAddressCreateModal.street_line_1" data-testid="customer-new-plan-planning-address-street-line-1" />
+        </label>
+        <label class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.addressModal.streetLine2') }}</span>
+          <input v-model="planningAddressCreateModal.street_line_2" data-testid="customer-new-plan-planning-address-street-line-2" />
+        </label>
+        <label class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.addressModal.postalCode') }}</span>
+          <input v-model="planningAddressCreateModal.postal_code" data-testid="customer-new-plan-planning-address-postal-code" />
+        </label>
+        <label class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.addressModal.city') }}</span>
+          <input v-model="planningAddressCreateModal.city" data-testid="customer-new-plan-planning-address-city" />
+        </label>
+        <label class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.addressModal.state') }}</span>
+          <input v-model="planningAddressCreateModal.state" data-testid="customer-new-plan-planning-address-state" />
+        </label>
+        <label class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.addressModal.countryCode') }}</span>
+          <input v-model="planningAddressCreateModal.country_code" data-testid="customer-new-plan-planning-address-country-code" maxlength="2" />
+        </label>
+        <p v-if="planningAddressCreateModal.error" class="field-help">{{ planningAddressCreateModal.error }}</p>
+        <div class="cta-row">
+          <button
+            class="cta-button"
+            data-testid="customer-new-plan-planning-address-save"
+            type="button"
+            :disabled="planningAddressCreateModal.saving"
+            @click="submitPlanningAddressCreateModal"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.saveAddress') }}
+          </button>
+          <button
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-planning-address-cancel"
+            type="button"
+            :disabled="planningAddressCreateModal.saving"
+            @click="closePlanningAddressCreateModal"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.cancelAddress') }}
+          </button>
+        </div>
+      </div>
+    </Modal>
+
+    <PlanningLocationPickerModal
+      v-model:open="planningLocationPickerOpen"
+      :latitude="planningLocationPickerLatitude"
+      :longitude="planningLocationPickerLongitude"
+      :initial-center="planningLocationPickerStartPoint"
+      :start-point-label="planningLocationPickerStartPoint.label"
+      :title="$t('sicherplan.customerPlansWizard.mapPicker.title')"
+      :confirm-text="$t('sicherplan.customerPlansWizard.mapPicker.apply')"
+      :cancel-text="$t('sicherplan.customerPlansWizard.mapPicker.cancel')"
+      :helper-text="$t('sicherplan.customerPlansWizard.mapPicker.helper')"
+      :latitude-label="$t('sicherplan.customerPlansWizard.forms.latitude')"
+      :longitude-label="$t('sicherplan.customerPlansWizard.forms.longitude')"
+      :load-error-text="$t('sicherplan.customerPlansWizard.mapPicker.loadError')"
+      @confirm="applyPlanningLocationSelection"
+    />
 
     <Modal
       v-model:open="templateModal.open"

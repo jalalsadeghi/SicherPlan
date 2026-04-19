@@ -38,6 +38,7 @@ const stores = vi.hoisted(() => ({
 }));
 
 const apiMocks = vi.hoisted(() => ({
+  createCustomerAvailableAddressMock: vi.fn(),
   createCustomerOrderMock: vi.fn(),
   createOrderAttachmentMock: vi.fn(),
   createOrderEquipmentLineMock: vi.fn(),
@@ -79,10 +80,41 @@ vi.mock('#/sicherplan-legacy/api/customers', async () => {
   const actual = await vi.importActual<typeof import('#/sicherplan-legacy/api/customers')>('#/sicherplan-legacy/api/customers');
   return {
     ...actual,
+    createCustomerAvailableAddress: apiMocks.createCustomerAvailableAddressMock,
     getCustomer: apiMocks.getCustomerMock,
     listCustomerAddresses: apiMocks.listCustomerAddressesMock,
   };
 });
+
+vi.mock('#/sicherplan-legacy/components/planning/PlanningLocationPickerModal.vue', () => ({
+  default: defineComponent({
+    name: 'PlanningLocationPickerModalStub',
+    props: {
+      loadErrorText: { type: String, default: '' },
+      open: { type: Boolean, default: false },
+    },
+    emits: ['confirm', 'update:open'],
+    template: `
+      <div v-if="open" data-testid="customer-new-plan-location-picker-dialog">
+        <div data-testid="customer-new-plan-location-picker-load-error">{{ loadErrorText }}</div>
+        <button
+          data-testid="customer-new-plan-location-picker-apply"
+          type="button"
+          @click="$emit('confirm', { latitude: '51.111111', longitude: '8.222222' }); $emit('update:open', false)"
+        >
+          apply
+        </button>
+        <button
+          data-testid="customer-new-plan-location-picker-cancel"
+          type="button"
+          @click="$emit('update:open', false)"
+        >
+          cancel
+        </button>
+      </div>
+    `,
+  }),
+}));
 
 vi.mock('#/sicherplan-legacy/api/planningAdmin', () => ({
   createPlanningRecord: apiMocks.createPlanningSetupRecordMock,
@@ -253,6 +285,18 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
 
     apiMocks.getCustomerMock.mockReset();
     apiMocks.getCustomerMock.mockResolvedValue(buildCustomer());
+    apiMocks.createCustomerAvailableAddressMock.mockReset();
+    apiMocks.createCustomerAvailableAddressMock.mockImplementation((_tenantId: string, _customerId: string, _token: string, payload: any) =>
+      Promise.resolve({
+        id: 'available-address-1',
+        city: payload.city,
+        country_code: payload.country_code,
+        postal_code: payload.postal_code,
+        state: payload.state ?? null,
+        street_line_1: payload.street_line_1,
+        street_line_2: payload.street_line_2 ?? null,
+      }),
+    );
     apiMocks.listCustomerAddressesMock.mockReset();
     apiMocks.listCustomerAddressesMock.mockResolvedValue([
       {
@@ -476,6 +520,280 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+  });
+
+  it('creates a new address inside the planning modal, refreshes options, and selects it', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    const initialAddressLoads = apiMocks.listCustomerAddressesMock.mock.calls.length;
+    const radios = wrapper.findAll('input[type="radio"]');
+    await radios[1]!.setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
+    await nextTickFlush();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-create-address-action"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-address-action"]').trigger('click');
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-address-street-line-1"]').setValue('Neue Straße 5');
+    await wrapper.get('[data-testid="customer-new-plan-planning-address-postal-code"]').setValue('50667');
+    await wrapper.get('[data-testid="customer-new-plan-planning-address-city"]').setValue('Köln');
+    await wrapper.get('[data-testid="customer-new-plan-planning-address-country-code"]').setValue('DE');
+    await wrapper.get('[data-testid="customer-new-plan-planning-address-save"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.createCustomerAvailableAddressMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'customer-1',
+      'token-1',
+      {
+        city: 'Köln',
+        country_code: 'DE',
+        postal_code: '50667',
+        state: null,
+        street_line_1: 'Neue Straße 5',
+        street_line_2: null,
+      },
+    );
+    expect(apiMocks.listCustomerAddressesMock.mock.calls.length).toBeGreaterThan(initialAddressLoads);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-address-id"]').element as HTMLSelectElement).value).toBe('available-address-1');
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-address-dialog"]').exists()).toBe(false);
+  });
+
+  it('validates required address fields and keeps the planning modal state stable when address creation is canceled', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    const radios = wrapper.findAll('input[type="radio"]');
+    await radios[1]!.setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-site-no"]').setValue('SITE-99');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-name"]').setValue('Stable Modal Site');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-address-action"]').trigger('click');
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-address-save"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.createCustomerAvailableAddressMock).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.addressCreateValidation');
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-address-dialog"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-address-street-line-1"]').setValue('Should be discarded');
+    await wrapper.get('[data-testid="customer-new-plan-planning-address-cancel"]').trigger('click');
+    await nextTickFlush();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-address-dialog"]').exists()).toBe(false);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-site-no"]').element as HTMLInputElement).value).toBe('SITE-99');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-name"]').element as HTMLInputElement).value).toBe('Stable Modal Site');
+  });
+
+  it('writes the created address into the correct family-specific target field', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    const cases = [
+      {
+        addressFieldTestId: 'customer-new-plan-planning-create-address-id',
+        family: 'trade_fair',
+      },
+      {
+        addressFieldTestId: 'customer-new-plan-planning-create-meeting-address-id',
+        family: 'patrol_route',
+      },
+    ];
+
+    for (const testCase of cases) {
+      await wrapper.get('[data-testid="customer-new-plan-planning-family"]').setValue(testCase.family);
+      await nextTickFlush();
+      const radios = wrapper.findAll('input[type="radio"]');
+      await radios[1]!.setValue(true);
+      await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
+      await nextTickFlush();
+
+      await wrapper.get('[data-testid="customer-new-plan-planning-create-address-action"]').trigger('click');
+      await nextTickFlush();
+      await wrapper.get('[data-testid="customer-new-plan-planning-address-street-line-1"]').setValue('Neue Straße 5');
+      await wrapper.get('[data-testid="customer-new-plan-planning-address-postal-code"]').setValue('50667');
+      await wrapper.get('[data-testid="customer-new-plan-planning-address-city"]').setValue('Köln');
+      await wrapper.get('[data-testid="customer-new-plan-planning-address-country-code"]').setValue('DE');
+      await wrapper.get('[data-testid="customer-new-plan-planning-address-save"]').trigger('click');
+      await nextTickFlush();
+
+      expect((wrapper.get(`[data-testid="${testCase.addressFieldTestId}"]`).element as HTMLSelectElement).value).toBe('available-address-1');
+      await wrapper.get('[data-testid="modal-cancel"]').trigger('click');
+      await nextTickFlush();
+    }
+  });
+
+  it('shows map picking only for coordinate-backed families and applies the selected coordinates', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    const radios = wrapper.findAll('input[type="radio"]');
+    await radios[1]!.setValue(true);
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-create-pick-on-map"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-pick-on-map"]').trigger('click');
+    await nextTickFlush();
+    await wrapper.get('[data-testid="customer-new-plan-location-picker-apply"]').trigger('click');
+    await nextTickFlush();
+
+    expect(Number((wrapper.get('[data-testid="customer-new-plan-planning-create-latitude"]').element as HTMLInputElement).value)).toBe(51.111111);
+    expect(Number((wrapper.get('[data-testid="customer-new-plan-planning-create-longitude"]').element as HTMLInputElement).value)).toBe(8.222222);
+
+    await wrapper.get('[data-testid="modal-cancel"]').trigger('click');
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-family"]').setValue('patrol_route');
+    await nextTickFlush();
+    const patrolRadios = wrapper.findAll('input[type="radio"]');
+    await patrolRadios[1]!.setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
+    await nextTickFlush();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-create-address-action"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-create-pick-on-map"]').exists()).toBe(false);
+  });
+
+  it('keeps coordinates unchanged when the map picker is canceled and wires the localized load error text', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    const radios = wrapper.findAll('input[type="radio"]');
+    await radios[1]!.setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-latitude"]').setValue('50.111111');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-longitude"]').setValue('7.222222');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-pick-on-map"]').trigger('click');
+    await nextTickFlush();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-location-picker-load-error"]').text()).toBe(
+      'sicherplan.customerPlansWizard.mapPicker.loadError',
+    );
+    await wrapper.get('[data-testid="customer-new-plan-location-picker-cancel"]').trigger('click');
+    await nextTickFlush();
+
+    expect(Number((wrapper.get('[data-testid="customer-new-plan-planning-create-latitude"]').element as HTMLInputElement).value)).toBe(50.111111);
+    expect(Number((wrapper.get('[data-testid="customer-new-plan-planning-create-longitude"]').element as HTMLInputElement).value)).toBe(7.222222);
+  });
+
+  it('submits only the canonical family-specific payload fields for site, trade fair, and patrol route', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    const scenarios = [
+      async () => {
+        await wrapper.get('[data-testid="customer-new-plan-planning-family"]').setValue('site');
+        await nextTickFlush();
+        const radios = wrapper.findAll('input[type="radio"]');
+        await radios[1]!.setValue(true);
+        await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
+        await nextTickFlush();
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-site-no"]').setValue('SITE-2');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-name"]').setValue('Werk Süd');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-address-id"]').setValue('address-1');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-timezone"]').setValue('Europe/Berlin');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-latitude"]').setValue('50.123456');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-longitude"]').setValue('8.123456');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-watchbook-enabled"]').setValue(true);
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-status"]').setValue('inactive');
+        await wrapper.get('[data-testid="modal-ok"]').trigger('click');
+        await nextTickFlush();
+        expect(apiMocks.createPlanningSetupRecordMock).toHaveBeenLastCalledWith(
+          'site',
+          'tenant-1',
+          'token-1',
+          expect.objectContaining({
+            address_id: 'address-1',
+            latitude: 50.123456,
+            longitude: 8.123456,
+            timezone: 'Europe/Berlin',
+            watchbook_enabled: true,
+            status: 'inactive',
+          }),
+        );
+      },
+      async () => {
+        await wrapper.get('[data-testid="customer-new-plan-planning-family"]').setValue('trade_fair');
+        await nextTickFlush();
+        const radios = wrapper.findAll('input[type="radio"]');
+        await radios[1]!.setValue(true);
+        await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
+        await nextTickFlush();
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-fair-no"]').setValue('FAIR-2');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-name"]').setValue('Sommermesse');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-venue-id"]').setValue('venue-1');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-address-id"]').setValue('address-1');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-timezone"]').setValue('Europe/Berlin');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-latitude"]').setValue('51.333333');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-longitude"]').setValue('9.444444');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-start-date"]').setValue('2026-07-01');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-end-date"]').setValue('2026-07-03');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-status"]').setValue('active');
+        await wrapper.get('[data-testid="modal-ok"]').trigger('click');
+        await nextTickFlush();
+        expect(apiMocks.createPlanningSetupRecordMock).toHaveBeenLastCalledWith(
+          'trade_fair',
+          'tenant-1',
+          'token-1',
+          expect.objectContaining({
+            venue_id: 'venue-1',
+            address_id: 'address-1',
+            latitude: 51.333333,
+            longitude: 9.444444,
+            timezone: 'Europe/Berlin',
+            start_date: '2026-07-01',
+            end_date: '2026-07-03',
+            status: 'active',
+          }),
+        );
+      },
+      async () => {
+        await wrapper.get('[data-testid="customer-new-plan-planning-family"]').setValue('patrol_route');
+        await nextTickFlush();
+        const radios = wrapper.findAll('input[type="radio"]');
+        await radios[1]!.setValue(true);
+        await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
+        await nextTickFlush();
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-route-no"]').setValue('ROUTE-2');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-name"]').setValue('Innenstadt Süd');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-site-id"]').setValue('site-1');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-meeting-address-id"]').setValue('address-1');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-start-point"]').setValue('Start A');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-end-point"]').setValue('Ende B');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-travel-policy-code"]').setValue('city');
+        await wrapper.get('[data-testid="customer-new-plan-planning-create-status"]').setValue('inactive');
+        await wrapper.get('[data-testid="modal-ok"]').trigger('click');
+        await nextTickFlush();
+        expect(apiMocks.createPlanningSetupRecordMock).toHaveBeenLastCalledWith(
+          'patrol_route',
+          'tenant-1',
+          'token-1',
+          expect.objectContaining({
+            site_id: 'site-1',
+            meeting_address_id: 'address-1',
+            start_point_text: 'Start A',
+            end_point_text: 'Ende B',
+            travel_policy_code: 'city',
+            status: 'inactive',
+          }),
+        );
+        expect(apiMocks.createPlanningSetupRecordMock.mock.calls.at(-1)?.[3]).not.toHaveProperty('latitude');
+        expect(apiMocks.createPlanningSetupRecordMock.mock.calls.at(-1)?.[3]).not.toHaveProperty('longitude');
+      },
+    ];
+
+    for (const run of scenarios) {
+      await run();
+    }
   });
 
   it('keeps the real planning create modal and typed values stable across focus-driven session refresh', async () => {

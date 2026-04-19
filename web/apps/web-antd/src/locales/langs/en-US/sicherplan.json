@@ -44,6 +44,7 @@
     "errorTitle": "Customer context could not be loaded",
     "errorBody": "The plan wizard cannot resolve the selected customer right now.",
     "dialogs": {
+      "addressCreateTitle": "Create new address",
       "equipmentTitle": "Create equipment",
       "planningCreateTitle": "Create planning entry",
       "requirementTitle": "Create requirement",
@@ -170,6 +171,8 @@
     },
     "errors": {
       "addressLoad": "Addresses could not be loaded for the selected customer.",
+      "addressCreateFailed": "The address could not be created.",
+      "addressCreateValidation": "Street, postal code, city, and country code are required.",
       "customerRequired": "The customer is missing from the wizard context.",
       "equipmentCreateFailed": "The equipment item could not be created.",
       "equipmentCreateInvalid": "Code, label, and unit of measure are required for new equipment.",
@@ -216,9 +219,35 @@
       "backToCustomers": "Back to customers",
       "backToPlans": "Back to plans",
       "cancel": "Cancel",
+      "cancelAddress": "Cancel",
       "generateContinue": "Generate Series & Continue",
+      "createAddress": "Create new address",
       "previous": "Previous",
-      "next": "Next"
+      "next": "Next",
+      "pickOnMap": "Pick on map",
+      "saveAddress": "Save address"
+    },
+    "addressModal": {
+      "title": "Create new address",
+      "helper": "Create a new customer address without leaving the wizard.",
+      "streetLine1": "Street and number",
+      "streetLine2": "Address line 2",
+      "postalCode": "Postal code",
+      "city": "City",
+      "state": "State / region",
+      "countryCode": "Country code"
+    },
+    "mapPicker": {
+      "title": "Pick location on map",
+      "helper": "Choose the point directly on the map instead of entering coordinates manually.",
+      "apply": "Apply location",
+      "cancel": "Cancel",
+      "loadError": "The map view could not be loaded. Please use manual coordinate entry for now.",
+      "startDefault": "Start point: default position 51.662973 / 8.174013",
+      "startExisting": "Start point: existing planning entry coordinates"
+    },
+    "messages": {
+      "addressCreateSuccess": "The address was created and assigned to the planning entry."
     },
     "steps": {
       "planning": "Planning",

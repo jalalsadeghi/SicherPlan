@@ -44,6 +44,7 @@
     "errorTitle": "Kundenkontext konnte nicht geladen werden",
     "errorBody": "Der Plan-Wizard kann den ausgewählten Kunden derzeit nicht auflösen.",
     "dialogs": {
+      "addressCreateTitle": "Neue Adresse anlegen",
       "equipmentTitle": "Equipment anlegen",
       "planningCreateTitle": "Planungseintrag anlegen",
       "requirementTitle": "Anforderung anlegen",
@@ -170,6 +171,8 @@
     },
     "errors": {
       "addressLoad": "Die Adressen des ausgewählten Kunden konnten nicht geladen werden.",
+      "addressCreateFailed": "Die Adresse konnte nicht angelegt werden.",
+      "addressCreateValidation": "Straße, PLZ, Ort und Ländercode sind erforderlich.",
       "customerRequired": "Der Kunde fehlt im Wizard-Kontext.",
       "equipmentCreateFailed": "Das Equipment konnte nicht angelegt werden.",
       "equipmentCreateInvalid": "Für neues Equipment sind Code, Bezeichnung und Mengeneinheit erforderlich.",
@@ -216,9 +219,35 @@
       "backToCustomers": "Zurück zu Kunden",
       "backToPlans": "Zurück zu Plänen",
       "cancel": "Abbrechen",
+      "cancelAddress": "Abbrechen",
       "generateContinue": "Serie erzeugen & weiter",
+      "createAddress": "Neue Adresse anlegen",
       "previous": "Zurück",
-      "next": "Weiter"
+      "next": "Weiter",
+      "pickOnMap": "Auf Karte wählen",
+      "saveAddress": "Adresse speichern"
+    },
+    "addressModal": {
+      "title": "Neue Adresse anlegen",
+      "helper": "Legen Sie eine neue Kundenadresse an, ohne den Wizard zu verlassen.",
+      "streetLine1": "Straße und Hausnummer",
+      "streetLine2": "Adresszusatz",
+      "postalCode": "PLZ",
+      "city": "Ort",
+      "state": "Bundesland / Region",
+      "countryCode": "Ländercode"
+    },
+    "mapPicker": {
+      "title": "Standort auf Karte wählen",
+      "helper": "Wählen Sie den Punkt direkt auf der Karte aus, statt die Koordinaten manuell einzugeben.",
+      "apply": "Position übernehmen",
+      "cancel": "Abbrechen",
+      "loadError": "Die Kartenansicht konnte nicht geladen werden. Verwenden Sie vorübergehend die manuelle Koordinateneingabe.",
+      "startDefault": "Startpunkt: Standardposition 51.662973 / 8.174013",
+      "startExisting": "Startpunkt: vorhandene Koordinaten des Planungseintrags"
+    },
+    "messages": {
+      "addressCreateSuccess": "Die Adresse wurde angelegt und in den Planungseintrag übernommen."
     },
     "steps": {
       "planning": "Planung",
