@@ -13,6 +13,7 @@ import {
   resolveAllowedWizardStep,
 } from './new-plan-wizard.steps';
 import type {
+  CustomerNewPlanWizardState,
   CustomerNewPlanWizardStatePatch,
   CustomerNewPlanWizardStepId,
   CustomerNewPlanWizardStepUiState,
@@ -20,6 +21,38 @@ import type {
 
 function normalizeScalar(value: null | string | undefined) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function resolveStableCustomerId(
+  currentCustomerId: string,
+  patchCustomerId: null | string | undefined,
+) {
+  const normalizedPatchCustomerId = normalizeScalar(patchCustomerId);
+  if (!currentCustomerId) {
+    return normalizedPatchCustomerId;
+  }
+  if (!normalizedPatchCustomerId || normalizedPatchCustomerId === currentCustomerId) {
+    return currentCustomerId;
+  }
+  return currentCustomerId;
+}
+
+function resetStepUiState(): CustomerNewPlanWizardStepUiState {
+  return {
+    completed: false,
+    dirty: false,
+    error: '',
+    loading: false,
+  };
+}
+
+function invalidateSteps(
+  state: CustomerNewPlanWizardState,
+  stepIds: CustomerNewPlanWizardStepId[],
+) {
+  for (const stepId of stepIds) {
+    state.step_state[stepId] = resetStepUiState();
+  }
 }
 
 export function useCustomerNewPlanWizard() {
@@ -99,9 +132,9 @@ export function useCustomerNewPlanWizard() {
   }
 
   function setSavedContext(patch: CustomerNewPlanWizardStatePatch) {
-    state.value = {
+    const nextState: CustomerNewPlanWizardState = {
       ...state.value,
-      customer_id: normalizeScalar(patch.customer_id ?? state.value.customer_id),
+      customer_id: resolveStableCustomerId(state.value.customer_id, patch.customer_id),
       order_id: normalizeScalar(patch.order_id ?? state.value.order_id),
       planning_entity_id: normalizeScalar(patch.planning_entity_id ?? state.value.planning_entity_id),
       planning_entity_type: normalizeScalar(patch.planning_entity_type ?? state.value.planning_entity_type),
@@ -109,7 +142,62 @@ export function useCustomerNewPlanWizard() {
       planning_record_id: normalizeScalar(patch.planning_record_id ?? state.value.planning_record_id),
       series_id: normalizeScalar(patch.series_id ?? state.value.series_id),
       shift_plan_id: normalizeScalar(patch.shift_plan_id ?? state.value.shift_plan_id),
+      step_state: {
+        ...state.value.step_state,
+      },
     };
+
+    const planningContextChanged =
+      nextState.planning_entity_id !== state.value.planning_entity_id ||
+      nextState.planning_entity_type !== state.value.planning_entity_type ||
+      nextState.planning_mode_code !== state.value.planning_mode_code;
+    const orderChanged = nextState.order_id !== state.value.order_id;
+    const planningRecordChanged = nextState.planning_record_id !== state.value.planning_record_id;
+    const shiftPlanChanged = nextState.shift_plan_id !== state.value.shift_plan_id;
+
+    if (planningContextChanged) {
+      nextState.planning_record_id = '';
+      nextState.shift_plan_id = '';
+      nextState.series_id = '';
+      invalidateSteps(nextState, [
+        'planning-record-overview',
+        'planning-record-documents',
+        'shift-plan',
+        'series-exceptions',
+      ]);
+    }
+
+    if (orderChanged) {
+      nextState.planning_record_id = '';
+      nextState.shift_plan_id = '';
+      nextState.series_id = '';
+      invalidateSteps(nextState, [
+        'equipment-lines',
+        'requirement-lines',
+        'order-documents',
+        'planning-record-overview',
+        'planning-record-documents',
+        'shift-plan',
+        'series-exceptions',
+      ]);
+    }
+
+    if (planningRecordChanged) {
+      nextState.shift_plan_id = '';
+      nextState.series_id = '';
+      invalidateSteps(nextState, [
+        'planning-record-documents',
+        'shift-plan',
+        'series-exceptions',
+      ]);
+    }
+
+    if (shiftPlanChanged) {
+      nextState.series_id = '';
+      invalidateSteps(nextState, ['series-exceptions']);
+    }
+
+    state.value = nextState;
     return syncCurrentStep(state.value.current_step);
   }
 

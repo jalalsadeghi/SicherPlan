@@ -20,6 +20,12 @@ test("wizard step content uses wizard field wrappers across implemented steps", 
   assert.match(source, /data-testid="customer-new-plan-step-panel-series-exceptions"/);
   assert.match(source, /class="field-stack"/);
   assert.match(source, /class="field-stack field-stack--wide"/);
+  assert.match(source, /data-testid="customer-new-plan-planning-create-address-id"/);
+  assert.match(source, /data-testid="customer-new-plan-planning-create-timezone"/);
+  assert.match(source, /data-testid="customer-new-plan-planning-create-latitude"/);
+  assert.match(source, /data-testid="customer-new-plan-planning-create-longitude"/);
+  assert.match(source, /data-testid="customer-new-plan-planning-create-status"/);
+  assert.match(source, /data-testid="customer-new-plan-trade-fair-zone"/);
 });
 
 test("wizard step content defines local form-control styling instead of relying on scoped planning views", () => {
@@ -46,6 +52,25 @@ test("teleported modal content gets explicit wizard styling hooks", () => {
   assert.match(source, /data-testid="customer-new-plan-new-equipment-dialog"/);
   assert.match(source, /data-testid="customer-new-plan-new-requirement-dialog"/);
   assert.match(source, /data-testid="customer-new-plan-new-template-dialog"/);
+});
+
+test("wizard planning step uses canonical branch-backed selectors and tenant catalog scope", () => {
+  assert.match(source, /listCustomerAddresses/);
+  assert.match(source, /listTradeFairZones/);
+  assert.match(source, /planningCreateAddressOptions/);
+  assert.match(source, /tradeFairZoneSelectOptions/);
+  assert.match(source, /createPlanningSetupRecord\('requirement_type'/);
+  assert.match(source, /createPlanningSetupRecord\('equipment_item'/);
+  const requirementCreateBlock = source.slice(
+    source.indexOf("createPlanningSetupRecord('requirement_type'"),
+    source.indexOf('resetRequirementModal();'),
+  );
+  const equipmentCreateBlock = source.slice(
+    source.indexOf("createPlanningSetupRecord('equipment_item'"),
+    source.indexOf('resetEquipmentModal();'),
+  );
+  assert.equal(requirementCreateBlock.includes('customer_id: props.customer.id'), false);
+  assert.equal(equipmentCreateBlock.includes('customer_id: props.customer.id'), false);
 });
 
 test("wizard form grid keeps responsive stacking rules", () => {

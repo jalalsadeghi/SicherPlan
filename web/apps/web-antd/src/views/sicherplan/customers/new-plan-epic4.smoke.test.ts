@@ -27,6 +27,7 @@ const apiMocks = vi.hoisted(() => ({
   listOrderRequirementLinesMock: vi.fn(),
   listPlanningRecordAttachmentsMock: vi.fn(),
   listPlanningSetupRecordsMock: vi.fn(),
+  listTradeFairZonesMock: vi.fn(),
   listShiftPlansMock: vi.fn(),
   listShiftSeriesExceptionsMock: vi.fn(),
   listShiftSeriesMock: vi.fn(),
@@ -51,6 +52,7 @@ vi.mock('vue-router', () => ({
 vi.mock('#/sicherplan-legacy/api/planningAdmin', () => ({
   createPlanningRecord: vi.fn(),
   listPlanningRecords: apiMocks.listPlanningSetupRecordsMock,
+  listTradeFairZones: apiMocks.listTradeFairZonesMock,
 }));
 
 vi.mock('#/sicherplan-legacy/api/employeeAdmin', () => ({
@@ -280,6 +282,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listOrderRequirementLinesMock.mockReset();
     apiMocks.listPlanningRecordAttachmentsMock.mockReset();
     apiMocks.listPlanningSetupRecordsMock.mockReset();
+    apiMocks.listTradeFairZonesMock.mockReset();
     apiMocks.listShiftPlansMock.mockReset();
     apiMocks.listShiftSeriesExceptionsMock.mockReset();
     apiMocks.listShiftSeriesMock.mockReset();
@@ -303,6 +306,20 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       };
       return Promise.resolve(map[entityKey] ?? []);
     });
+    apiMocks.listTradeFairZonesMock.mockResolvedValue([
+      {
+        id: 'zone-1',
+        tenant_id: 'tenant-1',
+        trade_fair_id: 'fair-1',
+        zone_type_code: 'hall',
+        zone_code: 'H2-A',
+        label: 'Halle 2 A',
+        notes: null,
+        status: 'active',
+        version_no: 1,
+        archived_at: null,
+      },
+    ]);
     apiMocks.listPlanningRecordAttachmentsMock.mockResolvedValue([]);
     apiMocks.listShiftPlansMock.mockResolvedValue([]);
     apiMocks.listShiftTemplatesMock.mockResolvedValue([{ id: 'template-1', tenant_id: 'tenant-1', code: 'TPL-1', label: 'Tagdienst Vorlage', local_start_time: '08:00', local_end_time: '16:00', default_break_minutes: 30, shift_type_code: 'day', status: 'active', version_no: 1 }]);
@@ -370,6 +387,20 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
         },
       }),
     );
+  });
+
+  it('loads trade fair zones into a selector instead of a raw UUID field', async () => {
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: 'fair-1',
+      planning_entity_type: 'trade_fair',
+      planning_mode_code: 'trade_fair',
+    });
+    await flushPromises();
+
+    expect(apiMocks.listTradeFairZonesMock).toHaveBeenCalledWith('tenant-1', 'fair-1', 'token-1');
+    const zoneSelect = wrapper.get('[data-testid="customer-new-plan-trade-fair-zone"]');
+    expect(zoneSelect.findAll('option')).toHaveLength(2);
+    expect(zoneSelect.text()).toContain('H2-A');
   });
 
   it('links planning-record documents through the canonical planning-record document path', async () => {
@@ -601,6 +632,20 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(routerPushMock).toHaveBeenCalledWith(
       '/admin/planning-staffing?date_from=2026-06-01T00%3A00&date_to=2026-06-02T00%3A00&planning_record_id=record-1&shift_id=shift-1',
     );
+    const redirectTarget = routerPushMock.mock.calls.at(-1)?.[0];
+    const redirectUrl = new URL(`https://example.test${redirectTarget}`);
+    expect(redirectUrl.pathname).toBe('/admin/planning-staffing');
+    expect(redirectUrl.searchParams.get('planning_record_id')).toBe('record-1');
+    expect(redirectUrl.searchParams.get('date_from')).toBe('2026-06-01T00:00');
+    expect(redirectUrl.searchParams.get('date_to')).toBe('2026-06-02T00:00');
+    expect(redirectUrl.searchParams.get('shift_id')).toBe('shift-1');
+    expect(redirectUrl.searchParams.get('planning_mode_code')).toBeNull();
+    expect([...redirectUrl.searchParams.keys()].sort()).toEqual([
+      'date_from',
+      'date_to',
+      'planning_record_id',
+      'shift_id',
+    ]);
   });
 
   it('keeps the user on the final step with clear feedback when series generation fails', async () => {
@@ -625,7 +670,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     expect(saved).toBe(false);
     expect(routerPushMock).not.toHaveBeenCalled();
-    expect(wrapper.get('[data-testid="customer-new-plan-step-panel-series-exceptions"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-series-exceptions"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.seriesGenerateFailed');
   });
 });

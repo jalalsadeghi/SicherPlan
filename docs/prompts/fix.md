@@ -1,172 +1,141 @@
 You are working in the SicherPlan repository.
 
-Context:
-The Customer New Plan Wizard was implemented from the sprint brief:
+This task is part of:
 - /docs/sprint/SPR-CUST-NEWPLAN-V1.md
 
-The current visible problem:
-On /admin/customers/new-plan?customer_id=..., the wizard shell and steps render, but the form elements inside the step content look unstyled/raw.
-The screenshot shows native inputs/selects/textareas without the standard SicherPlan/Vben admin form styling.
+Read the sprint document first.
+This is the final readiness pass before real data entry begins.
 
-Important:
-This is primarily a UI/styling and component-polish fix.
-Do NOT rewrite the wizard business flow.
-Do NOT change backend APIs.
-Do NOT remove or redesign the canonical Operations & Planning pages.
-Do NOT change the route contract unless you discover a real bug.
-Do NOT broaden the feature beyond Tenant Administrator.
+Goal:
+Validate the final Generate Series handoff, permissions, i18n, route behavior, and non-regression of the Customer New Plan Wizard.
 
-Files to inspect first:
-- /docs/sprint/SPR-CUST-NEWPLAN-V1.md
+Primary files to inspect:
+- web/apps/web-antd/src/router/routes/modules/sicherplan.ts
 - web/apps/web-antd/src/views/sicherplan/customers/new-plan.vue
 - web/apps/web-antd/src/views/sicherplan/customers/new-plan-step-content.vue
-- web/apps/web-antd/src/views/sicherplan/customers/new-plan-wizard.steps.ts
 - web/apps/web-antd/src/views/sicherplan/customers/use-customer-new-plan-wizard.ts
-- web/apps/web-antd/src/sicherplan-legacy/views/PlanningOpsAdminView.vue
-- web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue
-- web/apps/web-antd/src/sicherplan-legacy/views/PlanningShiftsAdminView.vue
-- nearby shared SicherPlan/Vben layout components and form patterns
+- web/apps/web-antd/src/sicherplan-legacy/components/customers/CustomerPlansTab.vue
+- web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue
+- relevant i18n files for sicherplan.customerPlansWizard and customerAdmin.plans
 
-First validate my diagnosis before coding:
-1. Confirm whether new-plan-step-content.vue uses classes such as:
-   - field-stack
-   - field-help
-   - cta-row
-   - cta-button
-   - planning-admin-checkbox
-2. Confirm whether those classes are actually styled inside new-plan-step-content.vue.
-3. Confirm whether similar styling exists in PlanningOpsAdminView.vue but is scoped and therefore not reusable automatically.
-4. Confirm whether the current forms are structurally present for all wizard steps.
-5. Confirm whether the issue is mainly missing local/shared form styling rather than missing business implementation.
+Before coding:
+Validate the current implementation and explicitly state whether the wizard is ready for real data entry.
+Do not change code unless you find a real issue.
 
-Then implement the minimal correct fix.
+A. Route and permission validation
+Confirm:
+- /admin/customers/new-plan exists
+- it is hidden from menu/sidebar
+- it is restricted to tenant_admin for V1
+- Customer > Plans launches it with customer_id
+- missing customer_id shows a controlled invalid state
+- unauthorized access shows controlled fallback
 
-Primary goal:
-Make all Customer New Plan Wizard form elements visually consistent with the existing SicherPlan admin UI.
+Fix any issue found.
 
-Required visual outcome:
-- Inputs, selects, textareas, checkboxes, file inputs, and modal form fields should have consistent spacing, border, radius, background, typography, focus states, disabled states, and dark-mode compatibility.
-- Step panels should look like intentional form sections, not raw browser controls.
-- Dialog forms for New Equipment, New Requirement, New Template, and Planning Entity creation should also be styled.
-- The visual style should be aligned with the existing PlanningOpsAdminView / PlanningOrders / PlanningShifts form patterns.
+B. Generate Series handoff validation
+Confirm:
+- final CTA label is Generate Series & Continue
+- series is saved before generateShiftSeries
+- generateShiftSeries uses canonical API
+- on success, user is redirected to the canonical /admin/planning-staffing page
+- Staffing Coverage receives supported query params only
 
-Implementation guidance:
+Inspect PlanningStaffingCoverageView.vue and confirm which query params are actually consumed.
+Use only supported or safely ignored params.
 
-A. Prefer reuse when practical
-- First check if the branch already has a shared reusable form-style component or CSS utility.
-- If such a shared form utility exists, reuse it.
-- If not, add a focused local style block to new-plan-step-content.vue or extract a small shared wizard form style in the nearest appropriate location.
-- Avoid broad global CSS that may unintentionally affect unrelated pages.
+Preferred handoff params:
+- planning_record_id
+- date_from
+- date_to
+- shift_id if supported/useful
+- planning_mode_code only if supported or safely ignored
 
-B. Fix scoped-style leakage
-- Do not rely on styles from PlanningOpsAdminView.vue, because they are scoped to that component.
-- If you reuse the pattern, copy/adapt the relevant form-control styling into the wizard component or a shared imported style.
-- Make sure styles apply to:
-  - normal step content
-  - modal content
-  - native input/select/textarea
-  - file inputs
-  - Ant Design modal content where applicable
+Do not invent unsupported staffing filters.
+Do not create a customer-only staffing page.
+Do not embed staffing coverage inside the wizard.
 
-C. Form field styling to add or normalize
-Add/ensure styling for:
-- .field-stack
-- .field-stack span
-- .field-stack input
-- .field-stack select
-- .field-stack textarea
-- .field-help
-- .cta-row
-- .cta-button
-- .cta-button.cta-secondary
-- .planning-admin-checkbox
-- .planning-admin-checkbox input[type="checkbox"]
-- .sp-customer-plan-wizard-step__modal
-- .sp-customer-plan-wizard-step__grid
-- .sp-customer-plan-wizard-step__panel
-- .sp-customer-plan-wizard-step__list-row
+C. i18n validation
+Confirm all new visible UI text is i18n-driven:
+- step labels
+- button labels
+- dialog titles
+- field labels
+- error messages
+- success messages
+- invalid states
+- handoff messages
 
-The result should match the existing admin look:
-- rounded controls, similar to the PlanningOpsAdminView form controls
-- soft borders using existing CSS variables
-- card/surface backgrounds using existing CSS variables
-- visible focus ring with the project’s teal/primary tone
-- readable disabled states
-- clean responsive grid behavior
+Use German first and English fallback, following existing project conventions.
+Fix any hard-coded user-facing strings.
 
-D. Layout improvements
-- Make label/value spacing consistent.
-- Ensure fields do not stretch awkwardly across the full page unless marked as wide.
-- Keep two-column or responsive grid behavior where sensible.
-- On narrow widths, all controls should stack cleanly.
-- Keep the action bar in new-plan.vue as-is unless it has a direct visual bug.
-- Do not make the wizard page visually denser than existing admin modules.
+D. Styling final check
+Confirm the fixes from the styling pass apply to:
+- normal step forms
+- modal forms
+- list rows
+- file inputs
+- checkboxes
+- buttons
+- responsive layout
+- dark mode if supported
 
-E. Modal polish
-- Ensure modal form fields are styled consistently.
-- Ensure modal buttons are not affected negatively.
-- Ensure modal content spacing is clean.
-- If Ant Design Modal teleports content, verify the chosen scoped/global styling still applies to labels and controls inside the modal.
+E. Non-regression validation
+Confirm:
+- Customer Plans tab still works
+- New Plan button still works
+- canonical Planning Setup still works
+- canonical Orders & Planning still works
+- canonical Shift Planning still works
+- canonical Staffing Coverage still works
+- Operations & Planning menu structure is unchanged
 
-F. Business-flow safety
-Do not change:
-- step order
-- save-on-next behavior
-- Previous behavior
-- Generate Series & Continue behavior
-- Staffing Coverage handoff
-- API adapter semantics
-- permission guard
-unless you find a real bug directly related to this styling fix.
+F. Tests
+Add or update tests for:
+- tenant_admin can open the wizard
+- non-tenant-admin cannot access the wizard
+- missing customer_id invalid state
+- final Generate Series redirect
+- supported staffing query params
+- i18n labels present
+- Customer Plans tab non-regression
+- Planning pages non-regression smoke tests where practical
 
-G. Verify step completeness, but do not broaden scope
-While inspecting, check whether all steps from /docs/sprint/SPR-CUST-NEWPLAN-V1.md have visible form content:
-1. Planning
-2. Order details
-3. Equipment lines
-4. Requirement lines
-5. Order documents
-6. Planning record
-7. Planning documents
-8. Shift plan
-9. Series & exceptions
-
-If any step is still only placeholder content, report it clearly.
-If all steps have real form content, say so and keep this patch focused on styling.
-
-H. Testing
-Add or update focused frontend tests where practical:
-- new-plan-step-content renders styled field wrappers for Planning step
-- Order Details fields use the wizard form field class
-- Equipment / Requirement / Template dialog content uses the styled modal form wrapper
-- action buttons keep the intended cta classes
-- responsive layout class exists on the form grid
-- no regression in New Plan route shell
-
-If visual regression tests are not available, add a manual QA checklist to the final report.
-
-Manual QA checklist to include in final output:
-- Planning step desktop layout
-- Order Details desktop layout
-- Equipment Lines with New Equipment dialog
-- Requirement Lines with New Requirement dialog
-- Shift Plan step
-- Series & Exceptions with New Template dialog
+G. Manual QA checklist
+Include a manual QA checklist in the final output:
+- Customer > Plans > New Plan entry
+- Planning step Use Existing
+- Planning step Create Site
+- Planning step Create Event Venue
+- Planning step Create Trade Fair
+- Planning step Create Patrol Route
+- Order Details
+- Equipment Lines + New Equipment
+- Requirement Lines + New Requirement
+- Order Documents
+- Planning Record
+- Planning Documents
+- Shift Plan
+- Series & Exceptions + New Template
+- Generate Series & Continue
+- landing in Staffing Coverage with narrowed context
+- Previous/edit behavior
+- browser refresh behavior
 - narrow-width layout
-- dark mode, if supported
-- browser focus state on input/select/textarea
-- disabled/loading state
+- dark mode if supported
 
-Expected final output:
-1. Validation summary of the diagnosis
-2. Whether all wizard step forms are structurally implemented
-3. The styling approach chosen: local styles vs shared style extraction
+Final output:
+1. Readiness validation summary
+2. Issues found
+3. Fixes implemented
 4. Changed files
-5. Tests added/updated and test results
-6. Manual QA checklist
-7. Any real remaining limitation
+5. Tests added/updated
+6. Test results
+7. Manual QA checklist
+8. Clear statement:
+   - Ready for real data entry
+   - Not ready, with exact blockers
 
-Important:
-Keep the patch focused.
+Before finalizing, explicitly state whether my proposal was correct or had to be adjusted.
 Avoid unrelated refactors.
-Do not change the customer-to-order-to-planning-to-shift-to-staffing domain flow.
+Do not broaden V1 scope.

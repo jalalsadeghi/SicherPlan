@@ -6,6 +6,10 @@ import { Modal } from 'ant-design-vue';
 
 import { $t } from '#/locales';
 import {
+  listCustomerAddresses,
+  type CustomerAddressRead,
+} from '#/sicherplan-legacy/api/customers';
+import {
   listFunctionTypes,
   listQualificationTypes,
   type FunctionTypeRead,
@@ -14,7 +18,9 @@ import {
 import {
   createPlanningRecord as createPlanningSetupRecord,
   listPlanningRecords as listPlanningSetupRecords,
+  listTradeFairZones,
   type PlanningListItem,
+  type TradeFairZoneRead,
 } from '#/sicherplan-legacy/api/planningAdmin';
 import {
   createPlanningRecord,
@@ -50,6 +56,7 @@ import {
   hasDuplicateActiveRequirementLine,
   validatePlanningRecordDraft,
 } from '#/sicherplan-legacy/features/planning/planningOrders.helpers';
+import { formatPlanningAddressOption } from '#/sicherplan-legacy/features/planning/planningAdmin.helpers';
 import {
   createShiftPlan,
   createShiftSeries,
@@ -229,16 +236,28 @@ const exceptionDraft = reactive({
 });
 
 const planningCreateModal = reactive({
+  address_id: '',
   end_date: '',
   fair_no: '',
+  latitude: '',
+  longitude: '',
+  meeting_address_id: '',
   name: '',
   notes: '',
   open: false,
   route_no: '',
   saving: false,
+  site_id: '',
   site_no: '',
   start_date: '',
+  start_point_text: '',
+  status: 'active',
+  timezone: 'Europe/Berlin',
+  travel_policy_code: '',
+  venue_id: '',
   venue_no: '',
+  watchbook_enabled: false,
+  end_point_text: '',
 });
 
 const requirementModal = reactive({
@@ -298,6 +317,12 @@ const shiftTemplateOptions = ref<ShiftTemplateListItem[]>([]);
 const shiftTypeOptions = ref<ShiftTypeOption[]>([]);
 const seriesRows = ref<any[]>([]);
 const seriesExceptions = ref<ShiftSeriesExceptionRead[]>([]);
+const planningCreateAddressOptions = ref<CustomerAddressRead[]>([]);
+const planningCreateAddressLookupLoading = ref(false);
+const planningCreateAddressLookupError = ref('');
+const tradeFairZoneOptions = ref<TradeFairZoneRead[]>([]);
+const tradeFairZoneLookupLoading = ref(false);
+const tradeFairZoneLookupError = ref('');
 
 const stepFeedback = reactive({
   message: '',
@@ -426,6 +451,27 @@ const shiftTypeSelectOptions = computed(() =>
   })),
 );
 
+const planningCreateAddressSelectOptions = computed(() =>
+  planningCreateAddressOptions.value.map((row) => ({
+    label: formatPlanningAddressOption(row),
+    value: row.address_id,
+  })),
+);
+
+const tradeFairZoneSelectOptions = computed(() =>
+  tradeFairZoneOptions.value.map((row) => ({
+    label: [row.zone_code, row.label].filter(Boolean).join(' — ') || row.id,
+    value: row.id,
+  })),
+);
+
+const timezoneOptions = computed(() =>
+  getSupportedTimezones().map((timezone) => ({
+    label: timezone,
+    value: timezone,
+  })),
+);
+
 const planningStepActive = computed(() => props.currentStepId === 'planning');
 const orderStepActive = computed(() => props.currentStepId === 'order-details');
 const equipmentStepActive = computed(() => props.currentStepId === 'equipment-lines');
@@ -460,16 +506,28 @@ function normalizeUuid(value: string | null | undefined) {
 
 function resetPlanningCreateModal() {
   Object.assign(planningCreateModal, {
+    address_id: '',
     end_date: '',
     fair_no: '',
+    latitude: '',
+    longitude: '',
+    meeting_address_id: '',
     name: '',
     notes: '',
     open: false,
     route_no: '',
     saving: false,
+    site_id: '',
     site_no: '',
     start_date: '',
+    start_point_text: '',
+    status: 'active',
+    timezone: 'Europe/Berlin',
+    travel_policy_code: '',
+    venue_id: '',
     venue_no: '',
+    watchbook_enabled: false,
+    end_point_text: '',
   });
 }
 
@@ -781,6 +839,16 @@ function formatDateTimeLocalValue(value: Date) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
+function getSupportedTimezones() {
+  const supportedValuesOf = (Intl as typeof Intl & {
+    supportedValuesOf?: (key: 'timeZone') => string[];
+  }).supportedValuesOf;
+  if (typeof supportedValuesOf === 'function') {
+    return supportedValuesOf('timeZone');
+  }
+  return ['Europe/Berlin'];
+}
+
 function buildCanonicalStaffingWindowFromDates(start: string, end: string) {
   const startDate = new Date(`${start}T00:00:00`);
   const endDate = new Date(`${end}T00:00:00`);
@@ -941,6 +1009,58 @@ async function loadPlanningEntityOptions() {
   }
 }
 
+async function loadPlanningCreateReferenceOptions() {
+  if (!props.tenantId || !props.accessToken || !props.customer.id) {
+    planningCreateAddressOptions.value = [];
+    planningCreateAddressLookupError.value = '';
+    planningCreateAddressLookupLoading.value = false;
+    return;
+  }
+  planningCreateAddressLookupLoading.value = true;
+  planningCreateAddressLookupError.value = '';
+  try {
+    planningCreateAddressOptions.value = await listCustomerAddresses(props.tenantId, props.customer.id, props.accessToken);
+    const validAddressIds = new Set(planningCreateAddressOptions.value.map((entry) => entry.address_id));
+    if (planningCreateModal.address_id && !validAddressIds.has(planningCreateModal.address_id)) {
+      planningCreateModal.address_id = '';
+    }
+    if (planningCreateModal.meeting_address_id && !validAddressIds.has(planningCreateModal.meeting_address_id)) {
+      planningCreateModal.meeting_address_id = '';
+    }
+  } catch {
+    planningCreateAddressOptions.value = [];
+    planningCreateAddressLookupError.value = $t('sicherplan.customerPlansWizard.errors.addressLoad');
+    planningCreateModal.address_id = '';
+    planningCreateModal.meeting_address_id = '';
+  } finally {
+    planningCreateAddressLookupLoading.value = false;
+  }
+}
+
+async function refreshTradeFairZoneOptions(tradeFairId: string) {
+  if (!props.tenantId || !props.accessToken || !tradeFairId) {
+    tradeFairZoneOptions.value = [];
+    tradeFairZoneLookupError.value = '';
+    tradeFairZoneLookupLoading.value = false;
+    planningRecordDraft.trade_fair_detail_trade_fair_zone_id = '';
+    return;
+  }
+  tradeFairZoneLookupLoading.value = true;
+  tradeFairZoneLookupError.value = '';
+  try {
+    tradeFairZoneOptions.value = await listTradeFairZones(props.tenantId, tradeFairId, props.accessToken);
+    if (!tradeFairZoneOptions.value.some((row) => row.id === planningRecordDraft.trade_fair_detail_trade_fair_zone_id)) {
+      planningRecordDraft.trade_fair_detail_trade_fair_zone_id = '';
+    }
+  } catch {
+    tradeFairZoneOptions.value = [];
+    tradeFairZoneLookupError.value = $t('sicherplan.customerPlansWizard.errors.tradeFairZoneLoad');
+    planningRecordDraft.trade_fair_detail_trade_fair_zone_id = '';
+  } finally {
+    tradeFairZoneLookupLoading.value = false;
+  }
+}
+
 async function loadOrderReferenceOptions() {
   if (!props.tenantId || !props.accessToken) {
     return;
@@ -1022,6 +1142,11 @@ async function loadPlanningRecordState() {
       planningRecordDraft.planning_from = selectedOrder.value.service_from;
       planningRecordDraft.planning_to = selectedOrder.value.service_to;
     }
+    if ((props.wizardState.planning_mode_code || planningModeCode.value) === 'trade_fair') {
+      await refreshTradeFairZoneOptions(props.wizardState.planning_entity_id);
+    } else {
+      await refreshTradeFairZoneOptions('');
+    }
     return;
   }
   const [record, attachments] = await Promise.all([
@@ -1030,6 +1155,11 @@ async function loadPlanningRecordState() {
   ]);
   syncPlanningRecordDraft(record);
   planningRecordAttachments.value = attachments;
+  if ((props.wizardState.planning_mode_code || planningModeCode.value) === 'trade_fair') {
+    await refreshTradeFairZoneOptions(props.wizardState.planning_entity_id);
+  } else {
+    await refreshTradeFairZoneOptions('');
+  }
 }
 
 async function loadShiftPlanningReferenceOptions() {
@@ -1102,6 +1232,8 @@ async function refreshStepData() {
   try {
     if (planningStepActive.value) {
       await loadPlanningEntityOptions();
+      await loadPlanningCreateReferenceOptions();
+      await loadPlanningRecordReferenceOptions();
     } else if (orderStepActive.value || equipmentStepActive.value || requirementStepActive.value || documentsStepActive.value) {
       await loadOrderReferenceOptions();
       await loadOrderState();
@@ -1143,8 +1275,14 @@ async function submitPlanningCreateModal() {
     }
     payload = {
       ...payloadBase,
+      address_id: planningCreateModal.address_id || null,
+      latitude: planningCreateModal.latitude || null,
       name: planningCreateModal.name.trim(),
       site_no: planningCreateModal.site_no.trim(),
+      longitude: planningCreateModal.longitude || null,
+      status: planningCreateModal.status || undefined,
+      timezone: planningCreateModal.timezone || null,
+      watchbook_enabled: planningCreateModal.watchbook_enabled,
     };
   } else if (planningFamily.value === 'event_venue') {
     if (!planningCreateModal.venue_no.trim() || !planningCreateModal.name.trim()) {
@@ -1153,8 +1291,13 @@ async function submitPlanningCreateModal() {
     }
     payload = {
       ...payloadBase,
+      address_id: planningCreateModal.address_id || null,
+      latitude: planningCreateModal.latitude || null,
       name: planningCreateModal.name.trim(),
       venue_no: planningCreateModal.venue_no.trim(),
+      longitude: planningCreateModal.longitude || null,
+      status: planningCreateModal.status || undefined,
+      timezone: planningCreateModal.timezone || null,
     };
   } else if (planningFamily.value === 'trade_fair') {
     if (
@@ -1169,10 +1312,16 @@ async function submitPlanningCreateModal() {
     }
     payload = {
       ...payloadBase,
+      address_id: planningCreateModal.address_id || null,
       end_date: planningCreateModal.end_date,
       fair_no: planningCreateModal.fair_no.trim(),
+      latitude: planningCreateModal.latitude || null,
       name: planningCreateModal.name.trim(),
+      longitude: planningCreateModal.longitude || null,
       start_date: planningCreateModal.start_date,
+      status: planningCreateModal.status || undefined,
+      timezone: planningCreateModal.timezone || null,
+      venue_id: planningCreateModal.venue_id || null,
     };
   } else {
     if (!planningCreateModal.route_no.trim() || !planningCreateModal.name.trim()) {
@@ -1181,8 +1330,14 @@ async function submitPlanningCreateModal() {
     }
     payload = {
       ...payloadBase,
+      end_point_text: planningCreateModal.end_point_text.trim() || null,
+      meeting_address_id: planningCreateModal.meeting_address_id || null,
       name: planningCreateModal.name.trim(),
       route_no: planningCreateModal.route_no.trim(),
+      site_id: planningCreateModal.site_id || null,
+      start_point_text: planningCreateModal.start_point_text.trim() || null,
+      status: planningCreateModal.status || undefined,
+      travel_policy_code: planningCreateModal.travel_policy_code.trim() || null,
     };
   }
 
@@ -1217,7 +1372,6 @@ async function submitRequirementModal() {
   try {
     const created = await createPlanningSetupRecord('requirement_type', props.tenantId, props.accessToken, {
       code: requirementModal.code.trim(),
-      customer_id: props.customer.id,
       default_planning_mode_code: requirementModal.default_planning_mode_code.trim(),
       label: requirementModal.label.trim(),
       notes: requirementModal.notes.trim() || null,
@@ -1245,7 +1399,6 @@ async function submitEquipmentModal() {
   try {
     const created = await createPlanningSetupRecord('equipment_item', props.tenantId, props.accessToken, {
       code: equipmentModal.code.trim(),
-      customer_id: props.customer.id,
       label: equipmentModal.label.trim(),
       notes: equipmentModal.notes.trim() || null,
       tenant_id: props.tenantId,
@@ -2308,7 +2461,14 @@ onMounted(() => {
         </label>
         <label v-else-if="props.wizardState.planning_mode_code === 'trade_fair'" class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.tradeFairZoneId') }}</span>
-          <input v-model="planningRecordDraft.trade_fair_detail_trade_fair_zone_id" />
+          <select v-model="planningRecordDraft.trade_fair_detail_trade_fair_zone_id" data-testid="customer-new-plan-trade-fair-zone">
+            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.tradeFairZonePlaceholder') }}</option>
+            <option v-for="option in tradeFairZoneSelectOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+          <p v-if="tradeFairZoneLookupError" class="field-help">{{ tradeFairZoneLookupError }}</p>
+          <p v-else-if="tradeFairZoneLookupLoading" class="field-help">{{ $t('sicherplan.customerPlansWizard.loadingBody') }}</p>
         </label>
         <label v-if="props.wizardState.planning_mode_code === 'trade_fair'" class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.standNote') }}</span>
@@ -2637,6 +2797,63 @@ onMounted(() => {
           <span>{{ $t('sicherplan.customerPlansWizard.forms.name') }}</span>
           <input v-model="planningCreateModal.name" data-testid="customer-new-plan-planning-create-name" />
         </label>
+        <label v-if="planningFamily === 'trade_fair'" class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.venueId') }}</span>
+          <select v-model="planningCreateModal.venue_id" data-testid="customer-new-plan-planning-create-venue-id">
+            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.none') }}</option>
+            <option v-for="option in eventVenueSelectOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
+        <label v-if="planningFamily === 'patrol_route'" class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.siteId') }}</span>
+          <select v-model="planningCreateModal.site_id" data-testid="customer-new-plan-planning-create-site-id">
+            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.none') }}</option>
+            <option v-for="option in siteSelectOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
+        <label v-if="planningFamily === 'site' || planningFamily === 'event_venue' || planningFamily === 'trade_fair'" class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.addressId') }}</span>
+          <select v-model="planningCreateModal.address_id" data-testid="customer-new-plan-planning-create-address-id">
+            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.none') }}</option>
+            <option v-for="option in planningCreateAddressSelectOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
+        <label v-if="planningFamily === 'patrol_route'" class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.meetingAddressId') }}</span>
+          <select v-model="planningCreateModal.meeting_address_id" data-testid="customer-new-plan-planning-create-meeting-address-id">
+            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.none') }}</option>
+            <option v-for="option in planningCreateAddressSelectOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
+        <label v-if="planningFamily === 'site' || planningFamily === 'event_venue' || planningFamily === 'trade_fair'" class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.timezone') }}</span>
+          <select v-model="planningCreateModal.timezone" data-testid="customer-new-plan-planning-create-timezone">
+            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.none') }}</option>
+            <option v-for="option in timezoneOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
+        <label v-if="planningFamily === 'site' || planningFamily === 'event_venue' || planningFamily === 'trade_fair'" class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.latitude') }}</span>
+          <input v-model="planningCreateModal.latitude" data-testid="customer-new-plan-planning-create-latitude" type="number" step="0.000001" />
+        </label>
+        <label v-if="planningFamily === 'site' || planningFamily === 'event_venue' || planningFamily === 'trade_fair'" class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.longitude') }}</span>
+          <input v-model="planningCreateModal.longitude" data-testid="customer-new-plan-planning-create-longitude" type="number" step="0.000001" />
+        </label>
+        <label v-if="planningFamily === 'site'" class="planning-admin-checkbox">
+          <input v-model="planningCreateModal.watchbook_enabled" data-testid="customer-new-plan-planning-create-watchbook-enabled" type="checkbox" />
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.watchbookEnabled') }}</span>
+        </label>
         <template v-if="planningFamily === 'trade_fair'">
           <label class="field-stack">
             <span>{{ $t('sicherplan.customerPlansWizard.forms.startDate') }}</span>
@@ -2647,6 +2864,29 @@ onMounted(() => {
             <input v-model="planningCreateModal.end_date" data-testid="customer-new-plan-planning-create-end-date" type="date" />
           </label>
         </template>
+        <template v-if="planningFamily === 'patrol_route'">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.startPointText') }}</span>
+            <input v-model="planningCreateModal.start_point_text" data-testid="customer-new-plan-planning-create-start-point" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.endPointText') }}</span>
+            <input v-model="planningCreateModal.end_point_text" data-testid="customer-new-plan-planning-create-end-point" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.travelPolicyCode') }}</span>
+            <input v-model="planningCreateModal.travel_policy_code" data-testid="customer-new-plan-planning-create-travel-policy-code" />
+          </label>
+        </template>
+        <label class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.status') }}</span>
+          <select v-model="planningCreateModal.status" data-testid="customer-new-plan-planning-create-status">
+            <option value="active">{{ $t('sicherplan.customerPlansWizard.forms.statusActive') }}</option>
+            <option value="inactive">{{ $t('sicherplan.customerPlansWizard.forms.statusInactive') }}</option>
+            <option value="archived">{{ $t('sicherplan.customerPlansWizard.forms.statusArchived') }}</option>
+          </select>
+        </label>
+        <p v-if="planningCreateAddressLookupError" class="field-help">{{ planningCreateAddressLookupError }}</p>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
           <textarea v-model="planningCreateModal.notes" rows="3" />

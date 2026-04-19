@@ -46,6 +46,7 @@ const apiMocks = vi.hoisted(() => ({
   getCustomerMock: vi.fn(),
   getCustomerOrderMock: vi.fn(),
   linkOrderAttachmentMock: vi.fn(),
+  listCustomerAddressesMock: vi.fn(),
   listFunctionTypesMock: vi.fn(),
   listOrderAttachmentsMock: vi.fn(),
   listOrderEquipmentLinesMock: vi.fn(),
@@ -79,12 +80,14 @@ vi.mock('#/sicherplan-legacy/api/customers', async () => {
   return {
     ...actual,
     getCustomer: apiMocks.getCustomerMock,
+    listCustomerAddresses: apiMocks.listCustomerAddressesMock,
   };
 });
 
 vi.mock('#/sicherplan-legacy/api/planningAdmin', () => ({
   createPlanningRecord: apiMocks.createPlanningSetupRecordMock,
   listPlanningRecords: apiMocks.listPlanningSetupRecordsMock,
+  listTradeFairZones: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('#/sicherplan-legacy/api/planningOrders', () => ({
@@ -246,6 +249,30 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
 
     apiMocks.getCustomerMock.mockReset();
     apiMocks.getCustomerMock.mockResolvedValue(buildCustomer());
+    apiMocks.listCustomerAddressesMock.mockReset();
+    apiMocks.listCustomerAddressesMock.mockResolvedValue([
+      {
+        id: 'customer-address-link-1',
+        tenant_id: 'tenant-1',
+        customer_id: 'customer-1',
+        address_id: 'address-1',
+        address_type: 'service',
+        label: null,
+        is_default: true,
+        status: 'active',
+        version_no: 1,
+        archived_at: null,
+        address: {
+          id: 'address-1',
+          street_line_1: 'Werkstraße 1',
+          street_line_2: null,
+          postal_code: '10115',
+          city: 'Berlin',
+          state: null,
+          country_code: 'DE',
+        },
+      },
+    ]);
 
     apiMocks.listPlanningSetupRecordsMock.mockReset();
     apiMocks.listPlanningSetupRecordsMock.mockImplementation((entityKey: string) => {
@@ -377,6 +404,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
     expect(apiMocks.createPlanningSetupRecordMock).toHaveBeenCalledWith('equipment_item', 'tenant-1', 'token-1', expect.any(Object));
+    expect(apiMocks.createPlanningSetupRecordMock.mock.calls.find((call) => call[0] === 'equipment_item')?.[3]).not.toHaveProperty('customer_id');
     expect(apiMocks.createOrderEquipmentLineMock).toHaveBeenCalledTimes(1);
 
     await wrapper.get('[data-testid="customer-new-plan-new-requirement"]').trigger('click');
@@ -388,6 +416,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
     expect(apiMocks.createPlanningSetupRecordMock).toHaveBeenCalledWith('requirement_type', 'tenant-1', 'token-1', expect.any(Object));
+    expect(apiMocks.createPlanningSetupRecordMock.mock.calls.find((call) => call[0] === 'requirement_type')?.[3]).not.toHaveProperty('customer_id');
     expect(apiMocks.createOrderRequirementLineMock).toHaveBeenCalledTimes(1);
 
     await wrapper.get('[data-testid="customer-new-plan-order-document-id"]').setValue('document-1');
@@ -410,6 +439,11 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
 
     await wrapper.get('[data-testid="customer-new-plan-planning-create-venue-no"]').setValue('VEN-2');
     await wrapper.get('[data-testid="customer-new-plan-planning-create-name"]').setValue('Messehalle');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-address-id"]').setValue('address-1');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-timezone"]').setValue('Europe/Berlin');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-latitude"]').setValue('52.520008');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-longitude"]').setValue('13.404954');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-status"]').setValue('inactive');
     await wrapper.get('[data-testid="modal-ok"]').trigger('click');
     await nextTickFlush();
 
@@ -417,7 +451,15 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
       'event_venue',
       'tenant-1',
       'token-1',
-      expect.objectContaining({ customer_id: 'customer-1', venue_no: 'VEN-2' }),
+      expect.objectContaining({
+        address_id: 'address-1',
+        customer_id: 'customer-1',
+        latitude: 52.520008,
+        longitude: 13.404954,
+        status: 'inactive',
+        timezone: 'Europe/Berlin',
+        venue_no: 'VEN-2',
+      }),
     );
 
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
