@@ -269,7 +269,7 @@ describe('CustomerNewPlanWizardView', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
   });
 
-  it('keeps planning-record-overview reachable and lets the step handle missing planning context itself', async () => {
+  it('keeps planning-record-overview reachable and lets the step handle planning-context setup itself', async () => {
     routeState.query = {
       customer_id: 'customer-1',
       order_id: 'order-1',

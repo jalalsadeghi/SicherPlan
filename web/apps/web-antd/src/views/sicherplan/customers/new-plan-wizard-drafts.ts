@@ -120,6 +120,39 @@ export function clearWizardDraft(
   storage.removeItem(buildWizardDraftStorageKey(context, stepId));
 }
 
+export function loadWizardDraftCandidatesForCustomer<T>(
+  context: Pick<CustomerNewPlanWizardDraftContext, 'customerId' | 'tenantId'>,
+  stepId: CustomerNewPlanWizardStepId,
+) {
+  const storage = getSessionStorage();
+  if (!storage) {
+    return [] as T[];
+  }
+  const customerPrefix = [
+    WIZARD_DRAFT_STORAGE_PREFIX,
+    normalizeKeySegment(context.tenantId),
+    normalizeKeySegment(context.customerId),
+  ].join(':');
+  const suffix = `:${stepId}`;
+  const matches: T[] = [];
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (!key?.startsWith(customerPrefix) || !key.endsWith(suffix)) {
+      continue;
+    }
+    const raw = storage.getItem(key);
+    if (!raw) {
+      continue;
+    }
+    try {
+      matches.push(JSON.parse(raw) as T);
+    } catch {
+      storage.removeItem(key);
+    }
+  }
+  return matches;
+}
+
 export function saveOrderDetailsEditDraft<T>(
   context: CustomerNewPlanWizardDraftContext,
   orderId: string,

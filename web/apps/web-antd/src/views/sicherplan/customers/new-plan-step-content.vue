@@ -96,6 +96,7 @@ import type {
 import {
   clearWizardDraft,
   clearOrderDetailsEditDraft,
+  loadWizardDraftCandidatesForCustomer,
   loadOrderDetailsEditDraft,
   loadWizardDraft,
   saveOrderDetailsEditDraft,
@@ -408,6 +409,17 @@ type OrderDocumentsDraftPersistence = {
   };
 };
 
+type PlanningRecordOverviewDraftPersistence = {
+  form: Partial<typeof planningRecordDraft>;
+  order_id?: string;
+  planning_context?: {
+    planning_entity_id: string;
+    planning_entity_type: PlanningEntityType;
+    planning_mode_code: string;
+  };
+  selection_mode?: PlanningSelectionMode;
+};
+
 type SeriesExceptionsDraftPersistence = {
   exception: typeof exceptionDraft;
   series: typeof seriesDraft;
@@ -420,15 +432,17 @@ const planningFamilyOptions = computed(() => [
   { label: $t('sicherplan.customerPlansWizard.forms.planningFamilies.patrolRoute'), value: 'patrol_route' },
 ]);
 
-const planningModeCode = computed(() => {
+function mapPlanningEntityTypeToModeCode(entityType: PlanningEntityType | '' | null | undefined) {
   const mapping: Record<PlanningEntityType, string> = {
     event_venue: 'event',
     patrol_route: 'patrol',
     site: 'site',
     trade_fair: 'trade_fair',
   };
-  return mapping[planningFamily.value];
-});
+  return entityType ? mapping[entityType] : '';
+}
+
+const planningModeCode = computed(() => mapPlanningEntityTypeToModeCode(planningFamily.value));
 
 const planningModeLabel = computed(() => {
   const mode = props.wizardState.planning_mode_code || planningModeCode.value;
@@ -605,9 +619,14 @@ const handledStepActive = computed(
     seriesStepActive.value,
 );
 const orderModeUsesExisting = computed(() => orderSelectionMode.value === 'use_existing');
+const planningModeUsesExisting = computed(() => planningSelectionMode.value === 'use_existing');
 const orderSelectionModeModel = computed<OrderSelectionMode>({
   get: () => orderSelectionMode.value,
   set: (value) => setOrderSelectionMode(value),
+});
+const planningSelectionModeModel = computed<PlanningSelectionMode>({
+  get: () => planningSelectionMode.value,
+  set: (value) => setPlanningSelectionMode(value),
 });
 const selectedExistingOrderSummary = computed(
   () => customerOrderRows.value.find((row) => row.id === selectedExistingOrderId.value) ?? null,
@@ -618,22 +637,37 @@ const existingOrderEditActive = computed(
 const currentPlanningEntityScope = computed(() => {
   const routePlanningEntityId = typeof route.query.planning_entity_id === 'string' ? route.query.planning_entity_id.trim() : '';
   const routePlanningEntityType = typeof route.query.planning_entity_type === 'string' ? route.query.planning_entity_type.trim() : '';
-  const planningEntityId = props.wizardState.planning_entity_id || routePlanningEntityId;
-  const planningEntityType = props.wizardState.planning_entity_type || routePlanningEntityType;
-  if (!planningEntityId || !planningEntityType) {
+  const localPlanningEntityId = planningRecordStepActive.value ? planningEntityId.value.trim() : '';
+  const localPlanningEntityType = planningRecordStepActive.value && localPlanningEntityId ? planningFamily.value : '';
+  const resolvedPlanningEntityId = localPlanningEntityId || props.wizardState.planning_entity_id || routePlanningEntityId;
+  const resolvedPlanningEntityType =
+    localPlanningEntityType ||
+    (props.wizardState.planning_entity_type as PlanningEntityType) ||
+    (routePlanningEntityType as PlanningEntityType);
+  if (!resolvedPlanningEntityId || !resolvedPlanningEntityType) {
     return null;
   }
   return {
-    planningEntityId,
-    planningEntityType,
+    planningEntityId: resolvedPlanningEntityId,
+    planningEntityType: resolvedPlanningEntityType,
   };
+});
+const currentPlanningModeCode = computed(() => {
+  if (planningRecordStepActive.value && planningEntityId.value.trim()) {
+    return planningModeCode.value;
+  }
+  return (
+    props.wizardState.planning_mode_code ||
+    mapPlanningEntityTypeToModeCode(currentPlanningEntityScope.value?.planningEntityType) ||
+    ''
+  );
 });
 const hasPlanningContext = computed(
   () =>
     Boolean(
-      props.wizardState.planning_entity_id &&
-        props.wizardState.planning_entity_type &&
-        props.wizardState.planning_mode_code,
+      currentPlanningEntityScope.value?.planningEntityId &&
+        currentPlanningEntityScope.value?.planningEntityType &&
+        currentPlanningModeCode.value,
     ),
 );
 
@@ -730,6 +764,21 @@ function clearDraftRestoreMessage() {
   draftRestoreMessage.value = '';
 }
 
+function buildPlanningContextPatch() {
+  if (!planningEntityId.value) {
+    return {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    } as CustomerNewPlanWizardStatePatch;
+  }
+  return {
+    planning_entity_id: planningEntityId.value,
+    planning_entity_type: planningFamily.value,
+    planning_mode_code: planningModeCode.value,
+  } as CustomerNewPlanWizardStatePatch;
+}
+
 function buildOrderDetailsDraftPersistence(): OrderDetailsDraftPersistence | null {
   if (orderSelectionMode.value !== 'create_new') {
     return null;
@@ -741,6 +790,25 @@ function buildOrderDetailsDraftPersistence(): OrderDetailsDraftPersistence | nul
     },
     mode: orderSelectionMode.value,
     selected_order_id: selectedExistingOrderId.value || '',
+  };
+}
+
+function buildPlanningRecordOverviewDraftPersistence(): PlanningRecordOverviewDraftPersistence | null {
+  if (!hasPlanningRecordDraftContent() && !hasPlanningContext.value) {
+    return null;
+  }
+  return {
+    form: { ...planningRecordDraft },
+    order_id: props.wizardState.order_id,
+    planning_context: hasPlanningContext.value
+      ? {
+          planning_entity_id: currentPlanningEntityScope.value?.planningEntityId || planningEntityId.value,
+          planning_entity_type:
+            currentPlanningEntityScope.value?.planningEntityType || planningFamily.value,
+          planning_mode_code: currentPlanningModeCode.value,
+        }
+      : undefined,
+    selection_mode: planningSelectionMode.value,
   };
 }
 
@@ -1086,6 +1154,19 @@ function applyPlanningRecordDraftPersistence(payload: Partial<typeof planningRec
   });
 }
 
+function applyPlanningRecordOverviewDraftPersistence(payload: PlanningRecordOverviewDraftPersistence) {
+  withDraftSyncPaused(() => {
+    planningSelectionMode.value = payload.selection_mode || 'use_existing';
+    if (payload.planning_context?.planning_entity_type) {
+      planningFamily.value = payload.planning_context.planning_entity_type;
+    }
+    planningEntityId.value = payload.planning_context?.planning_entity_id || '';
+    planningRecordDraft.planning_mode_code =
+      payload.planning_context?.planning_mode_code || planningModeCode.value;
+    Object.assign(planningRecordDraft, payload.form || {});
+  });
+}
+
 function applyPlanningRecordDocumentsDraftPersistence(payload: Partial<OrderDocumentsDraftPersistence>) {
   withDraftSyncPaused(() => {
     Object.assign(planningRecordAttachmentDraft, {
@@ -1172,7 +1253,7 @@ function persistOrderDocumentsDraft() {
 function persistPlanningRecordDraft() {
   saveStepDraft(
     'planning-record-overview',
-    hasPlanningRecordDraftContent() ? { ...planningRecordDraft } : null,
+    buildPlanningRecordOverviewDraftPersistence(),
   );
 }
 
@@ -1728,11 +1809,12 @@ function buildCanonicalStaffingWindowFromShiftRange(startsAt: string, endsAt: st
 }
 
 function buildPlanningRecordModePayload() {
-  const planningMode = props.wizardState.planning_mode_code || planningModeCode.value;
+  const planningMode = planningModeCode.value;
+  const activePlanningEntityId = currentPlanningEntityScope.value?.planningEntityId || planningEntityId.value;
   if (planningMode === 'event') {
     return {
       event_detail: {
-        event_venue_id: props.wizardState.planning_entity_id,
+        event_venue_id: activePlanningEntityId,
         setup_note: planningRecordDraft.event_detail_setup_note || null,
       },
       patrol_detail: null,
@@ -1747,7 +1829,7 @@ function buildPlanningRecordModePayload() {
       site_detail: null,
       trade_fair_detail: {
         stand_note: planningRecordDraft.trade_fair_detail_stand_note || null,
-        trade_fair_id: props.wizardState.planning_entity_id,
+        trade_fair_id: activePlanningEntityId,
         trade_fair_zone_id: normalizeUuid(planningRecordDraft.trade_fair_detail_trade_fair_zone_id),
       },
     };
@@ -1757,7 +1839,7 @@ function buildPlanningRecordModePayload() {
       event_detail: null,
       patrol_detail: {
         execution_note: planningRecordDraft.patrol_detail_execution_note || null,
-        patrol_route_id: props.wizardState.planning_entity_id,
+        patrol_route_id: activePlanningEntityId,
       },
       site_detail: null,
       trade_fair_detail: null,
@@ -1767,7 +1849,7 @@ function buildPlanningRecordModePayload() {
     event_detail: null,
     patrol_detail: null,
     site_detail: {
-      site_id: props.wizardState.planning_entity_id,
+      site_id: activePlanningEntityId,
       watchbook_scope_note: planningRecordDraft.site_detail_watchbook_scope_note || null,
     },
     trade_fair_detail: null,
@@ -1779,7 +1861,7 @@ function buildPlanningRecordDraftForValidation() {
   return {
     planning_from: planningRecordDraft.planning_from,
     planning_to: planningRecordDraft.planning_to,
-    planning_mode_code: props.wizardState.planning_mode_code || planningModeCode.value,
+    planning_mode_code: currentPlanningModeCode.value,
     event_detail: modePayload.event_detail,
     site_detail: modePayload.site_detail,
     trade_fair_detail: modePayload.trade_fair_detail,
@@ -1788,20 +1870,73 @@ function buildPlanningRecordDraftForValidation() {
 }
 
 function planningEntitySummaryLabel() {
-  const entityId = props.wizardState.planning_entity_id;
+  const entityId = currentPlanningEntityScope.value?.planningEntityId || planningEntityId.value;
   if (!entityId) {
     return '';
   }
-  if (props.wizardState.planning_mode_code === 'event') {
+  if (currentPlanningModeCode.value === 'event') {
     return eventVenueSelectOptions.value.find((row) => row.value === entityId)?.label || entityId;
   }
-  if (props.wizardState.planning_mode_code === 'trade_fair') {
+  if (currentPlanningModeCode.value === 'trade_fair') {
     return tradeFairSelectOptions.value.find((row) => row.value === entityId)?.label || entityId;
   }
-  if (props.wizardState.planning_mode_code === 'patrol') {
+  if (currentPlanningModeCode.value === 'patrol') {
     return patrolRouteSelectOptions.value.find((row) => row.value === entityId)?.label || entityId;
   }
   return siteSelectOptions.value.find((row) => row.value === entityId)?.label || entityId;
+}
+
+function setPlanningSelectionMode(mode: PlanningSelectionMode) {
+  if (planningSelectionMode.value === mode) {
+    return;
+  }
+  planningSelectionMode.value = mode;
+  setFeedback('neutral', '');
+  if (mode === 'create_new') {
+    planningEntityId.value = '';
+    emit('saved-context', buildPlanningContextPatch());
+  }
+}
+
+function setPlanningFamilySelection(family: PlanningEntityType) {
+  if (planningFamily.value === family) {
+    return;
+  }
+  planningFamily.value = family;
+  planningEntityId.value = '';
+  planningSelectionMode.value = 'use_existing';
+  withDraftSyncPaused(() => {
+    planningRecordDraft.planning_mode_code = planningModeCode.value;
+    planningRecordDraft.trade_fair_detail_trade_fair_zone_id = '';
+  });
+  emit('saved-context', buildPlanningContextPatch());
+}
+
+async function selectExistingPlanningEntity(entityId: string) {
+  if (!entityId) {
+    return;
+  }
+  planningSelectionMode.value = 'use_existing';
+  planningEntityId.value = entityId;
+  planningRecordDraft.planning_mode_code = planningModeCode.value;
+  if (planningModeCode.value === 'trade_fair') {
+    await refreshTradeFairZoneOptions(entityId);
+  } else {
+    await refreshTradeFairZoneOptions('');
+  }
+  emit('saved-context', buildPlanningContextPatch());
+  setFeedback('success', $t('sicherplan.customerPlansWizard.messages.planningEntrySelected'));
+  emit('step-ui-state', 'planning-record-overview', { dirty: hasPlanningRecordDraftContent(), error: '' });
+}
+
+function openPlanningCreateModal() {
+  setPlanningSelectionMode('create_new');
+  planningCreateModal.open = true;
+  void loadPlanningCreateReferenceOptions();
+}
+
+function onPlanningFamilyChange(event: Event) {
+  setPlanningFamilySelection((event.target as HTMLSelectElement).value as PlanningEntityType);
 }
 
 function sortShiftRange<T extends { ends_at: string; starts_at: string }>(shifts: T[]) {
@@ -2308,9 +2443,35 @@ async function loadPlanningRecordReferenceOptions(isCurrent = () => true) {
 }
 
 async function loadPlanningRecordState(isCurrent = () => true) {
-  const persistedPlanningRecordDraft = loadStepDraft<Partial<typeof planningRecordDraft>>('planning-record-overview');
+  const directPlanningRecordDraft = loadStepDraft<PlanningRecordOverviewDraftPersistence>('planning-record-overview');
+  const planningRecordDraftCandidates = loadWizardDraftCandidatesForCustomer<PlanningRecordOverviewDraftPersistence>(
+    {
+      customerId: props.customer.id,
+      tenantId: props.tenantId,
+    },
+    'planning-record-overview',
+  ).filter((candidate) => !candidate.order_id || candidate.order_id === props.wizardState.order_id);
+  const persistedPlanningRecordDraft =
+    directPlanningRecordDraft ||
+    planningRecordDraftCandidates.find((candidate) => Boolean(candidate.planning_context?.planning_entity_id)) ||
+    planningRecordDraftCandidates[0] ||
+    null;
   const persistedDocumentsDraft =
     loadStepDraft<OrderDocumentsDraftPersistence>('planning-record-documents');
+  if (
+    persistedPlanningRecordDraft &&
+    (!persistedPlanningRecordDraft.order_id || persistedPlanningRecordDraft.order_id === props.wizardState.order_id)
+  ) {
+    applyPlanningRecordOverviewDraftPersistence(persistedPlanningRecordDraft);
+    if (!props.wizardState.planning_entity_id && persistedPlanningRecordDraft.planning_context?.planning_entity_id) {
+      emit('saved-context', {
+        planning_entity_id: persistedPlanningRecordDraft.planning_context.planning_entity_id,
+        planning_entity_type: persistedPlanningRecordDraft.planning_context.planning_entity_type,
+        planning_mode_code: persistedPlanningRecordDraft.planning_context.planning_mode_code,
+      });
+    }
+  }
+  await loadPlanningEntityOptions();
   await loadPlanningRecordReferenceOptions(isCurrent);
   if (!isCurrent()) {
     return;
@@ -2321,8 +2482,15 @@ async function loadPlanningRecordState(isCurrent = () => true) {
     }
     selectedPlanningRecord.value = null;
     planningRecordAttachments.value = [];
-    if (persistedPlanningRecordDraft) {
-      applyPlanningRecordDraftPersistence(persistedPlanningRecordDraft);
+    if (persistedPlanningRecordDraft && (!persistedPlanningRecordDraft.order_id || persistedPlanningRecordDraft.order_id === props.wizardState.order_id)) {
+      applyPlanningRecordOverviewDraftPersistence(persistedPlanningRecordDraft);
+      if (persistedPlanningRecordDraft.planning_context?.planning_entity_id) {
+        emit('saved-context', {
+          planning_entity_id: persistedPlanningRecordDraft.planning_context.planning_entity_id,
+          planning_entity_type: persistedPlanningRecordDraft.planning_context.planning_entity_type,
+          planning_mode_code: persistedPlanningRecordDraft.planning_context.planning_mode_code,
+        });
+      }
       restoreDraftMessage();
     } else if (!hasPlanningRecordDraftContent()) {
       withDraftSyncPaused(() => {
@@ -2341,8 +2509,9 @@ async function loadPlanningRecordState(isCurrent = () => true) {
         resetPlanningRecordAttachmentDraft();
       });
     }
-    if ((props.wizardState.planning_mode_code || planningModeCode.value) === 'trade_fair') {
-      await refreshTradeFairZoneOptions(props.wizardState.planning_entity_id, isCurrent);
+    const activePlanningEntityId = currentPlanningEntityScope.value?.planningEntityId || planningEntityId.value;
+    if (currentPlanningModeCode.value === 'trade_fair') {
+      await refreshTradeFairZoneOptions(activePlanningEntityId, isCurrent);
     } else {
       await refreshTradeFairZoneOptions('', isCurrent);
     }
@@ -2357,8 +2526,8 @@ async function loadPlanningRecordState(isCurrent = () => true) {
   }
   syncPlanningRecordDraft(record);
   planningRecordAttachments.value = attachments;
-  if (persistedPlanningRecordDraft) {
-    applyPlanningRecordDraftPersistence(persistedPlanningRecordDraft);
+  if (persistedPlanningRecordDraft && (!persistedPlanningRecordDraft.order_id || persistedPlanningRecordDraft.order_id === props.wizardState.order_id)) {
+    applyPlanningRecordOverviewDraftPersistence(persistedPlanningRecordDraft);
     restoreDraftMessage();
   }
   if (persistedDocumentsDraft) {
@@ -2368,8 +2537,9 @@ async function loadPlanningRecordState(isCurrent = () => true) {
       resetPlanningRecordAttachmentDraft();
     });
   }
-  if ((props.wizardState.planning_mode_code || planningModeCode.value) === 'trade_fair') {
-    await refreshTradeFairZoneOptions(props.wizardState.planning_entity_id, isCurrent);
+  const activePlanningEntityId = currentPlanningEntityScope.value?.planningEntityId || planningEntityId.value;
+  if (currentPlanningModeCode.value === 'trade_fair') {
+    await refreshTradeFairZoneOptions(activePlanningEntityId, isCurrent);
   } else {
     await refreshTradeFairZoneOptions('', isCurrent);
   }
@@ -2627,7 +2797,15 @@ async function submitPlanningCreateModal() {
     await loadPlanningEntityOptions();
     planningEntityId.value = created.id;
     planningSelectionMode.value = 'use_existing';
+    planningRecordDraft.planning_mode_code = planningModeCode.value;
+    emit('saved-context', buildPlanningContextPatch());
+    if (planningModeCode.value === 'trade_fair') {
+      await refreshTradeFairZoneOptions(created.id);
+    } else {
+      await refreshTradeFairZoneOptions('');
+    }
     resetPlanningCreateModal();
+    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.planningEntryCreated'));
   } catch {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.planningCreateFailed'));
   } finally {
@@ -3145,12 +3323,12 @@ async function submitPlanningRecordStep() {
     return false;
   }
   if (!hasPlanningContext.value) {
-    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.planningContextRequired'));
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.selectOrCreatePlanningContextBeforeContinue'));
     emit('step-completion', 'planning-record-overview', false);
     emit('step-ui-state', 'planning-record-overview', { error: 'planning_context_required' });
     return false;
   }
-  planningRecordDraft.planning_mode_code = props.wizardState.planning_mode_code || planningModeCode.value;
+  planningRecordDraft.planning_mode_code = planningModeCode.value;
   const validation = validatePlanningRecordDraft(buildPlanningRecordDraftForValidation(), {
     eventVenueOptions: eventVenueOptions.value as never[],
     orderServiceFrom: selectedOrder.value?.service_from || orderDraft.service_from,
@@ -3176,7 +3354,7 @@ async function submitPlanningRecordStep() {
       order_id: props.wizardState.order_id,
       parent_planning_record_id: normalizeUuid(planningRecordDraft.parent_planning_record_id),
       dispatcher_user_id: normalizeUuid(planningRecordDraft.dispatcher_user_id),
-      planning_mode_code: props.wizardState.planning_mode_code || planningModeCode.value,
+      planning_mode_code: planningModeCode.value,
       name: planningRecordDraft.name.trim(),
       planning_from: planningRecordDraft.planning_from,
       planning_to: planningRecordDraft.planning_to,
@@ -3593,6 +3771,25 @@ watch(
 );
 
 watch(
+  () => [planningFamily.value, planningSelectionMode.value, planningEntityId.value] as const,
+  () => {
+    if (draftSyncPaused.value || !planningRecordStepActive.value) {
+      return;
+    }
+    if (
+      !hasPlanningRecordDraftContent() &&
+      planningSelectionMode.value === 'use_existing' &&
+      planningEntityId.value === props.wizardState.planning_entity_id &&
+      planningFamily.value === ((props.wizardState.planning_entity_type as PlanningEntityType) || planningFamily.value)
+    ) {
+      return;
+    }
+    persistPlanningRecordDraft();
+  },
+  { flush: 'sync' },
+);
+
+watch(
   () => [
     planningRecordAttachmentDraft.title,
     planningRecordAttachmentDraft.label,
@@ -3697,6 +3894,16 @@ watch(
       return;
     }
     persistSeriesDraft();
+  },
+);
+
+watch(
+  () => planningCreateModal.open,
+  async (isOpen) => {
+    if (!isOpen) {
+      return;
+    }
+    await loadPlanningCreateReferenceOptions();
   },
 );
 
@@ -4220,10 +4427,88 @@ onBeforeUnmount(() => {
       class="sp-customer-plan-wizard-step__panel"
       data-testid="customer-new-plan-step-panel-planning-record-overview"
     >
-      <p v-if="!hasPlanningContext" class="field-help" data-testid="customer-new-plan-planning-record-blocked">
-        {{ $t('sicherplan.customerPlansWizard.errors.planningContextRequired') }}
-      </p>
-      <div v-else class="sp-customer-plan-wizard-step__grid">
+      <section class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-planning-context-panel">
+        <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.planningContext') }}</strong></p>
+        <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.selectPlanningContext') }}</p>
+        <div class="sp-customer-plan-wizard-step__grid">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.planningModeCode') }}</span>
+            <select
+              :value="planningFamily"
+              data-testid="customer-new-plan-planning-context-family"
+              @change="onPlanningFamilyChange"
+            >
+              <option v-for="option in planningFamilyOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+        </div>
+        <div class="sp-customer-plan-wizard-step__grid">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.useExistingPlanningEntry') }}</span>
+            <input
+              v-model="planningSelectionModeModel"
+              data-testid="customer-new-plan-planning-context-use-existing"
+              type="radio"
+              value="use_existing"
+            />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.createNewPlanningEntry') }}</span>
+            <input
+              v-model="planningSelectionModeModel"
+              data-testid="customer-new-plan-planning-context-create-new"
+              type="radio"
+              value="create_new"
+            />
+          </label>
+        </div>
+        <template v-if="planningModeUsesExisting">
+          <p v-if="planningEntityLoading" class="field-help">{{ $t('sicherplan.customerPlansWizard.loadingBody') }}</p>
+          <p v-else-if="planningEntityError" class="field-help">{{ planningEntityError }}</p>
+          <template v-else-if="planningEntityOptions.length">
+            <div class="sp-customer-plan-wizard-step__list" data-testid="customer-new-plan-planning-context-list">
+              <button
+                v-for="row in planningEntityOptions"
+                :key="row.id"
+                type="button"
+                class="sp-customer-plan-wizard-step__list-row"
+                :class="{ 'sp-customer-plan-wizard-step__list-row--selected': row.id === planningEntityId }"
+                data-testid="customer-new-plan-planning-context-row"
+                @click="void selectExistingPlanningEntity(row.id)"
+              >
+                <strong>{{ row.name || row.label || row.code || row.id }}</strong>
+                <span>{{ row.code || row.id }}</span>
+              </button>
+            </div>
+          </template>
+          <div v-else data-testid="customer-new-plan-planning-context-empty">
+            <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.noPlanningEntriesFoundForCustomer') }}</p>
+            <div class="cta-row">
+              <button
+                type="button"
+                class="cta-button"
+                data-testid="customer-new-plan-planning-context-create-button"
+                @click="openPlanningCreateModal()"
+              >
+                {{ $t('sicherplan.customerPlansWizard.forms.createNewPlanningEntry') }}
+              </button>
+            </div>
+          </div>
+        </template>
+        <div v-else class="cta-row">
+          <button
+            type="button"
+            class="cta-button"
+            data-testid="customer-new-plan-planning-context-create-button"
+            @click="openPlanningCreateModal()"
+          >
+            {{ $t('sicherplan.customerPlansWizard.forms.createNewPlanningEntry') }}
+          </button>
+        </div>
+      </section>
+      <div v-if="hasPlanningContext" class="sp-customer-plan-wizard-step__grid" data-testid="customer-new-plan-planning-record-details">
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.orderTitle') }}</span>
           <input :value="selectedOrder?.title || orderDraft.title" readonly />
@@ -4248,15 +4533,15 @@ onBeforeUnmount(() => {
           <span>{{ $t('sicherplan.customerPlansWizard.forms.endDate') }}</span>
           <input v-model="planningRecordDraft.planning_to" data-testid="customer-new-plan-planning-record-to" type="date" />
         </label>
-        <label v-if="props.wizardState.planning_mode_code === 'event'" class="field-stack field-stack--wide">
+        <label v-if="planningModeCode === 'event'" class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.setupNote') }}</span>
           <textarea v-model="planningRecordDraft.event_detail_setup_note" rows="2" />
         </label>
-        <label v-else-if="props.wizardState.planning_mode_code === 'site'" class="field-stack field-stack--wide">
+        <label v-else-if="planningModeCode === 'site'" class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.watchbookScopeNote') }}</span>
           <textarea v-model="planningRecordDraft.site_detail_watchbook_scope_note" rows="2" />
         </label>
-        <label v-else-if="props.wizardState.planning_mode_code === 'trade_fair'" class="field-stack">
+        <label v-else-if="planningModeCode === 'trade_fair'" class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.tradeFairZoneId') }}</span>
           <select v-model="planningRecordDraft.trade_fair_detail_trade_fair_zone_id" data-testid="customer-new-plan-trade-fair-zone">
             <option value="">{{ $t('sicherplan.customerPlansWizard.forms.tradeFairZonePlaceholder') }}</option>
@@ -4267,11 +4552,11 @@ onBeforeUnmount(() => {
           <p v-if="tradeFairZoneLookupError" class="field-help">{{ tradeFairZoneLookupError }}</p>
           <p v-else-if="tradeFairZoneLookupLoading" class="field-help">{{ $t('sicherplan.customerPlansWizard.loadingBody') }}</p>
         </label>
-        <label v-if="props.wizardState.planning_mode_code === 'trade_fair'" class="field-stack field-stack--wide">
+        <label v-if="planningModeCode === 'trade_fair'" class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.standNote') }}</span>
           <textarea v-model="planningRecordDraft.trade_fair_detail_stand_note" rows="2" />
         </label>
-        <label v-if="props.wizardState.planning_mode_code === 'patrol'" class="field-stack field-stack--wide">
+        <label v-if="planningModeCode === 'patrol'" class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.executionNote') }}</span>
           <textarea v-model="planningRecordDraft.patrol_detail_execution_note" rows="2" />
         </label>

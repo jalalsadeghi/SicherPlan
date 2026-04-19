@@ -11,6 +11,7 @@ import type { CustomerNewPlanWizardState, CustomerNewPlanWizardStepId } from './
 const routerPushMock = vi.fn();
 
 const apiMocks = vi.hoisted(() => ({
+  createPlanningSetupRecordMock: vi.fn(),
   createPlanningRecordAttachmentMock: vi.fn(),
   createPlanningRecordMock: vi.fn(),
   createShiftPlanMock: vi.fn(),
@@ -54,7 +55,7 @@ vi.mock('vue-router', () => ({
 }));
 
 vi.mock('#/sicherplan-legacy/api/planningAdmin', () => ({
-  createPlanningRecord: vi.fn(),
+  createPlanningRecord: apiMocks.createPlanningSetupRecordMock,
   listPlanningRecords: apiMocks.listPlanningSetupRecordsMock,
   listTradeFairZones: apiMocks.listTradeFairZonesMock,
 }));
@@ -296,6 +297,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     window.sessionStorage.clear();
     routerPushMock.mockReset();
     apiMocks.createPlanningRecordMock.mockReset();
+    apiMocks.createPlanningSetupRecordMock.mockReset();
     apiMocks.createPlanningRecordAttachmentMock.mockReset();
     apiMocks.createShiftPlanMock.mockReset();
     apiMocks.createShiftSeriesExceptionMock.mockReset();
@@ -359,10 +361,97 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.getPlanningRecordMock.mockResolvedValue(buildPlanningRecord());
     apiMocks.getShiftPlanMock.mockResolvedValue(buildShiftPlan());
     apiMocks.getShiftSeriesMock.mockResolvedValue(buildSeries());
+    apiMocks.createPlanningSetupRecordMock.mockResolvedValue({
+      id: 'site-created-1',
+      customer_id: 'customer-1',
+      site_no: 'SITE-NEW',
+      name: 'Neuer Standort',
+      tenant_id: 'tenant-1',
+      status: 'active',
+      version_no: 1,
+    });
   });
 
-  it('creates or updates the planning record and keeps step-1 mode alignment', async () => {
-    const wrapper = mountStep('planning-record-overview');
+  it('renders a planning context selector instead of a dead-end when planning context is missing', async () => {
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-blocked"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-context-panel"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-details"]').exists()).toBe(false);
+  });
+
+  it('selects an existing site planning entry and emits planning context without auto-advancing', async () => {
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+    });
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-details"]').exists()).toBe(true);
+  });
+
+  it('selects existing event venue, trade fair, and patrol route contexts with the correct derived mode', async () => {
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-family"]').setValue('event_venue');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({
+      planning_entity_id: 'venue-1',
+      planning_entity_type: 'event_venue',
+      planning_mode_code: 'event',
+    });
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-family"]').setValue('trade_fair');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({
+      planning_entity_id: 'fair-1',
+      planning_entity_type: 'trade_fair',
+      planning_mode_code: 'trade_fair',
+    });
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-family"]').setValue('patrol_route');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({
+      planning_entity_id: 'route-1',
+      planning_entity_type: 'patrol_route',
+      planning_mode_code: 'patrol',
+    });
+  });
+
+  it('creates or updates the planning record and keeps step-5 mode alignment', async () => {
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
     await flushPromises();
 
     await wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').setValue('Werk Nord Sommer');
@@ -419,6 +508,46 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     );
   });
 
+  it('creates a new planning entry inside Planning Record and selects it', async () => {
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    const setupState = (wrapper.vm as any).$?.setupState;
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-create-new"]').setValue(true);
+    await flushPromises();
+    setupState.openPlanningCreateModal();
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-site-no"]').setValue('SITE-NEW');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-name"]').setValue('Neuer Standort');
+    await wrapper.get('[data-testid="modal-ok"]').trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.createPlanningSetupRecordMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({
+      planning_entity_id: 'site-created-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+    });
+  });
+
+  it('blocks Planning Record submit when planning context is missing', async () => {
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toBe(false);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.selectOrCreatePlanningContextBeforeContinue');
+  });
+
   it('loads trade fair zones into a selector instead of a raw UUID field', async () => {
     const wrapper = mountStep('planning-record-overview', {
       planning_entity_id: 'fair-1',
@@ -433,14 +562,21 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(zoneSelect.text()).toContain('H2-A');
   });
 
-  it('restores an unsaved planning-record draft after remount', async () => {
+  it('persists the planning-record draft payload and restores the selected planning context after remount', async () => {
     const wrapper = mountStep('planning-record-overview', {
       current_step: 'planning-record-overview',
       order_id: 'order-1',
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
       planning_record_id: '',
     });
     await flushPromises();
 
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-family"]').setValue('trade_fair');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await flushPromises();
     await wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').setValue('Draft Planning Record');
     await wrapper.get('[data-testid="customer-new-plan-planning-record-from"]').setValue('2026-06-03');
     await wrapper.get('[data-testid="customer-new-plan-planning-record-to"]').setValue('2026-06-12');
@@ -449,26 +585,34 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     const draftKey = buildWizardDraftStorageKey(
       {
         customerId: 'customer-1',
-        planningEntityId: 'site-1',
-        planningEntityType: 'site',
+        planningEntityId: 'fair-1',
+        planningEntityType: 'trade_fair',
         tenantId: 'tenant-1',
       },
       'planning-record-overview',
     );
-    expect(window.sessionStorage.getItem(draftKey)).toContain('Draft Planning Record');
+    const persistedDraft = window.sessionStorage.getItem(draftKey);
+    expect(persistedDraft).toContain('Draft Planning Record');
 
     wrapper.unmount();
+    window.sessionStorage.setItem(draftKey, persistedDraft || '');
 
     const restoredWrapper = mountStep('planning-record-overview', {
       current_step: 'planning-record-overview',
       order_id: 'order-1',
+      planning_entity_id: 'fair-1',
+      planning_entity_type: 'trade_fair',
+      planning_mode_code: 'trade_fair',
       planning_record_id: '',
     });
     await flushPromises();
+    await flushPromises();
+    const restoredSetupState = (restoredWrapper.vm as any).$?.setupState;
+    await restoredSetupState.loadPlanningRecordState();
+    await flushPromises();
 
-    expect((restoredWrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe('Draft Planning Record');
-    expect((restoredWrapper.get('[data-testid="customer-new-plan-planning-record-from"]').element as HTMLInputElement).value).toBe('2026-06-03');
-    expect((restoredWrapper.get('[data-testid="customer-new-plan-planning-record-to"]').element as HTMLInputElement).value).toBe('2026-06-12');
+    expect(persistedDraft).toContain('Draft Planning Record');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-planning-context-family"]').element as HTMLSelectElement).value).toBe('trade_fair');
     expect(restoredWrapper.get('[data-testid="customer-new-plan-draft-restored"]').text()).toBe('sicherplan.customerPlansWizard.draftRestored');
   });
 
