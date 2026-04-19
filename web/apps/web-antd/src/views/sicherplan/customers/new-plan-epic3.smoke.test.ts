@@ -834,22 +834,19 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(wrapper.findAll('[data-testid="customer-new-plan-existing-order-row"]')).toHaveLength(2);
     expect(wrapper.text()).toContain('Objektschutz RheinForum Koln - Nordtor Juli');
     expect(wrapper.text()).toContain('Objektschutz RheinForum Koln - Mai 2026');
+    const orderListCallsBeforeSelect = apiMocks.listCustomerOrdersMock.mock.calls.length;
+    const routerReplaceCallsBeforeSelect = routerReplaceMock.mock.calls.length;
 
     await wrapper.get('[data-testid="customer-new-plan-existing-order-row"]').trigger('click');
     await nextTickFlush();
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
     expect(apiMocks.getCustomerOrderMock).toHaveBeenCalledTimes(0);
+    expect(apiMocks.listCustomerOrdersMock.mock.calls.length).toBe(orderListCallsBeforeSelect);
     expect(wrapper.find('[data-testid="customer-new-plan-existing-order-edit-form"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="customer-new-plan-order-title"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="customer-new-plan-selected-order-summary"]').text()).toContain('ORD-EX-1');
-    expect(routerReplaceMock).toHaveBeenCalledWith(expect.objectContaining({
-      path: '/admin/customers/new-plan',
-      query: expect.objectContaining({
-        customer_id: 'customer-1',
-        order_id: 'order-existing-1',
-      }),
-    }));
+    expect(routerReplaceMock.mock.calls.length).toBe(routerReplaceCallsBeforeSelect);
   });
 
   it('keeps create-new mode selected through reference reload even when the order form is still empty', async () => {
@@ -954,6 +951,13 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
 
     expect(apiMocks.updateCustomerOrderMock).toHaveBeenCalledTimes(0);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
+    expect(routerReplaceMock).toHaveBeenCalledWith(expect.objectContaining({
+      path: '/admin/customers/new-plan',
+      query: expect.objectContaining({
+        customer_id: 'customer-1',
+        order_id: 'order-existing-1',
+      }),
+    }));
     expect(apiMocks.listOrderEquipmentLinesMock).toHaveBeenCalledWith('tenant-1', 'order-existing-1', 'token-1');
     expect(wrapper.text()).toContain('Funkgerät');
   });

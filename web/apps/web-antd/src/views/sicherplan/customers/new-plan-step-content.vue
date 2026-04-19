@@ -2011,7 +2011,6 @@ function selectExistingOrder(orderId: string) {
   selectedExistingOrderId.value = orderId;
   orderSelectionMode.value = 'use_existing';
   clearDraftRestoreMessage();
-  emit('saved-context', { order_id: orderId });
   emit('step-completion', 'order-details', true);
   emit('step-ui-state', 'order-details', { dirty: false, error: '' });
   setFeedback('neutral', '');
@@ -2110,6 +2109,12 @@ async function loadOrderState(isCurrent = () => true) {
         }
       } else {
         orderSelectionMode.value = 'use_existing';
+        selectedExistingOrderId.value =
+          persistedOrderDraft &&
+          isOrderDetailsDraftPersistence(persistedOrderDraft) &&
+          persistedOrderDraft.mode === 'use_existing'
+            ? persistedOrderDraft.selected_order_id || ''
+            : '';
         withDraftSyncPaused(() => {
           resetOrderDraft();
         });
@@ -2122,6 +2127,10 @@ async function loadOrderState(isCurrent = () => true) {
         isOrderDetailsDraftPersistence(persistedOrderDraft) && persistedOrderDraft.mode === 'use_existing' && customerOrderRows.value.length
           ? 'use_existing'
           : 'create_new';
+      selectedExistingOrderId.value =
+        isOrderDetailsDraftPersistence(persistedOrderDraft) && persistedOrderDraft.mode === 'use_existing'
+          ? persistedOrderDraft.selected_order_id || ''
+          : '';
       if (isOrderDetailsDraftPersistence(persistedOrderDraft)) {
         applyOrderDraftPersistence(persistedOrderDraft.form);
       } else {
@@ -2698,6 +2707,8 @@ async function submitOrderStep() {
       emit('step-ui-state', 'order-details', { error: 'edit_incomplete' });
       return false;
     }
+    emit('saved-context', { order_id: selectedExistingOrderId.value });
+    clearStepDraft('order-details');
     emit('step-completion', 'order-details', true);
     emit('step-ui-state', 'order-details', { dirty: false, error: '' });
     return true;
