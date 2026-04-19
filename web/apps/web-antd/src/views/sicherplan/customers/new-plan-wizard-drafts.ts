@@ -2,6 +2,7 @@ import type { CustomerNewPlanWizardStepId } from './new-plan-wizard.types';
 
 const WIZARD_DRAFT_STORAGE_PREFIX = 'sicherplan.customerNewPlanWizardDraft';
 const EMPTY_KEY_SEGMENT = '_';
+const ORDER_DETAILS_EDIT_KEY_SEGMENT = 'order-details-edit';
 
 export interface CustomerNewPlanWizardDraftContext {
   customerId: string;
@@ -30,6 +31,14 @@ export function buildWizardDraftStorageKey(
   context: CustomerNewPlanWizardDraftContext,
   stepId: CustomerNewPlanWizardStepId,
 ) {
+  if (stepId === 'order-details') {
+    return [
+      WIZARD_DRAFT_STORAGE_PREFIX,
+      normalizeKeySegment(context.tenantId),
+      normalizeKeySegment(context.customerId),
+      stepId,
+    ].join(':');
+  }
   return [
     WIZARD_DRAFT_STORAGE_PREFIX,
     normalizeKeySegment(context.tenantId),
@@ -37,6 +46,19 @@ export function buildWizardDraftStorageKey(
     normalizeKeySegment(context.planningEntityType),
     normalizeKeySegment(context.planningEntityId),
     stepId,
+  ].join(':');
+}
+
+export function buildOrderDetailsEditDraftStorageKey(
+  context: CustomerNewPlanWizardDraftContext,
+  orderId: string,
+) {
+  return [
+    WIZARD_DRAFT_STORAGE_PREFIX,
+    normalizeKeySegment(context.tenantId),
+    normalizeKeySegment(context.customerId),
+    ORDER_DETAILS_EDIT_KEY_SEGMENT,
+    normalizeKeySegment(orderId),
   ].join(':');
 }
 
@@ -98,22 +120,89 @@ export function clearWizardDraft(
   storage.removeItem(buildWizardDraftStorageKey(context, stepId));
 }
 
+export function saveOrderDetailsEditDraft<T>(
+  context: CustomerNewPlanWizardDraftContext,
+  orderId: string,
+  payload: null | T | undefined,
+) {
+  const storage = getSessionStorage();
+  if (!storage) {
+    return;
+  }
+  const storageKey = buildOrderDetailsEditDraftStorageKey(context, orderId);
+  if (payload == null) {
+    storage.removeItem(storageKey);
+    return;
+  }
+  try {
+    const serialized = JSON.stringify(payload);
+    if (!serialized || serialized === '{}' || serialized === '[]' || serialized === 'null') {
+      storage.removeItem(storageKey);
+      return;
+    }
+    storage.setItem(storageKey, serialized);
+  } catch {
+    storage.removeItem(storageKey);
+  }
+}
+
+export function loadOrderDetailsEditDraft<T>(
+  context: CustomerNewPlanWizardDraftContext,
+  orderId: string,
+) {
+  const storage = getSessionStorage();
+  if (!storage) {
+    return null as null | T;
+  }
+  const storageKey = buildOrderDetailsEditDraftStorageKey(context, orderId);
+  const raw = storage.getItem(storageKey);
+  if (!raw) {
+    return null as null | T;
+  }
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    storage.removeItem(storageKey);
+    return null as null | T;
+  }
+}
+
+export function clearOrderDetailsEditDraft(
+  context: CustomerNewPlanWizardDraftContext,
+  orderId: string,
+) {
+  const storage = getSessionStorage();
+  if (!storage) {
+    return;
+  }
+  storage.removeItem(buildOrderDetailsEditDraftStorageKey(context, orderId));
+}
+
 export function clearAllWizardDraftsForCurrentContext(context: CustomerNewPlanWizardDraftContext) {
   const storage = getSessionStorage();
   if (!storage) {
     return;
   }
-  const prefix = [
+  const scopedPrefix = [
     WIZARD_DRAFT_STORAGE_PREFIX,
     normalizeKeySegment(context.tenantId),
     normalizeKeySegment(context.customerId),
     normalizeKeySegment(context.planningEntityType),
     normalizeKeySegment(context.planningEntityId),
   ].join(':');
+  const customerPrefix = [
+    WIZARD_DRAFT_STORAGE_PREFIX,
+    normalizeKeySegment(context.tenantId),
+    normalizeKeySegment(context.customerId),
+  ].join(':');
   const keysToDelete: string[] = [];
   for (let index = 0; index < storage.length; index += 1) {
     const key = storage.key(index);
-    if (key?.startsWith(prefix)) {
+    if (
+      key?.startsWith(scopedPrefix) ||
+      key === `${customerPrefix}:order-details` ||
+      key?.startsWith(`${customerPrefix}:${ORDER_DETAILS_EDIT_KEY_SEGMENT}:`)
+    ) {
       keysToDelete.push(key);
     }
   }

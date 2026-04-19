@@ -1,5 +1,4 @@
 export type CustomerNewPlanWizardStepId =
-  | 'planning'
   | 'order-details'
   | 'equipment-lines'
   | 'requirement-lines'

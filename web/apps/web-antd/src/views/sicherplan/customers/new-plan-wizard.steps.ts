@@ -7,18 +7,9 @@ import type {
 
 export const CUSTOMER_NEW_PLAN_WIZARD_STEPS: CustomerNewPlanWizardStepDefinition[] = [
   {
-    id: 'planning',
-    labelKey: 'sicherplan.customerPlansWizard.steps.planning',
-    requiredContextFields: ['customer_id'],
-    loadHandlerKey: 'loadPlanningStep',
-    validateHandlerKey: 'validatePlanningStep',
-    saveHandlerKey: 'savePlanningStep',
-    nextStepResolverKey: 'resolvePlanningStepNext',
-  },
-  {
     id: 'order-details',
     labelKey: 'sicherplan.customerPlansWizard.steps.orderDetails',
-    requiredContextFields: ['customer_id', 'planning_entity_type', 'planning_entity_id', 'planning_mode_code'],
+    requiredContextFields: ['customer_id'],
     loadHandlerKey: 'loadOrderDetailsStep',
     validateHandlerKey: 'validateOrderDetailsStep',
     saveHandlerKey: 'saveOrderDetailsStep',
@@ -173,6 +164,11 @@ export function resolveAllowedWizardStep(
   state: CustomerNewPlanWizardState,
   requestedStepId: CustomerNewPlanWizardStepId | null | undefined,
 ) {
+  if (!requestedStepId) {
+    return hasRequiredContextForStep(state, state.current_step)
+      ? state.current_step
+      : CUSTOMER_NEW_PLAN_WIZARD_FIRST_STEP_ID;
+  }
   if (requestedStepId && hasRequiredContextForStep(state, requestedStepId)) {
     return requestedStepId;
   }

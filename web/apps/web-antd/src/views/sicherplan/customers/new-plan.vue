@@ -84,6 +84,9 @@ const customerId = computed(() => {
 const requestedStepId = computed(() => {
   const raw = route.query.step;
   const candidate = Array.isArray(raw) ? raw[0] : raw;
+  if (candidate === 'planning') {
+    return CUSTOMER_NEW_PLAN_WIZARD_FIRST_STEP_ID;
+  }
   return isWizardStepId(candidate) ? candidate : null;
 });
 
@@ -113,7 +116,6 @@ const hasUnsavedChanges = computed(() =>
   Object.values(wizardState.value.step_state).some((step) => step.dirty),
 );
 const handledSubmitStepIds = new Set<CustomerNewPlanWizardStepId>([
-  'planning',
   'order-details',
   'equipment-lines',
   'requirement-lines',
@@ -177,13 +179,20 @@ function syncWizardFromRoute() {
 }
 
 function buildWizardRouteQuery() {
+  const keepPlanningContextInRoute = Boolean(
+    wizardState.value.current_step !== CUSTOMER_NEW_PLAN_WIZARD_FIRST_STEP_ID ||
+      wizardState.value.order_id ||
+      wizardState.value.planning_record_id ||
+      wizardState.value.shift_plan_id ||
+      wizardState.value.series_id,
+  );
   const nextQuery: LocationQueryRaw = {
     ...route.query,
     customer_id: customerId.value || undefined,
     order_id: wizardState.value.order_id || undefined,
-    planning_entity_id: wizardState.value.planning_entity_id || undefined,
-    planning_entity_type: wizardState.value.planning_entity_type || undefined,
-    planning_mode_code: wizardState.value.planning_mode_code || undefined,
+    planning_entity_id: keepPlanningContextInRoute ? wizardState.value.planning_entity_id || undefined : undefined,
+    planning_entity_type: keepPlanningContextInRoute ? wizardState.value.planning_entity_type || undefined : undefined,
+    planning_mode_code: keepPlanningContextInRoute ? wizardState.value.planning_mode_code || undefined : undefined,
     planning_record_id: wizardState.value.planning_record_id || undefined,
     series_id: wizardState.value.series_id || undefined,
     shift_plan_id: wizardState.value.shift_plan_id || undefined,

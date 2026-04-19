@@ -95,7 +95,10 @@ import type {
 } from './new-plan-wizard.types';
 import {
   clearWizardDraft,
+  clearOrderDetailsEditDraft,
+  loadOrderDetailsEditDraft,
   loadWizardDraft,
+  saveOrderDetailsEditDraft,
   saveWizardDraft,
   type CustomerNewPlanWizardDraftContext,
 } from './new-plan-wizard-drafts';
@@ -137,6 +140,9 @@ const customerOrderRows = ref<CustomerOrderListItem[]>([]);
 const customerOrderRowsLoading = ref(false);
 const customerOrderRowsError = ref('');
 const selectedExistingOrderId = ref('');
+const editingExistingOrderId = ref('');
+const pendingExistingOrderEditId = ref('');
+const existingOrderEditFormOpen = ref(false);
 
 const orderDraft = reactive({
   customer_id: '',
@@ -390,6 +396,10 @@ type OrderDetailsDraftPersistence = {
   selected_order_id?: string;
 };
 
+type OrderDetailsEditDraftPersistence = {
+  form: typeof orderDraft;
+};
+
 type OrderDocumentsDraftPersistence = {
   attachment: AttachmentDraftPersistence;
   link: {
@@ -561,7 +571,6 @@ const timezoneOptions = computed(() =>
   })),
 );
 
-const planningStepActive = computed(() => props.currentStepId === 'planning');
 const orderStepActive = computed(() => props.currentStepId === 'order-details');
 const equipmentStepActive = computed(() => props.currentStepId === 'equipment-lines');
 const requirementStepActive = computed(() => props.currentStepId === 'requirement-lines');
@@ -586,7 +595,6 @@ const stepRefreshContextKey = computed(() =>
 );
 const handledStepActive = computed(
   () =>
-    planningStepActive.value ||
     orderStepActive.value ||
     equipmentStepActive.value ||
     requirementStepActive.value ||
@@ -604,6 +612,9 @@ const orderSelectionModeModel = computed<OrderSelectionMode>({
 const selectedExistingOrderSummary = computed(
   () => customerOrderRows.value.find((row) => row.id === selectedExistingOrderId.value) ?? null,
 );
+const existingOrderEditActive = computed(
+  () => orderModeUsesExisting.value && Boolean(existingOrderEditFormOpen.value && editingExistingOrderId.value),
+);
 const currentPlanningEntityScope = computed(() => {
   const routePlanningEntityId = typeof route.query.planning_entity_id === 'string' ? route.query.planning_entity_id.trim() : '';
   const routePlanningEntityType = typeof route.query.planning_entity_type === 'string' ? route.query.planning_entity_type.trim() : '';
@@ -617,7 +628,14 @@ const currentPlanningEntityScope = computed(() => {
     planningEntityType,
   };
 });
-const hasPlanningScopedOrderList = computed(() => Boolean(currentPlanningEntityScope.value));
+const hasPlanningContext = computed(
+  () =>
+    Boolean(
+      props.wizardState.planning_entity_id &&
+        props.wizardState.planning_entity_type &&
+        props.wizardState.planning_mode_code,
+    ),
+);
 
 function setFeedback(tone: 'error' | 'neutral' | 'success', message = '') {
   stepFeedback.tone = tone;
@@ -664,6 +682,14 @@ function loadStepDraft<T>(stepId: CustomerNewPlanWizardStepId) {
   return loadWizardDraft<T>(context, stepId);
 }
 
+function loadExistingOrderEditDraft<T>(orderId: string) {
+  const context = buildDraftContext();
+  if (!context || !orderId) {
+    return null as null | T;
+  }
+  return loadOrderDetailsEditDraft<T>(context, orderId);
+}
+
 function saveStepDraft<T>(stepId: CustomerNewPlanWizardStepId, payload: null | T | undefined) {
   const context = buildDraftContext();
   if (!context) {
@@ -672,12 +698,28 @@ function saveStepDraft<T>(stepId: CustomerNewPlanWizardStepId, payload: null | T
   saveWizardDraft(context, stepId, payload);
 }
 
+function saveExistingOrderEditDraft<T>(orderId: string, payload: null | T | undefined) {
+  const context = buildDraftContext();
+  if (!context || !orderId) {
+    return;
+  }
+  saveOrderDetailsEditDraft(context, orderId, payload);
+}
+
 function clearStepDraft(stepId: CustomerNewPlanWizardStepId) {
   const context = buildDraftContext();
   if (!context) {
     return;
   }
   clearWizardDraft(context, stepId);
+}
+
+function clearExistingOrderEditDraftState(orderId: string) {
+  const context = buildDraftContext();
+  if (!context || !orderId) {
+    return;
+  }
+  clearOrderDetailsEditDraft(context, orderId);
 }
 
 function restoreDraftMessage(messageKey = 'sicherplan.customerPlansWizard.draftRestored') {
@@ -689,7 +731,7 @@ function clearDraftRestoreMessage() {
 }
 
 function buildOrderDetailsDraftPersistence(): OrderDetailsDraftPersistence | null {
-  if (!hasOrderDraftContent()) {
+  if (orderSelectionMode.value !== 'create_new') {
     return null;
   }
   return {
@@ -699,6 +741,18 @@ function buildOrderDetailsDraftPersistence(): OrderDetailsDraftPersistence | nul
     },
     mode: orderSelectionMode.value,
     selected_order_id: selectedExistingOrderId.value || '',
+  };
+}
+
+function buildOrderDetailsEditDraftPersistence(): null | OrderDetailsEditDraftPersistence {
+  if (!existingOrderEditActive.value || !editingExistingOrderId.value || !hasExistingOrderEditDirtyState()) {
+    return null;
+  }
+  return {
+    form: {
+      ...orderDraft,
+      customer_id: props.customer.id,
+    },
   };
 }
 
@@ -725,6 +779,7 @@ function hasOrderDraftContent() {
 function matchesSelectedOrderDraft() {
   return Boolean(
     selectedOrder.value &&
+      existingOrderEditActive.value &&
       orderDraft.customer_id === selectedOrder.value.customer_id &&
       orderDraft.notes === (selectedOrder.value.notes ?? '') &&
       orderDraft.order_no === selectedOrder.value.order_no &&
@@ -737,6 +792,10 @@ function matchesSelectedOrderDraft() {
       orderDraft.service_to === selectedOrder.value.service_to &&
       orderDraft.title === selectedOrder.value.title,
   );
+}
+
+function hasExistingOrderEditDirtyState() {
+  return Boolean(existingOrderEditActive.value && !matchesSelectedOrderDraft());
 }
 
 function hasEquipmentLineDraftContent() {
@@ -891,30 +950,64 @@ function applyOrderDraftPersistence(payload: Partial<typeof orderDraft>) {
 }
 
 function resetOrderSelection() {
+  existingOrderEditFormOpen.value = false;
   selectedOrder.value = null;
+  editingExistingOrderId.value = '';
   selectedExistingOrderId.value = '';
+}
+
+function closeExistingOrderEdit(options?: { clearDraft?: boolean; preserveSelection?: boolean }) {
+  const editingOrderId = editingExistingOrderId.value;
+  existingOrderEditFormOpen.value = false;
+  selectedOrder.value = null;
+  editingExistingOrderId.value = '';
+  if (options?.preserveSelection === false) {
+    selectedExistingOrderId.value = '';
+  }
+  withDraftSyncPaused(() => {
+    resetOrderDraft();
+  });
+  if (options?.clearDraft !== false && editingOrderId) {
+    clearExistingOrderEditDraftState(editingOrderId);
+  }
 }
 
 function setOrderSelectionMode(mode: OrderSelectionMode) {
   if (orderSelectionMode.value === mode) {
     return;
   }
+  const previousEditingOrderId = editingExistingOrderId.value;
   orderSelectionMode.value = mode;
   setFeedback('neutral', '');
   if (mode === 'create_new') {
+    const persistedCreateDraft = loadStepDraft<OrderDetailsDraftPersistence | Partial<typeof orderDraft>>('order-details');
     clearDraftRestoreMessage();
     resetOrderSelection();
-    withDraftSyncPaused(() => {
-      resetOrderDraft();
-    });
+    if (previousEditingOrderId) {
+      clearExistingOrderEditDraftState(previousEditingOrderId);
+    }
+    if (isOrderDetailsDraftPersistence(persistedCreateDraft) && persistedCreateDraft.mode === 'create_new') {
+      applyOrderDraftPersistence(persistedCreateDraft.form);
+      if (hasOrderDraftContent()) {
+        restoreDraftMessage();
+      }
+    } else {
+      withDraftSyncPaused(() => {
+        resetOrderDraft();
+      });
+    }
     saveStepDraft('order-details', buildOrderDetailsDraftPersistence());
     emit('saved-context', { order_id: '' });
     return;
   }
-  clearStepDraft('order-details');
   clearDraftRestoreMessage();
   resetOrderSelection();
+  if (previousEditingOrderId) {
+    clearExistingOrderEditDraftState(previousEditingOrderId);
+  }
   emit('saved-context', { order_id: '' });
+  emit('step-completion', 'order-details', false);
+  emit('step-ui-state', 'order-details', { dirty: false, error: '' });
   if (!customerOrderRows.value.length) {
     withDraftSyncPaused(() => {
       resetOrderDraft();
@@ -999,14 +1092,14 @@ function applySeriesDraftPersistence(payload: Partial<SeriesExceptionsDraftPersi
 }
 
 function persistOrderDraft() {
-  if (matchesSelectedOrderDraft()) {
-    clearStepDraft('order-details');
+  if (existingOrderEditActive.value) {
+    saveExistingOrderEditDraft(editingExistingOrderId.value, buildOrderDetailsEditDraftPersistence());
     return;
   }
-  saveStepDraft(
-    'order-details',
-    buildOrderDetailsDraftPersistence(),
-  );
+  if (orderSelectionMode.value === 'use_existing') {
+    return;
+  }
+  saveStepDraft('order-details', buildOrderDetailsDraftPersistence());
 }
 
 function persistEquipmentLineDraft() {
@@ -1878,16 +1971,9 @@ async function loadCustomerOrderRows(isCurrent = () => true) {
   customerOrderRowsLoading.value = true;
   customerOrderRowsError.value = '';
   try {
-    const orderFilters: Parameters<typeof listCustomerOrders>[2] = {
+    const rows = await listCustomerOrders(props.tenantId, props.accessToken, {
       customer_id: props.customer.id,
       include_archived: false,
-    };
-    if (currentPlanningEntityScope.value) {
-      orderFilters.planning_entity_type = currentPlanningEntityScope.value.planningEntityType as Parameters<typeof listCustomerOrders>[2]['planning_entity_type'];
-      orderFilters.planning_entity_id = currentPlanningEntityScope.value.planningEntityId;
-    }
-    const rows = await listCustomerOrders(props.tenantId, props.accessToken, {
-      ...orderFilters,
     });
     if (!isCurrent()) {
       return;
@@ -1907,43 +1993,90 @@ async function loadCustomerOrderRows(isCurrent = () => true) {
   }
 }
 
-async function selectExistingOrder(orderId: string, options?: { applyDraft?: boolean }) {
+function selectExistingOrder(orderId: string) {
+  if (!orderId) {
+    return false;
+  }
+  if (existingOrderEditActive.value && editingExistingOrderId.value === orderId) {
+    return true;
+  }
+  if (existingOrderEditActive.value && editingExistingOrderId.value !== orderId && hasExistingOrderEditDirtyState()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.completeCurrentOrderEditBeforeContinue'));
+    emit('step-ui-state', 'order-details', { error: 'edit_incomplete' });
+    return false;
+  }
+  if (existingOrderEditActive.value && editingExistingOrderId.value !== orderId) {
+    closeExistingOrderEdit();
+  }
+  selectedExistingOrderId.value = orderId;
+  orderSelectionMode.value = 'use_existing';
+  clearDraftRestoreMessage();
+  emit('saved-context', { order_id: orderId });
+  emit('step-completion', 'order-details', true);
+  emit('step-ui-state', 'order-details', { dirty: false, error: '' });
+  setFeedback('neutral', '');
+  return true;
+}
+
+async function editExistingOrder(orderId: string) {
+  if (!selectExistingOrder(orderId)) {
+    return;
+  }
+  await openExistingOrderEdit(orderId);
+}
+
+async function openExistingOrderEdit(orderId: string, options?: { applyPersistedDraft?: boolean; showLoadedMessage?: boolean }) {
   if (!props.tenantId || !props.accessToken || !orderId) {
     return;
   }
-  const shouldApplyDraft = options?.applyDraft !== false;
+  if (existingOrderEditActive.value && editingExistingOrderId.value === orderId) {
+    return;
+  }
+  if (existingOrderEditActive.value && editingExistingOrderId.value !== orderId && hasExistingOrderEditDirtyState()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.completeCurrentOrderEditBeforeContinue'));
+    emit('step-ui-state', 'order-details', { error: 'edit_incomplete' });
+    return;
+  }
+  const shouldApplyDraft = options?.applyPersistedDraft !== false;
+  pendingExistingOrderEditId.value = orderId;
   stepLoading.value = true;
   emit('step-ui-state', 'order-details', { loading: true, error: '' });
   try {
     const order = await getCustomerOrder(props.tenantId, orderId, props.accessToken);
     syncOrderDraft(order);
     selectedExistingOrderId.value = order.id;
+    editingExistingOrderId.value = order.id;
+    existingOrderEditFormOpen.value = true;
     orderSelectionMode.value = 'use_existing';
-    clearStepDraft('order-details');
     clearDraftRestoreMessage();
-    emit('saved-context', { order_id: order.id });
-
-    const persistedDraft = loadStepDraft<OrderDetailsDraftPersistence | Partial<typeof orderDraft>>('order-details');
-    if (
-      shouldApplyDraft &&
-      isOrderDetailsDraftPersistence(persistedDraft) &&
-      persistedDraft.mode === 'use_existing' &&
-      persistedDraft.selected_order_id === order.id
-    ) {
+    const persistedDraft = shouldApplyDraft
+      ? loadExistingOrderEditDraft<OrderDetailsEditDraftPersistence>(order.id)
+      : null;
+    if (persistedDraft?.form) {
       applyOrderDraftPersistence(persistedDraft.form);
       restoreDraftMessage();
     }
-
+    const editDirty = Boolean(persistedDraft?.form) && hasExistingOrderEditDirtyState();
     emit('step-completion', 'order-details', true);
-    emit('step-ui-state', 'order-details', { dirty: false, error: '' });
-    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.existingOrderLoaded'));
+    emit('step-ui-state', 'order-details', { dirty: editDirty, error: '' });
+    if (options?.showLoadedMessage !== false) {
+      setFeedback('success', $t('sicherplan.customerPlansWizard.messages.existingOrderLoaded'));
+    }
   } catch {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.orderLoadFailed'));
     emit('step-ui-state', 'order-details', { error: 'load_failed' });
   } finally {
+    pendingExistingOrderEditId.value = '';
     stepLoading.value = false;
     emit('step-ui-state', 'order-details', { loading: false });
   }
+}
+
+function cancelExistingOrderEdit() {
+  closeExistingOrderEdit();
+  emit('step-completion', 'order-details', Boolean(selectedExistingOrderId.value));
+  emit('step-ui-state', 'order-details', { dirty: false, error: '' });
+  setFeedback('neutral', '');
 }
 
 async function loadOrderState(isCurrent = () => true) {
@@ -2027,6 +2160,39 @@ async function loadOrderState(isCurrent = () => true) {
       withDraftSyncPaused(() => {
         resetOrderAttachmentDraft();
       });
+    }
+    return;
+  }
+  if (orderStepActive.value) {
+    if (!isCurrent()) {
+      return;
+    }
+    if (
+      pendingExistingOrderEditId.value === props.wizardState.order_id ||
+      (existingOrderEditActive.value && editingExistingOrderId.value === props.wizardState.order_id)
+    ) {
+      emit('step-completion', 'order-details', true);
+      emit('step-ui-state', 'order-details', { dirty: hasExistingOrderEditDirtyState(), error: '' });
+      return;
+    }
+    orderSelectionMode.value = 'use_existing';
+    selectedExistingOrderId.value = props.wizardState.order_id;
+    const persistedExistingEditDraft = loadExistingOrderEditDraft<OrderDetailsEditDraftPersistence>(
+      props.wizardState.order_id,
+    );
+    if (persistedExistingEditDraft?.form) {
+      await openExistingOrderEdit(props.wizardState.order_id, {
+        applyPersistedDraft: true,
+        showLoadedMessage: false,
+      });
+      if (!isCurrent()) {
+        return;
+      }
+    } else {
+      closeExistingOrderEdit({ clearDraft: false });
+      clearDraftRestoreMessage();
+      emit('step-completion', 'order-details', true);
+      emit('step-ui-state', 'order-details', { dirty: false, error: '' });
     }
     return;
   }
@@ -2301,11 +2467,7 @@ async function refreshStepData() {
   emit('step-ui-state', props.currentStepId, { loading: true, error: '' });
   stepLoading.value = true;
   try {
-    if (planningStepActive.value) {
-      await loadPlanningEntityOptions();
-      await loadPlanningCreateReferenceOptions();
-      await loadPlanningRecordReferenceOptions(isCurrent);
-    } else if (orderStepActive.value) {
+    if (orderStepActive.value) {
       await loadOrderReferenceOptions(isCurrent);
       await loadCustomerOrderRows(isCurrent);
       await loadOrderState(isCurrent);
@@ -2428,7 +2590,6 @@ async function submitPlanningCreateModal() {
     await loadPlanningEntityOptions();
     planningEntityId.value = created.id;
     planningSelectionMode.value = 'use_existing';
-    emit('step-ui-state', 'planning', { dirty: true, error: '' });
     resetPlanningCreateModal();
   } catch {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.planningCreateFailed'));
@@ -2521,28 +2682,74 @@ async function onPlanningRecordAttachmentSelected(event: Event) {
   }
 }
 
-async function submitPlanningStep() {
-  if (!planningEntityId.value) {
-    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.planningSelectionRequired'));
-    return false;
-  }
-  emit('saved-context', {
-    planning_entity_id: planningEntityId.value,
-    planning_entity_type: planningFamily.value,
-    planning_mode_code: planningModeCode.value,
-  });
-  emit('step-completion', 'planning', true);
-  emit('step-ui-state', 'planning', { dirty: false, error: '' });
-  return true;
-}
-
 async function submitOrderStep() {
   if (!props.tenantId || !props.accessToken) {
     return false;
   }
-  if (orderModeUsesExisting.value && !selectedOrder.value) {
+  if (orderModeUsesExisting.value && !selectedExistingOrderId.value) {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.orderSelectionRequired'));
     emit('step-completion', 'order-details', false);
+    return false;
+  }
+  if (orderModeUsesExisting.value) {
+    if (hasExistingOrderEditDirtyState()) {
+      setFeedback('error', $t('sicherplan.customerPlansWizard.errors.completeCurrentOrderEditBeforeContinue'));
+      emit('step-completion', 'order-details', false);
+      emit('step-ui-state', 'order-details', { error: 'edit_incomplete' });
+      return false;
+    }
+    emit('step-completion', 'order-details', true);
+    emit('step-ui-state', 'order-details', { dirty: false, error: '' });
+    return true;
+  }
+  const blockReason = derivePlanningOrderSubmitBlockReason(orderDraft);
+  if (blockReason) {
+    setFeedback('error', $t(`sicherplan.customerPlansWizard.errors.${blockReason}`));
+    return false;
+  }
+  if (!orderDraft.service_from || !orderDraft.service_to || orderDraft.service_to < orderDraft.service_from) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.orderWindowInvalid'));
+    return false;
+  }
+  stepLoading.value = true;
+  emit('step-ui-state', 'order-details', { loading: true, error: '' });
+  try {
+    const payload = {
+      customer_id: props.customer.id,
+      notes: orderDraft.notes || null,
+      order_no: orderDraft.order_no,
+      patrol_route_id: normalizeUuid(orderDraft.patrol_route_id),
+      release_state: orderDraft.release_state || 'draft',
+      requirement_type_id: normalizeUuid(orderDraft.requirement_type_id),
+      security_concept_text: orderDraft.security_concept_text || null,
+      service_category_code: orderDraft.service_category_code,
+      service_from: orderDraft.service_from,
+      service_to: orderDraft.service_to,
+      tenant_id: props.tenantId,
+      title: orderDraft.title,
+    };
+    const saved = await createCustomerOrder(props.tenantId, props.accessToken, payload);
+    orderSelectionMode.value = 'use_existing';
+    selectedExistingOrderId.value = saved.id;
+    closeExistingOrderEdit({ clearDraft: false });
+    clearStepDraft('order-details');
+    clearDraftRestoreMessage();
+    emit('saved-context', { order_id: saved.id });
+    emit('step-completion', 'order-details', true);
+    emit('step-ui-state', 'order-details', { dirty: false, error: '' });
+    return true;
+  } catch {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.orderSaveFailed'));
+    emit('step-ui-state', 'order-details', { error: 'save_failed' });
+    return false;
+  } finally {
+    stepLoading.value = false;
+    emit('step-ui-state', 'order-details', { loading: false });
+  }
+}
+
+async function updateExistingOrder() {
+  if (!props.tenantId || !props.accessToken || !existingOrderEditActive.value || !selectedOrder.value) {
     return false;
   }
   const blockReason = derivePlanningOrderSubmitBlockReason(orderDraft);
@@ -2557,8 +2764,7 @@ async function submitOrderStep() {
   stepLoading.value = true;
   emit('step-ui-state', 'order-details', { loading: true, error: '' });
   try {
-    const isExistingOrder = Boolean(selectedOrder.value);
-    const payload = {
+    const saved = await updateCustomerOrder(props.tenantId, selectedOrder.value.id, props.accessToken, {
       customer_id: props.customer.id,
       notes: orderDraft.notes || null,
       order_no: orderDraft.order_no,
@@ -2571,22 +2777,15 @@ async function submitOrderStep() {
       service_to: orderDraft.service_to,
       tenant_id: props.tenantId,
       title: orderDraft.title,
-      ...(selectedOrder.value ? { version_no: selectedOrder.value.version_no } : {}),
-    };
-    const saved = selectedOrder.value
-      ? await updateCustomerOrder(props.tenantId, selectedOrder.value.id, props.accessToken, payload)
-      : await createCustomerOrder(props.tenantId, props.accessToken, payload);
-    orderSelectionMode.value = 'use_existing';
+      version_no: selectedOrder.value.version_no,
+    });
+    await loadCustomerOrderRows(() => true);
     selectedExistingOrderId.value = saved.id;
-    syncOrderDraft(saved);
-    clearStepDraft('order-details');
-    clearDraftRestoreMessage();
     emit('saved-context', { order_id: saved.id });
+    closeExistingOrderEdit();
     emit('step-completion', 'order-details', true);
     emit('step-ui-state', 'order-details', { dirty: false, error: '' });
-    if (isExistingOrder) {
-      setFeedback('success', $t('sicherplan.customerPlansWizard.messages.existingOrderUpdated'));
-    }
+    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.existingOrderUpdated'));
     return true;
   } catch {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.orderSaveFailed'));
@@ -2847,6 +3046,12 @@ async function submitDocumentsStep() {
 
 async function submitPlanningRecordStep() {
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
+    return false;
+  }
+  if (!hasPlanningContext.value) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.planningContextRequired'));
+    emit('step-completion', 'planning-record-overview', false);
+    emit('step-ui-state', 'planning-record-overview', { error: 'planning_context_required' });
     return false;
   }
   planningRecordDraft.planning_mode_code = props.wizardState.planning_mode_code || planningModeCode.value;
@@ -3142,9 +3347,6 @@ async function submitSeriesStep() {
 }
 
 async function submitCurrentStep() {
-  if (planningStepActive.value) {
-    return submitPlanningStep();
-  }
   if (orderStepActive.value) {
     return submitOrderStep();
   }
@@ -3181,19 +3383,13 @@ watch(planningFamily, async () => {
     return;
   }
   planningEntityId.value = '';
-  emit('step-completion', 'planning', false);
-  emit('step-ui-state', 'planning', { dirty: true, error: '' });
-  if (planningStepActive.value) {
-    await loadPlanningEntityOptions();
-  }
+  await loadPlanningEntityOptions();
 });
 
 watch(planningEntityId, () => {
   if (draftSyncPaused.value) {
     return;
   }
-  emit('step-completion', 'planning', false);
-  emit('step-ui-state', 'planning', { dirty: true, error: '' });
 });
 
 watch(
@@ -3212,8 +3408,13 @@ watch(
     if (draftSyncPaused.value) {
       return;
     }
-    emit('step-completion', 'order-details', false);
-    emit('step-ui-state', 'order-details', { dirty: true, error: '' });
+    if (existingOrderEditActive.value) {
+      emit('step-completion', 'order-details', true);
+      emit('step-ui-state', 'order-details', { dirty: hasExistingOrderEditDirtyState(), error: '' });
+    } else {
+      emit('step-completion', 'order-details', false);
+      emit('step-ui-state', 'order-details', { dirty: true, error: '' });
+    }
     persistOrderDraft();
   },
   { flush: 'sync' },
@@ -3410,6 +3611,7 @@ watch(
     closePlanningAddressCreateModal();
     planningLocationPickerOpen.value = false;
     clearDraftRestoreMessage();
+    existingOrderEditFormOpen.value = false;
     selectedOrder.value = null;
     selectedPlanningRecord.value = null;
     selectedShiftPlan.value = null;
@@ -3495,69 +3697,7 @@ onBeforeUnmount(() => {
       {{ draftRestoreMessage }}
     </p>
 
-    <section v-if="planningStepActive" class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-planning">
-      <div class="sp-customer-plan-wizard-step__grid">
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.planningFamily') }}</span>
-          <select v-model="planningFamily" data-testid="customer-new-plan-planning-family">
-            <option v-for="option in planningFamilyOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.planningModeCode') }}</span>
-          <input :value="planningModeLabel" readonly />
-        </label>
-      </div>
-
-      <div class="sp-customer-plan-wizard-step__toggle-row">
-        <label
-          class="planning-admin-checkbox"
-          data-testid="customer-new-plan-planning-mode-existing"
-          @click="planningSelectionMode = 'use_existing'"
-        >
-          <input v-model="planningSelectionMode" type="radio" value="use_existing" />
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.useExisting') }}</span>
-        </label>
-        <label
-          class="planning-admin-checkbox"
-          data-testid="customer-new-plan-planning-mode-create"
-          @click="planningSelectionMode = 'create_new'"
-        >
-          <input v-model="planningSelectionMode" type="radio" value="create_new" />
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.createNew') }}</span>
-        </label>
-      </div>
-
-      <div v-if="planningSelectionMode === 'use_existing'" class="sp-customer-plan-wizard-step__grid">
-        <label class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.planningEntity') }}</span>
-          <select v-model="planningEntityId" data-testid="customer-new-plan-planning-entity">
-            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.planningEntityPlaceholder') }}</option>
-            <option v-for="option in planningEntityOptions" :key="option.id" :value="option.id">
-              {{ option.name || option.label || option.code || option.id }}
-            </option>
-          </select>
-          <p v-if="planningEntityLoading" class="field-help">{{ $t('sicherplan.customerPlansWizard.loadingBody') }}</p>
-          <p v-else-if="planningEntityError" class="field-help">{{ planningEntityError }}</p>
-        </label>
-      </div>
-
-      <div v-else class="cta-row">
-        <button
-          type="button"
-          class="cta-button cta-secondary"
-          data-testid="customer-new-plan-planning-create"
-          @click="planningCreateModal.open = true"
-        >
-          {{ $t('sicherplan.customerPlansWizard.forms.createPlanningEntity') }}
-        </button>
-        <span v-if="planningEntityLabel" class="field-help">{{ planningEntityLabel }}</span>
-      </div>
-    </section>
-
-    <section v-else-if="orderStepActive" class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-order-details">
+    <section v-if="orderStepActive" class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-order-details">
       <div class="sp-customer-plan-wizard-step__toggle-row">
         <label
           class="planning-admin-checkbox"
@@ -3592,34 +3732,35 @@ onBeforeUnmount(() => {
       <template v-if="orderModeUsesExisting">
         <div data-testid="customer-new-plan-existing-order-select"></div>
         <p class="eyebrow">
-          {{
-            hasPlanningScopedOrderList
-              ? $t('sicherplan.customerPlansWizard.forms.existingPlanningEntityOrders')
-              : $t('sicherplan.customerPlansWizard.forms.existingCustomerOrders')
-          }}
+          {{ $t('sicherplan.customerPlansWizard.forms.existingCustomerOrders') }}
         </p>
         <div class="sp-customer-plan-wizard-step__list" data-testid="customer-new-plan-existing-order-list">
           <p v-if="customerOrderRowsLoading" class="field-help">{{ $t('sicherplan.customerPlansWizard.loadingBody') }}</p>
           <p v-else-if="customerOrderRowsError" class="field-help">{{ customerOrderRowsError }}</p>
           <p v-else-if="!customerOrderRows.length" class="field-help">
-            {{
-              hasPlanningScopedOrderList
-                ? $t('sicherplan.customerPlansWizard.forms.noPlanningEntityOrdersFound')
-                : $t('sicherplan.customerPlansWizard.forms.noExistingOrdersFound')
-            }}
+            {{ $t('sicherplan.customerPlansWizard.forms.noExistingOrdersFound') }}
           </p>
-          <button
+          <div
             v-for="row in customerOrderRows"
             :key="row.id"
-            type="button"
             class="sp-customer-plan-wizard-step__list-row"
             :class="{ 'sp-customer-plan-wizard-step__list-row--selected': row.id === selectedExistingOrderId }"
             data-testid="customer-new-plan-existing-order-row"
-            @click="void selectExistingOrder(row.id)"
+            @click="selectExistingOrder(row.id)"
           >
-            <strong>{{ row.order_no }} · {{ row.title }}</strong>
-            <span>{{ row.service_from }} - {{ row.service_to }} · {{ row.release_state }} · {{ row.status }}</span>
-          </button>
+            <div>
+              <strong>{{ row.order_no }} · {{ row.title }}</strong>
+              <span>{{ row.service_from }} - {{ row.service_to }} · {{ row.release_state }} · {{ row.status }}</span>
+            </div>
+            <button
+              type="button"
+              class="cta-button cta-secondary"
+              data-testid="customer-new-plan-existing-order-edit"
+              @click.stop="void editExistingOrder(row.id)"
+            >
+              {{ $t('sicherplan.customerPlansWizard.actions.edit') }}
+            </button>
+          </div>
         </div>
 
         <div v-if="selectedExistingOrderSummary" class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static" data-testid="customer-new-plan-selected-order-summary">
@@ -3629,86 +3770,97 @@ onBeforeUnmount(() => {
       </template>
 
       <p
-        v-if="orderModeUsesExisting && !selectedOrder && !customerOrderRowsLoading && !customerOrderRowsError"
+        v-if="orderModeUsesExisting && !selectedExistingOrderId && !customerOrderRowsLoading && !customerOrderRowsError"
         class="field-help"
       >
-        {{
-          hasPlanningScopedOrderList
-            ? $t('sicherplan.customerPlansWizard.forms.selectPlanningEntityOrder')
-            : $t('sicherplan.customerPlansWizard.forms.selectExistingOrder')
-        }}
-      </p>
-
-      <p
-        v-if="!orderModeUsesExisting && hasPlanningScopedOrderList && !customerOrderRows.length && !customerOrderRowsLoading && !customerOrderRowsError"
-        class="field-help"
-      >
-        {{ $t('sicherplan.customerPlansWizard.forms.noPlanningEntityOrdersFound') }}
+        {{ $t('sicherplan.customerPlansWizard.forms.selectExistingOrder') }}
       </p>
 
       <div
-        v-if="orderSelectionMode === 'create_new' || selectedOrder"
-        class="sp-customer-plan-wizard-step__grid"
+        v-if="orderSelectionMode === 'create_new' || existingOrderEditActive"
+        :data-testid="existingOrderEditActive ? 'customer-new-plan-existing-order-edit-form' : undefined"
       >
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.customer') }}</span>
-          <input :value="props.customer.name || props.customer.id" readonly />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.orderNo') }}</span>
-          <input v-model="orderDraft.order_no" data-testid="customer-new-plan-order-no" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.orderTitle') }}</span>
-          <input v-model="orderDraft.title" data-testid="customer-new-plan-order-title" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.requirementType') }}</span>
-          <select v-model="orderDraft.requirement_type_id" data-testid="customer-new-plan-order-requirement-type">
-            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.requirementTypePlaceholder') }}</option>
-            <option v-for="option in requirementTypeSelectOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.patrolRoute') }}</span>
-          <select v-model="orderDraft.patrol_route_id">
-            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.patrolRoutePlaceholder') }}</option>
-            <option v-for="option in patrolRouteSelectOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.serviceCategory') }}</span>
-          <select v-model="orderDraft.service_category_code" data-testid="customer-new-plan-order-service-category">
-            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.serviceCategoryPlaceholder') }}</option>
-            <option v-for="option in serviceCategorySelectOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.serviceFrom') }}</span>
-          <input v-model="orderDraft.service_from" data-testid="customer-new-plan-order-service-from" type="date" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.serviceTo') }}</span>
-          <input v-model="orderDraft.service_to" data-testid="customer-new-plan-order-service-to" type="date" />
-        </label>
-        <label class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.securityConcept') }}</span>
-          <textarea
-            v-model="orderDraft.security_concept_text"
-            data-testid="customer-new-plan-order-security-concept"
-            rows="3"
-          />
-        </label>
-        <label class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
-          <textarea v-model="orderDraft.notes" data-testid="customer-new-plan-order-notes" rows="3" />
-        </label>
+        <div class="sp-customer-plan-wizard-step__grid">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.customer') }}</span>
+            <input :value="props.customer.name || props.customer.id" readonly />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.orderNo') }}</span>
+            <input v-model="orderDraft.order_no" data-testid="customer-new-plan-order-no" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.orderTitle') }}</span>
+            <input v-model="orderDraft.title" data-testid="customer-new-plan-order-title" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.requirementType') }}</span>
+            <select v-model="orderDraft.requirement_type_id" data-testid="customer-new-plan-order-requirement-type">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.requirementTypePlaceholder') }}</option>
+              <option v-for="option in requirementTypeSelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.patrolRoute') }}</span>
+            <select v-model="orderDraft.patrol_route_id">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.patrolRoutePlaceholder') }}</option>
+              <option v-for="option in patrolRouteSelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.serviceCategory') }}</span>
+            <select v-model="orderDraft.service_category_code" data-testid="customer-new-plan-order-service-category">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.serviceCategoryPlaceholder') }}</option>
+              <option v-for="option in serviceCategorySelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.serviceFrom') }}</span>
+            <input v-model="orderDraft.service_from" data-testid="customer-new-plan-order-service-from" type="date" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.serviceTo') }}</span>
+            <input v-model="orderDraft.service_to" data-testid="customer-new-plan-order-service-to" type="date" />
+          </label>
+          <label class="field-stack field-stack--wide">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.securityConcept') }}</span>
+            <textarea
+              v-model="orderDraft.security_concept_text"
+              data-testid="customer-new-plan-order-security-concept"
+              rows="3"
+            />
+          </label>
+          <label class="field-stack field-stack--wide">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
+            <textarea v-model="orderDraft.notes" data-testid="customer-new-plan-order-notes" rows="3" />
+          </label>
+        </div>
+        <div v-if="existingOrderEditActive" class="cta-row">
+          <button
+            type="button"
+            class="cta-button"
+            data-testid="customer-new-plan-existing-order-update"
+            :disabled="stepLoading"
+            @click="void updateExistingOrder()"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.updateOrder') }}
+          </button>
+          <button
+            type="button"
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-existing-order-cancel-edit"
+            :disabled="stepLoading"
+            @click="cancelExistingOrderEdit()"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.cancelEdit') }}
+          </button>
+        </div>
       </div>
     </section>
 
@@ -3943,7 +4095,10 @@ onBeforeUnmount(() => {
       class="sp-customer-plan-wizard-step__panel"
       data-testid="customer-new-plan-step-panel-planning-record-overview"
     >
-      <div class="sp-customer-plan-wizard-step__grid">
+      <p v-if="!hasPlanningContext" class="field-help" data-testid="customer-new-plan-planning-record-blocked">
+        {{ $t('sicherplan.customerPlansWizard.errors.planningContextRequired') }}
+      </p>
+      <div v-else class="sp-customer-plan-wizard-step__grid">
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.orderTitle') }}</span>
           <input :value="selectedOrder?.title || orderDraft.title" readonly />

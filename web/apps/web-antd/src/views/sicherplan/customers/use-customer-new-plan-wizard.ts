@@ -73,9 +73,6 @@ export function useCustomerNewPlanWizard() {
     () =>
       Boolean(
         state.value.customer_id &&
-          state.value.planning_entity_type &&
-          state.value.planning_entity_id &&
-          state.value.planning_mode_code &&
           state.value.order_id &&
           state.value.planning_record_id &&
           state.value.shift_plan_id &&

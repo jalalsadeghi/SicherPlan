@@ -234,7 +234,6 @@ function baseWizardState(): CustomerNewPlanWizardState {
     shift_plan_id: '',
     series_id: '',
     step_state: {
-      planning: { completed: true, dirty: false, error: '', loading: false },
       'order-details': { completed: true, dirty: false, error: '', loading: false },
       'equipment-lines': { completed: true, dirty: false, error: '', loading: false },
       'requirement-lines': { completed: true, dirty: false, error: '', loading: false },
