@@ -562,6 +562,47 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(zoneSelect.text()).toContain('H2-A');
   });
 
+  it('loads planning-record overview data once per stable context and does not emit saved-context during hydration', async () => {
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: 'fair-1',
+      planning_entity_type: 'trade_fair',
+      planning_mode_code: 'trade_fair',
+      planning_record_id: '',
+    });
+    await flushPromises();
+    await flushPromises();
+
+    expect(apiMocks.getCustomerOrderMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listOrderAttachmentsMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listOrderEquipmentLinesMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listOrderRequirementLinesMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listPlanningSetupRecordsMock).toHaveBeenCalledTimes(4);
+    expect(apiMocks.listTradeFairZonesMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted('saved-context')).toBeUndefined();
+  });
+
+  it('reloads planning-entry options once when the user changes planning family', async () => {
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+      planning_record_id: '',
+    });
+    await flushPromises();
+    apiMocks.listPlanningSetupRecordsMock.mockClear();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-family"]').setValue('trade_fair');
+    await flushPromises();
+
+    expect(apiMocks.listPlanningSetupRecordsMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listPlanningSetupRecordsMock).toHaveBeenCalledWith(
+      'trade_fair',
+      'tenant-1',
+      'token-1',
+      { customer_id: 'customer-1' },
+    );
+  });
+
   it('persists the planning-record draft payload and restores the selected planning context after remount', async () => {
     const wrapper = mountStep('planning-record-overview', {
       current_step: 'planning-record-overview',

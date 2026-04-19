@@ -227,6 +227,32 @@ describe('CustomerNewPlanWizardView', () => {
     });
   });
 
+  it('normalizes legacy planning_id to planning_entity_id once and drops the stale key', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      step: 'planning-record-overview',
+      planning_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+    expect(routerReplaceMock).toHaveBeenCalledWith({
+      path: '/admin/customers/new-plan',
+      query: {
+        customer_id: 'customer-1',
+        order_id: 'order-1',
+        planning_entity_id: 'site-1',
+        planning_entity_type: 'site',
+        planning_mode_code: 'site',
+        step: 'planning-record-overview',
+      },
+    });
+  });
+
   it('persists order_id into the route after order-details succeeds', async () => {
     routeState.query = { customer_id: 'customer-1' };
     const wrapper = mountComponent();

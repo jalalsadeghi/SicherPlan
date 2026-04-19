@@ -23,6 +23,7 @@ type WizardContextState = 'loading' | 'ready' | 'missing' | 'not_found' | 'error
 type PersistedWizardRouteKey =
   | 'customer_id'
   | 'order_id'
+  | 'planning_id'
   | 'planning_entity_id'
   | 'planning_entity_type'
   | 'planning_mode_code'
@@ -143,11 +144,12 @@ function normalizeQueryString(value: unknown) {
 function readWizardRouteState() {
   const planningEntityType = normalizeQueryString(route.query.planning_entity_type);
   const planningModeCode = normalizeQueryString(route.query.planning_mode_code);
+  const planningEntityId = normalizeQueryString(route.query.planning_entity_id) || normalizeQueryString(route.query.planning_id);
 
   return {
     customer_id: customerId.value,
     order_id: normalizeQueryString(route.query.order_id),
-    planning_entity_id: normalizeQueryString(route.query.planning_entity_id),
+    planning_entity_id: planningEntityId,
     planning_entity_type: PLANNING_ENTITY_TYPES.has(planningEntityType) ? planningEntityType : '',
     planning_mode_code: PLANNING_MODE_CODES.has(planningModeCode) ? planningModeCode : '',
     planning_record_id: normalizeQueryString(route.query.planning_record_id),
@@ -197,6 +199,7 @@ function buildWizardRouteQuery() {
     series_id: wizardState.value.series_id || undefined,
     shift_plan_id: wizardState.value.shift_plan_id || undefined,
   };
+  delete nextQuery.planning_id;
 
   if (wizardState.value.current_step === CUSTOMER_NEW_PLAN_WIZARD_FIRST_STEP_ID) {
     delete nextQuery.step;
@@ -410,6 +413,7 @@ watch(
     route.query.step,
     route.query.planning_entity_type,
     route.query.planning_entity_id,
+    route.query.planning_id,
     route.query.planning_mode_code,
     route.query.order_id,
     route.query.planning_record_id,
