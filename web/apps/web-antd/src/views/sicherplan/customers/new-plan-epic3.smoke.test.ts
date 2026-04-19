@@ -1,17 +1,17 @@
 // @vitest-environment happy-dom
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
-import { defineComponent } from 'vue';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
+import { defineComponent, reactive } from 'vue';
 
 import CustomerNewPlanWizardView from './new-plan.vue';
 
-const routeState = {
+const routeState = reactive({
   query: { customer_id: 'customer-1' } as Record<string, unknown>,
-};
+});
 const routerPushMock = vi.fn();
 const routerReplaceMock = vi.fn();
-const authStoreState = {
+const authStoreState = reactive({
   accessToken: 'token-1',
   effectiveAccessToken: 'token-1',
   effectiveRole: 'tenant_admin',
@@ -19,7 +19,7 @@ const authStoreState = {
   ensureSessionReady: vi.fn().mockResolvedValue(undefined),
   isSessionResolving: false,
   syncFromPrimarySession: vi.fn(),
-};
+});
 
 const stores = vi.hoisted(() => ({
   attachmentsByOrder: {} as Record<string, Array<{ current_version_no: number; id: string; status: string; tenant_id: string; title: string }>>,
@@ -214,8 +214,10 @@ function nextTickFlush() {
   return flushPromises();
 }
 
+const mountedWrappers: VueWrapper[] = [];
+
 function mountComponent() {
-  return mount(CustomerNewPlanWizardView, {
+  const wrapper = mount(CustomerNewPlanWizardView, {
     global: {
       stubs: {
         EmptyState: EmptyStateStub,
@@ -225,6 +227,8 @@ function mountComponent() {
       },
     },
   });
+  mountedWrappers.push(wrapper);
+  return wrapper;
 }
 
 describe('CustomerNewPlanWizardView EPIC 3', () => {
@@ -365,6 +369,12 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     });
   });
 
+  afterEach(() => {
+    while (mountedWrappers.length) {
+      mountedWrappers.pop()?.unmount();
+    }
+  });
+
   it('runs through steps 1-5, persists canonical records, and updates earlier order data instead of creating duplicates', async () => {
     const wrapper = mountComponent();
     await nextTickFlush();
@@ -466,5 +476,68 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+  });
+
+  it('keeps the real planning create modal and typed values stable across focus-driven session refresh', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security');
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
+
+    const radios = wrapper.findAll('input[type="radio"]');
+    await radios[1]!.setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-site-no"]').setValue('TEST-SITE-FOCUS');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-name"]').setValue('Focus Persistence Test Site');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-timezone"]').setValue('Europe/Berlin');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-latitude"]').setValue('50.950000');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-longitude"]').setValue('6.980000');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-watchbook-enabled"]').setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-notes"]').setValue('Focus regression test');
+    await nextTickFlush();
+
+    apiMocks.getCustomerMock.mockResolvedValue(buildCustomer());
+    window.dispatchEvent(new Event('blur'));
+    authStoreState.isSessionResolving = true;
+    authStoreState.effectiveAccessToken = '';
+    authStoreState.accessToken = '';
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('focus'));
+    await nextTickFlush();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-loading"]').exists()).toBe(false);
+    expect(wrapper.find('.modal-stub').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-site-no"]').element as HTMLInputElement).value).toBe('TEST-SITE-FOCUS');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-name"]').element as HTMLInputElement).value).toBe('Focus Persistence Test Site');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-timezone"]').element as HTMLSelectElement).value).toBe('Europe/Berlin');
+    expect(Number((wrapper.get('[data-testid="customer-new-plan-planning-create-latitude"]').element as HTMLInputElement).value)).toBe(50.95);
+    expect(Number((wrapper.get('[data-testid="customer-new-plan-planning-create-longitude"]').element as HTMLInputElement).value)).toBe(6.98);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-watchbook-enabled"]').element as HTMLInputElement).checked).toBe(true);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-notes"]').element as HTMLTextAreaElement).value).toBe('Focus regression test');
+    expect((wrapper.findAll('input[type="radio"]')[1]!.element as HTMLInputElement).checked).toBe(true);
+    expect(routerPushMock).not.toHaveBeenCalled();
+
+    authStoreState.effectiveAccessToken = 'token-2';
+    authStoreState.accessToken = 'token-2';
+    authStoreState.isSessionResolving = false;
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-timezone"]').setValue('Europe/Berlin');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-name"]').trigger('focus');
+    await nextTickFlush();
+
+    expect(wrapper.find('.modal-stub').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
+    expect(routerPushMock).not.toHaveBeenCalled();
+
+    await wrapper.get('[data-testid="modal-cancel"]').trigger('click');
+    await nextTickFlush();
+
+    expect(wrapper.find('.modal-stub').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
   });
 });

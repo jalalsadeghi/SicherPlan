@@ -1,17 +1,17 @@
 // @vitest-environment happy-dom
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
-import { defineComponent } from 'vue';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
+import { defineComponent, reactive } from 'vue';
 
 import CustomerNewPlanWizardView from './new-plan.vue';
 
 const routerPushMock = vi.fn();
 const routerReplaceMock = vi.fn();
-const routeState = {
+const routeState = reactive({
   query: {} as Record<string, unknown>,
-};
-const authStoreState = {
+});
+const authStoreState = reactive({
   accessToken: 'token-1',
   effectiveAccessToken: 'token-1',
   effectiveRole: 'tenant_admin',
@@ -19,7 +19,7 @@ const authStoreState = {
   isSessionResolving: false,
   ensureSessionReady: vi.fn().mockResolvedValue(undefined),
   syncFromPrimarySession: vi.fn(),
-};
+});
 const customersApiMocks = vi.hoisted(() => ({
   getCustomerMock: vi.fn(),
 }));
@@ -52,10 +52,75 @@ vi.mock('#/sicherplan-legacy/api/customers', async () => {
 vi.mock('./new-plan-step-content.vue', () => ({
   default: defineComponent({
     name: 'CustomerNewPlanStepContentStub',
+    props: {
+      currentStepId: { type: String, required: true },
+    },
     emits: ['step-ui-state'],
+    data() {
+      return {
+        modalOpen: false,
+        modalNotes: '',
+        modalLatitude: '',
+        modalLongitude: '',
+        modalName: '',
+        modalSiteNo: '',
+        modalTimezone: '',
+        planningSelectionMode: 'use_existing',
+        watchbookEnabled: false,
+      };
+    },
     template: `
       <div data-testid="customer-new-plan-step-content-stub">
-        stub
+        <div data-testid="customer-new-plan-step-panel-planning" v-if="currentStepId === 'planning'">
+          <label>
+            <input
+              data-testid="customer-new-plan-use-existing-radio"
+              v-model="planningSelectionMode"
+              type="radio"
+              value="use_existing"
+            />
+            use-existing
+          </label>
+          <label>
+            <input
+              data-testid="customer-new-plan-create-new-radio"
+              v-model="planningSelectionMode"
+              type="radio"
+              value="create_new"
+            />
+            create-new
+          </label>
+          <button
+            data-testid="customer-new-plan-planning-create"
+            type="button"
+            @click="modalOpen = true"
+          >
+            open-modal
+          </button>
+          <div v-if="modalOpen" data-testid="customer-new-plan-planning-create-modal">
+            <input data-testid="customer-new-plan-planning-create-site-no" v-model="modalSiteNo" />
+            <input data-testid="customer-new-plan-planning-create-name" v-model="modalName" />
+            <select data-testid="customer-new-plan-planning-create-timezone" v-model="modalTimezone">
+              <option value=""></option>
+              <option value="Europe/Berlin">Europe/Berlin</option>
+            </select>
+            <input data-testid="customer-new-plan-planning-create-latitude" v-model="modalLatitude" />
+            <input data-testid="customer-new-plan-planning-create-longitude" v-model="modalLongitude" />
+            <label>
+              <input
+                data-testid="customer-new-plan-planning-create-watchbook-enabled"
+                v-model="watchbookEnabled"
+                type="checkbox"
+              />
+              watchbook
+            </label>
+            <textarea data-testid="customer-new-plan-planning-create-notes" v-model="modalNotes"></textarea>
+            <input data-testid="customer-new-plan-planning-create-second-focus-field" />
+            <button data-testid="customer-new-plan-planning-create-cancel" type="button" @click="modalOpen = false">
+              cancel
+            </button>
+          </div>
+        </div>
         <button data-testid="customer-new-plan-mark-dirty" type="button" @click="$emit('step-ui-state', 'planning', { dirty: true, error: '' })">
           dirty
         </button>
@@ -117,8 +182,10 @@ function buildCustomer(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const mountedWrappers: VueWrapper[] = [];
+
 function mountComponent() {
-  return mount(CustomerNewPlanWizardView, {
+  const wrapper = mount(CustomerNewPlanWizardView, {
     global: {
       stubs: {
         ModuleWorkspacePage: ModuleWorkspacePageStub,
@@ -128,6 +195,8 @@ function mountComponent() {
       },
     },
   });
+  mountedWrappers.push(wrapper);
+  return wrapper;
 }
 
 describe('CustomerNewPlanWizardView', () => {
@@ -148,6 +217,13 @@ describe('CustomerNewPlanWizardView', () => {
     authStoreState.ensureSessionReady.mockResolvedValue(undefined);
     customersApiMocks.getCustomerMock.mockReset();
     customersApiMocks.getCustomerMock.mockResolvedValue(buildCustomer());
+  });
+
+  afterEach(() => {
+    while (mountedWrappers.length) {
+      mountedWrappers.pop()?.unmount();
+    }
+    document.body.innerHTML = '';
   });
 
   it('shows the wizard shell for a valid selected customer and disables Previous on step 1', async () => {
@@ -258,5 +334,98 @@ describe('CustomerNewPlanWizardView', () => {
 
     await wrapper.get('[data-testid="customer-new-plan-breadcrumb"]').findAll('button')[0]!.trigger('click');
     expect(routerPushMock).not.toHaveBeenCalled();
+  });
+
+  it('preserves the mounted wizard content during same-customer session refresh churn', async () => {
+    routeState.query = { customer_id: 'customer-1' };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-mark-dirty"]').trigger('click');
+
+    customersApiMocks.getCustomerMock.mockResolvedValue(buildCustomer({ name: 'Alpha Security Reloaded' }));
+    authStoreState.isSessionResolving = true;
+    authStoreState.effectiveAccessToken = '';
+    authStoreState.accessToken = '';
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-loading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-step-content-stub"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-customer-summary"]').exists()).toBe(true);
+
+    authStoreState.effectiveAccessToken = 'token-2';
+    authStoreState.accessToken = 'token-2';
+    authStoreState.isSessionResolving = false;
+    await flushPromises();
+
+    expect(customersApiMocks.getCustomerMock).toHaveBeenLastCalledWith('tenant-1', 'customer-1', 'token-2');
+    expect(wrapper.find('[data-testid="customer-new-plan-step-content-stub"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security Reloaded');
+  });
+
+  it('keeps the planning create-new modal and typed values stable across focus-driven session refresh', async () => {
+    routeState.query = { customer_id: 'customer-1' };
+    const initialUrl = '/admin/customers/new-plan?customer_id=customer-1';
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security');
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
+
+    await wrapper.get('[data-testid="customer-new-plan-create-new-radio"]').setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-site-no"]').setValue('TEST-SITE-FOCUS');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-name"]').setValue('Focus Persistence Test Site');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-timezone"]').setValue('Europe/Berlin');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-latitude"]').setValue('50.950000');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-longitude"]').setValue('6.980000');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-watchbook-enabled"]').setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-notes"]').setValue('Focus regression test');
+    await flushPromises();
+
+    customersApiMocks.getCustomerMock.mockResolvedValue(buildCustomer({ name: 'Alpha Security Refreshed' }));
+    window.dispatchEvent(new Event('blur'));
+    authStoreState.isSessionResolving = true;
+    authStoreState.effectiveAccessToken = '';
+    authStoreState.accessToken = '';
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('focus'));
+    await flushPromises();
+
+    expect(routerPushMock).not.toHaveBeenCalled();
+    expect(routerReplaceMock).not.toHaveBeenCalledWith(expect.objectContaining({ path: initialUrl }));
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
+    expect(wrapper.find('[data-testid="customer-new-plan-loading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-create-modal"]').exists()).toBe(true);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-site-no"]').element as HTMLInputElement).value).toBe('TEST-SITE-FOCUS');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-name"]').element as HTMLInputElement).value).toBe('Focus Persistence Test Site');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-timezone"]').element as HTMLSelectElement).value).toBe('Europe/Berlin');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-latitude"]').element as HTMLInputElement).value).toBe('50.950000');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-longitude"]').element as HTMLInputElement).value).toBe('6.980000');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-watchbook-enabled"]').element as HTMLInputElement).checked).toBe(true);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-create-notes"]').element as HTMLTextAreaElement).value).toBe('Focus regression test');
+    expect((wrapper.get('[data-testid="customer-new-plan-create-new-radio"]').element as HTMLInputElement).checked).toBe(true);
+
+    authStoreState.effectiveAccessToken = 'token-2';
+    authStoreState.accessToken = 'token-2';
+    authStoreState.isSessionResolving = false;
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-second-focus-field"]').trigger('focus');
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-timezone"]').setValue('Europe/Berlin');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-create-modal"]').exists()).toBe(true);
+    expect(routerPushMock).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security Refreshed');
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-create-cancel"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-create-modal"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
   });
 });

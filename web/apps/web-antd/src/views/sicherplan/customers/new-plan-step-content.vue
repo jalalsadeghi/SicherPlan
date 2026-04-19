@@ -2889,7 +2889,7 @@ onMounted(() => {
         <p v-if="planningCreateAddressLookupError" class="field-help">{{ planningCreateAddressLookupError }}</p>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
-          <textarea v-model="planningCreateModal.notes" rows="3" />
+          <textarea v-model="planningCreateModal.notes" data-testid="customer-new-plan-planning-create-notes" rows="3" />
         </label>
       </div>
     </Modal>

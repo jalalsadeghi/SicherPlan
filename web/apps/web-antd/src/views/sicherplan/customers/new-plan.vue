@@ -62,8 +62,11 @@ const requestedStepId = computed(() => {
 const isAuthorized = computed(() => authStore.effectiveRole === 'tenant_admin');
 const tenantScopeId = computed(() => authStore.effectiveTenantScopeId);
 const accessToken = computed(() => authStore.effectiveAccessToken || authStore.accessToken);
+const hasStableCustomerContext = computed(
+  () => contextState.value === 'ready' && customer.value?.id === customerId.value,
+);
 const isLoading = computed(
-  () => authStore.isSessionResolving || contextState.value === 'loading',
+  () => contextState.value === 'loading' || (authStore.isSessionResolving && !hasStableCustomerContext.value),
 );
 const wizardSteps = computed(() =>
   wizardStepDefinitions.value.map((step) => ({
@@ -107,7 +110,9 @@ function confirmDiscardChanges() {
   return window.confirm($t('sicherplan.customerPlansWizard.confirmDiscard'));
 }
 
-async function resolveCustomerContext() {
+async function resolveCustomerContext(options?: { preserveContent?: boolean }) {
+  const preserveContent = Boolean(options?.preserveContent && hasStableCustomerContext.value);
+
   if (!isAuthorized.value) {
     contextState.value = 'error';
     customer.value = null;
@@ -121,16 +126,24 @@ async function resolveCustomerContext() {
   }
 
   if (!tenantScopeId.value || !accessToken.value) {
+    if (preserveContent) {
+      return;
+    }
     contextState.value = 'loading';
     customer.value = null;
     return;
   }
 
-  contextState.value = 'loading';
+  if (!preserveContent) {
+    contextState.value = 'loading';
+  }
   try {
     customer.value = await getCustomer(tenantScopeId.value, customerId.value, accessToken.value);
     contextState.value = 'ready';
   } catch (error) {
+    if (preserveContent) {
+      return;
+    }
     customer.value = null;
     if (error instanceof CustomerAdminApiError && error.statusCode === 404) {
       contextState.value = 'not_found';
@@ -241,8 +254,10 @@ watch(
     if (nextCustomerId !== previousCustomerId) {
       resetForCustomer(nextCustomerId, requestedStepId.value);
       await syncWizardRouteStep();
+      await resolveCustomerContext();
+      return;
     }
-    await resolveCustomerContext();
+    await resolveCustomerContext({ preserveContent: true });
   },
 );
 
