@@ -764,6 +764,14 @@ function hasOrderAttachmentDraftContent() {
   );
 }
 
+function hasOrderAttachmentSubmission() {
+  return Boolean(orderAttachmentDraft.content_base64 || orderAttachmentLink.document_id.trim());
+}
+
+function hasOrderAttachmentPartialDraft() {
+  return hasOrderAttachmentDraftContent() && !hasOrderAttachmentSubmission();
+}
+
 function hasPlanningRecordDraftContent() {
   return Boolean(
     planningRecordDraft.name ||
@@ -795,6 +803,14 @@ function hasPlanningRecordAttachmentDraftContent() {
       planningRecordAttachmentLink.document_id ||
       planningRecordAttachmentLink.label,
   );
+}
+
+function hasPlanningRecordAttachmentSubmission() {
+  return Boolean(planningRecordAttachmentDraft.content_base64 || planningRecordAttachmentLink.document_id.trim());
+}
+
+function hasPlanningRecordAttachmentPartialDraft() {
+  return hasPlanningRecordAttachmentDraftContent() && !hasPlanningRecordAttachmentSubmission();
 }
 
 function hasShiftPlanDraftContent() {
@@ -2619,6 +2635,28 @@ function clearRequirementLineDraftState() {
   emit('step-ui-state', 'requirement-lines', { dirty: false, error: '' });
 }
 
+function clearOrderDocumentDraftState() {
+  withDraftSyncPaused(() => {
+    resetOrderAttachmentDraft();
+  });
+  clearStepDraft('order-documents');
+  clearDraftRestoreMessage();
+  setFeedback('neutral', '');
+  emit('step-completion', 'order-documents', orderAttachments.value.length > 0);
+  emit('step-ui-state', 'order-documents', { dirty: false, error: '' });
+}
+
+function clearPlanningRecordDocumentDraftState() {
+  withDraftSyncPaused(() => {
+    resetPlanningRecordAttachmentDraft();
+  });
+  clearStepDraft('planning-record-documents');
+  clearDraftRestoreMessage();
+  setFeedback('neutral', '');
+  emit('step-completion', 'planning-record-documents', planningRecordAttachments.value.length > 0);
+  emit('step-ui-state', 'planning-record-documents', { dirty: false, error: '' });
+}
+
 async function saveEquipmentLineDraft() {
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
     return false;
@@ -2738,9 +2776,17 @@ async function submitDocumentsStep() {
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
     return false;
   }
-  if (!orderAttachmentDraft.content_base64 && !orderAttachmentLink.document_id.trim()) {
-    emit('step-completion', 'order-documents', orderAttachments.value.length > 0);
-    return orderAttachments.value.length > 0;
+  if (hasOrderAttachmentPartialDraft()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.completeCurrentOrderDocumentDraftBeforeContinue'));
+    emit('step-completion', 'order-documents', false);
+    emit('step-ui-state', 'order-documents', { error: 'draft_incomplete' });
+    return false;
+  }
+  if (!hasOrderAttachmentSubmission()) {
+    setFeedback('neutral', '');
+    emit('step-completion', 'order-documents', true);
+    emit('step-ui-state', 'order-documents', { dirty: false, error: '' });
+    return true;
   }
   stepLoading.value = true;
   emit('step-ui-state', 'order-documents', { loading: true, error: '' });
@@ -2843,9 +2889,17 @@ async function submitPlanningRecordDocumentsStep() {
   if (!props.tenantId || !props.accessToken || !props.wizardState.planning_record_id) {
     return false;
   }
-  if (!planningRecordAttachmentDraft.content_base64 && !planningRecordAttachmentLink.document_id.trim()) {
-    emit('step-completion', 'planning-record-documents', planningRecordAttachments.value.length > 0);
-    return planningRecordAttachments.value.length > 0;
+  if (hasPlanningRecordAttachmentPartialDraft()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.completeCurrentPlanningDocumentDraftBeforeContinue'));
+    emit('step-completion', 'planning-record-documents', false);
+    emit('step-ui-state', 'planning-record-documents', { error: 'draft_incomplete' });
+    return false;
+  }
+  if (!hasPlanningRecordAttachmentSubmission()) {
+    setFeedback('neutral', '');
+    emit('step-completion', 'planning-record-documents', true);
+    emit('step-ui-state', 'planning-record-documents', { dirty: false, error: '' });
+    return true;
   }
   stepLoading.value = true;
   emit('step-ui-state', 'planning-record-documents', { loading: true, error: '' });
@@ -3797,6 +3851,7 @@ onBeforeUnmount(() => {
     </section>
 
     <section v-else-if="documentsStepActive" class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-order-documents">
+      <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.orderDocumentsOptional') }}</p>
       <div v-if="orderAttachments.length" class="sp-customer-plan-wizard-step__list">
         <div v-for="document in orderAttachments" :key="document.id" class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static">
           <strong>{{ document.title }}</strong>
@@ -3806,11 +3861,11 @@ onBeforeUnmount(() => {
       <div class="sp-customer-plan-wizard-step__grid">
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.documentTitle') }}</span>
-          <input v-model="orderAttachmentDraft.title" />
+          <input v-model="orderAttachmentDraft.title" data-testid="customer-new-plan-order-document-title" />
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.documentLabel') }}</span>
-          <input v-model="orderAttachmentDraft.label" />
+          <input v-model="orderAttachmentDraft.label" data-testid="customer-new-plan-order-document-label" />
         </label>
         <label class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.documentFile') }}</span>
@@ -3825,8 +3880,19 @@ onBeforeUnmount(() => {
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.documentLabel') }}</span>
-          <input v-model="orderAttachmentLink.label" />
+          <input v-model="orderAttachmentLink.label" data-testid="customer-new-plan-order-document-link-label" />
         </label>
+      </div>
+      <div v-if="hasOrderAttachmentDraftContent()" class="cta-row">
+        <button
+          class="cta-button cta-secondary"
+          data-testid="customer-new-plan-clear-order-document-draft"
+          type="button"
+          :disabled="stepLoading"
+          @click="clearOrderDocumentDraftState"
+        >
+          {{ $t('sicherplan.customerPlansWizard.actions.clearOrderDocumentDraft') }}
+        </button>
       </div>
     </section>
 
@@ -3899,6 +3965,7 @@ onBeforeUnmount(() => {
       class="sp-customer-plan-wizard-step__panel"
       data-testid="customer-new-plan-step-panel-planning-record-documents"
     >
+      <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.planningDocumentsOptional') }}</p>
       <div v-if="planningRecordAttachments.length" class="sp-customer-plan-wizard-step__list">
         <div
           v-for="document in planningRecordAttachments"
@@ -3912,11 +3979,11 @@ onBeforeUnmount(() => {
       <div class="sp-customer-plan-wizard-step__grid">
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.documentTitle') }}</span>
-          <input v-model="planningRecordAttachmentDraft.title" />
+          <input v-model="planningRecordAttachmentDraft.title" data-testid="customer-new-plan-planning-record-document-title" />
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.documentLabel') }}</span>
-          <input v-model="planningRecordAttachmentDraft.label" />
+          <input v-model="planningRecordAttachmentDraft.label" data-testid="customer-new-plan-planning-record-document-label" />
         </label>
         <label class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.documentFile') }}</span>
@@ -3931,8 +3998,19 @@ onBeforeUnmount(() => {
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.documentLabel') }}</span>
-          <input v-model="planningRecordAttachmentLink.label" />
+          <input v-model="planningRecordAttachmentLink.label" data-testid="customer-new-plan-planning-record-document-link-label" />
         </label>
+      </div>
+      <div v-if="hasPlanningRecordAttachmentDraftContent()" class="cta-row">
+        <button
+          class="cta-button cta-secondary"
+          data-testid="customer-new-plan-clear-planning-document-draft"
+          type="button"
+          :disabled="stepLoading"
+          @click="clearPlanningRecordDocumentDraftState"
+        >
+          {{ $t('sicherplan.customerPlansWizard.actions.clearPlanningDocumentDraft') }}
+        </button>
       </div>
     </section>
 

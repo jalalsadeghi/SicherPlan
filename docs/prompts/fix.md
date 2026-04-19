@@ -1,89 +1,91 @@
 You are working in the SicherPlan repository.
 
-This task follows the patch adding existing-order selection to the Customer New Plan Wizard.
-
-Source document:
+This task follows the patch that makes document steps optional in:
+- Customer New Plan Wizard
 - /docs/sprint/SPR-CUST-NEWPLAN-V1.md
 
 Goal:
-Do a focused QA/hardening pass for the Order Details step after adding Use Existing Order / Create New Order behavior.
+Do a focused QA/hardening pass for the document steps:
+- Order Documents
+- Planning Documents, if it was changed too
 
 Do not add unrelated features.
 Do not change backend APIs.
 Do not change other wizard steps unless fixing a direct regression from this patch.
 
 Files to inspect:
-- web/apps/web-antd/src/views/sicherplan/customers/new-plan.vue
 - web/apps/web-antd/src/views/sicherplan/customers/new-plan-step-content.vue
-- web/apps/web-antd/src/views/sicherplan/customers/use-customer-new-plan-wizard.ts
+- web/apps/web-antd/src/views/sicherplan/customers/new-plan.vue
 - web/apps/web-antd/src/views/sicherplan/customers/new-plan-wizard-drafts.ts
 - web/apps/web-antd/src/sicherplan-legacy/api/planningOrders.ts
-- web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue
 - related tests under web/apps/web-antd/src/views/sicherplan/customers/
 
 Validation checklist:
 
-1. Existing order loading
-- listCustomerOrders is called with the selected customer_id.
-- Archived orders are not shown unless the branch convention says otherwise.
-- Empty state is clear when no order exists.
-- Orders show order_no, title, service dates, and release state.
+1. Order Documents optional behavior
+- Empty Order Documents step allows Next.
+- It does not call createOrderAttachment or linkOrderAttachment when no file/link exists.
+- It marks the step complete.
+- It moves to Planning Record.
+- No error message is shown.
 
-2. Existing order selection
-- Selecting an existing order calls getCustomerOrder.
-- The form hydrates correctly.
-- selectedOrder is set.
-- order_id is stored in wizard state.
-- order_id is reflected in route query.
-- Refresh keeps the selected order.
+2. Order Documents upload/link behavior
+- File upload still works.
+- Existing document link still works.
+- orderAttachments refresh after success.
+- Draft is cleared after success.
+- Existing attachments remain visible.
 
-3. Existing order editing
-- Editing a selected order and clicking Next calls updateCustomerOrder.
-- It does not call createCustomerOrder.
-- It does not create duplicate orders.
-- version_no is handled correctly.
+3. Partial draft behavior
+- If user typed title/label but did not choose file or document_id, behavior is clear.
+- Either it blocks with a localized message or clear button lets user skip.
+- No silent loss of partial user input unless user intentionally clears it.
 
-4. Create new mode
-- Switching to Create new order clears selected order safely.
-- Next calls createCustomerOrder.
-- New order_id is persisted into state/route.
-- Existing order list remains available if user switches back.
+4. Planning Documents optional behavior
+If the same logic was applied:
+- Empty Planning Documents step allows Next.
+- It moves to Shift Plan.
+- File/link still works.
+- planningRecordAttachments refresh after success.
+- Draft is cleared after success.
 
 5. Draft persistence
-- Unsaved create-new draft does not overwrite selected existing order.
-- Existing-order edit draft does not leak into create-new mode.
-- Customer switch clears or isolates drafts.
-- Browser refresh restores correct selected order/draft behavior.
+- Optional skip clears irrelevant document-step errors.
+- Document draft persistence does not re-block the step after user clears it.
+- File content is not persisted unsafely.
+- Metadata-only restoration still behaves as expected.
 
-6. Downstream steps
-- Equipment Lines loads lines for selected existing order.
-- Requirement Lines loads lines for selected existing order.
-- Order Documents loads documents for selected existing order.
-- Existing Save/Update-vs-Next behavior remains intact.
-
-7. Non-regression
-- Planning step still works.
-- Step 1 -> Step 2 route context still works.
-- Canonical /admin/planning-orders is unchanged.
-- Final handoff is unaffected.
+6. Non-regression
+- Equipment Lines multi-save behavior still works.
+- Requirement Lines multi-save behavior still works.
+- Order Details existing/create order behavior still works.
+- Planning Record creation still works.
+- Shift Plan and Series steps are unaffected.
 
 Tests:
-Run and update as needed:
+Run and update:
 - new-plan.test.ts
 - new-plan-epic3.smoke.test.ts
 - new-plan-epic4.smoke.test.ts
 - new-plan-wizard.test.ts
-- any focused new test for existing order selection
+- any new focused test for optional document behavior
 
-Required final output:
+Add missing tests if needed:
+- empty order-documents proceeds
+- empty planning-documents proceeds
+- partial order document draft blocks or clears
+- upload/link still works
+- no create/link API call when skipping empty step
+
+Final output:
 1. QA validation summary
 2. Issues found
 3. Fixes made
 4. Changed files
 5. Tests added/updated
 6. Test results
-7. Manual QA checklist result
+7. Manual QA result
 8. Clear statement: Ready / Not ready for real data entry
 
-Before finalizing, explicitly confirm whether the implementation matches the existing-order selection proposal.
+Before finalizing, explicitly confirm whether the implementation matches the optional-document proposal.
 Avoid unrelated refactors.

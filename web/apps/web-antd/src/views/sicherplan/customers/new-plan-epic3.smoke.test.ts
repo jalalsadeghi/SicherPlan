@@ -307,6 +307,14 @@ async function advanceToRequirementLines(wrapper: VueWrapper) {
   expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('requirement-lines');
 }
 
+async function advanceToOrderDocuments(wrapper: VueWrapper) {
+  await advanceToRequirementLines(wrapper);
+  await saveRequirementLine(wrapper);
+  await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+  await nextTickFlush();
+  expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-documents');
+}
+
 async function saveRequirementLine(
   wrapper: VueWrapper,
   overrides?: { minQty?: string | number; notes?: string; targetQty?: string | number },
@@ -546,6 +554,111 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
     expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+  });
+
+  it('allows skipping Order Documents when the draft is empty and no existing attachments exist', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToOrderDocuments(wrapper);
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.createOrderAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+  });
+
+  it('allows skipping Order Documents when existing attachments already exist', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToOrderDocuments(wrapper);
+    stores.attachmentsByOrder['order-1'] = [
+      { id: 'doc-1', current_version_no: 1, status: 'active', tenant_id: 'tenant-1', title: 'Bestandsdokument' },
+    ];
+    await wrapper.get('[data-testid="customer-new-plan-previous"]').trigger('click');
+    await nextTickFlush();
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.createOrderAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+  });
+
+  it('uploads order documents on Next and refreshes attachments before continuing', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToOrderDocuments(wrapper);
+    const uploadFile = new File(['order document'], 'konzept.pdf', { type: 'application/pdf' });
+    const uploadInput = wrapper.get('[data-testid="customer-new-plan-order-document-file"]');
+    Object.defineProperty(uploadInput.element, 'files', {
+      configurable: true,
+      value: [uploadFile],
+    });
+    await uploadInput.trigger('change');
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.createOrderAttachmentMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(stores.attachmentsByOrder['order-1']).toHaveLength(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+  });
+
+  it('links existing order documents on Next and keeps attachments visible', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToOrderDocuments(wrapper);
+    await wrapper.get('[data-testid="customer-new-plan-order-document-id"]').setValue('document-42');
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.createOrderAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(stores.attachmentsByOrder['order-1']).toHaveLength(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+
+    await wrapper.get('[data-testid="customer-new-plan-previous"]').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-documents');
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.createOrderAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(stores.attachmentsByOrder['order-1']).toHaveLength(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+  });
+
+  it('blocks partial order-document drafts until cleared, then allows skipping', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToOrderDocuments(wrapper);
+    await wrapper.get('[data-testid="customer-new-plan-order-document-title"]').setValue('Unvollstandiger Entwurf');
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.createOrderAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-documents');
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.completeCurrentOrderDocumentDraftBeforeContinue');
+    expect(wrapper.find('[data-testid="customer-new-plan-clear-order-document-draft"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="customer-new-plan-clear-order-document-draft"]').trigger('click');
+    await nextTickFlush();
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
   });
 

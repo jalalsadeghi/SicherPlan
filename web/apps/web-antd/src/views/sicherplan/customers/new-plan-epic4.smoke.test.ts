@@ -505,6 +505,80 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     );
   });
 
+  it('allows skipping Planning Record Documents when the draft is empty or attachments already exist', async () => {
+    const emptyWrapper = mountStep('planning-record-documents', {
+      planning_record_id: 'record-1',
+      current_step: 'planning-record-documents',
+    });
+    await flushPromises();
+
+    const emptySaved = await (emptyWrapper.vm as any).submitCurrentStep();
+
+    expect(emptySaved).toBe(true);
+    expect(apiMocks.createPlanningRecordAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(apiMocks.linkPlanningRecordAttachmentMock).toHaveBeenCalledTimes(0);
+
+    apiMocks.listPlanningRecordAttachmentsMock.mockResolvedValueOnce([
+      { id: 'doc-row-existing', tenant_id: 'tenant-1', title: 'Existing planning doc', current_version_no: 1, status: 'active' },
+    ]);
+    const existingWrapper = mountStep('planning-record-documents', {
+      planning_record_id: 'record-1',
+      current_step: 'planning-record-documents',
+    });
+    await flushPromises();
+
+    const existingSaved = await (existingWrapper.vm as any).submitCurrentStep();
+
+    expect(existingSaved).toBe(true);
+    expect(apiMocks.createPlanningRecordAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(apiMocks.linkPlanningRecordAttachmentMock).toHaveBeenCalledTimes(0);
+  });
+
+  it('uploads planning-record documents and blocks partial planning document drafts until cleared', async () => {
+    const uploadWrapper = mountStep('planning-record-documents', {
+      planning_record_id: 'record-1',
+      current_step: 'planning-record-documents',
+    });
+    await flushPromises();
+
+    const uploadState = (uploadWrapper.vm as any).$?.setupState;
+    uploadState.planningRecordAttachmentDraft.title = 'Planning brief';
+    uploadState.planningRecordAttachmentDraft.file_name = 'brief.pdf';
+    uploadState.planningRecordAttachmentDraft.content_type = 'application/pdf';
+    uploadState.planningRecordAttachmentDraft.content_base64 = 'base64-planning';
+    await flushPromises();
+
+    const uploaded = await (uploadWrapper.vm as any).submitCurrentStep();
+
+    expect(uploaded).toBe(true);
+    expect(apiMocks.createPlanningRecordAttachmentMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.linkPlanningRecordAttachmentMock).toHaveBeenCalledTimes(0);
+
+    const partialWrapper = mountStep('planning-record-documents', {
+      planning_record_id: 'record-1',
+      current_step: 'planning-record-documents',
+    });
+    await flushPromises();
+
+    const partialState = (partialWrapper.vm as any).$?.setupState;
+    partialState.planningRecordAttachmentDraft.title = 'Incomplete planning draft';
+    await flushPromises();
+
+    const blocked = await (partialWrapper.vm as any).submitCurrentStep();
+
+    expect(blocked).toBe(false);
+    expect(partialWrapper.text()).toContain(
+      'sicherplan.customerPlansWizard.errors.completeCurrentPlanningDocumentDraftBeforeContinue',
+    );
+    expect(partialWrapper.find('[data-testid="customer-new-plan-clear-planning-document-draft"]').exists()).toBe(true);
+
+    await partialWrapper.get('[data-testid="customer-new-plan-clear-planning-document-draft"]').trigger('click');
+    await flushPromises();
+
+    const cleared = await (partialWrapper.vm as any).submitCurrentStep();
+    expect(cleared).toBe(true);
+  });
+
   it('creates the shift plan and emits the canonical shift_plan_id', async () => {
     const wrapper = mountStep('shift-plan', {
       planning_record_id: 'record-1',
