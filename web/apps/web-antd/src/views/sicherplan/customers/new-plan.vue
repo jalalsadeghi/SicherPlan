@@ -10,6 +10,7 @@ import ForbiddenView from '#/views/_core/fallback/forbidden.vue';
 import { CustomerAdminApiError, getCustomer, type CustomerRead } from '#/sicherplan-legacy/api/customers';
 import { useAuthStore } from '#/sicherplan-legacy/stores/auth';
 import CustomerNewPlanStepContent from './new-plan-step-content.vue';
+import { clearAllWizardDraftsForCurrentContext } from './new-plan-wizard-drafts';
 import {
   CUSTOMER_NEW_PLAN_WIZARD_FIRST_STEP_ID,
   CUSTOMER_NEW_PLAN_WIZARD_LAST_STEP_ID,
@@ -19,6 +20,30 @@ import type { CustomerNewPlanWizardStepId } from './new-plan-wizard.types';
 import { useCustomerNewPlanWizard } from './use-customer-new-plan-wizard';
 
 type WizardContextState = 'loading' | 'ready' | 'missing' | 'not_found' | 'error';
+type PersistedWizardRouteKey =
+  | 'customer_id'
+  | 'order_id'
+  | 'planning_entity_id'
+  | 'planning_entity_type'
+  | 'planning_mode_code'
+  | 'planning_record_id'
+  | 'series_id'
+  | 'shift_plan_id'
+  | 'step';
+
+const PERSISTED_WIZARD_ROUTE_KEYS: PersistedWizardRouteKey[] = [
+  'customer_id',
+  'step',
+  'planning_entity_type',
+  'planning_entity_id',
+  'planning_mode_code',
+  'order_id',
+  'planning_record_id',
+  'shift_plan_id',
+  'series_id',
+];
+const PLANNING_ENTITY_TYPES = new Set(['event_venue', 'patrol_route', 'site', 'trade_fair']);
+const PLANNING_MODE_CODES = new Set(['event', 'patrol', 'site', 'trade_fair']);
 
 const route = useRoute();
 const router = useRouter();
@@ -45,6 +70,7 @@ const contextState = ref<WizardContextState>('loading');
 const bootstrapped = ref(false);
 const stepContentRef = ref<InstanceType<typeof CustomerNewPlanStepContent> | null>(null);
 const stepSubmitting = ref(false);
+const routeRestoreWarning = ref('');
 
 const customerId = computed(() => {
   const raw = route.query.customer_id;
@@ -103,11 +129,96 @@ const nextActionLabel = computed(() =>
 );
 const canSubmitCurrentStep = computed(() => handledSubmitStepIds.has(wizardState.value.current_step));
 
+function normalizeQueryString(value: unknown) {
+  if (Array.isArray(value)) {
+    return typeof value[0] === 'string' ? value[0].trim() : '';
+  }
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function readWizardRouteState() {
+  const planningEntityType = normalizeQueryString(route.query.planning_entity_type);
+  const planningModeCode = normalizeQueryString(route.query.planning_mode_code);
+
+  return {
+    customer_id: customerId.value,
+    order_id: normalizeQueryString(route.query.order_id),
+    planning_entity_id: normalizeQueryString(route.query.planning_entity_id),
+    planning_entity_type: PLANNING_ENTITY_TYPES.has(planningEntityType) ? planningEntityType : '',
+    planning_mode_code: PLANNING_MODE_CODES.has(planningModeCode) ? planningModeCode : '',
+    planning_record_id: normalizeQueryString(route.query.planning_record_id),
+    series_id: normalizeQueryString(route.query.series_id),
+    shift_plan_id: normalizeQueryString(route.query.shift_plan_id),
+    step: requestedStepId.value,
+  };
+}
+
+function syncWizardFromRoute() {
+  const routeState = readWizardRouteState();
+
+  setSavedContext({
+    customer_id: routeState.customer_id,
+    order_id: routeState.order_id,
+    planning_entity_id: routeState.planning_entity_id,
+    planning_entity_type: routeState.planning_entity_type,
+    planning_mode_code: routeState.planning_mode_code,
+    planning_record_id: routeState.planning_record_id,
+    series_id: routeState.series_id,
+    shift_plan_id: routeState.shift_plan_id,
+  });
+
+  const resolvedStep = applyRequestedStep(routeState.step);
+  routeRestoreWarning.value =
+    routeState.step && resolvedStep !== routeState.step
+      ? $t('sicherplan.customerPlansWizard.restoreFallback')
+      : '';
+}
+
+function buildWizardRouteQuery() {
+  const nextQuery: LocationQueryRaw = {
+    ...route.query,
+    customer_id: customerId.value || undefined,
+    order_id: wizardState.value.order_id || undefined,
+    planning_entity_id: wizardState.value.planning_entity_id || undefined,
+    planning_entity_type: wizardState.value.planning_entity_type || undefined,
+    planning_mode_code: wizardState.value.planning_mode_code || undefined,
+    planning_record_id: wizardState.value.planning_record_id || undefined,
+    series_id: wizardState.value.series_id || undefined,
+    shift_plan_id: wizardState.value.shift_plan_id || undefined,
+  };
+
+  if (wizardState.value.current_step === CUSTOMER_NEW_PLAN_WIZARD_FIRST_STEP_ID) {
+    delete nextQuery.step;
+  } else {
+    nextQuery.step = wizardState.value.current_step;
+  }
+
+  for (const key of PERSISTED_WIZARD_ROUTE_KEYS) {
+    if (!nextQuery[key]) {
+      delete nextQuery[key];
+    }
+  }
+
+  return nextQuery;
+}
+
 function confirmDiscardChanges() {
   if (!hasUnsavedChanges.value) {
     return true;
   }
   return window.confirm($t('sicherplan.customerPlansWizard.confirmDiscard'));
+}
+
+function clearCurrentWizardDrafts() {
+  if (!tenantScopeId.value || !customerId.value) {
+    return;
+  }
+  clearAllWizardDraftsForCurrentContext({
+    customerId: customerId.value,
+    planningEntityId: wizardState.value.planning_entity_id,
+    planningEntityType: wizardState.value.planning_entity_type,
+    tenantId: tenantScopeId.value,
+  });
 }
 
 async function resolveCustomerContext(options?: { preserveContent?: boolean }) {
@@ -157,6 +268,7 @@ function goBackToPlans() {
   if (!confirmDiscardChanges()) {
     return;
   }
+  clearCurrentWizardDrafts();
   resetWizard();
   void router.push({
     path: '/admin/customers',
@@ -173,6 +285,7 @@ function goBackToCustomers() {
   if (!confirmDiscardChanges()) {
     return;
   }
+  clearCurrentWizardDrafts();
   void router.push('/admin/customers');
 }
 
@@ -210,23 +323,15 @@ function selectStep(stepId: CustomerNewPlanWizardStepId) {
   setCurrentStep(stepId);
 }
 
-async function syncWizardRouteStep() {
+async function syncWizardRouteState() {
   if (!bootstrapped.value || !customerId.value) {
     return;
   }
-  const nextQuery: LocationQueryRaw = {
-    ...route.query,
-    customer_id: customerId.value,
-  };
-
-  if (wizardState.value.current_step === CUSTOMER_NEW_PLAN_WIZARD_FIRST_STEP_ID) {
-    delete nextQuery.step;
-  } else {
-    nextQuery.step = wizardState.value.current_step;
-  }
-
-  const currentQueryStep = Array.isArray(route.query.step) ? route.query.step[0] : route.query.step;
-  if (currentQueryStep === nextQuery.step) {
+  const nextQuery = buildWizardRouteQuery();
+  const queryChanged = PERSISTED_WIZARD_ROUTE_KEYS.some(
+    (key) => normalizeQueryString(route.query[key]) !== normalizeQueryString(nextQuery[key]),
+  );
+  if (!queryChanged) {
     return;
   }
 
@@ -240,9 +345,10 @@ onMounted(async () => {
   authStore.syncFromPrimarySession();
   await authStore.ensureSessionReady();
   bootstrapped.value = true;
-  resetForCustomer(customerId.value, requestedStepId.value);
+  resetForCustomer(customerId.value);
+  syncWizardFromRoute();
   await resolveCustomerContext();
-  await syncWizardRouteStep();
+  await syncWizardRouteState();
 });
 
 watch(
@@ -252,8 +358,9 @@ watch(
       return;
     }
     if (nextCustomerId !== previousCustomerId) {
-      resetForCustomer(nextCustomerId, requestedStepId.value);
-      await syncWizardRouteStep();
+      resetForCustomer(nextCustomerId);
+      syncWizardFromRoute();
+      await syncWizardRouteState();
       await resolveCustomerContext();
       return;
     }
@@ -262,23 +369,41 @@ watch(
 );
 
 watch(
-  () => requestedStepId.value,
-  async (nextStepId) => {
-    if (!bootstrapped.value) {
-      return;
-    }
-    applyRequestedStep(nextStepId);
-    await syncWizardRouteStep();
-  },
-);
-
-watch(
-  () => wizardState.value.current_step,
+  () => [
+    route.query.step,
+    route.query.planning_entity_type,
+    route.query.planning_entity_id,
+    route.query.planning_mode_code,
+    route.query.order_id,
+    route.query.planning_record_id,
+    route.query.shift_plan_id,
+    route.query.series_id,
+  ] as const,
   async () => {
     if (!bootstrapped.value) {
       return;
     }
-    await syncWizardRouteStep();
+    syncWizardFromRoute();
+    await syncWizardRouteState();
+  },
+);
+
+watch(
+  () => [
+    wizardState.value.current_step,
+    wizardState.value.planning_entity_type,
+    wizardState.value.planning_entity_id,
+    wizardState.value.planning_mode_code,
+    wizardState.value.order_id,
+    wizardState.value.planning_record_id,
+    wizardState.value.shift_plan_id,
+    wizardState.value.series_id,
+  ] as const,
+  async () => {
+    if (!bootstrapped.value) {
+      return;
+    }
+    await syncWizardRouteState();
   },
 );
 </script>
@@ -339,6 +464,10 @@ watch(
           />
 
           <template v-else>
+            <div v-if="routeRestoreWarning" class="sp-customer-plan-wizard__state" data-testid="customer-new-plan-restore-warning">
+              <strong>{{ routeRestoreWarning }}</strong>
+            </div>
+
             <header class="sp-customer-plan-wizard__summary" data-testid="customer-new-plan-customer-summary">
               <div>
                 <p class="eyebrow">{{ $t('sicherplan.customerPlansWizard.customerSummaryTitle') }}</p>

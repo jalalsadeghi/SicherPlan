@@ -43,6 +43,9 @@
     "unknownCustomerBody": "The provided customer is not available in this tenant scope.",
     "errorTitle": "Customer context could not be loaded",
     "errorBody": "The plan wizard cannot resolve the selected customer right now.",
+    "restoreFallback": "The requested step could not be restored. The wizard was reset to the earliest valid step.",
+    "draftRestored": "Unsaved draft restored.",
+    "draftRestoredFileReset": "Unsaved draft restored. Please select the file again.",
     "dialogs": {
       "addressCreateTitle": "Create new address",
       "equipmentTitle": "Create equipment",

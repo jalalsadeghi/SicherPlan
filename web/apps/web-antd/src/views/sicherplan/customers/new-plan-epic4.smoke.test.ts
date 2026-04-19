@@ -5,6 +5,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent } from 'vue';
 
 import CustomerNewPlanStepContent from './new-plan-step-content.vue';
+import { buildWizardDraftStorageKey } from './new-plan-wizard-drafts';
 import type { CustomerNewPlanWizardState, CustomerNewPlanWizardStepId } from './new-plan-wizard.types';
 
 const routerPushMock = vi.fn();
@@ -262,8 +263,35 @@ function mountStep(stepId: CustomerNewPlanWizardStepId, wizardOverrides: Partial
   });
 }
 
+function mountStepWithProps(
+  stepId: CustomerNewPlanWizardStepId,
+  options: {
+    accessToken?: string;
+    tenantId?: string;
+    wizardOverrides?: Partial<CustomerNewPlanWizardState>;
+  } = {},
+) {
+  return mount(CustomerNewPlanStepContent, {
+    props: {
+      accessToken: options.accessToken ?? 'token-1',
+      currentStepId: stepId,
+      customer: {
+        id: 'customer-1',
+        name: 'Alpha Security',
+        customer_number: 'CU-1000',
+      },
+      tenantId: options.tenantId ?? 'tenant-1',
+      wizardState: {
+        ...baseWizardState(),
+        ...(options.wizardOverrides ?? {}),
+      },
+    },
+  });
+}
+
 describe('CustomerNewPlanStepContent EPIC 4', () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     routerPushMock.mockReset();
     apiMocks.createPlanningRecordMock.mockReset();
     apiMocks.createPlanningRecordAttachmentMock.mockReset();
@@ -403,6 +431,45 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(zoneSelect.text()).toContain('H2-A');
   });
 
+  it('restores an unsaved planning-record draft after remount', async () => {
+    const wrapper = mountStep('planning-record-overview', {
+      current_step: 'planning-record-overview',
+      order_id: 'order-1',
+      planning_record_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').setValue('Draft Planning Record');
+    await wrapper.get('[data-testid="customer-new-plan-planning-record-from"]').setValue('2026-06-03');
+    await wrapper.get('[data-testid="customer-new-plan-planning-record-to"]').setValue('2026-06-12');
+    await flushPromises();
+
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'planning-record-overview',
+    );
+    expect(window.sessionStorage.getItem(draftKey)).toContain('Draft Planning Record');
+
+    wrapper.unmount();
+
+    const restoredWrapper = mountStep('planning-record-overview', {
+      current_step: 'planning-record-overview',
+      order_id: 'order-1',
+      planning_record_id: '',
+    });
+    await flushPromises();
+
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe('Draft Planning Record');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-planning-record-from"]').element as HTMLInputElement).value).toBe('2026-06-03');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-planning-record-to"]').element as HTMLInputElement).value).toBe('2026-06-12');
+    expect(restoredWrapper.get('[data-testid="customer-new-plan-draft-restored"]').text()).toBe('sicherplan.customerPlansWizard.draftRestored');
+  });
+
   it('links planning-record documents through the canonical planning-record document path', async () => {
     const wrapper = mountStep('planning-record-documents', {
       planning_record_id: 'record-1',
@@ -459,6 +526,141 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       }),
     );
     expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
+  });
+
+  it('restores an unsaved shift-plan draft after remount', async () => {
+    const wrapper = mountStep('shift-plan', {
+      current_step: 'shift-plan',
+      planning_record_id: 'record-1',
+      shift_plan_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').setValue('Draft Shift Plan');
+    await wrapper.get('[data-testid="customer-new-plan-shift-plan-from"]').setValue('2026-06-02');
+    await wrapper.get('[data-testid="customer-new-plan-shift-plan-to"]').setValue('2026-06-11');
+    await flushPromises();
+
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'shift-plan',
+    );
+    expect(window.sessionStorage.getItem(draftKey)).toContain('Draft Shift Plan');
+
+    wrapper.unmount();
+
+    const restoredWrapper = mountStep('shift-plan', {
+      current_step: 'shift-plan',
+      planning_record_id: 'record-1',
+      shift_plan_id: '',
+    });
+    await flushPromises();
+
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').element as HTMLInputElement).value).toBe('Draft Shift Plan');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-shift-plan-from"]').element as HTMLInputElement).value).toBe('2026-06-02');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-shift-plan-to"]').element as HTMLInputElement).value).toBe('2026-06-11');
+    expect(restoredWrapper.get('[data-testid="customer-new-plan-draft-restored"]').text()).toBe('sicherplan.customerPlansWizard.draftRestored');
+  });
+
+  it('ignores malformed session storage draft values safely', async () => {
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'shift-plan',
+    );
+    window.sessionStorage.setItem(draftKey, '{bad-json');
+
+    const wrapper = mountStep('shift-plan', {
+      current_step: 'shift-plan',
+      planning_record_id: 'record-1',
+      shift_plan_id: '',
+    });
+    await flushPromises();
+
+    const persisted = window.sessionStorage.getItem(draftKey);
+    expect(persisted).not.toContain('{bad-json');
+    expect(persisted).toContain('planning_record_id');
+    expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').element as HTMLInputElement).value).not.toBe('{bad-json');
+  });
+
+  it('does not hydrate a draft stored under another tenant context', async () => {
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'shift-plan',
+    );
+    window.sessionStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        name: 'Tenant One Draft',
+        planning_from: '2026-06-01',
+        planning_to: '2026-06-10',
+        remarks: '',
+        workforce_scope_code: 'internal',
+      }),
+    );
+
+    const wrapper = mountStepWithProps('shift-plan', {
+      tenantId: 'tenant-2',
+      wizardOverrides: {
+        current_step: 'shift-plan',
+        planning_record_id: 'record-1',
+        shift_plan_id: '',
+      },
+    });
+    await flushPromises();
+
+    expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').element as HTMLInputElement).value).not.toBe('Tenant One Draft');
+    expect(wrapper.find('[data-testid="customer-new-plan-draft-restored"]').exists()).toBe(false);
+  });
+
+  it('does not persist raw attachment base64 in session storage', async () => {
+    const wrapper = mountStep('planning-record-documents', {
+      current_step: 'planning-record-documents',
+      planning_record_id: 'record-1',
+    });
+    await flushPromises();
+
+    const setupState = (wrapper.vm as any).$.setupState;
+    setupState.planningRecordAttachmentDraft.title = 'Safety concept';
+    setupState.planningRecordAttachmentDraft.file_name = 'safety.pdf';
+    setupState.planningRecordAttachmentDraft.content_type = 'application/pdf';
+    setupState.planningRecordAttachmentDraft.content_base64 = 'very-large-base64';
+    await flushPromises();
+
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'planning-record-documents',
+    );
+    const persisted = JSON.parse(window.sessionStorage.getItem(draftKey) || '{}');
+
+    expect(persisted).toMatchObject({
+      attachment: {
+        content_type: 'application/pdf',
+        file_name: 'safety.pdf',
+        file_needs_reselect: true,
+        title: 'Safety concept',
+      },
+    });
+    expect(JSON.stringify(persisted)).not.toContain('very-large-base64');
   });
 
   it('updates existing shift-plan and series records instead of creating duplicates on revisit', async () => {

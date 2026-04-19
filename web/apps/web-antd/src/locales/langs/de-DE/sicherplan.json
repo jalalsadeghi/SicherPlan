@@ -43,6 +43,9 @@
     "unknownCustomerBody": "Der übergebene Kunde ist in diesem Mandantenscope nicht verfügbar.",
     "errorTitle": "Kundenkontext konnte nicht geladen werden",
     "errorBody": "Der Plan-Wizard kann den ausgewählten Kunden derzeit nicht auflösen.",
+    "restoreFallback": "Der angeforderte Schritt konnte nicht wiederhergestellt werden. Der Wizard wurde auf den frühesten gültigen Schritt zurückgesetzt.",
+    "draftRestored": "Ungespeicherter Entwurf wurde wiederhergestellt.",
+    "draftRestoredFileReset": "Ungespeicherter Entwurf wurde wiederhergestellt. Bitte wählen Sie die Datei erneut aus.",
     "dialogs": {
       "addressCreateTitle": "Neue Adresse anlegen",
       "equipmentTitle": "Equipment anlegen",

@@ -91,6 +91,12 @@ import type {
   CustomerNewPlanWizardStatePatch,
   CustomerNewPlanWizardStepId,
 } from './new-plan-wizard.types';
+import {
+  clearWizardDraft,
+  loadWizardDraft,
+  saveWizardDraft,
+  type CustomerNewPlanWizardDraftContext,
+} from './new-plan-wizard-drafts';
 
 type PlanningEntityType = 'event_venue' | 'patrol_route' | 'site' | 'trade_fair';
 type PlanningSelectionMode = 'create_new' | 'use_existing';
@@ -355,7 +361,30 @@ const stepFeedback = reactive({
   tone: 'neutral' as 'error' | 'neutral' | 'success',
 });
 
+const draftRestoreMessage = ref('');
+const draftSyncPaused = ref(false);
 const stepLoading = ref(false);
+
+type AttachmentDraftPersistence = {
+  content_type: string;
+  file_name: string;
+  file_needs_reselect?: boolean;
+  label: string;
+  title: string;
+};
+
+type OrderDocumentsDraftPersistence = {
+  attachment: AttachmentDraftPersistence;
+  link: {
+    document_id: string;
+    label: string;
+  };
+};
+
+type SeriesExceptionsDraftPersistence = {
+  exception: typeof exceptionDraft;
+  series: typeof seriesDraft;
+};
 
 const planningFamilyOptions = computed(() => [
   { label: $t('sicherplan.customerPlansWizard.forms.planningFamilies.site'), value: 'site' },
@@ -545,6 +574,386 @@ function setFeedback(tone: 'error' | 'neutral' | 'success', message = '') {
 function normalizeUuid(value: string | null | undefined) {
   const normalized = typeof value === 'string' ? value.trim() : '';
   return normalized || null;
+}
+
+function withDraftSyncPaused(callback: () => void) {
+  draftSyncPaused.value = true;
+  try {
+    callback();
+  } finally {
+    draftSyncPaused.value = false;
+  }
+}
+
+function buildDraftContext(): CustomerNewPlanWizardDraftContext | null {
+  if (!props.tenantId || !props.customer.id) {
+    return null;
+  }
+  return {
+    customerId: props.customer.id,
+    planningEntityId: props.wizardState.planning_entity_id,
+    planningEntityType: props.wizardState.planning_entity_type,
+    tenantId: props.tenantId,
+  };
+}
+
+function loadStepDraft<T>(stepId: CustomerNewPlanWizardStepId) {
+  const context = buildDraftContext();
+  if (!context) {
+    return null as null | T;
+  }
+  return loadWizardDraft<T>(context, stepId);
+}
+
+function saveStepDraft<T>(stepId: CustomerNewPlanWizardStepId, payload: null | T | undefined) {
+  const context = buildDraftContext();
+  if (!context) {
+    return;
+  }
+  saveWizardDraft(context, stepId, payload);
+}
+
+function clearStepDraft(stepId: CustomerNewPlanWizardStepId) {
+  const context = buildDraftContext();
+  if (!context) {
+    return;
+  }
+  clearWizardDraft(context, stepId);
+}
+
+function restoreDraftMessage(messageKey = 'sicherplan.customerPlansWizard.draftRestored') {
+  draftRestoreMessage.value = $t(messageKey);
+}
+
+function clearDraftRestoreMessage() {
+  draftRestoreMessage.value = '';
+}
+
+function hasOrderDraftContent() {
+  return Boolean(
+    orderDraft.order_no ||
+      orderDraft.title ||
+      orderDraft.requirement_type_id ||
+      orderDraft.service_category_code ||
+      orderDraft.service_from ||
+      orderDraft.service_to ||
+      orderDraft.notes ||
+      orderDraft.security_concept_text ||
+      orderDraft.patrol_route_id,
+  );
+}
+
+function matchesSelectedOrderDraft() {
+  return Boolean(
+    selectedOrder.value &&
+      orderDraft.customer_id === selectedOrder.value.customer_id &&
+      orderDraft.notes === (selectedOrder.value.notes ?? '') &&
+      orderDraft.order_no === selectedOrder.value.order_no &&
+      orderDraft.patrol_route_id === (selectedOrder.value.patrol_route_id ?? '') &&
+      orderDraft.release_state === selectedOrder.value.release_state &&
+      orderDraft.requirement_type_id === selectedOrder.value.requirement_type_id &&
+      orderDraft.security_concept_text === (selectedOrder.value.security_concept_text ?? '') &&
+      orderDraft.service_category_code === selectedOrder.value.service_category_code &&
+      orderDraft.service_from === selectedOrder.value.service_from &&
+      orderDraft.service_to === selectedOrder.value.service_to &&
+      orderDraft.title === selectedOrder.value.title,
+  );
+}
+
+function hasEquipmentLineDraftContent() {
+  return Boolean(
+    equipmentLineDraft.equipment_item_id || equipmentLineDraft.notes || equipmentLineDraft.required_qty !== 1,
+  );
+}
+
+function hasRequirementLineDraftContent() {
+  return Boolean(
+    requirementLineDraft.requirement_type_id ||
+      requirementLineDraft.function_type_id ||
+      requirementLineDraft.qualification_type_id ||
+      requirementLineDraft.notes ||
+      requirementLineDraft.min_qty !== 0 ||
+      requirementLineDraft.target_qty !== 1,
+  );
+}
+
+function hasOrderAttachmentDraftContent() {
+  return Boolean(
+    orderAttachmentDraft.title ||
+      orderAttachmentDraft.label ||
+      orderAttachmentDraft.file_name ||
+      orderAttachmentDraft.content_type ||
+      orderAttachmentDraft.content_base64 ||
+      orderAttachmentLink.document_id ||
+      orderAttachmentLink.label,
+  );
+}
+
+function hasPlanningRecordDraftContent() {
+  return Boolean(
+    planningRecordDraft.name ||
+      planningRecordDraft.notes ||
+      planningRecordDraft.parent_planning_record_id ||
+      planningRecordDraft.dispatcher_user_id ||
+      planningRecordDraft.planning_from ||
+      planningRecordDraft.planning_to ||
+      planningRecordDraft.event_detail_event_venue_id ||
+      planningRecordDraft.event_detail_setup_note ||
+      planningRecordDraft.site_detail_site_id ||
+      planningRecordDraft.site_detail_watchbook_scope_note ||
+      planningRecordDraft.trade_fair_detail_trade_fair_id ||
+      planningRecordDraft.trade_fair_detail_trade_fair_zone_id ||
+      planningRecordDraft.trade_fair_detail_stand_note ||
+      planningRecordDraft.patrol_detail_patrol_route_id ||
+      planningRecordDraft.patrol_detail_execution_note ||
+      planningRecordDraft.status !== 'active',
+  );
+}
+
+function hasPlanningRecordAttachmentDraftContent() {
+  return Boolean(
+    planningRecordAttachmentDraft.title ||
+      planningRecordAttachmentDraft.label ||
+      planningRecordAttachmentDraft.file_name ||
+      planningRecordAttachmentDraft.content_type ||
+      planningRecordAttachmentDraft.content_base64 ||
+      planningRecordAttachmentLink.document_id ||
+      planningRecordAttachmentLink.label,
+  );
+}
+
+function hasShiftPlanDraftContent() {
+  return Boolean(
+    shiftPlanDraft.name ||
+      shiftPlanDraft.planning_from ||
+      shiftPlanDraft.planning_to ||
+      shiftPlanDraft.remarks ||
+      shiftPlanDraft.workforce_scope_code !== 'internal',
+  );
+}
+
+function hasSeriesDraftContent() {
+  return Boolean(
+    seriesDraft.label ||
+      seriesDraft.shift_template_id ||
+      seriesDraft.date_from ||
+      seriesDraft.date_to ||
+      seriesDraft.interval_count !== 1 ||
+      seriesDraft.default_break_minutes !== 30 ||
+      seriesDraft.meeting_point ||
+      seriesDraft.location_text ||
+      seriesDraft.notes ||
+      seriesDraft.shift_type_code ||
+      seriesDraft.customer_visible_flag ||
+      seriesDraft.subcontractor_visible_flag ||
+      seriesDraft.stealth_mode_flag ||
+      seriesDraft.release_state !== 'draft' ||
+      seriesDraft.timezone !== 'Europe/Berlin' ||
+      seriesDraft.recurrence_code !== 'daily' ||
+      seriesDraft.weekday_mask !== '1111100' ||
+      exceptionDraft.exception_date ||
+      exceptionDraft.action_code !== 'skip' ||
+      exceptionDraft.override_local_start_time ||
+      exceptionDraft.override_local_end_time ||
+      exceptionDraft.override_break_minutes ||
+      exceptionDraft.override_shift_type_code ||
+      exceptionDraft.override_meeting_point ||
+      exceptionDraft.override_location_text ||
+      exceptionDraft.notes ||
+      exceptionDraft.customer_visible_flag !== null ||
+      exceptionDraft.subcontractor_visible_flag !== null ||
+      exceptionDraft.stealth_mode_flag !== null,
+  );
+}
+
+function buildAttachmentDraftPersistence(
+  attachmentDraft: typeof orderAttachmentDraft | typeof planningRecordAttachmentDraft,
+): AttachmentDraftPersistence {
+  return {
+    content_type: attachmentDraft.content_type,
+    file_name: attachmentDraft.file_name,
+    file_needs_reselect: Boolean(attachmentDraft.content_base64),
+    label: attachmentDraft.label,
+    title: attachmentDraft.title,
+  };
+}
+
+function applyOrderDraftPersistence(payload: Partial<typeof orderDraft>) {
+  withDraftSyncPaused(() => {
+    Object.assign(orderDraft, {
+      ...payload,
+      customer_id: props.customer.id,
+    });
+  });
+}
+
+function applyEquipmentLineDraftPersistence(
+  payload: Partial<typeof equipmentLineDraft> & { selected_equipment_line_id?: string },
+) {
+  withDraftSyncPaused(() => {
+    selectedEquipmentLineId.value = payload.selected_equipment_line_id || '';
+    Object.assign(equipmentLineDraft, payload);
+  });
+}
+
+function applyRequirementLineDraftPersistence(
+  payload: Partial<typeof requirementLineDraft> & { selected_requirement_line_id?: string },
+) {
+  withDraftSyncPaused(() => {
+    selectedRequirementLineId.value = payload.selected_requirement_line_id || '';
+    Object.assign(requirementLineDraft, payload);
+  });
+}
+
+function applyOrderDocumentsDraftPersistence(payload: Partial<OrderDocumentsDraftPersistence>) {
+  withDraftSyncPaused(() => {
+    Object.assign(orderAttachmentDraft, {
+      content_base64: '',
+      content_type: payload.attachment?.content_type || '',
+      file_name: payload.attachment?.file_name || '',
+      label: payload.attachment?.label || '',
+      title: payload.attachment?.title || '',
+    });
+    Object.assign(orderAttachmentLink, {
+      document_id: payload.link?.document_id || '',
+      label: payload.link?.label || '',
+    });
+  });
+  if (payload.attachment?.file_needs_reselect) {
+    restoreDraftMessage('sicherplan.customerPlansWizard.draftRestoredFileReset');
+  }
+}
+
+function applyPlanningRecordDraftPersistence(payload: Partial<typeof planningRecordDraft>) {
+  withDraftSyncPaused(() => {
+    Object.assign(planningRecordDraft, payload);
+  });
+}
+
+function applyPlanningRecordDocumentsDraftPersistence(payload: Partial<OrderDocumentsDraftPersistence>) {
+  withDraftSyncPaused(() => {
+    Object.assign(planningRecordAttachmentDraft, {
+      content_base64: '',
+      content_type: payload.attachment?.content_type || '',
+      file_name: payload.attachment?.file_name || '',
+      label: payload.attachment?.label || '',
+      title: payload.attachment?.title || '',
+    });
+    Object.assign(planningRecordAttachmentLink, {
+      document_id: payload.link?.document_id || '',
+      label: payload.link?.label || '',
+    });
+  });
+  if (payload.attachment?.file_needs_reselect) {
+    restoreDraftMessage('sicherplan.customerPlansWizard.draftRestoredFileReset');
+  }
+}
+
+function applyShiftPlanDraftPersistence(payload: Partial<typeof shiftPlanDraft>) {
+  withDraftSyncPaused(() => {
+    Object.assign(shiftPlanDraft, payload);
+  });
+}
+
+function applySeriesDraftPersistence(payload: Partial<SeriesExceptionsDraftPersistence>) {
+  withDraftSyncPaused(() => {
+    Object.assign(seriesDraft, payload.series || {});
+    selectedExceptionId.value = '';
+    Object.assign(exceptionDraft, payload.exception || {});
+  });
+}
+
+function persistOrderDraft() {
+  if (matchesSelectedOrderDraft()) {
+    clearStepDraft('order-details');
+    return;
+  }
+  saveStepDraft(
+    'order-details',
+    hasOrderDraftContent()
+      ? {
+          ...orderDraft,
+          customer_id: props.customer.id,
+        }
+      : null,
+  );
+}
+
+function persistEquipmentLineDraft() {
+  saveStepDraft(
+    'equipment-lines',
+    hasEquipmentLineDraftContent()
+      ? {
+          ...equipmentLineDraft,
+          selected_equipment_line_id: selectedEquipmentLineId.value,
+        }
+      : null,
+  );
+}
+
+function persistRequirementLineDraft() {
+  saveStepDraft(
+    'requirement-lines',
+    hasRequirementLineDraftContent()
+      ? {
+          ...requirementLineDraft,
+          selected_requirement_line_id: selectedRequirementLineId.value,
+        }
+      : null,
+  );
+}
+
+function persistOrderDocumentsDraft() {
+  saveStepDraft(
+    'order-documents',
+    hasOrderAttachmentDraftContent()
+      ? {
+          attachment: buildAttachmentDraftPersistence(orderAttachmentDraft),
+          link: {
+            document_id: orderAttachmentLink.document_id,
+            label: orderAttachmentLink.label,
+          },
+        }
+      : null,
+  );
+}
+
+function persistPlanningRecordDraft() {
+  saveStepDraft(
+    'planning-record-overview',
+    hasPlanningRecordDraftContent() ? { ...planningRecordDraft } : null,
+  );
+}
+
+function persistPlanningRecordDocumentsDraft() {
+  saveStepDraft(
+    'planning-record-documents',
+    hasPlanningRecordAttachmentDraftContent()
+      ? {
+          attachment: buildAttachmentDraftPersistence(planningRecordAttachmentDraft),
+          link: {
+            document_id: planningRecordAttachmentLink.document_id,
+            label: planningRecordAttachmentLink.label,
+          },
+        }
+      : null,
+  );
+}
+
+function persistShiftPlanDraft() {
+  saveStepDraft('shift-plan', hasShiftPlanDraftContent() ? { ...shiftPlanDraft } : null);
+}
+
+function persistSeriesDraft() {
+  saveStepDraft(
+    'series-exceptions',
+    hasSeriesDraftContent()
+      ? {
+          exception: { ...exceptionDraft },
+          series: { ...seriesDraft },
+        }
+      : null,
+  );
 }
 
 function resetPlanningCreateModal() {
@@ -870,115 +1279,129 @@ function resetTemplateModal() {
 
 function syncOrderDraft(order: CustomerOrderRead) {
   selectedOrder.value = order;
-  Object.assign(orderDraft, {
-    customer_id: order.customer_id,
-    notes: order.notes ?? '',
-    order_no: order.order_no,
-    patrol_route_id: order.patrol_route_id ?? '',
-    release_state: order.release_state,
-    requirement_type_id: order.requirement_type_id,
-    security_concept_text: order.security_concept_text ?? '',
-    service_category_code: order.service_category_code,
-    service_from: order.service_from,
-    service_to: order.service_to,
-    title: order.title,
+  withDraftSyncPaused(() => {
+    Object.assign(orderDraft, {
+      customer_id: order.customer_id,
+      notes: order.notes ?? '',
+      order_no: order.order_no,
+      patrol_route_id: order.patrol_route_id ?? '',
+      release_state: order.release_state,
+      requirement_type_id: order.requirement_type_id,
+      security_concept_text: order.security_concept_text ?? '',
+      service_category_code: order.service_category_code,
+      service_from: order.service_from,
+      service_to: order.service_to,
+      title: order.title,
+    });
   });
 }
 
 function syncPlanningRecordDraft(record: PlanningRecordRead) {
   selectedPlanningRecord.value = record;
-  Object.assign(planningRecordDraft, {
-    dispatcher_user_id: record.dispatcher_user_id ?? '',
-    event_detail_event_venue_id: record.event_detail?.event_venue_id ?? '',
-    event_detail_setup_note: record.event_detail?.setup_note ?? '',
-    name: record.name,
-    notes: record.notes ?? '',
-    parent_planning_record_id: record.parent_planning_record_id ?? '',
-    patrol_detail_execution_note: record.patrol_detail?.execution_note ?? '',
-    patrol_detail_patrol_route_id: record.patrol_detail?.patrol_route_id ?? '',
-    planning_from: record.planning_from,
-    planning_mode_code: record.planning_mode_code,
-    planning_to: record.planning_to,
-    site_detail_site_id: record.site_detail?.site_id ?? '',
-    site_detail_watchbook_scope_note: record.site_detail?.watchbook_scope_note ?? '',
-    status: record.status,
-    trade_fair_detail_stand_note: record.trade_fair_detail?.stand_note ?? '',
-    trade_fair_detail_trade_fair_id: record.trade_fair_detail?.trade_fair_id ?? '',
-    trade_fair_detail_trade_fair_zone_id: record.trade_fair_detail?.trade_fair_zone_id ?? '',
+  withDraftSyncPaused(() => {
+    Object.assign(planningRecordDraft, {
+      dispatcher_user_id: record.dispatcher_user_id ?? '',
+      event_detail_event_venue_id: record.event_detail?.event_venue_id ?? '',
+      event_detail_setup_note: record.event_detail?.setup_note ?? '',
+      name: record.name,
+      notes: record.notes ?? '',
+      parent_planning_record_id: record.parent_planning_record_id ?? '',
+      patrol_detail_execution_note: record.patrol_detail?.execution_note ?? '',
+      patrol_detail_patrol_route_id: record.patrol_detail?.patrol_route_id ?? '',
+      planning_from: record.planning_from,
+      planning_mode_code: record.planning_mode_code,
+      planning_to: record.planning_to,
+      site_detail_site_id: record.site_detail?.site_id ?? '',
+      site_detail_watchbook_scope_note: record.site_detail?.watchbook_scope_note ?? '',
+      status: record.status,
+      trade_fair_detail_stand_note: record.trade_fair_detail?.stand_note ?? '',
+      trade_fair_detail_trade_fair_id: record.trade_fair_detail?.trade_fair_id ?? '',
+      trade_fair_detail_trade_fair_zone_id: record.trade_fair_detail?.trade_fair_zone_id ?? '',
+    });
   });
 }
 
 function syncShiftPlanDraft(plan: ShiftPlanRead) {
   selectedShiftPlan.value = plan;
-  Object.assign(shiftPlanDraft, {
-    name: plan.name,
-    planning_from: plan.planning_from,
-    planning_record_id: plan.planning_record_id,
-    planning_to: plan.planning_to,
-    remarks: plan.remarks ?? '',
-    workforce_scope_code: plan.workforce_scope_code,
+  withDraftSyncPaused(() => {
+    Object.assign(shiftPlanDraft, {
+      name: plan.name,
+      planning_from: plan.planning_from,
+      planning_record_id: plan.planning_record_id,
+      planning_to: plan.planning_to,
+      remarks: plan.remarks ?? '',
+      workforce_scope_code: plan.workforce_scope_code,
+    });
   });
 }
 
 function syncSeriesDraft(series: ShiftSeriesRead) {
   selectedSeries.value = series;
-  Object.assign(seriesDraft, {
-    customer_visible_flag: series.customer_visible_flag,
-    date_from: series.date_from,
-    date_to: series.date_to,
-    default_break_minutes: series.default_break_minutes ?? 30,
-    interval_count: series.interval_count,
-    label: series.label,
-    location_text: series.location_text ?? '',
-    meeting_point: series.meeting_point ?? '',
-    notes: series.notes ?? '',
-    recurrence_code: series.recurrence_code,
-    release_state: series.release_state,
-    shift_template_id: series.shift_template_id,
-    shift_type_code: series.shift_type_code ?? '',
-    stealth_mode_flag: series.stealth_mode_flag,
-    subcontractor_visible_flag: series.subcontractor_visible_flag,
-    timezone: series.timezone,
-    weekday_mask: series.weekday_mask ?? '1111100',
+  withDraftSyncPaused(() => {
+    Object.assign(seriesDraft, {
+      customer_visible_flag: series.customer_visible_flag,
+      date_from: series.date_from,
+      date_to: series.date_to,
+      default_break_minutes: series.default_break_minutes ?? 30,
+      interval_count: series.interval_count,
+      label: series.label,
+      location_text: series.location_text ?? '',
+      meeting_point: series.meeting_point ?? '',
+      notes: series.notes ?? '',
+      recurrence_code: series.recurrence_code,
+      release_state: series.release_state,
+      shift_template_id: series.shift_template_id,
+      shift_type_code: series.shift_type_code ?? '',
+      stealth_mode_flag: series.stealth_mode_flag,
+      subcontractor_visible_flag: series.subcontractor_visible_flag,
+      timezone: series.timezone,
+      weekday_mask: series.weekday_mask ?? '1111100',
+    });
   });
 }
 
 function syncExceptionDraft(row: ShiftSeriesExceptionRead) {
-  selectedExceptionId.value = row.id;
-  Object.assign(exceptionDraft, {
-    action_code: row.action_code,
-    customer_visible_flag: row.customer_visible_flag ?? null,
-    exception_date: row.exception_date,
-    notes: row.notes ?? '',
-    override_break_minutes: row.override_break_minutes == null ? '' : String(row.override_break_minutes),
-    override_local_end_time: row.override_local_end_time ?? '',
-    override_local_start_time: row.override_local_start_time ?? '',
-    override_location_text: row.override_location_text ?? '',
-    override_meeting_point: row.override_meeting_point ?? '',
-    override_shift_type_code: row.override_shift_type_code ?? '',
-    stealth_mode_flag: row.stealth_mode_flag ?? null,
-    subcontractor_visible_flag: row.subcontractor_visible_flag ?? null,
+  withDraftSyncPaused(() => {
+    selectedExceptionId.value = row.id;
+    Object.assign(exceptionDraft, {
+      action_code: row.action_code,
+      customer_visible_flag: row.customer_visible_flag ?? null,
+      exception_date: row.exception_date,
+      notes: row.notes ?? '',
+      override_break_minutes: row.override_break_minutes == null ? '' : String(row.override_break_minutes),
+      override_local_end_time: row.override_local_end_time ?? '',
+      override_local_start_time: row.override_local_start_time ?? '',
+      override_location_text: row.override_location_text ?? '',
+      override_meeting_point: row.override_meeting_point ?? '',
+      override_shift_type_code: row.override_shift_type_code ?? '',
+      stealth_mode_flag: row.stealth_mode_flag ?? null,
+      subcontractor_visible_flag: row.subcontractor_visible_flag ?? null,
+    });
   });
 }
 
 function syncEquipmentLineDraft(line: OrderEquipmentLineRead) {
-  selectedEquipmentLineId.value = line.id;
-  Object.assign(equipmentLineDraft, {
-    equipment_item_id: line.equipment_item_id,
-    notes: line.notes ?? '',
-    required_qty: line.required_qty,
+  withDraftSyncPaused(() => {
+    selectedEquipmentLineId.value = line.id;
+    Object.assign(equipmentLineDraft, {
+      equipment_item_id: line.equipment_item_id,
+      notes: line.notes ?? '',
+      required_qty: line.required_qty,
+    });
   });
 }
 
 function syncRequirementLineDraft(line: OrderRequirementLineRead) {
-  selectedRequirementLineId.value = line.id;
-  Object.assign(requirementLineDraft, {
-    function_type_id: line.function_type_id ?? '',
-    min_qty: line.min_qty,
-    notes: line.notes ?? '',
-    qualification_type_id: line.qualification_type_id ?? '',
-    requirement_type_id: line.requirement_type_id,
-    target_qty: line.target_qty,
+  withDraftSyncPaused(() => {
+    selectedRequirementLineId.value = line.id;
+    Object.assign(requirementLineDraft, {
+      function_type_id: line.function_type_id ?? '',
+      min_qty: line.min_qty,
+      notes: line.notes ?? '',
+      qualification_type_id: line.qualification_type_id ?? '',
+      requirement_type_id: line.requirement_type_id,
+      target_qty: line.target_qty,
+    });
   });
 }
 
@@ -1276,15 +1699,58 @@ async function loadOrderReferenceOptions() {
 }
 
 async function loadOrderState() {
+  const persistedOrderDraft = loadStepDraft<Partial<typeof orderDraft>>('order-details');
+  const persistedEquipmentDraft = loadStepDraft<
+    Partial<typeof equipmentLineDraft> & { selected_equipment_line_id?: string }
+  >('equipment-lines');
+  const persistedRequirementDraft = loadStepDraft<
+    Partial<typeof requirementLineDraft> & { selected_requirement_line_id?: string }
+  >('requirement-lines');
+  const persistedDocumentsDraft = loadStepDraft<OrderDocumentsDraftPersistence>('order-documents');
+
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
     selectedOrder.value = null;
-    resetOrderDraft();
-    resetEquipmentLineDraft();
-    resetRequirementLineDraft();
-    resetOrderAttachmentDraft();
     orderEquipmentLines.value = [];
     orderRequirementLines.value = [];
     orderAttachments.value = [];
+    if (hasOrderDraftContent()) {
+      return;
+    }
+    if (persistedOrderDraft) {
+      applyOrderDraftPersistence(persistedOrderDraft);
+      restoreDraftMessage();
+    } else {
+      withDraftSyncPaused(() => {
+        resetOrderDraft();
+      });
+    }
+    if (persistedEquipmentDraft) {
+      applyEquipmentLineDraftPersistence(persistedEquipmentDraft);
+    } else if (hasEquipmentLineDraftContent()) {
+      // Keep the active unsaved draft through reference reloads.
+    } else {
+      withDraftSyncPaused(() => {
+        resetEquipmentLineDraft();
+      });
+    }
+    if (persistedRequirementDraft) {
+      applyRequirementLineDraftPersistence(persistedRequirementDraft);
+    } else if (hasRequirementLineDraftContent()) {
+      // Keep the active unsaved draft through reference reloads.
+    } else {
+      withDraftSyncPaused(() => {
+        resetRequirementLineDraft();
+      });
+    }
+    if (persistedDocumentsDraft) {
+      applyOrderDocumentsDraftPersistence(persistedDocumentsDraft);
+    } else if (hasOrderAttachmentDraftContent()) {
+      // Keep the active unsaved draft through reference reloads.
+    } else {
+      withDraftSyncPaused(() => {
+        resetOrderAttachmentDraft();
+      });
+    }
     return;
   }
   const order = await getCustomerOrder(props.tenantId, props.wizardState.order_id, props.accessToken);
@@ -1297,9 +1763,31 @@ async function loadOrderState() {
   orderEquipmentLines.value = equipmentLines;
   orderRequirementLines.value = requirementLines;
   orderAttachments.value = attachments;
-  resetEquipmentLineDraft();
-  resetRequirementLineDraft();
-  resetOrderAttachmentDraft();
+  if (persistedOrderDraft) {
+    applyOrderDraftPersistence(persistedOrderDraft);
+    restoreDraftMessage();
+  }
+  if (persistedEquipmentDraft) {
+    applyEquipmentLineDraftPersistence(persistedEquipmentDraft);
+  } else {
+    withDraftSyncPaused(() => {
+      resetEquipmentLineDraft();
+    });
+  }
+  if (persistedRequirementDraft) {
+    applyRequirementLineDraftPersistence(persistedRequirementDraft);
+  } else {
+    withDraftSyncPaused(() => {
+      resetRequirementLineDraft();
+    });
+  }
+  if (persistedDocumentsDraft) {
+    applyOrderDocumentsDraftPersistence(persistedDocumentsDraft);
+  } else {
+    withDraftSyncPaused(() => {
+      resetOrderAttachmentDraft();
+    });
+  }
 }
 
 async function loadPlanningRecordReferenceOptions() {
@@ -1323,16 +1811,32 @@ async function loadPlanningRecordReferenceOptions() {
 }
 
 async function loadPlanningRecordState() {
-  resetPlanningRecordAttachmentDraft();
+  const persistedPlanningRecordDraft = loadStepDraft<Partial<typeof planningRecordDraft>>('planning-record-overview');
+  const persistedDocumentsDraft =
+    loadStepDraft<OrderDocumentsDraftPersistence>('planning-record-documents');
   await loadPlanningRecordReferenceOptions();
   if (!props.tenantId || !props.accessToken || !props.wizardState.planning_record_id) {
     selectedPlanningRecord.value = null;
     planningRecordAttachments.value = [];
-    resetPlanningRecordDraft();
-    if (selectedOrder.value) {
-      planningRecordDraft.name = selectedOrder.value.title;
-      planningRecordDraft.planning_from = selectedOrder.value.service_from;
-      planningRecordDraft.planning_to = selectedOrder.value.service_to;
+    if (persistedPlanningRecordDraft) {
+      applyPlanningRecordDraftPersistence(persistedPlanningRecordDraft);
+      restoreDraftMessage();
+    } else if (!hasPlanningRecordDraftContent()) {
+      withDraftSyncPaused(() => {
+        resetPlanningRecordDraft();
+        if (selectedOrder.value) {
+          planningRecordDraft.name = selectedOrder.value.title;
+          planningRecordDraft.planning_from = selectedOrder.value.service_from;
+          planningRecordDraft.planning_to = selectedOrder.value.service_to;
+        }
+      });
+    }
+    if (persistedDocumentsDraft) {
+      applyPlanningRecordDocumentsDraftPersistence(persistedDocumentsDraft);
+    } else if (!hasPlanningRecordAttachmentDraftContent()) {
+      withDraftSyncPaused(() => {
+        resetPlanningRecordAttachmentDraft();
+      });
     }
     if ((props.wizardState.planning_mode_code || planningModeCode.value) === 'trade_fair') {
       await refreshTradeFairZoneOptions(props.wizardState.planning_entity_id);
@@ -1347,6 +1851,17 @@ async function loadPlanningRecordState() {
   ]);
   syncPlanningRecordDraft(record);
   planningRecordAttachments.value = attachments;
+  if (persistedPlanningRecordDraft) {
+    applyPlanningRecordDraftPersistence(persistedPlanningRecordDraft);
+    restoreDraftMessage();
+  }
+  if (persistedDocumentsDraft) {
+    applyPlanningRecordDocumentsDraftPersistence(persistedDocumentsDraft);
+  } else if (!hasPlanningRecordAttachmentDraftContent()) {
+    withDraftSyncPaused(() => {
+      resetPlanningRecordAttachmentDraft();
+    });
+  }
   if ((props.wizardState.planning_mode_code || planningModeCode.value) === 'trade_fair') {
     await refreshTradeFairZoneOptions(props.wizardState.planning_entity_id);
   } else {
@@ -1374,37 +1889,64 @@ async function loadShiftPlanningReferenceOptions() {
 }
 
 async function loadShiftPlanState() {
+  const persistedShiftPlanDraft = loadStepDraft<Partial<typeof shiftPlanDraft>>('shift-plan');
   await loadShiftPlanningReferenceOptions();
   if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
     selectedShiftPlan.value = null;
-    resetShiftPlanDraft();
-    if (selectedPlanningRecord.value) {
-      shiftPlanDraft.name = `${selectedPlanningRecord.value.name} / ${$t('sicherplan.customerPlansWizard.forms.shiftPlanDefaultNameSuffix')}`;
-      shiftPlanDraft.planning_from = selectedPlanningRecord.value.planning_from;
-      shiftPlanDraft.planning_to = selectedPlanningRecord.value.planning_to;
+    if (persistedShiftPlanDraft) {
+      applyShiftPlanDraftPersistence(persistedShiftPlanDraft);
+      restoreDraftMessage();
+    } else if (!hasShiftPlanDraftContent()) {
+      withDraftSyncPaused(() => {
+        resetShiftPlanDraft();
+        if (selectedPlanningRecord.value) {
+          shiftPlanDraft.name = `${selectedPlanningRecord.value.name} / ${$t('sicherplan.customerPlansWizard.forms.shiftPlanDefaultNameSuffix')}`;
+          shiftPlanDraft.planning_from = selectedPlanningRecord.value.planning_from;
+          shiftPlanDraft.planning_to = selectedPlanningRecord.value.planning_to;
+        }
+      });
     }
     return;
   }
   const plan = await getShiftPlan(props.tenantId, props.wizardState.shift_plan_id, props.accessToken);
   syncShiftPlanDraft(plan);
+  if (persistedShiftPlanDraft) {
+    applyShiftPlanDraftPersistence(persistedShiftPlanDraft);
+    restoreDraftMessage();
+  }
 }
 
 async function loadSeriesState() {
+  const persistedSeriesDraft = loadStepDraft<SeriesExceptionsDraftPersistence>('series-exceptions');
   await loadShiftPlanningReferenceOptions();
   if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
     selectedSeries.value = null;
     seriesRows.value = [];
     seriesExceptions.value = [];
-    resetSeriesDraft();
-    resetExceptionDraft();
+    if (persistedSeriesDraft) {
+      applySeriesDraftPersistence(persistedSeriesDraft);
+      restoreDraftMessage();
+    } else if (!hasSeriesDraftContent()) {
+      withDraftSyncPaused(() => {
+        resetSeriesDraft();
+        resetExceptionDraft();
+      });
+    }
     return;
   }
   seriesRows.value = await listShiftSeries(props.tenantId, props.wizardState.shift_plan_id, props.accessToken);
   if (!props.wizardState.series_id) {
     selectedSeries.value = null;
     seriesExceptions.value = [];
-    resetSeriesDraft();
-    resetExceptionDraft();
+    if (persistedSeriesDraft) {
+      applySeriesDraftPersistence(persistedSeriesDraft);
+      restoreDraftMessage();
+    } else if (!hasSeriesDraftContent()) {
+      withDraftSyncPaused(() => {
+        resetSeriesDraft();
+        resetExceptionDraft();
+      });
+    }
     return;
   }
   const [series, exceptions] = await Promise.all([
@@ -1413,12 +1955,17 @@ async function loadSeriesState() {
   ]);
   syncSeriesDraft(series);
   seriesExceptions.value = exceptions;
+  if (persistedSeriesDraft) {
+    applySeriesDraftPersistence(persistedSeriesDraft);
+    restoreDraftMessage();
+  }
 }
 
 async function refreshStepData() {
   if (!handledStepActive.value) {
     return;
   }
+  clearDraftRestoreMessage();
   emit('step-ui-state', props.currentStepId, { loading: true, error: '' });
   stepLoading.value = true;
   try {
@@ -1682,6 +2229,8 @@ async function submitOrderStep() {
       ? await updateCustomerOrder(props.tenantId, selectedOrder.value.id, props.accessToken, payload)
       : await createCustomerOrder(props.tenantId, props.accessToken, payload);
     syncOrderDraft(saved);
+    clearStepDraft('order-details');
+    clearDraftRestoreMessage();
     emit('saved-context', { order_id: saved.id });
     emit('step-completion', 'order-details', true);
     emit('step-ui-state', 'order-details', { dirty: false, error: '' });
@@ -1728,7 +2277,11 @@ async function submitEquipmentStep() {
       });
     }
     orderEquipmentLines.value = await listOrderEquipmentLines(props.tenantId, props.wizardState.order_id, props.accessToken);
-    resetEquipmentLineDraft();
+    withDraftSyncPaused(() => {
+      resetEquipmentLineDraft();
+    });
+    clearStepDraft('equipment-lines');
+    clearDraftRestoreMessage();
     emit('step-completion', 'equipment-lines', true);
     emit('step-ui-state', 'equipment-lines', { dirty: false, error: '' });
     return true;
@@ -1790,7 +2343,11 @@ async function submitRequirementStep() {
       });
     }
     orderRequirementLines.value = await listOrderRequirementLines(props.tenantId, props.wizardState.order_id, props.accessToken);
-    resetRequirementLineDraft();
+    withDraftSyncPaused(() => {
+      resetRequirementLineDraft();
+    });
+    clearStepDraft('requirement-lines');
+    clearDraftRestoreMessage();
     emit('step-completion', 'requirement-lines', true);
     emit('step-ui-state', 'requirement-lines', { dirty: false, error: '' });
     return true;
@@ -1832,7 +2389,11 @@ async function submitDocumentsStep() {
       });
     }
     orderAttachments.value = await listOrderAttachments(props.tenantId, props.wizardState.order_id, props.accessToken);
-    resetOrderAttachmentDraft();
+    withDraftSyncPaused(() => {
+      resetOrderAttachmentDraft();
+    });
+    clearStepDraft('order-documents');
+    clearDraftRestoreMessage();
     emit('step-completion', 'order-documents', true);
     emit('step-ui-state', 'order-documents', { dirty: false, error: '' });
     return true;
@@ -1889,6 +2450,8 @@ async function submitPlanningRecordStep() {
       ? await updatePlanningRecord(props.tenantId, selectedPlanningRecord.value.id, props.accessToken, payload)
       : await createPlanningRecord(props.tenantId, props.accessToken, payload);
     syncPlanningRecordDraft(saved);
+    clearStepDraft('planning-record-overview');
+    clearDraftRestoreMessage();
     emit('saved-context', { planning_record_id: saved.id });
     emit('step-completion', 'planning-record-overview', true);
     emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
@@ -1935,7 +2498,11 @@ async function submitPlanningRecordDocumentsStep() {
       props.wizardState.planning_record_id,
       props.accessToken,
     );
-    resetPlanningRecordAttachmentDraft();
+    withDraftSyncPaused(() => {
+      resetPlanningRecordAttachmentDraft();
+    });
+    clearStepDraft('planning-record-documents');
+    clearDraftRestoreMessage();
     emit('step-completion', 'planning-record-documents', true);
     emit('step-ui-state', 'planning-record-documents', { dirty: false, error: '' });
     return true;
@@ -1974,6 +2541,8 @@ async function submitShiftPlanStep() {
       ? await updateShiftPlan(props.tenantId, selectedShiftPlan.value.id, props.accessToken, payload)
       : await createShiftPlan(props.tenantId, props.accessToken, payload);
     syncShiftPlanDraft(saved);
+    clearStepDraft('shift-plan');
+    clearDraftRestoreMessage();
     emit('saved-context', { shift_plan_id: saved.id });
     shiftPlanRows.value = await listShiftPlans(props.tenantId, props.accessToken, { planning_record_id: props.wizardState.planning_record_id });
     emit('step-completion', 'shift-plan', true);
@@ -2109,6 +2678,8 @@ async function submitSeriesStep() {
     }
 
     seriesExceptions.value = await listShiftSeriesExceptions(props.tenantId, savedSeries.id, props.accessToken);
+    clearStepDraft('series-exceptions');
+    clearDraftRestoreMessage();
     const generatedShifts = await generateShiftSeries(props.tenantId, savedSeries.id, props.accessToken, {});
     emit('step-completion', 'series-exceptions', true);
     emit('step-ui-state', 'series-exceptions', { dirty: false, error: '' });
@@ -2160,6 +2731,9 @@ defineExpose({
 });
 
 watch(planningFamily, async () => {
+  if (draftSyncPaused.value) {
+    return;
+  }
   planningEntityId.value = '';
   emit('step-completion', 'planning', false);
   emit('step-ui-state', 'planning', { dirty: true, error: '' });
@@ -2169,6 +2743,9 @@ watch(planningFamily, async () => {
 });
 
 watch(planningEntityId, () => {
+  if (draftSyncPaused.value) {
+    return;
+  }
   emit('step-completion', 'planning', false);
   emit('step-ui-state', 'planning', { dirty: true, error: '' });
 });
@@ -2186,16 +2763,24 @@ watch(
     orderDraft.patrol_route_id,
   ] as const,
   () => {
+    if (draftSyncPaused.value) {
+      return;
+    }
     emit('step-completion', 'order-details', false);
     emit('step-ui-state', 'order-details', { dirty: true, error: '' });
+    persistOrderDraft();
   },
 );
 
 watch(
   () => [equipmentLineDraft.equipment_item_id, equipmentLineDraft.required_qty, equipmentLineDraft.notes] as const,
   () => {
+    if (draftSyncPaused.value) {
+      return;
+    }
     emit('step-completion', 'equipment-lines', false);
     emit('step-ui-state', 'equipment-lines', { dirty: true, error: '' });
+    persistEquipmentLineDraft();
   },
 );
 
@@ -2209,8 +2794,12 @@ watch(
     requirementLineDraft.notes,
   ] as const,
   () => {
+    if (draftSyncPaused.value) {
+      return;
+    }
     emit('step-completion', 'requirement-lines', false);
     emit('step-ui-state', 'requirement-lines', { dirty: true, error: '' });
+    persistRequirementLineDraft();
   },
 );
 
@@ -2224,8 +2813,12 @@ watch(
     orderAttachmentLink.label,
   ] as const,
   () => {
+    if (draftSyncPaused.value) {
+      return;
+    }
     emit('step-completion', 'order-documents', false);
     emit('step-ui-state', 'order-documents', { dirty: true, error: '' });
+    persistOrderDocumentsDraft();
   },
 );
 
@@ -2242,8 +2835,12 @@ watch(
     planningRecordDraft.patrol_detail_execution_note,
   ] as const,
   () => {
+    if (draftSyncPaused.value) {
+      return;
+    }
     emit('step-completion', 'planning-record-overview', false);
     emit('step-ui-state', 'planning-record-overview', { dirty: true, error: '' });
+    persistPlanningRecordDraft();
   },
 );
 
@@ -2257,8 +2854,12 @@ watch(
     planningRecordAttachmentLink.label,
   ] as const,
   () => {
+    if (draftSyncPaused.value) {
+      return;
+    }
     emit('step-completion', 'planning-record-documents', false);
     emit('step-ui-state', 'planning-record-documents', { dirty: true, error: '' });
+    persistPlanningRecordDocumentsDraft();
   },
 );
 
@@ -2271,8 +2872,12 @@ watch(
     shiftPlanDraft.remarks,
   ] as const,
   () => {
+    if (draftSyncPaused.value) {
+      return;
+    }
     emit('step-completion', 'shift-plan', false);
     emit('step-ui-state', 'shift-plan', { dirty: true, error: '' });
+    persistShiftPlanDraft();
   },
 );
 
@@ -2305,17 +2910,73 @@ watch(
     exceptionDraft.notes,
   ] as const,
   () => {
+    if (draftSyncPaused.value) {
+      return;
+    }
     emit('step-completion', 'series-exceptions', false);
     emit('step-ui-state', 'series-exceptions', { dirty: true, error: '' });
+    persistSeriesDraft();
   },
 );
 
 watch(
-  () => props.customer.id,
+  () => selectedEquipmentLineId.value,
+  () => {
+    if (draftSyncPaused.value) {
+      return;
+    }
+    persistEquipmentLineDraft();
+  },
+);
+
+watch(
+  () => selectedRequirementLineId.value,
+  () => {
+    if (draftSyncPaused.value) {
+      return;
+    }
+    persistRequirementLineDraft();
+  },
+);
+
+watch(
+  () => selectedExceptionId.value,
+  () => {
+    if (draftSyncPaused.value) {
+      return;
+    }
+    persistSeriesDraft();
+  },
+);
+
+watch(
+  () => [props.customer.id, props.wizardState.customer_id] as const,
   () => {
     planningCreateStagedAddresses.value = [];
     closePlanningAddressCreateModal();
     planningLocationPickerOpen.value = false;
+    clearDraftRestoreMessage();
+    selectedOrder.value = null;
+    selectedPlanningRecord.value = null;
+    selectedShiftPlan.value = null;
+    selectedSeries.value = null;
+    orderEquipmentLines.value = [];
+    orderRequirementLines.value = [];
+    orderAttachments.value = [];
+    planningRecordAttachments.value = [];
+    seriesRows.value = [];
+    seriesExceptions.value = [];
+    withDraftSyncPaused(() => {
+      resetOrderDraft();
+      resetEquipmentLineDraft();
+      resetRequirementLineDraft();
+      resetOrderAttachmentDraft();
+      resetPlanningRecordDraft();
+      resetPlanningRecordAttachmentDraft();
+      resetShiftPlanDraft();
+      resetSeriesDraft();
+      resetExceptionDraft();
+    });
   },
 );
 
@@ -2332,29 +2993,28 @@ watch(
     props.wizardState.series_id,
   ] as const,
   async () => {
-    if (props.wizardState.planning_entity_type) {
-      planningFamily.value = props.wizardState.planning_entity_type as PlanningEntityType;
-    }
-    planningEntityId.value = props.wizardState.planning_entity_id || '';
-    planningRecordDraft.planning_mode_code = props.wizardState.planning_mode_code || planningModeCode.value;
-    shiftPlanDraft.planning_record_id = props.wizardState.planning_record_id || '';
-    resetRequirementModal();
+    withDraftSyncPaused(() => {
+      if (props.wizardState.planning_entity_type) {
+        planningFamily.value = props.wizardState.planning_entity_type as PlanningEntityType;
+      }
+      planningEntityId.value = props.wizardState.planning_entity_id || '';
+      planningRecordDraft.planning_mode_code = props.wizardState.planning_mode_code || planningModeCode.value;
+      shiftPlanDraft.planning_record_id = props.wizardState.planning_record_id || '';
+      resetRequirementModal();
+    });
     await refreshStepData();
   },
   { immediate: true },
 );
 
 onMounted(() => {
-  resetOrderDraft();
-  resetPlanningRecordDraft();
-  resetShiftPlanDraft();
-  resetSeriesDraft();
-  resetExceptionDraft();
-  resetTemplateModal();
-  if (props.wizardState.planning_entity_type) {
-    planningFamily.value = props.wizardState.planning_entity_type as PlanningEntityType;
-  }
-  planningEntityId.value = props.wizardState.planning_entity_id || '';
+  withDraftSyncPaused(() => {
+    resetTemplateModal();
+    if (props.wizardState.planning_entity_type) {
+      planningFamily.value = props.wizardState.planning_entity_type as PlanningEntityType;
+    }
+    planningEntityId.value = props.wizardState.planning_entity_id || '';
+  });
 });
 </script>
 
@@ -2362,6 +3022,14 @@ onMounted(() => {
   <div class="sp-customer-plan-wizard-step">
     <p v-if="stepFeedback.message" class="sp-customer-plan-wizard-step__feedback" :data-tone="stepFeedback.tone">
       {{ stepFeedback.message }}
+    </p>
+    <p
+      v-if="draftRestoreMessage"
+      class="sp-customer-plan-wizard-step__feedback"
+      data-testid="customer-new-plan-draft-restored"
+      data-tone="neutral"
+    >
+      {{ draftRestoreMessage }}
     </p>
 
     <section v-if="planningStepActive" class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-planning">

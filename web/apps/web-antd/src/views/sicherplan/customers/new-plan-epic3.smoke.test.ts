@@ -5,6 +5,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { defineComponent, reactive } from 'vue';
 
 import CustomerNewPlanWizardView from './new-plan.vue';
+import { buildWizardDraftStorageKey } from './new-plan-wizard-drafts';
 
 const routeState = reactive({
   query: { customer_id: 'customer-1' } as Record<string, unknown>,
@@ -265,9 +266,15 @@ function mountComponent() {
 
 describe('CustomerNewPlanWizardView EPIC 3', () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     routeState.query = { customer_id: 'customer-1' };
     routerPushMock.mockReset();
     routerReplaceMock.mockReset();
+    authStoreState.accessToken = 'token-1';
+    authStoreState.effectiveAccessToken = 'token-1';
+    authStoreState.effectiveRole = 'tenant_admin';
+    authStoreState.effectiveTenantScopeId = 'tenant-1';
+    authStoreState.isSessionResolving = false;
     authStoreState.syncFromPrimarySession.mockReset();
     authStoreState.ensureSessionReady.mockReset();
     authStoreState.ensureSessionReady.mockResolvedValue(undefined);
@@ -417,6 +424,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     while (mountedWrappers.length) {
       mountedWrappers.pop()?.unmount();
     }
+    window.sessionStorage.clear();
   });
 
   it('runs through steps 1-5, persists canonical records, and updates earlier order data instead of creating duplicates', async () => {
@@ -520,6 +528,161 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+  });
+
+  it('restores an unsaved order-details draft after remount and stays on order-details', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      step: 'order-details',
+    };
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-order-no"]').setValue('ORD-DRAFT');
+    await wrapper.get('[data-testid="customer-new-plan-order-title"]').setValue('Ungespeicherter Auftrag');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-category"]').setValue('guarding');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-from"]').setValue('2026-06-01');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-to"]').setValue('2026-06-12');
+    await nextTickFlush();
+
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'order-details',
+    );
+    expect(window.sessionStorage.getItem(draftKey)).toContain('ORD-DRAFT');
+
+    wrapper.unmount();
+    mountedWrappers.pop();
+
+    const restoredWrapper = mountComponent();
+    await nextTickFlush();
+
+    expect(restoredWrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-no"]').element as HTMLInputElement).value).toBe('ORD-DRAFT');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('Ungespeicherter Auftrag');
+    expect(restoredWrapper.get('[data-testid="customer-new-plan-draft-restored"]').text()).toBe('sicherplan.customerPlansWizard.draftRestored');
+  });
+
+  it('keeps the unsaved order-details draft during same-customer auth refresh', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      step: 'order-details',
+    };
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-order-no"]').setValue('ORD-REFRESH');
+    await wrapper.get('[data-testid="customer-new-plan-order-title"]').setValue('Auth Refresh Draft');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-category"]').setValue('guarding');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-from"]').setValue('2026-06-01');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-to"]').setValue('2026-06-10');
+    await nextTickFlush();
+
+    authStoreState.effectiveAccessToken = 'token-2';
+    authStoreState.accessToken = 'token-2';
+    await nextTickFlush();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-no"]').element as HTMLInputElement).value).toBe('ORD-REFRESH');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('Auth Refresh Draft');
+  });
+
+  it('clears the unsaved order draft after successful save and persists order_id into the route update', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      step: 'order-details',
+    };
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-order-no"]').setValue('ORD-SAVE');
+    await wrapper.get('[data-testid="customer-new-plan-order-title"]').setValue('Gespeicherter Auftrag');
+    await wrapper.get('[data-testid="customer-new-plan-order-requirement-type"]').setValue('requirement-type-1');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-category"]').setValue('guarding');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-from"]').setValue('2026-06-01');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-to"]').setValue('2026-06-10');
+    await nextTickFlush();
+
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'order-details',
+    );
+    expect(window.sessionStorage.getItem(draftKey)).toContain('ORD-SAVE');
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.createCustomerOrderMock).toHaveBeenCalledTimes(1);
+    expect(window.sessionStorage.getItem(draftKey)).toBeNull();
+    expect(routerReplaceMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/admin/customers/new-plan',
+        query: expect.objectContaining({
+          order_id: 'order-1',
+        }),
+      }),
+    );
+  });
+
+  it('does not leak a previous customer order draft after customer switch', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      step: 'order-details',
+    };
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-order-title"]').setValue('Customer One Draft');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-category"]').setValue('guarding');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-from"]').setValue('2026-06-01');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-to"]').setValue('2026-06-10');
+    await nextTickFlush();
+
+    apiMocks.getCustomerMock.mockResolvedValueOnce(
+      buildCustomer({
+        customer_number: 'CU-2000',
+        id: 'customer-2',
+        name: 'Beta Security',
+        tenant_id: 'tenant-1',
+      }),
+    );
+    routeState.query = {
+      customer_id: 'customer-2',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      step: 'order-details',
+    };
+    await nextTickFlush();
+
+    expect((wrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-no"]').element as HTMLInputElement).value).toBe('');
   });
 
   it('creates a new address inside the planning modal, refreshes options, and selects it', async () => {

@@ -5,6 +5,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { defineComponent, reactive } from 'vue';
 
 import CustomerNewPlanWizardView from './new-plan.vue';
+import { buildWizardDraftStorageKey } from './new-plan-wizard-drafts';
 
 const routerPushMock = vi.fn();
 const routerReplaceMock = vi.fn();
@@ -54,8 +55,9 @@ vi.mock('./new-plan-step-content.vue', () => ({
     name: 'CustomerNewPlanStepContentStub',
     props: {
       currentStepId: { type: String, required: true },
+      wizardState: { type: Object, required: true },
     },
-    emits: ['step-ui-state'],
+    emits: ['saved-context', 'step-completion', 'step-ui-state'],
     data() {
       return {
         modalOpen: false,
@@ -63,11 +65,43 @@ vi.mock('./new-plan-step-content.vue', () => ({
         modalLatitude: '',
         modalLongitude: '',
         modalName: '',
+        planningEntityId: 'site-1',
         modalSiteNo: '',
         modalTimezone: '',
         planningSelectionMode: 'use_existing',
         watchbookEnabled: false,
       };
+    },
+    watch: {
+      wizardState: {
+        deep: true,
+        immediate: true,
+        handler(nextWizardState: { planning_entity_id?: string }) {
+          if (typeof nextWizardState?.planning_entity_id === 'string' && nextWizardState.planning_entity_id) {
+            this.planningEntityId = nextWizardState.planning_entity_id;
+          }
+        },
+      },
+    },
+    methods: {
+      async submitCurrentStep() {
+        if (this.currentStepId === 'planning') {
+          this.$emit('saved-context', {
+            planning_entity_id: this.planningEntityId,
+            planning_entity_type: 'site',
+            planning_mode_code: 'site',
+          });
+          this.$emit('step-completion', 'planning', true);
+          this.$emit('step-ui-state', 'planning', { dirty: false, error: '' });
+          return true;
+        }
+        if (this.currentStepId === 'order-details') {
+          this.$emit('saved-context', { order_id: 'order-1' });
+          this.$emit('step-completion', 'order-details', true);
+          return true;
+        }
+        return true;
+      },
     },
     template: `
       <div data-testid="customer-new-plan-step-content-stub">
@@ -97,6 +131,7 @@ vi.mock('./new-plan-step-content.vue', () => ({
           >
             open-modal
           </button>
+          <input data-testid="customer-new-plan-planning-entity" v-model="planningEntityId" />
           <div v-if="modalOpen" data-testid="customer-new-plan-planning-create-modal">
             <input data-testid="customer-new-plan-planning-create-site-no" v-model="modalSiteNo" />
             <input data-testid="customer-new-plan-planning-create-name" v-model="modalName" />
@@ -202,6 +237,7 @@ function mountComponent() {
 describe('CustomerNewPlanWizardView', () => {
   beforeEach(() => {
     vi.stubGlobal('confirm', confirmMock);
+    window.sessionStorage.clear();
     routeState.query = {};
     routerPushMock.mockReset();
     routerReplaceMock.mockReset();
@@ -224,6 +260,7 @@ describe('CustomerNewPlanWizardView', () => {
       mountedWrappers.pop()?.unmount();
     }
     document.body.innerHTML = '';
+    window.sessionStorage.clear();
   });
 
   it('shows the wizard shell for a valid selected customer and disables Previous on step 1', async () => {
@@ -253,6 +290,111 @@ describe('CustomerNewPlanWizardView', () => {
         customer_id: 'customer-1',
       },
     });
+  });
+
+  it('persists planning context into the route after Step 1 succeeds', async () => {
+    routeState.query = { customer_id: 'customer-1' };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/new-plan',
+      query: {
+        customer_id: 'customer-1',
+        step: 'order-details',
+        planning_entity_type: 'site',
+        planning_entity_id: 'site-1',
+        planning_mode_code: 'site',
+      },
+    });
+  });
+
+  it('persists planning context after the create-new planning path advances to order-details', async () => {
+    routeState.query = { customer_id: 'customer-1' };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-create-new-radio"]').setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-entity"]').setValue('site-created-1');
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/new-plan',
+      query: {
+        customer_id: 'customer-1',
+        step: 'order-details',
+        planning_entity_type: 'site',
+        planning_entity_id: 'site-created-1',
+        planning_mode_code: 'site',
+      },
+    });
+  });
+
+  it('hydrates a later step from route query planning context', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      step: 'order-details',
+      planning_entity_type: 'site',
+      planning_entity_id: 'site-1',
+      planning_mode_code: 'site',
+    };
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+  });
+
+  it('hydrates later steps when required downstream ids exist', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      step: 'equipment-lines',
+      planning_entity_type: 'site',
+      planning_entity_id: 'site-1',
+      planning_mode_code: 'site',
+      order_id: 'order-1',
+    };
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
+  });
+
+  it('falls back to planning and shows a controlled warning when a later step is missing planning context', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      step: 'order-details',
+    };
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
+    expect(wrapper.find('[data-testid="customer-new-plan-restore-warning"]').exists()).toBe(true);
+  });
+
+  it('ignores unknown query params and cleans empty persisted params from the URL', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      step: '',
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+      unknown_flag: 'keep-me',
+    };
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
+    expect(routerReplaceMock).not.toHaveBeenCalled();
   });
 
   it('shows a loading state while the customer context is resolving', async () => {
@@ -361,6 +503,139 @@ describe('CustomerNewPlanWizardView', () => {
     expect(customersApiMocks.getCustomerMock).toHaveBeenLastCalledWith('tenant-1', 'customer-1', 'token-2');
     expect(wrapper.find('[data-testid="customer-new-plan-step-content-stub"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security Reloaded');
+  });
+
+  it('does not reset from order-details back to planning when only the access token changes', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      step: 'order-details',
+      planning_entity_type: 'site',
+      planning_entity_id: 'site-1',
+      planning_mode_code: 'site',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+
+    customersApiMocks.getCustomerMock.mockResolvedValue(buildCustomer({ name: 'Alpha Security Reloaded' }));
+    authStoreState.isSessionResolving = true;
+    authStoreState.effectiveAccessToken = 'token-2';
+    authStoreState.accessToken = 'token-2';
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security Reloaded');
+  });
+
+  it('persists later context ids into the route when subsequent steps save them', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      step: 'order-details',
+      planning_entity_type: 'site',
+      planning_entity_id: 'site-1',
+      planning_mode_code: 'site',
+    };
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/new-plan',
+      query: {
+        customer_id: 'customer-1',
+        step: 'equipment-lines',
+        planning_entity_type: 'site',
+        planning_entity_id: 'site-1',
+        planning_mode_code: 'site',
+        order_id: 'order-1',
+      },
+    });
+  });
+
+  it('returns to planning with the selected entity preserved when Previous is clicked from order-details', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      step: 'order-details',
+      planning_entity_type: 'site',
+      planning_entity_id: 'site-1',
+      planning_mode_code: 'site',
+    };
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-previous"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-entity"]').element as HTMLInputElement).value).toBe('site-1');
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+  });
+
+  it('resets wizard context when the customer id changes', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      step: 'order-details',
+      planning_entity_type: 'site',
+      planning_entity_id: 'site-1',
+      planning_mode_code: 'site',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    routeState.query = {
+      customer_id: 'customer-2',
+    };
+    customersApiMocks.getCustomerMock.mockResolvedValue(buildCustomer({ id: 'customer-2', customer_number: 'CU-2000', name: 'Beta Security' }));
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
+    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Beta Security');
+  });
+
+  it('clears persisted drafts for the current wizard context when Cancel is clicked', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      step: 'order-details',
+      planning_entity_type: 'site',
+      planning_entity_id: 'site-1',
+      planning_mode_code: 'site',
+    };
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'order-details',
+    );
+    window.sessionStorage.setItem(draftKey, JSON.stringify({ order_no: 'ORD-CANCEL', title: 'Cancel me' }));
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-cancel"]').trigger('click');
+    await flushPromises();
+
+    expect(window.sessionStorage.getItem(draftKey)).toBeNull();
+    expect(routerPushMock).toHaveBeenCalledWith({
+      path: '/admin/customers',
+      query: {
+        customer_id: 'customer-1',
+        tab: 'plans',
+      },
+    });
   });
 
   it('keeps the planning create-new modal and typed values stable across focus-driven session refresh', async () => {
