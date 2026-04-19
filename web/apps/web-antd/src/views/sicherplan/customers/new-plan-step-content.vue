@@ -835,12 +835,40 @@ function hasOrderAttachmentDraftContent() {
   );
 }
 
-function hasOrderAttachmentSubmission() {
-  return Boolean(orderAttachmentDraft.content_base64 || orderAttachmentLink.document_id.trim());
+function hasOrderDocumentUploadDraftInput() {
+  return Boolean(
+    orderAttachmentDraft.title ||
+      orderAttachmentDraft.label ||
+      orderAttachmentDraft.file_name ||
+      orderAttachmentDraft.content_type ||
+      orderAttachmentDraft.content_base64,
+  );
+}
+
+function hasCompleteOrderDocumentUploadDraft() {
+  return Boolean(
+    orderAttachmentDraft.content_base64 && orderAttachmentDraft.file_name && orderAttachmentDraft.title.trim(),
+  );
+}
+
+function hasOrderDocumentLinkDraftInput() {
+  return Boolean(orderAttachmentLink.document_id.trim() || orderAttachmentLink.label.trim());
+}
+
+function hasCompleteOrderDocumentLinkDraft() {
+  return Boolean(orderAttachmentLink.document_id.trim());
+}
+
+function hasAnyOrderDocumentDraftInput() {
+  return hasOrderDocumentUploadDraftInput() || hasOrderDocumentLinkDraftInput();
 }
 
 function hasOrderAttachmentPartialDraft() {
-  return hasOrderAttachmentDraftContent() && !hasOrderAttachmentSubmission();
+  return (
+    (hasOrderDocumentUploadDraftInput() && !hasCompleteOrderDocumentUploadDraft()) ||
+    (hasOrderDocumentLinkDraftInput() && !hasCompleteOrderDocumentLinkDraft()) ||
+    (hasOrderDocumentUploadDraftInput() && hasOrderDocumentLinkDraftInput())
+  );
 }
 
 function hasPlanningRecordDraftContent() {
@@ -2870,7 +2898,7 @@ function clearOrderDocumentDraftState() {
   });
   clearStepDraft('order-documents');
   clearDraftRestoreMessage();
-  setFeedback('neutral', '');
+  setFeedback('success', $t('sicherplan.customerPlansWizard.messages.orderDocumentDraftCleared'));
   emit('step-completion', 'order-documents', orderAttachments.value.length > 0);
   emit('step-ui-state', 'order-documents', { dirty: false, error: '' });
 }
@@ -3005,43 +3033,100 @@ async function submitDocumentsStep() {
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
     return false;
   }
+  if (!hasAnyOrderDocumentDraftInput()) {
+    setFeedback('neutral', '');
+    emit('step-completion', 'order-documents', true);
+    emit('step-ui-state', 'order-documents', { dirty: false, error: '' });
+    return true;
+  }
   if (hasOrderAttachmentPartialDraft()) {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.completeCurrentOrderDocumentDraftBeforeContinue'));
     emit('step-completion', 'order-documents', false);
     emit('step-ui-state', 'order-documents', { error: 'draft_incomplete' });
     return false;
   }
-  if (!hasOrderAttachmentSubmission()) {
-    setFeedback('neutral', '');
-    emit('step-completion', 'order-documents', true);
-    emit('step-ui-state', 'order-documents', { dirty: false, error: '' });
-    return true;
+  if (hasCompleteOrderDocumentUploadDraft()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.attachOrClearCurrentOrderDocumentBeforeContinue'));
+    emit('step-completion', 'order-documents', false);
+    emit('step-ui-state', 'order-documents', { error: 'draft_incomplete' });
+    return false;
+  }
+  if (hasCompleteOrderDocumentLinkDraft()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.linkOrClearCurrentOrderDocumentBeforeContinue'));
+    emit('step-completion', 'order-documents', false);
+    emit('step-ui-state', 'order-documents', { error: 'draft_incomplete' });
+    return false;
+  }
+  setFeedback('neutral', '');
+  emit('step-completion', 'order-documents', true);
+  emit('step-ui-state', 'order-documents', { dirty: false, error: '' });
+  return true;
+}
+
+async function attachUploadedOrderDocument() {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
+    return false;
+  }
+  if (!hasCompleteOrderDocumentUploadDraft()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.orderDocumentUploadIncomplete'));
+    emit('step-ui-state', 'order-documents', { error: 'draft_incomplete' });
+    return false;
   }
   stepLoading.value = true;
   emit('step-ui-state', 'order-documents', { loading: true, error: '' });
   try {
-    if (orderAttachmentDraft.content_base64) {
-      await createOrderAttachment(props.tenantId, props.wizardState.order_id, props.accessToken, {
-        content_base64: orderAttachmentDraft.content_base64,
-        content_type: orderAttachmentDraft.content_type,
-        file_name: orderAttachmentDraft.file_name,
-        label: orderAttachmentDraft.label || null,
-        tenant_id: props.tenantId,
-        title: orderAttachmentDraft.title,
-      });
-    } else {
-      await linkOrderAttachment(props.tenantId, props.wizardState.order_id, props.accessToken, {
-        document_id: orderAttachmentLink.document_id.trim(),
-        label: orderAttachmentLink.label || null,
-        tenant_id: props.tenantId,
-      });
-    }
+    await createOrderAttachment(props.tenantId, props.wizardState.order_id, props.accessToken, {
+      content_base64: orderAttachmentDraft.content_base64,
+      content_type: orderAttachmentDraft.content_type,
+      file_name: orderAttachmentDraft.file_name,
+      label: orderAttachmentDraft.label || null,
+      tenant_id: props.tenantId,
+      title: orderAttachmentDraft.title.trim(),
+    });
     orderAttachments.value = await listOrderAttachments(props.tenantId, props.wizardState.order_id, props.accessToken);
     withDraftSyncPaused(() => {
       resetOrderAttachmentDraft();
     });
     clearStepDraft('order-documents');
     clearDraftRestoreMessage();
+    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.orderDocumentAttached'));
+    emit('step-completion', 'order-documents', true);
+    emit('step-ui-state', 'order-documents', { dirty: false, error: '' });
+    return true;
+  } catch {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.orderDocumentSaveFailed'));
+    emit('step-ui-state', 'order-documents', { error: 'save_failed' });
+    return false;
+  } finally {
+    stepLoading.value = false;
+    emit('step-ui-state', 'order-documents', { loading: false });
+  }
+}
+
+async function linkExistingOrderDocument() {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
+    return false;
+  }
+  if (!hasCompleteOrderDocumentLinkDraft()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.orderDocumentLinkIncomplete'));
+    emit('step-ui-state', 'order-documents', { error: 'draft_incomplete' });
+    return false;
+  }
+  stepLoading.value = true;
+  emit('step-ui-state', 'order-documents', { loading: true, error: '' });
+  try {
+    await linkOrderAttachment(props.tenantId, props.wizardState.order_id, props.accessToken, {
+      document_id: orderAttachmentLink.document_id.trim(),
+      label: orderAttachmentLink.label || null,
+      tenant_id: props.tenantId,
+    });
+    orderAttachments.value = await listOrderAttachments(props.tenantId, props.wizardState.order_id, props.accessToken);
+    withDraftSyncPaused(() => {
+      resetOrderAttachmentDraft();
+    });
+    clearStepDraft('order-documents');
+    clearDraftRestoreMessage();
+    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.orderDocumentLinked'));
     emit('step-completion', 'order-documents', true);
     emit('step-ui-state', 'order-documents', { dirty: false, error: '' });
     return true;
@@ -4057,38 +4142,67 @@ onBeforeUnmount(() => {
 
     <section v-else-if="documentsStepActive" class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-order-documents">
       <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.orderDocumentsOptional') }}</p>
-      <div v-if="orderAttachments.length" class="sp-customer-plan-wizard-step__list">
+      <div v-if="orderAttachments.length" class="sp-customer-plan-wizard-step__list" data-testid="customer-new-plan-order-document-list">
         <div v-for="document in orderAttachments" :key="document.id" class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static">
           <strong>{{ document.title }}</strong>
-          <span>{{ document.id }}</span>
+          <span>{{ document.id }}<template v-if="document.status"> · {{ document.status }}</template><template v-if="document.current_version_no"> · v{{ document.current_version_no }}</template></span>
         </div>
       </div>
-      <div class="sp-customer-plan-wizard-step__grid">
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.documentTitle') }}</span>
-          <input v-model="orderAttachmentDraft.title" data-testid="customer-new-plan-order-document-title" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.documentLabel') }}</span>
-          <input v-model="orderAttachmentDraft.label" data-testid="customer-new-plan-order-document-label" />
-        </label>
-        <label class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.documentFile') }}</span>
-          <input data-testid="customer-new-plan-order-document-file" type="file" @change="onOrderAttachmentSelected" />
-        </label>
-      </div>
-      <div class="sp-customer-plan-wizard-step__divider"></div>
-      <div class="sp-customer-plan-wizard-step__grid">
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.documentId') }}</span>
-          <input v-model="orderAttachmentLink.document_id" data-testid="customer-new-plan-order-document-id" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.documentLabel') }}</span>
-          <input v-model="orderAttachmentLink.label" data-testid="customer-new-plan-order-document-link-label" />
-        </label>
-      </div>
-      <div v-if="hasOrderAttachmentDraftContent()" class="cta-row">
+      <section class="sp-customer-plan-wizard-step__panel">
+        <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.uploadNewDocument') }}</strong></p>
+        <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.uploadNewDocumentHelp') }}</p>
+        <div class="sp-customer-plan-wizard-step__grid">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.documentTitle') }}</span>
+            <input v-model="orderAttachmentDraft.title" data-testid="customer-new-plan-order-document-upload-title" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.uploadLabel') }}</span>
+            <input v-model="orderAttachmentDraft.label" data-testid="customer-new-plan-order-document-upload-label" />
+          </label>
+          <label class="field-stack field-stack--wide">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.documentFile') }}</span>
+            <input data-testid="customer-new-plan-order-document-file" type="file" @change="onOrderAttachmentSelected" />
+          </label>
+        </div>
+        <div class="cta-row">
+          <button
+            type="button"
+            class="cta-button"
+            data-testid="customer-new-plan-attach-order-document"
+            :disabled="stepLoading"
+            @click="void attachUploadedOrderDocument()"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.attachUploadedDocument') }}
+          </button>
+        </div>
+      </section>
+      <section class="sp-customer-plan-wizard-step__panel">
+        <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.linkExistingDocument') }}</strong></p>
+        <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.linkExistingDocumentHelp') }}</p>
+        <div class="sp-customer-plan-wizard-step__grid">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.existingDocumentId') }}</span>
+            <input v-model="orderAttachmentLink.document_id" data-testid="customer-new-plan-order-document-link-id" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.linkLabel') }}</span>
+            <input v-model="orderAttachmentLink.label" data-testid="customer-new-plan-order-document-link-label" />
+          </label>
+        </div>
+        <div class="cta-row">
+          <button
+            type="button"
+            class="cta-button"
+            data-testid="customer-new-plan-link-order-document"
+            :disabled="stepLoading"
+            @click="void linkExistingOrderDocument()"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.linkExistingDocument') }}
+          </button>
+        </div>
+      </section>
+      <div v-if="hasAnyOrderDocumentDraftInput()" class="cta-row">
         <button
           class="cta-button cta-secondary"
           data-testid="customer-new-plan-clear-order-document-draft"

@@ -564,7 +564,10 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
 
-    await wrapper.get('[data-testid="customer-new-plan-order-document-id"]').setValue('document-1');
+    await wrapper.get('[data-testid="customer-new-plan-order-document-link-id"]').setValue('document-1');
+    await wrapper.get('[data-testid="customer-new-plan-link-order-document"]').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-documents');
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
     expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(1);
@@ -600,7 +603,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
   });
 
-  it('uploads order documents on Next and refreshes attachments before continuing', async () => {
+  it('attaches uploaded order documents inline, stays on the step, and allows continuing afterward', async () => {
     const wrapper = mountComponent();
     await nextTickFlush();
     await advanceToOrderDocuments(wrapper);
@@ -612,35 +615,39 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     });
     await uploadInput.trigger('change');
     await nextTickFlush();
+    await wrapper.get('[data-testid="customer-new-plan-order-document-upload-title"]').setValue('Sicherheitskonzept');
 
-    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-attach-order-document"]').trigger('click');
     await nextTickFlush();
 
     expect(apiMocks.createOrderAttachmentMock).toHaveBeenCalledTimes(1);
     expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(0);
     expect(stores.attachmentsByOrder['order-1']).toHaveLength(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-documents');
+    expect(wrapper.get('[data-testid="customer-new-plan-order-document-list"]').text()).toContain('Sicherheitskonzept');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-document-upload-title"]').element as HTMLInputElement).value).toBe('');
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
   });
 
-  it('links existing order documents on Next and keeps attachments visible', async () => {
+  it('links existing order documents inline, stays on the step, and allows continuing afterward', async () => {
     const wrapper = mountComponent();
     await nextTickFlush();
     await advanceToOrderDocuments(wrapper);
-    await wrapper.get('[data-testid="customer-new-plan-order-document-id"]').setValue('document-42');
+    await wrapper.get('[data-testid="customer-new-plan-order-document-link-id"]').setValue('document-42');
     await wrapper.get('[data-testid="customer-new-plan-order-document-link-label"]').setValue('Bestehendes Dokument');
     await nextTickFlush();
 
-    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-link-order-document"]').trigger('click');
     await nextTickFlush();
 
     expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(1);
     expect(apiMocks.createOrderAttachmentMock).toHaveBeenCalledTimes(0);
     expect(stores.attachmentsByOrder['order-1']).toHaveLength(1);
-    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
-
-    await wrapper.get('[data-testid="customer-new-plan-previous"]').trigger('click');
-    await nextTickFlush();
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-documents');
+    expect(wrapper.get('[data-testid="customer-new-plan-order-document-list"]').text()).toContain('Bestehendes Dokument');
 
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
@@ -655,7 +662,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     const wrapper = mountComponent();
     await nextTickFlush();
     await advanceToOrderDocuments(wrapper);
-    await wrapper.get('[data-testid="customer-new-plan-order-document-title"]').setValue('Unvollstandiger Entwurf');
+    await wrapper.get('[data-testid="customer-new-plan-order-document-upload-title"]').setValue('Unvollstandiger Entwurf');
 
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
@@ -671,6 +678,44 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
 
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+  });
+
+  it('blocks incomplete upload attach attempts and allows continuing after clearing the draft', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToOrderDocuments(wrapper);
+    await wrapper.get('[data-testid="customer-new-plan-order-document-upload-title"]').setValue('Nur Titel');
+
+    await wrapper.get('[data-testid="customer-new-plan-attach-order-document"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.createOrderAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.orderDocumentUploadIncomplete');
+
+    await wrapper.get('[data-testid="customer-new-plan-clear-order-document-draft"]').trigger('click');
+    await nextTickFlush();
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+  });
+
+  it('blocks incomplete link drafts until cleared, then allows continuing', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToOrderDocuments(wrapper);
+    await wrapper.get('[data-testid="customer-new-plan-order-document-link-label"]').setValue('Nur Label');
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.completeCurrentOrderDocumentDraftBeforeContinue');
+
+    await wrapper.get('[data-testid="customer-new-plan-clear-order-document-draft"]').trigger('click');
+    await nextTickFlush();
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
   });
 
