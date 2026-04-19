@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 from decimal import Decimal
+from typing import ClassVar
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.modules.core.schemas import AddressRead
 from app.modules.platform_services.docs_schemas import DocumentRead
@@ -501,13 +502,44 @@ class PatrolRouteLocationProjectionRead(BaseModel):
 
 
 class CustomerOrderFilter(BaseModel):
+    PLANNING_ENTITY_TYPES: ClassVar[frozenset[str]] = frozenset({"site", "event_venue", "trade_fair", "patrol_route"})
+
     search: str | None = None
     customer_id: str | None = None
     lifecycle_status: str | None = None
     release_state: str | None = None
     service_from: date | None = None
     service_to: date | None = None
+    planning_entity_type: str | None = None
+    planning_entity_id: str | None = None
     include_archived: bool = False
+
+    @field_validator("planning_entity_type")
+    @classmethod
+    def normalize_planning_entity_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        if not normalized:
+            return None
+        if normalized not in cls.PLANNING_ENTITY_TYPES:
+            raise ValueError("Invalid planning entity type")
+        return normalized
+
+    @field_validator("planning_entity_id")
+    @classmethod
+    def normalize_planning_entity_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @model_validator(mode="after")
+    def ignore_incomplete_planning_entity_filter(self) -> "CustomerOrderFilter":
+        if bool(self.planning_entity_type) != bool(self.planning_entity_id):
+            self.planning_entity_type = None
+            self.planning_entity_id = None
+        return self
 
 
 class OrderEquipmentLineCreate(BaseModel):

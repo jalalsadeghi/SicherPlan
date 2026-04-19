@@ -1,81 +1,103 @@
 You are working in the SicherPlan repository.
 
-This task follows the patch that makes document steps optional in:
-- Customer New Plan Wizard
+This task follows the patch that scopes existing orders in the Customer New Plan Wizard by selected planning entity.
+
+Source document:
 - /docs/sprint/SPR-CUST-NEWPLAN-V1.md
 
 Goal:
-Do a focused QA/hardening pass for the document steps:
-- Order Documents
-- Planning Documents, if it was changed too
+Do a focused QA/hardening pass to ensure the Order Details existing-order list only shows orders related to the selected planning entry.
 
 Do not add unrelated features.
-Do not change backend APIs.
-Do not change other wizard steps unless fixing a direct regression from this patch.
+Do not change backend APIs beyond the scoped filter already added.
+Do not change unrelated wizard steps.
 
 Files to inspect:
 - web/apps/web-antd/src/views/sicherplan/customers/new-plan-step-content.vue
-- web/apps/web-antd/src/views/sicherplan/customers/new-plan.vue
-- web/apps/web-antd/src/views/sicherplan/customers/new-plan-wizard-drafts.ts
 - web/apps/web-antd/src/sicherplan-legacy/api/planningOrders.ts
-- related tests under web/apps/web-antd/src/views/sicherplan/customers/
+- backend/app/modules/planning/router.py
+- backend/app/modules/planning/schemas.py
+- backend/app/modules/planning/repository.py
+- backend/app/modules/planning/order_service.py
+- backend/tests/modules/planning/
+- related frontend tests under web/apps/web-antd/src/views/sicherplan/customers/
 
 Validation checklist:
 
-1. Order Documents optional behavior
-- Empty Order Documents step allows Next.
-- It does not call createOrderAttachment or linkOrderAttachment when no file/link exists.
-- It marks the step complete.
-- It moves to Planning Record.
-- No error message is shown.
+1. Backend filter contract
+Confirm:
+- /api/planning/tenants/{tenant_id}/ops/orders accepts planning_entity_type and planning_entity_id.
+- Existing calls without those filters still work.
+- Invalid or incomplete planning entity filters are handled consistently.
+- Tenant isolation is preserved.
 
-2. Order Documents upload/link behavior
-- File upload still works.
-- Existing document link still works.
-- orderAttachments refresh after success.
-- Draft is cleared after success.
-- Existing attachments remain visible.
+2. Site filtering
+Confirm:
+- order is included only if it has a PlanningRecord with SitePlanDetail.site_id matching planning_entity_id.
+- unrelated orders for the same customer are excluded.
+- duplicate orders are not returned when multiple matching planning records exist.
 
-3. Partial draft behavior
-- If user typed title/label but did not choose file or document_id, behavior is clear.
-- Either it blocks with a localized message or clear button lets user skip.
-- No silent loss of partial user input unless user intentionally clears it.
+3. Event venue filtering
+Confirm:
+- event_venue uses EventPlanDetail.event_venue_id.
 
-4. Planning Documents optional behavior
-If the same logic was applied:
-- Empty Planning Documents step allows Next.
-- It moves to Shift Plan.
-- File/link still works.
-- planningRecordAttachments refresh after success.
-- Draft is cleared after success.
+4. Trade fair filtering
+Confirm:
+- trade_fair uses TradeFairPlanDetail.trade_fair_id.
 
-5. Draft persistence
-- Optional skip clears irrelevant document-step errors.
-- Document draft persistence does not re-block the step after user clears it.
-- File content is not persisted unsafely.
-- Metadata-only restoration still behaves as expected.
+5. Patrol route filtering
+Confirm:
+- patrol_route uses PatrolPlanDetail.patrol_route_id.
 
-6. Non-regression
-- Equipment Lines multi-save behavior still works.
-- Requirement Lines multi-save behavior still works.
-- Order Details existing/create order behavior still works.
-- Planning Record creation still works.
-- Shift Plan and Series steps are unaffected.
+6. Existing filters still compose
+Confirm the planning entity filter still works with:
+- customer_id
+- search
+- release_state
+- lifecycle_status
+- service_from/service_to
+- include_archived
+
+7. Frontend wizard
+Confirm:
+- loadCustomerOrderRows passes planning_entity_type/planning_entity_id when available.
+- UI shows only scoped orders.
+- Empty state is clear when no related orders exist.
+- "Create new order" remains available.
+- Selecting scoped order hydrates the form.
+- selected order writes order_id to route/state.
+- Next updates selected order instead of creating duplicates.
+
+8. Non-regression
+Confirm:
+- Step 1 Planning still works.
+- Order Details create-new mode still works.
+- Equipment/Requirement lines still load from selected order.
+- Optional document steps still work.
+- Planning Record step still works.
+- canonical /admin/planning-orders still lists all customer orders as before.
 
 Tests:
-Run and update:
-- new-plan.test.ts
+Run and update as needed:
+- backend planning/order tests
+- frontend new-plan tests
 - new-plan-epic3.smoke.test.ts
-- new-plan-epic4.smoke.test.ts
 - new-plan-wizard.test.ts
-- any new focused test for optional document behavior
 
 Add missing tests if needed:
-- empty order-documents proceeds
-- empty planning-documents proceeds
-- partial order document draft blocks or clears
-- upload/link still works
-- no create/link API call when skipping empty step
+- scoped order list excludes unrelated same-customer order
+- frontend passes filters
+- order selection still works after filtering
+
+Manual QA checklist:
+- Select planning entry RheinForum Köln – Objekt Nord.
+- Order Details shows only A-4002.
+- It does not show OBJECT_GUARD May 2026.
+- Select A-4002 and verify editable fields.
+- Click Next and verify Equipment Lines load for A-4002.
+- Browser refresh and verify selected order remains scoped/loaded.
+- Switch to another planning entry and verify different order list.
+- Create new order still works.
 
 Final output:
 1. QA validation summary
@@ -87,5 +109,5 @@ Final output:
 7. Manual QA result
 8. Clear statement: Ready / Not ready for real data entry
 
-Before finalizing, explicitly confirm whether the implementation matches the optional-document proposal.
+Before finalizing, explicitly confirm whether the implementation matches the planning-scoped order proposal.
 Avoid unrelated refactors.

@@ -604,6 +604,20 @@ const orderSelectionModeModel = computed<OrderSelectionMode>({
 const selectedExistingOrderSummary = computed(
   () => customerOrderRows.value.find((row) => row.id === selectedExistingOrderId.value) ?? null,
 );
+const currentPlanningEntityScope = computed(() => {
+  const routePlanningEntityId = typeof route.query.planning_entity_id === 'string' ? route.query.planning_entity_id.trim() : '';
+  const routePlanningEntityType = typeof route.query.planning_entity_type === 'string' ? route.query.planning_entity_type.trim() : '';
+  const planningEntityId = props.wizardState.planning_entity_id || routePlanningEntityId;
+  const planningEntityType = props.wizardState.planning_entity_type || routePlanningEntityType;
+  if (!planningEntityId || !planningEntityType) {
+    return null;
+  }
+  return {
+    planningEntityId,
+    planningEntityType,
+  };
+});
+const hasPlanningScopedOrderList = computed(() => Boolean(currentPlanningEntityScope.value));
 
 function setFeedback(tone: 'error' | 'neutral' | 'success', message = '') {
   stepFeedback.tone = tone;
@@ -632,10 +646,8 @@ function buildDraftContext(): CustomerNewPlanWizardDraftContext | null {
   if (!props.tenantId || !props.customer.id) {
     return null;
   }
-  const routePlanningEntityId = typeof route.query.planning_entity_id === 'string' ? route.query.planning_entity_id.trim() : '';
-  const routePlanningEntityType = typeof route.query.planning_entity_type === 'string' ? route.query.planning_entity_type.trim() : '';
-  const planningEntityId = props.wizardState.planning_entity_id || routePlanningEntityId;
-  const planningEntityType = props.wizardState.planning_entity_type || routePlanningEntityType;
+  const planningEntityId = currentPlanningEntityScope.value?.planningEntityId ?? '';
+  const planningEntityType = currentPlanningEntityScope.value?.planningEntityType ?? '';
   return {
     customerId: props.customer.id,
     planningEntityId,
@@ -1866,9 +1878,16 @@ async function loadCustomerOrderRows(isCurrent = () => true) {
   customerOrderRowsLoading.value = true;
   customerOrderRowsError.value = '';
   try {
-    const rows = await listCustomerOrders(props.tenantId, props.accessToken, {
+    const orderFilters: Parameters<typeof listCustomerOrders>[2] = {
       customer_id: props.customer.id,
       include_archived: false,
+    };
+    if (currentPlanningEntityScope.value) {
+      orderFilters.planning_entity_type = currentPlanningEntityScope.value.planningEntityType as Parameters<typeof listCustomerOrders>[2]['planning_entity_type'];
+      orderFilters.planning_entity_id = currentPlanningEntityScope.value.planningEntityId;
+    }
+    const rows = await listCustomerOrders(props.tenantId, props.accessToken, {
+      ...orderFilters,
     });
     if (!isCurrent()) {
       return;
@@ -3572,11 +3591,23 @@ onBeforeUnmount(() => {
 
       <template v-if="orderModeUsesExisting">
         <div data-testid="customer-new-plan-existing-order-select"></div>
-        <p class="eyebrow">{{ $t('sicherplan.customerPlansWizard.forms.existingCustomerOrders') }}</p>
+        <p class="eyebrow">
+          {{
+            hasPlanningScopedOrderList
+              ? $t('sicherplan.customerPlansWizard.forms.existingPlanningEntityOrders')
+              : $t('sicherplan.customerPlansWizard.forms.existingCustomerOrders')
+          }}
+        </p>
         <div class="sp-customer-plan-wizard-step__list" data-testid="customer-new-plan-existing-order-list">
           <p v-if="customerOrderRowsLoading" class="field-help">{{ $t('sicherplan.customerPlansWizard.loadingBody') }}</p>
           <p v-else-if="customerOrderRowsError" class="field-help">{{ customerOrderRowsError }}</p>
-          <p v-else-if="!customerOrderRows.length" class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.noExistingOrdersFound') }}</p>
+          <p v-else-if="!customerOrderRows.length" class="field-help">
+            {{
+              hasPlanningScopedOrderList
+                ? $t('sicherplan.customerPlansWizard.forms.noPlanningEntityOrdersFound')
+                : $t('sicherplan.customerPlansWizard.forms.noExistingOrdersFound')
+            }}
+          </p>
           <button
             v-for="row in customerOrderRows"
             :key="row.id"
@@ -3601,7 +3632,18 @@ onBeforeUnmount(() => {
         v-if="orderModeUsesExisting && !selectedOrder && !customerOrderRowsLoading && !customerOrderRowsError"
         class="field-help"
       >
-        {{ $t('sicherplan.customerPlansWizard.forms.selectExistingOrder') }}
+        {{
+          hasPlanningScopedOrderList
+            ? $t('sicherplan.customerPlansWizard.forms.selectPlanningEntityOrder')
+            : $t('sicherplan.customerPlansWizard.forms.selectExistingOrder')
+        }}
+      </p>
+
+      <p
+        v-if="!orderModeUsesExisting && hasPlanningScopedOrderList && !customerOrderRows.length && !customerOrderRowsLoading && !customerOrderRowsError"
+        class="field-help"
+      >
+        {{ $t('sicherplan.customerPlansWizard.forms.noPlanningEntityOrdersFound') }}
       </p>
 
       <div

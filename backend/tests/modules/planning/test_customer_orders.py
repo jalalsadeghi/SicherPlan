@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from app.errors import ApiException
 from app.modules.core.models import LookupValue
+from app.modules.customers.models import Customer
 from app.modules.iam.audit_service import AuditService
 from app.modules.planning.order_service import CustomerOrderService
 from app.modules.planning.schemas import (
@@ -91,6 +92,7 @@ class FakeOrderDocumentService:
 @dataclass
 class FakeCustomerOrderRepository(FakePlanningRepository):
     orders: dict[str, object] = field(default_factory=dict)
+    order_planning_links: list[dict[str, str]] = field(default_factory=list)
     order_equipment_lines: dict[str, object] = field(default_factory=dict)
     order_requirement_lines: dict[str, object] = field(default_factory=dict)
     function_types: dict[str, object] = field(default_factory=dict)
@@ -128,9 +130,47 @@ class FakeCustomerOrderRepository(FakePlanningRepository):
             rows = [row for row in rows if row.archived_at is None]
         if filters.customer_id:
             rows = [row for row in rows if row.customer_id == filters.customer_id]
+        if filters.lifecycle_status:
+            rows = [row for row in rows if row.status == filters.lifecycle_status]
         if filters.release_state:
             rows = [row for row in rows if row.release_state == filters.release_state]
+        if filters.service_from is not None:
+            rows = [row for row in rows if row.service_to >= filters.service_from]
+        if filters.service_to is not None:
+            rows = [row for row in rows if row.service_from <= filters.service_to]
+        if filters.search:
+            search_term = filters.search.strip().lower()
+            rows = [
+                row
+                for row in rows
+                if search_term in (row.order_no or "").lower() or search_term in (row.title or "").lower()
+            ]
+        if filters.planning_entity_type and filters.planning_entity_id:
+            allowed_order_ids = {
+                link["order_id"]
+                for link in self.order_planning_links
+                if link["tenant_id"] == tenant_id
+                and link["planning_entity_type"] == filters.planning_entity_type
+                and link["planning_entity_id"] == filters.planning_entity_id
+            }
+            rows = [row for row in rows if row.id in allowed_order_ids]
         return sorted(rows, key=lambda row: row.order_no)
+
+    def link_order_to_planning_entity(
+        self,
+        tenant_id: str,
+        order_id: str,
+        planning_entity_type: str,
+        planning_entity_id: str,
+    ) -> None:
+        self.order_planning_links.append(
+            {
+                "order_id": order_id,
+                "planning_entity_id": planning_entity_id,
+                "planning_entity_type": planning_entity_type,
+                "tenant_id": tenant_id,
+            }
+        )
 
     def get_customer_order(self, tenant_id: str, order_id: str):
         row = self.orders.get(order_id)
@@ -1046,3 +1086,309 @@ class CustomerOrderServiceTests(unittest.TestCase):
         archived_rows = self.service.list_orders("tenant-1", CustomerOrderFilter(include_archived=True), self.actor)
         self.assertEqual(active_rows, [])
         self.assertEqual([row.id for row in archived_rows], [archived.id])
+
+    def test_list_orders_with_customer_filter_only_returns_all_customer_orders(self) -> None:
+        first = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="A-4002",
+                title="Nordtor Juli",
+                service_category_code="object_security",
+                service_from=date(2026, 7, 1),
+                service_to=date(2026, 7, 31),
+            ),
+            self.actor,
+        )
+        second = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="OBJECT_GUARD",
+                title="Mai 2026",
+                service_category_code="object_security",
+                service_from=date(2026, 5, 1),
+                service_to=date(2026, 5, 31),
+            ),
+            self.actor,
+        )
+
+        rows = self.service.list_orders("tenant-1", CustomerOrderFilter(customer_id="customer-1"), self.actor)
+
+        self.assertEqual([row.id for row in rows], [first.id, second.id])
+
+    def test_customer_order_filter_rejects_invalid_planning_entity_type(self) -> None:
+        with self.assertRaises(ValueError):
+            CustomerOrderFilter(planning_entity_type="branch", planning_entity_id="site-1")
+
+    def test_customer_order_filter_ignores_incomplete_planning_entity_filter(self) -> None:
+        first = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="A-4100",
+                title="Scoped candidate",
+                service_category_code="object_security",
+                service_from=date(2026, 7, 1),
+                service_to=date(2026, 7, 31),
+            ),
+            self.actor,
+        )
+        second = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="A-4101",
+                title="Fallback candidate",
+                service_category_code="object_security",
+                service_from=date(2026, 7, 1),
+                service_to=date(2026, 7, 31),
+            ),
+            self.actor,
+        )
+        self.repository.link_order_to_planning_entity("tenant-1", first.id, "site", "site-nord")
+
+        type_only_rows = self.service.list_orders(
+            "tenant-1",
+            CustomerOrderFilter(customer_id="customer-1", planning_entity_type="site"),
+            self.actor,
+        )
+        id_only_rows = self.service.list_orders(
+            "tenant-1",
+            CustomerOrderFilter(customer_id="customer-1", planning_entity_id="site-nord"),
+            self.actor,
+        )
+
+        self.assertEqual([row.id for row in type_only_rows], [first.id, second.id])
+        self.assertEqual([row.id for row in id_only_rows], [first.id, second.id])
+
+    def test_list_orders_filters_site_related_orders_only_and_deduplicates(self) -> None:
+        related = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="A-4002",
+                title="Nordtor Juli",
+                service_category_code="object_security",
+                service_from=date(2026, 7, 1),
+                service_to=date(2026, 7, 31),
+            ),
+            self.actor,
+        )
+        unrelated = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="OBJECT_GUARD",
+                title="Mai 2026",
+                service_category_code="object_security",
+                service_from=date(2026, 5, 1),
+                service_to=date(2026, 5, 31),
+            ),
+            self.actor,
+        )
+        self.repository.link_order_to_planning_entity("tenant-1", related.id, "site", "site-nord")
+        self.repository.link_order_to_planning_entity("tenant-1", related.id, "site", "site-nord")
+        self.repository.link_order_to_planning_entity("tenant-1", unrelated.id, "site", "site-sued")
+
+        rows = self.service.list_orders(
+            "tenant-1",
+            CustomerOrderFilter(customer_id="customer-1", planning_entity_type="site", planning_entity_id="site-nord"),
+            self.actor,
+        )
+
+        self.assertEqual([row.id for row in rows], [related.id])
+
+    def test_list_orders_filters_event_venue_related_orders_only(self) -> None:
+        related = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="EV-1",
+                title="Arena Sommer",
+                service_category_code="event_security",
+                service_from=date(2026, 8, 1),
+                service_to=date(2026, 8, 2),
+            ),
+            self.actor,
+        )
+        self.repository.link_order_to_planning_entity("tenant-1", related.id, "event_venue", "venue-1")
+
+        rows = self.service.list_orders(
+            "tenant-1",
+            CustomerOrderFilter(customer_id="customer-1", planning_entity_type="event_venue", planning_entity_id="venue-1"),
+            self.actor,
+        )
+
+        self.assertEqual([row.id for row in rows], [related.id])
+
+    def test_list_orders_filters_trade_fair_related_orders_only(self) -> None:
+        related = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="FAIR-1",
+                title="Expo Halle 2",
+                service_category_code="trade_fair_security",
+                service_from=date(2026, 9, 10),
+                service_to=date(2026, 9, 12),
+            ),
+            self.actor,
+        )
+        self.repository.link_order_to_planning_entity("tenant-1", related.id, "trade_fair", "fair-1")
+
+        rows = self.service.list_orders(
+            "tenant-1",
+            CustomerOrderFilter(customer_id="customer-1", planning_entity_type="trade_fair", planning_entity_id="fair-1"),
+            self.actor,
+        )
+
+        self.assertEqual([row.id for row in rows], [related.id])
+
+    def test_list_orders_filters_patrol_route_related_orders_only(self) -> None:
+        related = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="PATROL-1",
+                title="Innenstadt Nacht",
+                service_category_code="patrol_service",
+                service_from=date(2026, 10, 1),
+                service_to=date(2026, 10, 1),
+            ),
+            self.actor,
+        )
+        self.repository.link_order_to_planning_entity("tenant-1", related.id, "patrol_route", "route-1")
+
+        rows = self.service.list_orders(
+            "tenant-1",
+            CustomerOrderFilter(customer_id="customer-1", planning_entity_type="patrol_route", planning_entity_id="route-1"),
+            self.actor,
+        )
+
+        self.assertEqual([row.id for row in rows], [related.id])
+
+    def test_list_orders_planning_entity_filter_enforces_tenant_isolation(self) -> None:
+        tenant_two_customer = Customer(
+            id="customer-tenant-2",
+            tenant_id="tenant-2",
+            customer_number="K-900",
+            name="Other Tenant",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            version_no=1,
+            status="active",
+        )
+        self.repository.customers[tenant_two_customer.id] = tenant_two_customer
+        tenant_two_requirement = self.repository.create_requirement_type(
+            "tenant-2",
+            type("RequirementPayload", (), {"customer_id": None, "code": "REQ-T2", "label": "Objektschutz", "default_planning_mode_code": "site", "description": None})(),
+            "user-1",
+        )
+        tenant_two_actor = _context("planning.order.read", "planning.order.write", tenant_id="tenant-2")
+        tenant_two_order = self.service.create_order(
+            "tenant-2",
+            CustomerOrderCreate(
+                tenant_id="tenant-2",
+                customer_id=tenant_two_customer.id,
+                requirement_type_id=tenant_two_requirement.id,
+                order_no="T2-1",
+                title="Cross tenant",
+                service_category_code="object_security",
+                service_from=date(2026, 11, 1),
+                service_to=date(2026, 11, 2),
+            ),
+            tenant_two_actor,
+        )
+        self.repository.link_order_to_planning_entity("tenant-2", tenant_two_order.id, "site", "site-nord")
+
+        rows = self.service.list_orders(
+            "tenant-1",
+            CustomerOrderFilter(customer_id="customer-1", planning_entity_type="site", planning_entity_id="site-nord"),
+            self.actor,
+        )
+
+        self.assertEqual(rows, [])
+
+    def test_list_orders_combines_planning_entity_with_search_date_and_release_filters(self) -> None:
+        matching = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="A-5001",
+                title="Nordtor August",
+                service_category_code="object_security",
+                service_from=date(2026, 8, 1),
+                service_to=date(2026, 8, 31),
+                release_state="release_ready",
+            ),
+            self.actor,
+        )
+        wrong_state = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="A-5002",
+                title="Nordtor Draft",
+                service_category_code="object_security",
+                service_from=date(2026, 8, 1),
+                service_to=date(2026, 8, 31),
+                release_state="draft",
+            ),
+            self.actor,
+        )
+        wrong_window = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="A-5003",
+                title="Nordtor September",
+                service_category_code="object_security",
+                service_from=date(2026, 9, 1),
+                service_to=date(2026, 9, 30),
+                release_state="release_ready",
+            ),
+            self.actor,
+        )
+        for order in (matching, wrong_state, wrong_window):
+            self.repository.link_order_to_planning_entity("tenant-1", order.id, "site", "site-nord")
+
+        rows = self.service.list_orders(
+            "tenant-1",
+            CustomerOrderFilter(
+                customer_id="customer-1",
+                planning_entity_type="site",
+                planning_entity_id="site-nord",
+                release_state="release_ready",
+                search="Nordtor",
+                service_from=date(2026, 8, 15),
+                service_to=date(2026, 8, 20),
+            ),
+            self.actor,
+        )
+
+        self.assertEqual([row.id for row in rows], [matching.id])

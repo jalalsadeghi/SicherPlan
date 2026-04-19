@@ -712,6 +712,47 @@ class SqlAlchemyPlanningRepository:
             )
             .order_by(CustomerOrder.order_no)
         )
+        if filters.planning_entity_type is not None and filters.planning_entity_id is not None:
+            statement = statement.join(
+                PlanningRecord,
+                and_(
+                    PlanningRecord.tenant_id == CustomerOrder.tenant_id,
+                    PlanningRecord.order_id == CustomerOrder.id,
+                ),
+            )
+            if filters.planning_entity_type == "site":
+                statement = statement.join(
+                    SitePlanDetail,
+                    and_(
+                        SitePlanDetail.tenant_id == PlanningRecord.tenant_id,
+                        SitePlanDetail.planning_record_id == PlanningRecord.id,
+                    ),
+                ).where(SitePlanDetail.site_id == filters.planning_entity_id)
+            elif filters.planning_entity_type == "event_venue":
+                statement = statement.join(
+                    EventPlanDetail,
+                    and_(
+                        EventPlanDetail.tenant_id == PlanningRecord.tenant_id,
+                        EventPlanDetail.planning_record_id == PlanningRecord.id,
+                    ),
+                ).where(EventPlanDetail.event_venue_id == filters.planning_entity_id)
+            elif filters.planning_entity_type == "trade_fair":
+                statement = statement.join(
+                    TradeFairPlanDetail,
+                    and_(
+                        TradeFairPlanDetail.tenant_id == PlanningRecord.tenant_id,
+                        TradeFairPlanDetail.planning_record_id == PlanningRecord.id,
+                    ),
+                ).where(TradeFairPlanDetail.trade_fair_id == filters.planning_entity_id)
+            elif filters.planning_entity_type == "patrol_route":
+                statement = statement.join(
+                    PatrolPlanDetail,
+                    and_(
+                        PatrolPlanDetail.tenant_id == PlanningRecord.tenant_id,
+                        PatrolPlanDetail.planning_record_id == PlanningRecord.id,
+                    ),
+                ).where(PatrolPlanDetail.patrol_route_id == filters.planning_entity_id)
+            statement = statement.distinct()
         if not filters.include_archived:
             statement = statement.where(CustomerOrder.archived_at.is_(None))
         if filters.customer_id is not None:

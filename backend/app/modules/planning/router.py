@@ -321,6 +321,8 @@ def _order_filters(
     release_state: str | None = Query(default=None),
     service_from: date | None = Query(default=None),
     service_to: date | None = Query(default=None),
+    planning_entity_type: str | None = Query(default=None),
+    planning_entity_id: UUID | None = Query(default=None),
     include_archived: bool = Query(default=False),
 ) -> CustomerOrderFilter:
     return CustomerOrderFilter(
@@ -330,6 +332,8 @@ def _order_filters(
         release_state=release_state,
         service_from=service_from,
         service_to=service_to,
+        planning_entity_type=planning_entity_type,
+        planning_entity_id=str(planning_entity_id) if planning_entity_id else None,
         include_archived=include_archived,
     )
 

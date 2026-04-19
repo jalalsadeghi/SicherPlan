@@ -82,6 +82,20 @@ export interface CustomerOrderRead extends CustomerOrderListItem {
   archived_at: string | null;
 }
 
+export type CustomerOrderPlanningEntityType = 'site' | 'event_venue' | 'trade_fair' | 'patrol_route';
+
+export interface CustomerOrderListFilters {
+  customer_id?: string;
+  include_archived?: boolean;
+  lifecycle_status?: string;
+  planning_entity_id?: string;
+  planning_entity_type?: CustomerOrderPlanningEntityType;
+  release_state?: string;
+  search?: string;
+  service_from?: string;
+  service_to?: string;
+}
+
 export interface PlanningRecordListItem {
   id: string;
   tenant_id: string;
@@ -213,7 +227,7 @@ function queryString(params: Record<string, unknown>) {
   return serialized ? `?${serialized}` : "";
 }
 
-export function listCustomerOrders(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
+export function listCustomerOrders(tenantId: string, accessToken: string, filters: CustomerOrderListFilters) {
   return request<CustomerOrderListItem[]>(
     `/api/planning/tenants/${tenantId}/ops/orders${queryString(filters)}`,
     accessToken,
