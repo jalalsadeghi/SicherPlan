@@ -83,6 +83,7 @@ describe('auth session lifecycle', () => {
       }),
     );
 
+    vi.setSystemTime(new Date('2026-04-12T10:00:00Z'));
     await initializeAuthSessionLifecycle();
     authStoreState.ensureSessionReady.mockClear();
 
@@ -93,12 +94,9 @@ describe('auth session lifecycle', () => {
     document.dispatchEvent(new Event('visibilitychange'));
     window.dispatchEvent(new Event('focus'));
 
+    expect(authStoreState.ensureSessionReady).toHaveBeenCalledTimes(1);
     expect(authStoreState.ensureSessionReady).toHaveBeenNthCalledWith(1, {
-      forceRefresh: true,
-      redirectOnFailure: true,
-    });
-    expect(authStoreState.ensureSessionReady).toHaveBeenNthCalledWith(2, {
-      forceRefresh: true,
+      forceRefresh: false,
       redirectOnFailure: true,
     });
   });

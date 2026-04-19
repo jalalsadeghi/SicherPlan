@@ -72,6 +72,7 @@ const stepContentRef = ref<InstanceType<typeof CustomerNewPlanStepContent> | nul
 const stepSubmitting = ref(false);
 const routeRestoreWarning = ref('');
 const persistDraftsOnUnmount = ref(true);
+let resolveCustomerContextSequence = 0;
 
 const customerId = computed(() => {
   const raw = route.query.customer_id;
@@ -223,6 +224,7 @@ function clearCurrentWizardDrafts() {
 }
 
 async function resolveCustomerContext(options?: { preserveContent?: boolean }) {
+  const requestSequence = ++resolveCustomerContextSequence;
   const preserveContent = Boolean(options?.preserveContent && hasStableCustomerContext.value);
 
   if (!isAuthorized.value) {
@@ -250,9 +252,16 @@ async function resolveCustomerContext(options?: { preserveContent?: boolean }) {
     contextState.value = 'loading';
   }
   try {
-    customer.value = await getCustomer(tenantScopeId.value, customerId.value, accessToken.value);
+    const loadedCustomer = await getCustomer(tenantScopeId.value, customerId.value, accessToken.value);
+    if (requestSequence !== resolveCustomerContextSequence) {
+      return;
+    }
+    customer.value = loadedCustomer;
     contextState.value = 'ready';
   } catch (error) {
+    if (requestSequence !== resolveCustomerContextSequence) {
+      return;
+    }
     if (preserveContent) {
       return;
     }
@@ -355,7 +364,7 @@ onMounted(async () => {
 });
 
 watch(
-  () => [customerId.value, tenantScopeId.value, accessToken.value, isAuthorized.value] as const,
+  () => [customerId.value, tenantScopeId.value, isAuthorized.value] as const,
   async ([nextCustomerId], [previousCustomerId]) => {
     if (!bootstrapped.value) {
       return;
@@ -365,6 +374,22 @@ watch(
       syncWizardFromRoute();
       await syncWizardRouteState();
       await resolveCustomerContext();
+      return;
+    }
+    await resolveCustomerContext({ preserveContent: true });
+  },
+);
+
+watch(
+  () => accessToken.value,
+  async (nextAccessToken, previousAccessToken) => {
+    if (!bootstrapped.value || nextAccessToken === previousAccessToken) {
+      return;
+    }
+    if (!nextAccessToken || !customerId.value || !tenantScopeId.value || !isAuthorized.value) {
+      return;
+    }
+    if (hasStableCustomerContext.value) {
       return;
     }
     await resolveCustomerContext({ preserveContent: true });

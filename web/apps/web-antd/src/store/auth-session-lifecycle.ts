@@ -1,11 +1,15 @@
 import { useAuthStore } from './auth';
 import { subscribeAuthSessionStateChanged } from './auth-session-events';
 import { readStoredAuthSessionMetadata } from './auth-session';
-import { getAuthSessionRefreshDelay } from './auth-session-timing';
+import { getAuthSessionRefreshDelay, isAuthSessionExpiringSoon } from './auth-session-timing';
 
 let lifecycleInitialized = false;
 let refreshTimer: null | ReturnType<typeof setTimeout> = null;
 let unsubscribeSessionListener: null | (() => void) = null;
+let lifecycleRefreshPromise: null | Promise<boolean> = null;
+let lastInteractiveRefreshStartedAt = 0;
+
+const FOCUS_VISIBILITY_REFRESH_COOLDOWN_MS = 1500;
 
 function clearRefreshTimer() {
   if (refreshTimer) {
@@ -17,13 +21,41 @@ function clearRefreshTimer() {
 async function refreshSessionForLifecycle(
   reason: 'bootstrap' | 'focus' | 'proactive' | 'visibility',
 ) {
+  const metadata = readStoredAuthSessionMetadata();
+  const now = Date.now();
   const authStore = useAuthStore();
-  const refreshed = await authStore.ensureSessionReady({
-    forceRefresh: reason !== 'bootstrap',
+  const sessionExpiringSoon = isAuthSessionExpiringSoon(metadata.accessTokenExpiresAt, now);
+  const shouldForceRefresh = reason === 'proactive' || ((reason === 'focus' || reason === 'visibility') && sessionExpiringSoon);
+
+  if (lifecycleRefreshPromise) {
+    return lifecycleRefreshPromise;
+  }
+
+  if (
+    (reason === 'focus' || reason === 'visibility')
+    && !shouldForceRefresh
+    && now - lastInteractiveRefreshStartedAt < FOCUS_VISIBILITY_REFRESH_COOLDOWN_MS
+  ) {
+    scheduleNextSessionRefresh();
+    return true;
+  }
+
+  if (reason === 'focus' || reason === 'visibility') {
+    lastInteractiveRefreshStartedAt = now;
+  }
+  lifecycleRefreshPromise = authStore.ensureSessionReady({
+    forceRefresh: reason === 'bootstrap' ? false : shouldForceRefresh,
     redirectOnFailure: reason !== 'bootstrap',
-  });
-  scheduleNextSessionRefresh();
-  return refreshed;
+  })
+    .then((refreshed) => {
+      scheduleNextSessionRefresh();
+      return refreshed;
+    })
+    .finally(() => {
+      lifecycleRefreshPromise = null;
+    });
+
+  return lifecycleRefreshPromise;
 }
 
 function scheduleNextSessionRefresh() {
@@ -75,6 +107,8 @@ export async function initializeAuthSessionLifecycle() {
 
 export function resetAuthSessionLifecycleForTests() {
   clearRefreshTimer();
+  lifecycleRefreshPromise = null;
+  lastInteractiveRefreshStartedAt = 0;
   unsubscribeSessionListener?.();
   unsubscribeSessionListener = null;
   if (lifecycleInitialized) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 import { Modal } from 'ant-design-vue';
 
@@ -102,6 +102,7 @@ type PlanningEntityType = 'event_venue' | 'patrol_route' | 'site' | 'trade_fair'
 type PlanningSelectionMode = 'create_new' | 'use_existing';
 
 const router = useRouter();
+const route = useRoute();
 
 const props = defineProps<{
   accessToken: string;
@@ -365,6 +366,7 @@ const stepFeedback = reactive({
 const draftRestoreMessage = ref('');
 const draftSyncPaused = ref(false);
 const stepLoading = ref(false);
+let stepRefreshSequence = 0;
 
 type AttachmentDraftPersistence = {
   content_type: string;
@@ -554,6 +556,20 @@ const planningRecordStepActive = computed(() => props.currentStepId === 'plannin
 const planningRecordDocumentsStepActive = computed(() => props.currentStepId === 'planning-record-documents');
 const shiftPlanStepActive = computed(() => props.currentStepId === 'shift-plan');
 const seriesStepActive = computed(() => props.currentStepId === 'series-exceptions');
+const stepRefreshContextKey = computed(() =>
+  JSON.stringify({
+    currentStepId: props.currentStepId,
+    customerId: props.customer.id,
+    orderId: props.wizardState.order_id,
+    planningEntityId: props.wizardState.planning_entity_id,
+    planningEntityType: props.wizardState.planning_entity_type,
+    planningModeCode: props.wizardState.planning_mode_code,
+    planningRecordId: props.wizardState.planning_record_id,
+    seriesId: props.wizardState.series_id,
+    shiftPlanId: props.wizardState.shift_plan_id,
+    tenantId: props.tenantId,
+  }),
+);
 const handledStepActive = computed(
   () =>
     planningStepActive.value ||
@@ -590,10 +606,14 @@ function buildDraftContext(): CustomerNewPlanWizardDraftContext | null {
   if (!props.tenantId || !props.customer.id) {
     return null;
   }
+  const routePlanningEntityId = typeof route.query.planning_entity_id === 'string' ? route.query.planning_entity_id.trim() : '';
+  const routePlanningEntityType = typeof route.query.planning_entity_type === 'string' ? route.query.planning_entity_type.trim() : '';
+  const planningEntityId = props.wizardState.planning_entity_id || routePlanningEntityId;
+  const planningEntityType = props.wizardState.planning_entity_type || routePlanningEntityType;
   return {
     customerId: props.customer.id,
-    planningEntityId: props.wizardState.planning_entity_id,
-    planningEntityType: props.wizardState.planning_entity_type,
+    planningEntityId,
+    planningEntityType,
     tenantId: props.tenantId,
   };
 }
@@ -628,6 +648,12 @@ function restoreDraftMessage(messageKey = 'sicherplan.customerPlansWizard.draftR
 
 function clearDraftRestoreMessage() {
   draftRestoreMessage.value = '';
+}
+
+function buildStepLoadGuard() {
+  const refreshSequence = ++stepRefreshSequence;
+  const refreshContextKey = stepRefreshContextKey.value;
+  return () => refreshSequence === stepRefreshSequence && refreshContextKey === stepRefreshContextKey.value;
 }
 
 function hasOrderDraftContent() {
@@ -1674,8 +1700,11 @@ async function submitPlanningAddressCreateModal() {
   }
 }
 
-async function refreshTradeFairZoneOptions(tradeFairId: string) {
+async function refreshTradeFairZoneOptions(tradeFairId: string, isCurrent = () => true) {
   if (!props.tenantId || !props.accessToken || !tradeFairId) {
+    if (!isCurrent()) {
+      return;
+    }
     tradeFairZoneOptions.value = [];
     tradeFairZoneLookupError.value = '';
     tradeFairZoneLookupLoading.value = false;
@@ -1685,20 +1714,30 @@ async function refreshTradeFairZoneOptions(tradeFairId: string) {
   tradeFairZoneLookupLoading.value = true;
   tradeFairZoneLookupError.value = '';
   try {
-    tradeFairZoneOptions.value = await listTradeFairZones(props.tenantId, tradeFairId, props.accessToken);
+    const zones = await listTradeFairZones(props.tenantId, tradeFairId, props.accessToken);
+    if (!isCurrent()) {
+      return;
+    }
+    tradeFairZoneOptions.value = zones;
     if (!tradeFairZoneOptions.value.some((row) => row.id === planningRecordDraft.trade_fair_detail_trade_fair_zone_id)) {
       planningRecordDraft.trade_fair_detail_trade_fair_zone_id = '';
     }
   } catch {
+    if (!isCurrent()) {
+      return;
+    }
     tradeFairZoneOptions.value = [];
     tradeFairZoneLookupError.value = $t('sicherplan.customerPlansWizard.errors.tradeFairZoneLoad');
     planningRecordDraft.trade_fair_detail_trade_fair_zone_id = '';
   } finally {
+    if (!isCurrent()) {
+      return;
+    }
     tradeFairZoneLookupLoading.value = false;
   }
 }
 
-async function loadOrderReferenceOptions() {
+async function loadOrderReferenceOptions(isCurrent = () => true) {
   if (!props.tenantId || !props.accessToken) {
     return;
   }
@@ -1712,6 +1751,9 @@ async function loadOrderReferenceOptions() {
       listQualificationTypes(props.tenantId, props.accessToken),
     ]);
 
+  if (!isCurrent()) {
+    return;
+  }
   serviceCategoryOptions.value = serviceCategories;
   requirementTypeOptions.value = requirementTypes as PlanningListItem[];
   patrolRouteOptions.value = patrolRoutes as PlanningListItem[];
@@ -1720,7 +1762,7 @@ async function loadOrderReferenceOptions() {
   qualificationTypeOptions.value = qualificationTypes;
 }
 
-async function loadOrderState() {
+async function loadOrderState(isCurrent = () => true) {
   const persistedOrderDraft = loadStepDraft<Partial<typeof orderDraft>>('order-details');
   const persistedEquipmentDraft = loadStepDraft<
     Partial<typeof equipmentLineDraft> & { selected_equipment_line_id?: string }
@@ -1731,6 +1773,9 @@ async function loadOrderState() {
   const persistedDocumentsDraft = loadStepDraft<OrderDocumentsDraftPersistence>('order-documents');
 
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
+    if (!isCurrent()) {
+      return;
+    }
     selectedOrder.value = null;
     orderEquipmentLines.value = [];
     orderRequirementLines.value = [];
@@ -1776,12 +1821,18 @@ async function loadOrderState() {
     return;
   }
   const order = await getCustomerOrder(props.tenantId, props.wizardState.order_id, props.accessToken);
+  if (!isCurrent()) {
+    return;
+  }
   syncOrderDraft(order);
   const [equipmentLines, requirementLines, attachments] = await Promise.all([
     listOrderEquipmentLines(props.tenantId, props.wizardState.order_id, props.accessToken),
     listOrderRequirementLines(props.tenantId, props.wizardState.order_id, props.accessToken),
     listOrderAttachments(props.tenantId, props.wizardState.order_id, props.accessToken),
   ]);
+  if (!isCurrent()) {
+    return;
+  }
   orderEquipmentLines.value = equipmentLines;
   orderRequirementLines.value = requirementLines;
   orderAttachments.value = attachments;
@@ -1812,7 +1863,7 @@ async function loadOrderState() {
   }
 }
 
-async function loadPlanningRecordReferenceOptions() {
+async function loadPlanningRecordReferenceOptions(isCurrent = () => true) {
   if (!props.tenantId || !props.accessToken) {
     eventVenueOptions.value = [];
     siteOptions.value = [];
@@ -1826,18 +1877,27 @@ async function loadPlanningRecordReferenceOptions() {
     listPlanningSetupRecords('trade_fair', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
     listPlanningSetupRecords('patrol_route', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
   ]);
+  if (!isCurrent()) {
+    return;
+  }
   eventVenueOptions.value = eventVenues as PlanningListItem[];
   siteOptions.value = sites as PlanningListItem[];
   tradeFairOptions.value = tradeFairs as PlanningListItem[];
   patrolRouteOptions.value = patrolRoutes as PlanningListItem[];
 }
 
-async function loadPlanningRecordState() {
+async function loadPlanningRecordState(isCurrent = () => true) {
   const persistedPlanningRecordDraft = loadStepDraft<Partial<typeof planningRecordDraft>>('planning-record-overview');
   const persistedDocumentsDraft =
     loadStepDraft<OrderDocumentsDraftPersistence>('planning-record-documents');
-  await loadPlanningRecordReferenceOptions();
+  await loadPlanningRecordReferenceOptions(isCurrent);
+  if (!isCurrent()) {
+    return;
+  }
   if (!props.tenantId || !props.accessToken || !props.wizardState.planning_record_id) {
+    if (!isCurrent()) {
+      return;
+    }
     selectedPlanningRecord.value = null;
     planningRecordAttachments.value = [];
     if (persistedPlanningRecordDraft) {
@@ -1861,9 +1921,9 @@ async function loadPlanningRecordState() {
       });
     }
     if ((props.wizardState.planning_mode_code || planningModeCode.value) === 'trade_fair') {
-      await refreshTradeFairZoneOptions(props.wizardState.planning_entity_id);
+      await refreshTradeFairZoneOptions(props.wizardState.planning_entity_id, isCurrent);
     } else {
-      await refreshTradeFairZoneOptions('');
+      await refreshTradeFairZoneOptions('', isCurrent);
     }
     return;
   }
@@ -1871,6 +1931,9 @@ async function loadPlanningRecordState() {
     getPlanningRecord(props.tenantId, props.wizardState.planning_record_id, props.accessToken),
     listPlanningRecordAttachments(props.tenantId, props.wizardState.planning_record_id, props.accessToken),
   ]);
+  if (!isCurrent()) {
+    return;
+  }
   syncPlanningRecordDraft(record);
   planningRecordAttachments.value = attachments;
   if (persistedPlanningRecordDraft) {
@@ -1885,13 +1948,13 @@ async function loadPlanningRecordState() {
     });
   }
   if ((props.wizardState.planning_mode_code || planningModeCode.value) === 'trade_fair') {
-    await refreshTradeFairZoneOptions(props.wizardState.planning_entity_id);
+    await refreshTradeFairZoneOptions(props.wizardState.planning_entity_id, isCurrent);
   } else {
-    await refreshTradeFairZoneOptions('');
+    await refreshTradeFairZoneOptions('', isCurrent);
   }
 }
 
-async function loadShiftPlanningReferenceOptions() {
+async function loadShiftPlanningReferenceOptions(isCurrent = () => true) {
   if (!props.tenantId || !props.accessToken) {
     shiftPlanRows.value = [];
     shiftTemplateOptions.value = [];
@@ -1905,15 +1968,24 @@ async function loadShiftPlanningReferenceOptions() {
     listShiftTemplates(props.tenantId, props.accessToken, {}),
     listShiftTypeOptions(props.tenantId, props.accessToken),
   ]);
+  if (!isCurrent()) {
+    return;
+  }
   shiftPlanRows.value = plans;
   shiftTemplateOptions.value = templates;
   shiftTypeOptions.value = shiftTypes;
 }
 
-async function loadShiftPlanState() {
+async function loadShiftPlanState(isCurrent = () => true) {
   const persistedShiftPlanDraft = loadStepDraft<Partial<typeof shiftPlanDraft>>('shift-plan');
-  await loadShiftPlanningReferenceOptions();
+  await loadShiftPlanningReferenceOptions(isCurrent);
+  if (!isCurrent()) {
+    return;
+  }
   if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
+    if (!isCurrent()) {
+      return;
+    }
     selectedShiftPlan.value = null;
     if (persistedShiftPlanDraft) {
       applyShiftPlanDraftPersistence(persistedShiftPlanDraft);
@@ -1931,6 +2003,9 @@ async function loadShiftPlanState() {
     return;
   }
   const plan = await getShiftPlan(props.tenantId, props.wizardState.shift_plan_id, props.accessToken);
+  if (!isCurrent()) {
+    return;
+  }
   syncShiftPlanDraft(plan);
   if (persistedShiftPlanDraft) {
     applyShiftPlanDraftPersistence(persistedShiftPlanDraft);
@@ -1938,10 +2013,16 @@ async function loadShiftPlanState() {
   }
 }
 
-async function loadSeriesState() {
+async function loadSeriesState(isCurrent = () => true) {
   const persistedSeriesDraft = loadStepDraft<SeriesExceptionsDraftPersistence>('series-exceptions');
-  await loadShiftPlanningReferenceOptions();
+  await loadShiftPlanningReferenceOptions(isCurrent);
+  if (!isCurrent()) {
+    return;
+  }
   if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
+    if (!isCurrent()) {
+      return;
+    }
     selectedSeries.value = null;
     seriesRows.value = [];
     seriesExceptions.value = [];
@@ -1956,8 +2037,15 @@ async function loadSeriesState() {
     }
     return;
   }
-  seriesRows.value = await listShiftSeries(props.tenantId, props.wizardState.shift_plan_id, props.accessToken);
+  const listedSeries = await listShiftSeries(props.tenantId, props.wizardState.shift_plan_id, props.accessToken);
+  if (!isCurrent()) {
+    return;
+  }
+  seriesRows.value = listedSeries;
   if (!props.wizardState.series_id) {
+    if (!isCurrent()) {
+      return;
+    }
     selectedSeries.value = null;
     seriesExceptions.value = [];
     if (persistedSeriesDraft) {
@@ -1975,6 +2063,9 @@ async function loadSeriesState() {
     getShiftSeries(props.tenantId, props.wizardState.series_id, props.accessToken),
     listShiftSeriesExceptions(props.tenantId, props.wizardState.series_id, props.accessToken),
   ]);
+  if (!isCurrent()) {
+    return;
+  }
   syncSeriesDraft(series);
   seriesExceptions.value = exceptions;
   if (persistedSeriesDraft) {
@@ -1987,6 +2078,7 @@ async function refreshStepData() {
   if (!handledStepActive.value) {
     return;
   }
+  const isCurrent = buildStepLoadGuard();
   clearDraftRestoreMessage();
   emit('step-ui-state', props.currentStepId, { loading: true, error: '' });
   stepLoading.value = true;
@@ -1994,25 +2086,31 @@ async function refreshStepData() {
     if (planningStepActive.value) {
       await loadPlanningEntityOptions();
       await loadPlanningCreateReferenceOptions();
-      await loadPlanningRecordReferenceOptions();
+      await loadPlanningRecordReferenceOptions(isCurrent);
     } else if (orderStepActive.value || equipmentStepActive.value || requirementStepActive.value || documentsStepActive.value) {
-      await loadOrderReferenceOptions();
-      await loadOrderState();
+      await loadOrderReferenceOptions(isCurrent);
+      await loadOrderState(isCurrent);
     } else if (planningRecordStepActive.value || planningRecordDocumentsStepActive.value) {
-      await loadOrderState();
-      await loadPlanningRecordState();
+      await loadOrderState(isCurrent);
+      await loadPlanningRecordState(isCurrent);
     } else if (shiftPlanStepActive.value) {
-      await loadPlanningRecordState();
-      await loadShiftPlanState();
+      await loadPlanningRecordState(isCurrent);
+      await loadShiftPlanState(isCurrent);
     } else if (seriesStepActive.value) {
-      await loadPlanningRecordState();
-      await loadShiftPlanState();
-      await loadSeriesState();
+      await loadPlanningRecordState(isCurrent);
+      await loadShiftPlanState(isCurrent);
+      await loadSeriesState(isCurrent);
     }
   } catch {
+    if (!isCurrent()) {
+      return;
+    }
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.stepLoad'));
     emit('step-ui-state', props.currentStepId, { error: 'load_failed' });
   } finally {
+    if (!isCurrent()) {
+      return;
+    }
     stepLoading.value = false;
     emit('step-ui-state', props.currentStepId, { loading: false });
   }
@@ -2792,6 +2890,7 @@ watch(
     emit('step-ui-state', 'order-details', { dirty: true, error: '' });
     persistOrderDraft();
   },
+  { flush: 'sync' },
 );
 
 watch(
@@ -2804,6 +2903,7 @@ watch(
     emit('step-ui-state', 'equipment-lines', { dirty: true, error: '' });
     persistEquipmentLineDraft();
   },
+  { flush: 'sync' },
 );
 
 watch(
@@ -2823,6 +2923,7 @@ watch(
     emit('step-ui-state', 'requirement-lines', { dirty: true, error: '' });
     persistRequirementLineDraft();
   },
+  { flush: 'sync' },
 );
 
 watch(
@@ -2842,6 +2943,7 @@ watch(
     emit('step-ui-state', 'order-documents', { dirty: true, error: '' });
     persistOrderDocumentsDraft();
   },
+  { flush: 'sync' },
 );
 
 watch(
@@ -2864,6 +2966,7 @@ watch(
     emit('step-ui-state', 'planning-record-overview', { dirty: true, error: '' });
     persistPlanningRecordDraft();
   },
+  { flush: 'sync' },
 );
 
 watch(
@@ -2883,6 +2986,7 @@ watch(
     emit('step-ui-state', 'planning-record-documents', { dirty: true, error: '' });
     persistPlanningRecordDocumentsDraft();
   },
+  { flush: 'sync' },
 );
 
 watch(
@@ -2901,6 +3005,7 @@ watch(
     emit('step-ui-state', 'shift-plan', { dirty: true, error: '' });
     persistShiftPlanDraft();
   },
+  { flush: 'sync' },
 );
 
 watch(
@@ -2939,6 +3044,7 @@ watch(
     emit('step-ui-state', 'series-exceptions', { dirty: true, error: '' });
     persistSeriesDraft();
   },
+  { flush: 'sync' },
 );
 
 watch(
@@ -3168,11 +3274,15 @@ onBeforeUnmount(() => {
         </label>
         <label class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.securityConcept') }}</span>
-          <textarea v-model="orderDraft.security_concept_text" rows="3" />
+          <textarea
+            v-model="orderDraft.security_concept_text"
+            data-testid="customer-new-plan-order-security-concept"
+            rows="3"
+          />
         </label>
         <label class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
-          <textarea v-model="orderDraft.notes" rows="3" />
+          <textarea v-model="orderDraft.notes" data-testid="customer-new-plan-order-notes" rows="3" />
         </label>
       </div>
     </section>

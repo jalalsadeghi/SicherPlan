@@ -351,6 +351,32 @@ describe('CustomerNewPlanWizardView', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
   });
 
+  it('does not rewrite the route when route.replace keeps the same wizard context', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      step: 'order-details',
+      planning_entity_type: 'site',
+      planning_entity_id: 'site-1',
+      planning_mode_code: 'site',
+    };
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    routerReplaceMock.mockClear();
+    routeState.query = {
+      customer_id: 'customer-1',
+      step: 'order-details',
+      planning_entity_type: 'site',
+      planning_entity_id: 'site-1',
+      planning_mode_code: 'site',
+    };
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect(routerReplaceMock).not.toHaveBeenCalled();
+  });
+
   it('hydrates later steps when required downstream ids exist', async () => {
     routeState.query = {
       customer_id: 'customer-1',
@@ -485,7 +511,6 @@ describe('CustomerNewPlanWizardView', () => {
 
     await wrapper.get('[data-testid="customer-new-plan-mark-dirty"]').trigger('click');
 
-    customersApiMocks.getCustomerMock.mockResolvedValue(buildCustomer({ name: 'Alpha Security Reloaded' }));
     authStoreState.isSessionResolving = true;
     authStoreState.effectiveAccessToken = '';
     authStoreState.accessToken = '';
@@ -500,9 +525,57 @@ describe('CustomerNewPlanWizardView', () => {
     authStoreState.isSessionResolving = false;
     await flushPromises();
 
-    expect(customersApiMocks.getCustomerMock).toHaveBeenLastCalledWith('tenant-1', 'customer-1', 'token-2');
+    expect(customersApiMocks.getCustomerMock).toHaveBeenCalledTimes(1);
     expect(wrapper.find('[data-testid="customer-new-plan-step-content-stub"]').exists()).toBe(true);
-    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security Reloaded');
+    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security');
+  });
+
+  it('does not refetch the customer again when only the access token changes for the same stable customer', async () => {
+    routeState.query = { customer_id: 'customer-1' };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(customersApiMocks.getCustomerMock).toHaveBeenCalledTimes(1);
+
+    authStoreState.effectiveAccessToken = 'token-2';
+    authStoreState.accessToken = 'token-2';
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-loading"]').exists()).toBe(false);
+    expect(customersApiMocks.getCustomerMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores stale customer context responses after a newer request wins', async () => {
+    let resolveFirstRequest: ((value: ReturnType<typeof buildCustomer>) => void) | null = null;
+    customersApiMocks.getCustomerMock.mockReset();
+    customersApiMocks.getCustomerMock
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirstRequest = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(
+        buildCustomer({
+          id: 'customer-2',
+          customer_number: 'CU-2000',
+          name: 'Beta Security',
+          tenant_id: 'tenant-1',
+        }),
+      );
+
+    routeState.query = { customer_id: 'customer-1' };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    routeState.query = { customer_id: 'customer-2' };
+    await flushPromises();
+
+    resolveFirstRequest?.(buildCustomer());
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Beta Security');
+    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).not.toContain('Alpha Security');
   });
 
   it('does not reset from order-details back to planning when only the access token changes', async () => {
@@ -518,14 +591,13 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
 
-    customersApiMocks.getCustomerMock.mockResolvedValue(buildCustomer({ name: 'Alpha Security Reloaded' }));
     authStoreState.isSessionResolving = true;
     authStoreState.effectiveAccessToken = 'token-2';
     authStoreState.accessToken = 'token-2';
     await flushPromises();
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
-    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security Reloaded');
+    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security');
   });
 
   it('persists later context ids into the route when subsequent steps save them', async () => {
@@ -660,7 +732,6 @@ describe('CustomerNewPlanWizardView', () => {
     await wrapper.get('[data-testid="customer-new-plan-planning-create-notes"]').setValue('Focus regression test');
     await flushPromises();
 
-    customersApiMocks.getCustomerMock.mockResolvedValue(buildCustomer({ name: 'Alpha Security Refreshed' }));
     window.dispatchEvent(new Event('blur'));
     authStoreState.isSessionResolving = true;
     authStoreState.effectiveAccessToken = '';
@@ -695,7 +766,7 @@ describe('CustomerNewPlanWizardView', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
     expect(wrapper.find('[data-testid="customer-new-plan-planning-create-modal"]').exists()).toBe(true);
     expect(routerPushMock).not.toHaveBeenCalled();
-    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security Refreshed');
+    expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security');
 
     await wrapper.get('[data-testid="customer-new-plan-planning-create-cancel"]').trigger('click');
     await flushPromises();

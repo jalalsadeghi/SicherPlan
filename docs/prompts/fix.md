@@ -1,139 +1,85 @@
-You are working in the SicherPlan repository.
+Add regression coverage for the real remaining browser bug, not only the previous simple remount/draft tests.
 
-This task follows the diagnosis from the previous prompt.
+Target:
+Customer New Plan Wizard, Step 2 Order Details must keep unsaved values when browser focus returns and both visibilitychange and focus trigger auth/session refresh behavior.
 
-Source document:
-- /docs/sprint/SPR-CUST-NEWPLAN-V1.md
+Files to inspect/update:
+- web/apps/web-antd/src/views/sicherplan/customers/new-plan.test.ts
+- web/apps/web-antd/src/views/sicherplan/customers/new-plan-epic3.smoke.test.ts
+- web/apps/web-antd/src/views/sicherplan/customers/new-plan-wizard.test.ts
+- any test utilities for auth/session/router/fetch mocks
+- auth-session-lifecycle tests, create them if missing
 
-User-visible bug:
-On Customer New Plan Wizard Step 2 "Order details", unsaved form data still clears after focus/app switch/auth refresh/reference reload.
+Required test 1 — lifecycle coalescing:
+1. Initialize auth session lifecycle.
+2. Simulate document.visibilityState = 'visible' and dispatch visibilitychange.
+3. Immediately dispatch window.focus.
+4. Mock /api/auth/refresh.
+5. Assert only one refresh request occurs or the second call reuses the in-flight promise.
+6. Assert no duplicate destructive session state transitions happen.
 
-Use the root cause discovered in the previous prompt.
-Do not assume the previous implementation is correct just because tests passed.
+Required test 2 — same-context accessToken churn:
+1. Mount /admin/customers/new-plan with:
+   - customer_id=84bad50d-209c-491e-b86b-13c7788c7620
+   - planning_entity_id=bfe2eaba-0a95-4918-9f11-5e46fd4043e3
+   - planning_entity_type=site
+   - planning_mode_code=site
+   - step=order-details
+2. Type values into:
+   - order_no
+   - title
+   - service_from
+   - service_to
+   - service_category_code
+   - notes
+   - security_concept_text
+3. Change accessToken in the auth store twice, quickly.
+4. Assert:
+   - customer-new-plan-step-content remains mounted
+   - no loading state replaces the form
+   - all typed values remain visible
+   - sessionStorage order-details draft still contains the typed values
 
-Goal:
-Fix the remaining bug so Order Details and other unsaved wizard drafts cannot be cleared by focus return, auth refresh, reference reload, component remount, or route hydration.
+Required test 3 — overlapping reload race:
+1. Mock customer/reference/catalog API calls with controllable promises.
+2. Trigger two lifecycle refresh waves:
+   - wave A starts first but resolves last
+   - wave B starts second but resolves first
+3. While both are in flight, type or update Order Details fields.
+4. Resolve wave B.
+5. Resolve wave A.
+6. Assert stale wave A does not overwrite:
+   - orderDraft
+   - selectedOrder
+   - dirty state
+   - sessionStorage draft
+7. Assert no saveWizardDraft(..., null) occurs for order-details during this process.
 
-Scope:
-- Frontend only
-- No backend changes
-- No canonical Planning/Orders/Shift/Staffing page redesign
-- No wizard step-order changes
-- No unrelated refactor
+Required test 4 — incomplete draft key guard:
+1. Mount with route containing planning_entity_id.
+2. Simulate a temporary wizardState where planning_entity_id is empty during hydration.
+3. Trigger auth refresh/reference reload.
+4. Assert no order-details draft is saved or cleared under a key containing the "_" empty segment when the route already has a planning_entity_id.
+5. Assert the real key draft survives.
 
-Required fix areas:
+Required test 5 — actual browser/E2E if Playwright/Cypress exists:
+If this repo has Playwright or another browser E2E setup, add a browser-level test:
+1. Open the exact URL.
+2. Fill Order Details fields.
+3. Dispatch visibility/focus or use page.bringToFront after switching away.
+4. Wait for mocked or real auth refresh/reference reload.
+5. Click another field.
+6. Assert values remain.
 
-A. Prevent empty/default draft overwrite
-If the diagnosis shows that reset/default initialization overwrites a non-empty draft:
-- Add a persistence suppression guard during reset/hydration.
-- Example patterns:
-  - isHydratingDraft = true
-  - isInitializingStep = true
-  - withDraftPersistencePaused(() => ...)
-- Watchers must not save empty/default values while a step is being reset or hydrated.
-- Never write an empty default draft over an existing non-empty draft unless the user intentionally clears/cancels the wizard.
+If no browser E2E setup exists, add a manual QA checklist to the final output and explain why Vitest covers the race deterministically.
 
-B. Make draft keys stable
-If the diagnosis shows a storage key mismatch:
-- Ensure the same key is used for saving and restoring a step.
-- The Order Details draft key must work before order_id exists.
-- Key must include:
-  - tenantId
-  - customerId
-  - planning_entity_type
-  - planning_entity_id
-  - step id
-- If planning context is temporarily unavailable during early hydration, defer draft load/save until the context is stable.
-- Do not save drafts under incomplete keys such as empty planning_entity_id if the route already contains planning context.
+Run:
+- pnpm --dir web/apps/web-antd exec vitest run src/views/sicherplan/customers/new-plan.test.ts src/views/sicherplan/customers/new-plan-epic3.smoke.test.ts src/views/sicherplan/customers/new-plan-epic4.smoke.test.ts src/views/sicherplan/customers/new-plan-wizard.test.ts
+- any new auth-session-lifecycle test file
+- pnpm --dir web/apps/web-antd exec vue-tsc --noEmit --skipLibCheck --pretty false
 
-C. Do not reset dirty active forms during reference reload
-If the diagnosis shows over-aggressive reset:
-- Modify loadOrderState() so:
-  - if order_id is missing and orderDraft is dirty or has user input, do not reset it.
-  - if order_id is missing and a persisted draft exists, hydrate it.
-  - if order_id is missing and no draft exists, initialize defaults only once.
-- Apply same pattern to:
-  - equipmentLineDraft
-  - requirementLineDraft
-  - planningRecordDraft
-  - shiftPlanDraft
-  - seriesDraft
-where applicable.
-
-D. Make same-customer auth refresh non-destructive
-If auth/accessToken changes:
-- Do not reset wizard state.
-- Do not remount child content unnecessarily.
-- Re-fetch reference data if needed, but do not clear active drafts.
-- Re-fetch customer context with preserveContent behavior.
-- Confirm that new-plan.vue does not set customer to null/loading for the same customer while an active draft exists.
-
-E. Hydrate before rendering if remount happens
-If the child component remounts:
-- Hydrate persisted draft before visible fields are reset to defaults.
-- Avoid a visible flash of empty fields if possible.
-- Do not mark hydrated draft as dirty just because it was restored.
-- Do not immediately overwrite hydrated draft with defaults via watchers.
-
-F. Correct cleanup rules
-Only clear a step draft when:
-- that step is successfully saved to backend
-- user cancels the wizard
-- customer_id changes
-- tenant changes
-- user intentionally resets the step
-
-Do not clear on:
-- focus return
-- auth refresh
-- reference data reload
-- route.replace for same context
-- same-customer customer GET
-
-G. Tests
-The failing regression test from the previous prompt must pass after the fix.
-
-Also add or update tests for:
-1. Order Details typed values survive accessToken change.
-2. Order Details typed values survive reference-data reload.
-3. Order Details typed values survive component remount when route has planning context.
-4. Existing non-empty sessionStorage draft is not overwritten by empty default initialization.
-5. Dirty Order Details does not reset when loadOrderState() runs with no order_id.
-6. Saved Order Details clears the draft after successful create/update.
-7. Cancel clears drafts.
-8. Customer switch prevents draft leakage.
-9. Step 1 -> Step 2 route persistence still works.
-10. Later step representative draft, such as Shift Plan or Series, survives remount/reference reload.
-
-H. Manual QA checklist required in final output
-Perform or describe exact manual QA steps:
-- Open the user’s exact URL with step=order-details.
-- Type Order number and Title.
-- Switch to another app/monitor and return.
-- Confirm values remain.
-- Wait for auth refresh or force token refresh.
-- Confirm values remain.
-- Click inside another field.
-- Confirm values remain.
-- Refresh browser.
-- Confirm values restore.
-- Click Next and save Order Details.
-- Confirm draft clears and order_id is added to context.
-- Go Previous and Next again.
-- Confirm no duplicated order is created.
-- Switch customer_id.
-- Confirm old draft does not appear.
-
-Final output:
-1. Confirmed root cause
-2. Fix implemented
-3. Files changed
-4. Tests added/updated
-5. Test results
-6. Manual QA result
-7. Any remaining limitation
-
-Important:
-Do not finish with “already implemented” unless the exact user scenario is reproduced and passes.
-The user has already confirmed the bug still exists in the browser.
-Avoid unrelated refactors.
+Final output must include:
+- exact tests added
+- why previous tests missed the bug
+- proof that double focus/visibility refresh does not clear Order Details
+- proof that stale async reloads cannot overwrite active dirty form data

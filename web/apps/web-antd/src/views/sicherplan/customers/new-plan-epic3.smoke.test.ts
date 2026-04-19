@@ -590,6 +590,8 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-order-service-category"]').setValue('guarding');
     await wrapper.get('[data-testid="customer-new-plan-order-service-from"]').setValue('2026-06-01');
     await wrapper.get('[data-testid="customer-new-plan-order-service-to"]').setValue('2026-06-10');
+    await wrapper.get('[data-testid="customer-new-plan-order-security-concept"]').setValue('Security concept survives refresh');
+    await wrapper.get('[data-testid="customer-new-plan-order-notes"]').setValue('Notes survive refresh');
     await nextTickFlush();
 
     authStoreState.effectiveAccessToken = 'token-2';
@@ -599,6 +601,8 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
     expect((wrapper.get('[data-testid="customer-new-plan-order-no"]').element as HTMLInputElement).value).toBe('ORD-REFRESH');
     expect((wrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('Auth Refresh Draft');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-security-concept"]').element as HTMLTextAreaElement).value).toBe('Security concept survives refresh');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-notes"]').element as HTMLTextAreaElement).value).toBe('Notes survive refresh');
   });
 
   it('restores a preexisting order-details draft after auth-driven remount and repeated reference reloads without overwriting it with defaults', async () => {
@@ -644,6 +648,8 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect((firstWrapper.get('[data-testid="customer-new-plan-order-service-category"]').element as HTMLSelectElement).value).toBe('guarding');
     expect((firstWrapper.get('[data-testid="customer-new-plan-order-service-from"]').element as HTMLInputElement).value).toBe('2026-06-01');
     expect((firstWrapper.get('[data-testid="customer-new-plan-order-service-to"]').element as HTMLInputElement).value).toBe('2026-06-12');
+    expect((firstWrapper.get('[data-testid="customer-new-plan-order-security-concept"]').element as HTMLTextAreaElement).value).toBe('Do not overwrite me');
+    expect((firstWrapper.get('[data-testid="customer-new-plan-order-notes"]').element as HTMLTextAreaElement).value).toBe('Keep this note');
 
     const firstServiceCategoryLoadCount = apiMocks.listServiceCategoryOptionsMock.mock.calls.length;
     const firstRequirementTypeLoadCount = apiMocks.listPlanningSetupRecordsMock.mock.calls.filter(
@@ -673,6 +679,8 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect((secondWrapper.get('[data-testid="customer-new-plan-order-service-category"]').element as HTMLSelectElement).value).toBe('guarding');
     expect((secondWrapper.get('[data-testid="customer-new-plan-order-service-from"]').element as HTMLInputElement).value).toBe('2026-06-01');
     expect((secondWrapper.get('[data-testid="customer-new-plan-order-service-to"]').element as HTMLInputElement).value).toBe('2026-06-12');
+    expect((secondWrapper.get('[data-testid="customer-new-plan-order-security-concept"]').element as HTMLTextAreaElement).value).toBe('Do not overwrite me');
+    expect((secondWrapper.get('[data-testid="customer-new-plan-order-notes"]').element as HTMLTextAreaElement).value).toBe('Keep this note');
     expect(secondWrapper.get('[data-testid="customer-new-plan-draft-restored"]').text()).toBe('sicherplan.customerPlansWizard.draftRestored');
     expect(window.sessionStorage.getItem(draftKey)).toContain('ORD-STORED');
     expect(window.sessionStorage.getItem(draftKey)).toContain('Persisted before mount');
@@ -708,6 +716,8 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-order-service-category"]').setValue('guarding');
     await wrapper.get('[data-testid="customer-new-plan-order-service-from"]').setValue('2026-06-03');
     await wrapper.get('[data-testid="customer-new-plan-order-service-to"]').setValue('2026-06-14');
+    await wrapper.get('[data-testid="customer-new-plan-order-security-concept"]').setValue('Security concept remount');
+    await wrapper.get('[data-testid="customer-new-plan-order-notes"]').setValue('Notes remount');
     await nextTickFlush();
 
     authStoreState.effectiveAccessToken = '';
@@ -731,6 +741,8 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect((restoredWrapper.get('[data-testid="customer-new-plan-order-service-category"]').element as HTMLSelectElement).value).toBe('guarding');
     expect((restoredWrapper.get('[data-testid="customer-new-plan-order-service-from"]').element as HTMLInputElement).value).toBe('2026-06-03');
     expect((restoredWrapper.get('[data-testid="customer-new-plan-order-service-to"]').element as HTMLInputElement).value).toBe('2026-06-14');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-security-concept"]').element as HTMLTextAreaElement).value).toBe('Security concept remount');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-notes"]').element as HTMLTextAreaElement).value).toBe('Notes remount');
   });
 
   it('persists the latest typed order-details values even if remount happens before watcher-flush settles', async () => {
@@ -750,6 +762,8 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     const serviceCategorySelect = wrapper.get('[data-testid="customer-new-plan-order-service-category"]').element as HTMLSelectElement;
     const serviceFromInput = wrapper.get('[data-testid="customer-new-plan-order-service-from"]').element as HTMLInputElement;
     const serviceToInput = wrapper.get('[data-testid="customer-new-plan-order-service-to"]').element as HTMLInputElement;
+    const securityConceptTextarea = wrapper.get('[data-testid="customer-new-plan-order-security-concept"]').element as HTMLTextAreaElement;
+    const notesTextarea = wrapper.get('[data-testid="customer-new-plan-order-notes"]').element as HTMLTextAreaElement;
 
     orderNoInput.value = 'ORD-RACE';
     orderNoInput.dispatchEvent(new Event('input'));
@@ -761,6 +775,10 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     serviceFromInput.dispatchEvent(new Event('input'));
     serviceToInput.value = '2026-06-15';
     serviceToInput.dispatchEvent(new Event('input'));
+    securityConceptTextarea.value = 'Security concept race';
+    securityConceptTextarea.dispatchEvent(new Event('input'));
+    notesTextarea.value = 'Notes race';
+    notesTextarea.dispatchEvent(new Event('input'));
 
     wrapper.unmount();
     mountedWrappers.pop();
@@ -773,6 +791,69 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect((restoredWrapper.get('[data-testid="customer-new-plan-order-service-category"]').element as HTMLSelectElement).value).toBe('guarding');
     expect((restoredWrapper.get('[data-testid="customer-new-plan-order-service-from"]').element as HTMLInputElement).value).toBe('2026-06-05');
     expect((restoredWrapper.get('[data-testid="customer-new-plan-order-service-to"]').element as HTMLInputElement).value).toBe('2026-06-15');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-security-concept"]').element as HTMLTextAreaElement).value).toBe('Security concept race');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-notes"]').element as HTMLTextAreaElement).value).toBe('Notes race');
+  });
+
+  it('does not save or clear order-details draft under an incomplete planning key when route context already has planning_entity_id', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      step: 'order-details',
+    };
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-order-no"]').setValue('ORD-REAL-KEY');
+    await wrapper.get('[data-testid="customer-new-plan-order-title"]').setValue('Real key draft');
+    await nextTickFlush();
+
+    const storageKeys = Array.from({ length: window.sessionStorage.length }, (_, index) => window.sessionStorage.key(index) || '');
+    expect(storageKeys.some((key) => key.includes('sicherplan.customerNewPlanWizardDraft:tenant-1:customer-1:_:_:order-details'))).toBe(false);
+    expect(storageKeys.some((key) => key.includes('sicherplan.customerNewPlanWizardDraft:tenant-1:customer-1:site:site-1:order-details'))).toBe(true);
+  });
+
+  it('keeps the real order-details draft through rapid same-context token churn without creating a second draft key', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      step: 'order-details',
+    };
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-order-no"]').setValue('ORD-DOUBLE-REFRESH');
+    await wrapper.get('[data-testid="customer-new-plan-order-title"]').setValue('Double refresh draft');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-category"]').setValue('guarding');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-from"]').setValue('2026-06-06');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-to"]').setValue('2026-06-16');
+    await wrapper.get('[data-testid="customer-new-plan-order-security-concept"]').setValue('Double refresh security concept');
+    await wrapper.get('[data-testid="customer-new-plan-order-notes"]').setValue('Double refresh notes');
+    await nextTickFlush();
+
+    authStoreState.effectiveAccessToken = '';
+    authStoreState.accessToken = '';
+    await nextTickFlush();
+    authStoreState.effectiveAccessToken = 'token-2';
+    authStoreState.accessToken = 'token-2';
+    await nextTickFlush();
+    authStoreState.effectiveAccessToken = 'token-3';
+    authStoreState.accessToken = 'token-3';
+    await nextTickFlush();
+
+    const storageKeys = Array.from({ length: window.sessionStorage.length }, (_, index) => window.sessionStorage.key(index) || '');
+    expect(storageKeys.filter((key) => key.includes('customerNewPlanWizardDraft')).length).toBe(1);
+    expect(storageKeys.some((key) => key.includes('sicherplan.customerNewPlanWizardDraft:tenant-1:customer-1:_:_:order-details'))).toBe(false);
+    expect((wrapper.get('[data-testid="customer-new-plan-order-no"]').element as HTMLInputElement).value).toBe('ORD-DOUBLE-REFRESH');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('Double refresh draft');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-security-concept"]').element as HTMLTextAreaElement).value).toBe('Double refresh security concept');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-notes"]').element as HTMLTextAreaElement).value).toBe('Double refresh notes');
   });
 
   it('clears the unsaved order draft after successful save and persists order_id into the route update', async () => {
