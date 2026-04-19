@@ -68,6 +68,8 @@
       "executionNote": "Execution note",
       "equipmentItem": "Equipment",
       "equipmentItemPlaceholder": "Select equipment",
+      "editingEquipmentLine": "Editing saved equipment line",
+      "editingRequirementLine": "Editing saved requirement line",
       "fairNo": "Fair number",
       "defaultBreakMinutes": "Default break minutes",
       "functionType": "Function type",
@@ -180,6 +182,7 @@
       "equipmentCreateFailed": "The equipment item could not be created.",
       "equipmentCreateInvalid": "Code, label, and unit of measure are required for new equipment.",
       "equipmentLineInvalid": "The equipment line needs an equipment item and a quantity above zero.",
+      "equipmentLineRequiredBeforeContinue": "Add at least one equipment line before continuing.",
       "equipmentLineSaveFailed": "The equipment line could not be saved.",
       "orderDocumentSaveFailed": "The order document could not be saved or linked.",
       "orderSaveFailed": "The order could not be saved.",
@@ -200,8 +203,11 @@
       "requirementCreateFailed": "The requirement could not be created.",
       "requirementCreateInvalid": "Code, label, and default planning mode are required for the new requirement.",
       "requirementLineInvalid": "The requirement line is incomplete or already active as a duplicate.",
+      "requirementLineRequiredBeforeContinue": "Add at least one requirement line before continuing.",
       "requirementLineSaveFailed": "The requirement line could not be saved.",
       "requirementTypeRequired": "A requirement type is required.",
+      "saveCurrentEquipmentLineBeforeContinue": "Save or clear the current equipment line before continuing.",
+      "saveCurrentRequirementLineBeforeContinue": "Save or clear the current requirement line before continuing.",
       "seriesGenerateFailed": "Series generation failed or the staffing handoff could not be completed.",
       "seriesInvalid": "Series label, template, and valid date range are required.",
       "serviceCategoryRequired": "A service category is required.",
@@ -225,10 +231,16 @@
       "cancelAddress": "Cancel",
       "generateContinue": "Generate Series & Continue",
       "createAddress": "Create new address",
+      "clearEquipmentLine": "Clear equipment line",
+      "clearRequirementLine": "Clear requirement line",
       "previous": "Previous",
       "next": "Next",
       "pickOnMap": "Pick on map",
-      "saveAddress": "Save address"
+      "saveAddress": "Save address",
+      "saveEquipmentLine": "Save equipment line",
+      "saveRequirementLine": "Save requirement line",
+      "updateEquipmentLine": "Update equipment line",
+      "updateRequirementLine": "Update requirement line"
     },
     "addressModal": {
       "title": "Create new address",
@@ -250,7 +262,11 @@
       "startExisting": "Start point: existing planning entry coordinates"
     },
     "messages": {
-      "addressCreateSuccess": "The address was created and assigned to the planning entry."
+      "addressCreateSuccess": "The address was created and assigned to the planning entry.",
+      "equipmentLineSaved": "Equipment line saved.",
+      "equipmentLineUpdated": "Equipment line updated.",
+      "requirementLineSaved": "Requirement line saved.",
+      "requirementLineUpdated": "Requirement line updated."
     },
     "steps": {
       "planning": "Planning",

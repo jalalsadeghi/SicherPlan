@@ -265,6 +265,53 @@ function mountComponent() {
   return wrapper;
 }
 
+async function advanceToEquipmentLines(wrapper: VueWrapper) {
+  await wrapper.get('[data-testid="customer-new-plan-planning-entity"]').setValue('site-1');
+  await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+  await nextTickFlush();
+
+  await wrapper.get('[data-testid="customer-new-plan-order-no"]').setValue('ORD-2000');
+  await wrapper.get('[data-testid="customer-new-plan-order-title"]').setValue('Werkschutz Nord');
+  await wrapper.get('[data-testid="customer-new-plan-order-requirement-type"]').setValue('requirement-type-1');
+  await wrapper.get('[data-testid="customer-new-plan-order-service-category"]').setValue('guarding');
+  await wrapper.get('[data-testid="customer-new-plan-order-service-from"]').setValue('2026-06-01');
+  await wrapper.get('[data-testid="customer-new-plan-order-service-to"]').setValue('2026-06-10');
+  await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+  await nextTickFlush();
+
+  expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
+}
+
+async function saveEquipmentLine(wrapper: VueWrapper, overrides?: { notes?: string; qty?: string | number }) {
+  await wrapper.get('[data-testid="customer-new-plan-equipment-item"]').setValue('equipment-item-1');
+  await wrapper.get('[data-testid="customer-new-plan-equipment-required-qty"]').setValue(String(overrides?.qty ?? 2));
+  await wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').setValue(overrides?.notes ?? 'Night radios');
+  await wrapper.get('[data-testid="customer-new-plan-save-equipment-line"]').trigger('click');
+  await nextTickFlush();
+}
+
+async function advanceToRequirementLines(wrapper: VueWrapper) {
+  await advanceToEquipmentLines(wrapper);
+  await saveEquipmentLine(wrapper);
+  await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+  await nextTickFlush();
+  expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('requirement-lines');
+}
+
+async function saveRequirementLine(
+  wrapper: VueWrapper,
+  overrides?: { minQty?: string | number; notes?: string; targetQty?: string | number },
+) {
+  await wrapper.get('[data-testid="customer-new-plan-requirement-type"]').setValue('requirement-type-1');
+  await wrapper.get('[data-testid="customer-new-plan-requirement-function-type"]').setValue('function-1');
+  await wrapper.get('[data-testid="customer-new-plan-requirement-qualification-type"]').setValue('qualification-1');
+  await wrapper.get('[data-testid="customer-new-plan-requirement-min-qty"]').setValue(String(overrides?.minQty ?? 1));
+  await wrapper.get('[data-testid="customer-new-plan-requirement-target-qty"]').setValue(String(overrides?.targetQty ?? 2));
+  await wrapper.get('[data-testid="customer-new-plan-requirement-notes"]').setValue(overrides?.notes ?? 'One supervisor');
+  await wrapper.get('[data-testid="customer-new-plan-save-requirement-line"]').trigger('click');
+  await nextTickFlush();
+}
+
 describe('CustomerNewPlanWizardView EPIC 3', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
@@ -432,20 +479,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     const wrapper = mountComponent();
     await nextTickFlush();
 
-    await wrapper.get('[data-testid="customer-new-plan-planning-entity"]').setValue('site-1');
-    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
-    await nextTickFlush();
-    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
-
-    await wrapper.get('[data-testid="customer-new-plan-order-no"]').setValue('ORD-2000');
-    await wrapper.get('[data-testid="customer-new-plan-order-title"]').setValue('Werkschutz Nord');
-    await wrapper.get('[data-testid="customer-new-plan-order-requirement-type"]').setValue('requirement-type-1');
-    await wrapper.get('[data-testid="customer-new-plan-order-service-category"]').setValue('guarding');
-    await wrapper.get('[data-testid="customer-new-plan-order-service-from"]').setValue('2026-06-01');
-    await wrapper.get('[data-testid="customer-new-plan-order-service-to"]').setValue('2026-06-10');
-    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
-    await nextTickFlush();
-
+    await advanceToEquipmentLines(wrapper);
     expect(apiMocks.createCustomerOrderMock).toHaveBeenCalledTimes(1);
     expect(apiMocks.createCustomerOrderMock.mock.calls[0]?.[2]).toMatchObject({ customer_id: 'customer-1', order_no: 'ORD-2000' });
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
@@ -464,11 +498,16 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-new-equipment-unit"]').setValue('piece');
     await wrapper.get('[data-testid="modal-ok"]').trigger('click');
     await nextTickFlush();
-    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await saveEquipmentLine(wrapper);
     await nextTickFlush();
     expect(apiMocks.createPlanningSetupRecordMock).toHaveBeenCalledWith('equipment_item', 'tenant-1', 'token-1', expect.any(Object));
     expect(apiMocks.createPlanningSetupRecordMock.mock.calls.find((call) => call[0] === 'equipment_item')?.[3]).not.toHaveProperty('customer_id');
     expect(apiMocks.createOrderEquipmentLineMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('requirement-lines');
 
     await wrapper.get('[data-testid="customer-new-plan-new-requirement"]').trigger('click');
     await nextTickFlush();
@@ -476,17 +515,340 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-new-requirement-label"]').setValue('Werkschutz');
     await wrapper.get('[data-testid="modal-ok"]').trigger('click');
     await nextTickFlush();
-    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await saveRequirementLine(wrapper);
     await nextTickFlush();
     expect(apiMocks.createPlanningSetupRecordMock).toHaveBeenCalledWith('requirement_type', 'tenant-1', 'token-1', expect.any(Object));
     expect(apiMocks.createPlanningSetupRecordMock.mock.calls.find((call) => call[0] === 'requirement_type')?.[3]).not.toHaveProperty('customer_id');
     expect(apiMocks.createOrderRequirementLineMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('requirement-lines');
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
 
     await wrapper.get('[data-testid="customer-new-plan-order-document-id"]').setValue('document-1');
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
     expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(1);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+  });
+
+  it('saves and updates equipment lines inline, blocks next for unsaved drafts, and clears persisted draft state', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToEquipmentLines(wrapper);
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
+    expect(apiMocks.createOrderEquipmentLineMock).toHaveBeenCalledTimes(0);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.equipmentLineRequiredBeforeContinue');
+
+    await wrapper.get('[data-testid="customer-new-plan-equipment-item"]').setValue('equipment-item-1');
+    await wrapper.get('[data-testid="customer-new-plan-equipment-required-qty"]').setValue('3');
+    await wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').setValue('Primary radios');
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.saveCurrentEquipmentLineBeforeContinue');
+    expect(apiMocks.createOrderEquipmentLineMock).toHaveBeenCalledTimes(0);
+
+    const equipmentDraftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'equipment-lines',
+    );
+    expect(window.sessionStorage.getItem(equipmentDraftKey)).toContain('Primary radios');
+
+    await wrapper.get('[data-testid="customer-new-plan-save-equipment-line"]').trigger('click');
+    await nextTickFlush();
+    expect(apiMocks.createOrderEquipmentLineMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.messages.equipmentLineSaved');
+    expect(window.sessionStorage.getItem(equipmentDraftKey)).toBeNull();
+    expect(stores.equipmentLinesByOrder['order-1']).toHaveLength(1);
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-item"]').element as HTMLSelectElement).value).toBe('');
+    expect(wrapper.find('[data-testid="customer-new-plan-save-equipment-line"]').exists()).toBe(true);
+
+    await wrapper.get('.sp-customer-plan-wizard-step__list-row').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-editing"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-update-equipment-line"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').setValue('Updated radios');
+    await wrapper.get('[data-testid="customer-new-plan-update-equipment-line"]').trigger('click');
+    await nextTickFlush();
+    expect(apiMocks.updateOrderEquipmentLineMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.messages.equipmentLineUpdated');
+    expect(stores.equipmentLinesByOrder['order-1']?.[0]?.notes).toBe('Updated radios');
+    expect(wrapper.find('[data-testid="customer-new-plan-save-equipment-line"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="customer-new-plan-equipment-item"]').setValue('equipment-item-1');
+    await wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').setValue('Discard me');
+    await nextTickFlush();
+    expect(window.sessionStorage.getItem(equipmentDraftKey)).toContain('Discard me');
+    await wrapper.get('[data-testid="customer-new-plan-clear-equipment-line"]').trigger('click');
+    await nextTickFlush();
+    expect(window.sessionStorage.getItem(equipmentDraftKey)).toBeNull();
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-item"]').element as HTMLSelectElement).value).toBe('');
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+    expect(apiMocks.createOrderEquipmentLineMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.updateOrderEquipmentLineMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('requirement-lines');
+  });
+
+  it('saves and updates requirement lines inline, blocks next for unsaved drafts, and clears persisted draft state', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToRequirementLines(wrapper);
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('requirement-lines');
+    expect(apiMocks.createOrderRequirementLineMock).toHaveBeenCalledTimes(0);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.requirementLineRequiredBeforeContinue');
+
+    await wrapper.get('[data-testid="customer-new-plan-requirement-type"]').setValue('requirement-type-1');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-function-type"]').setValue('function-1');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-qualification-type"]').setValue('qualification-1');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-min-qty"]').setValue('1');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-target-qty"]').setValue('2');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-notes"]').setValue('Need supervisor');
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('requirement-lines');
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.saveCurrentRequirementLineBeforeContinue');
+    expect(apiMocks.createOrderRequirementLineMock).toHaveBeenCalledTimes(0);
+
+    const requirementDraftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'requirement-lines',
+    );
+    expect(window.sessionStorage.getItem(requirementDraftKey)).toContain('Need supervisor');
+
+    await wrapper.get('[data-testid="customer-new-plan-save-requirement-line"]').trigger('click');
+    await nextTickFlush();
+    expect(apiMocks.createOrderRequirementLineMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('requirement-lines');
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.messages.requirementLineSaved');
+    expect(window.sessionStorage.getItem(requirementDraftKey)).toBeNull();
+    expect(stores.requirementLinesByOrder['order-1']).toHaveLength(1);
+    expect((wrapper.get('[data-testid="customer-new-plan-requirement-type"]').element as HTMLSelectElement).value).toBe('');
+
+    await wrapper.get('.sp-customer-plan-wizard-step__list-row').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-editing"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-update-requirement-line"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="customer-new-plan-requirement-notes"]').setValue('Updated requirement');
+    await wrapper.get('[data-testid="customer-new-plan-update-requirement-line"]').trigger('click');
+    await nextTickFlush();
+    expect(apiMocks.updateOrderRequirementLineMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.messages.requirementLineUpdated');
+    expect(stores.requirementLinesByOrder['order-1']?.[0]?.notes).toBe('Updated requirement');
+
+    await wrapper.get('[data-testid="customer-new-plan-requirement-type"]').setValue('requirement-type-1');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-notes"]').setValue('Discard requirement draft');
+    await nextTickFlush();
+    expect(window.sessionStorage.getItem(requirementDraftKey)).toContain('Discard requirement draft');
+    await wrapper.get('[data-testid="customer-new-plan-clear-requirement-line"]').trigger('click');
+    await nextTickFlush();
+    expect(window.sessionStorage.getItem(requirementDraftKey)).toBeNull();
+    expect((wrapper.get('[data-testid="customer-new-plan-requirement-type"]').element as HTMLSelectElement).value).toBe('');
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+    expect(apiMocks.createOrderRequirementLineMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.updateOrderRequirementLineMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-documents');
+  });
+
+  it('keeps an unsaved equipment draft during same-customer auth refresh and remount', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      order_id: 'order-1',
+      step: 'equipment-lines',
+    };
+    stores.orders['order-1'] = makeOrder('order-1');
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-equipment-item"]').setValue('equipment-item-1');
+    await wrapper.get('[data-testid="customer-new-plan-equipment-required-qty"]').setValue('4');
+    await wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').setValue('Keep after auth refresh');
+    await nextTickFlush();
+
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'equipment-lines',
+    );
+    expect(window.sessionStorage.getItem(draftKey)).toContain('Keep after auth refresh');
+
+    authStoreState.effectiveAccessToken = 'token-2';
+    await nextTickFlush();
+    await nextTickFlush();
+
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-item"]').element as HTMLSelectElement).value).toBe('equipment-item-1');
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-required-qty"]').element as HTMLInputElement).value).toBe('4');
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').element as HTMLTextAreaElement).value).toBe('Keep after auth refresh');
+
+    wrapper.unmount();
+    mountedWrappers.pop();
+
+    const restoredWrapper = mountComponent();
+    await nextTickFlush();
+
+    expect(restoredWrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-equipment-item"]').element as HTMLSelectElement).value).toBe('equipment-item-1');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-equipment-required-qty"]').element as HTMLInputElement).value).toBe('4');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-equipment-notes"]').element as HTMLTextAreaElement).value).toBe('Keep after auth refresh');
+    expect(window.sessionStorage.getItem(draftKey)).toContain('Keep after auth refresh');
+  });
+
+  it('keeps an unsaved requirement draft during same-customer auth refresh and remount', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      order_id: 'order-1',
+      step: 'requirement-lines',
+    };
+    stores.orders['order-1'] = makeOrder('order-1');
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-requirement-type"]').setValue('requirement-type-1');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-function-type"]').setValue('function-1');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-qualification-type"]').setValue('qualification-1');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-min-qty"]').setValue('2');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-target-qty"]').setValue('3');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-notes"]').setValue('Keep requirement draft');
+    await nextTickFlush();
+
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'requirement-lines',
+    );
+    expect(window.sessionStorage.getItem(draftKey)).toContain('Keep requirement draft');
+
+    authStoreState.effectiveAccessToken = 'token-2';
+    await nextTickFlush();
+    await nextTickFlush();
+
+    expect((wrapper.get('[data-testid="customer-new-plan-requirement-type"]').element as HTMLSelectElement).value).toBe('requirement-type-1');
+    expect((wrapper.get('[data-testid="customer-new-plan-requirement-min-qty"]').element as HTMLInputElement).value).toBe('2');
+    expect((wrapper.get('[data-testid="customer-new-plan-requirement-target-qty"]').element as HTMLInputElement).value).toBe('3');
+    expect((wrapper.get('[data-testid="customer-new-plan-requirement-notes"]').element as HTMLTextAreaElement).value).toBe('Keep requirement draft');
+
+    wrapper.unmount();
+    mountedWrappers.pop();
+
+    const restoredWrapper = mountComponent();
+    await nextTickFlush();
+
+    expect(restoredWrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('requirement-lines');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-requirement-type"]').element as HTMLSelectElement).value).toBe('requirement-type-1');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-requirement-min-qty"]').element as HTMLInputElement).value).toBe('2');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-requirement-target-qty"]').element as HTMLInputElement).value).toBe('3');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-requirement-notes"]').element as HTMLTextAreaElement).value).toBe('Keep requirement draft');
+    expect(window.sessionStorage.getItem(draftKey)).toContain('Keep requirement draft');
+  });
+
+  it('does not leak equipment or requirement drafts across customer switch', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      order_id: 'order-1',
+      step: 'equipment-lines',
+    };
+    stores.orders['order-1'] = makeOrder('order-1');
+    apiMocks.getCustomerMock.mockImplementation((_tenantId: string, customerId: string) =>
+      Promise.resolve(buildCustomer({ customer_number: customerId === 'customer-2' ? 'CU-2000' : 'CU-1000', id: customerId, name: customerId === 'customer-2' ? 'Beta Security' : 'Alpha Security' })),
+    );
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-equipment-item"]').setValue('equipment-item-1');
+    await wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').setValue('Customer one equipment draft');
+    await nextTickFlush();
+
+    const equipmentDraftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'equipment-lines',
+    );
+    expect(window.sessionStorage.getItem(equipmentDraftKey)).toContain('Customer one equipment draft');
+
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      order_id: 'order-1',
+      step: 'requirement-lines',
+    };
+    await nextTickFlush();
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-requirement-type"]').setValue('requirement-type-1');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-notes"]').setValue('Customer one requirement draft');
+    await nextTickFlush();
+
+    const requirementDraftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'requirement-lines',
+    );
+    expect(window.sessionStorage.getItem(requirementDraftKey)).toContain('Customer one requirement draft');
+
+    routeState.query = {
+      customer_id: 'customer-2',
+    };
+    await nextTickFlush();
+    await nextTickFlush();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-item"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-type"]').exists()).toBe(false);
+    expect(window.sessionStorage.getItem(equipmentDraftKey)).toContain('Customer one equipment draft');
+    expect(window.sessionStorage.getItem(requirementDraftKey)).toContain('Customer one requirement draft');
   });
 
   it('supports create-new planning behavior in step 1 and derives the planning mode from the chosen family', async () => {
@@ -1093,7 +1455,9 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-planning-create-longitude"]').setValue('7.222222');
     await wrapper.get('[data-testid="customer-new-plan-planning-create-pick-on-map"]').trigger('click');
     await nextTickFlush();
+    await nextTickFlush();
 
+    expect(wrapper.find('[data-testid="customer-new-plan-location-picker-dialog"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="customer-new-plan-location-picker-load-error"]').text()).toBe(
       'sicherplan.customerPlansWizard.mapPicker.loadError',
     );

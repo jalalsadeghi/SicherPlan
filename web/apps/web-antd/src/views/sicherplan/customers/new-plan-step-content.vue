@@ -704,6 +704,14 @@ function hasRequirementLineDraftContent() {
   );
 }
 
+function hasEquipmentLineDraftInput() {
+  return hasEquipmentLineDraftContent();
+}
+
+function hasRequirementLineDraftInput() {
+  return hasRequirementLineDraftContent();
+}
+
 function hasOrderAttachmentDraftContent() {
   return Boolean(
     orderAttachmentDraft.title ||
@@ -2366,20 +2374,73 @@ async function submitOrderStep() {
 }
 
 async function submitEquipmentStep() {
+  if (hasEquipmentLineDraftInput()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.saveCurrentEquipmentLineBeforeContinue'));
+    emit('step-completion', 'equipment-lines', false);
+    return false;
+  }
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
     return false;
   }
-  if (!equipmentLineDraft.equipment_item_id) {
-    emit('step-completion', 'equipment-lines', orderEquipmentLines.value.length > 0);
-    return orderEquipmentLines.value.length > 0;
+  if (!orderEquipmentLines.value.length) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.equipmentLineRequiredBeforeContinue'));
+    emit('step-completion', 'equipment-lines', false);
+    return false;
   }
-  if (equipmentLineDraft.required_qty < 1) {
+  emit('step-completion', 'equipment-lines', true);
+  return true;
+}
+
+async function submitRequirementStep() {
+  if (hasRequirementLineDraftInput()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.saveCurrentRequirementLineBeforeContinue'));
+    emit('step-completion', 'requirement-lines', false);
+    return false;
+  }
+  if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
+    return false;
+  }
+  if (!orderRequirementLines.value.length) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.requirementLineRequiredBeforeContinue'));
+    emit('step-completion', 'requirement-lines', false);
+    return false;
+  }
+  emit('step-completion', 'requirement-lines', true);
+  return true;
+}
+
+function clearEquipmentLineDraftState() {
+  withDraftSyncPaused(() => {
+    resetEquipmentLineDraft();
+  });
+  clearStepDraft('equipment-lines');
+  clearDraftRestoreMessage();
+  emit('step-completion', 'equipment-lines', orderEquipmentLines.value.length > 0);
+  emit('step-ui-state', 'equipment-lines', { dirty: false, error: '' });
+}
+
+function clearRequirementLineDraftState() {
+  withDraftSyncPaused(() => {
+    resetRequirementLineDraft();
+  });
+  clearStepDraft('requirement-lines');
+  clearDraftRestoreMessage();
+  emit('step-completion', 'requirement-lines', orderRequirementLines.value.length > 0);
+  emit('step-ui-state', 'requirement-lines', { dirty: false, error: '' });
+}
+
+async function saveEquipmentLineDraft() {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
+    return false;
+  }
+  if (!equipmentLineDraft.equipment_item_id || equipmentLineDraft.required_qty < 1) {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.equipmentLineInvalid'));
     return false;
   }
   stepLoading.value = true;
   emit('step-ui-state', 'equipment-lines', { loading: true, error: '' });
   try {
+    const isUpdate = Boolean(selectedEquipmentLineId.value);
     if (selectedEquipmentLineId.value) {
       await updateOrderEquipmentLine(props.tenantId, props.wizardState.order_id, selectedEquipmentLineId.value, props.accessToken, {
         equipment_item_id: equipmentLineDraft.equipment_item_id,
@@ -2397,13 +2458,15 @@ async function submitEquipmentStep() {
       });
     }
     orderEquipmentLines.value = await listOrderEquipmentLines(props.tenantId, props.wizardState.order_id, props.accessToken);
-    withDraftSyncPaused(() => {
-      resetEquipmentLineDraft();
-    });
-    clearStepDraft('equipment-lines');
-    clearDraftRestoreMessage();
-    emit('step-completion', 'equipment-lines', true);
-    emit('step-ui-state', 'equipment-lines', { dirty: false, error: '' });
+    clearEquipmentLineDraftState();
+    setFeedback(
+      'success',
+      $t(
+        isUpdate
+          ? 'sicherplan.customerPlansWizard.messages.equipmentLineUpdated'
+          : 'sicherplan.customerPlansWizard.messages.equipmentLineSaved',
+      ),
+    );
     return true;
   } catch {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.equipmentLineSaveFailed'));
@@ -2415,15 +2478,12 @@ async function submitEquipmentStep() {
   }
 }
 
-async function submitRequirementStep() {
+async function saveRequirementLineDraft() {
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
     return false;
   }
-  if (!requirementLineDraft.requirement_type_id) {
-    emit('step-completion', 'requirement-lines', orderRequirementLines.value.length > 0);
-    return orderRequirementLines.value.length > 0;
-  }
   if (
+    !requirementLineDraft.requirement_type_id ||
     requirementLineDraft.min_qty < 0 ||
     requirementLineDraft.target_qty < requirementLineDraft.min_qty ||
     hasDuplicateActiveRequirementLine(
@@ -2440,6 +2500,7 @@ async function submitRequirementStep() {
   stepLoading.value = true;
   emit('step-ui-state', 'requirement-lines', { loading: true, error: '' });
   try {
+    const isUpdate = Boolean(selectedRequirementLineId.value);
     if (selectedRequirementLineId.value) {
       await updateOrderRequirementLine(props.tenantId, props.wizardState.order_id, selectedRequirementLineId.value, props.accessToken, {
         function_type_id: normalizeUuid(requirementLineDraft.function_type_id),
@@ -2463,13 +2524,15 @@ async function submitRequirementStep() {
       });
     }
     orderRequirementLines.value = await listOrderRequirementLines(props.tenantId, props.wizardState.order_id, props.accessToken);
-    withDraftSyncPaused(() => {
-      resetRequirementLineDraft();
-    });
-    clearStepDraft('requirement-lines');
-    clearDraftRestoreMessage();
-    emit('step-completion', 'requirement-lines', true);
-    emit('step-ui-state', 'requirement-lines', { dirty: false, error: '' });
+    clearRequirementLineDraftState();
+    setFeedback(
+      'success',
+      $t(
+        isUpdate
+          ? 'sicherplan.customerPlansWizard.messages.requirementLineUpdated'
+          : 'sicherplan.customerPlansWizard.messages.requirementLineSaved',
+      ),
+    );
     return true;
   } catch {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.requirementLineSaveFailed'));
@@ -3304,6 +3367,7 @@ onBeforeUnmount(() => {
           :key="line.id"
           type="button"
           class="sp-customer-plan-wizard-step__list-row"
+          :class="{ 'sp-customer-plan-wizard-step__list-row--selected': line.id === selectedEquipmentLineId }"
           @click="syncEquipmentLineDraft(line)"
         >
           <strong>{{ equipmentItemSelectOptions.find((option) => option.value === line.equipment_item_id)?.label || line.equipment_item_id }}</strong>
@@ -3322,12 +3386,46 @@ onBeforeUnmount(() => {
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.requiredQty') }}</span>
-          <input v-model.number="equipmentLineDraft.required_qty" min="1" type="number" />
+          <input v-model.number="equipmentLineDraft.required_qty" data-testid="customer-new-plan-equipment-required-qty" min="1" type="number" />
         </label>
         <label class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
-          <textarea v-model="equipmentLineDraft.notes" rows="2" />
+          <textarea v-model="equipmentLineDraft.notes" data-testid="customer-new-plan-equipment-notes" rows="2" />
         </label>
+      </div>
+      <p v-if="selectedEquipmentLineId" class="field-help" data-testid="customer-new-plan-equipment-editing">
+        {{ $t('sicherplan.customerPlansWizard.forms.editingEquipmentLine') }}
+      </p>
+      <div class="cta-row">
+        <button
+          v-if="selectedEquipmentLineId"
+          type="button"
+          class="cta-button"
+          data-testid="customer-new-plan-update-equipment-line"
+          :disabled="stepLoading"
+          @click="void saveEquipmentLineDraft()"
+        >
+          {{ $t('sicherplan.customerPlansWizard.actions.updateEquipmentLine') }}
+        </button>
+        <button
+          v-else
+          type="button"
+          class="cta-button"
+          data-testid="customer-new-plan-save-equipment-line"
+          :disabled="stepLoading"
+          @click="void saveEquipmentLineDraft()"
+        >
+          {{ $t('sicherplan.customerPlansWizard.actions.saveEquipmentLine') }}
+        </button>
+        <button
+          type="button"
+          class="cta-button cta-secondary"
+          data-testid="customer-new-plan-clear-equipment-line"
+          :disabled="stepLoading"
+          @click="clearEquipmentLineDraftState"
+        >
+          {{ $t('sicherplan.customerPlansWizard.actions.clearEquipmentLine') }}
+        </button>
       </div>
     </section>
 
@@ -3348,6 +3446,7 @@ onBeforeUnmount(() => {
           :key="line.id"
           type="button"
           class="sp-customer-plan-wizard-step__list-row"
+          :class="{ 'sp-customer-plan-wizard-step__list-row--selected': line.id === selectedRequirementLineId }"
           @click="syncRequirementLineDraft(line)"
         >
           <strong>{{ requirementTypeSelectOptions.find((option) => option.value === line.requirement_type_id)?.label || line.requirement_type_id }}</strong>
@@ -3366,7 +3465,7 @@ onBeforeUnmount(() => {
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.functionType') }}</span>
-          <select v-model="requirementLineDraft.function_type_id">
+          <select v-model="requirementLineDraft.function_type_id" data-testid="customer-new-plan-requirement-function-type">
             <option value="">{{ $t('sicherplan.customerPlansWizard.forms.functionTypePlaceholder') }}</option>
             <option v-for="option in functionTypeSelectOptions" :key="option.value" :value="option.value">
               {{ option.label }}
@@ -3375,7 +3474,7 @@ onBeforeUnmount(() => {
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.qualificationType') }}</span>
-          <select v-model="requirementLineDraft.qualification_type_id">
+          <select v-model="requirementLineDraft.qualification_type_id" data-testid="customer-new-plan-requirement-qualification-type">
             <option value="">{{ $t('sicherplan.customerPlansWizard.forms.qualificationTypePlaceholder') }}</option>
             <option v-for="option in qualificationTypeSelectOptions" :key="option.value" :value="option.value">
               {{ option.label }}
@@ -3384,16 +3483,50 @@ onBeforeUnmount(() => {
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.minQty') }}</span>
-          <input v-model.number="requirementLineDraft.min_qty" min="0" type="number" />
+          <input v-model.number="requirementLineDraft.min_qty" data-testid="customer-new-plan-requirement-min-qty" min="0" type="number" />
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.targetQty') }}</span>
-          <input v-model.number="requirementLineDraft.target_qty" min="0" type="number" />
+          <input v-model.number="requirementLineDraft.target_qty" data-testid="customer-new-plan-requirement-target-qty" min="0" type="number" />
         </label>
         <label class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
-          <textarea v-model="requirementLineDraft.notes" rows="2" />
+          <textarea v-model="requirementLineDraft.notes" data-testid="customer-new-plan-requirement-notes" rows="2" />
         </label>
+      </div>
+      <p v-if="selectedRequirementLineId" class="field-help" data-testid="customer-new-plan-requirement-editing">
+        {{ $t('sicherplan.customerPlansWizard.forms.editingRequirementLine') }}
+      </p>
+      <div class="cta-row">
+        <button
+          v-if="selectedRequirementLineId"
+          type="button"
+          class="cta-button"
+          data-testid="customer-new-plan-update-requirement-line"
+          :disabled="stepLoading"
+          @click="void saveRequirementLineDraft()"
+        >
+          {{ $t('sicherplan.customerPlansWizard.actions.updateRequirementLine') }}
+        </button>
+        <button
+          v-else
+          type="button"
+          class="cta-button"
+          data-testid="customer-new-plan-save-requirement-line"
+          :disabled="stepLoading"
+          @click="void saveRequirementLineDraft()"
+        >
+          {{ $t('sicherplan.customerPlansWizard.actions.saveRequirementLine') }}
+        </button>
+        <button
+          type="button"
+          class="cta-button cta-secondary"
+          data-testid="customer-new-plan-clear-requirement-line"
+          :disabled="stepLoading"
+          @click="clearRequirementLineDraftState"
+        >
+          {{ $t('sicherplan.customerPlansWizard.actions.clearRequirementLine') }}
+        </button>
       </div>
     </section>
 
@@ -4262,6 +4395,11 @@ onBeforeUnmount(() => {
   border-color: rgb(40 170 170 / 38%);
   box-shadow: 0 0 0 3px rgb(40 170 170 / 10%);
   transform: translateY(-1px);
+}
+
+.sp-customer-plan-wizard-step__list-row--selected {
+  border-color: rgb(40 170 170 / 48%);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 12%);
 }
 
 .sp-customer-plan-wizard-step__list-row--static {

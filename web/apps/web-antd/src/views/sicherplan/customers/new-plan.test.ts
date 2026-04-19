@@ -551,7 +551,7 @@ describe('CustomerNewPlanWizardView', () => {
     customersApiMocks.getCustomerMock
       .mockImplementationOnce(
         () =>
-          new Promise((resolve) => {
+          new Promise<ReturnType<typeof buildCustomer>>((resolve) => {
             resolveFirstRequest = resolve;
           }),
       )
@@ -571,7 +571,9 @@ describe('CustomerNewPlanWizardView', () => {
     routeState.query = { customer_id: 'customer-2' };
     await flushPromises();
 
-    resolveFirstRequest?.(buildCustomer());
+    if (resolveFirstRequest) {
+      resolveFirstRequest(buildCustomer());
+    }
     await flushPromises();
 
     expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Beta Security');

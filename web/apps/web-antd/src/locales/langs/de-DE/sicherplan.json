@@ -68,6 +68,8 @@
       "executionNote": "Ausführungsnotiz",
       "equipmentItem": "Equipment",
       "equipmentItemPlaceholder": "Equipment wählen",
+      "editingEquipmentLine": "Gespeicherte Equipment-Linie wird bearbeitet",
+      "editingRequirementLine": "Gespeicherte Anforderungslinie wird bearbeitet",
       "fairNo": "Messenummer",
       "defaultBreakMinutes": "Standardpause in Minuten",
       "functionType": "Funktionstyp",
@@ -180,6 +182,7 @@
       "equipmentCreateFailed": "Das Equipment konnte nicht angelegt werden.",
       "equipmentCreateInvalid": "Für neues Equipment sind Code, Bezeichnung und Mengeneinheit erforderlich.",
       "equipmentLineInvalid": "Für die Equipment-Linie sind Equipment und eine Menge größer als null erforderlich.",
+      "equipmentLineRequiredBeforeContinue": "Legen Sie vor dem Weitergehen mindestens eine Equipment-Linie an.",
       "equipmentLineSaveFailed": "Die Equipment-Linie konnte nicht gespeichert werden.",
       "orderDocumentSaveFailed": "Das Auftragsdokument konnte nicht gespeichert oder verknüpft werden.",
       "orderSaveFailed": "Der Auftrag konnte nicht gespeichert werden.",
@@ -200,8 +203,11 @@
       "requirementCreateFailed": "Die Anforderung konnte nicht angelegt werden.",
       "requirementCreateInvalid": "Für die neue Anforderung sind Code, Bezeichnung und Standard-Planungsmodus erforderlich.",
       "requirementLineInvalid": "Die Anforderungslinie ist unvollständig oder doppelt aktiv.",
+      "requirementLineRequiredBeforeContinue": "Legen Sie vor dem Weitergehen mindestens eine Anforderungslinie an.",
       "requirementLineSaveFailed": "Die Anforderungslinie konnte nicht gespeichert werden.",
       "requirementTypeRequired": "Ein Anforderungstyp ist erforderlich.",
+      "saveCurrentEquipmentLineBeforeContinue": "Speichern oder leeren Sie die aktuelle Equipment-Linie, bevor Sie fortfahren.",
+      "saveCurrentRequirementLineBeforeContinue": "Speichern oder leeren Sie die aktuelle Anforderungslinie, bevor Sie fortfahren.",
       "seriesGenerateFailed": "Die Serienerzeugung oder die Übergabe an Staffing Coverage ist fehlgeschlagen.",
       "seriesInvalid": "Serienbezeichnung, Vorlage und ein gültiger Datumsbereich sind erforderlich.",
       "serviceCategoryRequired": "Eine Leistungskategorie ist erforderlich.",
@@ -225,10 +231,16 @@
       "cancelAddress": "Abbrechen",
       "generateContinue": "Serie erzeugen & weiter",
       "createAddress": "Neue Adresse anlegen",
+      "clearEquipmentLine": "Equipment-Linie leeren",
+      "clearRequirementLine": "Anforderungslinie leeren",
       "previous": "Zurück",
       "next": "Weiter",
       "pickOnMap": "Auf Karte wählen",
-      "saveAddress": "Adresse speichern"
+      "saveAddress": "Adresse speichern",
+      "saveEquipmentLine": "Equipment-Linie speichern",
+      "saveRequirementLine": "Anforderungslinie speichern",
+      "updateEquipmentLine": "Equipment-Linie aktualisieren",
+      "updateRequirementLine": "Anforderungslinie aktualisieren"
     },
     "addressModal": {
       "title": "Neue Adresse anlegen",
@@ -250,7 +262,11 @@
       "startExisting": "Startpunkt: vorhandene Koordinaten des Planungseintrags"
     },
     "messages": {
-      "addressCreateSuccess": "Die Adresse wurde angelegt und in den Planungseintrag übernommen."
+      "addressCreateSuccess": "Die Adresse wurde angelegt und in den Planungseintrag übernommen.",
+      "equipmentLineSaved": "Equipment-Linie gespeichert.",
+      "equipmentLineUpdated": "Equipment-Linie aktualisiert.",
+      "requirementLineSaved": "Anforderungslinie gespeichert.",
+      "requirementLineUpdated": "Anforderungslinie aktualisiert."
     },
     "steps": {
       "planning": "Planung",
