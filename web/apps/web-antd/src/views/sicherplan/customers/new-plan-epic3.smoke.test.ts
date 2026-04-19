@@ -188,7 +188,7 @@ const ForbiddenViewStub = defineComponent({
   template: '<div>forbidden</div>',
 });
 
-function buildCustomer() {
+function buildCustomer(overrides: Record<string, unknown> = {}) {
   return {
     id: 'customer-1',
     tenant_id: 'tenant-1',
@@ -213,6 +213,7 @@ function buildCustomer() {
     archived_at: null,
     contacts: [],
     addresses: [],
+    ...overrides,
   };
 }
 
@@ -598,6 +599,180 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
     expect((wrapper.get('[data-testid="customer-new-plan-order-no"]').element as HTMLInputElement).value).toBe('ORD-REFRESH');
     expect((wrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('Auth Refresh Draft');
+  });
+
+  it('restores a preexisting order-details draft after auth-driven remount and repeated reference reloads without overwriting it with defaults', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      step: 'order-details',
+    };
+
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'order-details',
+    );
+    window.sessionStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        customer_id: 'customer-1',
+        notes: 'Keep this note',
+        order_no: 'ORD-STORED',
+        patrol_route_id: '',
+        release_state: 'draft',
+        requirement_type_id: '',
+        security_concept_text: 'Do not overwrite me',
+        service_category_code: 'guarding',
+        service_from: '2026-06-01',
+        service_to: '2026-06-12',
+        title: 'Persisted before mount',
+      }),
+    );
+
+    const firstWrapper = mountComponent();
+    await nextTickFlush();
+
+    expect((firstWrapper.get('[data-testid="customer-new-plan-order-no"]').element as HTMLInputElement).value).toBe('ORD-STORED');
+    expect((firstWrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('Persisted before mount');
+    expect((firstWrapper.get('[data-testid="customer-new-plan-order-service-category"]').element as HTMLSelectElement).value).toBe('guarding');
+    expect((firstWrapper.get('[data-testid="customer-new-plan-order-service-from"]').element as HTMLInputElement).value).toBe('2026-06-01');
+    expect((firstWrapper.get('[data-testid="customer-new-plan-order-service-to"]').element as HTMLInputElement).value).toBe('2026-06-12');
+
+    const firstServiceCategoryLoadCount = apiMocks.listServiceCategoryOptionsMock.mock.calls.length;
+    const firstRequirementTypeLoadCount = apiMocks.listPlanningSetupRecordsMock.mock.calls.filter(
+      ([entityKey]) => entityKey === 'requirement_type',
+    ).length;
+    const firstPatrolRouteLoadCount = apiMocks.listPlanningSetupRecordsMock.mock.calls.filter(
+      ([entityKey]) => entityKey === 'patrol_route',
+    ).length;
+    const firstEquipmentItemLoadCount = apiMocks.listPlanningSetupRecordsMock.mock.calls.filter(
+      ([entityKey]) => entityKey === 'equipment_item',
+    ).length;
+    const firstFunctionTypeLoadCount = apiMocks.listFunctionTypesMock.mock.calls.length;
+    const firstQualificationTypeLoadCount = apiMocks.listQualificationTypesMock.mock.calls.length;
+
+    firstWrapper.unmount();
+    mountedWrappers.pop();
+
+    authStoreState.effectiveAccessToken = 'token-2';
+    authStoreState.accessToken = 'token-2';
+
+    const secondWrapper = mountComponent();
+    await nextTickFlush();
+
+    expect(secondWrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect((secondWrapper.get('[data-testid="customer-new-plan-order-no"]').element as HTMLInputElement).value).toBe('ORD-STORED');
+    expect((secondWrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('Persisted before mount');
+    expect((secondWrapper.get('[data-testid="customer-new-plan-order-service-category"]').element as HTMLSelectElement).value).toBe('guarding');
+    expect((secondWrapper.get('[data-testid="customer-new-plan-order-service-from"]').element as HTMLInputElement).value).toBe('2026-06-01');
+    expect((secondWrapper.get('[data-testid="customer-new-plan-order-service-to"]').element as HTMLInputElement).value).toBe('2026-06-12');
+    expect(secondWrapper.get('[data-testid="customer-new-plan-draft-restored"]').text()).toBe('sicherplan.customerPlansWizard.draftRestored');
+    expect(window.sessionStorage.getItem(draftKey)).toContain('ORD-STORED');
+    expect(window.sessionStorage.getItem(draftKey)).toContain('Persisted before mount');
+
+    expect(apiMocks.listServiceCategoryOptionsMock.mock.calls.length).toBeGreaterThan(firstServiceCategoryLoadCount);
+    expect(
+      apiMocks.listPlanningSetupRecordsMock.mock.calls.filter(([entityKey]) => entityKey === 'requirement_type').length,
+    ).toBeGreaterThan(firstRequirementTypeLoadCount);
+    expect(
+      apiMocks.listPlanningSetupRecordsMock.mock.calls.filter(([entityKey]) => entityKey === 'patrol_route').length,
+    ).toBeGreaterThan(firstPatrolRouteLoadCount);
+    expect(
+      apiMocks.listPlanningSetupRecordsMock.mock.calls.filter(([entityKey]) => entityKey === 'equipment_item').length,
+    ).toBeGreaterThan(firstEquipmentItemLoadCount);
+    expect(apiMocks.listFunctionTypesMock.mock.calls.length).toBeGreaterThan(firstFunctionTypeLoadCount);
+    expect(apiMocks.listQualificationTypesMock.mock.calls.length).toBeGreaterThan(firstQualificationTypeLoadCount);
+  });
+
+  it('keeps a typed order-details draft across auth churn and same-route remount when no order_id exists', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      step: 'order-details',
+    };
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-order-no"]').setValue('ORD-REMOUNT');
+    await wrapper.get('[data-testid="customer-new-plan-order-title"]').setValue('Remount after auth refresh');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-category"]').setValue('guarding');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-from"]').setValue('2026-06-03');
+    await wrapper.get('[data-testid="customer-new-plan-order-service-to"]').setValue('2026-06-14');
+    await nextTickFlush();
+
+    authStoreState.effectiveAccessToken = '';
+    authStoreState.accessToken = '';
+    authStoreState.isSessionResolving = true;
+    await nextTickFlush();
+
+    authStoreState.effectiveAccessToken = 'token-2';
+    authStoreState.accessToken = 'token-2';
+    authStoreState.isSessionResolving = false;
+
+    wrapper.unmount();
+    mountedWrappers.pop();
+
+    const restoredWrapper = mountComponent();
+    await nextTickFlush();
+
+    expect(restoredWrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-no"]').element as HTMLInputElement).value).toBe('ORD-REMOUNT');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('Remount after auth refresh');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-service-category"]').element as HTMLSelectElement).value).toBe('guarding');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-service-from"]').element as HTMLInputElement).value).toBe('2026-06-03');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-service-to"]').element as HTMLInputElement).value).toBe('2026-06-14');
+  });
+
+  it('persists the latest typed order-details values even if remount happens before watcher-flush settles', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      step: 'order-details',
+    };
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    const orderNoInput = wrapper.get('[data-testid="customer-new-plan-order-no"]').element as HTMLInputElement;
+    const titleInput = wrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement;
+    const serviceCategorySelect = wrapper.get('[data-testid="customer-new-plan-order-service-category"]').element as HTMLSelectElement;
+    const serviceFromInput = wrapper.get('[data-testid="customer-new-plan-order-service-from"]').element as HTMLInputElement;
+    const serviceToInput = wrapper.get('[data-testid="customer-new-plan-order-service-to"]').element as HTMLInputElement;
+
+    orderNoInput.value = 'ORD-RACE';
+    orderNoInput.dispatchEvent(new Event('input'));
+    titleInput.value = 'Watcher race draft';
+    titleInput.dispatchEvent(new Event('input'));
+    serviceCategorySelect.value = 'guarding';
+    serviceCategorySelect.dispatchEvent(new Event('change'));
+    serviceFromInput.value = '2026-06-05';
+    serviceFromInput.dispatchEvent(new Event('input'));
+    serviceToInput.value = '2026-06-15';
+    serviceToInput.dispatchEvent(new Event('input'));
+
+    wrapper.unmount();
+    mountedWrappers.pop();
+
+    const restoredWrapper = mountComponent();
+    await nextTickFlush();
+
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-no"]').element as HTMLInputElement).value).toBe('ORD-RACE');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('Watcher race draft');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-service-category"]').element as HTMLSelectElement).value).toBe('guarding');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-service-from"]').element as HTMLInputElement).value).toBe('2026-06-05');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-order-service-to"]').element as HTMLInputElement).value).toBe('2026-06-15');
   });
 
   it('clears the unsaved order draft after successful save and persists order_id into the route update', async () => {

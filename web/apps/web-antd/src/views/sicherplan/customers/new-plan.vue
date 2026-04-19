@@ -71,6 +71,7 @@ const bootstrapped = ref(false);
 const stepContentRef = ref<InstanceType<typeof CustomerNewPlanStepContent> | null>(null);
 const stepSubmitting = ref(false);
 const routeRestoreWarning = ref('');
+const persistDraftsOnUnmount = ref(true);
 
 const customerId = computed(() => {
   const raw = route.query.customer_id;
@@ -268,6 +269,7 @@ function goBackToPlans() {
   if (!confirmDiscardChanges()) {
     return;
   }
+  persistDraftsOnUnmount.value = false;
   clearCurrentWizardDrafts();
   resetWizard();
   void router.push({
@@ -285,6 +287,7 @@ function goBackToCustomers() {
   if (!confirmDiscardChanges()) {
     return;
   }
+  persistDraftsOnUnmount.value = false;
   clearCurrentWizardDrafts();
   void router.push('/admin/customers');
 }
@@ -512,6 +515,7 @@ watch(
                 :access-token="accessToken || ''"
                 :current-step-id="wizardState.current_step"
                 :customer="customer"
+                :persist-drafts-on-unmount="persistDraftsOnUnmount"
                 :tenant-id="tenantScopeId || ''"
                 :wizard-state="wizardState"
                 @saved-context="setSavedContext"

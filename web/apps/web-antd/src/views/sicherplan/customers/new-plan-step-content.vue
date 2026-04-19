@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { Modal } from 'ant-design-vue';
@@ -111,6 +111,7 @@ const props = defineProps<{
     id: string;
     name?: string | null;
   };
+  persistDraftsOnUnmount?: boolean;
   tenantId: string;
   wizardState: CustomerNewPlanWizardState;
 }>();
@@ -954,6 +955,27 @@ function persistSeriesDraft() {
         }
       : null,
   );
+}
+
+function persistAllUnsavedDrafts() {
+  if (draftSyncPaused.value) {
+    return;
+  }
+  persistOrderDraft();
+  persistEquipmentLineDraft();
+  persistRequirementLineDraft();
+  persistOrderDocumentsDraft();
+  persistPlanningRecordDraft();
+  persistPlanningRecordDocumentsDraft();
+  persistShiftPlanDraft();
+  persistSeriesDraft();
+}
+
+function handleBeforeUnload() {
+  if (props.persistDraftsOnUnmount === false) {
+    return;
+  }
+  persistAllUnsavedDrafts();
 }
 
 function resetPlanningCreateModal() {
@@ -3008,6 +3030,7 @@ watch(
 );
 
 onMounted(() => {
+  window.addEventListener('beforeunload', handleBeforeUnload);
   withDraftSyncPaused(() => {
     resetTemplateModal();
     if (props.wizardState.planning_entity_type) {
@@ -3015,6 +3038,14 @@ onMounted(() => {
     }
     planningEntityId.value = props.wizardState.planning_entity_id || '';
   });
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload);
+  if (props.persistDraftsOnUnmount === false) {
+    return;
+  }
+  persistAllUnsavedDrafts();
 });
 </script>
 

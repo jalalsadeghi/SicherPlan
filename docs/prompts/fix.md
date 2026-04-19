@@ -1,101 +1,139 @@
 You are working in the SicherPlan repository.
 
-This task follows the unsaved-draft persistence fix for:
+This task follows the diagnosis from the previous prompt.
+
+Source document:
 - /docs/sprint/SPR-CUST-NEWPLAN-V1.md
 
+User-visible bug:
+On Customer New Plan Wizard Step 2 "Order details", unsaved form data still clears after focus/app switch/auth refresh/reference reload.
+
+Use the root cause discovered in the previous prompt.
+Do not assume the previous implementation is correct just because tests passed.
+
 Goal:
-Run a focused QA and hardening pass for the Customer New Plan Wizard after implementing unsaved draft persistence.
+Fix the remaining bug so Order Details and other unsaved wizard drafts cannot be cleared by focus return, auth refresh, reference reload, component remount, or route hydration.
 
-Do not add unrelated features.
-Do not change backend APIs.
-Only fix issues directly related to:
-- unsaved draft persistence
-- auth refresh stability
-- focus/app-switch stability
-- component remount stability
-- route hydration stability
+Scope:
+- Frontend only
+- No backend changes
+- No canonical Planning/Orders/Shift/Staffing page redesign
+- No wizard step-order changes
+- No unrelated refactor
 
-Files to inspect:
-- web/apps/web-antd/src/views/sicherplan/customers/new-plan.vue
-- web/apps/web-antd/src/views/sicherplan/customers/new-plan-step-content.vue
-- web/apps/web-antd/src/views/sicherplan/customers/use-customer-new-plan-wizard.ts
-- web/apps/web-antd/src/views/sicherplan/customers/new-plan-wizard.steps.ts
-- web/apps/web-antd/src/views/sicherplan/customers/new-plan-wizard.types.ts
-- related tests under web/apps/web-antd/src/views/sicherplan/customers/
+Required fix areas:
 
-Validation checklist:
+A. Prevent empty/default draft overwrite
+If the diagnosis shows that reset/default initialization overwrites a non-empty draft:
+- Add a persistence suppression guard during reset/hydration.
+- Example patterns:
+  - isHydratingDraft = true
+  - isInitializingStep = true
+  - withDraftPersistencePaused(() => ...)
+- Watchers must not save empty/default values while a step is being reset or hydrated.
+- Never write an empty default draft over an existing non-empty draft unless the user intentionally clears/cancels the wizard.
 
-1. Order Details data stability
-- Fill Order number, Title, Service dates, Security concept, Notes
-- Trigger focus change / app switch / window focus
-- Trigger or simulate auth refresh
-- Verify data is not cleared
+B. Make draft keys stable
+If the diagnosis shows a storage key mismatch:
+- Ensure the same key is used for saving and restoring a step.
+- The Order Details draft key must work before order_id exists.
+- Key must include:
+  - tenantId
+  - customerId
+  - planning_entity_type
+  - planning_entity_id
+  - step id
+- If planning context is temporarily unavailable during early hydration, defer draft load/save until the context is stable.
+- Do not save drafts under incomplete keys such as empty planning_entity_id if the route already contains planning context.
 
-2. Reference reload stability
-- Ensure repeated calls to service-category-options, requirement-types, patrol-routes, equipment-items, function-types, qualification-types do not reset the visible draft
-- Confirm loadOrderState() does not blindly reset local form values while the user is editing
+C. Do not reset dirty active forms during reference reload
+If the diagnosis shows over-aggressive reset:
+- Modify loadOrderState() so:
+  - if order_id is missing and orderDraft is dirty or has user input, do not reset it.
+  - if order_id is missing and a persisted draft exists, hydrate it.
+  - if order_id is missing and no draft exists, initialize defaults only once.
+- Apply same pattern to:
+  - equipmentLineDraft
+  - requirementLineDraft
+  - planningRecordDraft
+  - shiftPlanDraft
+  - seriesDraft
+where applicable.
 
-3. Remount stability
-- Simulate component unmount/remount if possible
-- Verify sessionStorage draft rehydrates the current step
+D. Make same-customer auth refresh non-destructive
+If auth/accessToken changes:
+- Do not reset wizard state.
+- Do not remount child content unnecessarily.
+- Re-fetch reference data if needed, but do not clear active drafts.
+- Re-fetch customer context with preserveContent behavior.
+- Confirm that new-plan.vue does not set customer to null/loading for the same customer while an active draft exists.
 
-4. Route hydration compatibility
-- Refresh page on:
-  - order-details
-  - equipment-lines after order_id exists
-  - planning-record-overview after order_id exists
-  - shift-plan after planning_record_id exists
-- Verify correct step and context restore
+E. Hydrate before rendering if remount happens
+If the child component remounts:
+- Hydrate persisted draft before visible fields are reset to defaults.
+- Avoid a visible flash of empty fields if possible.
+- Do not mark hydrated draft as dirty just because it was restored.
+- Do not immediately overwrite hydrated draft with defaults via watchers.
 
-5. Successful save cleanup
-- After saving Order Details, confirm unsaved order draft is cleared
-- After saving later steps, confirm their drafts are cleared
-- Confirm saved server state remains loadable after refresh
+F. Correct cleanup rules
+Only clear a step draft when:
+- that step is successfully saved to backend
+- user cancels the wizard
+- customer_id changes
+- tenant changes
+- user intentionally resets the step
 
-6. Cancel behavior
-- Cancel wizard
-- Confirm drafts for the current wizard context are cleared
-- Reopen same customer New Plan and confirm stale unsaved data does not appear unless intentionally preserved by design
+Do not clear on:
+- focus return
+- auth refresh
+- reference data reload
+- route.replace for same context
+- same-customer customer GET
 
-7. Customer/tenant isolation
-- Change customer_id
-- Confirm previous customer’s draft does not appear
-- Change tenant context if feasible
-- Confirm previous tenant’s draft does not appear
+G. Tests
+The failing regression test from the previous prompt must pass after the fix.
 
-8. File input behavior
-- Confirm raw File objects are not persisted
-- Confirm user-facing behavior is clear if file selection must be repeated after refresh
+Also add or update tests for:
+1. Order Details typed values survive accessToken change.
+2. Order Details typed values survive reference-data reload.
+3. Order Details typed values survive component remount when route has planning context.
+4. Existing non-empty sessionStorage draft is not overwritten by empty default initialization.
+5. Dirty Order Details does not reset when loadOrderState() runs with no order_id.
+6. Saved Order Details clears the draft after successful create/update.
+7. Cancel clears drafts.
+8. Customer switch prevents draft leakage.
+9. Step 1 -> Step 2 route persistence still works.
+10. Later step representative draft, such as Shift Plan or Series, survives remount/reference reload.
 
-9. Non-regression
-- Step 1 Planning Use Existing still works
-- Step 1 Create New planning entry still works
-- Create new address and Pick on map still work
-- Equipment / Requirement / Template dialogs still work
-- Generate Series handoff still works
-- canonical Operations & Planning pages are untouched
-
-Tests:
-Add or update tests for any missing coverage:
-- dirty draft survives remount
-- dirty draft survives auth refresh
-- reference reload does not reset draft
-- saved step clears draft
-- cancel clears drafts
-- customer switch prevents draft leakage
-- malformed sessionStorage value is ignored safely
-- route query context and session draft context work together
+H. Manual QA checklist required in final output
+Perform or describe exact manual QA steps:
+- Open the user’s exact URL with step=order-details.
+- Type Order number and Title.
+- Switch to another app/monitor and return.
+- Confirm values remain.
+- Wait for auth refresh or force token refresh.
+- Confirm values remain.
+- Click inside another field.
+- Confirm values remain.
+- Refresh browser.
+- Confirm values restore.
+- Click Next and save Order Details.
+- Confirm draft clears and order_id is added to context.
+- Go Previous and Next again.
+- Confirm no duplicated order is created.
+- Switch customer_id.
+- Confirm old draft does not appear.
 
 Final output:
-1. QA validation summary
-2. Issues found
-3. Fixes made
-4. Changed files
-5. Tests added/updated
-6. Test results
-7. Manual QA checklist result
-8. Clear statement: Ready / Not ready for real data entry
+1. Confirmed root cause
+2. Fix implemented
+3. Files changed
+4. Tests added/updated
+5. Test results
+6. Manual QA result
+7. Any remaining limitation
 
-Before finalizing, explicitly confirm whether the implementation matches the draft-persistence proposal or required adjustment.
-
+Important:
+Do not finish with “already implemented” unless the exact user scenario is reproduced and passes.
+The user has already confirmed the bug still exists in the browser.
 Avoid unrelated refactors.
