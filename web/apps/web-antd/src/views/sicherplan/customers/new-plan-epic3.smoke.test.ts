@@ -48,6 +48,7 @@ const apiMocks = vi.hoisted(() => ({
   getCustomerMock: vi.fn(),
   getCustomerOrderMock: vi.fn(),
   linkOrderAttachmentMock: vi.fn(),
+  listCustomerOrdersMock: vi.fn(),
   listCustomerAddressesMock: vi.fn(),
   listFunctionTypesMock: vi.fn(),
   listOrderAttachmentsMock: vi.fn(),
@@ -130,6 +131,7 @@ vi.mock('#/sicherplan-legacy/api/planningOrders', () => ({
   createOrderRequirementLine: apiMocks.createOrderRequirementLineMock,
   getCustomerOrder: apiMocks.getCustomerOrderMock,
   linkOrderAttachment: apiMocks.linkOrderAttachmentMock,
+  listCustomerOrders: apiMocks.listCustomerOrdersMock,
   listOrderAttachments: apiMocks.listOrderAttachmentsMock,
   listOrderEquipmentLines: apiMocks.listOrderEquipmentLinesMock,
   listOrderRequirementLines: apiMocks.listOrderRequirementLinesMock,
@@ -265,11 +267,18 @@ function mountComponent() {
   return wrapper;
 }
 
-async function advanceToEquipmentLines(wrapper: VueWrapper) {
+async function advanceToOrderDetails(wrapper: VueWrapper) {
   await wrapper.get('[data-testid="customer-new-plan-planning-entity"]').setValue('site-1');
   await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
   await nextTickFlush();
 
+  expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+}
+
+async function advanceToEquipmentLines(wrapper: VueWrapper) {
+  await advanceToOrderDetails(wrapper);
+  await wrapper.get('[data-testid="customer-new-plan-order-mode-create-label"]').trigger('click');
+  await nextTickFlush();
   await wrapper.get('[data-testid="customer-new-plan-order-no"]').setValue('ORD-2000');
   await wrapper.get('[data-testid="customer-new-plan-order-title"]').setValue('Werkschutz Nord');
   await wrapper.get('[data-testid="customer-new-plan-order-requirement-type"]').setValue('requirement-type-1');
@@ -423,6 +432,14 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     });
     apiMocks.getCustomerOrderMock.mockReset();
     apiMocks.getCustomerOrderMock.mockImplementation((_tenantId: string, orderId: string) => Promise.resolve(stores.orders[orderId]));
+    apiMocks.listCustomerOrdersMock.mockReset();
+    apiMocks.listCustomerOrdersMock.mockImplementation((_tenantId: string, _token: string, filters: Record<string, unknown>) =>
+      Promise.resolve(
+        Object.values(stores.orders).filter(
+          (row: any) => !filters?.customer_id || row.customer_id === filters.customer_id,
+        ),
+      ),
+    );
 
     apiMocks.listOrderEquipmentLinesMock.mockReset();
     apiMocks.listOrderEquipmentLinesMock.mockImplementation((_tenantId: string, orderId: string) => Promise.resolve(stores.equipmentLinesByOrder[orderId] ?? []));
@@ -673,6 +690,204 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-documents');
   });
 
+  it('loads existing customer orders, hydrates a selected order, and persists order_id into route state', async () => {
+    stores.orders['order-existing-1'] = makeOrder('order-existing-1', {
+      order_no: 'ORD-EX-1',
+      title: 'Objektschutz RheinForum Koln - Nordtor Juli',
+      notes: 'Existing order notes',
+      security_concept_text: 'Existing concept',
+    });
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToOrderDetails(wrapper);
+
+    expect(apiMocks.listCustomerOrdersMock).toHaveBeenCalledWith('tenant-1', 'token-1', expect.objectContaining({
+      customer_id: 'customer-1',
+      include_archived: false,
+    }));
+    expect(wrapper.find('[data-testid="customer-new-plan-order-mode-existing"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-testid="customer-new-plan-existing-order-row"]')).toHaveLength(1);
+
+    await wrapper.get('[data-testid="customer-new-plan-existing-order-row"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.getCustomerOrderMock).toHaveBeenCalledWith('tenant-1', 'order-existing-1', 'token-1');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-no"]').element as HTMLInputElement).value).toBe('ORD-EX-1');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('Objektschutz RheinForum Koln - Nordtor Juli');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-security-concept"]').element as HTMLTextAreaElement).value).toBe('Existing concept');
+    expect(wrapper.get('[data-testid="customer-new-plan-selected-order-summary"]').text()).toContain('ORD-EX-1');
+    expect(routerReplaceMock).toHaveBeenCalledWith(expect.objectContaining({
+      path: '/admin/customers/new-plan',
+      query: expect.objectContaining({
+        customer_id: 'customer-1',
+        order_id: 'order-existing-1',
+        step: 'order-details',
+      }),
+    }));
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.messages.existingOrderLoaded');
+  });
+
+  it('updates a selected existing order on Next without creating a duplicate and then reuses its downstream data', async () => {
+    stores.orders['order-existing-1'] = makeOrder('order-existing-1', {
+      order_no: 'ORD-EX-1',
+      title: 'Existing title',
+      notes: 'Existing order notes',
+    });
+    stores.equipmentLinesByOrder['order-existing-1'] = [
+      {
+        archived_at: null,
+        equipment_item_id: 'equipment-item-1',
+        id: 'equipment-line-existing-1',
+        notes: 'Existing equipment line',
+        order_id: 'order-existing-1',
+        required_qty: 3,
+        status: 'active',
+        tenant_id: 'tenant-1',
+        version_no: 1,
+      },
+    ];
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToOrderDetails(wrapper);
+
+    await wrapper.get('[data-testid="customer-new-plan-existing-order-row"]').trigger('click');
+    await nextTickFlush();
+    await wrapper.get('[data-testid="customer-new-plan-order-title"]').setValue('Existing title updated');
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.updateCustomerOrderMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.createCustomerOrderMock).toHaveBeenCalledTimes(0);
+    expect(apiMocks.updateCustomerOrderMock.mock.calls[0]?.[1]).toBe('order-existing-1');
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
+    expect(apiMocks.listOrderEquipmentLinesMock).toHaveBeenCalledWith('tenant-1', 'order-existing-1', 'token-1');
+    expect(wrapper.text()).toContain('Funkgerät');
+  });
+
+  it('blocks Next in existing-order mode when no order is selected and keeps create-new mode working', async () => {
+    stores.orders['order-existing-1'] = makeOrder('order-existing-1', {
+      order_no: 'ORD-EX-1',
+      title: 'Existing title',
+    });
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToOrderDetails(wrapper);
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.orderSelectionRequired');
+    expect(apiMocks.createCustomerOrderMock).toHaveBeenCalledTimes(0);
+
+    wrapper.unmount();
+
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      step: 'order-details',
+    };
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'order-details',
+    );
+    window.sessionStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        form: {
+          customer_id: 'customer-1',
+          notes: '',
+          order_no: '',
+          patrol_route_id: '',
+          release_state: 'draft',
+          requirement_type_id: '',
+          security_concept_text: '',
+          service_category_code: '',
+          service_from: '',
+          service_to: '',
+          title: '',
+        },
+        mode: 'create_new',
+        selected_order_id: '',
+      }),
+    );
+
+    const createWrapper = mountComponent();
+    await nextTickFlush();
+
+    await createWrapper.get('[data-testid="customer-new-plan-order-no"]').setValue('ORD-NEW-2');
+    await createWrapper.get('[data-testid="customer-new-plan-order-title"]').setValue('Create after existing mode');
+    await createWrapper.get('[data-testid="customer-new-plan-order-requirement-type"]').setValue('requirement-type-1');
+    await createWrapper.get('[data-testid="customer-new-plan-order-service-category"]').setValue('guarding');
+    await createWrapper.get('[data-testid="customer-new-plan-order-service-from"]').setValue('2026-06-01');
+    await createWrapper.get('[data-testid="customer-new-plan-order-service-to"]').setValue('2026-06-10');
+    await createWrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.createCustomerOrderMock).toHaveBeenCalledTimes(1);
+    expect(createWrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
+  });
+
+  it('restores a selected existing order from route order_id and ignores stale create-new draft content', async () => {
+    stores.orders['order-existing-1'] = makeOrder('order-existing-1', {
+      order_no: 'ORD-EX-1',
+      title: 'Hydrated existing order',
+      security_concept_text: 'Hydrated concept',
+    });
+    routeState.query = {
+      customer_id: 'customer-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      order_id: 'order-existing-1',
+      step: 'order-details',
+    };
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'order-details',
+    );
+    window.sessionStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        mode: 'create_new',
+        selected_order_id: '',
+        form: {
+          customer_id: 'customer-1',
+          notes: 'stale create draft',
+          order_no: 'ORD-STALE',
+          patrol_route_id: '',
+          release_state: 'draft',
+          requirement_type_id: 'requirement-type-1',
+          security_concept_text: '',
+          service_category_code: 'guarding',
+          service_from: '2026-07-01',
+          service_to: '2026-07-02',
+          title: 'stale draft title',
+        },
+      }),
+    );
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-no"]').element as HTMLInputElement).value).toBe('ORD-EX-1');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('Hydrated existing order');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-security-concept"]').element as HTMLTextAreaElement).value).toBe('Hydrated concept');
+    expect(wrapper.get('[data-testid="customer-new-plan-selected-order-summary"]').text()).toContain('ORD-EX-1');
+  });
+
   it('keeps an unsaved equipment draft during same-customer auth refresh and remount', async () => {
     routeState.query = {
       customer_id: 'customer-1',
@@ -857,8 +1072,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
 
     await wrapper.get('[data-testid="customer-new-plan-planning-family"]').setValue('event_venue');
     await nextTickFlush();
-    const radios = wrapper.findAll('input[type="radio"]');
-    await radios[1]!.setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-mode-create"]').trigger('click');
     await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
     await nextTickFlush();
 
@@ -1308,8 +1522,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
 
     const initialAddressLoads = apiMocks.listCustomerAddressesMock.mock.calls.length;
-    const radios = wrapper.findAll('input[type="radio"]');
-    await radios[1]!.setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-mode-create"]').trigger('click');
     await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
     await nextTickFlush();
 
@@ -1346,8 +1559,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     const wrapper = mountComponent();
     await nextTickFlush();
 
-    const radios = wrapper.findAll('input[type="radio"]');
-    await radios[1]!.setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-mode-create"]').trigger('click');
     await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
     await nextTickFlush();
 
@@ -1390,8 +1602,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     for (const testCase of cases) {
       await wrapper.get('[data-testid="customer-new-plan-planning-family"]').setValue(testCase.family);
       await nextTickFlush();
-      const radios = wrapper.findAll('input[type="radio"]');
-      await radios[1]!.setValue(true);
+      await wrapper.get('[data-testid="customer-new-plan-planning-mode-create"]').trigger('click');
       await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
       await nextTickFlush();
 
@@ -1414,8 +1625,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     const wrapper = mountComponent();
     await nextTickFlush();
 
-    const radios = wrapper.findAll('input[type="radio"]');
-    await radios[1]!.setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-mode-create"]').trigger('click');
 
     await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
     await nextTickFlush();
@@ -1433,8 +1643,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
 
     await wrapper.get('[data-testid="customer-new-plan-planning-family"]').setValue('patrol_route');
     await nextTickFlush();
-    const patrolRadios = wrapper.findAll('input[type="radio"]');
-    await patrolRadios[1]!.setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-mode-create"]').trigger('click');
     await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
     await nextTickFlush();
 
@@ -1446,8 +1655,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     const wrapper = mountComponent();
     await nextTickFlush();
 
-    const radios = wrapper.findAll('input[type="radio"]');
-    await radios[1]!.setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-mode-create"]').trigger('click');
     await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
     await nextTickFlush();
 
@@ -1476,8 +1684,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
       async () => {
         await wrapper.get('[data-testid="customer-new-plan-planning-family"]').setValue('site');
         await nextTickFlush();
-        const radios = wrapper.findAll('input[type="radio"]');
-        await radios[1]!.setValue(true);
+        await wrapper.get('[data-testid="customer-new-plan-planning-mode-create"]').trigger('click');
         await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
         await nextTickFlush();
         await wrapper.get('[data-testid="customer-new-plan-planning-create-site-no"]').setValue('SITE-2');
@@ -1507,8 +1714,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
       async () => {
         await wrapper.get('[data-testid="customer-new-plan-planning-family"]').setValue('trade_fair');
         await nextTickFlush();
-        const radios = wrapper.findAll('input[type="radio"]');
-        await radios[1]!.setValue(true);
+        await wrapper.get('[data-testid="customer-new-plan-planning-mode-create"]').trigger('click');
         await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
         await nextTickFlush();
         await wrapper.get('[data-testid="customer-new-plan-planning-create-fair-no"]').setValue('FAIR-2');
@@ -1542,8 +1748,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
       async () => {
         await wrapper.get('[data-testid="customer-new-plan-planning-family"]').setValue('patrol_route');
         await nextTickFlush();
-        const radios = wrapper.findAll('input[type="radio"]');
-        await radios[1]!.setValue(true);
+        await wrapper.get('[data-testid="customer-new-plan-planning-mode-create"]').trigger('click');
         await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
         await nextTickFlush();
         await wrapper.get('[data-testid="customer-new-plan-planning-create-route-no"]').setValue('ROUTE-2');
@@ -1586,8 +1791,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security');
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning');
 
-    const radios = wrapper.findAll('input[type="radio"]');
-    await radios[1]!.setValue(true);
+    await wrapper.get('[data-testid="customer-new-plan-planning-mode-create"]').trigger('click');
     await wrapper.get('[data-testid="customer-new-plan-planning-create"]').trigger('click');
     await nextTickFlush();
 
@@ -1619,7 +1823,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(Number((wrapper.get('[data-testid="customer-new-plan-planning-create-longitude"]').element as HTMLInputElement).value)).toBe(6.98);
     expect((wrapper.get('[data-testid="customer-new-plan-planning-create-watchbook-enabled"]').element as HTMLInputElement).checked).toBe(true);
     expect((wrapper.get('[data-testid="customer-new-plan-planning-create-notes"]').element as HTMLTextAreaElement).value).toBe('Focus regression test');
-    expect((wrapper.findAll('input[type="radio"]')[1]!.element as HTMLInputElement).checked).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-create"]').exists()).toBe(true);
     expect(routerPushMock).not.toHaveBeenCalled();
 
     authStoreState.effectiveAccessToken = 'token-2';

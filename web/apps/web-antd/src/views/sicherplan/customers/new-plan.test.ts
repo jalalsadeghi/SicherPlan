@@ -571,8 +571,9 @@ describe('CustomerNewPlanWizardView', () => {
     routeState.query = { customer_id: 'customer-2' };
     await flushPromises();
 
-    if (resolveFirstRequest) {
-      resolveFirstRequest(buildCustomer());
+    const pendingFirstRequest = resolveFirstRequest;
+    if (pendingFirstRequest) {
+      (pendingFirstRequest as (value: ReturnType<typeof buildCustomer>) => void)(buildCustomer());
     }
     await flushPromises();
 

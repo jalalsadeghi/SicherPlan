@@ -1,18 +1,16 @@
 You are working in the SicherPlan repository.
 
-This task follows the patch that separates Save/Update from Next for:
-- Equipment Lines
-- Requirement Lines
+This task follows the patch adding existing-order selection to the Customer New Plan Wizard.
 
 Source document:
 - /docs/sprint/SPR-CUST-NEWPLAN-V1.md
 
 Goal:
-Do a focused QA and hardening pass to ensure multi-line behavior works correctly in the Customer New Plan Wizard.
+Do a focused QA/hardening pass for the Order Details step after adding Use Existing Order / Create New Order behavior.
 
 Do not add unrelated features.
 Do not change backend APIs.
-Do not change other wizard steps unless you find a direct regression caused by this patch.
+Do not change other wizard steps unless fixing a direct regression from this patch.
 
 Files to inspect:
 - web/apps/web-antd/src/views/sicherplan/customers/new-plan.vue
@@ -20,73 +18,62 @@ Files to inspect:
 - web/apps/web-antd/src/views/sicherplan/customers/use-customer-new-plan-wizard.ts
 - web/apps/web-antd/src/views/sicherplan/customers/new-plan-wizard-drafts.ts
 - web/apps/web-antd/src/sicherplan-legacy/api/planningOrders.ts
+- web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue
 - related tests under web/apps/web-antd/src/views/sicherplan/customers/
 
 Validation checklist:
 
-1. Equipment Lines save behavior
-- Save equipment line creates a line.
-- User remains on Equipment Lines after save.
-- Saved line list refreshes.
-- Form resets after save.
-- User can add another line.
-- User can click existing line and update it.
-- Update does not create duplicates.
-- Clear line resets draft and update mode.
+1. Existing order loading
+- listCustomerOrders is called with the selected customer_id.
+- Archived orders are not shown unless the branch convention says otherwise.
+- Empty state is clear when no order exists.
+- Orders show order_no, title, service dates, and release state.
 
-2. Requirement Lines save behavior
-- Save requirement line creates a line.
-- User remains on Requirement Lines after save.
-- Saved line list refreshes.
-- Form resets after save.
-- User can add another line.
-- User can click existing line and update it.
-- Update does not create duplicates.
-- Clear line resets draft and update mode.
+2. Existing order selection
+- Selecting an existing order calls getCustomerOrder.
+- The form hydrates correctly.
+- selectedOrder is set.
+- order_id is stored in wizard state.
+- order_id is reflected in route query.
+- Refresh keeps the selected order.
 
-3. Next behavior
-- Equipment Next does not create/update a line.
-- Equipment Next blocks when no saved line exists.
-- Equipment Next blocks when draft has unsaved values.
-- Equipment Next proceeds only when saved lines exist and draft is clean.
-- Requirement Next does not create/update a line.
-- Requirement Next blocks when no saved line exists.
-- Requirement Next blocks when draft has unsaved values.
-- Requirement Next proceeds only when saved lines exist and draft is clean.
+3. Existing order editing
+- Editing a selected order and clicking Next calls updateCustomerOrder.
+- It does not call createCustomerOrder.
+- It does not create duplicate orders.
+- version_no is handled correctly.
 
-4. Draft persistence
-- Unsaved equipment draft survives focus/auth refresh.
-- Unsaved requirement draft survives focus/auth refresh.
-- Saved equipment line clears the unsaved equipment draft.
-- Saved requirement line clears the unsaved requirement draft.
-- Clear line clears the relevant draft.
-- Customer switch does not leak draft data.
+4. Create new mode
+- Switching to Create new order clears selected order safely.
+- Next calls createCustomerOrder.
+- New order_id is persisted into state/route.
+- Existing order list remains available if user switches back.
 
-5. Existing flow regression check
+5. Draft persistence
+- Unsaved create-new draft does not overwrite selected existing order.
+- Existing-order edit draft does not leak into create-new mode.
+- Customer switch clears or isolates drafts.
+- Browser refresh restores correct selected order/draft behavior.
+
+6. Downstream steps
+- Equipment Lines loads lines for selected existing order.
+- Requirement Lines loads lines for selected existing order.
+- Order Documents loads documents for selected existing order.
+- Existing Save/Update-vs-Next behavior remains intact.
+
+7. Non-regression
 - Planning step still works.
-- Order Details still saves on Next.
-- Order Documents still works.
-- Planning Record still works.
-- Shift Plan and Series steps still work.
-- Generate Series handoff is unaffected.
-
-6. i18n
-- All new labels/messages are i18n-driven.
-- German and English fallback are present.
-
-7. UX
-- Inline Save/Update/Clear buttons are visually aligned.
-- Edit mode is understandable.
-- Error messages for blocked Next are clear.
-- Responsive layout remains usable.
+- Step 1 -> Step 2 route context still works.
+- Canonical /admin/planning-orders is unchanged.
+- Final handoff is unaffected.
 
 Tests:
-Run existing wizard tests and add missing ones if needed:
+Run and update as needed:
 - new-plan.test.ts
 - new-plan-epic3.smoke.test.ts
 - new-plan-epic4.smoke.test.ts
 - new-plan-wizard.test.ts
-- any new focused test file you create
+- any focused new test for existing order selection
 
 Required final output:
 1. QA validation summary
@@ -95,8 +82,8 @@ Required final output:
 4. Changed files
 5. Tests added/updated
 6. Test results
-7. Manual QA result
+7. Manual QA checklist result
 8. Clear statement: Ready / Not ready for real data entry
 
-Before finalizing, explicitly confirm whether the implementation matches the Save/Update-vs-Next proposal.
+Before finalizing, explicitly confirm whether the implementation matches the existing-order selection proposal.
 Avoid unrelated refactors.
