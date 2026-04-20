@@ -7,6 +7,11 @@ interface BuiltinThemePreset {
   type: BuiltinThemeType;
 }
 
+const FONT_SIZE_MIN = 12;
+const FONT_SIZE_MAX = 22;
+const FONT_SIZE_DEFAULT = 14;
+const FONT_SIZE_STEP = 1;
+
 const BUILT_IN_THEME_PRESETS: BuiltinThemePreset[] = [
   {
     color: 'hsl(212 100% 45%)',
@@ -111,6 +116,13 @@ const DEFAULT_TIME_ZONE_OPTIONS: TimezoneOption[] = [
 
 export const COLOR_PRESETS = [...BUILT_IN_THEME_PRESETS].slice(0, 7);
 
-export { BUILT_IN_THEME_PRESETS, DEFAULT_TIME_ZONE_OPTIONS };
+export {
+  BUILT_IN_THEME_PRESETS,
+  DEFAULT_TIME_ZONE_OPTIONS,
+  FONT_SIZE_DEFAULT,
+  FONT_SIZE_MAX,
+  FONT_SIZE_MIN,
+  FONT_SIZE_STEP,
+};
 
 export type { BuiltinThemePreset };

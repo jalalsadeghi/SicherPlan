@@ -14,6 +14,11 @@ import {
 } from '@vueuse/core';
 
 import { defaultPreferences } from './config';
+import {
+  FONT_SIZE_DEFAULT,
+  FONT_SIZE_MAX,
+  FONT_SIZE_MIN,
+} from './constants';
 import { updateCSSVariables } from './update-css-variables';
 
 const SUPPORTED_LOCALES = new Set(['de-DE', 'en-US'] as const);
@@ -158,17 +163,34 @@ class PreferenceManager {
   }
 
   private normalizePreferencesLocale(preferences: Preferences): Preferences {
+    const normalizedFontSize = this.normalizeThemeFontSize(
+      preferences.theme.fontSize,
+    );
     const locale = preferences.app.locale;
+    const normalizedPreferences: Preferences = {
+      ...preferences,
+      theme: {
+        ...preferences.theme,
+        fontSize: normalizedFontSize,
+      },
+    };
     if (SUPPORTED_LOCALES.has(locale)) {
-      return preferences;
+      return normalizedPreferences;
     }
     return {
-      ...preferences,
+      ...normalizedPreferences,
       app: {
-        ...preferences.app,
+        ...normalizedPreferences.app,
         locale: defaultPreferences.app.locale,
       },
     };
+  }
+
+  private normalizeThemeFontSize(fontSize: number) {
+    if (!Number.isFinite(fontSize)) {
+      return FONT_SIZE_DEFAULT;
+    }
+    return Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, fontSize));
   }
 
   /**

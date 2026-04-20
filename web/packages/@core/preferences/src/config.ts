@@ -1,5 +1,7 @@
 import type { Preferences } from './types';
 
+import { FONT_SIZE_DEFAULT } from './constants';
+
 const defaultPreferences: Preferences = {
   app: {
     accessMode: 'frontend',
@@ -120,7 +122,7 @@ const defaultPreferences: Preferences = {
     colorWarning: 'hsl(42 84% 61%)',
     mode: 'dark',
     radius: '0.5',
-    fontSize: 16,
+    fontSize: FONT_SIZE_DEFAULT,
     semiDarkHeader: false,
     semiDarkSidebar: false,
     semiDarkSidebarSub: false,

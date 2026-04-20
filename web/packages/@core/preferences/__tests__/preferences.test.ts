@@ -86,6 +86,7 @@ describe('preferences', () => {
     preferenceManager.resetPreferences();
 
     expect(preferenceManager.getPreferences()).toEqual(defaultPreferences);
+    expect(preferenceManager.getPreferences().theme.fontSize).toBe(14);
   });
 
   it('updates isMobile correctly', () => {
@@ -234,6 +235,26 @@ describe('preferences', () => {
     });
 
     expect(preferenceManager.getPreferences().theme.mode).toBe('light');
+  });
+
+  it('clamps font size updates below 12px to 12px', () => {
+    preferenceManager.updatePreferences({
+      theme: {
+        fontSize: 10,
+      },
+    });
+
+    expect(preferenceManager.getPreferences().theme.fontSize).toBe(12);
+  });
+
+  it('clamps font size updates above 22px to 22px', () => {
+    preferenceManager.updatePreferences({
+      theme: {
+        fontSize: 24,
+      },
+    });
+
+    expect(preferenceManager.getPreferences().theme.fontSize).toBe(22);
   });
 });
 

@@ -125,7 +125,7 @@
     "title": "Theme",
     "radius": "Radius",
     "fontSize": "Font Size",
-    "fontSizeTip": "Adjust global font size with real-time preview",
+    "fontSizeTip": "Adjust global font size from 12px to 22px with real-time preview",
     "light": "Light",
     "dark": "Dark",
     "darkSidebar": "Semi Dark Sidebar",

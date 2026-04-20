@@ -7,4 +7,8 @@ describe('defaultPreferences immutability test', () => {
   it('should not modify the config object', () => {
     expect(defaultPreferences).toMatchSnapshot();
   });
+
+  it('uses 14px as the default platform font size', () => {
+    expect(defaultPreferences.theme.fontSize).toBe(14);
+  });
 });

@@ -2,6 +2,12 @@
 import { watch } from 'vue';
 
 import { $t } from '@vben/locales';
+import {
+  FONT_SIZE_DEFAULT,
+  FONT_SIZE_MAX,
+  FONT_SIZE_MIN,
+  FONT_SIZE_STEP,
+} from '@vben/preferences';
 
 import {
   NumberField,
@@ -16,12 +22,12 @@ defineOptions({
 });
 
 const modelValue = defineModel<number>({
-  default: 16,
+  default: FONT_SIZE_DEFAULT,
 });
 
-const min = 15;
-const max = 22;
-const step = 1;
+const min = FONT_SIZE_MIN;
+const max = FONT_SIZE_MAX;
+const step = FONT_SIZE_STEP;
 
 // 限制输入值在 min 和 max 之间
 watch(
