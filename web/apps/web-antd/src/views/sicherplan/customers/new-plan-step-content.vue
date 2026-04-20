@@ -1950,7 +1950,6 @@ async function selectExistingPlanningEntity(entityId: string) {
   } else {
     await refreshTradeFairZoneOptions('');
   }
-  emit('saved-context', buildPlanningContextPatch());
   setFeedback('success', $t('sicherplan.customerPlansWizard.messages.planningEntrySelected'));
   emit('step-ui-state', 'planning-record-overview', { dirty: hasPlanningRecordDraftContent(), error: '' });
 }
@@ -2831,7 +2830,6 @@ async function submitPlanningCreateModal() {
     planningEntityId.value = created.id;
     planningSelectionMode.value = 'use_existing';
     planningRecordDraft.planning_mode_code = planningModeCode.value;
-    emit('saved-context', buildPlanningContextPatch());
     if (planningModeCode.value === 'trade_fair') {
       await refreshTradeFairZoneOptions(created.id);
     } else {
@@ -3402,7 +3400,10 @@ async function submitPlanningRecordStep() {
     syncPlanningRecordDraft(saved);
     clearStepDraft('planning-record-overview');
     clearDraftRestoreMessage();
-    emit('saved-context', { planning_record_id: saved.id });
+    emit('saved-context', {
+      ...buildPlanningContextPatch(),
+      planning_record_id: saved.id,
+    });
     emit('step-completion', 'planning-record-overview', true);
     emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
     return true;
@@ -4481,24 +4482,24 @@ onBeforeUnmount(() => {
             </select>
           </label>
         </div>
-        <div class="sp-customer-plan-wizard-step__grid">
-          <label class="field-stack">
-            <span>{{ $t('sicherplan.customerPlansWizard.forms.useExistingPlanningEntry') }}</span>
+        <div class="sp-customer-plan-wizard-step__toggle-row">
+          <label class="planning-admin-checkbox" data-testid="customer-new-plan-planning-context-existing-label">
             <input
               v-model="planningSelectionModeModel"
               data-testid="customer-new-plan-planning-context-use-existing"
               type="radio"
               value="use_existing"
             />
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.useExistingPlanningEntry') }}</span>
           </label>
-          <label class="field-stack">
-            <span>{{ $t('sicherplan.customerPlansWizard.forms.createNewPlanningEntry') }}</span>
+          <label class="planning-admin-checkbox" data-testid="customer-new-plan-planning-context-create-label">
             <input
               v-model="planningSelectionModeModel"
               data-testid="customer-new-plan-planning-context-create-new"
               type="radio"
               value="create_new"
             />
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.createNewPlanningEntry') }}</span>
           </label>
         </div>
         <template v-if="planningModeUsesExisting">
