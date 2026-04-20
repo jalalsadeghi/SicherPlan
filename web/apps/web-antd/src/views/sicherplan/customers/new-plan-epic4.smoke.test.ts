@@ -1027,7 +1027,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
   });
 
-  it('selects an existing shift plan row as official wizard context and shows the selected summary', async () => {
+  it('selects an existing shift plan row locally and shows the selected summary without committing wizard context immediately', async () => {
     apiMocks.listShiftPlansMock.mockResolvedValue([
       buildShiftPlan(),
       buildShiftPlan({ id: 'plan-2', name: 'Werk Süd / Schichtplan', planning_from: '2026-06-02', planning_to: '2026-06-09' }),
@@ -1046,7 +1046,8 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await flushPromises();
 
     expect(apiMocks.getShiftPlanMock).toHaveBeenCalledWith('tenant-1', 'plan-1', 'token-1');
-    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
+    expect(wrapper.emitted('saved-context')).toBeUndefined();
+    expect(routerReplaceMock).not.toHaveBeenCalled();
     expect(wrapper.emitted('step-completion')?.at(-1)).toEqual(['shift-plan', true]);
     expect(wrapper.emitted('step-ui-state')?.at(-1)?.[0]).toBe('shift-plan');
     expect(wrapper.get('[data-testid="customer-new-plan-selected-shift-plan-summary"]').text()).toContain('plan');
@@ -1086,7 +1087,8 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await flushPromises();
 
     expect(apiMocks.getShiftPlanMock).toHaveBeenCalledWith('tenant-1', 'plan-1', 'token-1');
-    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
+    expect(wrapper.emitted('saved-context')).toBeUndefined();
+    expect(routerReplaceMock).not.toHaveBeenCalled();
     expect(wrapper.find('[data-testid="customer-new-plan-selected-shift-plan-summary"]').exists()).toBe(true);
   });
 
@@ -1229,6 +1231,44 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect((restoredWrapper.get('[data-testid="customer-new-plan-shift-plan-from"]').element as HTMLInputElement).value).toBe('2026-06-02');
     expect((restoredWrapper.get('[data-testid="customer-new-plan-shift-plan-to"]').element as HTMLInputElement).value).toBe('2026-06-10');
     expect(restoredWrapper.get('[data-testid="customer-new-plan-draft-restored"]').text()).toBe('sicherplan.customerPlansWizard.draftRestored');
+  });
+
+  it('does not restore a generic persisted shift-plan draft over a saved selected shift plan', async () => {
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'shift-plan',
+    );
+    window.sessionStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        draft: {
+          name: 'Generic Draft',
+          planning_from: '2026-06-03',
+          planning_to: '2026-06-04',
+          planning_record_id: 'record-1',
+          remarks: 'draft',
+          workforce_scope_code: 'mixed',
+        },
+        selected_shift_plan_id: '',
+      }),
+    );
+
+    const wrapper = mountStep('shift-plan', {
+      current_step: 'shift-plan',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+    });
+    await flushPromises();
+
+    expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').element as HTMLInputElement).value).toBe('Werk Nord / Schichtplan');
+    expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-from"]').element as HTMLInputElement).value).toBe('2026-06-01');
+    expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-to"]').element as HTMLInputElement).value).toBe('2026-06-10');
+    expect(wrapper.find('[data-testid="customer-new-plan-draft-restored"]').exists()).toBe(false);
   });
 
   it('clears a real shift-plan draft after successful save', async () => {

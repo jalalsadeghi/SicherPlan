@@ -2101,7 +2101,6 @@ async function selectShiftPlanRow(planId: string) {
   syncShiftPlanDraft(plan);
   clearStepDraft('shift-plan');
   clearDraftRestoreMessage();
-  emit('saved-context', { shift_plan_id: plan.id });
   emit('step-completion', 'shift-plan', true);
   emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
 }
@@ -2840,8 +2839,7 @@ async function loadShiftPlanState(isCurrent = () => true) {
   syncShiftPlanDraft(plan);
   if (
     persistedShiftPlanDraft &&
-    (!persistedShiftPlanDraft.selected_shift_plan_id ||
-      persistedShiftPlanDraft.selected_shift_plan_id === props.wizardState.shift_plan_id)
+    persistedShiftPlanDraft.selected_shift_plan_id === props.wizardState.shift_plan_id
   ) {
     applyShiftPlanDraftPersistence(persistedShiftPlanDraft.draft);
     restoreDraftMessage();
