@@ -109,6 +109,10 @@ import {
 type PlanningEntityType = 'event_venue' | 'patrol_route' | 'site' | 'trade_fair';
 type PlanningSelectionMode = 'create_new' | 'use_existing';
 type OrderSelectionMode = 'create_new' | 'use_existing';
+interface ShiftPlanDraftPersistence {
+  draft: Partial<typeof shiftPlanDraft>;
+  selected_shift_plan_id: string;
+}
 
 const router = useRouter();
 const route = useRoute();
@@ -638,6 +642,9 @@ const planningSelectionModeModel = computed<PlanningSelectionMode>({
 const selectedExistingOrderSummary = computed(
   () => customerOrderRows.value.find((row) => row.id === selectedExistingOrderId.value) ?? null,
 );
+const selectedShiftPlanSummary = computed(
+  () => selectedShiftPlan.value ?? shiftPlanRows.value.find((row) => row.id === props.wizardState.shift_plan_id) ?? null,
+);
 const existingOrderEditActive = computed(
   () => orderModeUsesExisting.value && Boolean(existingOrderEditFormOpen.value && editingExistingOrderId.value),
 );
@@ -1011,11 +1018,58 @@ function hasPlanningRecordAttachmentPartialDraft() {
   return hasPlanningRecordAttachmentDraftContent() && !hasPlanningRecordAttachmentSubmission();
 }
 
+function buildShiftPlanDefaultDraft() {
+  return {
+    name: selectedPlanningRecord.value
+      ? `${selectedPlanningRecord.value.name} / ${$t('sicherplan.customerPlansWizard.forms.shiftPlanDefaultNameSuffix')}`
+      : '',
+    planning_from: selectedPlanningRecord.value?.planning_from || '',
+    planning_record_id: props.wizardState.planning_record_id || '',
+    planning_to: selectedPlanningRecord.value?.planning_to || '',
+    remarks: '',
+    workforce_scope_code: 'internal',
+  };
+}
+
+function buildSelectedShiftPlanBaseline(plan: ShiftPlanRead) {
+  return {
+    name: plan.name,
+    planning_from: plan.planning_from,
+    planning_record_id: plan.planning_record_id,
+    planning_to: plan.planning_to,
+    remarks: plan.remarks ?? '',
+    workforce_scope_code: plan.workforce_scope_code,
+  };
+}
+
 function hasShiftPlanDraftContent() {
+  if (selectedShiftPlan.value) {
+    const baseline = buildSelectedShiftPlanBaseline(selectedShiftPlan.value);
+    return Boolean(
+      shiftPlanDraft.name !== baseline.name ||
+        shiftPlanDraft.planning_from !== baseline.planning_from ||
+        shiftPlanDraft.planning_record_id !== baseline.planning_record_id ||
+        shiftPlanDraft.planning_to !== baseline.planning_to ||
+        shiftPlanDraft.remarks !== baseline.remarks ||
+        shiftPlanDraft.workforce_scope_code !== baseline.workforce_scope_code,
+    );
+  }
+  if (selectedPlanningRecord.value) {
+    const defaultDraft = buildShiftPlanDefaultDraft();
+    return Boolean(
+      shiftPlanDraft.name && shiftPlanDraft.name !== defaultDraft.name ||
+        shiftPlanDraft.planning_from && shiftPlanDraft.planning_from !== defaultDraft.planning_from ||
+        shiftPlanDraft.planning_record_id && shiftPlanDraft.planning_record_id !== defaultDraft.planning_record_id ||
+        shiftPlanDraft.planning_to && shiftPlanDraft.planning_to !== defaultDraft.planning_to ||
+        shiftPlanDraft.remarks ||
+        shiftPlanDraft.workforce_scope_code !== defaultDraft.workforce_scope_code,
+    );
+  }
   return Boolean(
     shiftPlanDraft.name ||
       shiftPlanDraft.planning_from ||
       shiftPlanDraft.planning_to ||
+      shiftPlanDraft.planning_record_id ||
       shiftPlanDraft.remarks ||
       shiftPlanDraft.workforce_scope_code !== 'internal',
   );
@@ -1244,9 +1298,34 @@ function applyPlanningRecordDocumentsDraftPersistence(payload: Partial<OrderDocu
   }
 }
 
+function normalizeShiftPlanDraftPersistence(
+  payload: ShiftPlanDraftPersistence | Partial<typeof shiftPlanDraft> | null | undefined,
+): ShiftPlanDraftPersistence | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  if ('draft' in payload && payload.draft && typeof payload.draft === 'object') {
+    return {
+      draft: payload.draft,
+      selected_shift_plan_id: typeof payload.selected_shift_plan_id === 'string' ? payload.selected_shift_plan_id : '',
+    };
+  }
+  return {
+    draft: payload as Partial<typeof shiftPlanDraft>,
+    selected_shift_plan_id: '',
+  };
+}
+
 function applyShiftPlanDraftPersistence(payload: Partial<typeof shiftPlanDraft>) {
   withDraftSyncPaused(() => {
-    Object.assign(shiftPlanDraft, payload);
+    Object.assign(shiftPlanDraft, {
+      name: payload.name ?? shiftPlanDraft.name,
+      planning_from: payload.planning_from ?? shiftPlanDraft.planning_from,
+      planning_record_id: payload.planning_record_id ?? shiftPlanDraft.planning_record_id,
+      planning_to: payload.planning_to ?? shiftPlanDraft.planning_to,
+      remarks: payload.remarks ?? shiftPlanDraft.remarks,
+      workforce_scope_code: payload.workforce_scope_code ?? shiftPlanDraft.workforce_scope_code,
+    });
   });
 }
 
@@ -1331,7 +1410,15 @@ function persistPlanningRecordDocumentsDraft() {
 }
 
 function persistShiftPlanDraft() {
-  saveStepDraft('shift-plan', hasShiftPlanDraftContent() ? { ...shiftPlanDraft } : null);
+  saveStepDraft(
+    'shift-plan',
+    hasShiftPlanDraftContent()
+      ? {
+          draft: { ...shiftPlanDraft },
+          selected_shift_plan_id: selectedShiftPlan.value?.id || '',
+        }
+      : null,
+  );
 }
 
 function persistSeriesDraft() {
@@ -1622,14 +1709,7 @@ function resetPlanningRecordAttachmentDraft() {
 }
 
 function resetShiftPlanDraft() {
-  Object.assign(shiftPlanDraft, {
-    name: '',
-    planning_from: '',
-    planning_record_id: props.wizardState.planning_record_id || '',
-    planning_to: '',
-    remarks: '',
-    workforce_scope_code: 'internal',
-  });
+  Object.assign(shiftPlanDraft, buildShiftPlanDefaultDraft());
 }
 
 function resetSeriesDraft() {
@@ -2019,6 +2099,23 @@ async function selectShiftPlanRow(planId: string) {
   }
   const plan = await getShiftPlan(props.tenantId, planId, props.accessToken);
   syncShiftPlanDraft(plan);
+  clearStepDraft('shift-plan');
+  clearDraftRestoreMessage();
+  emit('saved-context', { shift_plan_id: plan.id });
+  emit('step-completion', 'shift-plan', true);
+  emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
+}
+
+function startNewShiftPlan() {
+  selectedShiftPlan.value = null;
+  clearStepDraft('shift-plan');
+  clearDraftRestoreMessage();
+  withDraftSyncPaused(() => {
+    resetShiftPlanDraft();
+  });
+  emit('saved-context', { shift_plan_id: '' });
+  emit('step-completion', 'shift-plan', false);
+  emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
 }
 
 async function selectSeriesRow(seriesId: string) {
@@ -2606,6 +2703,9 @@ async function loadPlanningRecordState(isCurrent = () => true) {
       !hasPlanningRecordDraftContent();
     if (shouldAutoSelectSingleSavedRecord) {
       const matchingRow = planningRecordRows.value[0];
+      if (!matchingRow) {
+        return;
+      }
       const record = await getPlanningRecord(props.tenantId, matchingRow.id, props.accessToken);
       if (!isCurrent()) {
         return;
@@ -2705,7 +2805,9 @@ async function loadShiftPlanningReferenceOptions(isCurrent = () => true) {
 }
 
 async function loadShiftPlanState(isCurrent = () => true) {
-  const persistedShiftPlanDraft = loadStepDraft<Partial<typeof shiftPlanDraft>>('shift-plan');
+  const persistedShiftPlanDraft = normalizeShiftPlanDraftPersistence(
+    loadStepDraft<ShiftPlanDraftPersistence | Partial<typeof shiftPlanDraft>>('shift-plan'),
+  );
   await loadShiftPlanningReferenceOptions(isCurrent);
   if (!isCurrent()) {
     return;
@@ -2716,16 +2818,17 @@ async function loadShiftPlanState(isCurrent = () => true) {
     }
     selectedShiftPlan.value = null;
     if (persistedShiftPlanDraft) {
-      applyShiftPlanDraftPersistence(persistedShiftPlanDraft);
+      applyShiftPlanDraftPersistence(persistedShiftPlanDraft.draft);
       restoreDraftMessage();
+    } else if (shiftPlanRows.value.length === 1 && !hasShiftPlanDraftContent()) {
+      const matchingRow = shiftPlanRows.value[0];
+      if (!matchingRow) {
+        return;
+      }
+      await selectShiftPlanRow(matchingRow.id);
     } else if (!hasShiftPlanDraftContent()) {
       withDraftSyncPaused(() => {
         resetShiftPlanDraft();
-        if (selectedPlanningRecord.value) {
-          shiftPlanDraft.name = `${selectedPlanningRecord.value.name} / ${$t('sicherplan.customerPlansWizard.forms.shiftPlanDefaultNameSuffix')}`;
-          shiftPlanDraft.planning_from = selectedPlanningRecord.value.planning_from;
-          shiftPlanDraft.planning_to = selectedPlanningRecord.value.planning_to;
-        }
       });
     }
     return;
@@ -2735,8 +2838,12 @@ async function loadShiftPlanState(isCurrent = () => true) {
     return;
   }
   syncShiftPlanDraft(plan);
-  if (persistedShiftPlanDraft) {
-    applyShiftPlanDraftPersistence(persistedShiftPlanDraft);
+  if (
+    persistedShiftPlanDraft &&
+    (!persistedShiftPlanDraft.selected_shift_plan_id ||
+      persistedShiftPlanDraft.selected_shift_plan_id === props.wizardState.shift_plan_id)
+  ) {
+    applyShiftPlanDraftPersistence(persistedShiftPlanDraft.draft);
     restoreDraftMessage();
   }
 }
@@ -3595,6 +3702,22 @@ async function submitShiftPlanStep() {
   if (!shiftPlanDraft.name.trim() || !shiftPlanDraft.planning_from || !shiftPlanDraft.planning_to || shiftPlanDraft.planning_to < shiftPlanDraft.planning_from) {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.shiftPlanInvalid'));
     return false;
+  }
+  if (
+    selectedPlanningRecord.value &&
+    (shiftPlanDraft.planning_from < selectedPlanningRecord.value.planning_from ||
+      shiftPlanDraft.planning_to > selectedPlanningRecord.value.planning_to)
+  ) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.shiftPlanPlanningRecordWindowMismatch'));
+    return false;
+  }
+  if (selectedShiftPlan.value && !hasShiftPlanDraftContent()) {
+    clearStepDraft('shift-plan');
+    clearDraftRestoreMessage();
+    emit('saved-context', { shift_plan_id: selectedShiftPlan.value.id });
+    emit('step-completion', 'shift-plan', true);
+    emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
+    return true;
   }
   stepLoading.value = true;
   emit('step-ui-state', 'shift-plan', { loading: true, error: '' });
@@ -4803,17 +4926,41 @@ onBeforeUnmount(() => {
     </section>
 
     <section v-else-if="shiftPlanStepActive" class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-shift-plan">
-      <div v-if="shiftPlanRows.length" class="sp-customer-plan-wizard-step__list">
+      <div v-if="shiftPlanRows.length" class="cta-row">
+        <button
+          type="button"
+          class="cta-button cta-secondary"
+          data-testid="customer-new-plan-create-new-shift-plan"
+          @click="startNewShiftPlan"
+        >
+          {{ $t('sicherplan.customerPlansWizard.actions.createNewShiftPlan') }}
+        </button>
+      </div>
+      <div
+        v-if="shiftPlanRows.length"
+        class="sp-customer-plan-wizard-step__list"
+        data-testid="customer-new-plan-existing-shift-plan-list"
+      >
         <button
           v-for="row in shiftPlanRows"
           :key="row.id"
           type="button"
           class="sp-customer-plan-wizard-step__list-row"
+          :class="{ 'sp-customer-plan-wizard-step__list-row--selected': row.id === selectedShiftPlan?.id }"
+          data-testid="customer-new-plan-existing-shift-plan-row"
           @click="selectShiftPlanRow(row.id)"
         >
           <strong>{{ row.name }}</strong>
           <span>{{ row.planning_from }} - {{ row.planning_to }}</span>
         </button>
+      </div>
+      <div
+        v-if="selectedShiftPlanSummary"
+        class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static"
+        data-testid="customer-new-plan-selected-shift-plan-summary"
+      >
+        <strong>{{ $t('sicherplan.customerPlansWizard.forms.selectedShiftPlan') }}: {{ selectedShiftPlanSummary.name }}</strong>
+        <span>{{ selectedShiftPlanSummary.planning_from }} - {{ selectedShiftPlanSummary.planning_to }}</span>
       </div>
       <div class="sp-customer-plan-wizard-step__grid">
         <label class="field-stack">
@@ -4834,11 +4981,23 @@ onBeforeUnmount(() => {
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.startDate') }}</span>
-          <input v-model="shiftPlanDraft.planning_from" data-testid="customer-new-plan-shift-plan-from" type="date" />
+          <input
+            v-model="shiftPlanDraft.planning_from"
+            :max="selectedPlanningRecord?.planning_to || undefined"
+            :min="selectedPlanningRecord?.planning_from || undefined"
+            data-testid="customer-new-plan-shift-plan-from"
+            type="date"
+          />
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.endDate') }}</span>
-          <input v-model="shiftPlanDraft.planning_to" data-testid="customer-new-plan-shift-plan-to" type="date" />
+          <input
+            v-model="shiftPlanDraft.planning_to"
+            :max="selectedPlanningRecord?.planning_to || undefined"
+            :min="selectedPlanningRecord?.planning_from || undefined"
+            data-testid="customer-new-plan-shift-plan-to"
+            type="date"
+          />
         </label>
         <label class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>

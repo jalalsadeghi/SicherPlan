@@ -1027,6 +1027,171 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
   });
 
+  it('selects an existing shift plan row as official wizard context and shows the selected summary', async () => {
+    apiMocks.listShiftPlansMock.mockResolvedValue([
+      buildShiftPlan(),
+      buildShiftPlan({ id: 'plan-2', name: 'Werk Süd / Schichtplan', planning_from: '2026-06-02', planning_to: '2026-06-09' }),
+    ]);
+    const wrapper = mountStep('shift-plan', {
+      planning_record_id: 'record-1',
+      current_step: 'shift-plan',
+      shift_plan_id: '',
+    });
+    await flushPromises();
+
+    const rows = wrapper.findAll('[data-testid="customer-new-plan-existing-shift-plan-row"]');
+    expect(rows).toHaveLength(2);
+
+    await rows[0]!.trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.getShiftPlanMock).toHaveBeenCalledWith('tenant-1', 'plan-1', 'token-1');
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
+    expect(wrapper.emitted('step-completion')?.at(-1)).toEqual(['shift-plan', true]);
+    expect(wrapper.emitted('step-ui-state')?.at(-1)?.[0]).toBe('shift-plan');
+    expect(wrapper.get('[data-testid="customer-new-plan-selected-shift-plan-summary"]').text()).toContain('plan');
+    expect(rows[0]!.classes()).toContain('sp-customer-plan-wizard-step__list-row--selected');
+  });
+
+  it('continues with a selected existing shift plan without creating a duplicate', async () => {
+    apiMocks.listShiftPlansMock.mockResolvedValue([
+      buildShiftPlan(),
+      buildShiftPlan({ id: 'plan-2', name: 'Werk Süd / Schichtplan' }),
+    ]);
+    const wrapper = mountStep('shift-plan', {
+      planning_record_id: 'record-1',
+      current_step: 'shift-plan',
+      shift_plan_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.findAll('[data-testid="customer-new-plan-existing-shift-plan-row"]')[0]!.trigger('click');
+    await flushPromises();
+
+    const continued = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(continued).toBe(true);
+    expect(apiMocks.createShiftPlanMock).not.toHaveBeenCalled();
+    expect(apiMocks.updateShiftPlanMock).not.toHaveBeenCalled();
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
+  });
+
+  it('auto-selects a single existing shift plan when there is no real unsaved draft', async () => {
+    apiMocks.listShiftPlansMock.mockResolvedValue([buildShiftPlan()]);
+    const wrapper = mountStep('shift-plan', {
+      planning_record_id: 'record-1',
+      current_step: 'shift-plan',
+      shift_plan_id: '',
+    });
+    await flushPromises();
+
+    expect(apiMocks.getShiftPlanMock).toHaveBeenCalledWith('tenant-1', 'plan-1', 'token-1');
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
+    expect(wrapper.find('[data-testid="customer-new-plan-selected-shift-plan-summary"]').exists()).toBe(true);
+  });
+
+  it('continues with the single auto-selected shift plan without creating a duplicate', async () => {
+    apiMocks.listShiftPlansMock.mockResolvedValue([buildShiftPlan()]);
+    const wrapper = mountStep('shift-plan', {
+      planning_record_id: 'record-1',
+      current_step: 'shift-plan',
+      shift_plan_id: '',
+    });
+    await flushPromises();
+
+    const continued = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(continued).toBe(true);
+    expect(apiMocks.createShiftPlanMock).not.toHaveBeenCalled();
+    expect(apiMocks.updateShiftPlanMock).not.toHaveBeenCalled();
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
+  });
+
+  it('does not auto-select when multiple existing shift plans are available', async () => {
+    apiMocks.listShiftPlansMock.mockResolvedValue([
+      buildShiftPlan(),
+      buildShiftPlan({ id: 'plan-2', name: 'Werk Süd / Schichtplan' }),
+    ]);
+    const wrapper = mountStep('shift-plan', {
+      planning_record_id: 'record-1',
+      current_step: 'shift-plan',
+      shift_plan_id: '',
+    });
+    await flushPromises();
+
+    expect(apiMocks.getShiftPlanMock).not.toHaveBeenCalled();
+    expect(wrapper.emitted('saved-context')).toBeUndefined();
+    expect(wrapper.find('[data-testid="customer-new-plan-selected-shift-plan-summary"]').exists()).toBe(false);
+  });
+
+  it('lets the user clear selected shift plan context and start a new one explicitly', async () => {
+    apiMocks.listShiftPlansMock.mockResolvedValue([buildShiftPlan()]);
+    const wrapper = mountStep('shift-plan', {
+      planning_record_id: 'record-1',
+      current_step: 'shift-plan',
+      shift_plan_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-create-new-shift-plan"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: '' });
+    expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord Sommer / sicherplan.customerPlansWizard.forms.shiftPlanDefaultNameSuffix',
+    );
+  });
+
+  it('validates the shift plan window against the selected planning record window and applies min/max input bounds', async () => {
+    const wrapper = mountStep('shift-plan', {
+      planning_record_id: 'record-1',
+      current_step: 'shift-plan',
+      shift_plan_id: '',
+    });
+    await flushPromises();
+
+    const fromInput = wrapper.get('[data-testid="customer-new-plan-shift-plan-from"]');
+    const toInput = wrapper.get('[data-testid="customer-new-plan-shift-plan-to"]');
+    expect(fromInput.attributes('min')).toBe('2026-06-01');
+    expect(fromInput.attributes('max')).toBe('2026-06-10');
+    expect(toInput.attributes('min')).toBe('2026-06-01');
+    expect(toInput.attributes('max')).toBe('2026-06-10');
+
+    await wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').setValue('Werk Nord / Schichtplan');
+    await fromInput.setValue('2026-05-31');
+    await toInput.setValue('2026-06-10');
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toBe(false);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.shiftPlanPlanningRecordWindowMismatch');
+    expect(apiMocks.createShiftPlanMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts shift plan dates inside the planning record window and saves successfully', async () => {
+    apiMocks.getPlanningRecordMock.mockResolvedValue(
+      buildPlanningRecord({ planning_from: '2026-07-01', planning_to: '2026-07-31' }),
+    );
+    const wrapper = mountStep('shift-plan', {
+      planning_record_id: 'record-1',
+      current_step: 'shift-plan',
+      shift_plan_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').setValue('Werk Nord / Fenster ok');
+    await wrapper.get('[data-testid="customer-new-plan-shift-plan-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="customer-new-plan-shift-plan-to"]').setValue('2026-07-10');
+    apiMocks.createShiftPlanMock.mockResolvedValue(
+      buildShiftPlan({ name: 'Werk Nord / Fenster ok', planning_from: '2026-07-01', planning_to: '2026-07-10' }),
+    );
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toBe(true);
+    expect(apiMocks.createShiftPlanMock).toHaveBeenCalledOnce();
+  });
+
   it('restores an unsaved shift-plan draft after remount', async () => {
     const wrapper = mountStep('shift-plan', {
       current_step: 'shift-plan',
@@ -1037,7 +1202,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     await wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').setValue('Draft Shift Plan');
     await wrapper.get('[data-testid="customer-new-plan-shift-plan-from"]').setValue('2026-06-02');
-    await wrapper.get('[data-testid="customer-new-plan-shift-plan-to"]').setValue('2026-06-11');
+    await wrapper.get('[data-testid="customer-new-plan-shift-plan-to"]').setValue('2026-06-10');
     await flushPromises();
 
     const draftKey = buildWizardDraftStorageKey(
@@ -1062,8 +1227,42 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     expect((restoredWrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').element as HTMLInputElement).value).toBe('Draft Shift Plan');
     expect((restoredWrapper.get('[data-testid="customer-new-plan-shift-plan-from"]').element as HTMLInputElement).value).toBe('2026-06-02');
-    expect((restoredWrapper.get('[data-testid="customer-new-plan-shift-plan-to"]').element as HTMLInputElement).value).toBe('2026-06-11');
+    expect((restoredWrapper.get('[data-testid="customer-new-plan-shift-plan-to"]').element as HTMLInputElement).value).toBe('2026-06-10');
     expect(restoredWrapper.get('[data-testid="customer-new-plan-draft-restored"]').text()).toBe('sicherplan.customerPlansWizard.draftRestored');
+  });
+
+  it('clears a real shift-plan draft after successful save', async () => {
+    const wrapper = mountStep('shift-plan', {
+      current_step: 'shift-plan',
+      planning_record_id: 'record-1',
+      shift_plan_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').setValue('Draft Shift Plan');
+    await wrapper.get('[data-testid="customer-new-plan-shift-plan-from"]').setValue('2026-06-02');
+    await wrapper.get('[data-testid="customer-new-plan-shift-plan-to"]').setValue('2026-06-10');
+    await flushPromises();
+
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'shift-plan',
+    );
+    expect(window.sessionStorage.getItem(draftKey)).toContain('Draft Shift Plan');
+
+    apiMocks.createShiftPlanMock.mockResolvedValue(
+      buildShiftPlan({ name: 'Draft Shift Plan', planning_from: '2026-06-02', planning_to: '2026-06-10' }),
+    );
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toBe(true);
+    expect(window.sessionStorage.getItem(draftKey)).toBeNull();
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
   });
 
   it('ignores malformed session storage draft values safely', async () => {

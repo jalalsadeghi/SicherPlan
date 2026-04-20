@@ -71,6 +71,7 @@ const contextState = ref<WizardContextState>('loading');
 const bootstrapped = ref(false);
 const stepContentRef = ref<InstanceType<typeof CustomerNewPlanStepContent> | null>(null);
 const stepSubmitting = ref(false);
+const routeSyncSuspended = ref(false);
 const routeRestoreWarning = ref('');
 const persistDraftsOnUnmount = ref(true);
 let resolveCustomerContextSequence = 0;
@@ -160,6 +161,9 @@ function readWizardRouteState() {
 }
 
 function syncWizardFromRoute() {
+  if (routeSyncSuspended.value) {
+    return;
+  }
   const routeState = readWizardRouteState();
 
   setSavedContext({
@@ -320,21 +324,28 @@ function goToPreviousStep() {
   movePrevious();
 }
 
-function goToNextStep() {
+async function goToNextStep() {
   if (stepSubmitting.value) {
     return;
   }
   if (canSubmitCurrentStep.value) {
     stepSubmitting.value = true;
-    Promise.resolve(stepContentRef.value?.submitCurrentStep?.())
-      .then((success) => {
-        if (success && !isFinalStep.value) {
-          moveNext();
-        }
-      })
-      .finally(() => {
-        stepSubmitting.value = false;
-      });
+    const suspendRouteSyncForSubmit = !isFinalStep.value;
+    if (suspendRouteSyncForSubmit) {
+      routeSyncSuspended.value = true;
+    }
+    try {
+      const success = await Promise.resolve(stepContentRef.value?.submitCurrentStep?.());
+      if (success && !isFinalStep.value) {
+        moveNext();
+      }
+    } finally {
+      if (suspendRouteSyncForSubmit) {
+        routeSyncSuspended.value = false;
+        await syncWizardRouteState();
+      }
+      stepSubmitting.value = false;
+    }
     return;
   }
   if (!canMoveNext.value) {
@@ -348,7 +359,7 @@ function selectStep(stepId: CustomerNewPlanWizardStepId) {
 }
 
 async function syncWizardRouteState() {
-  if (!bootstrapped.value || !customerId.value) {
+  if (!bootstrapped.value || !customerId.value || routeSyncSuspended.value) {
     return;
   }
   const nextQuery = buildWizardRouteQuery();
@@ -421,7 +432,7 @@ watch(
     route.query.series_id,
   ] as const,
   async () => {
-    if (!bootstrapped.value) {
+    if (!bootstrapped.value || routeSyncSuspended.value) {
       return;
     }
     syncWizardFromRoute();

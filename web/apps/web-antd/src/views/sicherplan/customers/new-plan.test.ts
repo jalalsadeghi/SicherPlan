@@ -77,6 +77,12 @@ vi.mock('./new-plan-step-content.vue', () => ({
           this.$emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
           return true;
         }
+        if (this.currentStepId === 'shift-plan') {
+          this.$emit('saved-context', { shift_plan_id: 'shift-plan-1' });
+          this.$emit('step-completion', 'shift-plan', true);
+          this.$emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
+          return true;
+        }
         return true;
       },
     },
@@ -345,6 +351,50 @@ describe('CustomerNewPlanWizardView', () => {
         planning_mode_code: 'site',
         planning_record_id: 'record-1',
         step: 'planning-record-documents',
+      },
+    });
+  });
+
+  it('advances to series-exceptions after a successful shift-plan save even when router.replace mutates the route immediately', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+      step: 'shift-plan',
+    };
+    routerReplaceMock.mockImplementation(async ({ query }: { query: Record<string, unknown> }) => {
+      routeState.query = { ...query };
+    });
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await flushPromises();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('series-exceptions');
+    expect(
+      routerReplaceMock.mock.calls.some(
+        ([payload]) =>
+          payload?.path === '/admin/customers/new-plan' &&
+          payload?.query?.step === 'shift-plan' &&
+          payload?.query?.shift_plan_id === 'shift-plan-1',
+      ),
+    ).toBe(false);
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/new-plan',
+      query: {
+        customer_id: 'customer-1',
+        order_id: 'order-1',
+        planning_entity_id: 'site-1',
+        planning_entity_type: 'site',
+        planning_mode_code: 'site',
+        planning_record_id: 'record-1',
+        shift_plan_id: 'shift-plan-1',
+        step: 'series-exceptions',
       },
     });
   });

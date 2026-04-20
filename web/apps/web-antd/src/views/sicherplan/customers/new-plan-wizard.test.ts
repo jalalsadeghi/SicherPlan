@@ -166,6 +166,27 @@ describe('useCustomerNewPlanWizard', () => {
     expect(wizard.state.value.current_step).toBe('order-details');
   });
 
+  it('stores shift_plan_id, unlocks series-exceptions, and clears series_id when the shift plan changes', () => {
+    const wizard = useCustomerNewPlanWizard();
+
+    wizard.resetForCustomer('customer-1', 'shift-plan');
+    wizard.setSavedContext({
+      order_id: 'order-1',
+      planning_record_id: 'record-1',
+      series_id: 'series-1',
+    });
+    wizard.setCurrentStep('shift-plan');
+    wizard.setStepCompletion('shift-plan', true);
+
+    wizard.setSavedContext({ shift_plan_id: 'shift-plan-1' });
+
+    expect(wizard.state.value.shift_plan_id).toBe('shift-plan-1');
+    expect(wizard.state.value.series_id).toBe('');
+    expect(wizard.canEnterStep('series-exceptions')).toBe(true);
+    expect(wizard.moveNext()).toBe('series-exceptions');
+    expect(wizard.state.value.current_step).toBe('series-exceptions');
+  });
+
   it('preserves a newly saved planning_record_id when the planning context changes in the same patch', () => {
     const wizard = useCustomerNewPlanWizard();
 
