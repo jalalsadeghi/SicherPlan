@@ -99,6 +99,7 @@ export const moduleRegistry: Record<string, ModuleConfig> = {
       { labelKey: 'sicherplan.ui.stats.visibility', valueKey: 'sicherplan.ui.values.leastPrivilege' },
       { labelKey: 'sicherplan.ui.stats.evidence', valueKey: 'sicherplan.ui.values.documentLinked' },
     ],
+    showPageIntro: false,
     hideWorkspaceSectionHeaderForRoles: ['tenant_admin'],
     titleKey: 'sicherplan.admin.customers',
     workspaceDescriptionKey: 'sicherplan.ui.modules.customers.workspace',

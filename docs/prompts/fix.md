@@ -1,104 +1,106 @@
-You are working in the SicherPlan repository.
-
-Task:
-Refactor the /admin/customers page layout according to the requested UX change.
-
-User request:
-1. Move the "Customer list" box, currently on the left side, above the "Customer detail" box and below the "Module control" / page intro area.
-2. Make "Customer list" full-width, like the "Module control" box.
-3. Make "Customer detail" full-width as well.
-4. Remove the customer row list from inside the "Customer list" box:
-   - remove/hide the rendered customer rows with class customer-admin-row selected / customer-admin-row.
-   - customer navigation will move to the sidebar in a separate task.
+Add/update regression tests for the Customer search dialog on /admin/customers.
 
 Primary file:
 - web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
 
-Current code facts to validate:
-- CustomerAdminView.vue currently uses:
-  .customer-admin-grid {
-    grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
-  }
-- Customer list panel is:
-  <section class="module-card customer-admin-panel customer-admin-list-panel" data-testid="customer-list-section">
-- Customer detail panel is:
-  <section class="module-card customer-admin-panel customer-admin-detail" data-testid="customer-detail-workspace">
-- Customer rows are currently rendered with:
-  <div v-if="customers.length" class="customer-admin-list">
-    <button
-      v-for="customer in customers"
-      class="customer-admin-row"
-      :class="{ selected: customer.id === selectedCustomerId }"
-      @click="selectCustomer(customer.id)"
-    >
-- Those row buttons must be removed from this panel.
+Tests to inspect:
+- existing CustomerAdminView tests under web/apps/web-antd/src/sicherplan-legacy/views/
+- any SicherPlan Customers module tests
 
-Required implementation:
+Required tests:
 
-A. Layout
-1. Change the customer master/detail layout from two columns to one column.
-2. "Customer list" should appear first.
-3. "Customer detail" should appear below it.
-4. Both panels should span the full available content width.
-5. Remove sticky behavior from customer-admin-list-panel.
-6. Keep responsive behavior clean; on mobile it should still be one column.
+Test 1 — Module control hidden on Customers only
+1. Mount /admin/customers through the module wrapper if possible.
+2. Assert the Module control/PageIntro area is hidden or not visible for Customers.
+3. Mount or inspect another module route if feasible and assert Module control is not globally hidden.
 
-Suggested CSS:
-- .customer-admin-grid should become:
-  display: grid;
-  gap: var(--sp-page-gap, 1.25rem);
-  grid-template-columns: minmax(0, 1fr);
-- .customer-admin-list-panel should no longer be sticky.
-- Remove or neutralize position: sticky / top: 0.
+Test 2 — Search input replaced by SearchSelect-like control
+1. Mount CustomerAdminView.
+2. Assert customer-list-section exists.
+3. Assert the Search field has the new test id, for example:
+   customer-search-select
+4. Assert the old plain full-width search-only behavior is no longer the only UI.
+5. Assert filters.search still updates when the user types.
 
-B. Customer list panel content
-1. Keep the filter/search/action controls:
-   - Search
+Test 3 — Helper sentence removed
+1. Assert the text:
+   "Use the sidebar customer links to open a customer dashboard."
+   is not rendered.
+
+Test 4 — Search opens result dialog
+1. Mock listCustomers to return:
+   - RheinForum Köln / K-1000 / active
+   - HafenKontor Köln / K-1001 / active
+2. Type "Rhein" in the SearchSelect.
+3. Click Search or press Enter.
+4. Assert:
+   - listCustomers is called with filters.search = "Rhein"
+   - customer-search-results-modal is visible
+   - result row for RheinForum Köln is visible
+   - HafenKontor Köln is not shown if the mocked filter applies, or is shown only if listCustomers mock returns it.
+
+Test 5 — Selecting a search result opens customer dashboard
+1. Open the search result dialog.
+2. Click the RheinForum Köln result row.
+3. Assert:
+   - dialog closes
+   - selectCustomer/getCustomer is called for the chosen id
+   - router navigates to /admin/customers?customer_id=<id>&tab=dashboard
+   - CustomerDashboardTab or dashboard panel is active.
+
+Test 6 — Empty search result
+1. Mock listCustomers to return [].
+2. Search for an unknown value.
+3. Assert:
+   - modal opens
+   - customer-search-result-empty is visible
+   - no stale previous results remain.
+
+Test 7 — include_archived is respected
+1. Toggle include archived.
+2. Search.
+3. Assert listCustomers receives include_archived=true.
+4. Untoggle.
+5. Assert include_archived=false.
+
+Test 8 — permissions/tenant safety
+1. If tenantScopeId or accessToken is missing, Search should not fetch.
+2. If canRead is false, Search should not fetch.
+3. A useful disabled/empty state should remain.
+
+Test 9 — existing actions still work
+1. CSV export button still calls exportCustomers.
+2. New customer button still opens create flow.
+3. Existing route query customer_id still selects a customer.
+
+Commands:
+- pnpm --dir web/apps/web-antd exec vitest run <relevant CustomerAdminView test file>
+- pnpm --dir web/apps/web-antd exec vue-tsc --noEmit --skipLibCheck --pretty false
+
+If exact test paths differ, inspect package scripts and run the closest relevant tests.
+
+Manual QA checklist:
+1. Open http://localhost:5173/admin/customers.
+2. Confirm Module control is hidden.
+3. Confirm Customer list panel still shows:
+   - SearchSelect
    - Status filter
    - Default branch
    - Default mandate
-   - Include archived customers
-   - Search button
-   - CSV export
-   - New customer
-2. Remove the customer row list inside this panel.
-3. If customers.length is zero, do not show the old "empty list" message in this panel unless it still makes sense for filter result feedback.
-4. Consider showing a small helper text instead, for example:
-   "Use the sidebar customer links to open a customer dashboard."
-   Add i18n keys if needed.
-5. Do not remove the customers data loading from this component, because the sidebar dynamic links will also need customer data or the page still needs to auto-select based on route.
+   - Include archived
+   - Search / CSV export / New customer
+4. Confirm the helper sentence is gone.
+5. Type "Rhein" into SearchSelect.
+6. Click Search.
+7. Confirm modal opens and shows RheinForum Köln.
+8. Click RheinForum Köln.
+9. Confirm modal closes and Customer detail shows RheinForum Köln dashboard.
+10. Search an unknown value and confirm empty-state modal.
+11. Test responsive layout still looks clean.
 
-C. Selection behavior
-1. Do not break existing route-based customer selection:
-   - /admin/customers?customer_id=<id>&tab=dashboard must still select that customer.
-2. If no customer_id is provided, current behavior may auto-select first customer. Preserve or explicitly validate this behavior.
-3. Start new customer flow must still work.
-4. Search/export/new customer actions must still work.
-5. Dashboard/detail tabs must still work.
-
-D. Accessibility and tests
-1. Keep data-testid="customer-list-section".
-2. Keep data-testid="customer-detail-workspace".
-3. Remove tests expecting customer-admin-row inside customer-list-section, or update them.
-4. Add/adjust tests proving:
-   - customer-master-detail-layout is single-column / no two-column dependency
-   - customer list panel appears before detail panel
-   - customer rows are not rendered inside customer-list-section
-   - selecting via route query still opens customer dashboard
-   - filters/search still call listCustomers
-   - New customer still opens create form
-
-E. Validate
-Before implementing, validate whether my interpretation is correct.
-If the current layout was already changed in the repo, report the actual current code and implement the equivalent requested result.
-
-Do not change backend APIs.
-Do not remove listCustomers calls.
-Do not remove customer selection logic.
-Do not remove CustomerDashboardTab or CustomerPlansTab.
-
-Expected final behavior:
-- /admin/customers shows Module Control at top.
-- Below it, full-width Customer list/search/action panel.
-- Below that, full-width Customer detail panel.
-- No customer rows appear inside the Customer list panel.
+Final output must include:
+- files changed
+- whether a built-in SearchSelect/AutoComplete was found or a local implementation was used
+- tests added/updated
+- commands run
+- manual QA status or deterministic equivalent

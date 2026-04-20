@@ -14,8 +14,9 @@ describe('module registry wrapper flags', () => {
     expect(platformServices.showPageIntro).toBeUndefined();
   });
 
-  it('hides the customers workspace section header only for tenant admin', () => {
+  it('hides the customers page intro and only hides the workspace section header for tenant admin', () => {
     const customers = moduleRegistry.customers!;
+    expect(customers.showPageIntro).toBe(false);
     expect(customers.hideWorkspaceSectionHeaderForRoles).toEqual(['tenant_admin']);
   });
 

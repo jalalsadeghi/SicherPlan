@@ -1226,6 +1226,11 @@ export type MessageKey =
   | "customerAdmin.list.eyebrow"
   | "customerAdmin.list.title"
   | "customerAdmin.list.empty"
+  | "customerAdmin.searchResults.eyebrow"
+  | "customerAdmin.searchResults.title"
+  | "customerAdmin.searchResults.lead"
+  | "customerAdmin.searchResults.empty"
+  | "customerAdmin.searchResults.loading"
   | "customerAdmin.detail.eyebrow"
   | "customerAdmin.detail.emptyTitle"
   | "customerAdmin.detail.emptyBody"
@@ -3267,6 +3272,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.list.eyebrow": "Kundenliste",
     "customerAdmin.list.title": "Suche und Auswahl",
     "customerAdmin.list.empty": "Keine Kunden für die aktuellen Filter gefunden.",
+    "customerAdmin.searchResults.eyebrow": "Kundensuche",
+    "customerAdmin.searchResults.title": "Passende Kunden",
+    "customerAdmin.searchResults.lead":
+      "Wählen Sie einen Treffer aus, um direkt das Kundendashboard zu öffnen.",
+    "customerAdmin.searchResults.empty": "Keine passenden Kunden für die aktuellen Filter gefunden.",
+    "customerAdmin.searchResults.loading": "Kunden werden gesucht ...",
     "customerAdmin.detail.eyebrow": "Kundendetail",
     "customerAdmin.detail.emptyTitle": "Noch kein Kunde ausgewählt",
     "customerAdmin.detail.emptyBody": "Wähle oben einen Kunden aus der Liste aus oder starte einen neuen Datensatz.",
@@ -5376,6 +5387,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.list.eyebrow": "Customer list",
     "customerAdmin.list.title": "Search and select",
     "customerAdmin.list.empty": "No customers match the current filters.",
+    "customerAdmin.searchResults.eyebrow": "Customer search",
+    "customerAdmin.searchResults.title": "Matching customers",
+    "customerAdmin.searchResults.lead":
+      "Select a result to open that customer's dashboard directly.",
+    "customerAdmin.searchResults.empty": "No matching customers were found for the current filters.",
+    "customerAdmin.searchResults.loading": "Searching customers...",
     "customerAdmin.detail.eyebrow": "Customer detail",
     "customerAdmin.detail.emptyTitle": "No customer selected yet",
     "customerAdmin.detail.emptyBody": "Select a customer from the list above or start a new record.",

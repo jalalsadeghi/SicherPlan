@@ -9,7 +9,7 @@ const viewPath = resolve(
 );
 const source = readFileSync(viewPath, "utf8");
 
-test("customer workspace keeps desktop master detail layout with detail tabs", () => {
+test("customer workspace uses a single-column list-then-detail layout with detail tabs", () => {
   assert.match(source, /<SicherPlanLoadingOverlay[\s\S]*busy-testid="customer-workspace-loading-overlay"/);
   assert.match(source, /:busy="customerWorkspaceBusy"/);
   assert.match(source, /:text="customerWorkspaceLoadingText"/);
@@ -28,10 +28,66 @@ test("customer workspace keeps desktop master detail layout with detail tabs", (
   assert.match(source, /loading\.hrCatalogBootstrap/);
   assert.match(source, /const customerWorkspaceLoadingText = computed\(\(\) =>/);
   assert.match(source, /class="customer-admin-grid"/);
+  assert.match(source, /\.customer-admin-grid \{[\s\S]*grid-template-columns: minmax\(0, 1fr\);/);
   assert.match(source, /data-testid="customer-list-section"/);
   assert.match(source, /data-testid="customer-detail-workspace"/);
   assert.match(source, /data-testid="customer-detail-tabs"/);
+  assert.match(source, /\.customer-admin-list-panel \{[\s\S]*position: static;/);
   assert.match(source, /resolveCustomerAdminRouteContext\(route\.query\)/);
+});
+
+test("customer list panel keeps filters and actions but removes inline customer rows", () => {
+  const listSectionMatch = source.match(
+    /<section class="module-card customer-admin-panel customer-admin-list-panel" data-testid="customer-list-section">([\s\S]*?)<\/section>/,
+  );
+  assert.ok(listSectionMatch, "customer list section should exist");
+  const listSection = listSectionMatch[1];
+  assert.match(listSection, /customerAdmin\.filters\.search/);
+  assert.match(listSection, /customerAdmin\.actions\.search/);
+  assert.match(listSection, /customerAdmin\.actions\.exportCustomers/);
+  assert.match(listSection, /customerAdmin\.actions\.newCustomer/);
+  assert.match(listSection, /class="customer-admin-filter-grid"/);
+  assert.match(listSection, /class="customer-admin-filter-actions"/);
+  assert.match(listSection, /class="cta-row customer-admin-filter-actions__buttons"/);
+  assert.match(listSection, /data-testid="customer-search-select"/);
+  assert.match(listSection, /data-testid="customer-search-select-input"/);
+  assert.doesNotMatch(listSection, /customer-admin-row/);
+  assert.doesNotMatch(listSection, /v-for="customer in customers"/);
+  assert.doesNotMatch(listSection, /customerAdmin\.list\.sidebarNavigationHint/);
+
+  const listSectionIndex = source.indexOf('data-testid="customer-list-section"');
+  const detailSectionIndex = source.indexOf('data-testid="customer-detail-workspace"');
+  assert.ok(listSectionIndex >= 0 && detailSectionIndex >= 0 && listSectionIndex < detailSectionIndex);
+});
+
+test("customer list filter layout uses a dedicated responsive grid and compact action row", () => {
+  assert.match(source, /\.customer-admin-filter-grid \{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
+  assert.match(
+    source,
+    /@media \(max-width: 1280px\) \{[\s\S]*\.customer-admin-filter-grid \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
+  );
+  assert.match(source, /@media \(max-width: 720px\) \{[\s\S]*\.customer-admin-filter-grid \{[\s\S]*grid-template-columns: 1fr;/);
+  assert.match(source, /\.customer-admin-filter-actions \{[\s\S]*justify-content: space-between;[\s\S]*align-items: center;/);
+  assert.match(source, /\.customer-admin-filter-actions__buttons \{[\s\S]*justify-content: flex-end;/);
+  assert.match(source, /@media \(max-width: 720px\) \{[\s\S]*\.customer-admin-filter-actions \{[\s\S]*flex-direction: column;/);
+  assert.match(source, /@media \(max-width: 720px\) \{[\s\S]*\.customer-admin-filter-actions__buttons \{[\s\S]*justify-content: flex-start;/);
+});
+
+test("customer search uses debounced modal-backed results and dashboard selection", () => {
+  assert.match(source, /customerSearchModalOpen = ref\(false\)/);
+  assert.match(source, /customerSearchResults = ref<CustomerListItem\[\]>\(\[\]\)/);
+  assert.match(source, /customerSearchSuggestions = ref<CustomerListItem\[\]>\(\[\]\)/);
+  assert.match(source, /loading = reactive\(\{[\s\S]*customerSearch: false,/);
+  assert.match(source, /setTimeout\(\(\) => \{[\s\S]*runCustomerSearch\(\{ suppressFeedback: true \}\)/);
+  assert.match(source, /await listCustomers\([\s\S]*buildCustomerSearchParams/);
+  assert.match(source, /data-testid="customer-search-results-modal"/);
+  assert.match(source, /data-testid="customer-search-result-row"/);
+  assert.match(source, /data-testid="customer-search-result-empty"/);
+  assert.match(source, /data-testid="customer-search-result-close"/);
+  assert.match(source, /role="dialog"/);
+  assert.match(source, /window\.addEventListener\("keydown", handleCustomerSearchWindowKeydown\)/);
+  assert.match(source, /event\.key === "Escape"/);
+  assert.match(source, /await router\.replace\([\s\S]*customer_id: customerId,[\s\S]*tab: "dashboard"/);
 });
 
 test("customer workspace removes the manual bearer-token gate and only keeps tenant switching for platform admins", () => {

@@ -61,110 +61,179 @@
       busy-testid="customer-workspace-loading-overlay"
     >
       <div class="customer-admin-grid" data-testid="customer-master-detail-layout">
-      <section class="module-card customer-admin-panel customer-admin-list-panel" data-testid="customer-list-section">
-        <div class="customer-admin-panel__header">
-          <div>
-            <p class="eyebrow">{{ t("customerAdmin.list.eyebrow") }}</p>
-            <h3>{{ t("customerAdmin.list.title") }}</h3>
-          </div>
-          <StatusBadge :status="loading.list ? 'inactive' : 'active'" />
-        </div>
-
-        <div class="customer-admin-form-grid">
-          <label class="field-stack">
-            <span>{{ t("customerAdmin.filters.search") }}</span>
-            <input v-model="filters.search" :placeholder="t('customerAdmin.filters.searchPlaceholder')" />
-          </label>
-          <label class="field-stack">
-            <span>{{ t("customerAdmin.filters.status") }}</span>
-            <select v-model="filters.lifecycle_status">
-              <option value="">{{ t("customerAdmin.filters.allStatuses") }}</option>
-              <option value="active">{{ t("customerAdmin.status.active") }}</option>
-              <option value="inactive">{{ t("customerAdmin.status.inactive") }}</option>
-              <option value="archived">{{ t("customerAdmin.status.archived") }}</option>
-            </select>
-          </label>
-          <label class="field-stack">
-            <span>{{ t("customerAdmin.fields.defaultBranchId") }}</span>
-            <select v-model="filters.default_branch_id">
-              <option value="">{{ t("customerAdmin.summary.none") }}</option>
-              <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
-                {{ formatReferenceOptionLabel(branch) }}
-              </option>
-            </select>
-          </label>
-          <label class="field-stack">
-            <span>{{ t("customerAdmin.fields.defaultMandateId") }}</span>
-            <select v-model="filters.default_mandate_id">
-              <option value="">{{ t("customerAdmin.summary.none") }}</option>
-              <option
-                v-for="mandate in filterMandateOptions(filters.default_branch_id)"
-                :key="mandate.id"
-                :value="mandate.id"
-              >
-                {{ formatReferenceOptionLabel(mandate) }}
-              </option>
-            </select>
-          </label>
-        </div>
-
-        <label class="customer-admin-checkbox">
-          <input v-model="filters.include_archived" type="checkbox" />
-          <span>{{ t("customerAdmin.filters.includeArchived") }}</span>
-        </label>
-
-        <div class="cta-row">
-          <button class="cta-button" type="button" @click="handleRefreshCustomers">
-            {{ t("customerAdmin.actions.search") }}
-          </button>
-          <button
-            class="cta-button cta-secondary"
-            type="button"
-            :disabled="!canRead || !tenantScopeId"
-            @click="runCustomerExport"
-          >
-            {{ t("customerAdmin.actions.exportCustomers") }}
-          </button>
-          <button
-            class="cta-button cta-secondary"
-            type="button"
-            :disabled="!actionState.canCreate"
-            @click="startCreateCustomer"
-          >
-            {{ t("customerAdmin.actions.newCustomer") }}
-          </button>
-        </div>
-
-        <div v-if="customers.length" class="customer-admin-list">
-          <button
-            v-for="customer in customers"
-            :key="customer.id"
-            type="button"
-            class="customer-admin-row"
-            :class="{ selected: customer.id === selectedCustomerId }"
-            @click="selectCustomer(customer.id)"
-          >
+        <section class="module-card customer-admin-panel customer-admin-list-panel" data-testid="customer-list-section">
+          <div class="customer-admin-panel__header">
             <div>
-              <strong>{{ customer.name }}</strong>
-              <span>{{ customer.customer_number }}</span>
+              <p class="eyebrow">{{ t("customerAdmin.list.eyebrow") }}</p>
+              <h3>{{ t("customerAdmin.list.title") }}</h3>
             </div>
-            <StatusBadge :status="customer.status" />
-          </button>
-        </div>
-        <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.list.empty") }}</p>
-      </section>
-
-      <section class="module-card customer-admin-panel customer-admin-detail" data-testid="customer-detail-workspace">
-        <div class="customer-admin-panel__header">
-          <div>
-            <p class="eyebrow">{{ t("customerAdmin.detail.eyebrow") }}</p>
-            <h3>{{ isCreatingCustomer ? t("customerAdmin.detail.newTitle") : selectedCustomer?.name || t("customerAdmin.detail.workspaceTitle") }}</h3>
-            <p v-if="hasDetailWorkspace" class="field-help">{{ t("customerAdmin.detail.workspaceLead") }}</p>
+            <StatusBadge :status="loading.list ? 'inactive' : 'active'" />
           </div>
-          <StatusBadge v-if="selectedCustomer && !isCreatingCustomer" :status="selectedCustomer.status" />
+
+          <div class="customer-admin-filter-grid">
+            <label class="field-stack customer-admin-search-field">
+              <span>{{ t("customerAdmin.filters.search") }}</span>
+              <div class="customer-admin-search-select" data-testid="customer-search-select">
+                <input
+                  v-model="filters.search"
+                  :placeholder="t('customerAdmin.filters.searchPlaceholder')"
+                  data-testid="customer-search-select-input"
+                  @keydown.enter.prevent="handleOpenCustomerSearchResults"
+                />
+                <div
+                  v-if="customerSearchSuggestionsVisible"
+                  class="customer-admin-search-suggestions"
+                  data-testid="customer-search-suggestions"
+                >
+                  <button
+                    v-for="customer in customerSearchSuggestions"
+                    :key="customer.id"
+                    type="button"
+                    class="customer-admin-search-suggestion"
+                    data-testid="customer-search-suggestion"
+                    @click="selectCustomerFromSearchResult(customer.id)"
+                  >
+                    <span class="customer-admin-search-suggestion__title">{{ customer.name }}</span>
+                    <span class="customer-admin-search-suggestion__meta">{{ customer.customer_number }}</span>
+                  </button>
+                </div>
+              </div>
+              <small v-if="loading.customerSearch" class="customer-admin-field-help">
+                {{ t("customerAdmin.searchResults.loading") }}
+              </small>
+            </label>
+            <label class="field-stack">
+              <span>{{ t("customerAdmin.filters.status") }}</span>
+              <select v-model="filters.lifecycle_status">
+                <option value="">{{ t("customerAdmin.filters.allStatuses") }}</option>
+                <option value="active">{{ t("customerAdmin.status.active") }}</option>
+                <option value="inactive">{{ t("customerAdmin.status.inactive") }}</option>
+                <option value="archived">{{ t("customerAdmin.status.archived") }}</option>
+              </select>
+            </label>
+            <label class="field-stack">
+              <span>{{ t("customerAdmin.fields.defaultBranchId") }}</span>
+              <select v-model="filters.default_branch_id">
+                <option value="">{{ t("customerAdmin.summary.none") }}</option>
+                <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
+                  {{ formatReferenceOptionLabel(branch) }}
+                </option>
+              </select>
+            </label>
+            <label class="field-stack">
+              <span>{{ t("customerAdmin.fields.defaultMandateId") }}</span>
+              <select v-model="filters.default_mandate_id">
+                <option value="">{{ t("customerAdmin.summary.none") }}</option>
+                <option
+                  v-for="mandate in filterMandateOptions(filters.default_branch_id)"
+                  :key="mandate.id"
+                  :value="mandate.id"
+                >
+                  {{ formatReferenceOptionLabel(mandate) }}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <div class="customer-admin-filter-actions">
+            <label class="customer-admin-checkbox">
+              <input v-model="filters.include_archived" type="checkbox" />
+              <span>{{ t("customerAdmin.filters.includeArchived") }}</span>
+            </label>
+
+            <div class="cta-row customer-admin-filter-actions__buttons">
+              <button class="cta-button" type="button" @click="handleRefreshCustomers">
+                {{ t("customerAdmin.actions.search") }}
+              </button>
+              <button
+                class="cta-button cta-secondary"
+                type="button"
+                :disabled="!canRead || !tenantScopeId"
+                @click="runCustomerExport"
+              >
+                {{ t("customerAdmin.actions.exportCustomers") }}
+              </button>
+              <button
+                class="cta-button cta-secondary"
+                type="button"
+                :disabled="!actionState.canCreate"
+                @click="startCreateCustomer"
+              >
+                {{ t("customerAdmin.actions.newCustomer") }}
+              </button>
+            </div>
+          </div>
+
+          <p v-if="!customers.length" class="customer-admin-list-empty">{{ t("customerAdmin.list.empty") }}</p>
+        </section>
+
+        <div
+          v-if="customerSearchModalOpen"
+          class="customer-admin-modal-backdrop"
+          data-testid="customer-search-results-modal-backdrop"
+          @click.self="closeCustomerSearchResultsModal"
+        >
+          <section
+            class="module-card customer-admin-modal"
+            aria-labelledby="customer-search-results-title"
+            aria-modal="true"
+            role="dialog"
+            data-testid="customer-search-results-modal"
+          >
+            <div class="customer-admin-form-section__header customer-admin-form-section__header--split">
+              <div>
+                <p class="eyebrow">{{ t("customerAdmin.searchResults.eyebrow") }}</p>
+                <h4 id="customer-search-results-title">{{ t("customerAdmin.searchResults.title") }}</h4>
+              </div>
+              <button
+                class="cta-button cta-secondary"
+                type="button"
+                data-testid="customer-search-result-close"
+                @click="closeCustomerSearchResultsModal"
+              >
+                {{ t("customerAdmin.actions.cancel") }}
+              </button>
+            </div>
+            <p class="field-help">{{ t("customerAdmin.searchResults.lead") }}</p>
+            <p v-if="loading.customerSearch" class="customer-admin-list-empty">{{ t("customerAdmin.searchResults.loading") }}</p>
+            <p v-else-if="customerSearchError" class="customer-admin-list-empty">{{ customerSearchError }}</p>
+            <p
+              v-else-if="!customerSearchResults.length"
+              class="customer-admin-list-empty"
+              data-testid="customer-search-result-empty"
+            >
+              {{ t("customerAdmin.searchResults.empty") }}
+            </p>
+            <div v-else class="customer-admin-record-list">
+              <button
+                v-for="customer in customerSearchResults"
+                :key="customer.id"
+                type="button"
+                class="customer-admin-record customer-admin-search-result"
+                data-testid="customer-search-result-row"
+                @click="selectCustomerFromSearchResult(customer.id)"
+              >
+                <div class="customer-admin-record__body">
+                  <strong>{{ customer.name }}</strong>
+                  <p>{{ customer.customer_number }}</p>
+                </div>
+                <StatusBadge :status="customer.status" />
+              </button>
+            </div>
+          </section>
         </div>
 
-        <template v-if="hasDetailWorkspace">
+        <section class="module-card customer-admin-panel customer-admin-detail" data-testid="customer-detail-workspace">
+          <div class="customer-admin-panel__header">
+            <div>
+              <p class="eyebrow">{{ t("customerAdmin.detail.eyebrow") }}</p>
+              <h3>{{ isCreatingCustomer ? t("customerAdmin.detail.newTitle") : selectedCustomer?.name || t("customerAdmin.detail.workspaceTitle") }}</h3>
+              <p v-if="hasDetailWorkspace" class="field-help">{{ t("customerAdmin.detail.workspaceLead") }}</p>
+            </div>
+            <StatusBadge v-if="selectedCustomer && !isCreatingCustomer" :status="selectedCustomer.status" />
+          </div>
+
+          <template v-if="hasDetailWorkspace">
           <nav
             v-if="customerDetailTabs.length"
             class="customer-admin-tabs"
@@ -2026,7 +2095,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 
 import { webAppConfig } from "@/config/env";
 import {
@@ -2209,6 +2278,10 @@ const portalAccessGeneratedPassword = ref("");
 const portalAccessModalOpen = ref(false);
 const portalAccessPasswordTarget = ref<CustomerPortalAccessListItem | null>(null);
 const addressDirectoryModalOpen = ref(false);
+const customerSearchModalOpen = ref(false);
+const customerSearchResults = ref<CustomerListItem[]>([]);
+const customerSearchSuggestions = ref<CustomerListItem[]>([]);
+const customerSearchError = ref("");
 const pendingRouteCustomerId = ref("");
 const pendingRouteDetailTab = ref("");
 const billingProfileErrorState = reactive<{
@@ -2240,6 +2313,7 @@ const loading = reactive({
   historyAttachment: false,
   loginHistory: false,
   portalAccess: false,
+  customerSearch: false,
   employeeBlock: false,
   portalPrivacy: false,
   sharedAddress: false,
@@ -2252,6 +2326,8 @@ const filters = reactive<CustomerFilterParams>({
   default_mandate_id: "",
   include_archived: false,
 });
+let customerSearchDebounceHandle: ReturnType<typeof setTimeout> | null = null;
+let customerSearchRequestSeq = 0;
 const addressDirectorySearch = ref("");
 const customerDraft = reactive<CustomerCreatePayload>({
   tenant_id: "",
@@ -2716,6 +2792,12 @@ const surchargeEffectiveToRequired = computed(() => !!`${selectedRateCard.value?
 const surchargeMissingEffectiveToForRateCard = computed(() =>
   surchargeEffectiveToRequired.value && !`${surchargeRuleDraft.effective_to ?? ""}`.trim(),
 );
+const customerSearchSuggestionsVisible = computed(
+  () =>
+    !!`${filters.search ?? ""}`.trim()
+    && !customerSearchModalOpen.value
+    && !!customerSearchSuggestions.value.length,
+);
 const sectionVisibility = computed(() =>
   resolveCustomerAdminSectionVisibility({
     effectiveRole: authStore.effectiveRole,
@@ -2819,7 +2901,122 @@ function rememberScope() {
 }
 
 function handleRefreshCustomers() {
-  void refreshCustomers();
+  void handleOpenCustomerSearchResults();
+}
+
+function buildCustomerSearchParams(searchOverride?: string): CustomerFilterParams {
+  return {
+    ...filters,
+    search: searchOverride ?? filters.search,
+  };
+}
+
+function clearCustomerSearchDebounce() {
+  if (customerSearchDebounceHandle) {
+    clearTimeout(customerSearchDebounceHandle);
+    customerSearchDebounceHandle = null;
+  }
+}
+
+function resetCustomerSearchState(options: { closeModal?: boolean } = {}) {
+  clearCustomerSearchDebounce();
+  customerSearchRequestSeq += 1;
+  loading.customerSearch = false;
+  customerSearchSuggestions.value = [];
+  customerSearchResults.value = [];
+  customerSearchError.value = "";
+  if (options.closeModal) {
+    customerSearchModalOpen.value = false;
+  }
+}
+
+function closeCustomerSearchResultsModal() {
+  customerSearchModalOpen.value = false;
+}
+
+function resolveCustomerSearchErrorMessage(error: unknown) {
+  if (error instanceof CustomerAdminApiError) {
+    const feedbackKey =
+      mapCustomerCommercialApiMessage(error.messageKey) !== "customerAdmin.feedback.error"
+        ? mapCustomerCommercialApiMessage(error.messageKey)
+        : mapCustomerApiMessage(error.messageKey);
+    return t(feedbackKey as never);
+  }
+  return t("customerAdmin.feedback.error");
+}
+
+async function runCustomerSearch(options: { openModal?: boolean; suppressFeedback?: boolean } = {}) {
+  if (!tenantScopeId.value || !accessToken.value || !canRead.value) {
+    resetCustomerSearchState({ closeModal: true });
+    return [];
+  }
+
+  const requestSeq = ++customerSearchRequestSeq;
+  loading.customerSearch = true;
+  customerSearchError.value = "";
+  try {
+    const results = await listCustomers(
+      tenantScopeId.value,
+      accessToken.value,
+      buildCustomerSearchParams(`${filters.search ?? ""}`.trim()),
+    );
+    if (requestSeq !== customerSearchRequestSeq) {
+      return [];
+    }
+    customerSearchResults.value = results;
+    customerSearchSuggestions.value = `${filters.search ?? ""}`.trim() ? results.slice(0, 6) : [];
+    if (options.openModal) {
+      customerSearchModalOpen.value = true;
+    }
+    return results;
+  } catch (error) {
+    if (requestSeq !== customerSearchRequestSeq) {
+      return [];
+    }
+    const message = resolveCustomerSearchErrorMessage(error);
+    customerSearchResults.value = [];
+    customerSearchSuggestions.value = [];
+    customerSearchError.value = message;
+    if (options.openModal) {
+      customerSearchModalOpen.value = true;
+    }
+    if (!options.suppressFeedback) {
+      setFeedback("error", t("customerAdmin.feedback.error"), message);
+    }
+    return [];
+  } finally {
+    if (requestSeq === customerSearchRequestSeq) {
+      loading.customerSearch = false;
+    }
+  }
+}
+
+async function handleOpenCustomerSearchResults() {
+  clearCustomerSearchDebounce();
+  await runCustomerSearch({ openModal: true });
+}
+
+async function selectCustomerFromSearchResult(customerId: string) {
+  customerSearchModalOpen.value = false;
+  customerSearchSuggestions.value = [];
+  customerSearchError.value = "";
+  await selectCustomer(customerId, {
+    preferredDetailTab: "dashboard",
+  });
+  activeDetailTab.value = "dashboard";
+  await router.replace({
+    query: {
+      ...route.query,
+      customer_id: customerId,
+      tab: "dashboard",
+    },
+  });
+}
+
+function handleCustomerSearchWindowKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape" && customerSearchModalOpen.value) {
+    closeCustomerSearchResultsModal();
+  }
 }
 
 async function loadReferenceData() {
@@ -5005,6 +5202,20 @@ watch(
 );
 
 watch(
+  () => filters.search,
+  (search) => {
+    clearCustomerSearchDebounce();
+    if (!`${search ?? ""}`.trim()) {
+      resetCustomerSearchState({ closeModal: true });
+      return;
+    }
+    customerSearchDebounceHandle = setTimeout(() => {
+      void runCustomerSearch({ suppressFeedback: true });
+    }, 300);
+  },
+);
+
+watch(
   () => portalAccessDraft.contact_id,
   (contactId) => {
     if (!contactId) {
@@ -5022,6 +5233,7 @@ watch(
 );
 
 onMounted(() => {
+  window.addEventListener("keydown", handleCustomerSearchWindowKeydown);
   authStore.syncFromPrimarySession();
   resetCustomerDraft();
   resetContactDraft();
@@ -5043,6 +5255,11 @@ onMounted(() => {
     await refreshCustomers();
   })();
 });
+
+onBeforeUnmount(() => {
+  clearCustomerSearchDebounce();
+  window.removeEventListener("keydown", handleCustomerSearchWindowKeydown);
+});
 </script>
 
 <style scoped>
@@ -5053,7 +5270,6 @@ onMounted(() => {
 
 .customer-admin-form,
 .customer-admin-form-grid,
-.customer-admin-list,
 .customer-admin-record-list {
   display: grid;
   gap: 1rem;
@@ -5062,13 +5278,12 @@ onMounted(() => {
 .customer-admin-grid {
   display: grid;
   gap: var(--sp-page-gap, 1.25rem);
-  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
 .customer-admin-list-panel {
-  position: sticky;
-  top: 0;
+  position: static;
 }
 
 .customer-admin-subgrid {
@@ -5155,6 +5370,73 @@ onMounted(() => {
   gap: 1.1rem;
 }
 
+.customer-admin-filter-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+}
+
+.customer-admin-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.customer-admin-filter-actions__buttons {
+  justify-content: flex-end;
+}
+
+.customer-admin-search-field {
+  position: relative;
+}
+
+.customer-admin-search-select {
+  position: relative;
+}
+
+.customer-admin-search-suggestions {
+  position: absolute;
+  z-index: 4;
+  inset: calc(100% + 0.4rem) 0 auto;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.45rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 16px;
+  background: var(--sp-color-surface-page);
+  box-shadow: 0 20px 50px rgb(15 23 42 / 0.12);
+}
+
+.customer-admin-search-suggestion,
+.customer-admin-search-result {
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.customer-admin-search-suggestion {
+  display: grid;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 12px;
+  background: var(--sp-color-surface-page);
+}
+
+.customer-admin-search-suggestion__title {
+  font-weight: 600;
+  color: var(--sp-color-text-primary);
+}
+
+.customer-admin-search-suggestion__meta {
+  color: var(--sp-color-text-secondary);
+}
+
 .customer-admin-editor-intro,
 .customer-admin-form-section {
   padding: 1rem 1.1rem;
@@ -5230,7 +5512,6 @@ onMounted(() => {
   align-items: start;
 }
 
-.customer-admin-row,
 .customer-admin-record {
   display: flex;
   justify-content: space-between;
@@ -5240,16 +5521,6 @@ onMounted(() => {
   border-radius: 18px;
   border: 1px solid var(--sp-color-border-soft);
   background: var(--sp-color-surface-page);
-}
-
-.customer-admin-row {
-  cursor: pointer;
-  text-align: left;
-}
-
-.customer-admin-row.selected {
-  border-color: var(--sp-color-primary);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 40%, transparent);
 }
 
 .customer-admin-record.selected {
@@ -5276,7 +5547,6 @@ onMounted(() => {
   border-radius: 12px;
 }
 
-.customer-admin-row span,
 .customer-admin-record p,
 .customer-admin-list-empty,
 .customer-admin-record__meta {
@@ -5566,6 +5836,26 @@ onMounted(() => {
   .customer-admin-surcharge-date-grid {
     grid-template-columns: 1fr;
   }
+}
 
+@media (max-width: 1280px) {
+  .customer-admin-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .customer-admin-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-admin-filter-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .customer-admin-filter-actions__buttons {
+    justify-content: flex-start;
+  }
 }
 </style>
