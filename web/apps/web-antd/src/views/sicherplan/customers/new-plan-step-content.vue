@@ -253,7 +253,7 @@ const seriesDraft = reactive({
   stealth_mode_flag: false,
   subcontractor_visible_flag: false,
   timezone: 'Europe/Berlin',
-  weekday_mask: '1111100',
+  weekday_mask: '',
 });
 
 const exceptionDraft = reactive({
@@ -1032,6 +1032,40 @@ function buildShiftPlanDefaultDraft() {
   };
 }
 
+function buildSeriesDefaultDraft() {
+  return {
+    customer_visible_flag: false,
+    date_from: selectedShiftPlan.value?.planning_from || '',
+    date_to: selectedShiftPlan.value?.planning_to || '',
+    default_break_minutes: 30,
+    interval_count: 1,
+    label: selectedShiftPlan.value?.name || '',
+    location_text: '',
+    meeting_point: '',
+    notes: '',
+    recurrence_code: 'daily',
+    release_state: 'draft',
+    shift_template_id: '',
+    shift_type_code: '',
+    stealth_mode_flag: false,
+    subcontractor_visible_flag: false,
+    timezone: 'Europe/Berlin',
+    weekday_mask: '',
+  };
+}
+
+function formatWorkforceScopeLabel(workforceScopeCode: string | null | undefined) {
+  switch (workforceScopeCode) {
+    case 'subcontractor':
+      return $t('sicherplan.customerPlansWizard.forms.workforceSubcontractor');
+    case 'mixed':
+      return $t('sicherplan.customerPlansWizard.forms.workforceMixed');
+    case 'internal':
+    default:
+      return $t('sicherplan.customerPlansWizard.forms.workforceInternal');
+  }
+}
+
 function buildSelectedShiftPlanBaseline(plan: ShiftPlanRead) {
   return {
     name: plan.name,
@@ -1112,7 +1146,7 @@ function hasSeriesDraftContent() {
       seriesDraft.release_state !== 'draft' ||
       seriesDraft.timezone !== 'Europe/Berlin' ||
       seriesDraft.recurrence_code !== 'daily' ||
-      seriesDraft.weekday_mask !== '1111100' ||
+      seriesDraft.weekday_mask !== '' ||
       exceptionDraft.exception_date ||
       exceptionDraft.action_code !== 'skip' ||
       exceptionDraft.override_local_start_time ||
@@ -1732,25 +1766,7 @@ function resetShiftPlanDraft() {
 }
 
 function resetSeriesDraft() {
-  Object.assign(seriesDraft, {
-    customer_visible_flag: false,
-    date_from: '',
-    date_to: '',
-    default_break_minutes: 30,
-    interval_count: 1,
-    label: '',
-    location_text: '',
-    meeting_point: '',
-    notes: '',
-    recurrence_code: 'daily',
-    release_state: 'draft',
-    shift_template_id: '',
-    shift_type_code: '',
-    stealth_mode_flag: false,
-    subcontractor_visible_flag: false,
-    timezone: 'Europe/Berlin',
-    weekday_mask: '1111100',
-  });
+  Object.assign(seriesDraft, buildSeriesDefaultDraft());
 }
 
 function resetExceptionDraft() {
@@ -2832,6 +2848,51 @@ async function loadShiftPlanningReferenceOptions(isCurrent = () => true) {
   shiftTypeOptions.value = shiftTypes;
 }
 
+async function loadSeriesReferenceOptions(isCurrent = () => true) {
+  if (!props.tenantId || !props.accessToken) {
+    shiftTemplateOptions.value = [];
+    shiftTypeOptions.value = [];
+    return;
+  }
+  const [templates, shiftTypes] = await Promise.all([
+    listShiftTemplates(props.tenantId, props.accessToken, {}),
+    listShiftTypeOptions(props.tenantId, props.accessToken),
+  ]);
+  if (!isCurrent()) {
+    return;
+  }
+  shiftTemplateOptions.value = templates;
+  shiftTypeOptions.value = shiftTypes;
+}
+
+async function hydrateSeriesStepContext(isCurrent = () => true) {
+  if (!props.tenantId || !props.accessToken) {
+    selectedPlanningRecord.value = null;
+    selectedShiftPlan.value = null;
+    return;
+  }
+  const planningRecordPromise = props.wizardState.planning_record_id
+    ? getPlanningRecord(props.tenantId, props.wizardState.planning_record_id, props.accessToken)
+    : Promise.resolve(null);
+  const shiftPlanPromise = props.wizardState.shift_plan_id
+    ? getShiftPlan(props.tenantId, props.wizardState.shift_plan_id, props.accessToken)
+    : Promise.resolve(null);
+  const [record, plan] = await Promise.all([planningRecordPromise, shiftPlanPromise]);
+  if (!isCurrent()) {
+    return;
+  }
+  if (record) {
+    syncPlanningRecordDraft(record);
+  } else {
+    selectedPlanningRecord.value = null;
+  }
+  if (plan) {
+    syncShiftPlanDraft(plan);
+  } else {
+    selectedShiftPlan.value = null;
+  }
+}
+
 async function loadShiftPlanState(isCurrent = () => true) {
   const persistedShiftPlanDraft = normalizeShiftPlanDraftPersistence(
     loadStepDraft<ShiftPlanDraftPersistence | Partial<typeof shiftPlanDraft>>('shift-plan'),
@@ -2892,7 +2953,7 @@ async function loadShiftPlanState(isCurrent = () => true) {
 
 async function loadSeriesState(isCurrent = () => true) {
   const persistedSeriesDraft = loadStepDraft<SeriesExceptionsDraftPersistence>('series-exceptions');
-  await loadShiftPlanningReferenceOptions(isCurrent);
+  await loadSeriesReferenceOptions(isCurrent);
   if (!isCurrent()) {
     return;
   }
@@ -2979,8 +3040,7 @@ async function refreshStepData() {
       await loadPlanningRecordState(isCurrent);
       await loadShiftPlanState(isCurrent);
     } else if (seriesStepActive.value) {
-      await loadPlanningRecordState(isCurrent);
-      await loadShiftPlanState(isCurrent);
+      await hydrateSeriesStepContext(isCurrent);
       await loadSeriesState(isCurrent);
     }
   } catch {
@@ -3868,6 +3928,14 @@ async function submitSeriesStep() {
   }
   if (!seriesDraft.label.trim() || !seriesDraft.shift_template_id || !seriesDraft.date_from || !seriesDraft.date_to || seriesDraft.date_to < seriesDraft.date_from) {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.seriesInvalid'));
+    return false;
+  }
+  if (
+    selectedShiftPlanSummary.value &&
+    (seriesDraft.date_from < selectedShiftPlanSummary.value.planning_from ||
+      seriesDraft.date_to > selectedShiftPlanSummary.value.planning_to)
+  ) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.seriesShiftPlanWindowMismatch'));
     return false;
   }
   stepLoading.value = true;
@@ -5059,6 +5127,18 @@ onBeforeUnmount(() => {
     </section>
 
     <section v-else-if="seriesStepActive" class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-series-exceptions">
+      <div
+        v-if="selectedShiftPlanSummary"
+        class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static"
+        data-testid="customer-new-plan-series-shift-plan-summary"
+      >
+        <strong>{{ $t('sicherplan.customerPlansWizard.forms.selectedShiftPlan') }}: {{ selectedShiftPlanSummary.name }}</strong>
+        <span>{{ selectedShiftPlanSummary.planning_from }} - {{ selectedShiftPlanSummary.planning_to }}</span>
+        <span>
+          {{ $t('sicherplan.customerPlansWizard.forms.workforceScope') }}:
+          {{ formatWorkforceScopeLabel(selectedShiftPlanSummary.workforce_scope_code) }}
+        </span>
+      </div>
       <div class="cta-row">
         <button
           type="button"
@@ -5121,11 +5201,23 @@ onBeforeUnmount(() => {
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.startDate') }}</span>
-          <input v-model="seriesDraft.date_from" data-testid="customer-new-plan-series-from" type="date" />
+          <input
+            v-model="seriesDraft.date_from"
+            :max="selectedShiftPlanSummary?.planning_to || undefined"
+            :min="selectedShiftPlanSummary?.planning_from || undefined"
+            data-testid="customer-new-plan-series-from"
+            type="date"
+          />
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.endDate') }}</span>
-          <input v-model="seriesDraft.date_to" data-testid="customer-new-plan-series-to" type="date" />
+          <input
+            v-model="seriesDraft.date_to"
+            :max="selectedShiftPlanSummary?.planning_to || undefined"
+            :min="selectedShiftPlanSummary?.planning_from || undefined"
+            data-testid="customer-new-plan-series-to"
+            type="date"
+          />
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.defaultBreakMinutes') }}</span>

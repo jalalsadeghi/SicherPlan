@@ -1733,6 +1733,248 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     ]);
   });
 
+  it('loads the Series step with read-only upstream hydration and keeps the series form visible after all loaders finish', async () => {
+    apiMocks.getPlanningRecordMock.mockResolvedValue(
+      buildPlanningRecord({
+        id: 'record-1',
+        name: 'Werk Nord Sommer',
+        planning_from: '2026-06-01',
+        planning_to: '2026-06-10',
+      }),
+    );
+    apiMocks.getShiftPlanMock.mockResolvedValue(
+      buildShiftPlan({
+        id: 'plan-1',
+        name: 'Werk Nord / Schichtplan',
+        planning_from: '2026-06-01',
+        planning_to: '2026-06-10',
+      }),
+    );
+    apiMocks.listShiftSeriesMock.mockResolvedValue([]);
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
+
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+    await flushPromises();
+
+    expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledWith('tenant-1', 'record-1', 'token-1');
+    expect(apiMocks.getShiftPlanMock).toHaveBeenCalledWith('tenant-1', 'plan-1', 'token-1');
+    expect(apiMocks.listPlanningRecordAttachmentsMock).not.toHaveBeenCalled();
+    expect(apiMocks.listShiftPlansMock).not.toHaveBeenCalled();
+    expect(apiMocks.listShiftTemplatesMock).toHaveBeenCalled();
+    expect(apiMocks.listShiftTypeOptionsMock).toHaveBeenCalled();
+    expect(apiMocks.listShiftSeriesMock).toHaveBeenCalledWith('tenant-1', 'plan-1', 'token-1');
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-series-exceptions"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-shift-plan"]').exists()).toBe(false);
+    expect(wrapper.emitted('saved-context')).toBeUndefined();
+    expect(wrapper.find('[data-testid="customer-new-plan-draft-restored"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-series-shift-plan-summary"]').text()).toContain(
+      'Werk Nord / Schichtplan',
+    );
+    expect(wrapper.get('[data-testid="customer-new-plan-series-shift-plan-summary"]').text()).toContain(
+      'sicherplan.customerPlansWizard.forms.workforceScope',
+    );
+    expect((wrapper.get('[data-testid="customer-new-plan-series-label"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord / Schichtplan',
+    );
+    expect((wrapper.get('[data-testid="customer-new-plan-series-from"]').element as HTMLInputElement).value).toBe(
+      '2026-06-01',
+    );
+    expect((wrapper.get('[data-testid="customer-new-plan-series-to"]').element as HTMLInputElement).value).toBe(
+      '2026-06-10',
+    );
+    expect(((wrapper.vm as any).$?.setupState.seriesDraft.weekday_mask as string)).toBe('');
+  });
+
+  it('keeps Series active and ignores a stale shift-plan draft when shift_plan_id is already committed', async () => {
+    const shiftPlanDraftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'shift-plan',
+    );
+    window.sessionStorage.setItem(
+      shiftPlanDraftKey,
+      JSON.stringify({
+        draft: {
+          name: 'Stale Shift Draft',
+          planning_from: '2026-06-03',
+          planning_to: '2026-06-04',
+          planning_record_id: 'record-1',
+          remarks: 'stale',
+          workforce_scope_code: 'mixed',
+        },
+        selected_shift_plan_id: '',
+      }),
+    );
+
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-series-exceptions"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-shift-plan"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-series-shift-plan-summary"]').text()).toContain(
+      'Werk Nord / Schichtplan',
+    );
+    expect(wrapper.find('[data-testid="customer-new-plan-draft-restored"]').exists()).toBe(false);
+    expect(window.sessionStorage.getItem(shiftPlanDraftKey)).toContain('Stale Shift Draft');
+  });
+
+  it('restores a contentful series draft for the committed shift plan without activating upstream steps', async () => {
+    const seriesDraftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'series-exceptions',
+    );
+    window.sessionStorage.setItem(
+      seriesDraftKey,
+      JSON.stringify({
+        exception: {
+          action_code: 'skip',
+          customer_visible_flag: null,
+          exception_date: '',
+          notes: '',
+          override_break_minutes: '',
+          override_local_end_time: '',
+          override_local_start_time: '',
+          override_location_text: '',
+          override_meeting_point: '',
+          override_shift_type_code: '',
+          stealth_mode_flag: null,
+          subcontractor_visible_flag: null,
+        },
+        series: {
+          customer_visible_flag: false,
+          date_from: '2026-06-02',
+          date_to: '2026-06-09',
+          default_break_minutes: 45,
+          interval_count: 2,
+          label: 'Restored Series Draft',
+          location_text: 'Nordtor',
+          meeting_point: '',
+          notes: 'draft notes',
+          recurrence_code: 'weekly',
+          release_state: 'draft',
+          shift_template_id: 'template-1',
+          shift_type_code: 'day',
+          stealth_mode_flag: false,
+          subcontractor_visible_flag: false,
+          timezone: 'Europe/Berlin',
+          weekday_mask: '1010100',
+        },
+      }),
+    );
+
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-series-exceptions"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-shift-plan"]').exists()).toBe(false);
+    expect((wrapper.get('[data-testid="customer-new-plan-series-label"]').element as HTMLInputElement).value).toBe(
+      'Restored Series Draft',
+    );
+    expect((wrapper.get('[data-testid="customer-new-plan-series-from"]').element as HTMLInputElement).value).toBe(
+      '2026-06-02',
+    );
+    expect((wrapper.get('[data-testid="customer-new-plan-series-to"]').element as HTMLInputElement).value).toBe(
+      '2026-06-09',
+    );
+    expect(wrapper.get('[data-testid="customer-new-plan-draft-restored"]').text()).toBe(
+      'sicherplan.customerPlansWizard.draftRestored',
+    );
+    expect(wrapper.emitted('saved-context')).toBeUndefined();
+  });
+
+  it('displays existing series rows and keeps the wizard on Series when one row is selected', async () => {
+    apiMocks.listShiftSeriesMock.mockResolvedValue([
+      buildSeries({ id: 'series-1', label: 'Tagdienst' }),
+      buildSeries({ id: 'series-2', label: 'Nachtdienst', date_from: '2026-06-05', date_to: '2026-06-20' }),
+    ]);
+    apiMocks.getShiftSeriesMock.mockResolvedValue(
+      buildSeries({ id: 'series-2', label: 'Nachtdienst', date_from: '2026-06-05', date_to: '2026-06-20' }),
+    );
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([
+      {
+        id: 'exception-1',
+        tenant_id: 'tenant-1',
+        shift_series_id: 'series-2',
+        exception_date: '2026-06-07',
+        action_code: 'skip',
+        version_no: 1,
+      },
+    ]);
+
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    const rows = wrapper.findAll('.sp-customer-plan-wizard-step__list-row');
+    expect(rows.some((row) => row.text().includes('Tagdienst'))).toBe(true);
+    expect(rows.some((row) => row.text().includes('Nachtdienst'))).toBe(true);
+
+    const targetRow = rows.find((row) => row.text().includes('Nachtdienst'));
+    expect(targetRow).toBeDefined();
+    await targetRow!.trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.getShiftSeriesMock).toHaveBeenCalledWith('tenant-1', 'series-2', 'token-1');
+    expect(apiMocks.listShiftSeriesExceptionsMock).toHaveBeenCalledWith('tenant-1', 'series-2', 'token-1');
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-series-exceptions"]').exists()).toBe(true);
+    expect((wrapper.get('[data-testid="customer-new-plan-series-label"]').element as HTMLInputElement).value).toBe(
+      'Nachtdienst',
+    );
+  });
+
+  it('blocks Series submit when the date range exceeds the selected shift-plan window', async () => {
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-label"]').setValue('Nachtdienst Juni');
+    await wrapper.get('[data-testid="customer-new-plan-series-template"]').setValue('template-1');
+    await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-05-31');
+    await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-06-10');
+    await flushPromises();
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toBe(false);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.seriesShiftPlanWindowMismatch');
+    expect(apiMocks.createShiftSeriesMock).not.toHaveBeenCalled();
+  });
+
   it('keeps the user on the final step with clear feedback when series generation fails', async () => {
     const wrapper = mountStep('series-exceptions', {
       current_step: 'series-exceptions',

@@ -251,6 +251,7 @@
       "saveCurrentRequirementLineBeforeContinue": "Save or clear the current requirement line before continuing.",
       "seriesGenerateFailed": "Series generation failed or the staffing handoff could not be completed.",
       "seriesInvalid": "Series label, template, and valid date range are required.",
+      "seriesShiftPlanWindowMismatch": "The series window must stay inside the selected shift plan window.",
       "serviceCategoryRequired": "A service category is required.",
       "shiftPlanInvalid": "Shift plan name and a valid planning window are required.",
       "shiftPlanPlanningRecordWindowMismatch": "The shift plan window must stay inside the selected planning record window.",

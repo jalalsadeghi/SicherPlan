@@ -251,6 +251,7 @@
       "saveCurrentRequirementLineBeforeContinue": "Speichern oder leeren Sie die aktuelle Anforderungslinie, bevor Sie fortfahren.",
       "seriesGenerateFailed": "Die Serienerzeugung oder die Übergabe an Staffing Coverage ist fehlgeschlagen.",
       "seriesInvalid": "Serienbezeichnung, Vorlage und ein gültiger Datumsbereich sind erforderlich.",
+      "seriesShiftPlanWindowMismatch": "Das Serienfenster muss innerhalb des ausgewählten Schichtplanfensters liegen.",
       "serviceCategoryRequired": "Eine Leistungskategorie ist erforderlich.",
       "shiftPlanInvalid": "Schichtplanname und ein gültiges Planungsfenster sind erforderlich.",
       "shiftPlanPlanningRecordWindowMismatch": "Das Schichtplanfenster muss innerhalb des ausgewählten Planungsfensters liegen.",
