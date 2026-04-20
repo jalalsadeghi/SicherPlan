@@ -60,6 +60,7 @@ vi.mock('./new-plan-step-content.vue', () => ({
     emits: ['saved-context', 'step-completion', 'step-ui-state'],
     data() {
       return {
+        returnShiftPlanWithoutSavedContext: false,
         selectedShiftPlanId: '',
         shiftPlanName: '',
         shiftPlanFrom: '',
@@ -89,10 +90,21 @@ vi.mock('./new-plan-step-content.vue', () => ({
           if (!this.selectedShiftPlanId) {
             return false;
           }
-          this.$emit('saved-context', { shift_plan_id: this.selectedShiftPlanId });
-          this.$emit('step-completion', 'shift-plan', true);
-          this.$emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
-          return true;
+          if (this.returnShiftPlanWithoutSavedContext) {
+            return {
+              success: true,
+              completedStepId: 'shift-plan',
+              dirty: false,
+              error: '',
+            };
+          }
+          return {
+            success: true,
+            savedContext: { shift_plan_id: this.selectedShiftPlanId },
+            completedStepId: 'shift-plan',
+            dirty: false,
+            error: '',
+          };
         }
         return true;
       },
@@ -102,6 +114,9 @@ vi.mock('./new-plan-step-content.vue', () => ({
         this.shiftPlanFrom = '2026-07-01';
         this.shiftPlanTo = '2026-07-31';
         this.$emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
+      },
+      simulateMissingShiftPlanCommit() {
+        this.returnShiftPlanWithoutSavedContext = true;
       },
     },
     template: `
@@ -122,6 +137,13 @@ vi.mock('./new-plan-step-content.vue', () => ({
             @click="selectExistingShiftPlan"
           >
             select shift plan
+          </button>
+          <button
+            data-testid="customer-new-plan-simulate-missing-shift-plan-commit"
+            type="button"
+            @click="simulateMissingShiftPlanCommit"
+          >
+            simulate missing commit
           </button>
           <div
             v-if="selectedShiftPlanId"
@@ -414,6 +436,7 @@ describe('CustomerNewPlanWizardView', () => {
     await flushPromises();
     await flushPromises();
 
+    expect((wrapper.vm as any).wizardState.shift_plan_id).toBe('shift-plan-1');
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('series-exceptions');
     expect(
       routerReplaceMock.mock.calls.some(
@@ -470,6 +493,7 @@ describe('CustomerNewPlanWizardView', () => {
     await flushPromises();
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('series-exceptions');
+    expect((wrapper.vm as any).wizardState.shift_plan_id).toBe('shift-plan-1');
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
       path: '/admin/customers/new-plan',
       query: {
@@ -483,6 +507,36 @@ describe('CustomerNewPlanWizardView', () => {
         step: 'series-exceptions',
       },
     });
+  });
+
+  it('sets a shift-plan diagnostic and does not silently advance when submit reports success without shift_plan_id', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+      step: 'shift-plan',
+    };
+    routerReplaceMock.mockImplementation(async ({ query }: { query: Record<string, unknown> }) => {
+      routeState.query = { ...query };
+    });
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-existing-shift-plan-row"]').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-simulate-missing-shift-plan-commit"]').trigger('click');
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await flushPromises();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('shift-plan');
+    expect((wrapper.vm as any).wizardState.shift_plan_id).toBe('');
+    expect((wrapper.vm as any).wizardState.step_state['shift-plan'].error).toBe('submit_missing_shift_plan_id');
+    expect(routeState.query.step).toBe('shift-plan');
   });
 
   it('does not rewrite the route when route.replace keeps the same wizard context', async () => {

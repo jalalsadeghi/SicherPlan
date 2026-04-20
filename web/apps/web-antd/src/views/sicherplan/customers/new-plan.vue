@@ -16,7 +16,10 @@ import {
   CUSTOMER_NEW_PLAN_WIZARD_LAST_STEP_ID,
   isWizardStepId,
 } from './new-plan-wizard.steps';
-import type { CustomerNewPlanWizardStepId } from './new-plan-wizard.types';
+import type {
+  CustomerNewPlanStepSubmitResult,
+  CustomerNewPlanWizardStepId,
+} from './new-plan-wizard.types';
 import { useCustomerNewPlanWizard } from './use-customer-new-plan-wizard';
 
 type WizardContextState = 'loading' | 'ready' | 'missing' | 'not_found' | 'error';
@@ -324,6 +327,23 @@ function goToPreviousStep() {
   movePrevious();
 }
 
+function normalizeStepSubmitResult(result: CustomerNewPlanStepSubmitResult | undefined) {
+  if (typeof result === 'boolean') {
+    return {
+      success: result,
+    };
+  }
+  return result ?? { success: false };
+}
+
+function violatesShiftPlanSubmitInvariant(submitResult: ReturnType<typeof normalizeStepSubmitResult>) {
+  if (wizardState.value.current_step !== 'shift-plan' || !submitResult.success) {
+    return false;
+  }
+  const nextShiftPlanId = submitResult.savedContext?.shift_plan_id ?? wizardState.value.shift_plan_id;
+  return !nextShiftPlanId;
+}
+
 async function goToNextStep() {
   if (stepSubmitting.value) {
     return;
@@ -335,8 +355,28 @@ async function goToNextStep() {
       routeSyncSuspended.value = true;
     }
     try {
-      const success = await Promise.resolve(stepContentRef.value?.submitCurrentStep?.());
-      if (success && !isFinalStep.value) {
+      const submitResult = normalizeStepSubmitResult(
+        await Promise.resolve(stepContentRef.value?.submitCurrentStep?.()),
+      );
+      if (submitResult.savedContext) {
+        setSavedContext(submitResult.savedContext);
+      }
+      if (submitResult.completedStepId) {
+        setStepCompletion(submitResult.completedStepId, submitResult.success);
+        setStepUiState(submitResult.completedStepId, {
+          ...(submitResult.dirty !== undefined ? { dirty: submitResult.dirty } : {}),
+          ...(submitResult.error !== undefined ? { error: submitResult.error } : {}),
+        });
+      }
+      if (violatesShiftPlanSubmitInvariant(submitResult)) {
+        setStepCompletion('shift-plan', false);
+        setStepUiState('shift-plan', {
+          dirty: true,
+          error: 'submit_missing_shift_plan_id',
+        });
+        return;
+      }
+      if (submitResult.success && !isFinalStep.value) {
         moveNext();
       }
     } finally {

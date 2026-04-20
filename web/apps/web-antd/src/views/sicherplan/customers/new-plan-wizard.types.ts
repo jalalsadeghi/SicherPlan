@@ -42,6 +42,18 @@ export type CustomerNewPlanWizardStatePatch = Partial<
   >
 >;
 
+export interface CustomerNewPlanStepSubmitResultPayload {
+  success: boolean;
+  completedStepId?: CustomerNewPlanWizardStepId;
+  dirty?: boolean;
+  error?: string;
+  savedContext?: CustomerNewPlanWizardStatePatch;
+}
+
+export type CustomerNewPlanStepSubmitResult =
+  | boolean
+  | CustomerNewPlanStepSubmitResultPayload;
+
 export interface CustomerNewPlanWizardStepDefinition {
   id: CustomerNewPlanWizardStepId;
   labelKey: string;

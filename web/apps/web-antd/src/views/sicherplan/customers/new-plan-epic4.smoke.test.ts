@@ -1015,7 +1015,13 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
-    expect(saved).toBe(true);
+    expect(saved).toEqual({
+      success: true,
+      completedStepId: 'shift-plan',
+      dirty: false,
+      error: '',
+      savedContext: { shift_plan_id: 'plan-1' },
+    });
     expect(apiMocks.createShiftPlanMock).toHaveBeenCalledWith(
       'tenant-1',
       'token-1',
@@ -1024,7 +1030,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
         name: 'Werk Nord / Schichtplan',
       }),
     );
-    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
+    expect(wrapper.emitted('saved-context')).toBeUndefined();
   });
 
   it('selects an existing shift plan row locally and shows the selected summary without committing wizard context immediately', async () => {
@@ -1071,10 +1077,16 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     const continued = await (wrapper.vm as any).submitCurrentStep();
 
-    expect(continued).toBe(true);
+    expect(continued).toEqual({
+      success: true,
+      completedStepId: 'shift-plan',
+      dirty: false,
+      error: '',
+      savedContext: { shift_plan_id: 'plan-1' },
+    });
     expect(apiMocks.createShiftPlanMock).not.toHaveBeenCalled();
     expect(apiMocks.updateShiftPlanMock).not.toHaveBeenCalled();
-    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
+    expect(wrapper.emitted('saved-context')).toBeUndefined();
   });
 
   it('auto-selects a single existing shift plan when there is no real unsaved draft', async () => {
@@ -1104,10 +1116,16 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     const continued = await (wrapper.vm as any).submitCurrentStep();
 
-    expect(continued).toBe(true);
+    expect(continued).toEqual({
+      success: true,
+      completedStepId: 'shift-plan',
+      dirty: false,
+      error: '',
+      savedContext: { shift_plan_id: 'plan-1' },
+    });
     expect(apiMocks.createShiftPlanMock).not.toHaveBeenCalled();
     expect(apiMocks.updateShiftPlanMock).not.toHaveBeenCalled();
-    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
+    expect(wrapper.emitted('saved-context')).toBeUndefined();
   });
 
   it('does not auto-select when multiple existing shift plans are available', async () => {
@@ -1191,7 +1209,13 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
-    expect(saved).toBe(true);
+    expect(saved).toEqual({
+      success: true,
+      completedStepId: 'shift-plan',
+      dirty: false,
+      error: '',
+      savedContext: { shift_plan_id: 'plan-1' },
+    });
     expect(apiMocks.createShiftPlanMock).toHaveBeenCalledOnce();
   });
 
@@ -1270,6 +1294,79 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-from"]').element as HTMLInputElement).value).toBe('2026-06-01');
     expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-to"]').element as HTMLInputElement).value).toBe('2026-06-10');
     expect(wrapper.find('[data-testid="customer-new-plan-draft-restored"]').exists()).toBe(false);
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toEqual({
+      success: true,
+      completedStepId: 'shift-plan',
+      dirty: false,
+      error: '',
+      savedContext: { shift_plan_id: 'plan-1' },
+    });
+    expect(apiMocks.createShiftPlanMock).not.toHaveBeenCalled();
+    expect(apiMocks.updateShiftPlanMock).not.toHaveBeenCalled();
+  });
+
+  it('applies a contentful matching shift-plan draft, updates the saved plan, and returns committed context', async () => {
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'shift-plan',
+    );
+    window.sessionStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        draft: {
+          name: 'Werk Nord / Angepasst',
+          planning_from: '2026-06-01',
+          planning_to: '2026-06-10',
+          planning_record_id: 'record-1',
+          remarks: 'drafted change',
+          workforce_scope_code: 'internal',
+        },
+        selected_shift_plan_id: 'plan-1',
+      }),
+    );
+
+    const wrapper = mountStep('shift-plan', {
+      current_step: 'shift-plan',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+    });
+    await flushPromises();
+
+    expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').element as HTMLInputElement).value).toBe('Werk Nord / Angepasst');
+    expect(wrapper.get('[data-testid="customer-new-plan-draft-restored"]').text()).toBe('sicherplan.customerPlansWizard.draftRestored');
+
+    apiMocks.updateShiftPlanMock.mockResolvedValue(
+      buildShiftPlan({ id: 'plan-1', name: 'Werk Nord / Angepasst', remarks: 'drafted change', version_no: 2 }),
+    );
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toEqual({
+      success: true,
+      completedStepId: 'shift-plan',
+      dirty: false,
+      error: '',
+      savedContext: { shift_plan_id: 'plan-1' },
+    });
+    expect(apiMocks.updateShiftPlanMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'plan-1',
+      'token-1',
+      expect.objectContaining({
+        name: 'Werk Nord / Angepasst',
+        remarks: 'drafted change',
+        version_no: 1,
+      }),
+    );
+    expect(apiMocks.createShiftPlanMock).not.toHaveBeenCalled();
   });
 
   it('ignores and clears a blank/default persisted shift-plan draft instead of showing draft restored', async () => {
@@ -1337,9 +1434,15 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     );
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
-    expect(saved).toBe(true);
+    expect(saved).toEqual({
+      success: true,
+      completedStepId: 'shift-plan',
+      dirty: false,
+      error: '',
+      savedContext: { shift_plan_id: 'plan-1' },
+    });
     expect(window.sessionStorage.getItem(draftKey)).toBeNull();
-    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({ shift_plan_id: 'plan-1' });
+    expect(wrapper.emitted('saved-context')).toBeUndefined();
   });
 
   it('ignores malformed session storage draft values safely', async () => {
@@ -1451,7 +1554,13 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     const shiftPlanSaved = await (wrapper.vm as any).submitCurrentStep();
 
-    expect(shiftPlanSaved).toBe(true);
+    expect(shiftPlanSaved).toEqual({
+      success: true,
+      completedStepId: 'shift-plan',
+      dirty: false,
+      error: '',
+      savedContext: { shift_plan_id: 'plan-1' },
+    });
     expect(apiMocks.updateShiftPlanMock).toHaveBeenCalledWith(
       'tenant-1',
       'plan-1',

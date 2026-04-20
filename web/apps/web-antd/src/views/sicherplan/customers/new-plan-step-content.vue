@@ -91,6 +91,7 @@ import {
   type ShiftTypeOption,
 } from '#/sicherplan-legacy/api/planningShifts';
 import type {
+  CustomerNewPlanStepSubmitResult,
   CustomerNewPlanWizardState,
   CustomerNewPlanWizardStatePatch,
   CustomerNewPlanWizardStepId,
@@ -3736,7 +3737,7 @@ async function submitPlanningRecordDocumentsStep() {
   }
 }
 
-async function submitShiftPlanStep() {
+async function submitShiftPlanStep(): Promise<CustomerNewPlanStepSubmitResult> {
   if (!props.tenantId || !props.accessToken || !props.wizardState.planning_record_id) {
     return false;
   }
@@ -3755,10 +3756,15 @@ async function submitShiftPlanStep() {
   if (selectedShiftPlan.value && !hasShiftPlanDraftContent()) {
     clearStepDraft('shift-plan');
     clearDraftRestoreMessage();
-    emit('saved-context', { shift_plan_id: selectedShiftPlan.value.id });
     emit('step-completion', 'shift-plan', true);
     emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
-    return true;
+    return {
+      success: true,
+      completedStepId: 'shift-plan',
+      dirty: false,
+      error: '',
+      savedContext: { shift_plan_id: selectedShiftPlan.value.id },
+    };
   }
   stepLoading.value = true;
   emit('step-ui-state', 'shift-plan', { loading: true, error: '' });
@@ -3779,11 +3785,16 @@ async function submitShiftPlanStep() {
     syncShiftPlanDraft(saved);
     clearStepDraft('shift-plan');
     clearDraftRestoreMessage();
-    emit('saved-context', { shift_plan_id: saved.id });
     shiftPlanRows.value = await listShiftPlans(props.tenantId, props.accessToken, { planning_record_id: props.wizardState.planning_record_id });
     emit('step-completion', 'shift-plan', true);
     emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
-    return true;
+    return {
+      success: true,
+      completedStepId: 'shift-plan',
+      dirty: false,
+      error: '',
+      savedContext: { shift_plan_id: saved.id },
+    };
   } catch {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.shiftPlanSaveFailed'));
     emit('step-ui-state', 'shift-plan', { error: 'save_failed' });
@@ -3931,7 +3942,7 @@ async function submitSeriesStep() {
   }
 }
 
-async function submitCurrentStep() {
+async function submitCurrentStep(): Promise<CustomerNewPlanStepSubmitResult> {
   if (orderStepActive.value) {
     return submitOrderStep();
   }
