@@ -44,12 +44,15 @@ const DashboardCalendarPanelStub = defineComponent({
   name: "DashboardCalendarPanelStub",
   props: {
     cells: { type: Array, required: true },
+    loading: { type: Boolean, default: false },
+    loadingLabel: { type: String, default: "" },
+    monthLabel: { type: String, required: true },
     summary: { type: Array, required: true },
     title: { type: String, required: true },
   },
   emits: ["shift-calendar", "toggle-day"],
   template:
-    '<div class="dashboard-calendar-panel-stub">{{ title }}|{{ cells.length }}|{{ summary.map((item) => item.label).join(\',\') }}<button class="calendar-next" @click="$emit(\'shift-calendar\', \'next\')" /></div>',
+    '<div class="dashboard-calendar-panel-stub">{{ title }}|month={{ monthLabel }}|{{ cells.length }}|{{ summary.map((item) => item.label).join(\',\') }}|loading={{ loading ? loadingLabel : \'idle\' }}<button class="calendar-next" @click="$emit(\'shift-calendar\', \'next\')" /><button class="calendar-prev" @click="$emit(\'shift-calendar\', \'prev\')" /></div>',
 });
 
 const baseCustomer = {
@@ -103,6 +106,16 @@ function buildCoverageRow(overrides: Record<string, unknown> = {}) {
     demand_groups: [],
     ...overrides,
   };
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
 function mountComponent(props: Record<string, unknown> = {}) {
@@ -235,9 +248,9 @@ describe("CustomerDashboardTab", () => {
 
     expect(wrapper.text()).toContain("customerAdmin.dashboard.latestPlansEmptyTitle");
     expect(wrapper.text()).toContain("customerAdmin.dashboard.latestPlansEmptyBody");
-    expect(wrapper.text()).toContain("customerAdmin.dashboard.calendarEmptyTitle");
-    expect(wrapper.text()).toContain("customerAdmin.dashboard.calendarEmptyBody");
     expect(wrapper.get(".dashboard-calendar-panel-stub").text()).toContain("customerAdmin.dashboard.calendarTitle");
+    expect(wrapper.text()).not.toContain("customerAdmin.dashboard.calendarEmptyTitle");
+    expect(wrapper.text()).not.toContain("customerAdmin.dashboard.calendarEmptyBody");
   });
 
   it("renders status badges for latest plans with release-state tones", () => {
@@ -340,7 +353,7 @@ describe("CustomerDashboardTab", () => {
 
     const calendarProps = wrapper.getComponent(DashboardCalendarPanelStub).props("cells") as Array<Record<string, unknown>>;
     expect(calendarProps.every((cell) => (cell.shiftCount as number) === 0)).toBe(true);
-    expect(wrapper.text()).toContain("customerAdmin.dashboard.calendarEmptyTitle");
+    expect(wrapper.text()).not.toContain("customerAdmin.dashboard.calendarEmptyTitle");
   });
 
   it("populates shiftCount and orderCount from customer-scoped staffing coverage", async () => {
@@ -427,6 +440,112 @@ describe("CustomerDashboardTab", () => {
     expect(firstFilters.customer_id).toBe("customer-1");
     expect(secondFilters.customer_id).toBe("customer-1");
     expect(secondFilters.date_from).not.toBe(firstFilters.date_from);
+  });
+
+  it("keeps the calendar panel mounted while the next month is loading", async () => {
+    const firstRequest = createDeferred<Array<ReturnType<typeof buildCoverageRow>>>();
+    const secondRequest = createDeferred<Array<ReturnType<typeof buildCoverageRow>>>();
+    planningStaffingMocks.listStaffingCoverageMock
+      .mockImplementationOnce(() => firstRequest.promise)
+      .mockImplementationOnce(() => secondRequest.promise);
+
+    const wrapper = mountComponent();
+    const initialMonthLabel = wrapper.getComponent(DashboardCalendarPanelStub).props("monthLabel") as string;
+
+    expect(wrapper.get(".dashboard-calendar-panel-stub").text()).toContain("loading=workspace.loading.processing");
+
+    firstRequest.resolve([buildCoverageRow()]);
+    await flushPromises();
+
+    expect(wrapper.get(".dashboard-calendar-panel-stub").text()).toContain("loading=idle");
+
+    await wrapper.get(".calendar-next").trigger("click");
+    const nextMonthLabel = wrapper.getComponent(DashboardCalendarPanelStub).props("monthLabel") as string;
+
+    expect(wrapper.find(".dashboard-calendar-panel-stub").exists()).toBe(true);
+    expect(nextMonthLabel).not.toBe(initialMonthLabel);
+    expect(wrapper.get(".dashboard-calendar-panel-stub").text()).toContain("loading=workspace.loading.processing");
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading"]').exists()).toBe(false);
+
+    secondRequest.resolve([buildCoverageRow({ shift_id: "shift-2", order_id: "order-2" })]);
+    await flushPromises();
+
+    expect(wrapper.get(".dashboard-calendar-panel-stub").text()).toContain("loading=idle");
+  });
+
+  it("does not replace the calendar panel or accept stale data after quick next-previous navigation", async () => {
+    const currentMonthDate = new Date();
+    const nextMonthDate = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 18, 8, 0, 0, 0);
+    const initialRow = buildCoverageRow({
+      shift_id: "shift-current",
+      order_id: "order-current",
+      starts_at: new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth(), 18, 8, 0, 0, 0).toISOString(),
+      ends_at: new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth(), 18, 16, 0, 0, 0).toISOString(),
+    });
+    const nextMonthRow = buildCoverageRow({
+      shift_id: "shift-next",
+      order_id: "order-next",
+      starts_at: nextMonthDate.toISOString(),
+      ends_at: new Date(nextMonthDate.getFullYear(), nextMonthDate.getMonth(), 18, 16, 0, 0, 0).toISOString(),
+    });
+    const nextMonthRequest = createDeferred<Array<ReturnType<typeof buildCoverageRow>>>();
+
+    planningStaffingMocks.listStaffingCoverageMock
+      .mockResolvedValueOnce([initialRow])
+      .mockImplementationOnce(() => nextMonthRequest.promise);
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    const initialMonthLabel = wrapper.getComponent(DashboardCalendarPanelStub).props("monthLabel") as string;
+    const initialCells = wrapper.getComponent(DashboardCalendarPanelStub).props("cells") as Array<Record<string, unknown>>;
+    expect(initialCells.some((cell) => (cell.shiftCount as number) === 1)).toBe(true);
+
+    await wrapper.get(".calendar-next").trigger("click");
+    await wrapper.get(".calendar-prev").trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find(".dashboard-calendar-panel-stub").exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading"]').exists()).toBe(false);
+    expect(wrapper.getComponent(DashboardCalendarPanelStub).props("monthLabel")).toBe(initialMonthLabel);
+
+    nextMonthRequest.resolve([nextMonthRow]);
+    await flushPromises();
+
+    expect(wrapper.getComponent(DashboardCalendarPanelStub).props("monthLabel")).toBe(initialMonthLabel);
+    const finalCells = wrapper.getComponent(DashboardCalendarPanelStub).props("cells") as Array<Record<string, unknown>>;
+    expect(finalCells.some((cell) => (cell.shiftCount as number) === 1)).toBe(true);
+    expect(planningStaffingMocks.listStaffingCoverageMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows the calendar API error state when coverage loading fails", async () => {
+    const rejectedRequest = {
+      catch(onRejected?: (reason: unknown) => unknown) {
+        onRejected?.(new Error("boom"));
+        return rejectedRequest;
+      },
+      finally(onFinally?: () => void) {
+        onFinally?.();
+        return rejectedRequest;
+      },
+      then(_onResolved?: (value: Array<ReturnType<typeof buildCoverageRow>>) => unknown, onRejected?: (reason: unknown) => unknown) {
+        if (onRejected) {
+          onRejected(new Error("boom"));
+        }
+        return rejectedRequest;
+      },
+    };
+    planningStaffingMocks.listStaffingCoverageMock.mockImplementationOnce(() => rejectedRequest as never);
+
+    const wrapper = mountComponent();
+    await flushPromises();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-dashboard-calendar-error"]').text()).toContain(
+      "customerAdmin.dashboard.calendarLoadError",
+    );
+    expect(wrapper.find(".dashboard-calendar-panel-stub").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("customerAdmin.dashboard.calendarEmptyTitle");
   });
 
   it("keeps the dashboard KPI labels stable while tone styling changes", () => {

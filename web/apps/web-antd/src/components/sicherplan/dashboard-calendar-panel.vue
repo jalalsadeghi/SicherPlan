@@ -34,6 +34,8 @@ const props = defineProps<{
   actionTo?: string;
   cells: CalendarCell[];
   description: string;
+  loading?: boolean;
+  loadingLabel?: string;
   monthHint: string;
   monthLabel: string;
   moreLabel: string;
@@ -85,6 +87,13 @@ function toggleDay(dateKey: string) {
       <div>
         <strong>{{ monthLabel }}</strong>
         <p>{{ monthHint }}</p>
+        <span
+          v-if="loading && loadingLabel"
+          class="sp-dashboard__calendar-loading"
+          data-testid="dashboard-calendar-panel-loading"
+        >
+          {{ loadingLabel }}
+        </span>
       </div>
       <div class="sp-dashboard__summary-chips">
         <div
@@ -147,16 +156,16 @@ function toggleDay(dateKey: string) {
         </div>
         <div class="sp-dashboard__calendar-events">
           <span
-            v-if="cell.shiftCount"
-            class="sp-dashboard__calendar-pill sp-dashboard__calendar-pill--teal"
-          >
-            {{ cell.shiftCount }} {{ shiftShortLabel }}
-          </span>
-          <span
             v-if="cell.orderCount"
             class="sp-dashboard__calendar-pill sp-dashboard__calendar-pill--amber"
           >
             {{ cell.orderCount }} {{ orderShortLabel }}
+          </span>
+          <span
+            v-if="cell.shiftCount"
+            class="sp-dashboard__calendar-pill sp-dashboard__calendar-pill--teal"
+          >
+            {{ cell.shiftCount }} {{ shiftShortLabel }}
           </span>
         </div>
       </div>
@@ -200,6 +209,14 @@ function toggleDay(dateKey: string) {
 .sp-dashboard__calendar-topline p {
   margin: 0.32rem 0 0;
   color: var(--sp-color-text-secondary);
+}
+
+.sp-dashboard__calendar-loading {
+  display: inline-flex;
+  margin-top: 0.45rem;
+  color: var(--sp-color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .sp-dashboard__summary-chips {
@@ -356,8 +373,10 @@ function toggleDay(dateKey: string) {
 }
 
 .sp-dashboard__calendar-events {
-  display: grid;
-  gap: 0.45rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
 }
 
 .sp-dashboard__calendar-pill {

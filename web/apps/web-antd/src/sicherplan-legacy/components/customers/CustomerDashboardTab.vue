@@ -546,16 +546,15 @@ watch(
         </Card>
       </section>
 
-      <div v-if="calendarLoading" class="customer-dashboard-tab__state" data-testid="customer-dashboard-calendar-loading">
-        {{ t("workspace.loading.processing") }}
-      </div>
-      <div v-else-if="calendarError" class="customer-dashboard-tab__state" data-testid="customer-dashboard-calendar-error">
+      <div v-if="calendarError" class="customer-dashboard-tab__state" data-testid="customer-dashboard-calendar-error">
         {{ calendarError }}
       </div>
       <template v-else>
         <DashboardCalendarPanel
           :cells="calendarCells"
           :description="t('customerAdmin.dashboard.calendarDescription')"
+          :loading="calendarLoading"
+          :loading-label="t('workspace.loading.processing')"
           :month-hint="t('customerAdmin.dashboard.calendarMonthHint')"
           :month-label="monthLabel"
           :more-label="t('customerAdmin.dashboard.calendarMore')"
@@ -568,12 +567,6 @@ watch(
           :week-day-labels="weekDayLabels"
           @shift-calendar="shiftCalendar"
           @toggle-day="toggleCalendarDay"
-        />
-        <EmptyState
-          v-if="!coverageRows.length"
-          class="customer-dashboard-tab__calendar-empty"
-          :description="t('customerAdmin.dashboard.calendarEmptyBody')"
-          :title="t('customerAdmin.dashboard.calendarEmptyTitle')"
         />
       </template>
     </template>
