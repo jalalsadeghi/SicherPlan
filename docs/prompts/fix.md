@@ -1,56 +1,119 @@
-You are working in the SicherPlan repository.
+Add regression tests for the Customer New Plan wizard Shift Plan row-selection bug.
 
-Current bug:
-In Customer New Plan wizard, step 7 "Shift plan", an existing shift plan row is displayed, for example:
+Target:
+Clicking an existing Shift Plan row must select it locally without route refresh/reload and without losing selection. Next must then commit shift_plan_id and advance to series-exceptions.
 
-"Objektschutz RheinForum Köln – Nordtor Juli 2026 / Shift plan"
+Test files to inspect/update:
+- web/apps/web-antd/src/views/sicherplan/customers/new-plan.test.ts
+- web/apps/web-antd/src/views/sicherplan/customers/new-plan-wizard.test.ts
+- web/apps/web-antd/src/views/sicherplan/customers/new-plan-epic3.smoke.test.ts
+- web/apps/web-antd/src/views/sicherplan/customers/new-plan-epic4.smoke.test.ts
+- add a focused test file if needed.
 
-When the user clicks this row to select it before pressing Next, the page appears to refresh/reload. After it returns, the row is not selected and the fields are empty or not reliably populated. The UI also shows "Unsaved draft restored".
+Required test 1 — row click is local and non-routing:
+1. Mount new-plan at step=shift-plan with:
+   - customer_id
+   - order_id
+   - planning_record_id
+   - planning_entity_id
+   - planning_entity_type=site
+   - planning_mode_code=site
+   - no shift_plan_id
+2. Mock listShiftPlans to return one existing plan:
+   - id: shift-plan-1
+   - name: "Objektschutz RheinForum Köln – Nordtor Juli 2026 / Shift plan"
+   - planning_from: "2026-07-01"
+   - planning_to: "2026-07-31"
+3. Mock getShiftPlan for shift-plan-1.
+4. Click customer-new-plan-existing-shift-plan-row.
+5. Assert:
+   - getShiftPlan was called
+   - form fields are populated
+   - selected row has selected class or selected summary is visible
+   - route query still does NOT contain shift_plan_id immediately after click
+   - router.replace was not called solely because of row selection
+   - wizard current_step remains shift-plan
+   - no "Unsaved draft restored" appears from a blank/stale draft.
 
-This is the current route pattern:
+Required test 2 — Next commits selected existing ShiftPlan:
+1. Continue from test 1 after selecting the row.
+2. Click customer-new-plan-next.
+3. Assert:
+   - createShiftPlan was NOT called
+   - updateShiftPlan was NOT called if the form is unchanged
+   - saved-context commits shift_plan_id
+   - final route contains shift_plan_id=shift-plan-1
+   - final route contains step=series-exceptions
+   - wizard content data-step-id is series-exceptions.
 
-/admin/customers/new-plan?customer_id=84bad50d-209c-491e-b86b-13c7788c7620&order_id=...&step=shift-plan&planning_entity_id=...&planning_entity_type=site&planning_mode_code=site&planning_record_id=...
+Required test 3 — stale blank draft does not override selected plan:
+1. Seed sessionStorage with a shift-plan draft that has:
+   - selected_shift_plan_id: ""
+   - draft: empty/default values
+2. Mount step=shift-plan with existing shift plan row.
+3. Click the row.
+4. Assert:
+   - selected row remains selected
+   - saved plan fields remain visible
+   - blank draft is not applied
+   - "Unsaved draft restored" is not shown.
 
-Important:
-This is not about clicking Next anymore. The bug happens immediately when clicking an existing Shift Plan row.
+Required test 4 — stale generic draft is not applied when wizardState.shift_plan_id exists:
+1. Mount route with shift_plan_id=shift-plan-1.
+2. Seed sessionStorage with selected_shift_plan_id="" and unrelated draft values.
+3. Mock getShiftPlan returns shift-plan-1.
+4. Assert:
+   - getShiftPlan result is the source of truth
+   - generic draft does not overwrite fields
+   - selected summary is visible
+   - row is highlighted.
 
-My diagnosis:
-The current implementation treats row selection as official wizard context mutation. In new-plan-step-content.vue, selectShiftPlanRow(planId) currently:
-- calls getShiftPlan()
-- calls syncShiftPlanDraft(plan)
-- clears the shift-plan draft
-- emits saved-context with { shift_plan_id: plan.id }
-- marks step-completion true
+Required test 5 — contentful draft for same selected ShiftPlan is restored:
+1. Mount route with shift_plan_id=shift-plan-1.
+2. Seed sessionStorage with:
+   - selected_shift_plan_id: "shift-plan-1"
+   - draft with changed remarks or name
+3. Mock getShiftPlan returns shift-plan-1.
+4. Assert:
+   - saved plan loads first
+   - matching contentful draft applies
+   - "Unsaved draft restored" appears
+   - row remains selected.
 
-That emit changes parent wizardState.shift_plan_id. In new-plan.vue, the watcher on wizardState values calls syncWizardRouteState(). The routeSyncSuspended guard is only active during goToNextStep(), not during row selection. Therefore row selection triggers router.replace while current_step is still shift-plan. That causes the step to reload/re-hydrate, which is visible as a page refresh.
+Required test 6 — auto-select exactly one existing plan without route mutation:
+1. Mount shift-plan with no shift_plan_id.
+2. listShiftPlans returns exactly one existing plan.
+3. No contentful draft exists.
+4. Assert:
+   - the plan is selected locally
+   - route does not immediately get shift_plan_id
+   - Next commits it and advances.
 
-There is also a second likely bug:
-loadShiftPlanState() restores persistedShiftPlanDraft even when wizardState.shift_plan_id exists if persistedShiftPlanDraft.selected_shift_plan_id is empty. This can apply a stale/generic draft over a saved selected Shift Plan and show the misleading “Unsaved draft restored” message.
+Required test 7 — multiple plans are not auto-selected:
+1. listShiftPlans returns two plans.
+2. Assert neither is selected automatically.
+3. Click one row.
+4. Assert that row is selected locally and route remains unchanged until Next.
 
-Validate or falsify this diagnosis. Do not just say “already fixed”.
+Required test 8 — clicking create new does not wipe planning context:
+1. Start with an existing selected shift plan.
+2. Click create-new-shift-plan.
+3. Assert:
+   - selectedShiftPlan is cleared locally
+   - draft resets to default from selectedPlanningRecord
+   - planning_record_id remains intact
+   - no unrelated order/planning context is cleared
+   - route update, if any, does not cause step fallback.
 
-Inspect at least:
-- web/apps/web-antd/src/views/sicherplan/customers/new-plan-step-content.vue
-- web/apps/web-antd/src/views/sicherplan/customers/new-plan.vue
-- web/apps/web-antd/src/views/sicherplan/customers/use-customer-new-plan-wizard.ts
-- web/apps/web-antd/src/views/sicherplan/customers/new-plan-wizard-drafts.ts
-- web/apps/web-antd/src/sicherplan-legacy/api/planningShifts.ts
-- existing tests under web/apps/web-antd/src/views/sicherplan/customers/
+Run:
+- pnpm --dir web/apps/web-antd exec vitest run src/views/sicherplan/customers/new-plan.test.ts src/views/sicherplan/customers/new-plan-wizard.test.ts src/views/sicherplan/customers/new-plan-epic3.smoke.test.ts src/views/sicherplan/customers/new-plan-epic4.smoke.test.ts
+- pnpm --dir web/apps/web-antd exec vue-tsc --noEmit --skipLibCheck --pretty false
 
-Required validation:
-1. Confirm whether clicking an existing Shift Plan row calls selectShiftPlanRow().
-2. Confirm whether selectShiftPlanRow() emits saved-context immediately.
-3. Confirm whether that emit changes wizardState.shift_plan_id.
-4. Confirm whether the parent watcher calls syncWizardRouteState() because of that state change.
-5. Confirm whether routeSyncSuspended is false during row click.
-6. Confirm whether router.replace occurs with step=shift-plan and shift_plan_id.
-7. Confirm whether the child step reloads because props.wizardState.shift_plan_id changes.
-8. Confirm whether loadShiftPlanState() can restore a persisted shift-plan draft with empty selected_shift_plan_id over a saved plan.
-9. Confirm why “Unsaved draft restored” appears even though the user clicked a saved Shift Plan row.
-10. Confirm whether backend save/list/get APIs are working and whether this is frontend lifecycle/draft behavior.
-
-Expected diagnosis output:
-- Root cause confirmed or corrected.
-- Exact functions causing the refresh.
-- Exact functions causing selection loss or stale draft restore.
-- Minimal patch plan.
+Final output must include:
+- confirmed/corrected root cause
+- files changed
+- tests added
+- commands run
+- proof that row selection no longer triggers route refresh
+- proof that Next still advances to series-exceptions
+- proof that blank/stale drafts do not override saved Shift Plans.

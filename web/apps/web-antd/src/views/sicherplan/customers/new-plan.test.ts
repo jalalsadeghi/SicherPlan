@@ -58,6 +58,14 @@ vi.mock('./new-plan-step-content.vue', () => ({
       wizardState: { type: Object, required: true },
     },
     emits: ['saved-context', 'step-completion', 'step-ui-state'],
+    data() {
+      return {
+        selectedShiftPlanId: '',
+        shiftPlanName: '',
+        shiftPlanFrom: '',
+        shiftPlanTo: '',
+      };
+    },
     methods: {
       async submitCurrentStep() {
         if (this.currentStepId === 'order-details') {
@@ -78,12 +86,22 @@ vi.mock('./new-plan-step-content.vue', () => ({
           return true;
         }
         if (this.currentStepId === 'shift-plan') {
-          this.$emit('saved-context', { shift_plan_id: 'shift-plan-1' });
+          if (!this.selectedShiftPlanId) {
+            return false;
+          }
+          this.$emit('saved-context', { shift_plan_id: this.selectedShiftPlanId });
           this.$emit('step-completion', 'shift-plan', true);
           this.$emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
           return true;
         }
         return true;
+      },
+      selectExistingShiftPlan() {
+        this.selectedShiftPlanId = 'shift-plan-1';
+        this.shiftPlanName = 'Objektschutz RheinForum Koln - Nordtor Juli 2026 / Shift plan';
+        this.shiftPlanFrom = '2026-07-01';
+        this.shiftPlanTo = '2026-07-31';
+        this.$emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
       },
     },
     template: `
@@ -96,6 +114,24 @@ vi.mock('./new-plan-step-content.vue', () => ({
           >
             dirty
           </button>
+        </div>
+        <div data-testid="customer-new-plan-step-panel-shift-plan" v-else-if="currentStepId === 'shift-plan'">
+          <button
+            data-testid="customer-new-plan-existing-shift-plan-row"
+            type="button"
+            @click="selectExistingShiftPlan"
+          >
+            select shift plan
+          </button>
+          <div
+            v-if="selectedShiftPlanId"
+            data-testid="customer-new-plan-selected-shift-plan-summary"
+          >
+            {{ shiftPlanName }} {{ shiftPlanFrom }} {{ shiftPlanTo }}
+          </div>
+          <input data-testid="customer-new-plan-shift-plan-name" :value="shiftPlanName" />
+          <input data-testid="customer-new-plan-shift-plan-from" :value="shiftPlanFrom" />
+          <input data-testid="customer-new-plan-shift-plan-to" :value="shiftPlanTo" />
         </div>
       </div>
     `,
@@ -371,6 +407,9 @@ describe('CustomerNewPlanWizardView', () => {
     const wrapper = mountComponent();
     await flushPromises();
 
+    await wrapper.get('[data-testid="customer-new-plan-existing-shift-plan-row"]').trigger('click');
+    await flushPromises();
+
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await flushPromises();
     await flushPromises();
@@ -384,6 +423,53 @@ describe('CustomerNewPlanWizardView', () => {
           payload?.query?.shift_plan_id === 'shift-plan-1',
       ),
     ).toBe(false);
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/new-plan',
+      query: {
+        customer_id: 'customer-1',
+        order_id: 'order-1',
+        planning_entity_id: 'site-1',
+        planning_entity_type: 'site',
+        planning_mode_code: 'site',
+        planning_record_id: 'record-1',
+        shift_plan_id: 'shift-plan-1',
+        step: 'series-exceptions',
+      },
+    });
+  });
+
+  it('keeps shift-plan row selection local without immediate route mutation, then commits on Next', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+      step: 'shift-plan',
+    };
+    routerReplaceMock.mockImplementation(async ({ query }: { query: Record<string, unknown> }) => {
+      routeState.query = { ...query };
+    });
+    const wrapper = mountComponent();
+    await flushPromises();
+    routerReplaceMock.mockClear();
+
+    await wrapper.get('[data-testid="customer-new-plan-existing-shift-plan-row"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('shift-plan');
+    expect(wrapper.get('[data-testid="customer-new-plan-selected-shift-plan-summary"]').text()).toContain('Shift plan');
+    expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').element as HTMLInputElement).value).toContain('RheinForum');
+    expect(routeState.query.shift_plan_id).toBeUndefined();
+    expect(routerReplaceMock).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="customer-new-plan-draft-restored"]').exists()).toBe(false);
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await flushPromises();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('series-exceptions');
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
       path: '/admin/customers/new-plan',
       query: {

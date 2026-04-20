@@ -1042,6 +1042,24 @@ function buildSelectedShiftPlanBaseline(plan: ShiftPlanRead) {
   };
 }
 
+function hasContentfulShiftPlanDraftPersistence(
+  payload: ShiftPlanDraftPersistence | null,
+  baseline: Partial<typeof shiftPlanDraft>,
+) {
+  if (!payload) {
+    return false;
+  }
+  const draft = payload.draft;
+  return Boolean(
+    (draft.name ?? '') !== (baseline.name ?? '') ||
+      (draft.planning_from ?? '') !== (baseline.planning_from ?? '') ||
+      (draft.planning_record_id ?? '') !== (baseline.planning_record_id ?? '') ||
+      (draft.planning_to ?? '') !== (baseline.planning_to ?? '') ||
+      (draft.remarks ?? '') !== (baseline.remarks ?? '') ||
+      (draft.workforce_scope_code ?? 'internal') !== (baseline.workforce_scope_code ?? 'internal'),
+  );
+}
+
 function hasShiftPlanDraftContent() {
   if (selectedShiftPlan.value) {
     const baseline = buildSelectedShiftPlanBaseline(selectedShiftPlan.value);
@@ -2099,10 +2117,18 @@ async function selectShiftPlanRow(planId: string) {
   }
   const plan = await getShiftPlan(props.tenantId, planId, props.accessToken);
   syncShiftPlanDraft(plan);
-  clearStepDraft('shift-plan');
+  const persistedShiftPlanDraft = normalizeShiftPlanDraftPersistence(
+    loadStepDraft<ShiftPlanDraftPersistence | Partial<typeof shiftPlanDraft>>('shift-plan'),
+  );
+  if (
+    persistedShiftPlanDraft &&
+    (!persistedShiftPlanDraft.selected_shift_plan_id || persistedShiftPlanDraft.selected_shift_plan_id !== plan.id)
+  ) {
+    clearStepDraft('shift-plan');
+  }
   clearDraftRestoreMessage();
-  emit('step-completion', 'shift-plan', true);
   emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
+  setFeedback('neutral', '');
 }
 
 function startNewShiftPlan() {
@@ -2112,7 +2138,9 @@ function startNewShiftPlan() {
   withDraftSyncPaused(() => {
     resetShiftPlanDraft();
   });
-  emit('saved-context', { shift_plan_id: '' });
+  if (props.wizardState.shift_plan_id) {
+    emit('saved-context', { shift_plan_id: '' });
+  }
   emit('step-completion', 'shift-plan', false);
   emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
 }
@@ -2816,9 +2844,16 @@ async function loadShiftPlanState(isCurrent = () => true) {
       return;
     }
     selectedShiftPlan.value = null;
-    if (persistedShiftPlanDraft) {
+    const defaultDraft = buildShiftPlanDefaultDraft();
+    const hasContentfulPersistedShiftPlanDraft = hasContentfulShiftPlanDraftPersistence(
+      persistedShiftPlanDraft,
+      defaultDraft,
+    );
+    if (persistedShiftPlanDraft && hasContentfulPersistedShiftPlanDraft) {
       applyShiftPlanDraftPersistence(persistedShiftPlanDraft.draft);
       restoreDraftMessage();
+    } else if (persistedShiftPlanDraft && !hasContentfulPersistedShiftPlanDraft) {
+      clearStepDraft('shift-plan');
     } else if (shiftPlanRows.value.length === 1 && !hasShiftPlanDraftContent()) {
       const matchingRow = shiftPlanRows.value[0];
       if (!matchingRow) {
@@ -2837,12 +2872,20 @@ async function loadShiftPlanState(isCurrent = () => true) {
     return;
   }
   syncShiftPlanDraft(plan);
+  const selectedPlanBaseline = buildSelectedShiftPlanBaseline(plan);
   if (
     persistedShiftPlanDraft &&
-    persistedShiftPlanDraft.selected_shift_plan_id === props.wizardState.shift_plan_id
+    persistedShiftPlanDraft.selected_shift_plan_id === props.wizardState.shift_plan_id &&
+    hasContentfulShiftPlanDraftPersistence(persistedShiftPlanDraft, selectedPlanBaseline)
   ) {
     applyShiftPlanDraftPersistence(persistedShiftPlanDraft.draft);
     restoreDraftMessage();
+  } else if (
+    persistedShiftPlanDraft &&
+    persistedShiftPlanDraft.selected_shift_plan_id === props.wizardState.shift_plan_id &&
+    !hasContentfulShiftPlanDraftPersistence(persistedShiftPlanDraft, selectedPlanBaseline)
+  ) {
+    clearStepDraft('shift-plan');
   }
 }
 
