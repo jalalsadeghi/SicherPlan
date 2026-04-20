@@ -245,7 +245,7 @@ function isStaleShiftPlanRollbackRoute(routeState: ReturnType<typeof readWizardR
   );
 }
 
-function syncWizardFromRoute(options?: { allowClearingContext?: boolean; source?: 'external' | 'internal-final' | 'repair' }) {
+function syncWizardFromRoute() {
   const routeState = readWizardRouteState();
   const contextPatch: Record<string, string> = {
     customer_id: routeState.customer_id,
@@ -539,7 +539,7 @@ onMounted(async () => {
   await authStore.ensureSessionReady();
   bootstrapped.value = true;
   resetForCustomer(customerId.value);
-  syncWizardFromRoute({ source: 'external' });
+  syncWizardFromRoute();
   await resolveCustomerContext();
   await syncWizardRouteState({ source: 'external' });
 });
@@ -552,7 +552,7 @@ watch(
     }
     if (nextCustomerId !== previousCustomerId) {
       resetForCustomer(nextCustomerId);
-      syncWizardFromRoute({ source: 'external' });
+      syncWizardFromRoute();
       await syncWizardRouteState({ source: 'external' });
       await resolveCustomerContext();
       return;
@@ -609,10 +609,7 @@ watch(
     ) {
       return;
     }
-    syncWizardFromRoute({
-      allowClearingContext: !isSameUpstreamScope(routeState),
-      source: 'external',
-    });
+    syncWizardFromRoute();
     await syncWizardRouteState({ source: 'external' });
   },
 );

@@ -75,11 +75,13 @@ import {
   generateShiftSeries,
   getShiftPlan,
   getShiftSeries,
+  getShiftTemplate,
   listShiftPlans,
   listShiftSeries,
   listShiftSeriesExceptions,
   listShiftTemplates,
   listShiftTypeOptions,
+  PlanningShiftsApiError,
   updateShiftPlan,
   updateShiftSeries,
   updateShiftSeriesException,
@@ -88,6 +90,7 @@ import {
   type ShiftSeriesExceptionRead,
   type ShiftSeriesRead,
   type ShiftTemplateListItem,
+  type ShiftTemplateRead,
   type ShiftTypeOption,
 } from '#/sicherplan-legacy/api/planningShifts';
 import type {
@@ -271,6 +274,12 @@ const exceptionDraft = reactive({
   subcontractor_visible_flag: null as boolean | null,
 });
 
+const seriesGenerationDraft = reactive({
+  from_date: '',
+  regenerate_existing: false,
+  to_date: '',
+});
+
 const planningCreateModal = reactive({
   address_id: '',
   end_date: '',
@@ -382,6 +391,14 @@ const planningLocationPickerStartPoint = ref({
 const tradeFairZoneOptions = ref<TradeFairZoneRead[]>([]);
 const tradeFairZoneLookupLoading = ref(false);
 const tradeFairZoneLookupError = ref('');
+const shiftTemplateDetailCache = reactive<Record<string, ShiftTemplateRead>>({});
+const seriesTemplateFieldTouched = reactive({
+  default_break_minutes: false,
+  location_text: false,
+  meeting_point: false,
+  shift_type_code: false,
+});
+const seriesTemplateDefaultsApplying = ref(false);
 
 const stepFeedback = reactive({
   message: '',
@@ -434,6 +451,7 @@ type PlanningRecordOverviewDraftPersistence = {
 
 type SeriesExceptionsDraftPersistence = {
   exception: typeof exceptionDraft;
+  generation?: typeof seriesGenerationDraft;
   series: typeof seriesDraft;
 };
 
@@ -547,7 +565,7 @@ const shiftPlanSelectOptions = computed(() =>
 
 const shiftTemplateSelectOptions = computed(() =>
   shiftTemplateOptions.value.map((row) => ({
-    label: row.label || row.code,
+    label: [row.code, row.label].filter(Boolean).join(' — ') || row.id,
     value: row.id,
   })),
 );
@@ -596,6 +614,15 @@ const timezoneOptions = computed(() =>
     value: timezone,
   })),
 );
+const seriesWeekdayOptions = computed(() => [
+  { id: 'mon', index: 0, label: $t('sicherplan.customerPlansWizard.forms.weekdayMon') },
+  { id: 'tue', index: 1, label: $t('sicherplan.customerPlansWizard.forms.weekdayTue') },
+  { id: 'wed', index: 2, label: $t('sicherplan.customerPlansWizard.forms.weekdayWed') },
+  { id: 'thu', index: 3, label: $t('sicherplan.customerPlansWizard.forms.weekdayThu') },
+  { id: 'fri', index: 4, label: $t('sicherplan.customerPlansWizard.forms.weekdayFri') },
+  { id: 'sat', index: 5, label: $t('sicherplan.customerPlansWizard.forms.weekdaySat') },
+  { id: 'sun', index: 6, label: $t('sicherplan.customerPlansWizard.forms.weekdaySun') },
+]);
 
 const orderStepActive = computed(() => props.currentStepId === 'order-details');
 const equipmentStepActive = computed(() => props.currentStepId === 'equipment-lines');
@@ -646,6 +673,29 @@ const selectedExistingOrderSummary = computed(
 const selectedShiftPlanSummary = computed(
   () => selectedShiftPlan.value ?? shiftPlanRows.value.find((row) => row.id === props.wizardState.shift_plan_id) ?? null,
 );
+const seriesWeekdayMaskRequired = computed(() => seriesDraft.recurrence_code === 'weekly');
+const exceptionOverrideActive = computed(() => exceptionDraft.action_code === 'override');
+const selectedShiftTemplate = computed(
+  () => shiftTemplateOptions.value.find((row) => row.id === seriesDraft.shift_template_id) ?? null,
+);
+const exceptionCustomerVisibleModel = computed({
+  get: () => nullableBooleanToSelectValue(exceptionDraft.customer_visible_flag),
+  set: (value: string) => {
+    exceptionDraft.customer_visible_flag = selectValueToNullableBoolean(value);
+  },
+});
+const exceptionSubcontractorVisibleModel = computed({
+  get: () => nullableBooleanToSelectValue(exceptionDraft.subcontractor_visible_flag),
+  set: (value: string) => {
+    exceptionDraft.subcontractor_visible_flag = selectValueToNullableBoolean(value);
+  },
+});
+const exceptionStealthModeModel = computed({
+  get: () => nullableBooleanToSelectValue(exceptionDraft.stealth_mode_flag),
+  set: (value: string) => {
+    exceptionDraft.stealth_mode_flag = selectValueToNullableBoolean(value);
+  },
+});
 const existingOrderEditActive = computed(
   () => orderModeUsesExisting.value && Boolean(existingOrderEditFormOpen.value && editingExistingOrderId.value),
 );
@@ -691,6 +741,35 @@ function setFeedback(tone: 'error' | 'neutral' | 'success', message = '') {
   stepFeedback.message = message;
 }
 
+function resetSeriesTemplateTouchedState() {
+  Object.assign(seriesTemplateFieldTouched, {
+    default_break_minutes: false,
+    location_text: false,
+    meeting_point: false,
+    shift_type_code: false,
+  });
+}
+
+function nullableBooleanToSelectValue(value: boolean | null) {
+  if (value === true) {
+    return 'true';
+  }
+  if (value === false) {
+    return 'false';
+  }
+  return '';
+}
+
+function selectValueToNullableBoolean(value: string) {
+  if (value === 'true') {
+    return true;
+  }
+  if (value === 'false') {
+    return false;
+  }
+  return null;
+}
+
 function isOrderDetailsDraftPersistence(value: unknown): value is OrderDetailsDraftPersistence {
   return Boolean(value && typeof value === 'object' && 'form' in (value as Record<string, unknown>));
 }
@@ -698,6 +777,31 @@ function isOrderDetailsDraftPersistence(value: unknown): value is OrderDetailsDr
 function normalizeUuid(value: string | null | undefined) {
   const normalized = typeof value === 'string' ? value.trim() : '';
   return normalized || null;
+}
+
+function normalizeSeriesWeekdayMask(value: null | string | undefined) {
+  const candidate = (value ?? '').trim();
+  return /^[01]{7}$/.test(candidate) ? candidate : '1111100';
+}
+
+function isSeriesWeekdaySelected(index: number) {
+  return normalizeSeriesWeekdayMask(seriesDraft.weekday_mask)[index] === '1';
+}
+
+function toggleSeriesWeekday(index: number) {
+  if (!seriesWeekdayMaskRequired.value) {
+    return;
+  }
+  const mask = normalizeSeriesWeekdayMask(seriesDraft.weekday_mask).split('');
+  mask[index] = mask[index] === '1' ? '0' : '1';
+  seriesDraft.weekday_mask = mask.join('');
+}
+
+function ensureSeriesWeeklyMask() {
+  if (!seriesWeekdayMaskRequired.value) {
+    return;
+  }
+  seriesDraft.weekday_mask = normalizeSeriesWeekdayMask(seriesDraft.weekday_mask);
 }
 
 function withDraftSyncPaused(callback: () => void) {
@@ -1054,6 +1158,16 @@ function buildSeriesDefaultDraft() {
   };
 }
 
+function buildSeriesGenerationDefaultDraft(
+  source: Pick<typeof seriesDraft, 'date_from' | 'date_to'> = seriesDraft,
+) {
+  return {
+    from_date: source.date_from || selectedShiftPlan.value?.planning_from || '',
+    regenerate_existing: false,
+    to_date: source.date_to || selectedShiftPlan.value?.planning_to || '',
+  };
+}
+
 function formatWorkforceScopeLabel(workforceScopeCode: string | null | undefined) {
   switch (workforceScopeCode) {
     case 'subcontractor':
@@ -1129,6 +1243,7 @@ function hasShiftPlanDraftContent() {
 }
 
 function hasSeriesDraftContent() {
+  const generationDefaults = buildSeriesGenerationDefaultDraft();
   return Boolean(
     seriesDraft.label ||
       seriesDraft.shift_template_id ||
@@ -1158,7 +1273,10 @@ function hasSeriesDraftContent() {
       exceptionDraft.notes ||
       exceptionDraft.customer_visible_flag !== null ||
       exceptionDraft.subcontractor_visible_flag !== null ||
-      exceptionDraft.stealth_mode_flag !== null,
+      exceptionDraft.stealth_mode_flag !== null ||
+      (seriesGenerationDraft.from_date && seriesGenerationDraft.from_date !== generationDefaults.from_date) ||
+      (seriesGenerationDraft.to_date && seriesGenerationDraft.to_date !== generationDefaults.to_date) ||
+      seriesGenerationDraft.regenerate_existing,
   );
 }
 
@@ -1385,6 +1503,7 @@ function applyShiftPlanDraftPersistence(payload: Partial<typeof shiftPlanDraft>)
 function applySeriesDraftPersistence(payload: Partial<SeriesExceptionsDraftPersistence>) {
   withDraftSyncPaused(() => {
     Object.assign(seriesDraft, payload.series || {});
+    Object.assign(seriesGenerationDraft, payload.generation || {});
     selectedExceptionId.value = '';
     Object.assign(exceptionDraft, payload.exception || {});
   });
@@ -1480,6 +1599,7 @@ function persistSeriesDraft() {
     hasSeriesDraftContent()
       ? {
           exception: { ...exceptionDraft },
+          generation: { ...seriesGenerationDraft },
           series: { ...seriesDraft },
         }
       : null,
@@ -1767,6 +1887,11 @@ function resetShiftPlanDraft() {
 
 function resetSeriesDraft() {
   Object.assign(seriesDraft, buildSeriesDefaultDraft());
+  resetSeriesTemplateTouchedState();
+}
+
+function resetSeriesGenerationDraft(source: Pick<typeof seriesDraft, 'date_from' | 'date_to'> = seriesDraft) {
+  Object.assign(seriesGenerationDraft, buildSeriesGenerationDefaultDraft(source));
 }
 
 function resetExceptionDraft() {
@@ -1883,7 +2008,12 @@ function syncSeriesDraft(series: ShiftSeriesRead) {
       timezone: series.timezone,
       weekday_mask: series.weekday_mask ?? '1111100',
     });
+    Object.assign(seriesGenerationDraft, buildSeriesGenerationDefaultDraft({
+      date_from: series.date_from,
+      date_to: series.date_to,
+    }));
   });
+  resetSeriesTemplateTouchedState();
 }
 
 function syncExceptionDraft(row: ShiftSeriesExceptionRead) {
@@ -1904,6 +2034,103 @@ function syncExceptionDraft(row: ShiftSeriesExceptionRead) {
       subcontractor_visible_flag: row.subcontractor_visible_flag ?? null,
     });
   });
+}
+
+async function resolveShiftTemplate(templateId: string) {
+  if (!props.tenantId || !props.accessToken || !templateId) {
+    return null;
+  }
+  const cached = shiftTemplateDetailCache[templateId];
+  if (cached) {
+    return cached;
+  }
+  const detail = await getShiftTemplate(props.tenantId, templateId, props.accessToken);
+  shiftTemplateDetailCache[templateId] = detail;
+  return detail;
+}
+
+function applyTemplateDefaultsToSeriesDraft(
+  template: Pick<ShiftTemplateRead, 'default_break_minutes' | 'location_text' | 'meeting_point' | 'shift_type_code'>,
+  options: { onlyIfEmpty?: boolean } = {},
+) {
+  const onlyIfEmpty = options.onlyIfEmpty ?? false;
+  if (!seriesTemplateFieldTouched.default_break_minutes && template.default_break_minutes != null) {
+    if (!onlyIfEmpty || seriesDraft.default_break_minutes === 0 || seriesDraft.default_break_minutes === 30) {
+      seriesDraft.default_break_minutes = template.default_break_minutes;
+    }
+  }
+  if (!seriesTemplateFieldTouched.shift_type_code && template.shift_type_code) {
+    if (!onlyIfEmpty || !seriesDraft.shift_type_code) {
+      seriesDraft.shift_type_code = template.shift_type_code;
+    }
+  }
+  if (!seriesTemplateFieldTouched.meeting_point && template.meeting_point) {
+    if (!onlyIfEmpty || !seriesDraft.meeting_point) {
+      seriesDraft.meeting_point = template.meeting_point;
+    }
+  }
+  if (!seriesTemplateFieldTouched.location_text && template.location_text) {
+    if (!onlyIfEmpty || !seriesDraft.location_text) {
+      seriesDraft.location_text = template.location_text;
+    }
+  }
+}
+
+async function applySelectedShiftTemplateDefaults(templateId: string) {
+  if (!templateId) {
+    return;
+  }
+  const listItem = shiftTemplateOptions.value.find((row) => row.id === templateId) ?? null;
+  const detail = await resolveShiftTemplate(templateId);
+  if (seriesDraft.shift_template_id !== templateId) {
+    return;
+  }
+  seriesTemplateDefaultsApplying.value = true;
+  try {
+    withDraftSyncPaused(() => {
+      if (detail) {
+        applyTemplateDefaultsToSeriesDraft(detail, { onlyIfEmpty: true });
+      } else if (listItem) {
+        applyTemplateDefaultsToSeriesDraft(
+          {
+            default_break_minutes: listItem.default_break_minutes,
+            shift_type_code: listItem.shift_type_code,
+            meeting_point: null,
+            location_text: null,
+          },
+          { onlyIfEmpty: true },
+        );
+      }
+    });
+  } finally {
+    seriesTemplateDefaultsApplying.value = false;
+  }
+}
+
+function resolveSeriesErrorMessage(error: unknown) {
+  if (!(error instanceof PlanningShiftsApiError)) {
+    return 'sicherplan.customerPlansWizard.errors.seriesGenerateFailed';
+  }
+  switch (error.messageKey) {
+    case 'errors.planning.shift_series.invalid_weekday_mask':
+      return 'sicherplan.customerPlansWizard.errors.seriesWeekdayMaskInvalid';
+    case 'errors.planning.shift_series.invalid_generation_window':
+      return 'sicherplan.customerPlansWizard.errors.seriesGenerationWindowInvalid';
+    case 'errors.planning.shift_series.plan_window_mismatch':
+      return 'sicherplan.customerPlansWizard.errors.seriesShiftPlanWindowMismatch';
+    case 'errors.planning.shift_series_exception.duplicate_date':
+      return 'sicherplan.customerPlansWizard.errors.seriesExceptionDuplicateDate';
+    case 'errors.planning.shift_series.invalid_shift_type_code':
+      return 'sicherplan.customerPlansWizard.errors.seriesInvalidShiftTypeCode';
+    case 'errors.planning.shift_series.invalid_timezone':
+      return 'sicherplan.customerPlansWizard.errors.seriesInvalidTimezone';
+    case 'errors.planning.shift_series_exception.override_times_required':
+      return 'sicherplan.customerPlansWizard.errors.seriesExceptionOverrideTimesRequired';
+    case 'errors.planning.shift_series_exception.outside_window':
+      return 'sicherplan.customerPlansWizard.errors.seriesExceptionOutsideWindow';
+    default:
+      return 'sicherplan.customerPlansWizard.errors.seriesGenerateFailed';
+  }
 }
 
 function syncEquipmentLineDraft(line: OrderEquipmentLineRead) {
@@ -2172,18 +2399,6 @@ async function selectSeriesRow(seriesId: string) {
   ]);
   syncSeriesDraft(series);
   seriesExceptions.value = exceptions;
-}
-
-function setExceptionCustomerVisible(event: Event) {
-  exceptionDraft.customer_visible_flag = (event.target as HTMLInputElement)?.checked ?? false;
-}
-
-function setExceptionSubcontractorVisible(event: Event) {
-  exceptionDraft.subcontractor_visible_flag = (event.target as HTMLInputElement)?.checked ?? false;
-}
-
-function setExceptionStealthMode(event: Event) {
-  exceptionDraft.stealth_mode_flag = (event.target as HTMLInputElement)?.checked ?? false;
 }
 
 async function loadPlanningEntityOptions() {
@@ -2970,6 +3185,7 @@ async function loadSeriesState(isCurrent = () => true) {
     } else if (!hasSeriesDraftContent()) {
       withDraftSyncPaused(() => {
         resetSeriesDraft();
+        resetSeriesGenerationDraft();
         resetExceptionDraft();
       });
     }
@@ -2992,6 +3208,7 @@ async function loadSeriesState(isCurrent = () => true) {
     } else if (!hasSeriesDraftContent()) {
       withDraftSyncPaused(() => {
         resetSeriesDraft();
+        resetSeriesGenerationDraft();
         resetExceptionDraft();
       });
     }
@@ -3914,8 +4131,10 @@ function buildStaffingHandoffRoute(generatedShifts: Array<{ ends_at: string; id:
   const query = new URLSearchParams({
     date_from: canonicalWindow.date_from,
     date_to: canonicalWindow.date_to,
-    planning_record_id: props.wizardState.planning_record_id,
   });
+  if (props.wizardState.planning_record_id) {
+    query.set('planning_record_id', props.wizardState.planning_record_id);
+  }
   if (firstShift?.id) {
     query.set('shift_id', firstShift.id);
   }
@@ -3923,11 +4142,15 @@ function buildStaffingHandoffRoute(generatedShifts: Array<{ ends_at: string; id:
 }
 
 async function submitSeriesStep() {
-  if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id || !props.wizardState.planning_record_id) {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
     return false;
   }
   if (!seriesDraft.label.trim() || !seriesDraft.shift_template_id || !seriesDraft.date_from || !seriesDraft.date_to || seriesDraft.date_to < seriesDraft.date_from) {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.seriesInvalid'));
+    return false;
+  }
+  if (seriesWeekdayMaskRequired.value && (!/^[01]{7}$/.test(seriesDraft.weekday_mask) || !seriesDraft.weekday_mask.includes('1'))) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.seriesWeekdayMaskInvalid'));
     return false;
   }
   if (
@@ -3936,6 +4159,13 @@ async function submitSeriesStep() {
       seriesDraft.date_to > selectedShiftPlanSummary.value.planning_to)
   ) {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.seriesShiftPlanWindowMismatch'));
+    return false;
+  }
+  if (
+    exceptionOverrideActive.value &&
+    (!exceptionDraft.override_local_start_time.trim() || !exceptionDraft.override_local_end_time.trim())
+  ) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.seriesExceptionOverrideTimesRequired'));
     return false;
   }
   stepLoading.value = true;
@@ -3948,7 +4178,7 @@ async function submitSeriesStep() {
       label: seriesDraft.label.trim(),
       recurrence_code: seriesDraft.recurrence_code,
       interval_count: seriesDraft.interval_count,
-      weekday_mask: seriesDraft.weekday_mask,
+      weekday_mask: seriesWeekdayMaskRequired.value ? seriesDraft.weekday_mask : null,
       timezone: seriesDraft.timezone,
       date_from: seriesDraft.date_from,
       date_to: seriesDraft.date_to,
@@ -3993,15 +4223,32 @@ async function submitSeriesStep() {
     }
 
     seriesExceptions.value = await listShiftSeriesExceptions(props.tenantId, savedSeries.id, props.accessToken);
+    const generationFrom = seriesGenerationDraft.from_date || savedSeries.date_from;
+    const generationTo = seriesGenerationDraft.to_date || savedSeries.date_to;
+    if (
+      !generationFrom ||
+      !generationTo ||
+      generationTo < generationFrom ||
+      generationFrom < savedSeries.date_from ||
+      generationTo > savedSeries.date_to
+    ) {
+      setFeedback('error', $t('sicherplan.customerPlansWizard.errors.seriesGenerationWindowInvalid'));
+      emit('step-ui-state', 'series-exceptions', { error: 'generation_window_invalid' });
+      return false;
+    }
     clearStepDraft('series-exceptions');
     clearDraftRestoreMessage();
-    const generatedShifts = await generateShiftSeries(props.tenantId, savedSeries.id, props.accessToken, {});
+    const generatedShifts = await generateShiftSeries(props.tenantId, savedSeries.id, props.accessToken, {
+      from_date: generationFrom,
+      regenerate_existing: seriesGenerationDraft.regenerate_existing,
+      to_date: generationTo,
+    });
     emit('step-completion', 'series-exceptions', true);
     emit('step-ui-state', 'series-exceptions', { dirty: false, error: '' });
     await router.push(buildStaffingHandoffRoute(generatedShifts));
     return true;
-  } catch {
-    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.seriesGenerateFailed'));
+  } catch (error) {
+    setFeedback('error', $t(resolveSeriesErrorMessage(error)));
     emit('step-ui-state', 'series-exceptions', { error: 'save_failed' });
     return false;
   } finally {
@@ -4236,6 +4483,9 @@ watch(
     seriesDraft.subcontractor_visible_flag,
     seriesDraft.stealth_mode_flag,
     seriesDraft.release_state,
+    seriesGenerationDraft.from_date,
+    seriesGenerationDraft.to_date,
+    seriesGenerationDraft.regenerate_existing,
     exceptionDraft.exception_date,
     exceptionDraft.action_code,
     exceptionDraft.override_local_start_time,
@@ -4255,6 +4505,76 @@ watch(
     persistSeriesDraft();
   },
   { flush: 'sync' },
+);
+
+watch(
+  () => seriesDraft.recurrence_code,
+  () => {
+    if (draftSyncPaused.value) {
+      return;
+    }
+    if (seriesDraft.recurrence_code === 'daily' && seriesDraft.weekday_mask) {
+      seriesDraft.weekday_mask = '';
+    } else if (seriesDraft.recurrence_code === 'weekly') {
+      ensureSeriesWeeklyMask();
+    }
+  },
+);
+
+watch(
+  () => seriesDraft.shift_template_id,
+  async (templateId, previousTemplateId) => {
+    if (draftSyncPaused.value || !templateId || templateId === previousTemplateId) {
+      return;
+    }
+    await applySelectedShiftTemplateDefaults(templateId);
+  },
+);
+
+watch(
+  () => [
+    seriesDraft.default_break_minutes,
+    seriesDraft.shift_type_code,
+    seriesDraft.meeting_point,
+    seriesDraft.location_text,
+  ] as const,
+  ([nextBreak, nextShiftType, nextMeetingPoint, nextLocationText], [previousBreak, previousShiftType, previousMeetingPoint, previousLocationText]) => {
+    if (draftSyncPaused.value || seriesTemplateDefaultsApplying.value) {
+      return;
+    }
+    if (nextBreak !== previousBreak) {
+      seriesTemplateFieldTouched.default_break_minutes = true;
+    }
+    if (nextShiftType !== previousShiftType) {
+      seriesTemplateFieldTouched.shift_type_code = true;
+    }
+    if (nextMeetingPoint !== previousMeetingPoint) {
+      seriesTemplateFieldTouched.meeting_point = true;
+    }
+    if (nextLocationText !== previousLocationText) {
+      seriesTemplateFieldTouched.location_text = true;
+    }
+  },
+);
+
+watch(
+  () => exceptionDraft.action_code,
+  () => {
+    if (draftSyncPaused.value || exceptionDraft.action_code === 'override') {
+      return;
+    }
+    withDraftSyncPaused(() => {
+      exceptionDraft.override_local_start_time = '';
+      exceptionDraft.override_local_end_time = '';
+      exceptionDraft.override_break_minutes = '';
+      exceptionDraft.override_shift_type_code = '';
+      exceptionDraft.override_meeting_point = '';
+      exceptionDraft.override_location_text = '';
+      exceptionDraft.customer_visible_flag = null;
+      exceptionDraft.subcontractor_visible_flag = null;
+      exceptionDraft.stealth_mode_flag = null;
+    });
+  },
 );
 
 watch(
@@ -5186,7 +5506,7 @@ onBeforeUnmount(() => {
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.recurrenceCode') }}</span>
-          <select v-model="seriesDraft.recurrence_code">
+          <select v-model="seriesDraft.recurrence_code" data-testid="customer-new-plan-series-recurrence-code">
             <option value="daily">{{ $t('sicherplan.customerPlansWizard.forms.recurrenceDaily') }}</option>
             <option value="weekly">{{ $t('sicherplan.customerPlansWizard.forms.recurrenceWeekly') }}</option>
           </select>
@@ -5195,9 +5515,42 @@ onBeforeUnmount(() => {
           <span>{{ $t('sicherplan.customerPlansWizard.forms.intervalCount') }}</span>
           <input v-model.number="seriesDraft.interval_count" min="1" type="number" />
         </label>
-        <label class="field-stack">
+        <label v-if="seriesWeekdayMaskRequired" class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.weekdayMask') }}</span>
-          <input v-model="seriesDraft.weekday_mask" />
+          <div
+            class="sp-customer-plan-wizard-step__weekday-picker"
+            data-testid="customer-new-plan-series-weekday-picker"
+          >
+            <div
+              v-for="option in seriesWeekdayOptions"
+              :key="option.id"
+              data-testid="customer-new-plan-series-weekday-chip"
+            >
+              <button
+                :aria-pressed="isSeriesWeekdaySelected(option.index) ? 'true' : 'false'"
+                :class="[
+                  'sp-customer-plan-wizard-step__weekday-chip',
+                  {
+                    'sp-customer-plan-wizard-step__weekday-chip--active': isSeriesWeekdaySelected(option.index),
+                  },
+                ]"
+                :data-testid="`customer-new-plan-series-weekday-chip-${option.id}`"
+                type="button"
+                @click="toggleSeriesWeekday(option.index)"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+          </div>
+          <span class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.weekdayMaskHelp') }}</span>
+        </label>
+        <label class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.timezone') }}</span>
+          <select v-model="seriesDraft.timezone" data-testid="customer-new-plan-series-timezone">
+            <option v-for="option in timezoneOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.startDate') }}</span>
@@ -5257,6 +5610,41 @@ onBeforeUnmount(() => {
         </label>
       </div>
       <div class="sp-customer-plan-wizard-step__divider"></div>
+      <div class="sp-customer-plan-wizard-step__section-intro">
+        <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.generationOptions') }}</strong></p>
+        <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.generationOptionsHelp') }}</p>
+      </div>
+      <div class="sp-customer-plan-wizard-step__grid">
+        <label class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.generateFromDate') }}</span>
+          <input
+            v-model="seriesGenerationDraft.from_date"
+            :max="seriesDraft.date_to || selectedShiftPlanSummary?.planning_to || undefined"
+            :min="seriesDraft.date_from || selectedShiftPlanSummary?.planning_from || undefined"
+            data-testid="customer-new-plan-series-generation-from"
+            type="date"
+          />
+        </label>
+        <label class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.generateToDate') }}</span>
+          <input
+            v-model="seriesGenerationDraft.to_date"
+            :max="seriesDraft.date_to || selectedShiftPlanSummary?.planning_to || undefined"
+            :min="seriesDraft.date_from || selectedShiftPlanSummary?.planning_from || undefined"
+            data-testid="customer-new-plan-series-generation-to"
+            type="date"
+          />
+        </label>
+        <label class="planning-admin-checkbox">
+          <input
+            v-model="seriesGenerationDraft.regenerate_existing"
+            data-testid="customer-new-plan-series-regenerate-existing"
+            type="checkbox"
+          />
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.regenerateExisting') }}</span>
+        </label>
+      </div>
+      <div class="sp-customer-plan-wizard-step__divider"></div>
       <div v-if="seriesExceptions.length" class="sp-customer-plan-wizard-step__list">
         <button
           v-for="row in seriesExceptions"
@@ -5276,64 +5664,66 @@ onBeforeUnmount(() => {
         </label>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.actionCode') }}</span>
-          <select v-model="exceptionDraft.action_code">
+          <select v-model="exceptionDraft.action_code" data-testid="customer-new-plan-series-exception-action-code">
             <option value="skip">{{ $t('sicherplan.customerPlansWizard.forms.exceptionActionSkip') }}</option>
             <option value="override">{{ $t('sicherplan.customerPlansWizard.forms.exceptionActionOverride') }}</option>
           </select>
         </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideStartTime') }}</span>
-          <input v-model="exceptionDraft.override_local_start_time" type="time" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideEndTime') }}</span>
-          <input v-model="exceptionDraft.override_local_end_time" type="time" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideBreakMinutes') }}</span>
-          <input v-model="exceptionDraft.override_break_minutes" min="0" type="number" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideShiftType') }}</span>
-          <select v-model="exceptionDraft.override_shift_type_code">
-            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.shiftTypePlaceholder') }}</option>
-            <option v-for="option in shiftTypeSelectOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideMeetingPoint') }}</span>
-          <input v-model="exceptionDraft.override_meeting_point" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideLocationText') }}</span>
-          <input v-model="exceptionDraft.override_location_text" />
-        </label>
-        <label class="planning-admin-checkbox">
-          <input
-            :checked="Boolean(exceptionDraft.customer_visible_flag)"
-            type="checkbox"
-            @change="setExceptionCustomerVisible"
-          />
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.customerVisible') }}</span>
-        </label>
-        <label class="planning-admin-checkbox">
-          <input
-            :checked="Boolean(exceptionDraft.subcontractor_visible_flag)"
-            type="checkbox"
-            @change="setExceptionSubcontractorVisible"
-          />
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.subcontractorVisible') }}</span>
-        </label>
-        <label class="planning-admin-checkbox">
-          <input
-            :checked="Boolean(exceptionDraft.stealth_mode_flag)"
-            type="checkbox"
-            @change="setExceptionStealthMode"
-          />
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.stealthMode') }}</span>
-        </label>
+        <template v-if="exceptionOverrideActive">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideStartTime') }}</span>
+            <input v-model="exceptionDraft.override_local_start_time" data-testid="customer-new-plan-series-exception-override-start" type="time" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideEndTime') }}</span>
+            <input v-model="exceptionDraft.override_local_end_time" data-testid="customer-new-plan-series-exception-override-end" type="time" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideBreakMinutes') }}</span>
+            <input v-model="exceptionDraft.override_break_minutes" min="0" type="number" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideShiftType') }}</span>
+            <select v-model="exceptionDraft.override_shift_type_code">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.shiftTypePlaceholder') }}</option>
+              <option v-for="option in shiftTypeSelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideMeetingPoint') }}</span>
+            <input v-model="exceptionDraft.override_meeting_point" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideLocationText') }}</span>
+            <input v-model="exceptionDraft.override_location_text" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.customerVisible') }}</span>
+            <select v-model="exceptionCustomerVisibleModel" data-testid="customer-new-plan-series-exception-customer-visible">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.inheritValue') }}</option>
+              <option value="true">{{ $t('sicherplan.customerPlansWizard.forms.yesValue') }}</option>
+              <option value="false">{{ $t('sicherplan.customerPlansWizard.forms.noValue') }}</option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.subcontractorVisible') }}</span>
+            <select v-model="exceptionSubcontractorVisibleModel" data-testid="customer-new-plan-series-exception-subcontractor-visible">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.inheritValue') }}</option>
+              <option value="true">{{ $t('sicherplan.customerPlansWizard.forms.yesValue') }}</option>
+              <option value="false">{{ $t('sicherplan.customerPlansWizard.forms.noValue') }}</option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.stealthMode') }}</span>
+            <select v-model="exceptionStealthModeModel" data-testid="customer-new-plan-series-exception-stealth-mode">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.inheritValue') }}</option>
+              <option value="true">{{ $t('sicherplan.customerPlansWizard.forms.yesValue') }}</option>
+              <option value="false">{{ $t('sicherplan.customerPlansWizard.forms.noValue') }}</option>
+            </select>
+          </label>
+        </template>
         <label class="field-stack field-stack--wide">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
           <textarea v-model="exceptionDraft.notes" rows="2" />
@@ -5782,6 +6172,43 @@ onBeforeUnmount(() => {
   color: var(--sp-color-text-secondary);
   font-size: 0.82rem;
   line-height: 1.45;
+}
+
+.sp-customer-plan-wizard-step__weekday-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.sp-customer-plan-wizard-step__weekday-chip {
+  min-width: 2.5rem;
+  padding: 0.45rem 0.72rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 999px;
+  background: var(--sp-color-surface-page);
+  color: var(--sp-color-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.sp-customer-plan-wizard-step__weekday-chip:hover,
+.sp-customer-plan-wizard-step__weekday-chip:focus-visible {
+  border-color: rgb(40 170 170 / 48%);
+  color: var(--sp-color-text-primary);
+  box-shadow: 0 0 0 3px rgb(40 170 170 / 10%);
+  outline: none;
+}
+
+.sp-customer-plan-wizard-step__weekday-chip--active {
+  border-color: rgb(40 170 170 / 65%);
+  background: rgb(40 170 170 / 14%);
+  color: rgb(18 112 112);
 }
 
 .sp-customer-plan-wizard-step__list {

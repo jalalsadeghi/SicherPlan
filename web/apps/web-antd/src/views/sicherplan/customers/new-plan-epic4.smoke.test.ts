@@ -12,6 +12,22 @@ import type { CustomerNewPlanWizardState, CustomerNewPlanWizardStepId } from './
 
 const routerPushMock = vi.fn();
 const routerReplaceMock = vi.fn();
+const planningShiftsApiErrorExports = vi.hoisted(() => {
+  class PlanningShiftsApiError extends Error {
+    status: number;
+    messageKey: string;
+    details: Record<string, unknown>;
+
+    constructor(status: number, payload: { message_key: string; details: Record<string, unknown> }) {
+      super(payload.message_key);
+      this.status = status;
+      this.messageKey = payload.message_key;
+      this.details = payload.details;
+    }
+  }
+
+  return { PlanningShiftsApiError };
+});
 
 const apiMocks = vi.hoisted(() => ({
   createPlanningSetupRecordMock: vi.fn(),
@@ -26,6 +42,7 @@ const apiMocks = vi.hoisted(() => ({
   getPlanningRecordMock: vi.fn(),
   getShiftPlanMock: vi.fn(),
   getShiftSeriesMock: vi.fn(),
+  getShiftTemplateMock: vi.fn(),
   linkPlanningRecordAttachmentMock: vi.fn(),
   listOrderAttachmentsMock: vi.fn(),
   listOrderEquipmentLinesMock: vi.fn(),
@@ -94,6 +111,7 @@ vi.mock('#/sicherplan-legacy/api/planningOrders', () => ({
 }));
 
 vi.mock('#/sicherplan-legacy/api/planningShifts', () => ({
+  PlanningShiftsApiError: planningShiftsApiErrorExports.PlanningShiftsApiError,
   createShiftPlan: apiMocks.createShiftPlanMock,
   createShiftSeries: apiMocks.createShiftSeriesMock,
   createShiftSeriesException: apiMocks.createShiftSeriesExceptionMock,
@@ -101,6 +119,7 @@ vi.mock('#/sicherplan-legacy/api/planningShifts', () => ({
   generateShiftSeries: apiMocks.generateShiftSeriesMock,
   getShiftPlan: apiMocks.getShiftPlanMock,
   getShiftSeries: apiMocks.getShiftSeriesMock,
+  getShiftTemplate: apiMocks.getShiftTemplateMock,
   listShiftPlans: apiMocks.listShiftPlansMock,
   listShiftSeries: apiMocks.listShiftSeriesMock,
   listShiftSeriesExceptions: apiMocks.listShiftSeriesExceptionsMock,
@@ -241,6 +260,44 @@ function buildSeries(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function countWeeklyOccurrences(dateFrom: string, dateTo: string, weekdayMask: string) {
+  const start = new Date(`${dateFrom}T00:00:00Z`);
+  const end = new Date(`${dateTo}T00:00:00Z`);
+  const included: string[] = [];
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const weekdayIndex = (cursor.getUTCDay() + 6) % 7;
+    if (weekdayMask[weekdayIndex] === '1') {
+      included.push(cursor.toISOString().slice(0, 10));
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return included;
+}
+
+const SERIES_WEEKDAY_IDS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+
+async function setSeriesWeeklyMask(wrapper: ReturnType<typeof mount>, weekdayMask: string) {
+  const recurrenceSelect = wrapper.get('[data-testid="customer-new-plan-series-recurrence-code"]');
+  if ((recurrenceSelect.element as HTMLSelectElement).value !== 'weekly') {
+    await recurrenceSelect.setValue('weekly');
+    await flushPromises();
+  }
+  for (const [index, weekdayId] of SERIES_WEEKDAY_IDS.entries()) {
+    const chip = wrapper.get(`[data-testid="customer-new-plan-series-weekday-chip-${weekdayId}"]`);
+    const isSelected = chip.attributes('aria-pressed') === 'true';
+    const shouldBeSelected = weekdayMask[index] === '1';
+    if (isSelected !== shouldBeSelected) {
+      await chip.trigger('click');
+    }
+  }
+  await flushPromises();
+}
+
+function seriesWeekdayChip(wrapper: ReturnType<typeof mount>, weekdayId: (typeof SERIES_WEEKDAY_IDS)[number]) {
+  return wrapper.get(`[data-testid="customer-new-plan-series-weekday-chip-${weekdayId}"]`);
+}
+
 function baseWizardState(): CustomerNewPlanWizardState {
   return {
     current_step: 'planning-record-overview',
@@ -327,6 +384,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.getPlanningRecordMock.mockReset();
     apiMocks.getShiftPlanMock.mockReset();
     apiMocks.getShiftSeriesMock.mockReset();
+    apiMocks.getShiftTemplateMock.mockReset();
     apiMocks.linkPlanningRecordAttachmentMock.mockReset();
     apiMocks.listOrderAttachmentsMock.mockReset();
     apiMocks.listOrderEquipmentLinesMock.mockReset();
@@ -382,6 +440,23 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.getPlanningRecordMock.mockResolvedValue(buildPlanningRecord());
     apiMocks.getShiftPlanMock.mockResolvedValue(buildShiftPlan());
     apiMocks.getShiftSeriesMock.mockResolvedValue(buildSeries());
+    apiMocks.getShiftTemplateMock.mockImplementation((_, templateId: string) =>
+      Promise.resolve({
+        id: templateId,
+        tenant_id: 'tenant-1',
+        code: templateId === 'template-2' ? 'ST_RFK_NORTH_DAY_0800_1600' : 'TPL-1',
+        label: templateId === 'template-2' ? 'Nordtor Tagdienst 08:00-16:00' : 'Tagdienst Vorlage',
+        local_start_time: '08:00',
+        local_end_time: '16:00',
+        default_break_minutes: templateId === 'template-2' ? 30 : 30,
+        shift_type_code: templateId === 'template-2' ? 'site_day' : 'day',
+        meeting_point: templateId === 'template-2' ? 'Nordtor Sicherheitsloge' : null,
+        location_text: templateId === 'template-2' ? 'RheinForum Köln – Nordtor & Ladehof' : null,
+        notes: null,
+        status: 'active',
+        version_no: 1,
+      }),
+    );
     apiMocks.createPlanningSetupRecordMock.mockResolvedValue({
       id: 'site-created-1',
       customer_id: 'customer-1',
@@ -1713,7 +1788,11 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       }),
     );
     expect(apiMocks.createShiftSeriesExceptionMock).toHaveBeenCalled();
-    expect(apiMocks.generateShiftSeriesMock).toHaveBeenCalledWith('tenant-1', 'series-1', 'token-1', {});
+    expect(apiMocks.generateShiftSeriesMock).toHaveBeenCalledWith('tenant-1', 'series-1', 'token-1', {
+      from_date: '2026-06-01',
+      regenerate_existing: false,
+      to_date: '2026-06-10',
+    });
     expect(routerPushMock).toHaveBeenCalledWith(
       '/admin/planning-staffing?date_from=2026-06-01T00%3A00&date_to=2026-06-02T00%3A00&planning_record_id=record-1&shift_id=shift-1',
     );
@@ -1788,7 +1867,188 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect((wrapper.get('[data-testid="customer-new-plan-series-to"]').element as HTMLInputElement).value).toBe(
       '2026-06-10',
     );
+    expect((wrapper.get('[data-testid="customer-new-plan-series-generation-from"]').element as HTMLInputElement).value).toBe(
+      '2026-06-01',
+    );
+    expect((wrapper.get('[data-testid="customer-new-plan-series-generation-to"]').element as HTMLInputElement).value).toBe(
+      '2026-06-10',
+    );
+    expect((wrapper.get('[data-testid="customer-new-plan-series-timezone"]').element as HTMLSelectElement).value).toBe(
+      'Europe/Berlin',
+    );
     expect(((wrapper.vm as any).$?.setupState.seriesDraft.weekday_mask as string)).toBe('');
+  });
+
+  it('shows code and label for shift templates, applies template defaults, and submits explicit generation controls', async () => {
+    apiMocks.listShiftTemplatesMock.mockResolvedValue([
+      { id: 'template-1', tenant_id: 'tenant-1', code: 'TPL-1', label: 'Tagdienst Vorlage', local_start_time: '08:00', local_end_time: '16:00', default_break_minutes: 30, shift_type_code: 'day', status: 'active', version_no: 1 },
+      { id: 'template-2', tenant_id: 'tenant-1', code: 'ST_RFK_NORTH_DAY_0800_1600', label: 'Nordtor Tagdienst 08:00-16:00', local_start_time: '08:00', local_end_time: '16:00', default_break_minutes: 30, shift_type_code: 'site_day', status: 'active', version_no: 1 },
+    ]);
+    apiMocks.getShiftPlanMock.mockResolvedValue(
+      buildShiftPlan({
+        planning_from: '2026-07-01',
+        planning_to: '2026-07-31',
+      }),
+    );
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      shift_plan_id: 'plan-1',
+      planning_record_id: '',
+      series_id: '',
+    });
+    await flushPromises();
+
+    const templateSelect = wrapper.get('[data-testid="customer-new-plan-series-template"]');
+    expect(templateSelect.text()).toContain('ST_RFK_NORTH_DAY_0800_1600');
+    expect(templateSelect.text()).toContain('Nordtor Tagdienst 08:00-16:00');
+
+    await wrapper.get('[data-testid="customer-new-plan-series-label"]').setValue('Werktage Tagschicht Nordtor');
+    await templateSelect.setValue('template-2');
+    await flushPromises();
+    await flushPromises();
+
+    const setupState = (wrapper.vm as any).$?.setupState;
+    expect(apiMocks.getShiftTemplateMock).toHaveBeenCalledWith('tenant-1', 'template-2', 'token-1');
+    expect(setupState.seriesDraft.default_break_minutes).toBe(30);
+    expect(setupState.seriesDraft.shift_type_code).toBe('site_day');
+    expect(setupState.seriesDraft.meeting_point).toBe('Nordtor Sicherheitsloge');
+    expect(setupState.seriesDraft.location_text).toBe('RheinForum Köln – Nordtor & Ladehof');
+
+    await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-07-31');
+    await wrapper.get('[data-testid="customer-new-plan-series-generation-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-generation-to"]').setValue('2026-07-31');
+    await wrapper.get('[data-testid="customer-new-plan-series-regenerate-existing"]').setValue(false);
+    await flushPromises();
+
+    apiMocks.createShiftSeriesMock.mockResolvedValue(
+      buildSeries({
+        date_from: '2026-07-01',
+        date_to: '2026-07-31',
+        label: 'Werktage Tagschicht Nordtor',
+        shift_template_id: 'template-2',
+        shift_type_code: 'site_day',
+      }),
+    );
+    apiMocks.listShiftSeriesMock.mockResolvedValue([
+      buildSeries({
+        date_from: '2026-07-01',
+        date_to: '2026-07-31',
+        label: 'Werktage Tagschicht Nordtor',
+        shift_template_id: 'template-2',
+        shift_type_code: 'site_day',
+      }),
+    ]);
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
+    apiMocks.generateShiftSeriesMock.mockResolvedValue([
+      {
+        id: 'shift-1',
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: 'series-1',
+        occurrence_date: '2026-07-01',
+        starts_at: '2026-07-01T08:00:00Z',
+        ends_at: '2026-07-01T16:00:00Z',
+        break_minutes: 30,
+        shift_type_code: 'site_day',
+        location_text: 'RheinForum Köln – Nordtor & Ladehof',
+        meeting_point: 'Nordtor Sicherheitsloge',
+        release_state: 'draft',
+        customer_visible_flag: false,
+        subcontractor_visible_flag: false,
+        stealth_mode_flag: false,
+        source_kind_code: 'series',
+        status: 'active',
+        version_no: 1,
+      },
+    ]);
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toBe(true);
+    expect(apiMocks.createShiftSeriesMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'plan-1',
+      'token-1',
+      expect.objectContaining({
+        date_from: '2026-07-01',
+        date_to: '2026-07-31',
+        default_break_minutes: 30,
+        label: 'Werktage Tagschicht Nordtor',
+        location_text: 'RheinForum Köln – Nordtor & Ladehof',
+        meeting_point: 'Nordtor Sicherheitsloge',
+        shift_type_code: 'site_day',
+        shift_template_id: 'template-2',
+      }),
+    );
+    expect(apiMocks.generateShiftSeriesMock).toHaveBeenCalledWith('tenant-1', 'series-1', 'token-1', {
+      from_date: '2026-07-01',
+      regenerate_existing: false,
+      to_date: '2026-07-31',
+    });
+    expect(routerPushMock).toHaveBeenCalledWith(
+      '/admin/planning-staffing?date_from=2026-07-01T00%3A00&date_to=2026-07-02T00%3A00&shift_id=shift-1',
+    );
+  });
+
+  it('accepts the full RheinForum Nordtor weekly series data and reflects the exact form state', async () => {
+    apiMocks.listShiftTemplatesMock.mockResolvedValue([
+      { id: 'template-2', tenant_id: 'tenant-1', code: 'ST_RFK_NORTH_DAY_0800_1600', label: 'RheinForum Nordtor Day 08:00-16:00', local_start_time: '08:00', local_end_time: '16:00', default_break_minutes: 30, shift_type_code: 'site_day', status: 'active', version_no: 1 },
+    ]);
+    apiMocks.getShiftPlanMock.mockResolvedValue(
+      buildShiftPlan({
+        planning_from: '2026-07-01',
+        planning_to: '2026-07-31',
+      }),
+    );
+
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      order_id: 'order-1',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-label"]').setValue('Werktage Tagschicht Nordtor');
+    await wrapper.get('[data-testid="customer-new-plan-series-template"]').setValue('template-2');
+    await setSeriesWeeklyMask(wrapper, '1111100');
+    await wrapper.get('[data-testid="customer-new-plan-series-timezone"]').setValue('Europe/Berlin');
+    await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-07-31');
+    await flushPromises();
+
+    const setupState = (wrapper.vm as any).$?.setupState;
+    setupState.seriesDraft.default_break_minutes = 30;
+    setupState.seriesDraft.shift_type_code = 'site_day';
+    setupState.seriesDraft.meeting_point = 'Nordtor Sicherheitsloge';
+    setupState.seriesDraft.location_text = 'RheinForum Köln – Nordtor & Ladehof';
+    setupState.seriesDraft.customer_visible_flag = false;
+    setupState.seriesDraft.subcontractor_visible_flag = false;
+    setupState.seriesDraft.stealth_mode_flag = false;
+    setupState.seriesDraft.release_state = 'draft';
+    setupState.seriesDraft.notes = 'Standard weekday recurring day-shift pattern for RheinForum Köln – Nordtor & Ladehof.';
+    await flushPromises();
+
+    expect(setupState.seriesDraft).toMatchObject({
+      label: 'Werktage Tagschicht Nordtor',
+      recurrence_code: 'weekly',
+      interval_count: 1,
+      weekday_mask: '1111100',
+      timezone: 'Europe/Berlin',
+      date_from: '2026-07-01',
+      date_to: '2026-07-31',
+      default_break_minutes: 30,
+      shift_type_code: 'site_day',
+      meeting_point: 'Nordtor Sicherheitsloge',
+      location_text: 'RheinForum Köln – Nordtor & Ladehof',
+      customer_visible_flag: false,
+      subcontractor_visible_flag: false,
+      stealth_mode_flag: false,
+      release_state: 'draft',
+      notes: 'Standard weekday recurring day-shift pattern for RheinForum Köln – Nordtor & Ladehof.',
+    });
   });
 
   it('keeps Series active and ignores a stale shift-plan draft when shift_plan_id is already committed', async () => {
@@ -1907,6 +2167,13 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       'sicherplan.customerPlansWizard.draftRestored',
     );
     expect(wrapper.emitted('saved-context')).toBeUndefined();
+    expect(seriesWeekdayChip(wrapper, 'mon').attributes('aria-pressed')).toBe('true');
+    expect(seriesWeekdayChip(wrapper, 'tue').attributes('aria-pressed')).toBe('false');
+    expect(seriesWeekdayChip(wrapper, 'wed').attributes('aria-pressed')).toBe('true');
+    expect(seriesWeekdayChip(wrapper, 'thu').attributes('aria-pressed')).toBe('false');
+    expect(seriesWeekdayChip(wrapper, 'fri').attributes('aria-pressed')).toBe('true');
+    expect(seriesWeekdayChip(wrapper, 'sat').attributes('aria-pressed')).toBe('false');
+    expect(seriesWeekdayChip(wrapper, 'sun').attributes('aria-pressed')).toBe('false');
   });
 
   it('displays existing series rows and keeps the wizard on Series when one row is selected', async () => {
@@ -1953,6 +2220,39 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     );
   });
 
+  it('restores saved weekly series masks into active weekday chips when an existing series is selected', async () => {
+    apiMocks.listShiftSeriesMock.mockResolvedValue([
+      buildSeries({ id: 'series-1', label: 'Werktage', recurrence_code: 'weekly', weekday_mask: '1010100' }),
+    ]);
+    apiMocks.getShiftSeriesMock.mockResolvedValue(
+      buildSeries({ id: 'series-1', label: 'Werktage', recurrence_code: 'weekly', weekday_mask: '1010100' }),
+    );
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
+
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    const rows = wrapper.findAll('.sp-customer-plan-wizard-step__list-row');
+    const targetRow = rows.find((row) => row.text().includes('Werktage'));
+    expect(targetRow).toBeDefined();
+    await targetRow!.trigger('click');
+    await flushPromises();
+
+    expect((wrapper.vm as any).$?.setupState.seriesDraft.weekday_mask).toBe('1010100');
+    expect(seriesWeekdayChip(wrapper, 'mon').attributes('aria-pressed')).toBe('true');
+    expect(seriesWeekdayChip(wrapper, 'tue').attributes('aria-pressed')).toBe('false');
+    expect(seriesWeekdayChip(wrapper, 'wed').attributes('aria-pressed')).toBe('true');
+    expect(seriesWeekdayChip(wrapper, 'thu').attributes('aria-pressed')).toBe('false');
+    expect(seriesWeekdayChip(wrapper, 'fri').attributes('aria-pressed')).toBe('true');
+    expect(seriesWeekdayChip(wrapper, 'sat').attributes('aria-pressed')).toBe('false');
+    expect(seriesWeekdayChip(wrapper, 'sun').attributes('aria-pressed')).toBe('false');
+  });
+
   it('blocks Series submit when the date range exceeds the selected shift-plan window', async () => {
     const wrapper = mountStep('series-exceptions', {
       current_step: 'series-exceptions',
@@ -1973,6 +2273,515 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(saved).toBe(false);
     expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.seriesShiftPlanWindowMismatch');
     expect(apiMocks.createShiftSeriesMock).not.toHaveBeenCalled();
+  });
+
+  it('shows the weekday picker for weekly recurrence with seven chips and no raw weekday mask input', async () => {
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-recurrence-code"]').setValue('weekly');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-series-weekday-picker"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-testid="customer-new-plan-series-weekday-chip"]')).toHaveLength(7);
+    for (const weekdayId of SERIES_WEEKDAY_IDS) {
+      expect(wrapper.find(`[data-testid="customer-new-plan-series-weekday-chip-${weekdayId}"]`).exists()).toBe(true);
+    }
+    expect(wrapper.find('[data-testid="customer-new-plan-series-weekday-mask"]').exists()).toBe(false);
+  });
+
+  it('toggles weekday chips into the correct mask with matching aria and active classes', async () => {
+    const seriesDraftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'series-exceptions',
+    );
+    window.sessionStorage.setItem(
+      seriesDraftKey,
+      JSON.stringify({
+        exception: {
+          action_code: 'skip',
+          customer_visible_flag: null,
+          exception_date: '',
+          notes: '',
+          override_break_minutes: '',
+          override_local_end_time: '',
+          override_local_start_time: '',
+          override_location_text: '',
+          override_meeting_point: '',
+          override_shift_type_code: '',
+          stealth_mode_flag: null,
+          subcontractor_visible_flag: null,
+        },
+        series: {
+          customer_visible_flag: false,
+          date_from: '2026-06-01',
+          date_to: '2026-06-10',
+          default_break_minutes: 30,
+          interval_count: 1,
+          label: 'Weekly Draft',
+          location_text: '',
+          meeting_point: '',
+          notes: '',
+          recurrence_code: 'weekly',
+          release_state: 'draft',
+          shift_template_id: 'template-1',
+          shift_type_code: 'day',
+          stealth_mode_flag: false,
+          subcontractor_visible_flag: false,
+          timezone: 'Europe/Berlin',
+          weekday_mask: '1111100',
+        },
+      }),
+    );
+
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+    await flushPromises();
+
+    const setupState = (wrapper.vm as any).$?.setupState;
+    expect(setupState.seriesDraft.weekday_mask).toBe('1111100');
+
+    const saturdayChip = seriesWeekdayChip(wrapper, 'sat');
+    setupState.toggleSeriesWeekday(5);
+    await flushPromises();
+    expect(setupState.seriesDraft.weekday_mask).toBe('1111110');
+    expect(saturdayChip.attributes('aria-pressed')).toBe('true');
+    expect(saturdayChip.classes()).toContain('sp-customer-plan-wizard-step__weekday-chip--active');
+
+    const mondayChip = seriesWeekdayChip(wrapper, 'mon');
+    setupState.toggleSeriesWeekday(0);
+    await flushPromises();
+    expect(setupState.seriesDraft.weekday_mask).toBe('0111110');
+    expect(mondayChip.attributes('aria-pressed')).toBe('false');
+    expect(mondayChip.classes()).not.toContain('sp-customer-plan-wizard-step__weekday-chip--active');
+    expect(seriesWeekdayChip(wrapper, 'fri').attributes('aria-pressed')).toBe('true');
+  });
+
+  it('validates weekly weekday mask, clears it for daily recurrence, and supports tri-state override visibility', async () => {
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-label"]').setValue('Werktage Tagschicht Nordtor');
+    await wrapper.get('[data-testid="customer-new-plan-series-template"]').setValue('template-1');
+    await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-06-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-06-10');
+    await wrapper.get('[data-testid="customer-new-plan-series-timezone"]').setValue('Europe/Berlin');
+    await setSeriesWeeklyMask(wrapper, '0000000');
+    await flushPromises();
+
+    const setupState = (wrapper.vm as any).$?.setupState;
+    let saved = await (wrapper.vm as any).submitCurrentStep();
+    expect(saved).toBe(false);
+    expect(setupState.stepFeedback.message).toBe('sicherplan.customerPlansWizard.errors.seriesWeekdayMaskInvalid');
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.forms.weekdayMaskHelp');
+
+    await wrapper.get('[data-testid="customer-new-plan-series-recurrence-code"]').setValue('daily');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="customer-new-plan-series-weekday-picker"]').exists()).toBe(false);
+    expect(setupState.seriesDraft.weekday_mask).toBe('');
+
+    await setSeriesWeeklyMask(wrapper, '1111100');
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('override');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="customer-new-plan-series-exception-override-start"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-customer-visible"]').setValue('false');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-subcontractor-visible"]').setValue('true');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-stealth-mode"]').setValue('');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-06-03');
+    await flushPromises();
+
+    saved = await (wrapper.vm as any).submitCurrentStep();
+    expect(saved).toBe(false);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.seriesExceptionOverrideTimesRequired');
+
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-override-start"]').setValue('08:30');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-override-end"]').setValue('16:30');
+    await flushPromises();
+
+    apiMocks.createShiftSeriesMock.mockResolvedValue(
+      buildSeries({
+        date_from: '2026-06-01',
+        date_to: '2026-06-10',
+        recurrence_code: 'weekly',
+        weekday_mask: '1111100',
+      }),
+    );
+    apiMocks.createShiftSeriesExceptionMock.mockResolvedValue({
+      id: 'exception-1',
+      tenant_id: 'tenant-1',
+      shift_series_id: 'series-1',
+      exception_date: '2026-06-03',
+      action_code: 'override',
+      customer_visible_flag: false,
+      subcontractor_visible_flag: true,
+      stealth_mode_flag: null,
+      override_local_start_time: '08:30',
+      override_local_end_time: '16:30',
+      version_no: 1,
+    });
+    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries({ recurrence_code: 'weekly', weekday_mask: '1111100' })]);
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
+    apiMocks.generateShiftSeriesMock.mockResolvedValue([]);
+
+    saved = await (wrapper.vm as any).submitCurrentStep();
+    expect(saved).toBe(true);
+    expect(apiMocks.createShiftSeriesMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'plan-1',
+      'token-1',
+      expect.objectContaining({
+        recurrence_code: 'weekly',
+        weekday_mask: '1111100',
+        timezone: 'Europe/Berlin',
+      }),
+    );
+    expect(apiMocks.createShiftSeriesExceptionMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'series-1',
+      'token-1',
+      expect.objectContaining({
+        action_code: 'override',
+        customer_visible_flag: false,
+        subcontractor_visible_flag: true,
+        stealth_mode_flag: null,
+        override_local_start_time: '08:30',
+        override_local_end_time: '16:30',
+      }),
+    );
+  });
+
+  it('submits daily recurrence without a weekly mask and keeps the picker hidden', async () => {
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-label"]').setValue('Tagesdienst');
+    await wrapper.get('[data-testid="customer-new-plan-series-template"]').setValue('template-1');
+    await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-06-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-06-10');
+    await wrapper.get('[data-testid="customer-new-plan-series-recurrence-code"]').setValue('daily');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-series-weekday-picker"]').exists()).toBe(false);
+    expect((wrapper.vm as any).$?.setupState.seriesDraft.weekday_mask).toBe('');
+
+    apiMocks.createShiftSeriesMock.mockResolvedValue(
+      buildSeries({
+        recurrence_code: 'daily',
+        weekday_mask: null,
+      }),
+    );
+    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries({ recurrence_code: 'daily', weekday_mask: null })]);
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
+    apiMocks.generateShiftSeriesMock.mockResolvedValue([
+      {
+        id: 'shift-daily-1',
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: 'series-1',
+        occurrence_date: '2026-06-01',
+        starts_at: '2026-06-01T08:00:00Z',
+        ends_at: '2026-06-01T16:00:00Z',
+        break_minutes: 30,
+        shift_type_code: 'day',
+        location_text: null,
+        meeting_point: null,
+        release_state: 'draft',
+        customer_visible_flag: false,
+        subcontractor_visible_flag: false,
+        stealth_mode_flag: false,
+        source_kind_code: 'series',
+        status: 'active',
+        version_no: 1,
+      },
+    ]);
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toBe(true);
+    expect(apiMocks.createShiftSeriesMock).toHaveBeenLastCalledWith(
+      'tenant-1',
+      'plan-1',
+      'token-1',
+      expect.objectContaining({
+        recurrence_code: 'daily',
+        weekday_mask: null,
+      }),
+    );
+  });
+
+  it('submits skip exceptions with null override payload fields', async () => {
+    apiMocks.getShiftPlanMock.mockResolvedValue(
+      buildShiftPlan({
+        planning_from: '2026-07-01',
+        planning_to: '2026-07-31',
+      }),
+    );
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      order_id: 'order-1',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-label"]').setValue('Werktage Tagschicht Nordtor');
+    await wrapper.get('[data-testid="customer-new-plan-series-template"]').setValue('template-1');
+    await wrapper.get('[data-testid="customer-new-plan-series-recurrence-code"]').setValue('weekly');
+    await setSeriesWeeklyMask(wrapper, '1111100');
+    await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-07-31');
+    await wrapper.get('[data-testid="customer-new-plan-series-generation-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-generation-to"]').setValue('2026-07-31');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-07-03');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('skip');
+    await flushPromises();
+
+    const setupState = (wrapper.vm as any).$?.setupState;
+    setupState.exceptionDraft.notes = 'Interne Logistik-Sperrung am Nordtor; kein regulärer Objektschutzdienst an diesem Tag.';
+    apiMocks.createShiftSeriesMock.mockResolvedValue(
+      buildSeries({
+        date_from: '2026-07-01',
+        date_to: '2026-07-31',
+        recurrence_code: 'weekly',
+        weekday_mask: '1111100',
+      }),
+    );
+    apiMocks.createShiftSeriesExceptionMock.mockResolvedValue({
+      id: 'exception-1',
+      tenant_id: 'tenant-1',
+      shift_series_id: 'series-1',
+      exception_date: '2026-07-03',
+      action_code: 'skip',
+      customer_visible_flag: null,
+      subcontractor_visible_flag: null,
+      stealth_mode_flag: null,
+      version_no: 1,
+    });
+    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries({ date_from: '2026-07-01', date_to: '2026-07-31', recurrence_code: 'weekly', weekday_mask: '1111100' })]);
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
+    apiMocks.generateShiftSeriesMock.mockResolvedValue([]);
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toBe(true);
+    expect(apiMocks.createShiftSeriesExceptionMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'series-1',
+      'token-1',
+      expect.objectContaining({
+        action_code: 'skip',
+        override_local_start_time: null,
+        override_local_end_time: null,
+        override_break_minutes: null,
+        override_shift_type_code: null,
+        override_meeting_point: null,
+        override_location_text: null,
+        customer_visible_flag: null,
+        subcontractor_visible_flag: null,
+        stealth_mode_flag: null,
+      }),
+    );
+  });
+
+  it('defaults empty weekly weekday mask to monday-friday and does not overwrite manually edited template-derived fields', async () => {
+    apiMocks.listShiftTemplatesMock.mockResolvedValue([
+      { id: 'template-1', tenant_id: 'tenant-1', code: 'TPL-1', label: 'Tagdienst Vorlage', local_start_time: '08:00', local_end_time: '16:00', default_break_minutes: 30, shift_type_code: 'day', status: 'active', version_no: 1 },
+      { id: 'template-2', tenant_id: 'tenant-1', code: 'ST_RFK_NORTH_DAY_0800_1600', label: 'Nordtor Tagdienst 08:00-16:00', local_start_time: '08:00', local_end_time: '16:00', default_break_minutes: 30, shift_type_code: 'site_day', status: 'active', version_no: 1 },
+    ]);
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-recurrence-code"]').setValue('weekly');
+    await flushPromises();
+    expect((wrapper.vm as any).$?.setupState.seriesDraft.weekday_mask).toBe('1111100');
+    expect(seriesWeekdayChip(wrapper, 'mon').attributes('aria-pressed')).toBe('true');
+    expect(seriesWeekdayChip(wrapper, 'tue').attributes('aria-pressed')).toBe('true');
+    expect(seriesWeekdayChip(wrapper, 'wed').attributes('aria-pressed')).toBe('true');
+    expect(seriesWeekdayChip(wrapper, 'thu').attributes('aria-pressed')).toBe('true');
+    expect(seriesWeekdayChip(wrapper, 'fri').attributes('aria-pressed')).toBe('true');
+    expect(seriesWeekdayChip(wrapper, 'sat').attributes('aria-pressed')).toBe('false');
+    expect(seriesWeekdayChip(wrapper, 'sun').attributes('aria-pressed')).toBe('false');
+
+    await wrapper.get('[data-testid="customer-new-plan-series-template"]').setValue('template-2');
+    await flushPromises();
+    await flushPromises();
+
+    const setupState = (wrapper.vm as any).$?.setupState;
+    setupState.seriesDraft.default_break_minutes = 45;
+    setupState.seriesDraft.shift_type_code = 'custom_day';
+    setupState.seriesDraft.meeting_point = 'Custom meeting';
+    setupState.seriesDraft.location_text = 'Custom location';
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-template"]').setValue('template-1');
+    await flushPromises();
+    await flushPromises();
+
+    expect(setupState.seriesDraft.default_break_minutes).toBe(45);
+    expect(setupState.seriesDraft.shift_type_code).toBe('custom_day');
+    expect(setupState.seriesDraft.meeting_point).toBe('Custom meeting');
+    expect(setupState.seriesDraft.location_text).toBe('Custom location');
+  });
+
+  it('maps known backend series errors to specific user-facing messages', async () => {
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-label"]').setValue('Werktage Tagschicht Nordtor');
+    await wrapper.get('[data-testid="customer-new-plan-series-template"]').setValue('template-1');
+    await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-06-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-06-10');
+    await flushPromises();
+
+    apiMocks.createShiftSeriesMock.mockResolvedValue(buildSeries());
+    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries()]);
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
+    apiMocks.generateShiftSeriesMock.mockRejectedValue(
+      new planningShiftsApiErrorExports.PlanningShiftsApiError(400, {
+        message_key: 'errors.planning.shift_series.invalid_generation_window',
+        details: {},
+      }),
+    );
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toBe(false);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.seriesGenerationWindowInvalid');
+  });
+
+  it('runs full submit in order and clears the series draft only after successful generation', async () => {
+    apiMocks.getShiftPlanMock.mockResolvedValue(
+      buildShiftPlan({
+        planning_from: '2026-07-01',
+        planning_to: '2026-07-31',
+      }),
+    );
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'series-exceptions',
+    );
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-label"]').setValue('Werktage Tagschicht Nordtor');
+    await wrapper.get('[data-testid="customer-new-plan-series-template"]').setValue('template-1');
+    await wrapper.get('[data-testid="customer-new-plan-series-recurrence-code"]').setValue('weekly');
+    await setSeriesWeeklyMask(wrapper, '1111100');
+    await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-07-31');
+    await wrapper.get('[data-testid="customer-new-plan-series-generation-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-generation-to"]').setValue('2026-07-31');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-07-03');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('skip');
+    await flushPromises();
+
+    const generated = Array.from({ length: 22 }, (_, index) => ({
+      id: `shift-${index + 1}`,
+      tenant_id: 'tenant-1',
+      shift_plan_id: 'plan-1',
+      shift_series_id: 'series-1',
+      occurrence_date: `2026-07-${String(index + 1).padStart(2, '0')}`,
+      starts_at: `2026-07-${String(index + 1).padStart(2, '0')}T08:00:00Z`,
+      ends_at: `2026-07-${String(index + 1).padStart(2, '0')}T16:00:00Z`,
+      break_minutes: 30,
+      shift_type_code: 'site_day',
+      location_text: 'RheinForum Köln – Nordtor & Ladehof',
+      meeting_point: 'Nordtor Sicherheitsloge',
+      release_state: 'draft',
+      customer_visible_flag: false,
+      subcontractor_visible_flag: false,
+      stealth_mode_flag: false,
+      source_kind_code: 'series',
+      status: 'active',
+      version_no: 1,
+    }));
+    apiMocks.createShiftSeriesMock.mockResolvedValue(
+      buildSeries({
+        date_from: '2026-07-01',
+        date_to: '2026-07-31',
+        recurrence_code: 'weekly',
+        weekday_mask: '1111100',
+      }),
+    );
+    apiMocks.createShiftSeriesExceptionMock.mockResolvedValue({
+      id: 'exception-1',
+      tenant_id: 'tenant-1',
+      shift_series_id: 'series-1',
+      exception_date: '2026-07-03',
+      action_code: 'skip',
+      version_no: 1,
+    });
+    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries({ date_from: '2026-07-01', date_to: '2026-07-31', recurrence_code: 'weekly', weekday_mask: '1111100' })]);
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
+    apiMocks.generateShiftSeriesMock.mockResolvedValue(generated);
+
+    expect(window.sessionStorage.getItem(draftKey)).toContain('Werktage Tagschicht Nordtor');
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toBe(true);
+    const createOrder = apiMocks.createShiftSeriesMock.mock.invocationCallOrder[0];
+    const exceptionOrder = apiMocks.createShiftSeriesExceptionMock.mock.invocationCallOrder[0];
+    const generateOrder = apiMocks.generateShiftSeriesMock.mock.invocationCallOrder[0];
+    expect(createOrder).toBeDefined();
+    expect(exceptionOrder).toBeDefined();
+    expect(generateOrder).toBeDefined();
+    expect(createOrder!).toBeLessThan(exceptionOrder!);
+    expect(exceptionOrder!).toBeLessThan(generateOrder!);
+    expect(apiMocks.generateShiftSeriesMock).toHaveBeenCalledWith('tenant-1', 'series-1', 'token-1', {
+      from_date: '2026-07-01',
+      to_date: '2026-07-31',
+      regenerate_existing: false,
+    });
+    expect(apiMocks.generateShiftSeriesMock.mock.results[0]?.type).toBe('return');
+    expect(window.sessionStorage.getItem(draftKey)).toBeNull();
+    expect(routerPushMock).toHaveBeenCalled();
   });
 
   it('keeps the user on the final step with clear feedback when series generation fails', async () => {
@@ -1999,5 +2808,107 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(routerPushMock).not.toHaveBeenCalled();
     expect(wrapper.find('[data-testid="customer-new-plan-step-panel-series-exceptions"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.seriesGenerateFailed');
+  });
+
+  it('does not clear drafts and keeps entered fields visible when generation fails after series and exception save', async () => {
+    const draftKey = buildWizardDraftStorageKey(
+      {
+        customerId: 'customer-1',
+        planningEntityId: 'site-1',
+        planningEntityType: 'site',
+        tenantId: 'tenant-1',
+      },
+      'series-exceptions',
+    );
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-label"]').setValue('Werktage Tagschicht Nordtor');
+    await wrapper.get('[data-testid="customer-new-plan-series-template"]').setValue('template-1');
+    await wrapper.get('[data-testid="customer-new-plan-series-recurrence-code"]').setValue('weekly');
+    await setSeriesWeeklyMask(wrapper, '1111100');
+    await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-07-31');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-07-03');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('skip');
+    await flushPromises();
+
+    apiMocks.createShiftSeriesMock.mockResolvedValue(buildSeries({ date_from: '2026-07-01', date_to: '2026-07-31', recurrence_code: 'weekly', weekday_mask: '1111100' }));
+    apiMocks.createShiftSeriesExceptionMock.mockResolvedValue({
+      id: 'exception-1',
+      tenant_id: 'tenant-1',
+      shift_series_id: 'series-1',
+      exception_date: '2026-07-03',
+      action_code: 'skip',
+      version_no: 1,
+    });
+    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries({ date_from: '2026-07-01', date_to: '2026-07-31', recurrence_code: 'weekly', weekday_mask: '1111100' })]);
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
+    apiMocks.generateShiftSeriesMock.mockRejectedValue(new Error('generate failed'));
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toBe(false);
+    expect(window.sessionStorage.getItem(draftKey)).toContain('Werktage Tagschicht Nordtor');
+    expect((wrapper.get('[data-testid="customer-new-plan-series-label"]').element as HTMLInputElement).value).toBe('Werktage Tagschicht Nordtor');
+    expect((wrapper.vm as any).$?.setupState.seriesDraft.weekday_mask).toBe('1111100');
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-series-exceptions"]').exists()).toBe(true);
+  });
+
+  it('does not generate shifts when exception save fails and shows a useful mapped error', async () => {
+    apiMocks.getShiftPlanMock.mockResolvedValue(
+      buildShiftPlan({
+        planning_from: '2026-07-01',
+        planning_to: '2026-07-31',
+      }),
+    );
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-label"]').setValue('Werktage Tagschicht Nordtor');
+    await wrapper.get('[data-testid="customer-new-plan-series-template"]').setValue('template-1');
+    await wrapper.get('[data-testid="customer-new-plan-series-recurrence-code"]').setValue('weekly');
+    await setSeriesWeeklyMask(wrapper, '1111100');
+    await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-07-31');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-07-03');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('skip');
+    await flushPromises();
+
+    apiMocks.createShiftSeriesMock.mockResolvedValue(buildSeries({ date_from: '2026-07-01', date_to: '2026-07-31', recurrence_code: 'weekly', weekday_mask: '1111100' }));
+    apiMocks.createShiftSeriesExceptionMock.mockRejectedValue(
+      new planningShiftsApiErrorExports.PlanningShiftsApiError(409, {
+        message_key: 'errors.planning.shift_series_exception.duplicate_date',
+        details: {},
+      }),
+    );
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toBe(false);
+    expect(apiMocks.generateShiftSeriesMock).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.seriesExceptionDuplicateDate');
+  });
+
+  it('treats weekday_mask 1111100 as monday-friday and a skip on 2026-07-03 reduces 23 weekday occurrences to 22', () => {
+    const occurrences = countWeeklyOccurrences('2026-07-01', '2026-07-31', '1111100');
+    expect(occurrences).toHaveLength(23);
+    expect(occurrences.every((date) => {
+      const weekday = (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
+      return weekday >= 0 && weekday <= 4;
+    })).toBe(true);
+    const afterSkip = occurrences.filter((date) => date !== '2026-07-03');
+    expect(afterSkip).toHaveLength(22);
+    expect(afterSkip).not.toContain('2026-07-03');
   });
 });
