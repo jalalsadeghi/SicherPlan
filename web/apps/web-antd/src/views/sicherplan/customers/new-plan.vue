@@ -148,6 +148,20 @@ function normalizeQueryString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function hasQueryKey(query: typeof route.query, key: PersistedWizardRouteKey) {
+  return Object.prototype.hasOwnProperty.call(query, key);
+}
+
+function addPatchIfQueryKeyPresent(
+  patch: Record<string, string>,
+  key: Exclude<PersistedWizardRouteKey, 'step'>,
+  value: string,
+) {
+  if (hasQueryKey(route.query, key)) {
+    patch[key] = value;
+  }
+}
+
 function readWizardRouteState() {
   const planningEntityType = normalizeQueryString(route.query.planning_entity_type);
   const planningModeCode = normalizeQueryString(route.query.planning_mode_code);
@@ -233,41 +247,19 @@ function isStaleShiftPlanRollbackRoute(routeState: ReturnType<typeof readWizardR
 
 function syncWizardFromRoute(options?: { allowClearingContext?: boolean; source?: 'external' | 'internal-final' | 'repair' }) {
   const routeState = readWizardRouteState();
-  const allowClearingContext = options?.allowClearingContext ?? true;
-  const contextPatch = {
+  const contextPatch: Record<string, string> = {
     customer_id: routeState.customer_id,
-    order_id:
-      allowClearingContext || routeState.order_id || routeState.customer_id !== wizardState.value.customer_id
-        ? routeState.order_id
-        : wizardState.value.order_id,
-    planning_entity_id:
-      allowClearingContext || routeState.planning_entity_id || routeState.customer_id !== wizardState.value.customer_id
-        ? routeState.planning_entity_id
-        : wizardState.value.planning_entity_id,
-    planning_entity_type:
-      allowClearingContext || routeState.planning_entity_type || routeState.customer_id !== wizardState.value.customer_id
-        ? routeState.planning_entity_type
-        : wizardState.value.planning_entity_type,
-    planning_mode_code:
-      allowClearingContext || routeState.planning_mode_code || routeState.customer_id !== wizardState.value.customer_id
-        ? routeState.planning_mode_code
-        : wizardState.value.planning_mode_code,
-    planning_record_id:
-      allowClearingContext || routeState.planning_record_id || routeState.order_id !== wizardState.value.order_id
-        ? routeState.planning_record_id
-        : wizardState.value.planning_record_id,
-    shift_plan_id:
-      allowClearingContext || routeState.shift_plan_id || !isSameUpstreamScope(routeState)
-        ? routeState.shift_plan_id
-        : wizardState.value.shift_plan_id,
-    series_id:
-      allowClearingContext ||
-      routeState.series_id ||
-      !isSameUpstreamScope(routeState) ||
-      (routeState.shift_plan_id && routeState.shift_plan_id !== wizardState.value.shift_plan_id)
-        ? routeState.series_id
-        : wizardState.value.series_id,
   };
+
+  addPatchIfQueryKeyPresent(contextPatch, 'order_id', routeState.order_id);
+  if (hasQueryKey(route.query, 'planning_entity_id') || hasQueryKey(route.query, 'planning_id')) {
+    contextPatch.planning_entity_id = routeState.planning_entity_id;
+  }
+  addPatchIfQueryKeyPresent(contextPatch, 'planning_entity_type', routeState.planning_entity_type);
+  addPatchIfQueryKeyPresent(contextPatch, 'planning_mode_code', routeState.planning_mode_code);
+  addPatchIfQueryKeyPresent(contextPatch, 'planning_record_id', routeState.planning_record_id);
+  addPatchIfQueryKeyPresent(contextPatch, 'shift_plan_id', routeState.shift_plan_id);
+  addPatchIfQueryKeyPresent(contextPatch, 'series_id', routeState.series_id);
 
   setSavedContext(contextPatch);
 

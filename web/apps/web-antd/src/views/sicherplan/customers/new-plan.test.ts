@@ -310,6 +310,24 @@ describe('CustomerNewPlanWizardView', () => {
     });
   });
 
+  it('restores a direct valid series-exceptions URL when shift_plan_id is present', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'shift-plan-1',
+      step: 'series-exceptions',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('series-exceptions');
+    expect((wrapper.vm as any).wizardState.shift_plan_id).toBe('shift-plan-1');
+  });
+
   it('normalizes old step=planning links back to order-details and clears stale planning query on the first step', async () => {
     routeState.query = {
       customer_id: 'customer-1',
@@ -649,6 +667,54 @@ describe('CustomerNewPlanWizardView', () => {
     expect((wrapper.vm as any).wizardState.current_step).toBe('series-exceptions');
     expect(routeState.query.step).toBe('series-exceptions');
     expect(routeState.query.shift_plan_id).toBe('shift-plan-1');
+  });
+
+  it('does not clear committed shift_plan_id when the same-scope route later omits shift_plan_id', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'shift-plan-1',
+      step: 'series-exceptions',
+    };
+    routerReplaceMock.mockImplementation(async ({ query }: { query: Record<string, unknown> }) => {
+      routeState.query = { ...query };
+    });
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('series-exceptions');
+
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+      step: 'series-exceptions',
+    };
+    await flushPromises();
+    await flushPromises();
+
+    expect((wrapper.vm as any).wizardState.shift_plan_id).toBe('shift-plan-1');
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('series-exceptions');
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/new-plan',
+      query: {
+        customer_id: 'customer-1',
+        order_id: 'order-1',
+        planning_entity_id: 'site-1',
+        planning_entity_type: 'site',
+        planning_mode_code: 'site',
+        planning_record_id: 'record-1',
+        shift_plan_id: 'shift-plan-1',
+        step: 'series-exceptions',
+      },
+    });
   });
 
   it('allows explicit user navigation back to shift-plan from series-exceptions without losing the saved shift_plan_id', async () => {

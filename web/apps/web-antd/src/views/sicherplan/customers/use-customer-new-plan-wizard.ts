@@ -55,6 +55,16 @@ function invalidateSteps(
   }
 }
 
+function logWizardContextDiagnostic(
+  message: string,
+  payload: Record<string, unknown>,
+) {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+  console.debug(`[customer-new-plan-wizard] ${message}`, payload);
+}
+
 export function useCustomerNewPlanWizard() {
   const state = ref(createInitialWizardState());
 
@@ -129,14 +139,19 @@ export function useCustomerNewPlanWizard() {
   }
 
   function setSavedContext(patch: CustomerNewPlanWizardStatePatch) {
+    const previousState = state.value;
     const explicitOrderId = normalizeScalar(patch.order_id);
     const explicitPlanningRecordId = normalizeScalar(patch.planning_record_id);
+    const explicitShiftPlanId = normalizeScalar(patch.shift_plan_id);
+    const explicitSeriesId = normalizeScalar(patch.series_id);
     const hasExplicitPlanningContext =
       Object.prototype.hasOwnProperty.call(patch, 'planning_entity_id') ||
       Object.prototype.hasOwnProperty.call(patch, 'planning_entity_type') ||
       Object.prototype.hasOwnProperty.call(patch, 'planning_mode_code');
     const hasExplicitOrderId = Object.prototype.hasOwnProperty.call(patch, 'order_id');
     const hasExplicitPlanningRecordId = Object.prototype.hasOwnProperty.call(patch, 'planning_record_id');
+    const hasExplicitShiftPlanId = Object.prototype.hasOwnProperty.call(patch, 'shift_plan_id');
+    const hasExplicitSeriesId = Object.prototype.hasOwnProperty.call(patch, 'series_id');
     const nextState: CustomerNewPlanWizardState = {
       ...state.value,
       customer_id: resolveStableCustomerId(state.value.customer_id, patch.customer_id),
@@ -163,10 +178,37 @@ export function useCustomerNewPlanWizard() {
       Boolean(explicitPlanningRecordId && hasExplicitPlanningContext);
     const shouldPreservePlanningRecordForOrderChange =
       Boolean(explicitOrderId && explicitPlanningRecordId && hasExplicitOrderId && hasExplicitPlanningRecordId);
+    const shouldPreserveShiftPlanForPlanningContextChange =
+      Boolean(
+        shouldPreservePlanningRecordForPlanningContextChange &&
+          explicitShiftPlanId &&
+          hasExplicitPlanningRecordId &&
+          hasExplicitShiftPlanId,
+      );
+    const shouldPreserveShiftPlanForOrderChange =
+      Boolean(
+        shouldPreservePlanningRecordForOrderChange &&
+          explicitShiftPlanId &&
+          hasExplicitPlanningRecordId &&
+          hasExplicitShiftPlanId,
+      );
+    const shouldPreserveShiftPlanForPlanningRecordChange =
+      Boolean(explicitPlanningRecordId && explicitShiftPlanId && hasExplicitPlanningRecordId && hasExplicitShiftPlanId);
+    const shouldPreserveSeriesForShiftPlanChange =
+      Boolean(explicitShiftPlanId && explicitSeriesId && hasExplicitShiftPlanId && hasExplicitSeriesId);
+
+    let shiftPlanClearReason = '';
 
     if (planningContextChanged) {
       nextState.planning_record_id = shouldPreservePlanningRecordForPlanningContextChange ? explicitPlanningRecordId : '';
-      nextState.shift_plan_id = '';
+      if (shouldPreserveShiftPlanForPlanningContextChange) {
+        nextState.shift_plan_id = explicitShiftPlanId;
+      } else {
+        nextState.shift_plan_id = '';
+        shiftPlanClearReason = hasExplicitShiftPlanId
+          ? 'explicit_clear'
+          : 'planningContextChanged without explicit shift_plan_id';
+      }
       nextState.series_id = '';
       invalidateSteps(nextState, [
         'planning-record-documents',
@@ -180,7 +222,14 @@ export function useCustomerNewPlanWizard() {
 
     if (orderChanged) {
       nextState.planning_record_id = shouldPreservePlanningRecordForOrderChange ? explicitPlanningRecordId : '';
-      nextState.shift_plan_id = '';
+      if (shouldPreserveShiftPlanForOrderChange) {
+        nextState.shift_plan_id = explicitShiftPlanId;
+      } else {
+        nextState.shift_plan_id = '';
+        shiftPlanClearReason = hasExplicitShiftPlanId
+          ? 'explicit_clear'
+          : 'orderChanged without explicit shift_plan_id';
+      }
       nextState.series_id = '';
       invalidateSteps(nextState, [
         'equipment-lines',
@@ -196,7 +245,14 @@ export function useCustomerNewPlanWizard() {
     }
 
     if (planningRecordChanged) {
-      nextState.shift_plan_id = '';
+      if (shouldPreserveShiftPlanForPlanningRecordChange) {
+        nextState.shift_plan_id = explicitShiftPlanId;
+      } else {
+        nextState.shift_plan_id = '';
+        shiftPlanClearReason = hasExplicitShiftPlanId
+          ? 'explicit_clear'
+          : 'planningRecordChanged without explicit shift_plan_id';
+      }
       nextState.series_id = '';
       invalidateSteps(nextState, [
         'planning-record-documents',
@@ -206,11 +262,37 @@ export function useCustomerNewPlanWizard() {
     }
 
     if (shiftPlanChanged) {
-      nextState.series_id = '';
+      nextState.series_id = shouldPreserveSeriesForShiftPlanChange ? explicitSeriesId : '';
       invalidateSteps(nextState, ['series-exceptions']);
     }
 
     state.value = nextState;
+
+    if (previousState.shift_plan_id && !nextState.shift_plan_id) {
+      logWizardContextDiagnostic('cleared shift_plan_id', {
+        patch,
+        previousState,
+        nextState,
+        planningContextChanged,
+        orderChanged,
+        planningRecordChanged,
+        shiftPlanChanged,
+        reason: shiftPlanClearReason || (hasExplicitShiftPlanId ? 'explicit_clear' : 'unknown'),
+      });
+    }
+    if (previousState.current_step === 'series-exceptions' && !nextState.shift_plan_id) {
+      logWizardContextDiagnostic('series-exceptions lost shift_plan_id', {
+        patch,
+        previousState,
+        nextState,
+        planningContextChanged,
+        orderChanged,
+        planningRecordChanged,
+        shiftPlanChanged,
+        reason: shiftPlanClearReason || (hasExplicitShiftPlanId ? 'explicit_clear' : 'unknown'),
+      });
+    }
+
     return syncCurrentStep(state.value.current_step);
   }
 
