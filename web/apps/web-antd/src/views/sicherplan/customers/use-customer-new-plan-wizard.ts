@@ -129,6 +129,14 @@ export function useCustomerNewPlanWizard() {
   }
 
   function setSavedContext(patch: CustomerNewPlanWizardStatePatch) {
+    const explicitOrderId = normalizeScalar(patch.order_id);
+    const explicitPlanningRecordId = normalizeScalar(patch.planning_record_id);
+    const hasExplicitPlanningContext =
+      Object.prototype.hasOwnProperty.call(patch, 'planning_entity_id') ||
+      Object.prototype.hasOwnProperty.call(patch, 'planning_entity_type') ||
+      Object.prototype.hasOwnProperty.call(patch, 'planning_mode_code');
+    const hasExplicitOrderId = Object.prototype.hasOwnProperty.call(patch, 'order_id');
+    const hasExplicitPlanningRecordId = Object.prototype.hasOwnProperty.call(patch, 'planning_record_id');
     const nextState: CustomerNewPlanWizardState = {
       ...state.value,
       customer_id: resolveStableCustomerId(state.value.customer_id, patch.customer_id),
@@ -151,32 +159,40 @@ export function useCustomerNewPlanWizard() {
     const orderChanged = nextState.order_id !== state.value.order_id;
     const planningRecordChanged = nextState.planning_record_id !== state.value.planning_record_id;
     const shiftPlanChanged = nextState.shift_plan_id !== state.value.shift_plan_id;
+    const shouldPreservePlanningRecordForPlanningContextChange =
+      Boolean(explicitPlanningRecordId && hasExplicitPlanningContext);
+    const shouldPreservePlanningRecordForOrderChange =
+      Boolean(explicitOrderId && explicitPlanningRecordId && hasExplicitOrderId && hasExplicitPlanningRecordId);
 
     if (planningContextChanged) {
-      nextState.planning_record_id = '';
+      nextState.planning_record_id = shouldPreservePlanningRecordForPlanningContextChange ? explicitPlanningRecordId : '';
       nextState.shift_plan_id = '';
       nextState.series_id = '';
       invalidateSteps(nextState, [
-        'planning-record-overview',
         'planning-record-documents',
         'shift-plan',
         'series-exceptions',
       ]);
+      if (!shouldPreservePlanningRecordForPlanningContextChange) {
+        invalidateSteps(nextState, ['planning-record-overview']);
+      }
     }
 
     if (orderChanged) {
-      nextState.planning_record_id = '';
+      nextState.planning_record_id = shouldPreservePlanningRecordForOrderChange ? explicitPlanningRecordId : '';
       nextState.shift_plan_id = '';
       nextState.series_id = '';
       invalidateSteps(nextState, [
         'equipment-lines',
         'requirement-lines',
         'order-documents',
-        'planning-record-overview',
         'planning-record-documents',
         'shift-plan',
         'series-exceptions',
       ]);
+      if (!shouldPreservePlanningRecordForOrderChange) {
+        invalidateSteps(nextState, ['planning-record-overview']);
+      }
     }
 
     if (planningRecordChanged) {

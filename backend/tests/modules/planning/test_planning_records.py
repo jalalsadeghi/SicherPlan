@@ -91,6 +91,27 @@ class FakePlanningRecordRepository(FakeCustomerOrderRepository):
             rows = [row for row in rows if self.orders[row.order_id].customer_id == filters.customer_id]
         if filters.planning_mode_code is not None:
             rows = [row for row in rows if row.planning_mode_code == filters.planning_mode_code]
+        if filters.planning_entity_type is not None and filters.planning_entity_id is not None:
+            if filters.planning_entity_type == "site":
+                rows = [
+                    row for row in rows
+                    if getattr(self.site_plan_details.get(row.id), "site_id", None) == filters.planning_entity_id
+                ]
+            elif filters.planning_entity_type == "event_venue":
+                rows = [
+                    row for row in rows
+                    if getattr(self.event_plan_details.get(row.id), "event_venue_id", None) == filters.planning_entity_id
+                ]
+            elif filters.planning_entity_type == "trade_fair":
+                rows = [
+                    row for row in rows
+                    if getattr(self.trade_fair_plan_details.get(row.id), "trade_fair_id", None) == filters.planning_entity_id
+                ]
+            elif filters.planning_entity_type == "patrol_route":
+                rows = [
+                    row for row in rows
+                    if getattr(self.patrol_plan_details.get(row.id), "patrol_route_id", None) == filters.planning_entity_id
+                ]
         if filters.release_state is not None:
             rows = [row for row in rows if row.release_state == filters.release_state]
         if filters.dispatcher_user_id is not None:
@@ -470,6 +491,77 @@ class PlanningRecordServiceTests(unittest.TestCase):
         self.assertEqual(row.release_state, "release_ready")
         self.assertEqual(len(filtered), 1)
         self.assertIsNotNone(filtered[0].created_at)
+
+    def test_filters_planning_records_by_planning_entity(self) -> None:
+        matching = self.service.create_planning_record(
+            "tenant-1",
+            PlanningRecordCreate(
+                tenant_id="tenant-1",
+                order_id=self.order_id,
+                planning_mode_code="site",
+                name="Werk Nord Juli",
+                planning_from=date(2026, 9, 1),
+                planning_to=date(2026, 9, 3),
+                site_detail=SitePlanDetailCreate(site_id=self.site_id),
+            ),
+            self.actor,
+        )
+        self.repository.sites["site-2"] = SimpleNamespace(id="site-2", tenant_id="tenant-1", customer_id="customer-1")
+        self.service.create_planning_record(
+            "tenant-1",
+            PlanningRecordCreate(
+                tenant_id="tenant-1",
+                order_id=self.order_id,
+                planning_mode_code="site",
+                name="Werk Sued Juli",
+                planning_from=date(2026, 9, 1),
+                planning_to=date(2026, 9, 3),
+                site_detail=SitePlanDetailCreate(site_id="site-2"),
+            ),
+            self.actor,
+        )
+
+        filtered = self.service.list_planning_records(
+            "tenant-1",
+            PlanningRecordFilter(
+                order_id=self.order_id,
+                planning_mode_code="site",
+                planning_entity_type="site",
+                planning_entity_id=self.site_id,
+            ),
+            self.actor,
+        )
+
+        self.assertEqual([row.id for row in filtered], [matching.id])
+
+    def test_planning_record_filter_ignores_incomplete_planning_entity_filter(self) -> None:
+        self.service.create_planning_record(
+            "tenant-1",
+            PlanningRecordCreate(
+                tenant_id="tenant-1",
+                order_id=self.order_id,
+                planning_mode_code="site",
+                name="Werk Nord Juli",
+                planning_from=date(2026, 9, 1),
+                planning_to=date(2026, 9, 3),
+                site_detail=SitePlanDetailCreate(site_id=self.site_id),
+            ),
+            self.actor,
+        )
+
+        with_type_only = self.service.list_planning_records(
+            "tenant-1",
+            PlanningRecordFilter(order_id=self.order_id, planning_entity_type="site"),
+            self.actor,
+        )
+        with_id_only = self.service.list_planning_records(
+            "tenant-1",
+            PlanningRecordFilter(order_id=self.order_id, planning_entity_id=self.site_id),
+            self.actor,
+        )
+
+        self.assertEqual(len(with_type_only), 1)
+        self.assertEqual(len(with_id_only), 1)
 
     def test_update_site_record_persists_scalar_and_site_detail_without_relationship_crash(self) -> None:
         created = self.service.create_planning_record(

@@ -955,6 +955,39 @@ class SqlAlchemyPlanningRepository:
             statement = statement.where(PlanningRecord.planning_to >= filters.planning_from)
         if filters.planning_to is not None:
             statement = statement.where(PlanningRecord.planning_from <= filters.planning_to)
+        if filters.planning_entity_type is not None and filters.planning_entity_id is not None:
+            if filters.planning_entity_type == "site":
+                statement = statement.join(
+                    SitePlanDetail,
+                    and_(
+                        SitePlanDetail.planning_record_id == PlanningRecord.id,
+                        SitePlanDetail.tenant_id == PlanningRecord.tenant_id,
+                    ),
+                ).where(SitePlanDetail.site_id == filters.planning_entity_id)
+            elif filters.planning_entity_type == "event_venue":
+                statement = statement.join(
+                    EventPlanDetail,
+                    and_(
+                        EventPlanDetail.planning_record_id == PlanningRecord.id,
+                        EventPlanDetail.tenant_id == PlanningRecord.tenant_id,
+                    ),
+                ).where(EventPlanDetail.event_venue_id == filters.planning_entity_id)
+            elif filters.planning_entity_type == "trade_fair":
+                statement = statement.join(
+                    TradeFairPlanDetail,
+                    and_(
+                        TradeFairPlanDetail.planning_record_id == PlanningRecord.id,
+                        TradeFairPlanDetail.tenant_id == PlanningRecord.tenant_id,
+                    ),
+                ).where(TradeFairPlanDetail.trade_fair_id == filters.planning_entity_id)
+            elif filters.planning_entity_type == "patrol_route":
+                statement = statement.join(
+                    PatrolPlanDetail,
+                    and_(
+                        PatrolPlanDetail.planning_record_id == PlanningRecord.id,
+                        PatrolPlanDetail.tenant_id == PlanningRecord.tenant_id,
+                    ),
+                ).where(PatrolPlanDetail.patrol_route_id == filters.planning_entity_id)
         if filters.search:
             like_term = f"%{filters.search.strip().lower()}%"
             statement = statement.where(

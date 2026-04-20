@@ -166,6 +166,70 @@ describe('useCustomerNewPlanWizard', () => {
     expect(wizard.state.value.current_step).toBe('order-details');
   });
 
+  it('preserves a newly saved planning_record_id when the planning context changes in the same patch', () => {
+    const wizard = useCustomerNewPlanWizard();
+
+    wizard.resetForCustomer('customer-1', 'planning-record-overview');
+    wizard.setSavedContext({ order_id: 'order-1' });
+    wizard.setCurrentStep('planning-record-overview');
+    wizard.setStepCompletion('planning-record-overview', true);
+
+    wizard.setSavedContext({
+      planning_entity_type: 'site',
+      planning_entity_id: 'site-1',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+    });
+
+    expect(wizard.state.value.planning_entity_type).toBe('site');
+    expect(wizard.state.value.planning_entity_id).toBe('site-1');
+    expect(wizard.state.value.planning_mode_code).toBe('site');
+    expect(wizard.state.value.planning_record_id).toBe('record-1');
+    expect(wizard.canEnterStep('planning-record-documents')).toBe(true);
+    expect(wizard.moveNext()).toBe('planning-record-documents');
+    expect(wizard.state.value.current_step).toBe('planning-record-documents');
+  });
+
+  it('preserves planning_record_id when order_id and planning_record_id are restored together', () => {
+    const wizard = useCustomerNewPlanWizard();
+
+    wizard.resetForCustomer('customer-1', 'order-details');
+    wizard.setSavedContext({
+      order_id: 'order-1',
+      planning_record_id: 'record-1',
+    });
+
+    expect(wizard.state.value.order_id).toBe('order-1');
+    expect(wizard.state.value.planning_record_id).toBe('record-1');
+    expect(wizard.canEnterStep('planning-record-documents')).toBe(true);
+  });
+
+  it('clears planning_record_id when only planning context changes without a new planning record id', () => {
+    const wizard = useCustomerNewPlanWizard();
+
+    wizard.resetForCustomer('customer-1', 'order-details');
+    wizard.setSavedContext({
+      order_id: 'order-1',
+      planning_entity_type: 'site',
+      planning_entity_id: 'site-1',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+    });
+
+    wizard.setSavedContext({
+      planning_entity_type: 'trade_fair',
+      planning_entity_id: 'fair-1',
+      planning_mode_code: 'trade_fair',
+    });
+
+    expect(wizard.state.value.planning_entity_type).toBe('trade_fair');
+    expect(wizard.state.value.planning_entity_id).toBe('fair-1');
+    expect(wizard.state.value.planning_mode_code).toBe('trade_fair');
+    expect(wizard.state.value.planning_record_id).toBe('');
+    expect(wizard.state.value.shift_plan_id).toBe('');
+    expect(wizard.state.value.series_id).toBe('');
+  });
+
   it('does not report handoff readiness before the full persisted chain exists', () => {
     const wizard = useCustomerNewPlanWizard();
 

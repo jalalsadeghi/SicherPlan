@@ -113,6 +113,21 @@ export interface PlanningRecordListItem {
   version_no: number;
 }
 
+export interface PlanningRecordListFilters {
+  customer_id?: string;
+  dispatcher_user_id?: string;
+  include_archived?: boolean;
+  lifecycle_status?: string;
+  order_id?: string;
+  planning_entity_id?: string;
+  planning_entity_type?: CustomerOrderPlanningEntityType;
+  planning_from?: string;
+  planning_mode_code?: string;
+  planning_to?: string;
+  release_state?: string;
+  search?: string;
+}
+
 export interface PlanningRecordRead extends PlanningRecordListItem {
   released_by_user_id: string | null;
   notes: string | null;
@@ -215,9 +230,9 @@ async function request<T>(path: string, accessToken: string, options: JsonReques
   return (response.status === 204 ? undefined : response.json()) as T;
 }
 
-function queryString(params: Record<string, unknown>) {
+function queryString(params: object) {
   const query = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
+  Object.entries(params as Record<string, unknown>).forEach(([key, value]) => {
     if (value === null || value === undefined || value === "" || value === false) {
       return;
     }
@@ -334,7 +349,7 @@ export function getOrderCommercialLink(tenantId: string, orderId: string, access
   );
 }
 
-export function listPlanningRecords(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
+export function listPlanningRecords(tenantId: string, accessToken: string, filters: PlanningRecordListFilters) {
   return request<PlanningRecordListItem[]>(
     `/api/planning/tenants/${tenantId}/ops/planning-records${queryString(filters)}`,
     accessToken,

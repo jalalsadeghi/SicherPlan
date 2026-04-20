@@ -1,110 +1,118 @@
-You are working in the SicherPlan repository.
+Add regression tests for the Customer New Plan wizard Planning record step.
 
-This task follows the Planning Record context selector fix.
+Target behavior:
+A PlanningRecord created or already existing for an Order must be visible and usable inside the wizard, and Next must advance to planning-record-documents after a successful save.
 
-Source:
-- /docs/sprint/SPR-CUST-NEWPLAN-V1.md
+Inspect/update tests under:
+- web/apps/web-antd/src/views/sicherplan/customers/
+- web/apps/web-antd/src/views/sicherplan/customers/new-plan.test.ts
+- web/apps/web-antd/src/views/sicherplan/customers/new-plan-epic*.smoke.test.ts
+- web/apps/web-antd/src/views/sicherplan/customers/new-plan-wizard.test.ts
+- add a dedicated composable test for use-customer-new-plan-wizard.ts if missing
 
-Current product decision:
-- Order Details is first.
-- Planning context is inside Planning Record.
-- Planning is not a separate step.
+Required test 1 — setSavedContext atomic planning record save:
+1. Initialize wizard state with:
+   - customer_id
+   - order_id
+   - current_step = planning-record-overview
+2. Call setSavedContext({
+   planning_entity_id: 'site-1',
+   planning_entity_type: 'site',
+   planning_mode_code: 'site',
+   planning_record_id: 'planning-record-1'
+})
+3. Assert state.planning_record_id === 'planning-record-1'.
+4. Assert canEnterStep('planning-record-documents') is true.
+5. Assert moveNext() from planning-record-overview goes to planning-record-documents.
 
-Goal:
-Run a focused QA and hardening pass for the Planning Record context selector.
+Required test 2 — context-only change still clears planning_record_id:
+1. Start with an existing planning_record_id.
+2. Call setSavedContext({
+   planning_entity_id: 'different-site',
+   planning_entity_type: 'site',
+   planning_mode_code: 'site'
+})
+without planning_record_id.
+3. Assert planning_record_id is cleared and downstream shift/series ids are cleared.
 
-Do not add unrelated features.
-Do not reintroduce Planning as a separate step.
-Do not change backend APIs.
+Required test 3 — existing PlanningRecords are listed in wizard:
+1. Mount new-plan route with:
+   - customer_id
+   - order_id
+   - planning_entity_id
+   - planning_entity_type=site
+   - planning_mode_code=site
+   - step=planning-record-overview
+2. Mock listPlanningRecords to return a saved record for the order/mode/context:
+   - name: "Objektschutz RheinForum Köln – Nordtor Juli 2026"
+   - planning_from: "2026-07-01"
+   - planning_to: "2026-07-31"
+   - release_state: "draft"
+3. Assert the wizard renders this record in an existing PlanningRecords list.
+4. Assert clicking the row loads the form fields.
 
-Validate:
+Required test 4 — context-only draft must not override saved backend record:
+1. Seed sessionStorage with a planning-record-overview draft that contains only planning_context and no real form values.
+2. Mock listPlanningRecords/getPlanningRecord to return the saved record.
+3. Mount the wizard at planning-record-overview.
+4. Assert:
+   - no misleading “Unsaved draft restored” appears for the context-only draft
+   - the saved PlanningRecord is visible
+   - the form can be populated from the saved record
+   - the empty draft does not clear name/from/to fields.
 
-1. Visual layout
-- Planning context panel is clean.
-- Use existing / Create new options are aligned.
-- Radio controls use standard wizard/admin styling.
-- No awkward stretched field-stack radio layout remains.
-- Mobile/narrow layout stacks cleanly.
+Required test 5 — real unsaved draft is preserved:
+1. Seed sessionStorage with a real planning-record-overview draft:
+   - name
+   - planning_from
+   - planning_to
+   - notes
+2. Also mock an existing backend PlanningRecord.
+3. Mount the wizard.
+4. Assert the user draft is not overwritten automatically.
+5. Assert the existing backend PlanningRecord list is still visible so the user can intentionally select it.
 
-2. Existing planning entry selection
-- Clicking a row selects it locally.
-- Row highlight updates immediately.
-- Planning Record details appear.
-- No page/step refresh occurs.
-- No route.replace occurs on row click.
-- No saved-context emit occurs on row click.
-- No repeated backend GET burst occurs.
+Required test 6 — successful create advances:
+1. Mount the wizard at planning-record-overview with order_id and planning context.
+2. Fill:
+   - planning record name
+   - planning_from
+   - planning_to
+   - site watchbook note or notes
+3. Mock createPlanningRecord to return a saved PlanningRecord with id.
+4. Click Next.
+5. Assert:
+   - createPlanningRecord was called once with correct order_id, tenant_id, planning_mode_code, and site_detail.site_id
+   - saved-context preserves planning_record_id
+   - route query contains planning_record_id
+   - current step becomes planning-record-documents
+   - the wizard does not bounce back to planning-record-overview
+   - listPlanningRecords is refreshed and includes the saved record.
 
-3. Backend request behavior
-- Initial Planning Record load may fetch required order and planning option data.
-- Selecting a Site/Event/Patrol row should not refetch all order state and all planning families.
-- Selecting Trade Fair may fetch zones once.
-- No infinite loop.
-- No repeated customer/order/attachments/equipment/requirement reload after row selection.
+Required test 7 — multiple matching records:
+1. Mock two PlanningRecords for the same order/mode/context.
+2. Assert both are displayed.
+3. Assert no automatic selection happens unless route/wizardState specifies planning_record_id.
 
-4. Draft restore
-- After selecting a planning entry, browser refresh restores the selected row.
-- Restore does not emit saved-context repeatedly.
-- Restore does not trigger refresh loop.
-- Draft does not leak across customer/order.
+Required test 8 — admin page parity:
+1. Compare the listPlanningRecords filters used in the wizard with PlanningOrdersAdminView.vue.
+2. Assert wizard uses order_id and planning_mode_code at minimum.
+3. If backend now supports planning_entity_type/planning_entity_id filters, assert those are also used.
 
-5. Submit behavior
-- Missing planning context blocks Next.
-- Valid context + valid details saves PlanningRecord.
-- saved-context is emitted on successful save with planning context and planning_record_id.
-- Wizard moves to Planning Documents.
+Commands to run:
+- pnpm --dir web/apps/web-antd exec vitest run src/views/sicherplan/customers/new-plan.test.ts src/views/sicherplan/customers/new-plan-epic3.smoke.test.ts src/views/sicherplan/customers/new-plan-epic4.smoke.test.ts src/views/sicherplan/customers/new-plan-wizard.test.ts
+- pnpm --dir web/apps/web-antd exec vue-tsc --noEmit --skipLibCheck --pretty false
 
-6. Create new planning entry
-- Create new planning entry still opens modal.
-- Create new address still works.
-- Pick on map still works.
-- Created entry is selected locally.
-- It does not cause a full refresh loop.
-- Submit commits context and planning_record_id.
+If backend/API schemas are changed:
+- run the relevant backend pytest suite for planning records
+- run backend type/lint checks used by this repository
+- update frontend API types accordingly
 
-7. Non-regression
-- Order Details first-step behavior unchanged.
-- Equipment Lines unchanged.
-- Requirement Lines unchanged.
-- Order Documents optional behavior unchanged.
-- Planning Documents remains next after Planning Record.
-
-Tests:
-Run and update:
-- new-plan.test.ts
-- new-plan-epic3.smoke.test.ts
-- new-plan-epic4.smoke.test.ts
-- new-plan-wizard.test.ts
-- any focused Planning Record context tests
-
-Add missing tests for:
-- radio layout classes
-- no saved-context on planning row click
-- no route replace on planning row click
-- no full reload after planning row click
-- draft restore
-- successful submit commits context
-
-Manual QA checklist:
-- Open Planning Record step.
-- Select each planning family.
-- Select an existing entry.
-- Watch backend logs.
-- Confirm no unnecessary request burst.
-- Refresh and confirm restore.
-- Create PlanningRecord and continue.
-
-Final output:
-1. QA validation summary
-2. Issues found
-3. Fixes made
-4. Changed files
-5. Tests added/updated
-6. Test results
-7. Manual QA result
-8. Ready / Not ready for real data entry
-
-Before finalizing, explicitly confirm:
-- styling is fixed
-- planning row selection is local
-- context is committed only on Next/save
+Final output must include:
+- root cause confirmed or corrected
+- files changed
+- tests added
+- commands run
+- proof that Next advances after save
+- proof that existing PlanningRecords for the order/mode/context appear in the wizard
+- any manual QA steps still required.

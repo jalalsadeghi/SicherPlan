@@ -66,6 +66,17 @@ vi.mock('./new-plan-step-content.vue', () => ({
           this.$emit('step-ui-state', 'order-details', { dirty: false, error: '' });
           return true;
         }
+        if (this.currentStepId === 'planning-record-overview') {
+          this.$emit('saved-context', {
+            planning_entity_id: 'site-1',
+            planning_entity_type: 'site',
+            planning_mode_code: 'site',
+            planning_record_id: 'record-1',
+          });
+          this.$emit('step-completion', 'planning-record-overview', true);
+          this.$emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
+          return true;
+        }
         return true;
       },
     },
@@ -306,6 +317,36 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
     expect(wrapper.find('[data-testid="customer-new-plan-restore-warning"]').exists()).toBe(false);
+  });
+
+  it('advances to planning-record-documents after a successful planning-record save and persists planning_record_id', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      step: 'planning-record-overview',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-documents');
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/new-plan',
+      query: {
+        customer_id: 'customer-1',
+        order_id: 'order-1',
+        planning_entity_id: 'site-1',
+        planning_entity_type: 'site',
+        planning_mode_code: 'site',
+        planning_record_id: 'record-1',
+        step: 'planning-record-documents',
+      },
+    });
   });
 
   it('does not rewrite the route when route.replace keeps the same wizard context', async () => {

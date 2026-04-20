@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 
+import { readFileSync } from 'node:fs';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent } from 'vue';
@@ -28,6 +30,7 @@ const apiMocks = vi.hoisted(() => ({
   listOrderAttachmentsMock: vi.fn(),
   listOrderEquipmentLinesMock: vi.fn(),
   listOrderRequirementLinesMock: vi.fn(),
+  listPlanningRecordsMock: vi.fn(),
   listPlanningRecordAttachmentsMock: vi.fn(),
   listPlanningSetupRecordsMock: vi.fn(),
   listTradeFairZonesMock: vi.fn(),
@@ -81,6 +84,7 @@ vi.mock('#/sicherplan-legacy/api/planningOrders', () => ({
   listOrderAttachments: apiMocks.listOrderAttachmentsMock,
   listOrderEquipmentLines: apiMocks.listOrderEquipmentLinesMock,
   listOrderRequirementLines: apiMocks.listOrderRequirementLinesMock,
+  listPlanningRecords: apiMocks.listPlanningRecordsMock,
   listPlanningRecordAttachments: apiMocks.listPlanningRecordAttachmentsMock,
   listServiceCategoryOptions: vi.fn().mockResolvedValue([]),
   updatePlanningRecord: apiMocks.updatePlanningRecordMock,
@@ -178,6 +182,18 @@ function buildPlanningRecord(overrides: Record<string, unknown> = {}) {
     archived_at: null,
     ...overrides,
   };
+}
+
+function buildPlanningRecordDraftKey(planningEntityId: string, planningEntityType: string) {
+  return buildWizardDraftStorageKey(
+    {
+      customerId: 'customer-1',
+      planningEntityId,
+      planningEntityType,
+      tenantId: 'tenant-1',
+    },
+    'planning-record-overview',
+  );
 }
 
 function buildShiftPlan(overrides: Record<string, unknown> = {}) {
@@ -315,6 +331,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listOrderAttachmentsMock.mockReset();
     apiMocks.listOrderEquipmentLinesMock.mockReset();
     apiMocks.listOrderRequirementLinesMock.mockReset();
+    apiMocks.listPlanningRecordsMock.mockReset();
     apiMocks.listPlanningRecordAttachmentsMock.mockReset();
     apiMocks.listPlanningSetupRecordsMock.mockReset();
     apiMocks.listTradeFairZonesMock.mockReset();
@@ -356,6 +373,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       },
     ]);
     apiMocks.listPlanningRecordAttachmentsMock.mockResolvedValue([]);
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([]);
     apiMocks.listShiftPlansMock.mockResolvedValue([]);
     apiMocks.listShiftTemplatesMock.mockResolvedValue([{ id: 'template-1', tenant_id: 'tenant-1', code: 'TPL-1', label: 'Tagdienst Vorlage', local_start_time: '08:00', local_end_time: '16:00', default_break_minutes: 30, shift_type_code: 'day', status: 'active', version_no: 1 }]);
     apiMocks.listShiftTypeOptionsMock.mockResolvedValue([{ code: 'day', label: 'Day shift' }]);
@@ -470,6 +488,179 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(wrapper.emitted('saved-context')).toBeUndefined();
   });
 
+  it('loads existing operational planning records for the selected order and planning context', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([buildPlanningRecord()]);
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    apiMocks.listPlanningRecordsMock.mockClear();
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.listPlanningRecordsMock).toHaveBeenCalledWith('tenant-1', 'token-1', {
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+    });
+    expect(wrapper.find('[data-testid="customer-new-plan-existing-planning-records"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-testid="customer-new-plan-existing-planning-record-row"]')).toHaveLength(1);
+  });
+
+  it('loads an existing operational planning record locally without committing wizard context early', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([buildPlanningRecord()]);
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await flushPromises();
+    routerReplaceMock.mockClear();
+    apiMocks.getPlanningRecordMock.mockClear();
+
+    await wrapper.get('[data-testid="customer-new-plan-existing-planning-record-row"]').trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledWith('tenant-1', 'record-1', 'token-1');
+    expect(wrapper.emitted('saved-context')).toBeUndefined();
+    expect(routerReplaceMock).not.toHaveBeenCalled();
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord Sommer',
+    );
+  });
+
+  it('auto-selects the single saved planning record when there is no contentful unsaved draft', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([buildPlanningRecord()]);
+    const contextOnlyDraftKey = buildPlanningRecordDraftKey('site-1', 'site');
+    window.sessionStorage.setItem(
+      contextOnlyDraftKey,
+      JSON.stringify({
+        form: {
+          dispatcher_user_id: '',
+          event_detail_event_venue_id: '',
+          event_detail_setup_note: '',
+          name: '',
+          notes: '',
+          parent_planning_record_id: '',
+          patrol_detail_execution_note: '',
+          patrol_detail_patrol_route_id: '',
+          planning_from: '',
+          planning_mode_code: 'site',
+          planning_to: '',
+          site_detail_site_id: '',
+          site_detail_watchbook_scope_note: '',
+          status: 'active',
+          trade_fair_detail_stand_note: '',
+          trade_fair_detail_trade_fair_id: '',
+          trade_fair_detail_trade_fair_zone_id: '',
+        },
+        order_id: 'order-1',
+        planning_context: {
+          planning_entity_id: 'site-1',
+          planning_entity_type: 'site',
+          planning_mode_code: 'site',
+        },
+        selection_mode: 'use_existing',
+      }),
+    );
+
+    const wrapper = mountStep('planning-record-overview');
+    await flushPromises();
+    await flushPromises();
+
+    expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledWith('tenant-1', 'record-1', 'token-1');
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+    });
+    expect(wrapper.find('[data-testid="customer-new-plan-draft-restored"]').exists()).toBe(false);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord Sommer',
+    );
+  });
+
+  it('does not auto-select a saved planning record over a contentful unsaved draft', async () => {
+    const draftKey = buildPlanningRecordDraftKey('site-1', 'site');
+    window.sessionStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        form: {
+          dispatcher_user_id: '',
+          event_detail_event_venue_id: '',
+          event_detail_setup_note: '',
+          name: 'Draft Planning Record',
+          notes: '',
+          parent_planning_record_id: '',
+          patrol_detail_execution_note: '',
+          patrol_detail_patrol_route_id: '',
+          planning_from: '2026-06-03',
+          planning_mode_code: 'site',
+          planning_to: '2026-06-12',
+          site_detail_site_id: '',
+          site_detail_watchbook_scope_note: '',
+          status: 'active',
+          trade_fair_detail_stand_note: '',
+          trade_fair_detail_trade_fair_id: '',
+          trade_fair_detail_trade_fair_zone_id: '',
+        },
+        order_id: 'order-1',
+        planning_context: {
+          planning_entity_id: 'site-1',
+          planning_entity_type: 'site',
+          planning_mode_code: 'site',
+        },
+        selection_mode: 'use_existing',
+      }),
+    );
+
+    const wrapper = mountStep('planning-record-overview');
+    await flushPromises();
+    await flushPromises();
+
+    expect(apiMocks.getPlanningRecordMock).not.toHaveBeenCalledWith('tenant-1', 'record-1', 'token-1');
+    expect(wrapper.emitted('saved-context')).toBeUndefined();
+    expect(wrapper.get('[data-testid="customer-new-plan-draft-restored"]').text()).toBe('sicherplan.customerPlansWizard.draftRestored');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
+      'Draft Planning Record',
+    );
+  });
+
+  it('shows multiple matching planning records without auto-selecting one', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([
+      buildPlanningRecord({ id: 'record-1', name: 'Objektschutz RheinForum Köln – Nordtor Juli 2026' }),
+      buildPlanningRecord({
+        id: 'record-2',
+        name: 'Objektschutz RheinForum Köln – Nordtor August 2026',
+        planning_from: '2026-08-01',
+        planning_to: '2026-08-31',
+      }),
+    ]);
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-testid="customer-new-plan-existing-planning-record-row"]')).toHaveLength(2);
+    expect(wrapper.emitted('saved-context')).toBeUndefined();
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe('Werk Nord');
+    expect(apiMocks.getPlanningRecordMock).not.toHaveBeenCalledWith('tenant-1', 'record-1', 'token-1');
+    expect(apiMocks.getPlanningRecordMock).not.toHaveBeenCalledWith('tenant-1', 'record-2', 'token-1');
+  });
+
   it('creates or updates the planning record and keeps step-5 mode alignment', async () => {
     const wrapper = mountStep('planning-record-overview', {
       planning_entity_id: '',
@@ -508,6 +699,12 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       planning_mode_code: 'site',
       planning_record_id: 'record-1',
     });
+    expect(apiMocks.listPlanningRecordsMock).toHaveBeenCalledWith('tenant-1', 'token-1', {
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+    });
 
     await wrapper.setProps({
       wizardState: {
@@ -538,6 +735,17 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
         },
       }),
     );
+  });
+
+  it('keeps wizard planning-record filters aligned with planning-orders admin expectations', () => {
+    const adminViewSource = readFileSync(
+      '/home/jey/Projects/SicherPlan/web/apps/web-antd/src/sicherplan-legacy/views/PlanningOrdersAdminView.vue',
+      'utf8',
+    );
+
+    expect(adminViewSource).toContain('listPlanningRecords');
+    expect(adminViewSource).toContain('order_id');
+    expect(adminViewSource).toContain('planning_mode_code');
   });
 
   it('creates a new planning entry inside Planning Record and selects it locally', async () => {
