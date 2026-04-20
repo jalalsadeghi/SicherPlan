@@ -74,10 +74,13 @@ const contextState = ref<WizardContextState>('loading');
 const bootstrapped = ref(false);
 const stepContentRef = ref<InstanceType<typeof CustomerNewPlanStepContent> | null>(null);
 const stepSubmitting = ref(false);
-const routeSyncSuspended = ref(false);
 const routeRestoreWarning = ref('');
 const persistDraftsOnUnmount = ref(true);
+const activeInternalTransitionSeq = ref<number | null>(null);
+const pendingInternalRouteSignature = ref('');
+const lastCommittedInternalRouteSignature = ref('');
 let resolveCustomerContextSequence = 0;
+let routeTransitionSeq = 0;
 
 const customerId = computed(() => {
   const raw = route.query.customer_id;
@@ -163,22 +166,110 @@ function readWizardRouteState() {
   };
 }
 
-function syncWizardFromRoute() {
-  if (routeSyncSuspended.value) {
+function buildRouteStateSignature(routeState: ReturnType<typeof readWizardRouteState>) {
+  return [
+    routeState.customer_id,
+    routeState.order_id,
+    routeState.planning_entity_id,
+    routeState.planning_entity_type,
+    routeState.planning_mode_code,
+    routeState.planning_record_id,
+    routeState.shift_plan_id,
+    routeState.series_id,
+    routeState.step ?? '',
+  ].join('|');
+}
+
+function buildWizardStateRouteSignature() {
+  return [
+    wizardState.value.customer_id,
+    wizardState.value.order_id,
+    wizardState.value.planning_entity_id,
+    wizardState.value.planning_entity_type,
+    wizardState.value.planning_mode_code,
+    wizardState.value.planning_record_id,
+    wizardState.value.shift_plan_id,
+    wizardState.value.series_id,
+    wizardState.value.current_step,
+  ].join('|');
+}
+
+function beginInternalWizardTransition() {
+  const nextSeq = ++routeTransitionSeq;
+  activeInternalTransitionSeq.value = nextSeq;
+  pendingInternalRouteSignature.value = '';
+  return nextSeq;
+}
+
+function endInternalWizardTransition(transitionSeq: number) {
+  if (activeInternalTransitionSeq.value !== transitionSeq) {
     return;
   }
-  const routeState = readWizardRouteState();
+  activeInternalTransitionSeq.value = null;
+  pendingInternalRouteSignature.value = '';
+}
 
-  setSavedContext({
+function isInternalTransitionActive() {
+  return activeInternalTransitionSeq.value !== null;
+}
+
+function isSameUpstreamScope(routeState: ReturnType<typeof readWizardRouteState>) {
+  return (
+    routeState.customer_id === wizardState.value.customer_id &&
+    routeState.order_id === wizardState.value.order_id &&
+    routeState.planning_record_id === wizardState.value.planning_record_id
+  );
+}
+
+function isStaleShiftPlanRollbackRoute(routeState: ReturnType<typeof readWizardRouteState>) {
+  return (
+    wizardState.value.current_step === 'series-exceptions' &&
+    Boolean(wizardState.value.shift_plan_id) &&
+    isSameUpstreamScope(routeState) &&
+    (routeState.step === 'shift-plan' || !routeState.step) &&
+    routeState.shift_plan_id !== wizardState.value.shift_plan_id
+  );
+}
+
+function syncWizardFromRoute(options?: { allowClearingContext?: boolean; source?: 'external' | 'internal-final' | 'repair' }) {
+  const routeState = readWizardRouteState();
+  const allowClearingContext = options?.allowClearingContext ?? true;
+  const contextPatch = {
     customer_id: routeState.customer_id,
-    order_id: routeState.order_id,
-    planning_entity_id: routeState.planning_entity_id,
-    planning_entity_type: routeState.planning_entity_type,
-    planning_mode_code: routeState.planning_mode_code,
-    planning_record_id: routeState.planning_record_id,
-    series_id: routeState.series_id,
-    shift_plan_id: routeState.shift_plan_id,
-  });
+    order_id:
+      allowClearingContext || routeState.order_id || routeState.customer_id !== wizardState.value.customer_id
+        ? routeState.order_id
+        : wizardState.value.order_id,
+    planning_entity_id:
+      allowClearingContext || routeState.planning_entity_id || routeState.customer_id !== wizardState.value.customer_id
+        ? routeState.planning_entity_id
+        : wizardState.value.planning_entity_id,
+    planning_entity_type:
+      allowClearingContext || routeState.planning_entity_type || routeState.customer_id !== wizardState.value.customer_id
+        ? routeState.planning_entity_type
+        : wizardState.value.planning_entity_type,
+    planning_mode_code:
+      allowClearingContext || routeState.planning_mode_code || routeState.customer_id !== wizardState.value.customer_id
+        ? routeState.planning_mode_code
+        : wizardState.value.planning_mode_code,
+    planning_record_id:
+      allowClearingContext || routeState.planning_record_id || routeState.order_id !== wizardState.value.order_id
+        ? routeState.planning_record_id
+        : wizardState.value.planning_record_id,
+    shift_plan_id:
+      allowClearingContext || routeState.shift_plan_id || !isSameUpstreamScope(routeState)
+        ? routeState.shift_plan_id
+        : wizardState.value.shift_plan_id,
+    series_id:
+      allowClearingContext ||
+      routeState.series_id ||
+      !isSameUpstreamScope(routeState) ||
+      (routeState.shift_plan_id && routeState.shift_plan_id !== wizardState.value.shift_plan_id)
+        ? routeState.series_id
+        : wizardState.value.series_id,
+  };
+
+  setSavedContext(contextPatch);
 
   const resolvedStep = applyRequestedStep(routeState.step);
   routeRestoreWarning.value =
@@ -350,10 +441,7 @@ async function goToNextStep() {
   }
   if (canSubmitCurrentStep.value) {
     stepSubmitting.value = true;
-    const suspendRouteSyncForSubmit = !isFinalStep.value;
-    if (suspendRouteSyncForSubmit) {
-      routeSyncSuspended.value = true;
-    }
+    const transitionSeq = !isFinalStep.value ? beginInternalWizardTransition() : null;
     try {
       const submitResult = normalizeStepSubmitResult(
         await Promise.resolve(stepContentRef.value?.submitCurrentStep?.()),
@@ -378,11 +466,22 @@ async function goToNextStep() {
       }
       if (submitResult.success && !isFinalStep.value) {
         moveNext();
+        if (wizardState.value.current_step === 'shift-plan') {
+          setStepCompletion('shift-plan', false);
+          setStepUiState('shift-plan', {
+            dirty: true,
+            error: 'transition_failed_after_shift_plan_submit',
+          });
+          return;
+        }
+        await syncWizardRouteState({
+          force: true,
+          source: 'internal-final',
+        });
       }
     } finally {
-      if (suspendRouteSyncForSubmit) {
-        routeSyncSuspended.value = false;
-        await syncWizardRouteState();
+      if (transitionSeq !== null) {
+        endInternalWizardTransition(transitionSeq);
       }
       stepSubmitting.value = false;
     }
@@ -398,22 +497,49 @@ function selectStep(stepId: CustomerNewPlanWizardStepId) {
   setCurrentStep(stepId);
 }
 
-async function syncWizardRouteState() {
-  if (!bootstrapped.value || !customerId.value || routeSyncSuspended.value) {
+async function syncWizardRouteState(options?: { force?: boolean; source?: 'external' | 'internal-final' | 'repair' }) {
+  if (!bootstrapped.value || !customerId.value) {
+    return;
+  }
+  if (isInternalTransitionActive() && options?.source !== 'internal-final') {
     return;
   }
   const nextQuery = buildWizardRouteQuery();
+  const nextRouteState = {
+    customer_id: normalizeQueryString(nextQuery.customer_id),
+    order_id: normalizeQueryString(nextQuery.order_id),
+    planning_entity_id: normalizeQueryString(nextQuery.planning_entity_id),
+    planning_entity_type: normalizeQueryString(nextQuery.planning_entity_type),
+    planning_mode_code: normalizeQueryString(nextQuery.planning_mode_code),
+    planning_record_id: normalizeQueryString(nextQuery.planning_record_id),
+    shift_plan_id: normalizeQueryString(nextQuery.shift_plan_id),
+    series_id: normalizeQueryString(nextQuery.series_id),
+    step: (() => {
+      const raw = nextQuery.step;
+      if (Array.isArray(raw)) {
+        return typeof raw[0] === 'string' && isWizardStepId(raw[0]) ? raw[0] : null;
+      }
+      return typeof raw === 'string' && isWizardStepId(raw) ? raw : null;
+    })(),
+  };
+  const nextSignature = buildRouteStateSignature(nextRouteState);
   const queryChanged = PERSISTED_WIZARD_ROUTE_KEYS.some(
     (key) => normalizeQueryString(route.query[key]) !== normalizeQueryString(nextQuery[key]),
   );
-  if (!queryChanged) {
+  if (!options?.force && !queryChanged) {
     return;
+  }
+  if (options?.source === 'internal-final') {
+    pendingInternalRouteSignature.value = nextSignature;
   }
 
   await router.replace({
     path: '/admin/customers/new-plan',
     query: nextQuery,
   });
+  if (options?.source === 'internal-final') {
+    lastCommittedInternalRouteSignature.value = nextSignature;
+  }
 }
 
 onMounted(async () => {
@@ -421,9 +547,9 @@ onMounted(async () => {
   await authStore.ensureSessionReady();
   bootstrapped.value = true;
   resetForCustomer(customerId.value);
-  syncWizardFromRoute();
+  syncWizardFromRoute({ source: 'external' });
   await resolveCustomerContext();
-  await syncWizardRouteState();
+  await syncWizardRouteState({ source: 'external' });
 });
 
 watch(
@@ -434,8 +560,8 @@ watch(
     }
     if (nextCustomerId !== previousCustomerId) {
       resetForCustomer(nextCustomerId);
-      syncWizardFromRoute();
-      await syncWizardRouteState();
+      syncWizardFromRoute({ source: 'external' });
+      await syncWizardRouteState({ source: 'external' });
       await resolveCustomerContext();
       return;
     }
@@ -472,11 +598,30 @@ watch(
     route.query.series_id,
   ] as const,
   async () => {
-    if (!bootstrapped.value || routeSyncSuspended.value) {
+    if (!bootstrapped.value) {
       return;
     }
-    syncWizardFromRoute();
-    await syncWizardRouteState();
+    const routeState = readWizardRouteState();
+    const routeSignature = buildRouteStateSignature(routeState);
+    if (isInternalTransitionActive()) {
+      return;
+    }
+    if (isStaleShiftPlanRollbackRoute(routeState)) {
+      await syncWizardRouteState({ force: true, source: 'repair' });
+      return;
+    }
+    if (
+      lastCommittedInternalRouteSignature.value &&
+      routeSignature === lastCommittedInternalRouteSignature.value &&
+      routeSignature === buildWizardStateRouteSignature()
+    ) {
+      return;
+    }
+    syncWizardFromRoute({
+      allowClearingContext: !isSameUpstreamScope(routeState),
+      source: 'external',
+    });
+    await syncWizardRouteState({ source: 'external' });
   },
 );
 
@@ -495,7 +640,7 @@ watch(
     if (!bootstrapped.value) {
       return;
     }
-    await syncWizardRouteState();
+    await syncWizardRouteState({ source: 'external' });
   },
 );
 </script>
