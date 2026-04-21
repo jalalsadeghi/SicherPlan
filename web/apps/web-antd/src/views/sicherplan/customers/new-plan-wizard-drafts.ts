@@ -1,4 +1,4 @@
-import type { CustomerNewPlanWizardStepId } from './new-plan-wizard.types';
+import type { CustomerNewPlanWizardDraftStepId } from './new-plan-wizard.types';
 
 const WIZARD_DRAFT_STORAGE_PREFIX = 'sicherplan.customerNewPlanWizardDraft';
 const EMPTY_KEY_SEGMENT = '_';
@@ -29,7 +29,7 @@ function normalizeKeySegment(value: null | string | undefined) {
 
 export function buildWizardDraftStorageKey(
   context: CustomerNewPlanWizardDraftContext,
-  stepId: CustomerNewPlanWizardStepId,
+  stepId: CustomerNewPlanWizardDraftStepId,
 ) {
   if (stepId === 'order-details') {
     return [
@@ -64,7 +64,7 @@ export function buildOrderDetailsEditDraftStorageKey(
 
 export function saveWizardDraft<T>(
   context: CustomerNewPlanWizardDraftContext,
-  stepId: CustomerNewPlanWizardStepId,
+  stepId: CustomerNewPlanWizardDraftStepId,
   payload: null | T | undefined,
 ) {
   const storage = getSessionStorage();
@@ -90,7 +90,7 @@ export function saveWizardDraft<T>(
 
 export function loadWizardDraft<T>(
   context: CustomerNewPlanWizardDraftContext,
-  stepId: CustomerNewPlanWizardStepId,
+  stepId: CustomerNewPlanWizardDraftStepId,
 ) {
   const storage = getSessionStorage();
   if (!storage) {
@@ -111,7 +111,7 @@ export function loadWizardDraft<T>(
 
 export function clearWizardDraft(
   context: CustomerNewPlanWizardDraftContext,
-  stepId: CustomerNewPlanWizardStepId,
+  stepId: CustomerNewPlanWizardDraftStepId,
 ) {
   const storage = getSessionStorage();
   if (!storage) {
@@ -122,7 +122,7 @@ export function clearWizardDraft(
 
 export function loadWizardDraftCandidatesForCustomer<T>(
   context: Pick<CustomerNewPlanWizardDraftContext, 'customerId' | 'tenantId'>,
-  stepId: CustomerNewPlanWizardStepId,
+  stepId: CustomerNewPlanWizardDraftStepId,
 ) {
   const storage = getSessionStorage();
   if (!storage) {

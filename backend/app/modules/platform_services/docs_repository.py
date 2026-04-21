@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, String, cast, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -78,6 +78,44 @@ class SqlAlchemyDocumentRepository:
     def get_document(self, tenant_id: str, document_id: str) -> Document | None:
         statement = self._document_query().where(Document.tenant_id == tenant_id, Document.id == document_id)
         return self.session.scalars(statement).unique().one_or_none()
+
+    def list_documents(
+        self,
+        tenant_id: str,
+        *,
+        search: str | None = None,
+        document_type_key: str | None = None,
+        linked_entity: str | None = None,
+        limit: int = 25,
+    ) -> list[Document]:
+        statement = self._document_query().where(Document.tenant_id == tenant_id, Document.archived_at.is_(None))
+        if search or document_type_key:
+            statement = statement.outerjoin(DocumentType, Document.document_type_id == DocumentType.id)
+        if search:
+            pattern = f"%{search.strip()}%"
+            statement = statement.outerjoin(DocumentVersion).where(
+                or_(
+                    cast(Document.id, String).ilike(pattern),
+                    Document.title.ilike(pattern),
+                    Document.source_label.ilike(pattern),
+                    Document.source_module.ilike(pattern),
+                    DocumentVersion.file_name.ilike(pattern),
+                    DocumentType.key.ilike(pattern),
+                    DocumentType.name.ilike(pattern),
+                )
+            )
+        if document_type_key:
+            statement = statement.where(DocumentType.key == document_type_key)
+        if linked_entity:
+            owner_type, _, owner_id = linked_entity.partition(":")
+            if owner_type and owner_id:
+                statement = statement.join(DocumentLink, DocumentLink.document_id == Document.id).where(
+                    DocumentLink.tenant_id == tenant_id,
+                    DocumentLink.owner_type == owner_type,
+                    DocumentLink.owner_id == owner_id,
+                )
+        statement = statement.limit(limit)
+        return list(self.session.scalars(statement).unique().all())
 
     def find_document_by_source_reference(
         self,

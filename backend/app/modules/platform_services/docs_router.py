@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -54,6 +54,29 @@ def create_document(
     service: Annotated[DocumentService, Depends(get_document_service)],
 ) -> DocumentRead:
     return service.create_document(str(tenant_id), payload, context)
+
+
+@router.get("", response_model=list[DocumentRead])
+def list_documents(
+    tenant_id: UUID,
+    context: Annotated[
+        RequestAuthorizationContext,
+        Depends(require_authorization("platform.docs.read", scope="tenant")),
+    ],
+    service: Annotated[DocumentService, Depends(get_document_service)],
+    search: Annotated[str | None, Query(max_length=255)] = None,
+    document_type_code: Annotated[str | None, Query(max_length=120)] = None,
+    linked_entity: Annotated[str | None, Query(max_length=180)] = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 25,
+) -> list[DocumentRead]:
+    return service.list_documents(
+        str(tenant_id),
+        context,
+        search=search,
+        document_type_key=document_type_code,
+        linked_entity=linked_entity,
+        limit=limit,
+    )
 
 
 @router.get("/{document_id}", response_model=DocumentRead)

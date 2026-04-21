@@ -103,6 +103,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('#/views/sicherplan/customers/new-plan.vue'),
         meta: {
           authority: ['tenant_admin'],
+          fullPathKey: false,
           hideInMenu: true,
           icon: 'lucide:square-pen',
           title: $t('sicherplan.admin.customerNewPlan'),

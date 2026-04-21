@@ -128,6 +128,7 @@ export const moduleRegistry: Record<string, ModuleConfig> = {
       { labelKey: 'sicherplan.ui.stats.visibility', valueKey: 'sicherplan.ui.values.hrLeastPrivilege' },
       { labelKey: 'sicherplan.ui.stats.evidence', valueKey: 'sicherplan.ui.values.auditSafe' },
     ],
+    showPageIntro: false,
     showWorkspaceSectionHeader: false,
     titleKey: 'sicherplan.admin.employees',
     workspaceDescriptionKey: 'sicherplan.ui.modules.employees.workspace',

@@ -1,8 +1,27 @@
 import { describe, expect, it } from 'vitest';
 
+import { CUSTOMER_NEW_PLAN_WIZARD_STEP_IDS, CUSTOMER_NEW_PLAN_WIZARD_STEPS } from './new-plan-wizard.steps';
 import { useCustomerNewPlanWizard } from './use-customer-new-plan-wizard';
 
 describe('useCustomerNewPlanWizard', () => {
+  it('exposes only the six visible step ids in display order', () => {
+    expect(CUSTOMER_NEW_PLAN_WIZARD_STEP_IDS).toEqual([
+      'order-details',
+      'order-scope-documents',
+      'planning-record-overview',
+      'planning-record-documents',
+      'shift-plan',
+      'series-exceptions',
+    ]);
+    expect(CUSTOMER_NEW_PLAN_WIZARD_STEP_IDS).not.toContain('equipment-lines');
+    expect(CUSTOMER_NEW_PLAN_WIZARD_STEP_IDS).not.toContain('requirement-lines');
+    expect(CUSTOMER_NEW_PLAN_WIZARD_STEP_IDS).not.toContain('order-documents');
+
+    expect(CUSTOMER_NEW_PLAN_WIZARD_STEPS.find((step) => step.id === 'order-scope-documents')).toMatchObject({
+      requiredContextFields: ['customer_id', 'order_id'],
+    });
+  });
+
   it('initializes from customer context with order-details as the safe first step', () => {
     const wizard = useCustomerNewPlanWizard();
 
@@ -12,7 +31,7 @@ describe('useCustomerNewPlanWizard', () => {
     expect(wizard.state.value.current_step).toBe('order-details');
     expect(wizard.hasMinimumContext.value).toBe(true);
     expect(wizard.canEnterStep('order-details')).toBe(true);
-    expect(wizard.canEnterStep('equipment-lines')).toBe(false);
+    expect(wizard.canEnterStep('order-scope-documents')).toBe(false);
   });
 
   it('blocks direct entry into later steps when prerequisites are missing', () => {
@@ -35,8 +54,21 @@ describe('useCustomerNewPlanWizard', () => {
 
     expect(wizard.canMoveNext.value).toBe(true);
     wizard.moveNext();
-    expect(wizard.state.value.current_step).toBe('equipment-lines');
+    expect(wizard.state.value.current_step).toBe('order-scope-documents');
   });
+
+  it.each(['equipment-lines', 'requirement-lines', 'order-documents'])(
+    'normalizes legacy %s route steps to order-scope-documents',
+    (legacyStepId) => {
+      const wizard = useCustomerNewPlanWizard();
+
+      wizard.resetForCustomer('customer-1', 'order-details');
+      wizard.setSavedContext({ order_id: 'order-1' });
+
+      expect(wizard.applyRequestedStep(legacyStepId)).toBe('order-scope-documents');
+      expect(wizard.state.value.current_step).toBe('order-scope-documents');
+    },
+  );
 
   it('allows the planning-record step to be entered once order context exists', () => {
     const wizard = useCustomerNewPlanWizard();
@@ -48,6 +80,38 @@ describe('useCustomerNewPlanWizard', () => {
 
     expect(resolvedStep).toBe('planning-record-overview');
     expect(wizard.state.value.current_step).toBe('planning-record-overview');
+  });
+
+  it('falls back to order-details when order-scope-documents is requested without order context', () => {
+    const wizard = useCustomerNewPlanWizard();
+
+    wizard.resetForCustomer('customer-1', 'order-details');
+
+    expect(wizard.applyRequestedStep('order-scope-documents')).toBe('order-details');
+    expect(wizard.state.value.current_step).toBe('order-details');
+  });
+
+  it('allows order-scope-documents when order context exists', () => {
+    const wizard = useCustomerNewPlanWizard();
+
+    wizard.resetForCustomer('customer-1', 'order-details');
+    wizard.setSavedContext({ order_id: 'order-1' });
+
+    expect(wizard.applyRequestedStep('order-scope-documents')).toBe('order-scope-documents');
+    expect(wizard.state.value.current_step).toBe('order-scope-documents');
+  });
+
+  it('moves directly between order-scope-documents and planning-record-overview', () => {
+    const wizard = useCustomerNewPlanWizard();
+
+    wizard.resetForCustomer('customer-1', 'order-details');
+    wizard.setSavedContext({ order_id: 'order-1' });
+    wizard.setStepCompletion('order-details', true);
+    wizard.moveNext();
+    wizard.setStepCompletion('order-scope-documents', true);
+
+    expect(wizard.moveNext()).toBe('planning-record-overview');
+    expect(wizard.movePrevious()).toBe('order-scope-documents');
   });
 
   it('resets all transient ids when the customer context changes', () => {
@@ -124,9 +188,7 @@ describe('useCustomerNewPlanWizard', () => {
       shift_plan_id: 'shift-plan-1',
       series_id: 'series-1',
     });
-    wizard.setStepCompletion('equipment-lines', true);
-    wizard.setStepCompletion('requirement-lines', true);
-    wizard.setStepCompletion('order-documents', true);
+    wizard.setStepCompletion('order-scope-documents', true);
     wizard.setStepCompletion('planning-record-overview', true);
     wizard.setStepCompletion('planning-record-documents', true);
     wizard.setStepCompletion('shift-plan', true);

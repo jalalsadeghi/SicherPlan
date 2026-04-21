@@ -9,7 +9,7 @@ import {
   getPreviousWizardStepId,
   getWizardStepDefinition,
   hasRequiredContextForStep,
-  isWizardStepId,
+  normalizeWizardStepId,
   resolveAllowedWizardStep,
 } from './new-plan-wizard.steps';
 import type {
@@ -118,7 +118,7 @@ export function useCustomerNewPlanWizard() {
   }
 
   function applyRequestedStep(stepId: string | null | undefined) {
-    return syncCurrentStep(isWizardStepId(stepId) ? stepId : null);
+    return syncCurrentStep(normalizeWizardStepId(stepId));
   }
 
   function moveNext() {
@@ -232,9 +232,7 @@ export function useCustomerNewPlanWizard() {
       }
       nextState.series_id = '';
       invalidateSteps(nextState, [
-        'equipment-lines',
-        'requirement-lines',
-        'order-documents',
+        'order-scope-documents',
         'planning-record-documents',
         'shift-plan',
         'series-exceptions',

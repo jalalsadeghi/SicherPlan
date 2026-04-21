@@ -1,16 +1,26 @@
-import test from "node:test";
-import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { expect, test } from "vitest";
 
-const viewPath = resolve(
-  process.cwd(),
-  "web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue",
-);
-const registryPath = resolve(
-  process.cwd(),
-  "web/apps/web-antd/src/views/sicherplan/module-registry.ts",
-);
+const assert = {
+  match(actual, expected) {
+    expect(actual).toMatch(expected);
+  },
+  doesNotMatch(actual, expected) {
+    expect(actual).not.toMatch(expected);
+  },
+};
+
+function resolveWebAppPath(relativePath) {
+  const cwd = process.cwd();
+  if (cwd.endsWith("web/apps/web-antd")) {
+    return resolve(cwd, relativePath);
+  }
+  return resolve(cwd, "web/apps/web-antd", relativePath);
+}
+
+const viewPath = resolveWebAppPath("src/sicherplan-legacy/views/EmployeeAdminView.vue");
+const registryPath = resolveWebAppPath("src/views/sicherplan/module-registry.ts");
 
 const viewSource = readFileSync(viewPath, "utf8");
 const registrySource = readFileSync(registryPath, "utf8");
@@ -19,12 +29,18 @@ test("employees module hides the shared workspace section header", () => {
   assert.match(registrySource, /employees:\s*{[\s\S]*showWorkspaceSectionHeader:\s*false/);
 });
 
-test("employee workspace uses master detail layout and embedded scope is removed", () => {
+test("employee page does not render the top module intro hero", () => {
+  assert.doesNotMatch(viewSource, /class="module-card employee-admin-hero"/);
+  assert.doesNotMatch(viewSource, /class="employee-admin-meta__pill"/);
+});
+
+test("employee workspace uses stacked full-width list and detail layout with embedded scope removed", () => {
   assert.match(viewSource, /data-testid="employee-master-detail-layout"/);
   assert.match(viewSource, /data-testid="employee-list-section"/);
   assert.match(viewSource, /data-testid="employee-detail-workspace"/);
   assert.match(viewSource, /v-if="!embedded && isPlatformAdmin" class="module-card employee-admin-scope"/);
-  assert.match(viewSource, /\.employee-admin-grid\s*{\s*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(320px,\s*420px\)\s*minmax\(0,\s*1fr\)/);
+  assert.match(viewSource, /\.employee-admin-grid\s*{\s*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.match(viewSource, /\.employee-admin-list-panel\s*{\s*position:\s*static;[\s\S]*top:\s*auto;/);
 });
 
 test("employee workspace resolves tenant scope from session bootstrap for normal users", () => {
@@ -89,11 +105,21 @@ test("employee workspace removes the redundant catalogs tab and keeps only light
   assert.doesNotMatch(viewSource, /submitQualificationTypeCatalog/);
 });
 
-test("employee list rows use structured text stack markup and card row styling", () => {
-  assert.match(viewSource, /class="employee-admin-row__text"/);
-  assert.match(viewSource, /class="employee-admin-row__title"/);
-  assert.match(viewSource, /class="employee-admin-row__meta"/);
-  assert.match(viewSource, /\.employee-admin-row,\s*\.employee-admin-record\s*{[\s\S]*padding:\s*1rem;[\s\S]*border-radius:\s*18px;[\s\S]*border:\s*1px solid var\(--sp-color-border-soft\);/);
+test("employee search results render only inside a dismissible search dialog", () => {
+  assert.match(viewSource, /data-testid="employee-search-select"/);
+  assert.match(viewSource, /data-testid="employee-search-select-input"/);
+  assert.match(viewSource, /data-testid="employee-search-suggestions"/);
+  assert.match(viewSource, /data-testid="employee-search-suggestion-row"/);
+  assert.match(viewSource, /data-testid="employee-search-suggestion-empty"/);
+  assert.match(viewSource, /@keydown\.escape\.stop\.prevent="closeEmployeeSearchSuggestions"/);
+  assert.match(viewSource, /@keydown\.enter\.prevent="handleOpenEmployeeSearchResults"/);
+  assert.match(viewSource, /data-testid="employee-search-results-modal"/);
+  assert.match(viewSource, /data-testid="employee-search-result-close"/);
+  assert.match(viewSource, /data-testid="employee-search-result-empty"/);
+  assert.match(viewSource, /data-testid="employee-search-result-row"/);
+  assert.match(viewSource, /@click="selectEmployeeFromSearchResult\(employee\.id\)"/);
+  assert.doesNotMatch(viewSource, /class="employee-admin-row"/);
+  assert.match(viewSource, /\.employee-admin-record\s*{[\s\S]*padding:\s*1rem;[\s\S]*border-radius:\s*18px;[\s\S]*border:\s*1px solid var\(--sp-color-border-soft\);/);
 });
 
 test("employee list panel splits search and import-export into tabs and preserves tab-panel structure", () => {
@@ -106,6 +132,13 @@ test("employee list panel splits search and import-export into tabs and preserve
   assert.match(viewSource, /v-show="listPanelTab === 'import_export'"/);
   assert.match(viewSource, /employee-list-tab-panel-search[\s\S]*employeeAdmin\.actions\.search/);
   assert.match(viewSource, /employee-list-tab-panel-search[\s\S]*employeeAdmin\.actions\.newEmployee/);
+  assert.match(viewSource, /employee-list-tab-panel-search[\s\S]*data-testid="employee-search-select"/);
+  assert.match(viewSource, /class="employee-admin-filter-grid"/);
+  assert.match(viewSource, /class="employee-admin-filter-actions"/);
+  assert.match(viewSource, /class="cta-row employee-admin-filter-actions__buttons"/);
+  assert.match(viewSource, /\.employee-admin-filter-grid\s*{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(viewSource, /@media \(max-width:\s*1280px\)[\s\S]*\.employee-admin-filter-grid\s*{[\s\S]*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(viewSource, /@media \(max-width:\s*720px\)[\s\S]*\.employee-admin-filter-grid\s*{[\s\S]*grid-template-columns:\s*1fr/);
   assert.match(viewSource, /employee-list-tab-panel-import-export[\s\S]*employeeAdmin\.actions\.loadImportFile/);
   assert.match(viewSource, /employee-list-tab-panel-import-export[\s\S]*employeeAdmin\.actions\.importExecute/);
   assert.match(viewSource, /employee-list-tab-panel-import-export[\s\S]*employeeAdmin\.actions\.exportEmployees/);

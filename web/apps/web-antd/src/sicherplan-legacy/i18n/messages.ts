@@ -492,6 +492,14 @@ export type MessageKey =
   | "employeeAdmin.list.eyebrow"
   | "employeeAdmin.list.title"
   | "employeeAdmin.list.empty"
+  | "employeeAdmin.search.suggestionsEmpty"
+  | "employeeAdmin.search.suggestionsLoading"
+  | "employeeAdmin.search.selectEmployee"
+  | "employeeAdmin.searchResults.eyebrow"
+  | "employeeAdmin.searchResults.title"
+  | "employeeAdmin.searchResults.lead"
+  | "employeeAdmin.searchResults.empty"
+  | "employeeAdmin.searchResults.loading"
   | "employeeAdmin.detail.eyebrow"
   | "employeeAdmin.detail.newTitle"
   | "employeeAdmin.detail.emptyTitle"
@@ -812,6 +820,7 @@ export type MessageKey =
   | "employeeAdmin.actions.rememberScope"
   | "employeeAdmin.actions.refresh"
   | "employeeAdmin.actions.search"
+  | "employeeAdmin.actions.cancel"
   | "employeeAdmin.actions.clearFeedback"
   | "employeeAdmin.actions.newEmployee"
   | "employeeAdmin.actions.createEmployee"
@@ -2417,12 +2426,21 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.list.eyebrow": "Liste",
     "employeeAdmin.list.title": "Mitarbeiter",
     "employeeAdmin.list.empty": "Keine Mitarbeiter für die aktuellen Filter gefunden.",
+    "employeeAdmin.search.suggestionsEmpty": "Keine passenden Mitarbeiter",
+    "employeeAdmin.search.suggestionsLoading": "Mitarbeiter werden gesucht ...",
+    "employeeAdmin.search.selectEmployee": "Mitarbeiter auswählen",
+    "employeeAdmin.searchResults.eyebrow": "Mitarbeitersuche",
+    "employeeAdmin.searchResults.title": "Passende Mitarbeiter",
+    "employeeAdmin.searchResults.lead":
+      "Wählen Sie einen Treffer aus, um die Mitarbeiterakte im Arbeitsbereich zu öffnen.",
+    "employeeAdmin.searchResults.empty": "Keine passenden Mitarbeiter für die aktuellen Filter gefunden.",
+    "employeeAdmin.searchResults.loading": "Mitarbeiter werden gesucht ...",
     "employeeAdmin.detail.eyebrow": "Akte",
     "employeeAdmin.detail.newTitle": "Neue Mitarbeiterakte",
     "employeeAdmin.detail.emptyTitle": "Keine Mitarbeiterakte ausgewählt",
     "employeeAdmin.detail.emptyEyebrow": "Detailansicht",
     "employeeAdmin.detail.emptyBody":
-      "Wählen Sie links eine Mitarbeiterakte aus oder legen Sie eine neue an.",
+      "Suchen Sie eine Mitarbeiterakte über die Liste oder legen Sie eine neue an.",
     "employeeAdmin.tabs.overview": "Überblick",
     "employeeAdmin.tabs.appAccess": "App-Zugang",
     "employeeAdmin.tabs.profilePhoto": "Profilfoto",
@@ -2455,7 +2473,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.form.actionsEyebrow": "Aktion",
     "employeeAdmin.form.actionsTitle": "Akte speichern oder zurücksetzen",
     "employeeAdmin.filters.search": "Suche",
-    "employeeAdmin.filters.searchPlaceholder": "Personalnummer, Name oder E-Mail",
+    "employeeAdmin.filters.searchPlaceholder": "Personalnummer, Name, E-Mail oder Telefon",
     "employeeAdmin.filters.status": "Status",
     "employeeAdmin.filters.allStatuses": "Alle Status",
     "employeeAdmin.filters.includeArchived": "Archivierte Datensätze einschliessen",
@@ -2747,6 +2765,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.rememberScope": "Scope merken",
     "employeeAdmin.actions.refresh": "Neu laden",
     "employeeAdmin.actions.search": "Suchen",
+    "employeeAdmin.actions.cancel": "Schliessen",
     "employeeAdmin.actions.clearFeedback": "Hinweis schliessen",
     "employeeAdmin.actions.newEmployee": "Mitarbeiterakte anlegen",
     "employeeAdmin.actions.createEmployee": "Mitarbeiter anlegen",
@@ -4535,12 +4554,21 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.list.eyebrow": "List",
     "employeeAdmin.list.title": "Employees",
     "employeeAdmin.list.empty": "No employees match the current filters.",
+    "employeeAdmin.search.suggestionsEmpty": "No matching employees",
+    "employeeAdmin.search.suggestionsLoading": "Searching employees...",
+    "employeeAdmin.search.selectEmployee": "Select employee",
+    "employeeAdmin.searchResults.eyebrow": "Employee search",
+    "employeeAdmin.searchResults.title": "Matching employees",
+    "employeeAdmin.searchResults.lead":
+      "Select a result to open the employee file in the workspace.",
+    "employeeAdmin.searchResults.empty": "No matching employees were found for the current filters.",
+    "employeeAdmin.searchResults.loading": "Searching employees...",
     "employeeAdmin.detail.eyebrow": "File",
     "employeeAdmin.detail.newTitle": "New employee file",
     "employeeAdmin.detail.emptyTitle": "No employee file selected",
     "employeeAdmin.detail.emptyEyebrow": "Detail view",
     "employeeAdmin.detail.emptyBody":
-      "Select an employee file on the left or create a new one.",
+      "Search for an employee file from the list panel or create a new one.",
     "employeeAdmin.tabs.overview": "Overview",
     "employeeAdmin.tabs.appAccess": "App access",
     "employeeAdmin.tabs.profilePhoto": "Profile photo",
@@ -4573,7 +4601,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.form.actionsEyebrow": "Action",
     "employeeAdmin.form.actionsTitle": "Save or reset the file",
     "employeeAdmin.filters.search": "Search",
-    "employeeAdmin.filters.searchPlaceholder": "Personnel number, name, or email",
+    "employeeAdmin.filters.searchPlaceholder": "Personnel number, name, email, or phone",
     "employeeAdmin.filters.status": "Status",
     "employeeAdmin.filters.allStatuses": "All statuses",
     "employeeAdmin.filters.includeArchived": "Include archived records",
@@ -4870,6 +4898,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.rememberScope": "Remember scope",
     "employeeAdmin.actions.refresh": "Reload",
     "employeeAdmin.actions.search": "Search",
+    "employeeAdmin.actions.cancel": "Close",
     "employeeAdmin.actions.clearFeedback": "Dismiss message",
     "employeeAdmin.actions.newEmployee": "Create employee file",
     "employeeAdmin.actions.createEmployee": "Create employee",

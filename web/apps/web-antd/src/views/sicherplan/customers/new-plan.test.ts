@@ -75,6 +75,15 @@ vi.mock('./new-plan-step-content.vue', () => ({
           this.$emit('step-ui-state', 'order-details', { dirty: false, error: '' });
           return true;
         }
+        if (this.currentStepId === 'order-scope-documents') {
+          return {
+            success: true,
+            completedStepId: 'order-scope-documents',
+            dirty: false,
+            error: '',
+            savedContext: { order_id: this.wizardState.order_id },
+          };
+        }
         if (this.currentStepId === 'planning-record-overview') {
           this.$emit('saved-context', {
             planning_entity_id: 'site-1',
@@ -130,6 +139,9 @@ vi.mock('./new-plan-step-content.vue', () => ({
             dirty
           </button>
         </div>
+        <div data-testid="customer-new-plan-step-panel-order-scope-documents" v-else-if="currentStepId === 'order-scope-documents'">
+          order scope
+        </div>
         <div data-testid="customer-new-plan-step-panel-shift-plan" v-else-if="currentStepId === 'shift-plan'">
           <button
             data-testid="customer-new-plan-existing-shift-plan-row"
@@ -168,7 +180,12 @@ const ModuleWorkspacePageStub = defineComponent({
     description: { type: String, default: '' },
     showIntro: { type: Boolean, default: false },
   },
-  template: '<div><slot name="workspace" /></div>',
+  template: `
+    <div data-testid="module-workspace-page" :data-show-intro="String(showIntro)">
+      <div v-if="showIntro" data-testid="module-workspace-intro">{{ eyebrow }} {{ title }} {{ description }}</div>
+      <slot name="workspace" />
+    </div>
+  `,
 });
 
 const SectionBlockStub = defineComponent({
@@ -262,9 +279,23 @@ describe('CustomerNewPlanWizardView', () => {
     await flushPromises();
 
     expect(customersApiMocks.getCustomerMock).toHaveBeenCalledWith('tenant-1', 'customer-1', 'token-1');
+    expect(wrapper.get('[data-testid="module-workspace-page"]').attributes('data-show-intro')).toBe('false');
+    expect(wrapper.find('[data-testid="module-workspace-intro"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-breadcrumb"]').text()).toContain(
+      'sicherplan.customerPlansWizard.breadcrumbCustomers',
+    );
     expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security');
+    expect(wrapper.find('[data-testid="customer-new-plan-stepper"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
-    expect(wrapper.findAll('.sp-customer-plan-wizard__step')).toHaveLength(8);
+    expect(wrapper.find('[data-testid="customer-new-plan-step-content-stub"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-action-bar"]').exists()).toBe(true);
+    expect(wrapper.findAll('.sp-customer-plan-wizard__step')).toHaveLength(6);
+    expect(wrapper.find('[data-testid="customer-new-plan-step-equipment-lines"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-step-requirement-lines"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-step-order-documents"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-step-order-scope-documents"]').text()).toContain(
+      'sicherplan.customerPlansWizard.steps.orderScopeDocuments',
+    );
     expect(wrapper.get('[data-testid="customer-new-plan-previous"]').attributes('disabled')).toBeDefined();
   });
 
@@ -382,27 +413,121 @@ describe('CustomerNewPlanWizardView', () => {
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
       path: '/admin/customers/new-plan',
       query: {
         customer_id: 'customer-1',
         order_id: 'order-1',
-        step: 'equipment-lines',
+        step: 'order-scope-documents',
       },
     });
   });
 
-  it('hydrates a later step from route state when required ids exist', async () => {
+  it.each(['equipment-lines', 'requirement-lines', 'order-documents'])(
+    'normalizes legacy route step %s when required ids exist',
+    async (legacyStepId) => {
     routeState.query = {
       customer_id: 'customer-1',
       order_id: 'order-1',
-      step: 'equipment-lines',
+      step: legacyStepId,
     };
     const wrapper = mountComponent();
     await flushPromises();
 
-    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('equipment-lines');
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/new-plan',
+      query: {
+        customer_id: 'customer-1',
+        order_id: 'order-1',
+        step: 'order-scope-documents',
+      },
+    });
+    },
+  );
+
+  it('keeps legacy requirement-lines routes compatible across remounts', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      step: 'requirement-lines',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
+
+    wrapper.unmount();
+    const restoredWrapper = mountComponent();
+    await flushPromises();
+
+    expect(restoredWrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/new-plan',
+      query: {
+        customer_id: 'customer-1',
+        order_id: 'order-1',
+        step: 'order-scope-documents',
+      },
+    });
+  });
+
+  it('falls back to order-details when order-scope-documents is requested without order_id', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      step: 'order-scope-documents',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/new-plan',
+      query: {
+        customer_id: 'customer-1',
+      },
+    });
+  });
+
+  it('falls back to order-details when planning-record-overview is requested without order_id', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      step: 'planning-record-overview',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/new-plan',
+      query: {
+        customer_id: 'customer-1',
+      },
+    });
+  });
+
+  it('moves from order-scope-documents to planning-record-overview on Next', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      step: 'order-scope-documents',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/new-plan',
+      query: {
+        customer_id: 'customer-1',
+        order_id: 'order-1',
+        step: 'planning-record-overview',
+      },
+    });
   });
 
   it('does not auto-jump away from order-details when order_id exists but the route has no explicit step', async () => {
@@ -786,11 +911,11 @@ describe('CustomerNewPlanWizardView', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
   });
 
-  it('returns to order-details when Previous is clicked from equipment-lines', async () => {
+  it('returns to order-details when Previous is clicked from order-scope-documents', async () => {
     routeState.query = {
       customer_id: 'customer-1',
       order_id: 'order-1',
-      step: 'equipment-lines',
+      step: 'order-scope-documents',
     };
     const wrapper = mountComponent();
     await flushPromises();
@@ -805,7 +930,7 @@ describe('CustomerNewPlanWizardView', () => {
     routeState.query = {
       customer_id: 'customer-1',
       order_id: 'order-1',
-      step: 'equipment-lines',
+      step: 'order-scope-documents',
     };
     const wrapper = mountComponent();
     await flushPromises();

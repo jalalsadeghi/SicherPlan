@@ -37,6 +37,7 @@ describe('sicherplan route authority', () => {
 
     expect(newPlanRoute?.path).toBe('/admin/customers/new-plan');
     expect(newPlanRoute?.meta?.authority).toEqual(['tenant_admin']);
+    expect(newPlanRoute?.meta?.fullPathKey).toBe(false);
     expect(newPlanRoute?.meta?.hideInMenu).toBe(true);
   });
 

@@ -1,18 +1,5 @@
 <template>
   <section class="employee-admin-page">
-    <section v-if="!embedded" class="module-card employee-admin-hero">
-      <div>
-        <p class="eyebrow">{{ t("employeeAdmin.eyebrow") }}</p>
-        <h2>{{ t("employeeAdmin.title") }}</h2>
-        <p class="employee-admin-lead">{{ t("employeeAdmin.lead") }}</p>
-        <div class="employee-admin-meta">
-          <span class="employee-admin-meta__pill">{{ t("employeeAdmin.permission.read") }}: {{ canRead ? "on" : "off" }}</span>
-          <span class="employee-admin-meta__pill">{{ t("employeeAdmin.permission.write") }}: {{ canWrite ? "on" : "off" }}</span>
-          <span class="employee-admin-meta__pill">{{ t("employeeAdmin.permission.privateRead") }}: {{ canReadPrivate ? "on" : "off" }}</span>
-        </div>
-      </div>
-    </section>
-
     <div v-if="!embedded && isPlatformAdmin" class="module-card employee-admin-scope" :class="{ 'employee-admin-scope--embedded': embedded }">
       <label class="field-stack">
         <span>{{ t("employeeAdmin.scope.label") }}</span>
@@ -23,7 +10,7 @@
         <button class="cta-button" type="button" @click="rememberScope">
           {{ t("employeeAdmin.actions.rememberScope") }}
         </button>
-        <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshEmployees">
+        <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="() => refreshEmployees()">
           {{ t("employeeAdmin.actions.refresh") }}
         </button>
       </div>
@@ -83,10 +70,55 @@
         </nav>
 
         <section v-show="listPanelTab === 'search'" class="employee-admin-section employee-admin-tab-panel" data-testid="employee-list-tab-panel-search">
-          <div class="employee-admin-form-grid">
-            <label class="field-stack">
+          <div class="employee-admin-filter-grid">
+            <label class="field-stack employee-admin-search-field">
               <span>{{ t("employeeAdmin.filters.search") }}</span>
-              <input v-model="filters.search" :placeholder="t('employeeAdmin.filters.searchPlaceholder')" />
+              <div class="employee-admin-search-select" data-testid="employee-search-select">
+                <input
+                  v-model="filters.search"
+                  :placeholder="t('employeeAdmin.filters.searchPlaceholder')"
+                  data-testid="employee-search-select-input"
+                  @keydown.escape.stop.prevent="closeEmployeeSearchSuggestions"
+                  @keydown.enter.prevent="handleOpenEmployeeSearchResults"
+                />
+                <div
+                  v-if="employeeSearchSuggestionsVisible"
+                  class="employee-admin-search-suggestions"
+                  data-testid="employee-search-suggestions"
+                  role="listbox"
+                >
+                  <button
+                    v-for="employee in employeeSearchSuggestions"
+                    :key="employee.id"
+                    type="button"
+                    :aria-label="t('employeeAdmin.search.selectEmployee')"
+                    class="employee-admin-search-suggestion"
+                    data-testid="employee-search-suggestion-row"
+                    @click="selectEmployeeFromSuggestion(employee)"
+                  >
+                    <span class="employee-admin-search-suggestion__title">
+                      {{ employee.personnel_no }} · {{ employee.first_name }} {{ employee.last_name }}
+                    </span>
+                    <span v-if="employee.preferred_name" class="employee-admin-search-suggestion__meta">
+                      {{ employee.preferred_name }}
+                    </span>
+                    <span class="employee-admin-search-suggestion__meta">
+                      {{ resolveEmployeeSuggestionContact(employee) }}
+                    </span>
+                    <span class="employee-admin-search-suggestion__status">{{ employee.status }}</span>
+                  </button>
+                  <p
+                    v-if="employeeSearchSuggestionEmptyVisible"
+                    class="employee-admin-search-suggestion-empty"
+                    data-testid="employee-search-suggestion-empty"
+                  >
+                    {{ t("employeeAdmin.search.suggestionsEmpty") }}
+                  </p>
+                </div>
+              </div>
+              <small v-if="loading.employeeSearch" class="employee-admin-field-help">
+                {{ t("employeeAdmin.search.suggestionsLoading") }}
+              </small>
             </label>
             <label class="field-stack">
               <span>{{ t("employeeAdmin.filters.status") }}</span>
@@ -117,16 +149,18 @@
             </label>
           </div>
 
-          <label class="employee-admin-checkbox">
-            <input v-model="filters.include_archived" type="checkbox" />
-            <span>{{ t("employeeAdmin.filters.includeArchived") }}</span>
-          </label>
+          <div class="employee-admin-filter-actions">
+            <label class="employee-admin-checkbox">
+              <input v-model="filters.include_archived" type="checkbox" />
+              <span>{{ t("employeeAdmin.filters.includeArchived") }}</span>
+            </label>
 
-          <div class="cta-row">
-            <button class="cta-button" type="button" @click="refreshEmployees">{{ t("employeeAdmin.actions.search") }}</button>
-            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreate" @click="startCreateEmployee">
-              {{ t("employeeAdmin.actions.newEmployee") }}
-            </button>
+            <div class="cta-row employee-admin-filter-actions__buttons">
+              <button class="cta-button" type="button" @click="handleOpenEmployeeSearchResults">{{ t("employeeAdmin.actions.search") }}</button>
+              <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreate" @click="startCreateEmployee">
+                {{ t("employeeAdmin.actions.newEmployee") }}
+              </button>
+            </div>
           </div>
         </section>
 
@@ -176,24 +210,64 @@
           </p>
         </section>
 
-        <div v-if="employees.length" class="employee-admin-list">
-          <button
-            v-for="employee in employees"
-            :key="employee.id"
-            type="button"
-            class="employee-admin-row"
-            :class="{ selected: employee.id === selectedEmployeeId }"
-            @click="selectEmployee(employee.id)"
-          >
-            <div class="employee-admin-row__text">
-              <strong class="employee-admin-row__title">{{ employee.personnel_no }} · {{ employee.first_name }} {{ employee.last_name }}</strong>
-              <span class="employee-admin-row__meta">{{ employee.work_email || employee.mobile_phone || t("employeeAdmin.summary.none") }}</span>
-            </div>
-            <StatusBadge :status="employee.status" />
-          </button>
-        </div>
-        <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.list.empty") }}</p>
       </section>
+
+      <div
+        v-if="employeeSearchModalOpen"
+        class="employee-admin-modal-backdrop"
+        data-testid="employee-search-results-modal-backdrop"
+        @click.self="closeEmployeeSearchResultsModal"
+      >
+        <section
+          class="module-card employee-admin-modal"
+          aria-labelledby="employee-search-results-title"
+          aria-modal="true"
+          role="dialog"
+          data-testid="employee-search-results-modal"
+        >
+          <div class="employee-admin-form-section__header employee-admin-form-section__header--split">
+            <div>
+              <p class="eyebrow">{{ t("employeeAdmin.searchResults.eyebrow") }}</p>
+              <h4 id="employee-search-results-title">{{ t("employeeAdmin.searchResults.title") }}</h4>
+            </div>
+            <button
+              class="cta-button cta-secondary"
+              type="button"
+              data-testid="employee-search-result-close"
+              @click="closeEmployeeSearchResultsModal"
+            >
+              {{ t("employeeAdmin.actions.cancel") }}
+            </button>
+          </div>
+          <p class="field-help">{{ t("employeeAdmin.searchResults.lead") }}</p>
+          <p v-if="loading.employeeSearch" class="employee-admin-list-empty">{{ t("employeeAdmin.searchResults.loading") }}</p>
+          <p v-else-if="employeeSearchError" class="employee-admin-list-empty">{{ employeeSearchError }}</p>
+          <p
+            v-else-if="!employeeSearchResults.length"
+            class="employee-admin-list-empty"
+            data-testid="employee-search-result-empty"
+          >
+            {{ t("employeeAdmin.searchResults.empty") }}
+          </p>
+          <div v-else class="employee-admin-record-list">
+            <button
+              v-for="employee in employeeSearchResults"
+              :key="employee.id"
+              type="button"
+              class="employee-admin-record employee-admin-search-result"
+              data-testid="employee-search-result-row"
+              @click="selectEmployeeFromSearchResult(employee.id)"
+            >
+              <div class="employee-admin-record__body">
+                <strong>{{ employee.personnel_no }} · {{ employee.first_name }} {{ employee.last_name }}</strong>
+                <p v-if="employee.preferred_name">{{ employee.preferred_name }}</p>
+                <p>{{ employee.work_email || employee.mobile_phone || t("employeeAdmin.summary.none") }}</p>
+              </div>
+              <StatusBadge :status="employee.status" />
+            </button>
+          </div>
+        </section>
+      </div>
 
       <section class="module-card employee-admin-panel employee-admin-detail" data-testid="employee-detail-workspace">
         <div class="employee-admin-panel__header">
@@ -1868,6 +1942,7 @@ import {
   type EmployeeGroupRead,
   type EmployeeImportDryRunResult,
   type EmployeeImportExecuteResult,
+  type EmployeeListFilters,
   type EmployeeListItem,
   type EmployeeNoteRead,
   type EmployeeOperationalRead,
@@ -1930,6 +2005,7 @@ const loading = reactive({
   list: false,
   detail: false,
   action: false,
+  employeeSearch: false,
 });
 
 const filters = reactive({
@@ -2090,6 +2166,11 @@ const tenantScopeInput = ref(authStore.effectiveTenantScopeId || authStore.tenan
 const branches = ref<BranchRead[]>([]);
 const mandates = ref<MandateRead[]>([]);
 const employees = ref<EmployeeListItem[]>([]);
+const employeeSearchModalOpen = ref(false);
+const employeeSearchResults = ref<EmployeeListItem[]>([]);
+const employeeSearchSuggestions = ref<EmployeeListItem[]>([]);
+const employeeSearchSuggestionsSuppressed = ref(false);
+const employeeSearchError = ref("");
 const selectedEmployeeId = ref("");
 const selectedEmployee = ref<EmployeeOperationalRead | null>(null);
 const selectedPrivateProfile = ref<EmployeePrivateProfileRead | null>(null);
@@ -2132,6 +2213,9 @@ const editingAvailabilityRuleId = ref("");
 const editingAbsenceId = ref("");
 const selectedEmployeeDocumentId = ref("");
 const pendingQualificationProofFile = ref<File | null>(null);
+let employeeSearchDebounceHandle: ReturnType<typeof setTimeout> | null = null;
+let employeeSearchRequestSeq = 0;
+let suppressNextEmployeeSearchWatch = false;
 
 const documentUploadDraft = reactive({
   title: "",
@@ -2295,6 +2379,24 @@ const privateProfileMaritalStatusIsLegacy = computed(() => {
   return !maritalStatusOptions.value.some((option) => option.code === currentCode && option.archived_at == null && option.status === "active");
 });
 const filteredEmployeeMandates = computed(() => filterMandateOptions(employeeDraft.default_branch_id));
+const employeeSearchQuery = computed(() => `${filters.search ?? ""}`.trim());
+const canRunEmployeeSearch = computed(() => !!resolvedTenantScopeId.value && !!authStore.accessToken && canRead.value);
+const employeeSearchSuggestionEmptyVisible = computed(
+  () =>
+    !!employeeSearchQuery.value
+    && canRunEmployeeSearch.value
+    && !loading.employeeSearch
+    && !employeeSearchSuggestions.value.length
+    && !employeeSearchError.value,
+);
+const employeeSearchSuggestionsVisible = computed(
+  () =>
+    !!employeeSearchQuery.value
+    && canRunEmployeeSearch.value
+    && !employeeSearchModalOpen.value
+    && !employeeSearchSuggestionsSuppressed.value
+    && (loading.employeeSearch || !!employeeSearchSuggestions.value.length || employeeSearchSuggestionEmptyVisible.value),
+);
 const branchLabelMap = computed(() => new Map(branchOptions.value.map((branch) => [branch.id, formatStructureLabel(branch)])));
 const mandateLabelMap = computed(() => new Map(mandateOptions.value.map((mandate) => [mandate.id, formatStructureLabel(mandate)])));
 const selectedEmployeeBranchLabel = computed(() => {
@@ -2491,6 +2593,130 @@ function setCatalogRefreshWarning() {
 function rememberScope() {
   authStore.setTenantScopeId(tenantScopeInput.value);
   void refreshEmployees();
+}
+
+function buildEmployeeSearchParams(searchOverride?: string): EmployeeListFilters {
+  return {
+    ...filters,
+    search: searchOverride ?? filters.search,
+  };
+}
+
+function clearEmployeeSearchDebounce() {
+  if (employeeSearchDebounceHandle) {
+    clearTimeout(employeeSearchDebounceHandle);
+    employeeSearchDebounceHandle = null;
+  }
+}
+
+function resetEmployeeSearchState(options: { closeModal?: boolean } = {}) {
+  clearEmployeeSearchDebounce();
+  employeeSearchRequestSeq += 1;
+  loading.employeeSearch = false;
+  employeeSearchResults.value = [];
+  employeeSearchSuggestions.value = [];
+  employeeSearchSuggestionsSuppressed.value = false;
+  employeeSearchError.value = "";
+  if (options.closeModal) {
+    employeeSearchModalOpen.value = false;
+  }
+}
+
+function closeEmployeeSearchResultsModal() {
+  employeeSearchModalOpen.value = false;
+}
+
+function closeEmployeeSearchSuggestions() {
+  clearEmployeeSearchDebounce();
+  employeeSearchRequestSeq += 1;
+  employeeSearchSuggestions.value = [];
+  employeeSearchSuggestionsSuppressed.value = true;
+  loading.employeeSearch = false;
+}
+
+function resolveEmployeeSuggestionContact(employee: EmployeeListItem) {
+  const contact = employee as EmployeeListItem & { work_phone?: null | string };
+  return contact.work_email || contact.mobile_phone || contact.work_phone || t("employeeAdmin.summary.none");
+}
+
+function resolveEmployeeSearchErrorMessage(error: unknown) {
+  if (error instanceof EmployeeAdminApiError) {
+    return t(mapEmployeeApiMessage(error.messageKey) as never);
+  }
+  return t("employeeAdmin.feedback.error");
+}
+
+async function runEmployeeSearch(options: { openModal?: boolean; suppressFeedback?: boolean } = {}) {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !canRead.value) {
+    resetEmployeeSearchState({ closeModal: true });
+    return [];
+  }
+
+  const requestSeq = ++employeeSearchRequestSeq;
+  loading.employeeSearch = true;
+  employeeSearchError.value = "";
+  try {
+    const results = await listEmployees(
+      resolvedTenantScopeId.value,
+      authStore.accessToken,
+      buildEmployeeSearchParams(employeeSearchQuery.value),
+    );
+    if (requestSeq !== employeeSearchRequestSeq) {
+      return [];
+    }
+    employeeSearchResults.value = results;
+    employeeSearchSuggestions.value = employeeSearchQuery.value ? results.slice(0, 6) : [];
+    employeeSearchSuggestionsSuppressed.value = false;
+    if (options.openModal) {
+      employeeSearchModalOpen.value = true;
+    }
+    return results;
+  } catch (error) {
+    if (requestSeq !== employeeSearchRequestSeq) {
+      return [];
+    }
+    employeeSearchResults.value = [];
+    employeeSearchSuggestions.value = [];
+    employeeSearchError.value = resolveEmployeeSearchErrorMessage(error);
+    if (options.openModal) {
+      employeeSearchModalOpen.value = true;
+    }
+    if (!options.suppressFeedback) {
+      setFeedback("error", t("employeeAdmin.feedback.titleError"), employeeSearchError.value);
+    }
+    return [];
+  } finally {
+    if (requestSeq === employeeSearchRequestSeq) {
+      loading.employeeSearch = false;
+    }
+  }
+}
+
+async function handleOpenEmployeeSearchResults() {
+  clearEmployeeSearchDebounce();
+  await runEmployeeSearch({ openModal: true });
+}
+
+async function selectEmployeeFromSearchResult(employeeId: string) {
+  employeeSearchModalOpen.value = false;
+  employeeSearchSuggestions.value = [];
+  employeeSearchSuggestionsSuppressed.value = true;
+  employeeSearchError.value = "";
+  await selectEmployee(employeeId, { fallbackTab: "overview" });
+  activeDetailTab.value = "overview";
+}
+
+async function selectEmployeeFromSuggestion(employee: EmployeeListItem) {
+  clearEmployeeSearchDebounce();
+  employeeSearchRequestSeq += 1;
+  employeeSearchModalOpen.value = false;
+  employeeSearchSuggestions.value = [];
+  employeeSearchSuggestionsSuppressed.value = true;
+  employeeSearchError.value = "";
+  suppressNextEmployeeSearchWatch = true;
+  filters.search = `${employee.personnel_no} · ${employee.first_name} ${employee.last_name}`;
+  await selectEmployee(employee.id, { fallbackTab: "overview" });
+  activeDetailTab.value = "overview";
 }
 
 async function loadTenantStructure() {
@@ -2843,17 +3069,19 @@ function clearPhotoPreview() {
   photoPreviewUrl.value = "";
 }
 
-async function refreshEmployees() {
+async function refreshEmployees(options: { autoSelectFirst?: boolean } = {}) {
   if (!resolvedTenantScopeId.value || !authStore.accessToken || !canRead.value) {
     branches.value = [];
     mandates.value = [];
     maritalStatusOptions.value = [];
     maritalStatusLookupError.value = "";
     employees.value = [];
+    resetEmployeeSearchState({ closeModal: true });
     selectedEmployee.value = null;
     return;
   }
 
+  const { autoSelectFirst = true } = options;
   loading.list = true;
   try {
     employees.value = await listEmployees(resolvedTenantScopeId.value, authStore.accessToken, filters);
@@ -2865,7 +3093,7 @@ async function refreshEmployees() {
         selectedEmployeeId.value = "";
         selectedEmployee.value = null;
       }
-    } else if (employees.value.length && !isCreatingEmployee.value) {
+    } else if (autoSelectFirst && employees.value.length && !isCreatingEmployee.value) {
       const [firstEmployee] = employees.value;
       if (firstEmployee) {
         await selectEmployee(firstEmployee.id);
@@ -4071,6 +4299,25 @@ watch(
 );
 
 watch(
+  () => filters.search,
+  (search) => {
+    clearEmployeeSearchDebounce();
+    if (suppressNextEmployeeSearchWatch) {
+      suppressNextEmployeeSearchWatch = false;
+      return;
+    }
+    employeeSearchSuggestionsSuppressed.value = false;
+    if (!`${search ?? ""}`.trim()) {
+      resetEmployeeSearchState({ closeModal: true });
+      return;
+    }
+    employeeSearchDebounceHandle = setTimeout(() => {
+      void runEmployeeSearch({ suppressFeedback: true });
+    }, 300);
+  },
+);
+
+watch(
   () => [authStore.effectiveRole, authStore.effectiveTenantScopeId] as const,
   () => {
     if (!isPlatformAdmin.value) {
@@ -4105,6 +4352,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  clearEmployeeSearchDebounce();
   clearPhotoPreview();
 });
 </script>
@@ -4122,13 +4370,13 @@ onBeforeUnmount(() => {
 .employee-admin-grid {
   display: grid;
   gap: var(--sp-page-gap, 1.25rem);
-  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
 .employee-admin-list-panel {
-  position: sticky;
-  top: 0;
+  position: static;
+  top: auto;
 }
 
 .employee-admin-hero {
@@ -4249,6 +4497,87 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 40%, transparent);
 }
 
+.employee-admin-search-field {
+  position: relative;
+}
+
+.employee-admin-search-select {
+  position: relative;
+  display: grid;
+}
+
+.employee-admin-search-select input {
+  width: 100%;
+}
+
+.employee-admin-search-suggestions {
+  position: absolute;
+  z-index: 4;
+  inset: calc(100% + 0.4rem) 0 auto;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.45rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 16px;
+  background: var(--sp-color-surface-page);
+  box-shadow: 0 20px 50px rgb(15 23 42 / 0.12);
+}
+
+.employee-admin-search-suggestion,
+.employee-admin-search-result {
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.employee-admin-search-suggestion {
+  display: grid;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 12px;
+  background: var(--sp-color-surface-page);
+}
+
+.employee-admin-search-suggestion__title {
+  font-weight: 600;
+  color: var(--sp-color-text-primary);
+}
+
+.employee-admin-search-suggestion__meta,
+.employee-admin-search-suggestion__status,
+.employee-admin-search-suggestion-empty {
+  color: var(--sp-color-text-secondary);
+}
+
+.employee-admin-search-suggestion__status {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.employee-admin-search-suggestion-empty {
+  margin: 0;
+  padding: 0.8rem 0.9rem;
+}
+
+.employee-admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgb(15 23 42 / 42%);
+}
+
+.employee-admin-modal {
+  width: min(760px, 100%);
+  max-height: min(720px, calc(100vh - 3rem));
+  overflow: auto;
+}
+
 .employee-admin-record--static {
   cursor: default;
 }
@@ -4332,6 +4661,25 @@ onBeforeUnmount(() => {
 
 .employee-admin-form--structured {
   gap: 1.1rem;
+}
+
+.employee-admin-filter-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+}
+
+.employee-admin-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.employee-admin-filter-actions__buttons {
+  justify-content: flex-end;
 }
 
 .employee-admin-editor-intro,
@@ -4507,6 +4855,12 @@ onBeforeUnmount(() => {
   }
 }
 
+@media (max-width: 1280px) {
+  .employee-admin-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 820px) {
   .employee-admin-form-grid--editor,
   .employee-admin-form-actions {
@@ -4514,6 +4868,21 @@ onBeforeUnmount(() => {
   }
 
   .employee-admin-record__actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .employee-admin-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .employee-admin-filter-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .employee-admin-filter-actions__buttons {
     justify-content: flex-start;
   }
 }

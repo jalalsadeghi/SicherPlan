@@ -5,6 +5,12 @@ import type {
   CustomerNewPlanWizardStepUiState,
 } from './new-plan-wizard.types';
 
+export const CUSTOMER_NEW_PLAN_STEP_ALIASES: Record<string, CustomerNewPlanWizardStepId> = {
+  'equipment-lines': 'order-scope-documents',
+  'requirement-lines': 'order-scope-documents',
+  'order-documents': 'order-scope-documents',
+};
+
 export const CUSTOMER_NEW_PLAN_WIZARD_STEPS: CustomerNewPlanWizardStepDefinition[] = [
   {
     id: 'order-details',
@@ -16,31 +22,13 @@ export const CUSTOMER_NEW_PLAN_WIZARD_STEPS: CustomerNewPlanWizardStepDefinition
     nextStepResolverKey: 'resolveOrderDetailsStepNext',
   },
   {
-    id: 'equipment-lines',
-    labelKey: 'sicherplan.customerPlansWizard.steps.equipmentLines',
+    id: 'order-scope-documents',
+    labelKey: 'sicherplan.customerPlansWizard.steps.orderScopeDocuments',
     requiredContextFields: ['customer_id', 'order_id'],
-    loadHandlerKey: 'loadEquipmentLinesStep',
-    validateHandlerKey: 'validateEquipmentLinesStep',
-    saveHandlerKey: 'saveEquipmentLinesStep',
-    nextStepResolverKey: 'resolveEquipmentLinesStepNext',
-  },
-  {
-    id: 'requirement-lines',
-    labelKey: 'sicherplan.customerPlansWizard.steps.requirementLines',
-    requiredContextFields: ['customer_id', 'order_id'],
-    loadHandlerKey: 'loadRequirementLinesStep',
-    validateHandlerKey: 'validateRequirementLinesStep',
-    saveHandlerKey: 'saveRequirementLinesStep',
-    nextStepResolverKey: 'resolveRequirementLinesStepNext',
-  },
-  {
-    id: 'order-documents',
-    labelKey: 'sicherplan.customerPlansWizard.steps.orderDocuments',
-    requiredContextFields: ['customer_id', 'order_id'],
-    loadHandlerKey: 'loadOrderDocumentsStep',
-    validateHandlerKey: 'validateOrderDocumentsStep',
-    saveHandlerKey: 'saveOrderDocumentsStep',
-    nextStepResolverKey: 'resolveOrderDocumentsStepNext',
+    loadHandlerKey: 'loadOrderScopeDocumentsStep',
+    validateHandlerKey: 'validateOrderScopeDocumentsStep',
+    saveHandlerKey: 'saveOrderScopeDocumentsStep',
+    nextStepResolverKey: 'resolveOrderScopeDocumentsStepNext',
   },
   {
     id: 'planning-record-overview',
@@ -146,6 +134,16 @@ export function getNextWizardStepId(stepId: CustomerNewPlanWizardStepId) {
 
 export function isWizardStepId(value: string | null | undefined): value is CustomerNewPlanWizardStepId {
   return typeof value === 'string' && CUSTOMER_NEW_PLAN_WIZARD_STEP_IDS.includes(value as CustomerNewPlanWizardStepId);
+}
+
+export function normalizeWizardStepId(value: string | null | undefined): CustomerNewPlanWizardStepId | null {
+  if (isWizardStepId(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return CUSTOMER_NEW_PLAN_STEP_ALIASES[value] ?? null;
+  }
+  return null;
 }
 
 export function hasRequiredContextForStep(state: CustomerNewPlanWizardState, stepId: CustomerNewPlanWizardStepId) {

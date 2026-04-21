@@ -35,6 +35,15 @@ class DocumentRepository(Protocol):
     def get_document_type_by_key(self, key: str): ...  # noqa: ANN001
     def create_document(self, row: Document) -> Document: ...
     def get_document(self, tenant_id: str, document_id: str) -> Document | None: ...
+    def list_documents(
+        self,
+        tenant_id: str,
+        *,
+        search: str | None = None,
+        document_type_key: str | None = None,
+        linked_entity: str | None = None,
+        limit: int = 25,
+    ) -> list[Document]: ...
     def list_document_versions(self, tenant_id: str, document_id: str) -> list[DocumentVersion]: ...
     def create_document_version(self, document: Document, row: DocumentVersion) -> DocumentVersion: ...
     def get_document_version(self, tenant_id: str, document_id: str, version_no: int) -> DocumentVersion | None: ...
@@ -106,6 +115,29 @@ class DocumentService:
         # Existing auth contexts and anonymous public actors share the same tenant-scope attributes.
         document = self._require_document(tenant_id, document_id, actor)
         return DocumentRead.model_validate(document)
+
+    def list_documents(
+        self,
+        tenant_id: str,
+        actor: DocumentActorContext,
+        *,
+        search: str | None = None,
+        document_type_key: str | None = None,
+        linked_entity: str | None = None,
+        limit: int = 25,
+    ) -> list[DocumentRead]:
+        self._ensure_tenant_scope(actor, tenant_id)
+        bounded_limit = max(1, min(limit, 50))
+        return [
+            DocumentRead.model_validate(document)
+            for document in self.repository.list_documents(
+                tenant_id,
+                search=search,
+                document_type_key=document_type_key,
+                linked_entity=linked_entity,
+                limit=bounded_limit,
+            )
+        ]
 
     def add_document_version(
         self,

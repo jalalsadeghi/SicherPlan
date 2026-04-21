@@ -1,12 +1,19 @@
 export type CustomerNewPlanWizardStepId =
   | 'order-details'
-  | 'equipment-lines'
-  | 'requirement-lines'
-  | 'order-documents'
+  | 'order-scope-documents'
   | 'planning-record-overview'
   | 'planning-record-documents'
   | 'shift-plan'
   | 'series-exceptions';
+
+export type CustomerNewPlanWizardOrderScopeSubsectionId =
+  | 'equipment-lines'
+  | 'requirement-lines'
+  | 'order-documents';
+
+export type CustomerNewPlanWizardDraftStepId =
+  | CustomerNewPlanWizardStepId
+  | CustomerNewPlanWizardOrderScopeSubsectionId;
 
 export interface CustomerNewPlanWizardStepUiState {
   completed: boolean;

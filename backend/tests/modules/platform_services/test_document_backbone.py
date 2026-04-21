@@ -126,6 +126,41 @@ class FakeDocumentRepository:
             return None
         return document
 
+    def list_documents(
+        self,
+        tenant_id: str,
+        *,
+        search: str | None = None,
+        document_type_key: str | None = None,
+        linked_entity: str | None = None,
+        limit: int = 25,
+    ):
+        documents = [document for document in self.documents.values() if document.tenant_id == tenant_id and document.archived_at is None]
+        if search:
+            needle = search.lower()
+            documents = [
+                document
+                for document in documents
+                if needle in document.id.lower()
+                or needle in document.title.lower()
+                or needle in (document.source_label or "").lower()
+                or needle in (document.document_type.key if document.document_type else "").lower()
+            ]
+        if document_type_key:
+            documents = [
+                document
+                for document in documents
+                if document.document_type is not None and document.document_type.key == document_type_key
+            ]
+        if linked_entity:
+            owner_type, _, owner_id = linked_entity.partition(":")
+            documents = [
+                document
+                for document in documents
+                if any(link.owner_type == owner_type and link.owner_id == owner_id for link in document.links)
+            ]
+        return documents[:limit]
+
     def list_document_versions(self, tenant_id: str, document_id: str):
         document = self.get_document(tenant_id, document_id)
         return list(document.versions if document is not None else [])
@@ -281,6 +316,33 @@ class TestDocumentService(unittest.TestCase):
         self.assertEqual(link.owner_id, "branch-1")
         self.assertEqual(len(fetched.versions), 1)
         self.assertEqual(len(fetched.links), 1)
+
+    def test_list_documents_is_tenant_scoped_and_searchable(self) -> None:
+        matching = self.service.create_document(
+            "tenant-1",
+            DocumentCreate(
+                tenant_id="tenant-1",
+                title="Sicherheitskonzept Alpha",
+                document_type_key="timesheet",
+                source_label="alpha.pdf",
+            ),
+            _actor(),
+        )
+        self.service.create_document(
+            "tenant-1",
+            DocumentCreate(tenant_id="tenant-1", title="Wachbuch"),
+            _actor(),
+        )
+        self.service.create_document(
+            "tenant-2",
+            DocumentCreate(tenant_id="tenant-2", title="Sicherheitskonzept Fremdtenant"),
+            _actor("tenant-2"),
+        )
+
+        result = self.service.list_documents("tenant-1", _actor(), search="konzept", limit=10)
+
+        self.assertEqual([document.id for document in result], [matching.id])
+        self.assertEqual(result[0].document_type.key, "timesheet")
 
     def test_duplicate_content_marks_duplicate_of_version(self) -> None:
         document = self.service.create_document(

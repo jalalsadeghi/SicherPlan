@@ -6,6 +6,9 @@ export interface PlanningDocumentRead {
   title: string;
   current_version_no: number;
   status: string;
+  created_at?: string;
+  document_type?: { id: string; key: string; name: string } | null;
+  document_type_id?: string | null;
   source_label?: string | null;
   metadata_json?: Record<string, unknown>;
 }
@@ -411,6 +414,17 @@ export function linkPlanningRecordAttachment(tenantId: string, planningRecordId:
     `/api/planning/tenants/${tenantId}/ops/planning-records/${planningRecordId}/attachments/link`,
     accessToken,
     { method: "POST", body: payload },
+  );
+}
+
+export function listDocuments(
+  tenantId: string,
+  accessToken: string,
+  filters: { document_type_code?: string; linked_entity?: string; limit?: number; search?: string } = {},
+) {
+  return request<PlanningDocumentRead[]>(
+    `/api/platform/tenants/${tenantId}/documents${queryString(filters)}`,
+    accessToken,
   );
 }
 

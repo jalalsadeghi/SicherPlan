@@ -61,6 +61,67 @@ describe('useAccessStore', () => {
     expect(store.tabs[0]?.query).toEqual({ id: '1' });
   });
 
+  it('uses one Customer New Plan tab when only wizard query params change', () => {
+    const store = useTabbarStore();
+    const baseTab = {
+      meta: {
+        fullPathKey: false,
+        title: 'New plan',
+      },
+      name: 'SicherPlanCustomerNewPlan',
+      path: '/admin/customers/new-plan',
+    };
+
+    store.addTab({
+      ...baseTab,
+      fullPath: '/admin/customers/new-plan?customer_id=c1&step=order-details',
+      query: { customer_id: 'c1', step: 'order-details' },
+    } as any);
+    store.addTab({
+      ...baseTab,
+      fullPath: '/admin/customers/new-plan?customer_id=c1&step=order-scope-documents&order_id=o1',
+      query: { customer_id: 'c1', order_id: 'o1', step: 'order-scope-documents' },
+    } as any);
+    store.addTab({
+      ...baseTab,
+      fullPath: '/admin/customers/new-plan?customer_id=c1&step=planning-record-overview&order_id=o1',
+      query: { customer_id: 'c1', order_id: 'o1', step: 'planning-record-overview' },
+    } as any);
+
+    expect(store.tabs).toHaveLength(1);
+    expect(store.tabs[0]?.key).toBe('/admin/customers/new-plan');
+    expect(store.tabs[0]?.query).toEqual({
+      customer_id: 'c1',
+      order_id: 'o1',
+      step: 'planning-record-overview',
+    });
+  });
+
+  it('keeps default fullPath tab keys for other query-driven routes', () => {
+    const store = useTabbarStore();
+
+    store.addTab({
+      fullPath: '/reports?view=monthly',
+      meta: { title: 'Reports' },
+      name: 'Reports',
+      path: '/reports',
+      query: { view: 'monthly' },
+    } as any);
+    store.addTab({
+      fullPath: '/reports?view=yearly',
+      meta: { title: 'Reports' },
+      name: 'Reports',
+      path: '/reports',
+      query: { view: 'yearly' },
+    } as any);
+
+    expect(store.tabs).toHaveLength(2);
+    expect(store.tabs.map((tab) => tab.key)).toEqual([
+      '/reports?view=monthly',
+      '/reports?view=yearly',
+    ]);
+  });
+
   it('closes all tabs', async () => {
     const store = useTabbarStore();
     store.addTab({

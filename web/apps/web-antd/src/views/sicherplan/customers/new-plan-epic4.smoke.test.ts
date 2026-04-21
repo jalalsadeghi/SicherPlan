@@ -43,8 +43,10 @@ const apiMocks = vi.hoisted(() => ({
   getShiftPlanMock: vi.fn(),
   getShiftSeriesMock: vi.fn(),
   getShiftTemplateMock: vi.fn(),
+  linkOrderAttachmentMock: vi.fn(),
   linkPlanningRecordAttachmentMock: vi.fn(),
   listCustomerOrdersMock: vi.fn(),
+  listDocumentsMock: vi.fn(),
   listOrderAttachmentsMock: vi.fn(),
   listOrderEquipmentLinesMock: vi.fn(),
   listOrderRequirementLinesMock: vi.fn(),
@@ -98,7 +100,8 @@ vi.mock('#/sicherplan-legacy/api/planningOrders', () => ({
   getCustomerOrder: apiMocks.getCustomerOrderMock,
   getPlanningRecord: apiMocks.getPlanningRecordMock,
   linkPlanningRecordAttachment: apiMocks.linkPlanningRecordAttachmentMock,
-  linkOrderAttachment: vi.fn(),
+  linkOrderAttachment: apiMocks.linkOrderAttachmentMock,
+  listDocuments: apiMocks.listDocumentsMock,
   listCustomerOrders: apiMocks.listCustomerOrdersMock,
   listOrderAttachments: apiMocks.listOrderAttachmentsMock,
   listOrderEquipmentLines: apiMocks.listOrderEquipmentLinesMock,
@@ -330,9 +333,7 @@ function baseWizardState(): CustomerNewPlanWizardState {
     series_id: '',
     step_state: {
       'order-details': { completed: true, dirty: false, error: '', loading: false },
-      'equipment-lines': { completed: true, dirty: false, error: '', loading: false },
-      'requirement-lines': { completed: true, dirty: false, error: '', loading: false },
-      'order-documents': { completed: true, dirty: false, error: '', loading: false },
+      'order-scope-documents': { completed: true, dirty: false, error: '', loading: false },
       'planning-record-overview': { completed: false, dirty: false, error: '', loading: false },
       'planning-record-documents': { completed: false, dirty: false, error: '', loading: false },
       'shift-plan': { completed: false, dirty: false, error: '', loading: false },
@@ -404,8 +405,10 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.getShiftPlanMock.mockReset();
     apiMocks.getShiftSeriesMock.mockReset();
     apiMocks.getShiftTemplateMock.mockReset();
+    apiMocks.linkOrderAttachmentMock.mockReset();
     apiMocks.linkPlanningRecordAttachmentMock.mockReset();
     apiMocks.listCustomerOrdersMock.mockReset();
+    apiMocks.listDocumentsMock.mockReset();
     apiMocks.listOrderAttachmentsMock.mockReset();
     apiMocks.listOrderEquipmentLinesMock.mockReset();
     apiMocks.listOrderRequirementLinesMock.mockReset();
@@ -428,6 +431,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listOrderEquipmentLinesMock.mockResolvedValue([]);
     apiMocks.listOrderRequirementLinesMock.mockResolvedValue([]);
     apiMocks.listOrderAttachmentsMock.mockResolvedValue([]);
+    apiMocks.listDocumentsMock.mockResolvedValue([
+      { id: 'document-1', tenant_id: 'tenant-1', title: 'Safety concept', current_version_no: 1, status: 'active' },
+    ]);
     apiMocks.listPlanningSetupRecordsMock.mockImplementation((entityKey: string) => {
       const map: Record<string, unknown[]> = {
         event_venue: [{ id: 'venue-1', customer_id: 'customer-1', venue_no: 'VEN-1', name: 'Arena', tenant_id: 'tenant-1', status: 'active', version_no: 1 }],
@@ -517,7 +523,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     const equipmentLines = deferred<any[]>();
     apiMocks.listOrderEquipmentLinesMock.mockReturnValueOnce(equipmentLines.promise);
 
-    const wrapper = mountStep('equipment-lines', { current_step: 'equipment-lines' });
+    const wrapper = mountStep('order-scope-documents', { current_step: 'order-scope-documents' });
     await settleLoadingRender();
 
     expect(wrapper.find('[data-testid="customer-new-plan-step-panel-equipment-lines"]').exists()).toBe(true);
@@ -531,11 +537,154 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(wrapper.text()).toContain('3');
   });
 
+  it('renders the combined order-scope step with all three subsection cards and controls', async () => {
+    const wrapper = mountStep('order-scope-documents', { current_step: 'order-scope-documents' });
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-order-scope-documents-step"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-scope-equipment-card"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-scope-requirements-card"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-scope-documents-card"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-item"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-type"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-document-upload-title"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.forms.linkExistingDocument');
+    expect(wrapper.find('[data-testid="customer-new-plan-order-document-picker-open"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-document-link-id"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="customer-new-plan-order-document-link-id"]').element.closest('details')?.textContent).toContain(
+      'sicherplan.customerPlansWizard.forms.manualDocumentId',
+    );
+  });
+
+  it('opens the order document picker with local loading, keeps the step visible, and renders search results', async () => {
+    const documents = deferred<any[]>();
+    apiMocks.listDocumentsMock.mockReturnValue(documents.promise);
+
+    const wrapper = mountStep('order-scope-documents', { current_step: 'order-scope-documents' });
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-order-document-picker-open"]').trigger('click');
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-order-document-picker-modal"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-scope-documents-step"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-loading"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.forms.documentPickerLoading');
+    await wrapper.get('[data-testid="customer-new-plan-order-document-search"]').setValue('contract');
+    await wrapper.get('[data-testid="customer-new-plan-order-document-search"]').trigger('keyup.enter');
+
+    documents.resolve([
+      { id: 'doc-1', tenant_id: 'tenant-1', title: 'Customer contract RheinForum', current_version_no: 1, status: 'active' },
+      { id: 'doc-2', tenant_id: 'tenant-1', title: 'Security concept attachment', current_version_no: 2, status: 'active' },
+    ]);
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-testid="customer-new-plan-order-document-result-row"]')).toHaveLength(2);
+    expect(wrapper.text()).toContain('Customer contract RheinForum');
+    expect(wrapper.text()).toContain('Security concept attachment');
+  });
+
+  it('clears stale order document picker results and shows the empty state', async () => {
+    apiMocks.listDocumentsMock
+      .mockResolvedValueOnce([
+        { id: 'doc-1', tenant_id: 'tenant-1', title: 'Customer contract RheinForum', current_version_no: 1, status: 'active' },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const wrapper = mountStep('order-scope-documents', { current_step: 'order-scope-documents' });
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-order-document-picker-open"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.findAll('[data-testid="customer-new-plan-order-document-result-row"]')).toHaveLength(1);
+
+    await wrapper.get('[data-testid="customer-new-plan-order-document-search"]').setValue('unknown');
+    await wrapper.get('[data-testid="customer-new-plan-order-document-search"]').trigger('keyup.enter');
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-testid="customer-new-plan-order-document-result-row"]')).toHaveLength(0);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.forms.documentPickerEmpty');
+  });
+
+  it('clears a selected order document and blocks linking until another document is selected', async () => {
+    apiMocks.listDocumentsMock.mockResolvedValueOnce([
+      { id: 'doc-1', tenant_id: 'tenant-1', title: 'Customer contract RheinForum', current_version_no: 1, status: 'active' },
+    ]);
+    const wrapper = mountStep('order-scope-documents', { current_step: 'order-scope-documents' });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-order-document-picker-open"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-order-document-result-row"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="customer-new-plan-order-document-selected"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="customer-new-plan-order-document-clear"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="customer-new-plan-order-document-selected"]').exists()).toBe(false);
+
+    await wrapper.get('[data-testid="customer-new-plan-link-order-document"]').trigger('click');
+    await flushPromises();
+    expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(0);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.orderDocumentLinkIncomplete');
+  });
+
+  it('restores an order document link draft and shows the selected id fallback', async () => {
+    window.sessionStorage.setItem(
+      buildWizardDraftStorageKey(
+        { customerId: 'customer-1', planningEntityId: 'site-1', planningEntityType: 'site', tenantId: 'tenant-1' },
+        'order-documents',
+      ),
+      JSON.stringify({
+        link: {
+          document_id: 'doc-draft-1',
+          label: 'Draft link label',
+        },
+      }),
+    );
+
+    const wrapper = mountStep('order-scope-documents', { current_step: 'order-scope-documents' });
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-order-document-selected"]').text()).toContain('doc-draft-1');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-document-link-label"]').element as HTMLInputElement).value).toBe(
+      'Draft link label',
+    );
+  });
+
+  it('shows independent local loading indicators for all order-scope cards and keeps the combined step mounted', async () => {
+    const equipmentLines = deferred<any[]>();
+    const requirementLines = deferred<any[]>();
+    const attachments = deferred<any[]>();
+    apiMocks.listOrderEquipmentLinesMock.mockReturnValueOnce(equipmentLines.promise);
+    apiMocks.listOrderRequirementLinesMock.mockReturnValueOnce(requirementLines.promise);
+    apiMocks.listOrderAttachmentsMock.mockReturnValueOnce(attachments.promise);
+
+    const wrapper = mountStep('order-scope-documents', { current_step: 'order-scope-documents' });
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-order-scope-documents-step"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-lines-loading"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-lines-loading"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-documents-loading"]').exists()).toBe(true);
+
+    equipmentLines.resolve([{ id: 'equipment-line-1', equipment_item_id: 'equipment-1', required_qty: 4, notes: null }]);
+    requirementLines.resolve([{ id: 'requirement-line-1', requirement_type_id: 'requirement-type-1', function_type_id: null, qualification_type_id: null, min_qty: 1, target_qty: 2, notes: null }]);
+    attachments.resolve([{ id: 'doc-1', tenant_id: 'tenant-1', title: 'Dienstanweisung', current_version_no: 1, status: 'active' }]);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-order-scope-documents-step"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-lines-loading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-lines-loading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-documents-loading"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('4');
+    expect(wrapper.text()).toContain('1 / 2');
+    expect(wrapper.get('[data-testid="customer-new-plan-order-document-list"]').text()).toContain('Dienstanweisung');
+  });
+
   it('shows a local requirement-lines indicator without replacing the editor', async () => {
     const requirementLines = deferred<any[]>();
     apiMocks.listOrderRequirementLinesMock.mockReturnValueOnce(requirementLines.promise);
 
-    const wrapper = mountStep('requirement-lines', { current_step: 'requirement-lines' });
+    const wrapper = mountStep('order-scope-documents', { current_step: 'order-scope-documents' });
     await settleLoadingRender();
 
     expect(wrapper.find('[data-testid="customer-new-plan-step-panel-requirement-lines"]').exists()).toBe(true);
@@ -553,7 +702,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     const attachments = deferred<any[]>();
     apiMocks.listOrderAttachmentsMock.mockReturnValueOnce(attachments.promise);
 
-    const wrapper = mountStep('order-documents', { current_step: 'order-documents' });
+    const wrapper = mountStep('order-scope-documents', { current_step: 'order-scope-documents' });
     await settleLoadingRender();
 
     expect(wrapper.find('[data-testid="customer-new-plan-step-panel-order-documents"]').exists()).toBe(true);
@@ -670,7 +819,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
   });
 
   it('keeps dirty equipment drafts visible while saved data reloads', async () => {
-    const wrapper = mountStep('equipment-lines', { current_step: 'equipment-lines' });
+    const wrapper = mountStep('order-scope-documents', { current_step: 'order-scope-documents' });
     await flushPromises();
 
     await wrapper.get('[data-testid="customer-new-plan-equipment-required-qty"]').setValue(7);
@@ -688,6 +837,52 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     expect(wrapper.find('[data-testid="customer-new-plan-equipment-lines-loading"]').exists()).toBe(false);
     expect((wrapper.get('[data-testid="customer-new-plan-equipment-required-qty"]').element as HTMLInputElement).value).toBe('7');
+  });
+
+  it('restores old subsection draft keys inside the combined order-scope step', async () => {
+    window.sessionStorage.setItem(
+      buildWizardDraftStorageKey(
+        {
+          customerId: 'customer-1',
+          planningEntityId: 'site-1',
+          planningEntityType: 'site',
+          tenantId: 'tenant-1',
+        },
+        'equipment-lines',
+      ),
+      JSON.stringify({
+        equipment_item_id: 'equipment-1',
+        notes: 'Restored equipment draft',
+        required_qty: 5,
+      }),
+    );
+    window.sessionStorage.setItem(
+      buildWizardDraftStorageKey(
+        {
+          customerId: 'customer-1',
+          planningEntityId: 'site-1',
+          planningEntityType: 'site',
+          tenantId: 'tenant-1',
+        },
+        'requirement-lines',
+      ),
+      JSON.stringify({
+        function_type_id: '',
+        min_qty: 1,
+        notes: 'Restored requirement draft',
+        qualification_type_id: '',
+        requirement_type_id: 'requirement-type-1',
+        target_qty: 2,
+      }),
+    );
+
+    const wrapper = mountStep('order-scope-documents', { current_step: 'order-scope-documents' });
+    await flushPromises();
+
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-required-qty"]').element as HTMLInputElement).value).toBe('5');
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').element as HTMLTextAreaElement).value).toBe('Restored equipment draft');
+    expect((wrapper.get('[data-testid="customer-new-plan-requirement-min-qty"]').element as HTMLInputElement).value).toBe('1');
+    expect((wrapper.get('[data-testid="customer-new-plan-requirement-notes"]').element as HTMLTextAreaElement).value).toBe('Restored requirement draft');
   });
 
   it('keeps stale order-list requests from hiding newer loading or overwriting current data', async () => {
@@ -1249,7 +1444,14 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     });
     await flushPromises();
 
-    await wrapper.get('[data-testid="customer-new-plan-planning-record-document-id"]').setValue('document-1');
+    await wrapper.get('[data-testid="customer-new-plan-planning-document-picker-open"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-planning-document-search"]').setValue('Safety');
+    await wrapper.get('[data-testid="customer-new-plan-planning-document-search"]').trigger('keyup.enter');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-planning-document-result-row"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.get('[data-testid="customer-new-plan-planning-document-selected"]').text()).toContain('Safety concept');
     apiMocks.linkPlanningRecordAttachmentMock.mockResolvedValue({
       id: 'doc-row-1',
       tenant_id: 'tenant-1',

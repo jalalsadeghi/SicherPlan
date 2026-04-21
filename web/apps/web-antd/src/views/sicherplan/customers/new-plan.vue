@@ -15,6 +15,7 @@ import {
   CUSTOMER_NEW_PLAN_WIZARD_FIRST_STEP_ID,
   CUSTOMER_NEW_PLAN_WIZARD_LAST_STEP_ID,
   isWizardStepId,
+  normalizeWizardStepId,
 } from './new-plan-wizard.steps';
 import type {
   CustomerNewPlanStepSubmitResult,
@@ -95,7 +96,7 @@ const requestedStepId = computed(() => {
   if (candidate === 'planning') {
     return CUSTOMER_NEW_PLAN_WIZARD_FIRST_STEP_ID;
   }
-  return isWizardStepId(candidate) ? candidate : null;
+  return normalizeWizardStepId(candidate);
 });
 
 const isAuthorized = computed(() => authStore.effectiveRole === 'tenant_admin');
@@ -125,9 +126,7 @@ const hasUnsavedChanges = computed(() =>
 );
 const handledSubmitStepIds = new Set<CustomerNewPlanWizardStepId>([
   'order-details',
-  'equipment-lines',
-  'requirement-lines',
-  'order-documents',
+  'order-scope-documents',
   'planning-record-overview',
   'planning-record-documents',
   'shift-plan',
@@ -641,7 +640,7 @@ watch(
     v-else
     :description="$t('sicherplan.customerPlansWizard.description')"
     :eyebrow="$t('sicherplan.admin.customers')"
-    :show-intro="true"
+    :show-intro="false"
     :title="$t('sicherplan.customerPlansWizard.title')"
   >
     <template #workspace>
