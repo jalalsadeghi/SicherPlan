@@ -287,7 +287,7 @@
               :class="{ active: tab.id === activeDetailTab }"
               :data-testid="`employee-tab-${tab.id}`"
               :disabled="isEmployeeDetailTabDisabled(tab.id)"
-              @click="activeDetailTab = tab.id"
+              @click="selectEmployeeDetailTab(tab.id)"
             >
               {{ tab.label }}
             </button>
@@ -311,8 +311,36 @@
 
           <section
             v-if="activeDetailTab === 'overview'"
-            class="employee-admin-section employee-admin-tab-panel"
+            class="employee-admin-tab-panel"
             data-testid="employee-tab-panel-overview"
+          >
+            <section class="employee-admin-overview-onepage" data-testid="employee-overview-onepage">
+            <aside
+              v-if="visibleEmployeeOverviewSections.length > 1"
+              :aria-label="t('employeeAdmin.tabs.overview')"
+              class="employee-admin-overview-nav"
+              data-testid="employee-overview-section-nav"
+            >
+              <button
+                v-for="section in visibleEmployeeOverviewSections"
+                :key="section.id"
+                type="button"
+                :aria-current="section.id === activeOverviewSection ? 'true' : undefined"
+                class="employee-admin-overview-nav__item"
+                :class="{ active: section.id === activeOverviewSection }"
+                :data-testid="section.testId"
+                @click="selectOverviewSection(section.id)"
+              >
+                <span class="employee-admin-overview-nav__icon" :data-icon="section.icon" aria-hidden="true">{{ section.iconLabel }}</span>
+                <span>{{ section.label }}</span>
+              </button>
+            </aside>
+
+            <div class="employee-admin-overview-content">
+          <section
+            id="employee-overview-section-file"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-file"
           >
           <div v-if="selectedEmployee && !isCreatingEmployee" class="employee-admin-summary">
             <article class="employee-admin-summary__card">
@@ -334,7 +362,7 @@
           </div>
 
           <form class="employee-admin-form employee-admin-form--structured" @submit.prevent="submitEmployee">
-            <section class="employee-admin-editor-intro">
+            <section class="employee-admin-overview-section-card__header">
               <div>
                 <p class="eyebrow">{{ t("employeeAdmin.form.eyebrow") }}</p>
                 <h4>{{ t("employeeAdmin.form.title") }}</h4>
@@ -494,9 +522,10 @@
           </section>
 
           <section
-            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'app_access'"
-            class="employee-admin-section employee-admin-tab-panel"
-            data-testid="employee-tab-panel-app-access"
+            v-if="isEmployeeOverviewSectionVisible('app_access')"
+            id="employee-overview-section-app-access"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-app-access"
           >
             <div class="employee-admin-summary">
               <article class="employee-admin-summary__card">
@@ -521,7 +550,7 @@
               </article>
             </div>
             <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-editor-intro">
+              <section class="employee-admin-overview-section-card__header">
                 <div>
                   <p class="eyebrow">{{ t("employeeAdmin.access.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.access.title") }}</h4>
@@ -682,12 +711,13 @@
           </section>
 
           <section
-            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'qualifications'"
-            class="employee-admin-section employee-admin-tab-panel"
-            data-testid="employee-tab-panel-qualifications"
+            v-if="isEmployeeOverviewSectionVisible('qualifications')"
+            id="employee-overview-section-qualifications"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-qualifications"
           >
             <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-editor-intro">
+              <section class="employee-admin-overview-section-card__header">
                 <div>
                   <p class="eyebrow">{{ t("employeeAdmin.qualifications.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.qualifications.title") }}</h4>
@@ -852,12 +882,13 @@
           </section>
 
           <section
-            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'credentials'"
-            class="employee-admin-section employee-admin-tab-panel"
-            data-testid="employee-tab-panel-credentials"
+            v-if="isEmployeeOverviewSectionVisible('credentials')"
+            id="employee-overview-section-credentials"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-credentials"
           >
             <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-editor-intro">
+              <section class="employee-admin-overview-section-card__header">
                 <div>
                   <p class="eyebrow">{{ t("employeeAdmin.credentials.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.credentials.title") }}</h4>
@@ -942,12 +973,13 @@
           </section>
 
           <section
-            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'availability'"
-            class="employee-admin-section employee-admin-tab-panel"
-            data-testid="employee-tab-panel-availability"
+            v-if="isEmployeeOverviewSectionVisible('availability')"
+            id="employee-overview-section-availability"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-availability"
           >
             <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-editor-intro">
+              <section class="employee-admin-overview-section-card__header">
                 <div>
                   <p class="eyebrow">{{ t("employeeAdmin.availability.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.availability.title") }}</h4>
@@ -1041,12 +1073,13 @@
           </section>
 
           <section
-            v-if="selectedEmployee && !isCreatingEmployee && canReadPrivate && activeDetailTab === 'absences'"
-            class="employee-admin-section employee-admin-tab-panel"
-            data-testid="employee-tab-panel-absences"
+            v-if="isEmployeeOverviewSectionVisible('absences')"
+            id="employee-overview-section-absences"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-absences"
           >
             <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-editor-intro">
+              <section class="employee-admin-overview-section-card__header">
                 <div>
                   <p class="eyebrow">{{ t("employeeAdmin.absences.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.absences.title") }}</h4>
@@ -1118,12 +1151,13 @@
           </section>
 
           <section
-            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'notes'"
-            class="employee-admin-section employee-admin-tab-panel"
-            data-testid="employee-tab-panel-notes"
+            v-if="isEmployeeOverviewSectionVisible('notes')"
+            id="employee-overview-section-notes"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-notes"
           >
             <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-editor-intro">
+              <section class="employee-admin-overview-section-card__header">
                 <div>
                   <p class="eyebrow">{{ t("employeeAdmin.notes.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.notes.title") }}</h4>
@@ -1200,12 +1234,13 @@
           </section>
 
           <section
-            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'groups'"
-            class="employee-admin-section employee-admin-tab-panel"
-            data-testid="employee-tab-panel-groups"
+            v-if="isEmployeeOverviewSectionVisible('groups')"
+            id="employee-overview-section-groups"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-groups"
           >
             <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-editor-intro">
+              <section class="employee-admin-overview-section-card__header">
                 <div>
                   <p class="eyebrow">{{ t("employeeAdmin.groups.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.groups.title") }}</h4>
@@ -1305,12 +1340,13 @@
           </section>
 
           <section
-            v-if="selectedEmployee && !isCreatingEmployee && canReadPrivate && activeDetailTab === 'private_profile'"
-            class="employee-admin-section employee-admin-tab-panel"
-            data-testid="employee-tab-panel-private-profile"
+            v-if="isEmployeeOverviewSectionVisible('private_profile')"
+            id="employee-overview-section-private-profile"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-private-profile"
           >
             <form class="employee-admin-form employee-admin-form--structured" @submit.prevent="submitPrivateProfile">
-              <section class="employee-admin-editor-intro">
+              <section class="employee-admin-overview-section-card__header">
                 <div>
                   <p class="eyebrow">{{ t("employeeAdmin.privateProfile.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.privateProfile.title") }}</h4>
@@ -1487,12 +1523,13 @@
           </section>
 
           <section
-            v-if="selectedEmployee && !isCreatingEmployee && canReadPrivate && activeDetailTab === 'addresses'"
-            class="employee-admin-section employee-admin-tab-panel"
-            data-testid="employee-tab-panel-addresses"
+            v-if="isEmployeeOverviewSectionVisible('addresses')"
+            id="employee-overview-section-addresses"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-addresses"
           >
             <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-editor-intro">
+              <section class="employee-admin-overview-section-card__header">
                 <div>
                   <p class="eyebrow">{{ t("employeeAdmin.addresses.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.addresses.title") }}</h4>
@@ -1645,12 +1682,13 @@
           </section>
 
           <section
-            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'documents'"
-            class="employee-admin-section employee-admin-tab-panel"
-            data-testid="employee-tab-panel-documents"
+            v-if="isEmployeeOverviewSectionVisible('documents')"
+            id="employee-overview-section-documents"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-documents"
           >
             <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-editor-intro">
+              <section class="employee-admin-overview-section-card__header">
                 <div>
                   <p class="eyebrow">{{ t("employeeAdmin.documents.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.documents.title") }}</h4>
@@ -1805,6 +1843,9 @@
               </section>
             </div>
           </section>
+            </div>
+            </section>
+          </section>
         </template>
 
         <section v-else class="employee-admin-empty">
@@ -1824,7 +1865,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import { listBranches, listMandates, type BranchRead, type MandateRead } from "@/api/coreAdmin";
@@ -2167,13 +2208,13 @@ const importDryRunResult = ref<EmployeeImportDryRunResult | null>(null);
 const lastImportResult = ref<EmployeeImportExecuteResult | null>(null);
 const lastExportResult = ref<EmployeeExportResult | null>(null);
 const photoPreviewUrl = ref("");
-const pendingPhotoFile = ref<File | null>(null);
 const pendingEmployeeDocumentFile = ref<File | null>(null);
 const pendingEmployeeDocumentVersionFile = ref<File | null>(null);
 const pendingImportFile = ref<File | null>(null);
 const isCreatingEmployee = ref(false);
 const listPanelTab = ref<"import_export" | "search">("search");
 const activeDetailTab = ref("overview");
+const activeOverviewSection = ref<EmployeeOverviewSectionId>("employee_file");
 const editingNoteId = ref("");
 const editingGroupId = ref("");
 const editingMembershipId = ref("");
@@ -2418,29 +2459,148 @@ const addressEditorLeadKey = computed(() => {
   }
 });
 const employeeDetailTabs = computed(() => {
-  const tabs = [
-    { id: "overview", label: t("employeeAdmin.tabs.overview") },
-    { id: "app_access", label: t("employeeAdmin.tabs.appAccess") },
-    { id: "qualifications", label: t("employeeAdmin.tabs.qualifications") },
-    { id: "credentials", label: t("employeeAdmin.tabs.credentials") },
-    { id: "availability", label: t("employeeAdmin.tabs.availability") },
-    { id: "notes", label: t("employeeAdmin.tabs.notes") },
-    { id: "groups", label: t("employeeAdmin.tabs.groups") },
-    { id: "documents", label: t("employeeAdmin.tabs.documents") },
-  ];
-
-  if (canReadPrivate.value) {
-    tabs.splice(6, 0, { id: "private_profile", label: t("employeeAdmin.tabs.privateProfile") });
-    tabs.splice(7, 0, { id: "addresses", label: t("employeeAdmin.tabs.addresses") });
-    tabs.splice(8, 0, { id: "absences", label: t("employeeAdmin.tabs.absences") });
-  }
-
   if (isCreatingEmployee.value) {
-    return tabs.filter((tab) => tab.id === "overview");
+    return [{ id: "overview", label: t("employeeAdmin.tabs.overview") }];
   }
 
-  return [{ id: "dashboard", label: t("employeeAdmin.tabs.dashboard") }, ...tabs];
+  return [
+    { id: "dashboard", label: t("employeeAdmin.tabs.dashboard") },
+    { id: "overview", label: t("employeeAdmin.tabs.overview") },
+  ];
 });
+
+const legacyEmployeeDetailTabIds = new Set([
+  "app_access",
+  "qualifications",
+  "credentials",
+  "availability",
+  "private_profile",
+  "addresses",
+  "absences",
+  "notes",
+  "groups",
+  "documents",
+]);
+
+type EmployeeOverviewSectionId =
+  | "employee_file"
+  | "app_access"
+  | "qualifications"
+  | "credentials"
+  | "availability"
+  | "private_profile"
+  | "addresses"
+  | "absences"
+  | "notes"
+  | "groups"
+  | "documents";
+
+type EmployeeOverviewSection = {
+  id: EmployeeOverviewSectionId;
+  icon: string;
+  iconLabel: string;
+  label: string;
+  testId: string;
+  visible: boolean;
+};
+
+const employeeOverviewSections = computed(() => {
+  const existingEmployeeVisible = !isCreatingEmployee.value && !!selectedEmployee.value;
+  const privateEmployeeVisible = existingEmployeeVisible && canReadPrivate.value;
+
+  return [
+    {
+      id: "employee_file",
+      icon: "lucide:id-card",
+      iconLabel: "ID",
+      label: t("employeeAdmin.overviewSections.employeeFile"),
+      testId: "employee-overview-nav-file",
+      visible: true,
+    },
+    {
+      id: "app_access",
+      icon: "lucide:key-round",
+      iconLabel: "KEY",
+      label: t("employeeAdmin.overviewSections.appAccess"),
+      testId: "employee-overview-nav-app_access",
+      visible: existingEmployeeVisible,
+    },
+    {
+      id: "qualifications",
+      icon: "lucide:award",
+      iconLabel: "AWD",
+      label: t("employeeAdmin.overviewSections.qualifications"),
+      testId: "employee-overview-nav-qualifications",
+      visible: existingEmployeeVisible,
+    },
+    {
+      id: "credentials",
+      icon: "lucide:badge",
+      iconLabel: "BAD",
+      label: t("employeeAdmin.overviewSections.credentials"),
+      testId: "employee-overview-nav-credentials",
+      visible: existingEmployeeVisible,
+    },
+    {
+      id: "availability",
+      icon: "lucide:calendar-clock",
+      iconLabel: "CAL",
+      label: t("employeeAdmin.overviewSections.availability"),
+      testId: "employee-overview-nav-availability",
+      visible: existingEmployeeVisible,
+    },
+    {
+      id: "private_profile",
+      icon: "lucide:user-lock",
+      iconLabel: "LCK",
+      label: t("employeeAdmin.overviewSections.privateProfile"),
+      testId: "employee-overview-nav-private_profile",
+      visible: privateEmployeeVisible,
+    },
+    {
+      id: "addresses",
+      icon: "lucide:map-pin",
+      iconLabel: "PIN",
+      label: t("employeeAdmin.overviewSections.addresses"),
+      testId: "employee-overview-nav-addresses",
+      visible: privateEmployeeVisible,
+    },
+    {
+      id: "absences",
+      icon: "lucide:calendar-x",
+      iconLabel: "ABS",
+      label: t("employeeAdmin.overviewSections.absences"),
+      testId: "employee-overview-nav-absences",
+      visible: privateEmployeeVisible,
+    },
+    {
+      id: "notes",
+      icon: "lucide:sticky-note",
+      iconLabel: "NTE",
+      label: t("employeeAdmin.overviewSections.notes"),
+      testId: "employee-overview-nav-notes",
+      visible: existingEmployeeVisible,
+    },
+    {
+      id: "groups",
+      icon: "lucide:users",
+      iconLabel: "GRP",
+      label: t("employeeAdmin.overviewSections.groups"),
+      testId: "employee-overview-nav-groups",
+      visible: existingEmployeeVisible,
+    },
+    {
+      id: "documents",
+      icon: "lucide:file-text",
+      iconLabel: "DOC",
+      label: t("employeeAdmin.overviewSections.documents"),
+      testId: "employee-overview-nav-documents",
+      visible: existingEmployeeVisible,
+    },
+  ] satisfies EmployeeOverviewSection[];
+});
+
+const visibleEmployeeOverviewSections = computed(() => employeeOverviewSections.value.filter((section) => section.visible));
 
 type SelectEmployeeOptions = {
   fallbackTab?: string;
@@ -2478,6 +2638,50 @@ function isEmployeeDetailTabDisabled(tabId: string) {
     return false;
   }
   return true;
+}
+
+function selectEmployeeDetailTab(tabId: string) {
+  activeDetailTab.value = tabId;
+  if (tabId === "overview") {
+    activeOverviewSection.value = "employee_file";
+  }
+}
+
+function selectOverviewSection(sectionId: string) {
+  activeOverviewSection.value = normalizeOverviewSectionId(sectionId);
+  scrollToOverviewSection(activeOverviewSection.value);
+}
+
+function openEmployeeOverviewSection(sectionId: string) {
+  activeDetailTab.value = "overview";
+  activeOverviewSection.value = normalizeOverviewSectionId(sectionId);
+  scrollToOverviewSection(activeOverviewSection.value);
+}
+
+function normalizeOverviewSectionId(sectionId: string): EmployeeOverviewSectionId {
+  const normalizedSectionId = sectionId === "file" ? "employee_file" : sectionId;
+  const matchingSection = employeeOverviewSections.value.find((section) => section.id === normalizedSectionId);
+  if (matchingSection?.visible) {
+    return matchingSection.id;
+  }
+  return "employee_file";
+}
+
+function scrollToOverviewSection(sectionId: EmployeeOverviewSectionId) {
+  void nextTick(() => {
+    document.getElementById(resolveOverviewSectionElementId(sectionId))?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  });
+}
+
+function isEmployeeOverviewSectionVisible(sectionId: EmployeeOverviewSectionId) {
+  return employeeOverviewSections.value.some((section) => section.id === sectionId && section.visible);
+}
+
+function resolveOverviewSectionElementId(sectionId: EmployeeOverviewSectionId) {
+  return `employee-overview-section-${sectionId === "employee_file" ? "file" : sectionId.replaceAll("_", "-")}`;
 }
 
 function openWorkforceCatalogs() {
@@ -3255,11 +3459,17 @@ async function selectEmployee(employeeId: string, options: SelectEmployeeOptions
     if (firstQualification) {
       await loadQualificationProofs(firstQualification.id);
     }
-    activeDetailTab.value = resolveEmployeeDetailTab(
-      desiredTab,
-      employeeDetailTabs.value.map((tab) => tab.id),
-      fallbackTab,
-    );
+    if (legacyEmployeeDetailTabIds.has(desiredTab)) {
+      openEmployeeOverviewSection(desiredTab);
+    } else if (desiredTab === "profile_photo") {
+      activeDetailTab.value = "dashboard";
+    } else {
+      activeDetailTab.value = resolveEmployeeDetailTab(
+        desiredTab,
+        employeeDetailTabs.value.map((tab) => tab.id),
+        fallbackTab,
+      );
+    }
     await refreshPhotoPreview();
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3815,11 +4025,6 @@ async function submitAbsence() {
   }
 }
 
-function onPhotoSelected(event: Event) {
-  const target = event.target as HTMLInputElement;
-  pendingPhotoFile.value = target.files?.[0] ?? null;
-}
-
 async function submitDashboardPhoto(file: File) {
   await submitPhotoFile(file);
 }
@@ -3934,13 +4139,6 @@ async function submitEmployeeDocumentVersion() {
   }
 }
 
-async function submitPhoto() {
-  if (!pendingPhotoFile.value) {
-    return;
-  }
-  await submitPhotoFile(pendingPhotoFile.value);
-}
-
 async function submitPhotoFile(file: File) {
   if (!file || !selectedEmployeeId.value || !resolvedTenantScopeId.value || !authStore.accessToken || !actionState.value.canManagePhoto) {
     return;
@@ -3954,7 +4152,6 @@ async function submitPhotoFile(file: File) {
       content_type: file.type || "application/octet-stream",
       content_base64: contentBase64,
     });
-    pendingPhotoFile.value = null;
     await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.photoSaved"));
   } catch (error) {
@@ -4212,10 +4409,19 @@ function emptyToNull(value: string) {
 watch(
   () => [isCreatingEmployee.value, !!selectedEmployee.value, canReadPrivate.value, activeDetailTab.value],
   () => {
+    if (legacyEmployeeDetailTabIds.has(activeDetailTab.value)) {
+      openEmployeeOverviewSection(activeDetailTab.value);
+      return;
+    }
+    if (activeDetailTab.value === "profile_photo") {
+      activeDetailTab.value = isCreatingEmployee.value ? "overview" : "dashboard";
+      return;
+    }
     const allowedTabs = employeeDetailTabs.value.map((tab) => tab.id);
     if (!allowedTabs.includes(activeDetailTab.value)) {
       activeDetailTab.value = resolveEmployeeDetailTab(activeDetailTab.value, allowedTabs);
     }
+    activeOverviewSection.value = normalizeOverviewSectionId(activeOverviewSection.value);
   },
   { immediate: true },
 );
@@ -4639,6 +4845,138 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-color-primary) 28%, transparent);
 }
 
+.employee-admin-overview-onepage {
+  display: grid;
+  grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.employee-admin-overview-content {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.employee-admin-overview-section-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 1.25rem;
+  background: var(--sp-color-surface-card);
+  min-width: 0;
+  scroll-margin-top: 1rem;
+}
+
+.employee-admin-overview-section-card__header,
+.employee-admin-overview-section-card .employee-admin-editor-intro {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.employee-admin-overview-section-card__header h4,
+.employee-admin-overview-section-card .employee-admin-editor-intro h4 {
+  margin: 0;
+  color: var(--sp-color-text-primary);
+}
+
+.employee-admin-overview-subsection,
+.employee-admin-overview-section-card .employee-admin-form-section,
+.employee-admin-overview-section-card .employee-admin-form-actions {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.employee-admin-overview-subsection__header,
+.employee-admin-overview-section-card .employee-admin-form-section__header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.employee-admin-overview-subsection + .employee-admin-overview-subsection,
+.employee-admin-overview-section-card .employee-admin-overview-section-card__header + .employee-admin-form-section,
+.employee-admin-overview-section-card .employee-admin-editor-intro + .employee-admin-form-section,
+.employee-admin-overview-section-card .employee-admin-form-section + .employee-admin-form-section,
+.employee-admin-overview-section-card .employee-admin-form-section + .employee-admin-form-actions,
+.employee-admin-overview-section-card .employee-admin-form-section + .employee-admin-inline-form,
+.employee-admin-overview-section-card .employee-admin-inline-form + .employee-admin-form-section,
+.employee-admin-overview-section-card .employee-admin-form-section + .employee-admin-advanced-access {
+  border-top: 1px solid var(--sp-color-border-soft);
+  padding-top: 1rem;
+}
+
+.employee-admin-overview-nav {
+  position: sticky;
+  top: 1rem;
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.75rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 18px;
+  background: var(--sp-color-surface-page);
+}
+
+.employee-admin-overview-nav__item {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--sp-color-text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.employee-admin-overview-nav__item.active {
+  border-color: color-mix(in srgb, var(--sp-color-primary) 35%, transparent);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 62%, transparent);
+  color: var(--sp-color-primary-strong);
+}
+
+.employee-admin-overview-nav__item:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--sp-color-primary) 38%, transparent);
+  outline-offset: 2px;
+}
+
+.employee-admin-overview-nav__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 68%, transparent);
+  color: var(--sp-color-primary-strong);
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.employee-admin-overview-section-card .employee-admin-advanced-access {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--sp-color-border-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+.employee-admin-overview-section-card .employee-admin-advanced-access[open] {
+  padding-bottom: 0;
+}
+
 .employee-admin-detail,
 .employee-admin-form,
 .employee-admin-inline-form {
@@ -4833,13 +5171,24 @@ onBeforeUnmount(() => {
 @media (max-width: 1080px) {
   .employee-admin-grid,
   .employee-admin-hero,
-  .employee-admin-photo {
+  .employee-admin-photo,
+  .employee-admin-overview-onepage {
     grid-template-columns: 1fr;
     display: grid;
   }
 
   .employee-admin-list-panel {
     position: static;
+  }
+
+  .employee-admin-overview-nav {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .employee-admin-overview-nav__item {
+    min-width: max-content;
   }
 }
 

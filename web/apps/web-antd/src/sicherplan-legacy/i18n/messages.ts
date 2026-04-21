@@ -518,6 +518,17 @@ export type MessageKey =
   | "employeeAdmin.tabs.groups"
   | "employeeAdmin.tabs.addresses"
   | "employeeAdmin.tabs.documents"
+  | "employeeAdmin.overviewSections.employeeFile"
+  | "employeeAdmin.overviewSections.appAccess"
+  | "employeeAdmin.overviewSections.qualifications"
+  | "employeeAdmin.overviewSections.credentials"
+  | "employeeAdmin.overviewSections.availability"
+  | "employeeAdmin.overviewSections.privateProfile"
+  | "employeeAdmin.overviewSections.addresses"
+  | "employeeAdmin.overviewSections.absences"
+  | "employeeAdmin.overviewSections.notes"
+  | "employeeAdmin.overviewSections.groups"
+  | "employeeAdmin.overviewSections.documents"
   | "employeeAdmin.dashboard.identityEyebrow"
   | "employeeAdmin.dashboard.projectsEyebrow"
   | "employeeAdmin.dashboard.projectsTitle"
@@ -2480,6 +2491,17 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.tabs.groups": "Gruppen",
     "employeeAdmin.tabs.addresses": "Adressen",
     "employeeAdmin.tabs.documents": "Dateien",
+    "employeeAdmin.overviewSections.employeeFile": "Mitarbeiterakte",
+    "employeeAdmin.overviewSections.appAccess": "App-Zugang",
+    "employeeAdmin.overviewSections.qualifications": "Qualifikationen",
+    "employeeAdmin.overviewSections.credentials": "Ausweise",
+    "employeeAdmin.overviewSections.availability": "Verfügbarkeit",
+    "employeeAdmin.overviewSections.privateProfile": "Privatprofil",
+    "employeeAdmin.overviewSections.addresses": "Adressen",
+    "employeeAdmin.overviewSections.absences": "Abwesenheiten",
+    "employeeAdmin.overviewSections.notes": "Notizen",
+    "employeeAdmin.overviewSections.groups": "Gruppen",
+    "employeeAdmin.overviewSections.documents": "Dateien",
     "employeeAdmin.dashboard.identityEyebrow": "Mitarbeiter-Dashboard",
     "employeeAdmin.dashboard.projectsEyebrow": "Einsatzkontexte",
     "employeeAdmin.dashboard.projectsTitle": "Vergangene, aktuelle und kommende Projekte",
@@ -4634,6 +4656,17 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.tabs.groups": "Groups",
     "employeeAdmin.tabs.addresses": "Addresses",
     "employeeAdmin.tabs.documents": "Documents",
+    "employeeAdmin.overviewSections.employeeFile": "Employee file",
+    "employeeAdmin.overviewSections.appAccess": "App access",
+    "employeeAdmin.overviewSections.qualifications": "Qualifications",
+    "employeeAdmin.overviewSections.credentials": "Credentials",
+    "employeeAdmin.overviewSections.availability": "Availability",
+    "employeeAdmin.overviewSections.privateProfile": "Private profile",
+    "employeeAdmin.overviewSections.addresses": "Addresses",
+    "employeeAdmin.overviewSections.absences": "Absences",
+    "employeeAdmin.overviewSections.notes": "Notes",
+    "employeeAdmin.overviewSections.groups": "Groups",
+    "employeeAdmin.overviewSections.documents": "Documents",
     "employeeAdmin.dashboard.identityEyebrow": "Employee dashboard",
     "employeeAdmin.dashboard.projectsEyebrow": "Assignment contexts",
     "employeeAdmin.dashboard.projectsTitle": "Past, current, and future projects",

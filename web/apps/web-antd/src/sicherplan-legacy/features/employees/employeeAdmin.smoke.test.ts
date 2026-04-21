@@ -146,6 +146,17 @@ const translations: Record<string, string> = {
   "employeeAdmin.tabs.privateProfile": "Private profile",
   "employeeAdmin.tabs.profilePhoto": "Profile photo",
   "employeeAdmin.tabs.qualifications": "Qualifications",
+  "employeeAdmin.overviewSections.employeeFile": "Employee file",
+  "employeeAdmin.overviewSections.appAccess": "App access",
+  "employeeAdmin.overviewSections.qualifications": "Qualifications",
+  "employeeAdmin.overviewSections.credentials": "Credentials",
+  "employeeAdmin.overviewSections.availability": "Availability",
+  "employeeAdmin.overviewSections.privateProfile": "Private profile",
+  "employeeAdmin.overviewSections.addresses": "Addresses",
+  "employeeAdmin.overviewSections.absences": "Absences",
+  "employeeAdmin.overviewSections.notes": "Notes",
+  "employeeAdmin.overviewSections.groups": "Groups",
+  "employeeAdmin.overviewSections.documents": "Documents",
   "employeeAdmin.dashboard.identityEyebrow": "Employee dashboard",
   "employeeAdmin.dashboard.projectsEyebrow": "Assignment contexts",
   "employeeAdmin.dashboard.projectsTitle": "Past, current, and future projects",
@@ -915,6 +926,8 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(wrapper.get('[data-testid="employee-detail-workspace"]').text()).toContain("Markus Neumann");
     expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).toMatch(/Dashboard[\s\S]*Overview/);
     expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).not.toContain("Profile photo");
+    expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).not.toContain("Documents");
+    expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).not.toContain("Qualifications");
     expect(wrapper.get('[data-testid="employee-tab-dashboard"]').classes()).toContain("active");
     expect(wrapper.get('[data-testid="employee-dashboard-hero"]').text()).toContain("Markus Neumann");
     expect(wrapper.find('[data-testid="employee-dashboard-calendar"]').exists()).toBe(true);
@@ -931,10 +944,15 @@ describe("EmployeeAdminView search dialog regression", () => {
       }),
     );
 
-    await wrapper.get('[data-testid="employee-tab-documents"]').trigger("click");
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
     await settle();
-    expect(wrapper.get('[data-testid="employee-tab-documents"]').classes()).toContain("active");
-    expect(wrapper.find('[data-testid="employee-tab-panel-documents"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="employee-tab-overview"]').classes()).toContain("active");
+    expect(wrapper.find('[data-testid="employee-overview-section-nav"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-overview-section-app-access"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-overview-section-documents"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="employee-overview-nav-documents"]').trigger("click");
+    await settle();
+    expect(wrapper.get('[data-testid="employee-overview-nav-documents"]').classes()).toContain("active");
 
     await wrapper.get('[data-testid="employee-list-tab-search"]').trigger("click");
     await clickButtonByText(wrapper, "Create employee file");
@@ -942,5 +960,6 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(wrapper.get('[data-testid="employee-detail-workspace"]').text()).toContain("Create employee");
     expect(wrapper.find('[data-testid="employee-tab-dashboard"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="employee-tab-overview"]').classes()).toContain("active");
+    expect(wrapper.find('[data-testid="employee-overview-section-nav"]').exists()).toBe(false);
   });
 });
