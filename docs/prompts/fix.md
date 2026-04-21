@@ -1,165 +1,246 @@
 You are working in the SicherPlan repository.
 
-Bug:
-In /admin/employees > existing employee > Overview, the left-side section navigation looks correct visually, but it still does not stay visible while scrolling down.
+Task:
+Reduce clutter in Employee Overview by moving heavy editor forms from inline section cards into modal dialogs.
 
-User-visible evidence:
-- At the top of Overview, the left nav appears correctly.
-- When scrolling down to lower sections such as Qualifications, Addresses, Notes, Documents, the left nav stays behind at the top and disappears from the viewport.
-- The user needs the left nav to remain visible/floating on the left side at all scroll positions inside the Overview page.
+Page:
+- /admin/employees
+- Existing employee > Overview
 
-Important:
-The link styling is now acceptable. Do NOT redesign the nav visually again.
-Focus only on making the nav actually stay visible while scrolling.
+User request:
+The right-side Overview sections should show lists/status/data and action buttons. Large editor forms should not always be visible inline. Instead, each editor should open in a dialog when the user clicks its related button.
 
 Primary file:
 - web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
 
-Current latest-code facts to validate:
-1. EmployeeAdminView.vue already has:
-   - employee-admin-overview-onepage
-   - employee-admin-overview-nav-shell
-   - employee-admin-overview-nav
-   - employee-admin-overview-nav__link
-   - employee-admin-overview-content
-   - employee-admin-overview-section-card
-2. CSS already contains something like:
-   .employee-admin-overview-nav-shell {
-     position: sticky;
-     top: var(--employee-overview-sticky-top, 6.5rem);
-     max-height: calc(100vh - var(--employee-overview-sticky-top, 6.5rem) - 1rem);
-     overflow-y: auto;
-   }
-3. There is already IntersectionObserver scroll-spy logic:
-   - employeeOverviewSectionObserver
-   - setupEmployeeOverviewSectionObserver()
-   - activeOverviewSection
-4. Despite this, real browser QA shows the nav does not stay in the viewport.
-5. Therefore, simply adding `position: sticky` again is not enough.
+Existing modal style to reuse:
+EmployeeAdminView.vue already has modal/backdrop styling for employee search:
+- employee-admin-modal-backdrop
+- employee-admin-modal
 
-Required diagnosis:
-Before changing code, inspect the real rendered layout and answer:
-1. What is the actual scroll container?
-   - window/document?
-   - Vben layout content container?
-   - another internal scrollable element?
-2. Which ancestor of `.employee-admin-overview-nav-shell` prevents sticky from working?
-   Check for:
-   - overflow: hidden / auto / scroll
-   - transform / filter / perspective
-   - contain / will-change
-   - height constraints
-   - nav being inside a parent that ends too early
-3. Is `.employee-admin-overview-nav-shell` actually a sibling of `.employee-admin-overview-content`?
-4. Does `.employee-admin-overview-onepage` span the full height of all sections?
-5. Does the sticky top offset place the nav under the app header/tabbar correctly?
-6. If CSS sticky cannot be made reliable in this app layout, implement a robust fixed-position fallback.
+Reuse this pattern for editor dialogs where possible.
 
-Implementation requirement:
-Use the best and most reliable method after diagnosis.
+General requirements:
+1. Keep the section cards visible and compact.
+2. Keep existing lists/registers inline.
+3. Replace inline editor forms with action buttons:
+   - Add / Edit / Manage
+4. Opening an editor button shows a modal dialog.
+5. Modal contains the existing editor form fields and submit/cancel/reset actions.
+6. Submitting from modal must call the same existing methods and API payloads as before.
+7. On successful save:
+   - close the modal
+   - refresh relevant data
+   - stay on Overview
+   - preserve activeOverviewSection
+8. On validation error:
+   - keep modal open
+   - show existing feedback/error
+9. Do not change backend APIs.
 
-Preferred path A — fix CSS sticky if possible:
-1. Keep nav inside the left column of `.employee-admin-overview-onepage`.
-2. Ensure the parent layout allows sticky:
-   - no breaking overflow on relevant ancestors if safely adjustable
-   - one-page wrapper spans full content height
-   - nav shell is not nested inside only the first section
-3. Keep:
-   - desktop sticky left nav
-   - mobile static/horizontal nav
-4. Validate in real browser.
+Create a central modal state if useful, for example:
+type EmployeeOverviewEditorDialog =
+  | 'qualification'
+  | 'qualification_proof'
+  | 'credential'
+  | 'availability'
+  | 'absence'
+  | 'note'
+  | 'group_catalog'
+  | 'group_assignment'
+  | 'address'
+  | 'document_upload'
+  | 'document_link'
+  | 'document_version'
+  | null
 
-Fallback path B — implement controlled fixed-position behavior:
-If CSS sticky is still unreliable because of the app/Vben scroll container, implement a JS-assisted sticky/floating fallback.
+const activeEmployeeOverviewEditor = ref<EmployeeOverviewEditorDialog>(null)
 
-Add refs:
-- overviewOnePageRef
-- overviewNavShellRef
-- overviewNavPlaceholderRef if needed
+Or use separate booleans if simpler, but prefer a maintainable central approach.
 
-Add reactive state:
-- overviewNavFixed = false
-- overviewNavPinnedToBottom = false
-- overviewNavStyle = computed/inline style object
+Sections to update:
 
-Behavior:
-1. On desktop width only, when Overview tab is active and the user scrolls:
-   - measure overview container rect
-   - measure nav width/height
-   - use a top offset matching the app header/tabbar, for example 96px or computed from CSS variable
-2. If overview container top is above stickyTop and overview container bottom is below nav bottom:
-   - set nav to position: fixed
-   - set top = stickyTop
-   - set left = overview container left
-   - set width = nav column width
-   - keep z-index above content but below app header/dropdowns
-3. If user scrolls beyond bottom of overview container:
-   - pin nav to the bottom of the overview container
-   - either use absolute positioning inside the onepage wrapper
-   - or remove fixed and use a transform/absolute bottom placement
-4. If user scrolls above the overview container:
-   - nav returns to normal static position.
-5. On resize:
-   - recalculate left/width/top.
-6. On tab switch away from Overview:
-   - disable fixed mode and cleanup.
-7. On unmount:
-   - remove scroll/resize listeners.
-8. Use requestAnimationFrame throttling for scroll calculations.
-9. Do not cause layout jump:
-   - keep nav column width reserved
-   - if fixed removes nav from flow, use the nav shell itself in a reserved aside or add placeholder.
-10. Do not apply this on mobile/tablet widths where layout becomes one column.
+A. Qualifications
+Current inline content:
+- Existing qualifications list/register
+- Qualification editor form
+- Proof upload editor
 
-Suggested implementation details:
-- Keep existing `.employee-admin-overview-nav-shell` visual styles.
-- Add class modifiers:
-  - employee-admin-overview-nav-shell--fixed
-  - employee-admin-overview-nav-shell--pinned
-- Or bind inline style:
-  :style="overviewNavFloatingStyle"
-- Add data-testid:
-  - employee-overview-nav-floating-shell
+Required:
+1. Keep existing qualifications list inline.
+2. Add button:
+   - "Add qualification"
+3. Each existing qualification row should have Edit button or row click opens qualification editor modal.
+4. Move qualification create/update form to modal:
+   - employee-overview-editor-qualification-modal
+5. Proof upload:
+   - keep proof list inline for selected qualification if currently useful.
+   - add "Upload proof" button that opens proof upload modal:
+     employee-overview-editor-qualification-proof-modal
+6. Reuse:
+   - editQualification(...)
+   - resetQualificationDraft()
+   - submitQualification()
+   - submitQualificationProof()
+7. Do not break selectedQualification / selectedQualificationProofs behavior.
 
-Important:
-Do not create global scroll behavior or global CSS hacks.
-This must be scoped to Employee Overview only.
+B. Credentials
+Current inline content:
+- credential list/register
+- credential editor form
 
-Scroll-spy:
-1. Preserve existing IntersectionObserver active link behavior.
-2. If scroll container is not window, set the IntersectionObserver root to the actual scroll container.
-3. rootMargin must account for sticky/fixed top offset.
-4. Active link must update on manual scroll.
+Required:
+1. Keep credential list inline.
+2. Add "Add credential" button.
+3. Existing credential Edit opens credential modal.
+4. Move credential editor form to:
+   employee-overview-editor-credential-modal
+5. Keep "Issue credential badge" action available from list row.
 
-Click behavior:
-1. Clicking a nav link still calls scrollIntoView or scrollTo equivalent.
-2. If using a custom scroll container, use container-aware scrolling.
-3. activeOverviewSection updates immediately on click.
+C. Availability
+Current inline content:
+- availability rules list
+- availability editor form
 
-Responsive:
-1. Desktop/wide:
-   - nav floats/stays visible on the left.
-2. Tablet/mobile:
-   - nav becomes static or horizontally scrollable above content.
-   - no fixed overlay covering fields.
+Required:
+1. Keep availability list inline.
+2. Add "Add availability rule" button.
+3. Row click/Edit opens availability modal.
+4. Move availability editor to:
+   employee-overview-editor-availability-modal
+5. Preserve weekday checkbox behavior.
 
-Do not change:
-- Dashboard tab
-- Overview content sections
-- all employee forms/actions
-- permission logic
-- create employee flow
-- search/import/export
-- dashboard photo upload
-- employee calendar
-- backend APIs
+D. Absences
+Current inline content:
+- absence list
+- absence editor form
+
+Required:
+1. Keep absence list inline.
+2. Add "Add absence" button.
+3. Row click/Edit opens absence modal.
+4. Move absence editor to:
+   employee-overview-editor-absence-modal
+
+E. Notes
+Current inline content:
+- notes list
+- note editor form
+
+Required:
+1. Keep notes list inline.
+2. Add "Add note" button.
+3. Row click/Edit opens note modal.
+4. Move note editor to:
+   employee-overview-editor-note-modal
+
+F. Groups
+Current inline content:
+- group catalog editor
+- group assignment editor
+- current memberships
+
+Required:
+1. Keep current memberships list inline.
+2. Add button:
+   - "Create/update group catalog" or "Manage group catalog"
+   opens group catalog modal:
+   employee-overview-editor-group-catalog-modal
+3. Add button:
+   - "Assign group"
+   opens group assignment modal:
+   employee-overview-editor-group-assignment-modal
+4. Existing membership Edit opens group assignment modal with populated draft.
+5. Reuse:
+   - submitGroup()
+   - resetGroupDraft()
+   - submitMembership()
+   - resetMembershipDraft()
+   - editMembership(...)
+
+G. Addresses
+Current inline content:
+- current address
+- address editor form
+- address history
+
+Required:
+1. Keep current address inline.
+2. Keep address history inline.
+3. Add button:
+   - "Add address"
+   opens address modal.
+4. Edit current/history address opens address modal.
+5. Close validity / mark current can either:
+   - open the address modal with appropriate mode, or
+   - keep the existing action if it does not require a large inline editor.
+6. Move address editor form to:
+   employee-overview-editor-address-modal
+7. Reuse:
+   - editAddress(...)
+   - prepareAddressAsCurrent(...)
+   - prepareAddressValidityClose(...)
+   - submitAddress()
+   - resetAddressDraft()
+
+H. Documents
+Current inline content:
+- document library
+- upload new document form
+- link existing document form
+- add version form
+
+Required:
+1. Keep document library inline.
+2. Add buttons:
+   - "Upload document" -> document upload modal
+   - "Link existing document" -> document link modal
+   - "Add version" -> document version modal
+3. Existing document row "Use document for version" should open document version modal with selected document.
+4. Move upload form to:
+   employee-overview-editor-document-upload-modal
+5. Move link form to:
+   employee-overview-editor-document-link-modal
+6. Move version form to:
+   employee-overview-editor-document-version-modal
+7. Reuse:
+   - submitEmployeeDocumentUpload()
+   - submitEmployeeDocumentLink()
+   - submitEmployeeDocumentVersion()
+   - useEmployeeDocumentForVersion()
+8. Do not change the existing document API.
+9. If there is already a document picker pattern elsewhere, do not expand this task unless the raw document ID UX is also being addressed.
+
+I. Modal accessibility
+Every modal must:
+1. role="dialog"
+2. aria-modal="true"
+3. labelled by heading
+4. have Close/Cancel button
+5. close on backdrop click if current app pattern allows it
+6. ideally close on Escape
+7. use stable data-testid
+
+J. Preserve current section card data
+After moving editors:
+- cards should show lists/data and action buttons only.
+- cards should be significantly shorter.
+- no large editor form should be visible until a modal opens.
+
+K. Safety
+Do not move Employee file primary editor into modal unless explicitly requested.
+Do not move App access into modal unless needed.
+This task targets the heavy editors listed by the user:
+- Qualifications
+- Credentials
+- Availability
+- Absences
+- Notes
+- Groups catalog/assignment
+- Addresses
+- Documents upload/link/version
 
 Expected final behavior:
-1. Open /admin/employees.
-2. Select existing employee.
-3. Click Overview.
-4. Scroll down to Qualifications, Addresses, Notes, Documents.
-5. Left nav remains visible in the viewport.
-6. Active nav link changes according to visible section.
-7. Clicking a nav link scrolls to that section.
-8. On mobile/narrow width, nav remains usable and does not cover content.
+Overview card lists remain visible.
+Editor forms appear only inside modals opened by buttons.
+All existing create/update/save actions still work.

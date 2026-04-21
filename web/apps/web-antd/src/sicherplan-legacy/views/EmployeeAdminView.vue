@@ -377,7 +377,6 @@
                 <p class="eyebrow">{{ t("employeeAdmin.form.eyebrow") }}</p>
                 <h4>{{ t("employeeAdmin.form.title") }}</h4>
               </div>
-              <p class="field-help">{{ t("employeeAdmin.form.lead") }}</p>
             </section>
 
             <section class="employee-admin-form-section">
@@ -495,7 +494,6 @@
                 <p class="eyebrow">{{ t("employeeAdmin.form.accessEyebrow") }}</p>
                 <h4>{{ t("employeeAdmin.form.accessTitle") }}</h4>
               </div>
-              <p class="field-help">{{ t("employeeAdmin.form.accessLead") }}</p>
               <p v-if="!isCreatingEmployee && employeeDraft.user_id" class="field-help">
                 {{ t("employeeAdmin.form.accessCurrent") }}: {{ employeeDraft.user_id }}
               </p>
@@ -565,20 +563,17 @@
                   <p class="eyebrow">{{ t("employeeAdmin.access.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.access.title") }}</h4>
                 </div>
-                <p class="field-help">{{ t("employeeAdmin.access.lead") }}</p>
               </section>
 
               <section v-if="!hasLinkedAccess" class="employee-admin-form-section">
                 <div class="employee-admin-form-section__header">
                   <p class="eyebrow">{{ t("employeeAdmin.access.stateCreateEyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.access.stateCreateTitle") }}</h4>
-                  <p class="field-help">{{ t("employeeAdmin.access.stateCreateLead") }}</p>
                 </div>
                 <div class="employee-admin-form-section employee-admin-form-section--nested">
                   <div class="employee-admin-form-section__header">
                     <p class="eyebrow">{{ t("employeeAdmin.access.createEyebrow") }}</p>
                     <h4>{{ t("employeeAdmin.access.createTitle") }}</h4>
-                    <p class="field-help">{{ t("employeeAdmin.access.createLead") }}</p>
                   </div>
                   <div class="employee-admin-form-grid employee-admin-form-grid--editor">
                     <label class="field-stack">
@@ -607,14 +602,12 @@
                 <div class="employee-admin-form-section__header">
                   <p class="eyebrow">{{ t("employeeAdmin.access.stateLinkedEyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.access.stateLinkedTitle") }}</h4>
-                  <p class="field-help">{{ t("employeeAdmin.access.stateLinkedLead") }}</p>
                 </div>
 
                 <div class="employee-admin-form-section employee-admin-form-section--nested">
                   <div class="employee-admin-form-section__header">
                     <p class="eyebrow">{{ t("employeeAdmin.access.manageEyebrow") }}</p>
                     <h4>{{ t("employeeAdmin.access.manageTitle") }}</h4>
-                    <p class="field-help">{{ t("employeeAdmin.access.manageLead") }}</p>
                   </div>
                   <div class="employee-admin-form-grid employee-admin-form-grid--editor">
                     <label class="field-stack">
@@ -641,7 +634,6 @@
                   <div class="employee-admin-form-section__header">
                     <p class="eyebrow">{{ t("employeeAdmin.access.resetEyebrow") }}</p>
                     <h4>{{ t("employeeAdmin.access.resetTitle") }}</h4>
-                    <p class="field-help">{{ t("employeeAdmin.access.resetLead") }}</p>
                   </div>
                   <div class="employee-admin-form-grid employee-admin-form-grid--editor">
                     <label class="field-stack">
@@ -660,7 +652,6 @@
                   <div class="employee-admin-form-section__header">
                     <p class="eyebrow">{{ t("employeeAdmin.access.detachEyebrow") }}</p>
                     <h4>{{ t("employeeAdmin.access.detachTitle") }}</h4>
-                    <p class="field-help">{{ t("employeeAdmin.access.detachLead") }}</p>
                   </div>
                   <div class="cta-row">
                     <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess || !accessLink?.user_id" @click="detachAccessUser">
@@ -675,13 +666,11 @@
                   <span class="eyebrow">{{ t("employeeAdmin.access.advancedEyebrow") }}</span>
                   <strong>{{ t("employeeAdmin.access.advancedSummary") }}</strong>
                 </summary>
-                <p class="field-help">{{ t("employeeAdmin.access.advancedLead") }}</p>
 
                 <section class="employee-admin-form-section employee-admin-form-section--nested">
                   <div class="employee-admin-form-section__header">
                     <p class="eyebrow">{{ t("employeeAdmin.access.attachEyebrow") }}</p>
                     <h4>{{ t("employeeAdmin.access.attachTitle") }}</h4>
-                    <p class="field-help">{{ t("employeeAdmin.access.attachLead") }}</p>
                   </div>
                   <div class="employee-admin-form-grid employee-admin-form-grid--editor">
                     <label class="field-stack">
@@ -708,7 +697,6 @@
                   <div class="employee-admin-form-section__header">
                     <p class="eyebrow">{{ t("employeeAdmin.access.reconcileEyebrow") }}</p>
                     <h4>{{ t("employeeAdmin.access.reconcileTitle") }}</h4>
-                    <p class="field-help">{{ t("employeeAdmin.access.reconcileLead") }}</p>
                   </div>
                   <div class="cta-row">
                     <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess || !accessLink?.user_id" @click="reconcileAccessUser">
@@ -732,13 +720,17 @@
                   <p class="eyebrow">{{ t("employeeAdmin.qualifications.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.qualifications.title") }}</h4>
                 </div>
-                <p class="field-help">{{ t("employeeAdmin.qualifications.lead") }}</p>
               </section>
 
               <section class="employee-admin-form-section">
                 <div class="employee-admin-form-section__header">
                   <p class="eyebrow">{{ t("employeeAdmin.qualifications.registerEyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.qualifications.registerTitle") }}</h4>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" :disabled="!actionState.canManageQualifications" @click="openNewQualificationEditor">
+                    {{ t("employeeAdmin.actions.createQualification") }}
+                  </button>
                 </div>
                 <div v-if="employeeQualifications.length" class="employee-admin-record-list">
                   <button
@@ -767,87 +759,6 @@
                 <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.qualifications.empty") }}</p>
               </section>
 
-              <form class="employee-admin-form-section employee-admin-inline-form" @submit.prevent="submitQualification">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.qualifications.editorEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.qualifications.editorTitle") }}</h4>
-                </div>
-                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.recordKind") }}</span>
-                    <select v-model="qualificationDraft.record_kind" :disabled="!actionState.canManageQualifications">
-                      <option v-for="option in readinessRecordKindOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-                    </select>
-                  </label>
-                  <label v-if="qualificationDraft.record_kind === 'function'" class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.functionType") }}</span>
-                    <select
-                      v-model="qualificationDraft.function_type_id"
-                      :disabled="!actionState.canManageQualifications || employeeFunctionTypeOptions.length === 0"
-                    >
-                      <option value="">{{ t("employeeAdmin.qualifications.functionTypePlaceholder") }}</option>
-                      <option v-for="option in employeeFunctionTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-                    </select>
-                    <span v-if="employeeFunctionTypeOptions.length === 0" class="field-help">{{ t("employeeAdmin.qualifications.functionTypeEmptyHint") }}</span>
-                  </label>
-                  <label v-else class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.qualificationType") }}</span>
-                    <select
-                      v-model="qualificationDraft.qualification_type_id"
-                      :disabled="!actionState.canManageQualifications || employeeQualificationTypeOptions.length === 0"
-                    >
-                      <option value="">{{ t("employeeAdmin.qualifications.qualificationTypePlaceholder") }}</option>
-                      <option v-for="option in employeeQualificationTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-                    </select>
-                    <span v-if="employeeQualificationTypeOptions.length === 0" class="field-help">{{ t("employeeAdmin.qualifications.qualificationTypeEmptyHint") }}</span>
-                    <span
-                      v-else-if="selectedQualificationType?.expiry_required && selectedQualificationType?.default_validity_days"
-                      class="field-help"
-                    >
-                      {{ t("employeeAdmin.qualifications.expiryAutofillHint", { days: selectedQualificationType.default_validity_days }) }}
-                    </span>
-                    <span
-                      v-else-if="selectedQualificationType?.expiry_required"
-                      class="field-help"
-                    >
-                      {{ t("employeeAdmin.qualifications.expiryRequiredHint") }}
-                    </span>
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.certificateNo") }}</span>
-                    <input v-model="qualificationDraft.certificate_no" :disabled="!actionState.canManageQualifications" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.issuedAt") }}</span>
-                    <input v-model="qualificationDraft.issued_at" :disabled="!actionState.canManageQualifications" type="date" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
-                    <input v-model="qualificationDraft.valid_until" :disabled="!actionState.canManageQualifications" type="date" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.issuingAuthority") }}</span>
-                    <input v-model="qualificationDraft.issuing_authority" :disabled="!actionState.canManageQualifications" />
-                  </label>
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
-                    <textarea v-model="qualificationDraft.notes" :disabled="!actionState.canManageQualifications" rows="3" />
-                  </label>
-                </div>
-                <label class="employee-admin-checkbox">
-                  <input v-model="qualificationDraft.granted_internally" :disabled="!actionState.canManageQualifications" type="checkbox" />
-                  <span>{{ t("employeeAdmin.fields.grantedInternally") }}</span>
-                </label>
-                <div class="cta-row">
-                  <button class="cta-button" type="submit" :disabled="!actionState.canManageQualifications">
-                    {{ editingQualificationId ? t("employeeAdmin.actions.saveQualification") : t("employeeAdmin.actions.createQualification") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="resetQualificationDraft">
-                    {{ t("employeeAdmin.actions.resetQualification") }}
-                  </button>
-                </div>
-              </form>
-
               <section class="employee-admin-form-section">
                 <div class="employee-admin-form-section__header">
                   <p class="eyebrow">{{ t("employeeAdmin.qualifications.proofEyebrow") }}</p>
@@ -856,6 +767,11 @@
                 <p v-if="selectedQualification" class="field-help">
                   {{ t("employeeAdmin.qualifications.proofLead") }}: {{ selectedQualification.qualification_type?.label || selectedQualification.function_type?.label || selectedQualification.id }}
                 </p>
+                <div v-if="selectedQualification" class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageQualifications" @click="openQualificationProofEditor">
+                    {{ t("employeeAdmin.actions.uploadQualificationProof") }}
+                  </button>
+                </div>
                 <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.qualifications.proofEmpty") }}</p>
                 <div v-if="selectedQualificationProofs.length" class="employee-admin-record-list">
                   <article v-for="proof in selectedQualificationProofs" :key="`${proof.document_id}-${proof.current_version_no || 0}`" class="employee-admin-record employee-admin-record--static">
@@ -870,23 +786,6 @@
                     </div>
                   </article>
                 </div>
-                <form v-if="selectedQualification" class="employee-admin-form" @submit.prevent="submitQualificationProof">
-                  <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                    <label class="field-stack">
-                      <span>{{ t("employeeAdmin.fields.documentTitle") }}</span>
-                      <input v-model="qualificationProofDraft.title" :disabled="!actionState.canManageQualifications" />
-                    </label>
-                    <label class="field-stack field-stack--wide">
-                      <span>{{ t("employeeAdmin.fields.proofFile") }}</span>
-                      <input :disabled="!actionState.canManageQualifications" type="file" @change="onQualificationProofSelected" />
-                    </label>
-                  </div>
-                  <div class="cta-row">
-                    <button class="cta-button cta-secondary" type="submit" :disabled="!actionState.canManageQualifications || !pendingQualificationProofFile">
-                      {{ t("employeeAdmin.actions.uploadQualificationProof") }}
-                    </button>
-                  </div>
-                </form>
               </section>
             </div>
           </section>
@@ -903,13 +802,17 @@
                   <p class="eyebrow">{{ t("employeeAdmin.credentials.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.credentials.title") }}</h4>
                 </div>
-                <p class="field-help">{{ t("employeeAdmin.credentials.lead") }}</p>
               </section>
 
               <section class="employee-admin-form-section">
                 <div class="employee-admin-form-section__header">
                   <p class="eyebrow">{{ t("employeeAdmin.credentials.registerEyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.credentials.registerTitle") }}</h4>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" :disabled="!actionState.canManageCredentials" @click="openNewCredentialEditor">
+                    {{ t("employeeAdmin.actions.createCredential") }}
+                  </button>
                 </div>
                 <div v-if="employeeCredentials.length" class="employee-admin-record-list">
                   <article
@@ -932,53 +835,6 @@
                 </div>
                 <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.credentials.empty") }}</p>
               </section>
-
-              <form class="employee-admin-form-section employee-admin-inline-form" @submit.prevent="submitCredential">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.credentials.editorEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.credentials.editorTitle") }}</h4>
-                </div>
-                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.credentialNo") }}</span>
-                    <input v-model="credentialDraft.credential_no" :disabled="!actionState.canManageCredentials || !!editingCredentialId" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.credentialType") }}</span>
-                    <select v-model="credentialDraft.credential_type" :disabled="!actionState.canManageCredentials || !!editingCredentialId">
-                      <option value="">{{ t("employeeAdmin.credentials.credentialTypePlaceholder") }}</option>
-                      <option v-for="option in employeeCredentialTypeOptions" :key="option.value" :value="option.value">
-                        {{ option.label }}
-                      </option>
-                    </select>
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.encodedValue") }}</span>
-                    <input v-model="credentialDraft.encoded_value" :disabled="!actionState.canManageCredentials" />
-                    <p class="field-help">{{ t("employeeAdmin.credentials.encodedValueHelp") }}</p>
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.validFrom") }}</span>
-                    <input v-model="credentialDraft.valid_from" :disabled="!actionState.canManageCredentials" type="date" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
-                    <input v-model="credentialDraft.valid_until" :disabled="!actionState.canManageCredentials" type="date" />
-                  </label>
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
-                    <textarea v-model="credentialDraft.notes" :disabled="!actionState.canManageCredentials" rows="3" />
-                  </label>
-                </div>
-                <div class="cta-row">
-                  <button class="cta-button" type="submit" :disabled="!actionState.canManageCredentials">
-                    {{ editingCredentialId ? t("employeeAdmin.actions.saveCredential") : t("employeeAdmin.actions.createCredential") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="resetCredentialDraft">
-                    {{ t("employeeAdmin.actions.resetCredential") }}
-                  </button>
-                </div>
-              </form>
             </div>
           </section>
 
@@ -994,13 +850,17 @@
                   <p class="eyebrow">{{ t("employeeAdmin.availability.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.availability.title") }}</h4>
                 </div>
-                <p class="field-help">{{ t("employeeAdmin.availability.lead") }}</p>
               </section>
 
               <section class="employee-admin-form-section">
                 <div class="employee-admin-form-section__header">
                   <p class="eyebrow">{{ t("employeeAdmin.availability.registerEyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.availability.registerTitle") }}</h4>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" :disabled="!actionState.canManageAvailability" @click="openNewAvailabilityEditor">
+                    {{ t("employeeAdmin.actions.createAvailability") }}
+                  </button>
                 </div>
                 <div v-if="employeeAvailabilityRules.length" class="employee-admin-record-list">
                   <button
@@ -1020,332 +880,6 @@
                 </div>
                 <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.availability.empty") }}</p>
               </section>
-
-              <form class="employee-admin-form-section employee-admin-inline-form" @submit.prevent="submitAvailabilityRule">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.availability.editorEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.availability.editorTitle") }}</h4>
-                </div>
-                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.ruleKind") }}</span>
-                    <select v-model="availabilityDraft.rule_kind" :disabled="!actionState.canManageAvailability">
-                      <option value="">{{ t("employeeAdmin.availability.ruleKindPlaceholder") }}</option>
-                      <option v-for="option in employeeAvailabilityRuleKindOptions" :key="option.value" :value="option.value">
-                        {{ option.label }}
-                      </option>
-                    </select>
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.startsAt") }}</span>
-                    <input v-model="availabilityDraft.starts_at" :disabled="!actionState.canManageAvailability" type="datetime-local" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.endsAt") }}</span>
-                    <input v-model="availabilityDraft.ends_at" :disabled="!actionState.canManageAvailability" type="datetime-local" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.recurrenceType") }}</span>
-                    <select v-model="availabilityDraft.recurrence_type" :disabled="!actionState.canManageAvailability">
-                      <option v-for="option in availabilityRecurrenceOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-                    </select>
-                  </label>
-                  <div v-if="availabilityDraft.recurrence_type === 'weekly'" class="field-stack field-stack--wide">
-                    <span>{{ t("employeeAdmin.fields.weekdays") }}</span>
-                    <div class="employee-admin-weekday-grid">
-                      <label v-for="option in weekdayOptions" :key="option.value" class="employee-admin-checkbox">
-                        <input
-                          :checked="availabilityDraft.weekday_indexes.includes(option.value)"
-                          :disabled="!actionState.canManageAvailability"
-                          type="checkbox"
-                          @change="toggleAvailabilityWeekday(option.value, ($event.target as HTMLInputElement).checked)"
-                        />
-                        <span>{{ option.label }}</span>
-                      </label>
-                    </div>
-                    <p class="field-help">{{ buildWeekdayMask(availabilityDraft.weekday_indexes) }}</p>
-                  </div>
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
-                    <textarea v-model="availabilityDraft.notes" :disabled="!actionState.canManageAvailability" rows="3" />
-                  </label>
-                </div>
-                <div class="cta-row">
-                  <button class="cta-button" type="submit" :disabled="!actionState.canManageAvailability">
-                    {{ editingAvailabilityRuleId ? t("employeeAdmin.actions.saveAvailability") : t("employeeAdmin.actions.createAvailability") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="resetAvailabilityDraft">
-                    {{ t("employeeAdmin.actions.resetAvailability") }}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </section>
-
-          <section
-            v-if="isEmployeeOverviewSectionVisible('absences')"
-            id="employee-overview-section-absences"
-            class="employee-admin-overview-section-card"
-            data-testid="employee-overview-section-absences"
-          >
-            <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-overview-section-card__header">
-                <div>
-                  <p class="eyebrow">{{ t("employeeAdmin.absences.eyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.absences.title") }}</h4>
-                </div>
-                <p class="field-help">{{ t("employeeAdmin.absences.lead") }}</p>
-              </section>
-
-              <section class="employee-admin-form-section">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.absences.registerEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.absences.registerTitle") }}</h4>
-                </div>
-                <div v-if="employeeAbsences.length" class="employee-admin-record-list">
-                  <button
-                    v-for="absence in employeeAbsences"
-                    :key="absence.id"
-                    type="button"
-                    class="employee-admin-record"
-                    :class="{ selected: absence.id === editingAbsenceId }"
-                    @click="editAbsence(absence)"
-                  >
-                    <div class="employee-admin-record__body">
-                      <strong>{{ absence.absence_type }}</strong>
-                      <span class="employee-admin-record__meta">{{ absence.starts_on }} · {{ absence.ends_on }} · {{ absence.quantity_days }}</span>
-                    </div>
-                    <StatusBadge :status="absence.status" />
-                  </button>
-                </div>
-                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.absences.empty") }}</p>
-              </section>
-
-              <form class="employee-admin-form-section employee-admin-inline-form" @submit.prevent="submitAbsence">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.absences.editorEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.absences.editorTitle") }}</h4>
-                </div>
-                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.absenceType") }}</span>
-                    <input v-model="absenceDraft.absence_type" :disabled="!actionState.canManageAbsences" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.startsOn") }}</span>
-                    <input v-model="absenceDraft.starts_on" :disabled="!actionState.canManageAbsences" type="date" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.endsOn") }}</span>
-                    <input v-model="absenceDraft.ends_on" :disabled="!actionState.canManageAbsences" type="date" />
-                  </label>
-                  <label v-if="editingAbsenceId" class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.decisionNote") }}</span>
-                    <input v-model="absenceDraft.decision_note" :disabled="!actionState.canManageAbsences" />
-                  </label>
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
-                    <textarea v-model="absenceDraft.notes" :disabled="!actionState.canManageAbsences" rows="3" />
-                  </label>
-                </div>
-                <div class="cta-row">
-                  <button class="cta-button" type="submit" :disabled="!actionState.canManageAbsences">
-                    {{ editingAbsenceId ? t("employeeAdmin.actions.saveAbsence") : t("employeeAdmin.actions.createAbsence") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="resetAbsenceDraft">
-                    {{ t("employeeAdmin.actions.resetAbsence") }}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </section>
-
-          <section
-            v-if="isEmployeeOverviewSectionVisible('notes')"
-            id="employee-overview-section-notes"
-            class="employee-admin-overview-section-card"
-            data-testid="employee-overview-section-notes"
-          >
-            <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-overview-section-card__header">
-                <div>
-                  <p class="eyebrow">{{ t("employeeAdmin.notes.eyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.notes.title") }}</h4>
-                </div>
-                <p class="field-help">{{ t("employeeAdmin.notes.lead") }}</p>
-              </section>
-
-              <section class="employee-admin-form-section">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.notes.registerEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.notes.registerTitle") }}</h4>
-                </div>
-
-                <div v-if="employeeNotes.length" class="employee-admin-record-list">
-                  <button
-                    v-for="note in employeeNotes"
-                    :key="note.id"
-                    type="button"
-                    class="employee-admin-record"
-                    :class="{ selected: note.id === editingNoteId }"
-                    @click="editNote(note)"
-                  >
-                    <div class="employee-admin-record__body">
-                      <strong>{{ note.title }}</strong>
-                      <span class="employee-admin-record__meta">{{ t(`employeeAdmin.noteType.${note.note_type}` as never) }} · {{ note.reminder_at || t("employeeAdmin.summary.none") }}</span>
-                    </div>
-                    <StatusBadge :status="note.completed_at ? 'active' : note.status" />
-                  </button>
-                </div>
-                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.notes.empty") }}</p>
-              </section>
-
-              <form class="employee-admin-form-section employee-admin-inline-form" @submit.prevent="submitNote">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.notes.editorEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.notes.editorTitle") }}</h4>
-                </div>
-                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.noteType") }}</span>
-                    <select v-model="noteDraft.note_type" :disabled="!actionState.canManageNotes">
-                      <option value="operational_note">{{ t("employeeAdmin.noteType.operational_note") }}</option>
-                      <option value="positive_activity">{{ t("employeeAdmin.noteType.positive_activity") }}</option>
-                      <option value="reminder">{{ t("employeeAdmin.noteType.reminder") }}</option>
-                    </select>
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.noteTitle") }}</span>
-                    <input v-model="noteDraft.title" :disabled="!actionState.canManageNotes" required />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.reminderAt") }}</span>
-                    <input v-model="noteDraft.reminder_at" :disabled="!actionState.canManageNotes" type="date" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.completedAt") }}</span>
-                    <input v-model="noteDraft.completed_at" :disabled="!actionState.canManageNotes" type="date" />
-                  </label>
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("employeeAdmin.fields.noteBody") }}</span>
-                    <textarea v-model="noteDraft.body" :disabled="!actionState.canManageNotes" rows="3" />
-                  </label>
-                </div>
-                <div class="cta-row">
-                  <button class="cta-button" type="submit" :disabled="!actionState.canManageNotes">
-                    {{ editingNoteId ? t("employeeAdmin.actions.saveNote") : t("employeeAdmin.actions.createNote") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="resetNoteDraft">
-                    {{ t("employeeAdmin.actions.resetNote") }}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </section>
-
-          <section
-            v-if="isEmployeeOverviewSectionVisible('groups')"
-            id="employee-overview-section-groups"
-            class="employee-admin-overview-section-card"
-            data-testid="employee-overview-section-groups"
-          >
-            <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-overview-section-card__header">
-                <div>
-                  <p class="eyebrow">{{ t("employeeAdmin.groups.eyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.groups.title") }}</h4>
-                </div>
-                <p class="field-help">{{ t("employeeAdmin.groups.lead") }}</p>
-              </section>
-
-              <section class="employee-admin-form-section">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.groups.catalogEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.groups.catalogTitle") }}</h4>
-                </div>
-                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.groupCode") }}</span>
-                    <input v-model="groupDraft.code" :disabled="!actionState.canManageGroups" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.groupName") }}</span>
-                    <input v-model="groupDraft.name" :disabled="!actionState.canManageGroups" />
-                  </label>
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("employeeAdmin.fields.groupDescription") }}</span>
-                    <input v-model="groupDraft.description" :disabled="!actionState.canManageGroups" />
-                  </label>
-                </div>
-                <div class="cta-row">
-                  <button class="cta-button" type="button" :disabled="!actionState.canManageGroups" @click="submitGroup">
-                    {{ editingGroupId ? t("employeeAdmin.actions.saveGroup") : t("employeeAdmin.actions.createGroup") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="resetGroupDraft">
-                    {{ t("employeeAdmin.actions.resetGroup") }}
-                  </button>
-                </div>
-              </section>
-
-              <section class="employee-admin-form-section">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.groups.assignEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.groups.assignTitle") }}</h4>
-                </div>
-                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.assignGroup") }}</span>
-                    <select v-model="membershipDraft.group_id" :disabled="!actionState.canManageGroups">
-                      <option value="">{{ t("employeeAdmin.groups.selectPlaceholder") }}</option>
-                      <option v-for="group in employeeGroups" :key="group.id" :value="group.id">{{ group.code }} · {{ group.name }}</option>
-                    </select>
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.validFrom") }}</span>
-                    <input v-model="membershipDraft.valid_from" :disabled="!actionState.canManageGroups" type="date" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
-                    <input v-model="membershipDraft.valid_until" :disabled="!actionState.canManageGroups" type="date" />
-                  </label>
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("employeeAdmin.fields.membershipNotes") }}</span>
-                    <input v-model="membershipDraft.notes" :disabled="!actionState.canManageGroups" />
-                  </label>
-                </div>
-                <div class="cta-row">
-                  <button class="cta-button" type="button" :disabled="!actionState.canManageGroups || !membershipDraft.group_id" @click="submitMembership">
-                    {{ editingMembershipId ? t("employeeAdmin.actions.saveMembership") : t("employeeAdmin.actions.assignGroup") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="resetMembershipDraft">
-                    {{ t("employeeAdmin.actions.resetMembership") }}
-                  </button>
-                </div>
-              </section>
-
-              <section class="employee-admin-form-section">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.groups.currentEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.groups.currentTitle") }}</h4>
-                </div>
-                <div v-if="selectedEmployee?.group_memberships.length" class="employee-admin-record-list">
-                  <button
-                    v-for="membership in selectedEmployee.group_memberships"
-                    :key="membership.id"
-                    type="button"
-                    class="employee-admin-record"
-                    :class="{ selected: membership.id === editingMembershipId }"
-                    @click="editMembership(membership)"
-                  >
-                    <div class="employee-admin-record__body">
-                      <strong>{{ membership.group?.name || membership.group_id }}</strong>
-                      <span class="employee-admin-record__meta">{{ membership.valid_from }} · {{ membership.valid_until || t("employeeAdmin.summary.none") }}</span>
-                    </div>
-                    <StatusBadge :status="membership.status" />
-                  </button>
-                </div>
-                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.groups.empty") }}</p>
-              </section>
             </div>
           </section>
 
@@ -1361,7 +895,6 @@
                   <p class="eyebrow">{{ t("employeeAdmin.privateProfile.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.privateProfile.title") }}</h4>
                 </div>
-                <p class="field-help">{{ t("employeeAdmin.privateProfile.lead") }}</p>
               </section>
 
               <section class="employee-admin-form-section">
@@ -1438,7 +971,6 @@
                   <p class="eyebrow">{{ t("employeeAdmin.privateProfile.payrollEyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.privateProfile.payrollTitle") }}</h4>
                 </div>
-                <p class="field-help">{{ t("employeeAdmin.privateProfile.payrollLead") }}</p>
                 <div class="employee-admin-form-grid employee-admin-form-grid--editor">
                   <label class="field-stack field-stack--half">
                     <span>{{ t("employeeAdmin.fields.taxId") }}</span>
@@ -1506,7 +1038,6 @@
                   <p class="eyebrow">{{ t("employeeAdmin.privateProfile.notesEyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.privateProfile.notesTitle") }}</h4>
                 </div>
-                <p class="field-help">{{ t("employeeAdmin.privateProfile.notesLead") }}</p>
                 <div class="employee-admin-form-grid employee-admin-form-grid--editor">
                   <label class="field-stack field-stack--wide">
                     <span>{{ t("employeeAdmin.fields.notes") }}</span>
@@ -1544,13 +1075,17 @@
                   <p class="eyebrow">{{ t("employeeAdmin.addresses.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.addresses.title") }}</h4>
                 </div>
-                <p class="field-help">{{ t("employeeAdmin.addresses.lead") }}</p>
               </section>
 
               <section class="employee-admin-form-section">
                 <div class="employee-admin-form-section__header">
                   <p class="eyebrow">{{ t("employeeAdmin.addresses.currentEyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.addresses.currentTitle") }}</h4>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" :disabled="!actionState.canManageAddresses" @click="openNewAddressEditor">
+                    {{ t("employeeAdmin.actions.addAddress") }}
+                  </button>
                 </div>
                 <div v-if="currentEmployeeAddress" class="employee-admin-record employee-admin-record--static">
                   <div class="employee-admin-record__body">
@@ -1571,84 +1106,6 @@
                 </div>
                 <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.addresses.currentEmpty") }}</p>
               </section>
-
-              <form class="employee-admin-form-section" @submit.prevent="submitAddress">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t(addressEditorEyebrowKey as never) }}</p>
-                  <h4>{{ t(addressEditorTitleKey as never) }}</h4>
-                </div>
-                <p class="field-help">{{ t(addressEditorLeadKey as never) }}</p>
-                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("customerAdmin.fields.streetLine1") }}</span>
-                    <input v-model="addressDraft.street_line_1" :disabled="!actionState.canManageAddresses" />
-                  </label>
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("customerAdmin.fields.streetLine2") }}</span>
-                    <input v-model="addressDraft.street_line_2" :disabled="!actionState.canManageAddresses" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("customerAdmin.fields.postalCode") }}</span>
-                    <input v-model="addressDraft.postal_code" :disabled="!actionState.canManageAddresses" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("customerAdmin.fields.city") }}</span>
-                    <input v-model="addressDraft.city" :disabled="!actionState.canManageAddresses" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("customerAdmin.fields.state") }}</span>
-                    <input v-model="addressDraft.state_region" :disabled="!actionState.canManageAddresses" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("customerAdmin.fields.countryCode") }}</span>
-                    <input v-model="addressDraft.country_code" :disabled="!actionState.canManageAddresses" maxlength="2" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("customerAdmin.fields.addressType") }}</span>
-                    <select v-model="addressDraft.address_type" :disabled="!actionState.canManageAddresses">
-                      <option value="home">{{ t("employeeAdmin.addresses.typeHome") }}</option>
-                      <option value="mailing">{{ t("employeeAdmin.addresses.typeMailing") }}</option>
-                    </select>
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.validFrom") }}</span>
-                    <input v-model="addressDraft.valid_from" :disabled="!actionState.canManageAddresses" type="date" />
-                  </label>
-                  <label class="field-stack">
-                    <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
-                    <input
-                      v-model="addressDraft.valid_to"
-                      :disabled="!actionState.canManageAddresses"
-                      type="date"
-                    />
-                  </label>
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
-                    <textarea v-model="addressDraft.notes" :disabled="!actionState.canManageAddresses" rows="3" />
-                  </label>
-                </div>
-                <div class="employee-admin-checkbox">
-                  <input v-model="addressDraft.is_primary" :disabled="!actionState.canManageAddresses" type="checkbox" />
-                  <span>{{ t("employeeAdmin.addresses.primaryLabel") }}</span>
-                </div>
-                <div class="cta-row">
-                  <button
-                    v-if="editingAddressId"
-                    class="cta-button cta-secondary"
-                    type="button"
-                    :disabled="!actionState.canManageAddresses"
-                    @click="resetAddressDraft"
-                  >
-                    {{ t("employeeAdmin.actions.addAddress") }}
-                  </button>
-                  <button class="cta-button" type="submit" :disabled="!actionState.canManageAddresses">
-                    {{ editingAddressId ? t("employeeAdmin.actions.saveAddress") : t("employeeAdmin.actions.addAddress") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="resetAddressDraft">
-                    {{ t("employeeAdmin.actions.resetAddress") }}
-                  </button>
-                </div>
-              </form>
 
               <section class="employee-admin-form-section">
                 <div class="employee-admin-form-section__header">
@@ -1690,6 +1147,161 @@
               </section>
             </div>
           </section>
+          <section
+            v-if="isEmployeeOverviewSectionVisible('absences')"
+            id="employee-overview-section-absences"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-absences"
+          >
+            <div class="employee-admin-form employee-admin-form--structured">
+              <section class="employee-admin-overview-section-card__header">
+                <div>
+                  <p class="eyebrow">{{ t("employeeAdmin.absences.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.absences.title") }}</h4>
+                </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.absences.registerEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.absences.registerTitle") }}</h4>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" :disabled="!actionState.canManageAbsences" @click="openNewAbsenceEditor">
+                    {{ t("employeeAdmin.actions.createAbsence") }}
+                  </button>
+                </div>
+                <div v-if="employeeAbsences.length" class="employee-admin-record-list">
+                  <button
+                    v-for="absence in employeeAbsences"
+                    :key="absence.id"
+                    type="button"
+                    class="employee-admin-record"
+                    :class="{ selected: absence.id === editingAbsenceId }"
+                    @click="editAbsence(absence)"
+                  >
+                    <div class="employee-admin-record__body">
+                      <strong>{{ absence.absence_type }}</strong>
+                      <span class="employee-admin-record__meta">{{ absence.starts_on }} · {{ absence.ends_on }} · {{ absence.quantity_days }}</span>
+                    </div>
+                    <StatusBadge :status="absence.status" />
+                  </button>
+                </div>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.absences.empty") }}</p>
+              </section>
+            </div>
+          </section>
+
+          <section
+            v-if="isEmployeeOverviewSectionVisible('notes')"
+            id="employee-overview-section-notes"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-notes"
+          >
+            <div class="employee-admin-form employee-admin-form--structured">
+              <section class="employee-admin-overview-section-card__header">
+                <div>
+                  <p class="eyebrow">{{ t("employeeAdmin.notes.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.notes.title") }}</h4>
+                </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.notes.registerEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.notes.registerTitle") }}</h4>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" :disabled="!actionState.canManageNotes" @click="openNewNoteEditor">
+                    {{ t("employeeAdmin.actions.createNote") }}
+                  </button>
+                </div>
+
+                <div v-if="employeeNotes.length" class="employee-admin-record-list">
+                  <button
+                    v-for="note in employeeNotes"
+                    :key="note.id"
+                    type="button"
+                    class="employee-admin-record"
+                    :class="{ selected: note.id === editingNoteId }"
+                    @click="editNote(note)"
+                  >
+                    <div class="employee-admin-record__body">
+                      <strong>{{ note.title }}</strong>
+                      <span class="employee-admin-record__meta">{{ t(`employeeAdmin.noteType.${note.note_type}` as never) }} · {{ note.reminder_at || t("employeeAdmin.summary.none") }}</span>
+                    </div>
+                    <StatusBadge :status="note.completed_at ? 'active' : note.status" />
+                  </button>
+                </div>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.notes.empty") }}</p>
+              </section>
+            </div>
+          </section>
+
+          <section
+            v-if="isEmployeeOverviewSectionVisible('groups')"
+            id="employee-overview-section-groups"
+            class="employee-admin-overview-section-card"
+            data-testid="employee-overview-section-groups"
+          >
+            <div class="employee-admin-form employee-admin-form--structured">
+              <section class="employee-admin-overview-section-card__header">
+                <div>
+                  <p class="eyebrow">{{ t("employeeAdmin.groups.eyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.groups.title") }}</h4>
+                </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.groups.catalogEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.groups.catalogTitle") }}</h4>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" :disabled="!actionState.canManageGroups" @click="openGroupCatalogEditor">
+                    {{ t("employeeAdmin.groups.catalogTitle") }}
+                  </button>
+                </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.groups.assignEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.groups.assignTitle") }}</h4>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" :disabled="!actionState.canManageGroups" @click="openGroupAssignmentEditor">
+                    {{ t("employeeAdmin.actions.assignGroup") }}
+                  </button>
+                </div>
+              </section>
+
+              <section class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.groups.currentEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.groups.currentTitle") }}</h4>
+                </div>
+                <div v-if="selectedEmployee?.group_memberships.length" class="employee-admin-record-list">
+                  <button
+                    v-for="membership in selectedEmployee.group_memberships"
+                    :key="membership.id"
+                    type="button"
+                    class="employee-admin-record"
+                    :class="{ selected: membership.id === editingMembershipId }"
+                    @click="editMembership(membership)"
+                  >
+                    <div class="employee-admin-record__body">
+                      <strong>{{ membership.group?.name || membership.group_id }}</strong>
+                      <span class="employee-admin-record__meta">{{ membership.valid_from }} · {{ membership.valid_until || t("employeeAdmin.summary.none") }}</span>
+                    </div>
+                    <StatusBadge :status="membership.status" />
+                  </button>
+                </div>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.groups.empty") }}</p>
+              </section>
+            </div>
+          </section>
+
 
           <section
             v-if="isEmployeeOverviewSectionVisible('documents')"
@@ -1703,13 +1315,23 @@
                   <p class="eyebrow">{{ t("employeeAdmin.documents.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.documents.title") }}</h4>
                 </div>
-                <p class="field-help">{{ t("employeeAdmin.documents.lead") }}</p>
               </section>
 
               <section class="employee-admin-form-section">
                 <div class="employee-admin-form-section__header">
                   <p class="eyebrow">{{ t("employeeAdmin.documents.libraryEyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.documents.libraryTitle") }}</h4>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" :disabled="!actionState.canEdit" @click="openEmployeeOverviewEditor('document_upload')">
+                    {{ t("employeeAdmin.actions.uploadDocument") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canEdit" @click="openEmployeeOverviewEditor('document_link')">
+                    {{ t("employeeAdmin.actions.linkDocument") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canEdit" @click="openEmployeeOverviewEditor('document_version')">
+                    {{ t("employeeAdmin.actions.addDocumentVersion") }}
+                  </button>
                 </div>
                 <div v-if="employeeDocuments.length" class="employee-admin-record-list">
                   <article
@@ -1742,120 +1364,614 @@
                 </div>
                 <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.documents.empty") }}</p>
               </section>
-
-              <section class="employee-admin-form-section">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.documents.uploadEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.documents.uploadTitle") }}</h4>
-                </div>
-                <p class="field-help">{{ t("employeeAdmin.documents.uploadLead") }}</p>
-                <form class="employee-admin-form" @submit.prevent="submitEmployeeDocumentUpload">
-                  <div class="employee-admin-form-grid">
-                    <label class="field-stack">
-                      <span>{{ t("employeeAdmin.fields.documentTitle") }}</span>
-                      <input v-model="documentUploadDraft.title" required />
-                    </label>
-                    <label class="field-stack">
-                      <span>{{ t("employeeAdmin.fields.documentLabel") }}</span>
-                      <input v-model="documentUploadDraft.label" />
-                    </label>
-                    <label class="field-stack">
-                      <span>{{ t("employeeAdmin.fields.documentRelationType") }}</span>
-                      <select v-model="documentUploadDraft.relation_type">
-                        <option v-for="option in employeeDocumentRelationOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-                      </select>
-                    </label>
-                    <label class="field-stack">
-                      <span>{{ t("employeeAdmin.fields.documentTypeKey") }}</span>
-                      <select v-model="documentUploadDraft.document_type_key">
-                        <option v-for="option in employeeDocumentTypeOptions" :key="option.value || 'none'" :value="option.value">
-                          {{ option.label }}
-                        </option>
-                      </select>
-                      <span class="field-help">{{ t("employeeAdmin.documents.documentTypeHelp") }}</span>
-                    </label>
-                    <label class="field-stack field-stack--wide">
-                      <span>{{ t("employeeAdmin.fields.documentFile") }}</span>
-                      <input type="file" @change="onEmployeeDocumentSelected" />
-                    </label>
-                  </div>
-                  <div class="cta-row">
-                    <button class="cta-button" type="submit" :disabled="!actionState.canEdit || !pendingEmployeeDocumentFile">
-                      {{ t("employeeAdmin.actions.uploadDocument") }}
-                    </button>
-                  </div>
-                </form>
-              </section>
-
-              <section class="employee-admin-form-section">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.documents.linkEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.documents.linkTitle") }}</h4>
-                </div>
-                <p class="field-help">{{ t("employeeAdmin.documents.linkLead") }}</p>
-                <form class="employee-admin-form" @submit.prevent="submitEmployeeDocumentLink">
-                  <div class="employee-admin-form-grid">
-                    <label class="field-stack">
-                      <span>{{ t("employeeAdmin.fields.documentId") }}</span>
-                      <input v-model="documentLinkDraft.document_id" required />
-                    </label>
-                    <label class="field-stack">
-                      <span>{{ t("employeeAdmin.fields.documentLabel") }}</span>
-                      <input v-model="documentLinkDraft.label" />
-                    </label>
-                    <label class="field-stack">
-                      <span>{{ t("employeeAdmin.fields.documentRelationType") }}</span>
-                      <select v-model="documentLinkDraft.relation_type">
-                        <option v-for="option in employeeDocumentRelationOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-                      </select>
-                    </label>
-                  </div>
-                  <div class="cta-row">
-                    <button class="cta-button cta-secondary" type="submit" :disabled="!actionState.canEdit">
-                      {{ t("employeeAdmin.actions.linkDocument") }}
-                    </button>
-                  </div>
-                </form>
-              </section>
-
-              <section class="employee-admin-form-section">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.documents.versionEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.documents.versionTitle") }}</h4>
-                </div>
-                <p class="field-help">{{ t("employeeAdmin.documents.versionLead") }}</p>
-                <p v-if="selectedEmployeeDocument" class="field-help">
-                  {{ t("employeeAdmin.documents.selectedVersionTarget") }}: {{ selectedEmployeeDocument.title }}
-                </p>
-                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.documents.versionEmpty") }}</p>
-                <form class="employee-admin-form" @submit.prevent="submitEmployeeDocumentVersion">
-                  <div class="employee-admin-form-grid">
-                    <label class="field-stack">
-                      <span>{{ t("employeeAdmin.fields.documentVersionTarget") }}</span>
-                      <select v-model="selectedEmployeeDocumentId">
-                        <option value="">{{ t("employeeAdmin.summary.none") }}</option>
-                        <option v-for="document in employeeDocuments" :key="document.document_id" :value="document.document_id">
-                          {{ document.title }}
-                        </option>
-                      </select>
-                    </label>
-                    <label class="field-stack field-stack--wide">
-                      <span>{{ t("employeeAdmin.fields.documentFile") }}</span>
-                      <input type="file" @change="onEmployeeDocumentVersionSelected" />
-                    </label>
-                  </div>
-                  <div class="cta-row">
-                    <button class="cta-button" type="submit" :disabled="!actionState.canEdit || !selectedEmployeeDocumentId || !pendingEmployeeDocumentVersionFile">
-                      {{ t("employeeAdmin.actions.addDocumentVersion") }}
-                    </button>
-                  </div>
-                </form>
-              </section>
             </div>
           </section>
             </div>
             </section>
           </section>
+          <div
+            v-if="activeEmployeeOverviewEditor"
+            class="employee-admin-modal-backdrop"
+            @click.self="closeEmployeeOverviewEditor"
+          >
+            <section
+              v-if="activeEmployeeOverviewEditor === 'qualification'"
+              aria-labelledby="employee-overview-editor-qualification-title"
+              aria-modal="true"
+              class="module-card employee-admin-modal"
+              data-testid="employee-overview-editor-qualification-modal"
+              role="dialog"
+            >
+              <form class="employee-admin-form" @submit.prevent="submitQualification">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.qualifications.editorEyebrow") }}</p>
+                  <h4 id="employee-overview-editor-qualification-title">{{ t("employeeAdmin.qualifications.editorTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.recordKind") }}</span>
+                    <select v-model="qualificationDraft.record_kind" :disabled="!actionState.canManageQualifications">
+                      <option v-for="option in readinessRecordKindOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                  </label>
+                  <label v-if="qualificationDraft.record_kind === 'function'" class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.functionType") }}</span>
+                    <select v-model="qualificationDraft.function_type_id" :disabled="!actionState.canManageQualifications || employeeFunctionTypeOptions.length === 0">
+                      <option value="">{{ t("employeeAdmin.qualifications.functionTypePlaceholder") }}</option>
+                      <option v-for="option in employeeFunctionTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                    <span v-if="employeeFunctionTypeOptions.length === 0" class="field-help">{{ t("employeeAdmin.qualifications.functionTypeEmptyHint") }}</span>
+                  </label>
+                  <label v-else class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.qualificationType") }}</span>
+                    <select v-model="qualificationDraft.qualification_type_id" :disabled="!actionState.canManageQualifications || employeeQualificationTypeOptions.length === 0">
+                      <option value="">{{ t("employeeAdmin.qualifications.qualificationTypePlaceholder") }}</option>
+                      <option v-for="option in employeeQualificationTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                    <span v-if="employeeQualificationTypeOptions.length === 0" class="field-help">{{ t("employeeAdmin.qualifications.qualificationTypeEmptyHint") }}</span>
+                    <span v-else-if="selectedQualificationType?.expiry_required && selectedQualificationType?.default_validity_days" class="field-help">
+                      {{ t("employeeAdmin.qualifications.expiryAutofillHint", { days: selectedQualificationType.default_validity_days }) }}
+                    </span>
+                    <span v-else-if="selectedQualificationType?.expiry_required" class="field-help">{{ t("employeeAdmin.qualifications.expiryRequiredHint") }}</span>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.certificateNo") }}</span>
+                    <input v-model="qualificationDraft.certificate_no" :disabled="!actionState.canManageQualifications" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.issuedAt") }}</span>
+                    <input v-model="qualificationDraft.issued_at" :disabled="!actionState.canManageQualifications" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
+                    <input v-model="qualificationDraft.valid_until" :disabled="!actionState.canManageQualifications" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.issuingAuthority") }}</span>
+                    <input v-model="qualificationDraft.issuing_authority" :disabled="!actionState.canManageQualifications" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
+                    <textarea v-model="qualificationDraft.notes" :disabled="!actionState.canManageQualifications" rows="3" />
+                  </label>
+                </div>
+                <label class="employee-admin-checkbox">
+                  <input v-model="qualificationDraft.granted_internally" :disabled="!actionState.canManageQualifications" type="checkbox" />
+                  <span>{{ t("employeeAdmin.fields.grantedInternally") }}</span>
+                </label>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageQualifications">
+                    {{ editingQualificationId ? t("employeeAdmin.actions.saveQualification") : t("employeeAdmin.actions.createQualification") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetQualificationDraft">{{ t("employeeAdmin.actions.resetQualification") }}</button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeEmployeeOverviewEditor">{{ t("employeeAdmin.actions.cancel") }}</button>
+                </div>
+              </form>
+            </section>
+
+            <section
+              v-else-if="activeEmployeeOverviewEditor === 'qualification_proof'"
+              aria-labelledby="employee-overview-editor-qualification-proof-title"
+              aria-modal="true"
+              class="module-card employee-admin-modal"
+              data-testid="employee-overview-editor-qualification-proof-modal"
+              role="dialog"
+            >
+              <form class="employee-admin-form" @submit.prevent="submitQualificationProof">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.qualifications.proofEyebrow") }}</p>
+                  <h4 id="employee-overview-editor-qualification-proof-title">{{ t("employeeAdmin.qualifications.proofTitle") }}</h4>
+                </div>
+                <p v-if="selectedQualification" class="field-help">
+                  {{ t("employeeAdmin.qualifications.proofLead") }}: {{ selectedQualification.qualification_type?.label || selectedQualification.function_type?.label || selectedQualification.id }}
+                </p>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.documentTitle") }}</span>
+                    <input v-model="qualificationProofDraft.title" :disabled="!actionState.canManageQualifications" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.proofFile") }}</span>
+                    <input :disabled="!actionState.canManageQualifications" type="file" @change="onQualificationProofSelected" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageQualifications || !pendingQualificationProofFile">
+                    {{ t("employeeAdmin.actions.uploadQualificationProof") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeEmployeeOverviewEditor">{{ t("employeeAdmin.actions.cancel") }}</button>
+                </div>
+              </form>
+            </section>
+
+            <section
+              v-else-if="activeEmployeeOverviewEditor === 'credential'"
+              aria-labelledby="employee-overview-editor-credential-title"
+              aria-modal="true"
+              class="module-card employee-admin-modal"
+              data-testid="employee-overview-editor-credential-modal"
+              role="dialog"
+            >
+              <form class="employee-admin-form" @submit.prevent="submitCredential">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.credentials.editorEyebrow") }}</p>
+                  <h4 id="employee-overview-editor-credential-title">{{ t("employeeAdmin.credentials.editorTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.credentialNo") }}</span>
+                    <input v-model="credentialDraft.credential_no" :disabled="!actionState.canManageCredentials || !!editingCredentialId" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.credentialType") }}</span>
+                    <select v-model="credentialDraft.credential_type" :disabled="!actionState.canManageCredentials || !!editingCredentialId">
+                      <option value="">{{ t("employeeAdmin.credentials.credentialTypePlaceholder") }}</option>
+                      <option v-for="option in employeeCredentialTypeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.encodedValue") }}</span>
+                    <input v-model="credentialDraft.encoded_value" :disabled="!actionState.canManageCredentials" />
+                    <p class="field-help">{{ t("employeeAdmin.credentials.encodedValueHelp") }}</p>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validFrom") }}</span>
+                    <input v-model="credentialDraft.valid_from" :disabled="!actionState.canManageCredentials" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
+                    <input v-model="credentialDraft.valid_until" :disabled="!actionState.canManageCredentials" type="date" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
+                    <textarea v-model="credentialDraft.notes" :disabled="!actionState.canManageCredentials" rows="3" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageCredentials">
+                    {{ editingCredentialId ? t("employeeAdmin.actions.saveCredential") : t("employeeAdmin.actions.createCredential") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetCredentialDraft">{{ t("employeeAdmin.actions.resetCredential") }}</button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeEmployeeOverviewEditor">{{ t("employeeAdmin.actions.cancel") }}</button>
+                </div>
+              </form>
+            </section>
+
+            <section
+              v-else-if="activeEmployeeOverviewEditor === 'availability'"
+              aria-labelledby="employee-overview-editor-availability-title"
+              aria-modal="true"
+              class="module-card employee-admin-modal"
+              data-testid="employee-overview-editor-availability-modal"
+              role="dialog"
+            >
+              <form class="employee-admin-form" @submit.prevent="submitAvailabilityRule">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.availability.editorEyebrow") }}</p>
+                  <h4 id="employee-overview-editor-availability-title">{{ t("employeeAdmin.availability.editorTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.ruleKind") }}</span>
+                    <select v-model="availabilityDraft.rule_kind" :disabled="!actionState.canManageAvailability">
+                      <option value="">{{ t("employeeAdmin.availability.ruleKindPlaceholder") }}</option>
+                      <option v-for="option in employeeAvailabilityRuleKindOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.startsAt") }}</span>
+                    <input v-model="availabilityDraft.starts_at" :disabled="!actionState.canManageAvailability" type="datetime-local" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.endsAt") }}</span>
+                    <input v-model="availabilityDraft.ends_at" :disabled="!actionState.canManageAvailability" type="datetime-local" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.recurrenceType") }}</span>
+                    <select v-model="availabilityDraft.recurrence_type" :disabled="!actionState.canManageAvailability">
+                      <option v-for="option in availabilityRecurrenceOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                  </label>
+                  <div v-if="availabilityDraft.recurrence_type === 'weekly'" class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.weekdays") }}</span>
+                    <div class="employee-admin-weekday-grid">
+                      <label v-for="option in weekdayOptions" :key="option.value" class="employee-admin-checkbox">
+                        <input :checked="availabilityDraft.weekday_indexes.includes(option.value)" :disabled="!actionState.canManageAvailability" type="checkbox" @change="toggleAvailabilityWeekday(option.value, ($event.target as HTMLInputElement).checked)" />
+                        <span>{{ option.label }}</span>
+                      </label>
+                    </div>
+                    <p class="field-help">{{ buildWeekdayMask(availabilityDraft.weekday_indexes) }}</p>
+                  </div>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
+                    <textarea v-model="availabilityDraft.notes" :disabled="!actionState.canManageAvailability" rows="3" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageAvailability">
+                    {{ editingAvailabilityRuleId ? t("employeeAdmin.actions.saveAvailability") : t("employeeAdmin.actions.createAvailability") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetAvailabilityDraft">{{ t("employeeAdmin.actions.resetAvailability") }}</button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeEmployeeOverviewEditor">{{ t("employeeAdmin.actions.cancel") }}</button>
+                </div>
+              </form>
+            </section>
+
+            <section
+              v-else-if="activeEmployeeOverviewEditor === 'absence'"
+              aria-labelledby="employee-overview-editor-absence-title"
+              aria-modal="true"
+              class="module-card employee-admin-modal"
+              data-testid="employee-overview-editor-absence-modal"
+              role="dialog"
+            >
+              <form class="employee-admin-form" @submit.prevent="submitAbsence">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.absences.editorEyebrow") }}</p>
+                  <h4 id="employee-overview-editor-absence-title">{{ t("employeeAdmin.absences.editorTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.absenceType") }}</span>
+                    <input v-model="absenceDraft.absence_type" :disabled="!actionState.canManageAbsences" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.startsOn") }}</span>
+                    <input v-model="absenceDraft.starts_on" :disabled="!actionState.canManageAbsences" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.endsOn") }}</span>
+                    <input v-model="absenceDraft.ends_on" :disabled="!actionState.canManageAbsences" type="date" />
+                  </label>
+                  <label v-if="editingAbsenceId" class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.decisionNote") }}</span>
+                    <input v-model="absenceDraft.decision_note" :disabled="!actionState.canManageAbsences" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
+                    <textarea v-model="absenceDraft.notes" :disabled="!actionState.canManageAbsences" rows="3" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageAbsences">
+                    {{ editingAbsenceId ? t("employeeAdmin.actions.saveAbsence") : t("employeeAdmin.actions.createAbsence") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetAbsenceDraft">{{ t("employeeAdmin.actions.resetAbsence") }}</button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeEmployeeOverviewEditor">{{ t("employeeAdmin.actions.cancel") }}</button>
+                </div>
+              </form>
+            </section>
+
+            <section
+              v-else-if="activeEmployeeOverviewEditor === 'note'"
+              aria-labelledby="employee-overview-editor-note-title"
+              aria-modal="true"
+              class="module-card employee-admin-modal"
+              data-testid="employee-overview-editor-note-modal"
+              role="dialog"
+            >
+              <form class="employee-admin-form" @submit.prevent="submitNote">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.notes.editorEyebrow") }}</p>
+                  <h4 id="employee-overview-editor-note-title">{{ t("employeeAdmin.notes.editorTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.noteType") }}</span>
+                    <select v-model="noteDraft.note_type" :disabled="!actionState.canManageNotes">
+                      <option value="operational_note">{{ t("employeeAdmin.noteType.operational_note") }}</option>
+                      <option value="positive_activity">{{ t("employeeAdmin.noteType.positive_activity") }}</option>
+                      <option value="reminder">{{ t("employeeAdmin.noteType.reminder") }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.noteTitle") }}</span>
+                    <input v-model="noteDraft.title" :disabled="!actionState.canManageNotes" required />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.reminderAt") }}</span>
+                    <input v-model="noteDraft.reminder_at" :disabled="!actionState.canManageNotes" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.completedAt") }}</span>
+                    <input v-model="noteDraft.completed_at" :disabled="!actionState.canManageNotes" type="date" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.noteBody") }}</span>
+                    <textarea v-model="noteDraft.body" :disabled="!actionState.canManageNotes" rows="3" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageNotes">
+                    {{ editingNoteId ? t("employeeAdmin.actions.saveNote") : t("employeeAdmin.actions.createNote") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetNoteDraft">{{ t("employeeAdmin.actions.resetNote") }}</button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeEmployeeOverviewEditor">{{ t("employeeAdmin.actions.cancel") }}</button>
+                </div>
+              </form>
+            </section>
+
+            <section
+              v-else-if="activeEmployeeOverviewEditor === 'group_catalog'"
+              aria-labelledby="employee-overview-editor-group-catalog-title"
+              aria-modal="true"
+              class="module-card employee-admin-modal"
+              data-testid="employee-overview-editor-group-catalog-modal"
+              role="dialog"
+            >
+              <form class="employee-admin-form" @submit.prevent="submitGroup">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.groups.catalogEyebrow") }}</p>
+                  <h4 id="employee-overview-editor-group-catalog-title">{{ t("employeeAdmin.groups.catalogTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.groupCode") }}</span>
+                    <input v-model="groupDraft.code" :disabled="!actionState.canManageGroups" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.groupName") }}</span>
+                    <input v-model="groupDraft.name" :disabled="!actionState.canManageGroups" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.groupDescription") }}</span>
+                    <input v-model="groupDraft.description" :disabled="!actionState.canManageGroups" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageGroups">
+                    {{ editingGroupId ? t("employeeAdmin.actions.saveGroup") : t("employeeAdmin.actions.createGroup") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetGroupDraft">{{ t("employeeAdmin.actions.resetGroup") }}</button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeEmployeeOverviewEditor">{{ t("employeeAdmin.actions.cancel") }}</button>
+                </div>
+              </form>
+            </section>
+
+            <section
+              v-else-if="activeEmployeeOverviewEditor === 'group_assignment'"
+              aria-labelledby="employee-overview-editor-group-assignment-title"
+              aria-modal="true"
+              class="module-card employee-admin-modal"
+              data-testid="employee-overview-editor-group-assignment-modal"
+              role="dialog"
+            >
+              <form class="employee-admin-form" @submit.prevent="submitMembership">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.groups.assignEyebrow") }}</p>
+                  <h4 id="employee-overview-editor-group-assignment-title">{{ t("employeeAdmin.groups.assignTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.assignGroup") }}</span>
+                    <select v-model="membershipDraft.group_id" :disabled="!actionState.canManageGroups">
+                      <option value="">{{ t("employeeAdmin.groups.selectPlaceholder") }}</option>
+                      <option v-for="group in employeeGroups" :key="group.id" :value="group.id">{{ group.code }} · {{ group.name }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validFrom") }}</span>
+                    <input v-model="membershipDraft.valid_from" :disabled="!actionState.canManageGroups" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
+                    <input v-model="membershipDraft.valid_until" :disabled="!actionState.canManageGroups" type="date" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.membershipNotes") }}</span>
+                    <input v-model="membershipDraft.notes" :disabled="!actionState.canManageGroups" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageGroups || !membershipDraft.group_id">
+                    {{ editingMembershipId ? t("employeeAdmin.actions.saveMembership") : t("employeeAdmin.actions.assignGroup") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetMembershipDraft">{{ t("employeeAdmin.actions.resetMembership") }}</button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeEmployeeOverviewEditor">{{ t("employeeAdmin.actions.cancel") }}</button>
+                </div>
+              </form>
+            </section>
+
+            <section
+              v-else-if="activeEmployeeOverviewEditor === 'address'"
+              aria-labelledby="employee-overview-editor-address-title"
+              aria-modal="true"
+              class="module-card employee-admin-modal"
+              data-testid="employee-overview-editor-address-modal"
+              role="dialog"
+            >
+              <form class="employee-admin-form" @submit.prevent="submitAddress">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t(addressEditorEyebrowKey as never) }}</p>
+                  <h4 id="employee-overview-editor-address-title">{{ t(addressEditorTitleKey as never) }}</h4>
+                </div>
+                <p class="field-help">{{ t(addressEditorLeadKey as never) }}</p>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("customerAdmin.fields.streetLine1") }}</span>
+                    <input v-model="addressDraft.street_line_1" :disabled="!actionState.canManageAddresses" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("customerAdmin.fields.streetLine2") }}</span>
+                    <input v-model="addressDraft.street_line_2" :disabled="!actionState.canManageAddresses" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.postalCode") }}</span>
+                    <input v-model="addressDraft.postal_code" :disabled="!actionState.canManageAddresses" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.city") }}</span>
+                    <input v-model="addressDraft.city" :disabled="!actionState.canManageAddresses" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.state") }}</span>
+                    <input v-model="addressDraft.state_region" :disabled="!actionState.canManageAddresses" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.countryCode") }}</span>
+                    <input v-model="addressDraft.country_code" :disabled="!actionState.canManageAddresses" maxlength="2" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("customerAdmin.fields.addressType") }}</span>
+                    <select v-model="addressDraft.address_type" :disabled="!actionState.canManageAddresses">
+                      <option value="home">{{ t("employeeAdmin.addresses.typeHome") }}</option>
+                      <option value="mailing">{{ t("employeeAdmin.addresses.typeMailing") }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validFrom") }}</span>
+                    <input v-model="addressDraft.valid_from" :disabled="!actionState.canManageAddresses" type="date" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.validUntil") }}</span>
+                    <input v-model="addressDraft.valid_to" :disabled="!actionState.canManageAddresses" type="date" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.notes") }}</span>
+                    <textarea v-model="addressDraft.notes" :disabled="!actionState.canManageAddresses" rows="3" />
+                  </label>
+                </div>
+                <div class="employee-admin-checkbox">
+                  <input v-model="addressDraft.is_primary" :disabled="!actionState.canManageAddresses" type="checkbox" />
+                  <span>{{ t("employeeAdmin.addresses.primaryLabel") }}</span>
+                </div>
+                <div class="cta-row">
+                  <button v-if="editingAddressId" class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="resetAddressDraft">
+                    {{ t("employeeAdmin.actions.addAddress") }}
+                  </button>
+                  <button class="cta-button" type="submit" :disabled="!actionState.canManageAddresses">
+                    {{ editingAddressId ? t("employeeAdmin.actions.saveAddress") : t("employeeAdmin.actions.addAddress") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="resetAddressDraft">{{ t("employeeAdmin.actions.resetAddress") }}</button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeEmployeeOverviewEditor">{{ t("employeeAdmin.actions.cancel") }}</button>
+                </div>
+              </form>
+            </section>
+
+            <section
+              v-else-if="activeEmployeeOverviewEditor === 'document_upload'"
+              aria-labelledby="employee-overview-editor-document-upload-title"
+              aria-modal="true"
+              class="module-card employee-admin-modal"
+              data-testid="employee-overview-editor-document-upload-modal"
+              role="dialog"
+            >
+              <form class="employee-admin-form" @submit.prevent="submitEmployeeDocumentUpload">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.documents.uploadEyebrow") }}</p>
+                  <h4 id="employee-overview-editor-document-upload-title">{{ t("employeeAdmin.documents.uploadTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.documentTitle") }}</span>
+                    <input v-model="documentUploadDraft.title" required />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.documentLabel") }}</span>
+                    <input v-model="documentUploadDraft.label" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.documentRelationType") }}</span>
+                    <select v-model="documentUploadDraft.relation_type">
+                      <option v-for="option in employeeDocumentRelationOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.documentTypeKey") }}</span>
+                    <select v-model="documentUploadDraft.document_type_key">
+                      <option v-for="option in employeeDocumentTypeOptions" :key="option.value || 'none'" :value="option.value">{{ option.label }}</option>
+                    </select>
+                    <span class="field-help">{{ t("employeeAdmin.documents.documentTypeHelp") }}</span>
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.documentFile") }}</span>
+                    <input type="file" @change="onEmployeeDocumentSelected" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canEdit || !pendingEmployeeDocumentFile">
+                    {{ t("employeeAdmin.actions.uploadDocument") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeEmployeeOverviewEditor">{{ t("employeeAdmin.actions.cancel") }}</button>
+                </div>
+              </form>
+            </section>
+
+            <section
+              v-else-if="activeEmployeeOverviewEditor === 'document_link'"
+              aria-labelledby="employee-overview-editor-document-link-title"
+              aria-modal="true"
+              class="module-card employee-admin-modal"
+              data-testid="employee-overview-editor-document-link-modal"
+              role="dialog"
+            >
+              <form class="employee-admin-form" @submit.prevent="submitEmployeeDocumentLink">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.documents.linkEyebrow") }}</p>
+                  <h4 id="employee-overview-editor-document-link-title">{{ t("employeeAdmin.documents.linkTitle") }}</h4>
+                </div>
+                <div class="employee-admin-form-grid">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.documentId") }}</span>
+                    <input v-model="documentLinkDraft.document_id" required />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.documentLabel") }}</span>
+                    <input v-model="documentLinkDraft.label" />
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.documentRelationType") }}</span>
+                    <select v-model="documentLinkDraft.relation_type">
+                      <option v-for="option in employeeDocumentRelationOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canEdit">{{ t("employeeAdmin.actions.linkDocument") }}</button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeEmployeeOverviewEditor">{{ t("employeeAdmin.actions.cancel") }}</button>
+                </div>
+              </form>
+            </section>
+
+            <section
+              v-else-if="activeEmployeeOverviewEditor === 'document_version'"
+              aria-labelledby="employee-overview-editor-document-version-title"
+              aria-modal="true"
+              class="module-card employee-admin-modal"
+              data-testid="employee-overview-editor-document-version-modal"
+              role="dialog"
+            >
+              <form class="employee-admin-form" @submit.prevent="submitEmployeeDocumentVersion">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.documents.versionEyebrow") }}</p>
+                  <h4 id="employee-overview-editor-document-version-title">{{ t("employeeAdmin.documents.versionTitle") }}</h4>
+                </div>
+                <p v-if="selectedEmployeeDocument" class="field-help">
+                  {{ t("employeeAdmin.documents.selectedVersionTarget") }}: {{ selectedEmployeeDocument.title }}
+                </p>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.documents.versionEmpty") }}</p>
+                <div class="employee-admin-form-grid">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.documentVersionTarget") }}</span>
+                    <select v-model="selectedEmployeeDocumentId">
+                      <option value="">{{ t("employeeAdmin.summary.none") }}</option>
+                      <option v-for="document in employeeDocuments" :key="document.document_id" :value="document.document_id">{{ document.title }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("employeeAdmin.fields.documentFile") }}</span>
+                    <input type="file" @change="onEmployeeDocumentVersionSelected" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="submit" :disabled="!actionState.canEdit || !selectedEmployeeDocumentId || !pendingEmployeeDocumentVersionFile">
+                    {{ t("employeeAdmin.actions.addDocumentVersion") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeEmployeeOverviewEditor">{{ t("employeeAdmin.actions.cancel") }}</button>
+                </div>
+              </form>
+            </section>
+          </div>
         </template>
 
         <section v-else class="employee-admin-empty">
@@ -2187,6 +2303,20 @@ const accessAttachDraft = reactive({
 });
 
 type AddressEditorMode = "close" | "create" | "edit" | "transition";
+type EmployeeOverviewEditorDialog =
+  | "qualification"
+  | "qualification_proof"
+  | "credential"
+  | "availability"
+  | "absence"
+  | "note"
+  | "group_catalog"
+  | "group_assignment"
+  | "address"
+  | "document_upload"
+  | "document_link"
+  | "document_version"
+  | null;
 
 const tenantScopeInput = ref(authStore.effectiveTenantScopeId || authStore.tenantScopeId || "");
 const branches = ref<BranchRead[]>([]);
@@ -2227,6 +2357,7 @@ const isCreatingEmployee = ref(false);
 const listPanelTab = ref<"import_export" | "search">("search");
 const activeDetailTab = ref("overview");
 const activeOverviewSection = ref<EmployeeOverviewSectionId>("employee_file");
+const activeEmployeeOverviewEditor = ref<EmployeeOverviewEditorDialog>(null);
 const overviewOnePageRef = ref<HTMLElement | null>(null);
 const overviewNavShellRef = ref<HTMLElement | null>(null);
 const overviewNavFloatingMode = ref<"fixed" | "pinned" | "static">("static");
@@ -2885,6 +3016,59 @@ function openWorkforceCatalogs() {
   void router.push("/admin/workforce-catalogs");
 }
 
+function openEmployeeOverviewEditor(dialog: Exclude<EmployeeOverviewEditorDialog, null>) {
+  activeEmployeeOverviewEditor.value = dialog;
+}
+
+function closeEmployeeOverviewEditor() {
+  activeEmployeeOverviewEditor.value = null;
+}
+
+function openNewQualificationEditor() {
+  resetQualificationDraft();
+  openEmployeeOverviewEditor("qualification");
+}
+
+function openQualificationProofEditor() {
+  if (selectedQualification.value) {
+    openEmployeeOverviewEditor("qualification_proof");
+  }
+}
+
+function openNewCredentialEditor() {
+  resetCredentialDraft();
+  openEmployeeOverviewEditor("credential");
+}
+
+function openNewAvailabilityEditor() {
+  resetAvailabilityDraft();
+  openEmployeeOverviewEditor("availability");
+}
+
+function openNewAbsenceEditor() {
+  resetAbsenceDraft();
+  openEmployeeOverviewEditor("absence");
+}
+
+function openNewNoteEditor() {
+  resetNoteDraft();
+  openEmployeeOverviewEditor("note");
+}
+
+function openGroupCatalogEditor() {
+  openEmployeeOverviewEditor("group_catalog");
+}
+
+function openGroupAssignmentEditor() {
+  resetMembershipDraft();
+  openEmployeeOverviewEditor("group_assignment");
+}
+
+function openNewAddressEditor() {
+  resetAddressDraft();
+  openEmployeeOverviewEditor("address");
+}
+
 function resolveEmployeeDocumentErrorMessage(error: unknown) {
   if (!(error instanceof EmployeeAdminApiError)) {
     return t("employeeAdmin.feedback.error");
@@ -3207,6 +3391,7 @@ function editNote(note: EmployeeNoteRead) {
   noteDraft.body = note.body || "";
   noteDraft.reminder_at = note.reminder_at || "";
   noteDraft.completed_at = note.completed_at || "";
+  openEmployeeOverviewEditor("note");
 }
 
 function resetGroupDraft() {
@@ -3311,6 +3496,7 @@ function editQualification(qualification: EmployeeQualificationRead) {
   qualificationDraft.notes = qualification.notes || "";
   qualificationProofDraft.title = "";
   void loadQualificationProofs(qualification.id);
+  openEmployeeOverviewEditor("qualification");
 }
 
 function editCredential(credential: EmployeeCredentialRead) {
@@ -3321,6 +3507,7 @@ function editCredential(credential: EmployeeCredentialRead) {
   credentialDraft.valid_from = credential.valid_from;
   credentialDraft.valid_until = credential.valid_until || "";
   credentialDraft.notes = credential.notes || "";
+  openEmployeeOverviewEditor("credential");
 }
 
 function editAvailabilityRule(rule: EmployeeAvailabilityRuleRead) {
@@ -3331,6 +3518,7 @@ function editAvailabilityRule(rule: EmployeeAvailabilityRuleRead) {
   availabilityDraft.recurrence_type = rule.recurrence_type || "none";
   availabilityDraft.weekday_indexes = parseWeekdayMask(rule.weekday_mask);
   availabilityDraft.notes = rule.notes || "";
+  openEmployeeOverviewEditor("availability");
 }
 
 function editAbsence(absence: EmployeeAbsenceRead) {
@@ -3340,10 +3528,12 @@ function editAbsence(absence: EmployeeAbsenceRead) {
   absenceDraft.ends_on = absence.ends_on;
   absenceDraft.decision_note = absence.decision_note || "";
   absenceDraft.notes = absence.notes || "";
+  openEmployeeOverviewEditor("absence");
 }
 
 function useEmployeeDocumentForVersion(document: EmployeeDocumentListItemRead) {
   selectedEmployeeDocumentId.value = document.document_id;
+  openEmployeeOverviewEditor("document_version");
 }
 
 function editAddress(row: EmployeeAddressHistoryRead) {
@@ -3361,6 +3551,7 @@ function editAddress(row: EmployeeAddressHistoryRead) {
   addressDraft.valid_to = row.valid_to || "";
   addressDraft.is_primary = row.is_primary;
   addressDraft.notes = row.notes || "";
+  openEmployeeOverviewEditor("address");
 }
 
 function prepareAddressAsCurrent(row: EmployeeAddressHistoryRead) {
@@ -3378,6 +3569,7 @@ function prepareAddressAsCurrent(row: EmployeeAddressHistoryRead) {
   addressDraft.valid_to = "";
   addressDraft.is_primary = row.is_primary;
   addressDraft.notes = row.notes || "";
+  openEmployeeOverviewEditor("address");
 }
 
 function prepareAddressValidityClose(row: EmployeeAddressHistoryRead) {
@@ -3409,6 +3601,7 @@ function editMembership(membership: EmployeeGroupMembershipRead) {
   membershipDraft.valid_from = membership.valid_from;
   membershipDraft.valid_until = membership.valid_until || "";
   membershipDraft.notes = membership.notes || "";
+  openEmployeeOverviewEditor("group_assignment");
 }
 
 function startCreateEmployee() {
@@ -3817,6 +4010,7 @@ async function submitNote() {
     }
     resetNoteDraft();
     await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
+    closeEmployeeOverviewEditor();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.noteSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3850,6 +4044,7 @@ async function submitGroup() {
     }
     resetGroupDraft();
     await listSupplementalGroups();
+    closeEmployeeOverviewEditor();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.groupSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3885,6 +4080,7 @@ async function submitMembership() {
     }
     resetMembershipDraft();
     await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
+    closeEmployeeOverviewEditor();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.membershipSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -3993,6 +4189,7 @@ async function submitAddress() {
       authStore.accessToken,
     );
     resetAddressDraft();
+    closeEmployeeOverviewEditor();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.addressSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -4036,6 +4233,7 @@ async function submitQualification() {
       await createEmployeeQualification(resolvedTenantScopeId.value, authStore.accessToken, payload);
     }
     await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
+    closeEmployeeOverviewEditor();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.qualificationSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -4067,6 +4265,7 @@ async function submitQualificationProof() {
     pendingQualificationProofFile.value = null;
     qualificationProofDraft.title = "";
     await loadQualificationProofs(editingQualificationId.value);
+    closeEmployeeOverviewEditor();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.qualificationProofSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -4106,6 +4305,7 @@ async function submitCredential() {
       await createEmployeeCredential(resolvedTenantScopeId.value, authStore.accessToken, payload);
     }
     await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
+    closeEmployeeOverviewEditor();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.credentialSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -4173,6 +4373,7 @@ async function submitAvailabilityRule() {
       await createEmployeeAvailabilityRule(resolvedTenantScopeId.value, authStore.accessToken, payload);
     }
     await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
+    closeEmployeeOverviewEditor();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.availabilitySaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -4213,6 +4414,7 @@ async function submitAbsence() {
       await createEmployeeAbsence(resolvedTenantScopeId.value, authStore.accessToken, payload);
     }
     await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
+    closeEmployeeOverviewEditor();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.absenceSaved"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -4268,6 +4470,7 @@ async function submitEmployeeDocumentUpload() {
     );
     await uploadEmployeeDocument(resolvedTenantScopeId.value, selectedEmployeeId.value, authStore.accessToken, payload);
     await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
+    closeEmployeeOverviewEditor();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.documentUploaded"));
   } catch (error) {
     setFeedback("error", t("employeeAdmin.feedback.titleError"), resolveEmployeeDocumentErrorMessage(error));
@@ -4294,6 +4497,7 @@ async function submitEmployeeDocumentLink() {
       },
     );
     await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
+    closeEmployeeOverviewEditor();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.documentLinked"));
   } catch (error) {
     setFeedback("error", t("employeeAdmin.feedback.titleError"), resolveEmployeeDocumentErrorMessage(error));
@@ -4328,6 +4532,7 @@ async function submitEmployeeDocumentVersion() {
       payload,
     );
     await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
+    closeEmployeeOverviewEditor();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.documentVersionSaved"));
   } catch (error) {
     setFeedback("error", t("employeeAdmin.feedback.titleError"), resolveEmployeeDocumentErrorMessage(error));
@@ -5130,8 +5335,6 @@ onBeforeUnmount(() => {
 .employee-admin-overview-section-card .employee-admin-editor-intro + .employee-admin-form-section,
 .employee-admin-overview-section-card .employee-admin-form-section + .employee-admin-form-section,
 .employee-admin-overview-section-card .employee-admin-form-section + .employee-admin-form-actions,
-.employee-admin-overview-section-card .employee-admin-form-section + .employee-admin-inline-form,
-.employee-admin-overview-section-card .employee-admin-inline-form + .employee-admin-form-section,
 .employee-admin-overview-section-card .employee-admin-form-section + .employee-admin-advanced-access {
   border-top: 1px solid var(--sp-color-border-soft);
   padding-top: 1rem;
@@ -5221,8 +5424,7 @@ onBeforeUnmount(() => {
 }
 
 .employee-admin-detail,
-.employee-admin-form,
-.employee-admin-inline-form {
+.employee-admin-form {
   display: grid;
   gap: 1rem;
   min-width: 0;

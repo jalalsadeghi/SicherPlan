@@ -1011,7 +1011,7 @@ describe("EmployeeAdminView search dialog regression", () => {
 
     expect(wrapper.find('[data-testid="employee-overview-onepage"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="employee-overview-section-nav"]').exists()).toBe(true);
-    [
+    const expectedNavOrder = [
       "file",
       "app_access",
       "qualifications",
@@ -1023,10 +1023,11 @@ describe("EmployeeAdminView search dialog regression", () => {
       "notes",
       "groups",
       "documents",
-    ].forEach((sectionId) => {
+    ];
+    expectedNavOrder.forEach((sectionId) => {
       expect(wrapper.find(`[data-testid="employee-overview-nav-${sectionId}"]`).exists()).toBe(true);
     });
-    [
+    const expectedSectionOrder = [
       "file",
       "app-access",
       "qualifications",
@@ -1038,11 +1039,18 @@ describe("EmployeeAdminView search dialog regression", () => {
       "notes",
       "groups",
       "documents",
-    ].forEach((sectionId) => {
+    ];
+    expectedSectionOrder.forEach((sectionId) => {
       const section = wrapper.get(`[data-testid="employee-overview-section-${sectionId}"]`);
       expect(section.classes()).toContain("employee-admin-overview-section-card");
       expect(section.find("h4").exists()).toBe(true);
     });
+    expect(
+      wrapper
+        .get(".employee-admin-overview-content")
+        .findAll(".employee-admin-overview-section-card")
+        .map((section) => section.attributes("data-testid")?.replace("employee-overview-section-", "")),
+    ).toEqual(expectedSectionOrder);
 
     wrapper.unmount();
     mountedWrappers.pop();
@@ -1269,15 +1277,21 @@ describe("EmployeeAdminView search dialog regression", () => {
 
     expect(wrapper.get('[data-testid="employee-overview-section-file"]').find("form").exists()).toBe(true);
     expect(wrapper.get('[data-testid="employee-overview-section-app-access"]').findAll("input").length).toBeGreaterThan(0);
-    expect(wrapper.get('[data-testid="employee-overview-section-qualifications"]').text()).toContain("employeeAdmin.qualifications.editorTitle");
-    expect(wrapper.get('[data-testid="employee-overview-section-credentials"]').text()).toContain("employeeAdmin.credentials.editorTitle");
-    expect(wrapper.get('[data-testid="employee-overview-section-availability"]').text()).toContain("employeeAdmin.availability.editorTitle");
+    expect(wrapper.get('[data-testid="employee-overview-section-qualifications"]').text()).toContain("employeeAdmin.actions.createQualification");
+    expect(wrapper.get('[data-testid="employee-overview-section-credentials"]').text()).toContain("employeeAdmin.actions.createCredential");
+    expect(wrapper.get('[data-testid="employee-overview-section-availability"]').text()).toContain("employeeAdmin.actions.createAvailability");
     expect(wrapper.get('[data-testid="employee-overview-section-private-profile"]').find("form").exists()).toBe(true);
-    expect(wrapper.get('[data-testid="employee-overview-section-addresses"]').find("form").exists()).toBe(true);
-    expect(wrapper.get('[data-testid="employee-overview-section-absences"]').text()).toContain("employeeAdmin.absences.editorTitle");
-    expect(wrapper.get('[data-testid="employee-overview-section-notes"]').text()).toContain("employeeAdmin.notes.editorTitle");
+    expect(wrapper.get('[data-testid="employee-overview-section-addresses"]').text()).toContain("employeeAdmin.actions.addAddress");
+    expect(wrapper.get('[data-testid="employee-overview-section-absences"]').text()).toContain("employeeAdmin.actions.createAbsence");
+    expect(wrapper.get('[data-testid="employee-overview-section-notes"]').text()).toContain("employeeAdmin.actions.createNote");
     expect(wrapper.get('[data-testid="employee-overview-section-groups"]').text()).toContain("employeeAdmin.groups.assignTitle");
-    expect(wrapper.get('[data-testid="employee-overview-section-documents"]').find('input[type="file"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="employee-overview-section-documents"]').text()).toContain("employeeAdmin.actions.uploadDocument");
+
+    expect(wrapper.get('[data-testid="employee-overview-section-credentials"]').find("form").exists()).toBe(false);
+    await clickButtonByText(wrapper, "employeeAdmin.actions.createCredential");
+    await settle();
+    expect(wrapper.get('[data-testid="employee-overview-editor-credential-modal"]').text()).toContain("employeeAdmin.credentials.editorTitle");
+    expect(wrapper.get('[data-testid="employee-overview-editor-credential-modal"]').text()).toContain("employeeAdmin.credentials.encodedValueHelp");
   });
 
   it("does not render pure intro boxes or nested card styling inside the Overview page", async () => {
@@ -1289,6 +1303,48 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(overview.find(".employee-admin-editor-intro").exists()).toBe(false);
     expect(overview.findAll(".employee-admin-overview-section-card")).toHaveLength(11);
     expect(overview.findAll(".employee-admin-overview-section-card__header").length).toBeGreaterThanOrEqual(11);
+  });
+
+  it("removes static explanatory lead copy while keeping functional Overview hints", async () => {
+    const wrapper = await mountEmployeeAdmin();
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    const overviewText = wrapper.get('[data-testid="employee-overview-onepage"]').text();
+    [
+      "employeeAdmin.form.lead",
+      "employeeAdmin.form.accessLead",
+      "employeeAdmin.access.lead",
+      "employeeAdmin.access.stateCreateLead",
+      "employeeAdmin.access.createLead",
+      "employeeAdmin.access.stateLinkedLead",
+      "employeeAdmin.access.manageLead",
+      "employeeAdmin.access.resetLead",
+      "employeeAdmin.access.detachLead",
+      "employeeAdmin.access.advancedLead",
+      "employeeAdmin.access.attachLead",
+      "employeeAdmin.access.reconcileLead",
+      "employeeAdmin.qualifications.lead",
+      "employeeAdmin.credentials.lead",
+      "employeeAdmin.availability.lead",
+      "employeeAdmin.privateProfile.lead",
+      "employeeAdmin.privateProfile.payrollLead",
+      "employeeAdmin.privateProfile.notesLead",
+      "employeeAdmin.addresses.lead",
+      "employeeAdmin.absences.lead",
+      "employeeAdmin.notes.lead",
+      "employeeAdmin.groups.lead",
+      "employeeAdmin.documents.lead",
+      "employeeAdmin.documents.uploadLead",
+      "employeeAdmin.documents.linkLead",
+      "employeeAdmin.documents.versionLead",
+    ].forEach((removedKey) => {
+      expect(overviewText).not.toContain(removedKey);
+    });
+    expect(overviewText).toContain("employeeAdmin.access.createHint");
+    await clickButtonByText(wrapper, "employeeAdmin.actions.uploadDocument");
+    await settle();
+    expect(wrapper.get('[data-testid="employee-overview-editor-document-upload-modal"]').text()).toContain("employeeAdmin.documents.documentTypeHelp");
   });
 
   it("preserves initial load, create flow, import/export, and detail tab switching", async () => {

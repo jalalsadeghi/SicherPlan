@@ -131,6 +131,10 @@ test("employee detail uses dashboard and overview top-level tabs with one-page o
   assert.match(viewSource, /data-testid="employee-overview-section-notes"/);
   assert.match(viewSource, /data-testid="employee-overview-section-groups"/);
   assert.match(viewSource, /data-testid="employee-overview-section-documents"/);
+  assert.match(
+    viewSource,
+    /data-testid="employee-overview-section-file"[\s\S]*data-testid="employee-overview-section-app-access"[\s\S]*data-testid="employee-overview-section-qualifications"[\s\S]*data-testid="employee-overview-section-credentials"[\s\S]*data-testid="employee-overview-section-availability"[\s\S]*data-testid="employee-overview-section-private-profile"[\s\S]*data-testid="employee-overview-section-addresses"[\s\S]*data-testid="employee-overview-section-absences"[\s\S]*data-testid="employee-overview-section-notes"[\s\S]*data-testid="employee-overview-section-groups"[\s\S]*data-testid="employee-overview-section-documents"/,
+  );
   assert.match(viewSource, /async function selectEmployee\(employeeId: string, options: SelectEmployeeOptions = \{\}\)/);
   assert.match(viewSource, /preserveActiveTab = false/);
   assert.match(viewSource, /fallbackTab = "dashboard"/);
@@ -144,6 +148,42 @@ test("employee detail uses dashboard and overview top-level tabs with one-page o
   assert.match(viewSource, /employeeAdmin\.overviewSections\.documents/);
   assert.match(viewSource, /resolveEmployeeDetailTab\(\s*desiredTab,[\s\S]*employeeDetailTabs\.value\.map\(\(tab\) => tab\.id\)/);
   assert.match(viewSource, /selectEmployee\(selectedEmployeeId\.value, \{ preserveActiveTab: true \}\)/);
+});
+
+test("employee overview moves heavy editor forms into accessible modals", () => {
+  [
+    "qualification",
+    "qualification-proof",
+    "credential",
+    "availability",
+    "absence",
+    "note",
+    "group-catalog",
+    "group-assignment",
+    "address",
+    "document-upload",
+    "document-link",
+    "document-version",
+  ].forEach((editorId) => {
+    assert.match(viewSource, new RegExp(`data-testid="employee-overview-editor-${editorId}-modal"[\\s\\S]*role="dialog"`));
+  });
+
+  assert.match(viewSource, /type EmployeeOverviewEditorDialog =/);
+  assert.match(viewSource, /const activeEmployeeOverviewEditor = ref<EmployeeOverviewEditorDialog>\(null\)/);
+  assert.match(viewSource, /@click\.self="closeEmployeeOverviewEditor"/);
+  assert.match(viewSource, /aria-modal="true"/);
+  assert.match(viewSource, /function closeEmployeeOverviewEditor\(\)/);
+  assert.doesNotMatch(viewSource, /employee-admin-inline-form/);
+  assert.match(viewSource, /openNewQualificationEditor/);
+  assert.match(viewSource, /openNewCredentialEditor/);
+  assert.match(viewSource, /openNewAvailabilityEditor/);
+  assert.match(viewSource, /openNewAddressEditor/);
+  assert.match(viewSource, /openNewAbsenceEditor/);
+  assert.match(viewSource, /openNewNoteEditor/);
+  assert.match(viewSource, /openGroupAssignmentEditor/);
+  assert.match(viewSource, /openEmployeeOverviewEditor\(['"]document_upload['"]\)/);
+  assert.match(viewSource, /openEmployeeOverviewEditor\(['"]document_link['"]\)/);
+  assert.match(viewSource, /openEmployeeOverviewEditor\(['"]document_version['"]\)/);
 });
 
 test("existing employee detail prepends dashboard while create mode remains overview only", () => {
