@@ -314,10 +314,16 @@
             class="employee-admin-tab-panel"
             data-testid="employee-tab-panel-overview"
           >
-            <section class="employee-admin-overview-onepage" data-testid="employee-overview-onepage">
+            <section ref="overviewOnePageRef" class="employee-admin-overview-onepage" data-testid="employee-overview-onepage">
             <aside
               v-if="visibleEmployeeOverviewSections.length > 1"
               class="employee-admin-overview-nav-shell"
+              :class="{
+                'employee-admin-overview-nav-shell--fixed': overviewNavFloatingMode === 'fixed',
+                'employee-admin-overview-nav-shell--pinned': overviewNavFloatingMode === 'pinned',
+              }"
+              :style="overviewNavFloatingStyle"
+              ref="overviewNavShellRef"
               data-testid="employee-overview-section-nav"
             >
               <nav
@@ -1870,6 +1876,7 @@
 
 <script setup lang="ts">
 import { IconifyIcon } from "@vben/icons";
+import type { CSSProperties } from "vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
@@ -2220,6 +2227,10 @@ const isCreatingEmployee = ref(false);
 const listPanelTab = ref<"import_export" | "search">("search");
 const activeDetailTab = ref("overview");
 const activeOverviewSection = ref<EmployeeOverviewSectionId>("employee_file");
+const overviewOnePageRef = ref<HTMLElement | null>(null);
+const overviewNavShellRef = ref<HTMLElement | null>(null);
+const overviewNavFloatingMode = ref<"fixed" | "pinned" | "static">("static");
+const overviewNavFloatingStyle = ref<CSSProperties>({});
 const editingNoteId = ref("");
 const editingGroupId = ref("");
 const editingMembershipId = ref("");
@@ -2237,6 +2248,9 @@ let employeeSearchRequestSeq = 0;
 let suppressNextEmployeeSearchWatch = false;
 let employeeOverviewSectionObserver: IntersectionObserver | null = null;
 let suppressOverviewScrollSpyUntil = 0;
+let overviewNavScrollTargets: Array<HTMLElement | Window> = [];
+let overviewNavFloatingRaf: number | null = null;
+const OVERVIEW_NAV_FLOATING_MIN_WIDTH = 1081;
 
 const documentUploadDraft = reactive({
   title: "",
@@ -2697,6 +2711,130 @@ function disconnectEmployeeOverviewSectionObserver() {
   employeeOverviewSectionObserver = null;
 }
 
+function resolveOverviewStickyTop() {
+  const navShell = overviewNavShellRef.value;
+  if (navShell) {
+    const top = Number.parseFloat(window.getComputedStyle(navShell).top);
+    if (Number.isFinite(top)) {
+      return top;
+    }
+  }
+
+  const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize);
+  return (Number.isFinite(rootFontSize) ? rootFontSize : 16) * 6.5;
+}
+
+function isScrollableAncestor(element: HTMLElement) {
+  const overflowY = window.getComputedStyle(element).overflowY;
+  return /(auto|scroll|overlay)/.test(overflowY) && element.scrollHeight > element.clientHeight;
+}
+
+function findOverviewScrollContainers() {
+  const containers: HTMLElement[] = [];
+  let parent = overviewOnePageRef.value?.parentElement ?? null;
+
+  while (parent && parent !== document.body) {
+    if (isScrollableAncestor(parent)) {
+      containers.push(parent);
+    }
+    parent = parent.parentElement;
+  }
+
+  return containers;
+}
+
+function resolveOverviewIntersectionRoot() {
+  return findOverviewScrollContainers()[0] ?? null;
+}
+
+function resetOverviewNavFloating() {
+  overviewNavFloatingMode.value = "static";
+  overviewNavFloatingStyle.value = {};
+}
+
+function cancelOverviewNavFloatingFrame() {
+  if (overviewNavFloatingRaf !== null) {
+    window.cancelAnimationFrame(overviewNavFloatingRaf);
+    overviewNavFloatingRaf = null;
+  }
+}
+
+function updateOverviewNavFloating() {
+  overviewNavFloatingRaf = null;
+
+  const overviewElement = overviewOnePageRef.value;
+  const navShell = overviewNavShellRef.value;
+  if (
+    activeDetailTab.value !== "overview" ||
+    !overviewElement ||
+    !navShell ||
+    !window.matchMedia(`(min-width: ${OVERVIEW_NAV_FLOATING_MIN_WIDTH}px)`).matches
+  ) {
+    resetOverviewNavFloating();
+    return;
+  }
+
+  const stickyTop = resolveOverviewStickyTop();
+  const overviewRect = overviewElement.getBoundingClientRect();
+  const navWidth = navShell.offsetWidth;
+  const navHeight = navShell.offsetHeight;
+
+  if (!navWidth || !navHeight || overviewRect.top > stickyTop || overviewRect.height <= navHeight) {
+    resetOverviewNavFloating();
+    return;
+  }
+
+  const maxHeight = `calc(100vh - ${Math.round(stickyTop)}px - 1rem)`;
+  if (overviewRect.bottom <= stickyTop + navHeight) {
+    overviewNavFloatingMode.value = "pinned";
+    overviewNavFloatingStyle.value = {
+      left: "0px",
+      maxHeight,
+      top: `${Math.max(0, overviewElement.offsetHeight - navHeight)}px`,
+      width: `${navWidth}px`,
+    };
+    return;
+  }
+
+  overviewNavFloatingMode.value = "fixed";
+  overviewNavFloatingStyle.value = {
+    left: `${overviewRect.left}px`,
+    maxHeight,
+    top: `${stickyTop}px`,
+    width: `${navWidth}px`,
+  };
+}
+
+function scheduleOverviewNavFloatingUpdate() {
+  if (overviewNavFloatingRaf !== null) {
+    return;
+  }
+  overviewNavFloatingRaf = window.requestAnimationFrame(updateOverviewNavFloating);
+}
+
+function teardownOverviewNavFloating() {
+  cancelOverviewNavFloatingFrame();
+  overviewNavScrollTargets.forEach((target) => target.removeEventListener("scroll", scheduleOverviewNavFloatingUpdate));
+  window.removeEventListener("resize", scheduleOverviewNavFloatingUpdate);
+  overviewNavScrollTargets = [];
+  resetOverviewNavFloating();
+}
+
+function setupOverviewNavFloating() {
+  teardownOverviewNavFloating();
+
+  if (activeDetailTab.value !== "overview" || !overviewOnePageRef.value || !overviewNavShellRef.value) {
+    return;
+  }
+
+  overviewNavScrollTargets = [window, ...findOverviewScrollContainers()];
+  overviewNavScrollTargets.forEach((target) =>
+    target.addEventListener("scroll", scheduleOverviewNavFloatingUpdate, { passive: true }),
+  );
+  window.addEventListener("resize", scheduleOverviewNavFloatingUpdate, { passive: true });
+  scheduleOverviewNavFloatingUpdate();
+}
+
 function setupEmployeeOverviewSectionObserver() {
   disconnectEmployeeOverviewSectionObserver();
 
@@ -2712,6 +2850,7 @@ function setupEmployeeOverviewSectionObserver() {
     return;
   }
 
+  const stickyTop = resolveOverviewStickyTop();
   employeeOverviewSectionObserver = new IntersectionObserver(
     (entries) => {
       if (window.performance.now() < suppressOverviewScrollSpyUntil) {
@@ -2733,8 +2872,8 @@ function setupEmployeeOverviewSectionObserver() {
       }
     },
     {
-      root: null,
-      rootMargin: "-30% 0px -55% 0px",
+      root: resolveOverviewIntersectionRoot(),
+      rootMargin: `-${Math.round(stickyTop)}px 0px -55% 0px`,
       threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
     },
   );
@@ -4493,8 +4632,12 @@ watch(
   ] as const,
   () => {
     disconnectEmployeeOverviewSectionObserver();
+    teardownOverviewNavFloating();
     if (activeDetailTab.value === "overview") {
-      void nextTick(setupEmployeeOverviewSectionObserver);
+      void nextTick(() => {
+        setupEmployeeOverviewSectionObserver();
+        setupOverviewNavFloating();
+      });
     }
   },
   { immediate: true },
@@ -4623,6 +4766,7 @@ onBeforeUnmount(() => {
   clearEmployeeSearchDebounce();
   clearPhotoPreview();
   disconnectEmployeeOverviewSectionObserver();
+  teardownOverviewNavFloating();
 });
 </script>
 
@@ -4922,6 +5066,7 @@ onBeforeUnmount(() => {
 
 .employee-admin-overview-onepage {
   --employee-overview-sticky-top: var(--sp-sticky-offset, 6.5rem);
+  position: relative;
   display: grid;
   grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
   gap: 1.25rem;
@@ -4930,6 +5075,7 @@ onBeforeUnmount(() => {
 }
 
 .employee-admin-overview-content {
+  grid-column: 2;
   display: grid;
   gap: 1.25rem;
   min-width: 0;
@@ -4992,6 +5138,7 @@ onBeforeUnmount(() => {
 }
 
 .employee-admin-overview-nav-shell {
+  grid-column: 1;
   position: sticky;
   top: var(--employee-overview-sticky-top, 6.5rem);
   align-self: start;
@@ -5000,6 +5147,14 @@ onBeforeUnmount(() => {
   max-height: calc(100vh - var(--employee-overview-sticky-top, 6.5rem) - 1rem);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.employee-admin-overview-nav-shell--fixed {
+  position: fixed;
+}
+
+.employee-admin-overview-nav-shell--pinned {
+  position: absolute;
 }
 
 .employee-admin-overview-nav {
@@ -5270,9 +5425,19 @@ onBeforeUnmount(() => {
   }
 
   .employee-admin-overview-nav-shell {
+    grid-column: 1;
     position: static;
     max-height: none;
     overflow: visible;
+  }
+
+  .employee-admin-overview-nav-shell--fixed,
+  .employee-admin-overview-nav-shell--pinned {
+    position: static;
+  }
+
+  .employee-admin-overview-content {
+    grid-column: 1;
   }
 
   .employee-admin-overview-nav {

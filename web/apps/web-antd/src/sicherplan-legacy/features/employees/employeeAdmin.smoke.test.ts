@@ -1117,6 +1117,64 @@ describe("EmployeeAdminView search dialog regression", () => {
     );
   });
 
+  it("switches the Overview nav shell to fixed mode while the desktop Overview container is scrolled", async () => {
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          addEventListener: vi.fn(),
+          addListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+          matches: true,
+          media: query,
+          onchange: null,
+          removeEventListener: vi.fn(),
+          removeListener: vi.fn(),
+        }) as MediaQueryList,
+    );
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => undefined);
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(220);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(320);
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains("employee-admin-overview-onepage")) {
+        return {
+          bottom: 1800,
+          height: 1800,
+          left: 120,
+          right: 1120,
+          top: 0,
+          width: 1000,
+          x: 120,
+          y: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      }
+      return {
+        bottom: 320,
+        height: 320,
+        left: 120,
+        right: 340,
+        top: 0,
+        width: 220,
+        x: 120,
+        y: 0,
+        toJSON: () => ({}),
+      } as DOMRect;
+    });
+
+    const wrapper = await mountEmployeeAdmin();
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    const navShell = wrapper.get('[data-testid="employee-overview-section-nav"]');
+    expect(navShell.classes()).toContain("employee-admin-overview-nav-shell--fixed");
+    expect(navShell.attributes("style")).toContain("left: 120px");
+    expect(navShell.attributes("style")).toContain("width: 220px");
+  });
+
   it("updates the active Overview nav item from IntersectionObserver scroll-spy events", async () => {
     const { instances, triggerIntersection } = installIntersectionObserverMock();
     const wrapper = await mountEmployeeAdmin();
