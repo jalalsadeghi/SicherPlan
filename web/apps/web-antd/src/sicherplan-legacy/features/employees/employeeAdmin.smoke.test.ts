@@ -488,6 +488,7 @@ const mountedWrappers: VueWrapper[] = [];
 
 async function mountEmployeeAdmin() {
   const wrapper = mount(EmployeeAdminView, {
+    attachTo: document.body,
     global: {
       stubs: {
         RouterLink: defineComponent({
@@ -502,6 +503,10 @@ async function mountEmployeeAdmin() {
   mountedWrappers.push(wrapper);
   await settle();
   return wrapper;
+}
+
+function detailTabLabels(wrapper: VueWrapper<any>) {
+  return wrapper.get('[data-testid="employee-detail-tabs"]').findAll("button").map((tab) => tab.text().trim());
 }
 
 describe("EmployeeAdminView search dialog regression", () => {
@@ -916,6 +921,167 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(noPermissionWrapper.text()).toContain("No employee read permission.");
     expect(noPermissionWrapper.find('[data-testid="employee-list-section"]').exists()).toBe(false);
     expect(apiMocks.listEmployeesMock).not.toHaveBeenCalled();
+  });
+
+  it("shows only Dashboard and Overview as existing employee top-level tabs", async () => {
+    const wrapper = await mountEmployeeAdmin();
+
+    expect(detailTabLabels(wrapper)).toEqual(["Dashboard", "Overview"]);
+    expect(wrapper.get('[data-testid="employee-tab-dashboard"]').classes()).toContain("active");
+    expect(wrapper.find('[data-testid="employee-tab-app_access"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-tab-profile_photo"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-tab-qualifications"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-tab-credentials"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-tab-availability"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-tab-private_profile"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-tab-addresses"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-tab-absences"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-tab-notes"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-tab-groups"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-tab-documents"]').exists()).toBe(false);
+  });
+
+  it("keeps create employee mode limited to the usable Overview form", async () => {
+    const wrapper = await mountEmployeeAdmin();
+
+    await clickButtonByText(wrapper, "Create employee file");
+    await settle();
+
+    expect(detailTabLabels(wrapper)).toEqual(["Overview"]);
+    expect(wrapper.find('[data-testid="employee-tab-dashboard"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="employee-tab-overview"]').classes()).toContain("active");
+    expect(wrapper.get('[data-testid="employee-overview-section-file"]').text()).toContain("employeeAdmin.form.title");
+    expect(wrapper.get('[data-testid="employee-overview-section-file"]').find('input[required]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-overview-section-nav"]').exists()).toBe(false);
+  });
+
+  it("renders Overview nav and section cards with private visibility controlled by permission", async () => {
+    const wrapper = await mountEmployeeAdmin();
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    expect(wrapper.find('[data-testid="employee-overview-onepage"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-overview-section-nav"]').exists()).toBe(true);
+    [
+      "file",
+      "app_access",
+      "qualifications",
+      "credentials",
+      "availability",
+      "private_profile",
+      "addresses",
+      "absences",
+      "notes",
+      "groups",
+      "documents",
+    ].forEach((sectionId) => {
+      expect(wrapper.find(`[data-testid="employee-overview-nav-${sectionId}"]`).exists()).toBe(true);
+    });
+    [
+      "file",
+      "app-access",
+      "qualifications",
+      "credentials",
+      "availability",
+      "private-profile",
+      "addresses",
+      "absences",
+      "notes",
+      "groups",
+      "documents",
+    ].forEach((sectionId) => {
+      const section = wrapper.get(`[data-testid="employee-overview-section-${sectionId}"]`);
+      expect(section.classes()).toContain("employee-admin-overview-section-card");
+      expect(section.find("h4").exists()).toBe(true);
+    });
+
+    wrapper.unmount();
+    mountedWrappers.pop();
+    authStoreState.effectiveRole = "dispatcher";
+    authStoreState.activeRole = "dispatcher";
+    const dispatcherWrapper = await mountEmployeeAdmin();
+    await dispatcherWrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    expect(dispatcherWrapper.find('[data-testid="employee-overview-nav-private_profile"]').exists()).toBe(false);
+    expect(dispatcherWrapper.find('[data-testid="employee-overview-nav-addresses"]').exists()).toBe(false);
+    expect(dispatcherWrapper.find('[data-testid="employee-overview-nav-absences"]').exists()).toBe(false);
+    expect(dispatcherWrapper.find('[data-testid="employee-overview-section-private-profile"]').exists()).toBe(false);
+    expect(dispatcherWrapper.find('[data-testid="employee-overview-section-addresses"]').exists()).toBe(false);
+    expect(dispatcherWrapper.find('[data-testid="employee-overview-section-absences"]').exists()).toBe(false);
+  });
+
+  it("keeps Overview active, marks the nav item, and scrolls when a section is selected", async () => {
+    const scrollIntoViewMock = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoViewMock,
+    });
+    const wrapper = await mountEmployeeAdmin();
+
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await wrapper.get('[data-testid="employee-overview-nav-addresses"]').trigger("click");
+    await settle();
+
+    expect((wrapper.vm as any).activeDetailTab).toBe("overview");
+    expect((wrapper.vm as any).activeOverviewSection).toBe("addresses");
+    expect(wrapper.get('[data-testid="employee-overview-nav-addresses"]').attributes("aria-current")).toBe("true");
+    expect(scrollIntoViewMock).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth", block: "start" }));
+  });
+
+  it("normalizes every former tab id to its Overview section without blank panels", async () => {
+    const wrapper = await mountEmployeeAdmin();
+    const legacyTabIds = [
+      "app_access",
+      "qualifications",
+      "credentials",
+      "availability",
+      "private_profile",
+      "addresses",
+      "absences",
+      "notes",
+      "groups",
+      "documents",
+    ];
+
+    for (const legacyTabId of legacyTabIds) {
+      (wrapper.vm as any).activeDetailTab = legacyTabId;
+      await settle();
+
+      expect((wrapper.vm as any).activeDetailTab).toBe("overview");
+      expect((wrapper.vm as any).activeOverviewSection).toBe(legacyTabId);
+      expect(wrapper.find('[data-testid="employee-tab-panel-overview"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="employee-tab-panel-dashboard"]').exists()).toBe(false);
+    }
+  });
+
+  it("keeps former tab functionality reachable inside Overview section cards", async () => {
+    const wrapper = await mountEmployeeAdmin();
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    expect(wrapper.get('[data-testid="employee-overview-section-file"]').find("form").exists()).toBe(true);
+    expect(wrapper.get('[data-testid="employee-overview-section-app-access"]').findAll("input").length).toBeGreaterThan(0);
+    expect(wrapper.get('[data-testid="employee-overview-section-qualifications"]').text()).toContain("employeeAdmin.qualifications.editorTitle");
+    expect(wrapper.get('[data-testid="employee-overview-section-credentials"]').text()).toContain("employeeAdmin.credentials.editorTitle");
+    expect(wrapper.get('[data-testid="employee-overview-section-availability"]').text()).toContain("employeeAdmin.availability.editorTitle");
+    expect(wrapper.get('[data-testid="employee-overview-section-private-profile"]').find("form").exists()).toBe(true);
+    expect(wrapper.get('[data-testid="employee-overview-section-addresses"]').find("form").exists()).toBe(true);
+    expect(wrapper.get('[data-testid="employee-overview-section-absences"]').text()).toContain("employeeAdmin.absences.editorTitle");
+    expect(wrapper.get('[data-testid="employee-overview-section-notes"]').text()).toContain("employeeAdmin.notes.editorTitle");
+    expect(wrapper.get('[data-testid="employee-overview-section-groups"]').text()).toContain("employeeAdmin.groups.assignTitle");
+    expect(wrapper.get('[data-testid="employee-overview-section-documents"]').find('input[type="file"]').exists()).toBe(true);
+  });
+
+  it("does not render pure intro boxes or nested card styling inside the Overview page", async () => {
+    const wrapper = await mountEmployeeAdmin();
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    const overview = wrapper.get('[data-testid="employee-overview-onepage"]');
+    expect(overview.find(".employee-admin-editor-intro").exists()).toBe(false);
+    expect(overview.findAll(".employee-admin-overview-section-card")).toHaveLength(11);
+    expect(overview.findAll(".employee-admin-overview-section-card__header").length).toBeGreaterThanOrEqual(11);
   });
 
   it("preserves initial load, create flow, import/export, and detail tab switching", async () => {
