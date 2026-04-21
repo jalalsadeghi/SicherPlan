@@ -317,23 +317,27 @@
             <section class="employee-admin-overview-onepage" data-testid="employee-overview-onepage">
             <aside
               v-if="visibleEmployeeOverviewSections.length > 1"
-              :aria-label="t('employeeAdmin.tabs.overview')"
-              class="employee-admin-overview-nav"
+              class="employee-admin-overview-nav-shell"
               data-testid="employee-overview-section-nav"
             >
-              <button
-                v-for="section in visibleEmployeeOverviewSections"
-                :key="section.id"
-                type="button"
-                :aria-current="section.id === activeOverviewSection ? 'true' : undefined"
-                class="employee-admin-overview-nav__link"
-                :class="{ 'employee-admin-overview-nav__link--active': section.id === activeOverviewSection }"
-                :data-testid="section.testId"
-                @click="selectOverviewSection(section.id)"
+              <nav
+                :aria-label="t('employeeAdmin.tabs.overview')"
+                class="employee-admin-overview-nav"
               >
-                <IconifyIcon class="employee-admin-overview-nav__icon" :icon="section.icon" aria-hidden="true" />
-                <span>{{ section.label }}</span>
-              </button>
+                <button
+                  v-for="section in visibleEmployeeOverviewSections"
+                  :key="section.id"
+                  type="button"
+                  :aria-current="section.id === activeOverviewSection ? 'true' : undefined"
+                  class="employee-admin-overview-nav__link"
+                  :class="{ 'employee-admin-overview-nav__link--active': section.id === activeOverviewSection }"
+                  :data-testid="section.testId"
+                  @click="selectOverviewSection(section.id)"
+                >
+                  <IconifyIcon class="employee-admin-overview-nav__icon" :icon="section.icon" aria-hidden="true" />
+                  <span>{{ section.label }}</span>
+                </button>
+              </nav>
             </aside>
 
             <div class="employee-admin-overview-content">
@@ -4917,10 +4921,12 @@ onBeforeUnmount(() => {
 }
 
 .employee-admin-overview-onepage {
+  --employee-overview-sticky-top: var(--sp-sticky-offset, 6.5rem);
   display: grid;
   grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
   gap: 1.25rem;
   align-items: start;
+  min-width: 0;
 }
 
 .employee-admin-overview-content {
@@ -4937,7 +4943,7 @@ onBeforeUnmount(() => {
   border-radius: 1.25rem;
   background: var(--sp-color-surface-card);
   min-width: 0;
-  scroll-margin-top: var(--sp-sticky-offset, 6.5rem);
+  scroll-margin-top: var(--employee-overview-sticky-top, 6.5rem);
 }
 
 .employee-admin-overview-section-card__header,
@@ -4985,15 +4991,21 @@ onBeforeUnmount(() => {
   padding-top: 1rem;
 }
 
-.employee-admin-overview-nav {
+.employee-admin-overview-nav-shell {
   position: sticky;
-  top: var(--sp-sticky-offset, 6.5rem);
+  top: var(--employee-overview-sticky-top, 6.5rem);
   align-self: start;
+  z-index: 2;
+  min-width: 0;
+  max-height: calc(100vh - var(--employee-overview-sticky-top, 6.5rem) - 1rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.employee-admin-overview-nav {
   display: grid;
   gap: 0.25rem;
-  max-height: calc(100vh - var(--sp-sticky-offset, 6.5rem) - 1rem);
   padding: 0.25rem 0;
-  overflow-y: auto;
   border: 0;
   background: transparent;
 }
@@ -5257,11 +5269,15 @@ onBeforeUnmount(() => {
     position: static;
   }
 
-  .employee-admin-overview-nav {
+  .employee-admin-overview-nav-shell {
     position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .employee-admin-overview-nav {
     display: flex;
     overflow-x: auto;
-    max-height: none;
     padding: 0.25rem 0 0.5rem;
   }
 
