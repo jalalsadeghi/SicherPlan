@@ -484,6 +484,53 @@ async function clickButtonByTextWithin(wrapper: any, label: string) {
   await button.trigger("click");
 }
 
+type IntersectionObserverMockInstance = {
+  callback: IntersectionObserverCallback;
+  disconnect: ReturnType<typeof vi.fn>;
+  observe: ReturnType<typeof vi.fn>;
+  observedElements: Element[];
+  options?: IntersectionObserverInit;
+};
+
+function installIntersectionObserverMock() {
+  const instances: IntersectionObserverMockInstance[] = [];
+  const IntersectionObserverMock = vi.fn(function (
+    this: IntersectionObserverMockInstance,
+    callback: IntersectionObserverCallback,
+    options?: IntersectionObserverInit,
+  ) {
+    this.callback = callback;
+    this.options = options;
+    this.observedElements = [];
+    this.observe = vi.fn((element: Element) => {
+      this.observedElements.push(element);
+    });
+    this.disconnect = vi.fn();
+    instances.push(this);
+  });
+
+  Object.defineProperty(window, "IntersectionObserver", {
+    configurable: true,
+    value: IntersectionObserverMock,
+  });
+
+  function triggerIntersection(instance: IntersectionObserverMockInstance, target: Element, intersectionRatio = 1) {
+    instance.callback(
+      [
+        {
+          boundingClientRect: { top: 0 } as DOMRectReadOnly,
+          intersectionRatio,
+          isIntersecting: true,
+          target,
+        } as IntersectionObserverEntry,
+      ],
+      instance as unknown as IntersectionObserver,
+    );
+  }
+
+  return { instances, triggerIntersection };
+}
+
 const mountedWrappers: VueWrapper[] = [];
 
 async function mountEmployeeAdmin() {
@@ -583,6 +630,8 @@ describe("EmployeeAdminView search dialog regression", () => {
     while (mountedWrappers.length) {
       mountedWrappers.pop()?.unmount();
     }
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("renders a single-column full-width tools panel before the detail workspace", async () => {
@@ -1011,22 +1060,113 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(dispatcherWrapper.find('[data-testid="employee-overview-section-absences"]').exists()).toBe(false);
   });
 
+  it("renders clean link-style Overview nav items with real decorative icons", async () => {
+    const wrapper = await mountEmployeeAdmin();
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    const nav = wrapper.get('[data-testid="employee-overview-section-nav"]');
+    expect(nav.classes()).toContain("employee-admin-overview-nav");
+    expect(nav.classes()).not.toContain("employee-admin-card");
+    expect(nav.classes()).not.toContain("employee-admin-tab");
+    expect(nav.classes()).not.toContain("employee-admin-meta__pill");
+
+    const navItems = nav.findAll(".employee-admin-overview-nav__link");
+    expect(navItems).toHaveLength(11);
+    navItems.forEach((navItem) => {
+      expect(navItem.classes()).toContain("employee-admin-overview-nav__link");
+      expect(navItem.classes()).not.toContain("employee-admin-tab");
+      expect(navItem.classes()).not.toContain("employee-admin-meta__pill");
+      expect(navItem.classes()).not.toContain("employee-admin-overview-nav__chip");
+
+      const icon = navItem.find(".employee-admin-overview-nav__icon");
+      expect(icon.exists()).toBe(true);
+      expect(icon.attributes("aria-hidden")).toBe("true");
+      expect(["ID", "KEY", "AWD"]).not.toContain(icon.text().trim());
+      expect(navItem.element.firstElementChild).toBe(icon.element);
+    });
+  });
+
   it("keeps Overview active, marks the nav item, and scrolls when a section is selected", async () => {
     const scrollIntoViewMock = vi.fn();
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
-      configurable: true,
-      value: scrollIntoViewMock,
+    vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(function (this: HTMLElement, options?: boolean | ScrollIntoViewOptions) {
+      scrollIntoViewMock(this, options);
     });
     const wrapper = await mountEmployeeAdmin();
 
     await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    const section = wrapper.get('[data-testid="employee-overview-section-addresses"]');
     await wrapper.get('[data-testid="employee-overview-nav-addresses"]').trigger("click");
     await settle();
 
     expect((wrapper.vm as any).activeDetailTab).toBe("overview");
     expect((wrapper.vm as any).activeOverviewSection).toBe("addresses");
     expect(wrapper.get('[data-testid="employee-overview-nav-addresses"]').attributes("aria-current")).toBe("true");
-    expect(scrollIntoViewMock).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth", block: "start" }));
+    expect(scrollIntoViewMock).toHaveBeenCalledWith(
+      section.element,
+      expect.objectContaining({ behavior: "smooth", block: "start" }),
+    );
+  });
+
+  it("updates the active Overview nav item from IntersectionObserver scroll-spy events", async () => {
+    const { instances, triggerIntersection } = installIntersectionObserverMock();
+    const wrapper = await mountEmployeeAdmin();
+
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    const observer = instances.at(-1);
+    expect(observer).toBeDefined();
+
+    triggerIntersection(observer!, wrapper.get('[data-testid="employee-overview-section-qualifications"]').element);
+    await settle();
+
+    expect((wrapper.vm as any).activeOverviewSection).toBe("qualifications");
+    expect(wrapper.get('[data-testid="employee-overview-nav-qualifications"]').attributes("aria-current")).toBe("true");
+    expect(wrapper.get('[data-testid="employee-overview-nav-qualifications"]').classes()).toContain(
+      "employee-admin-overview-nav__link--active",
+    );
+
+    triggerIntersection(observer!, wrapper.get('[data-testid="employee-overview-section-notes"]').element);
+    await settle();
+
+    expect((wrapper.vm as any).activeOverviewSection).toBe("notes");
+    expect(wrapper.get('[data-testid="employee-overview-nav-notes"]').attributes("aria-current")).toBe("true");
+    expect(wrapper.get('[data-testid="employee-overview-nav-notes"]').classes()).toContain(
+      "employee-admin-overview-nav__link--active",
+    );
+    expect(wrapper.get('[data-testid="employee-overview-nav-qualifications"]').attributes("aria-current")).toBeUndefined();
+    expect(wrapper.get('[data-testid="employee-overview-nav-qualifications"]').classes()).not.toContain(
+      "employee-admin-overview-nav__link--active",
+    );
+  });
+
+  it("observes visible Overview sections, disconnects on unmount, and reinitializes when private visibility changes", async () => {
+    const { instances } = installIntersectionObserverMock();
+    const wrapper = await mountEmployeeAdmin();
+
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    const tenantAdminObserver = instances.at(-1);
+    expect(tenantAdminObserver).toBeDefined();
+    expect(tenantAdminObserver!.observe).toHaveBeenCalledTimes(11);
+    expect(tenantAdminObserver!.observedElements.map((element) => element.id)).toContain("employee-overview-section-addresses");
+
+    authStoreState.effectiveRole = "dispatcher";
+    authStoreState.activeRole = "dispatcher";
+    await settle();
+
+    const dispatcherObserver = instances.at(-1);
+    expect(dispatcherObserver).toBeDefined();
+    expect(dispatcherObserver).not.toBe(tenantAdminObserver);
+    expect(tenantAdminObserver!.disconnect).toHaveBeenCalled();
+    expect(dispatcherObserver!.observe).toHaveBeenCalledTimes(8);
+    expect(dispatcherObserver!.observedElements.map((element) => element.id)).not.toContain("employee-overview-section-addresses");
+
+    wrapper.unmount();
+    mountedWrappers.pop();
+    expect(dispatcherObserver!.disconnect).toHaveBeenCalled();
   });
 
   it("normalizes every former tab id to its Overview section without blank panels", async () => {
@@ -1118,7 +1258,7 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(wrapper.find('[data-testid="employee-overview-section-documents"]').exists()).toBe(true);
     await wrapper.get('[data-testid="employee-overview-nav-documents"]').trigger("click");
     await settle();
-    expect(wrapper.get('[data-testid="employee-overview-nav-documents"]').classes()).toContain("active");
+    expect(wrapper.get('[data-testid="employee-overview-nav-documents"]').classes()).toContain("employee-admin-overview-nav__link--active");
 
     await wrapper.get('[data-testid="employee-list-tab-search"]').trigger("click");
     await clickButtonByText(wrapper, "Create employee file");

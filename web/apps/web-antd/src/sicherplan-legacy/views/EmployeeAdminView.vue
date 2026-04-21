@@ -326,12 +326,12 @@
                 :key="section.id"
                 type="button"
                 :aria-current="section.id === activeOverviewSection ? 'true' : undefined"
-                class="employee-admin-overview-nav__item"
-                :class="{ active: section.id === activeOverviewSection }"
+                class="employee-admin-overview-nav__link"
+                :class="{ 'employee-admin-overview-nav__link--active': section.id === activeOverviewSection }"
                 :data-testid="section.testId"
                 @click="selectOverviewSection(section.id)"
               >
-                <span class="employee-admin-overview-nav__icon" :data-icon="section.icon" aria-hidden="true">{{ section.iconLabel }}</span>
+                <IconifyIcon class="employee-admin-overview-nav__icon" :icon="section.icon" aria-hidden="true" />
                 <span>{{ section.label }}</span>
               </button>
             </aside>
@@ -1865,6 +1865,7 @@
 </template>
 
 <script setup lang="ts">
+import { IconifyIcon } from "@vben/icons";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
@@ -2230,6 +2231,8 @@ const pendingQualificationProofFile = ref<File | null>(null);
 let employeeSearchDebounceHandle: ReturnType<typeof setTimeout> | null = null;
 let employeeSearchRequestSeq = 0;
 let suppressNextEmployeeSearchWatch = false;
+let employeeOverviewSectionObserver: IntersectionObserver | null = null;
+let suppressOverviewScrollSpyUntil = 0;
 
 const documentUploadDraft = reactive({
   title: "",
@@ -2498,7 +2501,6 @@ type EmployeeOverviewSectionId =
 type EmployeeOverviewSection = {
   id: EmployeeOverviewSectionId;
   icon: string;
-  iconLabel: string;
   label: string;
   testId: string;
   visible: boolean;
@@ -2512,7 +2514,6 @@ const employeeOverviewSections = computed(() => {
     {
       id: "employee_file",
       icon: "lucide:id-card",
-      iconLabel: "ID",
       label: t("employeeAdmin.overviewSections.employeeFile"),
       testId: "employee-overview-nav-file",
       visible: true,
@@ -2520,7 +2521,6 @@ const employeeOverviewSections = computed(() => {
     {
       id: "app_access",
       icon: "lucide:key-round",
-      iconLabel: "KEY",
       label: t("employeeAdmin.overviewSections.appAccess"),
       testId: "employee-overview-nav-app_access",
       visible: existingEmployeeVisible,
@@ -2528,15 +2528,13 @@ const employeeOverviewSections = computed(() => {
     {
       id: "qualifications",
       icon: "lucide:award",
-      iconLabel: "AWD",
       label: t("employeeAdmin.overviewSections.qualifications"),
       testId: "employee-overview-nav-qualifications",
       visible: existingEmployeeVisible,
     },
     {
       id: "credentials",
-      icon: "lucide:badge",
-      iconLabel: "BAD",
+      icon: "lucide:badge-check",
       label: t("employeeAdmin.overviewSections.credentials"),
       testId: "employee-overview-nav-credentials",
       visible: existingEmployeeVisible,
@@ -2544,7 +2542,6 @@ const employeeOverviewSections = computed(() => {
     {
       id: "availability",
       icon: "lucide:calendar-clock",
-      iconLabel: "CAL",
       label: t("employeeAdmin.overviewSections.availability"),
       testId: "employee-overview-nav-availability",
       visible: existingEmployeeVisible,
@@ -2552,7 +2549,6 @@ const employeeOverviewSections = computed(() => {
     {
       id: "private_profile",
       icon: "lucide:user-lock",
-      iconLabel: "LCK",
       label: t("employeeAdmin.overviewSections.privateProfile"),
       testId: "employee-overview-nav-private_profile",
       visible: privateEmployeeVisible,
@@ -2560,7 +2556,6 @@ const employeeOverviewSections = computed(() => {
     {
       id: "addresses",
       icon: "lucide:map-pin",
-      iconLabel: "PIN",
       label: t("employeeAdmin.overviewSections.addresses"),
       testId: "employee-overview-nav-addresses",
       visible: privateEmployeeVisible,
@@ -2568,7 +2563,6 @@ const employeeOverviewSections = computed(() => {
     {
       id: "absences",
       icon: "lucide:calendar-x",
-      iconLabel: "ABS",
       label: t("employeeAdmin.overviewSections.absences"),
       testId: "employee-overview-nav-absences",
       visible: privateEmployeeVisible,
@@ -2576,7 +2570,6 @@ const employeeOverviewSections = computed(() => {
     {
       id: "notes",
       icon: "lucide:sticky-note",
-      iconLabel: "NTE",
       label: t("employeeAdmin.overviewSections.notes"),
       testId: "employee-overview-nav-notes",
       visible: existingEmployeeVisible,
@@ -2584,7 +2577,6 @@ const employeeOverviewSections = computed(() => {
     {
       id: "groups",
       icon: "lucide:users",
-      iconLabel: "GRP",
       label: t("employeeAdmin.overviewSections.groups"),
       testId: "employee-overview-nav-groups",
       visible: existingEmployeeVisible,
@@ -2592,7 +2584,6 @@ const employeeOverviewSections = computed(() => {
     {
       id: "documents",
       icon: "lucide:file-text",
-      iconLabel: "DOC",
       label: t("employeeAdmin.overviewSections.documents"),
       testId: "employee-overview-nav-documents",
       visible: existingEmployeeVisible,
@@ -2649,12 +2640,14 @@ function selectEmployeeDetailTab(tabId: string) {
 
 function selectOverviewSection(sectionId: string) {
   activeOverviewSection.value = normalizeOverviewSectionId(sectionId);
+  suppressOverviewScrollSpy();
   scrollToOverviewSection(activeOverviewSection.value);
 }
 
 function openEmployeeOverviewSection(sectionId: string) {
   activeDetailTab.value = "overview";
   activeOverviewSection.value = normalizeOverviewSectionId(sectionId);
+  suppressOverviewScrollSpy();
   scrollToOverviewSection(activeOverviewSection.value);
 }
 
@@ -2676,12 +2669,73 @@ function scrollToOverviewSection(sectionId: EmployeeOverviewSectionId) {
   });
 }
 
+function suppressOverviewScrollSpy() {
+  suppressOverviewScrollSpyUntil = window.performance.now() + 650;
+}
+
 function isEmployeeOverviewSectionVisible(sectionId: EmployeeOverviewSectionId) {
   return employeeOverviewSections.value.some((section) => section.id === sectionId && section.visible);
 }
 
 function resolveOverviewSectionElementId(sectionId: EmployeeOverviewSectionId) {
   return `employee-overview-section-${sectionId === "employee_file" ? "file" : sectionId.replaceAll("_", "-")}`;
+}
+
+function resolveOverviewSectionIdFromElement(element: Element): EmployeeOverviewSectionId | null {
+  const sectionSuffix = element.id.replace(/^employee-overview-section-/, "");
+  const sectionId = sectionSuffix === "file" ? "employee_file" : sectionSuffix.replaceAll("-", "_");
+  const matchingSection = visibleEmployeeOverviewSections.value.find((section) => section.id === sectionId);
+  return matchingSection?.id ?? null;
+}
+
+function disconnectEmployeeOverviewSectionObserver() {
+  employeeOverviewSectionObserver?.disconnect();
+  employeeOverviewSectionObserver = null;
+}
+
+function setupEmployeeOverviewSectionObserver() {
+  disconnectEmployeeOverviewSectionObserver();
+
+  if (activeDetailTab.value !== "overview" || typeof window.IntersectionObserver === "undefined") {
+    return;
+  }
+
+  const sectionElements = visibleEmployeeOverviewSections.value
+    .map((section) => document.getElementById(resolveOverviewSectionElementId(section.id)))
+    .filter((element): element is HTMLElement => !!element);
+
+  if (!sectionElements.length) {
+    return;
+  }
+
+  employeeOverviewSectionObserver = new IntersectionObserver(
+    (entries) => {
+      if (window.performance.now() < suppressOverviewScrollSpyUntil) {
+        return;
+      }
+
+      const [dominantEntry] = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((left, right) => {
+          if (right.intersectionRatio !== left.intersectionRatio) {
+            return right.intersectionRatio - left.intersectionRatio;
+          }
+          return Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top);
+        });
+
+      const sectionId = dominantEntry ? resolveOverviewSectionIdFromElement(dominantEntry.target) : null;
+      if (sectionId) {
+        activeOverviewSection.value = sectionId;
+      }
+    },
+    {
+      root: null,
+      rootMargin: "-30% 0px -55% 0px",
+      threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
+    },
+  );
+
+  sectionElements.forEach((element) => employeeOverviewSectionObserver?.observe(element));
 }
 
 function openWorkforceCatalogs() {
@@ -4427,6 +4481,22 @@ watch(
 );
 
 watch(
+  () => [
+    activeDetailTab.value,
+    selectedEmployee.value?.id,
+    canReadPrivate.value,
+    visibleEmployeeOverviewSections.value.map((section) => section.id).join("|"),
+  ] as const,
+  () => {
+    disconnectEmployeeOverviewSectionObserver();
+    if (activeDetailTab.value === "overview") {
+      void nextTick(setupEmployeeOverviewSectionObserver);
+    }
+  },
+  { immediate: true },
+);
+
+watch(
   () => qualificationDraft.record_kind,
   (recordKind) => {
     if (recordKind === "function") {
@@ -4548,6 +4618,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   clearEmployeeSearchDebounce();
   clearPhotoPreview();
+  disconnectEmployeeOverviewSectionObserver();
 });
 </script>
 
@@ -4866,7 +4937,7 @@ onBeforeUnmount(() => {
   border-radius: 1.25rem;
   background: var(--sp-color-surface-card);
   min-width: 0;
-  scroll-margin-top: 1rem;
+  scroll-margin-top: var(--sp-sticky-offset, 6.5rem);
 }
 
 .employee-admin-overview-section-card__header,
@@ -4916,23 +4987,27 @@ onBeforeUnmount(() => {
 
 .employee-admin-overview-nav {
   position: sticky;
-  top: 1rem;
+  top: var(--sp-sticky-offset, 6.5rem);
+  align-self: start;
   display: grid;
-  gap: 0.45rem;
-  padding: 0.75rem;
-  border: 1px solid var(--sp-color-border-soft);
-  border-radius: 18px;
-  background: var(--sp-color-surface-page);
+  gap: 0.25rem;
+  max-height: calc(100vh - var(--sp-sticky-offset, 6.5rem) - 1rem);
+  padding: 0.25rem 0;
+  overflow-y: auto;
+  border: 0;
+  background: transparent;
 }
 
-.employee-admin-overview-nav__item {
-  display: flex;
-  gap: 0.55rem;
+.employee-admin-overview-nav__link {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
   align-items: center;
+  gap: 0.55rem;
   width: 100%;
-  padding: 0.55rem 0.65rem;
-  border: 1px solid transparent;
-  border-radius: 12px;
+  padding: 0.55rem 0.35rem 0.55rem 0.75rem;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0.35rem;
   background: transparent;
   color: var(--sp-color-text-secondary);
   font: inherit;
@@ -4940,27 +5015,28 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-.employee-admin-overview-nav__item.active {
-  border-color: color-mix(in srgb, var(--sp-color-primary) 35%, transparent);
-  background: color-mix(in srgb, var(--sp-color-primary-muted) 62%, transparent);
+.employee-admin-overview-nav__link:hover,
+.employee-admin-overview-nav__link:focus-visible {
   color: var(--sp-color-primary-strong);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 36%, transparent);
+  outline: none;
 }
 
-.employee-admin-overview-nav__item:focus-visible {
+.employee-admin-overview-nav__link:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--sp-color-primary) 38%, transparent);
   outline-offset: 2px;
 }
 
-.employee-admin-overview-nav__icon {
-  display: inline-grid;
-  place-items: center;
-  width: 1.8rem;
-  height: 1.8rem;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--sp-color-primary-muted) 68%, transparent);
+.employee-admin-overview-nav__link--active {
+  border-left-color: var(--sp-color-primary);
   color: var(--sp-color-primary-strong);
-  font-size: 0.65rem;
-  font-weight: 800;
+  font-weight: 700;
+}
+
+.employee-admin-overview-nav__icon {
+  width: 1.08rem;
+  height: 1.08rem;
+  color: currentColor;
 }
 
 .employee-admin-overview-section-card .employee-admin-advanced-access {
@@ -5185,10 +5261,19 @@ onBeforeUnmount(() => {
     position: static;
     display: flex;
     overflow-x: auto;
+    max-height: none;
+    padding: 0.25rem 0 0.5rem;
   }
 
-  .employee-admin-overview-nav__item {
+  .employee-admin-overview-nav__link {
     min-width: max-content;
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+    padding: 0.55rem 0.75rem;
+  }
+
+  .employee-admin-overview-nav__link--active {
+    border-bottom-color: var(--sp-color-primary);
   }
 }
 

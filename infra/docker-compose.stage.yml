@@ -30,8 +30,20 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    expose:
+      - "80"
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - web
     ports:
-      - "127.0.0.1:8080:80"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${DEPLOY_ROOT}/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ${DEPLOY_ROOT}/nginx/certs:/etc/nginx/certs:ro
 
 volumes:
   stage_postgres_data:

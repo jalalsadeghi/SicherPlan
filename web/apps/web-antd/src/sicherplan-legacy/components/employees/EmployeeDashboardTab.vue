@@ -503,7 +503,7 @@ watch(
 
 .employee-dashboard-tab__summary {
   display: grid;
-  gap: 0.65rem;
+  gap: 3.5rem;
   min-width: 0;
 }
 
