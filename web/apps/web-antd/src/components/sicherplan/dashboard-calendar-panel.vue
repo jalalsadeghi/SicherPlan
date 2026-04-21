@@ -380,7 +380,7 @@ function toggleDay(dateKey: string) {
 
 .sp-dashboard__calendar-item-label {
   color: var(--sp-color-text-primary);
-  font-size: 0.55rem;
+  font-size: 0.65rem;
   font-weight: 600;
   line-height: 1;
   min-width: 0;
@@ -417,7 +417,7 @@ function toggleDay(dateKey: string) {
   width: fit-content;
   padding: 0.14rem 0.45rem 0.14rem 0.25rem;
   border-radius: 999px;
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   font-weight: 700;
 }
 

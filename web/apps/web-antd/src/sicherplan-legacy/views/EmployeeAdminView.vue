@@ -294,6 +294,21 @@
         </nav>
 
         <template v-if="isCreatingEmployee || selectedEmployee">
+          <EmployeeDashboardTab
+            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'dashboard'"
+            :access-token="authStore.accessToken"
+            :can-manage-photo="actionState.canManagePhoto"
+            :can-read-staffing="canReadStaffing"
+            :employee="selectedEmployee"
+            :photo-uploading="loading.photo"
+            :photo-preview-url="photoPreviewUrl"
+            :selected-employee-branch-label="selectedEmployeeBranchLabel"
+            :selected-employee-mandate-label="selectedEmployeeMandateLabel"
+            :tenant-id="resolvedTenantScopeId"
+            data-testid="employee-tab-panel-dashboard"
+            @photo-selected="submitDashboardPhoto"
+          />
+
           <section
             v-if="activeDetailTab === 'overview'"
             class="employee-admin-section employee-admin-tab-panel"
@@ -663,51 +678,6 @@
                   </div>
                 </section>
               </details>
-            </div>
-          </section>
-
-          <section
-            v-if="selectedEmployee && !isCreatingEmployee && activeDetailTab === 'profile_photo'"
-            class="employee-admin-section employee-admin-tab-panel"
-            data-testid="employee-tab-panel-profile-photo"
-          >
-            <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-editor-intro">
-                <div>
-                  <p class="eyebrow">{{ t("employeeAdmin.photo.eyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.photo.title") }}</h4>
-                </div>
-                <p class="field-help">{{ t("employeeAdmin.photo.help") }}</p>
-              </section>
-
-              <section class="employee-admin-form-section">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.photo.manageEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.photo.manageTitle") }}</h4>
-                  <p class="field-help">{{ currentPhoto?.file_name || t("employeeAdmin.photo.empty") }}</p>
-                </div>
-
-                <div class="employee-admin-photo">
-                  <div class="employee-admin-photo__preview">
-                    <img v-if="photoPreviewUrl" :src="photoPreviewUrl" :alt="t('employeeAdmin.photo.alt')" />
-                    <span v-else>{{ t("employeeAdmin.photo.empty") }}</span>
-                  </div>
-                  <div class="employee-admin-photo__controls">
-                    <label class="field-stack field-stack--wide">
-                      <span>{{ t("employeeAdmin.photo.fileLabel") }}</span>
-                      <input :disabled="!actionState.canManagePhoto" type="file" accept="image/*" @change="onPhotoSelected" />
-                    </label>
-                    <div class="cta-row">
-                      <button class="cta-button" type="button" :disabled="!pendingPhotoFile || !actionState.canManagePhoto" @click="submitPhoto">
-                        {{ t("employeeAdmin.actions.uploadPhoto") }}
-                      </button>
-                      <button class="cta-button cta-secondary" type="button" :disabled="!currentPhoto?.current_version_no" @click="downloadDocument(currentPhoto)">
-                        {{ t("employeeAdmin.actions.downloadPhoto") }}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </section>
             </div>
           </section>
 
@@ -1957,6 +1927,7 @@ import {
 } from "@/api/employeeAdmin";
 import SicherPlanLoadingOverlay from "@/components/SicherPlanLoadingOverlay.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
+import EmployeeDashboardTab from "@/components/employees/EmployeeDashboardTab.vue";
 import { useSicherPlanFeedback } from "@/composables/useSicherPlanFeedback";
 import { useI18n } from "@/i18n";
 import {
@@ -1989,6 +1960,7 @@ import {
   validateEmployeePrivateProfileDraft,
   validateEmployeeQualificationDraft,
 } from "@/features/employees/employeeAdmin.helpers.js";
+import { hasPlanningStaffingPermission } from "@/features/planning/planningStaffing.helpers.js";
 import type { MessageKey } from "@/i18n/messages";
 import { useAuthStore } from "@/stores/auth";
 
@@ -2005,6 +1977,7 @@ const loading = reactive({
   list: false,
   detail: false,
   action: false,
+  photo: false,
   employeeSearch: false,
 });
 
@@ -2236,6 +2209,7 @@ const actionState = computed(() => deriveEmployeeActionState(effectiveRole.value
 const canRead = computed(() => actionState.value.canRead);
 const canWrite = computed(() => actionState.value.canWrite);
 const canReadPrivate = computed(() => actionState.value.canReadPrivate);
+const canReadStaffing = computed(() => hasPlanningStaffingPermission(effectiveRole.value, "planning.staffing.read"));
 const isEmployeeSessionResolving = computed(() => authStore.isSessionResolving);
 const employeeWorkspaceBusy = computed(() => isEmployeeSessionResolving.value || loading.action);
 const employeeWorkspaceLoadingText = computed(() =>
@@ -2447,7 +2421,6 @@ const employeeDetailTabs = computed(() => {
   const tabs = [
     { id: "overview", label: t("employeeAdmin.tabs.overview") },
     { id: "app_access", label: t("employeeAdmin.tabs.appAccess") },
-    { id: "profile_photo", label: t("employeeAdmin.tabs.profilePhoto") },
     { id: "qualifications", label: t("employeeAdmin.tabs.qualifications") },
     { id: "credentials", label: t("employeeAdmin.tabs.credentials") },
     { id: "availability", label: t("employeeAdmin.tabs.availability") },
@@ -2462,7 +2435,11 @@ const employeeDetailTabs = computed(() => {
     tabs.splice(8, 0, { id: "absences", label: t("employeeAdmin.tabs.absences") });
   }
 
-  return isCreatingEmployee.value ? tabs.filter((tab) => tab.id === "overview") : tabs;
+  if (isCreatingEmployee.value) {
+    return tabs.filter((tab) => tab.id === "overview");
+  }
+
+  return [{ id: "dashboard", label: t("employeeAdmin.tabs.dashboard") }, ...tabs];
 });
 
 type SelectEmployeeOptions = {
@@ -2702,8 +2679,8 @@ async function selectEmployeeFromSearchResult(employeeId: string) {
   employeeSearchSuggestions.value = [];
   employeeSearchSuggestionsSuppressed.value = true;
   employeeSearchError.value = "";
-  await selectEmployee(employeeId, { fallbackTab: "overview" });
-  activeDetailTab.value = "overview";
+  await selectEmployee(employeeId, { fallbackTab: "dashboard" });
+  activeDetailTab.value = "dashboard";
 }
 
 async function selectEmployeeFromSuggestion(employee: EmployeeListItem) {
@@ -2715,8 +2692,8 @@ async function selectEmployeeFromSuggestion(employee: EmployeeListItem) {
   employeeSearchError.value = "";
   suppressNextEmployeeSearchWatch = true;
   filters.search = `${employee.personnel_no} · ${employee.first_name} ${employee.last_name}`;
-  await selectEmployee(employee.id, { fallbackTab: "overview" });
-  activeDetailTab.value = "overview";
+  await selectEmployee(employee.id, { fallbackTab: "dashboard" });
+  activeDetailTab.value = "dashboard";
 }
 
 async function loadTenantStructure() {
@@ -3208,7 +3185,7 @@ async function selectEmployee(employeeId: string, options: SelectEmployeeOptions
   if (!resolvedTenantScopeId.value || !authStore.accessToken) {
     return;
   }
-  const { preserveActiveTab = false, fallbackTab = "overview" } = options;
+  const { preserveActiveTab = false, fallbackTab = "dashboard" } = options;
   const desiredTab = preserveActiveTab ? activeDetailTab.value : fallbackTab;
   isCreatingEmployee.value = false;
   selectedEmployeeId.value = employeeId;
@@ -3843,6 +3820,10 @@ function onPhotoSelected(event: Event) {
   pendingPhotoFile.value = target.files?.[0] ?? null;
 }
 
+async function submitDashboardPhoto(file: File) {
+  await submitPhotoFile(file);
+}
+
 function onQualificationProofSelected(event: Event) {
   const target = event.target as HTMLInputElement;
   pendingQualificationProofFile.value = target.files?.[0] ?? null;
@@ -3954,16 +3935,23 @@ async function submitEmployeeDocumentVersion() {
 }
 
 async function submitPhoto() {
-  if (!pendingPhotoFile.value || !selectedEmployeeId.value || !resolvedTenantScopeId.value || !authStore.accessToken) {
+  if (!pendingPhotoFile.value) {
     return;
   }
-  loading.action = true;
+  await submitPhotoFile(pendingPhotoFile.value);
+}
+
+async function submitPhotoFile(file: File) {
+  if (!file || !selectedEmployeeId.value || !resolvedTenantScopeId.value || !authStore.accessToken || !actionState.value.canManagePhoto) {
+    return;
+  }
+  loading.photo = true;
   try {
-    const contentBase64 = await fileToBase64(pendingPhotoFile.value);
+    const contentBase64 = await fileToBase64(file);
     await uploadEmployeePhoto(resolvedTenantScopeId.value, selectedEmployeeId.value, authStore.accessToken, {
-      title: pendingPhotoFile.value.name,
-      file_name: pendingPhotoFile.value.name,
-      content_type: pendingPhotoFile.value.type || "application/octet-stream",
+      title: file.name,
+      file_name: file.name,
+      content_type: file.type || "application/octet-stream",
       content_base64: contentBase64,
     });
     pendingPhotoFile.value = null;
@@ -3973,7 +3961,7 @@ async function submitPhoto() {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
     setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
   } finally {
-    loading.action = false;
+    loading.photo = false;
   }
 }
 
@@ -4222,7 +4210,7 @@ function emptyToNull(value: string) {
 }
 
 watch(
-  () => [isCreatingEmployee.value, !!selectedEmployee.value, canReadPrivate.value],
+  () => [isCreatingEmployee.value, !!selectedEmployee.value, canReadPrivate.value, activeDetailTab.value],
   () => {
     const allowedTabs = employeeDetailTabs.value.map((tab) => tab.id);
     if (!allowedTabs.includes(activeDetailTab.value)) {

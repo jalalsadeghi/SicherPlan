@@ -107,6 +107,8 @@ test("detail tab resolver preserves valid tabs and falls back safely", () => {
   assert.equal(resolveEmployeeDetailTab("private_profile", tabs), "overview");
   assert.equal(resolveEmployeeDetailTab("private_profile", ["credentials"], "overview"), "credentials");
   assert.equal(resolveEmployeeDetailTab("", []), "overview");
+  assert.equal(resolveEmployeeDetailTab("profile_photo", ["dashboard", "overview"], "dashboard"), "dashboard");
+  assert.equal(resolveEmployeeDetailTab("profile_photo", ["overview"], "dashboard"), "overview");
 });
 
 test("employee document type options expose the seeded employee-facing keys", () => {

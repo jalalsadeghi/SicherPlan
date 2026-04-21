@@ -20,6 +20,20 @@ describe('module registry wrapper flags', () => {
     expect(customers.hideWorkspaceSectionHeaderForRoles).toEqual(['tenant_admin']);
   });
 
+  it('hides the employees page intro and workspace section header without changing registry metadata', () => {
+    const employees = moduleRegistry.employees!;
+    expect(employees.showPageIntro).toBe(false);
+    expect(employees.showWorkspaceSectionHeader).toBe(false);
+    expect(employees.badges.map((badge) => badge.key)).toEqual([
+      'HR Split',
+      'Private Data',
+      'Import Ready',
+    ]);
+    expect(employees.titleKey).toBe('sicherplan.admin.employees');
+    expect(moduleRegistry.customers?.showPageIntro).toBe(false);
+    expect(moduleRegistry['planning-orders']?.showPageIntro).toBeUndefined();
+  });
+
   it('removes the platform-services workspace section header while keeping the hero', () => {
     const platformServices = moduleRegistry['platform-services']!;
     expect(platformServices.showPageIntro).toBeUndefined();

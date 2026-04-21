@@ -26,7 +26,8 @@ const viewSource = readFileSync(viewPath, "utf8");
 const registrySource = readFileSync(registryPath, "utf8");
 
 test("employees module hides the shared workspace section header", () => {
-  assert.match(registrySource, /employees:\s*{[\s\S]*showWorkspaceSectionHeader:\s*false/);
+  assert.match(registrySource, /customers:\s*{[\s\S]*showPageIntro:\s*false/);
+  assert.match(registrySource, /employees:\s*{[\s\S]*showPageIntro:\s*false,[\s\S]*showWorkspaceSectionHeader:\s*false/);
 });
 
 test("employee page does not render the top module intro hero", () => {
@@ -68,9 +69,11 @@ test("employee detail uses top-level tabs and isolated tab panels", () => {
   assert.match(viewSource, /const employeeWorkspaceBusy = computed\(\(\) => isEmployeeSessionResolving\.value \|\| loading\.action\)/);
   assert.match(viewSource, /const employeeWorkspaceLoadingText = computed\(\(\) =>/);
   assert.match(viewSource, /data-testid="employee-detail-tabs"/);
+  assert.match(viewSource, /EmployeeDashboardTab/);
+  assert.match(viewSource, /data-testid="employee-tab-panel-dashboard"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-overview"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-app-access"/);
-  assert.match(viewSource, /data-testid="employee-tab-panel-profile-photo"/);
+  assert.doesNotMatch(viewSource, /data-testid="employee-tab-panel-profile-photo"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-qualifications"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-credentials"/);
   assert.match(viewSource, /data-testid="employee-tab-panel-availability"/);
@@ -81,8 +84,58 @@ test("employee detail uses top-level tabs and isolated tab panels", () => {
   assert.match(viewSource, /data-testid="employee-tab-panel-documents"/);
   assert.match(viewSource, /async function selectEmployee\(employeeId: string, options: SelectEmployeeOptions = \{\}\)/);
   assert.match(viewSource, /preserveActiveTab = false/);
+  assert.match(viewSource, /fallbackTab = "dashboard"/);
   assert.match(viewSource, /resolveEmployeeDetailTab\(\s*desiredTab,[\s\S]*employeeDetailTabs\.value\.map\(\(tab\) => tab\.id\)/);
   assert.match(viewSource, /selectEmployee\(selectedEmployeeId\.value, \{ preserveActiveTab: true \}\)/);
+});
+
+test("existing employee detail prepends dashboard while create mode remains overview only", () => {
+  assert.match(viewSource, /const employeeDetailTabs = computed\(\(\) => \{[\s\S]*if \(isCreatingEmployee\.value\) \{[\s\S]*return tabs\.filter\(\(tab\) => tab\.id === "overview"\);[\s\S]*return \[\{ id: "dashboard", label: t\("employeeAdmin\.tabs\.dashboard"\) \}, \.\.\.tabs\];/);
+  assert.doesNotMatch(viewSource, /id: "profile_photo"/);
+  assert.match(viewSource, /function startCreateEmployee\(\) \{[\s\S]*isCreatingEmployee\.value = true;[\s\S]*activeDetailTab\.value = "overview";/);
+  assert.match(viewSource, /selectEmployeeFromSearchResult\(employeeId: string\)[\s\S]*selectEmployee\(employeeId, \{ fallbackTab: "dashboard" \}\);[\s\S]*activeDetailTab\.value = "dashboard";/);
+  assert.match(viewSource, /selectEmployeeFromSuggestion\(employee: EmployeeListItem\)[\s\S]*selectEmployee\(employee\.id, \{ fallbackTab: "dashboard" \}\);[\s\S]*activeDetailTab\.value = "dashboard";/);
+  assert.match(viewSource, /watch\(\s*\(\) => \[isCreatingEmployee\.value, !!selectedEmployee\.value, canReadPrivate\.value, activeDetailTab\.value\]/);
+});
+
+test("employee dashboard staffing data is permission-gated and uses the planning staffing board", () => {
+  const componentPath = resolveWebAppPath("src/sicherplan-legacy/components/employees/EmployeeDashboardTab.vue");
+  const helperPath = resolveWebAppPath("src/sicherplan-legacy/features/employees/employeeDashboard.helpers.ts");
+  const componentSource = readFileSync(componentPath, "utf8");
+  const helperSource = readFileSync(helperPath, "utf8");
+
+  assert.match(viewSource, /hasPlanningStaffingPermission\(effectiveRole\.value, "planning\.staffing\.read"\)/);
+  assert.match(viewSource, /:can-read-staffing="canReadStaffing"/);
+  assert.match(componentSource, /import \{ listStaffingBoard, type StaffingBoardShiftItem \} from "@\/api\/planningStaffing";/);
+  assert.match(componentSource, /filterShiftsForEmployee\(shifts, props\.employee\.id\)/);
+  assert.match(helperSource, /export function filterShiftsForEmployee/);
+  assert.match(helperSource, /shift\.assignments\.some\(\(assignment\) => assignment\.employee_id === employeeId\)/);
+  assert.match(helperSource, /export function groupEmployeeProjectsFromShifts/);
+  assert.match(helperSource, /export function mapEmployeeShiftsToCalendarCells/);
+  assert.match(helperSource, /export function classifyEmployeeProject/);
+  assert.match(componentSource, /v-if="!canReadStaffing"[\s\S]*employeeAdmin\.dashboard\.noStaffingAccess/);
+  assert.match(componentSource, /<DashboardCalendarPanel[\s\S]*data-testid="employee-dashboard-calendar"/);
+  assert.match(componentSource, /monthCache = new Map/);
+  assert.match(componentSource, /requestVersion/);
+});
+
+test("employee dashboard owns profile photo entry point and the old photo tab is removed", () => {
+  const componentPath = resolveWebAppPath("src/sicherplan-legacy/components/employees/EmployeeDashboardTab.vue");
+  const componentSource = readFileSync(componentPath, "utf8");
+
+  assert.match(viewSource, /:can-manage-photo="actionState\.canManagePhoto"/);
+  assert.match(viewSource, /:photo-uploading="loading\.photo"/);
+  assert.match(viewSource, /@photo-selected="submitDashboardPhoto"/);
+  assert.match(viewSource, /async function submitPhotoFile\(file: File\)/);
+  assert.match(componentSource, /data-testid="employee-dashboard-photo-button"/);
+  assert.match(componentSource, /data-testid="employee-dashboard-photo-input"/);
+  assert.match(componentSource, /data-testid="employee-dashboard-photo-uploading"/);
+  assert.match(componentSource, /data-testid="employee-dashboard-photo-image"/);
+  assert.match(componentSource, /data-testid="employee-dashboard-photo-placeholder"/);
+  assert.match(componentSource, /accept="image\/\*"/);
+  assert.doesNotMatch(componentSource, /employeeAdmin\.dashboard\.identityEyebrow/);
+  assert.doesNotMatch(viewSource, /activeDetailTab === 'profile_photo'/);
+  assert.doesNotMatch(viewSource, /employeeAdmin\.tabs\.profilePhoto/);
 });
 
 test("employee workspace removes the redundant catalogs tab and keeps only lightweight handoff navigation", () => {
@@ -190,7 +243,7 @@ test("non-overview employee tabs reuse the structured section pattern", () => {
   assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*v-if="!hasLinkedAccess"[\s\S]*employeeAdmin\.access\.createEyebrow/);
   assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*v-else[\s\S]*employeeAdmin\.access\.manageEyebrow[\s\S]*employeeAdmin\.access\.resetEyebrow[\s\S]*employeeAdmin\.access\.detachEyebrow/);
   assert.match(viewSource, /employee-tab-panel-app-access[\s\S]*employee-admin-advanced-access[\s\S]*employeeAdmin\.access\.attachEyebrow[\s\S]*employeeAdmin\.access\.reconcileEyebrow/);
-  assert.match(viewSource, /employee-tab-panel-profile-photo[\s\S]*employee-admin-editor-intro[\s\S]*employeeAdmin\.photo\.manageEyebrow/);
+  assert.doesNotMatch(viewSource, /employee-tab-panel-profile-photo/);
   assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*employeeAdmin\.qualifications\.registerEyebrow/);
   assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*createEmployeeQualification/);
   assert.match(viewSource, /employee-tab-panel-qualifications[\s\S]*updateEmployeeQualification/);

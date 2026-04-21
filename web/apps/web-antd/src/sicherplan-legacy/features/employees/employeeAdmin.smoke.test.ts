@@ -83,6 +83,10 @@ const coreAdminMocks = vi.hoisted(() => ({
   listMandatesMock: vi.fn(),
 }));
 
+const planningStaffingMocks = vi.hoisted(() => ({
+  listStaffingBoardMock: vi.fn(),
+}));
+
 const translations: Record<string, string> = {
   "employeeAdmin.actions.cancel": "Cancel",
   "employeeAdmin.actions.exportEmployees": "Export employees",
@@ -129,6 +133,7 @@ const translations: Record<string, string> = {
   "employeeAdmin.status.archived": "Archived",
   "employeeAdmin.status.inactive": "Inactive",
   "employeeAdmin.summary.none": "None",
+  "employeeAdmin.tabs.dashboard": "Dashboard",
   "employeeAdmin.tabs.absences": "Absences",
   "employeeAdmin.tabs.addresses": "Addresses",
   "employeeAdmin.tabs.appAccess": "App access",
@@ -141,6 +146,31 @@ const translations: Record<string, string> = {
   "employeeAdmin.tabs.privateProfile": "Private profile",
   "employeeAdmin.tabs.profilePhoto": "Profile photo",
   "employeeAdmin.tabs.qualifications": "Qualifications",
+  "employeeAdmin.dashboard.identityEyebrow": "Employee dashboard",
+  "employeeAdmin.dashboard.projectsEyebrow": "Assignment contexts",
+  "employeeAdmin.dashboard.projectsTitle": "Past, current, and future projects",
+  "employeeAdmin.dashboard.projectsEmpty": "No assignments found.",
+  "employeeAdmin.dashboard.noStaffingAccess": "No staffing access.",
+  "employeeAdmin.dashboard.loadError": "Dashboard data could not be loaded.",
+  "employeeAdmin.dashboard.projectStatus.past": "Past",
+  "employeeAdmin.dashboard.projectStatus.current": "Current",
+  "employeeAdmin.dashboard.projectStatus.future": "Future",
+  "employeeAdmin.dashboard.projectShiftCount": "shifts",
+  "employeeAdmin.dashboard.calendarTitle": "Employee calendar",
+  "employeeAdmin.dashboard.calendarDescription": "Only assigned shifts.",
+  "employeeAdmin.dashboard.calendarMonthHint": "Month view",
+  "employeeAdmin.dashboard.calendarPrevious": "Previous",
+  "employeeAdmin.dashboard.calendarNext": "Next",
+  "employeeAdmin.dashboard.calendarMore": "more",
+  "employeeAdmin.dashboard.calendarOrderShort": "ord.",
+  "employeeAdmin.dashboard.calendarShiftShort": "sh.",
+  "employeeAdmin.dashboard.calendarSummary.shifts": "Shifts",
+  "employeeAdmin.dashboard.calendarSummary.orders": "Orders",
+  "employeeAdmin.dashboard.calendarSummary.projects": "Projects",
+  "employeeAdmin.dashboard.photo.add": "Add photo",
+  "employeeAdmin.dashboard.photo.change": "Change photo",
+  "employeeAdmin.dashboard.photo.uploading": "Uploading photo...",
+  "employeeAdmin.dashboard.photo.alt": "Employee photo",
   "employeeAdmin.title": "Employees",
   "workspace.loading.processing": "Processing",
   "workspace.loading.reconcilingSession": "Reconciling session",
@@ -148,6 +178,7 @@ const translations: Record<string, string> = {
 
 vi.mock("@/i18n", () => ({
   useI18n: () => ({
+    locale: { value: "en-US" },
     t: (key: string, params?: Record<string, unknown>) => {
       const value = translations[key] ?? key;
       if (!params) {
@@ -180,6 +211,10 @@ vi.mock("@/composables/useSicherPlanFeedback", () => ({
 vi.mock("@/api/coreAdmin", () => ({
   listBranches: coreAdminMocks.listBranchesMock,
   listMandates: coreAdminMocks.listMandatesMock,
+}));
+
+vi.mock("@/api/planningStaffing", () => ({
+  listStaffingBoard: planningStaffingMocks.listStaffingBoardMock,
 }));
 
 vi.mock("@/api/employeeAdmin", () => {
@@ -318,6 +353,56 @@ const leon = buildEmployeeListItem("employee-leon", "P-2001", "Leon", "Yilmaz", 
   status: "inactive",
 });
 
+function buildStaffingBoardShift(
+  id: string,
+  employeeId: string,
+  startsAt: string,
+  endsAt: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    id,
+    tenant_id: "tenant-1",
+    planning_record_id: `planning-${id}`,
+    shift_plan_id: `shift-plan-${id}`,
+    order_id: `order-${id}`,
+    order_no: `ORD-${id}`,
+    planning_record_name: `Planning ${id}`,
+    planning_mode_code: "site",
+    workforce_scope_code: "internal",
+    starts_at: startsAt,
+    ends_at: endsAt,
+    shift_type_code: "regular",
+    release_state: "released",
+    status: "active",
+    location_text: null,
+    meeting_point: null,
+    demand_groups: [],
+    assignments: [
+      {
+        id: `assignment-${id}`,
+        shift_id: id,
+        demand_group_id: `demand-${id}`,
+        team_id: null,
+        employee_id: employeeId,
+        subcontractor_worker_id: null,
+        assignment_status_code: "assigned",
+        assignment_source_code: "manual",
+        confirmed_at: null,
+        version_no: 1,
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function dateTimeForCurrentMonth(dayOffset: number, hour: number) {
+  const value = new Date();
+  value.setDate(value.getDate() + dayOffset);
+  value.setHours(hour, 0, 0, 0);
+  return value.toISOString();
+}
+
 function createListEmployeesImplementation() {
   return vi.fn(async (_tenantId: string, _accessToken: string, params: Record<string, unknown>) => {
     const search = `${params.search ?? ""}`.trim().toLowerCase();
@@ -353,6 +438,16 @@ async function settle() {
   await flushPromises();
 }
 
+function createDeferred<T = void>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, reject, resolve };
+}
+
 async function waitForEmployeeSearchDebounce() {
   await new Promise((resolve) => setTimeout(resolve, 350));
   await settle();
@@ -384,6 +479,10 @@ async function mountEmployeeAdmin() {
   const wrapper = mount(EmployeeAdminView, {
     global: {
       stubs: {
+        RouterLink: defineComponent({
+          name: "RouterLinkStub",
+          template: "<a><slot /></a>",
+        }),
         SicherPlanLoadingOverlay: SicherPlanLoadingOverlayStub,
         StatusBadge: StatusBadgeStub,
       },
@@ -413,6 +512,7 @@ describe("EmployeeAdminView search dialog regression", () => {
 
     Object.values(apiMocks).forEach((mock) => mock.mockReset());
     Object.values(coreAdminMocks).forEach((mock) => mock.mockReset());
+    Object.values(planningStaffingMocks).forEach((mock) => mock.mockReset());
 
     coreAdminMocks.listBranchesMock.mockResolvedValue([
       { id: "branch-1", tenant_id: "tenant-1", code: "BR-1", name: "Berlin", status: "active", archived_at: null },
@@ -460,6 +560,7 @@ describe("EmployeeAdminView search dialog regression", () => {
       row_count: 2,
       document_id: "document-export-1",
     });
+    planningStaffingMocks.listStaffingBoardMock.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -567,7 +668,7 @@ describe("EmployeeAdminView search dialog regression", () => {
     );
     expect(apiMocks.getEmployeeMock).toHaveBeenCalledWith("tenant-1", "employee-markus", "token-1");
     expect(wrapper.get('[data-testid="employee-detail-workspace"]').text()).toContain("Markus Neumann");
-    expect(wrapper.get('[data-testid="employee-tab-overview"]').classes()).toContain("active");
+    expect(wrapper.get('[data-testid="employee-tab-dashboard"]').classes()).toContain("active");
   });
 
   it("matches employee suggestions by personnel number and work email fragments", async () => {
@@ -636,7 +737,7 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(wrapper.get('[data-testid="employee-search-suggestions"]').text()).not.toContain("Leon Yilmaz");
   });
 
-  it("selects a search result, closes the modal, and loads the overview detail", async () => {
+  it("selects a search result, closes the modal, and loads the dashboard detail", async () => {
     const wrapper = await mountEmployeeAdmin();
     apiMocks.getEmployeeMock.mockClear();
 
@@ -650,7 +751,112 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(wrapper.find('[data-testid="employee-search-results-modal"]').exists()).toBe(false);
     expect(apiMocks.getEmployeeMock).toHaveBeenCalledWith("tenant-1", "employee-markus", "token-1");
     expect(wrapper.get('[data-testid="employee-detail-workspace"]').text()).toContain("Markus Neumann");
-    expect(wrapper.get('[data-testid="employee-tab-overview"]').classes()).toContain("active");
+    expect(wrapper.get('[data-testid="employee-tab-dashboard"]').classes()).toContain("active");
+  });
+
+  it("renders dashboard projects and calendar from shifts assigned to the selected employee only", async () => {
+    planningStaffingMocks.listStaffingBoardMock.mockResolvedValue([
+      buildStaffingBoardShift(
+        "markus-current",
+        "employee-markus",
+        dateTimeForCurrentMonth(-1, 8),
+        dateTimeForCurrentMonth(1, 16),
+        {
+          order_no: "ORD-100",
+          planning_record_name: "City Center Patrol",
+        },
+      ),
+      buildStaffingBoardShift(
+        "leon-current",
+        "employee-leon",
+        dateTimeForCurrentMonth(0, 9),
+        dateTimeForCurrentMonth(0, 17),
+        {
+          order_no: "ORD-200",
+          planning_record_name: "Unrelated Site",
+        },
+      ),
+    ]);
+
+    const wrapper = await mountEmployeeAdmin();
+    await settle();
+
+    const projects = wrapper.get('[data-testid="employee-dashboard-projects"]');
+    expect(projects.text()).toContain("City Center Patrol");
+    expect(projects.text()).toContain("ORD-100");
+    expect(projects.text()).not.toContain("Unrelated Site");
+    expect(projects.text()).not.toContain("ORD-200");
+
+    const calendar = wrapper.get('[data-testid="employee-dashboard-calendar"]');
+    expect(calendar.text()).toContain("ORD-100");
+    expect(calendar.text()).not.toContain("ORD-200");
+    expect(planningStaffingMocks.listStaffingBoardMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({
+        date_from: expect.any(String),
+        date_to: expect.any(String),
+      }),
+    );
+  });
+
+  it("uploads a dashboard photo from the clickable avatar and keeps profile photo out of the tabs", async () => {
+    const wrapper = await mountEmployeeAdmin();
+    await settle();
+
+    expect(wrapper.find('[data-testid="employee-tab-profile_photo"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-tab-panel-profile-photo"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="employee-dashboard-hero"]').text()).not.toContain("Employee dashboard");
+
+    const photoButton = wrapper.get('[data-testid="employee-dashboard-photo-button"]');
+    expect(photoButton.attributes("aria-label")).toBe("Add photo");
+    expect(photoButton.attributes("disabled")).toBeUndefined();
+    const photoInput = wrapper.get('[data-testid="employee-dashboard-photo-input"]');
+    expect(photoInput.attributes("accept")).toBe("image/*");
+    expect(wrapper.find('[data-testid="employee-dashboard-photo-placeholder"]').exists()).toBe(true);
+    const inputClickSpy = vi.spyOn(photoInput.element as HTMLInputElement, "click");
+    await photoButton.trigger("click");
+    expect(inputClickSpy).toHaveBeenCalled();
+
+    const photoFile = new File(["photo-bytes"], "markus.png", { type: "image/png" });
+    await (wrapper.vm as any).submitDashboardPhoto(photoFile);
+    await settle();
+
+    expect(apiMocks.uploadEmployeePhotoMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "employee-markus",
+      "token-1",
+      expect.objectContaining({
+        content_type: "image/png",
+        file_name: "markus.png",
+        title: "markus.png",
+      }),
+    );
+    expect(apiMocks.uploadEmployeePhotoMock.mock.calls[0]?.[3].content_base64).toBeTruthy();
+    expect(showFeedbackToastMock).toHaveBeenCalledWith(expect.objectContaining({ tone: "success" }));
+  });
+
+  it("keeps dashboard photo upload loading local while the upload is pending", async () => {
+    const upload = createDeferred();
+    apiMocks.uploadEmployeePhotoMock.mockReturnValue(upload.promise);
+
+    const wrapper = await mountEmployeeAdmin();
+    await settle();
+
+    const uploadPromise = (wrapper.vm as any).submitDashboardPhoto(
+      new File(["photo-bytes"], "pending.png", { type: "image/png" }),
+    );
+    await settle();
+
+    expect(wrapper.find('[data-testid="employee-dashboard-photo-uploading"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-tab-panel-dashboard"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="employee-loading-overlay"]').attributes("data-busy")).toBe("false");
+
+    upload.resolve();
+    await uploadPromise;
+    await settle();
+
+    expect(wrapper.find('[data-testid="employee-dashboard-photo-uploading"]').exists()).toBe(false);
   });
 
   it("shows an empty dialog state without stale result rows", async () => {
@@ -707,6 +913,11 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(apiMocks.listEmployeesMock).toHaveBeenCalledWith("tenant-1", "token-1", expect.any(Object));
     expect(apiMocks.getEmployeeMock).toHaveBeenCalledWith("tenant-1", "employee-markus", "token-1");
     expect(wrapper.get('[data-testid="employee-detail-workspace"]').text()).toContain("Markus Neumann");
+    expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).toMatch(/Dashboard[\s\S]*Overview/);
+    expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).not.toContain("Profile photo");
+    expect(wrapper.get('[data-testid="employee-tab-dashboard"]').classes()).toContain("active");
+    expect(wrapper.get('[data-testid="employee-dashboard-hero"]').text()).toContain("Markus Neumann");
+    expect(wrapper.find('[data-testid="employee-dashboard-calendar"]').exists()).toBe(true);
 
     await wrapper.get('[data-testid="employee-list-tab-import-export"]').trigger("click");
     await clickButtonByText(wrapper, "Export employees");
@@ -729,6 +940,7 @@ describe("EmployeeAdminView search dialog regression", () => {
     await clickButtonByText(wrapper, "Create employee file");
     await settle();
     expect(wrapper.get('[data-testid="employee-detail-workspace"]').text()).toContain("Create employee");
+    expect(wrapper.find('[data-testid="employee-tab-dashboard"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="employee-tab-overview"]').classes()).toContain("active");
   });
 });

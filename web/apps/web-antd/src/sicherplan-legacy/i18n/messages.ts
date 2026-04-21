@@ -505,6 +505,7 @@ export type MessageKey =
   | "employeeAdmin.detail.emptyTitle"
   | "employeeAdmin.detail.emptyEyebrow"
   | "employeeAdmin.detail.emptyBody"
+  | "employeeAdmin.tabs.dashboard"
   | "employeeAdmin.tabs.overview"
   | "employeeAdmin.tabs.appAccess"
   | "employeeAdmin.tabs.profilePhoto"
@@ -517,6 +518,31 @@ export type MessageKey =
   | "employeeAdmin.tabs.groups"
   | "employeeAdmin.tabs.addresses"
   | "employeeAdmin.tabs.documents"
+  | "employeeAdmin.dashboard.identityEyebrow"
+  | "employeeAdmin.dashboard.projectsEyebrow"
+  | "employeeAdmin.dashboard.projectsTitle"
+  | "employeeAdmin.dashboard.projectsEmpty"
+  | "employeeAdmin.dashboard.noStaffingAccess"
+  | "employeeAdmin.dashboard.loadError"
+  | "employeeAdmin.dashboard.projectStatus.past"
+  | "employeeAdmin.dashboard.projectStatus.current"
+  | "employeeAdmin.dashboard.projectStatus.future"
+  | "employeeAdmin.dashboard.projectShiftCount"
+  | "employeeAdmin.dashboard.calendarTitle"
+  | "employeeAdmin.dashboard.calendarDescription"
+  | "employeeAdmin.dashboard.calendarMonthHint"
+  | "employeeAdmin.dashboard.calendarPrevious"
+  | "employeeAdmin.dashboard.calendarNext"
+  | "employeeAdmin.dashboard.calendarMore"
+  | "employeeAdmin.dashboard.calendarOrderShort"
+  | "employeeAdmin.dashboard.calendarShiftShort"
+  | "employeeAdmin.dashboard.calendarSummary.shifts"
+  | "employeeAdmin.dashboard.calendarSummary.orders"
+  | "employeeAdmin.dashboard.calendarSummary.projects"
+  | "employeeAdmin.dashboard.photo.add"
+  | "employeeAdmin.dashboard.photo.change"
+  | "employeeAdmin.dashboard.photo.uploading"
+  | "employeeAdmin.dashboard.photo.alt"
   | "employeeAdmin.form.eyebrow"
   | "employeeAdmin.form.title"
   | "employeeAdmin.form.lead"
@@ -2441,6 +2467,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.detail.emptyEyebrow": "Detailansicht",
     "employeeAdmin.detail.emptyBody":
       "Suchen Sie eine Mitarbeiterakte über die Liste oder legen Sie eine neue an.",
+    "employeeAdmin.tabs.dashboard": "Dashboard",
     "employeeAdmin.tabs.overview": "Überblick",
     "employeeAdmin.tabs.appAccess": "App-Zugang",
     "employeeAdmin.tabs.profilePhoto": "Profilfoto",
@@ -2453,6 +2480,31 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.tabs.groups": "Gruppen",
     "employeeAdmin.tabs.addresses": "Adressen",
     "employeeAdmin.tabs.documents": "Dateien",
+    "employeeAdmin.dashboard.identityEyebrow": "Mitarbeiter-Dashboard",
+    "employeeAdmin.dashboard.projectsEyebrow": "Einsatzkontexte",
+    "employeeAdmin.dashboard.projectsTitle": "Vergangene, aktuelle und kommende Projekte",
+    "employeeAdmin.dashboard.projectsEmpty": "Keine Einsätze im Dashboard-Zeitraum gefunden.",
+    "employeeAdmin.dashboard.noStaffingAccess": "Keine Berechtigung für Einsatzplanung.",
+    "employeeAdmin.dashboard.loadError": "Dashboard-Daten konnten nicht geladen werden.",
+    "employeeAdmin.dashboard.projectStatus.past": "Vergangen",
+    "employeeAdmin.dashboard.projectStatus.current": "Aktuell",
+    "employeeAdmin.dashboard.projectStatus.future": "Geplant",
+    "employeeAdmin.dashboard.projectShiftCount": "Schichten",
+    "employeeAdmin.dashboard.calendarTitle": "Mitarbeiter-Kalender",
+    "employeeAdmin.dashboard.calendarDescription": "Nur Schichten, denen dieser Mitarbeiter zugewiesen ist.",
+    "employeeAdmin.dashboard.calendarMonthHint": "Monatsansicht mit lokalen Ladezuständen.",
+    "employeeAdmin.dashboard.calendarPrevious": "Zurück",
+    "employeeAdmin.dashboard.calendarNext": "Weiter",
+    "employeeAdmin.dashboard.calendarMore": "weitere",
+    "employeeAdmin.dashboard.calendarOrderShort": "Auftr.",
+    "employeeAdmin.dashboard.calendarShiftShort": "Sch.",
+    "employeeAdmin.dashboard.calendarSummary.shifts": "Schichten",
+    "employeeAdmin.dashboard.calendarSummary.orders": "Aufträge",
+    "employeeAdmin.dashboard.calendarSummary.projects": "Projekte",
+    "employeeAdmin.dashboard.photo.add": "Foto hinzufügen",
+    "employeeAdmin.dashboard.photo.change": "Foto ändern",
+    "employeeAdmin.dashboard.photo.uploading": "Foto wird hochgeladen...",
+    "employeeAdmin.dashboard.photo.alt": "Mitarbeiterfoto",
     "employeeAdmin.form.eyebrow": "Datei",
     "employeeAdmin.form.title": "Strukturierte Mitarbeiterakte",
     "employeeAdmin.form.lead":
@@ -4569,6 +4621,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.detail.emptyEyebrow": "Detail view",
     "employeeAdmin.detail.emptyBody":
       "Search for an employee file from the list panel or create a new one.",
+    "employeeAdmin.tabs.dashboard": "Dashboard",
     "employeeAdmin.tabs.overview": "Overview",
     "employeeAdmin.tabs.appAccess": "App access",
     "employeeAdmin.tabs.profilePhoto": "Profile photo",
@@ -4581,6 +4634,31 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.tabs.groups": "Groups",
     "employeeAdmin.tabs.addresses": "Addresses",
     "employeeAdmin.tabs.documents": "Documents",
+    "employeeAdmin.dashboard.identityEyebrow": "Employee dashboard",
+    "employeeAdmin.dashboard.projectsEyebrow": "Assignment contexts",
+    "employeeAdmin.dashboard.projectsTitle": "Past, current, and future projects",
+    "employeeAdmin.dashboard.projectsEmpty": "No assignments found in the dashboard window.",
+    "employeeAdmin.dashboard.noStaffingAccess": "No staffing access.",
+    "employeeAdmin.dashboard.loadError": "Dashboard data could not be loaded.",
+    "employeeAdmin.dashboard.projectStatus.past": "Past",
+    "employeeAdmin.dashboard.projectStatus.current": "Current",
+    "employeeAdmin.dashboard.projectStatus.future": "Future",
+    "employeeAdmin.dashboard.projectShiftCount": "shifts",
+    "employeeAdmin.dashboard.calendarTitle": "Employee calendar",
+    "employeeAdmin.dashboard.calendarDescription": "Only shifts assigned to this employee.",
+    "employeeAdmin.dashboard.calendarMonthHint": "Month view with local loading state.",
+    "employeeAdmin.dashboard.calendarPrevious": "Previous",
+    "employeeAdmin.dashboard.calendarNext": "Next",
+    "employeeAdmin.dashboard.calendarMore": "more",
+    "employeeAdmin.dashboard.calendarOrderShort": "ord.",
+    "employeeAdmin.dashboard.calendarShiftShort": "sh.",
+    "employeeAdmin.dashboard.calendarSummary.shifts": "Shifts",
+    "employeeAdmin.dashboard.calendarSummary.orders": "Orders",
+    "employeeAdmin.dashboard.calendarSummary.projects": "Projects",
+    "employeeAdmin.dashboard.photo.add": "Add photo",
+    "employeeAdmin.dashboard.photo.change": "Change photo",
+    "employeeAdmin.dashboard.photo.uploading": "Uploading photo...",
+    "employeeAdmin.dashboard.photo.alt": "Employee photo",
     "employeeAdmin.form.eyebrow": "File",
     "employeeAdmin.form.title": "Structured employee file",
     "employeeAdmin.form.lead":
