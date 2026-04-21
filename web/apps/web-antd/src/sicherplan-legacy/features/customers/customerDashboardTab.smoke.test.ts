@@ -52,7 +52,7 @@ const DashboardCalendarPanelStub = defineComponent({
   },
   emits: ["shift-calendar", "toggle-day"],
   template:
-    '<div class="dashboard-calendar-panel-stub">{{ title }}|month={{ monthLabel }}|{{ cells.length }}|{{ summary.map((item) => item.label).join(\',\') }}|loading={{ loading ? loadingLabel : \'idle\' }}<button class="calendar-next" @click="$emit(\'shift-calendar\', \'next\')" /><button class="calendar-prev" @click="$emit(\'shift-calendar\', \'prev\')" /></div>',
+    '<div class="dashboard-calendar-panel-stub sp-dashboard__calendar-card">{{ title }}|month={{ monthLabel }}|{{ cells.length }}|{{ summary.map((item) => `${item.label}:${item.value}`).join(\',\') }}|loading={{ loading ? loadingLabel : \'idle\' }}<strong class="calendar-month-label">{{ monthLabel }}</strong><button class="calendar-prev" @click="$emit(\'shift-calendar\', \'prev\')">Previous</button><button class="calendar-next" @click="$emit(\'shift-calendar\', \'next\')">Next</button><span v-if="loading" data-testid="customer-dashboard-calendar-loading-indicator" role="status" aria-live="polite">{{ loadingLabel }}</span><div class="sp-dashboard__calendar-grid" /></div>',
 });
 
 const baseCustomer = {
@@ -116,6 +116,36 @@ function createDeferred<T>() {
     reject = rej;
   });
   return { promise, resolve, reject };
+}
+
+function createRejectableThenable<T>() {
+  const rejectionHandlers: Array<(reason: unknown) => unknown> = [];
+  const finallyHandlers: Array<() => void> = [];
+  const thenable = {
+    catch(onRejected?: (reason: unknown) => unknown) {
+      if (onRejected) {
+        rejectionHandlers.push(onRejected);
+      }
+      return thenable;
+    },
+    finally(onFinally?: () => void) {
+      if (onFinally) {
+        finallyHandlers.push(onFinally);
+      }
+      return thenable;
+    },
+    reject(reason: unknown) {
+      finallyHandlers.forEach((handler) => handler());
+      rejectionHandlers.forEach((handler) => handler(reason));
+    },
+    then(_onResolved?: (value: T) => unknown, onRejected?: (reason: unknown) => unknown) {
+      if (onRejected) {
+        rejectionHandlers.push(onRejected);
+      }
+      return thenable;
+    },
+  };
+  return thenable;
 }
 
 function mountComponent(props: Record<string, unknown> = {}) {
@@ -464,13 +494,20 @@ describe("CustomerDashboardTab", () => {
 
     expect(wrapper.find(".dashboard-calendar-panel-stub").exists()).toBe(true);
     expect(nextMonthLabel).not.toBe(initialMonthLabel);
-    expect(wrapper.get(".dashboard-calendar-panel-stub").text()).toContain("loading=workspace.loading.processing");
+    expect(wrapper.get('[data-testid="customer-dashboard-calendar-loading-indicator"]').text()).toBe(
+      "workspace.loading.processing",
+    );
+    expect(wrapper.find(".sp-dashboard__calendar-grid").exists()).toBe(true);
+    expect(wrapper.find(".sicherplan-loading-overlay").exists()).toBe(false);
+    expect(wrapper.find(".sp-dashboard__calendar-card").classes()).not.toContain("is-loading");
+    expect(wrapper.find(".sp-dashboard__calendar-card").classes()).not.toContain("is-dimmed");
     expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading"]').exists()).toBe(false);
 
     secondRequest.resolve([buildCoverageRow({ shift_id: "shift-2", order_id: "order-2" })]);
     await flushPromises();
 
     expect(wrapper.get(".dashboard-calendar-panel-stub").text()).toContain("loading=idle");
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(false);
   });
 
   it("does not replace the calendar panel or accept stale data after quick next-previous navigation", async () => {
@@ -507,6 +544,7 @@ describe("CustomerDashboardTab", () => {
 
     expect(wrapper.find(".dashboard-calendar-panel-stub").exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading"]').exists()).toBe(false);
+    expect(wrapper.find(".sicherplan-loading-overlay").exists()).toBe(false);
     expect(wrapper.getComponent(DashboardCalendarPanelStub).props("monthLabel")).toBe(initialMonthLabel);
 
     nextMonthRequest.resolve([nextMonthRow]);
@@ -519,31 +557,27 @@ describe("CustomerDashboardTab", () => {
   });
 
   it("shows the calendar API error state when coverage loading fails", async () => {
-    const rejectedRequest = {
-      catch(onRejected?: (reason: unknown) => unknown) {
-        onRejected?.(new Error("boom"));
-        return rejectedRequest;
-      },
-      finally(onFinally?: () => void) {
-        onFinally?.();
-        return rejectedRequest;
-      },
-      then(_onResolved?: (value: Array<ReturnType<typeof buildCoverageRow>>) => unknown, onRejected?: (reason: unknown) => unknown) {
-        if (onRejected) {
-          onRejected(new Error("boom"));
-        }
-        return rejectedRequest;
-      },
-    };
-    planningStaffingMocks.listStaffingCoverageMock.mockImplementationOnce(() => rejectedRequest as never);
+    const initialRow = buildCoverageRow();
+    const failingRequest = createRejectableThenable<Array<ReturnType<typeof buildCoverageRow>>>();
+    planningStaffingMocks.listStaffingCoverageMock
+      .mockResolvedValueOnce([initialRow])
+      .mockImplementationOnce(() => failingRequest as never);
 
     const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get(".calendar-next").trigger("click");
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(true);
+    expect(wrapper.find(".sp-dashboard__calendar-grid").exists()).toBe(true);
+
+    failingRequest.reject(new Error("boom"));
     await flushPromises();
     await flushPromises();
 
     expect(wrapper.get('[data-testid="customer-dashboard-calendar-error"]').text()).toContain(
       "customerAdmin.dashboard.calendarLoadError",
     );
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(false);
     expect(wrapper.find(".dashboard-calendar-panel-stub").exists()).toBe(false);
     expect(wrapper.text()).not.toContain("customerAdmin.dashboard.calendarEmptyTitle");
   });

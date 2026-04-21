@@ -37,6 +37,10 @@
     "stepContentBody": "Der inhaltliche Editor für diesen Schritt wird in den nächsten Epics angeschlossen. Der Shell-Kontext, die Navigation und die Weitergabe der IDs bleiben hier bereits stabil.",
     "loadingTitle": "Kundenkontext wird geladen",
     "loadingBody": "Der ausgewählte Kunde wird für den Plan-Wizard vorbereitet.",
+    "loading": {
+      "referenceData": "Optionen werden geladen...",
+      "savedData": "Gespeicherte Daten werden geladen..."
+    },
     "missingCustomerTitle": "Kunde fehlt",
     "missingCustomerBody": "Öffnen Sie den Wizard aus Kunde > Pläne oder übergeben Sie eine gültige customer_id.",
     "unknownCustomerTitle": "Kunde nicht gefunden",
@@ -656,6 +660,7 @@
       "coverageSetupRequired": "Abdeckung Setup erforderlich",
       "itemTypeOrder": "Auftrag",
       "itemTypeShift": "Schicht",
+      "loadError": "Die Staffing-Abdeckung für den Planungskalender konnte nicht geladen werden.",
       "more": "mehr",
       "shiftShort": "Schicht",
       "orderShort": "Auftrag"

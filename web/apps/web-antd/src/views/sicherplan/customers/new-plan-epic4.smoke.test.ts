@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
-import { defineComponent } from 'vue';
+import { defineComponent, nextTick } from 'vue';
 
 import CustomerNewPlanStepContent from './new-plan-step-content.vue';
 import { buildWizardDraftStorageKey } from './new-plan-wizard-drafts';
@@ -44,6 +44,7 @@ const apiMocks = vi.hoisted(() => ({
   getShiftSeriesMock: vi.fn(),
   getShiftTemplateMock: vi.fn(),
   linkPlanningRecordAttachmentMock: vi.fn(),
+  listCustomerOrdersMock: vi.fn(),
   listOrderAttachmentsMock: vi.fn(),
   listOrderEquipmentLinesMock: vi.fn(),
   listOrderRequirementLinesMock: vi.fn(),
@@ -98,6 +99,7 @@ vi.mock('#/sicherplan-legacy/api/planningOrders', () => ({
   getPlanningRecord: apiMocks.getPlanningRecordMock,
   linkPlanningRecordAttachment: apiMocks.linkPlanningRecordAttachmentMock,
   linkOrderAttachment: vi.fn(),
+  listCustomerOrders: apiMocks.listCustomerOrdersMock,
   listOrderAttachments: apiMocks.listOrderAttachmentsMock,
   listOrderEquipmentLines: apiMocks.listOrderEquipmentLinesMock,
   listOrderRequirementLines: apiMocks.listOrderRequirementLinesMock,
@@ -298,6 +300,23 @@ function seriesWeekdayChip(wrapper: ReturnType<typeof mount>, weekdayId: (typeof
   return wrapper.get(`[data-testid="customer-new-plan-series-weekday-chip-${weekdayId}"]`);
 }
 
+function deferred<T>() {
+  let reject!: (reason?: unknown) => void;
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, reject, resolve };
+}
+
+async function settleLoadingRender() {
+  for (let index = 0; index < 6; index += 1) {
+    await Promise.resolve();
+    await nextTick();
+  }
+}
+
 function baseWizardState(): CustomerNewPlanWizardState {
   return {
     current_step: 'planning-record-overview',
@@ -386,6 +405,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.getShiftSeriesMock.mockReset();
     apiMocks.getShiftTemplateMock.mockReset();
     apiMocks.linkPlanningRecordAttachmentMock.mockReset();
+    apiMocks.listCustomerOrdersMock.mockReset();
     apiMocks.listOrderAttachmentsMock.mockReset();
     apiMocks.listOrderEquipmentLinesMock.mockReset();
     apiMocks.listOrderRequirementLinesMock.mockReset();
@@ -404,6 +424,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.updateShiftSeriesMock.mockReset();
 
     apiMocks.getCustomerOrderMock.mockResolvedValue(buildOrder());
+    apiMocks.listCustomerOrdersMock.mockResolvedValue([buildOrder()]);
     apiMocks.listOrderEquipmentLinesMock.mockResolvedValue([]);
     apiMocks.listOrderRequirementLinesMock.mockResolvedValue([]);
     apiMocks.listOrderAttachmentsMock.mockResolvedValue([]);
@@ -466,6 +487,257 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       status: 'active',
       version_no: 1,
     });
+  });
+
+  it('keeps the step shell visible while order details load locally', async () => {
+    const orders = deferred<any[]>();
+    apiMocks.listCustomerOrdersMock.mockReturnValueOnce(orders.promise);
+
+    const wrapper = mountStep('order-details', {
+      current_step: 'order-details',
+      order_id: 'order-1',
+    });
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-order-details"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-mode-existing-label"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-existing-order-list"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-loading"]').exists()).toBe(true);
+    expect(wrapper.find('.ant-spin').exists()).toBe(false);
+
+    orders.resolve([buildOrder({ title: 'Werk Nord geladen' })]);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-order-loading"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-existing-order-row"]').text()).toContain('Werk Nord geladen');
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-order-details"]').exists()).toBe(true);
+  });
+
+  it('shows a local equipment-lines indicator without replacing the editor', async () => {
+    const equipmentLines = deferred<any[]>();
+    apiMocks.listOrderEquipmentLinesMock.mockReturnValueOnce(equipmentLines.promise);
+
+    const wrapper = mountStep('equipment-lines', { current_step: 'equipment-lines' });
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-equipment-lines"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-item"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-lines-loading"]').exists()).toBe(true);
+
+    equipmentLines.resolve([{ id: 'equipment-line-1', equipment_item_id: 'equipment-1', required_qty: 3, notes: null }]);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-lines-loading"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('3');
+  });
+
+  it('shows a local requirement-lines indicator without replacing the editor', async () => {
+    const requirementLines = deferred<any[]>();
+    apiMocks.listOrderRequirementLinesMock.mockReturnValueOnce(requirementLines.promise);
+
+    const wrapper = mountStep('requirement-lines', { current_step: 'requirement-lines' });
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-requirement-lines"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-type"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-lines-loading"]').exists()).toBe(true);
+
+    requirementLines.resolve([{ id: 'requirement-line-1', requirement_type_id: 'requirement-type-1', function_type_id: null, qualification_type_id: null, min_qty: 1, target_qty: 2, notes: null }]);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-lines-loading"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('1 / 2');
+  });
+
+  it('shows local order-document loading and then renders loaded documents', async () => {
+    const attachments = deferred<any[]>();
+    apiMocks.listOrderAttachmentsMock.mockReturnValueOnce(attachments.promise);
+
+    const wrapper = mountStep('order-documents', { current_step: 'order-documents' });
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-order-documents"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-document-upload-title"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-documents-loading"]').exists()).toBe(true);
+
+    attachments.resolve([{ id: 'doc-1', tenant_id: 'tenant-1', title: 'Dienstanweisung', current_version_no: 1, status: 'active' }]);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-order-documents-loading"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-order-document-list"]').text()).toContain('Dienstanweisung');
+  });
+
+  it('shows planning-record list and detail loading locally', async () => {
+    const records = deferred<any[]>();
+    const detail = deferred<any>();
+    apiMocks.listPlanningRecordsMock.mockReturnValueOnce(records.promise);
+    apiMocks.getPlanningRecordMock.mockReturnValueOnce(detail.promise);
+
+    const wrapper = mountStep('planning-record-overview', {
+      current_step: 'planning-record-overview',
+      planning_record_id: 'record-1',
+    });
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-planning-record-overview"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-loading"]').exists()).toBe(true);
+
+    records.resolve([{ id: 'record-1', name: 'Werk Nord Sommer', planning_from: '2026-06-01', planning_to: '2026-06-10' }]);
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-detail-loading"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-details"]').exists()).toBe(true);
+
+    detail.resolve(buildPlanningRecord({ name: 'Detail geladen' }));
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-loading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-detail-loading"]').exists()).toBe(false);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe('Detail geladen');
+  });
+
+  it('shows planning-document loading locally', async () => {
+    const attachments = deferred<any[]>();
+    apiMocks.listPlanningRecordAttachmentsMock.mockReturnValueOnce(attachments.promise);
+
+    const wrapper = mountStep('planning-record-documents', {
+      current_step: 'planning-record-documents',
+      planning_record_id: 'record-1',
+    });
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-planning-record-documents"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-document-title"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-documents-loading"]').exists()).toBe(true);
+
+    attachments.resolve([{ id: 'planning-doc-1', tenant_id: 'tenant-1', title: 'Wachbuch', current_version_no: 1, status: 'active' }]);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-documents-loading"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Wachbuch');
+  });
+
+  it('shows shift-plan list and detail loading locally', async () => {
+    const plans = deferred<any[]>();
+    const detail = deferred<any>();
+    apiMocks.listShiftPlansMock.mockReturnValueOnce(plans.promise);
+    apiMocks.getShiftPlanMock.mockReturnValueOnce(detail.promise);
+
+    const wrapper = mountStep('shift-plan', {
+      current_step: 'shift-plan',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+    });
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-shift-plan"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-shift-plan-loading"]').exists()).toBe(true);
+
+    plans.resolve([{ id: 'plan-1', name: 'Werk Nord / Plan', planning_from: '2026-06-01', planning_to: '2026-06-10' }]);
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-shift-plan-detail-loading"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-shift-plan-name"]').exists()).toBe(true);
+
+    detail.resolve(buildShiftPlan({ name: 'Schichtplan geladen' }));
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-shift-plan-loading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-shift-plan-detail-loading"]').exists()).toBe(false);
+    expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').element as HTMLInputElement).value).toBe('Schichtplan geladen');
+  });
+
+  it('shows series and exceptions loading locally', async () => {
+    const seriesRows = deferred<any[]>();
+    apiMocks.listShiftSeriesMock.mockReturnValueOnce(seriesRows.promise);
+
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+    });
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-series-exceptions"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-series-loading"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-series-label"]').exists()).toBe(true);
+
+    seriesRows.resolve([buildSeries({ label: 'Tagdienst geladen' })]);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-series-loading"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Tagdienst geladen');
+  });
+
+  it('keeps dirty equipment drafts visible while saved data reloads', async () => {
+    const wrapper = mountStep('equipment-lines', { current_step: 'equipment-lines' });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-equipment-required-qty"]').setValue(7);
+    const reload = deferred<any[]>();
+    apiMocks.listOrderEquipmentLinesMock.mockReturnValueOnce(reload.promise);
+
+    void (wrapper.vm as any).$?.setupState.loadOrderState();
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-lines-loading"]').exists()).toBe(true);
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-required-qty"]').element as HTMLInputElement).value).toBe('7');
+
+    reload.resolve([]);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-lines-loading"]').exists()).toBe(false);
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-required-qty"]').element as HTMLInputElement).value).toBe('7');
+  });
+
+  it('keeps stale order-list requests from hiding newer loading or overwriting current data', async () => {
+    const wrapper = mountStep('order-details', { current_step: 'order-details' });
+    await flushPromises();
+    apiMocks.listCustomerOrdersMock.mockReset();
+    const first = deferred<any[]>();
+    const second = deferred<any[]>();
+    apiMocks.listCustomerOrdersMock
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+
+    let firstCurrent = true;
+    const setupState = (wrapper.vm as any).$?.setupState;
+    void setupState.loadCustomerOrderRows(() => firstCurrent);
+    await settleLoadingRender();
+    expect(wrapper.find('[data-testid="customer-new-plan-order-loading"]').exists()).toBe(true);
+
+    void setupState.loadCustomerOrderRows(() => true);
+    await settleLoadingRender();
+    expect(wrapper.find('[data-testid="customer-new-plan-order-loading"]').exists()).toBe(true);
+
+    second.resolve([buildOrder({ id: 'order-latest', order_no: 'ORD-LATEST', title: 'Latest order' })]);
+    await flushPromises();
+    expect(wrapper.find('[data-testid="customer-new-plan-order-loading"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-existing-order-list"]').text()).toContain('Latest order');
+
+    firstCurrent = false;
+    first.resolve([buildOrder({ id: 'order-stale', order_no: 'ORD-STALE', title: 'Stale order' })]);
+    await flushPromises();
+    expect(wrapper.get('[data-testid="customer-new-plan-existing-order-list"]').text()).toContain('Latest order');
+    expect(wrapper.get('[data-testid="customer-new-plan-existing-order-list"]').text()).not.toContain('Stale order');
+  });
+
+  it('renders loader failures as local errors without replacing the step shell', async () => {
+    const failure = deferred<any[]>();
+    apiMocks.listPlanningRecordsMock.mockReturnValueOnce(failure.promise);
+
+    const wrapper = mountStep('planning-record-overview', {
+      current_step: 'planning-record-overview',
+      planning_record_id: '',
+    });
+    await settleLoadingRender();
+    failure.reject(new Error('network failed'));
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-planning-record-overview"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-existing-planning-records"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.planningRecordLoad');
+    expect(routerReplaceMock).not.toHaveBeenCalled();
   });
 
   it('renders a planning context selector instead of a dead-end when planning context is missing', async () => {

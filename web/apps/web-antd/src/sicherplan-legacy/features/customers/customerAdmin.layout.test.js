@@ -162,7 +162,7 @@ test("existing customers default to dashboard while create mode stays on overvie
 
 test("dashboard quick actions reuse existing tab and create handlers", () => {
   assert.match(source, /function handleDashboardCreateContact\(\) \{/);
-  assert.match(source, /activeDetailTab\.value = "contacts"/);
+  assert.match(source, /selectCustomerDetailTab\("contacts"\)/);
   assert.match(source, /startCreateContact\(\);/);
   assert.match(source, /function handleDashboardCreateInvoiceParty\(\) \{/);
   assert.match(source, /activeDetailTab\.value = "commercial"/);
@@ -174,14 +174,21 @@ test("dashboard quick actions reuse existing tab and create handlers", () => {
   assert.match(source, /:access-token="accessToken"/);
 });
 
-test("plans tab is inserted after portal and before history with planning-record permission gating", () => {
+test("plans tab is inserted after contacts access and before history with planning-record permission gating", () => {
   assert.match(source, /const canReadPlans = computed\(\(\) => hasPlanningOrderPermission\(authStore\.activeRole, "planning\.record\.read"\)\)/);
   assert.match(source, /const canStartCustomerPlanWizard = computed\(\(\) => authStore\.effectiveRole === "tenant_admin"\)/);
   assert.match(source, /buildCustomerDetailTabs\(\{[\s\S]*canReadCommercial: canReadCommercial\.value,[\s\S]*canReadPlans: canReadPlans\.value,/);
-  assert.match(source, /portal:\s*"customerAdmin\.tabs\.portal",[\s\S]*plans:\s*"customerAdmin\.tabs\.plans",[\s\S]*history:\s*"customerAdmin\.tabs\.history"/);
+  assert.match(source, /contact_access:\s*"customerAdmin\.tabs\.contactAccess",[\s\S]*plans:\s*"customerAdmin\.tabs\.plans",[\s\S]*history:\s*"customerAdmin\.tabs\.history"/);
   assert.match(source, /:can-start-new-plan="canStartCustomerPlanWizard"/);
   assert.match(source, /@start-new-plan="handleStartCustomerNewPlan"/);
   assert.match(source, /name: "SicherPlanCustomerNewPlan",[\s\S]*customer_id: selectedCustomer\.value\.id/);
+});
+
+test("customer detail navigation splits primary tabs from secondary link-style tabs", () => {
+  assert.match(source, /class="customer-admin-tabs customer-admin-tabs--split"/);
+  assert.match(source, /customer-admin-tabs__primary[\s\S]*v-for="tab in primaryCustomerDetailTabs"[\s\S]*class="customer-admin-tab"[\s\S]*@click="selectCustomerDetailTab\(tab\.id\)"/);
+  assert.match(source, /customer-admin-tabs__secondary[\s\S]*v-for="tab in secondaryCustomerDetailTabs"[\s\S]*class="customer-admin-tab-link"[\s\S]*:aria-current="tab\.id === activeDetailTab \? 'page' : undefined"[\s\S]*@click="selectCustomerDetailTab\(tab\.id\)"/);
+  assert.match(source, /const secondaryCustomerDetailTabIds = new Set\(\["history", "employee_blocks"\]\)/);
 });
 
 test("create-mode cancel restores the selected customer through the dashboard default path", () => {
@@ -340,12 +347,28 @@ test("customer-facing dropdowns use label-only option formatting", () => {
 });
 
 test("non-overview customer tabs reuse the structured section pattern", () => {
+  assert.match(source, /customer-tab-panel-contact-access[\s\S]*customer-tab-panel-contacts[\s\S]*customer-tab-panel-addresses[\s\S]*customer-tab-panel-portal/);
+  assert.match(source, /class="customer-admin-section customer-admin-section--contact-access customer-admin-contact-access"/);
+  assert.match(source, /class="customer-admin-contact-access-card customer-admin-contact-access-card--contacts"[\s\S]*data-testid="customer-contact-access-card-contacts"[\s\S]*customer-tab-panel-contacts/);
+  assert.match(source, /class="customer-admin-contact-access-card customer-admin-contact-access-card--addresses"[\s\S]*data-testid="customer-contact-access-card-addresses"[\s\S]*customer-tab-panel-addresses/);
+  assert.match(source, /class="customer-admin-contact-access-card customer-admin-contact-access-card--portal"[\s\S]*data-testid="customer-contact-access-card-portal"[\s\S]*customer-tab-panel-portal/);
+  assert.match(source, /customer-contact-access-card-contacts[\s\S]*customerAdmin\.contactAccess\.contactsTitle[\s\S]*customerAdmin\.contactAccess\.contactsDescription[\s\S]*customer-tab-panel-contacts/);
+  assert.match(source, /customer-contact-access-card-addresses[\s\S]*customerAdmin\.contactAccess\.addressesTitle[\s\S]*customerAdmin\.contactAccess\.addressesDescription[\s\S]*customer-tab-panel-addresses/);
+  assert.match(source, /customer-contact-access-card-portal[\s\S]*customerAdmin\.contactAccess\.portalTitle[\s\S]*customerAdmin\.contactAccess\.portalDescription[\s\S]*customer-tab-panel-portal/);
   assert.match(source, /customer-tab-panel-contacts[\s\S]*customer-admin-form customer-admin-form--structured[\s\S]*customerAdmin\.contacts\.registerEyebrow[\s\S]*customerAdmin\.contacts\.editorEyebrow[\s\S]*customerAdmin\.fields\.notes/);
   assert.match(source, /customer-tab-panel-addresses[\s\S]*customerAdmin\.addresses\.registerEyebrow[\s\S]*customerAdmin\.addresses\.editorEyebrow/);
   assert.match(source, /customer-tab-panel-commercial[\s\S]*customer-admin-editor-intro[\s\S]*customer-commercial-panel-billing-profile/);
-  assert.match(source, /customer-tab-panel-portal[\s\S]*customerAdmin\.portal\.lead[\s\S]*customer-portal-access-section[\s\S]*customerAdmin\.portalAccess\.title[\s\S]*customerAdmin\.loginHistory\.title/);
+  assert.match(source, /customer-tab-panel-portal[\s\S]*customerAdmin\.privacy\.title[\s\S]*customer-portal-access-section[\s\S]*customerAdmin\.portalAccess\.title[\s\S]*customerAdmin\.loginHistory\.title/);
   assert.match(source, /customer-tab-panel-history[\s\S]*customerAdmin\.history\.registerEyebrow[\s\S]*customerAdmin\.history\.attachmentEyebrow/);
   assert.match(source, /customer-tab-panel-employee-blocks[\s\S]*customerAdmin\.employeeBlocks\.registerEyebrow[\s\S]*customerAdmin\.employeeBlocks\.editorEyebrow/);
+
+  const contactAccessStart = source.indexOf('data-testid="customer-tab-panel-contact-access"');
+  const commercialPanelStart = source.indexOf('data-testid="customer-tab-panel-commercial"');
+  const contactAccessSource = source.slice(contactAccessStart, commercialPanelStart);
+  assert.equal(contactAccessSource.includes("customer-admin-editor-intro"), false);
+  assert.equal(contactAccessSource.includes("customerAdmin.contacts.title"), false);
+  assert.equal(contactAccessSource.includes("customerAdmin.addresses.title"), false);
+  assert.equal(contactAccessSource.includes("customerAdmin.portal.title"), false);
 });
 
 test("billing-profile form surfaces inline validation summary and field-level error hooks", () => {

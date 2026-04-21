@@ -215,7 +215,7 @@ test("customer detail tabs default to overview-first and hide commercial without
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    ["dashboard", "overview", "contacts", "addresses", "portal", "plans", "history", "employee_blocks"],
+    ["dashboard", "overview", "contact_access", "plans", "history", "employee_blocks"],
   );
   assert.deepEqual(
     buildCustomerDetailTabs({
@@ -224,7 +224,16 @@ test("customer detail tabs default to overview-first and hide commercial without
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    ["dashboard", "overview", "contacts", "addresses", "commercial", "portal", "plans", "history", "employee_blocks"],
+    ["dashboard", "overview", "contact_access", "commercial", "plans", "history", "employee_blocks"],
+  );
+  assert.equal(
+    buildCustomerDetailTabs({
+      canReadCommercial: true,
+      canReadPlans: true,
+      hasSelectedCustomer: true,
+      isCreatingCustomer: false,
+    }).some((tabId) => ["contacts", "addresses", "portal"].includes(tabId)),
+    false,
   );
   assert.deepEqual(
     buildCustomerDetailTabs({
@@ -233,7 +242,7 @@ test("customer detail tabs default to overview-first and hide commercial without
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    ["dashboard", "overview", "contacts", "addresses", "commercial", "portal", "history", "employee_blocks"],
+    ["dashboard", "overview", "contact_access", "commercial", "history", "employee_blocks"],
   );
 });
 
@@ -283,6 +292,26 @@ test("customer detail tab state falls back to dashboard for existing customers a
     }),
     "dashboard",
   );
+  assert.equal(
+    normalizeCustomerDetailTab("contact_access", {
+      canReadCommercial: true,
+      canReadPlans: true,
+      hasSelectedCustomer: true,
+      isCreatingCustomer: false,
+    }),
+    "contact_access",
+  );
+  for (const legacyTabId of ["contacts", "addresses", "portal"]) {
+    assert.equal(
+      normalizeCustomerDetailTab(legacyTabId, {
+        canReadCommercial: true,
+        canReadPlans: true,
+        hasSelectedCustomer: true,
+        isCreatingCustomer: false,
+      }),
+      "contact_access",
+    );
+  }
   assert.equal(
     normalizeCustomerDetailTab("", {
       canReadCommercial: true,

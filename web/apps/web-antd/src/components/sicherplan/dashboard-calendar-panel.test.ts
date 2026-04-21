@@ -99,13 +99,26 @@ describe("DashboardCalendarPanel", () => {
     expect(pills[1]?.classes()).toContain("sp-dashboard__calendar-pill--teal");
   });
 
-  it("shows an inline loading indicator without hiding the calendar grid", () => {
+  it("shows and hides an inline loading indicator without hiding calendar controls or grid", async () => {
     const wrapper = mountComponent({
       loading: true,
-      loadingLabel: "Processing request",
+      loadingLabel: "Loading calendar data",
     });
 
-    expect(wrapper.get('[data-testid="dashboard-calendar-panel-loading"]').text()).toBe("Processing request");
+    const loadingIndicator = wrapper.get('[data-testid="customer-dashboard-calendar-loading-indicator"]');
+    expect(loadingIndicator.text()).toBe("Loading calendar data");
+    expect(loadingIndicator.attributes("role")).toBe("status");
+    expect(loadingIndicator.attributes("aria-live")).toBe("polite");
+    expect(loadingIndicator.find(".sp-dashboard__calendar-loading-dot").exists()).toBe(true);
+    expect(wrapper.text()).toContain("April 2026");
+    expect(wrapper.text()).toContain("prev");
+    expect(wrapper.text()).toContain("next");
     expect(wrapper.find(".sp-dashboard__calendar-grid").exists()).toBe(true);
+
+    await wrapper.setProps({ loading: false });
+
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(false);
+    expect(wrapper.find(".sp-dashboard__calendar-grid").exists()).toBe(true);
+    expect(wrapper.text()).toContain("April 2026");
   });
 });

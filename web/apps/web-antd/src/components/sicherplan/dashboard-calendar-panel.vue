@@ -89,9 +89,12 @@ function toggleDay(dateKey: string) {
         <p>{{ monthHint }}</p>
         <span
           v-if="loading && loadingLabel"
-          class="sp-dashboard__calendar-loading"
-          data-testid="dashboard-calendar-panel-loading"
+          aria-live="polite"
+          class="sp-dashboard__calendar-loading-indicator"
+          data-testid="customer-dashboard-calendar-loading-indicator"
+          role="status"
         >
+          <span aria-hidden="true" class="sp-dashboard__calendar-loading-dot" />
           {{ loadingLabel }}
         </span>
       </div>
@@ -211,12 +214,40 @@ function toggleDay(dateKey: string) {
   color: var(--sp-color-text-secondary);
 }
 
-.sp-dashboard__calendar-loading {
+.sp-dashboard__calendar-loading-indicator {
   display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: fit-content;
+  padding: 0.3rem 0.55rem;
   margin-top: 0.45rem;
-  color: var(--sp-color-text-secondary);
-  font-size: 0.78rem;
-  font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--sp-color-primary-strong) 22%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 70%, white);
+  color: var(--sp-color-primary-strong);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.sp-dashboard__calendar-loading-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: currentColor;
+  animation: sp-dashboard-calendar-loading-pulse 1s ease-in-out infinite;
+}
+
+@keyframes sp-dashboard-calendar-loading-pulse {
+  0%,
+  100% {
+    opacity: 0.38;
+    transform: scale(0.85);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .sp-dashboard__summary-chips {

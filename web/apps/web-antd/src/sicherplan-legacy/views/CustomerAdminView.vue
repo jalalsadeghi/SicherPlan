@@ -236,21 +236,37 @@
           <template v-if="hasDetailWorkspace">
           <nav
             v-if="customerDetailTabs.length"
-            class="customer-admin-tabs"
+            class="customer-admin-tabs customer-admin-tabs--split"
             aria-label="Customer detail sections"
             data-testid="customer-detail-tabs"
           >
-            <button
-              v-for="tab in customerDetailTabs"
-              :key="tab.id"
-              type="button"
-              class="customer-admin-tab"
-              :class="{ active: tab.id === activeDetailTab }"
-              :data-testid="`customer-tab-${tab.id}`"
-              @click="activeDetailTab = tab.id"
-            >
-              {{ tab.label }}
-            </button>
+            <div class="customer-admin-tabs__primary">
+              <button
+                v-for="tab in primaryCustomerDetailTabs"
+                :key="tab.id"
+                type="button"
+                class="customer-admin-tab"
+                :class="{ active: tab.id === activeDetailTab }"
+                :data-testid="`customer-tab-${tab.id}`"
+                @click="selectCustomerDetailTab(tab.id)"
+              >
+                {{ tab.label }}
+              </button>
+            </div>
+            <div class="customer-admin-tabs__secondary">
+              <button
+                v-for="tab in secondaryCustomerDetailTabs"
+                :key="tab.id"
+                type="button"
+                class="customer-admin-tab-link"
+                :class="{ active: tab.id === activeDetailTab }"
+                :aria-current="tab.id === activeDetailTab ? 'page' : undefined"
+                :data-testid="`customer-tab-${tab.id}`"
+                @click="selectCustomerDetailTab(tab.id)"
+              >
+                {{ tab.label }}
+              </button>
+            </div>
           </nav>
 
           <CustomerDashboardTab
@@ -267,7 +283,7 @@
             :tenant-id="tenantScopeId"
             @create-contact="handleDashboardCreateContact"
             @create-invoice-party="handleDashboardCreateInvoiceParty"
-            @select-tab="activeDetailTab = $event"
+            @select-tab="selectCustomerDetailTab"
           />
 
           <CustomerPlansTab
@@ -459,16 +475,22 @@
             </form>
           </section>
 
-          <section v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'contacts'" class="customer-admin-section" data-testid="customer-tab-panel-contacts">
+          <section
+            v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'contact_access'"
+            class="customer-admin-section customer-admin-section--contact-access customer-admin-contact-access"
+            data-testid="customer-tab-panel-contact-access"
+          >
+            <section
+              class="customer-admin-contact-access-card customer-admin-contact-access-card--contacts"
+              data-testid="customer-contact-access-card-contacts"
+            >
+              <header class="customer-admin-contact-access-card__header">
+                <p class="eyebrow">{{ t("customerAdmin.tabs.contactAccess") }}</p>
+                <h3>{{ t("customerAdmin.contactAccess.contactsTitle") }}</h3>
+                <p>{{ t("customerAdmin.contactAccess.contactsDescription") }}</p>
+              </header>
+              <section class="customer-admin-section" data-testid="customer-tab-panel-contacts">
             <div class="customer-admin-form customer-admin-form--structured">
-              <section class="customer-admin-editor-intro">
-                <div>
-                  <p class="eyebrow">{{ t("customerAdmin.contacts.eyebrow") }}</p>
-                  <h4>{{ t("customerAdmin.contacts.title") }}</h4>
-                </div>
-                <p class="field-help">{{ t("customerAdmin.contacts.lead") }}</p>
-              </section>
-
               <section class="customer-admin-form-section">
                 <div class="customer-admin-form-section__header">
                   <p class="eyebrow">{{ t("customerAdmin.contacts.registerEyebrow") }}</p>
@@ -564,17 +586,19 @@
               </form>
             </div>
           </section>
+            </section>
 
-          <section v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'addresses'" class="customer-admin-section" data-testid="customer-tab-panel-addresses">
+            <section
+              class="customer-admin-contact-access-card customer-admin-contact-access-card--addresses"
+              data-testid="customer-contact-access-card-addresses"
+            >
+              <header class="customer-admin-contact-access-card__header">
+                <p class="eyebrow">{{ t("customerAdmin.tabs.contactAccess") }}</p>
+                <h3>{{ t("customerAdmin.contactAccess.addressesTitle") }}</h3>
+                <p>{{ t("customerAdmin.contactAccess.addressesDescription") }}</p>
+              </header>
+              <section class="customer-admin-section" data-testid="customer-tab-panel-addresses">
             <div class="customer-admin-form customer-admin-form--structured">
-              <section class="customer-admin-editor-intro">
-                <div>
-                  <p class="eyebrow">{{ t("customerAdmin.addresses.eyebrow") }}</p>
-                  <h4>{{ t("customerAdmin.addresses.title") }}</h4>
-                </div>
-                <p class="field-help">{{ t("customerAdmin.addresses.lead") }}</p>
-              </section>
-
               <section class="customer-admin-form-section">
                 <div class="customer-admin-form-section__header">
                   <p class="eyebrow">{{ t("customerAdmin.addresses.registerEyebrow") }}</p>
@@ -732,6 +756,294 @@
                 </div>
               </section>
             </div>
+          </section>
+            </section>
+
+            <section
+              class="customer-admin-contact-access-card customer-admin-contact-access-card--portal"
+              data-testid="customer-contact-access-card-portal"
+            >
+              <header class="customer-admin-contact-access-card__header">
+                <p class="eyebrow">{{ t("customerAdmin.tabs.contactAccess") }}</p>
+                <h3>{{ t("customerAdmin.contactAccess.portalTitle") }}</h3>
+                <p>{{ t("customerAdmin.contactAccess.portalDescription") }}</p>
+              </header>
+              <section class="customer-admin-section" data-testid="customer-tab-panel-portal">
+            <div class="customer-admin-form customer-admin-form--structured">
+              <section class="customer-admin-form-section">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.privacy.eyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.privacy.title") }}</h4>
+                </div>
+                <div class="customer-admin-summary">
+                  <article class="customer-admin-summary__card">
+                    <span>{{ t("customerAdmin.fields.personNamesReleased") }}</span>
+                    <strong>
+                      {{
+                        portalPrivacy?.person_names_released
+                          ? t("customerAdmin.status.active")
+                          : t("customerAdmin.status.inactive")
+                      }}
+                    </strong>
+                  </article>
+                  <article class="customer-admin-summary__card">
+                    <span>{{ t("customerAdmin.privacy.lastReleasedAt") }}</span>
+                    <strong>{{ formatOptionalDateTime(portalPrivacy?.person_names_released_at) }}</strong>
+                  </article>
+                  <article class="customer-admin-summary__card">
+                    <span>{{ t("customerAdmin.privacy.lastReleasedBy") }}</span>
+                    <strong>{{ portalPrivacy?.person_names_released_by_user_id || t("customerAdmin.summary.none") }}</strong>
+                  </article>
+                </div>
+                <div class="customer-admin-checkbox-group">
+                  <label class="customer-admin-checkbox">
+                    <input v-model="portalPrivacyDraft.person_names_released" type="checkbox" :disabled="!canWrite" />
+                    <span>{{ t("customerAdmin.fields.personNamesReleased") }}</span>
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshPortalPrivacy">
+                    {{ t("customerAdmin.actions.refreshPortalPrivacy") }}
+                  </button>
+                  <button class="cta-button" type="button" :disabled="!canWrite || loading.portalPrivacy" @click="submitPortalPrivacy">
+                    {{ t("customerAdmin.actions.savePortalPrivacy") }}
+                  </button>
+                </div>
+              </section>
+
+              <section
+                v-if="canManagePortalAccess"
+                class="customer-admin-form-section"
+                data-testid="customer-portal-access-section"
+              >
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.portalAccess.eyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.portalAccess.title") }}</h4>
+                </div>
+                <p class="field-help">{{ t("customerAdmin.portalAccess.lead") }}</p>
+                <div
+                  v-if="portalAccessGeneratedPassword"
+                  class="customer-admin-feedback customer-admin-feedback--success"
+                  data-tone="success"
+                >
+                  <div>
+                    <strong>{{ t("customerAdmin.portalAccess.generatedPasswordTitle") }}</strong>
+                    <span>{{ portalAccessGeneratedPassword }}</span>
+                  </div>
+                  <button type="button" @click="portalAccessGeneratedPassword = ''">
+                    {{ t("customerAdmin.actions.clearFeedback") }}
+                  </button>
+                </div>
+                <div class="cta-row">
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    :disabled="!canManagePortalAccess"
+                    @click="refreshCustomerPortalAccess"
+                  >
+                    {{ t("customerAdmin.actions.refreshPortalAccess") }}
+                  </button>
+                  <button
+                    class="cta-button"
+                    type="button"
+                    :disabled="loading.portalAccess || !portalAccessAvailableContacts.length"
+                    @click="openPortalAccessCreateModal"
+                  >
+                    {{ t("customerAdmin.actions.createPortalAccess") }}
+                  </button>
+                </div>
+                <p v-if="!portalAccessAvailableContacts.length" class="customer-admin-list-empty">
+                  {{ t("customerAdmin.portalAccess.noContactsHint") }}
+                </p>
+                <div
+                  v-else-if="customerPortalAccessAccounts.length"
+                  class="customer-admin-record-list"
+                  data-testid="customer-portal-access-list"
+                >
+                  <article
+                    v-for="account in customerPortalAccessAccounts"
+                    :key="account.user_id"
+                    class="customer-admin-record customer-admin-record--stacked"
+                  >
+                    <div class="customer-admin-record__body">
+                      <strong>{{ account.contact_name }} · {{ account.username }}</strong>
+                      <span class="customer-admin-record__meta">
+                        {{ [account.email, formatOptionalDateTime(account.last_login_at)].filter(Boolean).join(" · ") }}
+                      </span>
+                    </div>
+                    <div class="customer-admin-record__actions">
+                      <StatusBadge :status="account.status" />
+                      <button
+                        class="cta-button cta-secondary"
+                        type="button"
+                        :disabled="loading.portalAccess"
+                        @click="openPortalAccessPasswordReset(account)"
+                      >
+                        {{ t("customerAdmin.actions.resetPortalAccessPassword") }}
+                      </button>
+                      <button
+                        v-if="account.status === 'active'"
+                        class="cta-button cta-secondary"
+                        type="button"
+                        :disabled="loading.portalAccess"
+                        @click="setCustomerPortalAccessStatus(account, 'inactive')"
+                      >
+                        {{ t("customerAdmin.actions.deactivatePortalAccess") }}
+                      </button>
+                      <button
+                        v-else
+                        class="cta-button cta-secondary"
+                        type="button"
+                        :disabled="loading.portalAccess"
+                        @click="setCustomerPortalAccessStatus(account, 'active')"
+                      >
+                        {{ t("customerAdmin.actions.activatePortalAccess") }}
+                      </button>
+                      <button
+                        class="cta-button cta-secondary"
+                        type="button"
+                        :disabled="loading.portalAccess"
+                        @click="unlinkCustomerPortalAccount(account)"
+                      >
+                        {{ t("customerAdmin.actions.unlinkPortalAccess") }}
+                      </button>
+                    </div>
+                  </article>
+                </div>
+                <p v-else class="customer-admin-list-empty">
+                  {{ t("customerAdmin.portalAccess.empty") }}
+                </p>
+              </section>
+
+              <section class="customer-admin-form-section">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.loginHistory.eyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.loginHistory.title") }}</h4>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshCustomerPortalLoginHistory">
+                    {{ t("customerAdmin.actions.refreshLoginHistory") }}
+                  </button>
+                </div>
+                <div v-if="customerPortalLoginHistory.length" class="customer-admin-record-list">
+                  <article
+                    v-for="entry in customerPortalLoginHistory"
+                    :key="entry.id"
+                    class="customer-admin-record customer-admin-record--stacked"
+                  >
+                    <div class="customer-admin-record__body">
+                      <strong>{{ entry.identifier }}</strong>
+                      <span class="customer-admin-record__meta">{{ formatLoginHistoryMeta(entry) }}</span>
+                    </div>
+                  </article>
+                </div>
+                <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.loginHistory.empty") }}</p>
+              </section>
+            </div>
+
+            <div
+              v-if="portalAccessModalOpen"
+              class="customer-admin-modal-backdrop"
+              data-testid="customer-portal-access-create-modal"
+            >
+              <section class="module-card customer-admin-modal">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.portalAccess.modalEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.portalAccess.modalTitle") }}</h4>
+                </div>
+                <p class="field-help">{{ selectedCustomer?.name }}</p>
+                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.portalAccess.contactLabel") }}</span>
+                    <select v-model="portalAccessDraft.contact_id">
+                      <option value="">{{ t("customerAdmin.portalAccess.contactPlaceholder") }}</option>
+                      <option
+                        v-for="contact in portalAccessAvailableContacts"
+                        :key="contact.id"
+                        :value="contact.id"
+                      >
+                        {{ contact.full_name }}{{ contact.email ? ` · ${contact.email}` : "" }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.fields.username") }}</span>
+                    <input v-model="portalAccessDraft.username" />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.fields.email") }}</span>
+                    <input v-model="portalAccessDraft.email" />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.fields.fullName") }}</span>
+                    <input v-model="portalAccessDraft.full_name" />
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.locale") }}</span>
+                    <select v-model="portalAccessDraft.locale">
+                      <option value="de">de</option>
+                      <option value="en">en</option>
+                    </select>
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.lifecycleStatus") }}</span>
+                    <select v-model="portalAccessDraft.status">
+                      <option value="active">{{ t("customerAdmin.status.active") }}</option>
+                      <option value="inactive">{{ t("customerAdmin.status.inactive") }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.temporaryPassword") }}</span>
+                    <input v-model="portalAccessDraft.temporary_password" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button class="cta-button" type="button" :disabled="loading.portalAccess" @click="submitCustomerPortalAccess">
+                    {{ t("customerAdmin.actions.createPortalAccess") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="closePortalAccessCreateModal">
+                    {{ t("customerAdmin.actions.cancel") }}
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <div
+              v-if="portalAccessPasswordTarget"
+              class="customer-admin-modal-backdrop"
+              data-testid="customer-portal-access-password-modal"
+            >
+              <section class="module-card customer-admin-modal">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.portalAccess.passwordResetEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.portalAccess.passwordResetTitle") }}</h4>
+                </div>
+                <p class="field-help">
+                  {{ portalAccessPasswordTarget.contact_name }} · {{ portalAccessPasswordTarget.username }}
+                </p>
+                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("customerAdmin.fields.temporaryPassword") }}</span>
+                    <input v-model="portalAccessPasswordDraft.temporary_password" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button
+                    class="cta-button"
+                    type="button"
+                    :disabled="loading.portalAccess"
+                    @click="submitCustomerPortalAccessPasswordReset"
+                  >
+                    {{ t("customerAdmin.actions.resetPortalAccessPassword") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="closePortalAccessPasswordReset">
+                    {{ t("customerAdmin.actions.cancel") }}
+                  </button>
+                </div>
+              </section>
+            </div>
+            </section>
+            </section>
           </section>
 
           <section
@@ -1633,294 +1945,6 @@
           </section>
 
           <section
-            v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'portal'"
-            class="customer-admin-section"
-            data-testid="customer-tab-panel-portal"
-          >
-            <div class="customer-admin-form customer-admin-form--structured">
-              <section class="customer-admin-editor-intro">
-                <div>
-                  <p class="eyebrow">{{ t("customerAdmin.loginHistory.eyebrow") }}</p>
-                  <h4>{{ t("customerAdmin.portal.title") }}</h4>
-                </div>
-                <p class="field-help">{{ t("customerAdmin.portal.lead") }}</p>
-              </section>
-
-              <section class="customer-admin-form-section">
-                <div class="customer-admin-form-section__header">
-                  <p class="eyebrow">{{ t("customerAdmin.privacy.eyebrow") }}</p>
-                  <h4>{{ t("customerAdmin.privacy.title") }}</h4>
-                </div>
-                <div class="customer-admin-summary">
-                  <article class="customer-admin-summary__card">
-                    <span>{{ t("customerAdmin.fields.personNamesReleased") }}</span>
-                    <strong>
-                      {{
-                        portalPrivacy?.person_names_released
-                          ? t("customerAdmin.status.active")
-                          : t("customerAdmin.status.inactive")
-                      }}
-                    </strong>
-                  </article>
-                  <article class="customer-admin-summary__card">
-                    <span>{{ t("customerAdmin.privacy.lastReleasedAt") }}</span>
-                    <strong>{{ formatOptionalDateTime(portalPrivacy?.person_names_released_at) }}</strong>
-                  </article>
-                  <article class="customer-admin-summary__card">
-                    <span>{{ t("customerAdmin.privacy.lastReleasedBy") }}</span>
-                    <strong>{{ portalPrivacy?.person_names_released_by_user_id || t("customerAdmin.summary.none") }}</strong>
-                  </article>
-                </div>
-                <div class="customer-admin-checkbox-group">
-                  <label class="customer-admin-checkbox">
-                    <input v-model="portalPrivacyDraft.person_names_released" type="checkbox" :disabled="!canWrite" />
-                    <span>{{ t("customerAdmin.fields.personNamesReleased") }}</span>
-                  </label>
-                </div>
-                <div class="cta-row">
-                  <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshPortalPrivacy">
-                    {{ t("customerAdmin.actions.refreshPortalPrivacy") }}
-                  </button>
-                  <button class="cta-button" type="button" :disabled="!canWrite || loading.portalPrivacy" @click="submitPortalPrivacy">
-                    {{ t("customerAdmin.actions.savePortalPrivacy") }}
-                  </button>
-                </div>
-              </section>
-
-              <section
-                v-if="canManagePortalAccess"
-                class="customer-admin-form-section"
-                data-testid="customer-portal-access-section"
-              >
-                <div class="customer-admin-form-section__header">
-                  <p class="eyebrow">{{ t("customerAdmin.portalAccess.eyebrow") }}</p>
-                  <h4>{{ t("customerAdmin.portalAccess.title") }}</h4>
-                </div>
-                <p class="field-help">{{ t("customerAdmin.portalAccess.lead") }}</p>
-                <div
-                  v-if="portalAccessGeneratedPassword"
-                  class="customer-admin-feedback customer-admin-feedback--success"
-                  data-tone="success"
-                >
-                  <div>
-                    <strong>{{ t("customerAdmin.portalAccess.generatedPasswordTitle") }}</strong>
-                    <span>{{ portalAccessGeneratedPassword }}</span>
-                  </div>
-                  <button type="button" @click="portalAccessGeneratedPassword = ''">
-                    {{ t("customerAdmin.actions.clearFeedback") }}
-                  </button>
-                </div>
-                <div class="cta-row">
-                  <button
-                    class="cta-button cta-secondary"
-                    type="button"
-                    :disabled="!canManagePortalAccess"
-                    @click="refreshCustomerPortalAccess"
-                  >
-                    {{ t("customerAdmin.actions.refreshPortalAccess") }}
-                  </button>
-                  <button
-                    class="cta-button"
-                    type="button"
-                    :disabled="loading.portalAccess || !portalAccessAvailableContacts.length"
-                    @click="openPortalAccessCreateModal"
-                  >
-                    {{ t("customerAdmin.actions.createPortalAccess") }}
-                  </button>
-                </div>
-                <p v-if="!portalAccessAvailableContacts.length" class="customer-admin-list-empty">
-                  {{ t("customerAdmin.portalAccess.noContactsHint") }}
-                </p>
-                <div
-                  v-else-if="customerPortalAccessAccounts.length"
-                  class="customer-admin-record-list"
-                  data-testid="customer-portal-access-list"
-                >
-                  <article
-                    v-for="account in customerPortalAccessAccounts"
-                    :key="account.user_id"
-                    class="customer-admin-record customer-admin-record--stacked"
-                  >
-                    <div class="customer-admin-record__body">
-                      <strong>{{ account.contact_name }} · {{ account.username }}</strong>
-                      <span class="customer-admin-record__meta">
-                        {{ [account.email, formatOptionalDateTime(account.last_login_at)].filter(Boolean).join(" · ") }}
-                      </span>
-                    </div>
-                    <div class="customer-admin-record__actions">
-                      <StatusBadge :status="account.status" />
-                      <button
-                        class="cta-button cta-secondary"
-                        type="button"
-                        :disabled="loading.portalAccess"
-                        @click="openPortalAccessPasswordReset(account)"
-                      >
-                        {{ t("customerAdmin.actions.resetPortalAccessPassword") }}
-                      </button>
-                      <button
-                        v-if="account.status === 'active'"
-                        class="cta-button cta-secondary"
-                        type="button"
-                        :disabled="loading.portalAccess"
-                        @click="setCustomerPortalAccessStatus(account, 'inactive')"
-                      >
-                        {{ t("customerAdmin.actions.deactivatePortalAccess") }}
-                      </button>
-                      <button
-                        v-else
-                        class="cta-button cta-secondary"
-                        type="button"
-                        :disabled="loading.portalAccess"
-                        @click="setCustomerPortalAccessStatus(account, 'active')"
-                      >
-                        {{ t("customerAdmin.actions.activatePortalAccess") }}
-                      </button>
-                      <button
-                        class="cta-button cta-secondary"
-                        type="button"
-                        :disabled="loading.portalAccess"
-                        @click="unlinkCustomerPortalAccount(account)"
-                      >
-                        {{ t("customerAdmin.actions.unlinkPortalAccess") }}
-                      </button>
-                    </div>
-                  </article>
-                </div>
-                <p v-else class="customer-admin-list-empty">
-                  {{ t("customerAdmin.portalAccess.empty") }}
-                </p>
-              </section>
-
-              <section class="customer-admin-form-section">
-                <div class="customer-admin-form-section__header">
-                  <p class="eyebrow">{{ t("customerAdmin.loginHistory.eyebrow") }}</p>
-                  <h4>{{ t("customerAdmin.loginHistory.title") }}</h4>
-                </div>
-                <div class="cta-row">
-                  <button class="cta-button cta-secondary" type="button" :disabled="!canRead" @click="refreshCustomerPortalLoginHistory">
-                    {{ t("customerAdmin.actions.refreshLoginHistory") }}
-                  </button>
-                </div>
-                <div v-if="customerPortalLoginHistory.length" class="customer-admin-record-list">
-                  <article
-                    v-for="entry in customerPortalLoginHistory"
-                    :key="entry.id"
-                    class="customer-admin-record customer-admin-record--stacked"
-                  >
-                    <div class="customer-admin-record__body">
-                      <strong>{{ entry.identifier }}</strong>
-                      <span class="customer-admin-record__meta">{{ formatLoginHistoryMeta(entry) }}</span>
-                    </div>
-                  </article>
-                </div>
-                <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.loginHistory.empty") }}</p>
-              </section>
-            </div>
-
-            <div
-              v-if="portalAccessModalOpen"
-              class="customer-admin-modal-backdrop"
-              data-testid="customer-portal-access-create-modal"
-            >
-              <section class="module-card customer-admin-modal">
-                <div class="customer-admin-form-section__header">
-                  <p class="eyebrow">{{ t("customerAdmin.portalAccess.modalEyebrow") }}</p>
-                  <h4>{{ t("customerAdmin.portalAccess.modalTitle") }}</h4>
-                </div>
-                <p class="field-help">{{ selectedCustomer?.name }}</p>
-                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
-                  <label class="field-stack field-stack--half">
-                    <span>{{ t("customerAdmin.portalAccess.contactLabel") }}</span>
-                    <select v-model="portalAccessDraft.contact_id">
-                      <option value="">{{ t("customerAdmin.portalAccess.contactPlaceholder") }}</option>
-                      <option
-                        v-for="contact in portalAccessAvailableContacts"
-                        :key="contact.id"
-                        :value="contact.id"
-                      >
-                        {{ contact.full_name }}{{ contact.email ? ` · ${contact.email}` : "" }}
-                      </option>
-                    </select>
-                  </label>
-                  <label class="field-stack field-stack--half">
-                    <span>{{ t("customerAdmin.fields.username") }}</span>
-                    <input v-model="portalAccessDraft.username" />
-                  </label>
-                  <label class="field-stack field-stack--half">
-                    <span>{{ t("customerAdmin.fields.email") }}</span>
-                    <input v-model="portalAccessDraft.email" />
-                  </label>
-                  <label class="field-stack field-stack--half">
-                    <span>{{ t("customerAdmin.fields.fullName") }}</span>
-                    <input v-model="portalAccessDraft.full_name" />
-                  </label>
-                  <label class="field-stack field-stack--third">
-                    <span>{{ t("customerAdmin.fields.locale") }}</span>
-                    <select v-model="portalAccessDraft.locale">
-                      <option value="de">de</option>
-                      <option value="en">en</option>
-                    </select>
-                  </label>
-                  <label class="field-stack field-stack--third">
-                    <span>{{ t("customerAdmin.fields.lifecycleStatus") }}</span>
-                    <select v-model="portalAccessDraft.status">
-                      <option value="active">{{ t("customerAdmin.status.active") }}</option>
-                      <option value="inactive">{{ t("customerAdmin.status.inactive") }}</option>
-                    </select>
-                  </label>
-                  <label class="field-stack field-stack--third">
-                    <span>{{ t("customerAdmin.fields.temporaryPassword") }}</span>
-                    <input v-model="portalAccessDraft.temporary_password" />
-                  </label>
-                </div>
-                <div class="cta-row">
-                  <button class="cta-button" type="button" :disabled="loading.portalAccess" @click="submitCustomerPortalAccess">
-                    {{ t("customerAdmin.actions.createPortalAccess") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="closePortalAccessCreateModal">
-                    {{ t("customerAdmin.actions.cancel") }}
-                  </button>
-                </div>
-              </section>
-            </div>
-
-            <div
-              v-if="portalAccessPasswordTarget"
-              class="customer-admin-modal-backdrop"
-              data-testid="customer-portal-access-password-modal"
-            >
-              <section class="module-card customer-admin-modal">
-                <div class="customer-admin-form-section__header">
-                  <p class="eyebrow">{{ t("customerAdmin.portalAccess.passwordResetEyebrow") }}</p>
-                  <h4>{{ t("customerAdmin.portalAccess.passwordResetTitle") }}</h4>
-                </div>
-                <p class="field-help">
-                  {{ portalAccessPasswordTarget.contact_name }} · {{ portalAccessPasswordTarget.username }}
-                </p>
-                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("customerAdmin.fields.temporaryPassword") }}</span>
-                    <input v-model="portalAccessPasswordDraft.temporary_password" />
-                  </label>
-                </div>
-                <div class="cta-row">
-                  <button
-                    class="cta-button"
-                    type="button"
-                    :disabled="loading.portalAccess"
-                    @click="submitCustomerPortalAccessPasswordReset"
-                  >
-                    {{ t("customerAdmin.actions.resetPortalAccessPassword") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="closePortalAccessPasswordReset">
-                    {{ t("customerAdmin.actions.cancel") }}
-                  </button>
-                </div>
-              </section>
-            </div>
-          </section>
-
-          <section
             v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'history'"
             class="customer-admin-section"
             data-testid="customer-tab-panel-history"
@@ -2530,10 +2554,8 @@ const hasDetailWorkspace = computed(() => isCreatingCustomer.value || !!selected
 const detailTabLabelKeys = {
   dashboard: "customerAdmin.tabs.dashboard",
   overview: "customerAdmin.tabs.overview",
-  contacts: "customerAdmin.tabs.contacts",
-  addresses: "customerAdmin.tabs.addresses",
+  contact_access: "customerAdmin.tabs.contactAccess",
   commercial: "customerAdmin.tabs.commercial",
-  portal: "customerAdmin.tabs.portal",
   plans: "customerAdmin.tabs.plans",
   history: "customerAdmin.tabs.history",
   employee_blocks: "customerAdmin.tabs.employeeBlocks",
@@ -2548,6 +2570,13 @@ const customerDetailTabs = computed(() =>
     id: tabId,
     label: t(detailTabLabelKeys[tabId as keyof typeof detailTabLabelKeys] as never),
   })),
+);
+const secondaryCustomerDetailTabIds = new Set(["history", "employee_blocks"]);
+const primaryCustomerDetailTabs = computed(() =>
+  customerDetailTabs.value.filter((tab) => !secondaryCustomerDetailTabIds.has(tab.id)),
+);
+const secondaryCustomerDetailTabs = computed(() =>
+  customerDetailTabs.value.filter((tab) => secondaryCustomerDetailTabIds.has(tab.id)),
 );
 const commercialTabLabelKeys = {
   billing_profile: "customerAdmin.commercial.tabs.billingProfile",
@@ -3474,8 +3503,17 @@ function editInvoiceParty(invoiceParty: CustomerInvoicePartyRead) {
   editingInvoicePartyId.value = invoiceParty.id;
 }
 
+function selectCustomerDetailTab(tabId: string) {
+  activeDetailTab.value = normalizeCustomerDetailTab(tabId, {
+    canReadCommercial: canReadCommercial.value,
+    canReadPlans: canReadPlans.value,
+    hasSelectedCustomer: !!selectedCustomer.value,
+    isCreatingCustomer: isCreatingCustomer.value,
+  });
+}
+
 function openCustomerAddressesTab() {
-  activeDetailTab.value = "addresses";
+  selectCustomerDetailTab("addresses");
 }
 
 function editRateCard(rateCard: CustomerRateCardRead) {
@@ -3584,7 +3622,7 @@ function startCreateInvoiceParty() {
 }
 
 function handleDashboardCreateContact() {
-  activeDetailTab.value = "contacts";
+  selectCustomerDetailTab("contacts");
   startCreateContact();
 }
 
@@ -5469,6 +5507,23 @@ onBeforeUnmount(() => {
   gap: 0.75rem;
 }
 
+.customer-admin-tabs--split {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.customer-admin-tabs__primary,
+.customer-admin-tabs__secondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.customer-admin-tabs__secondary {
+  margin-left: auto;
+}
+
 .customer-admin-tab {
   border: 1px solid var(--sp-color-border-soft);
   background: var(--sp-color-surface-page);
@@ -5497,8 +5552,69 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 0 3px rgb(40 170 170 / 14%);
 }
 
+.customer-admin-tab-link {
+  border: 0;
+  background: transparent;
+  color: var(--sp-color-text-secondary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.35rem 0.1rem;
+  text-decoration: none;
+  text-underline-offset: 0.22rem;
+}
+
+.customer-admin-tab-link.active,
+.customer-admin-tab-link:hover,
+.customer-admin-tab-link:focus-visible {
+  color: var(--sp-color-primary-strong);
+  text-decoration: underline;
+}
+
+.customer-admin-tab-link:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--sp-color-primary) 48%, transparent);
+  outline-offset: 0.2rem;
+}
+
 .customer-admin-tabs--sub {
   margin-top: 0.25rem;
+}
+
+.customer-admin-contact-access {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.customer-admin-contact-access-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 1.25rem;
+  background: color-mix(in srgb, var(--sp-color-surface-card) 88%, white);
+  box-shadow: var(--sp-shadow-card);
+}
+
+.customer-admin-contact-access-card__header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.customer-admin-contact-access-card__header h3,
+.customer-admin-contact-access-card__header p {
+  margin: 0;
+}
+
+.customer-admin-contact-access-card__header h3 {
+  color: var(--sp-color-text-primary);
+}
+
+.customer-admin-contact-access-card__header p:not(.eyebrow) {
+  color: var(--sp-color-text-secondary);
+}
+
+[data-theme='dark'] .customer-admin-contact-access-card {
+  background: color-mix(in srgb, var(--sp-color-surface-card) 92%, black);
 }
 
 .customer-admin-tab--sub {

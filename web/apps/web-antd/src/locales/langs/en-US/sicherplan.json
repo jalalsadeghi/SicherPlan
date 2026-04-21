@@ -37,6 +37,10 @@
     "stepContentBody": "The step editor for this area will be wired in the next epics. The shell context, navigation, and ID handoff are already stabilized here.",
     "loadingTitle": "Loading customer context",
     "loadingBody": "The selected customer is being prepared for the plan wizard.",
+    "loading": {
+      "referenceData": "Loading options...",
+      "savedData": "Loading saved data..."
+    },
     "missingCustomerTitle": "Customer missing",
     "missingCustomerBody": "Open the wizard from Customer > Plans or provide a valid customer_id.",
     "unknownCustomerTitle": "Customer not found",
@@ -656,6 +660,7 @@
       "coverageSetupRequired": "Coverage setup required",
       "itemTypeOrder": "Order",
       "itemTypeShift": "Shift",
+      "loadError": "Planning calendar staffing coverage could not be loaded.",
       "more": "more",
       "shiftShort": "shift",
       "orderShort": "order"

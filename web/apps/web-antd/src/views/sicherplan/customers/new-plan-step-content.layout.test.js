@@ -9,7 +9,7 @@ const source = fs.readFileSync(
 );
 
 test("wizard step content uses wizard field wrappers across implemented steps", () => {
-  assert.match(source, /data-testid="customer-new-plan-step-panel-planning"/);
+  assert.match(source, /data-testid="customer-new-plan-step-panel-planning-record-overview"/);
   assert.match(source, /data-testid="customer-new-plan-step-panel-order-details"/);
   assert.match(source, /data-testid="customer-new-plan-step-panel-equipment-lines"/);
   assert.match(source, /data-testid="customer-new-plan-step-panel-requirement-lines"/);
@@ -86,4 +86,32 @@ test("wizard form grid keeps responsive stacking rules", () => {
   assert.match(source, /grid-template-columns: repeat\(auto-fit, minmax\(14rem, 1fr\)\);/);
   assert.match(source, /@media \(max-width: 960px\)/);
   assert.match(source, /\.sp-customer-plan-wizard-step__grid \{\s*grid-template-columns: 1fr;/);
+});
+
+test("wizard step content exposes non-disruptive local loading indicators for saved data areas", () => {
+  assert.match(source, /LocalLoadingIndicator/);
+  assert.match(source, /type StepLoadKey/);
+  assert.match(source, /beginStepLoads/);
+  assert.match(source, /finishStepLoads/);
+  assert.match(source, /stepLoadState = reactive/);
+  assert.match(source, /test-id="customer-new-plan-order-loading"/);
+  assert.match(source, /test-id="customer-new-plan-step-local-loading"/);
+  assert.match(source, /test-id="customer-new-plan-equipment-lines-loading"/);
+  assert.match(source, /test-id="customer-new-plan-equipment-options-loading"/);
+  assert.match(source, /test-id="customer-new-plan-requirement-lines-loading"/);
+  assert.match(source, /test-id="customer-new-plan-requirement-options-loading"/);
+  assert.match(source, /test-id="customer-new-plan-order-documents-loading"/);
+  assert.match(source, /test-id="customer-new-plan-planning-reference-loading"/);
+  assert.match(source, /test-id="customer-new-plan-planning-record-loading"/);
+  assert.match(source, /test-id="customer-new-plan-planning-record-detail-loading"/);
+  assert.match(source, /test-id="customer-new-plan-planning-documents-loading"/);
+  assert.match(source, /test-id="customer-new-plan-shift-plan-loading"/);
+  assert.match(source, /test-id="customer-new-plan-shift-plan-detail-loading"/);
+  assert.match(source, /test-id="customer-new-plan-shift-options-loading"/);
+  assert.match(source, /test-id="customer-new-plan-series-context-loading"/);
+  assert.match(source, /test-id="customer-new-plan-series-loading"/);
+  assert.match(source, /test-id="customer-new-plan-series-detail-loading"/);
+  assert.match(source, /test-id="customer-new-plan-series-exceptions-loading"/);
+  assert.match(source, /test-id="customer-new-plan-series-options-loading"/);
+  assert.doesNotMatch(source, /sp-customer-plan-wizard-step--loading/);
 });

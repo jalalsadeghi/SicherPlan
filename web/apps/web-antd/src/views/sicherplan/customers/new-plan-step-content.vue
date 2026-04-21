@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { Modal } from 'ant-design-vue';
 
 import { $t } from '#/locales';
+import LocalLoadingIndicator from '#/components/sicherplan/local-loading-indicator.vue';
 import {
   createCustomerAvailableAddress,
   listCustomerAddresses,
@@ -405,6 +406,77 @@ const stepFeedback = reactive({
   tone: 'neutral' as 'error' | 'neutral' | 'success',
 });
 
+type StepLoadKey =
+  | 'equipmentLines'
+  | 'orderDetails'
+  | 'orderDocuments'
+  | 'orderReferenceOptions'
+  | 'planningDocuments'
+  | 'planningRecordDetail'
+  | 'planningRecords'
+  | 'planningReferenceOptions'
+  | 'requirementLines'
+  | 'seriesContext'
+  | 'seriesDetail'
+  | 'seriesExceptions'
+  | 'seriesReferenceOptions'
+  | 'seriesRows'
+  | 'shiftPlanDetail'
+  | 'shiftPlans'
+  | 'shiftReferenceOptions';
+
+const stepLoadState = reactive<Record<StepLoadKey, boolean>>({
+  equipmentLines: false,
+  orderDetails: false,
+  orderDocuments: false,
+  orderReferenceOptions: false,
+  planningDocuments: false,
+  planningRecordDetail: false,
+  planningRecords: false,
+  planningReferenceOptions: false,
+  requirementLines: false,
+  seriesContext: false,
+  seriesDetail: false,
+  seriesExceptions: false,
+  seriesReferenceOptions: false,
+  seriesRows: false,
+  shiftPlanDetail: false,
+  shiftPlans: false,
+  shiftReferenceOptions: false,
+});
+
+const stepLoadError = reactive({
+  equipmentLines: '',
+  orderDetails: '',
+  orderDocuments: '',
+  planningDocuments: '',
+  planningRecords: '',
+  planningRecordDetail: '',
+  requirementLines: '',
+  series: '',
+  shiftPlan: '',
+});
+
+const stepLoadRequestVersion = reactive<Record<StepLoadKey, number>>({
+  equipmentLines: 0,
+  orderDetails: 0,
+  orderDocuments: 0,
+  orderReferenceOptions: 0,
+  planningDocuments: 0,
+  planningRecordDetail: 0,
+  planningRecords: 0,
+  planningReferenceOptions: 0,
+  requirementLines: 0,
+  seriesContext: 0,
+  seriesDetail: 0,
+  seriesExceptions: 0,
+  seriesReferenceOptions: 0,
+  seriesRows: 0,
+  shiftPlanDetail: 0,
+  shiftPlans: 0,
+  shiftReferenceOptions: 0,
+});
+
 const draftRestoreMessage = ref('');
 const draftSyncPaused = ref(false);
 const stepLoading = ref(false);
@@ -461,6 +533,8 @@ const planningFamilyOptions = computed(() => [
   { label: $t('sicherplan.customerPlansWizard.forms.planningFamilies.tradeFair'), value: 'trade_fair' },
   { label: $t('sicherplan.customerPlansWizard.forms.planningFamilies.patrolRoute'), value: 'patrol_route' },
 ]);
+const savedDataLoadingLabel = computed(() => $t('sicherplan.customerPlansWizard.loading.savedData'));
+const referenceDataLoadingLabel = computed(() => $t('sicherplan.customerPlansWizard.loading.referenceData'));
 
 function mapPlanningEntityTypeToModeCode(entityType: PlanningEntityType | '' | null | undefined) {
   const mapping: Record<PlanningEntityType, string> = {
@@ -2335,10 +2409,20 @@ async function selectExistingPlanningRecordRow(planningRecordId: string) {
   if (!props.tenantId || !props.accessToken || !planningRecordId) {
     return;
   }
-  const record = await getPlanningRecord(props.tenantId, planningRecordId, props.accessToken);
-  syncPlanningRecordDraft(record);
-  setFeedback('success', $t('sicherplan.customerPlansWizard.messages.planningRecordSelected'));
-  emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
+  const loadVersions = beginStepLoads('planningRecordDetail');
+  stepLoadError.planningRecordDetail = '';
+  try {
+    const record = await getPlanningRecord(props.tenantId, planningRecordId, props.accessToken);
+    syncPlanningRecordDraft(record);
+    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.planningRecordSelected'));
+    emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
+  } catch {
+    stepLoadError.planningRecordDetail = $t('sicherplan.customerPlansWizard.errors.planningRecordLoad');
+    setFeedback('error', stepLoadError.planningRecordDetail);
+    emit('step-ui-state', 'planning-record-overview', { error: 'load_failed' });
+  } finally {
+    finishStepLoads(loadVersions);
+  }
 }
 
 function openPlanningCreateModal() {
@@ -2359,20 +2443,25 @@ async function selectShiftPlanRow(planId: string) {
   if (!props.tenantId || !props.accessToken) {
     return;
   }
-  const plan = await getShiftPlan(props.tenantId, planId, props.accessToken);
-  syncShiftPlanDraft(plan);
-  const persistedShiftPlanDraft = normalizeShiftPlanDraftPersistence(
-    loadStepDraft<ShiftPlanDraftPersistence | Partial<typeof shiftPlanDraft>>('shift-plan'),
-  );
-  if (
-    persistedShiftPlanDraft &&
-    (!persistedShiftPlanDraft.selected_shift_plan_id || persistedShiftPlanDraft.selected_shift_plan_id !== plan.id)
-  ) {
-    clearStepDraft('shift-plan');
+  const loadVersions = beginStepLoads('shiftPlanDetail');
+  try {
+    const plan = await getShiftPlan(props.tenantId, planId, props.accessToken);
+    syncShiftPlanDraft(plan);
+    const persistedShiftPlanDraft = normalizeShiftPlanDraftPersistence(
+      loadStepDraft<ShiftPlanDraftPersistence | Partial<typeof shiftPlanDraft>>('shift-plan'),
+    );
+    if (
+      persistedShiftPlanDraft &&
+      (!persistedShiftPlanDraft.selected_shift_plan_id || persistedShiftPlanDraft.selected_shift_plan_id !== plan.id)
+    ) {
+      clearStepDraft('shift-plan');
+    }
+    clearDraftRestoreMessage();
+    emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
+    setFeedback('neutral', '');
+  } finally {
+    finishStepLoads(loadVersions);
   }
-  clearDraftRestoreMessage();
-  emit('step-ui-state', 'shift-plan', { dirty: false, error: '' });
-  setFeedback('neutral', '');
 }
 
 function startNewShiftPlan() {
@@ -2393,12 +2482,17 @@ async function selectSeriesRow(seriesId: string) {
   if (!props.tenantId || !props.accessToken) {
     return;
   }
-  const [series, exceptions] = await Promise.all([
-    getShiftSeries(props.tenantId, seriesId, props.accessToken),
-    listShiftSeriesExceptions(props.tenantId, seriesId, props.accessToken),
-  ]);
-  syncSeriesDraft(series);
-  seriesExceptions.value = exceptions;
+  const loadVersions = beginStepLoads('seriesDetail', 'seriesExceptions');
+  try {
+    const [series, exceptions] = await Promise.all([
+      getShiftSeries(props.tenantId, seriesId, props.accessToken),
+      listShiftSeriesExceptions(props.tenantId, seriesId, props.accessToken),
+    ]);
+    syncSeriesDraft(series);
+    seriesExceptions.value = exceptions;
+  } finally {
+    finishStepLoads(loadVersions);
+  }
 }
 
 async function loadPlanningEntityOptions() {
@@ -2406,6 +2500,7 @@ async function loadPlanningEntityOptions() {
     planningEntityOptions.value = [];
     return;
   }
+  const loadVersions = beginStepLoads('planningReferenceOptions');
   planningEntityLoading.value = true;
   planningEntityError.value = '';
   try {
@@ -2422,6 +2517,7 @@ async function loadPlanningEntityOptions() {
     planningEntityOptions.value = [];
     planningEntityError.value = $t('sicherplan.customerPlansWizard.errors.planningEntityLoad');
   } finally {
+    finishStepLoads(loadVersions);
     planningEntityLoading.value = false;
   }
 }
@@ -2433,6 +2529,7 @@ async function loadExistingPlanningRecordRows(isCurrent = () => true) {
     planningRecordRowsLoading.value = false;
     return;
   }
+  const loadVersions = beginStepLoads('planningRecords');
   planningRecordRowsLoading.value = true;
   planningRecordRowsError.value = '';
   try {
@@ -2456,6 +2553,7 @@ async function loadExistingPlanningRecordRows(isCurrent = () => true) {
     planningRecordRows.value = [];
     planningRecordRowsError.value = $t('sicherplan.customerPlansWizard.errors.planningRecordLoad');
   } finally {
+    finishStepLoads(loadVersions, isCurrent);
     if (isCurrent()) {
       planningRecordRowsLoading.value = false;
     }
@@ -2562,25 +2660,30 @@ async function loadOrderReferenceOptions(isCurrent = () => true) {
   if (!props.tenantId || !props.accessToken) {
     return;
   }
-  const [serviceCategories, requirementTypes, patrolRoutes, equipmentItems, functionTypes, qualificationTypes] =
-    await Promise.all([
-      listServiceCategoryOptions(props.tenantId, props.accessToken),
-      listPlanningSetupRecords('requirement_type', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
-      listPlanningSetupRecords('patrol_route', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
-      listPlanningSetupRecords('equipment_item', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
-      listFunctionTypes(props.tenantId, props.accessToken),
-      listQualificationTypes(props.tenantId, props.accessToken),
-    ]);
+  const loadVersions = beginStepLoads('orderReferenceOptions');
+  try {
+    const [serviceCategories, requirementTypes, patrolRoutes, equipmentItems, functionTypes, qualificationTypes] =
+      await Promise.all([
+        listServiceCategoryOptions(props.tenantId, props.accessToken),
+        listPlanningSetupRecords('requirement_type', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
+        listPlanningSetupRecords('patrol_route', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
+        listPlanningSetupRecords('equipment_item', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
+        listFunctionTypes(props.tenantId, props.accessToken),
+        listQualificationTypes(props.tenantId, props.accessToken),
+      ]);
 
-  if (!isCurrent()) {
-    return;
+    if (!isCurrent()) {
+      return;
+    }
+    serviceCategoryOptions.value = serviceCategories;
+    requirementTypeOptions.value = requirementTypes as PlanningListItem[];
+    patrolRouteOptions.value = patrolRoutes as PlanningListItem[];
+    equipmentItemOptions.value = equipmentItems as PlanningCatalogRecordRead[];
+    functionTypeOptions.value = functionTypes;
+    qualificationTypeOptions.value = qualificationTypes;
+  } finally {
+    finishStepLoads(loadVersions, isCurrent);
   }
-  serviceCategoryOptions.value = serviceCategories;
-  requirementTypeOptions.value = requirementTypes as PlanningListItem[];
-  patrolRouteOptions.value = patrolRoutes as PlanningListItem[];
-  equipmentItemOptions.value = equipmentItems as PlanningCatalogRecordRead[];
-  functionTypeOptions.value = functionTypes;
-  qualificationTypeOptions.value = qualificationTypes;
 }
 
 async function loadCustomerOrderRows(isCurrent = () => true) {
@@ -2593,6 +2696,7 @@ async function loadCustomerOrderRows(isCurrent = () => true) {
     customerOrderRowsLoading.value = false;
     return;
   }
+  const loadVersions = beginStepLoads('orderDetails');
   customerOrderRowsLoading.value = true;
   customerOrderRowsError.value = '';
   try {
@@ -2611,6 +2715,7 @@ async function loadCustomerOrderRows(isCurrent = () => true) {
     customerOrderRows.value = [];
     customerOrderRowsError.value = $t('sicherplan.customerPlansWizard.errors.orderListLoadFailed');
   } finally {
+    finishStepLoads(loadVersions, isCurrent);
     if (!isCurrent()) {
       return;
     }
@@ -2663,6 +2768,8 @@ async function openExistingOrderEdit(orderId: string, options?: { applyPersisted
   }
   const shouldApplyDraft = options?.applyPersistedDraft !== false;
   pendingExistingOrderEditId.value = orderId;
+  const loadVersions = beginStepLoads('orderDetails');
+  stepLoadError.orderDetails = '';
   stepLoading.value = true;
   emit('step-ui-state', 'order-details', { loading: true, error: '' });
   try {
@@ -2691,8 +2798,65 @@ async function openExistingOrderEdit(orderId: string, options?: { applyPersisted
     emit('step-ui-state', 'order-details', { error: 'load_failed' });
   } finally {
     pendingExistingOrderEditId.value = '';
+    finishStepLoads(loadVersions);
     stepLoading.value = false;
     emit('step-ui-state', 'order-details', { loading: false });
+  }
+}
+
+function clearStepLoadErrors() {
+  Object.assign(stepLoadError, {
+    equipmentLines: '',
+    orderDetails: '',
+    orderDocuments: '',
+    planningDocuments: '',
+    planningRecordDetail: '',
+    planningRecords: '',
+    requirementLines: '',
+    series: '',
+    shiftPlan: '',
+  });
+}
+
+function beginStepLoads(...keys: StepLoadKey[]) {
+  const versions = new Map<StepLoadKey, number>();
+  for (const key of keys) {
+    stepLoadRequestVersion[key] += 1;
+    versions.set(key, stepLoadRequestVersion[key]);
+    stepLoadState[key] = true;
+  }
+  return versions;
+}
+
+function finishStepLoads(versions: Map<StepLoadKey, number>, isCurrent = () => true) {
+  if (!isCurrent()) {
+    return;
+  }
+  for (const [key, version] of versions) {
+    if (stepLoadRequestVersion[key] === version) {
+      stepLoadState[key] = false;
+    }
+  }
+}
+
+function markActiveStepLoadError(message: string) {
+  if (orderStepActive.value) {
+    stepLoadError.orderDetails = message;
+  } else if (equipmentStepActive.value) {
+    stepLoadError.equipmentLines = message;
+  } else if (requirementStepActive.value) {
+    stepLoadError.requirementLines = message;
+  } else if (documentsStepActive.value) {
+    stepLoadError.orderDocuments = message;
+  } else if (planningRecordStepActive.value) {
+    stepLoadError.planningRecords = message;
+    stepLoadError.planningRecordDetail = message;
+  } else if (planningRecordDocumentsStepActive.value) {
+    stepLoadError.planningDocuments = message;
+  } else if (shiftPlanStepActive.value) {
+    stepLoadError.shiftPlan = message;
+  } else if (seriesStepActive.value) {
+    stepLoadError.series = message;
   }
 }
 
@@ -2830,25 +2994,38 @@ async function loadOrderState(isCurrent = () => true) {
     }
     return;
   }
-  const order = await getCustomerOrder(props.tenantId, props.wizardState.order_id, props.accessToken);
-  if (!isCurrent()) {
-    return;
+  const orderDetailVersions = beginStepLoads('orderDetails');
+  const orderSectionVersions = beginStepLoads('equipmentLines', 'requirementLines', 'orderDocuments');
+  stepLoadError.orderDetails = '';
+  stepLoadError.equipmentLines = '';
+  stepLoadError.requirementLines = '';
+  stepLoadError.orderDocuments = '';
+  let order: CustomerOrderRead | null = null;
+  try {
+    order = await getCustomerOrder(props.tenantId, props.wizardState.order_id, props.accessToken);
+    if (!isCurrent()) {
+      return;
+    }
+    orderSelectionMode.value = 'use_existing';
+    selectedExistingOrderId.value = order.id;
+    syncOrderDraft(order);
+    finishStepLoads(orderDetailVersions, isCurrent);
+    const [equipmentLines, requirementLines, attachments] = await Promise.all([
+      listOrderEquipmentLines(props.tenantId, props.wizardState.order_id, props.accessToken),
+      listOrderRequirementLines(props.tenantId, props.wizardState.order_id, props.accessToken),
+      listOrderAttachments(props.tenantId, props.wizardState.order_id, props.accessToken),
+    ]);
+    if (!isCurrent()) {
+      return;
+    }
+    orderEquipmentLines.value = equipmentLines;
+    orderRequirementLines.value = requirementLines;
+    orderAttachments.value = attachments;
+  } finally {
+    finishStepLoads(orderDetailVersions, isCurrent);
+    finishStepLoads(orderSectionVersions, isCurrent);
   }
-  orderSelectionMode.value = 'use_existing';
-  selectedExistingOrderId.value = order.id;
-  syncOrderDraft(order);
-  const [equipmentLines, requirementLines, attachments] = await Promise.all([
-    listOrderEquipmentLines(props.tenantId, props.wizardState.order_id, props.accessToken),
-    listOrderRequirementLines(props.tenantId, props.wizardState.order_id, props.accessToken),
-    listOrderAttachments(props.tenantId, props.wizardState.order_id, props.accessToken),
-  ]);
-  if (!isCurrent()) {
-    return;
-  }
-  orderEquipmentLines.value = equipmentLines;
-  orderRequirementLines.value = requirementLines;
-  orderAttachments.value = attachments;
-  if (persistedOrderDraft) {
+  if (persistedOrderDraft && order) {
     if (
       isOrderDetailsDraftPersistence(persistedOrderDraft) &&
       persistedOrderDraft.mode === 'use_existing' &&
@@ -2860,6 +3037,8 @@ async function loadOrderState(isCurrent = () => true) {
   }
   if (persistedEquipmentDraft) {
     applyEquipmentLineDraftPersistence(persistedEquipmentDraft);
+  } else if (hasEquipmentLineDraftContent()) {
+    // Keep the active unsaved draft while saved server rows refresh.
   } else {
     withDraftSyncPaused(() => {
       resetEquipmentLineDraft();
@@ -2867,6 +3046,8 @@ async function loadOrderState(isCurrent = () => true) {
   }
   if (persistedRequirementDraft) {
     applyRequirementLineDraftPersistence(persistedRequirementDraft);
+  } else if (hasRequirementLineDraftContent()) {
+    // Keep the active unsaved draft while saved server rows refresh.
   } else {
     withDraftSyncPaused(() => {
       resetRequirementLineDraft();
@@ -2874,6 +3055,8 @@ async function loadOrderState(isCurrent = () => true) {
   }
   if (persistedDocumentsDraft) {
     applyOrderDocumentsDraftPersistence(persistedDocumentsDraft);
+  } else if (hasOrderAttachmentDraftContent()) {
+    // Keep the active unsaved document draft while saved attachments refresh.
   } else {
     withDraftSyncPaused(() => {
       resetOrderAttachmentDraft();
@@ -2889,19 +3072,24 @@ async function loadPlanningRecordReferenceOptions(isCurrent = () => true) {
     patrolRouteOptions.value = [];
     return;
   }
-  const [eventVenues, sites, tradeFairs, patrolRoutes] = await Promise.all([
-    listPlanningSetupRecords('event_venue', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
-    listPlanningSetupRecords('site', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
-    listPlanningSetupRecords('trade_fair', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
-    listPlanningSetupRecords('patrol_route', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
-  ]);
-  if (!isCurrent()) {
-    return;
+  const loadVersions = beginStepLoads('planningReferenceOptions');
+  try {
+    const [eventVenues, sites, tradeFairs, patrolRoutes] = await Promise.all([
+      listPlanningSetupRecords('event_venue', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
+      listPlanningSetupRecords('site', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
+      listPlanningSetupRecords('trade_fair', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
+      listPlanningSetupRecords('patrol_route', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
+    ]);
+    if (!isCurrent()) {
+      return;
+    }
+    eventVenueOptions.value = eventVenues as PlanningListItem[];
+    siteOptions.value = sites as PlanningListItem[];
+    tradeFairOptions.value = tradeFairs as PlanningListItem[];
+    patrolRouteOptions.value = patrolRoutes as PlanningListItem[];
+  } finally {
+    finishStepLoads(loadVersions, isCurrent);
   }
-  eventVenueOptions.value = eventVenues as PlanningListItem[];
-  siteOptions.value = sites as PlanningListItem[];
-  tradeFairOptions.value = tradeFairs as PlanningListItem[];
-  patrolRouteOptions.value = patrolRoutes as PlanningListItem[];
 }
 
 function syncPlanningEntityOptionsFromReferenceOptions() {
@@ -2943,6 +3131,9 @@ async function loadPlanningRecordState(isCurrent = () => true) {
   ) {
     applyPlanningRecordOverviewDraftPersistence(persistedPlanningRecordDraft);
   }
+  stepLoadError.planningRecords = '';
+  stepLoadError.planningRecordDetail = '';
+  stepLoadError.planningDocuments = '';
   await loadPlanningRecordReferenceOptions(isCurrent);
   if (!isCurrent()) {
     return;
@@ -2965,18 +3156,23 @@ async function loadPlanningRecordState(isCurrent = () => true) {
       if (!matchingRow) {
         return;
       }
-      const record = await getPlanningRecord(props.tenantId, matchingRow.id, props.accessToken);
-      if (!isCurrent()) {
-        return;
+      const detailVersions = beginStepLoads('planningRecordDetail');
+      try {
+        const record = await getPlanningRecord(props.tenantId, matchingRow.id, props.accessToken);
+        if (!isCurrent()) {
+          return;
+        }
+        syncPlanningRecordDraft(record);
+        planningRecordAttachments.value = [];
+        emit('saved-context', {
+          ...buildPlanningContextPatch(),
+          planning_record_id: record.id,
+        });
+        clearStepDraft('planning-record-overview');
+        clearDraftRestoreMessage();
+      } finally {
+        finishStepLoads(detailVersions, isCurrent);
       }
-      syncPlanningRecordDraft(record);
-      planningRecordAttachments.value = [];
-      emit('saved-context', {
-        ...buildPlanningContextPatch(),
-        planning_record_id: record.id,
-      });
-      clearStepDraft('planning-record-overview');
-      clearDraftRestoreMessage();
       return;
     }
     selectedPlanningRecord.value = null;
@@ -3013,15 +3209,20 @@ async function loadPlanningRecordState(isCurrent = () => true) {
     }
     return;
   }
-  const [record, attachments] = await Promise.all([
-    getPlanningRecord(props.tenantId, props.wizardState.planning_record_id, props.accessToken),
-    listPlanningRecordAttachments(props.tenantId, props.wizardState.planning_record_id, props.accessToken),
-  ]);
-  if (!isCurrent()) {
-    return;
+  const detailVersions = beginStepLoads('planningRecordDetail', 'planningDocuments');
+  try {
+    const [record, attachments] = await Promise.all([
+      getPlanningRecord(props.tenantId, props.wizardState.planning_record_id, props.accessToken),
+      listPlanningRecordAttachments(props.tenantId, props.wizardState.planning_record_id, props.accessToken),
+    ]);
+    if (!isCurrent()) {
+      return;
+    }
+    syncPlanningRecordDraft(record);
+    planningRecordAttachments.value = attachments;
+  } finally {
+    finishStepLoads(detailVersions, isCurrent);
   }
-  syncPlanningRecordDraft(record);
-  planningRecordAttachments.value = attachments;
   if (persistedPlanningRecordDraft && (!persistedPlanningRecordDraft.order_id || persistedPlanningRecordDraft.order_id === props.wizardState.order_id)) {
     applyPlanningRecordOverviewDraftPersistence(persistedPlanningRecordDraft);
     restoreDraftMessage();
@@ -3048,19 +3249,24 @@ async function loadShiftPlanningReferenceOptions(isCurrent = () => true) {
     shiftTypeOptions.value = [];
     return;
   }
-  const [plans, templates, shiftTypes] = await Promise.all([
-    props.wizardState.planning_record_id
-      ? listShiftPlans(props.tenantId, props.accessToken, { planning_record_id: props.wizardState.planning_record_id })
-      : Promise.resolve([]),
-    listShiftTemplates(props.tenantId, props.accessToken, {}),
-    listShiftTypeOptions(props.tenantId, props.accessToken),
-  ]);
-  if (!isCurrent()) {
-    return;
+  const loadVersions = beginStepLoads('shiftPlans', 'shiftReferenceOptions');
+  try {
+    const [plans, templates, shiftTypes] = await Promise.all([
+      props.wizardState.planning_record_id
+        ? listShiftPlans(props.tenantId, props.accessToken, { planning_record_id: props.wizardState.planning_record_id })
+        : Promise.resolve([]),
+      listShiftTemplates(props.tenantId, props.accessToken, {}),
+      listShiftTypeOptions(props.tenantId, props.accessToken),
+    ]);
+    if (!isCurrent()) {
+      return;
+    }
+    shiftPlanRows.value = plans;
+    shiftTemplateOptions.value = templates;
+    shiftTypeOptions.value = shiftTypes;
+  } finally {
+    finishStepLoads(loadVersions, isCurrent);
   }
-  shiftPlanRows.value = plans;
-  shiftTemplateOptions.value = templates;
-  shiftTypeOptions.value = shiftTypes;
 }
 
 async function loadSeriesReferenceOptions(isCurrent = () => true) {
@@ -3069,15 +3275,20 @@ async function loadSeriesReferenceOptions(isCurrent = () => true) {
     shiftTypeOptions.value = [];
     return;
   }
-  const [templates, shiftTypes] = await Promise.all([
-    listShiftTemplates(props.tenantId, props.accessToken, {}),
-    listShiftTypeOptions(props.tenantId, props.accessToken),
-  ]);
-  if (!isCurrent()) {
-    return;
+  const loadVersions = beginStepLoads('seriesReferenceOptions');
+  try {
+    const [templates, shiftTypes] = await Promise.all([
+      listShiftTemplates(props.tenantId, props.accessToken, {}),
+      listShiftTypeOptions(props.tenantId, props.accessToken),
+    ]);
+    if (!isCurrent()) {
+      return;
+    }
+    shiftTemplateOptions.value = templates;
+    shiftTypeOptions.value = shiftTypes;
+  } finally {
+    finishStepLoads(loadVersions, isCurrent);
   }
-  shiftTemplateOptions.value = templates;
-  shiftTypeOptions.value = shiftTypes;
 }
 
 async function hydrateSeriesStepContext(isCurrent = () => true) {
@@ -3086,25 +3297,30 @@ async function hydrateSeriesStepContext(isCurrent = () => true) {
     selectedShiftPlan.value = null;
     return;
   }
-  const planningRecordPromise = props.wizardState.planning_record_id
-    ? getPlanningRecord(props.tenantId, props.wizardState.planning_record_id, props.accessToken)
-    : Promise.resolve(null);
-  const shiftPlanPromise = props.wizardState.shift_plan_id
-    ? getShiftPlan(props.tenantId, props.wizardState.shift_plan_id, props.accessToken)
-    : Promise.resolve(null);
-  const [record, plan] = await Promise.all([planningRecordPromise, shiftPlanPromise]);
-  if (!isCurrent()) {
-    return;
-  }
-  if (record) {
-    syncPlanningRecordDraft(record);
-  } else {
-    selectedPlanningRecord.value = null;
-  }
-  if (plan) {
-    syncShiftPlanDraft(plan);
-  } else {
-    selectedShiftPlan.value = null;
+  const loadVersions = beginStepLoads('seriesContext');
+  try {
+    const planningRecordPromise = props.wizardState.planning_record_id
+      ? getPlanningRecord(props.tenantId, props.wizardState.planning_record_id, props.accessToken)
+      : Promise.resolve(null);
+    const shiftPlanPromise = props.wizardState.shift_plan_id
+      ? getShiftPlan(props.tenantId, props.wizardState.shift_plan_id, props.accessToken)
+      : Promise.resolve(null);
+    const [record, plan] = await Promise.all([planningRecordPromise, shiftPlanPromise]);
+    if (!isCurrent()) {
+      return;
+    }
+    if (record) {
+      syncPlanningRecordDraft(record);
+    } else {
+      selectedPlanningRecord.value = null;
+    }
+    if (plan) {
+      syncShiftPlanDraft(plan);
+    } else {
+      selectedShiftPlan.value = null;
+    }
+  } finally {
+    finishStepLoads(loadVersions, isCurrent);
   }
 }
 
@@ -3112,6 +3328,7 @@ async function loadShiftPlanState(isCurrent = () => true) {
   const persistedShiftPlanDraft = normalizeShiftPlanDraftPersistence(
     loadStepDraft<ShiftPlanDraftPersistence | Partial<typeof shiftPlanDraft>>('shift-plan'),
   );
+  stepLoadError.shiftPlan = '';
   await loadShiftPlanningReferenceOptions(isCurrent);
   if (!isCurrent()) {
     return;
@@ -3144,11 +3361,20 @@ async function loadShiftPlanState(isCurrent = () => true) {
     }
     return;
   }
-  const plan = await getShiftPlan(props.tenantId, props.wizardState.shift_plan_id, props.accessToken);
-  if (!isCurrent()) {
+  const detailVersions = beginStepLoads('shiftPlanDetail');
+  let plan: ShiftPlanRead | null = null;
+  try {
+    plan = await getShiftPlan(props.tenantId, props.wizardState.shift_plan_id, props.accessToken);
+    if (!isCurrent()) {
+      return;
+    }
+    syncShiftPlanDraft(plan);
+  } finally {
+    finishStepLoads(detailVersions, isCurrent);
+  }
+  if (!plan) {
     return;
   }
-  syncShiftPlanDraft(plan);
   const selectedPlanBaseline = buildSelectedShiftPlanBaseline(plan);
   if (
     persistedShiftPlanDraft &&
@@ -3168,6 +3394,7 @@ async function loadShiftPlanState(isCurrent = () => true) {
 
 async function loadSeriesState(isCurrent = () => true) {
   const persistedSeriesDraft = loadStepDraft<SeriesExceptionsDraftPersistence>('series-exceptions');
+  stepLoadError.series = '';
   await loadSeriesReferenceOptions(isCurrent);
   if (!isCurrent()) {
     return;
@@ -3191,11 +3418,16 @@ async function loadSeriesState(isCurrent = () => true) {
     }
     return;
   }
-  const listedSeries = await listShiftSeries(props.tenantId, props.wizardState.shift_plan_id, props.accessToken);
-  if (!isCurrent()) {
-    return;
+  const rowVersions = beginStepLoads('seriesRows');
+  try {
+    const listedSeries = await listShiftSeries(props.tenantId, props.wizardState.shift_plan_id, props.accessToken);
+    if (!isCurrent()) {
+      return;
+    }
+    seriesRows.value = listedSeries;
+  } finally {
+    finishStepLoads(rowVersions, isCurrent);
   }
-  seriesRows.value = listedSeries;
   if (!props.wizardState.series_id) {
     if (!isCurrent()) {
       return;
@@ -3214,15 +3446,20 @@ async function loadSeriesState(isCurrent = () => true) {
     }
     return;
   }
-  const [series, exceptions] = await Promise.all([
-    getShiftSeries(props.tenantId, props.wizardState.series_id, props.accessToken),
-    listShiftSeriesExceptions(props.tenantId, props.wizardState.series_id, props.accessToken),
-  ]);
-  if (!isCurrent()) {
-    return;
+  const detailVersions = beginStepLoads('seriesDetail', 'seriesExceptions');
+  try {
+    const [series, exceptions] = await Promise.all([
+      getShiftSeries(props.tenantId, props.wizardState.series_id, props.accessToken),
+      listShiftSeriesExceptions(props.tenantId, props.wizardState.series_id, props.accessToken),
+    ]);
+    if (!isCurrent()) {
+      return;
+    }
+    syncSeriesDraft(series);
+    seriesExceptions.value = exceptions;
+  } finally {
+    finishStepLoads(detailVersions, isCurrent);
   }
-  syncSeriesDraft(series);
-  seriesExceptions.value = exceptions;
   if (persistedSeriesDraft) {
     applySeriesDraftPersistence(persistedSeriesDraft);
     restoreDraftMessage();
@@ -3240,6 +3477,7 @@ async function refreshStepData() {
   lastLoadedStepContextKey = externalContextKey;
   const isCurrent = buildStepLoadGuard();
   clearDraftRestoreMessage();
+  clearStepLoadErrors();
   emit('step-ui-state', props.currentStepId, { loading: true, error: '' });
   stepLoading.value = true;
   try {
@@ -3266,6 +3504,7 @@ async function refreshStepData() {
     }
     lastLoadedStepContextKey = '';
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.stepLoad'));
+    markActiveStepLoadError($t('sicherplan.customerPlansWizard.errors.stepLoad'));
     emit('step-ui-state', props.currentStepId, { error: 'load_failed' });
   } finally {
     if (!isCurrent()) {
@@ -4755,9 +4994,15 @@ onBeforeUnmount(() => {
           {{ $t('sicherplan.customerPlansWizard.forms.existingCustomerOrders') }}
         </p>
         <div class="sp-customer-plan-wizard-step__list" data-testid="customer-new-plan-existing-order-list">
-          <p v-if="customerOrderRowsLoading" class="field-help">{{ $t('sicherplan.customerPlansWizard.loadingBody') }}</p>
-          <p v-else-if="customerOrderRowsError" class="field-help">{{ customerOrderRowsError }}</p>
-          <p v-else-if="!customerOrderRows.length" class="field-help">
+          <LocalLoadingIndicator
+            v-if="customerOrderRowsLoading || stepLoadState.orderDetails"
+            :label="savedDataLoadingLabel"
+            test-id="customer-new-plan-order-loading"
+          />
+          <p v-if="stepLoadError.orderDetails || customerOrderRowsError" class="field-help">
+            {{ stepLoadError.orderDetails || customerOrderRowsError }}
+          </p>
+          <p v-else-if="!customerOrderRowsLoading && !stepLoadState.orderDetails && !customerOrderRows.length" class="field-help">
             {{ $t('sicherplan.customerPlansWizard.forms.noExistingOrdersFound') }}
           </p>
           <div
@@ -4783,7 +5028,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div v-if="selectedExistingOrderSummary" class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static" data-testid="customer-new-plan-selected-order-summary">
+      <div v-if="selectedExistingOrderSummary" class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static" data-testid="customer-new-plan-selected-order-summary">
           <strong>{{ $t('sicherplan.customerPlansWizard.forms.selectedOrder') }}: {{ selectedExistingOrderSummary.order_no }} · {{ selectedExistingOrderSummary.title }}</strong>
           <span>{{ selectedExistingOrderSummary.service_from }} - {{ selectedExistingOrderSummary.service_to }}</span>
         </div>
@@ -4800,6 +5045,11 @@ onBeforeUnmount(() => {
         v-if="orderSelectionMode === 'create_new' || existingOrderEditActive"
         :data-testid="existingOrderEditActive ? 'customer-new-plan-existing-order-edit-form' : undefined"
       >
+        <LocalLoadingIndicator
+          v-if="stepLoadState.orderDetails"
+          :label="savedDataLoadingLabel"
+          test-id="customer-new-plan-step-local-loading"
+        />
         <div class="sp-customer-plan-wizard-step__grid">
           <label class="field-stack">
             <span>{{ $t('sicherplan.customerPlansWizard.forms.customer') }}</span>
@@ -4895,6 +5145,17 @@ onBeforeUnmount(() => {
           {{ $t('sicherplan.customerPlansWizard.forms.newEquipment') }}
         </button>
       </div>
+      <LocalLoadingIndicator
+        v-if="stepLoadState.equipmentLines"
+        :label="savedDataLoadingLabel"
+        test-id="customer-new-plan-equipment-lines-loading"
+      />
+      <LocalLoadingIndicator
+        v-if="stepLoadState.orderReferenceOptions"
+        :label="referenceDataLoadingLabel"
+        test-id="customer-new-plan-equipment-options-loading"
+      />
+      <p v-if="stepLoadError.equipmentLines" class="field-help">{{ stepLoadError.equipmentLines }}</p>
       <div v-if="orderEquipmentLines.length" class="sp-customer-plan-wizard-step__list">
         <button
           v-for="line in orderEquipmentLines"
@@ -4974,6 +5235,17 @@ onBeforeUnmount(() => {
           {{ $t('sicherplan.customerPlansWizard.forms.newRequirement') }}
         </button>
       </div>
+      <LocalLoadingIndicator
+        v-if="stepLoadState.requirementLines"
+        :label="savedDataLoadingLabel"
+        test-id="customer-new-plan-requirement-lines-loading"
+      />
+      <LocalLoadingIndicator
+        v-if="stepLoadState.orderReferenceOptions"
+        :label="referenceDataLoadingLabel"
+        test-id="customer-new-plan-requirement-options-loading"
+      />
+      <p v-if="stepLoadError.requirementLines" class="field-help">{{ stepLoadError.requirementLines }}</p>
       <div v-if="orderRequirementLines.length" class="sp-customer-plan-wizard-step__list">
         <button
           v-for="line in orderRequirementLines"
@@ -5066,6 +5338,12 @@ onBeforeUnmount(() => {
 
     <section v-else-if="documentsStepActive" class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-order-documents">
       <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.orderDocumentsOptional') }}</p>
+      <LocalLoadingIndicator
+        v-if="stepLoadState.orderDocuments"
+        :label="savedDataLoadingLabel"
+        test-id="customer-new-plan-order-documents-loading"
+      />
+      <p v-if="stepLoadError.orderDocuments" class="field-help">{{ stepLoadError.orderDocuments }}</p>
       <div v-if="orderAttachments.length" class="sp-customer-plan-wizard-step__list" data-testid="customer-new-plan-order-document-list">
         <div v-for="document in orderAttachments" :key="document.id" class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static">
           <strong>{{ document.title }}</strong>
@@ -5182,9 +5460,13 @@ onBeforeUnmount(() => {
           </label>
         </div>
         <template v-if="planningModeUsesExisting">
-          <p v-if="planningEntityLoading" class="field-help">{{ $t('sicherplan.customerPlansWizard.loadingBody') }}</p>
-          <p v-else-if="planningEntityError" class="field-help">{{ planningEntityError }}</p>
-          <template v-else-if="planningEntityOptions.length">
+          <LocalLoadingIndicator
+            v-if="planningEntityLoading || stepLoadState.planningReferenceOptions"
+            :label="referenceDataLoadingLabel"
+            test-id="customer-new-plan-planning-reference-loading"
+          />
+          <p v-if="planningEntityError" class="field-help">{{ planningEntityError }}</p>
+          <template v-if="planningEntityOptions.length">
             <div class="sp-customer-plan-wizard-step__list" data-testid="customer-new-plan-planning-context-list">
               <button
                 v-for="row in planningEntityOptions"
@@ -5200,7 +5482,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </template>
-          <div v-else data-testid="customer-new-plan-planning-context-empty">
+          <div v-else-if="!planningEntityLoading && !stepLoadState.planningReferenceOptions" data-testid="customer-new-plan-planning-context-empty">
             <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.noPlanningEntriesFoundForCustomer') }}</p>
             <div class="cta-row">
               <button
@@ -5232,9 +5514,15 @@ onBeforeUnmount(() => {
       >
         <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.existingPlanningRecords') }}</strong></p>
         <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.existingPlanningRecordsHelp') }}</p>
-        <p v-if="planningRecordRowsLoading" class="field-help">{{ $t('sicherplan.customerPlansWizard.loadingBody') }}</p>
-        <p v-else-if="planningRecordRowsError" class="field-help">{{ planningRecordRowsError }}</p>
-        <div v-else-if="planningRecordRows.length" class="sp-customer-plan-wizard-step__list">
+        <LocalLoadingIndicator
+          v-if="planningRecordRowsLoading || stepLoadState.planningRecords"
+          :label="savedDataLoadingLabel"
+          test-id="customer-new-plan-planning-record-loading"
+        />
+        <p v-if="stepLoadError.planningRecords || planningRecordRowsError" class="field-help">
+          {{ stepLoadError.planningRecords || planningRecordRowsError }}
+        </p>
+        <div v-if="planningRecordRows.length" class="sp-customer-plan-wizard-step__list">
           <button
             v-for="row in planningRecordRows"
             :key="row.id"
@@ -5248,11 +5536,17 @@ onBeforeUnmount(() => {
             <span>{{ row.planning_from }} - {{ row.planning_to }}</span>
           </button>
         </div>
-        <p v-else class="field-help" data-testid="customer-new-plan-existing-planning-records-empty">
+        <p v-else-if="!planningRecordRowsLoading && !stepLoadState.planningRecords" class="field-help" data-testid="customer-new-plan-existing-planning-records-empty">
           {{ $t('sicherplan.customerPlansWizard.forms.noPlanningRecordsFoundForContext') }}
         </p>
       </section>
       <div v-if="hasPlanningContext" class="sp-customer-plan-wizard-step__grid" data-testid="customer-new-plan-planning-record-details">
+        <LocalLoadingIndicator
+          v-if="stepLoadState.planningRecordDetail"
+          :label="savedDataLoadingLabel"
+          test-id="customer-new-plan-planning-record-detail-loading"
+        />
+        <p v-if="stepLoadError.planningRecordDetail" class="field-help">{{ stepLoadError.planningRecordDetail }}</p>
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.orderTitle') }}</span>
           <input :value="selectedOrder?.title || orderDraft.title" readonly />
@@ -5317,6 +5611,12 @@ onBeforeUnmount(() => {
       data-testid="customer-new-plan-step-panel-planning-record-documents"
     >
       <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.planningDocumentsOptional') }}</p>
+      <LocalLoadingIndicator
+        v-if="stepLoadState.planningDocuments"
+        :label="savedDataLoadingLabel"
+        test-id="customer-new-plan-planning-documents-loading"
+      />
+      <p v-if="stepLoadError.planningDocuments" class="field-help">{{ stepLoadError.planningDocuments }}</p>
       <div v-if="planningRecordAttachments.length" class="sp-customer-plan-wizard-step__list">
         <div
           v-for="document in planningRecordAttachments"
@@ -5366,6 +5666,17 @@ onBeforeUnmount(() => {
     </section>
 
     <section v-else-if="shiftPlanStepActive" class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-shift-plan">
+      <LocalLoadingIndicator
+        v-if="stepLoadState.shiftPlans"
+        :label="savedDataLoadingLabel"
+        test-id="customer-new-plan-shift-plan-loading"
+      />
+      <LocalLoadingIndicator
+        v-if="stepLoadState.shiftReferenceOptions"
+        :label="referenceDataLoadingLabel"
+        test-id="customer-new-plan-shift-options-loading"
+      />
+      <p v-if="stepLoadError.shiftPlan" class="field-help">{{ stepLoadError.shiftPlan }}</p>
       <div v-if="shiftPlanRows.length" class="cta-row">
         <button
           type="button"
@@ -5402,6 +5713,11 @@ onBeforeUnmount(() => {
         <strong>{{ $t('sicherplan.customerPlansWizard.forms.selectedShiftPlan') }}: {{ selectedShiftPlanSummary.name }}</strong>
         <span>{{ selectedShiftPlanSummary.planning_from }} - {{ selectedShiftPlanSummary.planning_to }}</span>
       </div>
+      <LocalLoadingIndicator
+        v-if="stepLoadState.shiftPlanDetail"
+        :label="savedDataLoadingLabel"
+        test-id="customer-new-plan-shift-plan-detail-loading"
+      />
       <div class="sp-customer-plan-wizard-step__grid">
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.planningRecord') }}</span>
@@ -5447,6 +5763,22 @@ onBeforeUnmount(() => {
     </section>
 
     <section v-else-if="seriesStepActive" class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-series-exceptions">
+      <LocalLoadingIndicator
+        v-if="stepLoadState.seriesContext"
+        :label="savedDataLoadingLabel"
+        test-id="customer-new-plan-series-context-loading"
+      />
+      <LocalLoadingIndicator
+        v-if="stepLoadState.seriesRows"
+        :label="savedDataLoadingLabel"
+        test-id="customer-new-plan-series-loading"
+      />
+      <LocalLoadingIndicator
+        v-if="stepLoadState.seriesReferenceOptions"
+        :label="referenceDataLoadingLabel"
+        test-id="customer-new-plan-series-options-loading"
+      />
+      <p v-if="stepLoadError.series" class="field-help">{{ stepLoadError.series }}</p>
       <div
         v-if="selectedShiftPlanSummary"
         class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static"
@@ -5482,6 +5814,11 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div class="sp-customer-plan-wizard-step__grid">
+        <LocalLoadingIndicator
+          v-if="stepLoadState.seriesDetail"
+          :label="savedDataLoadingLabel"
+          test-id="customer-new-plan-series-detail-loading"
+        />
         <label class="field-stack">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.label') }}</span>
           <input v-model="seriesDraft.label" data-testid="customer-new-plan-series-label" />
@@ -5645,6 +5982,11 @@ onBeforeUnmount(() => {
         </label>
       </div>
       <div class="sp-customer-plan-wizard-step__divider"></div>
+      <LocalLoadingIndicator
+        v-if="stepLoadState.seriesExceptions"
+        :label="savedDataLoadingLabel"
+        test-id="customer-new-plan-series-exceptions-loading"
+      />
       <div v-if="seriesExceptions.length" class="sp-customer-plan-wizard-step__list">
         <button
           v-for="row in seriesExceptions"

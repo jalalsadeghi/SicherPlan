@@ -1241,6 +1241,7 @@ export type MessageKey =
   | "customerAdmin.tabs.overview"
   | "customerAdmin.tabs.contacts"
   | "customerAdmin.tabs.addresses"
+  | "customerAdmin.tabs.contactAccess"
   | "customerAdmin.tabs.commercial"
   | "customerAdmin.tabs.portal"
   | "customerAdmin.tabs.plans"
@@ -1330,6 +1331,12 @@ export type MessageKey =
   | "customerAdmin.summary.ranking"
   | "customerAdmin.summary.customerStatus"
   | "customerAdmin.summary.none"
+  | "customerAdmin.contactAccess.contactsTitle"
+  | "customerAdmin.contactAccess.contactsDescription"
+  | "customerAdmin.contactAccess.addressesTitle"
+  | "customerAdmin.contactAccess.addressesDescription"
+  | "customerAdmin.contactAccess.portalTitle"
+  | "customerAdmin.contactAccess.portalDescription"
   | "customerAdmin.contacts.eyebrow"
   | "customerAdmin.contacts.title"
   | "customerAdmin.contacts.lead"
@@ -3288,6 +3295,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.tabs.overview": "Überblick",
     "customerAdmin.tabs.contacts": "Kontakte",
     "customerAdmin.tabs.addresses": "Adressen",
+    "customerAdmin.tabs.contactAccess": "Kontakte & Zugang",
     "customerAdmin.tabs.commercial": "Commercial",
     "customerAdmin.tabs.portal": "Portal",
     "customerAdmin.tabs.plans": "Pläne",
@@ -3381,6 +3389,15 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.summary.ranking": "Ranking",
     "customerAdmin.summary.customerStatus": "Kundenstatus",
     "customerAdmin.summary.none": "Nicht gesetzt",
+    "customerAdmin.contactAccess.contactsTitle": "Kontakte",
+    "customerAdmin.contactAccess.contactsDescription":
+      "Kontaktpersonen, Rollen, Kommunikationsdaten sowie Haupt- und Rechnungskontakte verwalten.",
+    "customerAdmin.contactAccess.addressesTitle": "Adressen",
+    "customerAdmin.contactAccess.addressesDescription":
+      "Register-, Rechnungs-, Post- und Serviceadressen dieses Kunden verknüpfen und pflegen.",
+    "customerAdmin.contactAccess.portalTitle": "Portal & Zugang",
+    "customerAdmin.contactAccess.portalDescription":
+      "Portal-Sichtbarkeit, Benutzerzugänge, Passwortaktionen und Login-Historie steuern.",
     "customerAdmin.contacts.eyebrow": "Kontakte",
     "customerAdmin.contacts.title": "Kontaktpflege",
     "customerAdmin.contacts.lead": "Kontaktregister und Bearbeitung bleiben in einer strukturierten Kundenakte mit klarer Feldlogik getrennt.",
@@ -5403,6 +5420,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.tabs.overview": "Overview",
     "customerAdmin.tabs.contacts": "Contacts",
     "customerAdmin.tabs.addresses": "Addresses",
+    "customerAdmin.tabs.contactAccess": "Contacts & Access",
     "customerAdmin.tabs.commercial": "Commercial",
     "customerAdmin.tabs.portal": "Portal",
     "customerAdmin.tabs.plans": "Plans",
@@ -5496,6 +5514,15 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.summary.ranking": "Ranking",
     "customerAdmin.summary.customerStatus": "Customer status",
     "customerAdmin.summary.none": "Not set",
+    "customerAdmin.contactAccess.contactsTitle": "Contacts",
+    "customerAdmin.contactAccess.contactsDescription":
+      "Manage customer contact persons, roles, communication data, and primary/billing contact flags.",
+    "customerAdmin.contactAccess.addressesTitle": "Addresses",
+    "customerAdmin.contactAccess.addressesDescription":
+      "Link and maintain registered, billing, mailing, and service addresses for this customer.",
+    "customerAdmin.contactAccess.portalTitle": "Portal & Access",
+    "customerAdmin.contactAccess.portalDescription":
+      "Control portal visibility, portal user access, password actions, and customer login history.",
     "customerAdmin.contacts.eyebrow": "Contacts",
     "customerAdmin.contacts.title": "Contact maintenance",
     "customerAdmin.contacts.lead": "Keep the contact register and the editor separate inside one structured customer file layout.",

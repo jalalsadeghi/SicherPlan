@@ -16,14 +16,18 @@ export const CUSTOMER_PERMISSION_MATRIX = {
 export const CUSTOMER_DETAIL_TAB_ORDER = [
   "dashboard",
   "overview",
-  "contacts",
-  "addresses",
+  "contact_access",
   "commercial",
-  "portal",
   "plans",
   "history",
   "employee_blocks",
 ];
+
+const CUSTOMER_DETAIL_TAB_ALIASES = {
+  addresses: "contact_access",
+  contacts: "contact_access",
+  portal: "contact_access",
+};
 
 export const CUSTOMER_COMMERCIAL_TAB_ORDER = [
   "billing_profile",
@@ -219,7 +223,9 @@ export function normalizeCustomerDetailTab(activeTab, options) {
     return "";
   }
 
-  return tabs.includes(activeTab) ? activeTab : (options?.isCreatingCustomer ? "overview" : "dashboard");
+  const normalizedTab = CUSTOMER_DETAIL_TAB_ALIASES[activeTab] ?? activeTab;
+
+  return tabs.includes(normalizedTab) ? normalizedTab : (options?.isCreatingCustomer ? "overview" : "dashboard");
 }
 
 export function normalizeCustomerCommercialTab(activeTab) {

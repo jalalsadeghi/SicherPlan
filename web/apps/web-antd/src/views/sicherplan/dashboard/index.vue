@@ -70,6 +70,8 @@ const expandedCalendarDays = ref<string[]>([]);
 const lastLoadedDashboardKey = ref('');
 const activeDashboardLoadKey = ref('');
 const activeCoverageMonthKey = ref('');
+const calendarError = ref('');
+const calendarLoading = ref(false);
 const calendarCoverageItemsByDay = ref<Map<string, CalendarCellItem[]>>(new Map());
 const dashboardBootstrapComplete = ref(false);
 const dashboardSessionWatchArmed = ref(false);
@@ -116,7 +118,10 @@ function resetDashboardData() {
 
 function resetCalendarCoverage() {
   activeCoverageMonthKey.value = '';
+  calendarError.value = '';
+  calendarLoading.value = false;
   calendarCoverageItemsByDay.value = new Map();
+  coverageRequestVersion.value += 1;
   expandedCalendarDays.value = [];
 }
 
@@ -242,10 +247,14 @@ async function loadCalendarCoverageForVisibleMonth(options: { force?: boolean } 
   const cachedItems = coverageMonthCache.get(monthKey);
   if (cachedItems && !options.force) {
     calendarCoverageItemsByDay.value = cachedItems;
+    calendarError.value = '';
+    calendarLoading.value = false;
     return;
   }
 
   calendarCoverageItemsByDay.value = cachedItems ?? new Map();
+  calendarError.value = '';
+  calendarLoading.value = true;
 
   let request = coverageMonthRequests.get(monthKey);
   if (!request || options.force) {
@@ -254,22 +263,44 @@ async function loadCalendarCoverageForVisibleMonth(options: { force?: boolean } 
       date_to: formatDateTimeLocalValue(visibleCalendarMonthEnd(activeDate.value)),
     }).then((coverageRows) => buildCalendarCoverageItemsByDay(coverageRows));
     coverageMonthRequests.set(monthKey, request);
-    void request.finally(() => {
-      if (coverageMonthRequests.get(monthKey) === request) {
-        coverageMonthRequests.delete(monthKey);
-      }
-    });
+    void request.then(
+      () => {
+        if (coverageMonthRequests.get(monthKey) === request) {
+          coverageMonthRequests.delete(monthKey);
+        }
+      },
+      () => {
+        if (coverageMonthRequests.get(monthKey) === request) {
+          coverageMonthRequests.delete(monthKey);
+        }
+      },
+    );
   }
 
   const requestVersion = ++coverageRequestVersion.value;
-  const itemsByDay = await request;
-  coverageMonthCache.set(monthKey, itemsByDay);
+  try {
+    const itemsByDay = await request;
+    coverageMonthCache.set(monthKey, itemsByDay);
 
-  if (requestVersion !== coverageRequestVersion.value || activeCoverageMonthKey.value !== monthKey) {
-    return;
+    if (requestVersion !== coverageRequestVersion.value || activeCoverageMonthKey.value !== monthKey) {
+      return;
+    }
+
+    calendarCoverageItemsByDay.value = itemsByDay;
+  } catch {
+    if (requestVersion !== coverageRequestVersion.value || activeCoverageMonthKey.value !== monthKey) {
+      return;
+    }
+    calendarCoverageItemsByDay.value = new Map();
+    calendarError.value = $t('sicherplan.dashboardView.calendar.loadError');
+  } finally {
+    if (requestVersion === coverageRequestVersion.value && activeCoverageMonthKey.value === monthKey) {
+      calendarLoading.value = false;
+    }
+    if (coverageMonthRequests.get(monthKey) === request) {
+      coverageMonthRequests.delete(monthKey);
+    }
   }
-
-  calendarCoverageItemsByDay.value = itemsByDay;
 }
 
 function toggleCalendarDay(dayKey: string) {
@@ -842,6 +873,8 @@ onBeforeUnmount(() => {
       action-to="/admin/planning-shifts"
       :cells="calendarPanelCells"
       :description="$t('sicherplan.dashboardView.calendar.description')"
+      :loading="calendarLoading"
+      :loading-label="$t('workspace.loading.processing')"
       :month-hint="$t('sicherplan.dashboardView.calendar.monthHint')"
       :month-label="monthLabel"
       :more-label="$t('sicherplan.dashboardView.calendar.more')"
@@ -855,6 +888,13 @@ onBeforeUnmount(() => {
       @shift-calendar="shiftCalendar"
       @toggle-day="toggleCalendarDay"
     />
+    <div
+      v-if="calendarError"
+      class="sp-dashboard__calendar-error"
+      data-testid="dashboard-calendar-error"
+    >
+      {{ calendarError }}
+    </div>
   </div>
 </template>
 
@@ -1006,6 +1046,19 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sp-dashboard__calendar-error {
+  width: fit-content;
+  max-width: 100%;
+  margin-top: -0.6rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--sp-color-danger) 28%, var(--sp-color-border-soft));
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--sp-color-danger) 10%, var(--sp-color-surface-card));
+  color: var(--sp-color-danger);
+  font-size: 0.85rem;
+  font-weight: 700;
 }
 
 .sp-dashboard__panel-head {

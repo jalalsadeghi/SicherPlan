@@ -486,6 +486,128 @@ describe('SicherPlan dashboard session loading', () => {
     await flushPromises();
 
     expect(listStaffingCoverageMock).toHaveBeenCalledTimes(2);
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(false);
+    expect(wrapper.find('.sp-dashboard__calendar-grid').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Day Shift');
+  });
+
+  it('shows a local calendar loading indicator during main dashboard month navigation', async () => {
+    legacyAuthStoreState.effectiveAccessToken = 'token-1';
+    legacyAuthStoreState.tenantScopeId = 'tenant-1';
+    legacyAuthStoreState.sessionUser = { tenant_id: 'tenant-1' };
+    const nextMonthDeferred = createDeferred<any[]>();
+    listStaffingCoverageMock
+      .mockResolvedValueOnce([])
+      .mockImplementationOnce(() => nextMonthDeferred.promise);
+
+    wrapper = await mountView();
+    await flushPromises();
+
+    const initialMonthText = wrapper.get('.sp-dashboard__calendar-topline strong').text();
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(false);
+
+    await getButtonByText(wrapper, 'sicherplan.dashboardView.calendar.next').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('.sp-dashboard__calendar-card').exists()).toBe(true);
+    expect(wrapper.find('.sp-dashboard__calendar-grid').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="customer-dashboard-calendar-loading-indicator"]').text()).toContain(
+      'workspace.loading.processing',
+    );
+    expect(wrapper.get('.sp-dashboard__calendar-topline strong').text()).not.toBe(initialMonthText);
+    expect(wrapper.find('.sp-loading-overlay').exists()).toBe(false);
+    expect(wrapper.find('.sicherplan-loading-overlay').exists()).toBe(false);
+    expect(wrapper.get('.sp-dashboard').classes()).not.toContain('is-loading');
+    expect(wrapper.get('.sp-dashboard__calendar-card').classes()).not.toContain('is-dimmed');
+    expect(listCustomersMock).toHaveBeenCalledTimes(1);
+    expect(listCustomerOrdersMock).toHaveBeenCalledTimes(1);
+
+    nextMonthDeferred.resolve([
+      {
+        shift_id: 'shift-next',
+        planning_record_id: 'planning-next',
+        shift_plan_id: 'plan-next',
+        order_id: 'order-next',
+        order_no: 'ORD-NEXT',
+        planning_record_name: 'Planning Next',
+        planning_mode_code: 'site',
+        workforce_scope_code: 'internal',
+        starts_at: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 14, 8, 0, 0, 0).toISOString(),
+        ends_at: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 14, 16, 0, 0, 0).toISOString(),
+        shift_type_code: 'night_shift',
+        location_text: 'Berlin',
+        meeting_point: 'Gate B',
+        min_required_qty: 1,
+        target_required_qty: 2,
+        assigned_count: 1,
+        confirmed_count: 0,
+        released_partner_qty: 0,
+        coverage_state: 'yellow',
+        demand_groups: [{ demand_group_id: 'dg-next' }],
+      },
+    ]);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(false);
+    expect(wrapper.find('.sp-dashboard__calendar-grid').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Night Shift');
+  });
+
+  it('keeps an empty main dashboard calendar month visible after loading completes', async () => {
+    legacyAuthStoreState.effectiveAccessToken = 'token-1';
+    legacyAuthStoreState.tenantScopeId = 'tenant-1';
+    legacyAuthStoreState.sessionUser = { tenant_id: 'tenant-1' };
+    const nextMonthDeferred = createDeferred<any[]>();
+    listStaffingCoverageMock
+      .mockResolvedValueOnce([])
+      .mockImplementationOnce(() => nextMonthDeferred.promise);
+
+    wrapper = await mountView();
+    await flushPromises();
+
+    await getButtonByText(wrapper, 'sicherplan.dashboardView.calendar.next').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(true);
+    expect(wrapper.find('.sp-dashboard__calendar-grid').exists()).toBe(true);
+
+    nextMonthDeferred.resolve([]);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(false);
+    expect(wrapper.find('.sp-dashboard__calendar-grid').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('No calendar entries yet');
+    expect(wrapper.text()).not.toContain('customerAdmin.dashboard.calendarEmptyTitle');
+  });
+
+  it('shows a local main dashboard calendar error after failed month loading', async () => {
+    legacyAuthStoreState.effectiveAccessToken = 'token-1';
+    legacyAuthStoreState.tenantScopeId = 'tenant-1';
+    legacyAuthStoreState.sessionUser = { tenant_id: 'tenant-1' };
+    const nextMonthDeferred = createDeferred<any[]>();
+    listStaffingCoverageMock
+      .mockResolvedValueOnce([])
+      .mockImplementationOnce(() => nextMonthDeferred.promise);
+
+    wrapper = await mountView();
+    await flushPromises();
+
+    await getButtonByText(wrapper, 'sicherplan.dashboardView.calendar.next').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(true);
+    expect(wrapper.find('.sp-dashboard__calendar-grid').exists()).toBe(true);
+
+    nextMonthDeferred.reject(new Error('boom'));
+    await flushPromises();
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(false);
+    expect(wrapper.find('.sp-dashboard__calendar-grid').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="dashboard-calendar-error"]').text()).toContain(
+      'sicherplan.dashboardView.calendar.loadError',
+    );
   });
 
   it('ignores stale month coverage responses when a newer month resolves later', async () => {
@@ -559,6 +681,96 @@ describe('SicherPlan dashboard session loading', () => {
 
     expect(wrapper.text()).toContain('Night Shift');
     expect(wrapper.text()).not.toContain('Day Shift');
+  });
+
+  it('keeps loading active when an older month request resolves before the latest active month', async () => {
+    legacyAuthStoreState.effectiveAccessToken = 'token-1';
+    legacyAuthStoreState.tenantScopeId = 'tenant-1';
+    legacyAuthStoreState.sessionUser = { tenant_id: 'tenant-1' };
+    const nextMonthDeferred = createDeferred<any[]>();
+    const followingMonthDeferred = createDeferred<any[]>();
+    const currentDate = new Date();
+    const nextMonthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 14, 8, 0, 0, 0);
+    const followingMonthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 14, 8, 0, 0, 0);
+    listStaffingCoverageMock
+      .mockResolvedValueOnce([])
+      .mockImplementationOnce(() => nextMonthDeferred.promise)
+      .mockImplementationOnce(() => followingMonthDeferred.promise);
+
+    wrapper = await mountView();
+    await flushPromises();
+
+    await getButtonByText(wrapper, 'sicherplan.dashboardView.calendar.next').trigger('click');
+    await flushPromises();
+    const nextMonthLabel = wrapper.get('.sp-dashboard__calendar-topline strong').text();
+
+    await getButtonByText(wrapper, 'sicherplan.dashboardView.calendar.next').trigger('click');
+    await flushPromises();
+    const followingMonthLabel = wrapper.get('.sp-dashboard__calendar-topline strong').text();
+
+    expect(followingMonthLabel).not.toBe(nextMonthLabel);
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(true);
+
+    nextMonthDeferred.resolve([
+      {
+        shift_id: 'shift-stale',
+        planning_record_id: 'planning-stale',
+        shift_plan_id: 'plan-stale',
+        order_id: 'order-stale',
+        order_no: 'ORD-STALE',
+        planning_record_name: 'Planning Stale',
+        planning_mode_code: 'site',
+        workforce_scope_code: 'internal',
+        starts_at: nextMonthDate.toISOString(),
+        ends_at: new Date(nextMonthDate.getFullYear(), nextMonthDate.getMonth(), 14, 16, 0, 0, 0).toISOString(),
+        shift_type_code: 'stale_shift',
+        location_text: 'Berlin',
+        meeting_point: 'Gate A',
+        min_required_qty: 1,
+        target_required_qty: 2,
+        assigned_count: 1,
+        confirmed_count: 1,
+        released_partner_qty: 0,
+        coverage_state: 'green',
+        demand_groups: [{ demand_group_id: 'dg-stale' }],
+      },
+    ]);
+    await flushPromises();
+
+    expect(wrapper.get('.sp-dashboard__calendar-topline strong').text()).toBe(followingMonthLabel);
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('Stale Shift');
+
+    followingMonthDeferred.resolve([
+      {
+        shift_id: 'shift-latest',
+        planning_record_id: 'planning-latest',
+        shift_plan_id: 'plan-latest',
+        order_id: 'order-latest',
+        order_no: 'ORD-LATEST',
+        planning_record_name: 'Planning Latest',
+        planning_mode_code: 'site',
+        workforce_scope_code: 'internal',
+        starts_at: followingMonthDate.toISOString(),
+        ends_at: new Date(followingMonthDate.getFullYear(), followingMonthDate.getMonth(), 14, 16, 0, 0, 0).toISOString(),
+        shift_type_code: 'latest_shift',
+        location_text: 'Berlin',
+        meeting_point: 'Gate B',
+        min_required_qty: 1,
+        target_required_qty: 2,
+        assigned_count: 1,
+        confirmed_count: 0,
+        released_partner_qty: 0,
+        coverage_state: 'yellow',
+        demand_groups: [{ demand_group_id: 'dg-latest' }],
+      },
+    ]);
+    await flushPromises();
+
+    expect(wrapper.get('.sp-dashboard__calendar-topline strong').text()).toBe(followingMonthLabel);
+    expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Latest Shift');
+    expect(wrapper.text()).not.toContain('Stale Shift');
   });
 
   it('renders real staffing coverage items with coverage tones and expands remaining items on demand', async () => {
