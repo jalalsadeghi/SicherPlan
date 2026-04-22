@@ -6,6 +6,7 @@ import {
   buildPlanningImportTemplate,
   derivePlanningActionState,
   isPlanningChildEntity,
+  PLANNING_ENTITY_OPTIONS,
   PLANNING_MODE_OPTIONS,
   normalizePlanningEditorEntity,
   formatPlanningAddressOption,
@@ -26,6 +27,13 @@ test("derivePlanningActionState grants dispatcher planning write access", () => 
   assert.equal(state.canManageChildren, false);
 });
 
+test("planning setup entity order groups service categories with tenant catalogs", () => {
+  assert.deepEqual(
+    PLANNING_ENTITY_OPTIONS.slice(0, 3),
+    ["requirement_type", "service_category", "equipment_item"],
+  );
+});
+
 test("derivePlanningActionState enables child editing for fair and route records", () => {
   assert.equal(derivePlanningActionState("tenant_admin", "trade_fair", { id: "1" }).canManageChildren, true);
   assert.equal(derivePlanningActionState("tenant_admin", "patrol_route", { id: "1" }).canManageChildren, true);
@@ -43,6 +51,10 @@ test("buildPlanningImportTemplate returns stable CSV headers", () => {
   assert.equal(
     buildPlanningImportTemplate("equipment_item"),
     "code,label,unit_of_measure_code,notes,status",
+  );
+  assert.equal(
+    buildPlanningImportTemplate("service_category"),
+    "code,label,sort_order,notes,status",
   );
 });
 
@@ -144,6 +156,10 @@ test("resolvePlanningRouteContext keeps only supported entity and customer query
     { entity: "requirement_type", customerId: "customer-1" },
   );
   assert.deepEqual(
+    resolvePlanningRouteContext({ entity: "service_category" }),
+    { entity: "service_category", customerId: "" },
+  );
+  assert.deepEqual(
     resolvePlanningRouteContext({ entity: "unknown", customer_id: 7 }),
     { entity: null, customerId: "" },
   );
@@ -234,6 +250,17 @@ test("planning create validation covers top-level entities with entity-specific 
     validatePlanningCreateDraft({
       editorEntityKey: "equipment_item",
       draft: { customer_id: "", code: "RADIO", label: "", unit_of_measure_code: "" },
+      zoneDraft: {},
+      checkpointDraft: {},
+      parentTradeFairId: "",
+      parentPatrolRouteId: "",
+    }),
+    "validationLabelRequired",
+  );
+  assert.equal(
+    validatePlanningCreateDraft({
+      editorEntityKey: "service_category",
+      draft: { customer_id: "", code: "OBJ", label: "" },
       zoneDraft: {},
       checkpointDraft: {},
       parentTradeFairId: "",

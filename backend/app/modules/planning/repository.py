@@ -32,6 +32,7 @@ from app.modules.planning.models import (
     PatrolRoute,
     PlanningRecord,
     RequirementType,
+    ServiceCategory,
     Site,
     SitePlanDetail,
     Shift,
@@ -73,6 +74,8 @@ from app.modules.planning.schemas import (
     PlanningRecordUpdate,
     RequirementTypeCreate,
     RequirementTypeUpdate,
+    ServiceCategoryCreate,
+    ServiceCategoryUpdate,
     SitePlanDetailCreate,
     SitePlanDetailUpdate,
     SiteCreate,
@@ -115,6 +118,7 @@ class SqlAlchemyPlanningRepository:
     STALE_RESOURCE_CODES = {
         "RequirementType": "requirement_type",
         "EquipmentItem": "equipment_item",
+        "ServiceCategory": "service_category",
         "Site": "site",
         "EventVenue": "event_venue",
         "TradeFair": "trade_fair",
@@ -136,7 +140,7 @@ class SqlAlchemyPlanningRepository:
         "Assignment": "assignment",
         "SubcontractorRelease": "subcontractor_release",
     }
-    TENANT_SCOPED_OPS_MODELS = {RequirementType, EquipmentItem}
+    TENANT_SCOPED_OPS_MODELS = {RequirementType, EquipmentItem, ServiceCategory}
 
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -409,6 +413,41 @@ class SqlAlchemyPlanningRepository:
 
     def find_equipment_item_by_code(self, tenant_id: str, code: str, *, exclude_id: str | None = None) -> EquipmentItem | None:
         return self._find_by_code(EquipmentItem, tenant_id, code, exclude_id=exclude_id)
+
+    def list_service_categories(self, tenant_id: str, filters: OpsMasterFilter) -> list[ServiceCategory]:
+        return self._list_rows(ServiceCategory, tenant_id, filters)
+
+    def get_service_category(self, tenant_id: str, row_id: str) -> ServiceCategory | None:
+        return self._get_row(ServiceCategory, tenant_id, row_id)
+
+    def create_service_category(
+        self,
+        tenant_id: str,
+        payload: ServiceCategoryCreate,
+        actor_user_id: str | None,
+    ) -> ServiceCategory:
+        row = ServiceCategory(
+            tenant_id=tenant_id,
+            code=payload.code,
+            label=payload.label,
+            sort_order=payload.sort_order,
+            description=getattr(payload, "notes", getattr(payload, "description", None)),
+            created_by_user_id=actor_user_id,
+            updated_by_user_id=actor_user_id,
+        )
+        return self._create_row(row)
+
+    def update_service_category(
+        self,
+        tenant_id: str,
+        row_id: str,
+        payload: ServiceCategoryUpdate,
+        actor_user_id: str | None,
+    ) -> ServiceCategory | None:
+        return self._update_row(ServiceCategory, tenant_id, row_id, payload, actor_user_id)
+
+    def find_service_category_by_code(self, tenant_id: str, code: str, *, exclude_id: str | None = None) -> ServiceCategory | None:
+        return self._find_by_code(ServiceCategory, tenant_id, code, exclude_id=exclude_id)
 
     def list_sites(self, tenant_id: str, filters: OpsMasterFilter) -> list[Site]:
         return self._list_rows(Site, tenant_id, filters, extra_options=(selectinload(Site.address),))

@@ -22,6 +22,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       authority: ['platform_admin', 'tenant_admin', 'controller_qm'],
       icon: 'lucide:settings-2',
+      menuContainer: true,
       order: -9,
       title: $t('sicherplan.navigation.administration'),
     },
@@ -78,6 +79,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       authority: ['tenant_admin', 'dispatcher', 'accounting', 'controller_qm'],
       icon: 'lucide:users',
+      menuContainer: true,
       order: -8,
       title: $t('sicherplan.navigation.customers'),
     },
@@ -98,15 +100,16 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
-        name: 'SicherPlanCustomerNewPlan',
-        path: '/admin/customers/new-plan',
+        name: 'SicherPlanCustomerOrderWorkspace',
+        path: '/admin/customers/order-workspace',
+        alias: '/admin/customers/new-plan',
         component: () => import('#/views/sicherplan/customers/new-plan.vue'),
         meta: {
           authority: ['tenant_admin'],
           fullPathKey: false,
           hideInMenu: true,
           icon: 'lucide:square-pen',
-          title: $t('sicherplan.admin.customerNewPlan'),
+          title: $t('sicherplan.admin.customerOrderWorkspace'),
         },
       },
     ],
@@ -115,6 +118,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       authority: ['tenant_admin', 'dispatcher', 'controller_qm'],
       icon: 'lucide:users-round',
+      menuContainer: true,
       order: -7,
       title: $t('sicherplan.navigation.workforce'),
     },
@@ -173,6 +177,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       authority: ['tenant_admin', 'dispatcher', 'accounting', 'controller_qm'],
       icon: 'lucide:map',
+      menuContainer: true,
       order: -6,
       title: $t('sicherplan.navigation.operations'),
     },
@@ -231,6 +236,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       authority: ['tenant_admin', 'accounting', 'controller_qm'],
       icon: 'lucide:banknote',
+      menuContainer: true,
       order: -5,
       title: $t('sicherplan.navigation.finance'),
     },
@@ -289,6 +295,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       authority: ['tenant_admin', 'accounting', 'controller_qm'],
       icon: 'lucide:chart-column-big',
+      menuContainer: true,
       order: -4,
       title: $t('sicherplan.navigation.reporting'),
     },
@@ -313,6 +320,7 @@ const routes: RouteRecordRaw[] = [
   {
     meta: {
       icon: 'lucide:file-user',
+      menuContainer: true,
       order: 20,
       title: $t('sicherplan.public.title'),
     },
@@ -333,6 +341,7 @@ const routes: RouteRecordRaw[] = [
   {
     meta: {
       icon: 'lucide:door-open',
+      menuContainer: true,
       order: 10,
       title: $t('sicherplan.portal.title'),
     },
@@ -347,6 +356,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           authority: ['customer_user'],
           icon: 'lucide:user-round-search',
+          menuContainer: true,
           title: $t('sicherplan.portal.customer'),
         },
         children: [

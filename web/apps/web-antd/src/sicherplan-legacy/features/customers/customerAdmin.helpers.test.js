@@ -211,25 +211,25 @@ test("customer detail tabs default to overview-first and hide commercial without
   assert.deepEqual(
     buildCustomerDetailTabs({
       canReadCommercial: false,
-      canReadPlans: true,
+      canReadOrders: true,
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    ["dashboard", "overview", "contact_access", "plans", "history", "employee_blocks"],
+    ["dashboard", "overview", "contact_access", "orders", "history", "employee_blocks"],
   );
   assert.deepEqual(
     buildCustomerDetailTabs({
       canReadCommercial: true,
-      canReadPlans: true,
+      canReadOrders: true,
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    ["dashboard", "overview", "contact_access", "commercial", "plans", "history", "employee_blocks"],
+    ["dashboard", "overview", "contact_access", "commercial", "orders", "history", "employee_blocks"],
   );
   assert.equal(
     buildCustomerDetailTabs({
       canReadCommercial: true,
-      canReadPlans: true,
+      canReadOrders: true,
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }).some((tabId) => ["contacts", "addresses", "portal"].includes(tabId)),
@@ -238,7 +238,7 @@ test("customer detail tabs default to overview-first and hide commercial without
   assert.deepEqual(
     buildCustomerDetailTabs({
       canReadCommercial: true,
-      canReadPlans: false,
+      canReadOrders: false,
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
@@ -250,7 +250,7 @@ test("customer detail tab state falls back to dashboard for existing customers a
   assert.equal(
     normalizeCustomerDetailTab("history", {
       canReadCommercial: true,
-      canReadPlans: true,
+      canReadOrders: true,
       hasSelectedCustomer: false,
       isCreatingCustomer: false,
     }),
@@ -259,7 +259,7 @@ test("customer detail tab state falls back to dashboard for existing customers a
   assert.equal(
     normalizeCustomerDetailTab("history", {
       canReadCommercial: true,
-      canReadPlans: true,
+      canReadOrders: true,
       hasSelectedCustomer: true,
       isCreatingCustomer: true,
     }),
@@ -268,7 +268,25 @@ test("customer detail tab state falls back to dashboard for existing customers a
   assert.equal(
     normalizeCustomerDetailTab("commercial", {
       canReadCommercial: false,
-      canReadPlans: true,
+      canReadOrders: true,
+      hasSelectedCustomer: true,
+      isCreatingCustomer: false,
+    }),
+    "dashboard",
+  );
+  assert.equal(
+    normalizeCustomerDetailTab("orders", {
+      canReadCommercial: true,
+      canReadOrders: true,
+      hasSelectedCustomer: true,
+      isCreatingCustomer: false,
+    }),
+    "orders",
+  );
+  assert.equal(
+    normalizeCustomerDetailTab("orders", {
+      canReadCommercial: true,
+      canReadOrders: false,
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
@@ -277,25 +295,16 @@ test("customer detail tab state falls back to dashboard for existing customers a
   assert.equal(
     normalizeCustomerDetailTab("plans", {
       canReadCommercial: true,
-      canReadPlans: true,
+      canReadOrders: true,
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    "plans",
-  );
-  assert.equal(
-    normalizeCustomerDetailTab("plans", {
-      canReadCommercial: true,
-      canReadPlans: false,
-      hasSelectedCustomer: true,
-      isCreatingCustomer: false,
-    }),
-    "dashboard",
+    "orders",
   );
   assert.equal(
     normalizeCustomerDetailTab("contact_access", {
       canReadCommercial: true,
-      canReadPlans: true,
+      canReadOrders: true,
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
@@ -305,7 +314,7 @@ test("customer detail tab state falls back to dashboard for existing customers a
     assert.equal(
       normalizeCustomerDetailTab(legacyTabId, {
         canReadCommercial: true,
-        canReadPlans: true,
+        canReadOrders: true,
         hasSelectedCustomer: true,
         isCreatingCustomer: false,
       }),
@@ -315,7 +324,7 @@ test("customer detail tab state falls back to dashboard for existing customers a
   assert.equal(
     normalizeCustomerDetailTab("", {
       canReadCommercial: true,
-      canReadPlans: true,
+      canReadOrders: true,
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
@@ -361,7 +370,7 @@ test("pricing-rules subtab state and selected rate card fall back safely", () =>
 test("customer admin route context extracts customer deep-link state", () => {
   assert.deepEqual(
     resolveCustomerAdminRouteContext({ customer_id: "customer-1", tab: "plans" }),
-    { customerId: "customer-1", detailTab: "plans" },
+    { customerId: "customer-1", detailTab: "orders" },
   );
   assert.deepEqual(
     resolveCustomerAdminRouteContext({ customer_id: ["customer-1"], tab: null }),

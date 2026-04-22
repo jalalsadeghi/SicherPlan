@@ -18,7 +18,7 @@ export const CUSTOMER_DETAIL_TAB_ORDER = [
   "overview",
   "contact_access",
   "commercial",
-  "plans",
+  "orders",
   "history",
   "employee_blocks",
 ];
@@ -26,6 +26,7 @@ export const CUSTOMER_DETAIL_TAB_ORDER = [
 const CUSTOMER_DETAIL_TAB_ALIASES = {
   addresses: "contact_access",
   contacts: "contact_access",
+  plans: "orders",
   portal: "contact_access",
 };
 
@@ -197,7 +198,7 @@ export function resolveCustomerCancelSelection(previousSelectedCustomer) {
     : { isCreatingCustomer: false, selectedCustomerId: "", selectedCustomer: null };
 }
 
-export function buildCustomerDetailTabs({ canReadCommercial, canReadPlans, hasSelectedCustomer, isCreatingCustomer }) {
+export function buildCustomerDetailTabs({ canReadCommercial, canReadOrders, hasSelectedCustomer, isCreatingCustomer }) {
   if (isCreatingCustomer) {
     return ["overview"];
   }
@@ -210,8 +211,8 @@ export function buildCustomerDetailTabs({ canReadCommercial, canReadPlans, hasSe
     if (tabId === "commercial") {
       return !!canReadCommercial;
     }
-    if (tabId === "plans") {
-      return !!canReadPlans;
+    if (tabId === "orders") {
+      return !!canReadOrders;
     }
     return true;
   });
@@ -250,10 +251,11 @@ export function resolveCustomerSelectedRateCardId(activeRateCardId, rateCards) {
 
 export function resolveCustomerAdminRouteContext(query) {
   const normalizeValue = (value) => (typeof value === "string" ? value.trim() : "");
+  const detailTab = normalizeValue(query?.tab);
 
   return {
     customerId: normalizeValue(query?.customer_id),
-    detailTab: normalizeValue(query?.tab),
+    detailTab: CUSTOMER_DETAIL_TAB_ALIASES[detailTab] ?? detailTab,
   };
 }
 

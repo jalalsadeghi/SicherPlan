@@ -5,6 +5,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { defineComponent, reactive } from 'vue';
 
 import CustomerNewPlanWizardView from './new-plan.vue';
+import CustomerNewPlanStepContent from './new-plan-step-content.vue';
 import { buildOrderDetailsEditDraftStorageKey, buildWizardDraftStorageKey } from './new-plan-wizard-drafts';
 
 const routeState = reactive({
@@ -12,6 +13,13 @@ const routeState = reactive({
 });
 const routerPushMock = vi.fn();
 const routerReplaceMock = vi.fn();
+const scrollIntoViewMock = vi.fn();
+const intersectionObserverInstances: Array<{
+  callback: IntersectionObserverCallback;
+  disconnect: ReturnType<typeof vi.fn>;
+  observe: ReturnType<typeof vi.fn>;
+  unobserve: ReturnType<typeof vi.fn>;
+}> = [];
 const authStoreState = reactive({
   accessToken: 'token-1',
   effectiveAccessToken: 'token-1',
@@ -65,7 +73,11 @@ const apiMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('#/locales', () => ({
-  $t: (key: string) => key,
+  $t: (key: string) => ({
+    'sicherplan.customerPlansWizard.breadcrumbCustomers': 'Customers',
+    'sicherplan.customerPlansWizard.breadcrumbPlans': 'Orders',
+    'sicherplan.customerPlansWizard.title': 'Order workspace',
+  } as Record<string, string>)[key] ?? key,
 }));
 
 vi.mock('vue-router', () => ({
@@ -274,6 +286,14 @@ async function advanceToOrderDetails(wrapper: VueWrapper) {
   expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
 }
 
+function getOrderStepContentState(wrapper: VueWrapper) {
+  return wrapper.getComponent(CustomerNewPlanStepContent).vm as unknown as {
+    editingExistingOrderId: string;
+    existingOrderEditFormOpen: boolean;
+    selectedExistingOrderId: string;
+  };
+}
+
 async function ensureCreateNewOrderMode(wrapper: VueWrapper) {
   if (!wrapper.find('[data-testid="customer-new-plan-order-no"]').exists()) {
     await wrapper.get('[data-testid="customer-new-plan-order-mode-create"]').setValue(true);
@@ -335,6 +355,34 @@ async function saveRequirementLine(
 describe('CustomerNewPlanWizardView EPIC 3', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
+    scrollIntoViewMock.mockReset();
+    intersectionObserverInstances.length = 0;
+    Object.defineProperty(window.Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoViewMock,
+    });
+    Object.defineProperty(window, 'IntersectionObserver', {
+      configurable: true,
+      value: class MockIntersectionObserver {
+        callback: IntersectionObserverCallback;
+        disconnect = vi.fn();
+        observe = vi.fn();
+        unobserve = vi.fn();
+
+        constructor(callback: IntersectionObserverCallback) {
+          this.callback = callback;
+          intersectionObserverInstances.push(this);
+        }
+      },
+    });
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockReturnValue({
+        addEventListener: vi.fn(),
+        matches: false,
+        removeEventListener: vi.fn(),
+      }),
+    });
     routeState.query = { customer_id: 'customer-1' };
     routerPushMock.mockReset();
     routerReplaceMock.mockReset();
@@ -357,6 +405,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     stores.tradeFairs = [{ id: 'fair-1', customer_id: 'customer-1', fair_no: 'FAIR-1', name: 'Expo', tenant_id: 'tenant-1' }];
     stores.patrolRoutes = [{ id: 'route-1', customer_id: 'customer-1', route_no: 'ROU-1', name: 'Innenstadt', tenant_id: 'tenant-1' }];
     stores.requirementTypes = [{ id: 'requirement-type-1', customer_id: 'customer-1', code: 'REQ-1', label: 'Objektschutz', tenant_id: 'tenant-1' }];
+    stores.serviceCategories = [{ code: 'guarding', label: 'Bewachung' }];
     stores.equipmentItems = [{ id: 'equipment-item-1', customer_id: 'customer-1', code: 'EQ-1', label: 'Funkgerät', tenant_id: 'tenant-1' }];
 
     apiMocks.getCustomerMock.mockReset();
@@ -424,7 +473,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     });
 
     apiMocks.listServiceCategoryOptionsMock.mockReset();
-    apiMocks.listServiceCategoryOptionsMock.mockResolvedValue(stores.serviceCategories);
+    apiMocks.listServiceCategoryOptionsMock.mockImplementation(() => Promise.resolve(stores.serviceCategories));
     apiMocks.listFunctionTypesMock.mockReset();
     apiMocks.listFunctionTypesMock.mockResolvedValue(stores.functionTypes);
     apiMocks.listQualificationTypesMock.mockReset();
@@ -573,6 +622,97 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
     expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(1);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+  });
+
+  it('loads Order workspace service-category choices from the shared service-category options endpoint', async () => {
+    stores.serviceCategories = [
+      { code: 'tenant_object', label: 'Tenant Objektschutz' },
+      { code: 'tenant_event', label: 'Tenant Veranstaltungsschutz' },
+    ];
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await ensureCreateNewOrderMode(wrapper);
+
+    const serviceCategorySelect = wrapper.get('[data-testid="customer-new-plan-order-service-category"]').element as HTMLSelectElement;
+    expect(apiMocks.listServiceCategoryOptionsMock).toHaveBeenCalledWith('tenant-1', 'token-1');
+    expect(Array.from(serviceCategorySelect.options).map((option) => option.value)).toContain('tenant_object');
+    expect(Array.from(serviceCategorySelect.options).map((option) => option.textContent)).toContain('Tenant Objektschutz');
+  });
+
+  it('shows sticky order-scope section navigation only in the scope documents step and scrolls to sections', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect(wrapper.find('[data-testid="customer-order-scope-nav"]').exists()).toBe(false);
+
+    await advanceToOrderDocuments(wrapper);
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
+    expect(wrapper.find('[data-testid="customer-order-scope-onepage"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-order-scope-nav"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="customer-order-scope-nav-link-equipment"]').classes()).toContain('sp-customer-order-scope-nav__link--active');
+    expect(wrapper.get('[data-testid="customer-order-scope-nav-link-equipment"]').text()).toContain('sicherplan.customerPlansWizard.orderScope.equipmentTitle');
+    expect(wrapper.get('[data-testid="customer-order-scope-nav-link-requirements"]').text()).toContain('sicherplan.customerPlansWizard.orderScope.requirementsTitle');
+    expect(wrapper.get('[data-testid="customer-order-scope-nav-link-documents"]').text()).toContain('sicherplan.customerPlansWizard.orderScope.documentsTitle');
+    expect(wrapper.find('#customer-order-scope-section-equipment').exists()).toBe(true);
+    expect(wrapper.find('#customer-order-scope-section-requirements').exists()).toBe(true);
+    expect(wrapper.find('#customer-order-scope-section-documents').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-item"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-save-equipment-line"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-type"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-save-requirement-line"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-document-picker-open"]').exists()).toBe(true);
+
+    const requirementsSection = wrapper.get('#customer-order-scope-section-requirements').element;
+    await wrapper.get('[data-testid="customer-order-scope-nav-link-requirements"]').trigger('click');
+    await nextTickFlush();
+
+    expect(scrollIntoViewMock).toHaveBeenLastCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(scrollIntoViewMock.mock.contexts.at(-1)).toBe(requirementsSection);
+
+    const documentsSection = wrapper.get('#customer-order-scope-section-documents').element;
+    await wrapper.get('[data-testid="customer-order-scope-nav-link-documents"]').trigger('click');
+    await nextTickFlush();
+
+    expect(wrapper.get('[data-testid="customer-order-scope-nav-link-documents"]').classes()).toContain('sp-customer-order-scope-nav__link--active');
+    expect(scrollIntoViewMock).toHaveBeenLastCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(scrollIntoViewMock.mock.contexts.at(-1)).toBe(documentsSection);
+  });
+
+  it('updates the order-scope active nav link from IntersectionObserver scroll-spy events', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToOrderDocuments(wrapper);
+
+    const observer = intersectionObserverInstances.at(-1);
+    expect(observer).toBeTruthy();
+
+    const equipmentSection = wrapper.get('#customer-order-scope-section-equipment').element;
+    const requirementsSection = wrapper.get('#customer-order-scope-section-requirements').element;
+    const documentsSection = wrapper.get('#customer-order-scope-section-documents').element;
+
+    observer?.callback(
+      [{ isIntersecting: true, intersectionRatio: 0.8, boundingClientRect: { top: 0 }, target: equipmentSection } as IntersectionObserverEntry],
+      observer as unknown as IntersectionObserver,
+    );
+    await nextTickFlush();
+    expect(wrapper.get('[data-testid="customer-order-scope-nav-link-equipment"]').classes()).toContain('sp-customer-order-scope-nav__link--active');
+
+    observer?.callback(
+      [{ isIntersecting: true, intersectionRatio: 0.85, boundingClientRect: { top: 0 }, target: requirementsSection } as IntersectionObserverEntry],
+      observer as unknown as IntersectionObserver,
+    );
+    await nextTickFlush();
+    expect(wrapper.get('[data-testid="customer-order-scope-nav-link-requirements"]').classes()).toContain('sp-customer-order-scope-nav__link--active');
+
+    observer?.callback(
+      [{ isIntersecting: true, intersectionRatio: 0.9, boundingClientRect: { top: 0 }, target: documentsSection } as IntersectionObserverEntry],
+      observer as unknown as IntersectionObserver,
+    );
+    await nextTickFlush();
+    expect(wrapper.get('[data-testid="customer-order-scope-nav-link-documents"]').classes()).toContain('sp-customer-order-scope-nav__link--active');
   });
 
   it('allows skipping Order Documents when the draft is empty and no existing attachments exist', async () => {
@@ -899,10 +1039,14 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(wrapper.findAll('[data-testid="customer-new-plan-existing-order-row"]')).toHaveLength(2);
     expect(wrapper.text()).toContain('Objektschutz RheinForum Koln - Nordtor Juli');
     expect(wrapper.text()).toContain('Objektschutz RheinForum Koln - Mai 2026');
+    const firstOrderRow = wrapper.get('[data-testid="customer-new-plan-existing-order-row"]');
+    expect(firstOrderRow.get('.sp-customer-order-row__primary').text()).toBe('ORD-EX-1 · Objektschutz RheinForum Koln - Nordtor Juli');
+    expect(firstOrderRow.get('.sp-customer-order-row__secondary').text()).toBe('· 2026-06-01 - 2026-06-10 · draft · active');
+    expect(firstOrderRow.text()).not.toContain('Juli2026-06-01');
     const orderListCallsBeforeSelect = apiMocks.listCustomerOrdersMock.mock.calls.length;
     const routerReplaceCallsBeforeSelect = routerReplaceMock.mock.calls.length;
 
-    await wrapper.get('[data-testid="customer-new-plan-existing-order-row"]').trigger('click');
+    await firstOrderRow.trigger('click');
     await nextTickFlush();
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
@@ -910,7 +1054,10 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(apiMocks.listCustomerOrdersMock.mock.calls.length).toBe(orderListCallsBeforeSelect);
     expect(wrapper.find('[data-testid="customer-new-plan-existing-order-edit-form"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="customer-new-plan-order-title"]').exists()).toBe(false);
-    expect(wrapper.get('[data-testid="customer-new-plan-selected-order-summary"]').text()).toContain('ORD-EX-1');
+    const selectedRow = wrapper.get('[data-testid="customer-new-plan-existing-order-row"]');
+    expect(selectedRow.classes()).toContain('sp-customer-plan-wizard-step__list-row--selected');
+    expect(selectedRow.attributes('aria-pressed')).toBe('true');
+    expect(wrapper.find('[data-testid="customer-new-plan-selected-order-summary"]').exists()).toBe(false);
     expect(routerReplaceMock.mock.calls.length).toBe(routerReplaceCallsBeforeSelect);
   });
 
@@ -1017,7 +1164,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(apiMocks.updateCustomerOrderMock).toHaveBeenCalledTimes(0);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
     expect(routerReplaceMock).toHaveBeenCalledWith(expect.objectContaining({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: expect.objectContaining({
         customer_id: 'customer-1',
         order_id: 'order-existing-1',
@@ -1050,7 +1197,10 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-existing-order-cancel-edit"]').trigger('click');
     await nextTickFlush();
     expect(wrapper.find('[data-testid="customer-new-plan-existing-order-edit-form"]').exists()).toBe(false);
-    expect(wrapper.get('[data-testid="customer-new-plan-selected-order-summary"]').text()).toContain('ORD-EX-1');
+    const selectedRow = wrapper.get('[data-testid="customer-new-plan-existing-order-row"]');
+    expect(selectedRow.classes()).toContain('sp-customer-plan-wizard-step__list-row--selected');
+    expect(selectedRow.attributes('aria-pressed')).toBe('true');
+    expect(wrapper.find('[data-testid="customer-new-plan-selected-order-summary"]').exists()).toBe(false);
   });
 
   it('blocks Next in existing-order mode when no order is selected and keeps create-new mode working', async () => {
@@ -1162,9 +1312,98 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect(wrapper.text()).toContain('Order workspace');
+    expect(wrapper.text()).not.toContain('New plan');
     expect(wrapper.find('[data-testid="customer-new-plan-existing-order-edit-form"]').exists()).toBe(false);
     expect(apiMocks.getCustomerOrderMock).toHaveBeenCalledTimes(0);
-    expect(wrapper.get('[data-testid="customer-new-plan-selected-order-summary"]').text()).toContain('ORD-EX-1');
+    const selectedRow = wrapper.get('[data-testid="customer-new-plan-existing-order-row"]');
+    expect(selectedRow.classes()).toContain('sp-customer-plan-wizard-step__list-row--selected');
+    expect(selectedRow.attributes('aria-pressed')).toBe('true');
+    expect(selectedRow.text()).toContain('ORD-EX-1');
+    expect(selectedRow.text()).toContain('Hydrated existing order');
+    expect(wrapper.find('[data-testid="customer-new-plan-selected-order-summary"]').exists()).toBe(false);
+    expect((wrapper.vm as any).wizardState.order_id).toBe('order-existing-1');
+    expect(getOrderStepContentState(wrapper).selectedExistingOrderId).toBe('order-existing-1');
+    expect(getOrderStepContentState(wrapper).editingExistingOrderId).toBe('');
+    expect(getOrderStepContentState(wrapper).existingOrderEditFormOpen).toBe(false);
+  });
+
+  it('opens an existing-order edit form from external order_mode=edit navigation without a persisted edit draft', async () => {
+    stores.orders['order-existing-1'] = makeOrder('order-existing-1', {
+      notes: 'Saved notes',
+      order_no: 'ORD-EX-1',
+      security_concept_text: 'Saved concept',
+      title: 'Hydrated existing order',
+    });
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-existing-1',
+      order_mode: 'edit',
+      step: 'order-details',
+    };
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect(apiMocks.getCustomerOrderMock).toHaveBeenCalledWith('tenant-1', 'order-existing-1', 'token-1');
+    expect(getOrderStepContentState(wrapper).selectedExistingOrderId).toBe('order-existing-1');
+    expect(getOrderStepContentState(wrapper).editingExistingOrderId).toBe('order-existing-1');
+    expect(getOrderStepContentState(wrapper).existingOrderEditFormOpen).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-existing-order-edit-form"]').exists()).toBe(true);
+    expect((wrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('Hydrated existing order');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-notes"]').element as HTMLTextAreaElement).value).toBe('Saved notes');
+  });
+
+  it('restores an existing-order edit draft when external order_mode=edit opens the editor', async () => {
+    stores.orders['order-existing-1'] = makeOrder('order-existing-1', {
+      notes: 'Saved notes',
+      order_no: 'ORD-EX-1',
+      security_concept_text: 'Saved concept',
+      title: 'Hydrated existing order',
+    });
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-existing-1',
+      order_mode: 'edit',
+      step: 'order-details',
+    };
+    window.sessionStorage.setItem(
+      buildOrderDetailsEditDraftStorageKey(
+        {
+          customerId: 'customer-1',
+          tenantId: 'tenant-1',
+        },
+        'order-existing-1',
+      ),
+      JSON.stringify({
+        form: {
+          customer_id: 'customer-1',
+          notes: 'Draft notes override',
+          order_no: 'ORD-DRAFT-EDIT',
+          patrol_route_id: '',
+          release_state: 'draft',
+          requirement_type_id: 'requirement-type-1',
+          security_concept_text: 'Draft concept override',
+          service_category_code: 'guarding',
+          service_from: '2026-06-01',
+          service_to: '2026-06-10',
+          title: 'Draft title override',
+        },
+        order_id: 'order-existing-1',
+      }),
+    );
+
+    const wrapper = mountComponent();
+    await nextTickFlush();
+
+    expect(getOrderStepContentState(wrapper).selectedExistingOrderId).toBe('order-existing-1');
+    expect(getOrderStepContentState(wrapper).editingExistingOrderId).toBe('order-existing-1');
+    expect(getOrderStepContentState(wrapper).existingOrderEditFormOpen).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-existing-order-edit-form"]').exists()).toBe(true);
+    expect((wrapper.get('[data-testid="customer-new-plan-order-title"]').element as HTMLInputElement).value).toBe('Draft title override');
+    expect((wrapper.get('[data-testid="customer-new-plan-order-notes"]').element as HTMLTextAreaElement).value).toBe('Draft notes override');
+    expect(wrapper.get('[data-testid="customer-new-plan-draft-restored"]').text()).toBe('sicherplan.customerPlansWizard.draftRestored');
   });
 
   it('persists an existing-order edit draft separately from create-new drafts and restores the edit form on remount', async () => {
@@ -1827,7 +2066,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(window.sessionStorage.getItem(draftKey)).toBeNull();
     expect(routerReplaceMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: '/admin/customers/new-plan',
+        path: '/admin/customers/order-workspace',
         query: expect.objectContaining({
           order_id: 'order-1',
         }),

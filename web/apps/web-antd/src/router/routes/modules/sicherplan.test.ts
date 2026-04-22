@@ -27,18 +27,25 @@ describe('sicherplan route authority', () => {
     ]);
   });
 
-  it('adds the hidden customer new-plan wizard route for tenant admins only', () => {
+  it('adds the hidden customer order workspace route with legacy new-plan alias for tenant admins only', () => {
     const customersSection = sicherplanRoutes.find(
       (route) => route.name === 'SicherPlanCustomersSection',
     );
-    const newPlanRoute = customersSection?.children?.find(
+    const orderWorkspaceRoute = customersSection?.children?.find(
+      (route) => route.name === 'SicherPlanCustomerOrderWorkspace',
+    );
+    const legacyNewPlanRoute = customersSection?.children?.find(
       (route) => route.name === 'SicherPlanCustomerNewPlan',
     );
 
-    expect(newPlanRoute?.path).toBe('/admin/customers/new-plan');
-    expect(newPlanRoute?.meta?.authority).toEqual(['tenant_admin']);
-    expect(newPlanRoute?.meta?.fullPathKey).toBe(false);
-    expect(newPlanRoute?.meta?.hideInMenu).toBe(true);
+    expect(orderWorkspaceRoute?.path).toBe('/admin/customers/order-workspace');
+    expect(orderWorkspaceRoute?.alias).toBe('/admin/customers/new-plan');
+    expect(legacyNewPlanRoute).toBeUndefined();
+    expect(orderWorkspaceRoute?.meta?.authority).toEqual(['tenant_admin']);
+    expect(orderWorkspaceRoute?.meta?.fullPathKey).toBe(false);
+    expect(orderWorkspaceRoute?.meta?.hideInMenu).toBe(true);
+    expect(`${orderWorkspaceRoute?.meta?.title}`).toContain('customerOrderWorkspace');
+    expect(`${orderWorkspaceRoute?.meta?.title}`).not.toContain('customerNewPlan');
   });
 
   it('splits the customer portal into explicit child routes', () => {
@@ -117,5 +124,24 @@ describe('sicherplan route authority', () => {
       'dispatcher',
       'controller_qm',
     ]);
+  });
+
+  it('marks grouped sidebar sections as non-navigating menu containers', () => {
+    const sectionNames = [
+      'SicherPlanAdministrationSection',
+      'SicherPlanCustomersSection',
+      'SicherPlanWorkforceSection',
+      'SicherPlanOperationsSection',
+      'SicherPlanFinanceSection',
+      'SicherPlanReportingSection',
+      'SicherPlanPublic',
+      'SicherPlanPortal',
+    ];
+
+    for (const sectionName of sectionNames) {
+      const route = sicherplanRoutes.find((item) => item.name === sectionName);
+      expect(route?.children?.length).toBeGreaterThan(0);
+      expect(route?.meta?.menuContainer).toBe(true);
+    }
   });
 });

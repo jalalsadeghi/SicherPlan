@@ -106,6 +106,11 @@ interface RouteMeta {
    */
   menuVisibleWithForbidden?: boolean;
   /**
+   * Pure navigation container. Clicking/opening this menu node must not
+   * automatically navigate to the node itself or its first child.
+   */
+  menuContainer?: boolean;
+  /**
    * 不使用基础布局（仅在顶级生效）
    */
   noBasicLayout?: boolean;

@@ -100,6 +100,32 @@ describe('generateMenus', () => {
     ]);
   });
 
+  it('preserves explicit menu container metadata', async () => {
+    const menus = generateMenus(
+      [
+        {
+          meta: { menuContainer: true, title: 'Workspace group' },
+          name: 'workspaceGroup',
+          path: '/workspace-group',
+          children: [
+            {
+              meta: { title: 'Workspace child' },
+              name: 'workspaceChild',
+              path: '/workspace-child',
+            },
+          ],
+        },
+      ] as RouteRecordRaw[],
+      mockRouter as any,
+    );
+
+    expect(menus[0]).toMatchObject({
+      menuContainer: true,
+      name: 'Workspace group',
+      path: '/workspace-group',
+    });
+  });
+
   it('handles dynamic route parameters correctly', async () => {
     const mockRoutesWithParams = [
       {

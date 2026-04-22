@@ -398,6 +398,12 @@
                   </label>
                 </template>
 
+                <template v-else-if="editorEntityKey === 'service_category'">
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsCode") }}</span><input v-model="draft.code" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsLabel") }}</span><input v-model="draft.label" required /></label>
+                  <label class="field-stack field-stack--half"><span>{{ tp("fieldsSortOrder") }}</span><input v-model="draft.sort_order" type="number" min="0" /></label>
+                </template>
+
                 <template v-else-if="editorEntityKey === 'site'">
                   <label class="planning-admin-site-primary-field field-stack field-stack--half"><span>{{ tp("fieldsSiteNo") }}</span><input v-model="draft.site_no" required /></label>
                   <label class="planning-admin-site-primary-field field-stack field-stack--half"><span>{{ tp("fieldsName") }}</span><input v-model="draft.name" required /></label>
@@ -894,6 +900,7 @@ const draft = reactive({
   label: "",
   default_planning_mode_code: "",
   unit_of_measure_code: "",
+  sort_order: 100,
   site_no: "",
   venue_no: "",
   fair_no: "",
@@ -1069,6 +1076,7 @@ function entityName(key) {
     {
       requirement_type: "entityRequirementType",
       equipment_item: "entityEquipmentItem",
+      service_category: "entityServiceCategory",
       site: "entitySite",
       event_venue: "entityEventVenue",
       trade_fair: "entityTradeFair",
@@ -1382,6 +1390,7 @@ function resetDraft() {
     label: "",
     default_planning_mode_code: "",
     unit_of_measure_code: "",
+    sort_order: 100,
     site_no: "",
     venue_no: "",
     fair_no: "",
@@ -1453,6 +1462,7 @@ function syncDraft(record) {
     label: record.label || "",
     default_planning_mode_code: record.default_planning_mode_code || "",
     unit_of_measure_code: record.unit_of_measure_code || "",
+    sort_order: record.sort_order ?? 100,
     site_no: record.site_no || "",
     venue_no: record.venue_no || "",
     fair_no: record.fair_no || "",
@@ -1491,6 +1501,9 @@ function buildRecordPayload() {
   }
   if (editorEntityKey.value === "equipment_item") {
     return { ...base, code: draft.code, label: draft.label, unit_of_measure_code: draft.unit_of_measure_code };
+  }
+  if (editorEntityKey.value === "service_category") {
+    return { ...base, code: draft.code, label: draft.label, sort_order: Number(draft.sort_order) || 100 };
   }
   if (editorEntityKey.value === "site") {
     return {

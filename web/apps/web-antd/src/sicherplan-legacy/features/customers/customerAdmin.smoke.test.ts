@@ -74,6 +74,7 @@ const translations: Record<string, string> = {
   "customerAdmin.actions.createSharedAddress": "Create shared address",
   "customerAdmin.actions.exportCustomers": "CSV export",
   "customerAdmin.actions.newCustomer": "New customer",
+  "customerAdmin.actions.newOrder": "New order",
   "customerAdmin.actions.refreshHistory": "Refresh history",
   "customerAdmin.actions.resetPortalAccessPassword": "Reset portal password",
   "customerAdmin.actions.search": "Search",
@@ -125,7 +126,7 @@ const translations: Record<string, string> = {
   "customerAdmin.tabs.employeeBlocks": "Employee blocks",
   "customerAdmin.tabs.history": "History",
   "customerAdmin.tabs.overview": "Overview",
-  "customerAdmin.tabs.plans": "Plans",
+  "customerAdmin.tabs.orders": "Orders",
   "customerAdmin.tabs.portal": "Portal",
 };
 
@@ -239,9 +240,31 @@ const CustomerDashboardTabStub = defineComponent({
   `,
 });
 
-const CustomerPlansTabStub = defineComponent({
-  name: "CustomerPlansTabStub",
-  template: '<div data-testid="customer-plans-tab-stub" />',
+const CustomerOrdersTabStub = defineComponent({
+  name: "CustomerOrdersTabStub",
+  props: {
+    canStartNewOrder: { type: Boolean, default: false },
+  },
+  emits: ["edit-order", "start-new-order"],
+  template: `
+    <div data-testid="customer-orders-tab-stub">
+      <button
+        v-if="canStartNewOrder"
+        data-testid="customer-orders-new-order"
+        type="button"
+        @click="$emit('start-new-order')"
+      >
+        New order
+      </button>
+      <button
+        data-testid="customer-orders-edit-order"
+        type="button"
+        @click="$emit('edit-order', 'order-1')"
+      >
+        Edit order
+      </button>
+    </div>
+  `,
 });
 
 const baseReferenceData = {
@@ -369,7 +392,7 @@ async function mountCustomerAdmin() {
     global: {
       stubs: {
         CustomerDashboardTab: CustomerDashboardTabStub,
-        CustomerPlansTab: CustomerPlansTabStub,
+        CustomerOrdersTab: CustomerOrdersTabStub,
         SicherPlanLoadingOverlay: SicherPlanLoadingOverlayStub,
         StatusBadge: StatusBadgeStub,
       },
@@ -782,6 +805,57 @@ describe("CustomerAdminView search dialog", () => {
     );
   });
 
+  it("renders Orders as the customer detail tab label and no longer shows Plans", async () => {
+    const wrapper = await mountSelectedCustomer("orders");
+
+    const ordersTab = wrapper.get('[data-testid="customer-tab-orders"]');
+    expect(ordersTab.text()).toBe("Orders");
+    expect(ordersTab.classes()).toContain("active");
+    expect(wrapper.find('[data-testid="customer-tab-plans"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-orders-tab-stub"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("Plans");
+  });
+
+  it("routes the Orders tab New order CTA to the customer order workspace with customer context", async () => {
+    const wrapper = await mountSelectedCustomer("orders");
+
+    await wrapper.get('[data-testid="customer-orders-new-order"]').trigger("click");
+    await settle();
+
+    expect(routerPushMock).toHaveBeenCalledWith({
+      name: "SicherPlanCustomerOrderWorkspace",
+      query: {
+        customer_id: "customer-default",
+      },
+    });
+    expect(routerPushMock.mock.calls.at(-1)?.[0]).not.toMatchObject({
+      path: "/admin/customers/new-plan",
+    });
+    expect(routerPushMock.mock.calls.at(-1)?.[0]?.query).not.toHaveProperty("order_id");
+    expect(wrapper.text()).toContain("New order");
+    expect(wrapper.text()).not.toContain("New plan");
+  });
+
+  it("routes explicit order edits to the customer order workspace with order context", async () => {
+    const wrapper = await mountSelectedCustomer("orders");
+
+    await wrapper.get('[data-testid="customer-orders-edit-order"]').trigger("click");
+    await settle();
+
+    expect(routerPushMock).toHaveBeenCalledWith({
+      name: "SicherPlanCustomerOrderWorkspace",
+      query: {
+        customer_id: "customer-default",
+        order_id: "order-1",
+        order_mode: "edit",
+        step: "order-details",
+      },
+    });
+    expect(routerPushMock.mock.calls.at(-1)?.[0]).not.toMatchObject({
+      path: "/admin/customers/new-plan",
+    });
+  });
+
   it("keeps contact creation working from the merged contact access tab", async () => {
     const wrapper = await mountSelectedCustomer("contact_access");
 
@@ -956,5 +1030,15 @@ describe("CustomerAdminView search dialog", () => {
 
       wrapper.unmount();
     }
+  });
+
+  it("normalizes legacy plans route state to the Orders tab without a blank panel", async () => {
+    const wrapper = await mountSelectedCustomer("plans");
+
+    expect(wrapper.get('[data-testid="customer-tab-orders"]').classes()).toContain("active");
+    expect(wrapper.find('[data-testid="customer-orders-tab-stub"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-tab-plans"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Orders");
+    expect(wrapper.text()).not.toContain("Plans");
   });
 });

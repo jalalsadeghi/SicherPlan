@@ -286,13 +286,14 @@
             @select-tab="selectCustomerDetailTab"
           />
 
-          <CustomerPlansTab
-            v-if="selectedCustomer && !isCreatingCustomer && canReadPlans && activeDetailTab === 'plans'"
+          <CustomerOrdersTab
+            v-if="selectedCustomer && !isCreatingCustomer && canReadCustomerOrders && activeDetailTab === 'orders'"
             :access-token="accessToken"
-            :can-start-new-plan="canStartCustomerPlanWizard"
+            :can-start-new-order="canStartCustomerOrderWizard"
             :customer-id="selectedCustomer.id"
             :tenant-id="tenantScopeId"
-            @start-new-plan="handleStartCustomerNewPlan"
+            @edit-order="handleEditCustomerOrder"
+            @start-new-order="handleStartCustomerNewOrder"
           />
 
           <section v-if="activeDetailTab === 'overview'" class="customer-admin-tab-panel" data-testid="customer-tab-panel-overview">
@@ -2191,7 +2192,7 @@ import {
 import SicherPlanLoadingOverlay from "@/components/SicherPlanLoadingOverlay.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import CustomerDashboardTab from "@/components/customers/CustomerDashboardTab.vue";
-import CustomerPlansTab from "@/components/customers/CustomerPlansTab.vue";
+import CustomerOrdersTab from "@/components/customers/CustomerOrdersTab.vue";
 import {
   applySurchargeAmountMode,
   buildWeekdayMask,
@@ -2514,8 +2515,8 @@ const canRead = computed(() => actionState.value.canRead);
 const canWrite = computed(() => actionState.value.canCreate);
 const canReadCommercial = computed(() => commercialActionState.value.canReadCommercial);
 const canWriteCommercial = computed(() => commercialActionState.value.canWriteCommercial);
-const canReadPlans = computed(() => hasPlanningOrderPermission(authStore.activeRole, "planning.record.read"));
-const canStartCustomerPlanWizard = computed(() => authStore.effectiveRole === "tenant_admin");
+const canReadCustomerOrders = computed(() => hasPlanningOrderPermission(authStore.activeRole, "planning.record.read"));
+const canStartCustomerOrderWizard = computed(() => authStore.effectiveRole === "tenant_admin");
 const tenantScopeId = computed(() => authStore.effectiveTenantScopeId);
 const accessToken = computed(() => authStore.effectiveAccessToken || authStore.accessToken);
 const isCustomerSessionResolving = computed(() => authStore.isSessionResolving);
@@ -2556,14 +2557,14 @@ const detailTabLabelKeys = {
   overview: "customerAdmin.tabs.overview",
   contact_access: "customerAdmin.tabs.contactAccess",
   commercial: "customerAdmin.tabs.commercial",
-  plans: "customerAdmin.tabs.plans",
+  orders: "customerAdmin.tabs.orders",
   history: "customerAdmin.tabs.history",
   employee_blocks: "customerAdmin.tabs.employeeBlocks",
 } as const;
 const customerDetailTabs = computed(() =>
   buildCustomerDetailTabs({
     canReadCommercial: canReadCommercial.value,
-    canReadPlans: canReadPlans.value,
+    canReadOrders: canReadCustomerOrders.value,
     hasSelectedCustomer: !!selectedCustomer.value,
     isCreatingCustomer: isCreatingCustomer.value,
   }).map((tabId) => ({
@@ -3506,7 +3507,7 @@ function editInvoiceParty(invoiceParty: CustomerInvoicePartyRead) {
 function selectCustomerDetailTab(tabId: string) {
   activeDetailTab.value = normalizeCustomerDetailTab(tabId, {
     canReadCommercial: canReadCommercial.value,
-    canReadPlans: canReadPlans.value,
+    canReadOrders: canReadCustomerOrders.value,
     hasSelectedCustomer: !!selectedCustomer.value,
     isCreatingCustomer: isCreatingCustomer.value,
   });
@@ -3631,14 +3632,29 @@ function handleDashboardCreateInvoiceParty() {
   startCreateInvoiceParty();
 }
 
-function handleStartCustomerNewPlan() {
-  if (!selectedCustomer.value || !canStartCustomerPlanWizard.value) {
+function handleStartCustomerNewOrder() {
+  if (!selectedCustomer.value || !canStartCustomerOrderWizard.value) {
     return;
   }
   void router.push({
-    name: "SicherPlanCustomerNewPlan",
+    name: "SicherPlanCustomerOrderWorkspace",
     query: {
       customer_id: selectedCustomer.value.id,
+    },
+  });
+}
+
+function handleEditCustomerOrder(orderId: string) {
+  if (!selectedCustomer.value || !canStartCustomerOrderWizard.value || !orderId) {
+    return;
+  }
+  void router.push({
+    name: "SicherPlanCustomerOrderWorkspace",
+    query: {
+      customer_id: selectedCustomer.value.id,
+      order_id: orderId,
+      order_mode: "edit",
+      step: "order-details",
     },
   });
 }
@@ -3806,7 +3822,7 @@ async function selectCustomer(customerId: string, options: SelectCustomerOptions
       await refreshCustomerDashboard();
       activeDetailTab.value = normalizeCustomerDetailTab(desiredDetailTab, {
         canReadCommercial: canReadCommercial.value,
-        canReadPlans: canReadPlans.value,
+        canReadOrders: canReadCustomerOrders.value,
         hasSelectedCustomer: !!selectedCustomer.value,
         isCreatingCustomer: isCreatingCustomer.value,
       });
@@ -3825,7 +3841,7 @@ async function selectCustomer(customerId: string, options: SelectCustomerOptions
       await refreshCustomerPortalAccess();
       activeDetailTab.value = normalizeCustomerDetailTab(activeDetailTab.value || options.fallbackDetailTab || "dashboard", {
         canReadCommercial: canReadCommercial.value,
-        canReadPlans: canReadPlans.value,
+        canReadOrders: canReadCustomerOrders.value,
         hasSelectedCustomer: !!selectedCustomer.value,
         isCreatingCustomer: isCreatingCustomer.value,
       });
@@ -5129,7 +5145,7 @@ watch(
     if (selectedCustomer.value?.id === nextContext.customerId) {
       activeDetailTab.value = normalizeCustomerDetailTab(nextContext.detailTab || activeDetailTab.value, {
         canReadCommercial: canReadCommercial.value,
-        canReadPlans: canReadPlans.value,
+        canReadOrders: canReadCustomerOrders.value,
         hasSelectedCustomer: !!selectedCustomer.value,
         isCreatingCustomer: isCreatingCustomer.value,
       });
@@ -5145,11 +5161,11 @@ watch(
 );
 
 watch(
-  () => [selectedCustomer.value?.id ?? "", isCreatingCustomer.value, canReadCommercial.value, canReadPlans.value],
+  () => [selectedCustomer.value?.id ?? "", isCreatingCustomer.value, canReadCommercial.value, canReadCustomerOrders.value],
   () => {
     activeDetailTab.value = normalizeCustomerDetailTab(activeDetailTab.value, {
       canReadCommercial: canReadCommercial.value,
-      canReadPlans: canReadPlans.value,
+      canReadOrders: canReadCustomerOrders.value,
       hasSelectedCustomer: !!selectedCustomer.value,
       isCreatingCustomer: isCreatingCustomer.value,
     });

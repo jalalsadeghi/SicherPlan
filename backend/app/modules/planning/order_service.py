@@ -16,7 +16,7 @@ from app.modules.customers.models import Customer
 from app.modules.iam.audit_service import AuditActor, AuditService
 from app.modules.iam.authz import RequestAuthorizationContext
 from app.modules.planning.commercial_link_service import PlanningCommercialLinkService
-from app.modules.planning.models import CustomerOrder, OrderEquipmentLine, OrderRequirementLine, PatrolRoute, RequirementType
+from app.modules.planning.models import CustomerOrder, OrderEquipmentLine, OrderRequirementLine, PatrolRoute, RequirementType, ServiceCategory
 from app.modules.planning.schemas import (
     CustomerOrderAttachmentCreate,
     CustomerOrderAttachmentLinkCreate,
@@ -40,6 +40,7 @@ from app.modules.platform_services.docs_service import DocumentService
 class PlanningOrderRepository(Protocol):
     def get_customer(self, tenant_id: str, customer_id: str) -> Customer | None: ...
     def list_lookup_values(self, tenant_id: str | None, domain: str): ...  # noqa: ANN001
+    def list_service_categories(self, tenant_id: str, filters): ...  # noqa: ANN001
     def get_requirement_type(self, tenant_id: str, row_id: str) -> RequirementType | None: ...
     def get_patrol_route(self, tenant_id: str, row_id: str) -> PatrolRoute | None: ...
     def get_equipment_item(self, tenant_id: str, row_id: str): ...  # noqa: ANN001
@@ -447,6 +448,7 @@ class CustomerOrderService:
         if requirement_type is None:
             raise self._not_found("requirement_type")
         self._validate_service_category_code(
+            tenant_id,
             service_category_code,
             current_service_category_code=current_service_category_code,
         )
@@ -461,10 +463,25 @@ class CustomerOrderService:
 
     def _validate_service_category_code(
         self,
+        tenant_id: str,
         service_category_code: str,
         *,
         current_service_category_code: str | None = None,
     ) -> None:
+        catalog_codes = {
+            row.code
+            for row in self._list_active_service_categories(tenant_id)
+        }
+        if catalog_codes:
+            if service_category_code in catalog_codes:
+                return
+            if current_service_category_code is not None and service_category_code == current_service_category_code:
+                return
+            raise ApiException(
+                400,
+                "planning.customer_order.invalid_service_category_code",
+                "errors.planning.customer_order.invalid_service_category_code",
+            )
         canonical_codes = {row["code"] for row in self.SERVICE_CATEGORY_FALLBACK_OPTIONS}
         allowed_codes = {
             getattr(row, "code", None)
@@ -483,6 +500,18 @@ class CustomerOrderService:
             "planning.customer_order.invalid_service_category_code",
             "errors.planning.customer_order.invalid_service_category_code",
         )
+
+    def _list_active_service_categories(self, tenant_id: str) -> list[ServiceCategory]:
+        list_service_categories = getattr(self.repository, "list_service_categories", None)
+        if not callable(list_service_categories):
+            return []
+        from app.modules.planning.schemas import OpsMasterFilter
+
+        return [
+            row
+            for row in list_service_categories(tenant_id, OpsMasterFilter(lifecycle_status="active"))
+            if getattr(row, "archived_at", None) is None and getattr(row, "status", "active") == "active"
+        ]
 
     def _validate_requirement_line(
         self,

@@ -27,6 +27,8 @@ from app.modules.planning.schemas import (
     PlanningOpsImportRowResult,
     RequirementTypeCreate,
     RequirementTypeUpdate,
+    ServiceCategoryCreate,
+    ServiceCategoryUpdate,
     SiteCreate,
     SiteUpdate,
     TradeFairCreate,
@@ -41,6 +43,7 @@ from app.modules.platform_services.integration_models import ImportExportJob
 IMPORT_HEADERS = {
     "requirement_type": ("code", "label", "default_planning_mode_code", "notes", "status"),
     "equipment_item": ("code", "label", "unit_of_measure_code", "notes", "status"),
+    "service_category": ("code", "label", "sort_order", "notes", "status"),
     "site": ("customer_id", "site_no", "name", "address_id", "timezone", "latitude", "longitude", "watchbook_enabled", "notes", "status"),
     "event_venue": ("customer_id", "venue_no", "name", "address_id", "timezone", "latitude", "longitude", "notes", "status"),
     "trade_fair": ("customer_id", "venue_id", "fair_no", "name", "address_id", "timezone", "latitude", "longitude", "start_date", "end_date", "notes", "status"),
@@ -50,6 +53,7 @@ IMPORT_HEADERS = {
 LEGACY_IMPORT_HEADERS = {
     "requirement_type": ("code", "label", "default_planning_mode_code", "description", "status"),
     "equipment_item": ("code", "label", "unit_of_measure_code", "description", "status"),
+    "service_category": ("code", "label", "sort_order", "description", "status"),
 }
 
 
@@ -262,6 +266,18 @@ class PlanningOpsService:
                 actor,
             )
             return PlanningOpsImportRowResult(row_no=row.row_no, entity_ref=entity_ref, status="applied", messages=["updated"], entity_id=updated.id)
+        if entity_key == "service_category":
+            existing = self.planning_service.repository.find_service_category_by_code(tenant_id, payload.code)
+            if existing is None:
+                created = self.planning_service.create_service_category(tenant_id, payload, actor)
+                return PlanningOpsImportRowResult(row_no=row.row_no, entity_ref=entity_ref, status="applied", messages=["created"], entity_id=created.id)
+            updated = self.planning_service.update_service_category(
+                tenant_id,
+                existing.id,
+                ServiceCategoryUpdate(**payload.model_dump(), version_no=existing.version_no),
+                actor,
+            )
+            return PlanningOpsImportRowResult(row_no=row.row_no, entity_ref=entity_ref, status="applied", messages=["updated"], entity_id=updated.id)
         if entity_key == "site":
             existing = self.planning_service.repository.find_site_by_no(tenant_id, payload.site_no)
             if existing is None:
@@ -326,6 +342,14 @@ class PlanningOpsService:
                 code=self._required(data, "code"),
                 label=self._required(data, "label"),
                 unit_of_measure_code=self._required(data, "unit_of_measure_code"),
+                notes=data.get("notes") or data.get("description") or None,
+            )
+        if entity_key == "service_category":
+            return ServiceCategoryCreate(
+                tenant_id=tenant_id,
+                code=self._required(data, "code"),
+                label=self._required(data, "label"),
+                sort_order=int(data.get("sort_order") or 100),
                 notes=data.get("notes") or data.get("description") or None,
             )
         if entity_key == "site":
@@ -417,6 +441,7 @@ class PlanningOpsService:
         ref_fields = {
             "requirement_type": "code",
             "equipment_item": "code",
+            "service_category": "code",
             "site": "site_no",
             "event_venue": "venue_no",
             "trade_fair": "fair_no",

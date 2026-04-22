@@ -10,6 +10,8 @@ import { buildWizardDraftStorageKey } from './new-plan-wizard-drafts';
 const routerPushMock = vi.fn();
 const routerReplaceMock = vi.fn();
 const routeState = reactive({
+  fullPath: '/admin/customers/order-workspace',
+  path: '/admin/customers/order-workspace',
   query: {} as Record<string, unknown>,
 });
 const authStoreState = reactive({
@@ -27,7 +29,11 @@ const customersApiMocks = vi.hoisted(() => ({
 const confirmMock = vi.fn();
 
 vi.mock('#/locales', () => ({
-  $t: (key: string) => key,
+  $t: (key: string) => ({
+    'sicherplan.customerPlansWizard.breadcrumbCustomers': 'Customers',
+    'sicherplan.customerPlansWizard.breadcrumbPlans': 'Orders',
+    'sicherplan.customerPlansWizard.title': 'Order workspace',
+  } as Record<string, string>)[key] ?? key,
 }));
 
 vi.mock('vue-router', () => ({
@@ -248,6 +254,8 @@ describe('CustomerNewPlanWizardView', () => {
   beforeEach(() => {
     vi.stubGlobal('confirm', confirmMock);
     window.sessionStorage.clear();
+    routeState.fullPath = '/admin/customers/order-workspace';
+    routeState.path = '/admin/customers/order-workspace';
     routeState.query = {};
     routerPushMock.mockReset();
     routerReplaceMock.mockReset();
@@ -282,8 +290,11 @@ describe('CustomerNewPlanWizardView', () => {
     expect(wrapper.get('[data-testid="module-workspace-page"]').attributes('data-show-intro')).toBe('false');
     expect(wrapper.find('[data-testid="module-workspace-intro"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="customer-new-plan-breadcrumb"]').text()).toContain(
-      'sicherplan.customerPlansWizard.breadcrumbCustomers',
+      'Customers',
     );
+    expect(wrapper.get('[data-testid="customer-new-plan-breadcrumb"]').text()).toContain('Orders');
+    expect(wrapper.get('[data-testid="customer-new-plan-breadcrumb"]').text()).toContain('Order workspace');
+    expect(wrapper.text()).not.toContain('New plan');
     expect(wrapper.get('[data-testid="customer-new-plan-customer-summary"]').text()).toContain('Alpha Security');
     expect(wrapper.find('[data-testid="customer-new-plan-stepper"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
@@ -299,6 +310,37 @@ describe('CustomerNewPlanWizardView', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-previous"]').attributes('disabled')).toBeDefined();
   });
 
+  it('opens from the old new-plan alias with query params preserved and visible Order workspace naming', async () => {
+    routeState.path = '/admin/customers/new-plan';
+    routeState.fullPath = '/admin/customers/new-plan?customer_id=customer-1';
+    routeState.query = { customer_id: 'customer-1' };
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(customersApiMocks.getCustomerMock).toHaveBeenCalledWith('tenant-1', 'customer-1', 'token-1');
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect(wrapper.get('[data-testid="customer-new-plan-breadcrumb"]').text()).toContain('Order workspace');
+    expect(routeState.query).toEqual({ customer_id: 'customer-1' });
+    expect(routerReplaceMock).not.toHaveBeenCalled();
+  });
+
+  it('opens from the canonical order workspace path with Orders breadcrumb naming', async () => {
+    routeState.path = '/admin/customers/order-workspace';
+    routeState.fullPath = '/admin/customers/order-workspace?customer_id=customer-1';
+    routeState.query = { customer_id: 'customer-1' };
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    const breadcrumbText = wrapper.get('[data-testid="customer-new-plan-breadcrumb"]').text();
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
+    expect(breadcrumbText).toContain('Customers');
+    expect(breadcrumbText).toContain('Orders');
+    expect(breadcrumbText).toContain('Order workspace');
+    expect(breadcrumbText).not.toContain('New plan');
+  });
+
   it('normalizes an invalid later-step query back to order-details', async () => {
     routeState.query = { customer_id: 'customer-1', step: 'series-exceptions' };
     const wrapper = mountComponent();
@@ -306,7 +348,7 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
     expect(routerReplaceMock).toHaveBeenCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
       },
@@ -328,7 +370,7 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('shift-plan');
     expect(routerReplaceMock).toHaveBeenCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
         order_id: 'order-1',
@@ -372,7 +414,7 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
     expect(routerReplaceMock).toHaveBeenCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
       },
@@ -393,7 +435,7 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
     expect(routerReplaceMock).toHaveBeenCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
         order_id: 'order-1',
@@ -415,7 +457,7 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
         order_id: 'order-1',
@@ -437,7 +479,7 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
         order_id: 'order-1',
@@ -464,7 +506,7 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(restoredWrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
         order_id: 'order-1',
@@ -483,7 +525,7 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
       },
@@ -500,7 +542,7 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
       },
@@ -521,7 +563,7 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
         order_id: 'order-1',
@@ -571,7 +613,7 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-documents');
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
         order_id: 'order-1',
@@ -612,13 +654,13 @@ describe('CustomerNewPlanWizardView', () => {
     expect(
       routerReplaceMock.mock.calls.some(
         ([payload]) =>
-          payload?.path === '/admin/customers/new-plan' &&
+          payload?.path === '/admin/customers/order-workspace' &&
           payload?.query?.step === 'shift-plan' &&
           payload?.query?.shift_plan_id === 'shift-plan-1',
       ),
     ).toBe(false);
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
         order_id: 'order-1',
@@ -666,7 +708,7 @@ describe('CustomerNewPlanWizardView', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('series-exceptions');
     expect((wrapper.vm as any).wizardState.shift_plan_id).toBe('shift-plan-1');
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
         order_id: 'order-1',
@@ -751,7 +793,7 @@ describe('CustomerNewPlanWizardView', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('series-exceptions');
     expect((wrapper.vm as any).wizardState.shift_plan_id).toBe('shift-plan-1');
     expect(routerReplaceMock).toHaveBeenCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
         order_id: 'order-1',
@@ -828,7 +870,7 @@ describe('CustomerNewPlanWizardView', () => {
     expect((wrapper.vm as any).wizardState.shift_plan_id).toBe('shift-plan-1');
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('series-exceptions');
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
         order_id: 'order-1',
@@ -872,7 +914,7 @@ describe('CustomerNewPlanWizardView', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('shift-plan');
     expect((wrapper.vm as any).wizardState.shift_plan_id).toBe('shift-plan-1');
     expect(routerReplaceMock).toHaveBeenLastCalledWith({
-      path: '/admin/customers/new-plan',
+      path: '/admin/customers/order-workspace',
       query: {
         customer_id: 'customer-1',
         order_id: 'order-1',
@@ -955,7 +997,7 @@ describe('CustomerNewPlanWizardView', () => {
     expect(draftKey).toBe('sicherplan.customerNewPlanWizardDraft:tenant-1:customer-1:order-details');
   });
 
-  it('cancels back to customer plans after discard confirmation', async () => {
+  it('cancels back to customer orders after discard confirmation', async () => {
     routeState.query = { customer_id: 'customer-1' };
     const wrapper = mountComponent();
     await flushPromises();
@@ -969,7 +1011,7 @@ describe('CustomerNewPlanWizardView', () => {
       path: '/admin/customers',
       query: {
         customer_id: 'customer-1',
-        tab: 'plans',
+        tab: 'orders',
       },
     });
   });

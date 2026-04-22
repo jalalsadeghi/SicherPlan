@@ -88,6 +88,26 @@ test("wizard form grid keeps responsive stacking rules", () => {
   assert.match(source, /\.sp-customer-plan-wizard-step__grid \{\s*grid-template-columns: 1fr;/);
 });
 
+test("order scope documents step uses employee-overview style sticky section navigation", () => {
+  assert.match(source, /v-else-if="orderScopeDocumentsStepActive"[\s\S]*data-testid="customer-order-scope-onepage"/);
+  assert.match(source, /data-testid="customer-order-scope-nav"/);
+  assert.match(source, /customer-order-scope-nav-link-equipment/);
+  assert.match(source, /customer-order-scope-nav-link-requirements/);
+  assert.match(source, /customer-order-scope-nav-link-documents/);
+  assert.match(source, /IconifyIcon class="sp-customer-order-scope-nav__icon"/);
+  assert.match(source, /id="customer-order-scope-section-equipment"/);
+  assert.match(source, /id="customer-order-scope-section-requirements"/);
+  assert.match(source, /id="customer-order-scope-section-documents"/);
+  assert.match(source, /scrollIntoView\(\{\s*behavior: 'smooth',\s*block: 'start'/);
+  assert.match(source, /new IntersectionObserver/);
+  assert.match(source, /activeOrderScopeSection\.value = sectionId/);
+  assert.match(source, /\.sp-customer-order-scope-nav-shell \{[\s\S]*position: sticky;/);
+  assert.match(source, /\.sp-customer-order-scope-nav-shell--fixed \{[\s\S]*position: fixed;/);
+  assert.match(source, /\.sp-customer-order-scope-nav-shell--pinned \{[\s\S]*position: absolute;/);
+  assert.match(source, /\.sp-customer-order-scope-nav__link--active \{[\s\S]*border-left-color: var\(--sp-color-primary\);/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__scope-card \{[\s\S]*scroll-margin-top: var\(--customer-order-scope-sticky-top, 6\.5rem\);/);
+});
+
 test("wizard step content exposes non-disruptive local loading indicators for saved data areas", () => {
   assert.match(source, /LocalLoadingIndicator/);
   assert.match(source, /type StepLoadKey/);

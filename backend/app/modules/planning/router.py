@@ -90,6 +90,10 @@ from app.modules.planning.schemas import (
     RequirementTypeListItem,
     RequirementTypeRead,
     RequirementTypeUpdate,
+    ServiceCategoryCreate,
+    ServiceCategoryListItem,
+    ServiceCategoryRead,
+    ServiceCategoryUpdate,
     SiteCreate,
     SiteListItem,
     SiteLocationProjectionRead,
@@ -589,6 +593,47 @@ def list_service_category_options(
     service: Annotated[PlanningService, Depends(get_planning_service)],
 ) -> list[PlanningReferenceOptionRead]:
     return service.list_service_category_options(str(tenant_id), context)
+
+
+@router.get("/service-categories", response_model=list[ServiceCategoryListItem])
+def list_service_categories(
+    tenant_id: UUID,
+    filters: Annotated[OpsMasterFilter, Depends(_filters)],
+    context: Annotated[RequestAuthorizationContext, Depends(require_permission_only("planning.ops.read"))],
+    service: Annotated[PlanningService, Depends(get_planning_service)],
+) -> list[ServiceCategoryListItem]:
+    return service.list_service_categories(str(tenant_id), filters, context)
+
+
+@router.post("/service-categories", response_model=ServiceCategoryRead, status_code=status.HTTP_201_CREATED)
+def create_service_category(
+    tenant_id: UUID,
+    payload: ServiceCategoryCreate,
+    context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.ops.write", scope="tenant"))],
+    service: Annotated[PlanningService, Depends(get_planning_service)],
+) -> ServiceCategoryRead:
+    return service.create_service_category(str(tenant_id), payload, context)
+
+
+@router.get("/service-categories/{row_id}", response_model=ServiceCategoryRead)
+def get_service_category(
+    tenant_id: UUID,
+    row_id: UUID,
+    context: Annotated[RequestAuthorizationContext, Depends(require_permission_only("planning.ops.read"))],
+    service: Annotated[PlanningService, Depends(get_planning_service)],
+) -> ServiceCategoryRead:
+    return service.get_service_category(str(tenant_id), str(row_id), context)
+
+
+@router.patch("/service-categories/{row_id}", response_model=ServiceCategoryRead)
+def update_service_category(
+    tenant_id: UUID,
+    row_id: UUID,
+    payload: ServiceCategoryUpdate,
+    context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.ops.write", scope="tenant"))],
+    service: Annotated[PlanningService, Depends(get_planning_service)],
+) -> ServiceCategoryRead:
+    return service.update_service_category(str(tenant_id), str(row_id), payload, context)
 
 
 @router.post("/equipment-items", response_model=EquipmentItemRead, status_code=status.HTTP_201_CREATED)

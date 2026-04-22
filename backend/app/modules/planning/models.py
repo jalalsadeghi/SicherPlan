@@ -105,6 +105,29 @@ class EquipmentItem(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
         self.description = value
 
 
+class ServiceCategory(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
+    __tablename__ = "service_category"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "code", name="uq_ops_service_category_tenant_code"),
+        UniqueConstraint("tenant_id", "id", name="uq_ops_service_category_tenant_id_id"),
+        {"schema": "ops"},
+    )
+
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("core.tenant.id", ondelete="RESTRICT"), nullable=False)
+    code: Mapped[str] = mapped_column(String(80), nullable=False)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=100, server_default="100")
+
+    @property
+    def notes(self) -> str | None:
+        return self.description
+
+    @notes.setter
+    def notes(self, value: str | None) -> None:
+        self.description = value
+
+
 class Site(UUIDPrimaryKeyMixin, AuditLifecycleMixin, Base):
     __tablename__ = "site"
     __table_args__ = (

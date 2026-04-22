@@ -61,35 +61,37 @@ describe('useAccessStore', () => {
     expect(store.tabs[0]?.query).toEqual({ id: '1' });
   });
 
-  it('uses one Customer New Plan tab when only wizard query params change', () => {
+  it('uses one Customer Order Workspace tab when only wizard query params change', () => {
     const store = useTabbarStore();
     const baseTab = {
       meta: {
         fullPathKey: false,
-        title: 'New plan',
+        title: 'Order workspace',
       },
-      name: 'SicherPlanCustomerNewPlan',
-      path: '/admin/customers/new-plan',
+      name: 'SicherPlanCustomerOrderWorkspace',
+      path: '/admin/customers/order-workspace',
     };
 
     store.addTab({
       ...baseTab,
-      fullPath: '/admin/customers/new-plan?customer_id=c1&step=order-details',
+      fullPath: '/admin/customers/order-workspace?customer_id=c1&step=order-details',
       query: { customer_id: 'c1', step: 'order-details' },
     } as any);
     store.addTab({
       ...baseTab,
-      fullPath: '/admin/customers/new-plan?customer_id=c1&step=order-scope-documents&order_id=o1',
+      fullPath: '/admin/customers/order-workspace?customer_id=c1&step=order-scope-documents&order_id=o1',
       query: { customer_id: 'c1', order_id: 'o1', step: 'order-scope-documents' },
     } as any);
     store.addTab({
       ...baseTab,
-      fullPath: '/admin/customers/new-plan?customer_id=c1&step=planning-record-overview&order_id=o1',
+      fullPath: '/admin/customers/order-workspace?customer_id=c1&step=planning-record-overview&order_id=o1',
       query: { customer_id: 'c1', order_id: 'o1', step: 'planning-record-overview' },
     } as any);
 
     expect(store.tabs).toHaveLength(1);
-    expect(store.tabs[0]?.key).toBe('/admin/customers/new-plan');
+    expect(store.tabs[0]?.key).toBe('/admin/customers/order-workspace');
+    expect(store.tabs[0]?.name).toBe('SicherPlanCustomerOrderWorkspace');
+    expect(store.tabs[0]?.meta?.title).toBe('Order workspace');
     expect(store.tabs[0]?.query).toEqual({
       customer_id: 'c1',
       order_id: 'o1',

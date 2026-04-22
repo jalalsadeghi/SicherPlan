@@ -1290,33 +1290,52 @@ export type MessageKey =
   | "customerAdmin.tabs.contactAccess"
   | "customerAdmin.tabs.commercial"
   | "customerAdmin.tabs.portal"
-  | "customerAdmin.tabs.plans"
+  | "customerAdmin.tabs.orders"
   | "customerAdmin.tabs.history"
   | "customerAdmin.tabs.employeeBlocks"
-  | "customerAdmin.plans.eyebrow"
-  | "customerAdmin.plans.title"
-  | "customerAdmin.plans.searchPlaceholder"
-  | "customerAdmin.plans.sortLabel"
-  | "customerAdmin.plans.sort.createdAtDesc"
-  | "customerAdmin.plans.sort.createdAtAsc"
-  | "customerAdmin.plans.sort.executionStartDesc"
-  | "customerAdmin.plans.sort.executionStartAsc"
-  | "customerAdmin.plans.sort.executionEndDesc"
-  | "customerAdmin.plans.sort.executionEndAsc"
-  | "customerAdmin.plans.sort.releaseDateDesc"
-  | "customerAdmin.plans.sort.releaseDateAsc"
-  | "customerAdmin.plans.sort.status"
-  | "customerAdmin.plans.emptyTitle"
-  | "customerAdmin.plans.emptyBody"
-  | "customerAdmin.plans.errorTitle"
-  | "customerAdmin.plans.errorBody"
-  | "customerAdmin.plans.displayState.archived"
-  | "customerAdmin.plans.displayState.upcoming"
-  | "customerAdmin.plans.displayState.inProgress"
-  | "customerAdmin.plans.displayState.completed"
-  | "customerAdmin.plans.registrationDate"
-  | "customerAdmin.plans.releaseDate"
-  | "customerAdmin.plans.rawReleaseState"
+  | "customerAdmin.orders.eyebrow"
+  | "customerAdmin.orders.title"
+  | "customerAdmin.orders.searchPlaceholder"
+  | "customerAdmin.orders.sortLabel"
+  | "customerAdmin.orders.sort.createdAtDesc"
+  | "customerAdmin.orders.sort.createdAtAsc"
+  | "customerAdmin.orders.sort.executionStartDesc"
+  | "customerAdmin.orders.sort.executionStartAsc"
+  | "customerAdmin.orders.sort.executionEndDesc"
+  | "customerAdmin.orders.sort.executionEndAsc"
+  | "customerAdmin.orders.sort.releaseDateDesc"
+  | "customerAdmin.orders.sort.releaseDateAsc"
+  | "customerAdmin.orders.sort.status"
+  | "customerAdmin.orders.emptyTitle"
+  | "customerAdmin.orders.emptyBody"
+  | "customerAdmin.orders.errorTitle"
+  | "customerAdmin.orders.errorBody"
+  | "customerAdmin.orders.displayState.archived"
+  | "customerAdmin.orders.displayState.upcoming"
+  | "customerAdmin.orders.displayState.inProgress"
+  | "customerAdmin.orders.displayState.completed"
+  | "customerAdmin.orders.registrationDate"
+  | "customerAdmin.orders.releaseDate"
+  | "customerAdmin.orders.rawReleaseState"
+  | "customerAdmin.orders.detail.attachments"
+  | "customerAdmin.orders.detail.close"
+  | "customerAdmin.orders.detail.createdAt"
+  | "customerAdmin.orders.detail.customer"
+  | "customerAdmin.orders.detail.errorBody"
+  | "customerAdmin.orders.detail.errorTitle"
+  | "customerAdmin.orders.detail.eyebrow"
+  | "customerAdmin.orders.detail.loading"
+  | "customerAdmin.orders.detail.noAttachments"
+  | "customerAdmin.orders.detail.notes"
+  | "customerAdmin.orders.detail.patrolRoute"
+  | "customerAdmin.orders.detail.releasedAt"
+  | "customerAdmin.orders.detail.requirementType"
+  | "customerAdmin.orders.detail.securityConcept"
+  | "customerAdmin.orders.detail.serviceCategory"
+  | "customerAdmin.orders.detail.serviceFrom"
+  | "customerAdmin.orders.detail.serviceTo"
+  | "customerAdmin.orders.detail.title"
+  | "customerAdmin.orders.detail.updatedAt"
   | "customerAdmin.dashboard.kpis.tenure"
   | "customerAdmin.dashboard.kpis.plans"
   | "customerAdmin.dashboard.kpis.finance"
@@ -1505,6 +1524,7 @@ export type MessageKey =
   | "customerAdmin.actions.exportCustomers"
   | "customerAdmin.actions.newCustomer"
   | "customerAdmin.actions.newPlan"
+  | "customerAdmin.actions.newOrder"
   | "customerAdmin.actions.createCustomer"
   | "customerAdmin.actions.saveCustomer"
   | "customerAdmin.actions.cancel"
@@ -3391,33 +3411,52 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.tabs.contactAccess": "Kontakte & Zugang",
     "customerAdmin.tabs.commercial": "Commercial",
     "customerAdmin.tabs.portal": "Portal",
-    "customerAdmin.tabs.plans": "Pläne",
+    "customerAdmin.tabs.orders": "Aufträge",
     "customerAdmin.tabs.history": "Historie",
     "customerAdmin.tabs.employeeBlocks": "Mitarbeitersperren",
-    "customerAdmin.plans.eyebrow": "Planung",
-    "customerAdmin.plans.title": "Kundenpläne",
-    "customerAdmin.plans.searchPlaceholder": "Planname oder Auftragsnummer suchen",
-    "customerAdmin.plans.sortLabel": "Sortierung",
-    "customerAdmin.plans.sort.createdAtDesc": "Registrierungsdatum absteigend",
-    "customerAdmin.plans.sort.createdAtAsc": "Registrierungsdatum aufsteigend",
-    "customerAdmin.plans.sort.executionStartDesc": "Ausführungsstart absteigend",
-    "customerAdmin.plans.sort.executionStartAsc": "Ausführungsstart aufsteigend",
-    "customerAdmin.plans.sort.executionEndDesc": "Ausführungsende absteigend",
-    "customerAdmin.plans.sort.executionEndAsc": "Ausführungsende aufsteigend",
-    "customerAdmin.plans.sort.releaseDateDesc": "Freigabedatum absteigend",
-    "customerAdmin.plans.sort.releaseDateAsc": "Freigabedatum aufsteigend",
-    "customerAdmin.plans.sort.status": "Status",
-    "customerAdmin.plans.emptyTitle": "Keine Pläne gefunden",
-    "customerAdmin.plans.emptyBody": "Für diesen Kunden liegen aktuell keine passenden Planungsstände vor.",
-    "customerAdmin.plans.errorTitle": "Pläne konnten nicht geladen werden",
-    "customerAdmin.plans.errorBody": "Die kundenbezogenen Planungsstände sind derzeit nicht verfügbar.",
-    "customerAdmin.plans.displayState.archived": "Archiviert",
-    "customerAdmin.plans.displayState.upcoming": "Bevorstehend",
-    "customerAdmin.plans.displayState.inProgress": "In Ausführung",
-    "customerAdmin.plans.displayState.completed": "Abgeschlossen",
-    "customerAdmin.plans.registrationDate": "Registriert",
-    "customerAdmin.plans.releaseDate": "Freigegeben",
-    "customerAdmin.plans.rawReleaseState": "Release-Status",
+    "customerAdmin.orders.eyebrow": "Aufträge",
+    "customerAdmin.orders.title": "Kundenaufträge",
+    "customerAdmin.orders.searchPlaceholder": "Auftragstitel oder Auftragsnummer suchen",
+    "customerAdmin.orders.sortLabel": "Sortierung",
+    "customerAdmin.orders.sort.createdAtDesc": "Registrierungsdatum absteigend",
+    "customerAdmin.orders.sort.createdAtAsc": "Registrierungsdatum aufsteigend",
+    "customerAdmin.orders.sort.executionStartDesc": "Ausführungsstart absteigend",
+    "customerAdmin.orders.sort.executionStartAsc": "Ausführungsstart aufsteigend",
+    "customerAdmin.orders.sort.executionEndDesc": "Ausführungsende absteigend",
+    "customerAdmin.orders.sort.executionEndAsc": "Ausführungsende aufsteigend",
+    "customerAdmin.orders.sort.releaseDateDesc": "Freigabedatum absteigend",
+    "customerAdmin.orders.sort.releaseDateAsc": "Freigabedatum aufsteigend",
+    "customerAdmin.orders.sort.status": "Status",
+    "customerAdmin.orders.emptyTitle": "Keine Aufträge gefunden",
+    "customerAdmin.orders.emptyBody": "Für diesen Kunden liegen aktuell keine passenden Aufträge vor.",
+    "customerAdmin.orders.errorTitle": "Aufträge konnten nicht geladen werden",
+    "customerAdmin.orders.errorBody": "Die kundenbezogenen Aufträge sind derzeit nicht verfügbar.",
+    "customerAdmin.orders.displayState.archived": "Archiviert",
+    "customerAdmin.orders.displayState.upcoming": "Bevorstehend",
+    "customerAdmin.orders.displayState.inProgress": "In Ausführung",
+    "customerAdmin.orders.displayState.completed": "Abgeschlossen",
+    "customerAdmin.orders.registrationDate": "Registriert",
+    "customerAdmin.orders.releaseDate": "Freigegeben",
+    "customerAdmin.orders.rawReleaseState": "Release-Status",
+    "customerAdmin.orders.detail.attachments": "Anhänge",
+    "customerAdmin.orders.detail.close": "Schließen",
+    "customerAdmin.orders.detail.createdAt": "Angelegt",
+    "customerAdmin.orders.detail.customer": "Kunde",
+    "customerAdmin.orders.detail.errorBody": "Die Auftragsdetails konnten nicht geladen werden.",
+    "customerAdmin.orders.detail.errorTitle": "Auftragsdetails nicht verfügbar",
+    "customerAdmin.orders.detail.eyebrow": "Auftragsvorschau",
+    "customerAdmin.orders.detail.loading": "Auftragsdetails werden geladen...",
+    "customerAdmin.orders.detail.noAttachments": "Keine Anhänge verknüpft.",
+    "customerAdmin.orders.detail.notes": "Notizen",
+    "customerAdmin.orders.detail.patrolRoute": "Patrouillenroute",
+    "customerAdmin.orders.detail.releasedAt": "Freigegeben am",
+    "customerAdmin.orders.detail.requirementType": "Anforderungstyp",
+    "customerAdmin.orders.detail.securityConcept": "Sicherheitskonzept",
+    "customerAdmin.orders.detail.serviceCategory": "Leistungskategorie",
+    "customerAdmin.orders.detail.serviceFrom": "Leistungsbeginn",
+    "customerAdmin.orders.detail.serviceTo": "Leistungsende",
+    "customerAdmin.orders.detail.title": "Auftragsdetails",
+    "customerAdmin.orders.detail.updatedAt": "Aktualisiert",
     "customerAdmin.dashboard.kpis.tenure": "Kundendauer",
     "customerAdmin.dashboard.kpis.plans": "Pläne gesamt",
     "customerAdmin.dashboard.kpis.finance": "Realisierter Vertragswert",
@@ -3622,6 +3661,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.exportCustomers": "CSV-Export",
     "customerAdmin.actions.newCustomer": "Neuer Kunde",
     "customerAdmin.actions.newPlan": "Neuer Plan",
+    "customerAdmin.actions.newOrder": "Neuer Auftrag",
     "customerAdmin.actions.createCustomer": "Kunden anlegen",
     "customerAdmin.actions.saveCustomer": "Kunde speichern",
     "customerAdmin.actions.cancel": "Abbrechen",
@@ -5563,33 +5603,52 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.tabs.contactAccess": "Contacts & Access",
     "customerAdmin.tabs.commercial": "Commercial",
     "customerAdmin.tabs.portal": "Portal",
-    "customerAdmin.tabs.plans": "Plans",
+    "customerAdmin.tabs.orders": "Orders",
     "customerAdmin.tabs.history": "History",
     "customerAdmin.tabs.employeeBlocks": "Employee blocks",
-    "customerAdmin.plans.eyebrow": "Planning",
-    "customerAdmin.plans.title": "Customer plans",
-    "customerAdmin.plans.searchPlaceholder": "Search by plan name or order number",
-    "customerAdmin.plans.sortLabel": "Sort",
-    "customerAdmin.plans.sort.createdAtDesc": "Registration date desc",
-    "customerAdmin.plans.sort.createdAtAsc": "Registration date asc",
-    "customerAdmin.plans.sort.executionStartDesc": "Execution start desc",
-    "customerAdmin.plans.sort.executionStartAsc": "Execution start asc",
-    "customerAdmin.plans.sort.executionEndDesc": "Execution end desc",
-    "customerAdmin.plans.sort.executionEndAsc": "Execution end asc",
-    "customerAdmin.plans.sort.releaseDateDesc": "Release date desc",
-    "customerAdmin.plans.sort.releaseDateAsc": "Release date asc",
-    "customerAdmin.plans.sort.status": "Status",
-    "customerAdmin.plans.emptyTitle": "No plans found",
-    "customerAdmin.plans.emptyBody": "No matching planning records are currently available for this customer.",
-    "customerAdmin.plans.errorTitle": "Plans could not be loaded",
-    "customerAdmin.plans.errorBody": "Customer planning records are currently unavailable.",
-    "customerAdmin.plans.displayState.archived": "Archived",
-    "customerAdmin.plans.displayState.upcoming": "Upcoming",
-    "customerAdmin.plans.displayState.inProgress": "In progress",
-    "customerAdmin.plans.displayState.completed": "Completed",
-    "customerAdmin.plans.registrationDate": "Registered",
-    "customerAdmin.plans.releaseDate": "Released",
-    "customerAdmin.plans.rawReleaseState": "Release state",
+    "customerAdmin.orders.eyebrow": "Orders",
+    "customerAdmin.orders.title": "Customer orders",
+    "customerAdmin.orders.searchPlaceholder": "Search by order title or order number",
+    "customerAdmin.orders.sortLabel": "Sort",
+    "customerAdmin.orders.sort.createdAtDesc": "Registration date desc",
+    "customerAdmin.orders.sort.createdAtAsc": "Registration date asc",
+    "customerAdmin.orders.sort.executionStartDesc": "Execution start desc",
+    "customerAdmin.orders.sort.executionStartAsc": "Execution start asc",
+    "customerAdmin.orders.sort.executionEndDesc": "Execution end desc",
+    "customerAdmin.orders.sort.executionEndAsc": "Execution end asc",
+    "customerAdmin.orders.sort.releaseDateDesc": "Release date desc",
+    "customerAdmin.orders.sort.releaseDateAsc": "Release date asc",
+    "customerAdmin.orders.sort.status": "Status",
+    "customerAdmin.orders.emptyTitle": "No orders found",
+    "customerAdmin.orders.emptyBody": "No matching orders are currently available for this customer.",
+    "customerAdmin.orders.errorTitle": "Orders could not be loaded",
+    "customerAdmin.orders.errorBody": "Customer orders are currently unavailable.",
+    "customerAdmin.orders.displayState.archived": "Archived",
+    "customerAdmin.orders.displayState.upcoming": "Upcoming",
+    "customerAdmin.orders.displayState.inProgress": "In progress",
+    "customerAdmin.orders.displayState.completed": "Completed",
+    "customerAdmin.orders.registrationDate": "Registered",
+    "customerAdmin.orders.releaseDate": "Released",
+    "customerAdmin.orders.rawReleaseState": "Release state",
+    "customerAdmin.orders.detail.attachments": "Attachments",
+    "customerAdmin.orders.detail.close": "Close",
+    "customerAdmin.orders.detail.createdAt": "Created",
+    "customerAdmin.orders.detail.customer": "Customer",
+    "customerAdmin.orders.detail.errorBody": "Order details could not be loaded.",
+    "customerAdmin.orders.detail.errorTitle": "Order details unavailable",
+    "customerAdmin.orders.detail.eyebrow": "Order preview",
+    "customerAdmin.orders.detail.loading": "Loading order details...",
+    "customerAdmin.orders.detail.noAttachments": "No attachments linked.",
+    "customerAdmin.orders.detail.notes": "Notes",
+    "customerAdmin.orders.detail.patrolRoute": "Patrol route",
+    "customerAdmin.orders.detail.releasedAt": "Released at",
+    "customerAdmin.orders.detail.requirementType": "Requirement type",
+    "customerAdmin.orders.detail.securityConcept": "Security concept",
+    "customerAdmin.orders.detail.serviceCategory": "Service category",
+    "customerAdmin.orders.detail.serviceFrom": "Service from",
+    "customerAdmin.orders.detail.serviceTo": "Service to",
+    "customerAdmin.orders.detail.title": "Order details",
+    "customerAdmin.orders.detail.updatedAt": "Updated",
     "customerAdmin.dashboard.kpis.tenure": "Customer tenure",
     "customerAdmin.dashboard.kpis.plans": "Total plans",
     "customerAdmin.dashboard.kpis.finance": "Realized contract amount",
@@ -5794,6 +5853,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.exportCustomers": "CSV export",
     "customerAdmin.actions.newCustomer": "New customer",
     "customerAdmin.actions.newPlan": "New plan",
+    "customerAdmin.actions.newOrder": "New order",
     "customerAdmin.actions.createCustomer": "Create customer",
     "customerAdmin.actions.saveCustomer": "Save customer",
     "customerAdmin.actions.cancel": "Cancel",

@@ -79,6 +79,23 @@ function useMixedMenu() {
     return rootMenuPath.value;
   });
 
+  function findMenuByPath(path: string, items: MenuRecordRaw[] = menus.value) {
+    for (const item of items) {
+      if (item.path === path) {
+        return item;
+      }
+      const child = findMenuByPath(path, item.children ?? []);
+      if (child) {
+        return child;
+      }
+    }
+    return null;
+  }
+
+  function isMenuContainer(path: string) {
+    return !!findMenuByPath(path)?.menuContainer;
+  }
+
   /**
    * 菜单点击事件处理
    * @param key 菜单路径
@@ -99,7 +116,11 @@ function useMixedMenu() {
 
     if (_splitSideMenus.length === 0) {
       navigation(key);
-    } else if (rootMenu && preferences.sidebar.autoActivateChild) {
+    } else if (
+      rootMenu &&
+      preferences.sidebar.autoActivateChild &&
+      !rootMenu.menuContainer
+    ) {
       navigation(
         defaultSubMap.has(rootMenu.path)
           ? (defaultSubMap.get(rootMenu.path) as string)
@@ -114,7 +135,11 @@ function useMixedMenu() {
    * @param parentsPath 父级路径
    */
   const handleMenuOpen = (key: string, parentsPath: string[]) => {
-    if (parentsPath.length <= 1 && preferences.sidebar.autoActivateChild) {
+    if (
+      parentsPath.length <= 1 &&
+      preferences.sidebar.autoActivateChild &&
+      !isMenuContainer(key)
+    ) {
       navigation(
         defaultSubMap.has(key) ? (defaultSubMap.get(key) as string) : key,
       );

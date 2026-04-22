@@ -140,16 +140,16 @@ test("customer same-record reloads preserve nested tab context with safe fallbac
 
 test("existing customers default to dashboard while create mode stays on overview", () => {
   assert.match(source, /import CustomerDashboardTab from "@\/components\/customers\/CustomerDashboardTab\.vue"/);
-  assert.match(source, /import CustomerPlansTab from "@\/components\/customers\/CustomerPlansTab\.vue"/);
+  assert.match(source, /import CustomerOrdersTab from "@\/components\/customers\/CustomerOrdersTab\.vue"/);
   assert.match(source, /dashboard:\s*"customerAdmin\.tabs\.dashboard"/);
-  assert.match(source, /plans:\s*"customerAdmin\.tabs\.plans"/);
+  assert.match(source, /orders:\s*"customerAdmin\.tabs\.orders"/);
   assert.match(
     source,
     /<CustomerDashboardTab[\s\S]*v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'dashboard'"/,
   );
   assert.match(
     source,
-    /<CustomerPlansTab[\s\S]*v-if="selectedCustomer && !isCreatingCustomer && canReadPlans && activeDetailTab === 'plans'"/,
+    /<CustomerOrdersTab[\s\S]*v-if="selectedCustomer && !isCreatingCustomer && canReadCustomerOrders && activeDetailTab === 'orders'"/,
   );
   assert.match(source, /customerDashboard = ref<CustomerDashboardRead \| null>\(null\)/);
   assert.match(source, /customerDashboardError = ref\(""\)/);
@@ -174,14 +174,14 @@ test("dashboard quick actions reuse existing tab and create handlers", () => {
   assert.match(source, /:access-token="accessToken"/);
 });
 
-test("plans tab is inserted after contacts access and before history with planning-record permission gating", () => {
-  assert.match(source, /const canReadPlans = computed\(\(\) => hasPlanningOrderPermission\(authStore\.activeRole, "planning\.record\.read"\)\)/);
-  assert.match(source, /const canStartCustomerPlanWizard = computed\(\(\) => authStore\.effectiveRole === "tenant_admin"\)/);
-  assert.match(source, /buildCustomerDetailTabs\(\{[\s\S]*canReadCommercial: canReadCommercial\.value,[\s\S]*canReadPlans: canReadPlans\.value,/);
-  assert.match(source, /contact_access:\s*"customerAdmin\.tabs\.contactAccess",[\s\S]*plans:\s*"customerAdmin\.tabs\.plans",[\s\S]*history:\s*"customerAdmin\.tabs\.history"/);
-  assert.match(source, /:can-start-new-plan="canStartCustomerPlanWizard"/);
-  assert.match(source, /@start-new-plan="handleStartCustomerNewPlan"/);
-  assert.match(source, /name: "SicherPlanCustomerNewPlan",[\s\S]*customer_id: selectedCustomer\.value\.id/);
+test("orders tab is inserted after contacts access and before history with planning order permission gating", () => {
+  assert.match(source, /const canReadCustomerOrders = computed\(\(\) => hasPlanningOrderPermission\(authStore\.activeRole, "planning\.record\.read"\)\)/);
+  assert.match(source, /const canStartCustomerOrderWizard = computed\(\(\) => authStore\.effectiveRole === "tenant_admin"\)/);
+  assert.match(source, /buildCustomerDetailTabs\(\{[\s\S]*canReadCommercial: canReadCommercial\.value,[\s\S]*canReadOrders: canReadCustomerOrders\.value,/);
+  assert.match(source, /contact_access:\s*"customerAdmin\.tabs\.contactAccess",[\s\S]*orders:\s*"customerAdmin\.tabs\.orders",[\s\S]*history:\s*"customerAdmin\.tabs\.history"/);
+  assert.match(source, /:can-start-new-order="canStartCustomerOrderWizard"/);
+  assert.match(source, /@start-new-order="handleStartCustomerNewOrder"/);
+  assert.match(source, /name: "SicherPlanCustomerOrderWorkspace",[\s\S]*customer_id: selectedCustomer\.value\.id/);
 });
 
 test("customer detail navigation splits primary tabs from secondary link-style tabs", () => {

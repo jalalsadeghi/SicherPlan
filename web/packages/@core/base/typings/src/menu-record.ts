@@ -53,6 +53,10 @@ interface MenuRecordRaw extends MenuRecordBadgeRaw {
    */
   name: string;
   /**
+   * Pure navigation container. Opening the group should not navigate.
+   */
+  menuContainer?: boolean;
+  /**
    * 排序号
    */
   order?: number;

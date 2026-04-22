@@ -375,7 +375,7 @@ async function resolveCustomerContext(options?: { preserveContent?: boolean }) {
   }
 }
 
-function goBackToPlans() {
+function goBackToOrders() {
   if (!confirmDiscardChanges()) {
     return;
   }
@@ -387,7 +387,7 @@ function goBackToPlans() {
     query: customerId.value
       ? {
           customer_id: customerId.value,
-          tab: 'plans',
+          tab: 'orders',
         }
       : undefined,
   });
@@ -525,7 +525,7 @@ async function syncWizardRouteState(options?: { force?: boolean; source?: 'exter
   }
 
   await router.replace({
-    path: '/admin/customers/new-plan',
+    path: '/admin/customers/order-workspace',
     query: nextQuery,
   });
   if (options?.source === 'internal-final') {
@@ -655,7 +655,7 @@ watch(
               {{ $t('sicherplan.customerPlansWizard.breadcrumbCustomers') }}
             </button>
             <span>/</span>
-            <button type="button" class="sp-customer-plan-wizard__crumb-action" @click="goBackToPlans">
+            <button type="button" class="sp-customer-plan-wizard__crumb-action" @click="goBackToOrders">
               {{ $t('sicherplan.customerPlansWizard.breadcrumbPlans') }}
             </button>
             <span>/</span>
@@ -751,7 +751,7 @@ watch(
                 type="button"
                 class="cta-button cta-secondary"
                 data-testid="customer-new-plan-cancel"
-                @click="goBackToPlans"
+                @click="goBackToOrders"
               >
                 {{ $t('sicherplan.customerPlansWizard.actions.cancel') }}
               </button>

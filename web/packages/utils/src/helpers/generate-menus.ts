@@ -41,6 +41,7 @@ function generateMenus(
       hideChildrenInMenu = false,
       icon,
       link,
+      menuContainer,
       order,
       title = '',
       query,
@@ -79,6 +80,7 @@ function generateMenus(
       path: resultPath,
       show: !meta.hideInMenu,
       children: resultChildren,
+      ...(menuContainer ? { menuContainer } : {}),
     };
   });
 

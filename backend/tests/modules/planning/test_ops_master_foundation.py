@@ -5,6 +5,7 @@ import unittest
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from pathlib import Path
 from uuid import uuid4
 
 from sqlalchemy import CheckConstraint
@@ -16,7 +17,7 @@ from app.modules.customers.models import Customer
 from app.modules.iam.audit_service import AuditService
 from app.modules.iam.auth_schemas import AuthenticatedRoleScope
 from app.modules.iam.authz import RequestAuthorizationContext
-from app.modules.planning.models import EquipmentItem, EventVenue, PatrolCheckpoint, PatrolRoute, RequirementType, Site, TradeFair, TradeFairZone
+from app.modules.planning.models import EquipmentItem, EventVenue, PatrolCheckpoint, PatrolRoute, RequirementType, ServiceCategory, Site, TradeFair, TradeFairZone
 from app.modules.planning.schemas import (
     EquipmentItemCreate,
     EquipmentItemUpdate,
@@ -25,6 +26,8 @@ from app.modules.planning.schemas import (
     PatrolRouteCreate,
     RequirementTypeCreate,
     RequirementTypeUpdate,
+    ServiceCategoryCreate,
+    ServiceCategoryUpdate,
     SiteCreate,
     TradeFairCreate,
     TradeFairZoneCreate,
@@ -63,6 +66,7 @@ class FakePlanningRepository:
     addresses: dict[str, Address] = field(default_factory=dict)
     requirement_types: dict[str, RequirementType] = field(default_factory=dict)
     equipment_items: dict[str, EquipmentItem] = field(default_factory=dict)
+    service_categories: dict[str, ServiceCategory] = field(default_factory=dict)
     sites: dict[str, Site] = field(default_factory=dict)
     event_venues: dict[str, EventVenue] = field(default_factory=dict)
     trade_fairs: dict[str, TradeFair] = field(default_factory=dict)
@@ -218,6 +222,60 @@ class FakePlanningRepository:
 
     def find_equipment_item_by_code(self, tenant_id: str, code: str, *, exclude_id: str | None = None):
         for row in self.equipment_items.values():
+            if row.tenant_id == tenant_id and row.code == code and row.id != exclude_id:
+                return row
+        return None
+
+    def list_service_categories(self, tenant_id: str, filters: OpsMasterFilter) -> list[ServiceCategory]:
+        rows = [row for row in self.service_categories.values() if row.tenant_id == tenant_id]
+        if not filters.include_archived:
+            rows = [row for row in rows if row.archived_at is None]
+        if filters.search:
+            needle = filters.search.casefold()
+            rows = [
+                row
+                for row in rows
+                if needle in row.code.casefold()
+                or needle in row.label.casefold()
+                or (row.description is not None and needle in row.description.casefold())
+            ]
+        return sorted(rows, key=lambda row: (row.sort_order, row.label))
+
+    def get_service_category(self, tenant_id: str, row_id: str) -> ServiceCategory | None:
+        row = self.service_categories.get(row_id)
+        if row is None or row.tenant_id != tenant_id:
+            return None
+        return row
+
+    def create_service_category(self, tenant_id: str, payload: ServiceCategoryCreate, actor_user_id: str | None) -> ServiceCategory:
+        row = ServiceCategory(
+            tenant_id=tenant_id,
+            code=payload.code,
+            label=payload.label,
+            sort_order=payload.sort_order,
+            description=getattr(payload, "notes", getattr(payload, "description", None)),
+            created_by_user_id=actor_user_id,
+            updated_by_user_id=actor_user_id,
+        )
+        self._stamp(row)
+        self.service_categories[row.id] = row
+        return row
+
+    def update_service_category(self, tenant_id: str, row_id: str, payload, actor_user_id: str | None) -> ServiceCategory | None:
+        row = self.get_service_category(tenant_id, row_id)
+        if row is None:
+            return None
+        if payload.version_no != row.version_no:
+            raise ApiException(409, "planning.service_category.stale_version", "errors.planning.service_category.stale_version")
+        for key, value in payload.model_dump(exclude_unset=True, exclude={"version_no"}).items():
+            setattr(row, key, value)
+        row.version_no += 1
+        row.updated_by_user_id = actor_user_id
+        row.updated_at = datetime.now(UTC)
+        return row
+
+    def find_service_category_by_code(self, tenant_id: str, code: str, *, exclude_id: str | None = None):
+        for row in self.service_categories.values():
             if row.tenant_id == tenant_id and row.code == code and row.id != exclude_id:
                 return row
         return None
@@ -821,6 +879,100 @@ class PlanningOpsMasterFoundationTests(unittest.TestCase):
             ["object_security", "event_security", "trade_fair_security", "patrol_service"],
         )
         self.assertNotIn("site", [option.code for option in result])
+
+    def test_service_category_crud_feeds_order_workspace_options(self) -> None:
+        created = self.service.create_service_category(
+            "tenant-1",
+            ServiceCategoryCreate(
+                tenant_id="tenant-1",
+                code="mobile_patrol",
+                label="Mobile patrol",
+                sort_order=5,
+                notes="Tenant-owned category",
+            ),
+            self.context,
+        )
+
+        rows = self.service.list_service_categories("tenant-1", OpsMasterFilter(), self.context)
+        self.assertEqual([row.code for row in rows], ["mobile_patrol"])
+
+        updated = self.service.update_service_category(
+            "tenant-1",
+            created.id,
+            ServiceCategoryUpdate(label="Mobile patrol updated", version_no=created.version_no),
+            self.context,
+        )
+        self.assertEqual(updated.label, "Mobile patrol updated")
+
+        options = self.service.list_service_category_options("tenant-1", self.context)
+        self.assertEqual([option.code for option in options], ["mobile_patrol"])
+        self.assertEqual(options[0].label, "Mobile patrol updated")
+
+    def test_service_category_get_search_filter_and_tenant_scope(self) -> None:
+        first = self.service.create_service_category(
+            "tenant-1",
+            ServiceCategoryCreate(tenant_id="tenant-1", code="object", label="Objektschutz", sort_order=20),
+            self.context,
+        )
+        self.service.create_service_category(
+            "tenant-1",
+            ServiceCategoryCreate(tenant_id="tenant-1", code="event", label="Veranstaltungsschutz", sort_order=10),
+            self.context,
+        )
+        self.service.create_service_category(
+            "tenant-2",
+            ServiceCategoryCreate(tenant_id="tenant-2", code="object", label="Tenant 2 Objektschutz", sort_order=1),
+            _context("planning.ops.write", tenant_id="tenant-2"),
+        )
+
+        fetched = self.service.get_service_category("tenant-1", first.id, self.context)
+        self.assertEqual(fetched.code, "object")
+
+        filtered = self.service.list_service_categories(
+            "tenant-1",
+            OpsMasterFilter(search="veranstaltung"),
+            self.context,
+        )
+        self.assertEqual([row.code for row in filtered], ["event"])
+
+        tenant_rows = self.service.list_service_categories("tenant-1", OpsMasterFilter(), self.context)
+        self.assertEqual([row.code for row in tenant_rows], ["event", "object"])
+        self.assertNotIn("Tenant 2 Objektschutz", [row.label for row in tenant_rows])
+
+    def test_service_category_options_use_catalog_instead_of_legacy_lookup_when_catalog_exists(self) -> None:
+        self.repository.lookup_values.append(
+            LookupValue(
+                tenant_id=None,
+                domain="service_category",
+                code="object_security",
+                label="Legacy lookup",
+                description=None,
+                sort_order=1,
+            ),
+        )
+        self.service.create_service_category(
+            "tenant-1",
+            ServiceCategoryCreate(tenant_id="tenant-1", code="tenant_object", label="Tenant catalog", sort_order=1),
+            self.context,
+        )
+
+        options = self.service.list_service_category_options("tenant-1", self.context)
+
+        self.assertEqual([option.code for option in options], ["tenant_object"])
+        self.assertEqual(options[0].label, "Tenant catalog")
+
+    def test_service_category_router_declares_catalog_permissions(self) -> None:
+        router_source = Path("backend/app/modules/planning/router.py").read_text(encoding="utf-8")
+
+        self.assertIn('@router.get("/service-categories", response_model=list[ServiceCategoryListItem])', router_source)
+        self.assertRegex(router_source, r"def list_service_categories[\s\S]*require_permission_only\(\"planning\.ops\.read\"\)")
+        self.assertIn('@router.post("/service-categories", response_model=ServiceCategoryRead, status_code=status.HTTP_201_CREATED)', router_source)
+        self.assertRegex(router_source, r"def create_service_category[\s\S]*require_authorization\(\"planning\.ops\.write\", scope=\"tenant\"\)")
+        self.assertIn('@router.get("/service-categories/{row_id}", response_model=ServiceCategoryRead)', router_source)
+        self.assertRegex(router_source, r"def get_service_category[\s\S]*require_permission_only\(\"planning\.ops\.read\"\)")
+        self.assertIn('@router.patch("/service-categories/{row_id}", response_model=ServiceCategoryRead)', router_source)
+        self.assertRegex(router_source, r"def update_service_category[\s\S]*require_authorization\(\"planning\.ops\.write\", scope=\"tenant\"\)")
+        self.assertRegex(router_source, r"def list_service_category_options[\s\S]*require_permission_only\(\"planning\.ops\.read\"\)")
 
     def test_create_site_requires_existing_customer(self) -> None:
         payload = SiteCreate(tenant_id="tenant-1", customer_id="missing", site_no="S-001", name="Objekt A")

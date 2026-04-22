@@ -15,7 +15,7 @@ from app.modules.core.models import Address, LookupValue
 from app.modules.customers.models import Customer
 from app.modules.iam.audit_service import AuditActor, AuditService
 from app.modules.iam.authz import RequestAuthorizationContext
-from app.modules.planning.models import EquipmentItem, EventVenue, PatrolRoute, RequirementType, Site, TradeFair
+from app.modules.planning.models import EquipmentItem, EventVenue, PatrolRoute, RequirementType, ServiceCategory, Site, TradeFair
 from app.modules.planning.schemas import (
     EquipmentItemCreate,
     EquipmentItemListItem,
@@ -42,6 +42,10 @@ from app.modules.planning.schemas import (
     RequirementTypeListItem,
     RequirementTypeRead,
     RequirementTypeUpdate,
+    ServiceCategoryCreate,
+    ServiceCategoryListItem,
+    ServiceCategoryRead,
+    ServiceCategoryUpdate,
     SiteCreate,
     SiteCrosslinkRead,
     SiteListItem,
@@ -73,6 +77,11 @@ class PlanningRepository(Protocol):
     def create_equipment_item(self, tenant_id: str, payload: EquipmentItemCreate, actor_user_id: str | None) -> EquipmentItem: ...
     def update_equipment_item(self, tenant_id: str, row_id: str, payload: EquipmentItemUpdate, actor_user_id: str | None) -> EquipmentItem | None: ...
     def find_equipment_item_by_code(self, tenant_id: str, code: str, *, exclude_id: str | None = None) -> EquipmentItem | None: ...
+    def list_service_categories(self, tenant_id: str, filters: OpsMasterFilter) -> list[ServiceCategory]: ...
+    def get_service_category(self, tenant_id: str, row_id: str) -> ServiceCategory | None: ...
+    def create_service_category(self, tenant_id: str, payload: ServiceCategoryCreate, actor_user_id: str | None) -> ServiceCategory: ...
+    def update_service_category(self, tenant_id: str, row_id: str, payload: ServiceCategoryUpdate, actor_user_id: str | None) -> ServiceCategory | None: ...
+    def find_service_category_by_code(self, tenant_id: str, code: str, *, exclude_id: str | None = None) -> ServiceCategory | None: ...
     def list_sites(self, tenant_id: str, filters: OpsMasterFilter) -> list[Site]: ...
     def get_site(self, tenant_id: str, row_id: str) -> Site | None: ...
     def create_site(self, tenant_id: str, payload: SiteCreate, actor_user_id: str | None) -> Site: ...
@@ -218,6 +227,22 @@ class PlanningService:
         tenant_id: str,
         _actor: RequestAuthorizationContext,
     ) -> list[PlanningReferenceOptionRead]:
+        catalog_rows = self.repository.list_service_categories(
+            tenant_id,
+            OpsMasterFilter(lifecycle_status="active"),
+        )
+        if catalog_rows:
+            return [
+                PlanningReferenceOptionRead(
+                    id=row.id,
+                    code=row.code,
+                    label=row.label,
+                    description=row.description,
+                    sort_order=row.sort_order,
+                )
+                for row in sorted(catalog_rows, key=lambda row: (row.sort_order, row.label))
+            ]
+
         canonical_by_code = {
             row["code"]: row
             for row in self.SERVICE_CATEGORY_FALLBACK_OPTIONS
@@ -241,6 +266,42 @@ class PlanningService:
             )
 
         return resolved_rows
+
+    def list_service_categories(self, tenant_id: str, filters: OpsMasterFilter, _actor: RequestAuthorizationContext) -> list[ServiceCategoryListItem]:
+        return [ServiceCategoryListItem.model_validate(row) for row in self.repository.list_service_categories(tenant_id, filters)]
+
+    def get_service_category(self, tenant_id: str, row_id: str, _actor: RequestAuthorizationContext) -> ServiceCategoryRead:
+        row = self.repository.get_service_category(tenant_id, row_id)
+        if row is None:
+            raise self._not_found("service_category")
+        return ServiceCategoryRead.model_validate(row)
+
+    def create_service_category(self, tenant_id: str, payload: ServiceCategoryCreate, actor: RequestAuthorizationContext) -> ServiceCategoryRead:
+        if self.repository.find_service_category_by_code(tenant_id, payload.code) is not None:
+            raise self._duplicate("service_category")
+        row = self.repository.create_service_category(tenant_id, payload, actor.user_id)
+        self._record_event(actor, "planning.service_category.created", "ops.service_category", row.id, tenant_id, after_json=self._snapshot(row))
+        return ServiceCategoryRead.model_validate(row)
+
+    def update_service_category(
+        self,
+        tenant_id: str,
+        row_id: str,
+        payload: ServiceCategoryUpdate,
+        actor: RequestAuthorizationContext,
+    ) -> ServiceCategoryRead:
+        current = self.repository.get_service_category(tenant_id, row_id)
+        if current is None:
+            raise self._not_found("service_category")
+        before_json = self._snapshot(current)
+        next_code = self._field_value(payload, "code", current.code)
+        if self.repository.find_service_category_by_code(tenant_id, next_code, exclude_id=row_id) is not None:
+            raise self._duplicate("service_category")
+        row = self.repository.update_service_category(tenant_id, row_id, payload, actor.user_id)
+        if row is None:
+            raise self._not_found("service_category")
+        self._record_event(actor, "planning.service_category.updated", "ops.service_category", row.id, tenant_id, before_json=before_json, after_json=self._snapshot(row))
+        return ServiceCategoryRead.model_validate(row)
 
     def get_equipment_item(self, tenant_id: str, row_id: str, _actor: RequestAuthorizationContext) -> EquipmentItemRead:
         row = self.repository.get_equipment_item(tenant_id, row_id)

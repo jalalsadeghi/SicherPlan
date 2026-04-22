@@ -8,9 +8,9 @@ const source = fs.readFileSync(
   "utf8",
 );
 
-test("wizard shell keeps customer new-plan route behavior and controlled states", () => {
+test("wizard shell keeps customer order workspace route behavior and controlled states", () => {
   assert.match(source, /path: '\/admin\/customers'/);
-  assert.match(source, /path: '\/admin\/customers\/new-plan'/);
+  assert.match(source, /path: '\/admin\/customers\/order-workspace'/);
   assert.match(source, /contextState\.value = 'missing'/);
   assert.match(source, /contextState\.value = 'not_found'/);
   assert.match(source, /<ForbiddenView v-if="!isAuthorized" \/>/);

@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { IconifyIcon } from '@vben/icons';
+import type { CSSProperties } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { Modal } from 'ant-design-vue';
@@ -116,6 +118,7 @@ import {
 type PlanningEntityType = 'event_venue' | 'patrol_route' | 'site' | 'trade_fair';
 type PlanningSelectionMode = 'create_new' | 'use_existing';
 type OrderSelectionMode = 'create_new' | 'use_existing';
+type OrderScopeSectionId = 'documents' | 'equipment' | 'requirements';
 type DocumentPickerTarget = 'order' | 'planning-record';
 interface ShiftPlanDraftPersistence {
   draft: Partial<typeof shiftPlanDraft>;
@@ -158,6 +161,17 @@ const selectedExistingOrderId = ref('');
 const editingExistingOrderId = ref('');
 const pendingExistingOrderEditId = ref('');
 const existingOrderEditFormOpen = ref(false);
+const activeOrderScopeSection = ref<OrderScopeSectionId>('equipment');
+const orderScopeOnePageRef = ref<HTMLElement | null>(null);
+const orderScopeNavShellRef = ref<HTMLElement | null>(null);
+const orderScopeNavFloatingMode = ref<'fixed' | 'pinned' | 'static'>('static');
+const orderScopeNavFloatingStyle = ref<CSSProperties>({});
+
+let orderScopeSectionObserver: IntersectionObserver | null = null;
+let suppressOrderScopeScrollSpyUntil = 0;
+let orderScopeNavScrollTargets: Array<HTMLElement | Window> = [];
+let orderScopeNavFloatingRaf: number | null = null;
+const ORDER_SCOPE_NAV_FLOATING_MIN_WIDTH = 1081;
 
 const orderDraft = reactive({
   customer_id: '',
@@ -718,6 +732,26 @@ const planningRecordStepActive = computed(() => props.currentStepId === 'plannin
 const planningRecordDocumentsStepActive = computed(() => props.currentStepId === 'planning-record-documents');
 const shiftPlanStepActive = computed(() => props.currentStepId === 'shift-plan');
 const seriesStepActive = computed(() => props.currentStepId === 'series-exceptions');
+const orderScopeSections = computed(() => [
+  {
+    id: 'equipment' as const,
+    icon: 'lucide:package',
+    label: $t('sicherplan.customerPlansWizard.orderScope.equipmentTitle'),
+    testId: 'customer-order-scope-nav-link-equipment',
+  },
+  {
+    id: 'requirements' as const,
+    icon: 'lucide:list-checks',
+    label: $t('sicherplan.customerPlansWizard.orderScope.requirementsTitle'),
+    testId: 'customer-order-scope-nav-link-requirements',
+  },
+  {
+    id: 'documents' as const,
+    icon: 'lucide:file-text',
+    label: $t('sicherplan.customerPlansWizard.orderScope.documentsTitle'),
+    testId: 'customer-order-scope-nav-link-documents',
+  },
+]);
 const stepRefreshContextKey = computed(() =>
   JSON.stringify({
     currentStepId: props.currentStepId,
@@ -751,9 +785,6 @@ const planningSelectionModeModel = computed<PlanningSelectionMode>({
   get: () => planningSelectionMode.value,
   set: (value) => setPlanningSelectionMode(value),
 });
-const selectedExistingOrderSummary = computed(
-  () => customerOrderRows.value.find((row) => row.id === selectedExistingOrderId.value) ?? null,
-);
 const selectedShiftPlanSummary = computed(
   () => selectedShiftPlan.value ?? shiftPlanRows.value.find((row) => row.id === props.wizardState.shift_plan_id) ?? null,
 );
@@ -762,6 +793,249 @@ const exceptionOverrideActive = computed(() => exceptionDraft.action_code === 'o
 const selectedShiftTemplate = computed(
   () => shiftTemplateOptions.value.find((row) => row.id === seriesDraft.shift_template_id) ?? null,
 );
+
+function normalizeOrderScopeSectionId(sectionId: string): OrderScopeSectionId {
+  return orderScopeSections.value.some((section) => section.id === sectionId)
+    ? (sectionId as OrderScopeSectionId)
+    : 'equipment';
+}
+
+function resolveOrderScopeSectionElementId(sectionId: OrderScopeSectionId) {
+  return `customer-order-scope-section-${sectionId}`;
+}
+
+function resolveOrderScopeSectionIdFromElement(element: Element): OrderScopeSectionId | null {
+  const sectionId = element.id.replace(/^customer-order-scope-section-/, '');
+  return orderScopeSections.value.some((section) => section.id === sectionId)
+    ? (sectionId as OrderScopeSectionId)
+    : null;
+}
+
+function suppressOrderScopeScrollSpy() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  suppressOrderScopeScrollSpyUntil = window.performance.now() + 650;
+}
+
+function scrollToOrderScopeSection(sectionId: OrderScopeSectionId) {
+  void nextTick(() => {
+    const sectionElement = orderScopeOnePageRef.value?.querySelector<HTMLElement>(`#${resolveOrderScopeSectionElementId(sectionId)}`)
+      ?? document.getElementById(resolveOrderScopeSectionElementId(sectionId));
+    sectionElement?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  });
+}
+
+function selectOrderScopeSection(sectionId: string) {
+  activeOrderScopeSection.value = normalizeOrderScopeSectionId(sectionId);
+  suppressOrderScopeScrollSpy();
+  scrollToOrderScopeSection(activeOrderScopeSection.value);
+}
+
+function disconnectOrderScopeSectionObserver() {
+  orderScopeSectionObserver?.disconnect();
+  orderScopeSectionObserver = null;
+}
+
+function resolveOrderScopeStickyTop() {
+  const navShell = orderScopeNavShellRef.value;
+  if (navShell && typeof window !== 'undefined') {
+    const top = Number.parseFloat(window.getComputedStyle(navShell).top);
+    if (Number.isFinite(top)) {
+      return top;
+    }
+  }
+
+  if (typeof window === 'undefined') {
+    return 104;
+  }
+  const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize);
+  return (Number.isFinite(rootFontSize) ? rootFontSize : 16) * 6.5;
+}
+
+function isScrollableAncestor(element: HTMLElement) {
+  const overflowY = window.getComputedStyle(element).overflowY;
+  return /(auto|scroll|overlay)/.test(overflowY) && element.scrollHeight > element.clientHeight;
+}
+
+function findOrderScopeScrollContainers() {
+  const containers: HTMLElement[] = [];
+  let parent = orderScopeOnePageRef.value?.parentElement ?? null;
+
+  while (parent && parent !== document.body) {
+    if (isScrollableAncestor(parent)) {
+      containers.push(parent);
+    }
+    parent = parent.parentElement;
+  }
+
+  return containers;
+}
+
+function resolveOrderScopeIntersectionRoot() {
+  return findOrderScopeScrollContainers()[0] ?? null;
+}
+
+function resetOrderScopeNavFloating() {
+  orderScopeNavFloatingMode.value = 'static';
+  orderScopeNavFloatingStyle.value = {};
+}
+
+function cancelOrderScopeNavFloatingFrame() {
+  if (orderScopeNavFloatingRaf !== null) {
+    window.cancelAnimationFrame(orderScopeNavFloatingRaf);
+    orderScopeNavFloatingRaf = null;
+  }
+}
+
+function updateOrderScopeNavFloating() {
+  orderScopeNavFloatingRaf = null;
+
+  const onePageElement = orderScopeOnePageRef.value;
+  const navShell = orderScopeNavShellRef.value;
+  if (
+    !orderScopeDocumentsStepActive.value ||
+    !onePageElement ||
+    !navShell ||
+    typeof window === 'undefined' ||
+    !window.matchMedia(`(min-width: ${ORDER_SCOPE_NAV_FLOATING_MIN_WIDTH}px)`).matches
+  ) {
+    resetOrderScopeNavFloating();
+    return;
+  }
+
+  const stickyTop = resolveOrderScopeStickyTop();
+  const onePageRect = onePageElement.getBoundingClientRect();
+  const navWidth = navShell.offsetWidth;
+  const navHeight = navShell.offsetHeight;
+
+  if (!navWidth || !navHeight || onePageRect.top > stickyTop || onePageRect.height <= navHeight) {
+    resetOrderScopeNavFloating();
+    return;
+  }
+
+  const maxHeight = `calc(100vh - ${Math.round(stickyTop)}px - 1rem)`;
+  if (onePageRect.bottom <= stickyTop + navHeight) {
+    orderScopeNavFloatingMode.value = 'pinned';
+    orderScopeNavFloatingStyle.value = {
+      left: '0px',
+      maxHeight,
+      top: `${Math.max(0, onePageElement.offsetHeight - navHeight)}px`,
+      width: `${navWidth}px`,
+    };
+    return;
+  }
+
+  orderScopeNavFloatingMode.value = 'fixed';
+  orderScopeNavFloatingStyle.value = {
+    left: `${onePageRect.left}px`,
+    maxHeight,
+    top: `${stickyTop}px`,
+    width: `${navWidth}px`,
+  };
+}
+
+function scheduleOrderScopeNavFloatingUpdate() {
+  if (orderScopeNavFloatingRaf !== null || typeof window === 'undefined') {
+    return;
+  }
+  orderScopeNavFloatingRaf = window.requestAnimationFrame(updateOrderScopeNavFloating);
+}
+
+function teardownOrderScopeNavFloating() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  cancelOrderScopeNavFloatingFrame();
+  orderScopeNavScrollTargets.forEach((target) => target.removeEventListener('scroll', scheduleOrderScopeNavFloatingUpdate));
+  window.removeEventListener('resize', scheduleOrderScopeNavFloatingUpdate);
+  orderScopeNavScrollTargets = [];
+  resetOrderScopeNavFloating();
+}
+
+function setupOrderScopeNavFloating() {
+  teardownOrderScopeNavFloating();
+
+  if (!orderScopeDocumentsStepActive.value || !orderScopeOnePageRef.value || !orderScopeNavShellRef.value || typeof window === 'undefined') {
+    return;
+  }
+
+  orderScopeNavScrollTargets = [window, ...findOrderScopeScrollContainers()];
+  orderScopeNavScrollTargets.forEach((target) =>
+    target.addEventListener('scroll', scheduleOrderScopeNavFloatingUpdate, { passive: true }),
+  );
+  window.addEventListener('resize', scheduleOrderScopeNavFloatingUpdate, { passive: true });
+  scheduleOrderScopeNavFloatingUpdate();
+}
+
+function setupOrderScopeSectionObserver() {
+  disconnectOrderScopeSectionObserver();
+
+  if (!orderScopeDocumentsStepActive.value || typeof window === 'undefined' || typeof window.IntersectionObserver === 'undefined') {
+    return;
+  }
+
+  const sectionElements = orderScopeSections.value
+    .map(
+      (section) =>
+        orderScopeOnePageRef.value?.querySelector<HTMLElement>(`#${resolveOrderScopeSectionElementId(section.id)}`)
+        ?? document.getElementById(resolveOrderScopeSectionElementId(section.id)),
+    )
+    .filter((element): element is HTMLElement => !!element);
+
+  if (!sectionElements.length) {
+    return;
+  }
+
+  const stickyTop = resolveOrderScopeStickyTop();
+  orderScopeSectionObserver = new IntersectionObserver(
+    (entries) => {
+      if (window.performance.now() < suppressOrderScopeScrollSpyUntil) {
+        return;
+      }
+
+      const [dominantEntry] = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((left, right) => {
+          if (right.intersectionRatio !== left.intersectionRatio) {
+            return right.intersectionRatio - left.intersectionRatio;
+          }
+          return Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top);
+        });
+
+      const sectionId = dominantEntry ? resolveOrderScopeSectionIdFromElement(dominantEntry.target) : null;
+      if (sectionId) {
+        activeOrderScopeSection.value = sectionId;
+      }
+    },
+    {
+      root: resolveOrderScopeIntersectionRoot(),
+      rootMargin: `-${Math.round(stickyTop)}px 0px -55% 0px`,
+      threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
+    },
+  );
+
+  sectionElements.forEach((element) => orderScopeSectionObserver?.observe(element));
+}
+
+function setupOrderScopeOnePageNavigation() {
+  void nextTick(() => {
+    if (!orderScopeDocumentsStepActive.value) {
+      disconnectOrderScopeSectionObserver();
+      teardownOrderScopeNavFloating();
+      activeOrderScopeSection.value = 'equipment';
+      return;
+    }
+
+    activeOrderScopeSection.value = normalizeOrderScopeSectionId(activeOrderScopeSection.value);
+    setupOrderScopeSectionObserver();
+    setupOrderScopeNavFloating();
+  });
+}
+
 const exceptionCustomerVisibleModel = computed({
   get: () => nullableBooleanToSelectValue(exceptionDraft.customer_visible_flag),
   set: (value: string) => {
@@ -783,6 +1057,13 @@ const exceptionStealthModeModel = computed({
 const existingOrderEditActive = computed(
   () => orderModeUsesExisting.value && Boolean(existingOrderEditFormOpen.value && editingExistingOrderId.value),
 );
+const externalOrderEditRequested = computed(() => {
+  const rawOrderMode = route.query.order_mode;
+  const rawIntent = route.query.intent;
+  const orderMode = Array.isArray(rawOrderMode) ? rawOrderMode[0] : rawOrderMode;
+  const intent = Array.isArray(rawIntent) ? rawIntent[0] : rawIntent;
+  return orderMode === 'edit' || intent === 'edit-order';
+});
 const currentPlanningEntityScope = computed(() => {
   const routePlanningEntityId = typeof route.query.planning_entity_id === 'string' ? route.query.planning_entity_id.trim() : '';
   const routePlanningEntityType = typeof route.query.planning_entity_type === 'string' ? route.query.planning_entity_type.trim() : '';
@@ -2988,7 +3269,7 @@ async function loadOrderState(isCurrent = () => true) {
     const persistedExistingEditDraft = loadExistingOrderEditDraft<OrderDetailsEditDraftPersistence>(
       props.wizardState.order_id,
     );
-    if (persistedExistingEditDraft?.form) {
+    if (externalOrderEditRequested.value || persistedExistingEditDraft?.form) {
       await openExistingOrderEdit(props.wizardState.order_id, {
         applyPersistedDraft: true,
         showLoadedMessage: false,
@@ -4672,6 +4953,9 @@ async function submitCurrentStep(): Promise<CustomerNewPlanStepSubmitResult> {
 }
 
 defineExpose({
+  editingExistingOrderId,
+  existingOrderEditFormOpen,
+  selectedExistingOrderId,
   submitCurrentStep,
 });
 
@@ -5079,6 +5363,10 @@ watch(
   { immediate: true },
 );
 
+watch(orderScopeDocumentsStepActive, () => {
+  setupOrderScopeOnePageNavigation();
+}, { immediate: true });
+
 onMounted(() => {
   window.addEventListener('beforeunload', handleBeforeUnload);
   withPlanningContextHydrationPaused(() =>
@@ -5094,6 +5382,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload);
+  disconnectOrderScopeSectionObserver();
+  teardownOrderScopeNavFloating();
   if (props.persistDraftsOnUnmount === false) {
     return;
   }
@@ -5169,12 +5459,19 @@ onBeforeUnmount(() => {
             :key="row.id"
             class="sp-customer-plan-wizard-step__list-row"
             :class="{ 'sp-customer-plan-wizard-step__list-row--selected': row.id === selectedExistingOrderId }"
+            :aria-pressed="row.id === selectedExistingOrderId ? 'true' : 'false'"
             data-testid="customer-new-plan-existing-order-row"
+            role="button"
+            tabindex="0"
             @click="selectExistingOrder(row.id)"
+            @keydown.enter.prevent="selectExistingOrder(row.id)"
+            @keydown.space.prevent="selectExistingOrder(row.id)"
           >
-            <div>
-              <strong>{{ row.order_no }} · {{ row.title }}</strong>
-              <span>{{ row.service_from }} - {{ row.service_to }} · {{ row.release_state }} · {{ row.status }}</span>
+            <div class="sp-customer-order-row-label">
+              <span class="sp-customer-order-row__primary">{{ row.order_no }} · {{ row.title }}</span>
+              <span class="sp-customer-order-row__secondary">
+                · {{ row.service_from }} - {{ row.service_to }} · {{ row.release_state }} · {{ row.status }}
+              </span>
             </div>
             <button
               type="button"
@@ -5185,11 +5482,6 @@ onBeforeUnmount(() => {
               {{ $t('sicherplan.customerPlansWizard.actions.edit') }}
             </button>
           </div>
-        </div>
-
-      <div v-if="selectedExistingOrderSummary" class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static" data-testid="customer-new-plan-selected-order-summary">
-          <strong>{{ $t('sicherplan.customerPlansWizard.forms.selectedOrder') }}: {{ selectedExistingOrderSummary.order_no }} · {{ selectedExistingOrderSummary.title }}</strong>
-          <span>{{ selectedExistingOrderSummary.service_from }} - {{ selectedExistingOrderSummary.service_to }}</span>
         </div>
       </template>
 
@@ -5298,7 +5590,44 @@ onBeforeUnmount(() => {
       class="sp-customer-plan-wizard-step__scope-documents"
       data-testid="customer-new-plan-order-scope-documents-step"
     >
-      <section class="sp-customer-plan-wizard-step__scope-card" data-testid="customer-new-plan-order-scope-equipment-card">
+      <section
+        ref="orderScopeOnePageRef"
+        class="sp-customer-order-scope-onepage"
+        data-testid="customer-order-scope-onepage"
+      >
+        <aside
+          ref="orderScopeNavShellRef"
+          class="sp-customer-order-scope-nav-shell"
+          :class="{
+            'sp-customer-order-scope-nav-shell--fixed': orderScopeNavFloatingMode === 'fixed',
+            'sp-customer-order-scope-nav-shell--pinned': orderScopeNavFloatingMode === 'pinned',
+          }"
+          :style="orderScopeNavFloatingStyle"
+          data-testid="customer-order-scope-nav"
+        >
+          <nav class="sp-customer-order-scope-nav" aria-label="Order scope sections">
+            <button
+              v-for="section in orderScopeSections"
+              :key="section.id"
+              type="button"
+              :aria-current="section.id === activeOrderScopeSection ? 'true' : undefined"
+              class="sp-customer-order-scope-nav__link"
+              :class="{ 'sp-customer-order-scope-nav__link--active': section.id === activeOrderScopeSection }"
+              :data-testid="section.testId"
+              @click="selectOrderScopeSection(section.id)"
+            >
+              <IconifyIcon class="sp-customer-order-scope-nav__icon" :icon="section.icon" aria-hidden="true" />
+              <span>{{ section.label }}</span>
+            </button>
+          </nav>
+        </aside>
+
+        <div class="sp-customer-order-scope-content">
+      <section
+        id="customer-order-scope-section-equipment"
+        class="sp-customer-plan-wizard-step__scope-card"
+        data-testid="customer-new-plan-order-scope-equipment-card"
+      >
         <div data-testid="customer-new-plan-step-panel-equipment-lines">
           <header class="sp-customer-plan-wizard-step__scope-card-header">
             <h4>{{ $t('sicherplan.customerPlansWizard.orderScope.equipmentTitle') }}</h4>
@@ -5393,7 +5722,11 @@ onBeforeUnmount(() => {
         </div>
     </section>
 
-      <section class="sp-customer-plan-wizard-step__scope-card" data-testid="customer-new-plan-order-scope-requirements-card">
+      <section
+        id="customer-order-scope-section-requirements"
+        class="sp-customer-plan-wizard-step__scope-card"
+        data-testid="customer-new-plan-order-scope-requirements-card"
+      >
         <div data-testid="customer-new-plan-step-panel-requirement-lines">
           <header class="sp-customer-plan-wizard-step__scope-card-header">
             <h4>{{ $t('sicherplan.customerPlansWizard.orderScope.requirementsTitle') }}</h4>
@@ -5510,7 +5843,11 @@ onBeforeUnmount(() => {
         </div>
     </section>
 
-      <section class="sp-customer-plan-wizard-step__scope-card" data-testid="customer-new-plan-order-scope-documents-card">
+      <section
+        id="customer-order-scope-section-documents"
+        class="sp-customer-plan-wizard-step__scope-card"
+        data-testid="customer-new-plan-order-scope-documents-card"
+      >
         <div data-testid="customer-new-plan-step-panel-order-documents">
       <header class="sp-customer-plan-wizard-step__scope-card-header">
         <h4>{{ $t('sicherplan.customerPlansWizard.orderScope.documentsTitle') }}</h4>
@@ -5627,6 +5964,8 @@ onBeforeUnmount(() => {
           {{ $t('sicherplan.customerPlansWizard.actions.clearOrderDocumentDraft') }}
         </button>
       </div>
+        </div>
+      </section>
         </div>
       </section>
     </section>
@@ -6730,6 +7069,92 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.sp-customer-order-scope-onepage {
+  --customer-order-scope-sticky-top: var(--sp-sticky-offset, 6.5rem);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+  min-width: 0;
+}
+
+.sp-customer-order-scope-content {
+  grid-column: 2;
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.sp-customer-order-scope-nav-shell {
+  grid-column: 1;
+  position: sticky;
+  top: var(--customer-order-scope-sticky-top, 6.5rem);
+  align-self: start;
+  z-index: 2;
+  min-width: 0;
+  max-height: calc(100vh - var(--customer-order-scope-sticky-top, 6.5rem) - 1rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sp-customer-order-scope-nav-shell--fixed {
+  position: fixed;
+}
+
+.sp-customer-order-scope-nav-shell--pinned {
+  position: absolute;
+}
+
+.sp-customer-order-scope-nav {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.25rem 0;
+  border: 0;
+  background: transparent;
+}
+
+.sp-customer-order-scope-nav__link {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.35rem 0.55rem 0.75rem;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--sp-color-text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sp-customer-order-scope-nav__link:hover,
+.sp-customer-order-scope-nav__link:focus-visible {
+  color: var(--sp-color-primary-strong);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 36%, transparent);
+  outline: none;
+}
+
+.sp-customer-order-scope-nav__link:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--sp-color-primary) 38%, transparent);
+  outline-offset: 2px;
+}
+
+.sp-customer-order-scope-nav__link--active {
+  border-left-color: var(--sp-color-primary);
+  color: var(--sp-color-primary-strong);
+  font-weight: 700;
+}
+
+.sp-customer-order-scope-nav__icon {
+  width: 1.08rem;
+  height: 1.08rem;
+  color: currentColor;
+}
+
 .sp-customer-plan-wizard-step__scope-card {
   display: grid;
   gap: 1rem;
@@ -6742,6 +7167,7 @@ onBeforeUnmount(() => {
   background: var(--sp-color-surface-card);
   box-shadow: var(--sp-elevation-sm, 0 10px 30px rgb(15 23 42 / 0.06));
   overflow: hidden;
+  scroll-margin-top: var(--customer-order-scope-sticky-top, 6.5rem);
 }
 
 .sp-customer-plan-wizard-step__scope-card-header {
@@ -6912,6 +7338,27 @@ onBeforeUnmount(() => {
 .sp-customer-plan-wizard-step__list-row span {
   color: var(--sp-color-text-secondary);
   text-align: right;
+}
+
+.sp-customer-order-row-label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.sp-customer-order-row-label span {
+  text-align: left;
+}
+
+.sp-customer-order-row__primary {
+  color: var(--sp-color-text-primary);
+  font-weight: 700;
+}
+
+.sp-customer-order-row__secondary {
+  color: var(--sp-color-text-secondary);
 }
 
 .sp-customer-plan-wizard-step__list-row:not(.sp-customer-plan-wizard-step__list-row--static) {
@@ -7106,6 +7553,43 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 960px) {
+  .sp-customer-order-scope-onepage {
+    grid-template-columns: 1fr;
+  }
+
+  .sp-customer-order-scope-nav-shell,
+  .sp-customer-order-scope-content {
+    grid-column: 1;
+  }
+
+  .sp-customer-order-scope-nav-shell {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .sp-customer-order-scope-nav-shell--fixed,
+  .sp-customer-order-scope-nav-shell--pinned {
+    position: static;
+  }
+
+  .sp-customer-order-scope-nav {
+    display: flex;
+    overflow-x: auto;
+    padding: 0.25rem 0 0.5rem;
+  }
+
+  .sp-customer-order-scope-nav__link {
+    min-width: max-content;
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+    padding: 0.55rem 0.75rem;
+  }
+
+  .sp-customer-order-scope-nav__link--active {
+    border-bottom-color: var(--sp-color-primary);
+  }
+
   .sp-customer-plan-wizard-step__grid {
     grid-template-columns: 1fr;
   }

@@ -69,6 +69,24 @@ class EquipmentItemUpdate(BaseModel):
     version_no: int | None = None
 
 
+class ServiceCategoryCreate(BaseModel):
+    tenant_id: str
+    code: str
+    label: str
+    sort_order: int = 100
+    notes: str | None = Field(default=None, validation_alias=AliasChoices("notes", "description"))
+
+
+class ServiceCategoryUpdate(BaseModel):
+    code: str | None = None
+    label: str | None = None
+    sort_order: int | None = None
+    notes: str | None = Field(default=None, validation_alias=AliasChoices("notes", "description"))
+    status: str | None = None
+    archived_at: datetime | None = None
+    version_no: int | None = None
+
+
 class SiteCreate(BaseModel):
     tenant_id: str
     customer_id: str | None
@@ -267,6 +285,27 @@ class EquipmentItemListItem(BaseModel):
 
 
 class EquipmentItemRead(EquipmentItemListItem):
+    notes: str | None = Field(validation_alias=AliasChoices("notes", "description"))
+    created_at: datetime
+    updated_at: datetime
+    created_by_user_id: str | None
+    updated_by_user_id: str | None
+    archived_at: datetime | None
+
+
+class ServiceCategoryListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    tenant_id: str
+    code: str
+    label: str
+    sort_order: int
+    status: str
+    version_no: int
+
+
+class ServiceCategoryRead(ServiceCategoryListItem):
     notes: str | None = Field(validation_alias=AliasChoices("notes", "description"))
     created_at: datetime
     updated_at: datetime

@@ -3,11 +3,12 @@ import { webAppConfig } from "@/config/env";
 export interface PlanningListItem {
   id: string;
   tenant_id: string;
-  customer_id: string;
+  customer_id?: string | null;
   status: string;
   version_no: number;
   code?: string;
   label?: string;
+  sort_order?: number;
   site_no?: string;
   venue_no?: string;
   fair_no?: string;
@@ -161,6 +162,7 @@ function buildQuery(params) {
 const ENTITY_PATHS = {
   requirement_type: "requirement-types",
   equipment_item: "equipment-items",
+  service_category: "service-categories",
   site: "sites",
   event_venue: "event-venues",
   trade_fair: "trade-fairs",

@@ -6,6 +6,10 @@ const source = readFileSync(
   new URL("../../views/PlanningOpsAdminView.vue", import.meta.url),
   "utf8",
 );
+const messagesSource = readFileSync(
+  new URL("../../i18n/planningAdmin.messages.ts", import.meta.url),
+  "utf8",
+);
 
 test("browse records card uses internal tabs and keeps area shared above them", () => {
   assert.match(source, /<InternalCardTabs[\s\S]*test-id="planning-browse-tabs"/);
@@ -134,6 +138,24 @@ test("equipment item form renders status before unit of measure without changing
     /editorEntityKey === 'equipment_item'[\s\S]*tp\("fieldsLabel"\)[\s\S]*tp\("status"\)[\s\S]*tp\("fieldsUnitOfMeasure"\)[\s\S]*tp\("fieldsNotes"\)/,
   );
   assert.match(source, /<label v-if="visibleStatus && editorEntityKey !== 'equipment_item'" class="field-stack field-stack--half">/);
+});
+
+test("service category is a tenant-scoped planning setup catalog with simple code label sort fields", () => {
+  assert.match(source, /editorEntityKey === 'service_category'[\s\S]*tp\("fieldsCode"\)[\s\S]*tp\("fieldsLabel"\)[\s\S]*tp\("fieldsSortOrder"\)/);
+  assert.match(source, /service_category: "entityServiceCategory"/);
+  assert.match(source, /editorEntityKey\.value === "service_category"[\s\S]*sort_order: Number\(draft\.sort_order\) \|\| 100/);
+  assert.match(source, /const editorUsesCustomer = computed\(\(\) => isPlanningCustomerScopedEntity\(editorEntityKey\.value\)\)/);
+  assert.match(messagesSource, /entityServiceCategory: "Leistungskategorien"/);
+  assert.match(messagesSource, /entityServiceCategory: "Service categories"/);
+});
+
+test("service category browse create select and update use the generic planning catalog APIs", () => {
+  assert.match(source, /@click="startCreateRecord"/);
+  assert.match(source, /function startCreateRecord\(\) \{[\s\S]*editorEntityKey\.value = entityKey\.value/);
+  assert.match(source, /records\.value = await listPlanningRecords\(entityKey\.value, resolvedTenantScopeId\.value, accessToken\.value, filters\)/);
+  assert.match(source, /async function selectRecord\(recordId[\s\S]*selectedRecord\.value = await getPlanningRecord\(entityKey\.value, resolvedTenantScopeId\.value, recordId, accessToken\.value\)/);
+  assert.match(source, /selectedRecord\.value = await createPlanningRecord\(editorEntityKey\.value, resolvedTenantScopeId\.value, accessToken\.value, payload\)/);
+  assert.match(source, /selectedRecord\.value = await updatePlanningRecord\(\s*editorEntityKey\.value,\s*resolvedTenantScopeId\.value,\s*selectedRecord\.value\.id,/);
 });
 
 test("equipment item manage-units action shares the main action row and aligns as the right-side secondary action", () => {

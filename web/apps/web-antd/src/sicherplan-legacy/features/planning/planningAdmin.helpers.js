@@ -11,6 +11,7 @@ export const PLANNING_PERMISSION_MATRIX = {
 
 export const PLANNING_ENTITY_OPTIONS = [
   "requirement_type",
+  "service_category",
   "equipment_item",
   "site",
   "event_venue",
@@ -47,6 +48,12 @@ export const PLANNING_ENTITY_FORM_CONFIG = {
   equipment_item: {
     child: false,
     labelKey: "entityEquipmentItem",
+    parentEntityKey: null,
+    scope: "tenant",
+  },
+  service_category: {
+    child: false,
+    labelKey: "entityServiceCategory",
     parentEntityKey: null,
     scope: "tenant",
   },
@@ -185,6 +192,12 @@ export function validatePlanningCreateDraft({
     return null;
   }
 
+  if (normalizedEntityKey === "service_category") {
+    if (!requiredValue(draft.code)) return "validationCodeRequired";
+    if (!requiredValue(draft.label)) return "validationLabelRequired";
+    return null;
+  }
+
   if (isPlanningCustomerScopedEntity(normalizedEntityKey) && !requiredValue(draft.customer_id)) {
     return "validationCustomerRequired";
   }
@@ -244,6 +257,7 @@ export function mapPlanningApiMessage(messageKey) {
     "errors.iam.authorization.scope_denied": "permissionDenied",
     "errors.planning.requirement_type.not_found": "notFound",
     "errors.planning.equipment_item.not_found": "notFound",
+    "errors.planning.service_category.not_found": "notFound",
     "errors.planning.site.not_found": "notFound",
     "errors.planning.event_venue.not_found": "notFound",
     "errors.planning.trade_fair.not_found": "notFound",
@@ -252,6 +266,7 @@ export function mapPlanningApiMessage(messageKey) {
     "errors.planning.patrol_checkpoint.not_found": "notFound",
     "errors.planning.requirement_type.duplicate_code": "duplicateCode",
     "errors.planning.equipment_item.duplicate_code": "duplicateCode",
+    "errors.planning.service_category.duplicate_code": "duplicateCode",
     "errors.planning.equipment_item.invalid_unit_of_measure_code": "validationUnitInvalid",
     "errors.planning.site.duplicate_code": "duplicateCode",
     "errors.planning.event_venue.duplicate_code": "duplicateCode",
@@ -262,6 +277,7 @@ export function mapPlanningApiMessage(messageKey) {
     "errors.planning.patrol_checkpoint.duplicate_code": "duplicateChild",
     "errors.planning.requirement_type.stale_version": "staleVersion",
     "errors.planning.equipment_item.stale_version": "staleVersion",
+    "errors.planning.service_category.stale_version": "staleVersion",
     "errors.planning.site.stale_version": "staleVersion",
     "errors.planning.event_venue.stale_version": "staleVersion",
     "errors.planning.trade_fair.stale_version": "staleVersion",
@@ -279,6 +295,7 @@ export function buildPlanningImportTemplate(entityKey) {
   const headers = {
     requirement_type: ["code", "label", "default_planning_mode_code", "notes", "status"],
     equipment_item: ["code", "label", "unit_of_measure_code", "notes", "status"],
+    service_category: ["code", "label", "sort_order", "notes", "status"],
     site: ["customer_id", "site_no", "name", "address_id", "timezone", "latitude", "longitude", "watchbook_enabled", "notes", "status"],
     event_venue: ["customer_id", "venue_no", "name", "address_id", "timezone", "latitude", "longitude", "notes", "status"],
     trade_fair: ["customer_id", "venue_id", "fair_no", "name", "address_id", "timezone", "latitude", "longitude", "start_date", "end_date", "notes", "status"],
