@@ -34,6 +34,8 @@ import {
   createOrderAttachment,
   createOrderEquipmentLine,
   createOrderRequirementLine,
+  deleteOrderEquipmentLine,
+  deleteOrderRequirementLine,
   getCustomerOrder,
   listCustomerOrders,
   getPlanningRecord,
@@ -50,6 +52,7 @@ import {
   updateCustomerOrder,
   updateOrderEquipmentLine,
   updateOrderRequirementLine,
+  unlinkOrderAttachment,
   type CustomerOrderRead,
   type OrderEquipmentLineRead,
   type OrderRequirementLineRead,
@@ -66,6 +69,7 @@ import {
   hasDuplicateActiveRequirementLine,
   validatePlanningRecordDraft,
 } from '#/sicherplan-legacy/features/planning/planningOrders.helpers';
+import { useSicherPlanFeedback } from '#/sicherplan-legacy/composables/useSicherPlanFeedback';
 import PlanningLocationPickerModal from '#/sicherplan-legacy/components/planning/PlanningLocationPickerModal.vue';
 import {
   formatPlanningAddressOption,
@@ -171,6 +175,8 @@ let orderScopeSectionObserver: IntersectionObserver | null = null;
 let suppressOrderScopeScrollSpyUntil = 0;
 let orderScopeNavScrollTargets: Array<HTMLElement | Window> = [];
 let orderScopeNavFloatingRaf: number | null = null;
+const orderScopeVisibleEntries = new Map<OrderScopeSectionId, IntersectionObserverEntry>();
+const EXTRA_SECTION_NAV_TOP_OFFSET = 25;
 const ORDER_SCOPE_NAV_FLOATING_MIN_WIDTH = 1081;
 
 const orderDraft = reactive({
@@ -383,6 +389,7 @@ const selectedRequirementLineId = ref('');
 const selectedExceptionId = ref('');
 const selectedOrder = ref<CustomerOrderRead | null>(null);
 const selectedPlanningRecord = ref<PlanningRecordRead | null>(null);
+const planningRecordDirty = ref(false);
 const selectedShiftPlan = ref<ShiftPlanRead | null>(null);
 const selectedSeries = ref<ShiftSeriesRead | null>(null);
 const planningRecordRows = ref<PlanningRecordListItem[]>([]);
@@ -429,10 +436,7 @@ const seriesTemplateFieldTouched = reactive({
 });
 const seriesTemplateDefaultsApplying = ref(false);
 
-const stepFeedback = reactive({
-  message: '',
-  tone: 'neutral' as 'error' | 'neutral' | 'success',
-});
+const { showFeedbackToast } = useSicherPlanFeedback();
 
 type StepLoadKey =
   | 'equipmentLines'
@@ -546,6 +550,7 @@ type PlanningRecordOverviewDraftPersistence = {
     planning_entity_type: PlanningEntityType;
     planning_mode_code: string;
   };
+  selected_planning_record_id?: string;
   selection_mode?: PlanningSelectionMode;
 };
 
@@ -615,6 +620,31 @@ const equipmentItemSelectOptions = computed(() =>
     value: row.id,
   })),
 );
+const availableEquipmentItemSelectOptions = computed(() => {
+  const usedEquipmentItemIds = new Set(
+    orderEquipmentLines.value
+      .filter((line) => line.id !== selectedEquipmentLineId.value && line.archived_at == null && line.status === 'active')
+      .map((line) => line.equipment_item_id),
+  );
+  return equipmentItemSelectOptions.value.filter((option) => !usedEquipmentItemIds.has(option.value));
+});
+const equipmentLineDuplicateActive = computed(
+  () =>
+    !!equipmentLineDraft.equipment_item_id &&
+    orderEquipmentLines.value.some(
+      (line) =>
+        line.id !== selectedEquipmentLineId.value &&
+        line.archived_at == null &&
+        line.status === 'active' &&
+        line.equipment_item_id === equipmentLineDraft.equipment_item_id,
+    ),
+);
+const equipmentItemsExhausted = computed(
+  () =>
+    equipmentItemSelectOptions.value.length > 0 &&
+    availableEquipmentItemSelectOptions.value.length === 0 &&
+    !selectedEquipmentLineId.value,
+);
 
 const functionTypeSelectOptions = computed(() =>
   functionTypeOptions.value.map((row) => ({
@@ -628,6 +658,15 @@ const qualificationTypeSelectOptions = computed(() =>
     label: row.label,
     value: row.id,
   })),
+);
+const requirementLineDuplicateActive = computed(() =>
+  hasDuplicateActiveRequirementLine(
+    orderRequirementLines.value,
+    requirementLineDraft.requirement_type_id,
+    requirementLineDraft.function_type_id,
+    requirementLineDraft.qualification_type_id,
+    selectedRequirementLineId.value,
+  ),
 );
 
 const serviceCategorySelectOptions = computed(() =>
@@ -838,6 +877,7 @@ function selectOrderScopeSection(sectionId: string) {
 function disconnectOrderScopeSectionObserver() {
   orderScopeSectionObserver?.disconnect();
   orderScopeSectionObserver = null;
+  orderScopeVisibleEntries.clear();
 }
 
 function resolveOrderScopeStickyTop() {
@@ -850,10 +890,12 @@ function resolveOrderScopeStickyTop() {
   }
 
   if (typeof window === 'undefined') {
-    return 104;
+    return 104 + EXTRA_SECTION_NAV_TOP_OFFSET;
   }
+
   const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize);
-  return (Number.isFinite(rootFontSize) ? rootFontSize : 16) * 6.5;
+  const baseTop = (Number.isFinite(rootFontSize) ? rootFontSize : 16) * 6.5;
+  return baseTop + EXTRA_SECTION_NAV_TOP_OFFSET;
 }
 
 function isScrollableAncestor(element: HTMLElement) {
@@ -877,6 +919,36 @@ function findOrderScopeScrollContainers() {
 
 function resolveOrderScopeIntersectionRoot() {
   return findOrderScopeScrollContainers()[0] ?? null;
+}
+
+function resolveActiveOrderScopeSection(sectionElements: HTMLElement[]) {
+  const stickyTop = resolveOrderScopeStickyTop();
+  const activeLineTolerance = 32;
+  const visibleSections = sectionElements
+    .map((element) => {
+      const sectionId = resolveOrderScopeSectionIdFromElement(element);
+      if (!sectionId || !orderScopeVisibleEntries.has(sectionId)) {
+        return null;
+      }
+      const rect = element.getBoundingClientRect();
+      return {
+        distance: Math.abs(rect.top - stickyTop),
+        isCurrentOrNear: rect.top <= stickyTop + activeLineTolerance,
+        rectTop: rect.top,
+        sectionId,
+      };
+    })
+    .filter((entry): entry is Exclude<typeof entry, null> => !!entry);
+
+  const currentSections = visibleSections.filter((section) => section.isCurrentOrNear);
+  const [bestSection] = (currentSections.length ? currentSections : visibleSections).sort((left, right) => {
+    if (left.distance !== right.distance) {
+      return left.distance - right.distance;
+    }
+    return left.rectTop - right.rectTop;
+  });
+
+  return bestSection?.sectionId ?? null;
 }
 
 function resetOrderScopeNavFloating() {
@@ -997,16 +1069,19 @@ function setupOrderScopeSectionObserver() {
         return;
       }
 
-      const [dominantEntry] = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((left, right) => {
-          if (right.intersectionRatio !== left.intersectionRatio) {
-            return right.intersectionRatio - left.intersectionRatio;
-          }
-          return Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top);
-        });
+      entries.forEach((entry) => {
+        const sectionId = resolveOrderScopeSectionIdFromElement(entry.target);
+        if (!sectionId) {
+          return;
+        }
+        if (entry.isIntersecting) {
+          orderScopeVisibleEntries.set(sectionId, entry);
+          return;
+        }
+        orderScopeVisibleEntries.delete(sectionId);
+      });
 
-      const sectionId = dominantEntry ? resolveOrderScopeSectionIdFromElement(dominantEntry.target) : null;
+      const sectionId = resolveActiveOrderScopeSection(sectionElements);
       if (sectionId) {
         activeOrderScopeSection.value = sectionId;
       }
@@ -1102,8 +1177,14 @@ const hasPlanningContext = computed(
 );
 
 function setFeedback(tone: 'error' | 'neutral' | 'success', message = '') {
-  stepFeedback.tone = tone;
-  stepFeedback.message = message;
+  if (!message.trim()) {
+    return;
+  }
+  showFeedbackToast({
+    key: 'customer-new-plan-step-feedback',
+    message,
+    tone,
+  });
 }
 
 function resetSeriesTemplateTouchedState() {
@@ -1316,6 +1397,7 @@ function buildPlanningRecordOverviewDraftPersistence(): PlanningRecordOverviewDr
           planning_mode_code: currentPlanningModeCode.value,
         }
       : undefined,
+    selected_planning_record_id: selectedPlanningRecord.value?.id,
     selection_mode: planningSelectionMode.value,
   };
 }
@@ -1815,6 +1897,24 @@ function hasContentfulPlanningRecordDraftPayload(payload: null | PlanningRecordO
   );
 }
 
+function planningRecordDraftMatchesRecord(
+  draft: null | PlanningRecordOverviewDraftPersistence | undefined,
+  record: PlanningRecordRead,
+) {
+  if (!draft || !draft.selected_planning_record_id || draft.selected_planning_record_id !== record.id) {
+    return false;
+  }
+  const context = draft.planning_context;
+  if (!context) {
+    return false;
+  }
+  return (
+    context.planning_entity_id === planningEntityIdForRecord(record) &&
+    context.planning_entity_type === planningFamilyForRecord(record) &&
+    context.planning_mode_code === record.planning_mode_code
+  );
+}
+
 function applyPlanningRecordDocumentsDraftPersistence(payload: Partial<OrderDocumentsDraftPersistence>) {
   withDraftSyncPaused(() => {
     Object.assign(planningRecordAttachmentDraft, {
@@ -2212,6 +2312,8 @@ function resetOrderAttachmentDraft() {
 }
 
 function resetPlanningRecordDraft() {
+  selectedPlanningRecord.value = null;
+  planningRecordDirty.value = false;
   Object.assign(planningRecordDraft, {
     dispatcher_user_id: '',
     event_detail_event_venue_id: '',
@@ -2231,6 +2333,27 @@ function resetPlanningRecordDraft() {
     trade_fair_detail_trade_fair_id: '',
     trade_fair_detail_trade_fair_zone_id: '',
   });
+}
+
+function resetPlanningRecordDraftForNewContext() {
+  withDraftSyncPaused(() => {
+    resetPlanningRecordDraft();
+    planningRecordDraft.planning_mode_code = planningModeCode.value;
+    planningRecordDraft.planning_from = selectedOrder.value?.service_from || orderDraft.service_from || '';
+    planningRecordDraft.planning_to = selectedOrder.value?.service_to || orderDraft.service_to || '';
+  });
+  clearStepDraft('planning-record-overview');
+  clearDraftRestoreMessage();
+}
+
+function invalidateSelectedPlanningRecordForCurrentContext() {
+  resetPlanningRecordDraftForNewContext();
+  emit('saved-context', {
+    ...buildPlanningContextPatch(),
+    planning_record_id: '',
+  });
+  emit('step-completion', 'planning-record-overview', false);
+  emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
 }
 
 function resetPlanningRecordAttachmentDraft() {
@@ -2314,9 +2437,39 @@ function syncOrderDraft(order: CustomerOrderRead) {
   });
 }
 
+function planningFamilyForRecord(record: PlanningRecordRead): PlanningEntityType {
+  if (record.planning_mode_code === 'event') {
+    return 'event_venue';
+  }
+  if (record.planning_mode_code === 'trade_fair') {
+    return 'trade_fair';
+  }
+  if (record.planning_mode_code === 'patrol') {
+    return 'patrol_route';
+  }
+  return 'site';
+}
+
+function planningEntityIdForRecord(record: PlanningRecordRead) {
+  if (record.planning_mode_code === 'event') {
+    return record.event_detail?.event_venue_id ?? '';
+  }
+  if (record.planning_mode_code === 'trade_fair') {
+    return record.trade_fair_detail?.trade_fair_id ?? '';
+  }
+  if (record.planning_mode_code === 'patrol') {
+    return record.patrol_detail?.patrol_route_id ?? '';
+  }
+  return record.site_detail?.site_id ?? '';
+}
+
 function syncPlanningRecordDraft(record: PlanningRecordRead) {
-  selectedPlanningRecord.value = record;
   withDraftSyncPaused(() => {
+    resetPlanningRecordDraft();
+    selectedPlanningRecord.value = record;
+    planningSelectionMode.value = 'use_existing';
+    planningFamily.value = planningFamilyForRecord(record);
+    planningEntityId.value = planningEntityIdForRecord(record);
     Object.assign(planningRecordDraft, {
       dispatcher_user_id: record.dispatcher_user_id ?? '',
       event_detail_event_venue_id: record.event_detail?.event_venue_id ?? '',
@@ -2337,6 +2490,7 @@ function syncPlanningRecordDraft(record: PlanningRecordRead) {
       trade_fair_detail_trade_fair_zone_id: record.trade_fair_detail?.trade_fair_zone_id ?? '',
     });
   });
+  planningRecordDirty.value = false;
 }
 
 function syncShiftPlanDraft(plan: ShiftPlanRead) {
@@ -2668,26 +2822,41 @@ function setPlanningFamilySelection(family: PlanningEntityType) {
   if (planningFamily.value === family) {
     return;
   }
-  planningFamily.value = family;
-  planningEntityId.value = '';
-  planningSelectionMode.value = 'use_existing';
-  selectedPlanningRecord.value = null;
+  const hadSelectedPlanningRecord = Boolean(selectedPlanningRecord.value);
+  withDraftSyncPaused(() => {
+    planningFamily.value = family;
+    planningEntityId.value = '';
+    planningSelectionMode.value = 'use_existing';
+  });
   planningRecordRows.value = [];
   planningRecordRowsError.value = '';
-  withDraftSyncPaused(() => {
-    planningRecordDraft.planning_mode_code = planningModeCode.value;
-    planningRecordDraft.trade_fair_detail_trade_fair_zone_id = '';
-  });
+  if (hadSelectedPlanningRecord) {
+    invalidateSelectedPlanningRecordForCurrentContext();
+  } else {
+    withDraftSyncPaused(() => {
+      planningRecordDraft.planning_mode_code = planningModeCode.value;
+      planningRecordDraft.trade_fair_detail_trade_fair_zone_id = '';
+    });
+  }
 }
 
 async function selectExistingPlanningEntity(entityId: string) {
   if (!entityId) {
     return;
   }
-  planningSelectionMode.value = 'use_existing';
-  planningEntityId.value = entityId;
-  selectedPlanningRecord.value = null;
-  planningRecordDraft.planning_mode_code = planningModeCode.value;
+  const hadSelectedPlanningRecord = Boolean(selectedPlanningRecord.value);
+  const contextChanged = planningEntityId.value !== entityId;
+  const invalidatedSelectedPlanningRecord = hadSelectedPlanningRecord && contextChanged;
+  withDraftSyncPaused(() => {
+    planningSelectionMode.value = 'use_existing';
+    planningEntityId.value = entityId;
+  });
+  if (invalidatedSelectedPlanningRecord) {
+    invalidateSelectedPlanningRecordForCurrentContext();
+  } else {
+    selectedPlanningRecord.value = null;
+    planningRecordDraft.planning_mode_code = planningModeCode.value;
+  }
   if (planningModeCode.value === 'trade_fair') {
     await refreshTradeFairZoneOptions(entityId);
   } else {
@@ -2695,7 +2864,34 @@ async function selectExistingPlanningEntity(entityId: string) {
   }
   await loadExistingPlanningRecordRows();
   setFeedback('success', $t('sicherplan.customerPlansWizard.messages.planningEntrySelected'));
-  emit('step-ui-state', 'planning-record-overview', { dirty: hasPlanningRecordDraftContent(), error: '' });
+  emit('step-ui-state', 'planning-record-overview', {
+    dirty: invalidatedSelectedPlanningRecord ? false : hasPlanningRecordDraftContent(),
+    error: '',
+  });
+}
+
+async function onPlanningEntityChange(event: Event) {
+  const entityId = (event.target as HTMLSelectElement).value;
+  if (!entityId) {
+    const hadSelectedPlanningRecord = Boolean(selectedPlanningRecord.value);
+    withDraftSyncPaused(() => {
+      planningEntityId.value = '';
+    });
+    planningRecordRows.value = [];
+    planningRecordRowsError.value = '';
+    if (hadSelectedPlanningRecord) {
+      invalidateSelectedPlanningRecordForCurrentContext();
+    } else {
+      selectedPlanningRecord.value = null;
+    }
+    await refreshTradeFairZoneOptions('');
+    emit('step-ui-state', 'planning-record-overview', {
+      dirty: hadSelectedPlanningRecord ? false : hasPlanningRecordDraftContent(),
+      error: '',
+    });
+    return;
+  }
+  await selectExistingPlanningEntity(entityId);
 }
 
 async function selectExistingPlanningRecordRow(planningRecordId: string) {
@@ -2707,7 +2903,15 @@ async function selectExistingPlanningRecordRow(planningRecordId: string) {
   try {
     const record = await getPlanningRecord(props.tenantId, planningRecordId, props.accessToken);
     syncPlanningRecordDraft(record);
+    clearStepDraft('planning-record-overview');
+    clearDraftRestoreMessage();
+    if (record.planning_mode_code === 'trade_fair') {
+      await refreshTradeFairZoneOptions(record.trade_fair_detail?.trade_fair_id ?? '');
+    } else {
+      await refreshTradeFairZoneOptions('');
+    }
     setFeedback('success', $t('sicherplan.customerPlansWizard.messages.planningRecordSelected'));
+    emit('step-completion', 'planning-record-overview', true);
     emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
   } catch {
     stepLoadError.planningRecordDetail = $t('sicherplan.customerPlansWizard.errors.planningRecordLoad');
@@ -3516,6 +3720,7 @@ async function loadPlanningRecordState(isCurrent = () => true) {
     return;
   }
   const detailVersions = beginStepLoads('planningRecordDetail', 'planningDocuments');
+  let loadedPlanningRecord: PlanningRecordRead | null = null;
   try {
     const [record, attachments] = await Promise.all([
       getPlanningRecord(props.tenantId, props.wizardState.planning_record_id, props.accessToken),
@@ -3524,14 +3729,23 @@ async function loadPlanningRecordState(isCurrent = () => true) {
     if (!isCurrent()) {
       return;
     }
+    loadedPlanningRecord = record;
     syncPlanningRecordDraft(record);
     planningRecordAttachments.value = attachments;
   } finally {
     finishStepLoads(detailVersions, isCurrent);
   }
-  if (persistedPlanningRecordDraft && (!persistedPlanningRecordDraft.order_id || persistedPlanningRecordDraft.order_id === props.wizardState.order_id)) {
+  if (
+    loadedPlanningRecord &&
+    persistedPlanningRecordDraft &&
+    (!persistedPlanningRecordDraft.order_id || persistedPlanningRecordDraft.order_id === props.wizardState.order_id) &&
+    planningRecordDraftMatchesRecord(persistedPlanningRecordDraft, loadedPlanningRecord)
+  ) {
     applyPlanningRecordOverviewDraftPersistence(persistedPlanningRecordDraft);
     restoreDraftMessage();
+  } else {
+    clearStepDraft('planning-record-overview');
+    clearDraftRestoreMessage();
   }
   if (persistedDocumentsDraft) {
     applyPlanningRecordDocumentsDraftPersistence(persistedDocumentsDraft);
@@ -4207,11 +4421,27 @@ function clearPlanningRecordDocumentDraftState() {
   emit('step-ui-state', 'planning-record-documents', { dirty: false, error: '' });
 }
 
+function clearPlanningRecordDraftState() {
+  withDraftSyncPaused(() => {
+    if (selectedPlanningRecord.value) {
+      syncPlanningRecordDraft(selectedPlanningRecord.value);
+    } else {
+      resetPlanningRecordDraft();
+    }
+  });
+  clearStepDraft('planning-record-overview');
+  clearDraftRestoreMessage();
+  setFeedback('neutral', '');
+  const completed = Boolean(selectedPlanningRecord.value?.id || props.wizardState.planning_record_id);
+  emit('step-completion', 'planning-record-overview', completed);
+  emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
+}
+
 async function saveEquipmentLineDraft() {
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
     return false;
   }
-  if (!equipmentLineDraft.equipment_item_id || equipmentLineDraft.required_qty < 1) {
+  if (!equipmentLineDraft.equipment_item_id || equipmentLineDraft.required_qty < 1 || equipmentLineDuplicateActive.value) {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.equipmentLineInvalid'));
     return false;
   }
@@ -4256,6 +4486,39 @@ async function saveEquipmentLineDraft() {
   }
 }
 
+function confirmRemove(messageKey: string) {
+  return window.confirm($t(messageKey));
+}
+
+async function deleteEquipmentLine(line: OrderEquipmentLineRead) {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
+    return false;
+  }
+  if (!confirmRemove('sicherplan.customerPlansWizard.confirmRemoveEquipmentLine')) {
+    return false;
+  }
+  stepLoading.value = true;
+  emit('step-ui-state', 'order-scope-documents', { loading: true, error: '' });
+  try {
+    await deleteOrderEquipmentLine(props.tenantId, props.wizardState.order_id, line.id, props.accessToken);
+    orderEquipmentLines.value = await listOrderEquipmentLines(props.tenantId, props.wizardState.order_id, props.accessToken);
+    if (selectedEquipmentLineId.value === line.id) {
+      clearEquipmentLineDraftState();
+    } else {
+      emit('step-completion', 'order-scope-documents', orderEquipmentLines.value.length > 0);
+    }
+    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.equipmentLineDeleted'));
+    return true;
+  } catch {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.equipmentLineDeleteFailed'));
+    emit('step-ui-state', 'order-scope-documents', { error: 'delete_failed' });
+    return false;
+  } finally {
+    stepLoading.value = false;
+    emit('step-ui-state', 'order-scope-documents', { loading: false });
+  }
+}
+
 async function saveRequirementLineDraft() {
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
     return false;
@@ -4264,13 +4527,7 @@ async function saveRequirementLineDraft() {
     !requirementLineDraft.requirement_type_id ||
     requirementLineDraft.min_qty < 0 ||
     requirementLineDraft.target_qty < requirementLineDraft.min_qty ||
-    hasDuplicateActiveRequirementLine(
-      orderRequirementLines.value,
-      requirementLineDraft.requirement_type_id,
-      requirementLineDraft.function_type_id,
-      requirementLineDraft.qualification_type_id,
-      selectedRequirementLineId.value,
-    )
+    requirementLineDuplicateActive.value
   ) {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.requirementLineInvalid'));
     return false;
@@ -4315,6 +4572,35 @@ async function saveRequirementLineDraft() {
   } catch {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.requirementLineSaveFailed'));
     emit('step-ui-state', 'order-scope-documents', { error: 'save_failed' });
+    return false;
+  } finally {
+    stepLoading.value = false;
+    emit('step-ui-state', 'order-scope-documents', { loading: false });
+  }
+}
+
+async function deleteRequirementLine(line: OrderRequirementLineRead) {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
+    return false;
+  }
+  if (!confirmRemove('sicherplan.customerPlansWizard.confirmRemoveRequirementLine')) {
+    return false;
+  }
+  stepLoading.value = true;
+  emit('step-ui-state', 'order-scope-documents', { loading: true, error: '' });
+  try {
+    await deleteOrderRequirementLine(props.tenantId, props.wizardState.order_id, line.id, props.accessToken);
+    orderRequirementLines.value = await listOrderRequirementLines(props.tenantId, props.wizardState.order_id, props.accessToken);
+    if (selectedRequirementLineId.value === line.id) {
+      clearRequirementLineDraftState();
+    } else {
+      emit('step-completion', 'order-scope-documents', orderRequirementLines.value.length > 0);
+    }
+    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.requirementLineDeleted'));
+    return true;
+  } catch {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.requirementLineDeleteFailed'));
+    emit('step-ui-state', 'order-scope-documents', { error: 'delete_failed' });
     return false;
   } finally {
     stepLoading.value = false;
@@ -4415,6 +4701,23 @@ function documentSummary(document: PlanningDocumentRead | null, fallbackId = '')
   const fileName = latestFileName(document);
   return [
     document.title,
+    typeLabel,
+    fileName && fileName !== document.title ? fileName : '',
+    document.current_version_no ? `v${document.current_version_no}` : '',
+    document.status,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function orderAttachmentDisplayTitle(document: PlanningDocumentRead) {
+  return document.relation_label?.trim() || document.title;
+}
+
+function documentRowMetadata(document: PlanningDocumentRead) {
+  const typeLabel = documentTypeLabel(document);
+  const fileName = latestFileName(document);
+  return [
     typeLabel,
     fileName && fileName !== document.title ? fileName : '',
     document.current_version_no ? `v${document.current_version_no}` : '',
@@ -4561,7 +4864,32 @@ async function linkExistingOrderDocument() {
   }
 }
 
-async function submitPlanningRecordStep() {
+async function unlinkOrderDocument(documentId: string) {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
+    return false;
+  }
+  if (!confirmRemove('sicherplan.customerPlansWizard.confirmUnlinkOrderDocument')) {
+    return false;
+  }
+  stepLoading.value = true;
+  emit('step-ui-state', 'order-scope-documents', { loading: true, error: '' });
+  try {
+    await unlinkOrderAttachment(props.tenantId, props.wizardState.order_id, documentId, props.accessToken);
+    orderAttachments.value = await listOrderAttachments(props.tenantId, props.wizardState.order_id, props.accessToken);
+    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.orderDocumentUnlinked'));
+    emit('step-ui-state', 'order-scope-documents', { dirty: false, error: '' });
+    return true;
+  } catch {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.orderDocumentUnlinkFailed'));
+    emit('step-ui-state', 'order-scope-documents', { error: 'delete_failed' });
+    return false;
+  } finally {
+    stepLoading.value = false;
+    emit('step-ui-state', 'order-scope-documents', { loading: false });
+  }
+}
+
+async function savePlanningRecordDraftOrSelection() {
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
     return false;
   }
@@ -4610,6 +4938,7 @@ async function submitPlanningRecordStep() {
       ? await updatePlanningRecord(props.tenantId, selectedPlanningRecord.value.id, props.accessToken, payload)
       : await createPlanningRecord(props.tenantId, props.accessToken, payload);
     syncPlanningRecordDraft(saved);
+    planningRecordDirty.value = false;
     clearStepDraft('planning-record-overview');
     clearDraftRestoreMessage();
     emit('saved-context', {
@@ -4627,6 +4956,30 @@ async function submitPlanningRecordStep() {
     stepLoading.value = false;
     emit('step-ui-state', 'planning-record-overview', { loading: false });
   }
+}
+
+async function submitPlanningRecordStep() {
+  if (!hasPlanningContext.value) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.selectOrCreatePlanningContextBeforeContinue'));
+    emit('step-completion', 'planning-record-overview', false);
+    emit('step-ui-state', 'planning-record-overview', { error: 'planning_context_required' });
+    return false;
+  }
+  if (planningRecordDirty.value) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.savePlanningRecordBeforeContinue'));
+    emit('step-completion', 'planning-record-overview', false);
+    emit('step-ui-state', 'planning-record-overview', { dirty: true, error: 'save_required' });
+    return false;
+  }
+  if (!selectedPlanningRecord.value?.id && !props.wizardState.planning_record_id) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.savePlanningRecordBeforeContinue'));
+    emit('step-completion', 'planning-record-overview', false);
+    emit('step-ui-state', 'planning-record-overview', { error: 'save_required' });
+    return false;
+  }
+  emit('step-completion', 'planning-record-overview', true);
+  emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
+  return true;
 }
 
 async function submitPlanningRecordDocumentsStep() {
@@ -5082,6 +5435,7 @@ watch(
     if (draftSyncPaused.value) {
       return;
     }
+    planningRecordDirty.value = true;
     emit('step-completion', 'planning-record-overview', false);
     emit('step-ui-state', 'planning-record-overview', { dirty: true, error: '' });
     persistPlanningRecordDraft();
@@ -5095,6 +5449,9 @@ watch(
     if (draftSyncPaused.value || planningContextHydrationPaused.value || !planningRecordStepActive.value) {
       return;
     }
+    if (!hasPlanningRecordDraftContent() && planningSelectionMode.value === 'use_existing') {
+      return;
+    }
     if (
       !hasPlanningRecordDraftContent() &&
       planningSelectionMode.value === 'use_existing' &&
@@ -5103,6 +5460,9 @@ watch(
     ) {
       return;
     }
+    planningRecordDirty.value = true;
+    emit('step-completion', 'planning-record-overview', false);
+    emit('step-ui-state', 'planning-record-overview', { dirty: true, error: '' });
     persistPlanningRecordDraft();
   },
   { flush: 'sync' },
@@ -5393,9 +5753,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="sp-customer-plan-wizard-step">
-    <p v-if="stepFeedback.message" class="sp-customer-plan-wizard-step__feedback" :data-tone="stepFeedback.tone">
-      {{ stepFeedback.message }}
-    </p>
     <p
       v-if="draftRestoreMessage"
       class="sp-customer-plan-wizard-step__feedback"
@@ -5632,15 +5989,17 @@ onBeforeUnmount(() => {
           <header class="sp-customer-plan-wizard-step__scope-card-header">
             <h4>{{ $t('sicherplan.customerPlansWizard.orderScope.equipmentTitle') }}</h4>
           </header>
-      <div class="cta-row">
-        <button
-          type="button"
-          class="cta-button cta-secondary"
-          data-testid="customer-new-plan-new-equipment"
-          @click="equipmentModal.open = true"
-        >
-          {{ $t('sicherplan.customerPlansWizard.forms.newEquipment') }}
-        </button>
+      <div class="sp-customer-plan-wizard-step__scope-subsection">
+        <div class="cta-row sp-customer-plan-wizard-step__scope-action-row">
+          <button
+            type="button"
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-new-equipment"
+            @click="equipmentModal.open = true"
+          >
+            {{ $t('sicherplan.customerPlansWizard.forms.newEquipment') }}
+          </button>
+        </div>
       </div>
       <LocalLoadingIndicator
         v-if="stepLoadState.equipmentLines"
@@ -5653,71 +6012,107 @@ onBeforeUnmount(() => {
         test-id="customer-new-plan-equipment-options-loading"
       />
       <p v-if="stepLoadError.equipmentLines" class="field-help">{{ stepLoadError.equipmentLines }}</p>
-      <div v-if="orderEquipmentLines.length" class="sp-customer-plan-wizard-step__list">
-        <button
-          v-for="line in orderEquipmentLines"
-          :key="line.id"
-          type="button"
-          class="sp-customer-plan-wizard-step__list-row"
-          :class="{ 'sp-customer-plan-wizard-step__list-row--selected': line.id === selectedEquipmentLineId }"
-          @click="syncEquipmentLineDraft(line)"
-        >
-          <strong>{{ equipmentItemSelectOptions.find((option) => option.value === line.equipment_item_id)?.label || line.equipment_item_id }}</strong>
-          <span>{{ line.required_qty }}</span>
-        </button>
+      <div v-if="orderEquipmentLines.length" class="sp-customer-plan-wizard-step__scope-saved-list">
+        <div class="sp-customer-plan-wizard-step__list">
+          <div
+            v-for="line in orderEquipmentLines"
+            :key="line.id"
+            class="sp-customer-plan-wizard-step__list-row"
+            :class="{ 'sp-customer-plan-wizard-step__list-row--selected': line.id === selectedEquipmentLineId }"
+          >
+            <button
+              type="button"
+              class="sp-customer-plan-wizard-step__list-row-main"
+              data-testid="customer-new-plan-equipment-line-select"
+              @click="syncEquipmentLineDraft(line)"
+            >
+              <strong>{{ equipmentItemSelectOptions.find((option) => option.value === line.equipment_item_id)?.label || line.equipment_item_id }}</strong>
+              <span>{{ line.required_qty }}</span>
+            </button>
+            <button
+              type="button"
+              class="cta-button cta-secondary sp-customer-plan-wizard-step__row-action"
+              data-testid="customer-new-plan-delete-equipment-line"
+              :disabled="stepLoading"
+              @click.stop="void deleteEquipmentLine(line)"
+            >
+              {{ $t('sicherplan.customerPlansWizard.actions.deleteEquipmentLine') }}
+            </button>
+          </div>
+        </div>
       </div>
-      <div class="sp-customer-plan-wizard-step__grid">
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.equipmentItem') }}</span>
-          <select v-model="equipmentLineDraft.equipment_item_id" data-testid="customer-new-plan-equipment-item">
-            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.equipmentItemPlaceholder') }}</option>
-            <option v-for="option in equipmentItemSelectOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.requiredQty') }}</span>
-          <input v-model.number="equipmentLineDraft.required_qty" data-testid="customer-new-plan-equipment-required-qty" min="1" type="number" />
-        </label>
-        <label class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
-          <textarea v-model="equipmentLineDraft.notes" data-testid="customer-new-plan-equipment-notes" rows="2" />
-        </label>
-      </div>
-      <p v-if="selectedEquipmentLineId" class="field-help" data-testid="customer-new-plan-equipment-editing">
-        {{ $t('sicherplan.customerPlansWizard.forms.editingEquipmentLine') }}
-      </p>
-      <div class="cta-row">
-        <button
-          v-if="selectedEquipmentLineId"
-          type="button"
-          class="cta-button"
-          data-testid="customer-new-plan-update-equipment-line"
-          :disabled="stepLoading"
-          @click="void saveEquipmentLineDraft()"
-        >
-          {{ $t('sicherplan.customerPlansWizard.actions.updateEquipmentLine') }}
-        </button>
-        <button
-          v-else
-          type="button"
-          class="cta-button"
-          data-testid="customer-new-plan-save-equipment-line"
-          :disabled="stepLoading"
-          @click="void saveEquipmentLineDraft()"
-        >
-          {{ $t('sicherplan.customerPlansWizard.actions.saveEquipmentLine') }}
-        </button>
-        <button
-          type="button"
-          class="cta-button cta-secondary"
-          data-testid="customer-new-plan-clear-equipment-line"
-          :disabled="stepLoading"
-          @click="clearEquipmentLineDraftState"
-        >
-          {{ $t('sicherplan.customerPlansWizard.actions.clearEquipmentLine') }}
-        </button>
+      <div class="sp-customer-plan-wizard-step__scope-editor">
+        <div class="sp-customer-plan-wizard-step__grid">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.equipmentItem') }}</span>
+            <select
+              v-model="equipmentLineDraft.equipment_item_id"
+              data-testid="customer-new-plan-equipment-item"
+              :disabled="equipmentItemsExhausted"
+            >
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.equipmentItemPlaceholder') }}</option>
+              <option v-for="option in availableEquipmentItemSelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+            <span
+              v-if="equipmentItemsExhausted"
+              class="field-help"
+              data-testid="customer-new-plan-equipment-all-assigned"
+            >
+              {{ $t('sicherplan.customerPlansWizard.forms.allEquipmentItemsAssigned') }}
+            </span>
+            <span
+              v-else-if="equipmentLineDuplicateActive"
+              class="field-help"
+              data-testid="customer-new-plan-equipment-duplicate"
+            >
+              {{ $t('sicherplan.customerPlansWizard.errors.equipmentLineDuplicate') }}
+            </span>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.requiredQty') }}</span>
+            <input v-model.number="equipmentLineDraft.required_qty" data-testid="customer-new-plan-equipment-required-qty" min="1" type="number" />
+          </label>
+          <label class="field-stack field-stack--wide">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
+            <textarea v-model="equipmentLineDraft.notes" data-testid="customer-new-plan-equipment-notes" rows="2" />
+          </label>
+        </div>
+        <p v-if="selectedEquipmentLineId" class="field-help" data-testid="customer-new-plan-equipment-editing">
+          {{ $t('sicherplan.customerPlansWizard.forms.editingEquipmentLine') }}
+        </p>
+        <div class="cta-row">
+          <button
+            v-if="selectedEquipmentLineId"
+            type="button"
+            class="cta-button"
+            data-testid="customer-new-plan-update-equipment-line"
+            :disabled="stepLoading || equipmentLineDuplicateActive"
+            @click="void saveEquipmentLineDraft()"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.updateEquipmentLine') }}
+          </button>
+          <button
+            v-else
+            type="button"
+            class="cta-button"
+            data-testid="customer-new-plan-save-equipment-line"
+            :disabled="stepLoading || equipmentLineDuplicateActive"
+            @click="void saveEquipmentLineDraft()"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.saveEquipmentLine') }}
+          </button>
+          <button
+            type="button"
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-clear-equipment-line"
+            :disabled="stepLoading"
+            @click="clearEquipmentLineDraftState"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.clearEquipmentLine') }}
+          </button>
+        </div>
       </div>
         </div>
     </section>
@@ -5731,15 +6126,17 @@ onBeforeUnmount(() => {
           <header class="sp-customer-plan-wizard-step__scope-card-header">
             <h4>{{ $t('sicherplan.customerPlansWizard.orderScope.requirementsTitle') }}</h4>
           </header>
-      <div class="cta-row">
-        <button
-          type="button"
-          class="cta-button cta-secondary"
-          data-testid="customer-new-plan-new-requirement"
-          @click="requirementModal.open = true"
-        >
-          {{ $t('sicherplan.customerPlansWizard.forms.newRequirement') }}
-        </button>
+      <div class="sp-customer-plan-wizard-step__scope-subsection">
+        <div class="cta-row sp-customer-plan-wizard-step__scope-action-row">
+          <button
+            type="button"
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-new-requirement"
+            @click="requirementModal.open = true"
+          >
+            {{ $t('sicherplan.customerPlansWizard.forms.newRequirement') }}
+          </button>
+        </div>
       </div>
       <LocalLoadingIndicator
         v-if="stepLoadState.requirementLines"
@@ -5752,93 +6149,118 @@ onBeforeUnmount(() => {
         test-id="customer-new-plan-requirement-options-loading"
       />
       <p v-if="stepLoadError.requirementLines" class="field-help">{{ stepLoadError.requirementLines }}</p>
-      <div v-if="orderRequirementLines.length" class="sp-customer-plan-wizard-step__list">
-        <button
-          v-for="line in orderRequirementLines"
-          :key="line.id"
-          type="button"
-          class="sp-customer-plan-wizard-step__list-row"
-          :class="{ 'sp-customer-plan-wizard-step__list-row--selected': line.id === selectedRequirementLineId }"
-          @click="syncRequirementLineDraft(line)"
-        >
-          <strong>{{ requirementTypeSelectOptions.find((option) => option.value === line.requirement_type_id)?.label || line.requirement_type_id }}</strong>
-          <span>{{ line.min_qty }} / {{ line.target_qty }}</span>
-        </button>
+      <div v-if="orderRequirementLines.length" class="sp-customer-plan-wizard-step__scope-saved-list">
+        <div class="sp-customer-plan-wizard-step__list">
+          <div
+            v-for="line in orderRequirementLines"
+            :key="line.id"
+            class="sp-customer-plan-wizard-step__list-row"
+            :class="{ 'sp-customer-plan-wizard-step__list-row--selected': line.id === selectedRequirementLineId }"
+          >
+            <button
+              type="button"
+              class="sp-customer-plan-wizard-step__list-row-main"
+              data-testid="customer-new-plan-requirement-line-select"
+              @click="syncRequirementLineDraft(line)"
+            >
+              <strong>{{ requirementTypeSelectOptions.find((option) => option.value === line.requirement_type_id)?.label || line.requirement_type_id }}</strong>
+              <span>{{ line.min_qty }} / {{ line.target_qty }}</span>
+            </button>
+            <button
+              type="button"
+              class="cta-button cta-secondary sp-customer-plan-wizard-step__row-action"
+              data-testid="customer-new-plan-delete-requirement-line"
+              :disabled="stepLoading"
+              @click.stop="void deleteRequirementLine(line)"
+            >
+              {{ $t('sicherplan.customerPlansWizard.actions.deleteRequirementLine') }}
+            </button>
+          </div>
+        </div>
       </div>
-      <div class="sp-customer-plan-wizard-step__grid">
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.requirementType') }}</span>
-          <select v-model="requirementLineDraft.requirement_type_id" data-testid="customer-new-plan-requirement-type">
-            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.requirementTypePlaceholder') }}</option>
-            <option v-for="option in requirementTypeSelectOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.functionType') }}</span>
-          <select v-model="requirementLineDraft.function_type_id" data-testid="customer-new-plan-requirement-function-type">
-            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.functionTypePlaceholder') }}</option>
-            <option v-for="option in functionTypeSelectOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.qualificationType') }}</span>
-          <select v-model="requirementLineDraft.qualification_type_id" data-testid="customer-new-plan-requirement-qualification-type">
-            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.qualificationTypePlaceholder') }}</option>
-            <option v-for="option in qualificationTypeSelectOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.minQty') }}</span>
-          <input v-model.number="requirementLineDraft.min_qty" data-testid="customer-new-plan-requirement-min-qty" min="0" type="number" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.targetQty') }}</span>
-          <input v-model.number="requirementLineDraft.target_qty" data-testid="customer-new-plan-requirement-target-qty" min="0" type="number" />
-        </label>
-        <label class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
-          <textarea v-model="requirementLineDraft.notes" data-testid="customer-new-plan-requirement-notes" rows="2" />
-        </label>
-      </div>
-      <p v-if="selectedRequirementLineId" class="field-help" data-testid="customer-new-plan-requirement-editing">
-        {{ $t('sicherplan.customerPlansWizard.forms.editingRequirementLine') }}
-      </p>
-      <div class="cta-row">
-        <button
-          v-if="selectedRequirementLineId"
-          type="button"
-          class="cta-button"
-          data-testid="customer-new-plan-update-requirement-line"
-          :disabled="stepLoading"
-          @click="void saveRequirementLineDraft()"
+      <div class="sp-customer-plan-wizard-step__scope-editor">
+        <div class="sp-customer-plan-wizard-step__grid">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.requirementType') }}</span>
+            <select v-model="requirementLineDraft.requirement_type_id" data-testid="customer-new-plan-requirement-type">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.requirementTypePlaceholder') }}</option>
+              <option v-for="option in requirementTypeSelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.functionType') }}</span>
+            <select v-model="requirementLineDraft.function_type_id" data-testid="customer-new-plan-requirement-function-type">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.functionTypePlaceholder') }}</option>
+              <option v-for="option in functionTypeSelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.qualificationType') }}</span>
+            <select v-model="requirementLineDraft.qualification_type_id" data-testid="customer-new-plan-requirement-qualification-type">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.qualificationTypePlaceholder') }}</option>
+              <option v-for="option in qualificationTypeSelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.minQty') }}</span>
+            <input v-model.number="requirementLineDraft.min_qty" data-testid="customer-new-plan-requirement-min-qty" min="0" type="number" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.targetQty') }}</span>
+            <input v-model.number="requirementLineDraft.target_qty" data-testid="customer-new-plan-requirement-target-qty" min="0" type="number" />
+          </label>
+          <label class="field-stack field-stack--wide">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
+            <textarea v-model="requirementLineDraft.notes" data-testid="customer-new-plan-requirement-notes" rows="2" />
+          </label>
+        </div>
+        <p v-if="selectedRequirementLineId" class="field-help" data-testid="customer-new-plan-requirement-editing">
+          {{ $t('sicherplan.customerPlansWizard.forms.editingRequirementLine') }}
+        </p>
+        <p
+          v-if="requirementLineDuplicateActive"
+          class="field-help"
+          data-testid="customer-new-plan-requirement-duplicate"
         >
-          {{ $t('sicherplan.customerPlansWizard.actions.updateRequirementLine') }}
-        </button>
-        <button
-          v-else
-          type="button"
-          class="cta-button"
-          data-testid="customer-new-plan-save-requirement-line"
-          :disabled="stepLoading"
-          @click="void saveRequirementLineDraft()"
-        >
-          {{ $t('sicherplan.customerPlansWizard.actions.saveRequirementLine') }}
-        </button>
-        <button
-          type="button"
-          class="cta-button cta-secondary"
-          data-testid="customer-new-plan-clear-requirement-line"
-          :disabled="stepLoading"
-          @click="clearRequirementLineDraftState"
-        >
-          {{ $t('sicherplan.customerPlansWizard.actions.clearRequirementLine') }}
-        </button>
+          {{ $t('sicherplan.customerPlansWizard.errors.requirementLineDuplicate') }}
+        </p>
+        <div class="cta-row">
+          <button
+            v-if="selectedRequirementLineId"
+            type="button"
+            class="cta-button"
+            data-testid="customer-new-plan-update-requirement-line"
+            :disabled="stepLoading || requirementLineDuplicateActive"
+            @click="void saveRequirementLineDraft()"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.updateRequirementLine') }}
+          </button>
+          <button
+            v-else
+            type="button"
+            class="cta-button"
+            data-testid="customer-new-plan-save-requirement-line"
+            :disabled="stepLoading || requirementLineDuplicateActive"
+            @click="void saveRequirementLineDraft()"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.saveRequirementLine') }}
+          </button>
+          <button
+            type="button"
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-clear-requirement-line"
+            :disabled="stepLoading"
+            @click="clearRequirementLineDraftState"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.clearRequirementLine') }}
+          </button>
+        </div>
       </div>
         </div>
     </section>
@@ -5848,7 +6270,7 @@ onBeforeUnmount(() => {
         class="sp-customer-plan-wizard-step__scope-card"
         data-testid="customer-new-plan-order-scope-documents-card"
       >
-        <div data-testid="customer-new-plan-step-panel-order-documents">
+        <div class="sp-customer-plan-wizard-step__documents-panel" data-testid="customer-new-plan-step-panel-order-documents">
       <header class="sp-customer-plan-wizard-step__scope-card-header">
         <h4>{{ $t('sicherplan.customerPlansWizard.orderScope.documentsTitle') }}</h4>
       </header>
@@ -5859,15 +6281,28 @@ onBeforeUnmount(() => {
         test-id="customer-new-plan-order-documents-loading"
       />
       <p v-if="stepLoadError.orderDocuments" class="field-help">{{ stepLoadError.orderDocuments }}</p>
-      <div v-if="orderAttachments.length" class="sp-customer-plan-wizard-step__list" data-testid="customer-new-plan-order-document-list">
+      <div v-if="orderAttachments.length" class="sp-customer-plan-wizard-step__list sp-customer-plan-wizard-step__document-list" data-testid="customer-new-plan-order-document-list">
         <div v-for="document in orderAttachments" :key="document.id" class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static">
-          <strong>{{ document.title }}</strong>
-          <span>{{ document.id }}<template v-if="document.status"> · {{ document.status }}</template><template v-if="document.current_version_no"> · v{{ document.current_version_no }}</template></span>
+          <div class="sp-customer-plan-wizard-step__document-row-copy">
+            <strong>{{ orderAttachmentDisplayTitle(document) }}</strong>
+            <span v-if="documentRowMetadata(document)">{{ documentRowMetadata(document) }}</span>
+          </div>
+          <button
+            type="button"
+            class="sp-customer-plan-wizard-step__list-action sp-customer-plan-wizard-step__list-action--compact"
+            data-testid="customer-new-plan-unlink-order-document"
+            :disabled="stepLoading"
+            @click.stop="void unlinkOrderDocument(document.id)"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.unlinkOrderDocument') }}
+          </button>
         </div>
       </div>
-      <section class="sp-customer-plan-wizard-step__panel">
-        <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.uploadNewDocument') }}</strong></p>
+      <section class="sp-customer-plan-wizard-step__document-subsection">
+        <header class="sp-customer-plan-wizard-step__document-subsection-header">
+          <h5>{{ $t('sicherplan.customerPlansWizard.forms.uploadNewDocument') }}</h5>
         <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.uploadNewDocumentHelp') }}</p>
+        </header>
         <div class="sp-customer-plan-wizard-step__grid">
           <label class="field-stack">
             <span>{{ $t('sicherplan.customerPlansWizard.forms.documentTitle') }}</span>
@@ -5894,9 +6329,12 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </section>
-      <section class="sp-customer-plan-wizard-step__panel">
-        <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.linkExistingDocument') }}</strong></p>
+      <div class="sp-customer-plan-wizard-step__document-divider" aria-hidden="true"></div>
+      <section class="sp-customer-plan-wizard-step__document-subsection">
+        <header class="sp-customer-plan-wizard-step__document-subsection-header">
+          <h5>{{ $t('sicherplan.customerPlansWizard.forms.linkExistingDocument') }}</h5>
         <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.linkExistingDocumentHelp') }}</p>
+        </header>
         <div
           v-if="orderAttachmentLink.document_id"
           class="sp-customer-plan-wizard-step__document-selection"
@@ -5926,15 +6364,6 @@ onBeforeUnmount(() => {
             {{ $t('sicherplan.customerPlansWizard.forms.documentPickerClear') }}
           </button>
         </div>
-        <details class="sp-customer-plan-wizard-step__manual-document-id">
-          <summary>{{ $t('sicherplan.customerPlansWizard.forms.manualDocumentId') }}</summary>
-        <div class="sp-customer-plan-wizard-step__grid">
-          <label class="field-stack">
-            <span>{{ $t('sicherplan.customerPlansWizard.forms.existingDocumentId') }}</span>
-            <input v-model="orderAttachmentLink.document_id" data-testid="customer-new-plan-order-document-link-id" />
-          </label>
-        </div>
-        </details>
         <div class="sp-customer-plan-wizard-step__grid">
           <label class="field-stack">
             <span>{{ $t('sicherplan.customerPlansWizard.forms.linkLabel') }}</span>
@@ -5951,19 +6380,18 @@ onBeforeUnmount(() => {
           >
             {{ $t('sicherplan.customerPlansWizard.actions.linkExistingDocument') }}
           </button>
+          <button
+            v-if="hasAnyOrderDocumentDraftInput()"
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-clear-order-document-draft"
+            type="button"
+            :disabled="stepLoading"
+            @click="clearOrderDocumentDraftState"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.clearOrderDocumentDraft') }}
+          </button>
         </div>
       </section>
-      <div v-if="hasAnyOrderDocumentDraftInput()" class="cta-row">
-        <button
-          class="cta-button cta-secondary"
-          data-testid="customer-new-plan-clear-order-document-draft"
-          type="button"
-          :disabled="stepLoading"
-          @click="clearOrderDocumentDraftState"
-        >
-          {{ $t('sicherplan.customerPlansWizard.actions.clearOrderDocumentDraft') }}
-        </button>
-      </div>
         </div>
       </section>
         </div>
@@ -5975,187 +6403,189 @@ onBeforeUnmount(() => {
       class="sp-customer-plan-wizard-step__panel"
       data-testid="customer-new-plan-step-panel-planning-record-overview"
     >
-      <section class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-planning-context-panel">
-        <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.planningContext') }}</strong></p>
-        <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.selectPlanningContext') }}</p>
-        <div class="sp-customer-plan-wizard-step__grid">
-          <label class="field-stack">
-            <span>{{ $t('sicherplan.customerPlansWizard.forms.planningModeCode') }}</span>
-            <select
-              :value="planningFamily"
-              data-testid="customer-new-plan-planning-context-family"
-              @change="onPlanningFamilyChange"
+      <section
+        class="sp-customer-plan-wizard-step__planning-record-card"
+        data-testid="customer-new-plan-planning-record-card"
+      >
+        <section
+          class="sp-customer-plan-wizard-step__planning-record-subsection"
+          data-testid="customer-new-plan-existing-planning-records"
+        >
+          <div class="sp-customer-plan-wizard-step__planning-record-subsection-header">
+            <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.existingPlanningRecords') }}</strong></p>
+            <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.existingPlanningRecordsHelp') }}</p>
+          </div>
+          <LocalLoadingIndicator
+            v-if="planningRecordRowsLoading || stepLoadState.planningRecords"
+            :label="savedDataLoadingLabel"
+            test-id="customer-new-plan-planning-record-loading"
+          />
+          <p v-if="stepLoadError.planningRecords || planningRecordRowsError" class="field-help">
+            {{ stepLoadError.planningRecords || planningRecordRowsError }}
+          </p>
+          <div v-if="planningRecordRows.length" class="sp-customer-plan-wizard-step__list">
+            <div
+              v-for="row in planningRecordRows"
+              :key="row.id"
+              class="sp-customer-plan-wizard-step__list-row"
+              :class="{ 'sp-customer-plan-wizard-step__list-row--selected': row.id === selectedPlanningRecord?.id }"
+              data-testid="customer-new-plan-existing-planning-record-row"
             >
-              <option v-for="option in planningFamilyOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
-          </label>
-        </div>
-        <div class="sp-customer-plan-wizard-step__toggle-row">
-          <label class="planning-admin-checkbox" data-testid="customer-new-plan-planning-context-existing-label">
-            <input
-              v-model="planningSelectionModeModel"
-              data-testid="customer-new-plan-planning-context-use-existing"
-              type="radio"
-              value="use_existing"
-            />
-            <span>{{ $t('sicherplan.customerPlansWizard.forms.useExistingPlanningEntry') }}</span>
-          </label>
-          <label class="planning-admin-checkbox" data-testid="customer-new-plan-planning-context-create-label">
-            <input
-              v-model="planningSelectionModeModel"
-              data-testid="customer-new-plan-planning-context-create-new"
-              type="radio"
-              value="create_new"
-            />
-            <span>{{ $t('sicherplan.customerPlansWizard.forms.createNewPlanningEntry') }}</span>
-          </label>
-        </div>
-        <template v-if="planningModeUsesExisting">
+              <div class="sp-customer-plan-wizard-step__planning-record-row-copy">
+                <strong>{{ row.name }}</strong>
+                <span>{{ row.planning_from }} - {{ row.planning_to }}</span>
+              </div>
+              <button
+                type="button"
+                class="sp-customer-plan-wizard-step__row-link-action"
+                data-testid="customer-new-plan-edit-planning-record"
+                @click="void selectExistingPlanningRecordRow(row.id)"
+              >
+                {{ $t('sicherplan.customerPlansWizard.actions.edit') }}
+              </button>
+            </div>
+          </div>
+          <p v-else-if="!planningRecordRowsLoading && !stepLoadState.planningRecords" class="field-help" data-testid="customer-new-plan-existing-planning-records-empty">
+            {{ $t('sicherplan.customerPlansWizard.forms.noPlanningRecordsFoundForContext') }}
+          </p>
+        </section>
+
+        <div class="sp-customer-plan-wizard-step__planning-record-divider" aria-hidden="true"></div>
+
+        <section class="sp-customer-plan-wizard-step__planning-record-subsection" data-testid="customer-new-plan-planning-record-editor">
+          <header
+            class="sp-customer-plan-wizard-step__planning-record-subsection-header sp-customer-plan-wizard-step__planning-record-subsection-header--with-action"
+          >
+            <div class="sp-customer-plan-wizard-step__planning-record-subsection-title">
+              <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.planningRecordDetails') }}</strong></p>
+              <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.selectPlanningContext') }}</p>
+            </div>
+            <button
+              type="button"
+              class="cta-button cta-secondary"
+              data-testid="customer-new-plan-planning-record-create-entry"
+              :disabled="stepLoading"
+              @click="openPlanningCreateModal()"
+            >
+              {{ $t('sicherplan.customerPlansWizard.forms.createNewPlanningEntry') }}
+            </button>
+          </header>
+          <LocalLoadingIndicator
+            v-if="stepLoadState.planningRecordDetail"
+            :label="savedDataLoadingLabel"
+            test-id="customer-new-plan-planning-record-detail-loading"
+          />
           <LocalLoadingIndicator
             v-if="planningEntityLoading || stepLoadState.planningReferenceOptions"
             :label="referenceDataLoadingLabel"
             test-id="customer-new-plan-planning-reference-loading"
           />
+          <p v-if="stepLoadError.planningRecordDetail" class="field-help">{{ stepLoadError.planningRecordDetail }}</p>
           <p v-if="planningEntityError" class="field-help">{{ planningEntityError }}</p>
-          <template v-if="planningEntityOptions.length">
-            <div class="sp-customer-plan-wizard-step__list" data-testid="customer-new-plan-planning-context-list">
-              <button
-                v-for="row in planningEntityOptions"
-                :key="row.id"
-                type="button"
-                class="sp-customer-plan-wizard-step__list-row"
-                :class="{ 'sp-customer-plan-wizard-step__list-row--selected': row.id === planningEntityId }"
-                data-testid="customer-new-plan-planning-context-row"
-                @click="void selectExistingPlanningEntity(row.id)"
+          <div class="sp-customer-plan-wizard-step__grid" data-testid="customer-new-plan-planning-record-details">
+            <label class="field-stack">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.orderTitle') }}</span>
+              <input :value="selectedOrder?.title || orderDraft.title" readonly />
+            </label>
+            <label class="field-stack">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.planningModeCode') }}</span>
+              <select
+                :value="planningFamily"
+                data-testid="customer-new-plan-planning-context-family"
+                @change="onPlanningFamilyChange"
               >
-                <strong>{{ row.name || row.label || row.code || row.id }}</strong>
-                <span>{{ row.code || row.id }}</span>
-              </button>
-            </div>
-          </template>
-          <div v-else-if="!planningEntityLoading && !stepLoadState.planningReferenceOptions" data-testid="customer-new-plan-planning-context-empty">
-            <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.noPlanningEntriesFoundForCustomer') }}</p>
-            <div class="cta-row">
-              <button
-                type="button"
-                class="cta-button"
-                data-testid="customer-new-plan-planning-context-create-button"
-                @click="openPlanningCreateModal()"
+                <option v-for="option in planningFamilyOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+            <label class="field-stack">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.planningEntity') }}</span>
+              <select
+                :value="planningEntityId"
+                data-testid="customer-new-plan-planning-context-entry"
+                :disabled="planningEntityLoading || stepLoadState.planningReferenceOptions"
+                @change="void onPlanningEntityChange($event)"
               >
-                {{ $t('sicherplan.customerPlansWizard.forms.createNewPlanningEntry') }}
-              </button>
-            </div>
+                <option value="">{{ $t('sicherplan.customerPlansWizard.forms.planningEntityPlaceholder') }}</option>
+                <option v-for="option in planningEntityOptions" :key="option.id" :value="option.id">
+                  {{ option.name || option.label || option.code || option.id }}
+                </option>
+              </select>
+              <p v-if="!planningEntityOptions.length && !planningEntityLoading && !stepLoadState.planningReferenceOptions" class="field-help">
+                {{ $t('sicherplan.customerPlansWizard.forms.noPlanningEntriesFoundForCustomer') }}
+              </p>
+            </label>
+            <label class="field-stack">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.name') }}</span>
+              <input v-model="planningRecordDraft.name" data-testid="customer-new-plan-planning-record-name" />
+            </label>
+            <label class="field-stack">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.startDate') }}</span>
+              <input v-model="planningRecordDraft.planning_from" data-testid="customer-new-plan-planning-record-from" type="date" />
+            </label>
+            <label class="field-stack">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.endDate') }}</span>
+              <input v-model="planningRecordDraft.planning_to" data-testid="customer-new-plan-planning-record-to" type="date" />
+            </label>
+            <label v-if="planningModeCode === 'event'" class="field-stack field-stack--wide">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.setupNote') }}</span>
+              <textarea v-model="planningRecordDraft.event_detail_setup_note" rows="2" />
+            </label>
+            <label v-else-if="planningModeCode === 'site'" class="field-stack field-stack--wide">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.watchbookScopeNote') }}</span>
+              <textarea v-model="planningRecordDraft.site_detail_watchbook_scope_note" rows="2" />
+            </label>
+            <label v-else-if="planningModeCode === 'trade_fair'" class="field-stack">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.tradeFairZoneId') }}</span>
+              <select v-model="planningRecordDraft.trade_fair_detail_trade_fair_zone_id" data-testid="customer-new-plan-trade-fair-zone">
+                <option value="">{{ $t('sicherplan.customerPlansWizard.forms.tradeFairZonePlaceholder') }}</option>
+                <option v-for="option in tradeFairZoneSelectOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+              <p v-if="tradeFairZoneLookupError" class="field-help">{{ tradeFairZoneLookupError }}</p>
+              <p v-else-if="tradeFairZoneLookupLoading" class="field-help">{{ $t('sicherplan.customerPlansWizard.loadingBody') }}</p>
+            </label>
+            <label v-if="planningModeCode === 'trade_fair'" class="field-stack field-stack--wide">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.standNote') }}</span>
+              <textarea v-model="planningRecordDraft.trade_fair_detail_stand_note" rows="2" />
+            </label>
+            <label v-if="planningModeCode === 'patrol'" class="field-stack field-stack--wide">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.executionNote') }}</span>
+              <textarea v-model="planningRecordDraft.patrol_detail_execution_note" rows="2" />
+            </label>
+            <label class="field-stack field-stack--wide">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
+              <textarea v-model="planningRecordDraft.notes" rows="3" />
+            </label>
           </div>
-        </template>
-        <div v-else class="cta-row">
-          <button
-            type="button"
-            class="cta-button"
-            data-testid="customer-new-plan-planning-context-create-button"
-            @click="openPlanningCreateModal()"
-          >
-            {{ $t('sicherplan.customerPlansWizard.forms.createNewPlanningEntry') }}
-          </button>
-        </div>
+          <div class="cta-row">
+            <button
+              type="button"
+              class="cta-button"
+              data-testid="customer-new-plan-save-planning-record"
+              :disabled="stepLoading || !hasPlanningContext"
+              @click="void savePlanningRecordDraftOrSelection()"
+            >
+              {{
+                selectedPlanningRecord
+                  ? $t('sicherplan.customerPlansWizard.actions.updatePlanningRecord')
+                  : $t('sicherplan.customerPlansWizard.actions.savePlanningRecord')
+              }}
+            </button>
+            <button
+              type="button"
+              class="cta-button cta-secondary"
+              data-testid="customer-new-plan-clear-planning-record-draft"
+              :disabled="stepLoading"
+              @click="clearPlanningRecordDraftState"
+            >
+              {{ $t('sicherplan.customerPlansWizard.actions.clearPlanningRecordDraft') }}
+            </button>
+          </div>
+        </section>
       </section>
-      <section
-        v-if="hasPlanningContext"
-        class="sp-customer-plan-wizard-step__panel"
-        data-testid="customer-new-plan-existing-planning-records"
-      >
-        <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.existingPlanningRecords') }}</strong></p>
-        <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.existingPlanningRecordsHelp') }}</p>
-        <LocalLoadingIndicator
-          v-if="planningRecordRowsLoading || stepLoadState.planningRecords"
-          :label="savedDataLoadingLabel"
-          test-id="customer-new-plan-planning-record-loading"
-        />
-        <p v-if="stepLoadError.planningRecords || planningRecordRowsError" class="field-help">
-          {{ stepLoadError.planningRecords || planningRecordRowsError }}
-        </p>
-        <div v-if="planningRecordRows.length" class="sp-customer-plan-wizard-step__list">
-          <button
-            v-for="row in planningRecordRows"
-            :key="row.id"
-            type="button"
-            class="sp-customer-plan-wizard-step__list-row"
-            :class="{ 'sp-customer-plan-wizard-step__list-row--selected': row.id === selectedPlanningRecord?.id }"
-            data-testid="customer-new-plan-existing-planning-record-row"
-            @click="void selectExistingPlanningRecordRow(row.id)"
-          >
-            <strong>{{ row.name }}</strong>
-            <span>{{ row.planning_from }} - {{ row.planning_to }}</span>
-          </button>
-        </div>
-        <p v-else-if="!planningRecordRowsLoading && !stepLoadState.planningRecords" class="field-help" data-testid="customer-new-plan-existing-planning-records-empty">
-          {{ $t('sicherplan.customerPlansWizard.forms.noPlanningRecordsFoundForContext') }}
-        </p>
-      </section>
-      <div v-if="hasPlanningContext" class="sp-customer-plan-wizard-step__grid" data-testid="customer-new-plan-planning-record-details">
-        <LocalLoadingIndicator
-          v-if="stepLoadState.planningRecordDetail"
-          :label="savedDataLoadingLabel"
-          test-id="customer-new-plan-planning-record-detail-loading"
-        />
-        <p v-if="stepLoadError.planningRecordDetail" class="field-help">{{ stepLoadError.planningRecordDetail }}</p>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.orderTitle') }}</span>
-          <input :value="selectedOrder?.title || orderDraft.title" readonly />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.planningModeCode') }}</span>
-          <input :value="planningModeLabel" readonly />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.planningEntity') }}</span>
-          <input :value="planningEntitySummaryLabel()" readonly />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.name') }}</span>
-          <input v-model="planningRecordDraft.name" data-testid="customer-new-plan-planning-record-name" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.startDate') }}</span>
-          <input v-model="planningRecordDraft.planning_from" data-testid="customer-new-plan-planning-record-from" type="date" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.endDate') }}</span>
-          <input v-model="planningRecordDraft.planning_to" data-testid="customer-new-plan-planning-record-to" type="date" />
-        </label>
-        <label v-if="planningModeCode === 'event'" class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.setupNote') }}</span>
-          <textarea v-model="planningRecordDraft.event_detail_setup_note" rows="2" />
-        </label>
-        <label v-else-if="planningModeCode === 'site'" class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.watchbookScopeNote') }}</span>
-          <textarea v-model="planningRecordDraft.site_detail_watchbook_scope_note" rows="2" />
-        </label>
-        <label v-else-if="planningModeCode === 'trade_fair'" class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.tradeFairZoneId') }}</span>
-          <select v-model="planningRecordDraft.trade_fair_detail_trade_fair_zone_id" data-testid="customer-new-plan-trade-fair-zone">
-            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.tradeFairZonePlaceholder') }}</option>
-            <option v-for="option in tradeFairZoneSelectOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-          <p v-if="tradeFairZoneLookupError" class="field-help">{{ tradeFairZoneLookupError }}</p>
-          <p v-else-if="tradeFairZoneLookupLoading" class="field-help">{{ $t('sicherplan.customerPlansWizard.loadingBody') }}</p>
-        </label>
-        <label v-if="planningModeCode === 'trade_fair'" class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.standNote') }}</span>
-          <textarea v-model="planningRecordDraft.trade_fair_detail_stand_note" rows="2" />
-        </label>
-        <label v-if="planningModeCode === 'patrol'" class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.executionNote') }}</span>
-          <textarea v-model="planningRecordDraft.patrol_detail_execution_note" rows="2" />
-        </label>
-        <label class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
-          <textarea v-model="planningRecordDraft.notes" rows="3" />
-        </label>
-      </div>
     </section>
 
     <section
@@ -7070,7 +7500,7 @@ onBeforeUnmount(() => {
 }
 
 .sp-customer-order-scope-onepage {
-  --customer-order-scope-sticky-top: var(--sp-sticky-offset, 6.5rem);
+  --customer-order-scope-sticky-top: calc(var(--sp-sticky-offset, 6.5rem) + 25px);
   position: relative;
   display: grid;
   grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
@@ -7180,6 +7610,126 @@ onBeforeUnmount(() => {
   color: var(--sp-color-text-primary);
   font-size: 1rem;
   font-weight: 700;
+}
+
+.sp-customer-plan-wizard-step__editor-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sp-customer-plan-wizard-step__editor-header p {
+  margin: 0;
+}
+
+.sp-customer-plan-wizard-step__scope-action-row {
+  margin-bottom: 0;
+}
+
+.sp-customer-plan-wizard-step__scope-subsection {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.sp-customer-plan-wizard-step__scope-saved-list {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+  margin: 0.15rem 0 0.35rem;
+}
+
+.sp-customer-plan-wizard-step__scope-editor {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.sp-customer-plan-wizard-step__documents-panel {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.sp-customer-plan-wizard-step__document-list {
+  margin: 0.35rem 0 0.55rem;
+}
+
+.sp-customer-plan-wizard-step__document-row-copy {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.sp-customer-plan-wizard-step__planning-record-row-copy {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.sp-customer-plan-wizard-step__document-subsection {
+  display: grid;
+  gap: 0.95rem;
+  min-width: 0;
+}
+
+.sp-customer-plan-wizard-step__document-subsection-header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.sp-customer-plan-wizard-step__document-subsection-header h5 {
+  margin: 0;
+  color: var(--sp-color-text-primary);
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.sp-customer-plan-wizard-step__document-divider {
+  height: 1px;
+  margin: 0.45rem 0;
+  background: var(--sp-color-border-soft);
+}
+
+.sp-customer-plan-wizard-step__planning-record-card {
+  display: grid;
+  gap: 1.05rem;
+}
+
+.sp-customer-plan-wizard-step__planning-record-subsection {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.sp-customer-plan-wizard-step__planning-record-subsection-header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.sp-customer-plan-wizard-step__planning-record-subsection-header--with-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sp-customer-plan-wizard-step__planning-record-subsection-header p {
+  margin: 0;
+}
+
+.sp-customer-plan-wizard-step__planning-record-subsection-title {
+  display: grid;
+  gap: 0.25rem;
+  min-width: min(100%, 16rem);
+}
+
+.sp-customer-plan-wizard-step__planning-record-divider {
+  height: 1px;
+  margin: 0.35rem 0;
+  background: var(--sp-color-border-soft);
 }
 
 .sp-customer-plan-wizard-step__grid {
@@ -7326,6 +7876,22 @@ onBeforeUnmount(() => {
     background-color 0.18s ease;
 }
 
+.sp-customer-plan-wizard-step__list-row-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .sp-customer-plan-wizard-step__list-row strong,
 .sp-customer-plan-wizard-step__list-row span {
   min-width: 0;
@@ -7361,15 +7927,15 @@ onBeforeUnmount(() => {
   color: var(--sp-color-text-secondary);
 }
 
-.sp-customer-plan-wizard-step__list-row:not(.sp-customer-plan-wizard-step__list-row--static) {
-  cursor: pointer;
-}
-
 .sp-customer-plan-wizard-step__list-row:not(.sp-customer-plan-wizard-step__list-row--static):hover,
-.sp-customer-plan-wizard-step__list-row:not(.sp-customer-plan-wizard-step__list-row--static):focus-visible {
+.sp-customer-plan-wizard-step__list-row:has(.sp-customer-plan-wizard-step__list-row-main:focus-visible) {
   border-color: rgb(40 170 170 / 38%);
   box-shadow: 0 0 0 3px rgb(40 170 170 / 10%);
   transform: translateY(-1px);
+}
+
+.sp-customer-plan-wizard-step__list-row-main:focus-visible {
+  outline: none;
 }
 
 .sp-customer-plan-wizard-step__list-row--selected {
@@ -7379,6 +7945,68 @@ onBeforeUnmount(() => {
 
 .sp-customer-plan-wizard-step__list-row--static {
   align-items: center;
+}
+
+.sp-customer-plan-wizard-step__row-action {
+  flex: 0 0 auto;
+}
+
+.sp-customer-plan-wizard-step__row-link-action {
+  flex: 0 0 auto;
+  padding: 0.25rem 0.35rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: rgb(18 112 112);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sp-customer-plan-wizard-step__row-link-action:hover,
+.sp-customer-plan-wizard-step__row-link-action:focus-visible {
+  outline: none;
+  background: rgb(40 170 170 / 10%);
+  color: rgb(12 92 92);
+}
+
+.sp-customer-plan-wizard-step__list-action {
+  flex: 0 0 auto;
+  min-height: 2.25rem;
+  padding: 0.42rem 0.72rem;
+  border: 1px solid color-mix(in srgb, var(--sp-color-border-soft) 72%, var(--sp-color-danger));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sp-color-surface-page) 88%, var(--sp-color-danger));
+  color: var(--sp-color-danger);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.sp-customer-plan-wizard-step__list-action--compact {
+  font-size: 0.78rem;
+  line-height: 1.15;
+}
+
+.sp-customer-plan-wizard-step__list-action:hover,
+.sp-customer-plan-wizard-step__list-action:focus-visible {
+  border-color: color-mix(in srgb, var(--sp-color-danger) 54%, var(--sp-color-border-soft));
+  background: color-mix(in srgb, var(--sp-color-surface-page) 78%, var(--sp-color-danger));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sp-color-danger) 13%, transparent);
+  outline: none;
+}
+
+.sp-customer-plan-wizard-step__list-action:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .sp-customer-plan-wizard-step__feedback {

@@ -900,6 +900,14 @@ class SqlAlchemyPlanningRepository:
     ) -> OrderEquipmentLine | None:
         return self._update_row(OrderEquipmentLine, tenant_id, row_id, payload, actor_user_id)
 
+    def delete_order_equipment_line(self, tenant_id: str, row_id: str) -> bool:
+        row = self.get_order_equipment_line(tenant_id, row_id)
+        if row is None:
+            return False
+        self.session.delete(row)
+        self._commit_or_raise()
+        return True
+
     def find_order_equipment_line(self, tenant_id: str, order_id: str, equipment_item_id: str, *, exclude_id: str | None = None) -> OrderEquipmentLine | None:
         statement = select(OrderEquipmentLine).where(
             OrderEquipmentLine.tenant_id == tenant_id,
@@ -962,6 +970,14 @@ class SqlAlchemyPlanningRepository:
         actor_user_id: str | None,
     ) -> OrderRequirementLine | None:
         return self._update_row(OrderRequirementLine, tenant_id, row_id, payload, actor_user_id)
+
+    def delete_order_requirement_line(self, tenant_id: str, row_id: str) -> bool:
+        row = self.get_order_requirement_line(tenant_id, row_id)
+        if row is None:
+            return False
+        self.session.delete(row)
+        self._commit_or_raise()
+        return True
 
     def list_planning_records(self, tenant_id: str, filters: PlanningRecordFilter) -> list[PlanningRecord]:
         statement = (

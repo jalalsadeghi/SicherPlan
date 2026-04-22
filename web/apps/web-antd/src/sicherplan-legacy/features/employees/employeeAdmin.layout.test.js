@@ -98,7 +98,12 @@ test("employee detail uses dashboard and overview top-level tabs with one-page o
   assert.doesNotMatch(viewSource, /class="[^"]*employee-admin-overview-nav[^"]*employee-admin-card[^"]*"/);
   assert.doesNotMatch(viewSource, /class="[^"]*employee-admin-overview-nav__link[^"]*employee-admin-tab[^"]*"/);
   assert.doesNotMatch(viewSource, /employee-admin-overview-nav__chip/);
-  assert.match(viewSource, /--employee-overview-sticky-top:\s*var\(--sp-sticky-offset,\s*6\.5rem\)/);
+  assert.match(viewSource, /const EXTRA_SECTION_NAV_TOP_OFFSET = 25;/);
+  assert.match(viewSource, /const employeeOverviewVisibleEntries = new Map<EmployeeOverviewSectionId, IntersectionObserverEntry>\(\);/);
+  assert.match(viewSource, /function resolveActiveEmployeeOverviewSection\(sectionElements: HTMLElement\[\]\)/);
+  assert.match(viewSource, /distance:\s*Math\.abs\(rect\.top - stickyTop\)/);
+  assert.match(viewSource, /isCurrentOrNear:\s*rect\.top <= stickyTop \+ activeLineTolerance/);
+  assert.match(viewSource, /--employee-overview-sticky-top:\s*calc\(var\(--sp-sticky-offset,\s*6\.5rem\) \+ 25px\)/);
   assert.match(viewSource, /\.employee-admin-overview-onepage\s*\{[\s\S]*grid-template-columns:\s*minmax\(190px,\s*240px\) minmax\(0,\s*1fr\)/);
   assert.match(viewSource, /\.employee-admin-overview-onepage\s*\{[\s\S]*align-items:\s*start/);
   assert.match(viewSource, /\.employee-admin-overview-onepage\s*\{[\s\S]*position:\s*relative/);

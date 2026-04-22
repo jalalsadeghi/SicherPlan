@@ -2381,6 +2381,8 @@ let employeeOverviewSectionObserver: IntersectionObserver | null = null;
 let suppressOverviewScrollSpyUntil = 0;
 let overviewNavScrollTargets: Array<HTMLElement | Window> = [];
 let overviewNavFloatingRaf: number | null = null;
+const employeeOverviewVisibleEntries = new Map<EmployeeOverviewSectionId, IntersectionObserverEntry>();
+const EXTRA_SECTION_NAV_TOP_OFFSET = 25;
 const OVERVIEW_NAV_FLOATING_MIN_WIDTH = 1081;
 
 const documentUploadDraft = reactive({
@@ -2840,6 +2842,7 @@ function resolveOverviewSectionIdFromElement(element: Element): EmployeeOverview
 function disconnectEmployeeOverviewSectionObserver() {
   employeeOverviewSectionObserver?.disconnect();
   employeeOverviewSectionObserver = null;
+  employeeOverviewVisibleEntries.clear();
 }
 
 function resolveOverviewStickyTop() {
@@ -2852,7 +2855,8 @@ function resolveOverviewStickyTop() {
   }
 
   const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize);
-  return (Number.isFinite(rootFontSize) ? rootFontSize : 16) * 6.5;
+  const baseTop = (Number.isFinite(rootFontSize) ? rootFontSize : 16) * 6.5;
+  return baseTop + EXTRA_SECTION_NAV_TOP_OFFSET;
 }
 
 function isScrollableAncestor(element: HTMLElement) {
@@ -2876,6 +2880,36 @@ function findOverviewScrollContainers() {
 
 function resolveOverviewIntersectionRoot() {
   return findOverviewScrollContainers()[0] ?? null;
+}
+
+function resolveActiveEmployeeOverviewSection(sectionElements: HTMLElement[]) {
+  const stickyTop = resolveOverviewStickyTop();
+  const activeLineTolerance = 32;
+  const visibleSections = sectionElements
+    .map((element) => {
+      const sectionId = resolveOverviewSectionIdFromElement(element);
+      if (!sectionId || !employeeOverviewVisibleEntries.has(sectionId)) {
+        return null;
+      }
+      const rect = element.getBoundingClientRect();
+      return {
+        distance: Math.abs(rect.top - stickyTop),
+        isCurrentOrNear: rect.top <= stickyTop + activeLineTolerance,
+        rectTop: rect.top,
+        sectionId,
+      };
+    })
+    .filter((entry): entry is Exclude<typeof entry, null> => !!entry);
+
+  const currentSections = visibleSections.filter((section) => section.isCurrentOrNear);
+  const [bestSection] = (currentSections.length ? currentSections : visibleSections).sort((left, right) => {
+    if (left.distance !== right.distance) {
+      return left.distance - right.distance;
+    }
+    return left.rectTop - right.rectTop;
+  });
+
+  return bestSection?.sectionId ?? null;
 }
 
 function resetOverviewNavFloating() {
@@ -2988,16 +3022,19 @@ function setupEmployeeOverviewSectionObserver() {
         return;
       }
 
-      const [dominantEntry] = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((left, right) => {
-          if (right.intersectionRatio !== left.intersectionRatio) {
-            return right.intersectionRatio - left.intersectionRatio;
-          }
-          return Math.abs(left.boundingClientRect.top) - Math.abs(right.boundingClientRect.top);
-        });
+      entries.forEach((entry) => {
+        const sectionId = resolveOverviewSectionIdFromElement(entry.target);
+        if (!sectionId) {
+          return;
+        }
+        if (entry.isIntersecting) {
+          employeeOverviewVisibleEntries.set(sectionId, entry);
+          return;
+        }
+        employeeOverviewVisibleEntries.delete(sectionId);
+      });
 
-      const sectionId = dominantEntry ? resolveOverviewSectionIdFromElement(dominantEntry.target) : null;
+      const sectionId = resolveActiveEmployeeOverviewSection(sectionElements);
       if (sectionId) {
         activeOverviewSection.value = sectionId;
       }
@@ -5270,7 +5307,7 @@ onBeforeUnmount(() => {
 }
 
 .employee-admin-overview-onepage {
-  --employee-overview-sticky-top: var(--sp-sticky-offset, 6.5rem);
+  --employee-overview-sticky-top: calc(var(--sp-sticky-offset, 6.5rem) + 25px);
   position: relative;
   display: grid;
   grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);

@@ -7,6 +7,10 @@ const source = fs.readFileSync(
   path.resolve("web/apps/web-antd/src/views/sicherplan/customers/new-plan-step-content.vue"),
   "utf8",
 );
+const employeeSource = fs.readFileSync(
+  path.resolve("web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue"),
+  "utf8",
+);
 
 test("wizard step content uses wizard field wrappers across implemented steps", () => {
   assert.match(source, /data-testid="customer-new-plan-step-panel-planning-record-overview"/);
@@ -57,6 +61,15 @@ test("teleported modal content gets explicit wizard styling hooks", () => {
   assert.match(source, /data-testid="customer-new-plan-new-template-dialog"/);
 });
 
+test("wizard step operational feedback uses bottom-right toast notifications instead of a top banner", () => {
+  assert.match(source, /useSicherPlanFeedback/);
+  assert.match(source, /const \{ showFeedbackToast \} = useSicherPlanFeedback\(\);/);
+  assert.match(source, /function setFeedback\(tone: 'error' \| 'neutral' \| 'success', message = ''\) \{[\s\S]*showFeedbackToast\(\{[\s\S]*key: 'customer-new-plan-step-feedback'/);
+  assert.doesNotMatch(source, /const stepFeedback = reactive/);
+  assert.doesNotMatch(source, /v-if="stepFeedback\.message"/);
+  assert.match(source, /v-if="draftRestoreMessage"[\s\S]*data-testid="customer-new-plan-draft-restored"/);
+});
+
 test("wizard planning step uses canonical branch-backed selectors and tenant catalog scope", () => {
   assert.match(source, /listCustomerAddresses/);
   assert.match(source, /createCustomerAvailableAddress/);
@@ -100,12 +113,69 @@ test("order scope documents step uses employee-overview style sticky section nav
   assert.match(source, /id="customer-order-scope-section-documents"/);
   assert.match(source, /scrollIntoView\(\{\s*behavior: 'smooth',\s*block: 'start'/);
   assert.match(source, /new IntersectionObserver/);
+  assert.match(source, /const EXTRA_SECTION_NAV_TOP_OFFSET = 25;/);
+  assert.match(source, /const orderScopeVisibleEntries = new Map<OrderScopeSectionId, IntersectionObserverEntry>\(\);/);
+  assert.match(source, /resolveActiveOrderScopeSection/);
   assert.match(source, /activeOrderScopeSection\.value = sectionId/);
   assert.match(source, /\.sp-customer-order-scope-nav-shell \{[\s\S]*position: sticky;/);
   assert.match(source, /\.sp-customer-order-scope-nav-shell--fixed \{[\s\S]*position: fixed;/);
   assert.match(source, /\.sp-customer-order-scope-nav-shell--pinned \{[\s\S]*position: absolute;/);
   assert.match(source, /\.sp-customer-order-scope-nav__link--active \{[\s\S]*border-left-color: var\(--sp-color-primary\);/);
+  assert.match(source, /--customer-order-scope-sticky-top: calc\(var\(--sp-sticky-offset, 6\.5rem\) \+ 25px\);/);
   assert.match(source, /\.sp-customer-plan-wizard-step__scope-card \{[\s\S]*scroll-margin-top: var\(--customer-order-scope-sticky-top, 6\.5rem\);/);
+});
+
+test("order scope layout keeps action rows spaced and flattens document subsections", () => {
+  assert.match(source, /sp-customer-plan-wizard-step__scope-action-row[\s\S]*data-testid="customer-new-plan-new-equipment"/);
+  assert.match(source, /sp-customer-plan-wizard-step__scope-action-row[\s\S]*data-testid="customer-new-plan-new-requirement"/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__scope-subsection"[\s\S]*data-testid="customer-new-plan-new-equipment"/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__scope-subsection"[\s\S]*data-testid="customer-new-plan-new-requirement"/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__scope-saved-list"[\s\S]*customer-new-plan-equipment-line-select/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__scope-saved-list"[\s\S]*customer-new-plan-requirement-line-select/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__scope-editor"[\s\S]*customer-new-plan-equipment-item/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__scope-editor"[\s\S]*customer-new-plan-requirement-type/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__scope-action-row \{[\s\S]*margin-bottom: 0;/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__scope-subsection \{[\s\S]*gap: 0\.65rem;/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__scope-saved-list \{[\s\S]*margin: 0\.15rem 0 0\.35rem;/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__scope-editor \{[\s\S]*gap: 0\.85rem;/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__document-subsection"/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__document-divider" aria-hidden="true"/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__list sp-customer-plan-wizard-step__document-list"/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__list-action sp-customer-plan-wizard-step__list-action--compact"/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__document-list \{[\s\S]*margin: 0\.35rem 0 0\.55rem;/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__document-subsection \{[\s\S]*display: grid;[\s\S]*gap: 0\.95rem;/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__document-divider \{[\s\S]*height: 1px;[\s\S]*margin: 0\.45rem 0;[\s\S]*background: var\(--sp-color-border-soft\);/);
+  assert.match(source, /customer-new-plan-order-scope-documents-card[\s\S]*customer-new-plan-order-document-upload-title/);
+  assert.doesNotMatch(source, /customer-new-plan-order-document-link-id/);
+  const documentsCardSource = source.slice(
+    source.indexOf('data-testid="customer-new-plan-order-scope-documents-card"'),
+    source.indexOf('v-else-if="planningRecordStepActive"'),
+  );
+  assert.doesNotMatch(documentsCardSource, /class="sp-customer-plan-wizard-step__panel"/);
+  assert.doesNotMatch(documentsCardSource, /manualDocumentId/);
+  assert.match(documentsCardSource, /data-testid="customer-new-plan-link-order-document"[\s\S]*data-testid="customer-new-plan-clear-order-document-draft"/);
+});
+
+test("order scope prevents duplicate equipment and requirement selections locally", () => {
+  assert.match(source, /const availableEquipmentItemSelectOptions = computed/);
+  assert.match(source, /line\.id !== selectedEquipmentLineId\.value[\s\S]*line\.equipment_item_id === equipmentLineDraft\.equipment_item_id/);
+  assert.match(source, /const requirementLineDuplicateActive = computed\(\(\) =>\s*hasDuplicateActiveRequirementLine/);
+  assert.match(source, /v-for="option in availableEquipmentItemSelectOptions"/);
+  assert.match(source, /data-testid="customer-new-plan-equipment-all-assigned"/);
+  assert.match(source, /data-testid="customer-new-plan-equipment-duplicate"/);
+  assert.match(source, /data-testid="customer-new-plan-requirement-duplicate"/);
+  assert.match(source, /data-testid="customer-new-plan-save-equipment-line"[\s\S]*:disabled="stepLoading \|\| equipmentLineDuplicateActive"/);
+  assert.match(source, /data-testid="customer-new-plan-save-requirement-line"[\s\S]*:disabled="stepLoading \|\| requirementLineDuplicateActive"/);
+  assert.match(source, /if \(!equipmentLineDraft\.equipment_item_id \|\| equipmentLineDraft\.required_qty < 1 \|\| equipmentLineDuplicateActive\.value\)/);
+  assert.match(source, /requirementLineDuplicateActive\.value[\s\S]*setFeedback\('error', \$t\('sicherplan\.customerPlansWizard\.errors\.requirementLineInvalid'\)\)/);
+});
+
+test("employee overview uses the same section nav offset and deterministic active-section tracking", () => {
+  assert.match(employeeSource, /const EXTRA_SECTION_NAV_TOP_OFFSET = 25;/);
+  assert.match(employeeSource, /const employeeOverviewVisibleEntries = new Map<EmployeeOverviewSectionId, IntersectionObserverEntry>\(\);/);
+  assert.match(employeeSource, /resolveActiveEmployeeOverviewSection/);
+  assert.match(employeeSource, /--employee-overview-sticky-top: calc\(var\(--sp-sticky-offset, 6\.5rem\) \+ 25px\);/);
+  assert.match(employeeSource, /\.employee-admin-overview-section-card \{[\s\S]*scroll-margin-top: var\(--employee-overview-sticky-top, 6\.5rem\);/);
 });
 
 test("wizard step content exposes non-disruptive local loading indicators for saved data areas", () => {

@@ -56,6 +56,7 @@ from app.modules.planning.schemas import (
     EventVenueRead,
     EventVenueUpdate,
     OpsMasterFilter,
+    OrderAttachmentRead,
     OrderEquipmentLineCreate,
     OrderEquipmentLineRead,
     OrderEquipmentLineUpdate,
@@ -1022,6 +1023,17 @@ def update_order_equipment_line(
     return service.update_order_equipment_line(str(tenant_id), str(order_id), str(row_id), payload, context)
 
 
+@router.delete("/orders/{order_id}/equipment-lines/{row_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_order_equipment_line(
+    tenant_id: UUID,
+    order_id: UUID,
+    row_id: UUID,
+    context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.order.write", scope="tenant"))],
+    service: Annotated[CustomerOrderService, Depends(get_customer_order_service)],
+) -> None:
+    service.delete_order_equipment_line(str(tenant_id), str(order_id), str(row_id), context)
+
+
 @router.get("/orders/{order_id}/requirement-lines", response_model=list[OrderRequirementLineRead])
 def list_order_requirement_lines(
     tenant_id: UUID,
@@ -1055,36 +1067,58 @@ def update_order_requirement_line(
     return service.update_order_requirement_line(str(tenant_id), str(order_id), str(row_id), payload, context)
 
 
-@router.get("/orders/{order_id}/attachments", response_model=list[DocumentRead])
+@router.delete("/orders/{order_id}/requirement-lines/{row_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_order_requirement_line(
+    tenant_id: UUID,
+    order_id: UUID,
+    row_id: UUID,
+    context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.order.write", scope="tenant"))],
+    service: Annotated[CustomerOrderService, Depends(get_customer_order_service)],
+) -> None:
+    service.delete_order_requirement_line(str(tenant_id), str(order_id), str(row_id), context)
+
+
+@router.get("/orders/{order_id}/attachments", response_model=list[OrderAttachmentRead])
 def list_order_attachments(
     tenant_id: UUID,
     order_id: UUID,
     context: Annotated[RequestAuthorizationContext, Depends(require_permission_only("planning.order.read"))],
     service: Annotated[CustomerOrderService, Depends(get_customer_order_service)],
-) -> list[DocumentRead]:
+) -> list[OrderAttachmentRead]:
     return service.list_order_attachments(str(tenant_id), str(order_id), context)
 
 
-@router.post("/orders/{order_id}/attachments", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
+@router.post("/orders/{order_id}/attachments", response_model=OrderAttachmentRead, status_code=status.HTTP_201_CREATED)
 def create_order_attachment(
     tenant_id: UUID,
     order_id: UUID,
     payload: CustomerOrderAttachmentCreate,
     context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.order.write", scope="tenant"))],
     service: Annotated[CustomerOrderService, Depends(get_customer_order_service)],
-) -> DocumentRead:
+) -> OrderAttachmentRead:
     return service.create_order_attachment(str(tenant_id), str(order_id), payload, context)
 
 
-@router.post("/orders/{order_id}/attachments/link", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
+@router.post("/orders/{order_id}/attachments/link", response_model=OrderAttachmentRead, status_code=status.HTTP_201_CREATED)
 def link_order_attachment(
     tenant_id: UUID,
     order_id: UUID,
     payload: CustomerOrderAttachmentLinkCreate,
     context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.order.write", scope="tenant"))],
     service: Annotated[CustomerOrderService, Depends(get_customer_order_service)],
-) -> DocumentRead:
+) -> OrderAttachmentRead:
     return service.link_order_attachment(str(tenant_id), str(order_id), payload, context)
+
+
+@router.delete("/orders/{order_id}/attachments/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def unlink_order_attachment(
+    tenant_id: UUID,
+    order_id: UUID,
+    document_id: UUID,
+    context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.order.write", scope="tenant"))],
+    service: Annotated[CustomerOrderService, Depends(get_customer_order_service)],
+) -> None:
+    service.unlink_order_attachment(str(tenant_id), str(order_id), str(document_id), context)
 
 
 @router.get("/orders/{order_id}/commercial-link", response_model=PlanningCommercialLinkRead)

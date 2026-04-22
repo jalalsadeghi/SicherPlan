@@ -26,6 +26,7 @@ from app.modules.planning.schemas import (
     CustomerOrderRead,
     CustomerOrderReleaseStateUpdate,
     CustomerOrderUpdate,
+    OrderAttachmentRead,
     OrderEquipmentLineCreate,
     OrderEquipmentLineRead,
     OrderEquipmentLineUpdate,
@@ -33,7 +34,7 @@ from app.modules.planning.schemas import (
     OrderRequirementLineRead,
     OrderRequirementLineUpdate,
 )
-from app.modules.platform_services.docs_schemas import DocumentCreate, DocumentLinkCreate, DocumentVersionCreate, DocumentRead
+from app.modules.platform_services.docs_schemas import DocumentCreate, DocumentLinkCreate, DocumentVersionCreate
 from app.modules.platform_services.docs_service import DocumentService
 
 
@@ -56,11 +57,13 @@ class PlanningOrderRepository(Protocol):
     def get_order_equipment_line(self, tenant_id: str, row_id: str) -> OrderEquipmentLine | None: ...
     def create_order_equipment_line(self, tenant_id: str, payload: OrderEquipmentLineCreate, actor_user_id: str | None) -> OrderEquipmentLine: ...
     def update_order_equipment_line(self, tenant_id: str, row_id: str, payload: OrderEquipmentLineUpdate, actor_user_id: str | None) -> OrderEquipmentLine | None: ...
+    def delete_order_equipment_line(self, tenant_id: str, row_id: str) -> bool: ...
     def find_order_equipment_line(self, tenant_id: str, order_id: str, equipment_item_id: str, *, exclude_id: str | None = None) -> OrderEquipmentLine | None: ...
     def list_order_requirement_lines(self, tenant_id: str, order_id: str) -> list[OrderRequirementLine]: ...
     def get_order_requirement_line(self, tenant_id: str, row_id: str) -> OrderRequirementLine | None: ...
     def create_order_requirement_line(self, tenant_id: str, payload: OrderRequirementLineCreate, actor_user_id: str | None) -> OrderRequirementLine: ...
     def update_order_requirement_line(self, tenant_id: str, row_id: str, payload: OrderRequirementLineUpdate, actor_user_id: str | None) -> OrderRequirementLine | None: ...
+    def delete_order_requirement_line(self, tenant_id: str, row_id: str) -> bool: ...
 
 
 class PlanningOrderDocumentRepository(Protocol):
@@ -286,6 +289,22 @@ class CustomerOrderService:
         self._record_event(actor, "planning.order_equipment.updated", "ops.order_equipment", row.id, tenant_id, before_json=before_json, after_json=self._snapshot(row))
         return OrderEquipmentLineRead.model_validate(row)
 
+    def delete_order_equipment_line(
+        self,
+        tenant_id: str,
+        order_id: str,
+        row_id: str,
+        actor: RequestAuthorizationContext,
+    ) -> None:
+        self._require_order(tenant_id, order_id)
+        current = self.repository.get_order_equipment_line(tenant_id, row_id)
+        if current is None or current.order_id != order_id:
+            raise self._not_found("order_equipment")
+        before_json = self._snapshot(current)
+        if not self.repository.delete_order_equipment_line(tenant_id, row_id):
+            raise self._not_found("order_equipment")
+        self._record_event(actor, "planning.order_equipment.deleted", "ops.order_equipment", row_id, tenant_id, before_json=before_json)
+
     def list_order_requirement_lines(self, tenant_id: str, order_id: str, _actor: RequestAuthorizationContext) -> list[OrderRequirementLineRead]:
         self._require_order(tenant_id, order_id)
         return [OrderRequirementLineRead.model_validate(row) for row in self.repository.list_order_requirement_lines(tenant_id, order_id)]
@@ -350,9 +369,28 @@ class CustomerOrderService:
         self._record_event(actor, "planning.order_requirement_line.updated", "ops.order_requirement_line", row.id, tenant_id, before_json=before_json, after_json=self._snapshot(row))
         return OrderRequirementLineRead.model_validate(row)
 
-    def list_order_attachments(self, tenant_id: str, order_id: str, _actor: RequestAuthorizationContext) -> list[DocumentRead]:
+    def delete_order_requirement_line(
+        self,
+        tenant_id: str,
+        order_id: str,
+        row_id: str,
+        actor: RequestAuthorizationContext,
+    ) -> None:
         self._require_order(tenant_id, order_id)
-        return [DocumentRead.model_validate(row) for row in self.document_repository.list_documents_for_owner(tenant_id, "ops.customer_order", order_id)]
+        current = self.repository.get_order_requirement_line(tenant_id, row_id)
+        if current is None or current.order_id != order_id:
+            raise self._not_found("order_requirement_line")
+        before_json = self._snapshot(current)
+        if not self.repository.delete_order_requirement_line(tenant_id, row_id):
+            raise self._not_found("order_requirement_line")
+        self._record_event(actor, "planning.order_requirement_line.deleted", "ops.order_requirement_line", row_id, tenant_id, before_json=before_json)
+
+    def list_order_attachments(self, tenant_id: str, order_id: str, _actor: RequestAuthorizationContext) -> list[OrderAttachmentRead]:
+        self._require_order(tenant_id, order_id)
+        return [
+            self._read_order_attachment(row, order_id)
+            for row in self.document_repository.list_documents_for_owner(tenant_id, "ops.customer_order", order_id)
+        ]
 
     def create_order_attachment(
         self,
@@ -360,7 +398,7 @@ class CustomerOrderService:
         order_id: str,
         payload: CustomerOrderAttachmentCreate,
         actor: RequestAuthorizationContext,
-    ) -> DocumentRead:
+    ) -> OrderAttachmentRead:
         self._require_order(tenant_id, order_id)
         if payload.tenant_id != tenant_id:
             raise ApiException(400, "planning.order_attachment.scope_mismatch", "errors.planning.order_attachment.scope_mismatch")
@@ -401,7 +439,7 @@ class CustomerOrderService:
         )
         self._record_event(actor, "planning.customer_order.attachment.created", "ops.customer_order", order_id, tenant_id, metadata_json={"document_id": document.id})
         refreshed = self.document_repository.list_documents_for_owner(tenant_id, "ops.customer_order", order_id)
-        return DocumentRead.model_validate(next(row for row in refreshed if row.id == document.id))
+        return self._read_order_attachment(next(row for row in refreshed if row.id == document.id), order_id)
 
     def link_order_attachment(
         self,
@@ -409,7 +447,7 @@ class CustomerOrderService:
         order_id: str,
         payload: CustomerOrderAttachmentLinkCreate,
         actor: RequestAuthorizationContext,
-    ) -> DocumentRead:
+    ) -> OrderAttachmentRead:
         self._require_order(tenant_id, order_id)
         if payload.tenant_id != tenant_id:
             raise ApiException(400, "planning.order_attachment.scope_mismatch", "errors.planning.order_attachment.scope_mismatch")
@@ -427,7 +465,18 @@ class CustomerOrderService:
         )
         self._record_event(actor, "planning.customer_order.attachment.linked", "ops.customer_order", order_id, tenant_id, metadata_json={"document_id": payload.document_id})
         refreshed = self.document_repository.list_documents_for_owner(tenant_id, "ops.customer_order", order_id)
-        return DocumentRead.model_validate(next(row for row in refreshed if row.id == payload.document_id))
+        return self._read_order_attachment(next(row for row in refreshed if row.id == payload.document_id), order_id)
+
+    def unlink_order_attachment(
+        self,
+        tenant_id: str,
+        order_id: str,
+        document_id: str,
+        actor: RequestAuthorizationContext,
+    ) -> None:
+        self._require_order(tenant_id, order_id)
+        self.document_service.delete_document_link(tenant_id, document_id, "ops.customer_order", order_id, actor)
+        self._record_event(actor, "planning.customer_order.attachment.unlinked", "ops.customer_order", order_id, tenant_id, metadata_json={"document_id": document_id})
 
     def _validate_order_payload(
         self,
@@ -573,9 +622,25 @@ class CustomerOrderService:
         return schema.model_copy(
             update={
                 "attachments": [
-                    DocumentRead.model_validate(document)
+                    self._read_order_attachment(document, row.id)
                     for document in self.document_repository.list_documents_for_owner(row.tenant_id, "ops.customer_order", row.id)
                 ]
+            }
+        )
+
+    @staticmethod
+    def _read_order_attachment(document: object, order_id: str) -> OrderAttachmentRead:
+        relation_label: str | None = None
+        relation_type: str | None = None
+        for link in getattr(document, "links", []) or []:
+            if getattr(link, "owner_type", None) == "ops.customer_order" and getattr(link, "owner_id", None) == order_id:
+                relation_label = getattr(link, "label", None)
+                relation_type = getattr(link, "relation_type", None)
+                break
+        return OrderAttachmentRead.model_validate(document).model_copy(
+            update={
+                "relation_label": relation_label,
+                "relation_type": relation_type,
             }
         )
 

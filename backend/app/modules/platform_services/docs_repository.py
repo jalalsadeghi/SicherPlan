@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Select, String, cast, or_, select
+from sqlalchemy import Select, String, cast, delete, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -174,6 +174,18 @@ class SqlAlchemyDocumentRepository:
             raise
         self.session.refresh(row)
         return row
+
+    def delete_document_link(self, tenant_id: str, document_id: str, owner_type: str, owner_id: str) -> bool:
+        result = self.session.execute(
+            delete(DocumentLink).where(
+                DocumentLink.tenant_id == tenant_id,
+                DocumentLink.document_id == document_id,
+                DocumentLink.owner_type == owner_type,
+                DocumentLink.owner_id == owner_id,
+            )
+        )
+        self.session.commit()
+        return bool(result.rowcount)
 
     def owner_exists(self, tenant_id: str, owner_type: str, owner_id: str) -> bool:
         if owner_type not in self.SUPPORTED_OWNER_TYPES:

@@ -14,6 +14,7 @@ from app.modules.iam.audit_service import AuditService
 from app.modules.planning.order_service import CustomerOrderService
 from app.modules.planning.schemas import (
     CustomerOrderAttachmentCreate,
+    CustomerOrderAttachmentLinkCreate,
     CustomerOrderCreate,
     CustomerOrderFilter,
     CustomerOrderReleaseStateUpdate,
@@ -86,7 +87,33 @@ class FakeOrderDocumentService:
 
     def add_document_link(self, tenant_id: str, document_id: str, payload, actor):  # noqa: ANN001
         self.repository.by_owner.setdefault((tenant_id, payload.owner_type, payload.owner_id), []).append(document_id)
+        self.repository.documents[document_id].links.append(
+            SimpleNamespace(
+                id=str(uuid4()),
+                tenant_id=tenant_id,
+                document_id=document_id,
+                owner_type=payload.owner_type,
+                owner_id=payload.owner_id,
+                relation_type=payload.relation_type,
+                label=payload.label,
+                linked_by_user_id=actor.user_id,
+                linked_at=datetime.now(UTC),
+                metadata_json=payload.metadata_json,
+            )
+        )
         return SimpleNamespace(document_id=document_id, owner_id=payload.owner_id)
+
+    def delete_document_link(self, tenant_id: str, document_id: str, owner_type: str, owner_id: str, actor):  # noqa: ANN001
+        owner_key = (tenant_id, owner_type, owner_id)
+        document_ids = self.repository.by_owner.get(owner_key, [])
+        if document_id not in document_ids:
+            raise ApiException(404, "docs.document_link.not_found", "errors.docs.document_link.not_found")
+        document_ids.remove(document_id)
+        self.repository.documents[document_id].links = [
+            link
+            for link in self.repository.documents[document_id].links
+            if not (link.owner_type == owner_type and link.owner_id == owner_id)
+        ]
 
 
 @dataclass
@@ -280,6 +307,13 @@ class FakeCustomerOrderRepository(FakePlanningRepository):
         row.updated_by_user_id = actor_user_id
         return row
 
+    def delete_order_equipment_line(self, tenant_id: str, row_id: str) -> bool:
+        row = self.get_order_equipment_line(tenant_id, row_id)
+        if row is None:
+            return False
+        del self.order_equipment_lines[row_id]
+        return True
+
     def find_order_equipment_line(self, tenant_id: str, order_id: str, equipment_item_id: str, *, exclude_id: str | None = None):
         for row in self.order_equipment_lines.values():
             if row.tenant_id == tenant_id and row.order_id == order_id and row.equipment_item_id == equipment_item_id and row.id != exclude_id:
@@ -335,6 +369,13 @@ class FakeCustomerOrderRepository(FakePlanningRepository):
         row.function_type = self.function_types.get(row.function_type_id)
         row.qualification_type = self.qualification_types.get(row.qualification_type_id)
         return row
+
+    def delete_order_requirement_line(self, tenant_id: str, row_id: str) -> bool:
+        row = self.get_order_requirement_line(tenant_id, row_id)
+        if row is None:
+            return False
+        del self.order_requirement_lines[row_id]
+        return True
 
 
 class CustomerOrderServiceTests(unittest.TestCase):
@@ -580,6 +621,41 @@ class CustomerOrderServiceTests(unittest.TestCase):
         self.assertEqual(event.after_json["equipment_item_id"], self.equipment_item_id)
         self.assertNotIn("equipment_item", event.after_json)
         self.assert_json_safe(event.after_json)
+
+    def test_delete_equipment_line_removes_scope_line_and_audits(self) -> None:
+        order = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="ORD-EQUIP-DELETE",
+                title="Objekt Nord",
+                service_category_code="object_security",
+                service_from=date(2026, 6, 1),
+                service_to=date(2026, 6, 2),
+            ),
+            self.actor,
+        )
+        line = self.service.create_order_equipment_line(
+            "tenant-1",
+            order.id,
+            OrderEquipmentLineCreate(
+                tenant_id="tenant-1",
+                order_id=order.id,
+                equipment_item_id=self.equipment_item_id,
+                required_qty=2,
+            ),
+            self.actor,
+        )
+
+        self.service.delete_order_equipment_line("tenant-1", order.id, line.id, self.actor)
+
+        self.assertEqual(self.service.list_order_equipment_lines("tenant-1", order.id, self.actor), [])
+        event = self.audit_repository.audit_events[-1]
+        self.assertEqual(event.event_type, "planning.order_equipment.deleted")
+        self.assertEqual(event.before_json["id"], line.id)
+        self.assert_json_safe(event.before_json)
 
     def test_requirement_line_rejects_invalid_qty_window(self) -> None:
         order = self.service.create_order(
@@ -827,6 +903,42 @@ class CustomerOrderServiceTests(unittest.TestCase):
         self.assertNotIn("qualification_type", event.after_json)
         self.assert_json_safe(event.after_json)
 
+    def test_delete_requirement_line_removes_scope_line_and_audits(self) -> None:
+        order = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="ORD-REQ-DELETE",
+                title="Objekt",
+                service_category_code="object_security",
+                service_from=date(2026, 7, 1),
+                service_to=date(2026, 7, 3),
+            ),
+            self.actor,
+        )
+        line = self.service.create_order_requirement_line(
+            "tenant-1",
+            order.id,
+            OrderRequirementLineCreate(
+                tenant_id="tenant-1",
+                order_id=order.id,
+                requirement_type_id=self.requirement_type_id,
+                min_qty=1,
+                target_qty=2,
+            ),
+            self.actor,
+        )
+
+        self.service.delete_order_requirement_line("tenant-1", order.id, line.id, self.actor)
+
+        self.assertEqual(self.service.list_order_requirement_lines("tenant-1", order.id, self.actor), [])
+        event = self.audit_repository.audit_events[-1]
+        self.assertEqual(event.event_type, "planning.order_requirement_line.deleted")
+        self.assertEqual(event.before_json["id"], line.id)
+        self.assert_json_safe(event.before_json)
+
     def test_requirement_line_round_trip_supports_optional_function_and_qualification_ids(self) -> None:
         order = self.service.create_order(
             "tenant-1",
@@ -1044,6 +1156,81 @@ class CustomerOrderServiceTests(unittest.TestCase):
         self.assertEqual(len(attachments), 1)
         self.assertEqual(attachments[0].id, document.id)
         self.assertEqual(self.document_repository.by_owner[("tenant-1", "ops.customer_order", order.id)], [document.id])
+
+    def test_link_attachment_returns_relation_label_without_overwriting_document_title(self) -> None:
+        order = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="ORD-DOC-LINK-LABEL",
+                title="Route",
+                service_category_code="patrol_service",
+                service_from=date(2026, 8, 1),
+                service_to=date(2026, 8, 1),
+            ),
+            self.actor,
+        )
+        self.document_repository.documents["document-existing"] = FakeDocumentRecord(
+            id="document-existing",
+            tenant_id="tenant-1",
+            title="1663202370369.jpg",
+        )
+
+        document = self.service.link_order_attachment(
+            "tenant-1",
+            order.id,
+            CustomerOrderAttachmentLinkCreate(
+                tenant_id="tenant-1",
+                document_id="document-existing",
+                label="Bestehendes Dokument",
+            ),
+            self.actor,
+        )
+
+        self.assertEqual(document.id, "document-existing")
+        self.assertEqual(document.title, "1663202370369.jpg")
+        self.assertEqual(document.relation_label, "Bestehendes Dokument")
+        attachments = self.service.list_order_attachments("tenant-1", order.id, self.actor)
+        self.assertEqual(attachments[0].title, "1663202370369.jpg")
+        self.assertEqual(attachments[0].relation_label, "Bestehendes Dokument")
+
+    def test_unlink_attachment_removes_order_relation_without_deleting_document(self) -> None:
+        order = self.service.create_order(
+            "tenant-1",
+            CustomerOrderCreate(
+                tenant_id="tenant-1",
+                customer_id="customer-1",
+                requirement_type_id=self.requirement_type_id,
+                order_no="ORD-DOC-UNLINK",
+                title="Route",
+                service_category_code="patrol_service",
+                service_from=date(2026, 8, 1),
+                service_to=date(2026, 8, 1),
+            ),
+            self.actor,
+        )
+        document = self.service.create_order_attachment(
+            "tenant-1",
+            order.id,
+            CustomerOrderAttachmentCreate(
+                tenant_id="tenant-1",
+                title="Sicherheitskonzept",
+                file_name="konzept.pdf",
+                content_type="application/pdf",
+                content_base64="UERG",
+            ),
+            self.actor,
+        )
+
+        self.service.unlink_order_attachment("tenant-1", order.id, document.id, self.actor)
+
+        self.assertEqual(self.service.list_order_attachments("tenant-1", order.id, self.actor), [])
+        self.assertIn(document.id, self.document_repository.documents)
+        event = self.audit_repository.audit_events[-1]
+        self.assertEqual(event.event_type, "planning.customer_order.attachment.unlinked")
+        self.assertEqual(event.metadata_json["document_id"], document.id)
 
     def test_release_transition_and_archived_listing_behavior(self) -> None:
         order = self.service.create_order(

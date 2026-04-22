@@ -48,6 +48,7 @@ class DocumentRepository(Protocol):
     def create_document_version(self, document: Document, row: DocumentVersion) -> DocumentVersion: ...
     def get_document_version(self, tenant_id: str, document_id: str, version_no: int) -> DocumentVersion | None: ...
     def create_document_link(self, row: DocumentLink) -> DocumentLink: ...
+    def delete_document_link(self, tenant_id: str, document_id: str, owner_type: str, owner_id: str) -> bool: ...
     def owner_exists(self, tenant_id: str, owner_type: str, owner_id: str) -> bool: ...
 
 
@@ -235,6 +236,20 @@ class DocumentService:
                 "errors.docs.document_link.duplicate",
             ) from exc
         return DocumentLinkRead.model_validate(link)
+
+    def delete_document_link(
+        self,
+        tenant_id: str,
+        document_id: str,
+        owner_type: str,
+        owner_id: str,
+        actor: DocumentActorContext,
+    ) -> None:
+        self._ensure_tenant_scope(actor, tenant_id)
+        self._require_document(tenant_id, document_id, actor)
+        deleted = self.repository.delete_document_link(tenant_id, document_id, owner_type, owner_id)
+        if not deleted:
+            raise ApiException(404, "docs.document_link.not_found", "errors.docs.document_link.not_found")
 
     def get_document_version(
         self,

@@ -1180,10 +1180,11 @@ describe("EmployeeAdminView search dialog regression", () => {
     const navShell = wrapper.get('[data-testid="employee-overview-section-nav"]');
     expect(navShell.classes()).toContain("employee-admin-overview-nav-shell--fixed");
     expect(navShell.attributes("style")).toContain("left: 120px");
+    expect(navShell.attributes("style")).toContain("top: 129px");
     expect(navShell.attributes("style")).toContain("width: 220px");
   });
 
-  it("updates the active Overview nav item from IntersectionObserver scroll-spy events", async () => {
+  it("updates the active Overview nav item from visible section position, not stale intersection ratio", async () => {
     const { instances, triggerIntersection } = installIntersectionObserverMock();
     const wrapper = await mountEmployeeAdmin();
 
@@ -1193,16 +1194,43 @@ describe("EmployeeAdminView search dialog regression", () => {
     const observer = instances.at(-1);
     expect(observer).toBeDefined();
 
-    triggerIntersection(observer!, wrapper.get('[data-testid="employee-overview-section-addresses"]').element);
+    const credentialsSection = wrapper.get('[data-testid="employee-overview-section-credentials"]').element as HTMLElement;
+    const availabilitySection = wrapper.get('[data-testid="employee-overview-section-availability"]').element as HTMLElement;
+    const sectionTops = { availability: 129, credentials: 420 };
+    const mockRect = (top: number) =>
+      ({
+        bottom: top + 320,
+        height: 320,
+        left: 0,
+        right: 800,
+        top,
+        width: 800,
+        x: 0,
+        y: top,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    vi.spyOn(credentialsSection, "getBoundingClientRect").mockImplementation(() => mockRect(sectionTops.credentials));
+    vi.spyOn(availabilitySection, "getBoundingClientRect").mockImplementation(() => mockRect(sectionTops.availability));
+
+    triggerIntersection(observer!, credentialsSection, 0.9);
+    triggerIntersection(observer!, availabilitySection, 0.4);
     await settle();
 
-    expect((wrapper.vm as any).activeOverviewSection).toBe("addresses");
-    expect(wrapper.get('[data-testid="employee-overview-nav-addresses"]').attributes("aria-current")).toBe("true");
-    expect(wrapper.get('[data-testid="employee-overview-nav-addresses"]').classes()).toContain(
+    expect((wrapper.vm as any).activeOverviewSection).toBe("availability");
+    expect(wrapper.get('[data-testid="employee-overview-nav-availability"]').attributes("aria-current")).toBe("true");
+    expect(wrapper.get('[data-testid="employee-overview-nav-availability"]').classes()).toContain(
+      "employee-admin-overview-nav__link--active",
+    );
+    expect(wrapper.get('[data-testid="employee-overview-nav-credentials"]').attributes("aria-current")).toBeUndefined();
+    expect(wrapper.get('[data-testid="employee-overview-nav-credentials"]').classes()).not.toContain(
       "employee-admin-overview-nav__link--active",
     );
 
-    triggerIntersection(observer!, wrapper.get('[data-testid="employee-overview-section-documents"]').element);
+    const documentsSection = wrapper.get('[data-testid="employee-overview-section-documents"]').element as HTMLElement;
+    vi.spyOn(documentsSection, "getBoundingClientRect").mockImplementation(() => mockRect(129));
+    sectionTops.availability = -260;
+    sectionTops.credentials = -620;
+    triggerIntersection(observer!, documentsSection, 0.6);
     await settle();
 
     expect((wrapper.vm as any).activeOverviewSection).toBe("documents");
@@ -1210,8 +1238,8 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(wrapper.get('[data-testid="employee-overview-nav-documents"]').classes()).toContain(
       "employee-admin-overview-nav__link--active",
     );
-    expect(wrapper.get('[data-testid="employee-overview-nav-addresses"]').attributes("aria-current")).toBeUndefined();
-    expect(wrapper.get('[data-testid="employee-overview-nav-addresses"]').classes()).not.toContain(
+    expect(wrapper.get('[data-testid="employee-overview-nav-availability"]').attributes("aria-current")).toBeUndefined();
+    expect(wrapper.get('[data-testid="employee-overview-nav-availability"]').classes()).not.toContain(
       "employee-admin-overview-nav__link--active",
     );
   });

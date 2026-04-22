@@ -677,6 +677,11 @@ class CustomerOrderAttachmentLinkCreate(BaseModel):
     metadata_json: dict[str, object] = Field(default_factory=dict)
 
 
+class OrderAttachmentRead(DocumentRead):
+    relation_label: str | None = None
+    relation_type: str | None = None
+
+
 class PlanningRecordAttachmentCreate(BaseModel):
     tenant_id: str
     title: str
@@ -753,7 +758,7 @@ class CustomerOrderRead(CustomerOrderListItem):
     released_by_user_id: str | None
     equipment_lines: list[OrderEquipmentLineRead] = Field(default_factory=list)
     requirement_lines: list[OrderRequirementLineRead] = Field(default_factory=list)
-    attachments: list[DocumentRead] = Field(default_factory=list)
+    attachments: list[OrderAttachmentRead] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
     created_by_user_id: str | None

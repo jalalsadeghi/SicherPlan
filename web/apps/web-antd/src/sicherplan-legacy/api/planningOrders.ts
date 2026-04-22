@@ -9,6 +9,8 @@ export interface PlanningDocumentRead {
   created_at?: string;
   document_type?: { id: string; key: string; name: string } | null;
   document_type_id?: string | null;
+  relation_label?: string | null;
+  relation_type?: string | null;
   source_label?: string | null;
   metadata_json?: Record<string, unknown>;
 }
@@ -302,6 +304,14 @@ export function updateOrderEquipmentLine(tenantId: string, orderId: string, rowI
   );
 }
 
+export function deleteOrderEquipmentLine(tenantId: string, orderId: string, rowId: string, accessToken: string) {
+  return request<void>(
+    `/api/planning/tenants/${tenantId}/ops/orders/${orderId}/equipment-lines/${rowId}`,
+    accessToken,
+    { method: "DELETE" },
+  );
+}
+
 export function listOrderRequirementLines(tenantId: string, orderId: string, accessToken: string) {
   return request<OrderRequirementLineRead[]>(
     `/api/planning/tenants/${tenantId}/ops/orders/${orderId}/requirement-lines`,
@@ -325,6 +335,14 @@ export function updateOrderRequirementLine(tenantId: string, orderId: string, ro
   );
 }
 
+export function deleteOrderRequirementLine(tenantId: string, orderId: string, rowId: string, accessToken: string) {
+  return request<void>(
+    `/api/planning/tenants/${tenantId}/ops/orders/${orderId}/requirement-lines/${rowId}`,
+    accessToken,
+    { method: "DELETE" },
+  );
+}
+
 export function listOrderAttachments(tenantId: string, orderId: string, accessToken: string) {
   return request<PlanningDocumentRead[]>(`/api/planning/tenants/${tenantId}/ops/orders/${orderId}/attachments`, accessToken);
 }
@@ -342,6 +360,14 @@ export function linkOrderAttachment(tenantId: string, orderId: string, accessTok
     `/api/planning/tenants/${tenantId}/ops/orders/${orderId}/attachments/link`,
     accessToken,
     { method: "POST", body: payload },
+  );
+}
+
+export function unlinkOrderAttachment(tenantId: string, orderId: string, documentId: string, accessToken: string) {
+  return request<void>(
+    `/api/planning/tenants/${tenantId}/ops/orders/${orderId}/attachments/${documentId}`,
+    accessToken,
+    { method: "DELETE" },
   );
 }
 

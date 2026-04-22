@@ -12,6 +12,12 @@ import type { CustomerNewPlanWizardState, CustomerNewPlanWizardStepId } from './
 
 const routerPushMock = vi.fn();
 const routerReplaceMock = vi.fn();
+const notificationMocks = vi.hoisted(() => ({
+  error: vi.fn(),
+  info: vi.fn(),
+  success: vi.fn(),
+  warning: vi.fn(),
+}));
 const planningShiftsApiErrorExports = vi.hoisted(() => {
   class PlanningShiftsApiError extends Error {
     status: number;
@@ -153,6 +159,7 @@ vi.mock('ant-design-vue', () => ({
       </div>
     `,
   }),
+  notification: notificationMocks,
 }));
 
 function buildOrder(overrides: Record<string, unknown> = {}) {
@@ -425,6 +432,10 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.updateShiftPlanMock.mockReset();
     apiMocks.updateShiftSeriesExceptionMock.mockReset();
     apiMocks.updateShiftSeriesMock.mockReset();
+    notificationMocks.error.mockReset();
+    notificationMocks.info.mockReset();
+    notificationMocks.success.mockReset();
+    notificationMocks.warning.mockReset();
 
     apiMocks.getCustomerOrderMock.mockResolvedValue(buildOrder());
     apiMocks.listCustomerOrdersMock.mockResolvedValue([buildOrder()]);
@@ -550,10 +561,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(wrapper.find('[data-testid="customer-new-plan-order-document-upload-title"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.forms.linkExistingDocument');
     expect(wrapper.find('[data-testid="customer-new-plan-order-document-picker-open"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="customer-new-plan-order-document-link-id"]').exists()).toBe(true);
-    expect(wrapper.get('[data-testid="customer-new-plan-order-document-link-id"]').element.closest('details')?.textContent).toContain(
-      'sicherplan.customerPlansWizard.forms.manualDocumentId',
-    );
+    expect(wrapper.find('[data-testid="customer-new-plan-order-document-link-id"]').exists()).toBe(false);
   });
 
   it('opens the order document picker with local loading, keeps the step visible, and renders search results', async () => {
@@ -624,7 +632,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await wrapper.get('[data-testid="customer-new-plan-link-order-document"]').trigger('click');
     await flushPromises();
     expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(0);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.orderDocumentLinkIncomplete');
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.orderDocumentLinkIncomplete',
+    }));
   });
 
   it('restores an order document link draft and shows the selected id fallback', async () => {
@@ -736,6 +746,11 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     expect(wrapper.find('[data-testid="customer-new-plan-planning-record-detail-loading"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-new-plan-planning-record-details"]').exists()).toBe(true);
+    expect(
+      wrapper
+        .get('[data-testid="customer-new-plan-planning-record-detail-loading"]')
+        .element.closest('[data-testid="customer-new-plan-planning-record-details"]'),
+    ).toBeNull();
 
     detail.resolve(buildPlanningRecord({ name: 'Detail geladen' }));
     await flushPromises();
@@ -944,11 +959,14 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await flushPromises();
 
     expect(wrapper.find('[data-testid="customer-new-plan-planning-record-blocked"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="customer-new-plan-planning-context-panel"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-details"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-context-panel"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-existing-planning-records"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-details"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-context-family"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-context-entry"]').exists()).toBe(true);
   });
 
-  it('renders planning context mode options with the standard toggle styling', async () => {
+  it('renders planning context controls inside the planning-record editor', async () => {
     const wrapper = mountStep('planning-record-overview', {
       planning_entity_id: '',
       planning_entity_type: '',
@@ -956,10 +974,47 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     });
     await flushPromises();
 
-    expect(wrapper.get('[data-testid="customer-new-plan-planning-context-existing-label"]').classes()).toContain('planning-admin-checkbox');
-    expect(wrapper.get('[data-testid="customer-new-plan-planning-context-create-label"]').classes()).toContain('planning-admin-checkbox');
-    expect(wrapper.find('[data-testid="customer-new-plan-planning-context-existing-label"].field-stack').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="customer-new-plan-planning-context-create-label"].field-stack').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-context-panel"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-card"]').exists()).toBe(true);
+    const stepPanel = wrapper.get('[data-testid="customer-new-plan-step-panel-planning-record-overview"]');
+    expect(stepPanel.classes()).toContain('sp-customer-plan-wizard-step__panel');
+    expect(stepPanel.findAll('.sp-customer-plan-wizard-step__panel')).toHaveLength(0);
+    expect(wrapper.get('[data-testid="customer-new-plan-planning-record-card"]').classes()).not.toContain(
+      'sp-customer-plan-wizard-step__panel',
+    );
+    expect(wrapper.get('[data-testid="customer-new-plan-existing-planning-records"]').classes()).toContain(
+      'sp-customer-plan-wizard-step__planning-record-subsection',
+    );
+    expect(wrapper.get('[data-testid="customer-new-plan-planning-record-editor"]').classes()).toContain(
+      'sp-customer-plan-wizard-step__planning-record-subsection',
+    );
+    expect(wrapper.find('.sp-customer-plan-wizard-step__planning-record-divider').exists()).toBe(true);
+    const modeSelect = wrapper.get('[data-testid="customer-new-plan-planning-context-family"]');
+    const entrySelect = wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]');
+    expect(modeSelect.element.tagName).toBe('SELECT');
+    expect(entrySelect.element.tagName).toBe('SELECT');
+    expect(modeSelect.attributes('readonly')).toBeUndefined();
+    expect(entrySelect.attributes('readonly')).toBeUndefined();
+    expect(modeSelect.element.closest('[data-testid="customer-new-plan-planning-record-editor"]')).toBeTruthy();
+    expect(entrySelect.element.closest('[data-testid="customer-new-plan-planning-record-editor"]')).toBeTruthy();
+    const createEntryButton = wrapper.get('[data-testid="customer-new-plan-planning-record-create-entry"]');
+    expect(createEntryButton.element.closest('[data-testid="customer-new-plan-planning-record-editor"]')).toBeTruthy();
+    expect(createEntryButton.element.closest('[data-testid="customer-new-plan-existing-planning-records"]')).toBeNull();
+    expect(createEntryButton.element.closest('.sp-customer-plan-wizard-step__planning-record-subsection-header--with-action')).toBeTruthy();
+    expect(wrapper.find('[data-testid="customer-new-plan-save-planning-record"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-clear-planning-record-draft"]').exists()).toBe(true);
+    expect(
+      wrapper.get('[data-testid="customer-new-plan-existing-planning-records"]').element.closest('[data-testid="customer-new-plan-planning-record-card"]'),
+    ).toBe(
+      wrapper.get('[data-testid="customer-new-plan-planning-record-editor"]').element.closest('[data-testid="customer-new-plan-planning-record-card"]'),
+    );
+
+    expect(entrySelect.text()).toContain('Werk Nord');
+    expect(entrySelect.text()).not.toContain('Arena');
+    await modeSelect.setValue('event_venue');
+    await flushPromises();
+    expect(wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').text()).toContain('Arena');
+    expect(wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').text()).not.toContain('Werk Nord');
   });
 
   it('selects an existing site planning entry locally without committing wizard context', async () => {
@@ -976,7 +1031,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listPlanningSetupRecordsMock.mockClear();
     routerReplaceMock.mockClear();
 
-    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
     await flushPromises();
 
     expect(wrapper.emitted('saved-context')).toBeUndefined();
@@ -986,9 +1041,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(apiMocks.listOrderEquipmentLinesMock).toHaveBeenCalledTimes(0);
     expect(apiMocks.listOrderRequirementLinesMock).toHaveBeenCalledTimes(0);
     expect(apiMocks.listPlanningSetupRecordsMock).toHaveBeenCalledTimes(0);
-    expect(wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').classes()).toContain(
-      'sp-customer-plan-wizard-step__list-row--selected',
-    );
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').element as HTMLSelectElement).value).toBe('site-1');
     expect(wrapper.find('[data-testid="customer-new-plan-planning-record-details"]').exists()).toBe(true);
   });
 
@@ -1002,7 +1055,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     await wrapper.get('[data-testid="customer-new-plan-planning-context-family"]').setValue('event_venue');
     await flushPromises();
-    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('venue-1');
     await flushPromises();
     const setupState = (wrapper.vm as any).$?.setupState;
     expect(setupState.planningEntityId).toBe('venue-1');
@@ -1011,8 +1064,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     await wrapper.get('[data-testid="customer-new-plan-planning-context-family"]').setValue('trade_fair');
     await flushPromises();
+    expect(setupState.planningEntityId).toBe('');
     apiMocks.listTradeFairZonesMock.mockClear();
-    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('fair-1');
     await flushPromises();
     expect(setupState.planningEntityId).toBe('fair-1');
     expect(setupState.planningRecordDraft.planning_mode_code).toBe('trade_fair');
@@ -1022,7 +1076,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await wrapper.get('[data-testid="customer-new-plan-planning-context-family"]').setValue('patrol_route');
     await flushPromises();
     apiMocks.listTradeFairZonesMock.mockClear();
-    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('route-1');
     await flushPromises();
     expect(setupState.planningEntityId).toBe('route-1');
     expect(setupState.planningRecordDraft.planning_mode_code).toBe('patrol');
@@ -1040,7 +1094,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await flushPromises();
 
     apiMocks.listPlanningRecordsMock.mockClear();
-    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
     await flushPromises();
 
     expect(apiMocks.listPlanningRecordsMock).toHaveBeenCalledWith('tenant-1', 'token-1', {
@@ -1051,6 +1105,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     });
     expect(wrapper.find('[data-testid="customer-new-plan-existing-planning-records"]').exists()).toBe(true);
     expect(wrapper.findAll('[data-testid="customer-new-plan-existing-planning-record-row"]')).toHaveLength(1);
+    expect(wrapper.findAll('[data-testid="customer-new-plan-edit-planning-record"]')).toHaveLength(1);
   });
 
   it('loads an existing operational planning record locally without committing wizard context early', async () => {
@@ -1062,7 +1117,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     });
     await flushPromises();
 
-    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
     await flushPromises();
     routerReplaceMock.mockClear();
     apiMocks.getPlanningRecordMock.mockClear();
@@ -1070,12 +1125,182 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await wrapper.get('[data-testid="customer-new-plan-existing-planning-record-row"]').trigger('click');
     await flushPromises();
 
+    expect(apiMocks.getPlanningRecordMock).not.toHaveBeenCalled();
+
+    await wrapper.get('[data-testid="customer-new-plan-edit-planning-record"]').trigger('click');
+    await flushPromises();
+
     expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledWith('tenant-1', 'record-1', 'token-1');
     expect(wrapper.emitted('saved-context')).toBeUndefined();
     expect(routerReplaceMock).not.toHaveBeenCalled();
+    expect(wrapper.emitted('step-ui-state')?.some((event) => event[0] === 'planning-record-overview' && (event[1] as Record<string, unknown>).dirty === false && (event[1] as Record<string, unknown>).error === '')).toBe(true);
     expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
       'Werk Nord Sommer',
     );
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').setValue('Werk Nord Sommer geandert');
+    await flushPromises();
+
+    expect(wrapper.emitted('step-ui-state')?.at(-1)?.[1]).toMatchObject({ dirty: true, error: '' });
+  });
+
+  it('fully replaces planning-record editor values when switching existing records', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([
+      buildPlanningRecord({
+        id: 'record-1',
+        name: 'Werk Nord Sommer',
+        notes: 'Sommernotiz',
+        site_detail: { site_id: 'site-1', watchbook_scope_note: 'Sommer-Wachbuch' },
+      }),
+      buildPlanningRecord({
+        id: 'record-2',
+        name: 'Werk Nord Herbst',
+        notes: null,
+        planning_from: '2026-09-01',
+        planning_to: '2026-09-10',
+        site_detail: { site_id: 'site-1', watchbook_scope_note: null },
+      }),
+    ]);
+    apiMocks.getPlanningRecordMock
+      .mockResolvedValueOnce(buildPlanningRecord({
+        id: 'record-1',
+        name: 'Werk Nord Sommer',
+        notes: 'Sommernotiz',
+        site_detail: { site_id: 'site-1', watchbook_scope_note: 'Sommer-Wachbuch' },
+      }))
+      .mockResolvedValueOnce(buildPlanningRecord({
+        id: 'record-2',
+        name: 'Werk Nord Herbst',
+        notes: null,
+        planning_from: '2026-09-01',
+        planning_to: '2026-09-10',
+        site_detail: { site_id: 'site-1', watchbook_scope_note: null },
+      }));
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+
+    const editActions = wrapper.findAll('[data-testid="customer-new-plan-edit-planning-record"]');
+    await editActions[0]!.trigger('click');
+    await flushPromises();
+
+    const setupState = (wrapper.vm as any).$?.setupState;
+    expect(setupState.planningRecordDraft.name).toBe('Werk Nord Sommer');
+    expect(setupState.planningRecordDraft.notes).toBe('Sommernotiz');
+    expect(setupState.planningRecordDraft.site_detail_watchbook_scope_note).toBe('Sommer-Wachbuch');
+
+    await editActions[1]!.trigger('click');
+    await flushPromises();
+
+    expect(setupState.planningRecordDraft.name).toBe('Werk Nord Herbst');
+    expect(setupState.planningRecordDraft.notes).toBe('');
+    expect(setupState.planningRecordDraft.site_detail_watchbook_scope_note).toBe('');
+    expect(setupState.planningRecordDirty).toBe(false);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').element as HTMLSelectElement).value).toBe('site-1');
+  });
+
+  it('clears selected planning-record editor values when the planning context changes', async () => {
+    apiMocks.listPlanningSetupRecordsMock.mockImplementation((entityKey: string) => {
+      const map: Record<string, unknown[]> = {
+        event_venue: [{ id: 'venue-1', customer_id: 'customer-1', venue_no: 'VEN-1', name: 'Arena', tenant_id: 'tenant-1', status: 'active', version_no: 1 }],
+        patrol_route: [{ id: 'route-1', customer_id: 'customer-1', route_no: 'ROU-1', name: 'Innenstadt', tenant_id: 'tenant-1', status: 'active', version_no: 1 }],
+        site: [
+          { id: 'site-1', customer_id: 'customer-1', site_no: 'SITE-1', name: 'Werk Nord', tenant_id: 'tenant-1', status: 'active', version_no: 1 },
+          { id: 'site-2', customer_id: 'customer-1', site_no: 'SITE-2', name: 'Werk Süd', tenant_id: 'tenant-1', status: 'active', version_no: 1 },
+        ],
+        trade_fair: [{ id: 'fair-1', customer_id: 'customer-1', fair_no: 'FAIR-1', name: 'Expo', tenant_id: 'tenant-1', status: 'active', version_no: 1 }],
+      };
+      return Promise.resolve(map[entityKey] ?? []);
+    });
+    apiMocks.listPlanningRecordsMock.mockImplementation((_tenantId, _token, params) =>
+      Promise.resolve(
+        params?.planning_entity_id === 'site-2'
+          ? []
+          : [
+              buildPlanningRecord({
+                id: 'record-1',
+                name: 'Werk Nord Sommer',
+                notes: 'Sommernotiz',
+                site_detail: { site_id: 'site-1', watchbook_scope_note: 'Sommer-Wachbuch' },
+              }),
+            ],
+      ),
+    );
+    apiMocks.getPlanningRecordMock.mockResolvedValue(buildPlanningRecord({
+      id: 'record-1',
+      name: 'Werk Nord Sommer',
+      notes: 'Sommernotiz',
+      site_detail: { site_id: 'site-1', watchbook_scope_note: 'Sommer-Wachbuch' },
+    }));
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-edit-planning-record"]').trigger('click');
+    await flushPromises();
+
+    const setupState = (wrapper.vm as any).$?.setupState;
+    expect(setupState.selectedPlanningRecord.id).toBe('record-1');
+    expect(setupState.planningRecordDraft.name).toBe('Werk Nord Sommer');
+    expect(setupState.planningRecordDraft.notes).toBe('Sommernotiz');
+    expect(setupState.planningRecordDraft.site_detail_watchbook_scope_note).toBe('Sommer-Wachbuch');
+
+    apiMocks.listPlanningRecordsMock.mockClear();
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-2');
+    await flushPromises();
+
+    expect(apiMocks.listPlanningRecordsMock).toHaveBeenCalledWith('tenant-1', 'token-1', {
+      order_id: 'order-1',
+      planning_entity_id: 'site-2',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+    });
+    expect(setupState.selectedPlanningRecord).toBeNull();
+    expect(setupState.planningEntityId).toBe('site-2');
+    expect(setupState.planningRecordDraft.name).toBe('');
+    expect(setupState.planningRecordDraft.notes).toBe('');
+    expect(setupState.planningRecordDraft.site_detail_watchbook_scope_note).toBe('');
+    expect(setupState.planningRecordDraft.planning_from).toBe('2026-06-01');
+    expect(setupState.planningRecordDraft.planning_to).toBe('2026-06-10');
+    expect(setupState.planningRecordDirty).toBe(false);
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toMatchObject({
+      planning_entity_id: 'site-2',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: '',
+    });
+    expect(wrapper.emitted('step-completion')?.at(-1)).toEqual(['planning-record-overview', false]);
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-edit-planning-record"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-family"]').setValue('event_venue');
+    await flushPromises();
+
+    expect(setupState.selectedPlanningRecord).toBeNull();
+    expect(setupState.planningFamily).toBe('event_venue');
+    expect(setupState.planningEntityId).toBe('');
+    expect(setupState.planningRecordDraft.name).toBe('');
+    expect(setupState.planningRecordDraft.notes).toBe('');
+    expect(setupState.planningRecordDraft.site_detail_watchbook_scope_note).toBe('');
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toMatchObject({
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+      planning_record_id: '',
+    });
   });
 
   it('auto-selects the single saved planning record when there is no contentful unsaved draft', async () => {
@@ -1193,7 +1418,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     });
     await flushPromises();
 
-    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
     await flushPromises();
 
     expect(wrapper.findAll('[data-testid="customer-new-plan-existing-planning-record-row"]')).toHaveLength(2);
@@ -1211,8 +1436,10 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     });
     await flushPromises();
 
-    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
     await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-clear-planning-record-draft"]').exists()).toBe(true);
 
     await wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').setValue('Werk Nord Sommer');
     await wrapper.get('[data-testid="customer-new-plan-planning-record-from"]').setValue('2026-06-01');
@@ -1220,9 +1447,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     apiMocks.createPlanningRecordMock.mockResolvedValue(buildPlanningRecord());
 
-    const created = await (wrapper.vm as any).submitCurrentStep();
+    await wrapper.get('[data-testid="customer-new-plan-save-planning-record"]').trigger('click');
+    await flushPromises();
 
-    expect(created).toBe(true);
     expect(apiMocks.createPlanningRecordMock).toHaveBeenCalledWith(
       'tenant-1',
       'token-1',
@@ -1241,6 +1468,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       planning_mode_code: 'site',
       planning_record_id: 'record-1',
     });
+    expect(await (wrapper.vm as any).submitCurrentStep()).toBe(true);
     expect(apiMocks.listPlanningRecordsMock).toHaveBeenCalledWith('tenant-1', 'token-1', {
       order_id: 'order-1',
       planning_entity_id: 'site-1',
@@ -1262,9 +1490,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').setValue('Werk Nord Herbst');
     apiMocks.updatePlanningRecordMock.mockResolvedValue(buildPlanningRecord({ name: 'Werk Nord Herbst', version_no: 2 }));
 
-    const updated = await (wrapper.vm as any).submitCurrentStep();
+    await wrapper.get('[data-testid="customer-new-plan-save-planning-record"]').trigger('click');
+    await flushPromises();
 
-    expect(updated).toBe(true);
     expect(apiMocks.updatePlanningRecordMock).toHaveBeenCalledWith(
       'tenant-1',
       'record-1',
@@ -1277,6 +1505,96 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
         },
       }),
     );
+    expect(wrapper.emitted('step-ui-state')?.some((event) => event[0] === 'planning-record-overview' && (event[1] as Record<string, unknown>).dirty === false && (event[1] as Record<string, unknown>).error === '')).toBe(true);
+    expect(await (wrapper.vm as any).submitCurrentStep()).toBe(true);
+  });
+
+  it('clears planning-record editor drafts without saving or changing the planning context', async () => {
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').setValue('Werk Nord Sommer');
+    await wrapper.get('[data-testid="customer-new-plan-planning-record-from"]').setValue('2026-06-01');
+    await wrapper.get('[data-testid="customer-new-plan-planning-record-to"]').setValue('2026-06-10');
+
+    await wrapper.get('[data-testid="customer-new-plan-clear-planning-record-draft"]').trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.createPlanningRecordMock).not.toHaveBeenCalled();
+    expect(apiMocks.updatePlanningRecordMock).not.toHaveBeenCalled();
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').element as HTMLSelectElement).value).toBe('site-1');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe('');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-from"]').element as HTMLInputElement).value).toBe('');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-to"]').element as HTMLInputElement).value).toBe('');
+    expect(wrapper.emitted('step-completion')?.at(-1)).toEqual(['planning-record-overview', false]);
+    expect(wrapper.emitted('step-ui-state')?.at(-1)?.[1]).toMatchObject({ dirty: false, error: '' });
+  });
+
+  it('reverts an edited existing planning record when the editor is cleared', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([buildPlanningRecord()]);
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-edit-planning-record"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').setValue('Werk Nord Herbst');
+    await flushPromises();
+
+    expect(wrapper.emitted('step-ui-state')?.at(-1)?.[1]).toMatchObject({ dirty: true, error: '' });
+
+    await wrapper.get('[data-testid="customer-new-plan-clear-planning-record-draft"]').trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.updatePlanningRecordMock).not.toHaveBeenCalled();
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord Sommer',
+    );
+    expect(wrapper.emitted('step-completion')?.at(-1)).toEqual(['planning-record-overview', true]);
+    expect(wrapper.emitted('step-ui-state')?.at(-1)?.[1]).toMatchObject({ dirty: false, error: '' });
+    expect(await (wrapper.vm as any).submitCurrentStep()).toBe(true);
+  });
+
+  it('blocks Next from silently saving an unsaved planning record draft', async () => {
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').setValue('Werk Nord Sommer');
+    await wrapper.get('[data-testid="customer-new-plan-planning-record-from"]').setValue('2026-06-01');
+    await wrapper.get('[data-testid="customer-new-plan-planning-record-to"]').setValue('2026-06-10');
+
+    const continued = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(continued).toBe(false);
+    expect(apiMocks.createPlanningRecordMock).not.toHaveBeenCalled();
+    expect(apiMocks.updatePlanningRecordMock).not.toHaveBeenCalled();
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.savePlanningRecordBeforeContinue',
+    }));
+
+    apiMocks.createPlanningRecordMock.mockResolvedValue(buildPlanningRecord());
+    await wrapper.get('[data-testid="customer-new-plan-save-planning-record"]').trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.createPlanningRecordMock).toHaveBeenCalledTimes(1);
+    expect(await (wrapper.vm as any).submitCurrentStep()).toBe(true);
   });
 
   it('keeps wizard planning-record filters aligned with planning-orders admin expectations', () => {
@@ -1299,10 +1617,21 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await flushPromises();
 
     const setupState = (wrapper.vm as any).$?.setupState;
-    await wrapper.get('[data-testid="customer-new-plan-planning-context-create-new"]').setValue(true);
+    apiMocks.listPlanningSetupRecordsMock.mockImplementation((entityKey: string) => {
+      const map: Record<string, unknown[]> = {
+        site: [
+          { id: 'site-1', customer_id: 'customer-1', site_no: 'SITE-1', name: 'Werk Nord', tenant_id: 'tenant-1', status: 'active', version_no: 1 },
+          { id: 'site-created-1', customer_id: 'customer-1', site_no: 'SITE-NEW', name: 'Neuer Standort', tenant_id: 'tenant-1', status: 'active', version_no: 1 },
+        ],
+      };
+      return Promise.resolve(map[entityKey] ?? []);
+    });
+    await wrapper.get('[data-testid="customer-new-plan-planning-record-create-entry"]').trigger('click');
     await flushPromises();
-    setupState.openPlanningCreateModal();
-    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-create-site-no"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-create-name"]').exists()).toBe(true);
+
     await wrapper.get('[data-testid="customer-new-plan-planning-create-site-no"]').setValue('SITE-NEW');
     await wrapper.get('[data-testid="customer-new-plan-planning-create-name"]').setValue('Neuer Standort');
     await wrapper.get('[data-testid="modal-ok"]').trigger('click');
@@ -1311,6 +1640,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(apiMocks.createPlanningSetupRecordMock).toHaveBeenCalledTimes(1);
     expect(setupState.planningEntityId).toBe('site-created-1');
     expect(setupState.planningSelectionMode).toBe('use_existing');
+    const entrySelect = wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]');
+    expect(entrySelect.text()).toContain('Neuer Standort');
+    expect((entrySelect.element as HTMLSelectElement).value).toBe('site-created-1');
     expect(wrapper.emitted('saved-context')).toBeUndefined();
   });
 
@@ -1325,7 +1657,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
     expect(saved).toBe(false);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.selectOrCreatePlanningContextBeforeContinue');
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.selectOrCreatePlanningContextBeforeContinue',
+    }));
   });
 
   it('loads trade fair zones into a selector instead of a raw UUID field', async () => {
@@ -1396,7 +1730,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     await wrapper.get('[data-testid="customer-new-plan-planning-context-family"]').setValue('trade_fair');
     await flushPromises();
-    await wrapper.get('[data-testid="customer-new-plan-planning-context-row"]').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('fair-1');
     await flushPromises();
     await wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').setValue('Draft Planning Record');
     await wrapper.get('[data-testid="customer-new-plan-planning-record-from"]').setValue('2026-06-03');
@@ -1538,9 +1872,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     const blocked = await (partialWrapper.vm as any).submitCurrentStep();
 
     expect(blocked).toBe(false);
-    expect(partialWrapper.text()).toContain(
-      'sicherplan.customerPlansWizard.errors.completeCurrentPlanningDocumentDraftBeforeContinue',
-    );
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.completeCurrentPlanningDocumentDraftBeforeContinue',
+    }));
     expect(partialWrapper.find('[data-testid="customer-new-plan-clear-planning-document-draft"]').exists()).toBe(true);
 
     await partialWrapper.get('[data-testid="customer-new-plan-clear-planning-document-draft"]').trigger('click');
@@ -1734,7 +2068,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
     expect(saved).toBe(false);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.shiftPlanPlanningRecordWindowMismatch');
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.shiftPlanPlanningRecordWindowMismatch',
+    }));
     expect(apiMocks.createShiftPlanMock).not.toHaveBeenCalled();
   });
 
@@ -2745,7 +3081,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
     expect(saved).toBe(false);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.seriesShiftPlanWindowMismatch');
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.seriesShiftPlanWindowMismatch',
+    }));
     expect(apiMocks.createShiftSeriesMock).not.toHaveBeenCalled();
   });
 
@@ -2866,7 +3204,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     const setupState = (wrapper.vm as any).$?.setupState;
     let saved = await (wrapper.vm as any).submitCurrentStep();
     expect(saved).toBe(false);
-    expect(setupState.stepFeedback.message).toBe('sicherplan.customerPlansWizard.errors.seriesWeekdayMaskInvalid');
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.seriesWeekdayMaskInvalid',
+    }));
     expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.forms.weekdayMaskHelp');
 
     await wrapper.get('[data-testid="customer-new-plan-series-recurrence-code"]').setValue('daily');
@@ -2888,7 +3228,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     saved = await (wrapper.vm as any).submitCurrentStep();
     expect(saved).toBe(false);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.seriesExceptionOverrideTimesRequired');
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.seriesExceptionOverrideTimesRequired',
+    }));
 
     await wrapper.get('[data-testid="customer-new-plan-series-exception-override-start"]').setValue('08:30');
     await wrapper.get('[data-testid="customer-new-plan-series-exception-override-end"]').setValue('16:30');
@@ -3156,7 +3498,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
     expect(saved).toBe(false);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.seriesGenerationWindowInvalid');
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.seriesGenerationWindowInvalid',
+    }));
   });
 
   it('runs full submit in order and clears the series draft only after successful generation', async () => {
@@ -3281,7 +3625,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(saved).toBe(false);
     expect(routerPushMock).not.toHaveBeenCalled();
     expect(wrapper.find('[data-testid="customer-new-plan-step-panel-series-exceptions"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.seriesGenerateFailed');
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.seriesGenerateFailed',
+    }));
   });
 
   it('does not clear drafts and keeps entered fields visible when generation fails after series and exception save', async () => {
@@ -3371,7 +3717,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     expect(saved).toBe(false);
     expect(apiMocks.generateShiftSeriesMock).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.seriesExceptionDuplicateDate');
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.seriesExceptionDuplicateDate',
+    }));
   });
 
   it('treats weekday_mask 1111100 as monday-friday and a skip on 2026-07-03 reduces 23 weekday occurrences to 22', () => {

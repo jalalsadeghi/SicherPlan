@@ -14,6 +14,8 @@ const routeState = reactive({
 const routerPushMock = vi.fn();
 const routerReplaceMock = vi.fn();
 const scrollIntoViewMock = vi.fn();
+const confirmMock = vi.fn();
+const showFeedbackToastMock = vi.fn();
 const intersectionObserverInstances: Array<{
   callback: IntersectionObserverCallback;
   disconnect: ReturnType<typeof vi.fn>;
@@ -31,8 +33,11 @@ const authStoreState = reactive({
 });
 
 const stores = vi.hoisted(() => ({
-  attachmentsByOrder: {} as Record<string, Array<{ current_version_no: number; id: string; status: string; tenant_id: string; title: string }>>,
-  equipmentItems: [{ id: 'equipment-item-1', customer_id: 'customer-1', code: 'EQ-1', label: 'Funkgerät', tenant_id: 'tenant-1' }],
+  attachmentsByOrder: {} as Record<string, Array<{ current_version_no: number; id: string; relation_label?: string | null; source_label?: string | null; status: string; tenant_id: string; title: string }>>,
+  equipmentItems: [
+    { id: 'equipment-item-1', customer_id: 'customer-1', code: 'EQ-1', label: 'Funkgerät', tenant_id: 'tenant-1' },
+    { id: 'equipment-item-2', customer_id: 'customer-1', code: 'EQ-2', label: 'Taschenlampe', tenant_id: 'tenant-1' },
+  ],
   equipmentLinesByOrder: {} as Record<string, Array<{ id: string; equipment_item_id: string; required_qty: number; notes: string | null; order_id: string; tenant_id: string; status: string; version_no: number; archived_at: null }>>,
   eventVenues: [{ id: 'venue-1', customer_id: 'customer-1', venue_no: 'VEN-1', name: 'Arena', tenant_id: 'tenant-1' }],
   functionTypes: [{ id: 'function-1', code: 'SUP', label: 'Supervisor' }],
@@ -54,6 +59,8 @@ const apiMocks = vi.hoisted(() => ({
   createOrderEquipmentLineMock: vi.fn(),
   createOrderRequirementLineMock: vi.fn(),
   createPlanningSetupRecordMock: vi.fn(),
+  deleteOrderEquipmentLineMock: vi.fn(),
+  deleteOrderRequirementLineMock: vi.fn(),
   getCustomerMock: vi.fn(),
   getCustomerOrderMock: vi.fn(),
   linkOrderAttachmentMock: vi.fn(),
@@ -70,6 +77,7 @@ const apiMocks = vi.hoisted(() => ({
   updateCustomerOrderMock: vi.fn(),
   updateOrderEquipmentLineMock: vi.fn(),
   updateOrderRequirementLineMock: vi.fn(),
+  unlinkOrderAttachmentMock: vi.fn(),
 }));
 
 vi.mock('#/locales', () => ({
@@ -85,6 +93,12 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({
     push: routerPushMock,
     replace: routerReplaceMock,
+  }),
+}));
+
+vi.mock('#/sicherplan-legacy/composables/useSicherPlanFeedback', () => ({
+  useSicherPlanFeedback: () => ({
+    showFeedbackToast: showFeedbackToastMock,
   }),
 }));
 
@@ -143,6 +157,8 @@ vi.mock('#/sicherplan-legacy/api/planningOrders', () => ({
   createOrderAttachment: apiMocks.createOrderAttachmentMock,
   createOrderEquipmentLine: apiMocks.createOrderEquipmentLineMock,
   createOrderRequirementLine: apiMocks.createOrderRequirementLineMock,
+  deleteOrderEquipmentLine: apiMocks.deleteOrderEquipmentLineMock,
+  deleteOrderRequirementLine: apiMocks.deleteOrderRequirementLineMock,
   getCustomerOrder: apiMocks.getCustomerOrderMock,
   linkOrderAttachment: apiMocks.linkOrderAttachmentMock,
   listDocuments: apiMocks.listDocumentsMock,
@@ -154,6 +170,7 @@ vi.mock('#/sicherplan-legacy/api/planningOrders', () => ({
   updateCustomerOrder: apiMocks.updateCustomerOrderMock,
   updateOrderEquipmentLine: apiMocks.updateOrderEquipmentLineMock,
   updateOrderRequirementLine: apiMocks.updateOrderRequirementLineMock,
+  unlinkOrderAttachment: apiMocks.unlinkOrderAttachmentMock,
 }));
 
 vi.mock('#/sicherplan-legacy/api/employeeAdmin', () => ({
@@ -265,6 +282,10 @@ function nextTickFlush() {
   return flushPromises();
 }
 
+function expectFeedback(tone: 'error' | 'neutral' | 'success', message: string) {
+  expect(showFeedbackToastMock).toHaveBeenCalledWith(expect.objectContaining({ message, tone }));
+}
+
 const mountedWrappers: VueWrapper[] = [];
 
 function mountComponent() {
@@ -352,10 +373,33 @@ async function saveRequirementLine(
   await nextTickFlush();
 }
 
+function mountExistingOrderScope(overrides: Partial<typeof routeState.query> = {}) {
+  routeState.query = {
+    customer_id: 'customer-1',
+    order_id: 'order-1',
+    step: 'order-scope-documents',
+    ...overrides,
+  };
+  stores.orders['order-1'] = makeOrder('order-1');
+  return mountComponent();
+}
+
+function orderDocumentRows(wrapper: VueWrapper) {
+  return wrapper.findAll('[data-testid="customer-new-plan-order-document-list"] .sp-customer-plan-wizard-step__list-row');
+}
+
+function orderDocumentPrimaryTitle(wrapper: VueWrapper, index = 0) {
+  return orderDocumentRows(wrapper)[index]!.get('strong').text();
+}
+
 describe('CustomerNewPlanWizardView EPIC 3', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
+    vi.stubGlobal('confirm', confirmMock);
+    confirmMock.mockReset();
+    confirmMock.mockReturnValue(true);
     scrollIntoViewMock.mockReset();
+    showFeedbackToastMock.mockReset();
     intersectionObserverInstances.length = 0;
     Object.defineProperty(window.Element.prototype, 'scrollIntoView', {
       configurable: true,
@@ -406,7 +450,10 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     stores.patrolRoutes = [{ id: 'route-1', customer_id: 'customer-1', route_no: 'ROU-1', name: 'Innenstadt', tenant_id: 'tenant-1' }];
     stores.requirementTypes = [{ id: 'requirement-type-1', customer_id: 'customer-1', code: 'REQ-1', label: 'Objektschutz', tenant_id: 'tenant-1' }];
     stores.serviceCategories = [{ code: 'guarding', label: 'Bewachung' }];
-    stores.equipmentItems = [{ id: 'equipment-item-1', customer_id: 'customer-1', code: 'EQ-1', label: 'Funkgerät', tenant_id: 'tenant-1' }];
+    stores.equipmentItems = [
+      { id: 'equipment-item-1', customer_id: 'customer-1', code: 'EQ-1', label: 'Funkgerät', tenant_id: 'tenant-1' },
+      { id: 'equipment-item-2', customer_id: 'customer-1', code: 'EQ-2', label: 'Taschenlampe', tenant_id: 'tenant-1' },
+    ];
 
     apiMocks.getCustomerMock.mockReset();
     apiMocks.getCustomerMock.mockResolvedValue(buildCustomer());
@@ -525,6 +572,11 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
       stores.equipmentLinesByOrder[orderId] = (stores.equipmentLinesByOrder[orderId] ?? []).map((row) => row.id === rowId ? { ...row, ...payload, version_no: row.version_no + 1 } : row);
       return Promise.resolve(stores.equipmentLinesByOrder[orderId].find((row) => row.id === rowId));
     });
+    apiMocks.deleteOrderEquipmentLineMock.mockReset();
+    apiMocks.deleteOrderEquipmentLineMock.mockImplementation((_tenantId: string, orderId: string, rowId: string) => {
+      stores.equipmentLinesByOrder[orderId] = (stores.equipmentLinesByOrder[orderId] ?? []).filter((row) => row.id !== rowId);
+      return Promise.resolve();
+    });
 
     apiMocks.listOrderRequirementLinesMock.mockReset();
     apiMocks.listOrderRequirementLinesMock.mockImplementation((_tenantId: string, orderId: string) => Promise.resolve(stores.requirementLinesByOrder[orderId] ?? []));
@@ -539,6 +591,11 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
       stores.requirementLinesByOrder[orderId] = (stores.requirementLinesByOrder[orderId] ?? []).map((row) => row.id === rowId ? { ...row, ...payload, version_no: row.version_no + 1 } : row);
       return Promise.resolve(stores.requirementLinesByOrder[orderId].find((row) => row.id === rowId));
     });
+    apiMocks.deleteOrderRequirementLineMock.mockReset();
+    apiMocks.deleteOrderRequirementLineMock.mockImplementation((_tenantId: string, orderId: string, rowId: string) => {
+      stores.requirementLinesByOrder[orderId] = (stores.requirementLinesByOrder[orderId] ?? []).filter((row) => row.id !== rowId);
+      return Promise.resolve();
+    });
 
     apiMocks.listOrderAttachmentsMock.mockReset();
     apiMocks.listOrderAttachmentsMock.mockImplementation((_tenantId: string, orderId: string) => Promise.resolve(stores.attachmentsByOrder[orderId] ?? []));
@@ -548,7 +605,14 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     ]);
     apiMocks.linkOrderAttachmentMock.mockReset();
     apiMocks.linkOrderAttachmentMock.mockImplementation((_tenantId: string, orderId: string, _token: string, payload: any) => {
-      const doc = { id: payload.document_id, current_version_no: 1, status: 'active', tenant_id: 'tenant-1', title: payload.label || payload.document_id };
+      const doc = {
+        id: payload.document_id,
+        current_version_no: 1,
+        relation_label: payload.label || null,
+        status: 'active',
+        tenant_id: 'tenant-1',
+        title: '1663202370369.jpg',
+      };
       stores.attachmentsByOrder[orderId] = [...(stores.attachmentsByOrder[orderId] ?? []), doc];
       return Promise.resolve(doc);
     });
@@ -557,6 +621,11 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
       const doc = { id: 'uploaded-doc-1', current_version_no: 1, status: 'active', tenant_id: 'tenant-1', title: payload.title };
       stores.attachmentsByOrder[orderId] = [...(stores.attachmentsByOrder[orderId] ?? []), doc];
       return Promise.resolve(doc);
+    });
+    apiMocks.unlinkOrderAttachmentMock.mockReset();
+    apiMocks.unlinkOrderAttachmentMock.mockImplementation((_tenantId: string, orderId: string, documentId: string) => {
+      stores.attachmentsByOrder[orderId] = (stores.attachmentsByOrder[orderId] ?? []).filter((doc) => doc.id !== documentId);
+      return Promise.resolve();
     });
   });
 
@@ -614,7 +683,11 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(apiMocks.createOrderRequirementLineMock).toHaveBeenCalledTimes(1);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
 
-    await wrapper.get('[data-testid="customer-new-plan-order-document-link-id"]').setValue('document-1');
+    await wrapper.get('[data-testid="customer-new-plan-order-document-picker-open"]').trigger('click');
+    await nextTickFlush();
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-order-document-result-row"]').trigger('click');
+    await nextTickFlush();
     await wrapper.get('[data-testid="customer-new-plan-link-order-document"]').trigger('click');
     await nextTickFlush();
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
@@ -692,6 +765,11 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     const equipmentSection = wrapper.get('#customer-order-scope-section-equipment').element;
     const requirementsSection = wrapper.get('#customer-order-scope-section-requirements').element;
     const documentsSection = wrapper.get('#customer-order-scope-section-documents').element;
+    const sectionTops = { documents: 640, equipment: 129, requirements: 420 };
+    const mockRect = (top: number) => ({ bottom: top + 320, height: 320, left: 0, right: 0, top, width: 800, x: 0, y: top, toJSON: () => ({}) });
+    vi.spyOn(equipmentSection, 'getBoundingClientRect').mockImplementation(() => mockRect(sectionTops.equipment) as DOMRect);
+    vi.spyOn(requirementsSection, 'getBoundingClientRect').mockImplementation(() => mockRect(sectionTops.requirements) as DOMRect);
+    vi.spyOn(documentsSection, 'getBoundingClientRect').mockImplementation(() => mockRect(sectionTops.documents) as DOMRect);
 
     observer?.callback(
       [{ isIntersecting: true, intersectionRatio: 0.8, boundingClientRect: { top: 0 }, target: equipmentSection } as IntersectionObserverEntry],
@@ -700,6 +778,9 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
     expect(wrapper.get('[data-testid="customer-order-scope-nav-link-equipment"]').classes()).toContain('sp-customer-order-scope-nav__link--active');
 
+    sectionTops.equipment = -260;
+    sectionTops.requirements = 129;
+    sectionTops.documents = 420;
     observer?.callback(
       [{ isIntersecting: true, intersectionRatio: 0.85, boundingClientRect: { top: 0 }, target: requirementsSection } as IntersectionObserverEntry],
       observer as unknown as IntersectionObserver,
@@ -707,6 +788,9 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
     expect(wrapper.get('[data-testid="customer-order-scope-nav-link-requirements"]').classes()).toContain('sp-customer-order-scope-nav__link--active');
 
+    sectionTops.equipment = -620;
+    sectionTops.requirements = -260;
+    sectionTops.documents = 129;
     observer?.callback(
       [{ isIntersecting: true, intersectionRatio: 0.9, boundingClientRect: { top: 0 }, target: documentsSection } as IntersectionObserverEntry],
       observer as unknown as IntersectionObserver,
@@ -744,6 +828,43 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
   });
 
+  it('displays linked order documents with a custom relation label as the primary title', async () => {
+    stores.attachmentsByOrder['order-1'] = [
+      {
+        id: 'document-badge-photo',
+        current_version_no: 1,
+        relation_label: 'Employee badge photo',
+        status: 'active',
+        tenant_id: 'tenant-1',
+        title: '1663202370369.jpg',
+      },
+    ];
+
+    const wrapper = mountExistingOrderScope();
+    await nextTickFlush();
+
+    expect(orderDocumentPrimaryTitle(wrapper)).toBe('Employee badge photo');
+    expect(orderDocumentPrimaryTitle(wrapper)).not.toBe('1663202370369.jpg');
+  });
+
+  it('falls back to the document title when a linked order document has no custom relation label', async () => {
+    stores.attachmentsByOrder['order-1'] = [
+      {
+        id: 'document-badge-title',
+        current_version_no: 1,
+        relation_label: null,
+        status: 'active',
+        tenant_id: 'tenant-1',
+        title: 'WB-P2002-badge',
+      },
+    ];
+
+    const wrapper = mountExistingOrderScope();
+    await nextTickFlush();
+
+    expect(orderDocumentPrimaryTitle(wrapper)).toBe('WB-P2002-badge');
+  });
+
   it('attaches uploaded order documents inline, stays on the step, and allows continuing afterward', async () => {
     const wrapper = mountComponent();
     await nextTickFlush();
@@ -766,6 +887,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(stores.attachmentsByOrder['order-1']).toHaveLength(1);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
     expect(wrapper.get('[data-testid="customer-new-plan-order-document-list"]').text()).toContain('Sicherheitskonzept');
+    expect(orderDocumentPrimaryTitle(wrapper)).toBe('Sicherheitskonzept');
     expect((wrapper.get('[data-testid="customer-new-plan-order-document-upload-title"]').element as HTMLInputElement).value).toBe('');
 
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
@@ -799,20 +921,50 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
       'tenant-1',
       'order-1',
       'token-1',
-      expect.objectContaining({ document_id: 'document-42' }),
+      expect.objectContaining({ document_id: 'document-42', label: 'Bestehendes Dokument' }),
     );
     expect(apiMocks.createOrderAttachmentMock).toHaveBeenCalledTimes(0);
     expect(stores.attachmentsByOrder['order-1']).toHaveLength(1);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
     expect(wrapper.get('[data-testid="customer-new-plan-order-document-list"]').text()).toContain('Bestehendes Dokument');
+    expect(wrapper.get('[data-testid="customer-new-plan-order-document-list"]').text()).not.toContain('1663202370369.jpg');
+
+    await wrapper.get('[data-testid="customer-new-plan-unlink-order-document"]').trigger('click');
+    await nextTickFlush();
+    expect(apiMocks.unlinkOrderAttachmentMock).toHaveBeenCalledTimes(1);
+    expect(stores.attachmentsByOrder['order-1']).toHaveLength(0);
+    expectFeedback('success', 'sicherplan.customerPlansWizard.messages.orderDocumentUnlinked');
 
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
 
     expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(1);
     expect(apiMocks.createOrderAttachmentMock).toHaveBeenCalledTimes(0);
-    expect(stores.attachmentsByOrder['order-1']).toHaveLength(1);
+    expect(stores.attachmentsByOrder['order-1']).toHaveLength(0);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+  });
+
+  it('keeps linked document title and relation label as separate UI assumptions', async () => {
+    stores.attachmentsByOrder['order-1'] = [
+      {
+        id: 'document-title-and-label',
+        current_version_no: 3,
+        relation_label: 'Employee badge photo',
+        source_label: 'source file: 1663202370369.jpg',
+        status: 'active',
+        tenant_id: 'tenant-1',
+        title: '1663202370369.jpg',
+      },
+    ];
+
+    const wrapper = mountExistingOrderScope();
+    await nextTickFlush();
+
+    const row = orderDocumentRows(wrapper)[0]!;
+    expect(row.get('strong').text()).toBe('Employee badge photo');
+    expect(row.text()).toContain('source file: 1663202370369.jpg');
+    expect(row.text()).toContain('v3');
+    expect(row.text()).toContain('active');
   });
 
   it('blocks partial order-document drafts until cleared, then allows skipping', async () => {
@@ -827,7 +979,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(apiMocks.createOrderAttachmentMock).toHaveBeenCalledTimes(0);
     expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(0);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.completeCurrentOrderDocumentDraftBeforeContinue');
+    expectFeedback('error', 'sicherplan.customerPlansWizard.errors.completeCurrentOrderDocumentDraftBeforeContinue');
     expect(wrapper.find('[data-testid="customer-new-plan-clear-order-document-draft"]').exists()).toBe(true);
 
     await wrapper.get('[data-testid="customer-new-plan-clear-order-document-draft"]').trigger('click');
@@ -848,7 +1000,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
 
     expect(apiMocks.createOrderAttachmentMock).toHaveBeenCalledTimes(0);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.orderDocumentUploadIncomplete');
+    expectFeedback('error', 'sicherplan.customerPlansWizard.errors.orderDocumentUploadIncomplete');
 
     await wrapper.get('[data-testid="customer-new-plan-clear-order-document-draft"]').trigger('click');
     await nextTickFlush();
@@ -867,13 +1019,283 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
 
     expect(apiMocks.linkOrderAttachmentMock).toHaveBeenCalledTimes(0);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.completeCurrentOrderDocumentDraftBeforeContinue');
+    expectFeedback('error', 'sicherplan.customerPlansWizard.errors.completeCurrentOrderDocumentDraftBeforeContinue');
 
     await wrapper.get('[data-testid="customer-new-plan-clear-order-document-draft"]').trigger('click');
     await nextTickFlush();
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+  });
+
+  it('removes existing equipment rows, refreshes the list, and clears the selected edit draft', async () => {
+    stores.equipmentLinesByOrder['order-1'] = [
+      {
+        id: 'equipment-line-existing-1',
+        archived_at: null,
+        equipment_item_id: 'equipment-item-1',
+        notes: 'Selected row',
+        order_id: 'order-1',
+        required_qty: 2,
+        status: 'active',
+        tenant_id: 'tenant-1',
+        version_no: 1,
+      },
+      {
+        id: 'equipment-line-existing-2',
+        archived_at: null,
+        equipment_item_id: 'equipment-item-2',
+        notes: 'Other row',
+        order_id: 'order-1',
+        required_qty: 1,
+        status: 'active',
+        tenant_id: 'tenant-1',
+        version_no: 1,
+      },
+    ];
+
+    const wrapper = mountExistingOrderScope();
+    await nextTickFlush();
+
+    const removeActions = wrapper.findAll('[data-testid="customer-new-plan-delete-equipment-line"]');
+    expect(removeActions).toHaveLength(2);
+
+    await wrapper.findAll('[data-testid="customer-new-plan-equipment-line-select"]')[0]!.trigger('click');
+    await nextTickFlush();
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').element as HTMLTextAreaElement).value).toBe('Selected row');
+
+    await removeActions[0]!.trigger('click');
+    await nextTickFlush();
+
+    expect(confirmMock).toHaveBeenCalledWith('sicherplan.customerPlansWizard.confirmRemoveEquipmentLine');
+    expect(apiMocks.deleteOrderEquipmentLineMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'order-1',
+      'equipment-line-existing-1',
+      'token-1',
+    );
+    expect(apiMocks.listOrderEquipmentLinesMock).toHaveBeenCalledWith('tenant-1', 'order-1', 'token-1');
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-line-select"]').text()).toContain('Taschenlampe');
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-line-select"]').text()).not.toContain('Funkgerät');
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-item"]').element as HTMLSelectElement).value).toBe('');
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').element as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it('removes existing requirement rows, refreshes the list, and clears the selected edit draft', async () => {
+    stores.requirementLinesByOrder['order-1'] = [
+      {
+        id: 'requirement-line-existing-1',
+        archived_at: null,
+        function_type_id: 'function-1',
+        min_qty: 1,
+        notes: 'Selected requirement',
+        order_id: 'order-1',
+        qualification_type_id: 'qualification-1',
+        requirement_type_id: 'requirement-type-1',
+        status: 'active',
+        target_qty: 2,
+        tenant_id: 'tenant-1',
+        version_no: 1,
+      },
+      {
+        id: 'requirement-line-existing-2',
+        archived_at: null,
+        function_type_id: null,
+        min_qty: 0,
+        notes: 'Other requirement',
+        order_id: 'order-1',
+        qualification_type_id: null,
+        requirement_type_id: 'requirement-type-1',
+        status: 'active',
+        target_qty: 1,
+        tenant_id: 'tenant-1',
+        version_no: 1,
+      },
+    ];
+
+    const wrapper = mountExistingOrderScope();
+    await nextTickFlush();
+
+    const removeActions = wrapper.findAll('[data-testid="customer-new-plan-delete-requirement-line"]');
+    expect(removeActions).toHaveLength(2);
+
+    await wrapper.findAll('[data-testid="customer-new-plan-requirement-line-select"]')[0]!.trigger('click');
+    await nextTickFlush();
+    expect((wrapper.get('[data-testid="customer-new-plan-requirement-notes"]').element as HTMLTextAreaElement).value).toBe('Selected requirement');
+
+    await removeActions[0]!.trigger('click');
+    await nextTickFlush();
+
+    expect(confirmMock).toHaveBeenCalledWith('sicherplan.customerPlansWizard.confirmRemoveRequirementLine');
+    expect(apiMocks.deleteOrderRequirementLineMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'order-1',
+      'requirement-line-existing-1',
+      'token-1',
+    );
+    expect(apiMocks.listOrderRequirementLinesMock).toHaveBeenCalledWith('tenant-1', 'order-1', 'token-1');
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-line-select"]').text()).toContain('0 / 1');
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-line-select"]').text()).not.toContain('1 / 2');
+    expect((wrapper.get('[data-testid="customer-new-plan-requirement-type"]').element as HTMLSelectElement).value).toBe('');
+    expect((wrapper.get('[data-testid="customer-new-plan-requirement-notes"]').element as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it('unlinks existing order documents and refreshes the attachment list without deleting document metadata', async () => {
+    stores.attachmentsByOrder['order-1'] = [
+      { id: 'document-existing-1', current_version_no: 1, status: 'active', tenant_id: 'tenant-1', title: 'Wachbuch' },
+      { id: 'document-existing-2', current_version_no: 2, status: 'active', tenant_id: 'tenant-1', title: 'Sicherheitskonzept' },
+    ];
+
+    const wrapper = mountExistingOrderScope();
+    await nextTickFlush();
+
+    const removeActions = wrapper.findAll('[data-testid="customer-new-plan-unlink-order-document"]');
+    expect(removeActions).toHaveLength(2);
+    expect(removeActions[0]?.classes()).toContain('sp-customer-plan-wizard-step__list-action--compact');
+    const documentList = wrapper.get('[data-testid="customer-new-plan-order-document-list"]');
+    expect(documentList.classes()).toContain('sp-customer-plan-wizard-step__document-list');
+    expect(documentList.text()).toContain('Wachbuch');
+    expect(documentList.text()).toContain('v1');
+    expect(documentList.text()).toContain('active');
+    expect(documentList.text()).not.toContain('document-existing-1');
+    expect(wrapper.find('[data-testid="customer-new-plan-order-document-link-id"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('sicherplan.customerPlansWizard.forms.manualDocumentId');
+
+    await removeActions[0]!.trigger('click');
+    await nextTickFlush();
+
+    expect(confirmMock).toHaveBeenCalledWith('sicherplan.customerPlansWizard.confirmUnlinkOrderDocument');
+    expect(apiMocks.unlinkOrderAttachmentMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'order-1',
+      'document-existing-1',
+      'token-1',
+    );
+    expect(apiMocks.listOrderAttachmentsMock).toHaveBeenCalledWith('tenant-1', 'order-1', 'token-1');
+    expect(wrapper.get('[data-testid="customer-new-plan-order-document-list"]').text()).not.toContain('Wachbuch');
+    expect(wrapper.get('[data-testid="customer-new-plan-order-document-list"]').text()).toContain('Sicherheitskonzept');
+  });
+
+  it('places clear document draft next to link action and keeps cleanup spacing structure', async () => {
+    const wrapper = mountExistingOrderScope();
+    await nextTickFlush();
+
+    await wrapper.get('[data-testid="customer-new-plan-order-document-link-label"]').setValue('Draft label');
+    await nextTickFlush();
+
+    const linkButton = wrapper.get('[data-testid="customer-new-plan-link-order-document"]');
+    const clearButton = wrapper.get('[data-testid="customer-new-plan-clear-order-document-draft"]');
+    expect(linkButton.element.closest('.cta-row')).toBe(clearButton.element.closest('.cta-row'));
+    expect(clearButton.element.closest('.sp-customer-plan-wizard-step__documents-panel')).toBeTruthy();
+
+    const documentsCard = wrapper.get('[data-testid="customer-new-plan-order-scope-documents-card"]');
+    expect(documentsCard.findAll('.sp-customer-plan-wizard-step__document-subsection')).toHaveLength(2);
+    expect(documentsCard.find('.sp-customer-plan-wizard-step__document-divider').exists()).toBe(true);
+    expect(documentsCard.find('.sp-customer-plan-wizard-step__document-list').exists()).toBe(false);
+  });
+
+  it('renders scoped spacing wrappers for equipment and requirement saved-row areas', async () => {
+    stores.equipmentLinesByOrder['order-1'] = [
+      {
+        id: 'equipment-line-existing-1',
+        archived_at: null,
+        equipment_item_id: 'equipment-item-1',
+        notes: 'Equipment row',
+        order_id: 'order-1',
+        required_qty: 2,
+        status: 'active',
+        tenant_id: 'tenant-1',
+        version_no: 1,
+      },
+    ];
+    stores.requirementLinesByOrder['order-1'] = [
+      {
+        id: 'requirement-line-existing-1',
+        archived_at: null,
+        function_type_id: 'function-1',
+        min_qty: 1,
+        notes: 'Requirement row',
+        order_id: 'order-1',
+        qualification_type_id: 'qualification-1',
+        requirement_type_id: 'requirement-type-1',
+        status: 'active',
+        target_qty: 2,
+        tenant_id: 'tenant-1',
+        version_no: 1,
+      },
+    ];
+
+    const wrapper = mountExistingOrderScope();
+    await nextTickFlush();
+
+    const equipmentCard = wrapper.get('[data-testid="customer-new-plan-order-scope-equipment-card"]');
+    expect(equipmentCard.find('.sp-customer-plan-wizard-step__scope-subsection').exists()).toBe(true);
+    expect(equipmentCard.find('.sp-customer-plan-wizard-step__scope-saved-list').exists()).toBe(true);
+    expect(equipmentCard.find('.sp-customer-plan-wizard-step__scope-editor').exists()).toBe(true);
+
+    const requirementsCard = wrapper.get('[data-testid="customer-new-plan-order-scope-requirements-card"]');
+    expect(requirementsCard.find('.sp-customer-plan-wizard-step__scope-subsection').exists()).toBe(true);
+    expect(requirementsCard.find('.sp-customer-plan-wizard-step__scope-saved-list').exists()).toBe(true);
+    expect(requirementsCard.find('.sp-customer-plan-wizard-step__scope-editor').exists()).toBe(true);
+  });
+
+  it('keeps row edit/select behavior isolated from remove button clicks', async () => {
+    stores.equipmentLinesByOrder['order-1'] = [
+      {
+        id: 'equipment-line-existing-1',
+        archived_at: null,
+        equipment_item_id: 'equipment-item-1',
+        notes: 'Selectable equipment',
+        order_id: 'order-1',
+        required_qty: 2,
+        status: 'active',
+        tenant_id: 'tenant-1',
+        version_no: 1,
+      },
+    ];
+    stores.requirementLinesByOrder['order-1'] = [
+      {
+        id: 'requirement-line-existing-1',
+        archived_at: null,
+        function_type_id: 'function-1',
+        min_qty: 1,
+        notes: 'Selectable requirement',
+        order_id: 'order-1',
+        qualification_type_id: 'qualification-1',
+        requirement_type_id: 'requirement-type-1',
+        status: 'active',
+        target_qty: 2,
+        tenant_id: 'tenant-1',
+        version_no: 1,
+      },
+    ];
+
+    const wrapper = mountExistingOrderScope();
+    await nextTickFlush();
+
+    confirmMock.mockReturnValueOnce(false);
+    await wrapper.get('[data-testid="customer-new-plan-delete-equipment-line"]').trigger('click');
+    await nextTickFlush();
+    expect(apiMocks.deleteOrderEquipmentLineMock).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-editing"]').exists()).toBe(false);
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').element as HTMLTextAreaElement).value).toBe('');
+
+    await wrapper.get('[data-testid="customer-new-plan-equipment-line-select"]').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-editing"]').exists()).toBe(true);
+    expect((wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').element as HTMLTextAreaElement).value).toBe('Selectable equipment');
+
+    confirmMock.mockReturnValueOnce(false);
+    await wrapper.get('[data-testid="customer-new-plan-delete-requirement-line"]').trigger('click');
+    await nextTickFlush();
+    expect(apiMocks.deleteOrderRequirementLineMock).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-editing"]').exists()).toBe(false);
+    expect((wrapper.get('[data-testid="customer-new-plan-requirement-notes"]').element as HTMLTextAreaElement).value).toBe('');
+
+    await wrapper.get('[data-testid="customer-new-plan-requirement-line-select"]').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-editing"]').exists()).toBe(true);
+    expect((wrapper.get('[data-testid="customer-new-plan-requirement-notes"]').element as HTMLTextAreaElement).value).toBe('Selectable requirement');
   });
 
   it('saves and updates equipment lines inline, blocks next for unsaved drafts, and clears persisted draft state', async () => {
@@ -885,7 +1307,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
     expect(apiMocks.createOrderEquipmentLineMock).toHaveBeenCalledTimes(0);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.equipmentLineRequiredBeforeContinue');
+    expectFeedback('error', 'sicherplan.customerPlansWizard.errors.equipmentLineRequiredBeforeContinue');
 
     await wrapper.get('[data-testid="customer-new-plan-equipment-item"]').setValue('equipment-item-1');
     await wrapper.get('[data-testid="customer-new-plan-equipment-required-qty"]').setValue('3');
@@ -893,7 +1315,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.saveCurrentEquipmentLineBeforeContinue');
+    expectFeedback('error', 'sicherplan.customerPlansWizard.errors.saveCurrentEquipmentLineBeforeContinue');
     expect(apiMocks.createOrderEquipmentLineMock).toHaveBeenCalledTimes(0);
 
     const equipmentDraftKey = buildWizardDraftStorageKey(
@@ -909,26 +1331,46 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
     expect(apiMocks.createOrderEquipmentLineMock).toHaveBeenCalledTimes(1);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.messages.equipmentLineSaved');
+    expectFeedback('success', 'sicherplan.customerPlansWizard.messages.equipmentLineSaved');
     expect(window.sessionStorage.getItem(equipmentDraftKey)).toBeNull();
     expect(stores.equipmentLinesByOrder['order-1']).toHaveLength(1);
     expect((wrapper.get('[data-testid="customer-new-plan-equipment-item"]').element as HTMLSelectElement).value).toBe('');
     expect(wrapper.find('[data-testid="customer-new-plan-save-equipment-line"]').exists()).toBe(true);
+    const equipmentOptionsAfterSave = wrapper
+      .get('[data-testid="customer-new-plan-equipment-item"]')
+      .findAll('option')
+      .map((option) => option.attributes('value'));
+    expect(equipmentOptionsAfterSave).not.toContain('equipment-item-1');
+    expect(equipmentOptionsAfterSave).toContain('equipment-item-2');
 
-    await wrapper.get('.sp-customer-plan-wizard-step__list-row').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-equipment-line-select"]').trigger('click');
     await nextTickFlush();
     expect(wrapper.find('[data-testid="customer-new-plan-equipment-editing"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-new-plan-update-equipment-line"]').exists()).toBe(true);
+    const equipmentOptionsWhileEditing = wrapper
+      .get('[data-testid="customer-new-plan-equipment-item"]')
+      .findAll('option')
+      .map((option) => option.attributes('value'));
+    expect(equipmentOptionsWhileEditing).toContain('equipment-item-1');
 
     await wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').setValue('Updated radios');
     await wrapper.get('[data-testid="customer-new-plan-update-equipment-line"]').trigger('click');
     await nextTickFlush();
     expect(apiMocks.updateOrderEquipmentLineMock).toHaveBeenCalledTimes(1);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.messages.equipmentLineUpdated');
+    expectFeedback('success', 'sicherplan.customerPlansWizard.messages.equipmentLineUpdated');
     expect(stores.equipmentLinesByOrder['order-1']?.[0]?.notes).toBe('Updated radios');
     expect(wrapper.find('[data-testid="customer-new-plan-save-equipment-line"]').exists()).toBe(true);
 
-    await wrapper.get('[data-testid="customer-new-plan-equipment-item"]').setValue('equipment-item-1');
+    await wrapper.get('[data-testid="customer-new-plan-equipment-line-select"]').trigger('click');
+    await nextTickFlush();
+    await wrapper.get('[data-testid="customer-new-plan-delete-equipment-line"]').trigger('click');
+    await nextTickFlush();
+    expect(apiMocks.deleteOrderEquipmentLineMock).toHaveBeenCalledTimes(1);
+    expect(stores.equipmentLinesByOrder['order-1']).toHaveLength(0);
+    expectFeedback('success', 'sicherplan.customerPlansWizard.messages.equipmentLineDeleted');
+    expect(wrapper.find('[data-testid="customer-new-plan-save-equipment-line"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="customer-new-plan-equipment-item"]').setValue('equipment-item-2');
     await wrapper.get('[data-testid="customer-new-plan-equipment-notes"]').setValue('Discard me');
     await nextTickFlush();
     expect(window.sessionStorage.getItem(equipmentDraftKey)).toContain('Discard me');
@@ -941,7 +1383,25 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
     expect(apiMocks.createOrderEquipmentLineMock).toHaveBeenCalledTimes(1);
     expect(apiMocks.updateOrderEquipmentLineMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.deleteOrderEquipmentLineMock).toHaveBeenCalledTimes(1);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
+  });
+
+  it('shows equipment save failures as toast feedback without restoring the old top banner', async () => {
+    apiMocks.createOrderEquipmentLineMock.mockRejectedValueOnce(new Error('save failed'));
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToEquipmentLines(wrapper);
+
+    await wrapper.get('[data-testid="customer-new-plan-equipment-item"]').setValue('equipment-item-1');
+    await wrapper.get('[data-testid="customer-new-plan-equipment-required-qty"]').setValue('3');
+    await wrapper.get('[data-testid="customer-new-plan-save-equipment-line"]').trigger('click');
+    await nextTickFlush();
+
+    expectFeedback('error', 'sicherplan.customerPlansWizard.errors.equipmentLineSaveFailed');
+    expect(wrapper.text()).not.toContain('sicherplan.customerPlansWizard.errors.equipmentLineSaveFailed');
+    expect(wrapper.find('[data-testid="customer-new-plan-draft-restored"]').exists()).toBe(false);
+    expect(apiMocks.createOrderEquipmentLineMock).toHaveBeenCalledTimes(1);
   });
 
   it('saves and updates requirement lines inline, blocks next for unsaved drafts, and clears persisted draft state', async () => {
@@ -953,7 +1413,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
     expect(apiMocks.createOrderRequirementLineMock).toHaveBeenCalledTimes(0);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.requirementLineRequiredBeforeContinue');
+    expectFeedback('error', 'sicherplan.customerPlansWizard.errors.requirementLineRequiredBeforeContinue');
 
     await wrapper.get('[data-testid="customer-new-plan-requirement-type"]').setValue('requirement-type-1');
     await wrapper.get('[data-testid="customer-new-plan-requirement-function-type"]').setValue('function-1');
@@ -964,11 +1424,17 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.saveCurrentRequirementLineBeforeContinue');
+    expectFeedback('error', 'sicherplan.customerPlansWizard.errors.saveCurrentRequirementLineBeforeContinue');
     expect(apiMocks.createOrderRequirementLineMock).toHaveBeenCalledTimes(0);
     expect(wrapper.find('[data-testid="customer-new-plan-order-scope-equipment-card"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-new-plan-order-scope-requirements-card"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-new-plan-order-scope-documents-card"]').exists()).toBe(true);
+    const documentsCard = wrapper.get('[data-testid="customer-new-plan-order-scope-documents-card"]');
+    expect(documentsCard.findAll('.sp-customer-plan-wizard-step__document-subsection')).toHaveLength(2);
+    expect(documentsCard.find('.sp-customer-plan-wizard-step__document-divider').exists()).toBe(true);
+    expect(documentsCard.find('[data-testid="customer-new-plan-order-document-upload-title"]').exists()).toBe(true);
+    expect(documentsCard.find('[data-testid="customer-new-plan-order-document-link-id"]').exists()).toBe(false);
+    expect(documentsCard.find('.sp-customer-plan-wizard-step__panel').exists()).toBe(false);
 
     const requirementDraftKey = buildWizardDraftStorageKey(
       {
@@ -983,21 +1449,33 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
     expect(apiMocks.createOrderRequirementLineMock).toHaveBeenCalledTimes(1);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.messages.requirementLineSaved');
+    expectFeedback('success', 'sicherplan.customerPlansWizard.messages.requirementLineSaved');
     expect(window.sessionStorage.getItem(requirementDraftKey)).toBeNull();
     expect(stores.requirementLinesByOrder['order-1']).toHaveLength(1);
     expect((wrapper.get('[data-testid="customer-new-plan-requirement-type"]').element as HTMLSelectElement).value).toBe('');
 
-    await wrapper.findAll('.sp-customer-plan-wizard-step__list-row')[1]!.trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-type"]').setValue('requirement-type-1');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-function-type"]').setValue('function-1');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-qualification-type"]').setValue('qualification-1');
+    await nextTickFlush();
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-duplicate"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="customer-new-plan-save-requirement-line"]').attributes('disabled')).toBeDefined();
+    await wrapper.get('[data-testid="customer-new-plan-save-requirement-line"]').trigger('click');
+    await nextTickFlush();
+    expect(apiMocks.createOrderRequirementLineMock).toHaveBeenCalledTimes(1);
+
+    await wrapper.get('[data-testid="customer-new-plan-requirement-line-select"]').trigger('click');
     await nextTickFlush();
     expect(wrapper.find('[data-testid="customer-new-plan-requirement-editing"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-new-plan-update-requirement-line"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-duplicate"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-update-requirement-line"]').attributes('disabled')).toBeUndefined();
 
     await wrapper.get('[data-testid="customer-new-plan-requirement-notes"]').setValue('Updated requirement');
     await wrapper.get('[data-testid="customer-new-plan-update-requirement-line"]').trigger('click');
     await nextTickFlush();
     expect(apiMocks.updateOrderRequirementLineMock).toHaveBeenCalledTimes(1);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.messages.requirementLineUpdated');
+    expectFeedback('success', 'sicherplan.customerPlansWizard.messages.requirementLineUpdated');
     expect(stores.requirementLinesByOrder['order-1']?.[0]?.notes).toBe('Updated requirement');
 
     await wrapper.get('[data-testid="customer-new-plan-requirement-type"]').setValue('requirement-type-1');
@@ -1014,6 +1492,33 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(apiMocks.createOrderRequirementLineMock).toHaveBeenCalledTimes(1);
     expect(apiMocks.updateOrderRequirementLineMock).toHaveBeenCalledTimes(1);
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+  });
+
+  it('removes selected requirement lines inline and blocks continuing until a requirement line exists again', async () => {
+    const wrapper = mountComponent();
+    await nextTickFlush();
+    await advanceToRequirementLines(wrapper);
+
+    await wrapper.get('[data-testid="customer-new-plan-requirement-type"]').setValue('requirement-type-1');
+    await wrapper.get('[data-testid="customer-new-plan-requirement-target-qty"]').setValue('2');
+    await wrapper.get('[data-testid="customer-new-plan-save-requirement-line"]').trigger('click');
+    await nextTickFlush();
+    expect(stores.requirementLinesByOrder['order-1']).toHaveLength(1);
+
+    await wrapper.get('[data-testid="customer-new-plan-requirement-line-select"]').trigger('click');
+    await nextTickFlush();
+    await wrapper.get('[data-testid="customer-new-plan-delete-requirement-line"]').trigger('click');
+    await nextTickFlush();
+
+    expect(apiMocks.deleteOrderRequirementLineMock).toHaveBeenCalledTimes(1);
+    expect(stores.requirementLinesByOrder['order-1']).toHaveLength(0);
+    expectFeedback('success', 'sicherplan.customerPlansWizard.messages.requirementLineDeleted');
+    expect(wrapper.find('[data-testid="customer-new-plan-save-requirement-line"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
+    await nextTickFlush();
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-scope-documents');
+    expectFeedback('error', 'sicherplan.customerPlansWizard.errors.requirementLineRequiredBeforeContinue');
   });
 
   it('selects an existing order on row click without opening the edit form or leaving order-details', async () => {
@@ -1125,7 +1630,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     expect(apiMocks.updateCustomerOrderMock.mock.calls[0]?.[1]).toBe('order-existing-1');
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
     expect(wrapper.find('[data-testid="customer-new-plan-existing-order-edit-form"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.messages.existingOrderUpdated');
+    expectFeedback('success', 'sicherplan.customerPlansWizard.messages.existingOrderUpdated');
     expect(wrapper.get('[data-testid="customer-new-plan-existing-order-list"]').text()).toContain('Existing title updated');
     expect(stores.orders['order-existing-1']?.title).toBe('Existing title updated');
   });
@@ -1192,7 +1697,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
     expect(apiMocks.updateCustomerOrderMock).toHaveBeenCalledTimes(0);
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.completeCurrentOrderEditBeforeContinue');
+    expectFeedback('error', 'sicherplan.customerPlansWizard.errors.completeCurrentOrderEditBeforeContinue');
 
     await wrapper.get('[data-testid="customer-new-plan-existing-order-cancel-edit"]').trigger('click');
     await nextTickFlush();
@@ -1215,7 +1720,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await nextTickFlush();
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.orderSelectionRequired');
+    expectFeedback('error', 'sicherplan.customerPlansWizard.errors.orderSelectionRequired');
     expect(apiMocks.createCustomerOrderMock).toHaveBeenCalledTimes(0);
 
     wrapper.unmount();
@@ -2169,7 +2674,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
 
     expect(apiMocks.createCustomerAvailableAddressMock).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.errors.addressCreateValidation');
+    expectFeedback('error', 'sicherplan.customerPlansWizard.errors.addressCreateValidation');
     expect(wrapper.find('[data-testid="customer-new-plan-planning-address-dialog"]').exists()).toBe(true);
 
     await wrapper.get('[data-testid="customer-new-plan-planning-address-street-line-1"]').setValue('Should be discarded');
