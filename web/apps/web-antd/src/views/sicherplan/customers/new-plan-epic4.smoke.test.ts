@@ -1108,7 +1108,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(wrapper.findAll('[data-testid="customer-new-plan-edit-planning-record"]')).toHaveLength(1);
   });
 
-  it('loads an existing operational planning record locally without committing wizard context early', async () => {
+  it('selects an existing operational planning record for the wizard when the row is clicked', async () => {
     apiMocks.listPlanningRecordsMock.mockResolvedValue([buildPlanningRecord()]);
     const wrapper = mountStep('planning-record-overview', {
       planning_entity_id: '',
@@ -1121,19 +1121,111 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await flushPromises();
     routerReplaceMock.mockClear();
     apiMocks.getPlanningRecordMock.mockClear();
+    apiMocks.listPlanningSetupRecordsMock.mockResolvedValue([]);
 
     await wrapper.get('[data-testid="customer-new-plan-existing-planning-record-row"]').trigger('click');
     await flushPromises();
 
-    expect(apiMocks.getPlanningRecordMock).not.toHaveBeenCalled();
+    expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledWith('tenant-1', 'record-1', 'token-1');
+    expect(wrapper.findAll('[data-testid="customer-new-plan-existing-planning-record-row"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-existing-planning-record-row"]').classes()).toContain(
+      'sp-customer-plan-wizard-step__list-row--selected',
+    );
+    expect(wrapper.get('[data-testid="customer-new-plan-selected-planning-record-summary"]').text()).toContain(
+      'Werk Nord Sommer',
+    );
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+    });
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-context-family"]').element as HTMLSelectElement).value).toBe('site');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').element as HTMLSelectElement).value).toBe('site-1');
+    expect(wrapper.text()).not.toContain('sicherplan.customerPlansWizard.forms.noPlanningEntriesFoundForCustomer');
+    expect(await (wrapper.vm as any).submitCurrentStep()).toBe(true);
 
     await wrapper.get('[data-testid="customer-new-plan-edit-planning-record"]').trigger('click');
     await flushPromises();
 
     expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledWith('tenant-1', 'record-1', 'token-1');
-    expect(wrapper.emitted('saved-context')).toBeUndefined();
     expect(routerReplaceMock).not.toHaveBeenCalled();
     expect(wrapper.emitted('step-ui-state')?.some((event) => event[0] === 'planning-record-overview' && (event[1] as Record<string, unknown>).dirty === false && (event[1] as Record<string, unknown>).error === '')).toBe(true);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord Sommer',
+    );
+  });
+
+  it.each([
+    {
+      family: 'event_venue',
+      mode: 'event',
+      record: buildPlanningRecord({
+        event_detail: { event_venue_id: 'venue-1', setup_note: null },
+        planning_mode_code: 'event',
+        site_detail: null,
+      }),
+      value: 'venue-1',
+    },
+    {
+      family: 'trade_fair',
+      mode: 'trade_fair',
+      record: buildPlanningRecord({
+        planning_mode_code: 'trade_fair',
+        site_detail: null,
+        trade_fair_detail: { trade_fair_id: 'fair-1', trade_fair_zone_id: null, stand_note: null },
+      }),
+      value: 'fair-1',
+    },
+    {
+      family: 'patrol_route',
+      mode: 'patrol',
+      record: buildPlanningRecord({
+        patrol_detail: { patrol_route_id: 'route-1', execution_note: null },
+        planning_mode_code: 'patrol',
+        site_detail: null,
+      }),
+      value: 'route-1',
+    },
+  ])('hydrates the planning entry from an existing $family planning record', async ({ family, mode, record, value }) => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([record]);
+    apiMocks.getPlanningRecordMock.mockResolvedValue(record);
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-family"]').setValue(family);
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue(value);
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-existing-planning-record-row"]').trigger('click');
+    await flushPromises();
+
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-context-family"]').element as HTMLSelectElement).value).toBe(family);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').element as HTMLSelectElement).value).toBe(value);
+    expect((wrapper.vm as any).$?.setupState.planningRecordDraft.planning_mode_code).toBe(mode);
+    expect(wrapper.findAll('[data-testid="customer-new-plan-existing-planning-record-row"]')).toHaveLength(1);
+    expect(wrapper.text()).not.toContain('sicherplan.customerPlansWizard.forms.noPlanningEntriesFoundForCustomer');
+  });
+
+  it('opens explicit edit mode and blocks Next when the edit is dirty', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([buildPlanningRecord()]);
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-edit-planning-record"]').trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledWith('tenant-1', 'record-1', 'token-1');
     expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
       'Werk Nord Sommer',
     );
@@ -1142,6 +1234,48 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await flushPromises();
 
     expect(wrapper.emitted('step-ui-state')?.at(-1)?.[1]).toMatchObject({ dirty: true, error: '' });
+    expect(await (wrapper.vm as any).submitCurrentStep()).toBe(false);
+    expect(apiMocks.createPlanningRecordMock).not.toHaveBeenCalled();
+    expect(apiMocks.updatePlanningRecordMock).not.toHaveBeenCalled();
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.saveOrCancelPlanningRecordEditBeforeContinue',
+    }));
+  });
+
+  it('blocks Next when a clean selected planning record conflicts with wizard context', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([buildPlanningRecord()]);
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+      planning_record_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-edit-planning-record"]').trigger('click');
+    await flushPromises();
+    await wrapper.setProps({
+      wizardState: {
+        ...baseWizardState(),
+        order_id: 'order-1',
+        planning_entity_id: 'site-1',
+        planning_entity_type: 'site',
+        planning_mode_code: 'site',
+        planning_record_id: 'other-record',
+      },
+    });
+    await flushPromises();
+
+    expect((wrapper.vm as any).$?.setupState.selectedPlanningRecord.id).toBe('record-1');
+    expect((wrapper.vm as any).$?.setupState.planningRecordDirty).toBe(false);
+    expect(await (wrapper.vm as any).submitCurrentStep()).toBe(false);
+    expect(apiMocks.createPlanningRecordMock).not.toHaveBeenCalled();
+    expect(apiMocks.updatePlanningRecordMock).not.toHaveBeenCalled();
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.savePlanningRecordBeforeContinue',
+    }));
   });
 
   it('fully replaces planning-record editor values when switching existing records', async () => {

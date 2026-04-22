@@ -1,69 +1,84 @@
 You are working in the SicherPlan repository.
 
-This is a focused follow-up requirement for the Planning record step refactor in:
+This task follows the fix for existing Planning Record hydration in:
+- /admin/customers/order-workspace
+- step=planning-record-overview
 
-/admin/customers/order-workspace
-step=planning-record-overview
+Goal:
+Run a focused QA/hardening pass.
 
-Important clarification:
-The button "Create new planning entry" must be positioned specifically at the TOP-RIGHT of the "Planning record details" box/subsection.
+Do not add unrelated features.
+Do not change unrelated wizard/order-workspace steps.
+Do not change backend APIs unless a direct regression requires it.
 
-It must NOT be:
-- at the top-right of the whole step
-- inside the Existing planning records subsection
-- floating above both subsections
-- placed below the editor fields
+Validate:
 
-Correct placement:
-Inside the header row of the "Planning record details" subsection:
-- subsection title on the left
-- "Create new planning entry" button on the right
+1. Existing record selection
+- Clicking an existing planning record row keeps the row visible.
+- Row remains highlighted/selected.
+- Editor values hydrate correctly.
+- Planning Entry select is not blank.
 
-Expected subsection structure:
-<div class="sp-customer-plan-wizard-step__subsection">
-  <div class="sp-customer-plan-wizard-step__subsection-header sp-customer-plan-wizard-step__subsection-header--with-action">
-    <div class="sp-customer-plan-wizard-step__subsection-title">
-      <strong>Planning record details</strong>
-      <p class="field-help">...</p>
-    </div>
+2. Planning context mapping
+Confirm mapping:
+- site -> site_detail.site_id
+- event -> event_detail.event_venue_id
+- trade_fair -> trade_fair_detail.trade_fair_id
+- patrol -> patrol_detail.patrol_route_id
 
-    <button
-      type="button"
-      class="cta-button cta-secondary"
-      data-testid="customer-new-plan-planning-record-create-entry"
-      @click="openPlanningCreateModal()"
-    >
-      Create new planning entry
-    </button>
-  </div>
+3. Options behavior
+- Options load for the correct planning family.
+- Selected option is present or safely restored.
+- Options loading does not clear selected id.
+- No “No planning entries found for this customer” when the record has a valid linked entry.
 
-  <!-- planning record editor fields here -->
-</div>
+4. Edit behavior
+- Edit opens editor.
+- Edit hydrates planning entry correctly.
+- Dirty edit behavior is still correct.
+- Save/update keeps record selected.
 
-Implementation requirements:
-1. Put the button in the header of the Planning record details subsection only.
-2. Align it to the top-right on desktop/wide screens.
-3. On smaller screens, allow it to stack below the title/help text cleanly.
-4. Do not place it in the Existing planning records subsection.
-5. Do not move the actual modal logic; continue reusing:
-   openPlanningCreateModal()
-6. Keep all existing editor fields and actions unchanged.
+5. Next behavior
+- Selected unchanged existing record can continue.
+- Dirty edit still blocks if required.
+- Planning Documents opens next.
 
-Suggested CSS behavior:
-.sp-customer-plan-wizard-step__subsection-header--with-action {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
+6. Backend/list filtering
+- Existing records list is scoped correctly.
+- If planning_entity filters were implemented, verify they work.
+- No unrelated records appear.
 
-On narrow screens:
-- button may wrap below the title block
-- but it should remain inside the Planning record details subsection header
+7. Non-regression
+- Order Details first step works.
+- Equipment/Requirement/Document steps unchanged.
+- Create new Planning Record path still works.
+- Canonical /admin/planning-orders unchanged.
 
-Validation:
-After implementation, confirm visually that:
-- Existing planning records subsection has no Create new planning entry button
-- Planning record details subsection has the button in its own top-right corner
-- mobile layout still looks clean
+Tests:
+Run and update:
+- relevant order-workspace tests
+- relevant planning record tests
+- backend tests if filter changed
+
+Manual QA:
+- Select existing planning record.
+- Check Planning Entry select.
+- Edit existing planning record.
+- Save/update.
+- Continue with Next.
+- Refresh and repeat.
+
+Final output:
+1. QA validation summary
+2. Issues found
+3. Fixes made
+4. Files changed
+5. Tests added/updated
+6. Test results
+7. Manual QA result
+8. Ready / Not ready for real data entry
+
+Explicitly confirm:
+- Planning Entry stays selected
+- existing row list does not disappear
+- Next still works

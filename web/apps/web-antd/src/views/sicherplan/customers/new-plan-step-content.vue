@@ -157,6 +157,7 @@ const planningEntityOptions = ref<PlanningListItem[]>([]);
 const planningEntityId = ref('');
 const planningEntityLoading = ref(false);
 const planningEntityError = ref('');
+const planningEntityOptionsRequestSeq = ref(0);
 const orderSelectionMode = ref<OrderSelectionMode>('use_existing');
 const customerOrderRows = ref<CustomerOrderListItem[]>([]);
 const customerOrderRowsLoading = ref(false);
@@ -389,12 +390,18 @@ const selectedRequirementLineId = ref('');
 const selectedExceptionId = ref('');
 const selectedOrder = ref<CustomerOrderRead | null>(null);
 const selectedPlanningRecord = ref<PlanningRecordRead | null>(null);
+const selectedExistingPlanningRecordId = ref('');
+const editingExistingPlanningRecordId = ref('');
+const committedPlanningRecordId = ref('');
 const planningRecordDirty = ref(false);
 const selectedShiftPlan = ref<ShiftPlanRead | null>(null);
 const selectedSeries = ref<ShiftSeriesRead | null>(null);
 const planningRecordRows = ref<PlanningRecordListItem[]>([]);
 const planningRecordRowsLoading = ref(false);
 const planningRecordRowsError = ref('');
+const selectedPlanningRecordRow = computed(() =>
+  planningRecordRows.value.find((row) => row.id === selectedExistingPlanningRecordId.value),
+);
 const orderEquipmentLines = ref<OrderEquipmentLineRead[]>([]);
 const orderRequirementLines = ref<OrderRequirementLineRead[]>([]);
 const orderAttachments = ref<PlanningDocumentRead[]>([]);
@@ -1915,6 +1922,29 @@ function planningRecordDraftMatchesRecord(
   );
 }
 
+function hasCommittedPlanningRecordSelection() {
+  const selectedId = selectedPlanningRecord.value?.id || selectedExistingPlanningRecordId.value;
+  if (
+    !selectedId ||
+    planningRecordDirty.value ||
+    (props.wizardState.planning_record_id || committedPlanningRecordId.value) !== selectedId
+  ) {
+    return false;
+  }
+  if (selectedPlanningRecord.value?.id === selectedId) {
+    return (
+      currentPlanningEntityScope.value?.planningEntityId === planningEntityIdForRecord(selectedPlanningRecord.value) &&
+      currentPlanningEntityScope.value?.planningEntityType === planningFamilyForRecord(selectedPlanningRecord.value) &&
+      currentPlanningModeCode.value === selectedPlanningRecord.value.planning_mode_code
+    );
+  }
+  return Boolean(
+    currentPlanningEntityScope.value?.planningEntityId &&
+      currentPlanningEntityScope.value?.planningEntityType &&
+      currentPlanningModeCode.value,
+  );
+}
+
 function applyPlanningRecordDocumentsDraftPersistence(payload: Partial<OrderDocumentsDraftPersistence>) {
   withDraftSyncPaused(() => {
     Object.assign(planningRecordAttachmentDraft, {
@@ -2313,6 +2343,9 @@ function resetOrderAttachmentDraft() {
 
 function resetPlanningRecordDraft() {
   selectedPlanningRecord.value = null;
+  selectedExistingPlanningRecordId.value = '';
+  editingExistingPlanningRecordId.value = '';
+  committedPlanningRecordId.value = '';
   planningRecordDirty.value = false;
   Object.assign(planningRecordDraft, {
     dispatcher_user_id: '',
@@ -2348,6 +2381,10 @@ function resetPlanningRecordDraftForNewContext() {
 
 function invalidateSelectedPlanningRecordForCurrentContext() {
   resetPlanningRecordDraftForNewContext();
+  selectedPlanningRecord.value = null;
+  selectedExistingPlanningRecordId.value = '';
+  editingExistingPlanningRecordId.value = '';
+  committedPlanningRecordId.value = '';
   emit('saved-context', {
     ...buildPlanningContextPatch(),
     planning_record_id: '',
@@ -2463,33 +2500,69 @@ function planningEntityIdForRecord(record: PlanningRecordRead) {
   return record.site_detail?.site_id ?? '';
 }
 
+function planningRecordContextIsValid(record: PlanningRecordRead) {
+  return Boolean(planningEntityIdForRecord(record));
+}
+
+function linkedPlanningEntityFallbackOption(record: PlanningRecordRead): PlanningListItem | null {
+  const entityId = planningEntityIdForRecord(record);
+  if (!entityId) {
+    return null;
+  }
+  return {
+    customer_id: props.customer.id,
+    id: entityId,
+    label: `${entityId} / ${$t('sicherplan.customerPlansWizard.forms.linkedPlanningEntry')}`,
+    name: `${entityId} / ${$t('sicherplan.customerPlansWizard.forms.linkedPlanningEntry')}`,
+    status: 'active',
+    tenant_id: props.tenantId,
+    version_no: 0,
+  };
+}
+
+function ensureSelectedPlanningEntityOption(record = selectedPlanningRecord.value) {
+  if (!record) {
+    return;
+  }
+  const fallback = linkedPlanningEntityFallbackOption(record);
+  if (!fallback || planningEntityOptions.value.some((option) => option.id === fallback.id)) {
+    return;
+  }
+  planningEntityOptions.value = [fallback, ...planningEntityOptions.value];
+}
+
 function syncPlanningRecordDraft(record: PlanningRecordRead) {
-  withDraftSyncPaused(() => {
-    resetPlanningRecordDraft();
-    selectedPlanningRecord.value = record;
-    planningSelectionMode.value = 'use_existing';
-    planningFamily.value = planningFamilyForRecord(record);
-    planningEntityId.value = planningEntityIdForRecord(record);
-    Object.assign(planningRecordDraft, {
-      dispatcher_user_id: record.dispatcher_user_id ?? '',
-      event_detail_event_venue_id: record.event_detail?.event_venue_id ?? '',
-      event_detail_setup_note: record.event_detail?.setup_note ?? '',
-      name: record.name,
-      notes: record.notes ?? '',
-      parent_planning_record_id: record.parent_planning_record_id ?? '',
-      patrol_detail_execution_note: record.patrol_detail?.execution_note ?? '',
-      patrol_detail_patrol_route_id: record.patrol_detail?.patrol_route_id ?? '',
-      planning_from: record.planning_from,
-      planning_mode_code: record.planning_mode_code,
-      planning_to: record.planning_to,
-      site_detail_site_id: record.site_detail?.site_id ?? '',
-      site_detail_watchbook_scope_note: record.site_detail?.watchbook_scope_note ?? '',
-      status: record.status,
-      trade_fair_detail_stand_note: record.trade_fair_detail?.stand_note ?? '',
-      trade_fair_detail_trade_fair_id: record.trade_fair_detail?.trade_fair_id ?? '',
-      trade_fair_detail_trade_fair_zone_id: record.trade_fair_detail?.trade_fair_zone_id ?? '',
-    });
-  });
+  withPlanningContextHydrationPaused(() =>
+    withDraftSyncPaused(() => {
+      resetPlanningRecordDraft();
+      selectedPlanningRecord.value = record;
+      selectedExistingPlanningRecordId.value = record.id;
+      committedPlanningRecordId.value = record.id;
+      planningSelectionMode.value = 'use_existing';
+      planningFamily.value = planningFamilyForRecord(record);
+      planningEntityId.value = planningEntityIdForRecord(record);
+      Object.assign(planningRecordDraft, {
+        dispatcher_user_id: record.dispatcher_user_id ?? '',
+        event_detail_event_venue_id: record.event_detail?.event_venue_id ?? '',
+        event_detail_setup_note: record.event_detail?.setup_note ?? '',
+        name: record.name,
+        notes: record.notes ?? '',
+        parent_planning_record_id: record.parent_planning_record_id ?? '',
+        patrol_detail_execution_note: record.patrol_detail?.execution_note ?? '',
+        patrol_detail_patrol_route_id: record.patrol_detail?.patrol_route_id ?? '',
+        planning_from: record.planning_from,
+        planning_mode_code: record.planning_mode_code,
+        planning_to: record.planning_to,
+        site_detail_site_id: record.site_detail?.site_id ?? '',
+        site_detail_watchbook_scope_note: record.site_detail?.watchbook_scope_note ?? '',
+        status: record.status,
+        trade_fair_detail_stand_note: record.trade_fair_detail?.stand_note ?? '',
+        trade_fair_detail_trade_fair_id: record.trade_fair_detail?.trade_fair_id ?? '',
+        trade_fair_detail_trade_fair_zone_id: record.trade_fair_detail?.trade_fair_zone_id ?? '',
+      });
+    }),
+  );
+  ensureSelectedPlanningEntityOption(record);
   planningRecordDirty.value = false;
 }
 
@@ -2822,7 +2895,7 @@ function setPlanningFamilySelection(family: PlanningEntityType) {
   if (planningFamily.value === family) {
     return;
   }
-  const hadSelectedPlanningRecord = Boolean(selectedPlanningRecord.value);
+  const hadSelectedPlanningRecord = Boolean(selectedPlanningRecord.value || selectedExistingPlanningRecordId.value);
   withDraftSyncPaused(() => {
     planningFamily.value = family;
     planningEntityId.value = '';
@@ -2844,7 +2917,7 @@ async function selectExistingPlanningEntity(entityId: string) {
   if (!entityId) {
     return;
   }
-  const hadSelectedPlanningRecord = Boolean(selectedPlanningRecord.value);
+  const hadSelectedPlanningRecord = Boolean(selectedPlanningRecord.value || selectedExistingPlanningRecordId.value);
   const contextChanged = planningEntityId.value !== entityId;
   const invalidatedSelectedPlanningRecord = hadSelectedPlanningRecord && contextChanged;
   withDraftSyncPaused(() => {
@@ -2855,6 +2928,9 @@ async function selectExistingPlanningEntity(entityId: string) {
     invalidateSelectedPlanningRecordForCurrentContext();
   } else {
     selectedPlanningRecord.value = null;
+    selectedExistingPlanningRecordId.value = '';
+    editingExistingPlanningRecordId.value = '';
+    committedPlanningRecordId.value = '';
     planningRecordDraft.planning_mode_code = planningModeCode.value;
   }
   if (planningModeCode.value === 'trade_fair') {
@@ -2873,7 +2949,7 @@ async function selectExistingPlanningEntity(entityId: string) {
 async function onPlanningEntityChange(event: Event) {
   const entityId = (event.target as HTMLSelectElement).value;
   if (!entityId) {
-    const hadSelectedPlanningRecord = Boolean(selectedPlanningRecord.value);
+    const hadSelectedPlanningRecord = Boolean(selectedPlanningRecord.value || selectedExistingPlanningRecordId.value);
     withDraftSyncPaused(() => {
       planningEntityId.value = '';
     });
@@ -2883,6 +2959,9 @@ async function onPlanningEntityChange(event: Event) {
       invalidateSelectedPlanningRecordForCurrentContext();
     } else {
       selectedPlanningRecord.value = null;
+      selectedExistingPlanningRecordId.value = '';
+      editingExistingPlanningRecordId.value = '';
+      committedPlanningRecordId.value = '';
     }
     await refreshTradeFairZoneOptions('');
     emit('step-ui-state', 'planning-record-overview', {
@@ -2894,23 +2973,41 @@ async function onPlanningEntityChange(event: Event) {
   await selectExistingPlanningEntity(entityId);
 }
 
-async function selectExistingPlanningRecordRow(planningRecordId: string) {
+async function hydrateExistingPlanningRecordSelection(planningRecordId: string, { edit }: { edit: boolean }) {
   if (!props.tenantId || !props.accessToken || !planningRecordId) {
     return;
   }
+  selectedExistingPlanningRecordId.value = planningRecordId;
+  committedPlanningRecordId.value = planningRecordId;
   const loadVersions = beginStepLoads('planningRecordDetail');
   stepLoadError.planningRecordDetail = '';
   try {
     const record = await getPlanningRecord(props.tenantId, planningRecordId, props.accessToken);
+    if (!planningRecordContextIsValid(record)) {
+      stepLoadError.planningRecordDetail = $t('sicherplan.customerPlansWizard.errors.invalidPlanningRecordDetail');
+      setFeedback('error', stepLoadError.planningRecordDetail);
+      emit('step-ui-state', 'planning-record-overview', { error: 'invalid_record_detail' });
+      return;
+    }
     syncPlanningRecordDraft(record);
+    selectedExistingPlanningRecordId.value = record.id;
+    editingExistingPlanningRecordId.value = edit ? record.id : '';
     clearStepDraft('planning-record-overview');
     clearDraftRestoreMessage();
+    await loadPlanningEntityOptions();
+    planningEntityId.value = planningEntityIdForRecord(record);
+    ensureSelectedPlanningEntityOption(record);
     if (record.planning_mode_code === 'trade_fair') {
       await refreshTradeFairZoneOptions(record.trade_fair_detail?.trade_fair_id ?? '');
     } else {
       await refreshTradeFairZoneOptions('');
     }
     setFeedback('success', $t('sicherplan.customerPlansWizard.messages.planningRecordSelected'));
+    committedPlanningRecordId.value = record.id;
+    emit('saved-context', {
+      ...buildPlanningContextPatch(),
+      planning_record_id: record.id,
+    });
     emit('step-completion', 'planning-record-overview', true);
     emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
   } catch {
@@ -2920,6 +3017,14 @@ async function selectExistingPlanningRecordRow(planningRecordId: string) {
   } finally {
     finishStepLoads(loadVersions);
   }
+}
+
+async function selectExistingPlanningRecordRow(planningRecordId: string) {
+  await hydrateExistingPlanningRecordSelection(planningRecordId, { edit: false });
+}
+
+async function openExistingPlanningRecordEditor(planningRecordId: string) {
+  await hydrateExistingPlanningRecordSelection(planningRecordId, { edit: true });
 }
 
 function openPlanningCreateModal() {
@@ -2994,28 +3099,41 @@ async function selectSeriesRow(seriesId: string) {
 
 async function loadPlanningEntityOptions() {
   if (!props.tenantId || !props.accessToken) {
-    planningEntityOptions.value = [];
     return;
   }
+  const requestSeq = planningEntityOptionsRequestSeq.value + 1;
+  planningEntityOptionsRequestSeq.value = requestSeq;
+  const requestedFamily = planningFamily.value;
+  const requestedPlanningEntityId = planningEntityId.value;
   const loadVersions = beginStepLoads('planningReferenceOptions');
   planningEntityLoading.value = true;
   planningEntityError.value = '';
   try {
-    planningEntityOptions.value = await listPlanningSetupRecords(
-      planningFamily.value,
+    const options = await listPlanningSetupRecords(
+      requestedFamily,
       props.tenantId,
       props.accessToken,
       { customer_id: props.customer.id },
     );
-    if (!planningEntityOptions.value.some((option) => option.id === planningEntityId.value)) {
+    if (requestSeq !== planningEntityOptionsRequestSeq.value || requestedFamily !== planningFamily.value) {
+      return;
+    }
+    planningEntityOptions.value = options as PlanningListItem[];
+    ensureSelectedPlanningEntityOption();
+    const activePlanningEntityId = planningEntityId.value || requestedPlanningEntityId;
+    if (activePlanningEntityId && planningEntityOptions.value.some((option) => option.id === activePlanningEntityId)) {
+      planningEntityId.value = activePlanningEntityId;
+    } else if (!activePlanningEntityId && !selectedPlanningRecord.value) {
       planningEntityId.value = '';
     }
   } catch {
-    planningEntityOptions.value = [];
+    ensureSelectedPlanningEntityOption();
     planningEntityError.value = $t('sicherplan.customerPlansWizard.errors.planningEntityLoad');
   } finally {
     finishStepLoads(loadVersions);
-    planningEntityLoading.value = false;
+    if (requestSeq === planningEntityOptionsRequestSeq.value) {
+      planningEntityLoading.value = false;
+    }
   }
 }
 
@@ -3042,6 +3160,11 @@ async function loadExistingPlanningRecordRows(isCurrent = () => true) {
     planningRecordRows.value = rows;
     if (selectedPlanningRecord.value && !rows.some((row) => row.id === selectedPlanningRecord.value?.id)) {
       selectedPlanningRecord.value = null;
+    }
+    if (selectedExistingPlanningRecordId.value && !rows.some((row) => row.id === selectedExistingPlanningRecordId.value)) {
+      selectedExistingPlanningRecordId.value = '';
+      editingExistingPlanningRecordId.value = '';
+      committedPlanningRecordId.value = '';
     }
   } catch {
     if (!isCurrent()) {
@@ -3612,7 +3735,8 @@ function syncPlanningEntityOptionsFromReferenceOptions() {
   } else {
     planningEntityOptions.value = siteOptions.value;
   }
-  if (!planningEntityOptions.value.some((option) => option.id === planningEntityId.value)) {
+  ensureSelectedPlanningEntityOption();
+  if (!selectedPlanningRecord.value && !planningEntityOptions.value.some((option) => option.id === planningEntityId.value)) {
     planningEntityId.value = '';
   }
 }
@@ -4941,12 +5065,19 @@ async function savePlanningRecordDraftOrSelection() {
     planningRecordDirty.value = false;
     clearStepDraft('planning-record-overview');
     clearDraftRestoreMessage();
+    selectedExistingPlanningRecordId.value = saved.id;
+    editingExistingPlanningRecordId.value = saved.id;
+    committedPlanningRecordId.value = saved.id;
     emit('saved-context', {
       ...buildPlanningContextPatch(),
       planning_record_id: saved.id,
     });
     emit('step-completion', 'planning-record-overview', true);
     emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
+    await loadExistingPlanningRecordRows();
+    selectedExistingPlanningRecordId.value = saved.id;
+    editingExistingPlanningRecordId.value = saved.id;
+    committedPlanningRecordId.value = saved.id;
     return true;
   } catch {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.planningRecordSaveFailed'));
@@ -4966,12 +5097,27 @@ async function submitPlanningRecordStep() {
     return false;
   }
   if (planningRecordDirty.value) {
-    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.savePlanningRecordBeforeContinue'));
+    const messageKey = editingExistingPlanningRecordId.value
+      ? 'saveOrCancelPlanningRecordEditBeforeContinue'
+      : 'savePlanningRecordBeforeContinue';
+    setFeedback('error', $t(`sicherplan.customerPlansWizard.errors.${messageKey}` as never));
     emit('step-completion', 'planning-record-overview', false);
     emit('step-ui-state', 'planning-record-overview', { dirty: true, error: 'save_required' });
     return false;
   }
-  if (!selectedPlanningRecord.value?.id && !props.wizardState.planning_record_id) {
+  if (!hasCommittedPlanningRecordSelection() && !props.wizardState.planning_record_id) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.savePlanningRecordBeforeContinue'));
+    emit('step-completion', 'planning-record-overview', false);
+    emit('step-ui-state', 'planning-record-overview', { error: 'save_required' });
+    return false;
+  }
+  if (selectedPlanningRecord.value?.id && !hasCommittedPlanningRecordSelection()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.savePlanningRecordBeforeContinue'));
+    emit('step-completion', 'planning-record-overview', false);
+    emit('step-ui-state', 'planning-record-overview', { error: 'save_required' });
+    return false;
+  }
+  if (selectedExistingPlanningRecordId.value && !hasCommittedPlanningRecordSelection()) {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.savePlanningRecordBeforeContinue'));
     emit('step-completion', 'planning-record-overview', false);
     emit('step-ui-state', 'planning-record-overview', { error: 'save_required' });
@@ -5314,6 +5460,9 @@ defineExpose({
 
 watch(planningFamily, async () => {
   if (draftSyncPaused.value || planningContextHydrationPaused.value || stepLoading.value) {
+    return;
+  }
+  if (selectedPlanningRecord.value && planningFamily.value === planningFamilyForRecord(selectedPlanningRecord.value)) {
     return;
   }
   planningEntityId.value = '';
@@ -5669,6 +5818,9 @@ watch(
     existingOrderEditFormOpen.value = false;
     selectedOrder.value = null;
     selectedPlanningRecord.value = null;
+    selectedExistingPlanningRecordId.value = '';
+    editingExistingPlanningRecordId.value = '';
+    committedPlanningRecordId.value = '';
     selectedShiftPlan.value = null;
     selectedSeries.value = null;
     planningRecordRows.value = [];
@@ -5714,6 +5866,7 @@ watch(
         }
         planningEntityId.value = props.wizardState.planning_entity_id || '';
         planningRecordDraft.planning_mode_code = props.wizardState.planning_mode_code || planningModeCode.value;
+        committedPlanningRecordId.value = props.wizardState.planning_record_id || committedPlanningRecordId.value;
         shiftPlanDraft.planning_record_id = props.wizardState.planning_record_id || '';
         resetRequirementModal();
       }),
@@ -6428,8 +6581,14 @@ onBeforeUnmount(() => {
               v-for="row in planningRecordRows"
               :key="row.id"
               class="sp-customer-plan-wizard-step__list-row"
-              :class="{ 'sp-customer-plan-wizard-step__list-row--selected': row.id === selectedPlanningRecord?.id }"
+              :class="{ 'sp-customer-plan-wizard-step__list-row--selected': row.id === selectedExistingPlanningRecordId }"
               data-testid="customer-new-plan-existing-planning-record-row"
+              data-order-workspace-testid="customer-order-workspace-existing-planning-record-row"
+              role="button"
+              tabindex="0"
+              @click="void selectExistingPlanningRecordRow(row.id)"
+              @keydown.enter.prevent="void selectExistingPlanningRecordRow(row.id)"
+              @keydown.space.prevent="void selectExistingPlanningRecordRow(row.id)"
             >
               <div class="sp-customer-plan-wizard-step__planning-record-row-copy">
                 <strong>{{ row.name }}</strong>
@@ -6439,12 +6598,22 @@ onBeforeUnmount(() => {
                 type="button"
                 class="sp-customer-plan-wizard-step__row-link-action"
                 data-testid="customer-new-plan-edit-planning-record"
-                @click="void selectExistingPlanningRecordRow(row.id)"
+                data-order-workspace-testid="customer-order-workspace-existing-planning-record-edit"
+                @click.stop="void openExistingPlanningRecordEditor(row.id)"
               >
                 {{ $t('sicherplan.customerPlansWizard.actions.edit') }}
               </button>
             </div>
           </div>
+          <p
+            v-if="selectedPlanningRecordRow"
+            class="field-help"
+            data-testid="customer-new-plan-selected-planning-record-summary"
+            data-order-workspace-testid="customer-order-workspace-selected-planning-record-summary"
+          >
+            {{ $t('sicherplan.customerPlansWizard.forms.selectedPlanningRecord') }}:
+            {{ selectedPlanningRecordRow.name }}
+          </p>
           <p v-else-if="!planningRecordRowsLoading && !stepLoadState.planningRecords" class="field-help" data-testid="customer-new-plan-existing-planning-records-empty">
             {{ $t('sicherplan.customerPlansWizard.forms.noPlanningRecordsFoundForContext') }}
           </p>
@@ -6452,7 +6621,11 @@ onBeforeUnmount(() => {
 
         <div class="sp-customer-plan-wizard-step__planning-record-divider" aria-hidden="true"></div>
 
-        <section class="sp-customer-plan-wizard-step__planning-record-subsection" data-testid="customer-new-plan-planning-record-editor">
+        <section
+          class="sp-customer-plan-wizard-step__planning-record-subsection"
+          data-testid="customer-new-plan-planning-record-editor"
+          data-order-workspace-testid="customer-order-workspace-planning-record-editor"
+        >
           <header
             class="sp-customer-plan-wizard-step__planning-record-subsection-header sp-customer-plan-wizard-step__planning-record-subsection-header--with-action"
           >
@@ -6512,7 +6685,10 @@ onBeforeUnmount(() => {
                   {{ option.name || option.label || option.code || option.id }}
                 </option>
               </select>
-              <p v-if="!planningEntityOptions.length && !planningEntityLoading && !stepLoadState.planningReferenceOptions" class="field-help">
+              <p
+                v-if="!planningEntityOptions.length && !planningEntityLoading && !stepLoadState.planningReferenceOptions && !selectedPlanningRecord"
+                class="field-help"
+              >
                 {{ $t('sicherplan.customerPlansWizard.forms.noPlanningEntriesFoundForCustomer') }}
               </p>
             </label>
@@ -6565,6 +6741,7 @@ onBeforeUnmount(() => {
               type="button"
               class="cta-button"
               data-testid="customer-new-plan-save-planning-record"
+              data-order-workspace-testid="customer-order-workspace-update-planning-record"
               :disabled="stepLoading || !hasPlanningContext"
               @click="void savePlanningRecordDraftOrSelection()"
             >
@@ -6578,6 +6755,7 @@ onBeforeUnmount(() => {
               type="button"
               class="cta-button cta-secondary"
               data-testid="customer-new-plan-clear-planning-record-draft"
+              data-order-workspace-testid="customer-order-workspace-cancel-planning-record-edit"
               :disabled="stepLoading"
               @click="clearPlanningRecordDraftState"
             >
