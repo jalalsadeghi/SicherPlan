@@ -15,6 +15,8 @@ from app.modules.planning.schemas import (
     EventPlanDetailUpdate,
     PatrolPlanDetailCreate,
     PatrolPlanDetailUpdate,
+    PlanningRecordAttachmentCreate,
+    PlanningRecordAttachmentLinkCreate,
     PlanningRecordCreate,
     PlanningRecordFilter,
     PlanningRecordReleaseStateUpdate,
@@ -24,7 +26,7 @@ from app.modules.planning.schemas import (
     TradeFairPlanDetailCreate,
     TradeFairPlanDetailUpdate,
 )
-from tests.modules.planning.test_customer_orders import FakeCustomerOrderRepository, FakeOrderDocumentRepository
+from tests.modules.planning.test_customer_orders import FakeCustomerOrderRepository, FakeDocumentRecord, FakeOrderDocumentRepository, FakeOrderDocumentService
 from tests.modules.planning.test_ops_master_foundation import RecordingAuditRepository, _context
 
 
@@ -294,9 +296,12 @@ class PlanningRecordServiceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.repository = FakePlanningRecordRepository()
         self.audit_repository = RecordingAuditRepository()
+        self.document_repository = FakeOrderDocumentRepository()
+        self.document_service = FakeOrderDocumentService(self.document_repository)
         self.service = PlanningRecordService(
             self.repository,
-            document_repository=FakeOrderDocumentRepository(),
+            document_repository=self.document_repository,
+            document_service=self.document_service,
             audit_service=AuditService(self.audit_repository),
         )
         requirement = self.repository.create_requirement_type(
@@ -367,6 +372,82 @@ class PlanningRecordServiceTests(unittest.TestCase):
         self.assertIsInstance(event.after_json["created_at"], str)
         self.assertNotIn("event_detail", event.after_json)
         json.dumps(event.after_json)
+
+    def test_unlink_attachment_removes_planning_record_relation_without_deleting_document(self) -> None:
+        row = self.service.create_planning_record(
+            "tenant-1",
+            PlanningRecordCreate(
+                tenant_id="tenant-1",
+                order_id=self.order_id,
+                dispatcher_user_id="dispatcher-1",
+                planning_mode_code="event",
+                name="Event-Dokumente",
+                planning_from=date(2026, 9, 1),
+                planning_to=date(2026, 9, 3),
+                event_detail=EventPlanDetailCreate(event_venue_id=self.event_venue_id, setup_note="Buehne"),
+            ),
+            self.actor,
+        )
+        document = self.service.create_planning_record_attachment(
+            "tenant-1",
+            row.id,
+            PlanningRecordAttachmentCreate(
+                tenant_id="tenant-1",
+                title="Planungsbrief",
+                file_name="brief.pdf",
+                content_type="application/pdf",
+                content_base64="UERG",
+            ),
+            self.actor,
+        )
+
+        self.service.unlink_planning_record_attachment("tenant-1", row.id, document.id, self.actor)
+
+        self.assertEqual(self.service.list_planning_record_attachments("tenant-1", row.id, self.actor), [])
+        self.assertIn(document.id, self.document_repository.documents)
+        event = self.audit_repository.audit_events[-1]
+        self.assertEqual(event.event_type, "planning.planning_record.attachment.unlinked")
+        self.assertEqual(event.after_json["document_id"], document.id)
+
+    def test_link_attachment_returns_relation_label_without_overwriting_planning_document_title(self) -> None:
+        row = self.service.create_planning_record(
+            "tenant-1",
+            PlanningRecordCreate(
+                tenant_id="tenant-1",
+                order_id=self.order_id,
+                dispatcher_user_id="dispatcher-1",
+                planning_mode_code="event",
+                name="Event-Link-Dokumente",
+                planning_from=date(2026, 9, 1),
+                planning_to=date(2026, 9, 3),
+                event_detail=EventPlanDetailCreate(event_venue_id=self.event_venue_id, setup_note="Buehne"),
+            ),
+            self.actor,
+        )
+        self.document_repository.documents["document-existing"] = FakeDocumentRecord(
+            id="document-existing",
+            tenant_id="tenant-1",
+            title="1663202370369.jpg",
+            source_label="camera-upload",
+        )
+
+        document = self.service.link_planning_record_attachment(
+            "tenant-1",
+            row.id,
+            PlanningRecordAttachmentLinkCreate(
+                tenant_id="tenant-1",
+                document_id="document-existing",
+                label="Image for test",
+            ),
+            self.actor,
+        )
+
+        self.assertEqual(document.id, "document-existing")
+        self.assertEqual(document.title, "1663202370369.jpg")
+        self.assertEqual(document.relation_label, "Image for test")
+        attachments = self.service.list_planning_record_attachments("tenant-1", row.id, self.actor)
+        self.assertEqual(attachments[0].title, "1663202370369.jpg")
+        self.assertEqual(attachments[0].relation_label, "Image for test")
 
     def test_rejects_mismatched_detail_payload(self) -> None:
         with self.assertRaises(ApiException) as captured:

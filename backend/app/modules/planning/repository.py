@@ -1397,6 +1397,14 @@ class SqlAlchemyPlanningRepository:
     ) -> ShiftSeriesException | None:
         return self._update_row(ShiftSeriesException, tenant_id, row_id, payload, actor_user_id)
 
+    def delete_shift_series_exception(self, tenant_id: str, row_id: str) -> bool:
+        row = self.get_shift_series_exception(tenant_id, row_id)
+        if row is None:
+            return False
+        self.session.delete(row)
+        self._commit_or_raise()
+        return True
+
     def list_shifts(self, tenant_id: str, filters: ShiftListFilter) -> list[Shift]:
         statement = (
             select(Shift)

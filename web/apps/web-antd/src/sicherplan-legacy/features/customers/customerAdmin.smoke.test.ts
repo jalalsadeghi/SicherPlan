@@ -15,6 +15,8 @@ const routeState = reactive({
 const routerPushMock = vi.fn();
 const routerReplaceMock = vi.fn();
 const showFeedbackToastMock = vi.fn();
+const createObjectUrlMock = vi.fn(() => "blob:customer-export");
+const revokeObjectUrlMock = vi.fn();
 
 const authStoreState = reactive({
   accessToken: "token-1",
@@ -34,6 +36,7 @@ const apiMocks = vi.hoisted(() => ({
   createCustomerAvailableAddressMock: vi.fn(),
   createCustomerContactMock: vi.fn(),
   createCustomerEmployeeBlockMock: vi.fn(),
+  downloadCustomerDocumentMock: vi.fn(),
   exportCustomersMock: vi.fn(),
   getCustomerCommercialProfileMock: vi.fn(),
   getCustomerDashboardMock: vi.fn(),
@@ -68,12 +71,16 @@ const translations: Record<string, string> = {
   "customerAdmin.actions.cancel": "Cancel",
   "customerAdmin.actions.addAddress": "Add address",
   "customerAdmin.actions.addContact": "Add contact",
+  "customerAdmin.actions.advancedFilters": "Advanced filters",
+  "customerAdmin.actions.applyFilters": "Apply filters",
   "customerAdmin.actions.createAddress": "Create address",
   "customerAdmin.actions.createContact": "Create contact",
   "customerAdmin.actions.createPortalAccess": "Create portal access",
   "customerAdmin.actions.createSharedAddress": "Create shared address",
+  "customerAdmin.actions.closeFilters": "Close filters",
   "customerAdmin.actions.exportCustomers": "CSV export",
   "customerAdmin.actions.newCustomer": "New customer",
+  "customerAdmin.actions.backToList": "Back to customer list",
   "customerAdmin.actions.newOrder": "New order",
   "customerAdmin.actions.refreshHistory": "Refresh history",
   "customerAdmin.actions.resetPortalAccessPassword": "Reset portal password",
@@ -85,9 +92,17 @@ const translations: Record<string, string> = {
   "customerAdmin.contactAccess.portalDescription": "Control portal access and login history.",
   "customerAdmin.contactAccess.portalTitle": "Portal & Access",
   "customerAdmin.detail.emptyBody": "Choose a customer from the list or create a new record.",
+  "customerAdmin.detail.emptyTitle": "No customer selected yet",
+  "customerAdmin.detail.notFoundBody": "The requested customer is not available in the current list. Select a customer from the list.",
+  "customerAdmin.detail.notFoundTitle": "Customer not found",
   "customerAdmin.detail.newTitle": "Create customer",
   "customerAdmin.detail.workspaceLead": "Workspace lead",
   "customerAdmin.detail.workspaceTitle": "Customer workspace",
+  "customerAdmin.feedback.documentId": "Document ID",
+  "customerAdmin.feedback.exportDownloadFailed": "Export created, download failed",
+  "customerAdmin.feedback.exportDownloadFallback": "Use the document ID to download the file from the document library.",
+  "customerAdmin.feedback.exportDownloadStarted": "The download started.",
+  "customerAdmin.feedback.exportReady": "Customer export created",
   "customerAdmin.fields.address": "Address",
   "customerAdmin.fields.addressType": "Address type",
   "customerAdmin.fields.effectiveFrom": "Effective from",
@@ -100,8 +115,10 @@ const translations: Record<string, string> = {
   "customerAdmin.fields.temporaryPassword": "Temporary password",
   "customerAdmin.fields.username": "Username",
   "customerAdmin.filters.allStatuses": "All statuses",
+  "customerAdmin.filters.additionalTitle": "Additional filters",
   "customerAdmin.filters.includeArchived": "Include archived customers",
   "customerAdmin.filters.search": "Search",
+  "customerAdmin.filters.searchCustomers": "Search customers",
   "customerAdmin.filters.searchPlaceholder": "Number or name",
   "customerAdmin.history.empty": "No history entries.",
   "customerAdmin.portal.title": "Portal controls and releases",
@@ -128,6 +145,7 @@ const translations: Record<string, string> = {
   "customerAdmin.tabs.overview": "Overview",
   "customerAdmin.tabs.orders": "Orders",
   "customerAdmin.tabs.portal": "Portal",
+  "customerAdmin.title": "Customers",
 };
 
 vi.mock("@/i18n", () => ({
@@ -184,6 +202,7 @@ vi.mock("@/api/customers", async () => {
     createCustomerAvailableAddress: apiMocks.createCustomerAvailableAddressMock,
     createCustomerContact: apiMocks.createCustomerContactMock,
     createCustomerEmployeeBlock: apiMocks.createCustomerEmployeeBlockMock,
+    downloadCustomerDocument: apiMocks.downloadCustomerDocumentMock,
     exportCustomers: apiMocks.exportCustomersMock,
     getCustomer: apiMocks.getCustomerMock,
     getCustomerCommercialProfile: apiMocks.getCustomerCommercialProfileMock,
@@ -269,10 +288,26 @@ const CustomerOrdersTabStub = defineComponent({
 
 const baseReferenceData = {
   legal_forms: [],
-  classifications: [],
+  classifications: [
+    {
+      id: "classification-vip",
+      code: "VIP",
+      label: "VIP customer",
+      description: null,
+      is_active: true,
+      status: "active",
+      archived_at: null,
+    },
+  ],
   rankings: [],
   customer_statuses: [],
-  branches: [],
+  branches: [
+    {
+      id: "branch-cgn",
+      code: "CGN",
+      name: "Cologne branch",
+    },
+  ],
   mandates: [],
   invoice_layouts: [],
   function_types: [],
@@ -284,6 +319,9 @@ function buildCustomerListItem(id: string, name: string, customerNumber: string,
     id,
     tenant_id: "tenant-1",
     customer_number: customerNumber,
+    classification_lookup_id: "classification-vip",
+    customer_status_lookup_id: null,
+    default_branch_id: "branch-cgn",
     name,
     status,
     version_no: 1,
@@ -365,6 +403,16 @@ async function settle() {
   await flushPromises();
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, reject, resolve };
+}
+
 async function clickButtonByText(wrapper: VueWrapper<any>, label: string) {
   const button = wrapper
     .findAll("button")
@@ -403,6 +451,21 @@ async function mountCustomerAdmin() {
   return wrapper;
 }
 
+function mountCustomerAdminWithoutSettling() {
+  const wrapper = mount(CustomerAdminView, {
+    global: {
+      stubs: {
+        CustomerDashboardTab: CustomerDashboardTabStub,
+        CustomerOrdersTab: CustomerOrdersTabStub,
+        SicherPlanLoadingOverlay: SicherPlanLoadingOverlayStub,
+        StatusBadge: StatusBadgeStub,
+      },
+    },
+  });
+  mountedWrappers.push(wrapper);
+  return wrapper;
+}
+
 async function mountSelectedCustomer(tab = "dashboard") {
   routeState.query = {
     customer_id: "customer-default",
@@ -429,7 +492,22 @@ describe("CustomerAdminView search dialog", () => {
 
     routerPushMock.mockReset();
     routerReplaceMock.mockReset();
+    routerReplaceMock.mockImplementation(async (location: { query?: Record<string, unknown> }) => {
+      if (location?.query) {
+        routeState.query = { ...location.query };
+      }
+    });
     showFeedbackToastMock.mockReset();
+    createObjectUrlMock.mockClear();
+    revokeObjectUrlMock.mockClear();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: createObjectUrlMock,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: revokeObjectUrlMock,
+    });
 
     apiMocks.createCustomerAddressMock.mockReset();
     apiMocks.createCustomerAddressMock.mockResolvedValue({});
@@ -447,6 +525,11 @@ describe("CustomerAdminView search dialog", () => {
     apiMocks.createCustomerContactMock.mockResolvedValue({});
     apiMocks.createCustomerEmployeeBlockMock.mockReset();
     apiMocks.createCustomerEmployeeBlockMock.mockResolvedValue({});
+    apiMocks.downloadCustomerDocumentMock.mockReset();
+    apiMocks.downloadCustomerDocumentMock.mockResolvedValue({
+      blob: new Blob(["customer_number,name\nK-0001,Alpha Security\n"], { type: "text/csv" }),
+      fileName: "customers.csv",
+    });
     apiMocks.getCustomerReferenceDataMock.mockReset();
     apiMocks.getCustomerReferenceDataMock.mockResolvedValue(baseReferenceData);
     apiMocks.listCustomersMock.mockReset();
@@ -550,6 +633,10 @@ describe("CustomerAdminView search dialog", () => {
     apiMocks.exportCustomersMock.mockResolvedValue({
       document_id: "doc-1",
       file_name: "customers.csv",
+      job_id: "job-1",
+      row_count: 1,
+      tenant_id: "tenant-1",
+      version_no: 1,
     });
     apiMocks.updateCustomerAddressMock.mockReset();
     apiMocks.updateCustomerAddressMock.mockResolvedValue({});
@@ -585,88 +672,232 @@ describe("CustomerAdminView search dialog", () => {
     expect(moduleRegistry["planning-orders"]?.showPageIntro).toBeUndefined();
   });
 
-  it("renders the search-select control and removes the sidebar helper sentence", async () => {
+  it("lands on a list-first customer page without auto-opening the first customer", async () => {
     const wrapper = await mountCustomerAdmin();
 
+    expect(wrapper.find('[data-testid="customer-list-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-detail-only-mode"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-page-context-label"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-page-context-label-full-title"]').exists()).toBe(false);
+    expect(routeState.meta.title).toBe("Customers");
     expect(wrapper.find('[data-testid="customer-list-section"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-search-select"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-advanced-filters-open"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-list-header-export"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-list-header-new-customer"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-list-section"] input[type="checkbox"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-testid="customer-list-row"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="customer-list-row-name"]').text()).toContain("Alpha Security");
+    expect(wrapper.get('[data-testid="customer-list-row-number"]').text()).toContain("K-0001");
+    expect(wrapper.get('[data-testid="customer-list-row"]').text()).toContain("Cologne branch");
+    expect(wrapper.get('[data-testid="customer-list-row"]').text()).toContain("VIP customer");
+    expect(wrapper.find('[data-testid="customer-list-row-status"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-detail-workspace"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-detail-tabs"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-dashboard-tab-stub"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-detail-empty-state"]').exists()).toBe(false);
 
     const searchInput = wrapper.get<HTMLInputElement>('[data-testid="customer-search-select-input"]');
     await searchInput.setValue("Rhein");
 
     expect(searchInput.element.value).toBe("Rhein");
+    expect(wrapper.find('[data-testid="customer-search-suggestions"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-search-results-modal"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("Use the sidebar customer links to open a customer dashboard.");
   });
 
-  it("opens the customer search dialog from Search and shows matching results", async () => {
+  it("opens a customer workspace only after clicking a customer row and updates the selected route", async () => {
     const wrapper = await mountCustomerAdmin();
-    apiMocks.listCustomersMock.mockClear();
-
-    await wrapper.get<HTMLInputElement>('[data-testid="customer-search-select-input"]').setValue("Rhein");
-    await clickButtonByText(wrapper, "Search");
-    await settle();
-
-    const lastCall = apiMocks.listCustomersMock.mock.calls.at(-1);
-    expect(lastCall?.[2]).toMatchObject({ search: "Rhein" });
-    expect(wrapper.find('[data-testid="customer-search-results-modal"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain("RheinForum Köln");
-    expect(wrapper.text()).not.toContain("Use the sidebar customer links to open a customer dashboard.");
-  });
-
-  it("selects a search result, closes the dialog, loads the customer, and routes to dashboard", async () => {
-    const wrapper = await mountCustomerAdmin();
-    apiMocks.listCustomersMock.mockClear();
     apiMocks.getCustomerMock.mockClear();
     routerReplaceMock.mockClear();
 
-    await wrapper.get<HTMLInputElement>('[data-testid="customer-search-select-input"]').setValue("Rhein");
-    await clickButtonByText(wrapper, "Search");
+    await wrapper.get('[data-testid="customer-list-row"]').trigger("click");
     await settle();
 
-    await wrapper.get('[data-testid="customer-search-result-row"]').trigger("click");
-    await settle();
-
-    expect(wrapper.find('[data-testid="customer-search-results-modal"]').exists()).toBe(false);
-    expect(apiMocks.getCustomerMock).toHaveBeenCalledWith("tenant-1", "customer-rhein", "token-1");
+    expect(apiMocks.getCustomerMock).toHaveBeenCalledWith("tenant-1", "customer-default", "token-1");
     expect(routerReplaceMock).toHaveBeenCalledWith(
       expect.objectContaining({
         query: expect.objectContaining({
-          customer_id: "customer-rhein",
+          customer_id: "customer-default",
           tab: "dashboard",
         }),
       }),
     );
-    expect(wrapper.get('[data-testid="customer-dashboard-tab-stub"]').text()).toContain("customer-rhein");
+    expect(wrapper.find('[data-testid="customer-detail-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-list-section"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-detail-workspace"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-page-context-label"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-page-context-label-full-title"]').exists()).toBe(false);
+    expect(routeState.meta.title).toBe("Alpha Security");
+    expect(routeState.meta.title).not.toBe("Customers");
+    expect(`${routeState.meta.title}`).not.toContain("...");
+    expect(wrapper.get('[data-testid="customer-detail-title"]').text()).toBe("Alpha Security");
+    expect(wrapper.get('[data-testid="customer-detail-title"]').classes()).toContain("customer-admin-detail-title");
+    expect(wrapper.get('[data-testid="customer-detail-workspace"]').text()).toContain("Workspace lead");
+    expect(wrapper.get('[data-testid="customer-back-to-list"]').classes()).toContain("customer-admin-back-button");
+    expect(wrapper.get('[data-testid="customer-detail-workspace"] .status-badge-stub').text()).toBe("active");
+    expect(wrapper.get('[data-testid="customer-dashboard-tab-stub"]').text()).toContain("customer-default");
   });
 
-  it("shows the empty state for unknown search values without stale results", async () => {
+  it("truncates long customer names only in the upper context label while preserving the full detail title", async () => {
+    const longName = "RheinForum International Security Services Operations GmbH West Region";
+    routeState.query = {
+      customer_id: "customer-default",
+      tab: "dashboard",
+    };
+    apiMocks.listCustomersMock.mockResolvedValueOnce([
+      buildCustomerListItem("customer-default", longName, "K-0001", "active"),
+    ]);
+    apiMocks.getCustomerMock.mockResolvedValueOnce(buildCustomerRead("customer-default", longName, "K-0001"));
+
+    const wrapper = await mountCustomerAdmin();
+
+    expect(wrapper.find('[data-testid="customer-page-context-label"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-page-context-label-full-title"]').exists()).toBe(false);
+    expect(routeState.meta.title).toBe("RheinForum International Security...");
+    expect(routeState.meta.title).not.toBe(longName);
+    expect(wrapper.get('[data-testid="customer-detail-title"]').text()).toBe(longName);
+  });
+
+  it("filters visible customer rows directly by name without suggestions or modal", async () => {
+    apiMocks.listCustomersMock.mockResolvedValueOnce([
+      buildCustomerListItem("customer-default", "Alpha Security", "K-0001", "active"),
+      buildCustomerListItem("customer-rhein", "RheinForum Köln", "K-1000", "active"),
+      buildCustomerListItem("customer-hafen", "HafenKontor Köln", "K-1001", "active"),
+    ]);
     const wrapper = await mountCustomerAdmin();
     apiMocks.listCustomersMock.mockClear();
 
+    const searchInput = wrapper.get<HTMLInputElement>('[data-testid="customer-search-select-input"]');
+    expect(wrapper.findAll('[data-testid="customer-list-row"]')).toHaveLength(3);
+
+    await searchInput.setValue("Rhein");
+    await settle();
+
+    expect(apiMocks.listCustomersMock).not.toHaveBeenCalled();
+    expect(wrapper.findAll('[data-testid="customer-list-row"]')).toHaveLength(1);
+    expect(wrapper.text()).toContain("RheinForum Köln");
+    expect(wrapper.text()).not.toContain("Alpha Security");
+    expect(wrapper.find('[data-testid="customer-search-suggestions"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-search-results-modal"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Use the sidebar customer links to open a customer dashboard.");
+  });
+
+  it("filters visible customer rows by customer number and restores the full list when cleared", async () => {
+    apiMocks.listCustomersMock.mockResolvedValueOnce([
+      buildCustomerListItem("customer-default", "Alpha Security", "K-0001", "active"),
+      buildCustomerListItem("customer-rhein", "RheinForum Köln", "K-1000", "active"),
+      buildCustomerListItem("customer-hafen", "HafenKontor Köln", "K-1001", "active"),
+    ]);
+    const wrapper = await mountCustomerAdmin();
+    apiMocks.listCustomersMock.mockClear();
+
+    const searchInput = wrapper.get<HTMLInputElement>('[data-testid="customer-search-select-input"]');
+    await searchInput.setValue("K-1001");
+    await settle();
+
+    expect(apiMocks.listCustomersMock).not.toHaveBeenCalled();
+    expect(wrapper.findAll('[data-testid="customer-list-row"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="customer-list-row-name"]').text()).toContain("HafenKontor Köln");
+
+    await searchInput.setValue("");
+    await settle();
+
+    expect(wrapper.findAll('[data-testid="customer-list-row"]')).toHaveLength(3);
+    expect(wrapper.find('[data-testid="customer-search-suggestions"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-search-results-modal"]').exists()).toBe(false);
+  });
+
+  it("opens advanced filters with synchronized search and applies filters to the list", async () => {
+    const wrapper = await mountCustomerAdmin();
+    apiMocks.listCustomersMock.mockClear();
+    apiMocks.getCustomerMock.mockClear();
+
     await wrapper.get<HTMLInputElement>('[data-testid="customer-search-select-input"]').setValue("Rhein");
-    await clickButtonByText(wrapper, "Search");
+    await wrapper.get('[data-testid="customer-advanced-filters-open"]').trigger("click");
+    await settle();
+
+    expect(wrapper.find('[data-testid="customer-advanced-filters-dialog"]').exists()).toBe(true);
+    expect(wrapper.get<HTMLInputElement>('[data-testid="customer-advanced-filters-search"]').element.value).toBe("Rhein");
+    await wrapper.get<HTMLSelectElement>('[data-testid="customer-advanced-filters-status"]').setValue("active");
+    await wrapper.get<HTMLSelectElement>('[data-testid="customer-advanced-filters-default-branch"]').setValue("branch-cgn");
+    await wrapper.get<HTMLInputElement>('[data-testid="customer-advanced-filters-include-archived"]').setValue(true);
+    await wrapper.get('[data-testid="customer-advanced-filters-dialog"] form').trigger("submit");
+    await settle();
+
+    expect(apiMocks.listCustomersMock.mock.calls.at(-1)?.[2]).toMatchObject({
+      default_branch_id: "branch-cgn",
+      include_archived: true,
+      lifecycle_status: "active",
+      search: "Rhein",
+    });
+    expect(apiMocks.getCustomerMock).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="customer-list-row-name"]').text()).toContain("RheinForum Köln");
+    expect(wrapper.find('[data-testid="customer-advanced-filters-dialog"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-detail-workspace"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-dashboard-tab-stub"]').exists()).toBe(false);
+  });
+
+  it("closes advanced filters on cancel without applying staged filters", async () => {
+    const wrapper = await mountCustomerAdmin();
+    apiMocks.listCustomersMock.mockClear();
+
+    await wrapper.get('[data-testid="customer-advanced-filters-open"]').trigger("click");
+    await settle();
+    await wrapper.get<HTMLSelectElement>('[data-testid="customer-advanced-filters-status"]').setValue("archived");
+    await wrapper.get('[data-testid="customer-advanced-filters-cancel"]').trigger("click");
+    await settle();
+
+    expect(wrapper.find('[data-testid="customer-advanced-filters-dialog"]').exists()).toBe(false);
+    expect(apiMocks.listCustomersMock).not.toHaveBeenCalled();
+  });
+
+  it("closes advanced filters with Escape like the existing customer modals", async () => {
+    const wrapper = await mountCustomerAdmin();
+
+    await wrapper.get('[data-testid="customer-advanced-filters-open"]').trigger("click");
+    await settle();
+    expect(wrapper.find('[data-testid="customer-advanced-filters-dialog"]').exists()).toBe(true);
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await settle();
+
+    expect(wrapper.find('[data-testid="customer-advanced-filters-dialog"]').exists()).toBe(false);
+  });
+
+  it("shows the local empty state for unknown search values without stale rows or modal results", async () => {
+    apiMocks.listCustomersMock.mockResolvedValueOnce([
+      buildCustomerListItem("customer-default", "Alpha Security", "K-0001", "active"),
+      buildCustomerListItem("customer-rhein", "RheinForum Köln", "K-1000", "active"),
+    ]);
+    const wrapper = await mountCustomerAdmin();
+    apiMocks.listCustomersMock.mockClear();
+
+    const searchInput = wrapper.get<HTMLInputElement>('[data-testid="customer-search-select-input"]');
+    await searchInput.setValue("Rhein");
     await settle();
     expect(wrapper.text()).toContain("RheinForum Köln");
 
-    await wrapper.get('[data-testid="customer-search-result-close"]').trigger("click");
+    await searchInput.setValue("unknown");
     await settle();
 
-    await wrapper.get<HTMLInputElement>('[data-testid="customer-search-select-input"]').setValue("unknown");
-    await clickButtonByText(wrapper, "Search");
-    await settle();
-
-    expect(wrapper.find('[data-testid="customer-search-result-empty"]').exists()).toBe(true);
+    expect(apiMocks.listCustomersMock).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="customer-list-empty-state"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-search-suggestions"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-search-results-modal"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("RheinForum Köln");
   });
 
-  it("passes include_archived through the search dialog requests", async () => {
+  it("passes include_archived through advanced filter requests", async () => {
     const wrapper = await mountCustomerAdmin();
     apiMocks.listCustomersMock.mockClear();
 
-    const includeArchived = wrapper.get<HTMLInputElement>('[data-testid="customer-list-section"] input[type="checkbox"]');
+    await wrapper.get('[data-testid="customer-advanced-filters-open"]').trigger("click");
+    await settle();
+    const includeArchived = wrapper.get<HTMLInputElement>('[data-testid="customer-advanced-filters-include-archived"]');
     await includeArchived.setValue(true);
-    await wrapper.get<HTMLInputElement>('[data-testid="customer-search-select-input"]').setValue("Rhein");
-    await clickButtonByText(wrapper, "Search");
+    await wrapper.get<HTMLInputElement>('[data-testid="customer-advanced-filters-search"]').setValue("Rhein");
+    await wrapper.get('[data-testid="customer-advanced-filters-dialog"] form').trigger("submit");
     await settle();
 
     expect(apiMocks.listCustomersMock.mock.calls.at(-1)?.[2]).toMatchObject({
@@ -674,8 +905,10 @@ describe("CustomerAdminView search dialog", () => {
       include_archived: true,
     });
 
-    await includeArchived.setValue(false);
-    await clickButtonByText(wrapper, "Search");
+    await wrapper.get('[data-testid="customer-advanced-filters-open"]').trigger("click");
+    await settle();
+    await wrapper.get<HTMLInputElement>('[data-testid="customer-advanced-filters-include-archived"]').setValue(false);
+    await wrapper.get('[data-testid="customer-advanced-filters-dialog"] form').trigger("submit");
     await settle();
 
     expect(apiMocks.listCustomersMock.mock.calls.at(-1)?.[2]).toMatchObject({
@@ -699,7 +932,150 @@ describe("CustomerAdminView search dialog", () => {
     expect(wrapper.find('[data-testid="customer-search-results-modal"]').exists()).toBe(false);
   });
 
-  it("keeps export, new customer, and route-based customer selection working", async () => {
+  it("shows the full workspace overlay only during the initial blocking customer bootstrap", async () => {
+    const initialList = deferred<ReturnType<typeof buildCustomerListItem>[]>();
+    apiMocks.listCustomersMock.mockReturnValue(initialList.promise);
+
+    const wrapper = mountCustomerAdminWithoutSettling();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("true");
+
+    initialList.resolve([buildCustomerListItem("customer-default", "Alpha Security", "K-0001", "active")]);
+    await settle();
+
+    expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
+    expect(wrapper.find('[data-testid="customer-list-row"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-detail-workspace"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-dashboard-tab-stub"]').exists()).toBe(false);
+  });
+
+  it("does not activate the full overlay for background search, same-record detail refresh, or session reconciliation", async () => {
+    apiMocks.listCustomersMock.mockResolvedValueOnce([
+      buildCustomerListItem("customer-default", "Alpha Security", "K-0001", "active"),
+      buildCustomerListItem("customer-rhein", "RheinForum Köln", "K-1000", "active"),
+    ]);
+    const wrapper = await mountCustomerAdmin();
+    expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
+
+    apiMocks.listCustomersMock.mockClear();
+    const searchInput = wrapper.get<HTMLInputElement>('[data-testid="customer-search-select-input"]');
+    await searchInput.setValue("Rhein");
+    await settle();
+    expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
+    expect(apiMocks.listCustomersMock).not.toHaveBeenCalled();
+
+    const refreshedCustomer = deferred<ReturnType<typeof buildCustomerRead>>();
+    apiMocks.getCustomerMock.mockReturnValueOnce(refreshedCustomer.promise);
+    await wrapper.get('[data-testid="customer-list-row"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
+    refreshedCustomer.resolve(buildCustomerRead("customer-rhein", "RheinForum Köln", "K-1000"));
+    await settle();
+    expect(wrapper.find('[data-testid="customer-detail-workspace"]').exists()).toBe(true);
+
+    authStoreState.isSessionResolving = true;
+    await settle();
+    expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
+    expect(wrapper.find('[data-testid="customer-detail-workspace"]').exists()).toBe(true);
+    authStoreState.isSessionResolving = false;
+  });
+
+  it("shows a controlled empty state for an invalid customer_id without auto-selecting another customer", async () => {
+    routeState.query = {
+      customer_id: "customer-missing",
+      tab: "dashboard",
+    };
+    const wrapper = await mountCustomerAdmin();
+
+    expect(wrapper.find('[data-testid="customer-detail-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-list-section"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-dashboard-tab-stub"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-detail-empty-state"]').text()).toContain("Customer not found");
+    expect(wrapper.find('[data-testid="customer-back-to-list"]').exists()).toBe(true);
+  });
+
+  it("returns from an invalid customer route to the list-only fallback", async () => {
+    routeState.query = {
+      customer_id: "customer-missing",
+      tab: "dashboard",
+    };
+    const wrapper = await mountCustomerAdmin();
+
+    await wrapper.get('[data-testid="customer-back-to-list"]').trigger("click");
+    await settle();
+
+    expect(routerReplaceMock).toHaveBeenCalledWith({ query: {} });
+    expect(wrapper.find('[data-testid="customer-list-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-list-section"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-detail-workspace"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-dashboard-tab-stub"]').exists()).toBe(false);
+  });
+
+  it("returns to list-first state when customer_id is removed from the route", async () => {
+    const wrapper = await mountSelectedCustomer("dashboard");
+    expect(wrapper.find('[data-testid="customer-dashboard-tab-stub"]').exists()).toBe(true);
+
+    routeState.query = {};
+    await settle();
+
+    expect(wrapper.find('[data-testid="customer-list-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-list-row"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-detail-workspace"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-dashboard-tab-stub"]').exists()).toBe(false);
+  });
+
+  it("returns from selected detail mode to list-only mode through the back action", async () => {
+    const wrapper = await mountSelectedCustomer("dashboard");
+
+    expect(wrapper.find('[data-testid="customer-detail-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-list-section"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-back-to-list"]').classes()).toContain("customer-admin-back-button");
+
+    await wrapper.get('[data-testid="customer-back-to-list"]').trigger("click");
+    await settle();
+
+    expect(routerReplaceMock).toHaveBeenCalledWith({ query: {} });
+    expect(wrapper.find('[data-testid="customer-list-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-list-section"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-detail-workspace"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-page-context-label"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-page-context-label-full-title"]').exists()).toBe(false);
+    expect(routeState.meta.title).toBe("Customers");
+  });
+
+  it("does not activate the full overlay while nested contact saves and same-customer refreshes are pending", async () => {
+    const wrapper = await mountSelectedCustomer("contact_access");
+    expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
+
+    const contactPanel = wrapper.get('[data-testid="customer-contact-access-card-contacts"]');
+    await contactPanel.get<HTMLInputElement>('input[required]').setValue("Ada Lovelace");
+    await contactPanel.get<HTMLInputElement>('input[type="email"]').setValue("ada@example.test");
+
+    const contactSave = deferred<Record<string, never>>();
+    apiMocks.createCustomerContactMock.mockReturnValueOnce(contactSave.promise);
+    await contactPanel.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
+    expect(wrapper.find('[data-testid="customer-tab-panel-contact-access"]').exists()).toBe(true);
+
+    const detailRefresh = deferred<ReturnType<typeof buildCustomerRead>>();
+    apiMocks.getCustomerMock.mockReturnValueOnce(detailRefresh.promise);
+    contactSave.resolve({});
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
+    expect(wrapper.find('[data-testid="customer-tab-panel-contact-access"]').exists()).toBe(true);
+
+    detailRefresh.resolve(buildCustomerRead("customer-default", "Alpha Security", "K-0001"));
+    await settle();
+
+    expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
+    expect(wrapper.find('[data-testid="customer-tab-panel-contact-access"]').exists()).toBe(true);
+  });
+
+  it("keeps route-based customer selection working in detail-only mode", async () => {
     routeState.query = {
       customer_id: "customer-rhein",
       tab: "dashboard",
@@ -712,18 +1088,128 @@ describe("CustomerAdminView search dialog", () => {
       return [buildCustomerListItem("customer-rhein", "RheinForum Köln", "K-1000", "active")];
     });
     apiMocks.getCustomerMock.mockClear();
-    apiMocks.exportCustomersMock.mockClear();
 
     const wrapper = await mountCustomerAdmin();
 
     expect(apiMocks.getCustomerMock).toHaveBeenCalledWith("tenant-1", "customer-rhein", "token-1");
-    await clickButtonByText(wrapper, "CSV export");
+    expect(wrapper.find('[data-testid="customer-detail-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-list-section"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-page-context-label"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-page-context-label-full-title"]').exists()).toBe(false);
+    expect(routeState.meta.title).toBe("RheinForum Köln");
+    expect(wrapper.get('[data-testid="customer-dashboard-tab-stub"]').text()).toContain("customer-rhein");
+  });
+
+  it("keeps export and new customer actions in list-only mode", async () => {
+    const wrapper = await mountCustomerAdmin();
+    apiMocks.exportCustomersMock.mockClear();
+
+    const filterToolbar = wrapper.get(".customer-admin-filter-toolbar");
+    expect(filterToolbar.text()).toContain("Advanced filters");
+    expect(filterToolbar.text()).not.toContain("CSV export");
+    expect(filterToolbar.text()).not.toContain("New customer");
+
+    await wrapper.get('[data-testid="customer-list-header-export"]').trigger("click");
     await settle();
+    expect(apiMocks.exportCustomersMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({
+        include_archived: false,
+        tenant_id: "tenant-1",
+      }),
+    );
+    expect(apiMocks.downloadCustomerDocumentMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "doc-1",
+      1,
+      "token-1",
+      "customers.csv",
+    );
+    expect(createObjectUrlMock).toHaveBeenCalledWith(expect.any(Blob));
+    expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:customer-export");
+    expect(showFeedbackToastMock).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining("The download started."),
+      title: "Customer export created",
+      tone: "success",
+    }));
+
+    await wrapper.get('[data-testid="customer-list-header-new-customer"]').trigger("click");
+    await settle();
+    expect(wrapper.find('[data-testid="customer-detail-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-list-section"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Create customer");
+  });
+
+  it("shows a clear fallback message when customer export download fails after creation", async () => {
+    const wrapper = await mountCustomerAdmin();
+    apiMocks.downloadCustomerDocumentMock.mockRejectedValueOnce(new Error("download failed"));
+    showFeedbackToastMock.mockClear();
+
+    await wrapper.get('[data-testid="customer-list-header-export"]').trigger("click");
+    await settle();
+
     expect(apiMocks.exportCustomersMock).toHaveBeenCalled();
+    expect(apiMocks.downloadCustomerDocumentMock).toHaveBeenCalled();
+    expect(createObjectUrlMock).not.toHaveBeenCalled();
+    expect(showFeedbackToastMock).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining("Use the document ID to download the file from the document library."),
+      title: "Export created, download failed",
+      tone: "warning",
+    }));
+    expect(showFeedbackToastMock.mock.calls.at(-1)?.[0].message).toContain("doc-1");
+  });
+
+  it("exports and downloads with active search and advanced filter state", async () => {
+    const wrapper = await mountCustomerAdmin();
+
+    await wrapper.get<HTMLInputElement>('[data-testid="customer-search-select-input"]').setValue("Rhein");
+    await wrapper.get('[data-testid="customer-advanced-filters-open"]').trigger("click");
+    await settle();
+    await wrapper.get<HTMLInputElement>('[data-testid="customer-advanced-filters-include-archived"]').setValue(true);
+    await wrapper.get('[data-testid="customer-advanced-filters-dialog"] form').trigger("submit");
+    await settle();
+
+    apiMocks.exportCustomersMock.mockClear();
+    apiMocks.downloadCustomerDocumentMock.mockClear();
+
+    await wrapper.get('[data-testid="customer-list-header-export"]').trigger("click");
+    await settle();
+
+    expect(apiMocks.exportCustomersMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({
+        include_archived: true,
+        search: "Rhein",
+        tenant_id: "tenant-1",
+      }),
+    );
+    expect(apiMocks.downloadCustomerDocumentMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "doc-1",
+      1,
+      "token-1",
+      "customers.csv",
+    );
+  });
+
+  it("returns from new customer cancel to the list-first state when no selected route exists", async () => {
+    const wrapper = await mountCustomerAdmin();
 
     await clickButtonByText(wrapper, "New customer");
     await settle();
+    expect(wrapper.find('[data-testid="customer-detail-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-list-section"]').exists()).toBe(false);
     expect(wrapper.text()).toContain("Create customer");
+
+    await clickButtonByText(wrapper, "Cancel");
+    await settle();
+
+    expect(wrapper.find('[data-testid="customer-list-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-list-row"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-detail-workspace"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-dashboard-tab-stub"]').exists()).toBe(false);
   });
 
   it("renders contact access as the only contacts-addresses-portal top-level tab with right-side history links", async () => {

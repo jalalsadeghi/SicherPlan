@@ -161,6 +161,9 @@ class CustomerListItem(BaseModel):
     name: str
     status: str
     version_no: int
+    classification_lookup_id: str | None = None
+    customer_status_lookup_id: str | None = None
+    default_branch_id: str | None = None
 
 
 class CustomerRead(CustomerListItem):
@@ -1008,6 +1011,7 @@ class CustomerExportResult(BaseModel):
     tenant_id: str
     job_id: str
     document_id: str
+    version_no: int
     file_name: str
     row_count: int
 

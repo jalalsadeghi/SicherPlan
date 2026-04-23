@@ -28,6 +28,7 @@ from app.modules.planning.schemas import (
     PlanningRecordCreate,
     PlanningRecordAttachmentCreate,
     PlanningRecordAttachmentLinkCreate,
+    PlanningRecordAttachmentRead,
     PlanningRecordFilter,
     PlanningRecordListItem,
     PlanningRecordRead,
@@ -40,7 +41,6 @@ from app.modules.planning.schemas import (
     TradeFairPlanDetailRead,
     TradeFairPlanDetailUpdate,
 )
-from app.modules.platform_services.docs_schemas import DocumentRead
 from app.modules.platform_services.docs_schemas import DocumentCreate, DocumentLinkCreate, DocumentVersionCreate
 from app.modules.platform_services.docs_service import DocumentService
 from app.modules.planning.validation_service import PlanningValidationService
@@ -216,10 +216,10 @@ class PlanningRecordService:
         tenant_id: str,
         planning_record_id: str,
         _actor: RequestAuthorizationContext,
-    ) -> list[DocumentRead]:
+    ) -> list[PlanningRecordAttachmentRead]:
         self._require_record(tenant_id, planning_record_id)
         return [
-            DocumentRead.model_validate(document)
+            self._read_planning_record_attachment(document, planning_record_id)
             for document in self.document_repository.list_documents_for_owner(tenant_id, "ops.planning_record", planning_record_id)
         ]
 
@@ -229,7 +229,7 @@ class PlanningRecordService:
         planning_record_id: str,
         payload: PlanningRecordAttachmentCreate,
         actor: RequestAuthorizationContext,
-    ) -> DocumentRead:
+    ) -> PlanningRecordAttachmentRead:
         self._require_record(tenant_id, planning_record_id)
         if payload.tenant_id != tenant_id:
             raise ApiException(
@@ -283,7 +283,7 @@ class PlanningRecordService:
             after_json={"document_id": document.id},
         )
         refreshed = self.document_repository.list_documents_for_owner(tenant_id, "ops.planning_record", planning_record_id)
-        return DocumentRead.model_validate(next(row for row in refreshed if row.id == document.id))
+        return self._read_planning_record_attachment(next(row for row in refreshed if row.id == document.id), planning_record_id)
 
     def link_planning_record_attachment(
         self,
@@ -291,7 +291,7 @@ class PlanningRecordService:
         planning_record_id: str,
         payload: PlanningRecordAttachmentLinkCreate,
         actor: RequestAuthorizationContext,
-    ) -> DocumentRead:
+    ) -> PlanningRecordAttachmentRead:
         self._require_record(tenant_id, planning_record_id)
         if payload.tenant_id != tenant_id:
             raise ApiException(
@@ -322,7 +322,43 @@ class PlanningRecordService:
             after_json={"document_id": payload.document_id},
         )
         refreshed = self.document_repository.list_documents_for_owner(tenant_id, "ops.planning_record", planning_record_id)
-        return DocumentRead.model_validate(next(row for row in refreshed if row.id == payload.document_id))
+        return self._read_planning_record_attachment(next(row for row in refreshed if row.id == payload.document_id), planning_record_id)
+
+    def unlink_planning_record_attachment(
+        self,
+        tenant_id: str,
+        planning_record_id: str,
+        document_id: str,
+        actor: RequestAuthorizationContext,
+    ) -> None:
+        self._require_record(tenant_id, planning_record_id)
+        if self.document_service is None:
+            raise ApiException(500, "platform.internal", "errors.platform.internal")
+        self.document_service.delete_document_link(tenant_id, document_id, "ops.planning_record", planning_record_id, actor)
+        self._record_event(
+            actor,
+            "planning.planning_record.attachment.unlinked",
+            "ops.planning_record",
+            planning_record_id,
+            tenant_id,
+            after_json={"document_id": document_id},
+        )
+
+    @staticmethod
+    def _read_planning_record_attachment(document: object, planning_record_id: str) -> PlanningRecordAttachmentRead:
+        relation_label: str | None = None
+        relation_type: str | None = None
+        for link in getattr(document, "links", []) or []:
+            if getattr(link, "owner_type", None) == "ops.planning_record" and getattr(link, "owner_id", None) == planning_record_id:
+                relation_label = getattr(link, "label", None)
+                relation_type = getattr(link, "relation_type", None)
+                break
+        return PlanningRecordAttachmentRead.model_validate(document).model_copy(
+            update={
+                "relation_label": relation_label,
+                "relation_type": relation_type,
+            }
+        )
 
     def _validate_detail_payloads(self, tenant_id: str, order: CustomerOrder, planning_mode_code: str, payload: PlanningRecordCreate | PlanningRecordUpdate) -> None:
         detail_payloads = {
@@ -477,7 +513,7 @@ class PlanningRecordService:
         return schema.model_copy(
             update={
                 "attachments": [
-                    DocumentRead.model_validate(document)
+                    self._read_planning_record_attachment(document, row.id)
                     for document in self.document_repository.list_documents_for_owner(row.tenant_id, "ops.planning_record", row.id)
                 ]
             }

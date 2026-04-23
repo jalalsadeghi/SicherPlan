@@ -682,6 +682,11 @@ class OrderAttachmentRead(DocumentRead):
     relation_type: str | None = None
 
 
+class PlanningRecordAttachmentRead(DocumentRead):
+    relation_label: str | None = None
+    relation_type: str | None = None
+
+
 class PlanningRecordAttachmentCreate(BaseModel):
     tenant_id: str
     title: str
@@ -952,7 +957,7 @@ class PlanningRecordRead(PlanningRecordListItem):
     site_detail: SitePlanDetailRead | None = None
     trade_fair_detail: TradeFairPlanDetailRead | None = None
     patrol_detail: PatrolPlanDetailRead | None = None
-    attachments: list[DocumentRead] = Field(default_factory=list)
+    attachments: list[PlanningRecordAttachmentRead] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
     created_by_user_id: str | None
@@ -1199,6 +1204,7 @@ class ShiftSeriesCreate(BaseModel):
 
 
 class ShiftSeriesUpdate(BaseModel):
+    shift_template_id: str | None = None
     label: str | None = None
     recurrence_code: str | None = None
     interval_count: int | None = Field(default=None, ge=1)

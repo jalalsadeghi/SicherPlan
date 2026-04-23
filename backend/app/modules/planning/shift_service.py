@@ -77,6 +77,7 @@ class ShiftPlanningRepository(Protocol):
     def get_shift_series_exception_by_date(self, tenant_id: str, shift_series_id: str, exception_date: date) -> ShiftSeriesException | None: ...
     def create_shift_series_exception(self, tenant_id: str, shift_series_id: str, payload: ShiftSeriesExceptionCreate, actor_user_id: str | None) -> ShiftSeriesException: ...
     def update_shift_series_exception(self, tenant_id: str, row_id: str, payload: ShiftSeriesExceptionUpdate, actor_user_id: str | None) -> ShiftSeriesException | None: ...
+    def delete_shift_series_exception(self, tenant_id: str, row_id: str) -> bool: ...
     def list_shifts(self, tenant_id: str, filters: ShiftListFilter) -> list[Shift]: ...
     def get_shift(self, tenant_id: str, row_id: str) -> Shift | None: ...
     def find_shift_duplicate(self, tenant_id: str, shift_plan_id: str, starts_at: datetime, ends_at: datetime, shift_type_code: str, *, exclude_id: str | None = None) -> Shift | None: ...
@@ -239,13 +240,13 @@ class ShiftPlanningService:
     def update_shift_series(self, tenant_id: str, shift_series_id: str, payload: ShiftSeriesUpdate, actor: RequestAuthorizationContext) -> ShiftSeriesRead:
         current = self._require_shift_series(tenant_id, shift_series_id)
         shift_plan = self._require_shift_plan(tenant_id, current.shift_plan_id)
-        if "shift_template_id" in payload.model_dump(exclude_unset=True):
-            raise ApiException(400, "planning.shift_series.template_change_not_allowed", "errors.planning.shift_series.template_change_not_allowed")
         before_json = self._snapshot(current)
+        next_template_id = self._field_value(payload, "shift_template_id", current.shift_template_id)
+        self._require_template(tenant_id, next_template_id)
         candidate = ShiftSeriesCreate(
             tenant_id=tenant_id,
             shift_plan_id=current.shift_plan_id,
-            shift_template_id=current.shift_template_id,
+            shift_template_id=next_template_id,
             label=self._field_value(payload, "label", current.label),
             recurrence_code=self._field_value(payload, "recurrence_code", current.recurrence_code),
             interval_count=self._field_value(payload, "interval_count", current.interval_count),
@@ -375,6 +376,26 @@ class ShiftPlanningService:
             raise self._not_found("shift_series_exception")
         self._record_event(actor, "planning.shift_series_exception.updated", "ops.shift_series_exception", row.id, tenant_id, before_json=before_json, after_json=self._snapshot(row))
         return ShiftSeriesExceptionRead.model_validate(row)
+
+    def delete_shift_series_exception(
+        self,
+        tenant_id: str,
+        row_id: str,
+        actor: RequestAuthorizationContext,
+    ) -> None:
+        current = self._require_shift_series_exception(tenant_id, row_id)
+        before_json = self._snapshot(current)
+        deleted = self.repository.delete_shift_series_exception(tenant_id, row_id)
+        if not deleted:
+            raise self._not_found("shift_series_exception")
+        self._record_event(
+            actor,
+            "planning.shift_series_exception.deleted",
+            "ops.shift_series_exception",
+            row_id,
+            tenant_id,
+            before_json=before_json,
+        )
 
     def list_shifts(self, tenant_id: str, filters: ShiftListFilter, _actor: RequestAuthorizationContext) -> list[ShiftListItem]:
         return [ShiftListItem.model_validate(row) for row in self.repository.list_shifts(tenant_id, filters)]

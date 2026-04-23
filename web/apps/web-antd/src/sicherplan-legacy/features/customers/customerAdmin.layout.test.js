@@ -9,50 +9,91 @@ const viewPath = resolve(
 );
 const source = readFileSync(viewPath, "utf8");
 
-test("customer workspace uses a single-column list-then-detail layout with detail tabs", () => {
+test("customer workspace splits list-only and detail-only modes with detail tabs", () => {
   assert.match(source, /<SicherPlanLoadingOverlay[\s\S]*busy-testid="customer-workspace-loading-overlay"/);
   assert.match(source, /:busy="customerWorkspaceBusy"/);
   assert.match(source, /:text="customerWorkspaceLoadingText"/);
   assert.match(source, /const customerWorkspaceBusy = computed\(/);
-  assert.match(source, /loading\.customer/);
-  assert.match(source, /loading\.contact/);
-  assert.match(source, /loading\.address/);
-  assert.match(source, /loading\.commercial/);
-  assert.match(source, /loading\.rateLine/);
-  assert.match(source, /loading\.surchargeRule/);
-  assert.match(source, /loading\.portalAccess/);
-  assert.match(source, /loading\.portalPrivacy/);
-  assert.match(source, /loading\.historyAttachment/);
-  assert.match(source, /loading\.employeeBlock/);
-  assert.match(source, /loading\.sharedAddress/);
-  assert.match(source, /loading\.hrCatalogBootstrap/);
+  assert.match(source, /const customerWorkspaceHasStableContent = computed/);
+  assert.match(source, /const customerWorkspaceBlockingLoad = computed/);
+  const busyBlock = source.slice(
+    source.indexOf("const customerWorkspaceBusy = computed"),
+    source.indexOf("const customerWorkspaceLoadingText = computed"),
+  );
+  assert.match(busyBlock, /customerWorkspaceBlockingLoad\.value/);
+  assert.doesNotMatch(busyBlock, /loading\.customer/);
+  assert.doesNotMatch(busyBlock, /loading\.contact/);
+  assert.doesNotMatch(busyBlock, /loading\.address/);
+  assert.doesNotMatch(busyBlock, /loading\.commercial/);
+  assert.doesNotMatch(busyBlock, /loading\.rateLine/);
+  assert.doesNotMatch(busyBlock, /loading\.surchargeRule/);
+  assert.doesNotMatch(busyBlock, /loading\.portalAccess/);
+  assert.doesNotMatch(busyBlock, /loading\.portalPrivacy/);
+  assert.doesNotMatch(busyBlock, /loading\.historyAttachment/);
+  assert.doesNotMatch(busyBlock, /loading\.employeeBlock/);
+  assert.doesNotMatch(busyBlock, /loading\.sharedAddress/);
+  assert.doesNotMatch(busyBlock, /loading\.hrCatalogBootstrap/);
   assert.match(source, /const customerWorkspaceLoadingText = computed\(\(\) =>/);
   assert.match(source, /class="customer-admin-grid"/);
   assert.match(source, /\.customer-admin-grid \{[\s\S]*grid-template-columns: minmax\(0, 1fr\);/);
+  assert.match(source, /v-if="customerAdminListMode"[\s\S]*data-testid="customer-list-only-mode"/);
+  assert.match(source, /v-else[\s\S]*data-testid="customer-detail-only-mode"/);
   assert.match(source, /data-testid="customer-list-section"/);
   assert.match(source, /data-testid="customer-detail-workspace"/);
+  assert.match(source, /data-testid="customer-back-to-list"/);
   assert.match(source, /data-testid="customer-detail-tabs"/);
+  assert.match(source, /data-testid="customer-detail-title"/);
+  assert.doesNotMatch(source, /data-testid="customer-page-context-label"/);
+  assert.doesNotMatch(source, /data-testid="customer-page-context-label-full-title"/);
   assert.match(source, /\.customer-admin-list-panel \{[\s\S]*position: static;/);
   assert.match(source, /resolveCustomerAdminRouteContext\(route\.query\)/);
 });
 
-test("customer list panel keeps filters and actions but removes inline customer rows", () => {
+test("customer detail mode updates app-shell title without rendering a duplicate in-page pill", () => {
+  assert.match(source, /const customerPageContextFullTitle = computed/);
+  assert.match(source, /const customerPageContextLabel = computed\(\(\) => truncateCustomerContextLabel/);
+  assert.match(source, /function truncateCustomerContextLabel\(value: string, maxLength = 34\)/);
+  assert.match(source, /\(route\.meta as Record<string, unknown>\)\.title = label/);
+  assert.doesNotMatch(source, /class="customer-admin-context-bar"/);
+  assert.doesNotMatch(source, /\.customer-admin-context-bar/);
+  assert.match(source, /class="customer-admin-detail-title"/);
+  assert.match(source, /class="cta-button cta-secondary customer-admin-back-button"/);
+  assert.match(source, /\.customer-admin-detail-title \{[\s\S]*font-size: clamp\(1\.55rem, 2\.4vw, 2\.2rem\);/);
+  assert.match(source, /\.customer-admin-detail-title \{[\s\S]*font-weight: 800;/);
+  assert.match(source, /\.customer-admin-back-button \{[\s\S]*min-height: 2rem;/);
+  assert.match(source, /\.customer-admin-back-button \{[\s\S]*padding: 0\.32rem 0\.68rem;/);
+});
+
+test("customer list panel keeps a compact inline search row and renders clickable customer rows", () => {
   const listSectionMatch = source.match(
     /<section class="module-card customer-admin-panel customer-admin-list-panel" data-testid="customer-list-section">([\s\S]*?)<\/section>/,
   );
   assert.ok(listSectionMatch, "customer list section should exist");
   const listSection = listSectionMatch[1];
   assert.match(listSection, /customerAdmin\.filters\.search/);
-  assert.match(listSection, /customerAdmin\.actions\.search/);
+  assert.match(listSection, /customerAdmin\.actions\.advancedFilters/);
   assert.match(listSection, /customerAdmin\.actions\.exportCustomers/);
   assert.match(listSection, /customerAdmin\.actions\.newCustomer/);
-  assert.match(listSection, /class="customer-admin-filter-grid"/);
-  assert.match(listSection, /class="customer-admin-filter-actions"/);
-  assert.match(listSection, /class="cta-row customer-admin-filter-actions__buttons"/);
+  assert.match(listSection, /data-testid="customer-list-header-export"/);
+  assert.match(listSection, /data-testid="customer-list-header-new-customer"/);
+  assert.match(listSection, /class="customer-admin-filter-toolbar"/);
+  assert.match(listSection, /class="customer-admin-filter-toolbar__actions"/);
   assert.match(listSection, /data-testid="customer-search-select"/);
   assert.match(listSection, /data-testid="customer-search-select-input"/);
-  assert.doesNotMatch(listSection, /customer-admin-row/);
-  assert.doesNotMatch(listSection, /v-for="customer in customers"/);
+  assert.match(listSection, /data-testid="customer-advanced-filters-open"/);
+  assert.doesNotMatch(listSection, /data-testid="customer-search-suggestions"/);
+  assert.doesNotMatch(listSection, /@keydown\.enter\.prevent="handleOpenCustomerSearchResults"/);
+  assert.doesNotMatch(listSection, /customerAdmin\.actions\.search/);
+  assert.doesNotMatch(listSection, /v-model="filters\.lifecycle_status"/);
+  assert.doesNotMatch(listSection, /v-model="filters\.default_branch_id"/);
+  assert.doesNotMatch(listSection, /v-model="filters\.default_mandate_id"/);
+  assert.doesNotMatch(listSection, /v-model="filters\.include_archived"/);
+  assert.match(listSection, /data-testid="customer-list-row"/);
+  assert.match(listSection, /data-testid="customer-list-row-name"/);
+  assert.match(listSection, /data-testid="customer-list-row-number"/);
+  assert.match(listSection, /data-testid="customer-list-row-status"/);
+  assert.match(listSection, /@click="openCustomerWorkspace\(customer\.id\)"/);
+  assert.match(listSection, /v-for="customer in filteredCustomers"/);
   assert.doesNotMatch(listSection, /customerAdmin\.list\.sidebarNavigationHint/);
 
   const listSectionIndex = source.indexOf('data-testid="customer-list-section"');
@@ -60,34 +101,77 @@ test("customer list panel keeps filters and actions but removes inline customer 
   assert.ok(listSectionIndex >= 0 && detailSectionIndex >= 0 && listSectionIndex < detailSectionIndex);
 });
 
-test("customer list filter layout uses a dedicated responsive grid and compact action row", () => {
-  assert.match(source, /\.customer-admin-filter-grid \{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
-  assert.match(
-    source,
-    /@media \(max-width: 1280px\) \{[\s\S]*\.customer-admin-filter-grid \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
-  );
-  assert.match(source, /@media \(max-width: 720px\) \{[\s\S]*\.customer-admin-filter-grid \{[\s\S]*grid-template-columns: 1fr;/);
-  assert.match(source, /\.customer-admin-filter-actions \{[\s\S]*justify-content: space-between;[\s\S]*align-items: center;/);
-  assert.match(source, /\.customer-admin-filter-actions__buttons \{[\s\S]*justify-content: flex-end;/);
-  assert.match(source, /@media \(max-width: 720px\) \{[\s\S]*\.customer-admin-filter-actions \{[\s\S]*flex-direction: column;/);
-  assert.match(source, /@media \(max-width: 720px\) \{[\s\S]*\.customer-admin-filter-actions__buttons \{[\s\S]*justify-content: flex-start;/);
+test("advanced filters use the existing modal pattern and stable controls", () => {
+  assert.match(source, /advancedFiltersModalOpen = ref\(false\)/);
+  assert.match(source, /data-testid="customer-advanced-filters-dialog"/);
+  assert.match(source, /role="dialog"/);
+  assert.match(source, /aria-modal="true"/);
+  assert.match(source, /data-testid="customer-advanced-filters-search"/);
+  assert.match(source, /data-testid="customer-advanced-filters-status"/);
+  assert.match(source, /data-testid="customer-advanced-filters-default-branch"/);
+  assert.match(source, /data-testid="customer-advanced-filters-default-mandate"/);
+  assert.match(source, /data-testid="customer-advanced-filters-include-archived"/);
+  assert.match(source, /data-testid="customer-advanced-filters-apply"/);
+  assert.match(source, /data-testid="customer-advanced-filters-cancel"/);
+  assert.match(source, /function applyAdvancedFilters\(\)/);
+  assert.match(source, /await refreshCustomers\(\);[\s\S]*advancedFiltersModalOpen\.value = false/);
+  assert.match(source, /event\.key === "Escape" && advancedFiltersModalOpen\.value/);
 });
 
-test("customer search uses debounced modal-backed results and dashboard selection", () => {
-  assert.match(source, /customerSearchModalOpen = ref\(false\)/);
-  assert.match(source, /customerSearchResults = ref<CustomerListItem\[\]>\(\[\]\)/);
-  assert.match(source, /customerSearchSuggestions = ref<CustomerListItem\[\]>\(\[\]\)/);
-  assert.match(source, /loading = reactive\(\{[\s\S]*customerSearch: false,/);
-  assert.match(source, /setTimeout\(\(\) => \{[\s\S]*runCustomerSearch\(\{ suppressFeedback: true \}\)/);
-  assert.match(source, /await listCustomers\([\s\S]*buildCustomerSearchParams/);
-  assert.match(source, /data-testid="customer-search-results-modal"/);
-  assert.match(source, /data-testid="customer-search-result-row"/);
-  assert.match(source, /data-testid="customer-search-result-empty"/);
-  assert.match(source, /data-testid="customer-search-result-close"/);
-  assert.match(source, /role="dialog"/);
+test("customer list compact filter layout keeps search beside actions", () => {
+  assert.match(source, /\.customer-admin-filter-toolbar \{[\s\S]*grid-template-columns: minmax\(280px, 1fr\) auto;/);
+  assert.match(source, /\.customer-admin-filter-toolbar__actions \{[\s\S]*justify-content: flex-end;/);
+  assert.match(source, /\.customer-admin-list-header-actions \{/);
+  assert.match(source, /\.customer-admin-header-action \{/);
+  assert.match(source, /\.customer-admin-filter-grid--dialog \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(source, /@media \(max-width: 720px\) \{[\s\S]*\.customer-admin-filter-toolbar \{[\s\S]*grid-template-columns: 1fr;/);
+});
+
+test("customer export downloads the generated platform document after creation", () => {
+  assert.match(source, /downloadCustomerDocument/);
+  assert.match(source, /const result = await exportCustomers/);
+  assert.match(source, /result\.document_id/);
+  assert.match(source, /result\.version_no/);
+  assert.match(source, /triggerBlobDownload\(download\.blob, download\.fileName \|\| result\.file_name\)/);
+  assert.match(source, /customerAdmin\.feedback\.exportDownloadStarted/);
+  assert.match(source, /customerAdmin\.feedback\.exportDownloadFailed/);
+  assert.match(source, /customerAdmin\.feedback\.exportDownloadFallback/);
+});
+
+test("customer search locally filters visible list rows without suggestion or modal flow", () => {
+  assert.match(source, /const normalizedCustomerListSearch = computed/);
+  assert.match(source, /const filteredCustomers = computed/);
+  assert.match(source, /customerListSearchHaystack\(customer\)\.includes\(search\)/);
+  assert.match(source, /function customerListSearchHaystack\(customer: CustomerListItem\)/);
+  assert.doesNotMatch(source, /customerSearchModalOpen = ref/);
+  assert.doesNotMatch(source, /customerSearchResults = ref/);
+  assert.doesNotMatch(source, /customerSearchSuggestions = ref/);
+  assert.doesNotMatch(source, /customerSearch: false/);
+  assert.doesNotMatch(source, /runCustomerSearch/);
+  assert.doesNotMatch(source, /buildCustomerSearchParams/);
+  assert.doesNotMatch(source, /data-testid="customer-search-results-modal"/);
+  assert.doesNotMatch(source, /data-testid="customer-search-result-row"/);
+  assert.doesNotMatch(source, /data-testid="customer-search-result-empty"/);
+  assert.doesNotMatch(source, /data-testid="customer-search-result-close"/);
   assert.match(source, /window\.addEventListener\("keydown", handleCustomerSearchWindowKeydown\)/);
   assert.match(source, /event\.key === "Escape"/);
-  assert.match(source, /await router\.replace\([\s\S]*customer_id: customerId,[\s\S]*tab: "dashboard"/);
+  assert.match(source, /await router\.replace\([\s\S]*customer_id: customerId,[\s\S]*tab: detailTab/);
+});
+
+test("plain customers route stays list-first and customer_id query owns workspace selection", () => {
+  assert.match(source, /const routeHasSelectedCustomer = computed/);
+  assert.match(source, /const customerAdminDetailMode = computed/);
+  assert.match(source, /const customerAdminListMode = computed\(\(\) => !customerAdminDetailMode\.value\)/);
+  assert.match(source, /function openCustomerWorkspace\(customerId: string, detailTab = "dashboard"\)/);
+  assert.match(source, /customer_id: customerId/);
+  assert.match(source, /tab: detailTab/);
+  assert.match(source, /data-testid="customer-detail-empty-state"/);
+  assert.match(source, /async function returnToCustomerList\(\)/);
+  assert.match(source, /delete nextQuery\.customer_id/);
+  assert.match(source, /delete nextQuery\.tab/);
+  assert.match(source, /routeCustomerNotFound/);
+  assert.doesNotMatch(source, /else if \(customers\.value\[0\] && !isCreatingCustomer\.value\)/);
+  assert.doesNotMatch(source, /await selectCustomer\(customers\.value\[0\]\.id\)/);
 });
 
 test("customer workspace removes the manual bearer-token gate and only keeps tenant switching for platform admins", () => {
@@ -115,7 +199,8 @@ test("customer workspace keeps the draft workspace mounted during session reconc
   assert.match(source, /workspace\.loading\.reconcilingSession/);
   assert.match(source, /customerAdmin\.scope\.reconcilingTitle/);
   assert.match(source, /customerAdmin\.scope\.reconcilingBody/);
-  assert.match(source, /isCustomerSessionResolving\.value\s*\|\|\s*loading\.customer/);
+  assert.match(source, /customerWorkspaceHasStableContent/);
+  assert.match(source, /!customerWorkspaceHasStableContent\.value[\s\S]*isCustomerSessionResolving\.value/);
 });
 
 test("customer same-record reloads preserve nested tab context with safe fallbacks", () => {
@@ -191,8 +276,9 @@ test("customer detail navigation splits primary tabs from secondary link-style t
   assert.match(source, /const secondaryCustomerDetailTabIds = new Set\(\["history", "employee_blocks"\]\)/);
 });
 
-test("create-mode cancel restores the selected customer through the dashboard default path", () => {
+test("create-mode cancel returns to list-first without an explicit selected customer route", () => {
   assert.match(source, /async function cancelCustomerEdit\(\) \{/);
+  assert.match(source, /if \(!routeHasSelectedCustomer\.value\) \{[\s\S]*clearCustomerWorkspace\(\);[\s\S]*return;/);
   assert.match(source, /await selectCustomer\(selectedCustomer\.value\.id, \{\s*preferredDetailTab: "dashboard",\s*\}\);/);
   assert.match(source, /startCreateCustomer\(\) \{[\s\S]*activeDetailTab\.value = "overview"/);
   assert.match(source, /startCreateCustomer\(\) \{[\s\S]*customerDashboard\.value = null;/);

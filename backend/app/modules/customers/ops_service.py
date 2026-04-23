@@ -207,7 +207,7 @@ class CustomerOpsService:
                 counts[key] += int(key in result.messages)
 
         invalid_rows = sum(1 for row in row_results if row.status == "invalid")
-        report_document_id = self._create_result_document(
+        report_document_id, _report_version_no = self._create_result_document(
             tenant_id,
             actor,
             file_name=f"customer-import-{job.id}.csv",
@@ -280,7 +280,7 @@ class CustomerOpsService:
             )
         )
         csv_content, row_count = self._build_export_csv(customers)
-        document_id = self._create_result_document(
+        document_id, version_no = self._create_result_document(
             tenant_id,
             actor,
             file_name=f"customers-export-{job.id}.csv",
@@ -309,6 +309,7 @@ class CustomerOpsService:
             tenant_id=tenant_id,
             job_id=job.id,
             document_id=document_id,
+            version_no=version_no,
             file_name=f"customers-export-{job.id}.csv",
             row_count=row_count,
         )
@@ -327,7 +328,7 @@ class CustomerOpsService:
             raise ApiException(404, "customers.not_found.contact", "errors.customers.contact.not_found")
         vcard_text = self._build_vcard(customer, contact)
         file_name = f"{self._slugify(contact.full_name)}.vcf"
-        document_id = self._create_result_document(
+        document_id, version_no = self._create_result_document(
             tenant_id,
             actor,
             file_name=file_name,
@@ -337,16 +338,16 @@ class CustomerOpsService:
             owner_id=contact.id,
             content=vcard_text.encode("utf-8"),
         )
-        document = self.document_service.get_document(tenant_id, document_id, actor)
-        version = document.versions[-1]
         self._record_event(
             actor,
             event_type="customers.contact.vcard_exported",
             entity_type="crm.customer_contact",
             entity_id=contact.id,
             tenant_id=tenant_id,
-            metadata_json={"customer_id": customer_id, "document_id": document_id, "version_no": version.version_no},
+            metadata_json={"customer_id": customer_id, "document_id": document_id, "version_no": version_no},
         )
+        document = self.document_service.get_document(tenant_id, document_id, actor)
+        version = document.versions[-1]
         return CustomerVCardResult(
             tenant_id=tenant_id,
             customer_id=customer_id,
@@ -684,7 +685,7 @@ class CustomerOpsService:
         owner_type: str,
         owner_id: str,
         content: bytes,
-    ) -> str:
+    ) -> tuple[str, int]:
         document = self.document_service.create_document(
             tenant_id,
             DocumentCreate(
@@ -695,7 +696,7 @@ class CustomerOpsService:
             ),
             actor,
         )
-        self.document_service.add_document_version(
+        version = self.document_service.add_document_version(
             tenant_id,
             document.id,
             DocumentVersionCreate(
@@ -712,7 +713,7 @@ class CustomerOpsService:
             DocumentLinkCreate(owner_type=owner_type, owner_id=owner_id, relation_type="attachment"),
             actor,
         )
-        return document.id
+        return document.id, version.version_no
 
     @staticmethod
     def _slugify(value: str) -> str:

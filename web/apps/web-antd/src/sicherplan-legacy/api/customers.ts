@@ -9,6 +9,9 @@ export interface CustomerListItem {
   name: string;
   status: LifecycleStatus | string;
   version_no: number;
+  classification_lookup_id?: string | null;
+  customer_status_lookup_id?: string | null;
+  default_branch_id?: string | null;
 }
 
 export interface CustomerContactRead {
@@ -581,6 +584,7 @@ export interface CustomerExportResult {
   tenant_id: string;
   job_id: string;
   document_id: string;
+  version_no: number;
   file_name: string;
   row_count: number;
 }
@@ -934,6 +938,48 @@ export function exportCustomers(tenantId: string, accessToken: string, payload: 
     method: "POST",
     body: payload,
   });
+}
+
+function extractDownloadFileName(contentDisposition: string | null, fallback: string) {
+  if (!contentDisposition) {
+    return fallback;
+  }
+  const match = contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
+  return match?.[1] ?? fallback;
+}
+
+export async function downloadCustomerDocument(
+  tenantId: string,
+  documentId: string,
+  versionNo: number,
+  accessToken: string,
+  fallbackFileName = `document-${documentId}`,
+) {
+  const response = await legacySessionRequest(
+    `/api/platform/tenants/${tenantId}/documents/${documentId}/versions/${versionNo}/download`,
+    { accessToken },
+  );
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as unknown;
+
+    if (isApiErrorEnvelope(payload)) {
+      throw new CustomerAdminApiError(response.status, payload.error);
+    }
+
+    throw new CustomerAdminApiError(response.status, {
+      code: "platform.internal",
+      message_key: response.status === 404 ? "errors.platform.http_not_found" : "errors.platform.internal",
+      request_id: "",
+      details: {},
+    });
+  }
+
+  const blob = await response.blob();
+  return {
+    blob,
+    fileName: extractDownloadFileName(response.headers.get("content-disposition"), fallbackFileName),
+  };
 }
 
 export function exportCustomerVCard(

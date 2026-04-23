@@ -443,6 +443,14 @@ export function linkPlanningRecordAttachment(tenantId: string, planningRecordId:
   );
 }
 
+export function unlinkPlanningRecordAttachment(tenantId: string, planningRecordId: string, documentId: string, accessToken: string) {
+  return request<void>(
+    `/api/planning/tenants/${tenantId}/ops/planning-records/${planningRecordId}/attachments/${documentId}`,
+    accessToken,
+    { method: "DELETE" },
+  );
+}
+
 export function listDocuments(
   tenantId: string,
   accessToken: string,

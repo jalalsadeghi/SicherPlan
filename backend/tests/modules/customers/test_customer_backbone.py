@@ -716,6 +716,9 @@ class TestCustomerService(unittest.TestCase):
         self.assertEqual(updated.name, "Nord Security AG")
         self.assertEqual(len(listed), 1)
         self.assertEqual(listed[0].customer_number, "K-1000")
+        self.assertEqual(listed[0].classification_lookup_id, "lookup-category")
+        self.assertEqual(listed[0].customer_status_lookup_id, "lookup-status")
+        self.assertEqual(listed[0].default_branch_id, "branch-1")
 
     def test_customer_reference_data_returns_lookup_and_structure_options(self) -> None:
         reference_data = self.service.get_reference_data("tenant-1", _actor())

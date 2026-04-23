@@ -19,6 +19,7 @@ from app.modules.planning.schemas import (
     ShiftSeriesCreate,
     ShiftSeriesExceptionCreate,
     ShiftSeriesGenerationRequest,
+    ShiftSeriesUpdate,
     ShiftTemplateCreate,
 )
 from app.modules.planning.shift_service import ShiftPlanningService
@@ -269,6 +270,13 @@ class FakeShiftPlanningRepository(FakePlanningRecordRepository):
         row.updated_at = datetime.now(UTC)
         row.updated_by_user_id = actor_user_id
         return row
+
+    def delete_shift_series_exception(self, tenant_id: str, row_id: str) -> bool:
+        row = self.get_shift_series_exception(tenant_id, row_id)
+        if row is None:
+            return False
+        del self.shift_series_exceptions[row.id]
+        return True
 
     def list_shifts(self, tenant_id: str, filters) -> list[Shift]:
         rows = [row for row in self.shifts.values() if row.tenant_id == tenant_id]
@@ -570,6 +578,54 @@ class ShiftPlanningServiceTests(unittest.TestCase):
             )
         self.assertEqual(captured.exception.message_key, "errors.planning.shift_series.invalid_shift_type_code")
 
+    def test_shift_series_update_can_replace_template_for_manual_time_adapter(self) -> None:
+        night_template = self.service.create_shift_template(
+            "tenant-1",
+            ShiftTemplateCreate(
+                tenant_id="tenant-1",
+                code="TPL-NIGHT",
+                label="Nachtdienst",
+                local_start_time=time(18, 0),
+                local_end_time=time(22, 0),
+                default_break_minutes=15,
+                shift_type_code="site_day",
+            ),
+            _context("planning.shift.write"),
+        )
+        series = self.service.create_shift_series(
+            "tenant-1",
+            ShiftSeriesCreate(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan.id,
+                shift_template_id=self.template.id,
+                label="April Tage",
+                recurrence_code="daily",
+                interval_count=1,
+                timezone="Europe/Berlin",
+                date_from=date(2026, 4, 1),
+                date_to=date(2026, 4, 1),
+            ),
+            _context("planning.shift.write"),
+        )
+
+        updated = self.service.update_shift_series(
+            "tenant-1",
+            series.id,
+            ShiftSeriesUpdate(shift_template_id=night_template.id, default_break_minutes=15, version_no=series.version_no),
+            _context("planning.shift.write"),
+        )
+        rows = self.service.generate_shift_series(
+            "tenant-1",
+            updated.id,
+            ShiftSeriesGenerationRequest(regenerate_existing=True),
+            _context("planning.shift.write"),
+        )
+
+        self.assertEqual(updated.shift_template_id, night_template.id)
+        self.assertEqual(rows[0].starts_at.hour, 16)
+        self.assertEqual(rows[0].ends_at.hour, 20)
+        self.assertEqual(rows[0].break_minutes, 15)
+
     def test_shift_rejects_unknown_shift_type_code(self) -> None:
         with self.assertRaises(ApiException) as captured:
             self.service.create_shift(
@@ -636,6 +692,52 @@ class ShiftPlanningServiceTests(unittest.TestCase):
         )
 
         self.assertEqual([row.occurrence_date for row in rows], [date(2026, 4, 6)])
+
+    def test_delete_shift_series_exception_removes_only_exception_row(self) -> None:
+        series = self.service.create_shift_series(
+            "tenant-1",
+            ShiftSeriesCreate(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan.id,
+                shift_template_id=self.template.id,
+                label="April Tage",
+                recurrence_code="daily",
+                interval_count=1,
+                timezone="Europe/Berlin",
+                date_from=date(2026, 4, 1),
+                date_to=date(2026, 4, 10),
+            ),
+            _context("planning.shift.write"),
+        )
+        deleted_exception = self.service.create_shift_series_exception(
+            "tenant-1",
+            series.id,
+            ShiftSeriesExceptionCreate(
+                tenant_id="tenant-1",
+                exception_date=date(2026, 4, 3),
+                action_code="skip",
+            ),
+            _context("planning.shift.write"),
+        )
+        kept_exception = self.service.create_shift_series_exception(
+            "tenant-1",
+            series.id,
+            ShiftSeriesExceptionCreate(
+                tenant_id="tenant-1",
+                exception_date=date(2026, 4, 4),
+                action_code="skip",
+            ),
+            _context("planning.shift.write"),
+        )
+
+        self.service.delete_shift_series_exception("tenant-1", deleted_exception.id, _context("planning.shift.write"))
+
+        rows = self.service.list_shift_series_exceptions("tenant-1", series.id, _context("planning.shift.read"))
+        self.assertEqual([row.id for row in rows], [kept_exception.id])
+        self.assertIsNotNone(self.repository.get_shift_series("tenant-1", series.id))
+        self.assertTrue(
+            any(event.event_type == "planning.shift_series_exception.deleted" for event in self.audit_repository.audit_events),
+        )
 
     def test_copy_slice_skips_existing_duplicates(self) -> None:
         self.service.create_shift(

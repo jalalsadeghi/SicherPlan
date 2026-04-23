@@ -200,8 +200,21 @@ test("wizard step content exposes non-disruptive local loading indicators for sa
   assert.match(source, /test-id="customer-new-plan-shift-options-loading"/);
   assert.match(source, /test-id="customer-new-plan-series-context-loading"/);
   assert.match(source, /test-id="customer-new-plan-series-loading"/);
-  assert.match(source, /test-id="customer-new-plan-series-detail-loading"/);
+  assert.match(source, /data-testid="customer-new-plan-series-detail-loading"/);
+  assert.match(source, /data-order-workspace-testid="customer-order-workspace-series-loading"/);
   assert.match(source, /test-id="customer-new-plan-series-exceptions-loading"/);
   assert.match(source, /test-id="customer-new-plan-series-options-loading"/);
   assert.doesNotMatch(source, /sp-customer-plan-wizard-step--loading/);
+});
+
+test("series exceptions keeps generation options compact and saved-series loading above fields", () => {
+  assert.match(source, /const seriesEditMode = computed\(\(\) => Boolean\(selectedSeries\.value\?\.id\)\);/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__series-loading-row"[\s\S]*data-order-workspace-testid="customer-order-workspace-series-loading"/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__series-loading-row"[\s\S]*<LocalLoadingIndicator :label="\$t\('sicherplan\.customerPlansWizard\.forms\.loadingSavedSeries'\)" \/>[\s\S]*<\/div>\s*<div class="sp-customer-plan-wizard-step__grid">/);
+  assert.match(source, /:data-order-workspace-testid="seriesEditMode \? 'customer-order-workspace-series-update' : 'customer-order-workspace-series-save'"/);
+  assert.match(source, /seriesEditMode[\s\S]*\$t\('sicherplan\.customerPlansWizard\.actions\.updateSeries'\)[\s\S]*\$t\('sicherplan\.customerPlansWizard\.actions\.saveSeries'\)/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__generation-grid"[\s\S]*data-order-workspace-testid="customer-order-workspace-generation-options"/);
+  assert.match(source, /data-order-workspace-testid="customer-order-workspace-generate-from"[\s\S]*data-order-workspace-testid="customer-order-workspace-generate-to"[\s\S]*data-order-workspace-testid="customer-order-workspace-regenerate-existing"/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__generation-grid \{[\s\S]*grid-template-columns: minmax\(10rem, 14rem\) minmax\(10rem, 14rem\) minmax\(12rem, max-content\);/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__generation-date-field \{[\s\S]*max-width: 14rem;/);
 });

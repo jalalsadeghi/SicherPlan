@@ -318,6 +318,10 @@ export function updateShiftSeriesException(tenantId: string, rowId: string, acce
   return request<ShiftSeriesExceptionRead>(`/api/planning/tenants/${tenantId}/ops/shift-series-exceptions/${rowId}`, accessToken, { method: "PATCH", body: payload });
 }
 
+export function deleteShiftSeriesException(tenantId: string, rowId: string, accessToken: string) {
+  return request<void>(`/api/planning/tenants/${tenantId}/ops/shift-series-exceptions/${rowId}`, accessToken, { method: "DELETE" });
+}
+
 export function listShifts(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
   return request<ShiftListItem[]>(`/api/planning/tenants/${tenantId}/ops/shifts${queryString(filters)}`, accessToken);
 }

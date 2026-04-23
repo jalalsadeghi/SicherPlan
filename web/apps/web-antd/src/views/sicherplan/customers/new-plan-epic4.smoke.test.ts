@@ -12,6 +12,7 @@ import type { CustomerNewPlanWizardState, CustomerNewPlanWizardStepId } from './
 
 const routerPushMock = vi.fn();
 const routerReplaceMock = vi.fn();
+const confirmMock = vi.fn();
 const notificationMocks = vi.hoisted(() => ({
   error: vi.fn(),
   info: vi.fn(),
@@ -43,6 +44,7 @@ const apiMocks = vi.hoisted(() => ({
   createShiftSeriesExceptionMock: vi.fn(),
   createShiftSeriesMock: vi.fn(),
   createShiftTemplateMock: vi.fn(),
+  deleteShiftSeriesExceptionMock: vi.fn(),
   generateShiftSeriesMock: vi.fn(),
   getCustomerOrderMock: vi.fn(),
   getPlanningRecordMock: vi.fn(),
@@ -69,6 +71,7 @@ const apiMocks = vi.hoisted(() => ({
   updateShiftPlanMock: vi.fn(),
   updateShiftSeriesExceptionMock: vi.fn(),
   updateShiftSeriesMock: vi.fn(),
+  unlinkPlanningRecordAttachmentMock: vi.fn(),
 }));
 
 vi.mock('#/locales', () => ({
@@ -119,6 +122,7 @@ vi.mock('#/sicherplan-legacy/api/planningOrders', () => ({
   updateCustomerOrder: vi.fn(),
   updateOrderEquipmentLine: vi.fn(),
   updateOrderRequirementLine: vi.fn(),
+  unlinkPlanningRecordAttachment: apiMocks.unlinkPlanningRecordAttachmentMock,
 }));
 
 vi.mock('#/sicherplan-legacy/api/planningShifts', () => ({
@@ -127,6 +131,7 @@ vi.mock('#/sicherplan-legacy/api/planningShifts', () => ({
   createShiftSeries: apiMocks.createShiftSeriesMock,
   createShiftSeriesException: apiMocks.createShiftSeriesExceptionMock,
   createShiftTemplate: apiMocks.createShiftTemplateMock,
+  deleteShiftSeriesException: apiMocks.deleteShiftSeriesExceptionMock,
   generateShiftSeries: apiMocks.generateShiftSeriesMock,
   getShiftPlan: apiMocks.getShiftPlanMock,
   getShiftSeries: apiMocks.getShiftSeriesMock,
@@ -310,6 +315,21 @@ function seriesWeekdayChip(wrapper: ReturnType<typeof mount>, weekdayId: (typeof
   return wrapper.get(`[data-testid="customer-new-plan-series-weekday-chip-${weekdayId}"]`);
 }
 
+async function saveCurrentSeries(wrapper: ReturnType<typeof mount>) {
+  await wrapper.get('[data-testid="customer-new-plan-save-series"]').trigger('click');
+  await flushPromises();
+}
+
+async function openNewExceptionDialog(wrapper: ReturnType<typeof mount>) {
+  await wrapper.get('[data-testid="customer-new-plan-new-exception"]').trigger('click');
+  await flushPromises();
+}
+
+async function saveCurrentException(wrapper: ReturnType<typeof mount>) {
+  await wrapper.get('[data-testid="customer-new-plan-save-exception"]').trigger('click');
+  await flushPromises();
+}
+
 function deferred<T>() {
   let reject!: (reason?: unknown) => void;
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -397,8 +417,11 @@ function mountStepWithProps(
 describe('CustomerNewPlanStepContent EPIC 4', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
+    vi.stubGlobal('confirm', confirmMock);
     routerPushMock.mockReset();
     routerReplaceMock.mockReset();
+    confirmMock.mockReset();
+    confirmMock.mockReturnValue(true);
     apiMocks.createPlanningRecordMock.mockReset();
     apiMocks.createPlanningSetupRecordMock.mockReset();
     apiMocks.createPlanningRecordAttachmentMock.mockReset();
@@ -406,6 +429,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.createShiftSeriesExceptionMock.mockReset();
     apiMocks.createShiftSeriesMock.mockReset();
     apiMocks.createShiftTemplateMock.mockReset();
+    apiMocks.deleteShiftSeriesExceptionMock.mockReset();
     apiMocks.generateShiftSeriesMock.mockReset();
     apiMocks.getCustomerOrderMock.mockReset();
     apiMocks.getPlanningRecordMock.mockReset();
@@ -432,6 +456,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.updateShiftPlanMock.mockReset();
     apiMocks.updateShiftSeriesExceptionMock.mockReset();
     apiMocks.updateShiftSeriesMock.mockReset();
+    apiMocks.unlinkPlanningRecordAttachmentMock.mockReset();
     notificationMocks.error.mockReset();
     notificationMocks.info.mockReset();
     notificationMocks.success.mockReset();
@@ -1976,6 +2001,11 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     });
     await flushPromises();
 
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-planning-document-upload-title"]').exists()).toBe(true);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-attach-planning-document"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('sicherplan.customerPlansWizard.forms.linkExistingDocument');
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-link-planning-document"]').exists()).toBe(true);
+
     await wrapper.get('[data-testid="customer-new-plan-planning-document-picker-open"]').trigger('click');
     await flushPromises();
     await wrapper.get('[data-testid="customer-new-plan-planning-document-search"]').setValue('Safety');
@@ -1995,9 +2025,10 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       { id: 'doc-row-1', tenant_id: 'tenant-1', title: 'Safety concept', current_version_no: 1, status: 'active' },
     ]);
 
-    const saved = await (wrapper.vm as any).submitCurrentStep();
+    await wrapper.get('[data-order-workspace-testid="customer-order-workspace-link-planning-document"]').trigger('click');
+    await flushPromises();
 
-    expect(saved).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-planning-record-documents"]').exists()).toBe(true);
     expect(apiMocks.linkPlanningRecordAttachmentMock).toHaveBeenCalledWith(
       'tenant-1',
       'record-1',
@@ -2006,6 +2037,13 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
         document_id: 'document-1',
       }),
     );
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-document-selected"]').exists()).toBe(false);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-planning-document-list"]').exists()).toBe(true);
+
+    const continued = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(continued).toBe(true);
+    expect(apiMocks.linkPlanningRecordAttachmentMock).toHaveBeenCalledTimes(1);
   });
 
   it('allows skipping Planning Record Documents when the draft is empty or attachments already exist', async () => {
@@ -2022,7 +2060,15 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(apiMocks.linkPlanningRecordAttachmentMock).toHaveBeenCalledTimes(0);
 
     apiMocks.listPlanningRecordAttachmentsMock.mockResolvedValueOnce([
-      { id: 'doc-row-existing', tenant_id: 'tenant-1', title: 'Existing planning doc', current_version_no: 1, status: 'active' },
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        tenant_id: 'tenant-1',
+        title: '1663202370369.jpg',
+        source_label: 'camera-upload',
+        relation_label: 'Image for test',
+        current_version_no: 1,
+        status: 'active',
+      },
     ]);
     const existingWrapper = mountStep('planning-record-documents', {
       planning_record_id: 'record-1',
@@ -2030,11 +2076,35 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     });
     await flushPromises();
 
+    const documentList = existingWrapper.get('[data-order-workspace-testid="customer-order-workspace-planning-document-list"]');
+    expect(documentList.text()).toContain('Image for test');
+    expect(documentList.text()).not.toContain('11111111-1111-4111-8111-111111111111');
+    expect(existingWrapper.get('[data-order-workspace-testid="customer-order-workspace-planning-document-primary-label"]').text()).toBe('Image for test');
+    expect(existingWrapper.get('[data-order-workspace-testid="customer-order-workspace-planning-document-secondary-label"]').text()).toContain('v1');
+    expect(existingWrapper.find('[data-testid="customer-new-plan-planning-record-document-id"]').exists()).toBe(false);
+    expect(existingWrapper.find('[data-order-workspace-testid="customer-order-workspace-planning-document-picker"]').exists()).toBe(true);
+    expect(existingWrapper.find('[data-order-workspace-testid="customer-order-workspace-planning-document-remove"]').exists()).toBe(true);
+
     const existingSaved = await (existingWrapper.vm as any).submitCurrentStep();
 
     expect(existingSaved).toBe(true);
     expect(apiMocks.createPlanningRecordAttachmentMock).toHaveBeenCalledTimes(0);
     expect(apiMocks.linkPlanningRecordAttachmentMock).toHaveBeenCalledTimes(0);
+
+    apiMocks.unlinkPlanningRecordAttachmentMock.mockResolvedValue(undefined);
+    apiMocks.listPlanningRecordAttachmentsMock.mockResolvedValueOnce([]);
+
+    await existingWrapper.get('[data-order-workspace-testid="customer-order-workspace-planning-document-remove"]').trigger('click');
+    await flushPromises();
+
+    expect(confirmMock).toHaveBeenCalledWith('sicherplan.customerPlansWizard.confirmUnlinkPlanningDocument');
+    expect(apiMocks.unlinkPlanningRecordAttachmentMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'record-1',
+      '11111111-1111-4111-8111-111111111111',
+      'token-1',
+    );
+    expect(existingWrapper.find('[data-order-workspace-testid="customer-order-workspace-planning-document-list"]').exists()).toBe(false);
   });
 
   it('uploads planning-record documents and blocks partial planning document drafts until cleared', async () => {
@@ -2049,13 +2119,57 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     uploadState.planningRecordAttachmentDraft.file_name = 'brief.pdf';
     uploadState.planningRecordAttachmentDraft.content_type = 'application/pdf';
     uploadState.planningRecordAttachmentDraft.content_base64 = 'base64-planning';
+    apiMocks.createPlanningRecordAttachmentMock.mockResolvedValue({
+      id: 'doc-row-upload',
+      tenant_id: 'tenant-1',
+      title: 'Planning brief',
+      current_version_no: 1,
+      status: 'active',
+    });
+    apiMocks.listPlanningRecordAttachmentsMock.mockResolvedValue([
+      { id: 'doc-row-upload', tenant_id: 'tenant-1', title: 'Planning brief', current_version_no: 1, status: 'active' },
+    ]);
     await flushPromises();
 
-    const uploaded = await (uploadWrapper.vm as any).submitCurrentStep();
+    await uploadWrapper.get('[data-order-workspace-testid="customer-order-workspace-attach-planning-document"]').trigger('click');
+    await flushPromises();
 
-    expect(uploaded).toBe(true);
+    expect(uploadWrapper.find('[data-testid="customer-new-plan-step-panel-planning-record-documents"]').exists()).toBe(true);
     expect(apiMocks.createPlanningRecordAttachmentMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.createPlanningRecordAttachmentMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'record-1',
+      'token-1',
+      expect.objectContaining({
+        content_base64: 'base64-planning',
+        file_name: 'brief.pdf',
+        title: 'Planning brief',
+      }),
+    );
     expect(apiMocks.linkPlanningRecordAttachmentMock).toHaveBeenCalledTimes(0);
+    expect((uploadWrapper.get('[data-order-workspace-testid="customer-order-workspace-planning-document-upload-title"]').element as HTMLInputElement).value).toBe('');
+    expect(uploadWrapper.find('[data-order-workspace-testid="customer-order-workspace-planning-document-list"]').exists()).toBe(true);
+
+    const completeDraftWrapper = mountStep('planning-record-documents', {
+      planning_record_id: 'record-1',
+      current_step: 'planning-record-documents',
+    });
+    await flushPromises();
+
+    const completeDraftState = (completeDraftWrapper.vm as any).$?.setupState;
+    completeDraftState.planningRecordAttachmentDraft.title = 'Complete draft via Next';
+    completeDraftState.planningRecordAttachmentDraft.file_name = 'complete.pdf';
+    completeDraftState.planningRecordAttachmentDraft.content_type = 'application/pdf';
+    completeDraftState.planningRecordAttachmentDraft.content_base64 = 'base64-complete';
+    await flushPromises();
+
+    const completeDraftContinued = await (completeDraftWrapper.vm as any).submitCurrentStep();
+
+    expect(completeDraftContinued).toBe(false);
+    expect(apiMocks.createPlanningRecordAttachmentMock).toHaveBeenCalledTimes(1);
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.completeCurrentPlanningDocumentDraftBeforeContinue',
+    }));
 
     const partialWrapper = mountStep('planning-record-documents', {
       planning_record_id: 'record-1',
@@ -2080,6 +2194,29 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     const cleared = await (partialWrapper.vm as any).submitCurrentStep();
     expect(cleared).toBe(true);
+
+    const partialLinkWrapper = mountStep('planning-record-documents', {
+      planning_record_id: 'record-1',
+      current_step: 'planning-record-documents',
+    });
+    await flushPromises();
+
+    const partialLinkState = (partialLinkWrapper.vm as any).$?.setupState;
+    partialLinkState.planningRecordAttachmentLink.label = 'Missing document ID';
+    await flushPromises();
+
+    const blockedLink = await (partialLinkWrapper.vm as any).submitCurrentStep();
+
+    expect(blockedLink).toBe(false);
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.completeCurrentPlanningDocumentDraftBeforeContinue',
+    }));
+
+    await partialLinkWrapper.get('[data-order-workspace-testid="customer-order-workspace-clear-planning-document-draft"]').trigger('click');
+    await flushPromises();
+
+    const clearedLink = await (partialLinkWrapper.vm as any).submitCurrentStep();
+    expect(clearedLink).toBe(true);
   });
 
   it('creates the shift plan and emits the canonical shift_plan_id', async () => {
@@ -2693,9 +2830,8 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       },
     ]);
 
-    const seriesSaved = await (wrapper.vm as any).submitCurrentStep();
+    await saveCurrentSeries(wrapper);
 
-    expect(seriesSaved).toBe(true);
     expect(apiMocks.updateShiftSeriesMock).toHaveBeenCalledWith(
       'tenant-1',
       'series-1',
@@ -2745,7 +2881,6 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await wrapper.get('[data-testid="customer-new-plan-series-template"]').setValue('template-2');
     await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-06-01');
     await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-06-10');
-    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-06-03');
 
     apiMocks.createShiftSeriesMock.mockResolvedValue(buildSeries({ shift_template_id: 'template-2', label: 'Nachtdienst Juni' }));
     apiMocks.createShiftSeriesExceptionMock.mockResolvedValue({
@@ -2760,6 +2895,11 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([
       { id: 'exception-1', tenant_id: 'tenant-1', shift_series_id: 'series-1', exception_date: '2026-06-03', action_code: 'skip', version_no: 1 },
     ]);
+    await saveCurrentSeries(wrapper);
+    await openNewExceptionDialog(wrapper);
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-06-03');
+    await saveCurrentException(wrapper);
+
     apiMocks.generateShiftSeriesMock.mockResolvedValue([
       {
         id: 'shift-1',
@@ -2782,7 +2922,6 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
         version_no: 1,
       },
     ]);
-
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
     expect(saved).toBe(true);
@@ -2875,16 +3014,283 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect((wrapper.get('[data-testid="customer-new-plan-series-to"]').element as HTMLInputElement).value).toBe(
       '2026-06-10',
     );
-    expect((wrapper.get('[data-testid="customer-new-plan-series-generation-from"]').element as HTMLInputElement).value).toBe(
-      '2026-06-01',
-    );
-    expect((wrapper.get('[data-testid="customer-new-plan-series-generation-to"]').element as HTMLInputElement).value).toBe(
-      '2026-06-10',
+    expect(wrapper.find('[data-testid="customer-new-plan-series-generation-from"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-series-generation-to"]').exists()).toBe(false);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-exceptions-section"]').exists()).toBe(false);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-generation-options-section"]').exists()).toBe(false);
+    expect(wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-gating-helper"]').text()).toBe(
+      'sicherplan.customerPlansWizard.forms.seriesDependentSectionsHelper',
     );
     expect((wrapper.get('[data-testid="customer-new-plan-series-timezone"]').element as HTMLSelectElement).value).toBe(
       'Europe/Berlin',
     );
     expect(((wrapper.vm as any).$?.setupState.seriesDraft.weekday_mask as string)).toBe('');
+  });
+
+  it('renders Series and Exceptions sections, saves series independently, and blocks dirty generation', async () => {
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-series-section"]').exists()).toBe(true);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-series-save"]').exists()).toBe(true);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-series-template-helper"]').exists()).toBe(true);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-series-start-time"]').exists()).toBe(true);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-series-end-time"]').exists()).toBe(true);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-series-shift-type"]').exists()).toBe(true);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-series-default-break"]').exists()).toBe(true);
+    expect(wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-save"]').text()).toBe(
+      'sicherplan.customerPlansWizard.actions.saveSeries',
+    );
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-selected-shift-plan-summary"]').exists()).toBe(true);
+    expect(wrapper.get('[data-order-workspace-testid="customer-order-workspace-selected-shift-plan-summary"]').classes()).toContain(
+      'sp-customer-plan-wizard-step__info-summary',
+    );
+    expect(wrapper.get('[data-order-workspace-testid="customer-order-workspace-selected-shift-plan-summary"]').classes()).not.toContain(
+      'sp-customer-plan-wizard-step__list-row',
+    );
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-exceptions-section"]').exists()).toBe(false);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-generation-options-section"]').exists()).toBe(false);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-series-gating-helper"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-series-exception-date"]').exists()).toBe(false);
+    const checkboxRows = wrapper.findAll('.planning-admin-checkbox--centered');
+    expect(checkboxRows.length).toBeGreaterThanOrEqual(3);
+
+    await wrapper.get('[data-testid="customer-new-plan-series-label"]').setValue('Tagdienst Juni');
+    await wrapper.get('[data-testid="customer-new-plan-series-template"]').setValue('template-1');
+    await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-06-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-06-10');
+    await flushPromises();
+
+    expect(await (wrapper.vm as any).submitCurrentStep()).toBe(false);
+    expect(apiMocks.createShiftSeriesMock).not.toHaveBeenCalled();
+    expect(apiMocks.generateShiftSeriesMock).not.toHaveBeenCalled();
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.saveCurrentSeriesBeforeContinue',
+    }));
+
+    apiMocks.createShiftSeriesMock.mockResolvedValue(buildSeries({ label: 'Tagdienst Juni' }));
+    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries({ label: 'Tagdienst Juni' })]);
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
+    await saveCurrentSeries(wrapper);
+
+    expect(apiMocks.createShiftSeriesMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'plan-1',
+      'token-1',
+      expect.objectContaining({ label: 'Tagdienst Juni' }),
+    );
+    expect(apiMocks.generateShiftSeriesMock).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-series-exceptions"]').exists()).toBe(true);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-series-update"]').exists()).toBe(true);
+    expect(wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-update"]').text()).toBe(
+      'sicherplan.customerPlansWizard.actions.updateSeries',
+    );
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-series-gating-helper"]').exists()).toBe(false);
+    const exceptionsSection = wrapper.get('[data-order-workspace-testid="customer-order-workspace-exceptions-section"]');
+    const generationSection = wrapper.get('[data-order-workspace-testid="customer-order-workspace-generation-options-section"]');
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-new-exception"]').exists()).toBe(true);
+    expect(exceptionsSection.element.compareDocumentPosition(generationSection.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const generationControls = generationSection.findAll('.sp-customer-plan-wizard-step__generation-grid > *');
+    expect(generationControls).toHaveLength(3);
+    expect(generationControls[0]!.find('[data-order-workspace-testid="customer-order-workspace-generate-from"]').exists()).toBe(true);
+    expect(generationControls[1]!.find('[data-order-workspace-testid="customer-order-workspace-generate-to"]').exists()).toBe(true);
+    expect(generationControls[2]!.find('[data-order-workspace-testid="customer-order-workspace-regenerate-existing"]').exists()).toBe(true);
+  });
+
+  it('saves manual time-first series input by reusing a compatible generated template', async () => {
+    apiMocks.listShiftTemplatesMock.mockResolvedValue([
+      { id: 'manual-template-1', tenant_id: 'tenant-1', code: 'OW_0900_1700_day_45', label: 'Manual 09:00-17:00', local_start_time: '09:00', local_end_time: '17:00', default_break_minutes: 45, shift_type_code: 'day', status: 'active', version_no: 1 },
+    ]);
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-label"]').setValue('Manuelle Tagschicht');
+    await wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-start-time"]').setValue('09:00');
+    await wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-end-time"]').setValue('17:00');
+    await wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-shift-type"]').setValue('day');
+    await wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-default-break"]').setValue(45);
+    await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-06-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-06-10');
+    apiMocks.createShiftSeriesMock.mockResolvedValue(buildSeries({ label: 'Manuelle Tagschicht', shift_template_id: 'manual-template-1' }));
+    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries({ label: 'Manuelle Tagschicht', shift_template_id: 'manual-template-1' })]);
+
+    await saveCurrentSeries(wrapper);
+
+    expect(apiMocks.createShiftTemplateMock).not.toHaveBeenCalled();
+    expect(apiMocks.createShiftSeriesMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'plan-1',
+      'token-1',
+      expect.objectContaining({
+        label: 'Manuelle Tagschicht',
+        shift_template_id: 'manual-template-1',
+        shift_type_code: 'day',
+        default_break_minutes: 45,
+      }),
+    );
+  });
+
+  it('blocks time-first series save when required time fields or weekly weekdays are invalid', async () => {
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-series-label"]').setValue('Fehlerhafte Serie');
+    await wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-shift-type"]').setValue('day');
+    await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-06-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-06-10');
+    await saveCurrentSeries(wrapper);
+    expect(apiMocks.createShiftSeriesMock).not.toHaveBeenCalled();
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.seriesStartTimeRequired',
+    }));
+
+    await wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-start-time"]').setValue('17:00');
+    await wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-end-time"]').setValue('09:00');
+    await saveCurrentSeries(wrapper);
+    expect(apiMocks.createShiftSeriesMock).not.toHaveBeenCalled();
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.seriesEndTimeAfterStart',
+    }));
+
+    await wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-end-time"]').setValue('18:00');
+    await wrapper.get('[data-testid="customer-new-plan-series-recurrence-code"]').setValue('weekly');
+    await flushPromises();
+    for (const weekdayId of SERIES_WEEKDAY_IDS) {
+      if (seriesWeekdayChip(wrapper, weekdayId).attributes('aria-pressed') === 'true') {
+        await seriesWeekdayChip(wrapper, weekdayId).trigger('click');
+      }
+    }
+    await saveCurrentSeries(wrapper);
+    expect(apiMocks.createShiftSeriesMock).not.toHaveBeenCalled();
+    expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sicherplan.customerPlansWizard.errors.seriesWeekdayMaskInvalid',
+    }));
+  });
+
+  it('renders saved-series loading above the Series form fields without replacing the label field', async () => {
+    const seriesDetail = deferred<ReturnType<typeof buildSeries>>();
+    apiMocks.getShiftSeriesMock.mockReturnValue(seriesDetail.promise);
+
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: 'series-1',
+    });
+    await settleLoadingRender();
+
+    const loading = wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-loading"]');
+    const label = wrapper.get('[data-testid="customer-new-plan-series-label"]');
+    expect(loading.text()).toContain('sicherplan.customerPlansWizard.forms.loadingSavedSeries');
+    expect(wrapper.find('[data-testid="customer-new-plan-series-label"]').exists()).toBe(true);
+    expect(loading.element.closest('.sp-customer-plan-wizard-step__grid')).toBeNull();
+    expect(loading.element.compareDocumentPosition(label.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    seriesDetail.resolve(buildSeries());
+    await flushPromises();
+  });
+
+  it('manages multiple series exceptions through the dialog with create, edit, and delete', async () => {
+    const exceptionOne = {
+      id: 'exception-1',
+      tenant_id: 'tenant-1',
+      shift_series_id: 'series-1',
+      exception_date: '2026-06-03',
+      action_code: 'skip',
+      version_no: 1,
+    };
+    const exceptionTwo = {
+      id: 'exception-2',
+      tenant_id: 'tenant-1',
+      shift_series_id: 'series-1',
+      exception_date: '2026-06-04',
+      action_code: 'skip',
+      version_no: 1,
+    };
+    const exceptionThree = {
+      id: 'exception-3',
+      tenant_id: 'tenant-1',
+      shift_series_id: 'series-1',
+      exception_date: '2026-06-05',
+      action_code: 'skip',
+      version_no: 1,
+    };
+    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries()]);
+    apiMocks.getShiftSeriesMock.mockResolvedValue(buildSeries());
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValueOnce([exceptionOne, exceptionTwo]);
+
+    const wrapper = mountStep('series-exceptions', {
+      current_step: 'series-exceptions',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: 'series-1',
+    });
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-order-workspace-testid="customer-order-workspace-exception-row"]')).toHaveLength(2);
+    expect(wrapper.find('.sp-customer-plan-wizard-step__exception-action-row').exists()).toBe(true);
+    expect(wrapper.find('.sp-customer-plan-wizard-step__exception-list').exists()).toBe(true);
+
+    apiMocks.createShiftSeriesExceptionMock.mockResolvedValue(exceptionThree);
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValueOnce([exceptionOne, exceptionTwo, exceptionThree]);
+    await openNewExceptionDialog(wrapper);
+    expect(wrapper.find('[data-order-workspace-testid="customer-order-workspace-exception-dialog"]').exists()).toBe(true);
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-06-05');
+    await saveCurrentException(wrapper);
+    expect(apiMocks.createShiftSeriesExceptionMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'series-1',
+      'token-1',
+      expect.objectContaining({ exception_date: '2026-06-05', action_code: 'skip' }),
+    );
+    expect(wrapper.findAll('[data-order-workspace-testid="customer-order-workspace-exception-row"]')).toHaveLength(3);
+
+    apiMocks.updateShiftSeriesExceptionMock.mockResolvedValue({ ...exceptionTwo, action_code: 'override', version_no: 2 });
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValueOnce([
+      exceptionOne,
+      { ...exceptionTwo, action_code: 'override', version_no: 2 },
+      exceptionThree,
+    ]);
+    await wrapper.findAll('[data-order-workspace-testid="customer-order-workspace-edit-exception"]')[1]!.trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('override');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-override-start"]').setValue('09:00');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-override-end"]').setValue('17:00');
+    await saveCurrentException(wrapper);
+    expect(apiMocks.updateShiftSeriesExceptionMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'exception-2',
+      'token-1',
+      expect.objectContaining({
+        action_code: 'override',
+        override_local_start_time: '09:00',
+        override_local_end_time: '17:00',
+      }),
+    );
+
+    apiMocks.deleteShiftSeriesExceptionMock.mockResolvedValue(undefined);
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValueOnce([
+      { ...exceptionTwo, action_code: 'override', version_no: 2 },
+      exceptionThree,
+    ]);
+    await wrapper.findAll('[data-order-workspace-testid="customer-order-workspace-delete-exception"]')[0]!.trigger('click');
+    await flushPromises();
+    expect(apiMocks.deleteShiftSeriesExceptionMock).toHaveBeenCalledWith('tenant-1', 'exception-1', 'token-1');
+    expect(wrapper.findAll('[data-order-workspace-testid="customer-order-workspace-exception-row"]')).toHaveLength(2);
   });
 
   it('shows code and label for shift templates, applies template defaults, and submits explicit generation controls', async () => {
@@ -2916,17 +3322,30 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await flushPromises();
 
     const setupState = (wrapper.vm as any).$?.setupState;
+    expect(apiMocks.getShiftTemplateMock).not.toHaveBeenCalledWith('tenant-1', 'template-2', 'token-1');
+    expect(setupState.seriesDraft.shift_type_code).toBe('');
+
+    await wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-apply-template"]').trigger('click');
+    await flushPromises();
+
     expect(apiMocks.getShiftTemplateMock).toHaveBeenCalledWith('tenant-1', 'template-2', 'token-1');
+    expect(setupState.seriesDraft.local_start_time).toBe('08:00');
+    expect(setupState.seriesDraft.local_end_time).toBe('16:00');
     expect(setupState.seriesDraft.default_break_minutes).toBe(30);
     expect(setupState.seriesDraft.shift_type_code).toBe('site_day');
     expect(setupState.seriesDraft.meeting_point).toBe('Nordtor Sicherheitsloge');
     expect(setupState.seriesDraft.location_text).toBe('RheinForum Köln – Nordtor & Ladehof');
 
+    await wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-start-time"]').setValue('09:15');
+    await templateSelect.setValue('template-1');
+    await flushPromises();
+    expect(setupState.seriesDraft.local_start_time).toBe('09:15');
+    await templateSelect.setValue('template-2');
+    await wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-apply-template"]').trigger('click');
+    await flushPromises();
+
     await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-07-01');
     await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-07-31');
-    await wrapper.get('[data-testid="customer-new-plan-series-generation-from"]').setValue('2026-07-01');
-    await wrapper.get('[data-testid="customer-new-plan-series-generation-to"]').setValue('2026-07-31');
-    await wrapper.get('[data-testid="customer-new-plan-series-regenerate-existing"]').setValue(false);
     await flushPromises();
 
     apiMocks.createShiftSeriesMock.mockResolvedValue(
@@ -2971,6 +3390,11 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       },
     ]);
 
+    await saveCurrentSeries(wrapper);
+    await wrapper.get('[data-testid="customer-new-plan-series-generation-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-generation-to"]').setValue('2026-07-31');
+    await wrapper.get('[data-testid="customer-new-plan-series-regenerate-existing"]').setValue(false);
+    await flushPromises();
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
     expect(saved).toBe(true);
@@ -3137,6 +3561,8 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
           interval_count: 2,
           label: 'Restored Series Draft',
           location_text: 'Nordtor',
+          local_end_time: '17:00',
+          local_start_time: '09:00',
           meeting_point: '',
           notes: 'draft notes',
           recurrence_code: 'weekly',
@@ -3170,6 +3596,12 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     );
     expect((wrapper.get('[data-testid="customer-new-plan-series-to"]').element as HTMLInputElement).value).toBe(
       '2026-06-09',
+    );
+    expect((wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-start-time"]').element as HTMLInputElement).value).toBe(
+      '09:00',
+    );
+    expect((wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-end-time"]').element as HTMLInputElement).value).toBe(
+      '17:00',
     );
     expect(wrapper.get('[data-testid="customer-new-plan-draft-restored"]').text()).toBe(
       'sicherplan.customerPlansWizard.draftRestored',
@@ -3226,6 +3658,12 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect((wrapper.get('[data-testid="customer-new-plan-series-label"]').element as HTMLInputElement).value).toBe(
       'Nachtdienst',
     );
+    expect((wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-start-time"]').element as HTMLInputElement).value).toBe(
+      '08:00',
+    );
+    expect((wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-end-time"]').element as HTMLInputElement).value).toBe(
+      '16:00',
+    );
   });
 
   it('restores saved weekly series masks into active weekday chips when an existing series is selected', async () => {
@@ -3276,9 +3714,8 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-06-10');
     await flushPromises();
 
-    const saved = await (wrapper.vm as any).submitCurrentStep();
+    await saveCurrentSeries(wrapper);
 
-    expect(saved).toBe(false);
     expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
       message: 'sicherplan.customerPlansWizard.errors.seriesShiftPlanWindowMismatch',
     }));
@@ -3400,8 +3837,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await flushPromises();
 
     const setupState = (wrapper.vm as any).$?.setupState;
-    let saved = await (wrapper.vm as any).submitCurrentStep();
-    expect(saved).toBe(false);
+    await saveCurrentSeries(wrapper);
     expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
       message: 'sicherplan.customerPlansWizard.errors.seriesWeekdayMaskInvalid',
     }));
@@ -3415,6 +3851,18 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await setSeriesWeeklyMask(wrapper, '1111100');
     await flushPromises();
 
+    apiMocks.createShiftSeriesMock.mockResolvedValue(
+      buildSeries({
+        date_from: '2026-06-01',
+        date_to: '2026-06-10',
+        recurrence_code: 'weekly',
+        weekday_mask: '1111100',
+      }),
+    );
+    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries({ recurrence_code: 'weekly', weekday_mask: '1111100' })]);
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
+    await saveCurrentSeries(wrapper);
+    await openNewExceptionDialog(wrapper);
     await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('override');
     await flushPromises();
     expect(wrapper.find('[data-testid="customer-new-plan-series-exception-override-start"]').exists()).toBe(true);
@@ -3424,8 +3872,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-06-03');
     await flushPromises();
 
-    saved = await (wrapper.vm as any).submitCurrentStep();
-    expect(saved).toBe(false);
+    await saveCurrentException(wrapper);
     expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
       message: 'sicherplan.customerPlansWizard.errors.seriesExceptionOverrideTimesRequired',
     }));
@@ -3434,14 +3881,6 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await wrapper.get('[data-testid="customer-new-plan-series-exception-override-end"]').setValue('16:30');
     await flushPromises();
 
-    apiMocks.createShiftSeriesMock.mockResolvedValue(
-      buildSeries({
-        date_from: '2026-06-01',
-        date_to: '2026-06-10',
-        recurrence_code: 'weekly',
-        weekday_mask: '1111100',
-      }),
-    );
     apiMocks.createShiftSeriesExceptionMock.mockResolvedValue({
       id: 'exception-1',
       tenant_id: 'tenant-1',
@@ -3455,12 +3894,8 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       override_local_end_time: '16:30',
       version_no: 1,
     });
-    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries({ recurrence_code: 'weekly', weekday_mask: '1111100' })]);
-    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
-    apiMocks.generateShiftSeriesMock.mockResolvedValue([]);
 
-    saved = await (wrapper.vm as any).submitCurrentStep();
-    expect(saved).toBe(true);
+    await saveCurrentException(wrapper);
     expect(apiMocks.createShiftSeriesMock).toHaveBeenCalledWith(
       'tenant-1',
       'plan-1',
@@ -3536,6 +3971,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       },
     ]);
 
+    await saveCurrentSeries(wrapper);
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
     expect(saved).toBe(true);
@@ -3572,14 +4008,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await setSeriesWeeklyMask(wrapper, '1111100');
     await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-07-01');
     await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-07-31');
-    await wrapper.get('[data-testid="customer-new-plan-series-generation-from"]').setValue('2026-07-01');
-    await wrapper.get('[data-testid="customer-new-plan-series-generation-to"]').setValue('2026-07-31');
-    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-07-03');
-    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('skip');
     await flushPromises();
 
     const setupState = (wrapper.vm as any).$?.setupState;
-    setupState.exceptionDraft.notes = 'Interne Logistik-Sperrung am Nordtor; kein regulärer Objektschutzdienst an diesem Tag.';
     apiMocks.createShiftSeriesMock.mockResolvedValue(
       buildSeries({
         date_from: '2026-07-01',
@@ -3603,9 +4034,16 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
     apiMocks.generateShiftSeriesMock.mockResolvedValue([]);
 
-    const saved = await (wrapper.vm as any).submitCurrentStep();
+    await saveCurrentSeries(wrapper);
+    await wrapper.get('[data-testid="customer-new-plan-series-generation-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-generation-to"]').setValue('2026-07-31');
+    await flushPromises();
+    await openNewExceptionDialog(wrapper);
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-07-03');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('skip');
+    setupState.exceptionDraft.notes = 'Interne Logistik-Sperrung am Nordtor; kein regulärer Objektschutzdienst an diesem Tag.';
+    await saveCurrentException(wrapper);
 
-    expect(saved).toBe(true);
     expect(apiMocks.createShiftSeriesExceptionMock).toHaveBeenCalledWith(
       'tenant-1',
       'series-1',
@@ -3693,6 +4131,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       }),
     );
 
+    await saveCurrentSeries(wrapper);
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
     expect(saved).toBe(false);
@@ -3701,7 +4140,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     }));
   });
 
-  it('runs full submit in order and clears the series draft only after successful generation', async () => {
+  it('saves series and exception before final generation and clears the series draft', async () => {
     apiMocks.getShiftPlanMock.mockResolvedValue(
       buildShiftPlan({
         planning_from: '2026-07-01',
@@ -3731,10 +4170,6 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await setSeriesWeeklyMask(wrapper, '1111100');
     await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-07-01');
     await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-07-31');
-    await wrapper.get('[data-testid="customer-new-plan-series-generation-from"]').setValue('2026-07-01');
-    await wrapper.get('[data-testid="customer-new-plan-series-generation-to"]').setValue('2026-07-31');
-    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-07-03');
-    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('skip');
     await flushPromises();
 
     const generated = Array.from({ length: 22 }, (_, index) => ({
@@ -3779,6 +4214,15 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     expect(window.sessionStorage.getItem(draftKey)).toContain('Werktage Tagschicht Nordtor');
 
+    await saveCurrentSeries(wrapper);
+    await wrapper.get('[data-testid="customer-new-plan-series-generation-from"]').setValue('2026-07-01');
+    await wrapper.get('[data-testid="customer-new-plan-series-generation-to"]').setValue('2026-07-31');
+    await flushPromises();
+    await openNewExceptionDialog(wrapper);
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-07-03');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('skip');
+    await saveCurrentException(wrapper);
+
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
     expect(saved).toBe(true);
@@ -3818,6 +4262,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
     apiMocks.generateShiftSeriesMock.mockRejectedValue(new Error('generate failed'));
 
+    await saveCurrentSeries(wrapper);
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
     expect(saved).toBe(false);
@@ -3828,7 +4273,13 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     }));
   });
 
-  it('does not clear drafts and keeps entered fields visible when generation fails after series and exception save', async () => {
+  it('keeps saved series fields visible when generation fails after series and exception save', async () => {
+    apiMocks.getShiftPlanMock.mockResolvedValue(
+      buildShiftPlan({
+        planning_from: '2026-07-01',
+        planning_to: '2026-07-31',
+      }),
+    );
     const draftKey = buildWizardDraftStorageKey(
       {
         customerId: 'customer-1',
@@ -3852,11 +4303,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await setSeriesWeeklyMask(wrapper, '1111100');
     await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-07-01');
     await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-07-31');
-    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-07-03');
-    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('skip');
     await flushPromises();
 
-    apiMocks.createShiftSeriesMock.mockResolvedValue(buildSeries({ date_from: '2026-07-01', date_to: '2026-07-31', recurrence_code: 'weekly', weekday_mask: '1111100' }));
+    apiMocks.createShiftSeriesMock.mockResolvedValue(buildSeries({ date_from: '2026-07-01', date_to: '2026-07-31', label: 'Werktage Tagschicht Nordtor', recurrence_code: 'weekly', weekday_mask: '1111100' }));
     apiMocks.createShiftSeriesExceptionMock.mockResolvedValue({
       id: 'exception-1',
       tenant_id: 'tenant-1',
@@ -3865,14 +4314,20 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       action_code: 'skip',
       version_no: 1,
     });
-    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries({ date_from: '2026-07-01', date_to: '2026-07-31', recurrence_code: 'weekly', weekday_mask: '1111100' })]);
+    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries({ date_from: '2026-07-01', date_to: '2026-07-31', label: 'Werktage Tagschicht Nordtor', recurrence_code: 'weekly', weekday_mask: '1111100' })]);
     apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
     apiMocks.generateShiftSeriesMock.mockRejectedValue(new Error('generate failed'));
+
+    await saveCurrentSeries(wrapper);
+    await openNewExceptionDialog(wrapper);
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-07-03');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('skip');
+    await saveCurrentException(wrapper);
 
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
     expect(saved).toBe(false);
-    expect(window.sessionStorage.getItem(draftKey)).toContain('Werktage Tagschicht Nordtor');
+    expect(window.sessionStorage.getItem(draftKey)).toBeNull();
     expect((wrapper.get('[data-testid="customer-new-plan-series-label"]').element as HTMLInputElement).value).toBe('Werktage Tagschicht Nordtor');
     expect((wrapper.vm as any).$?.setupState.seriesDraft.weekday_mask).toBe('1111100');
     expect(wrapper.find('[data-testid="customer-new-plan-step-panel-series-exceptions"]').exists()).toBe(true);
@@ -3899,11 +4354,11 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await setSeriesWeeklyMask(wrapper, '1111100');
     await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-07-01');
     await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-07-31');
-    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-07-03');
-    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('skip');
     await flushPromises();
 
     apiMocks.createShiftSeriesMock.mockResolvedValue(buildSeries({ date_from: '2026-07-01', date_to: '2026-07-31', recurrence_code: 'weekly', weekday_mask: '1111100' }));
+    apiMocks.listShiftSeriesMock.mockResolvedValue([buildSeries({ date_from: '2026-07-01', date_to: '2026-07-31', recurrence_code: 'weekly', weekday_mask: '1111100' })]);
+    apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
     apiMocks.createShiftSeriesExceptionMock.mockRejectedValue(
       new planningShiftsApiErrorExports.PlanningShiftsApiError(409, {
         message_key: 'errors.planning.shift_series_exception.duplicate_date',
@@ -3911,9 +4366,12 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       }),
     );
 
-    const saved = await (wrapper.vm as any).submitCurrentStep();
+    await saveCurrentSeries(wrapper);
+    await openNewExceptionDialog(wrapper);
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-date"]').setValue('2026-07-03');
+    await wrapper.get('[data-testid="customer-new-plan-series-exception-action-code"]').setValue('skip');
+    await saveCurrentException(wrapper);
 
-    expect(saved).toBe(false);
     expect(apiMocks.generateShiftSeriesMock).not.toHaveBeenCalled();
     expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
       message: 'sicherplan.customerPlansWizard.errors.seriesExceptionDuplicateDate',

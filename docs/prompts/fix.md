@@ -1,107 +1,63 @@
 You are working in the SicherPlan repository.
 
-This task follows the Planning Record UX fix in:
-- /admin/customers/order-workspace
-- step=planning-record-overview
+This task follows the customer-specific title/pill cleanup for:
+- /admin/customers
 
 Context:
-- /docs/sprint/SPR-CUST-NEWPLAN-V1.md
+- list-only mode
+- customer-specific detail-only mode
 
 Goal:
-Run a focused QA/hardening pass for the Planning Record step.
+Run a focused QA and hardening pass for:
+- top tab/title naming in customer-specific mode
+- removal of the redundant in-page customer-name pill
 
 Do not add unrelated features.
-Do not change unrelated steps.
-Do not change backend APIs unless a direct bug requires it.
+Do not redesign unrelated customer workspace logic.
+Only verify and harden the naming/presentation behavior.
 
-Validate the six user requirements:
+Validate:
 
-1. Edit button removed
-- Existing planning record card no longer has an Edit button.
-- There is no dead/hidden edit action that affects UX.
+1. List-only mode
+- top tab/title is still generic "Customers"
+- no customer-specific label leaks into list mode
 
-2. Card click selects and hydrates
-- Clicking the card selects the planning record.
-- The editor below shows all relevant record data.
-- Bottom Next can proceed to Planning Documents if the editor is valid and unchanged.
+2. Customer-specific mode
+- top tab/title shows the selected customer name
+- multiple open customer pages are distinguishable
+- long names truncate cleanly if needed
 
-3. Changing Planning entry clears existing selection
-- Select an existing planning record.
-- Change Planning entry in the editor.
-- Existing record selection clears.
-- Old record data clears.
-- New planning entry remains as context for new record entry.
-- No stale planning_record_id remains committed.
+3. Redundant pill removal
+- the extra customer-name pill/box inside the page content is gone
+- no blank wrapper or awkward spacing remains
 
-4. Invalid fields block Next with red inline errors
-- Missing Planning entry -> red field + inline error.
-- Missing name -> red field + inline error.
-- Missing start date -> red field + inline error.
-- Missing end date -> red field + inline error.
-- end date before start date -> red field + inline error.
-- No generic-only toast as the only validation feedback.
+4. Main header preserved
+- the main large customer name heading still exists
+- helper text still exists
+- back-to-list still exists
+- status badge still exists
 
-5. Planning entry displays name
-- Select options show human-readable names.
-- Selected value displays name.
-- UUID is not used as primary display label unless no better data exists.
-- If options reload, selected label remains stable.
-
-6. User-flow QA
-- User can select existing record and continue.
-- User can edit/update selected record.
-- User can change planning entry and create/update a new record context.
-- User can recover from validation errors.
-- Existing list remains stable.
-
-Technical validation:
-
-A. State consistency
-- selectedExistingPlanningRecordId is cleared when planning entry changes.
-- selectedPlanningRecord object is cleared or replaced correctly.
-- planning_record_id is not incorrectly reused after changing planning entry.
-- dirty state reflects editor changes.
-
-B. Route/state behavior
-- selecting an existing record commits planning_record_id only when appropriate.
-- changing planning entry removes stale planning_record_id from state/route if that record no longer applies.
-- no route loop.
-- no refresh loop.
-
-C. Option handling
-- options load for correct family.
-- selected option is preserved while loading.
-- no false "No planning entries found" message when a selected record has valid detail.
-
-D. Non-regression
-- Order Details still works.
-- Order scope/documents step still works.
-- Planning Documents opens after Next.
-- Shift Plan and Series steps remain accessible after valid Planning Record.
-- canonical /admin/planning-orders remains unchanged.
+5. Non-regression
+- list-only/detail-only page behavior still works
+- back-to-list navigation still works
+- selected customer routes still work
+- customer detail tabs/workspace still work
 
 Tests:
-Run and update:
-- relevant order-workspace tests
-- relevant new-plan/order workspace shared tests
-- planning record frontend tests
-- backend tests only if touched
-
-Add missing tests for:
-- no Edit button
-- card selection hydrates editor
-- next with selected existing record
-- planning entry label display
-- planning entry change clears selection
-- inline field validation
-- list stability during hydration
+Run and update relevant tests.
+Add missing tests if needed for:
+- generic title in list-only mode
+- customer-name title in detail mode
+- no redundant pill rendered
+- main header preserved
 
 Manual QA:
-- Repeat exactly the user scenario from screenshot.
-- Confirm all six requirements.
-- Try invalid inputs.
-- Continue to Planning Documents.
-- Return and edit again.
+- open list-only page
+- open one customer page
+- open multiple customer pages
+- verify titles in top tab strip
+- verify no duplicate pill exists in page content
+- verify back-to-list and detail workspace still work
 
 Final output:
 1. QA validation summary
@@ -111,6 +67,9 @@ Final output:
 5. Tests added/updated
 6. Test results
 7. Manual QA result
-8. Ready / Not ready for real data entry
+8. Ready / Not ready for real user testing
 
-Before finalizing, explicitly confirm each user requirement as PASS/FAIL.
+Explicitly confirm:
+- top tab names are now customer-specific in detail mode
+- generic Customers remains in list-only mode
+- redundant in-page pill is removed

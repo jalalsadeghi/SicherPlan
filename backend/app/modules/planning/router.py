@@ -18,7 +18,6 @@ from app.modules.platform_services.comm_repository import SqlAlchemyCommunicatio
 from app.modules.platform_services.comm_schemas import OutboundMessageRead
 from app.modules.platform_services.comm_service import CommunicationService
 from app.modules.platform_services.docs_repository import SqlAlchemyDocumentRepository
-from app.modules.platform_services.docs_schemas import DocumentRead
 from app.modules.platform_services.docs_service import DocumentService
 from app.modules.platform_services.storage import build_object_storage_adapter
 from app.modules.planning.communication_service import PlanningCommunicationService
@@ -66,6 +65,7 @@ from app.modules.planning.schemas import (
     PlanningRecordCreate,
     PlanningRecordAttachmentCreate,
     PlanningRecordAttachmentLinkCreate,
+    PlanningRecordAttachmentRead,
     PlanningRecordFilter,
     PlanningDispatcherCandidateRead,
     PlanningRecordListItem,
@@ -1192,36 +1192,47 @@ def set_planning_record_release_state(
     return service.set_planning_record_release_state(str(tenant_id), str(planning_record_id), payload, context)
 
 
-@router.get("/planning-records/{planning_record_id}/attachments", response_model=list[DocumentRead])
+@router.get("/planning-records/{planning_record_id}/attachments", response_model=list[PlanningRecordAttachmentRead])
 def list_planning_record_attachments(
     tenant_id: UUID,
     planning_record_id: UUID,
     context: Annotated[RequestAuthorizationContext, Depends(require_permission_only("planning.record.read"))],
     service: Annotated[PlanningRecordService, Depends(get_planning_record_service)],
-) -> list[DocumentRead]:
+) -> list[PlanningRecordAttachmentRead]:
     return service.list_planning_record_attachments(str(tenant_id), str(planning_record_id), context)
 
 
-@router.post("/planning-records/{planning_record_id}/attachments", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
+@router.post("/planning-records/{planning_record_id}/attachments", response_model=PlanningRecordAttachmentRead, status_code=status.HTTP_201_CREATED)
 def create_planning_record_attachment(
     tenant_id: UUID,
     planning_record_id: UUID,
     payload: PlanningRecordAttachmentCreate,
     context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.record.write", scope="tenant"))],
     service: Annotated[PlanningRecordService, Depends(get_planning_record_service)],
-) -> DocumentRead:
+) -> PlanningRecordAttachmentRead:
     return service.create_planning_record_attachment(str(tenant_id), str(planning_record_id), payload, context)
 
 
-@router.post("/planning-records/{planning_record_id}/attachments/link", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
+@router.post("/planning-records/{planning_record_id}/attachments/link", response_model=PlanningRecordAttachmentRead, status_code=status.HTTP_201_CREATED)
 def link_planning_record_attachment(
     tenant_id: UUID,
     planning_record_id: UUID,
     payload: PlanningRecordAttachmentLinkCreate,
     context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.record.write", scope="tenant"))],
     service: Annotated[PlanningRecordService, Depends(get_planning_record_service)],
-) -> DocumentRead:
+) -> PlanningRecordAttachmentRead:
     return service.link_planning_record_attachment(str(tenant_id), str(planning_record_id), payload, context)
+
+
+@router.delete("/planning-records/{planning_record_id}/attachments/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def unlink_planning_record_attachment(
+    tenant_id: UUID,
+    planning_record_id: UUID,
+    document_id: UUID,
+    context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.record.write", scope="tenant"))],
+    service: Annotated[PlanningRecordService, Depends(get_planning_record_service)],
+) -> None:
+    service.unlink_planning_record_attachment(str(tenant_id), str(planning_record_id), str(document_id), context)
 
 
 @router.get("/planning-records/{planning_record_id}/commercial-link", response_model=PlanningCommercialLinkRead)
@@ -1410,6 +1421,16 @@ def update_shift_series_exception(
     service: Annotated[ShiftPlanningService, Depends(get_shift_planning_service)],
 ) -> ShiftSeriesExceptionRead:
     return service.update_shift_series_exception(str(tenant_id), str(row_id), payload, context)
+
+
+@router.delete("/shift-series-exceptions/{row_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_shift_series_exception(
+    tenant_id: UUID,
+    row_id: UUID,
+    context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.shift.write", scope="tenant"))],
+    service: Annotated[ShiftPlanningService, Depends(get_shift_planning_service)],
+) -> None:
+    service.delete_shift_series_exception(str(tenant_id), str(row_id), context)
 
 
 @router.get("/shifts", response_model=list[ShiftListItem])

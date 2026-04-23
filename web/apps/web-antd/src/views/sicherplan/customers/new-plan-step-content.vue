@@ -53,6 +53,7 @@ import {
   updateOrderEquipmentLine,
   updateOrderRequirementLine,
   unlinkOrderAttachment,
+  unlinkPlanningRecordAttachment,
   type CustomerOrderRead,
   type OrderEquipmentLineRead,
   type OrderRequirementLineRead,
@@ -80,6 +81,7 @@ import {
   createShiftSeries,
   createShiftSeriesException,
   createShiftTemplate,
+  deleteShiftSeriesException,
   generateShiftSeries,
   getShiftPlan,
   getShiftSeries,
@@ -283,6 +285,8 @@ const seriesDraft = reactive({
   interval_count: 1,
   label: '',
   location_text: '',
+  local_end_time: '',
+  local_start_time: '',
   meeting_point: '',
   notes: '',
   recurrence_code: 'daily',
@@ -385,6 +389,11 @@ const templateModal = reactive({
   shift_type_code: '',
 });
 
+const exceptionModal = reactive({
+  open: false,
+  saving: false,
+});
+
 const selectedEquipmentLineId = ref('');
 const selectedRequirementLineId = ref('');
 const selectedExceptionId = ref('');
@@ -404,6 +413,8 @@ const planningRecordFieldErrors = reactive({
 });
 const selectedShiftPlan = ref<ShiftPlanRead | null>(null);
 const selectedSeries = ref<ShiftSeriesRead | null>(null);
+const seriesDependentSectionsVisible = computed(() => Boolean(selectedSeries.value?.id || props.wizardState.series_id));
+const seriesEditMode = computed(() => Boolean(selectedSeries.value?.id));
 const planningRecordRows = ref<PlanningRecordListItem[]>([]);
 const planningRecordRowsLoading = ref(false);
 const planningRecordRowsError = ref('');
@@ -446,10 +457,20 @@ const shiftTemplateDetailCache = reactive<Record<string, ShiftTemplateRead>>({})
 const seriesTemplateFieldTouched = reactive({
   default_break_minutes: false,
   location_text: false,
+  local_end_time: false,
+  local_start_time: false,
   meeting_point: false,
   shift_type_code: false,
 });
 const seriesTemplateDefaultsApplying = ref(false);
+const seriesFieldErrors = reactive({
+  dateRange: '',
+  defaultBreak: '',
+  endTime: '',
+  shiftType: '',
+  startTime: '',
+  weekdayMask: '',
+});
 
 const { showFeedbackToast } = useSicherPlanFeedback();
 
@@ -1206,8 +1227,21 @@ function resetSeriesTemplateTouchedState() {
   Object.assign(seriesTemplateFieldTouched, {
     default_break_minutes: false,
     location_text: false,
+    local_end_time: false,
+    local_start_time: false,
     meeting_point: false,
     shift_type_code: false,
+  });
+}
+
+function clearSeriesFieldErrors() {
+  Object.assign(seriesFieldErrors, {
+    dateRange: '',
+    defaultBreak: '',
+    endTime: '',
+    shiftType: '',
+    startTime: '',
+    weekdayMask: '',
   });
 }
 
@@ -1243,6 +1277,12 @@ function normalizeUuid(value: string | null | undefined) {
 function normalizeSeriesWeekdayMask(value: null | string | undefined) {
   const candidate = (value ?? '').trim();
   return /^[01]{7}$/.test(candidate) ? candidate : '1111100';
+}
+
+function normalizeSeriesTimeValue(value: null | string | undefined) {
+  const normalized = (value ?? '').trim();
+  const match = normalized.match(/^(\d{2}:\d{2})/);
+  return match?.[1] ?? normalized;
 }
 
 function isSeriesWeekdaySelected(index: number) {
@@ -1577,12 +1617,34 @@ function hasPlanningRecordAttachmentDraftContent() {
   );
 }
 
-function hasPlanningRecordAttachmentSubmission() {
-  return Boolean(planningRecordAttachmentDraft.content_base64 || planningRecordAttachmentLink.document_id.trim());
+function hasPlanningRecordDocumentUploadDraftInput() {
+  return Boolean(
+    planningRecordAttachmentDraft.title ||
+      planningRecordAttachmentDraft.label ||
+      planningRecordAttachmentDraft.file_name ||
+      planningRecordAttachmentDraft.content_type ||
+      planningRecordAttachmentDraft.content_base64,
+  );
 }
 
-function hasPlanningRecordAttachmentPartialDraft() {
-  return hasPlanningRecordAttachmentDraftContent() && !hasPlanningRecordAttachmentSubmission();
+function hasCompletePlanningRecordDocumentUploadDraft() {
+  return Boolean(
+    planningRecordAttachmentDraft.content_base64 &&
+      planningRecordAttachmentDraft.file_name &&
+      planningRecordAttachmentDraft.title.trim(),
+  );
+}
+
+function hasPlanningRecordDocumentLinkDraftInput() {
+  return Boolean(planningRecordAttachmentLink.document_id.trim() || planningRecordAttachmentLink.label.trim());
+}
+
+function hasCompletePlanningRecordDocumentLinkDraft() {
+  return Boolean(planningRecordAttachmentLink.document_id.trim());
+}
+
+function hasAnyPlanningRecordDocumentDraftInput() {
+  return hasPlanningRecordDocumentUploadDraftInput() || hasPlanningRecordDocumentLinkDraftInput();
 }
 
 function buildShiftPlanDefaultDraft() {
@@ -1607,6 +1669,8 @@ function buildSeriesDefaultDraft() {
     interval_count: 1,
     label: selectedShiftPlan.value?.name || '',
     location_text: '',
+    local_end_time: '',
+    local_start_time: '',
     meeting_point: '',
     notes: '',
     recurrence_code: 'daily',
@@ -1713,6 +1777,8 @@ function hasSeriesDraftContent() {
       seriesDraft.date_to ||
       seriesDraft.interval_count !== 1 ||
       seriesDraft.default_break_minutes !== 30 ||
+      seriesDraft.local_start_time ||
+      seriesDraft.local_end_time ||
       seriesDraft.meeting_point ||
       seriesDraft.location_text ||
       seriesDraft.notes ||
@@ -2449,6 +2515,29 @@ function resetExceptionDraft() {
   });
 }
 
+function openNewExceptionModal() {
+  if (!selectedSeries.value?.id) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.saveCurrentSeriesBeforeContinue'));
+    return;
+  }
+  withDraftSyncPaused(() => {
+    resetExceptionDraft();
+  });
+  exceptionModal.open = true;
+}
+
+function openEditExceptionModal(row: ShiftSeriesExceptionRead) {
+  syncExceptionDraft(row);
+  exceptionModal.open = true;
+}
+
+function closeExceptionModal() {
+  exceptionModal.open = false;
+  withDraftSyncPaused(() => {
+    resetExceptionDraft();
+  });
+}
+
 function resetTemplateModal() {
   Object.assign(templateModal, {
     code: '',
@@ -2654,6 +2743,12 @@ function syncSeriesDraft(series: ShiftSeriesRead) {
       interval_count: series.interval_count,
       label: series.label,
       location_text: series.location_text ?? '',
+      local_end_time: normalizeSeriesTimeValue(
+        shiftTemplateOptions.value.find((row) => row.id === series.shift_template_id)?.local_end_time,
+      ),
+      local_start_time: normalizeSeriesTimeValue(
+        shiftTemplateOptions.value.find((row) => row.id === series.shift_template_id)?.local_start_time,
+      ),
       meeting_point: series.meeting_point ?? '',
       notes: series.notes ?? '',
       recurrence_code: series.recurrence_code,
@@ -2707,61 +2802,75 @@ async function resolveShiftTemplate(templateId: string) {
 }
 
 function applyTemplateDefaultsToSeriesDraft(
-  template: Pick<ShiftTemplateRead, 'default_break_minutes' | 'location_text' | 'meeting_point' | 'shift_type_code'>,
-  options: { onlyIfEmpty?: boolean } = {},
+  template: Pick<ShiftTemplateRead, 'default_break_minutes' | 'local_end_time' | 'local_start_time' | 'location_text' | 'meeting_point' | 'shift_type_code'>,
+  options: { force?: boolean; onlyIfEmpty?: boolean } = {},
 ) {
   const onlyIfEmpty = options.onlyIfEmpty ?? false;
-  if (!seriesTemplateFieldTouched.default_break_minutes && template.default_break_minutes != null) {
+  const force = options.force ?? false;
+  if ((force || !seriesTemplateFieldTouched.local_start_time) && template.local_start_time) {
+    if (!onlyIfEmpty || !seriesDraft.local_start_time) {
+      seriesDraft.local_start_time = normalizeSeriesTimeValue(template.local_start_time);
+    }
+  }
+  if ((force || !seriesTemplateFieldTouched.local_end_time) && template.local_end_time) {
+    if (!onlyIfEmpty || !seriesDraft.local_end_time) {
+      seriesDraft.local_end_time = normalizeSeriesTimeValue(template.local_end_time);
+    }
+  }
+  if ((force || !seriesTemplateFieldTouched.default_break_minutes) && template.default_break_minutes != null) {
     if (!onlyIfEmpty || seriesDraft.default_break_minutes === 0 || seriesDraft.default_break_minutes === 30) {
       seriesDraft.default_break_minutes = template.default_break_minutes;
     }
   }
-  if (!seriesTemplateFieldTouched.shift_type_code && template.shift_type_code) {
+  if ((force || !seriesTemplateFieldTouched.shift_type_code) && template.shift_type_code) {
     if (!onlyIfEmpty || !seriesDraft.shift_type_code) {
       seriesDraft.shift_type_code = template.shift_type_code;
     }
   }
-  if (!seriesTemplateFieldTouched.meeting_point && template.meeting_point) {
+  if ((force || !seriesTemplateFieldTouched.meeting_point) && template.meeting_point) {
     if (!onlyIfEmpty || !seriesDraft.meeting_point) {
       seriesDraft.meeting_point = template.meeting_point;
     }
   }
-  if (!seriesTemplateFieldTouched.location_text && template.location_text) {
+  if ((force || !seriesTemplateFieldTouched.location_text) && template.location_text) {
     if (!onlyIfEmpty || !seriesDraft.location_text) {
       seriesDraft.location_text = template.location_text;
     }
   }
 }
 
-async function applySelectedShiftTemplateDefaults(templateId: string) {
-  if (!templateId) {
+async function applySelectedShiftTemplatePreset() {
+  if (!seriesDraft.shift_template_id) {
     return;
   }
-  const listItem = shiftTemplateOptions.value.find((row) => row.id === templateId) ?? null;
-  const detail = await resolveShiftTemplate(templateId);
-  if (seriesDraft.shift_template_id !== templateId) {
-    return;
-  }
+  const listItem = shiftTemplateOptions.value.find((row) => row.id === seriesDraft.shift_template_id) ?? null;
+  const detail = await resolveShiftTemplate(seriesDraft.shift_template_id);
   seriesTemplateDefaultsApplying.value = true;
   try {
     withDraftSyncPaused(() => {
       if (detail) {
-        applyTemplateDefaultsToSeriesDraft(detail, { onlyIfEmpty: true });
+        applyTemplateDefaultsToSeriesDraft(detail, { force: true });
       } else if (listItem) {
-        applyTemplateDefaultsToSeriesDraft(
-          {
-            default_break_minutes: listItem.default_break_minutes,
-            shift_type_code: listItem.shift_type_code,
-            meeting_point: null,
-            location_text: null,
-          },
-          { onlyIfEmpty: true },
-        );
+        applyTemplateDefaultsToSeriesDraft({
+          default_break_minutes: listItem.default_break_minutes,
+          local_end_time: listItem.local_end_time,
+          local_start_time: listItem.local_start_time,
+          shift_type_code: listItem.shift_type_code,
+          meeting_point: null,
+          location_text: null,
+        }, { force: true });
       }
     });
   } finally {
     seriesTemplateDefaultsApplying.value = false;
   }
+}
+
+async function hydrateSeriesTimeFieldsFromTemplate() {
+  if (!seriesDraft.shift_template_id || (seriesDraft.local_start_time && seriesDraft.local_end_time)) {
+    return;
+  }
+  await applySelectedShiftTemplatePreset();
 }
 
 function resolveSeriesErrorMessage(error: unknown) {
@@ -3150,6 +3259,7 @@ async function selectSeriesRow(seriesId: string) {
       listShiftSeriesExceptions(props.tenantId, seriesId, props.accessToken),
     ]);
     syncSeriesDraft(series);
+    await hydrateSeriesTimeFieldsFromTemplate();
     seriesExceptions.value = exceptions;
   } finally {
     finishStepLoads(loadVersions);
@@ -4159,6 +4269,7 @@ async function loadSeriesState(isCurrent = () => true) {
       return;
     }
     syncSeriesDraft(series);
+    await hydrateSeriesTimeFieldsFromTemplate();
     seriesExceptions.value = exceptions;
   } finally {
     finishStepLoads(detailVersions, isCurrent);
@@ -4897,6 +5008,10 @@ function orderAttachmentDisplayTitle(document: PlanningDocumentRead) {
   return document.relation_label?.trim() || document.title;
 }
 
+function planningRecordAttachmentDisplayTitle(document: PlanningDocumentRead) {
+  return document.relation_label?.trim() || document.title || document.source_label || document.id;
+}
+
 function documentRowMetadata(document: PlanningDocumentRead) {
   const typeLabel = documentTypeLabel(document);
   const fileName = latestFileName(document);
@@ -5047,6 +5162,91 @@ async function linkExistingOrderDocument() {
   }
 }
 
+async function attachUploadedPlanningRecordDocument() {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.planning_record_id) {
+    return false;
+  }
+  if (!hasCompletePlanningRecordDocumentUploadDraft()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.planningRecordDocumentUploadIncomplete'));
+    emit('step-ui-state', 'planning-record-documents', { error: 'draft_incomplete' });
+    return false;
+  }
+  stepLoading.value = true;
+  emit('step-ui-state', 'planning-record-documents', { loading: true, error: '' });
+  try {
+    await createPlanningRecordAttachment(props.tenantId, props.wizardState.planning_record_id, props.accessToken, {
+      content_base64: planningRecordAttachmentDraft.content_base64,
+      content_type: planningRecordAttachmentDraft.content_type,
+      file_name: planningRecordAttachmentDraft.file_name,
+      label: planningRecordAttachmentDraft.label || null,
+      tenant_id: props.tenantId,
+      title: planningRecordAttachmentDraft.title.trim(),
+    });
+    planningRecordAttachments.value = await listPlanningRecordAttachments(
+      props.tenantId,
+      props.wizardState.planning_record_id,
+      props.accessToken,
+    );
+    withDraftSyncPaused(() => {
+      resetPlanningRecordAttachmentDraft();
+    });
+    clearStepDraft('planning-record-documents');
+    clearDraftRestoreMessage();
+    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.planningRecordDocumentAttached'));
+    emit('step-completion', 'planning-record-documents', true);
+    emit('step-ui-state', 'planning-record-documents', { dirty: false, error: '' });
+    return true;
+  } catch {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.planningRecordDocumentSaveFailed'));
+    emit('step-ui-state', 'planning-record-documents', { error: 'save_failed' });
+    return false;
+  } finally {
+    stepLoading.value = false;
+    emit('step-ui-state', 'planning-record-documents', { loading: false });
+  }
+}
+
+async function linkExistingPlanningRecordDocument() {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.planning_record_id) {
+    return false;
+  }
+  if (!hasCompletePlanningRecordDocumentLinkDraft()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.planningRecordDocumentLinkIncomplete'));
+    emit('step-ui-state', 'planning-record-documents', { error: 'draft_incomplete' });
+    return false;
+  }
+  stepLoading.value = true;
+  emit('step-ui-state', 'planning-record-documents', { loading: true, error: '' });
+  try {
+    await linkPlanningRecordAttachment(props.tenantId, props.wizardState.planning_record_id, props.accessToken, {
+      document_id: planningRecordAttachmentLink.document_id.trim(),
+      label: planningRecordAttachmentLink.label || null,
+      tenant_id: props.tenantId,
+    });
+    planningRecordAttachments.value = await listPlanningRecordAttachments(
+      props.tenantId,
+      props.wizardState.planning_record_id,
+      props.accessToken,
+    );
+    withDraftSyncPaused(() => {
+      resetPlanningRecordAttachmentDraft();
+    });
+    clearStepDraft('planning-record-documents');
+    clearDraftRestoreMessage();
+    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.planningRecordDocumentLinked'));
+    emit('step-completion', 'planning-record-documents', true);
+    emit('step-ui-state', 'planning-record-documents', { dirty: false, error: '' });
+    return true;
+  } catch {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.planningRecordDocumentSaveFailed'));
+    emit('step-ui-state', 'planning-record-documents', { error: 'save_failed' });
+    return false;
+  } finally {
+    stepLoading.value = false;
+    emit('step-ui-state', 'planning-record-documents', { loading: false });
+  }
+}
+
 async function unlinkOrderDocument(documentId: string) {
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
     return false;
@@ -5069,6 +5269,35 @@ async function unlinkOrderDocument(documentId: string) {
   } finally {
     stepLoading.value = false;
     emit('step-ui-state', 'order-scope-documents', { loading: false });
+  }
+}
+
+async function unlinkPlanningRecordDocument(documentId: string) {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.planning_record_id) {
+    return false;
+  }
+  if (!confirmRemove('sicherplan.customerPlansWizard.confirmUnlinkPlanningDocument')) {
+    return false;
+  }
+  stepLoading.value = true;
+  emit('step-ui-state', 'planning-record-documents', { loading: true, error: '' });
+  try {
+    await unlinkPlanningRecordAttachment(props.tenantId, props.wizardState.planning_record_id, documentId, props.accessToken);
+    planningRecordAttachments.value = await listPlanningRecordAttachments(
+      props.tenantId,
+      props.wizardState.planning_record_id,
+      props.accessToken,
+    );
+    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.planningRecordDocumentUnlinked'));
+    emit('step-ui-state', 'planning-record-documents', { dirty: false, error: '' });
+    return true;
+  } catch {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.planningRecordDocumentUnlinkFailed'));
+    emit('step-ui-state', 'planning-record-documents', { error: 'delete_failed' });
+    return false;
+  } finally {
+    stepLoading.value = false;
+    emit('step-ui-state', 'planning-record-documents', { loading: false });
   }
 }
 
@@ -5212,58 +5441,16 @@ async function submitPlanningRecordDocumentsStep() {
   if (!props.tenantId || !props.accessToken || !props.wizardState.planning_record_id) {
     return false;
   }
-  if (hasPlanningRecordAttachmentPartialDraft()) {
+  if (hasAnyPlanningRecordDocumentDraftInput()) {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.completeCurrentPlanningDocumentDraftBeforeContinue'));
     emit('step-completion', 'planning-record-documents', false);
     emit('step-ui-state', 'planning-record-documents', { error: 'draft_incomplete' });
     return false;
   }
-  if (!hasPlanningRecordAttachmentSubmission()) {
-    setFeedback('neutral', '');
-    emit('step-completion', 'planning-record-documents', true);
-    emit('step-ui-state', 'planning-record-documents', { dirty: false, error: '' });
-    return true;
-  }
-  stepLoading.value = true;
-  emit('step-ui-state', 'planning-record-documents', { loading: true, error: '' });
-  try {
-    if (planningRecordAttachmentDraft.content_base64) {
-      await createPlanningRecordAttachment(props.tenantId, props.wizardState.planning_record_id, props.accessToken, {
-        content_base64: planningRecordAttachmentDraft.content_base64,
-        content_type: planningRecordAttachmentDraft.content_type,
-        file_name: planningRecordAttachmentDraft.file_name,
-        label: planningRecordAttachmentDraft.label || null,
-        tenant_id: props.tenantId,
-        title: planningRecordAttachmentDraft.title,
-      });
-    } else {
-      await linkPlanningRecordAttachment(props.tenantId, props.wizardState.planning_record_id, props.accessToken, {
-        document_id: planningRecordAttachmentLink.document_id.trim(),
-        label: planningRecordAttachmentLink.label || null,
-        tenant_id: props.tenantId,
-      });
-    }
-    planningRecordAttachments.value = await listPlanningRecordAttachments(
-      props.tenantId,
-      props.wizardState.planning_record_id,
-      props.accessToken,
-    );
-    withDraftSyncPaused(() => {
-      resetPlanningRecordAttachmentDraft();
-    });
-    clearStepDraft('planning-record-documents');
-    clearDraftRestoreMessage();
-    emit('step-completion', 'planning-record-documents', true);
-    emit('step-ui-state', 'planning-record-documents', { dirty: false, error: '' });
-    return true;
-  } catch {
-    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.planningRecordDocumentSaveFailed'));
-    emit('step-ui-state', 'planning-record-documents', { error: 'save_failed' });
-    return false;
-  } finally {
-    stepLoading.value = false;
-    emit('step-ui-state', 'planning-record-documents', { loading: false });
-  }
+  setFeedback('neutral', '');
+  emit('step-completion', 'planning-record-documents', true);
+  emit('step-ui-state', 'planning-record-documents', { dirty: false, error: '' });
+  return true;
 }
 
 async function submitShiftPlanStep(): Promise<CustomerNewPlanStepSubmitResult> {
@@ -5393,15 +5580,103 @@ function buildStaffingHandoffRoute(generatedShifts: Array<{ ends_at: string; id:
   return `/admin/planning-staffing?${query.toString()}`;
 }
 
-async function submitSeriesStep() {
-  if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
+function buildSeriesCompatibilityTemplateCode() {
+  const start = normalizeSeriesTimeValue(seriesDraft.local_start_time).replace(':', '');
+  const end = normalizeSeriesTimeValue(seriesDraft.local_end_time).replace(':', '');
+  const shiftType = seriesDraft.shift_type_code.trim() || 'shift';
+  return `OW_${start}_${end}_${shiftType}_${seriesDraft.default_break_minutes}`.replace(/[^A-Za-z0-9_]/g, '_').slice(0, 80);
+}
+
+function findCompatibleShiftTemplate() {
+  const start = normalizeSeriesTimeValue(seriesDraft.local_start_time);
+  const end = normalizeSeriesTimeValue(seriesDraft.local_end_time);
+  const shiftType = seriesDraft.shift_type_code.trim();
+  return shiftTemplateOptions.value.find((row) =>
+    row.code === buildSeriesCompatibilityTemplateCode() ||
+    (
+      normalizeSeriesTimeValue(row.local_start_time) === start &&
+      normalizeSeriesTimeValue(row.local_end_time) === end &&
+      row.default_break_minutes === seriesDraft.default_break_minutes &&
+      row.shift_type_code === shiftType
+    ),
+  ) ?? null;
+}
+
+function selectedTemplateMatchesSeriesTiming() {
+  const template = shiftTemplateOptions.value.find((row) => row.id === seriesDraft.shift_template_id);
+  if (!template) {
     return false;
   }
-  if (!seriesDraft.label.trim() || !seriesDraft.shift_template_id || !seriesDraft.date_from || !seriesDraft.date_to || seriesDraft.date_to < seriesDraft.date_from) {
+  return (
+    normalizeSeriesTimeValue(template.local_start_time) === normalizeSeriesTimeValue(seriesDraft.local_start_time) &&
+    normalizeSeriesTimeValue(template.local_end_time) === normalizeSeriesTimeValue(seriesDraft.local_end_time) &&
+    template.default_break_minutes === seriesDraft.default_break_minutes &&
+    template.shift_type_code === seriesDraft.shift_type_code
+  );
+}
+
+async function ensureSeriesCompatibilityTemplate() {
+  if (seriesDraft.shift_template_id && selectedTemplateMatchesSeriesTiming()) {
+    return seriesDraft.shift_template_id;
+  }
+  const reusableTemplate = findCompatibleShiftTemplate();
+  if (reusableTemplate) {
+    seriesDraft.shift_template_id = reusableTemplate.id;
+    return reusableTemplate.id;
+  }
+  const code = buildSeriesCompatibilityTemplateCode();
+  const created = await createShiftTemplate(props.tenantId, props.accessToken, {
+    tenant_id: props.tenantId,
+    code,
+    label: `${$t('sicherplan.customerPlansWizard.forms.seriesTemplateGeneratedLabel')} ${seriesDraft.local_start_time}-${seriesDraft.local_end_time}`,
+    local_start_time: seriesDraft.local_start_time,
+    local_end_time: seriesDraft.local_end_time,
+    default_break_minutes: seriesDraft.default_break_minutes,
+    shift_type_code: seriesDraft.shift_type_code,
+    meeting_point: null,
+    location_text: null,
+    notes: $t('sicherplan.customerPlansWizard.forms.seriesTemplateGeneratedNote'),
+  });
+  shiftTemplateDetailCache[created.id] = created;
+  shiftTemplateOptions.value = await listShiftTemplates(props.tenantId, props.accessToken, {});
+  seriesDraft.shift_template_id = created.id;
+  return created.id;
+}
+
+function validateSeriesDraft() {
+  clearSeriesFieldErrors();
+  if (!seriesDraft.label.trim() || !seriesDraft.date_from || !seriesDraft.date_to || seriesDraft.date_to < seriesDraft.date_from) {
+    seriesFieldErrors.dateRange = $t('sicherplan.customerPlansWizard.errors.seriesDateRangeInvalid');
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.seriesInvalid'));
     return false;
   }
+  if (!seriesDraft.local_start_time.trim()) {
+    seriesFieldErrors.startTime = $t('sicherplan.customerPlansWizard.errors.seriesStartTimeRequired');
+    setFeedback('error', seriesFieldErrors.startTime);
+    return false;
+  }
+  if (!seriesDraft.local_end_time.trim()) {
+    seriesFieldErrors.endTime = $t('sicherplan.customerPlansWizard.errors.seriesEndTimeRequired');
+    setFeedback('error', seriesFieldErrors.endTime);
+    return false;
+  }
+  if (seriesDraft.local_end_time <= seriesDraft.local_start_time) {
+    seriesFieldErrors.endTime = $t('sicherplan.customerPlansWizard.errors.seriesEndTimeAfterStart');
+    setFeedback('error', seriesFieldErrors.endTime);
+    return false;
+  }
+  if (!seriesDraft.shift_type_code.trim()) {
+    seriesFieldErrors.shiftType = $t('sicherplan.customerPlansWizard.errors.seriesShiftTypeRequired');
+    setFeedback('error', seriesFieldErrors.shiftType);
+    return false;
+  }
+  if (seriesDraft.default_break_minutes < 0) {
+    seriesFieldErrors.defaultBreak = $t('sicherplan.customerPlansWizard.errors.seriesDefaultBreakInvalid');
+    setFeedback('error', seriesFieldErrors.defaultBreak);
+    return false;
+  }
   if (seriesWeekdayMaskRequired.value && (!/^[01]{7}$/.test(seriesDraft.weekday_mask) || !seriesDraft.weekday_mask.includes('1'))) {
+    seriesFieldErrors.weekdayMask = $t('sicherplan.customerPlansWizard.errors.seriesWeekdaySelectionRequired');
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.seriesWeekdayMaskInvalid'));
     return false;
   }
@@ -5413,6 +5688,18 @@ async function submitSeriesStep() {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.seriesShiftPlanWindowMismatch'));
     return false;
   }
+  return true;
+}
+
+function validateExceptionDraft() {
+  if (!exceptionDraft.exception_date) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.exceptionDateRequired'));
+    return false;
+  }
+  if (!exceptionDraft.action_code.trim()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.exceptionActionRequired'));
+    return false;
+  }
   if (
     exceptionOverrideActive.value &&
     (!exceptionDraft.override_local_start_time.trim() || !exceptionDraft.override_local_end_time.trim())
@@ -5420,69 +5707,217 @@ async function submitSeriesStep() {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.seriesExceptionOverrideTimesRequired'));
     return false;
   }
+  return true;
+}
+
+function buildSeriesPayload() {
+  return {
+    tenant_id: props.tenantId,
+    shift_plan_id: props.wizardState.shift_plan_id,
+    shift_template_id: seriesDraft.shift_template_id,
+    label: seriesDraft.label.trim(),
+    recurrence_code: seriesDraft.recurrence_code,
+    interval_count: seriesDraft.interval_count,
+    weekday_mask: seriesWeekdayMaskRequired.value ? seriesDraft.weekday_mask : null,
+    timezone: seriesDraft.timezone,
+    date_from: seriesDraft.date_from,
+    date_to: seriesDraft.date_to,
+    default_break_minutes: seriesDraft.default_break_minutes,
+    shift_type_code: seriesDraft.shift_type_code || null,
+    meeting_point: seriesDraft.meeting_point.trim() || null,
+    location_text: seriesDraft.location_text.trim() || null,
+    notes: seriesDraft.notes.trim() || null,
+    customer_visible_flag: seriesDraft.customer_visible_flag,
+    subcontractor_visible_flag: seriesDraft.subcontractor_visible_flag,
+    stealth_mode_flag: seriesDraft.stealth_mode_flag,
+    release_state: seriesDraft.release_state,
+    ...(selectedSeries.value ? { version_no: selectedSeries.value.version_no } : {}),
+  };
+}
+
+function buildExceptionPayload() {
+  return {
+    tenant_id: props.tenantId,
+    exception_date: exceptionDraft.exception_date,
+    action_code: exceptionDraft.action_code,
+    override_local_start_time: exceptionDraft.override_local_start_time.trim() || null,
+    override_local_end_time: exceptionDraft.override_local_end_time.trim() || null,
+    override_break_minutes: exceptionDraft.override_break_minutes === '' ? null : Number(exceptionDraft.override_break_minutes),
+    override_shift_type_code: exceptionDraft.override_shift_type_code.trim() || null,
+    override_meeting_point: exceptionDraft.override_meeting_point.trim() || null,
+    override_location_text: exceptionDraft.override_location_text.trim() || null,
+    customer_visible_flag: exceptionDraft.customer_visible_flag,
+    subcontractor_visible_flag: exceptionDraft.subcontractor_visible_flag,
+    stealth_mode_flag: exceptionDraft.stealth_mode_flag,
+    notes: exceptionDraft.notes.trim() || null,
+    ...(selectedExceptionId.value
+      ? { version_no: seriesExceptions.value.find((row) => row.id === selectedExceptionId.value)?.version_no }
+      : {}),
+  };
+}
+
+async function saveSeriesDraft() {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
+    return false;
+  }
+  if (seriesDraft.shift_template_id && (!seriesDraft.local_start_time || !seriesDraft.local_end_time || !seriesDraft.shift_type_code)) {
+    await applySelectedShiftTemplatePreset();
+  }
+  if (!validateSeriesDraft()) {
+    emit('step-completion', 'series-exceptions', false);
+    emit('step-ui-state', 'series-exceptions', { error: 'validation_failed' });
+    return false;
+  }
   stepLoading.value = true;
   emit('step-ui-state', 'series-exceptions', { loading: true, error: '' });
   try {
-    const seriesPayload = {
-      tenant_id: props.tenantId,
-      shift_plan_id: props.wizardState.shift_plan_id,
-      shift_template_id: seriesDraft.shift_template_id,
-      label: seriesDraft.label.trim(),
-      recurrence_code: seriesDraft.recurrence_code,
-      interval_count: seriesDraft.interval_count,
-      weekday_mask: seriesWeekdayMaskRequired.value ? seriesDraft.weekday_mask : null,
-      timezone: seriesDraft.timezone,
-      date_from: seriesDraft.date_from,
-      date_to: seriesDraft.date_to,
-      default_break_minutes: seriesDraft.default_break_minutes,
-      shift_type_code: seriesDraft.shift_type_code || null,
-      meeting_point: seriesDraft.meeting_point.trim() || null,
-      location_text: seriesDraft.location_text.trim() || null,
-      notes: seriesDraft.notes.trim() || null,
-      customer_visible_flag: seriesDraft.customer_visible_flag,
-      subcontractor_visible_flag: seriesDraft.subcontractor_visible_flag,
-      stealth_mode_flag: seriesDraft.stealth_mode_flag,
-      release_state: seriesDraft.release_state,
-      ...(selectedSeries.value ? { version_no: selectedSeries.value.version_no } : {}),
-    };
-    const savedSeries = selectedSeries.value
-      ? await updateShiftSeries(props.tenantId, selectedSeries.value.id, props.accessToken, seriesPayload)
-      : await createShiftSeries(props.tenantId, props.wizardState.shift_plan_id, props.accessToken, seriesPayload);
+    await ensureSeriesCompatibilityTemplate();
+    const updatingExistingSeries = Boolean(selectedSeries.value);
+    const savedSeries = updatingExistingSeries
+      ? await updateShiftSeries(props.tenantId, selectedSeries.value!.id, props.accessToken, buildSeriesPayload())
+      : await createShiftSeries(props.tenantId, props.wizardState.shift_plan_id, props.accessToken, buildSeriesPayload());
     syncSeriesDraft(savedSeries);
     emit('saved-context', { series_id: savedSeries.id });
     seriesRows.value = await listShiftSeries(props.tenantId, props.wizardState.shift_plan_id, props.accessToken);
-
-    if (exceptionDraft.exception_date) {
-      const exceptionPayload = {
-        tenant_id: props.tenantId,
-        exception_date: exceptionDraft.exception_date,
-        action_code: exceptionDraft.action_code,
-        override_local_start_time: exceptionDraft.override_local_start_time.trim() || null,
-        override_local_end_time: exceptionDraft.override_local_end_time.trim() || null,
-        override_break_minutes: exceptionDraft.override_break_minutes === '' ? null : Number(exceptionDraft.override_break_minutes),
-        override_shift_type_code: exceptionDraft.override_shift_type_code.trim() || null,
-        override_meeting_point: exceptionDraft.override_meeting_point.trim() || null,
-        override_location_text: exceptionDraft.override_location_text.trim() || null,
-        customer_visible_flag: exceptionDraft.customer_visible_flag,
-        subcontractor_visible_flag: exceptionDraft.subcontractor_visible_flag,
-        stealth_mode_flag: exceptionDraft.stealth_mode_flag,
-        notes: exceptionDraft.notes.trim() || null,
-      };
-      const savedException = selectedExceptionId.value
-        ? await updateShiftSeriesException(props.tenantId, selectedExceptionId.value, props.accessToken, exceptionPayload)
-        : await createShiftSeriesException(props.tenantId, savedSeries.id, props.accessToken, exceptionPayload);
-      syncExceptionDraft(savedException);
-    }
-
     seriesExceptions.value = await listShiftSeriesExceptions(props.tenantId, savedSeries.id, props.accessToken);
-    const generationFrom = seriesGenerationDraft.from_date || savedSeries.date_from;
-    const generationTo = seriesGenerationDraft.to_date || savedSeries.date_to;
+    clearStepDraft('series-exceptions');
+    clearDraftRestoreMessage();
+    setFeedback('success', $t(updatingExistingSeries ? 'sicherplan.customerPlansWizard.messages.seriesUpdated' : 'sicherplan.customerPlansWizard.messages.seriesSaved'));
+    emit('step-completion', 'series-exceptions', true);
+    emit('step-ui-state', 'series-exceptions', { dirty: false, error: '' });
+    return true;
+  } catch (error) {
+    setFeedback('error', $t(resolveSeriesErrorMessage(error)));
+    emit('step-ui-state', 'series-exceptions', { error: 'save_failed' });
+    return false;
+  } finally {
+    stepLoading.value = false;
+    emit('step-ui-state', 'series-exceptions', { loading: false });
+  }
+}
+
+async function saveExceptionDraft() {
+  if (!props.tenantId || !props.accessToken || !selectedSeries.value?.id) {
+    return false;
+  }
+  if (!validateExceptionDraft()) {
+    emit('step-ui-state', 'series-exceptions', { error: 'validation_failed' });
+    return false;
+  }
+  exceptionModal.saving = true;
+  emit('step-ui-state', 'series-exceptions', { loading: true, error: '' });
+  try {
+    const savedException = selectedExceptionId.value
+      ? await updateShiftSeriesException(props.tenantId, selectedExceptionId.value, props.accessToken, buildExceptionPayload())
+      : await createShiftSeriesException(props.tenantId, selectedSeries.value.id, props.accessToken, buildExceptionPayload());
+    seriesExceptions.value = await listShiftSeriesExceptions(props.tenantId, savedException.shift_series_id, props.accessToken);
+    closeExceptionModal();
+    clearStepDraft('series-exceptions');
+    clearDraftRestoreMessage();
+    setFeedback(
+      'success',
+      $t(
+        selectedExceptionId.value
+          ? 'sicherplan.customerPlansWizard.messages.exceptionSaved'
+          : 'sicherplan.customerPlansWizard.messages.exceptionSaved',
+      ),
+    );
+    emit('step-ui-state', 'series-exceptions', { dirty: false, error: '' });
+    return true;
+  } catch (error) {
+    setFeedback('error', $t(resolveSeriesErrorMessage(error)));
+    emit('step-ui-state', 'series-exceptions', { error: 'save_failed' });
+    return false;
+  } finally {
+    exceptionModal.saving = false;
+    emit('step-ui-state', 'series-exceptions', { loading: false });
+  }
+}
+
+async function deleteExceptionRow(row: ShiftSeriesExceptionRead) {
+  if (!props.tenantId || !props.accessToken) {
+    return false;
+  }
+  if (!confirmRemove('sicherplan.customerPlansWizard.confirmDeleteException')) {
+    return false;
+  }
+  stepLoading.value = true;
+  emit('step-ui-state', 'series-exceptions', { loading: true, error: '' });
+  try {
+    await deleteShiftSeriesException(props.tenantId, row.id, props.accessToken);
+    seriesExceptions.value = await listShiftSeriesExceptions(props.tenantId, row.shift_series_id, props.accessToken);
+    if (selectedExceptionId.value === row.id) {
+      closeExceptionModal();
+    }
+    setFeedback('success', $t('sicherplan.customerPlansWizard.messages.exceptionDeleted'));
+    emit('step-ui-state', 'series-exceptions', { dirty: false, error: '' });
+    return true;
+  } catch {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.exceptionDeleteFailed'));
+    emit('step-ui-state', 'series-exceptions', { error: 'delete_failed' });
+    return false;
+  } finally {
+    stepLoading.value = false;
+    emit('step-ui-state', 'series-exceptions', { loading: false });
+  }
+}
+
+function hasUnsavedSeriesChanges() {
+  if (!selectedSeries.value) {
+    return hasSeriesDraftContent();
+  }
+  return (
+    seriesDraft.label !== selectedSeries.value.label ||
+    seriesDraft.shift_template_id !== selectedSeries.value.shift_template_id ||
+    seriesDraft.recurrence_code !== selectedSeries.value.recurrence_code ||
+    seriesDraft.interval_count !== selectedSeries.value.interval_count ||
+    seriesDraft.weekday_mask !== (selectedSeries.value.weekday_mask ?? '1111100') ||
+    seriesDraft.timezone !== selectedSeries.value.timezone ||
+    seriesDraft.date_from !== selectedSeries.value.date_from ||
+    seriesDraft.date_to !== selectedSeries.value.date_to ||
+    seriesDraft.default_break_minutes !== (selectedSeries.value.default_break_minutes ?? 30) ||
+    seriesDraft.shift_type_code !== (selectedSeries.value.shift_type_code ?? '') ||
+    !selectedTemplateMatchesSeriesTiming() ||
+    seriesDraft.meeting_point !== (selectedSeries.value.meeting_point ?? '') ||
+    seriesDraft.location_text !== (selectedSeries.value.location_text ?? '') ||
+    seriesDraft.notes !== (selectedSeries.value.notes ?? '') ||
+    seriesDraft.customer_visible_flag !== selectedSeries.value.customer_visible_flag ||
+    seriesDraft.subcontractor_visible_flag !== selectedSeries.value.subcontractor_visible_flag ||
+    seriesDraft.stealth_mode_flag !== selectedSeries.value.stealth_mode_flag ||
+    seriesDraft.release_state !== selectedSeries.value.release_state
+  );
+}
+
+async function submitSeriesStep() {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
+    return false;
+  }
+  if (hasUnsavedSeriesChanges()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.saveCurrentSeriesBeforeContinue'));
+    emit('step-ui-state', 'series-exceptions', { dirty: true, error: 'save_required' });
+    return false;
+  }
+  if (!selectedSeries.value?.id) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.saveCurrentSeriesBeforeContinue'));
+    emit('step-ui-state', 'series-exceptions', { error: 'save_required' });
+    return false;
+  }
+  if (exceptionModal.open) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.saveOrCancelCurrentExceptionBeforeContinue'));
+    emit('step-ui-state', 'series-exceptions', { error: 'save_required' });
+    return false;
+  }
+  stepLoading.value = true;
+  emit('step-ui-state', 'series-exceptions', { loading: true, error: '' });
+  try {
+    const generationFrom = seriesGenerationDraft.from_date || selectedSeries.value.date_from;
+    const generationTo = seriesGenerationDraft.to_date || selectedSeries.value.date_to;
     if (
       !generationFrom ||
       !generationTo ||
       generationTo < generationFrom ||
-      generationFrom < savedSeries.date_from ||
-      generationTo > savedSeries.date_to
+      generationFrom < selectedSeries.value.date_from ||
+      generationTo > selectedSeries.value.date_to
     ) {
       setFeedback('error', $t('sicherplan.customerPlansWizard.errors.seriesGenerationWindowInvalid'));
       emit('step-ui-state', 'series-exceptions', { error: 'generation_window_invalid' });
@@ -5490,7 +5925,7 @@ async function submitSeriesStep() {
     }
     clearStepDraft('series-exceptions');
     clearDraftRestoreMessage();
-    const generatedShifts = await generateShiftSeries(props.tenantId, savedSeries.id, props.accessToken, {
+    const generatedShifts = await generateShiftSeries(props.tenantId, selectedSeries.value.id, props.accessToken, {
       from_date: generationFrom,
       regenerate_existing: seriesGenerationDraft.regenerate_existing,
       to_date: generationTo,
@@ -5745,6 +6180,8 @@ watch(
     seriesDraft.recurrence_code,
     seriesDraft.interval_count,
     seriesDraft.weekday_mask,
+    seriesDraft.local_start_time,
+    seriesDraft.local_end_time,
     seriesDraft.default_break_minutes,
     seriesDraft.shift_type_code,
     seriesDraft.meeting_point,
@@ -5793,28 +6230,26 @@ watch(
 );
 
 watch(
-  () => seriesDraft.shift_template_id,
-  async (templateId, previousTemplateId) => {
-    if (draftSyncPaused.value || !templateId || templateId === previousTemplateId) {
-      return;
-    }
-    await applySelectedShiftTemplateDefaults(templateId);
-  },
-);
-
-watch(
   () => [
     seriesDraft.default_break_minutes,
+    seriesDraft.local_start_time,
+    seriesDraft.local_end_time,
     seriesDraft.shift_type_code,
     seriesDraft.meeting_point,
     seriesDraft.location_text,
   ] as const,
-  ([nextBreak, nextShiftType, nextMeetingPoint, nextLocationText], [previousBreak, previousShiftType, previousMeetingPoint, previousLocationText]) => {
+  ([nextBreak, nextStart, nextEnd, nextShiftType, nextMeetingPoint, nextLocationText], [previousBreak, previousStart, previousEnd, previousShiftType, previousMeetingPoint, previousLocationText]) => {
     if (draftSyncPaused.value || seriesTemplateDefaultsApplying.value) {
       return;
     }
     if (nextBreak !== previousBreak) {
       seriesTemplateFieldTouched.default_break_minutes = true;
+    }
+    if (nextStart !== previousStart) {
+      seriesTemplateFieldTouched.local_start_time = true;
+    }
+    if (nextEnd !== previousEnd) {
+      seriesTemplateFieldTouched.local_end_time = true;
     }
     if (nextShiftType !== previousShiftType) {
       seriesTemplateFieldTouched.shift_type_code = true;
@@ -6531,6 +6966,9 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </div>
+      <p v-else-if="!stepLoadState.planningDocuments" class="field-help">
+        {{ $t('sicherplan.customerPlansWizard.forms.noPlanningDocumentsYet') }}
+      </p>
       <section class="sp-customer-plan-wizard-step__document-subsection">
         <header class="sp-customer-plan-wizard-step__document-subsection-header">
           <h5>{{ $t('sicherplan.customerPlansWizard.forms.uploadNewDocument') }}</h5>
@@ -6880,86 +7318,156 @@ onBeforeUnmount(() => {
         test-id="customer-new-plan-planning-documents-loading"
       />
       <p v-if="stepLoadError.planningDocuments" class="field-help">{{ stepLoadError.planningDocuments }}</p>
-      <div v-if="planningRecordAttachments.length" class="sp-customer-plan-wizard-step__list">
+      <div
+        v-if="planningRecordAttachments.length"
+        class="sp-customer-plan-wizard-step__list sp-customer-plan-wizard-step__document-list"
+        data-testid="customer-new-plan-planning-document-list"
+        data-order-workspace-testid="customer-order-workspace-planning-document-list"
+      >
         <div
           v-for="document in planningRecordAttachments"
           :key="document.id"
           class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static"
+          data-order-workspace-testid="customer-order-workspace-planning-document-row"
         >
-          <strong>{{ document.title }}</strong>
-          <span>{{ document.id }}</span>
+          <div class="sp-customer-plan-wizard-step__document-row-copy">
+            <strong data-order-workspace-testid="customer-order-workspace-planning-document-primary-label">
+              {{ planningRecordAttachmentDisplayTitle(document) }}
+            </strong>
+            <span
+              v-if="documentRowMetadata(document)"
+              data-order-workspace-testid="customer-order-workspace-planning-document-secondary-label"
+            >
+              {{ documentRowMetadata(document) }}
+            </span>
+          </div>
+          <button
+            type="button"
+            class="sp-customer-plan-wizard-step__list-action sp-customer-plan-wizard-step__list-action--compact"
+            data-testid="customer-new-plan-unlink-planning-record-document"
+            data-order-workspace-testid="customer-order-workspace-planning-document-remove"
+            :disabled="stepLoading"
+            @click.stop="void unlinkPlanningRecordDocument(document.id)"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.unlinkPlanningDocument') }}
+          </button>
         </div>
       </div>
-      <div class="sp-customer-plan-wizard-step__grid">
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.documentTitle') }}</span>
-          <input v-model="planningRecordAttachmentDraft.title" data-testid="customer-new-plan-planning-record-document-title" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.documentLabel') }}</span>
-          <input v-model="planningRecordAttachmentDraft.label" data-testid="customer-new-plan-planning-record-document-label" />
-        </label>
-        <label class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.documentFile') }}</span>
-          <input data-testid="customer-new-plan-planning-record-document-file" type="file" @change="onPlanningRecordAttachmentSelected" />
-        </label>
-      </div>
-      <div class="sp-customer-plan-wizard-step__divider"></div>
-      <div
-        v-if="planningRecordAttachmentLink.document_id"
-        class="sp-customer-plan-wizard-step__document-selection"
-        data-testid="customer-new-plan-planning-document-selected"
-      >
-        <strong>{{ $t('sicherplan.customerPlansWizard.forms.documentPickerSelected') }}</strong>
-        <span>{{ documentSummary(selectedPlanningRecordLinkDocument, planningRecordAttachmentLink.document_id) }}</span>
-      </div>
-      <div class="cta-row">
-        <button
-          type="button"
-          class="cta-button cta-secondary"
-          data-testid="customer-new-plan-planning-document-picker-open"
-          :disabled="stepLoading"
-          @click="openDocumentPicker('planning-record')"
-        >
-          {{ $t('sicherplan.customerPlansWizard.forms.documentPickerOpen') }}
-        </button>
-        <button
+      <section class="sp-customer-plan-wizard-step__document-subsection">
+        <header class="sp-customer-plan-wizard-step__document-subsection-header">
+          <h5>{{ $t('sicherplan.customerPlansWizard.forms.uploadNewDocument') }}</h5>
+          <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.uploadNewDocumentHelp') }}</p>
+        </header>
+        <div class="sp-customer-plan-wizard-step__grid">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.documentTitle') }}</span>
+            <input
+              v-model="planningRecordAttachmentDraft.title"
+              data-testid="customer-new-plan-planning-record-document-title"
+              data-order-workspace-testid="customer-order-workspace-planning-document-upload-title"
+            />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.uploadLabel') }}</span>
+            <input
+              v-model="planningRecordAttachmentDraft.label"
+              data-testid="customer-new-plan-planning-record-document-label"
+              data-order-workspace-testid="customer-order-workspace-planning-document-upload-label"
+            />
+          </label>
+          <label class="field-stack field-stack--wide">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.documentFile') }}</span>
+            <input
+              data-testid="customer-new-plan-planning-record-document-file"
+              data-order-workspace-testid="customer-order-workspace-planning-document-file"
+              type="file"
+              @change="onPlanningRecordAttachmentSelected"
+            />
+          </label>
+        </div>
+        <div class="cta-row">
+          <button
+            type="button"
+            class="cta-button"
+            data-testid="customer-new-plan-attach-planning-record-document"
+            data-order-workspace-testid="customer-order-workspace-attach-planning-document"
+            :disabled="stepLoading"
+            @click="void attachUploadedPlanningRecordDocument()"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.attachUploadedDocument') }}
+          </button>
+        </div>
+      </section>
+      <div class="sp-customer-plan-wizard-step__document-divider" aria-hidden="true"></div>
+      <section class="sp-customer-plan-wizard-step__document-subsection">
+        <header class="sp-customer-plan-wizard-step__document-subsection-header">
+          <h5>{{ $t('sicherplan.customerPlansWizard.forms.linkExistingDocument') }}</h5>
+          <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.linkExistingDocumentHelp') }}</p>
+        </header>
+        <div
           v-if="planningRecordAttachmentLink.document_id"
-          type="button"
-          class="cta-button cta-secondary"
-          data-testid="customer-new-plan-planning-document-clear"
-          :disabled="stepLoading"
-          @click="clearSelectedPlanningRecordLinkDocument"
+          class="sp-customer-plan-wizard-step__document-selection"
+          data-testid="customer-new-plan-planning-document-selected"
         >
-          {{ $t('sicherplan.customerPlansWizard.forms.documentPickerClear') }}
-        </button>
-      </div>
-      <details class="sp-customer-plan-wizard-step__manual-document-id">
-        <summary>{{ $t('sicherplan.customerPlansWizard.forms.manualDocumentId') }}</summary>
-      <div class="sp-customer-plan-wizard-step__grid">
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.documentId') }}</span>
-          <input v-model="planningRecordAttachmentLink.document_id" data-testid="customer-new-plan-planning-record-document-id" />
-        </label>
-      </div>
-      </details>
-      <div class="sp-customer-plan-wizard-step__grid">
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.documentLabel') }}</span>
-          <input v-model="planningRecordAttachmentLink.label" data-testid="customer-new-plan-planning-record-document-link-label" />
-        </label>
-      </div>
-      <div v-if="hasPlanningRecordAttachmentDraftContent()" class="cta-row">
-        <button
-          class="cta-button cta-secondary"
-          data-testid="customer-new-plan-clear-planning-document-draft"
-          type="button"
-          :disabled="stepLoading"
-          @click="clearPlanningRecordDocumentDraftState"
-        >
-          {{ $t('sicherplan.customerPlansWizard.actions.clearPlanningDocumentDraft') }}
-        </button>
-      </div>
+          <strong>{{ $t('sicherplan.customerPlansWizard.forms.documentPickerSelected') }}</strong>
+          <span>{{ documentSummary(selectedPlanningRecordLinkDocument, planningRecordAttachmentLink.document_id) }}</span>
+        </div>
+        <div class="cta-row">
+          <button
+            type="button"
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-planning-document-picker-open"
+            data-order-workspace-testid="customer-order-workspace-planning-document-picker"
+            :disabled="stepLoading"
+            @click="openDocumentPicker('planning-record')"
+          >
+            {{ $t('sicherplan.customerPlansWizard.forms.documentPickerOpen') }}
+          </button>
+          <button
+            v-if="planningRecordAttachmentLink.document_id"
+            type="button"
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-planning-document-clear"
+            :disabled="stepLoading"
+            @click="clearSelectedPlanningRecordLinkDocument"
+          >
+            {{ $t('sicherplan.customerPlansWizard.forms.documentPickerClear') }}
+          </button>
+        </div>
+        <div class="sp-customer-plan-wizard-step__grid">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.linkLabel') }}</span>
+            <input
+              v-model="planningRecordAttachmentLink.label"
+              data-testid="customer-new-plan-planning-record-document-link-label"
+              data-order-workspace-testid="customer-order-workspace-planning-document-link-label"
+            />
+          </label>
+        </div>
+        <div class="cta-row">
+          <button
+            type="button"
+            class="cta-button"
+            data-testid="customer-new-plan-link-planning-record-document"
+            data-order-workspace-testid="customer-order-workspace-link-planning-document"
+            :disabled="stepLoading"
+            @click="void linkExistingPlanningRecordDocument()"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.linkExistingDocument') }}
+          </button>
+          <button
+            v-if="hasAnyPlanningRecordDocumentDraftInput()"
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-clear-planning-document-draft"
+            data-order-workspace-testid="customer-order-workspace-clear-planning-document-draft"
+            type="button"
+            :disabled="stepLoading"
+            @click="clearPlanningRecordDocumentDraftState"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.clearPlanningDocumentDraft') }}
+          </button>
+        </div>
+      </section>
     </section>
 
     <section v-else-if="shiftPlanStepActive" class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-shift-plan">
@@ -7078,8 +7586,9 @@ onBeforeUnmount(() => {
       <p v-if="stepLoadError.series" class="field-help">{{ stepLoadError.series }}</p>
       <div
         v-if="selectedShiftPlanSummary"
-        class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static"
+        class="sp-customer-plan-wizard-step__info-summary"
         data-testid="customer-new-plan-series-shift-plan-summary"
+        data-order-workspace-testid="customer-order-workspace-selected-shift-plan-summary"
       >
         <strong>{{ $t('sicherplan.customerPlansWizard.forms.selectedShiftPlan') }}: {{ selectedShiftPlanSummary.name }}</strong>
         <span>{{ selectedShiftPlanSummary.planning_from }} - {{ selectedShiftPlanSummary.planning_to }}</span>
@@ -7110,264 +7619,338 @@ onBeforeUnmount(() => {
           <span>{{ row.date_from }} - {{ row.date_to }}</span>
         </button>
       </div>
-      <div class="sp-customer-plan-wizard-step__grid">
-        <LocalLoadingIndicator
+      <section
+        class="sp-customer-plan-wizard-step__document-subsection"
+        data-testid="customer-new-plan-series-section"
+        data-order-workspace-testid="customer-order-workspace-series-section"
+      >
+        <header class="sp-customer-plan-wizard-step__document-subsection-header">
+          <h5>{{ $t('sicherplan.customerPlansWizard.forms.series') }}</h5>
+          <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.seriesHelp') }}</p>
+        </header>
+        <div
           v-if="stepLoadState.seriesDetail"
-          :label="savedDataLoadingLabel"
-          test-id="customer-new-plan-series-detail-loading"
-        />
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.label') }}</span>
-          <input v-model="seriesDraft.label" data-testid="customer-new-plan-series-label" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.shiftTemplate') }}</span>
-          <select v-model="seriesDraft.shift_template_id" data-testid="customer-new-plan-series-template">
-            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.shiftTemplatePlaceholder') }}</option>
-            <option v-for="option in shiftTemplateSelectOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.shiftType') }}</span>
-          <select v-model="seriesDraft.shift_type_code">
-            <option value="">{{ $t('sicherplan.customerPlansWizard.forms.shiftTypePlaceholder') }}</option>
-            <option v-for="option in shiftTypeSelectOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.recurrenceCode') }}</span>
-          <select v-model="seriesDraft.recurrence_code" data-testid="customer-new-plan-series-recurrence-code">
-            <option value="daily">{{ $t('sicherplan.customerPlansWizard.forms.recurrenceDaily') }}</option>
-            <option value="weekly">{{ $t('sicherplan.customerPlansWizard.forms.recurrenceWeekly') }}</option>
-          </select>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.intervalCount') }}</span>
-          <input v-model.number="seriesDraft.interval_count" min="1" type="number" />
-        </label>
-        <label v-if="seriesWeekdayMaskRequired" class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.weekdayMask') }}</span>
-          <div
-            class="sp-customer-plan-wizard-step__weekday-picker"
-            data-testid="customer-new-plan-series-weekday-picker"
-          >
-            <div
-              v-for="option in seriesWeekdayOptions"
-              :key="option.id"
-              data-testid="customer-new-plan-series-weekday-chip"
-            >
-              <button
-                :aria-pressed="isSeriesWeekdaySelected(option.index) ? 'true' : 'false'"
-                :class="[
-                  'sp-customer-plan-wizard-step__weekday-chip',
-                  {
-                    'sp-customer-plan-wizard-step__weekday-chip--active': isSeriesWeekdaySelected(option.index),
-                  },
-                ]"
-                :data-testid="`customer-new-plan-series-weekday-chip-${option.id}`"
-                type="button"
-                @click="toggleSeriesWeekday(option.index)"
-              >
-                {{ option.label }}
-              </button>
-            </div>
-          </div>
-          <span class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.weekdayMaskHelp') }}</span>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.timezone') }}</span>
-          <select v-model="seriesDraft.timezone" data-testid="customer-new-plan-series-timezone">
-            <option v-for="option in timezoneOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.startDate') }}</span>
-          <input
-            v-model="seriesDraft.date_from"
-            :max="selectedShiftPlanSummary?.planning_to || undefined"
-            :min="selectedShiftPlanSummary?.planning_from || undefined"
-            data-testid="customer-new-plan-series-from"
-            type="date"
-          />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.endDate') }}</span>
-          <input
-            v-model="seriesDraft.date_to"
-            :max="selectedShiftPlanSummary?.planning_to || undefined"
-            :min="selectedShiftPlanSummary?.planning_from || undefined"
-            data-testid="customer-new-plan-series-to"
-            type="date"
-          />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.defaultBreakMinutes') }}</span>
-          <input v-model.number="seriesDraft.default_break_minutes" min="0" type="number" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.meetingPoint') }}</span>
-          <input v-model="seriesDraft.meeting_point" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.locationText') }}</span>
-          <input v-model="seriesDraft.location_text" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.releaseState') }}</span>
-          <select v-model="seriesDraft.release_state">
-            <option value="draft">{{ $t('sicherplan.customerPlansWizard.forms.releaseStateDraft') }}</option>
-            <option value="release_ready">{{ $t('sicherplan.customerPlansWizard.forms.releaseStateReady') }}</option>
-            <option value="released">{{ $t('sicherplan.customerPlansWizard.forms.releaseStateReleased') }}</option>
-          </select>
-        </label>
-        <label class="planning-admin-checkbox">
-          <input v-model="seriesDraft.customer_visible_flag" type="checkbox" />
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.customerVisible') }}</span>
-        </label>
-        <label class="planning-admin-checkbox">
-          <input v-model="seriesDraft.subcontractor_visible_flag" type="checkbox" />
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.subcontractorVisible') }}</span>
-        </label>
-        <label class="planning-admin-checkbox">
-          <input v-model="seriesDraft.stealth_mode_flag" type="checkbox" />
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.stealthMode') }}</span>
-        </label>
-        <label class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
-          <textarea v-model="seriesDraft.notes" rows="2" />
-        </label>
-      </div>
-      <div class="sp-customer-plan-wizard-step__divider"></div>
-      <div class="sp-customer-plan-wizard-step__section-intro">
-        <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.generationOptions') }}</strong></p>
-        <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.generationOptionsHelp') }}</p>
-      </div>
-      <div class="sp-customer-plan-wizard-step__grid">
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.generateFromDate') }}</span>
-          <input
-            v-model="seriesGenerationDraft.from_date"
-            :max="seriesDraft.date_to || selectedShiftPlanSummary?.planning_to || undefined"
-            :min="seriesDraft.date_from || selectedShiftPlanSummary?.planning_from || undefined"
-            data-testid="customer-new-plan-series-generation-from"
-            type="date"
-          />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.generateToDate') }}</span>
-          <input
-            v-model="seriesGenerationDraft.to_date"
-            :max="seriesDraft.date_to || selectedShiftPlanSummary?.planning_to || undefined"
-            :min="seriesDraft.date_from || selectedShiftPlanSummary?.planning_from || undefined"
-            data-testid="customer-new-plan-series-generation-to"
-            type="date"
-          />
-        </label>
-        <label class="planning-admin-checkbox">
-          <input
-            v-model="seriesGenerationDraft.regenerate_existing"
-            data-testid="customer-new-plan-series-regenerate-existing"
-            type="checkbox"
-          />
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.regenerateExisting') }}</span>
-        </label>
-      </div>
-      <div class="sp-customer-plan-wizard-step__divider"></div>
-      <LocalLoadingIndicator
-        v-if="stepLoadState.seriesExceptions"
-        :label="savedDataLoadingLabel"
-        test-id="customer-new-plan-series-exceptions-loading"
-      />
-      <div v-if="seriesExceptions.length" class="sp-customer-plan-wizard-step__list">
-        <button
-          v-for="row in seriesExceptions"
-          :key="row.id"
-          type="button"
-          class="sp-customer-plan-wizard-step__list-row"
-          @click="syncExceptionDraft(row)"
+          class="sp-customer-plan-wizard-step__series-loading-row"
+          data-testid="customer-new-plan-series-detail-loading"
+          data-order-workspace-testid="customer-order-workspace-series-loading"
         >
-          <strong>{{ row.exception_date }}</strong>
-          <span>{{ row.action_code }}</span>
-        </button>
-      </div>
-      <div class="sp-customer-plan-wizard-step__grid">
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.exceptionDate') }}</span>
-          <input v-model="exceptionDraft.exception_date" data-testid="customer-new-plan-series-exception-date" type="date" />
-        </label>
-        <label class="field-stack">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.actionCode') }}</span>
-          <select v-model="exceptionDraft.action_code" data-testid="customer-new-plan-series-exception-action-code">
-            <option value="skip">{{ $t('sicherplan.customerPlansWizard.forms.exceptionActionSkip') }}</option>
-            <option value="override">{{ $t('sicherplan.customerPlansWizard.forms.exceptionActionOverride') }}</option>
-          </select>
-        </label>
-        <template v-if="exceptionOverrideActive">
+          <LocalLoadingIndicator :label="$t('sicherplan.customerPlansWizard.forms.loadingSavedSeries')" />
+        </div>
+        <div
+          class="sp-customer-plan-wizard-step__template-helper"
+          data-testid="customer-new-plan-series-template-helper"
+          data-order-workspace-testid="customer-order-workspace-series-template-helper"
+        >
           <label class="field-stack">
-            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideStartTime') }}</span>
-            <input v-model="exceptionDraft.override_local_start_time" data-testid="customer-new-plan-series-exception-override-start" type="time" />
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.useTemplateOptional') }}</span>
+            <select v-model="seriesDraft.shift_template_id" data-testid="customer-new-plan-series-template">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.shiftTemplatePlaceholder') }}</option>
+              <option v-for="option in shiftTemplateSelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
           </label>
+          <button
+            type="button"
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-apply-template"
+            data-order-workspace-testid="customer-order-workspace-series-apply-template"
+            :disabled="stepLoading || !seriesDraft.shift_template_id"
+            @click="void applySelectedShiftTemplatePreset()"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.applyTemplate') }}
+          </button>
+        </div>
+        <div class="sp-customer-plan-wizard-step__grid">
           <label class="field-stack">
-            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideEndTime') }}</span>
-            <input v-model="exceptionDraft.override_local_end_time" data-testid="customer-new-plan-series-exception-override-end" type="time" />
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.label') }}</span>
+            <input v-model="seriesDraft.label" data-testid="customer-new-plan-series-label" />
           </label>
-          <label class="field-stack">
-            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideBreakMinutes') }}</span>
-            <input v-model="exceptionDraft.override_break_minutes" min="0" type="number" />
+          <label :class="['field-stack', { 'field-stack--invalid': seriesFieldErrors.startTime }]">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.startTime') }}</span>
+            <input
+              v-model="seriesDraft.local_start_time"
+              data-testid="customer-new-plan-series-start-time"
+              data-order-workspace-testid="customer-order-workspace-series-start-time"
+              type="time"
+            />
+            <p v-if="seriesFieldErrors.startTime" class="field-error">{{ seriesFieldErrors.startTime }}</p>
           </label>
-          <label class="field-stack">
-            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideShiftType') }}</span>
-            <select v-model="exceptionDraft.override_shift_type_code">
+          <label :class="['field-stack', { 'field-stack--invalid': seriesFieldErrors.endTime }]">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.endTime') }}</span>
+            <input
+              v-model="seriesDraft.local_end_time"
+              data-testid="customer-new-plan-series-end-time"
+              data-order-workspace-testid="customer-order-workspace-series-end-time"
+              type="time"
+            />
+            <p v-if="seriesFieldErrors.endTime" class="field-error">{{ seriesFieldErrors.endTime }}</p>
+          </label>
+          <label :class="['field-stack', { 'field-stack--invalid': seriesFieldErrors.shiftType }]">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.shiftType') }}</span>
+            <select
+              v-model="seriesDraft.shift_type_code"
+              data-testid="customer-new-plan-series-shift-type"
+              data-order-workspace-testid="customer-order-workspace-series-shift-type"
+            >
               <option value="">{{ $t('sicherplan.customerPlansWizard.forms.shiftTypePlaceholder') }}</option>
               <option v-for="option in shiftTypeSelectOptions" :key="option.value" :value="option.value">
                 {{ option.label }}
               </option>
             </select>
+            <p v-if="seriesFieldErrors.shiftType" class="field-error">{{ seriesFieldErrors.shiftType }}</p>
+          </label>
+          <label :class="['field-stack', { 'field-stack--invalid': seriesFieldErrors.defaultBreak }]">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.defaultBreakMinutes') }}</span>
+            <input
+              v-model.number="seriesDraft.default_break_minutes"
+              data-testid="customer-new-plan-series-default-break"
+              data-order-workspace-testid="customer-order-workspace-series-default-break"
+              min="0"
+              type="number"
+            />
+            <p v-if="seriesFieldErrors.defaultBreak" class="field-error">{{ seriesFieldErrors.defaultBreak }}</p>
           </label>
           <label class="field-stack">
-            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideMeetingPoint') }}</span>
-            <input v-model="exceptionDraft.override_meeting_point" />
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.recurrenceCode') }}</span>
+            <select v-model="seriesDraft.recurrence_code" data-testid="customer-new-plan-series-recurrence-code">
+              <option value="daily">{{ $t('sicherplan.customerPlansWizard.forms.recurrenceDaily') }}</option>
+              <option value="weekly">{{ $t('sicherplan.customerPlansWizard.forms.recurrenceWeekly') }}</option>
+            </select>
           </label>
           <label class="field-stack">
-            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideLocationText') }}</span>
-            <input v-model="exceptionDraft.override_location_text" />
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.intervalCount') }}</span>
+            <input v-model.number="seriesDraft.interval_count" min="1" type="number" />
+          </label>
+          <label v-if="seriesWeekdayMaskRequired" class="field-stack field-stack--wide">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.weekdayMask') }}</span>
+            <div
+              class="sp-customer-plan-wizard-step__weekday-picker"
+              data-testid="customer-new-plan-series-weekday-picker"
+            >
+              <div
+                v-for="option in seriesWeekdayOptions"
+                :key="option.id"
+                data-testid="customer-new-plan-series-weekday-chip"
+              >
+                <button
+                  :aria-pressed="isSeriesWeekdaySelected(option.index) ? 'true' : 'false'"
+                  :class="[
+                    'sp-customer-plan-wizard-step__weekday-chip',
+                    {
+                      'sp-customer-plan-wizard-step__weekday-chip--active': isSeriesWeekdaySelected(option.index),
+                    },
+                  ]"
+                  :data-testid="`customer-new-plan-series-weekday-chip-${option.id}`"
+                  type="button"
+                  @click="toggleSeriesWeekday(option.index)"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+            </div>
+            <span class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.weekdayMaskHelp') }}</span>
+            <p v-if="seriesFieldErrors.weekdayMask" class="field-error">{{ seriesFieldErrors.weekdayMask }}</p>
           </label>
           <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.timezone') }}</span>
+            <select v-model="seriesDraft.timezone" data-testid="customer-new-plan-series-timezone">
+              <option v-for="option in timezoneOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label :class="['field-stack', { 'field-stack--invalid': seriesFieldErrors.dateRange }]">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.startDate') }}</span>
+            <input
+              v-model="seriesDraft.date_from"
+              :max="selectedShiftPlanSummary?.planning_to || undefined"
+              :min="selectedShiftPlanSummary?.planning_from || undefined"
+              data-testid="customer-new-plan-series-from"
+              type="date"
+            />
+          </label>
+          <label :class="['field-stack', { 'field-stack--invalid': seriesFieldErrors.dateRange }]">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.endDate') }}</span>
+            <input
+              v-model="seriesDraft.date_to"
+              :max="selectedShiftPlanSummary?.planning_to || undefined"
+              :min="selectedShiftPlanSummary?.planning_from || undefined"
+              data-testid="customer-new-plan-series-to"
+              type="date"
+            />
+            <p v-if="seriesFieldErrors.dateRange" class="field-error">{{ seriesFieldErrors.dateRange }}</p>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.meetingPoint') }}</span>
+            <input v-model="seriesDraft.meeting_point" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.locationText') }}</span>
+            <input v-model="seriesDraft.location_text" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.releaseState') }}</span>
+            <select v-model="seriesDraft.release_state">
+              <option value="draft">{{ $t('sicherplan.customerPlansWizard.forms.releaseStateDraft') }}</option>
+              <option value="release_ready">{{ $t('sicherplan.customerPlansWizard.forms.releaseStateReady') }}</option>
+              <option value="released">{{ $t('sicherplan.customerPlansWizard.forms.releaseStateReleased') }}</option>
+            </select>
+          </label>
+          <label class="planning-admin-checkbox planning-admin-checkbox--centered">
+            <input v-model="seriesDraft.customer_visible_flag" type="checkbox" />
             <span>{{ $t('sicherplan.customerPlansWizard.forms.customerVisible') }}</span>
-            <select v-model="exceptionCustomerVisibleModel" data-testid="customer-new-plan-series-exception-customer-visible">
-              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.inheritValue') }}</option>
-              <option value="true">{{ $t('sicherplan.customerPlansWizard.forms.yesValue') }}</option>
-              <option value="false">{{ $t('sicherplan.customerPlansWizard.forms.noValue') }}</option>
-            </select>
           </label>
-          <label class="field-stack">
+          <label class="planning-admin-checkbox planning-admin-checkbox--centered">
+            <input v-model="seriesDraft.subcontractor_visible_flag" type="checkbox" />
             <span>{{ $t('sicherplan.customerPlansWizard.forms.subcontractorVisible') }}</span>
-            <select v-model="exceptionSubcontractorVisibleModel" data-testid="customer-new-plan-series-exception-subcontractor-visible">
-              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.inheritValue') }}</option>
-              <option value="true">{{ $t('sicherplan.customerPlansWizard.forms.yesValue') }}</option>
-              <option value="false">{{ $t('sicherplan.customerPlansWizard.forms.noValue') }}</option>
-            </select>
           </label>
-          <label class="field-stack">
+          <label class="planning-admin-checkbox planning-admin-checkbox--centered">
+            <input v-model="seriesDraft.stealth_mode_flag" type="checkbox" />
             <span>{{ $t('sicherplan.customerPlansWizard.forms.stealthMode') }}</span>
-            <select v-model="exceptionStealthModeModel" data-testid="customer-new-plan-series-exception-stealth-mode">
-              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.inheritValue') }}</option>
-              <option value="true">{{ $t('sicherplan.customerPlansWizard.forms.yesValue') }}</option>
-              <option value="false">{{ $t('sicherplan.customerPlansWizard.forms.noValue') }}</option>
-            </select>
           </label>
-        </template>
-        <label class="field-stack field-stack--wide">
-          <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
-          <textarea v-model="exceptionDraft.notes" rows="2" />
-        </label>
-      </div>
+          <label class="field-stack field-stack--wide">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
+            <textarea v-model="seriesDraft.notes" rows="2" />
+          </label>
+        </div>
+        <div class="cta-row">
+          <button
+            type="button"
+            class="cta-button"
+            data-testid="customer-new-plan-save-series"
+            :data-order-workspace-testid="seriesEditMode ? 'customer-order-workspace-series-update' : 'customer-order-workspace-series-save'"
+            :disabled="stepLoading"
+            @click="void saveSeriesDraft()"
+          >
+            {{
+              seriesEditMode
+                ? $t('sicherplan.customerPlansWizard.actions.updateSeries')
+                : $t('sicherplan.customerPlansWizard.actions.saveSeries')
+            }}
+          </button>
+        </div>
+      </section>
+      <p
+        v-if="!seriesDependentSectionsVisible"
+        class="sp-customer-plan-wizard-step__gating-helper field-help"
+        data-testid="customer-new-plan-series-gating-helper"
+        data-order-workspace-testid="customer-order-workspace-series-gating-helper"
+      >
+        {{ $t('sicherplan.customerPlansWizard.forms.seriesDependentSectionsHelper') }}
+      </p>
+      <section
+        v-if="seriesDependentSectionsVisible"
+        class="sp-customer-plan-wizard-step__dependent-section"
+        data-testid="customer-new-plan-exceptions-section"
+        data-order-workspace-testid="customer-order-workspace-exceptions-section"
+      >
+        <LocalLoadingIndicator
+          v-if="stepLoadState.seriesExceptions"
+          :label="savedDataLoadingLabel"
+          test-id="customer-new-plan-series-exceptions-loading"
+        />
+        <div class="sp-customer-plan-wizard-step__section-intro">
+          <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.exceptions') }}</strong></p>
+          <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.exceptionsHelp') }}</p>
+        </div>
+        <div class="cta-row sp-customer-plan-wizard-step__exception-action-row">
+          <button
+            type="button"
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-new-exception"
+            data-order-workspace-testid="customer-order-workspace-new-exception"
+            :disabled="stepLoading"
+            @click="openNewExceptionModal"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.newException') }}
+          </button>
+        </div>
+        <div v-if="seriesExceptions.length" class="sp-customer-plan-wizard-step__list sp-customer-plan-wizard-step__exception-list">
+          <div
+            v-for="row in seriesExceptions"
+            :key="row.id"
+            class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static"
+            data-testid="customer-new-plan-series-exception-row"
+            data-order-workspace-testid="customer-order-workspace-exception-row"
+          >
+            <div class="sp-customer-plan-wizard-step__document-row-copy">
+              <strong>{{ row.exception_date }}</strong>
+              <span>{{ row.action_code }}</span>
+            </div>
+            <div class="cta-row">
+              <button
+                type="button"
+                class="sp-customer-plan-wizard-step__list-action sp-customer-plan-wizard-step__list-action--compact"
+                data-testid="customer-new-plan-edit-exception"
+                data-order-workspace-testid="customer-order-workspace-edit-exception"
+                :disabled="stepLoading"
+                @click="openEditExceptionModal(row)"
+              >
+                {{ $t('sicherplan.customerPlansWizard.actions.editException') }}
+              </button>
+              <button
+                type="button"
+                class="sp-customer-plan-wizard-step__list-action sp-customer-plan-wizard-step__list-action--compact"
+                data-testid="customer-new-plan-delete-exception"
+                data-order-workspace-testid="customer-order-workspace-delete-exception"
+                :disabled="stepLoading"
+                @click="void deleteExceptionRow(row)"
+              >
+                {{ $t('sicherplan.customerPlansWizard.actions.deleteException') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section
+        v-if="seriesDependentSectionsVisible"
+        class="sp-customer-plan-wizard-step__dependent-section"
+        data-testid="customer-new-plan-generation-options-section"
+        data-order-workspace-testid="customer-order-workspace-generation-options-section"
+      >
+        <div class="sp-customer-plan-wizard-step__section-intro">
+          <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.generationOptions') }}</strong></p>
+          <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.generationOptionsHelp') }}</p>
+        </div>
+        <div
+          class="sp-customer-plan-wizard-step__generation-grid"
+          data-testid="customer-new-plan-generation-options"
+          data-order-workspace-testid="customer-order-workspace-generation-options"
+        >
+          <label class="field-stack sp-customer-plan-wizard-step__generation-date-field">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.generateFromDate') }}</span>
+            <input
+              v-model="seriesGenerationDraft.from_date"
+              :max="seriesDraft.date_to || selectedShiftPlanSummary?.planning_to || undefined"
+              :min="seriesDraft.date_from || selectedShiftPlanSummary?.planning_from || undefined"
+              data-testid="customer-new-plan-series-generation-from"
+              data-order-workspace-testid="customer-order-workspace-generate-from"
+              type="date"
+            />
+          </label>
+          <label class="field-stack sp-customer-plan-wizard-step__generation-date-field">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.generateToDate') }}</span>
+            <input
+              v-model="seriesGenerationDraft.to_date"
+              :max="seriesDraft.date_to || selectedShiftPlanSummary?.planning_to || undefined"
+              :min="seriesDraft.date_from || selectedShiftPlanSummary?.planning_from || undefined"
+              data-testid="customer-new-plan-series-generation-to"
+              data-order-workspace-testid="customer-order-workspace-generate-to"
+              type="date"
+            />
+          </label>
+          <label class="planning-admin-checkbox planning-admin-checkbox--centered sp-customer-plan-wizard-step__generation-checkbox">
+            <input
+              v-model="seriesGenerationDraft.regenerate_existing"
+              data-testid="customer-new-plan-series-regenerate-existing"
+              data-order-workspace-testid="customer-order-workspace-regenerate-existing"
+              type="checkbox"
+            />
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.regenerateExisting') }}</span>
+          </label>
+        </div>
+      </section>
     </section>
 
     <section v-else class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-placeholder">
@@ -7639,6 +8222,112 @@ onBeforeUnmount(() => {
       :load-error-text="$t('sicherplan.customerPlansWizard.mapPicker.loadError')"
       @confirm="applyPlanningLocationSelection"
     />
+
+    <Modal
+      v-model:open="exceptionModal.open"
+      :confirm-loading="exceptionModal.saving"
+      :footer="null"
+      :title="$t('sicherplan.customerPlansWizard.dialogs.exceptionTitle')"
+      wrap-class-name="sp-customer-plan-wizard-modal"
+      @cancel="closeExceptionModal"
+    >
+      <div
+        class="sp-customer-plan-wizard-step__modal"
+        data-testid="customer-new-plan-exception-dialog"
+        data-order-workspace-testid="customer-order-workspace-exception-dialog"
+      >
+        <label class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.exceptionDate') }}</span>
+          <input v-model="exceptionDraft.exception_date" data-testid="customer-new-plan-series-exception-date" type="date" />
+        </label>
+        <label class="field-stack">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.actionCode') }}</span>
+          <select v-model="exceptionDraft.action_code" data-testid="customer-new-plan-series-exception-action-code">
+            <option value="skip">{{ $t('sicherplan.customerPlansWizard.forms.exceptionActionSkip') }}</option>
+            <option value="override">{{ $t('sicherplan.customerPlansWizard.forms.exceptionActionOverride') }}</option>
+          </select>
+        </label>
+        <template v-if="exceptionOverrideActive">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideStartTime') }}</span>
+            <input v-model="exceptionDraft.override_local_start_time" data-testid="customer-new-plan-series-exception-override-start" type="time" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideEndTime') }}</span>
+            <input v-model="exceptionDraft.override_local_end_time" data-testid="customer-new-plan-series-exception-override-end" type="time" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideBreakMinutes') }}</span>
+            <input v-model="exceptionDraft.override_break_minutes" min="0" type="number" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideShiftType') }}</span>
+            <select v-model="exceptionDraft.override_shift_type_code">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.shiftTypePlaceholder') }}</option>
+              <option v-for="option in shiftTypeSelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideMeetingPoint') }}</span>
+            <input v-model="exceptionDraft.override_meeting_point" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.overrideLocationText') }}</span>
+            <input v-model="exceptionDraft.override_location_text" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.customerVisible') }}</span>
+            <select v-model="exceptionCustomerVisibleModel" data-testid="customer-new-plan-series-exception-customer-visible">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.inheritValue') }}</option>
+              <option value="true">{{ $t('sicherplan.customerPlansWizard.forms.yesValue') }}</option>
+              <option value="false">{{ $t('sicherplan.customerPlansWizard.forms.noValue') }}</option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.subcontractorVisible') }}</span>
+            <select v-model="exceptionSubcontractorVisibleModel" data-testid="customer-new-plan-series-exception-subcontractor-visible">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.inheritValue') }}</option>
+              <option value="true">{{ $t('sicherplan.customerPlansWizard.forms.yesValue') }}</option>
+              <option value="false">{{ $t('sicherplan.customerPlansWizard.forms.noValue') }}</option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.stealthMode') }}</span>
+            <select v-model="exceptionStealthModeModel" data-testid="customer-new-plan-series-exception-stealth-mode">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.inheritValue') }}</option>
+              <option value="true">{{ $t('sicherplan.customerPlansWizard.forms.yesValue') }}</option>
+              <option value="false">{{ $t('sicherplan.customerPlansWizard.forms.noValue') }}</option>
+            </select>
+          </label>
+        </template>
+        <label class="field-stack field-stack--wide">
+          <span>{{ $t('sicherplan.customerPlansWizard.forms.notes') }}</span>
+          <textarea v-model="exceptionDraft.notes" rows="2" />
+        </label>
+        <div class="cta-row">
+          <button
+            type="button"
+            class="cta-button"
+            data-testid="customer-new-plan-save-exception"
+            data-order-workspace-testid="customer-order-workspace-save-exception"
+            :disabled="exceptionModal.saving"
+            @click="void saveExceptionDraft()"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.saveException') }}
+          </button>
+          <button
+            type="button"
+            class="cta-button cta-secondary"
+            :disabled="exceptionModal.saving"
+            @click="closeExceptionModal"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.cancel') }}
+          </button>
+        </div>
+      </div>
+    </Modal>
 
     <Modal
       v-model:open="templateModal.open"
@@ -8241,6 +8930,76 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
+.sp-customer-plan-wizard-step__info-summary {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--sp-color-surface-page) 82%, rgb(40 170 170));
+  color: var(--sp-color-text-secondary);
+  cursor: default;
+}
+
+.sp-customer-plan-wizard-step__info-summary strong {
+  color: var(--sp-color-text-primary);
+}
+
+.sp-customer-plan-wizard-step__dependent-section {
+  display: grid;
+  gap: 0.9rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sp-color-border-soft);
+}
+
+.sp-customer-plan-wizard-step__gating-helper {
+  margin: 0;
+  padding: 0.8rem 0.9rem;
+  border: 1px dashed var(--sp-color-border-soft);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--sp-color-surface-page) 92%, rgb(40 170 170));
+}
+
+.sp-customer-plan-wizard-step__series-loading-row {
+  display: flex;
+  align-items: center;
+  min-height: 2.6rem;
+}
+
+.sp-customer-plan-wizard-step__template-helper {
+  display: grid;
+  grid-template-columns: minmax(14rem, 22rem) max-content;
+  gap: 0.75rem;
+  align-items: end;
+  padding: 0.8rem 0.9rem;
+  border: 1px dashed var(--sp-color-border-soft);
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--sp-color-surface-page) 90%, rgb(40 170 170));
+}
+
+.sp-customer-plan-wizard-step__generation-grid {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(10rem, 14rem) minmax(12rem, max-content);
+  gap: 0.9rem;
+  align-items: end;
+}
+
+.sp-customer-plan-wizard-step__generation-date-field {
+  max-width: 14rem;
+}
+
+.sp-customer-plan-wizard-step__generation-checkbox {
+  padding-top: 0;
+}
+
+.sp-customer-plan-wizard-step__exception-action-row {
+  margin-bottom: 0.15rem;
+}
+
+.sp-customer-plan-wizard-step__exception-list {
+  margin-top: 0.45rem;
+}
+
 .sp-customer-plan-wizard-step__row-action {
   flex: 0 0 auto;
 }
@@ -8354,12 +9113,19 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 0.7rem;
+  min-height: 2.6rem;
   min-width: 0;
   color: var(--sp-color-text-secondary);
 }
 
+.planning-admin-checkbox--centered {
+  align-self: center;
+  padding-top: 1.4rem;
+}
+
 .planning-admin-checkbox input[type='checkbox'],
 .planning-admin-checkbox input[type='radio'] {
+  flex: 0 0 auto;
   width: 1rem;
   height: 1rem;
   margin: 0;
@@ -8369,6 +9135,20 @@ onBeforeUnmount(() => {
 
 .planning-admin-checkbox span {
   font-weight: 500;
+}
+
+@media (max-width: 720px) {
+  .sp-customer-plan-wizard-step__template-helper {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sp-customer-plan-wizard-step__generation-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sp-customer-plan-wizard-step__generation-date-field {
+    max-width: none;
+  }
 }
 
 .cta-row {

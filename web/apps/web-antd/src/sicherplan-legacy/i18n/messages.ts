@@ -1280,6 +1280,8 @@ export type MessageKey =
   | "customerAdmin.detail.eyebrow"
   | "customerAdmin.detail.emptyTitle"
   | "customerAdmin.detail.emptyBody"
+  | "customerAdmin.detail.notFoundTitle"
+  | "customerAdmin.detail.notFoundBody"
   | "customerAdmin.detail.newTitle"
   | "customerAdmin.detail.workspaceTitle"
   | "customerAdmin.detail.workspaceLead"
@@ -1387,6 +1389,8 @@ export type MessageKey =
   | "customerAdmin.filters.status"
   | "customerAdmin.filters.allStatuses"
   | "customerAdmin.filters.includeArchived"
+  | "customerAdmin.filters.searchCustomers"
+  | "customerAdmin.filters.additionalTitle"
   | "customerAdmin.lifecycle.title"
   | "customerAdmin.lifecycle.help"
   | "customerAdmin.summary.primaryContact"
@@ -1521,8 +1525,12 @@ export type MessageKey =
   | "customerAdmin.actions.rememberScope"
   | "customerAdmin.actions.refresh"
   | "customerAdmin.actions.search"
+  | "customerAdmin.actions.advancedFilters"
+  | "customerAdmin.actions.applyFilters"
+  | "customerAdmin.actions.closeFilters"
   | "customerAdmin.actions.exportCustomers"
   | "customerAdmin.actions.newCustomer"
+  | "customerAdmin.actions.backToList"
   | "customerAdmin.actions.newPlan"
   | "customerAdmin.actions.newOrder"
   | "customerAdmin.actions.createCustomer"
@@ -1576,6 +1584,9 @@ export type MessageKey =
   | "customerAdmin.feedback.contactSaved"
   | "customerAdmin.feedback.addressSaved"
   | "customerAdmin.feedback.exportReady"
+  | "customerAdmin.feedback.exportDownloadStarted"
+  | "customerAdmin.feedback.exportDownloadFailed"
+  | "customerAdmin.feedback.exportDownloadFallback"
   | "customerAdmin.feedback.vcardReady"
   | "customerAdmin.feedback.documentId"
   | "customerAdmin.feedback.scopeSaved"
@@ -3401,6 +3412,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.detail.eyebrow": "Kundendetail",
     "customerAdmin.detail.emptyTitle": "Noch kein Kunde ausgewählt",
     "customerAdmin.detail.emptyBody": "Wähle oben einen Kunden aus der Liste aus oder starte einen neuen Datensatz.",
+    "customerAdmin.detail.notFoundTitle": "Kunde nicht gefunden",
+    "customerAdmin.detail.notFoundBody": "Der angeforderte Kunde ist in der aktuellen Liste nicht verfügbar. Wähle einen Kunden aus der Liste.",
     "customerAdmin.detail.newTitle": "Neuen Kunden anlegen",
     "customerAdmin.detail.workspaceTitle": "Kundenarbeitsbereich",
     "customerAdmin.detail.workspaceLead": "Die Fachbereiche sind in Tabs getrennt, damit nur der gerade bearbeitete Bereich sichtbar bleibt.",
@@ -3512,6 +3525,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.filters.status": "Statusfilter",
     "customerAdmin.filters.allStatuses": "Alle Status",
     "customerAdmin.filters.includeArchived": "Archivierte Kunden einbeziehen",
+    "customerAdmin.filters.searchCustomers": "Kunden suchen",
+    "customerAdmin.filters.additionalTitle": "Zusatzfilter",
     "customerAdmin.lifecycle.title": "Statussteuerung",
     "customerAdmin.lifecycle.help": "Archivierte Kunden bleiben erhalten und können derzeit nicht reaktiviert werden.",
     "customerAdmin.summary.primaryContact": "Primärkontakt",
@@ -3658,8 +3673,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.rememberScope": "Scope speichern",
     "customerAdmin.actions.refresh": "Aktualisieren",
     "customerAdmin.actions.search": "Suchen",
+    "customerAdmin.actions.advancedFilters": "Erweiterte Filter",
+    "customerAdmin.actions.applyFilters": "Filter anwenden",
+    "customerAdmin.actions.closeFilters": "Filter schliessen",
     "customerAdmin.actions.exportCustomers": "CSV-Export",
     "customerAdmin.actions.newCustomer": "Neuer Kunde",
+    "customerAdmin.actions.backToList": "Zur Kundenliste",
     "customerAdmin.actions.newPlan": "Neuer Plan",
     "customerAdmin.actions.newOrder": "Neuer Auftrag",
     "customerAdmin.actions.createCustomer": "Kunden anlegen",
@@ -3713,6 +3732,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.contactSaved": "Kontakt gespeichert",
     "customerAdmin.feedback.addressSaved": "Adresslink gespeichert",
     "customerAdmin.feedback.exportReady": "Kundenexport erstellt",
+    "customerAdmin.feedback.exportDownloadStarted": "Der Download wurde gestartet.",
+    "customerAdmin.feedback.exportDownloadFailed": "Export erstellt, Download fehlgeschlagen",
+    "customerAdmin.feedback.exportDownloadFallback":
+      "Nutze die Dokument-ID, um die Datei in der Dokumentenablage herunterzuladen.",
     "customerAdmin.feedback.vcardReady": "vCard erstellt",
     "customerAdmin.feedback.documentId": "Dokument-ID",
     "customerAdmin.feedback.scopeSaved": "Mandantenscope gespeichert",
@@ -5593,6 +5616,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.detail.eyebrow": "Customer detail",
     "customerAdmin.detail.emptyTitle": "No customer selected yet",
     "customerAdmin.detail.emptyBody": "Select a customer from the list above or start a new record.",
+    "customerAdmin.detail.notFoundTitle": "Customer not found",
+    "customerAdmin.detail.notFoundBody": "The requested customer is not available in the current list. Select a customer from the list.",
     "customerAdmin.detail.newTitle": "Create a new customer",
     "customerAdmin.detail.workspaceTitle": "Customer workspace",
     "customerAdmin.detail.workspaceLead": "Each business area is isolated behind tabs so only the active workspace stays visible at a time.",
@@ -5704,6 +5729,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.filters.status": "Status filter",
     "customerAdmin.filters.allStatuses": "All statuses",
     "customerAdmin.filters.includeArchived": "Include archived customers",
+    "customerAdmin.filters.searchCustomers": "Search customers",
+    "customerAdmin.filters.additionalTitle": "Additional filters",
     "customerAdmin.lifecycle.title": "Lifecycle controls",
     "customerAdmin.lifecycle.help": "Archived customers are preserved and cannot currently be reactivated.",
     "customerAdmin.summary.primaryContact": "Primary contact",
@@ -5850,8 +5877,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.rememberScope": "Save scope",
     "customerAdmin.actions.refresh": "Refresh",
     "customerAdmin.actions.search": "Search",
+    "customerAdmin.actions.advancedFilters": "Advanced filters",
+    "customerAdmin.actions.applyFilters": "Apply filters",
+    "customerAdmin.actions.closeFilters": "Close filters",
     "customerAdmin.actions.exportCustomers": "CSV export",
     "customerAdmin.actions.newCustomer": "New customer",
+    "customerAdmin.actions.backToList": "Back to customer list",
     "customerAdmin.actions.newPlan": "New plan",
     "customerAdmin.actions.newOrder": "New order",
     "customerAdmin.actions.createCustomer": "Create customer",
@@ -5905,6 +5936,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.feedback.contactSaved": "Contact saved",
     "customerAdmin.feedback.addressSaved": "Address link saved",
     "customerAdmin.feedback.exportReady": "Customer export created",
+    "customerAdmin.feedback.exportDownloadStarted": "The download started.",
+    "customerAdmin.feedback.exportDownloadFailed": "Export created, download failed",
+    "customerAdmin.feedback.exportDownloadFallback":
+      "Use the document ID to download the file from the document library.",
     "customerAdmin.feedback.vcardReady": "vCard created",
     "customerAdmin.feedback.documentId": "Document ID",
     "customerAdmin.feedback.scopeSaved": "Tenant scope saved",
