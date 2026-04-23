@@ -394,6 +394,14 @@ const selectedExistingPlanningRecordId = ref('');
 const editingExistingPlanningRecordId = ref('');
 const committedPlanningRecordId = ref('');
 const planningRecordDirty = ref(false);
+const planningRecordFieldErrors = reactive({
+  dateRange: '',
+  name: '',
+  planningEntity: '',
+  planningFrom: '',
+  planningMode: '',
+  planningTo: '',
+});
 const selectedShiftPlan = ref<ShiftPlanRead | null>(null);
 const selectedSeries = ref<ShiftSeriesRead | null>(null);
 const planningRecordRows = ref<PlanningRecordListItem[]>([]);
@@ -2347,6 +2355,7 @@ function resetPlanningRecordDraft() {
   editingExistingPlanningRecordId.value = '';
   committedPlanningRecordId.value = '';
   planningRecordDirty.value = false;
+  clearPlanningRecordFieldErrors();
   Object.assign(planningRecordDraft, {
     dispatcher_user_id: '',
     event_detail_event_venue_id: '',
@@ -2385,6 +2394,7 @@ function invalidateSelectedPlanningRecordForCurrentContext() {
   selectedExistingPlanningRecordId.value = '';
   editingExistingPlanningRecordId.value = '';
   committedPlanningRecordId.value = '';
+  setFeedback('neutral', $t('sicherplan.customerPlansWizard.messages.planningEntryChangedForNewRecord'));
   emit('saved-context', {
     ...buildPlanningContextPatch(),
     planning_record_id: '',
@@ -2500,6 +2510,15 @@ function planningEntityIdForRecord(record: PlanningRecordRead) {
   return record.site_detail?.site_id ?? '';
 }
 
+function planningEntityOptionLabel(option: PlanningListItem) {
+  const code = option.site_no || option.venue_no || option.fair_no || option.route_no || option.code || '';
+  const name = option.name || option.label || '';
+  if (code && name) {
+    return `${code} - ${name}`;
+  }
+  return name || code || option.id;
+}
+
 function planningRecordContextIsValid(record: PlanningRecordRead) {
   return Boolean(planningEntityIdForRecord(record));
 }
@@ -2529,6 +2548,49 @@ function ensureSelectedPlanningEntityOption(record = selectedPlanningRecord.valu
     return;
   }
   planningEntityOptions.value = [fallback, ...planningEntityOptions.value];
+}
+
+function clearPlanningRecordFieldErrors() {
+  Object.assign(planningRecordFieldErrors, {
+    dateRange: '',
+    name: '',
+    planningEntity: '',
+    planningFrom: '',
+    planningMode: '',
+    planningTo: '',
+  });
+}
+
+function setPlanningRecordFieldError(field: keyof typeof planningRecordFieldErrors, messageKey: string) {
+  planningRecordFieldErrors[field] = $t(`sicherplan.customerPlansWizard.errors.${messageKey}` as never);
+}
+
+function validatePlanningRecordFields() {
+  clearPlanningRecordFieldErrors();
+  if (!planningEntityId.value.trim()) {
+    setPlanningRecordFieldError('planningEntity', 'planningEntryRequired');
+  }
+  if (!planningRecordDraft.name.trim()) {
+    setPlanningRecordFieldError('name', 'planningRecordNameRequired');
+  }
+  if (!planningRecordDraft.planning_from) {
+    setPlanningRecordFieldError('planningFrom', 'planningRecordStartRequired');
+  }
+  if (!planningRecordDraft.planning_to) {
+    setPlanningRecordFieldError('planningTo', 'planningRecordEndRequired');
+  }
+  if (
+    planningRecordDraft.planning_from &&
+    planningRecordDraft.planning_to &&
+    planningRecordDraft.planning_to < planningRecordDraft.planning_from
+  ) {
+    setPlanningRecordFieldError('dateRange', 'planningRecordDateRangeInvalid');
+  }
+  const modeMatchesEntity = planningRecordDraft.planning_mode_code === planningModeCode.value;
+  if (!modeMatchesEntity) {
+    setPlanningRecordFieldError('planningMode', 'planningRecordModeMismatch');
+  }
+  return !Object.values(planningRecordFieldErrors).some(Boolean);
 }
 
 function syncPlanningRecordDraft(record: PlanningRecordRead) {
@@ -2564,6 +2626,7 @@ function syncPlanningRecordDraft(record: PlanningRecordRead) {
   );
   ensureSelectedPlanningEntityOption(record);
   planningRecordDirty.value = false;
+  clearPlanningRecordFieldErrors();
 }
 
 function syncShiftPlanDraft(plan: ShiftPlanRead) {
@@ -2973,7 +3036,7 @@ async function onPlanningEntityChange(event: Event) {
   await selectExistingPlanningEntity(entityId);
 }
 
-async function hydrateExistingPlanningRecordSelection(planningRecordId: string, { edit }: { edit: boolean }) {
+async function hydrateExistingPlanningRecordSelection(planningRecordId: string) {
   if (!props.tenantId || !props.accessToken || !planningRecordId) {
     return;
   }
@@ -2991,7 +3054,7 @@ async function hydrateExistingPlanningRecordSelection(planningRecordId: string, 
     }
     syncPlanningRecordDraft(record);
     selectedExistingPlanningRecordId.value = record.id;
-    editingExistingPlanningRecordId.value = edit ? record.id : '';
+    editingExistingPlanningRecordId.value = record.id;
     clearStepDraft('planning-record-overview');
     clearDraftRestoreMessage();
     await loadPlanningEntityOptions();
@@ -3020,11 +3083,7 @@ async function hydrateExistingPlanningRecordSelection(planningRecordId: string, 
 }
 
 async function selectExistingPlanningRecordRow(planningRecordId: string) {
-  await hydrateExistingPlanningRecordSelection(planningRecordId, { edit: false });
-}
-
-async function openExistingPlanningRecordEditor(planningRecordId: string) {
-  await hydrateExistingPlanningRecordSelection(planningRecordId, { edit: true });
+  await hydrateExistingPlanningRecordSelection(planningRecordId);
 }
 
 function openPlanningCreateModal() {
@@ -5019,11 +5078,18 @@ async function savePlanningRecordDraftOrSelection() {
   }
   if (!hasPlanningContext.value) {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.selectOrCreatePlanningContextBeforeContinue'));
+    validatePlanningRecordFields();
     emit('step-completion', 'planning-record-overview', false);
     emit('step-ui-state', 'planning-record-overview', { error: 'planning_context_required' });
     return false;
   }
   planningRecordDraft.planning_mode_code = planningModeCode.value;
+  if (!validatePlanningRecordFields()) {
+    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.planningRecordValidationFailed'));
+    emit('step-completion', 'planning-record-overview', false);
+    emit('step-ui-state', 'planning-record-overview', { error: 'validation_failed' });
+    return false;
+  }
   const validation = validatePlanningRecordDraft(buildPlanningRecordDraftForValidation(), {
     eventVenueOptions: eventVenueOptions.value as never[],
     orderServiceFrom: selectedOrder.value?.service_from || orderDraft.service_from,
@@ -5058,11 +5124,13 @@ async function savePlanningRecordDraftOrSelection() {
       ...modePayload,
       ...(selectedPlanningRecord.value ? { version_no: selectedPlanningRecord.value.version_no } : {}),
     };
-    const saved = selectedPlanningRecord.value
-      ? await updatePlanningRecord(props.tenantId, selectedPlanningRecord.value.id, props.accessToken, payload)
+    const existingPlanningRecord = selectedPlanningRecord.value;
+    const saved = existingPlanningRecord
+      ? await updatePlanningRecord(props.tenantId, existingPlanningRecord.id, props.accessToken, payload)
       : await createPlanningRecord(props.tenantId, props.accessToken, payload);
     syncPlanningRecordDraft(saved);
     planningRecordDirty.value = false;
+    clearPlanningRecordFieldErrors();
     clearStepDraft('planning-record-overview');
     clearDraftRestoreMessage();
     selectedExistingPlanningRecordId.value = saved.id;
@@ -5072,6 +5140,14 @@ async function savePlanningRecordDraftOrSelection() {
       ...buildPlanningContextPatch(),
       planning_record_id: saved.id,
     });
+    setFeedback(
+      'success',
+      $t(
+        existingPlanningRecord
+          ? 'sicherplan.customerPlansWizard.messages.planningRecordUpdated'
+          : 'sicherplan.customerPlansWizard.messages.planningRecordSelected',
+      ),
+    );
     emit('step-completion', 'planning-record-overview', true);
     emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
     await loadExistingPlanningRecordRows();
@@ -5092,11 +5168,13 @@ async function savePlanningRecordDraftOrSelection() {
 async function submitPlanningRecordStep() {
   if (!hasPlanningContext.value) {
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.selectOrCreatePlanningContextBeforeContinue'));
+    validatePlanningRecordFields();
     emit('step-completion', 'planning-record-overview', false);
     emit('step-ui-state', 'planning-record-overview', { error: 'planning_context_required' });
     return false;
   }
   if (planningRecordDirty.value) {
+    validatePlanningRecordFields();
     const messageKey = editingExistingPlanningRecordId.value
       ? 'saveOrCancelPlanningRecordEditBeforeContinue'
       : 'savePlanningRecordBeforeContinue';
@@ -5106,6 +5184,7 @@ async function submitPlanningRecordStep() {
     return false;
   }
   if (!hasCommittedPlanningRecordSelection() && !props.wizardState.planning_record_id) {
+    validatePlanningRecordFields();
     setFeedback('error', $t('sicherplan.customerPlansWizard.errors.savePlanningRecordBeforeContinue'));
     emit('step-completion', 'planning-record-overview', false);
     emit('step-ui-state', 'planning-record-overview', { error: 'save_required' });
@@ -5124,6 +5203,7 @@ async function submitPlanningRecordStep() {
     return false;
   }
   emit('step-completion', 'planning-record-overview', true);
+  clearPlanningRecordFieldErrors();
   emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
   return true;
 }
@@ -6594,15 +6674,6 @@ onBeforeUnmount(() => {
                 <strong>{{ row.name }}</strong>
                 <span>{{ row.planning_from }} - {{ row.planning_to }}</span>
               </div>
-              <button
-                type="button"
-                class="sp-customer-plan-wizard-step__row-link-action"
-                data-testid="customer-new-plan-edit-planning-record"
-                data-order-workspace-testid="customer-order-workspace-existing-planning-record-edit"
-                @click.stop="void openExistingPlanningRecordEditor(row.id)"
-              >
-                {{ $t('sicherplan.customerPlansWizard.actions.edit') }}
-              </button>
             </div>
           </div>
           <p
@@ -6660,31 +6731,39 @@ onBeforeUnmount(() => {
               <span>{{ $t('sicherplan.customerPlansWizard.forms.orderTitle') }}</span>
               <input :value="selectedOrder?.title || orderDraft.title" readonly />
             </label>
-            <label class="field-stack">
+            <label class="field-stack" :class="{ 'field-stack--invalid': planningRecordFieldErrors.planningMode }">
               <span>{{ $t('sicherplan.customerPlansWizard.forms.planningModeCode') }}</span>
               <select
                 :value="planningFamily"
                 data-testid="customer-new-plan-planning-context-family"
+                :aria-invalid="Boolean(planningRecordFieldErrors.planningMode)"
                 @change="onPlanningFamilyChange"
               >
                 <option v-for="option in planningFamilyOptions" :key="option.value" :value="option.value">
                   {{ option.label }}
                 </option>
               </select>
+              <p v-if="planningRecordFieldErrors.planningMode" class="field-error" data-testid="customer-new-plan-planning-mode-error">
+                {{ planningRecordFieldErrors.planningMode }}
+              </p>
             </label>
-            <label class="field-stack">
+            <label class="field-stack" :class="{ 'field-stack--invalid': planningRecordFieldErrors.planningEntity }">
               <span>{{ $t('sicherplan.customerPlansWizard.forms.planningEntity') }}</span>
               <select
                 :value="planningEntityId"
                 data-testid="customer-new-plan-planning-context-entry"
                 :disabled="planningEntityLoading || stepLoadState.planningReferenceOptions"
+                :aria-invalid="Boolean(planningRecordFieldErrors.planningEntity)"
                 @change="void onPlanningEntityChange($event)"
               >
                 <option value="">{{ $t('sicherplan.customerPlansWizard.forms.planningEntityPlaceholder') }}</option>
                 <option v-for="option in planningEntityOptions" :key="option.id" :value="option.id">
-                  {{ option.name || option.label || option.code || option.id }}
+                  {{ planningEntityOptionLabel(option) }}
                 </option>
               </select>
+              <p v-if="planningRecordFieldErrors.planningEntity" class="field-error" data-testid="customer-new-plan-planning-entry-error">
+                {{ planningRecordFieldErrors.planningEntity }}
+              </p>
               <p
                 v-if="!planningEntityOptions.length && !planningEntityLoading && !stepLoadState.planningReferenceOptions && !selectedPlanningRecord"
                 class="field-help"
@@ -6692,17 +6771,40 @@ onBeforeUnmount(() => {
                 {{ $t('sicherplan.customerPlansWizard.forms.noPlanningEntriesFoundForCustomer') }}
               </p>
             </label>
-            <label class="field-stack">
+            <label class="field-stack" :class="{ 'field-stack--invalid': planningRecordFieldErrors.name }">
               <span>{{ $t('sicherplan.customerPlansWizard.forms.name') }}</span>
-              <input v-model="planningRecordDraft.name" data-testid="customer-new-plan-planning-record-name" />
+              <input
+                v-model="planningRecordDraft.name"
+                data-testid="customer-new-plan-planning-record-name"
+                :aria-invalid="Boolean(planningRecordFieldErrors.name)"
+              />
+              <p v-if="planningRecordFieldErrors.name" class="field-error" data-testid="customer-new-plan-planning-record-name-error">
+                {{ planningRecordFieldErrors.name }}
+              </p>
             </label>
-            <label class="field-stack">
+            <label class="field-stack" :class="{ 'field-stack--invalid': planningRecordFieldErrors.planningFrom || planningRecordFieldErrors.dateRange }">
               <span>{{ $t('sicherplan.customerPlansWizard.forms.startDate') }}</span>
-              <input v-model="planningRecordDraft.planning_from" data-testid="customer-new-plan-planning-record-from" type="date" />
+              <input
+                v-model="planningRecordDraft.planning_from"
+                data-testid="customer-new-plan-planning-record-from"
+                type="date"
+                :aria-invalid="Boolean(planningRecordFieldErrors.planningFrom || planningRecordFieldErrors.dateRange)"
+              />
+              <p v-if="planningRecordFieldErrors.planningFrom || planningRecordFieldErrors.dateRange" class="field-error" data-testid="customer-new-plan-planning-record-from-error">
+                {{ planningRecordFieldErrors.planningFrom || planningRecordFieldErrors.dateRange }}
+              </p>
             </label>
-            <label class="field-stack">
+            <label class="field-stack" :class="{ 'field-stack--invalid': planningRecordFieldErrors.planningTo || planningRecordFieldErrors.dateRange }">
               <span>{{ $t('sicherplan.customerPlansWizard.forms.endDate') }}</span>
-              <input v-model="planningRecordDraft.planning_to" data-testid="customer-new-plan-planning-record-to" type="date" />
+              <input
+                v-model="planningRecordDraft.planning_to"
+                data-testid="customer-new-plan-planning-record-to"
+                type="date"
+                :aria-invalid="Boolean(planningRecordFieldErrors.planningTo || planningRecordFieldErrors.dateRange)"
+              />
+              <p v-if="planningRecordFieldErrors.planningTo || planningRecordFieldErrors.dateRange" class="field-error" data-testid="customer-new-plan-planning-record-to-error">
+                {{ planningRecordFieldErrors.planningTo || planningRecordFieldErrors.dateRange }}
+              </p>
             </label>
             <label v-if="planningModeCode === 'event'" class="field-stack field-stack--wide">
               <span>{{ $t('sicherplan.customerPlansWizard.forms.setupNote') }}</span>
@@ -7981,6 +8083,20 @@ onBeforeUnmount(() => {
   opacity: 0.72;
   cursor: not-allowed;
   background: color-mix(in srgb, var(--sp-color-surface-page) 72%, var(--sp-color-border-soft));
+}
+
+.field-stack--invalid input,
+.field-stack--invalid select,
+.field-stack--invalid textarea {
+  border-color: rgb(210 40 40 / 72%);
+  box-shadow: 0 0 0 3px rgb(210 40 40 / 10%);
+}
+
+.field-error {
+  margin: -0.15rem 0 0;
+  color: rgb(190 30 30);
+  font-size: 0.78rem;
+  font-weight: 650;
 }
 
 .field-stack--wide {
