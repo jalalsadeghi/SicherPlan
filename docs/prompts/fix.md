@@ -1,75 +1,66 @@
-You are working in the SicherPlan repository.
-
-This task follows the customer-specific title/pill cleanup for:
-- /admin/customers
-
-Context:
-- list-only mode
-- customer-specific detail-only mode
+Add/update regression tests for the Customers > Contacts & Access left-nav layout bug.
 
 Goal:
-Run a focused QA and hardening pass for:
-- top tab/title naming in customer-specific mode
-- removal of the redundant in-page customer-name pill
+The left-side section navigation must stay sticky/visible without collapsing the page layout during scroll or click-to-scroll.
 
-Do not add unrelated features.
-Do not redesign unrelated customer workspace logic.
-Only verify and harden the naming/presentation behavior.
+Required coverage:
 
-Validate:
+Test 1 — Stable two-column structure
+1. Mount /admin/customers with Contacts & Access tab active.
+2. Assert the main layout has:
+   - left nav container
+   - right content container
+3. Assert the content container is a sibling of the nav container, not nested incorrectly.
+4. Assert the layout wrapper keeps its intended grid/flex classes.
 
-1. List-only mode
-- top tab/title is still generic "Customers"
-- no customer-specific label leaks into list mode
+Test 2 — Sticky/fixed behavior does not remove layout width
+If the implementation uses fixed fallback:
+1. Simulate the scroll state where nav becomes fixed.
+2. Assert the nav shell gets the fixed/sticky class/state.
+3. Assert the layout still keeps a reserved nav column / placeholder width.
+4. Assert the content wrapper width/layout classes remain intact.
 
-2. Customer-specific mode
-- top tab/title shows the selected customer name
-- multiple open customer pages are distinguishable
-- long names truncate cleanly if needed
+Test 3 — Click-to-scroll does not collapse layout
+1. Mock scrollIntoView.
+2. Click Addresses link.
+3. Assert scrollIntoView is called for Addresses section.
+4. Assert no layout-collapse class/state is introduced.
+5. Assert the content wrapper remains present and structurally separate from the nav.
 
-3. Redundant pill removal
-- the extra customer-name pill/box inside the page content is gone
-- no blank wrapper or awkward spacing remains
+Test 4 — Active link behavior still works
+1. Mock IntersectionObserver or the current section-detection logic.
+2. Simulate Contacts active, then Addresses active, then Portal & Access active.
+3. Assert the active nav item changes correctly.
+4. Assert layout structure remains unchanged during those state changes.
 
-4. Main header preserved
-- the main large customer name heading still exists
-- helper text still exists
-- back-to-list still exists
-- status badge still exists
+Test 5 — No regression to Employees Overview pattern
+1. If a shared helper/composable is used, assert the Customers page uses the same pattern safely.
+2. Do not regress Employees Overview behavior.
 
-5. Non-regression
-- list-only/detail-only page behavior still works
-- back-to-list navigation still works
-- selected customer routes still work
-- customer detail tabs/workspace still work
+Test 6 — Responsive fallback
+1. Assert narrow-screen layout still behaves safely.
+2. The nav may become static/horizontal on small screens, but layout must not collapse.
 
-Tests:
-Run and update relevant tests.
-Add missing tests if needed for:
-- generic title in list-only mode
-- customer-name title in detail mode
-- no redundant pill rendered
-- main header preserved
+Commands:
+- run the relevant customer admin/frontend vitest suites
+- run vue-tsc --noEmit --skipLibCheck
+- include exact commands in final output
 
-Manual QA:
-- open list-only page
-- open one customer page
-- open multiple customer pages
-- verify titles in top tab strip
-- verify no duplicate pill exists in page content
-- verify back-to-list and detail workspace still work
+Manual QA checklist:
+1. Open /admin/customers
+2. Go to Contacts & Access
+3. Confirm layout looks correct initially
+4. Scroll down
+5. Confirm left nav stays visible and page layout does NOT collapse
+6. Click Addresses
+7. Confirm scroll works and layout still does NOT collapse
+8. Click Portal & Access
+9. Confirm same result
+10. Confirm no console errors
 
-Final output:
-1. QA validation summary
-2. Issues found
-3. Fixes made
-4. Files changed
-5. Tests added/updated
-6. Test results
-7. Manual QA result
-8. Ready / Not ready for real user testing
-
-Explicitly confirm:
-- top tab names are now customer-specific in detail mode
-- generic Customers remains in list-only mode
-- redundant in-page pill is removed
+Final output must include:
+- files changed
+- tests added/updated
+- commands run
+- root cause of the collapse
+- proof the sticky nav works without reflow/collapse

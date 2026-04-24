@@ -50,3 +50,21 @@ test("customer dashboard latest plans use release-state status tags with stable 
   assert.match(source, /:data-tone="resolveLatestPlanStatusTone\(plan\.status\)"/);
   assert.match(source, /:data-status="plan\.status"/);
 });
+
+test("customer dashboard second row is composed from equal-height orders and plans cards", () => {
+  assert.match(source, /listCustomerOrders,/);
+  assert.match(source, /const latestOrders = ref<CustomerOrderListItem\[\]>\(\[\]\);/);
+  assert.match(source, /const latestFivePlans = computed\(\(\) => latestPlans\.value\.slice\(0, 5\)\);/);
+  assert.match(source, /function sortOrdersByLatestWindow\(rows: CustomerOrderListItem\[\]\)/);
+  assert.match(source, /async function loadLatestOrders\(\)/);
+  assert.match(source, /data-testid="customer-dashboard-second-row"/);
+  assert.match(source, /data-testid="customer-dashboard-orders-card"/);
+  assert.match(source, /data-testid="customer-dashboard-orders-row"/);
+  assert.match(source, /data-testid="customer-dashboard-orders-empty"/);
+  assert.match(source, /data-testid="customer-dashboard-plans-card"/);
+  assert.match(source, /data-testid="customer-dashboard-plans-row"/);
+  assert.match(source, /data-testid="customer-dashboard-plans-empty"/);
+  assert.match(source, /customer-dashboard-tab__row--second/);
+  assert.match(source, /customer-dashboard-tab__panel--equal/);
+  assert.match(source, /customer-dashboard-tab__list--stretch/);
+});

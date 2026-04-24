@@ -76,43 +76,31 @@ const routes: RouteRecordRaw[] = [
     ],
   },
   {
+    name: 'SicherPlanCustomers',
+    path: '/admin/customers',
+    component: AdminModuleView,
     meta: {
       authority: ['tenant_admin', 'dispatcher', 'accounting', 'controller_qm'],
+      fullPathKey: false,
       icon: 'lucide:users',
-      menuContainer: true,
+      moduleKey: 'customers',
       order: -8,
-      title: $t('sicherplan.navigation.customers'),
+      title: $t('sicherplan.admin.customers'),
     },
-    name: 'SicherPlanCustomersSection',
-    path: '/admin/customers-section',
-    component: RouteSectionView,
-    redirect: '/admin/customers',
-    children: [
-      {
-        name: 'SicherPlanCustomers',
-        path: '/admin/customers',
-        component: AdminModuleView,
-        meta: {
-          authority: ['tenant_admin', 'dispatcher', 'accounting', 'controller_qm'],
-          icon: 'lucide:users',
-          moduleKey: 'customers',
-          title: $t('sicherplan.admin.customers'),
-        },
-      },
-      {
-        name: 'SicherPlanCustomerOrderWorkspace',
-        path: '/admin/customers/order-workspace',
-        alias: '/admin/customers/new-plan',
-        component: () => import('#/views/sicherplan/customers/new-plan.vue'),
-        meta: {
-          authority: ['tenant_admin'],
-          fullPathKey: false,
-          hideInMenu: true,
-          icon: 'lucide:square-pen',
-          title: $t('sicherplan.admin.customerOrderWorkspace'),
-        },
-      },
-    ],
+    children: [],
+  },
+  {
+    name: 'SicherPlanCustomerOrderWorkspace',
+    path: '/admin/customers/order-workspace',
+    alias: '/admin/customers/new-plan',
+    component: () => import('#/views/sicherplan/customers/new-plan.vue'),
+    meta: {
+      authority: ['tenant_admin'],
+      fullPathKey: false,
+      hideInMenu: true,
+      icon: 'lucide:square-pen',
+      title: $t('sicherplan.admin.customerOrderWorkspace'),
+    },
   },
   {
     meta: {

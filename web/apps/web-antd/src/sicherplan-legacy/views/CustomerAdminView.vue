@@ -520,24 +520,72 @@
 
           <section
             v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'contact_access'"
-            class="customer-admin-section customer-admin-section--contact-access customer-admin-contact-access"
+            class="customer-admin-section customer-admin-section--contact-access"
             data-testid="customer-tab-panel-contact-access"
           >
             <section
-              class="customer-admin-contact-access-card customer-admin-contact-access-card--contacts"
-              data-testid="customer-contact-access-card-contacts"
+              ref="contactAccessOnePageRef"
+              class="customer-admin-contact-access-onepage"
+              data-testid="customer-contacts-access-layout"
             >
-              <header class="customer-admin-contact-access-card__header">
-                <p class="eyebrow">{{ t("customerAdmin.tabs.contactAccess") }}</p>
-                <h3>{{ t("customerAdmin.contactAccess.contactsTitle") }}</h3>
-                <p>{{ t("customerAdmin.contactAccess.contactsDescription") }}</p>
-              </header>
-              <section class="customer-admin-section" data-testid="customer-tab-panel-contacts">
-            <div class="customer-admin-form customer-admin-form--structured">
-              <section class="customer-admin-form-section">
-                <div class="customer-admin-form-section__header">
-                  <p class="eyebrow">{{ t("customerAdmin.contacts.registerEyebrow") }}</p>
-                  <h4>{{ t("customerAdmin.contacts.registerTitle") }}</h4>
+              <aside
+                ref="contactAccessNavShellRef"
+                class="customer-admin-contact-access-nav-shell"
+                :class="{
+                  'customer-admin-contact-access-nav-shell--fixed': contactAccessNavFloatingMode === 'fixed',
+                  'customer-admin-contact-access-nav-shell--pinned': contactAccessNavFloatingMode === 'pinned',
+                }"
+                :style="contactAccessNavFloatingStyle"
+                data-testid="customer-contacts-access-nav"
+              >
+                <nav class="customer-admin-contact-access-nav" aria-label="Customer contacts and access sections">
+                  <button
+                    v-for="section in customerContactAccessSections"
+                    :key="section.id"
+                    type="button"
+                    class="customer-admin-contact-access-nav__link"
+                    :class="{ 'customer-admin-contact-access-nav__link--active': section.id === activeContactAccessSection }"
+                    :aria-current="section.id === activeContactAccessSection ? 'true' : undefined"
+                    :data-testid="section.testId"
+                    @click="selectCustomerContactAccessSection(section.id)"
+                  >
+                    <IconifyIcon class="customer-admin-contact-access-nav__icon" :icon="section.icon" aria-hidden="true" />
+                    <span>{{ section.label }}</span>
+                  </button>
+                </nav>
+              </aside>
+
+              <div class="customer-admin-contact-access-content">
+                <section
+                  id="customer-contacts-access-section-contacts"
+                  class="customer-admin-contact-access-section-card"
+                  data-testid="customer-contacts-access-section-contacts"
+                >
+                  <div class="customer-admin-form customer-admin-form--structured">
+                    <section class="customer-admin-contact-access-section-card__header">
+                      <div>
+                        <p class="eyebrow">{{ t("customerAdmin.tabs.contactAccess") }}</p>
+                        <h3>{{ t("customerAdmin.contactAccess.contactsTitle") }}</h3>
+                      </div>
+                      <p>{{ t("customerAdmin.contactAccess.contactsDescription") }}</p>
+                    </section>
+
+                    <section class="customer-admin-section" data-testid="customer-tab-panel-contacts">
+                      <section class="customer-admin-form-section">
+                <div class="customer-admin-form-section__header customer-admin-form-section__header--split">
+                  <div>
+                    <p class="eyebrow">{{ t("customerAdmin.contacts.registerEyebrow") }}</p>
+                    <h4>{{ t("customerAdmin.contacts.registerTitle") }}</h4>
+                  </div>
+                  <button
+                    class="cta-button cta-secondary"
+                    data-testid="customer-contact-register-create"
+                    type="button"
+                    :disabled="!actionState.canManageContacts"
+                    @click="startCreateContact"
+                  >
+                    {{ t("customerAdmin.actions.createNewContact") }}
+                  </button>
                 </div>
                 <div v-if="selectedCustomer.contacts.length" class="customer-admin-record-list">
                   <article v-for="contact in selectedCustomer.contacts" :key="contact.id" class="customer-admin-record">
@@ -567,85 +615,40 @@
                 </div>
                 <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.contacts.empty") }}</p>
               </section>
+                    </section>
+                  </div>
+                </section>
 
-              <form class="customer-admin-form-section" @submit.prevent="submitContact">
-                <div class="customer-admin-form-section__header">
-                  <p class="eyebrow">{{ t("customerAdmin.contacts.editorEyebrow") }}</p>
-                  <h4>{{ t("customerAdmin.contacts.editorTitle") }}</h4>
-                </div>
-                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
-                <label class="field-stack field-stack--half">
-                  <span>{{ t("customerAdmin.fields.fullName") }}</span>
-                  <input v-model="contactDraft.full_name" required />
-                </label>
-                <label class="field-stack field-stack--third">
-                  <span>{{ t("customerAdmin.fields.contactTitle") }}</span>
-                  <input v-model="contactDraft.title" />
-                </label>
-                <label class="field-stack field-stack--third">
-                  <span>{{ t("customerAdmin.fields.functionLabel") }}</span>
-                  <input v-model="contactDraft.function_label" />
-                </label>
-                <label class="field-stack field-stack--half">
-                  <span>{{ t("customerAdmin.fields.email") }}</span>
-                  <input v-model="contactDraft.email" type="email" />
-                </label>
-                <label class="field-stack field-stack--third">
-                  <span>{{ t("customerAdmin.fields.phone") }}</span>
-                  <input v-model="contactDraft.phone" />
-                </label>
-                <label class="field-stack field-stack--third">
-                  <span>{{ t("customerAdmin.fields.mobile") }}</span>
-                  <input v-model="contactDraft.mobile" />
-                </label>
-                <label class="field-stack field-stack--wide">
-                  <span>{{ t("customerAdmin.fields.notes") }}</span>
-                  <textarea v-model="contactDraft.notes" rows="3" />
-                </label>
-                </div>
+                <section
+                  id="customer-contacts-access-section-addresses"
+                  class="customer-admin-contact-access-section-card"
+                  data-testid="customer-contacts-access-section-addresses"
+                >
+                  <div class="customer-admin-form customer-admin-form--structured">
+                    <section class="customer-admin-contact-access-section-card__header">
+                      <div>
+                        <p class="eyebrow">{{ t("customerAdmin.tabs.contactAccess") }}</p>
+                        <h3>{{ t("customerAdmin.contactAccess.addressesTitle") }}</h3>
+                      </div>
+                      <p>{{ t("customerAdmin.contactAccess.addressesDescription") }}</p>
+                    </section>
 
-                <div class="customer-admin-checkbox-group">
-                  <label class="customer-admin-checkbox">
-                    <input v-model="contactDraft.is_primary_contact" type="checkbox" />
-                    <span>{{ t("customerAdmin.fields.isPrimaryContact") }}</span>
-                  </label>
-                  <label class="customer-admin-checkbox">
-                    <input v-model="contactDraft.is_billing_contact" type="checkbox" />
-                    <span>{{ t("customerAdmin.fields.isBillingContact") }}</span>
-                  </label>
-                </div>
-
-                <div class="cta-row">
-                  <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageContacts" @click="startCreateContact">
-                    {{ t("customerAdmin.actions.addContact") }}
+                    <section class="customer-admin-section" data-testid="customer-tab-panel-addresses">
+                      <section class="customer-admin-form-section">
+                <div class="customer-admin-form-section__header customer-admin-form-section__header--split">
+                  <div>
+                    <p class="eyebrow">{{ t("customerAdmin.addresses.registerEyebrow") }}</p>
+                    <h4>{{ t("customerAdmin.addresses.registerTitle") }}</h4>
+                  </div>
+                  <button
+                    class="cta-button cta-secondary"
+                    data-testid="customer-address-register-create"
+                    type="button"
+                    :disabled="!actionState.canManageAddresses"
+                    @click="startCreateAddress"
+                  >
+                    {{ t("customerAdmin.actions.createNewAddress") }}
                   </button>
-                  <button class="cta-button" type="submit" :disabled="!actionState.canManageContacts">
-                    {{ editingContactId ? t("customerAdmin.actions.saveContact") : t("customerAdmin.actions.createContact") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="resetContactDraft">
-                    {{ t("customerAdmin.actions.cancel") }}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </section>
-            </section>
-
-            <section
-              class="customer-admin-contact-access-card customer-admin-contact-access-card--addresses"
-              data-testid="customer-contact-access-card-addresses"
-            >
-              <header class="customer-admin-contact-access-card__header">
-                <p class="eyebrow">{{ t("customerAdmin.tabs.contactAccess") }}</p>
-                <h3>{{ t("customerAdmin.contactAccess.addressesTitle") }}</h3>
-                <p>{{ t("customerAdmin.contactAccess.addressesDescription") }}</p>
-              </header>
-              <section class="customer-admin-section" data-testid="customer-tab-panel-addresses">
-            <div class="customer-admin-form customer-admin-form--structured">
-              <section class="customer-admin-form-section">
-                <div class="customer-admin-form-section__header">
-                  <p class="eyebrow">{{ t("customerAdmin.addresses.registerEyebrow") }}</p>
-                  <h4>{{ t("customerAdmin.addresses.registerTitle") }}</h4>
                 </div>
                 <div v-if="selectedCustomer.addresses.length" class="customer-admin-record-list">
                   <article v-for="address in selectedCustomer.addresses" :key="address.id" class="customer-admin-record">
@@ -678,142 +681,26 @@
                 </div>
                 <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.addresses.empty") }}</p>
               </section>
-
-              <form class="customer-admin-form-section" @submit.prevent="submitAddress">
-                <div class="customer-admin-form-section__header customer-admin-form-section__header--split">
-                  <div>
-                    <p class="eyebrow">{{ t("customerAdmin.addresses.editorEyebrow") }}</p>
-                    <h4>{{ t("customerAdmin.addresses.editorTitle") }}</h4>
+                    </section>
                   </div>
-                  <button
-                    class="cta-button cta-secondary"
-                    type="button"
-                    :disabled="!actionState.canManageAddresses"
-                    @click="openAddressDirectoryCreateModal"
-                  >
-                    {{ t("customerAdmin.actions.createSharedAddress") }}
-                  </button>
-                </div>
-                <p class="field-help">{{ t("customerAdmin.addresses.linkLead") }}</p>
-                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
-                <label class="field-stack field-stack--half">
-                  <span>{{ t("customerAdmin.fields.address") }}</span>
-                  <select
-                    v-model="addressDraft.address_id"
-                    :disabled="!actionState.canManageAddresses || !customerAddressLinkOptions.length"
-                  >
-                    <option value="">{{ customerAddressLinkPlaceholder }}</option>
-                    <option v-for="option in customerAddressLinkOptions" :key="option.value" :value="option.value">
-                      {{ option.label }}
-                    </option>
-                  </select>
-                  <p v-if="!customerAddressLinkOptions.length" class="field-help">
-                    {{ t("customerAdmin.addresses.addressLinkEmpty") }}
-                  </p>
-                </label>
-                <label class="field-stack field-stack--third">
-                  <span>{{ t("customerAdmin.fields.addressType") }}</span>
-                  <select v-model="addressDraft.address_type">
-                    <option value="registered">{{ t("customerAdmin.addressType.registered") }}</option>
-                    <option value="billing">{{ t("customerAdmin.addressType.billing") }}</option>
-                    <option value="mailing">{{ t("customerAdmin.addressType.mailing") }}</option>
-                    <option value="service">{{ t("customerAdmin.addressType.service") }}</option>
-                  </select>
-                </label>
-                <label class="field-stack field-stack--half">
-                  <span>{{ t("customerAdmin.fields.label") }}</span>
-                  <input v-model="addressDraft.label" />
-                </label>
-                </div>
+                </section>
 
-                <div class="customer-admin-checkbox-group">
-                  <label class="customer-admin-checkbox">
-                    <input v-model="addressDraft.is_default" type="checkbox" />
-                    <span>{{ t("customerAdmin.fields.isDefault") }}</span>
-                  </label>
-                </div>
+                <section
+                  id="customer-contacts-access-section-portal"
+                  class="customer-admin-contact-access-section-card"
+                  data-testid="customer-contacts-access-section-portal"
+                >
+                  <div class="customer-admin-form customer-admin-form--structured">
+                    <section class="customer-admin-contact-access-section-card__header">
+                      <div>
+                        <p class="eyebrow">{{ t("customerAdmin.tabs.contactAccess") }}</p>
+                        <h3>{{ t("customerAdmin.contactAccess.portalTitle") }}</h3>
+                      </div>
+                      <p>{{ t("customerAdmin.contactAccess.portalDescription") }}</p>
+                    </section>
 
-                <div class="cta-row">
-                  <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="startCreateAddress">
-                    {{ t("customerAdmin.actions.addAddress") }}
-                  </button>
-                  <button class="cta-button" type="submit" :disabled="!actionState.canManageAddresses || !customerAddressLinkOptions.length">
-                    {{ editingAddressId ? t("customerAdmin.actions.saveAddress") : t("customerAdmin.actions.createAddress") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="resetAddressDraft">
-                    {{ t("customerAdmin.actions.cancel") }}
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            <div
-              v-if="addressDirectoryModalOpen"
-              class="customer-admin-modal-backdrop"
-              data-testid="customer-address-directory-create-modal"
-            >
-              <section class="module-card customer-admin-modal">
-                <div class="customer-admin-form-section__header">
-                  <p class="eyebrow">{{ t("customerAdmin.addresses.createModalEyebrow") }}</p>
-                  <h4>{{ t("customerAdmin.addresses.createModalTitle") }}</h4>
-                </div>
-                <p class="field-help">{{ t("customerAdmin.addresses.createModalLead") }}</p>
-                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("customerAdmin.fields.streetLine1") }}</span>
-                    <input v-model="addressDirectoryDraft.street_line_1" />
-                  </label>
-                  <label class="field-stack field-stack--wide">
-                    <span>{{ t("customerAdmin.fields.streetLine2") }}</span>
-                    <input v-model="addressDirectoryDraft.street_line_2" />
-                  </label>
-                  <label class="field-stack field-stack--third">
-                    <span>{{ t("customerAdmin.fields.postalCode") }}</span>
-                    <input v-model="addressDirectoryDraft.postal_code" />
-                  </label>
-                  <label class="field-stack field-stack--third">
-                    <span>{{ t("customerAdmin.fields.city") }}</span>
-                    <input v-model="addressDirectoryDraft.city" />
-                  </label>
-                  <label class="field-stack field-stack--third">
-                    <span>{{ t("customerAdmin.fields.countryCode") }}</span>
-                    <input v-model="addressDirectoryDraft.country_code" maxlength="2" />
-                  </label>
-                  <label class="field-stack field-stack--half">
-                    <span>{{ t("customerAdmin.fields.state") }}</span>
-                    <input v-model="addressDirectoryDraft.state" />
-                  </label>
-                </div>
-                <div class="cta-row">
-                  <button
-                    class="cta-button"
-                    type="button"
-                    :disabled="loading.sharedAddress"
-                    @click="submitAddressDirectoryEntry"
-                  >
-                    {{ t("customerAdmin.actions.createSharedAddress") }}
-                  </button>
-                  <button class="cta-button cta-secondary" type="button" @click="closeAddressDirectoryCreateModal">
-                    {{ t("customerAdmin.actions.cancel") }}
-                  </button>
-                </div>
-              </section>
-            </div>
-          </section>
-            </section>
-
-            <section
-              class="customer-admin-contact-access-card customer-admin-contact-access-card--portal"
-              data-testid="customer-contact-access-card-portal"
-            >
-              <header class="customer-admin-contact-access-card__header">
-                <p class="eyebrow">{{ t("customerAdmin.tabs.contactAccess") }}</p>
-                <h3>{{ t("customerAdmin.contactAccess.portalTitle") }}</h3>
-                <p>{{ t("customerAdmin.contactAccess.portalDescription") }}</p>
-              </header>
-              <section class="customer-admin-section" data-testid="customer-tab-panel-portal">
-            <div class="customer-admin-form customer-admin-form--structured">
-              <section class="customer-admin-form-section">
+                    <section class="customer-admin-section" data-testid="customer-tab-panel-portal">
+                      <section class="customer-admin-form-section">
                 <div class="customer-admin-form-section__header">
                   <p class="eyebrow">{{ t("customerAdmin.privacy.eyebrow") }}</p>
                   <h4>{{ t("customerAdmin.privacy.title") }}</h4>
@@ -852,13 +739,13 @@
                     {{ t("customerAdmin.actions.savePortalPrivacy") }}
                   </button>
                 </div>
-              </section>
+                      </section>
 
-              <section
-                v-if="canManagePortalAccess"
-                class="customer-admin-form-section"
-                data-testid="customer-portal-access-section"
-              >
+                      <section
+                        v-if="canManagePortalAccess"
+                        class="customer-admin-form-section"
+                        data-testid="customer-portal-access-section"
+                      >
                 <div class="customer-admin-form-section__header">
                   <p class="eyebrow">{{ t("customerAdmin.portalAccess.eyebrow") }}</p>
                   <h4>{{ t("customerAdmin.portalAccess.title") }}</h4>
@@ -956,9 +843,9 @@
                 <p v-else class="customer-admin-list-empty">
                   {{ t("customerAdmin.portalAccess.empty") }}
                 </p>
-              </section>
+                      </section>
 
-              <section class="customer-admin-form-section">
+                      <section class="customer-admin-form-section">
                 <div class="customer-admin-form-section__header">
                   <p class="eyebrow">{{ t("customerAdmin.loginHistory.eyebrow") }}</p>
                   <h4>{{ t("customerAdmin.loginHistory.title") }}</h4>
@@ -981,9 +868,222 @@
                   </article>
                 </div>
                 <p v-else class="customer-admin-list-empty">{{ t("customerAdmin.loginHistory.empty") }}</p>
+                      </section>
+                    </section>
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <div
+              v-if="contactEditorModalOpen"
+              class="customer-admin-modal-backdrop"
+              data-testid="customer-contact-editor-modal"
+            >
+              <section
+                class="module-card customer-admin-modal"
+                aria-modal="true"
+                role="dialog"
+              >
+                <form class="customer-admin-form-section" @submit.prevent="submitContact">
+                  <div class="customer-admin-form-section__header">
+                    <p class="eyebrow">{{ t("customerAdmin.contacts.editorEyebrow") }}</p>
+                    <h4>{{ t("customerAdmin.contacts.editorTitle") }}</h4>
+                  </div>
+                  <p class="field-help">{{ selectedCustomer?.name }}</p>
+                  <p
+                    v-if="contactEditorErrorMessage"
+                    class="field-help customer-admin-field-help--error"
+                    data-testid="customer-contact-editor-error"
+                  >
+                    {{ contactEditorErrorMessage }}
+                  </p>
+                  <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                    <label class="field-stack field-stack--half">
+                      <span>{{ t("customerAdmin.fields.fullName") }}</span>
+                      <input v-model="contactDraft.full_name" required @input="clearContactEditorError" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.contactTitle") }}</span>
+                      <input v-model="contactDraft.title" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.functionLabel") }}</span>
+                      <input v-model="contactDraft.function_label" />
+                    </label>
+                    <label class="field-stack field-stack--half">
+                      <span>{{ t("customerAdmin.fields.email") }}</span>
+                      <input v-model="contactDraft.email" type="email" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.phone") }}</span>
+                      <input v-model="contactDraft.phone" />
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.mobile") }}</span>
+                      <input v-model="contactDraft.mobile" />
+                    </label>
+                    <label class="field-stack field-stack--wide">
+                      <span>{{ t("customerAdmin.fields.notes") }}</span>
+                      <textarea v-model="contactDraft.notes" rows="3" />
+                    </label>
+                  </div>
+
+                  <div class="customer-admin-checkbox-group">
+                    <label class="customer-admin-checkbox">
+                      <input v-model="contactDraft.is_primary_contact" type="checkbox" />
+                      <span>{{ t("customerAdmin.fields.isPrimaryContact") }}</span>
+                    </label>
+                    <label class="customer-admin-checkbox">
+                      <input v-model="contactDraft.is_billing_contact" type="checkbox" />
+                      <span>{{ t("customerAdmin.fields.isBillingContact") }}</span>
+                    </label>
+                  </div>
+
+                  <div class="cta-row">
+                    <button class="cta-button" type="submit" :disabled="!actionState.canManageContacts || loading.contact">
+                      {{ editingContactId ? t("customerAdmin.actions.saveContact") : t("customerAdmin.actions.createContact") }}
+                    </button>
+                    <button class="cta-button cta-secondary" type="button" @click="closeContactEditorModal">
+                      {{ t("customerAdmin.actions.cancel") }}
+                    </button>
+                  </div>
+                </form>
               </section>
             </div>
 
+            <div
+              v-if="addressEditorModalOpen"
+              class="customer-admin-modal-backdrop"
+              data-testid="customer-address-editor-modal"
+            >
+              <section class="module-card customer-admin-modal" aria-modal="true" role="dialog">
+                <form class="customer-admin-form-section" @submit.prevent="submitAddress">
+                  <div class="customer-admin-form-section__header customer-admin-form-section__header--split">
+                    <div>
+                      <p class="eyebrow">{{ t("customerAdmin.addresses.editorEyebrow") }}</p>
+                      <h4>{{ t("customerAdmin.addresses.editorTitle") }}</h4>
+                    </div>
+                    <button
+                      class="cta-button cta-secondary"
+                      type="button"
+                      :disabled="!actionState.canManageAddresses"
+                      @click="openAddressDirectoryCreateModal"
+                    >
+                      {{ t("customerAdmin.actions.createSharedAddress") }}
+                    </button>
+                  </div>
+                  <p class="field-help">{{ t("customerAdmin.addresses.linkLead") }}</p>
+                  <p
+                    v-if="addressEditorErrorMessage"
+                    class="field-help customer-admin-field-help--error"
+                    data-testid="customer-address-editor-error"
+                  >
+                    {{ addressEditorErrorMessage }}
+                  </p>
+                  <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                    <label class="field-stack field-stack--half">
+                      <span>{{ t("customerAdmin.fields.address") }}</span>
+                      <select
+                        v-model="addressDraft.address_id"
+                        :disabled="!actionState.canManageAddresses || !customerAddressLinkOptions.length"
+                        @change="clearAddressEditorError"
+                      >
+                        <option value="">{{ customerAddressLinkPlaceholder }}</option>
+                        <option v-for="option in customerAddressLinkOptions" :key="option.value" :value="option.value">
+                          {{ option.label }}
+                        </option>
+                      </select>
+                      <p v-if="!customerAddressLinkOptions.length" class="field-help">
+                        {{ t("customerAdmin.addresses.addressLinkEmpty") }}
+                      </p>
+                    </label>
+                    <label class="field-stack field-stack--third">
+                      <span>{{ t("customerAdmin.fields.addressType") }}</span>
+                      <select v-model="addressDraft.address_type">
+                        <option value="registered">{{ t("customerAdmin.addressType.registered") }}</option>
+                        <option value="billing">{{ t("customerAdmin.addressType.billing") }}</option>
+                        <option value="mailing">{{ t("customerAdmin.addressType.mailing") }}</option>
+                        <option value="service">{{ t("customerAdmin.addressType.service") }}</option>
+                      </select>
+                    </label>
+                    <label class="field-stack field-stack--half">
+                      <span>{{ t("customerAdmin.fields.label") }}</span>
+                      <input v-model="addressDraft.label" />
+                    </label>
+                  </div>
+
+                  <div class="customer-admin-checkbox-group">
+                    <label class="customer-admin-checkbox">
+                      <input v-model="addressDraft.is_default" type="checkbox" />
+                      <span>{{ t("customerAdmin.fields.isDefault") }}</span>
+                    </label>
+                  </div>
+
+                  <div class="cta-row">
+                    <button class="cta-button" type="submit" :disabled="!actionState.canManageAddresses || loading.address || !customerAddressLinkOptions.length">
+                      {{ editingAddressId ? t("customerAdmin.actions.saveAddress") : t("customerAdmin.actions.createAddress") }}
+                    </button>
+                    <button class="cta-button cta-secondary" type="button" @click="closeAddressEditorModal">
+                      {{ t("customerAdmin.actions.cancel") }}
+                    </button>
+                  </div>
+                </form>
+              </section>
+            </div>
+
+            <div
+              v-if="addressDirectoryModalOpen"
+              class="customer-admin-modal-backdrop"
+              data-testid="customer-address-directory-create-modal"
+            >
+              <section class="module-card customer-admin-modal">
+                <div class="customer-admin-form-section__header">
+                  <p class="eyebrow">{{ t("customerAdmin.addresses.createModalEyebrow") }}</p>
+                  <h4>{{ t("customerAdmin.addresses.createModalTitle") }}</h4>
+                </div>
+                <p class="field-help">{{ t("customerAdmin.addresses.createModalLead") }}</p>
+                <div class="customer-admin-form-grid customer-admin-form-grid--detail">
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("customerAdmin.fields.streetLine1") }}</span>
+                    <input v-model="addressDirectoryDraft.street_line_1" />
+                  </label>
+                  <label class="field-stack field-stack--wide">
+                    <span>{{ t("customerAdmin.fields.streetLine2") }}</span>
+                    <input v-model="addressDirectoryDraft.street_line_2" />
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.postalCode") }}</span>
+                    <input v-model="addressDirectoryDraft.postal_code" />
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.city") }}</span>
+                    <input v-model="addressDirectoryDraft.city" />
+                  </label>
+                  <label class="field-stack field-stack--third">
+                    <span>{{ t("customerAdmin.fields.countryCode") }}</span>
+                    <input v-model="addressDirectoryDraft.country_code" maxlength="2" />
+                  </label>
+                  <label class="field-stack field-stack--half">
+                    <span>{{ t("customerAdmin.fields.state") }}</span>
+                    <input v-model="addressDirectoryDraft.state" />
+                  </label>
+                </div>
+                <div class="cta-row">
+                  <button
+                    class="cta-button"
+                    type="button"
+                    :disabled="loading.sharedAddress"
+                    @click="submitAddressDirectoryEntry"
+                  >
+                    {{ t("customerAdmin.actions.createSharedAddress") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeAddressDirectoryCreateModal">
+                    {{ t("customerAdmin.actions.cancel") }}
+                  </button>
+                </div>
+              </section>
+            </div>
             <div
               v-if="portalAccessModalOpen"
               class="customer-admin-modal-backdrop"
@@ -1085,8 +1185,6 @@
                 </div>
               </section>
             </div>
-            </section>
-            </section>
           </section>
 
           <section
@@ -2163,7 +2261,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, type CSSProperties } from "vue";
+import { IconifyIcon } from "@vben/icons";
 
 import { webAppConfig } from "@/config/env";
 import {
@@ -2347,10 +2446,19 @@ const portalAccessGeneratedPassword = ref("");
 const portalAccessModalOpen = ref(false);
 const portalAccessPasswordTarget = ref<CustomerPortalAccessListItem | null>(null);
 const addressDirectoryModalOpen = ref(false);
+const contactEditorModalOpen = ref(false);
+const contactEditorErrorMessage = ref("");
+const addressEditorModalOpen = ref(false);
+const addressEditorErrorMessage = ref("");
+const contactAccessOnePageRef = ref<HTMLElement | null>(null);
+const contactAccessNavShellRef = ref<HTMLElement | null>(null);
+const contactAccessNavFloatingMode = ref<"fixed" | "pinned" | "static">("static");
+const contactAccessNavFloatingStyle = ref<CSSProperties>({});
 const pendingRouteCustomerId = ref("");
 const pendingRouteDetailTab = ref("");
 const customerWorkspaceInitialLoadComplete = ref(false);
 const routeCustomerNotFound = ref(false);
+const activeContactAccessSection = ref<CustomerContactAccessSectionId>("contacts");
 const billingProfileErrorState = reactive<{
   summaryTitle: string;
   summaryBody: string;
@@ -2620,6 +2728,20 @@ const customerPageContextFullTitle = computed(() =>
     : t("customerAdmin.title"),
 );
 const customerPageContextLabel = computed(() => truncateCustomerContextLabel(customerPageContextFullTitle.value));
+type CustomerContactAccessSectionId = "addresses" | "contacts" | "portal";
+type CustomerContactAccessSection = {
+  id: CustomerContactAccessSectionId;
+  icon: string;
+  label: string;
+  testId: string;
+};
+const CUSTOMER_CONTACT_ACCESS_NAV_TOP_OFFSET = 25;
+const CUSTOMER_CONTACT_ACCESS_NAV_FLOATING_MIN_WIDTH = 1081;
+let customerContactAccessSectionObserver: IntersectionObserver | null = null;
+let suppressContactAccessScrollSpyUntil = 0;
+let contactAccessNavScrollTargets: Array<HTMLElement | Window> = [];
+let contactAccessNavFloatingRaf: number | null = null;
+const customerContactAccessVisibleEntries = new Map<CustomerContactAccessSectionId, IntersectionObserverEntry>();
 const detailTabLabelKeys = {
   dashboard: "customerAdmin.tabs.dashboard",
   overview: "customerAdmin.tabs.overview",
@@ -2646,6 +2768,28 @@ const primaryCustomerDetailTabs = computed(() =>
 );
 const secondaryCustomerDetailTabs = computed(() =>
   customerDetailTabs.value.filter((tab) => secondaryCustomerDetailTabIds.has(tab.id)),
+);
+const customerContactAccessSections = computed(
+  (): CustomerContactAccessSection[] => [
+    {
+      id: "contacts",
+      icon: "lucide:contact-round",
+      label: t("customerAdmin.contactAccess.contactsTitle"),
+      testId: "customer-contacts-access-nav-contacts",
+    },
+    {
+      id: "addresses",
+      icon: "lucide:map-pin",
+      label: t("customerAdmin.contactAccess.addressesTitle"),
+      testId: "customer-contacts-access-nav-addresses",
+    },
+    {
+      id: "portal",
+      icon: "lucide:key-round",
+      label: t("customerAdmin.contactAccess.portalTitle"),
+      testId: "customer-contacts-access-nav-portal",
+    },
+  ],
 );
 const commercialTabLabelKeys = {
   billing_profile: "customerAdmin.commercial.tabs.billingProfile",
@@ -2765,12 +2909,28 @@ const customerAddressLinkOptions = computed(() => {
       )
       .map((address) => address.address_id),
   );
-  return availableAddressDirectory.value
+  const options = new Map(
+    availableAddressDirectory.value
     .filter((address) => !linkedAddressIds.has(address.id))
     .map((address) => ({
       value: address.id,
       label: formatAddressDirectoryOption(address),
-    }));
+    }))
+    .map((option) => [option.value, option]),
+  );
+  const editingAddress = (selectedCustomer.value?.addresses ?? []).find((address) => address.id === editingAddressId.value);
+  if (editingAddress?.address) {
+    options.set(editingAddress.address.id, {
+      value: editingAddress.address.id,
+      label: formatAddressDirectoryOption(editingAddress.address),
+    });
+  } else if (addressDraft.address_id && !options.has(addressDraft.address_id)) {
+    options.set(addressDraft.address_id, {
+      value: addressDraft.address_id,
+      label: addressDraft.address_id,
+    });
+  }
+  return [...options.values()];
 });
 const customerAddressLinkPlaceholder = computed(() =>
   customerAddressLinkOptions.value.length
@@ -2991,6 +3151,260 @@ function buildPreservedCustomerSelectionOptions(): SelectCustomerOptions {
     preservePricingRulesTab: true,
     preserveSelectedRateCard: true,
   };
+}
+
+function normalizeCustomerContactAccessSectionId(sectionId: string): CustomerContactAccessSectionId {
+  const matchingSection = customerContactAccessSections.value.find((section) => section.id === sectionId);
+  return matchingSection?.id ?? "contacts";
+}
+
+function resolveCustomerContactAccessSectionElementId(sectionId: CustomerContactAccessSectionId) {
+  return `customer-contacts-access-section-${sectionId}`;
+}
+
+function suppressCustomerContactAccessScrollSpy() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  suppressContactAccessScrollSpyUntil = window.performance.now() + 650;
+}
+
+function scrollToCustomerContactAccessSection(sectionId: CustomerContactAccessSectionId) {
+  void nextTick(() => {
+    const sectionElement = document.getElementById(resolveCustomerContactAccessSectionElementId(sectionId));
+    if (sectionElement && typeof sectionElement.scrollIntoView === "function") {
+      sectionElement.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  });
+}
+
+function selectCustomerContactAccessSection(sectionId: string) {
+  activeContactAccessSection.value = normalizeCustomerContactAccessSectionId(sectionId);
+  suppressCustomerContactAccessScrollSpy();
+  scrollToCustomerContactAccessSection(activeContactAccessSection.value);
+}
+
+function resolveCustomerContactAccessSectionIdFromElement(element: Element): CustomerContactAccessSectionId | null {
+  const sectionId = element.id.replace(/^customer-contacts-access-section-/, "");
+  const normalizedSectionId = normalizeCustomerContactAccessSectionId(sectionId);
+  return customerContactAccessSections.value.some((section) => section.id === normalizedSectionId)
+    ? normalizedSectionId
+    : null;
+}
+
+function disconnectCustomerContactAccessSectionObserver() {
+  customerContactAccessSectionObserver?.disconnect();
+  customerContactAccessSectionObserver = null;
+  customerContactAccessVisibleEntries.clear();
+}
+
+function isCustomerContactAccessScrollableAncestor(element: HTMLElement) {
+  const overflowY = window.getComputedStyle(element).overflowY;
+  return /(auto|scroll|overlay)/.test(overflowY) && element.scrollHeight > element.clientHeight;
+}
+
+function findCustomerContactAccessScrollContainers() {
+  const containers: HTMLElement[] = [];
+  let parent = contactAccessOnePageRef.value?.parentElement ?? null;
+
+  while (parent && parent !== document.body) {
+    if (isCustomerContactAccessScrollableAncestor(parent)) {
+      containers.push(parent);
+    }
+    parent = parent.parentElement;
+  }
+
+  return containers;
+}
+
+function resolveContactAccessIntersectionRoot() {
+  return findCustomerContactAccessScrollContainers()[0] ?? null;
+}
+
+function resolveCustomerContactAccessStickyTop() {
+  const navShell = contactAccessNavShellRef.value;
+  if (navShell && typeof window !== "undefined") {
+    const top = Number.parseFloat(window.getComputedStyle(navShell).top);
+    if (Number.isFinite(top)) {
+      return top;
+    }
+  }
+  if (typeof window === "undefined") {
+    return 0;
+  }
+  const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize);
+  const baseTop = (Number.isFinite(rootFontSize) ? rootFontSize : 16) * 6.5;
+  return baseTop + CUSTOMER_CONTACT_ACCESS_NAV_TOP_OFFSET;
+}
+
+function resolveActiveCustomerContactAccessSection(sectionElements: HTMLElement[]) {
+  const stickyTop = resolveCustomerContactAccessStickyTop();
+  const activeLineTolerance = 32;
+  const visibleSections = sectionElements
+    .map((element) => {
+      const sectionId = resolveCustomerContactAccessSectionIdFromElement(element);
+      if (!sectionId || !customerContactAccessVisibleEntries.has(sectionId)) {
+        return null;
+      }
+      const rect = element.getBoundingClientRect();
+      return {
+        distance: Math.abs(rect.top - stickyTop),
+        isCurrentOrNear: rect.top <= stickyTop + activeLineTolerance,
+        rectTop: rect.top,
+        sectionId,
+      };
+    })
+    .filter((entry): entry is Exclude<typeof entry, null> => !!entry);
+
+  const currentSections = visibleSections.filter((section) => section.isCurrentOrNear);
+  const [bestSection] = (currentSections.length ? currentSections : visibleSections).sort((left, right) => {
+    if (left.distance !== right.distance) {
+      return left.distance - right.distance;
+    }
+    return left.rectTop - right.rectTop;
+  });
+
+  return bestSection?.sectionId ?? null;
+}
+
+function resetContactAccessNavFloating() {
+  contactAccessNavFloatingMode.value = "static";
+  contactAccessNavFloatingStyle.value = {};
+}
+
+function cancelContactAccessNavFloatingFrame() {
+  if (contactAccessNavFloatingRaf !== null) {
+    window.cancelAnimationFrame(contactAccessNavFloatingRaf);
+    contactAccessNavFloatingRaf = null;
+  }
+}
+
+function updateContactAccessNavFloating() {
+  contactAccessNavFloatingRaf = null;
+
+  const onePageElement = contactAccessOnePageRef.value;
+  const navShell = contactAccessNavShellRef.value;
+  if (
+    activeDetailTab.value !== "contact_access"
+    || !onePageElement
+    || !navShell
+    || !window.matchMedia(`(min-width: ${CUSTOMER_CONTACT_ACCESS_NAV_FLOATING_MIN_WIDTH}px)`).matches
+  ) {
+    resetContactAccessNavFloating();
+    return;
+  }
+
+  const stickyTop = resolveCustomerContactAccessStickyTop();
+  const onePageRect = onePageElement.getBoundingClientRect();
+  const navWidth = navShell.offsetWidth;
+  const navHeight = navShell.offsetHeight;
+
+  if (!navWidth || !navHeight || onePageRect.top > stickyTop || onePageRect.height <= navHeight) {
+    resetContactAccessNavFloating();
+    return;
+  }
+
+  const maxHeight = `calc(100vh - ${Math.round(stickyTop)}px - 1rem)`;
+  if (onePageRect.bottom <= stickyTop + navHeight) {
+    contactAccessNavFloatingMode.value = "pinned";
+    contactAccessNavFloatingStyle.value = {
+      left: "0px",
+      maxHeight,
+      top: `${Math.max(0, onePageElement.offsetHeight - navHeight)}px`,
+      width: `${navWidth}px`,
+    };
+    return;
+  }
+
+  contactAccessNavFloatingMode.value = "fixed";
+  contactAccessNavFloatingStyle.value = {
+    left: `${onePageRect.left}px`,
+    maxHeight,
+    top: `${stickyTop}px`,
+    width: `${navWidth}px`,
+  };
+}
+
+function scheduleContactAccessNavFloatingUpdate() {
+  if (contactAccessNavFloatingRaf !== null) {
+    return;
+  }
+  contactAccessNavFloatingRaf = window.requestAnimationFrame(updateContactAccessNavFloating);
+}
+
+function teardownContactAccessNavFloating() {
+  cancelContactAccessNavFloatingFrame();
+  contactAccessNavScrollTargets.forEach((target) => target.removeEventListener("scroll", scheduleContactAccessNavFloatingUpdate));
+  window.removeEventListener("resize", scheduleContactAccessNavFloatingUpdate);
+  contactAccessNavScrollTargets = [];
+  resetContactAccessNavFloating();
+}
+
+function setupContactAccessNavFloating() {
+  teardownContactAccessNavFloating();
+
+  if (activeDetailTab.value !== "contact_access" || !contactAccessOnePageRef.value || !contactAccessNavShellRef.value) {
+    return;
+  }
+
+  contactAccessNavScrollTargets = [window, ...findCustomerContactAccessScrollContainers()];
+  contactAccessNavScrollTargets.forEach((target) =>
+    target.addEventListener("scroll", scheduleContactAccessNavFloatingUpdate, { passive: true }),
+  );
+  window.addEventListener("resize", scheduleContactAccessNavFloatingUpdate, { passive: true });
+  scheduleContactAccessNavFloatingUpdate();
+}
+
+function setupCustomerContactAccessSectionObserver() {
+  disconnectCustomerContactAccessSectionObserver();
+
+  if (activeDetailTab.value !== "contact_access" || typeof window.IntersectionObserver === "undefined") {
+    return;
+  }
+
+  const sectionElements = customerContactAccessSections.value
+    .map((section) => document.getElementById(resolveCustomerContactAccessSectionElementId(section.id)))
+    .filter((element): element is HTMLElement => !!element);
+
+  if (!sectionElements.length) {
+    return;
+  }
+
+  const stickyTop = resolveCustomerContactAccessStickyTop();
+  customerContactAccessSectionObserver = new IntersectionObserver(
+    (entries) => {
+      if (window.performance.now() < suppressContactAccessScrollSpyUntil) {
+        return;
+      }
+
+      entries.forEach((entry) => {
+        const sectionId = resolveCustomerContactAccessSectionIdFromElement(entry.target);
+        if (!sectionId) {
+          return;
+        }
+        if (entry.isIntersecting) {
+          customerContactAccessVisibleEntries.set(sectionId, entry);
+          return;
+        }
+        customerContactAccessVisibleEntries.delete(sectionId);
+      });
+
+      const sectionId = resolveActiveCustomerContactAccessSection(sectionElements);
+      if (sectionId) {
+        activeContactAccessSection.value = sectionId;
+      }
+    },
+    {
+      root: resolveContactAccessIntersectionRoot(),
+      rootMargin: `-${Math.round(stickyTop)}px 0px -55% 0px`,
+      threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
+    },
+  );
+
+  sectionElements.forEach((element) => customerContactAccessSectionObserver?.observe(element));
 }
 
 function syncSurchargeWeekdayMask() {
@@ -3275,6 +3689,7 @@ function resetContactDraft() {
   contactDraft.user_id = "";
   contactDraft.notes = "";
   editingContactId.value = "";
+  clearContactEditorError();
 }
 
 function resetAddressDraft() {
@@ -3285,6 +3700,7 @@ function resetAddressDraft() {
   addressDraft.label = "";
   addressDraft.is_default = false;
   editingAddressId.value = "";
+  clearAddressEditorError();
 }
 
 function resetAddressDirectoryDraft() {
@@ -3441,6 +3857,34 @@ function openPortalAccessCreateModal() {
   portalAccessModalOpen.value = true;
 }
 
+function clearContactEditorError() {
+  contactEditorErrorMessage.value = "";
+}
+
+function openContactEditorModal() {
+  clearContactEditorError();
+  contactEditorModalOpen.value = true;
+}
+
+function closeContactEditorModal() {
+  contactEditorModalOpen.value = false;
+  resetContactDraft();
+}
+
+function clearAddressEditorError() {
+  addressEditorErrorMessage.value = "";
+}
+
+function openAddressEditorModal() {
+  clearAddressEditorError();
+  addressEditorModalOpen.value = true;
+}
+
+function closeAddressEditorModal() {
+  addressEditorModalOpen.value = false;
+  resetAddressDraft();
+}
+
 function closePortalAccessCreateModal() {
   portalAccessModalOpen.value = false;
 }
@@ -3522,6 +3966,7 @@ function editContact(contact: CustomerContactRead) {
   contactDraft.user_id = contact.user_id ?? "";
   contactDraft.notes = contact.notes ?? "";
   editingContactId.value = contact.id;
+  openContactEditorModal();
 }
 
 function editAddress(address: CustomerAddressRead) {
@@ -3532,6 +3977,7 @@ function editAddress(address: CustomerAddressRead) {
   addressDraft.label = address.label ?? "";
   addressDraft.is_default = address.is_default;
   editingAddressId.value = address.id;
+  openAddressEditorModal();
 }
 
 function editInvoiceParty(invoiceParty: CustomerInvoicePartyRead) {
@@ -3555,6 +4001,9 @@ function selectCustomerDetailTab(tabId: string) {
     hasSelectedCustomer: !!selectedCustomer.value,
     isCreatingCustomer: isCreatingCustomer.value,
   });
+  if (activeDetailTab.value === "contact_access") {
+    activeContactAccessSection.value = "contacts";
+  }
 }
 
 function openCustomerAddressesTab() {
@@ -3655,10 +4104,12 @@ function startCreateCustomer() {
 
 function startCreateContact() {
   resetContactDraft();
+  openContactEditorModal();
 }
 
 function startCreateAddress() {
   resetAddressDraft();
+  openAddressEditorModal();
 }
 
 function startCreateInvoiceParty() {
@@ -3736,6 +4187,8 @@ function clearCustomerWorkspace() {
   employeeBlockCapability.value = null;
   portalPrivacy.value = null;
   portalAccessGeneratedPassword.value = "";
+  contactEditorModalOpen.value = false;
+  addressEditorModalOpen.value = false;
   closePortalAccessCreateModal();
   closePortalAccessPasswordReset();
   resetCustomerDraft();
@@ -3863,6 +4316,8 @@ async function selectCustomer(customerId: string, options: SelectCustomerOptions
     selectedCustomer.value = await getCustomer(tenantScopeId.value, customerId, accessToken.value);
     if (selectedCustomer.value) {
       populateCustomerDraft(selectedCustomer.value);
+      contactEditorModalOpen.value = false;
+      addressEditorModalOpen.value = false;
       resetContactDraft();
       resetAddressDraft();
       addressDirectorySearch.value = "";
@@ -4071,10 +4526,12 @@ async function submitContact() {
     return;
   }
   if (!contactDraft.full_name.trim()) {
+    contactEditorErrorMessage.value = t("customerAdmin.feedback.contactRequired");
     setFeedback("error", t("customerAdmin.feedback.validation"), t("customerAdmin.feedback.contactRequired"));
     return;
   }
 
+  clearContactEditorError();
   loading.contact = true;
   try {
     if (editingContactId.value) {
@@ -4097,9 +4554,11 @@ async function submitContact() {
       );
     }
     setFeedback("success", t("customerAdmin.feedback.contactSaved"), contactDraft.full_name);
+    contactEditorModalOpen.value = false;
     resetContactDraft();
     await selectCustomer(selectedCustomer.value.id, buildPreservedCustomerSelectionOptions());
   } catch (error) {
+    contactEditorErrorMessage.value = t("customerAdmin.feedback.error");
     handleApiError(error);
   } finally {
     loading.contact = false;
@@ -4137,14 +4596,17 @@ async function submitAddress() {
     return;
   }
   if (!customerAddressLinkOptions.value.length) {
+    addressEditorErrorMessage.value = t("customerAdmin.addresses.addressLinkEmpty");
     setFeedback("error", t("customerAdmin.feedback.validation"), t("customerAdmin.addresses.addressLinkEmpty"));
     return;
   }
   if (!addressDraft.address_id.trim()) {
+    addressEditorErrorMessage.value = t("customerAdmin.feedback.addressRequired");
     setFeedback("error", t("customerAdmin.feedback.validation"), t("customerAdmin.feedback.addressRequired"));
     return;
   }
 
+  clearAddressEditorError();
   loading.address = true;
   try {
     if (editingAddressId.value) {
@@ -4167,9 +4629,11 @@ async function submitAddress() {
       );
     }
     setFeedback("success", t("customerAdmin.feedback.addressSaved"), addressDraft.address_type);
+    addressEditorModalOpen.value = false;
     resetAddressDraft();
     await selectCustomer(selectedCustomer.value.id, buildPreservedCustomerSelectionOptions());
   } catch (error) {
+    addressEditorErrorMessage.value = t("customerAdmin.feedback.error");
     handleApiError(error);
   } finally {
     loading.address = false;
@@ -5285,6 +5749,23 @@ watch(
 );
 
 watch(
+  () => [activeDetailTab.value, selectedCustomer.value?.id ?? ""] as const,
+  async ([tabId]) => {
+    if (tabId !== "contact_access") {
+      activeContactAccessSection.value = "contacts";
+      disconnectCustomerContactAccessSectionObserver();
+      teardownContactAccessNavFloating();
+      return;
+    }
+    activeContactAccessSection.value = "contacts";
+    await nextTick();
+    setupContactAccessNavFloating();
+    setupCustomerContactAccessSectionObserver();
+  },
+  { immediate: true },
+);
+
+watch(
   () => customerPageContextLabel.value,
   (label) => {
     (route.meta as Record<string, unknown>).title = label;
@@ -5420,6 +5901,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleCustomerSearchWindowKeydown);
+  disconnectCustomerContactAccessSectionObserver();
+  teardownContactAccessNavFloating();
 });
 </script>
 
@@ -5729,41 +6212,141 @@ onBeforeUnmount(() => {
   margin-top: 0.25rem;
 }
 
-.customer-admin-contact-access {
+.customer-admin-contact-access-onepage {
+  --customer-contact-access-sticky-top: calc(var(--sp-sticky-offset, 6.5rem) + 25px);
+  position: relative;
   display: grid;
+  grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
   gap: 1.25rem;
+  align-items: start;
+  min-width: 0;
 }
 
-.customer-admin-contact-access-card {
+.customer-admin-contact-access-content {
+  grid-column: 2;
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.customer-admin-contact-access-nav-shell {
+  grid-column: 1;
+  position: sticky;
+  top: var(--customer-contact-access-sticky-top, 6.5rem);
+  align-self: start;
+  z-index: 2;
+  min-width: 0;
+  max-height: calc(100vh - var(--customer-contact-access-sticky-top, 6.5rem) - 1rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.customer-admin-contact-access-nav-shell--fixed {
+  position: fixed;
+}
+
+.customer-admin-contact-access-nav-shell--pinned {
+  position: absolute;
+}
+
+.customer-admin-contact-access-nav {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.25rem 0;
+  border: 0;
+  background: transparent;
+}
+
+.customer-admin-contact-access-nav__link {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.35rem 0.55rem 0.75rem;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--sp-color-text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.customer-admin-contact-access-nav__link:hover,
+.customer-admin-contact-access-nav__link:focus-visible {
+  color: var(--sp-color-primary-strong);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 36%, transparent);
+  outline: none;
+}
+
+.customer-admin-contact-access-nav__link:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--sp-color-primary) 38%, transparent);
+  outline-offset: 2px;
+}
+
+.customer-admin-contact-access-nav__link--active {
+  border-left-color: var(--sp-color-primary);
+  color: var(--sp-color-primary-strong);
+  font-weight: 700;
+}
+
+.customer-admin-contact-access-nav__icon {
+  width: 1.08rem;
+  height: 1.08rem;
+  color: currentColor;
+}
+
+.customer-admin-contact-access-section-card {
   display: grid;
   gap: 1rem;
   padding: 1.1rem;
   border: 1px solid var(--sp-color-border-soft);
   border-radius: 1.25rem;
-  background: color-mix(in srgb, var(--sp-color-surface-card) 88%, white);
-  box-shadow: var(--sp-shadow-card);
+  background: var(--sp-color-surface-card);
+  min-width: 0;
+  scroll-margin-top: var(--customer-contact-access-sticky-top, 6.5rem);
 }
 
-.customer-admin-contact-access-card__header {
+.customer-admin-contact-access-section-card__header,
+.customer-admin-contact-access-section-card .customer-admin-editor-intro {
   display: grid;
-  gap: 0.25rem;
+  gap: 0.35rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
-.customer-admin-contact-access-card__header h3,
-.customer-admin-contact-access-card__header p {
+.customer-admin-contact-access-section-card__header h3,
+.customer-admin-contact-access-section-card__header p {
   margin: 0;
 }
 
-.customer-admin-contact-access-card__header h3 {
+.customer-admin-contact-access-section-card__header h3 {
   color: var(--sp-color-text-primary);
 }
 
-.customer-admin-contact-access-card__header p:not(.eyebrow) {
+.customer-admin-contact-access-section-card__header p:not(.eyebrow) {
   color: var(--sp-color-text-secondary);
 }
 
-[data-theme='dark'] .customer-admin-contact-access-card {
-  background: color-mix(in srgb, var(--sp-color-surface-card) 92%, black);
+.customer-admin-contact-access-section-card .customer-admin-section,
+.customer-admin-contact-access-section-card .customer-admin-form-section {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.customer-admin-contact-access-section-card .customer-admin-form-section + .customer-admin-form-section,
+.customer-admin-contact-access-section-card .customer-admin-contact-access-section-card__header + .customer-admin-section,
+.customer-admin-contact-access-section-card .customer-admin-section + .customer-admin-section {
+  border-top: 1px solid var(--sp-color-border-soft);
+  padding-top: 1rem;
 }
 
 .customer-admin-tab--sub {
@@ -6138,6 +6721,46 @@ onBeforeUnmount(() => {
 @media (max-width: 1280px) {
   .customer-admin-filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1080px) {
+  .customer-admin-contact-access-onepage {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .customer-admin-contact-access-nav-shell {
+    grid-column: 1;
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .customer-admin-contact-access-nav-shell--fixed,
+  .customer-admin-contact-access-nav-shell--pinned {
+    position: static;
+  }
+
+  .customer-admin-contact-access-nav {
+    display: flex;
+    overflow-x: auto;
+    padding: 0.25rem 0 0.5rem;
+  }
+
+  .customer-admin-contact-access-content {
+    grid-column: 1;
+  }
+
+  .customer-admin-contact-access-nav__link {
+    min-width: max-content;
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+    padding: 0.55rem 0.75rem;
+  }
+
+  .customer-admin-contact-access-nav__link--active {
+    border-bottom-color: var(--sp-color-primary);
   }
 }
 

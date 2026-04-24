@@ -17,6 +17,9 @@ const routerReplaceMock = vi.fn();
 const showFeedbackToastMock = vi.fn();
 const createObjectUrlMock = vi.fn(() => "blob:customer-export");
 const revokeObjectUrlMock = vi.fn();
+const scrollIntoViewMock = vi.fn();
+type IntersectionObserverCallbackRef = ((entries: IntersectionObserverEntry[]) => void) | null;
+let intersectionObserverCallback: IntersectionObserverCallbackRef = null;
 
 const authStoreState = reactive({
   accessToken: "token-1",
@@ -73,12 +76,17 @@ const translations: Record<string, string> = {
   "customerAdmin.actions.addContact": "Add contact",
   "customerAdmin.actions.advancedFilters": "Advanced filters",
   "customerAdmin.actions.applyFilters": "Apply filters",
+  "customerAdmin.actions.archive": "Archive",
   "customerAdmin.actions.createAddress": "Create address",
   "customerAdmin.actions.createContact": "Create contact",
+  "customerAdmin.actions.createNewContact": "Create new contact",
+  "customerAdmin.actions.createNewAddress": "Create new address",
   "customerAdmin.actions.createPortalAccess": "Create portal access",
   "customerAdmin.actions.createSharedAddress": "Create shared address",
   "customerAdmin.actions.closeFilters": "Close filters",
+  "customerAdmin.actions.edit": "Edit",
   "customerAdmin.actions.exportCustomers": "CSV export",
+  "customerAdmin.actions.exportVCard": "vCard",
   "customerAdmin.actions.newCustomer": "New customer",
   "customerAdmin.actions.backToList": "Back to customer list",
   "customerAdmin.actions.newOrder": "New order",
@@ -91,6 +99,11 @@ const translations: Record<string, string> = {
   "customerAdmin.contactAccess.contactsTitle": "Contacts",
   "customerAdmin.contactAccess.portalDescription": "Control portal access and login history.",
   "customerAdmin.contactAccess.portalTitle": "Portal & Access",
+  "customerAdmin.contacts.empty": "No contacts have been added yet.",
+  "customerAdmin.contacts.primaryBadge": "Primary contact",
+  "customerAdmin.contacts.registerEyebrow": "Register",
+  "customerAdmin.contacts.registerTitle": "Existing contacts",
+  "customerAdmin.contacts.standardBadge": "Contact",
   "customerAdmin.detail.emptyBody": "Choose a customer from the list or create a new record.",
   "customerAdmin.detail.emptyTitle": "No customer selected yet",
   "customerAdmin.detail.notFoundBody": "The requested customer is not available in the current list. Select a customer from the list.",
@@ -98,7 +111,18 @@ const translations: Record<string, string> = {
   "customerAdmin.detail.newTitle": "Create customer",
   "customerAdmin.detail.workspaceLead": "Workspace lead",
   "customerAdmin.detail.workspaceTitle": "Customer workspace",
+  "customerAdmin.addresses.addressLinkEmpty": "No shared addresses are available for this type.",
+  "customerAdmin.addresses.editorEyebrow": "Editor",
+  "customerAdmin.addresses.editorTitle": "Create or update an address link",
+  "customerAdmin.addresses.empty": "No addresses linked yet.",
+  "customerAdmin.addresses.linkLead": "Link an existing shared address to this customer.",
+  "customerAdmin.addresses.linkBadge": "Linked address",
+  "customerAdmin.addresses.defaultBadge": "Default address",
+  "customerAdmin.addresses.registerEyebrow": "Register",
+  "customerAdmin.addresses.registerTitle": "Address register",
   "customerAdmin.feedback.documentId": "Document ID",
+  "customerAdmin.feedback.addressRequired": "An address link needs a selected address.",
+  "customerAdmin.feedback.contactRequired": "A contact needs at least a name.",
   "customerAdmin.feedback.exportDownloadFailed": "Export created, download failed",
   "customerAdmin.feedback.exportDownloadFallback": "Use the document ID to download the file from the document library.",
   "customerAdmin.feedback.exportDownloadStarted": "The download started.",
@@ -507,6 +531,29 @@ describe("CustomerAdminView search dialog", () => {
     Object.defineProperty(URL, "revokeObjectURL", {
       configurable: true,
       value: revokeObjectUrlMock,
+    });
+    scrollIntoViewMock.mockReset();
+    HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
+    intersectionObserverCallback = null;
+    class MockIntersectionObserver {
+      callback: IntersectionObserverCallback;
+      constructor(callback: IntersectionObserverCallback) {
+        this.callback = callback;
+        intersectionObserverCallback = (entries) => this.callback(entries as IntersectionObserverEntry[], this as unknown as IntersectionObserver);
+      }
+      disconnect() {}
+      observe() {}
+      unobserve() {}
+      takeRecords() {
+        return [];
+      }
+      root = null;
+      rootMargin = "";
+      thresholds = [];
+    }
+    Object.defineProperty(window, "IntersectionObserver", {
+      configurable: true,
+      value: MockIntersectionObserver,
     });
 
     apiMocks.createCustomerAddressMock.mockReset();
@@ -1048,13 +1095,16 @@ describe("CustomerAdminView search dialog", () => {
     const wrapper = await mountSelectedCustomer("contact_access");
     expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
 
-    const contactPanel = wrapper.get('[data-testid="customer-contact-access-card-contacts"]');
-    await contactPanel.get<HTMLInputElement>('input[required]').setValue("Ada Lovelace");
-    await contactPanel.get<HTMLInputElement>('input[type="email"]').setValue("ada@example.test");
+    const contactPanel = wrapper.get('[data-testid="customer-contacts-access-section-contacts"]');
+    await contactPanel.get('[data-testid="customer-contact-register-create"]').trigger("click");
+    await settle();
+    const contactModal = wrapper.get('[data-testid="customer-contact-editor-modal"]');
+    await contactModal.get<HTMLInputElement>('input[required]').setValue("Ada Lovelace");
+    await contactModal.get<HTMLInputElement>('input[type="email"]').setValue("ada@example.test");
 
     const contactSave = deferred<Record<string, never>>();
     apiMocks.createCustomerContactMock.mockReturnValueOnce(contactSave.promise);
-    await contactPanel.get("form").trigger("submit");
+    await contactModal.get("form").trigger("submit");
     await flushPromises();
 
     expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
@@ -1242,31 +1292,39 @@ describe("CustomerAdminView search dialog", () => {
     expect(wrapper.find('[data-testid="customer-tab-panel-employee-blocks"]').exists()).toBe(true);
   });
 
-  it("renders contacts, addresses, and portal sections stacked inside contact access", async () => {
+  it("renders contact access with employee-overview style section nav and one section container per area", async () => {
     const wrapper = await mountSelectedCustomer("contact_access");
 
     const html = wrapper.html();
     const contactAccessPanel = wrapper.get('[data-testid="customer-tab-panel-contact-access"]');
-    const contactsCard = wrapper.get('[data-testid="customer-contact-access-card-contacts"]');
-    const addressesCard = wrapper.get('[data-testid="customer-contact-access-card-addresses"]');
-    const portalCard = wrapper.get('[data-testid="customer-contact-access-card-portal"]');
-    const directCardTestIds = Array.from(contactAccessPanel.element.children).map((child) =>
+    const onePageLayout = wrapper.get('[data-testid="customer-contacts-access-layout"]');
+    const nav = wrapper.get('[data-testid="customer-contacts-access-nav"]');
+    const contentShell = onePageLayout.get(".customer-admin-contact-access-content");
+    const contactsSection = wrapper.get('[data-testid="customer-contacts-access-section-contacts"]');
+    const addressesSection = wrapper.get('[data-testid="customer-contacts-access-section-addresses"]');
+    const portalSection = wrapper.get('[data-testid="customer-contacts-access-section-portal"]');
+    const directLayoutChildren = Array.from(onePageLayout.element.children).map((child) =>
       child.getAttribute("data-testid"),
     );
-    expect(directCardTestIds).toEqual([
-      "customer-contact-access-card-contacts",
-      "customer-contact-access-card-addresses",
-      "customer-contact-access-card-portal",
+    expect(directLayoutChildren).toEqual([
+      "customer-contacts-access-nav",
+      null,
     ]);
-    expect(contactsCard.classes()).toContain("customer-admin-contact-access-card");
-    expect(addressesCard.classes()).toContain("customer-admin-contact-access-card");
-    expect(portalCard.classes()).toContain("customer-admin-contact-access-card");
-    expect(contactsCard.text()).toContain("Contacts");
-    expect(contactsCard.text()).toContain("Manage customer contact persons.");
-    expect(addressesCard.text()).toContain("Addresses");
-    expect(addressesCard.text()).toContain("Link and maintain customer addresses.");
-    expect(portalCard.text()).toContain("Portal & Access");
-    expect(portalCard.text()).toContain("Control portal access and login history.");
+    expect(contentShell.classes()).toContain("customer-admin-contact-access-content");
+    expect(nav.text()).toContain("Contacts");
+    expect(nav.text()).toContain("Addresses");
+    expect(nav.text()).toContain("Portal & Access");
+    expect(wrapper.findAll(".customer-admin-contact-access-nav__link")).toHaveLength(3);
+    expect(wrapper.get('[data-testid="customer-contacts-access-nav-contacts"]').attributes("aria-current")).toBe("true");
+    expect(contactsSection.classes()).toContain("customer-admin-contact-access-section-card");
+    expect(addressesSection.classes()).toContain("customer-admin-contact-access-section-card");
+    expect(portalSection.classes()).toContain("customer-admin-contact-access-section-card");
+    expect(contactsSection.text()).toContain("Contacts");
+    expect(contactsSection.text()).toContain("Manage customer contact persons.");
+    expect(addressesSection.text()).toContain("Addresses");
+    expect(addressesSection.text()).toContain("Link and maintain customer addresses.");
+    expect(portalSection.text()).toContain("Portal & Access");
+    expect(portalSection.text()).toContain("Control portal access and login history.");
     expect(contactAccessPanel.findAll(".customer-admin-editor-intro")).toHaveLength(0);
     expect(contactAccessPanel.text()).not.toContain("Contact maintenance");
     expect(contactAccessPanel.text()).not.toContain("Address links");
@@ -1274,21 +1332,43 @@ describe("CustomerAdminView search dialog", () => {
     expect(wrapper.find('[data-testid="customer-tab-panel-contacts"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-tab-panel-addresses"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-tab-panel-portal"]').exists()).toBe(true);
-    expect(contactsCard.find('[data-testid="customer-tab-panel-contacts"]').exists()).toBe(true);
-    expect(addressesCard.find('[data-testid="customer-tab-panel-addresses"]').exists()).toBe(true);
-    expect(portalCard.find('[data-testid="customer-tab-panel-portal"]').exists()).toBe(true);
-    expect(contactsCard.find('[data-testid="customer-tab-panel-addresses"]').exists()).toBe(false);
-    expect(addressesCard.find('[data-testid="customer-tab-panel-portal"]').exists()).toBe(false);
-    expect(portalCard.find('[data-testid="customer-tab-panel-contacts"]').exists()).toBe(false);
+    expect(contactsSection.find('[data-testid="customer-tab-panel-contacts"]').exists()).toBe(true);
+    expect(addressesSection.find('[data-testid="customer-tab-panel-addresses"]').exists()).toBe(true);
+    expect(portalSection.find('[data-testid="customer-tab-panel-portal"]').exists()).toBe(true);
+    expect(contactsSection.find('[data-testid="customer-tab-panel-addresses"]').exists()).toBe(false);
+    expect(addressesSection.find('[data-testid="customer-tab-panel-portal"]').exists()).toBe(false);
+    expect(portalSection.find('[data-testid="customer-tab-panel-contacts"]').exists()).toBe(false);
+    expect(contactsSection.findAll(".customer-admin-form-section")).toHaveLength(1);
+    expect(addressesSection.findAll(".customer-admin-form-section")).toHaveLength(1);
+    expect(portalSection.findAll(".customer-admin-form-section").length).toBeGreaterThanOrEqual(2);
+    expect(contactsSection.find('[data-testid="customer-contact-editor-modal"]').exists()).toBe(false);
+    expect(contactsSection.text()).toContain("Create new contact");
+    expect(addressesSection.find('[data-testid="customer-address-editor-modal"]').exists()).toBe(false);
+    expect(addressesSection.text()).toContain("Create new address");
     expect(html.indexOf('data-testid="customer-tab-panel-contact-access"')).toBeLessThan(
-      html.indexOf('data-testid="customer-tab-panel-contacts"'),
+      html.indexOf('data-testid="customer-contacts-access-layout"'),
     );
-    expect(html.indexOf('data-testid="customer-tab-panel-contacts"')).toBeLessThan(
-      html.indexOf('data-testid="customer-tab-panel-addresses"'),
+    expect(html.indexOf('data-testid="customer-contacts-access-section-contacts"')).toBeLessThan(
+      html.indexOf('data-testid="customer-contacts-access-section-addresses"'),
     );
-    expect(html.indexOf('data-testid="customer-tab-panel-addresses"')).toBeLessThan(
-      html.indexOf('data-testid="customer-tab-panel-portal"'),
+    expect(html.indexOf('data-testid="customer-contacts-access-section-addresses"')).toBeLessThan(
+      html.indexOf('data-testid="customer-contacts-access-section-portal"'),
     );
+
+    await wrapper.get('[data-testid="customer-contacts-access-nav-portal"]').trigger("click");
+    await settle();
+    expect(wrapper.get('[data-testid="customer-contacts-access-nav-portal"]').attributes("aria-current")).toBe("true");
+    expect(onePageLayout.get(".customer-admin-contact-access-content").classes()).toContain("customer-admin-contact-access-content");
+    expect(onePageLayout.find('[data-testid="customer-contacts-access-nav"]').exists()).toBe(true);
+  });
+
+  it("keeps the left nav interactive like Employees Overview on click", async () => {
+    const wrapper = await mountSelectedCustomer("contact_access");
+
+    await wrapper.get('[data-testid="customer-contacts-access-nav-addresses"]').trigger("click");
+    await settle();
+
+    expect(wrapper.get('[data-testid="customer-contacts-access-nav-addresses"]').attributes("aria-current")).toBe("true");
   });
 
   it("renders Orders as the customer detail tab label and no longer shows Plans", async () => {
@@ -1345,11 +1425,14 @@ describe("CustomerAdminView search dialog", () => {
   it("keeps contact creation working from the merged contact access tab", async () => {
     const wrapper = await mountSelectedCustomer("contact_access");
 
-    const contactPanel = wrapper.get('[data-testid="customer-contact-access-card-contacts"]');
+    const contactPanel = wrapper.get('[data-testid="customer-contacts-access-section-contacts"]');
     expect(contactPanel.text()).toContain("Mira Contact");
-    await contactPanel.get<HTMLInputElement>('input[required]').setValue("Ada Lovelace");
-    await contactPanel.get<HTMLInputElement>('input[type="email"]').setValue("ada@example.test");
-    await contactPanel.get("form").trigger("submit");
+    await contactPanel.get('[data-testid="customer-contact-register-create"]').trigger("click");
+    await settle();
+    const modal = wrapper.get('[data-testid="customer-contact-editor-modal"]');
+    await modal.get<HTMLInputElement>('input[required]').setValue("Ada Lovelace");
+    await modal.get<HTMLInputElement>('input[type="email"]').setValue("ada@example.test");
+    await modal.get("form").trigger("submit");
     await settle();
 
     expect(apiMocks.createCustomerContactMock).toHaveBeenCalledWith(
@@ -1363,15 +1446,54 @@ describe("CustomerAdminView search dialog", () => {
         email: "ada@example.test",
       }),
     );
+    expect(wrapper.find('[data-testid="customer-contact-editor-modal"]').exists()).toBe(false);
+  });
+
+  it("opens the same contact editor modal for edit mode and keeps validation errors inside it", async () => {
+    const wrapper = await mountSelectedCustomer("contact_access");
+
+    const contactPanel = wrapper.get('[data-testid="customer-contacts-access-section-contacts"]');
+    await clickButtonByTextWithin(contactPanel, "Edit");
+    await settle();
+
+    const modal = wrapper.get('[data-testid="customer-contact-editor-modal"]');
+    const inputs = modal.findAll("input");
+    expect(inputs[0]!.element.value).toBe("Mira Contact");
+
+    await inputs[0]!.setValue("");
+    await modal.get("form").trigger("submit");
+    await settle();
+
+    expect(wrapper.get('[data-testid="customer-contact-editor-error"]').text()).toContain("A contact needs at least a name.");
+    expect(wrapper.find('[data-testid="customer-contact-editor-modal"]').exists()).toBe(true);
+
+    await inputs[0]!.setValue("Mira Contact Updated");
+    await modal.get("form").trigger("submit");
+    await settle();
+
+    expect(apiMocks.updateCustomerContactMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "customer-default",
+      "contact-1",
+      "token-1",
+      expect.objectContaining({
+        full_name: "Mira Contact Updated",
+        version_no: 1,
+      }),
+    );
+    expect(wrapper.find('[data-testid="customer-contact-editor-modal"]').exists()).toBe(false);
   });
 
   it("keeps address creation and shared-address modal behavior working from contact access", async () => {
     const wrapper = await mountSelectedCustomer("contact_access");
 
-    const addressPanel = wrapper.get('[data-testid="customer-contact-access-card-addresses"]');
+    const addressPanel = wrapper.get('[data-testid="customer-contacts-access-section-addresses"]');
     expect(addressPanel.text()).toContain("Alte Strasse 1");
-    await addressPanel.get<HTMLSelectElement>("select").setValue("address-option-2");
-    await addressPanel.get("form").trigger("submit");
+    await addressPanel.get('[data-testid="customer-address-register-create"]').trigger("click");
+    await settle();
+    const addressModal = wrapper.get('[data-testid="customer-address-editor-modal"]');
+    await addressModal.get<HTMLSelectElement>("select").setValue("address-option-2");
+    await addressModal.get("form").trigger("submit");
     await settle();
 
     expect(apiMocks.createCustomerAddressMock).toHaveBeenCalledWith(
@@ -1385,8 +1507,12 @@ describe("CustomerAdminView search dialog", () => {
         address_type: "billing",
       }),
     );
+    expect(wrapper.find('[data-testid="customer-address-editor-modal"]').exists()).toBe(false);
 
-    await clickButtonByTextWithin(addressPanel, "Create shared address");
+    await addressPanel.get('[data-testid="customer-address-register-create"]').trigger("click");
+    await settle();
+    const addressEditModal = wrapper.get('[data-testid="customer-address-editor-modal"]');
+    await clickButtonByTextWithin(addressEditModal, "Create shared address");
     await settle();
     const modal = wrapper.get('[data-testid="customer-address-directory-create-modal"]');
     const inputs = modal.findAll("input");
@@ -1410,6 +1536,41 @@ describe("CustomerAdminView search dialog", () => {
     );
   });
 
+  it("opens the same address editor modal for edit mode and keeps validation errors inside it", async () => {
+    const wrapper = await mountSelectedCustomer("contact_access");
+
+    const addressPanel = wrapper.get('[data-testid="customer-contacts-access-section-addresses"]');
+    await clickButtonByTextWithin(addressPanel, "Edit");
+    await settle();
+
+    const modal = wrapper.get('[data-testid="customer-address-editor-modal"]');
+    const select = modal.get("select");
+    expect((select.element as HTMLSelectElement).value).toBe("address-option-1");
+
+    await select.setValue("");
+    await modal.get("form").trigger("submit");
+    await settle();
+
+    expect(wrapper.get('[data-testid="customer-address-editor-error"]').text()).toContain("An address link needs a selected address.");
+    expect(wrapper.find('[data-testid="customer-address-editor-modal"]').exists()).toBe(true);
+
+    await select.setValue("address-option-1");
+    await modal.get("form").trigger("submit");
+    await settle();
+
+    expect(apiMocks.updateCustomerAddressMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "customer-default",
+      "customer-address-1",
+      "token-1",
+      expect.objectContaining({
+        address_id: "address-option-1",
+        version_no: 1,
+      }),
+    );
+    expect(wrapper.find('[data-testid="customer-address-editor-modal"]').exists()).toBe(false);
+  });
+
   it("keeps portal privacy, portal access, password reset, and login history visible in contact access", async () => {
     portalAccessMocks.createCustomerPortalAccessMock.mockResolvedValue({ temporary_password: "Temp-1" });
     portalAccessMocks.resetCustomerPortalAccessPasswordMock.mockResolvedValue({ temporary_password: "Temp-2" });
@@ -1426,7 +1587,7 @@ describe("CustomerAdminView search dialog", () => {
     ]);
     const wrapper = await mountSelectedCustomer("contact_access");
 
-    const portalCard = wrapper.get('[data-testid="customer-contact-access-card-portal"]');
+    const portalCard = wrapper.get('[data-testid="customer-contacts-access-section-portal"]');
     const portalPanel = wrapper.get('[data-testid="customer-tab-panel-portal"]');
     expect(portalCard.text()).toContain("Portal & Access");
     expect(portalCard.text()).toContain("Control portal access and login history.");

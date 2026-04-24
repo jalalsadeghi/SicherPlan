@@ -64,6 +64,92 @@ test("customer detail mode updates app-shell title without rendering a duplicate
   assert.match(source, /\.customer-admin-back-button \{[\s\S]*padding: 0\.32rem 0\.68rem;/);
 });
 
+test("contacts and access nav reuses the employee-style floating shell behavior", () => {
+  assert.match(source, /ref="contactAccessOnePageRef"/);
+  assert.match(source, /ref="contactAccessNavShellRef"/);
+  assert.match(source, /const contactAccessNavFloatingMode = ref<"fixed" \| "pinned" \| "static">\("static"\)/);
+  assert.match(source, /const contactAccessNavFloatingStyle = ref<CSSProperties>\(\{\}\)/);
+  assert.match(source, /const CUSTOMER_CONTACT_ACCESS_NAV_FLOATING_MIN_WIDTH = 1081/);
+  assert.match(source, /let contactAccessNavScrollTargets: Array<HTMLElement \| Window> = \[\]/);
+  assert.match(source, /let contactAccessNavFloatingRaf: number \| null = null/);
+  assert.match(source, /'customer-admin-contact-access-nav-shell--fixed': contactAccessNavFloatingMode === 'fixed'/);
+  assert.match(source, /'customer-admin-contact-access-nav-shell--pinned': contactAccessNavFloatingMode === 'pinned'/);
+  assert.match(source, /:style="contactAccessNavFloatingStyle"/);
+  assert.match(source, /function isCustomerContactAccessScrollableAncestor\(element: HTMLElement\)/);
+  assert.match(source, /function findCustomerContactAccessScrollContainers\(\)/);
+  assert.match(source, /function resolveContactAccessIntersectionRoot\(\)/);
+  assert.match(source, /function resetContactAccessNavFloating\(\)/);
+  assert.match(source, /function cancelContactAccessNavFloatingFrame\(\)/);
+  assert.match(source, /function scrollToCustomerContactAccessSection\(sectionId: CustomerContactAccessSectionId\)/);
+  assert.match(source, /sectionElement\.scrollIntoView\(\{[\s\S]*behavior: "smooth",[\s\S]*block: "start",/);
+  assert.match(source, /function selectCustomerContactAccessSection\(sectionId: string\) \{[\s\S]*scrollToCustomerContactAccessSection\(activeContactAccessSection\.value\);/);
+  assert.match(source, /function updateContactAccessNavFloating\(\)/);
+  assert.match(source, /window\.matchMedia\(`\(min-width: \$\{CUSTOMER_CONTACT_ACCESS_NAV_FLOATING_MIN_WIDTH\}px\)`\)\.matches/);
+  assert.match(source, /contactAccessNavFloatingMode\.value = "pinned"/);
+  assert.match(source, /contactAccessNavFloatingMode\.value = "fixed"/);
+  assert.match(source, /function scheduleContactAccessNavFloatingUpdate\(\)/);
+  assert.match(source, /window\.requestAnimationFrame\(updateContactAccessNavFloating\)/);
+  assert.match(source, /function teardownContactAccessNavFloating\(\)/);
+  assert.match(source, /function setupContactAccessNavFloating\(\)/);
+  assert.match(source, /contactAccessNavScrollTargets = \[window, \.\.\.findCustomerContactAccessScrollContainers\(\)\]/);
+  assert.match(source, /target\.addEventListener\("scroll", scheduleContactAccessNavFloatingUpdate, \{ passive: true \}\)/);
+  assert.match(source, /window\.addEventListener\("resize", scheduleContactAccessNavFloatingUpdate, \{ passive: true \}\)/);
+  assert.match(source, /setupContactAccessNavFloating\(\);[\s\S]*setupCustomerContactAccessSectionObserver\(\);/);
+  assert.match(source, /teardownContactAccessNavFloating\(\);/);
+  assert.match(source, /root: resolveContactAccessIntersectionRoot\(\)/);
+  assert.match(source, /\.customer-admin-contact-access-nav-shell \{[\s\S]*grid-column: 1;[\s\S]*position: sticky;[\s\S]*z-index: 2;/);
+  assert.match(source, /\.customer-admin-contact-access-content \{[\s\S]*grid-column: 2;[\s\S]*display: grid;/);
+  assert.match(source, /\.customer-admin-contact-access-nav-shell--fixed \{[\s\S]*position: fixed;/);
+  assert.match(source, /\.customer-admin-contact-access-nav-shell--pinned \{[\s\S]*position: absolute;/);
+  assert.doesNotMatch(source, /\.customer-admin-contact-access-onepage--fixed/);
+  assert.doesNotMatch(source, /\.customer-admin-contact-access-content--fixed/);
+  assert.match(source, /@media \(max-width: 1080px\) \{[\s\S]*\.customer-admin-contact-access-nav-shell--fixed,[\s\S]*\.customer-admin-contact-access-nav-shell--pinned \{[\s\S]*position: static;/);
+  assert.match(source, /@media \(max-width: 1080px\) \{[\s\S]*\.customer-admin-contact-access-content \{[\s\S]*grid-column: 1;/);
+});
+
+test("contacts register opens the existing contact editor in a modal instead of keeping it inline", () => {
+  assert.match(source, /data-testid="customer-contact-register-create"/);
+  assert.match(source, /customerAdmin\.actions\.createNewContact/);
+  assert.match(source, /@click="startCreateContact"/);
+  assert.match(source, /v-if="contactEditorModalOpen"/);
+  assert.match(source, /data-testid="customer-contact-editor-modal"/);
+  assert.match(source, /aria-modal="true"/);
+  assert.match(source, /role="dialog"/);
+  assert.match(source, /v-if="contactEditorErrorMessage"/);
+  assert.match(source, /data-testid="customer-contact-editor-error"/);
+  assert.match(source, /@submit\.prevent="submitContact"/);
+  assert.match(source, /@click="closeContactEditorModal"/);
+  assert.match(source, /const contactEditorModalOpen = ref\(false\)/);
+  assert.match(source, /const contactEditorErrorMessage = ref\(""\)/);
+  assert.match(source, /function clearContactEditorError\(\)/);
+  assert.match(source, /function openContactEditorModal\(\)/);
+  assert.match(source, /function closeContactEditorModal\(\)/);
+  assert.match(source, /function editContact\(contact: CustomerContactRead\) \{[\s\S]*openContactEditorModal\(\);/);
+  assert.match(source, /function startCreateContact\(\) \{[\s\S]*openContactEditorModal\(\);/);
+  assert.match(source, /contactEditorErrorMessage\.value = t\("customerAdmin\.feedback\.contactRequired"\)/);
+  assert.match(source, /contactEditorModalOpen\.value = false;[\s\S]*resetContactDraft\(\);[\s\S]*await selectCustomer\(selectedCustomer\.value\.id, buildPreservedCustomerSelectionOptions\(\)\);/);
+  assert.doesNotMatch(source, /<form class="customer-admin-form-section" @submit\.prevent="submitContact">[\s\S]*customer-tab-panel-contacts/);
+});
+
+test("address register opens the existing address link editor in a modal instead of keeping it inline", () => {
+  assert.match(source, /data-testid="customer-address-register-create"/);
+  assert.match(source, /customerAdmin\.actions\.createNewAddress/);
+  assert.match(source, /@click="startCreateAddress"/);
+  assert.match(source, /v-if="addressEditorModalOpen"/);
+  assert.match(source, /data-testid="customer-address-editor-modal"/);
+  assert.match(source, /data-testid="customer-address-editor-error"/);
+  assert.match(source, /const addressEditorModalOpen = ref\(false\)/);
+  assert.match(source, /const addressEditorErrorMessage = ref\(""\)/);
+  assert.match(source, /function clearAddressEditorError\(\)/);
+  assert.match(source, /function openAddressEditorModal\(\)/);
+  assert.match(source, /function closeAddressEditorModal\(\)/);
+  assert.match(source, /function editAddress\(address: CustomerAddressRead\) \{[\s\S]*openAddressEditorModal\(\);/);
+  assert.match(source, /function startCreateAddress\(\) \{[\s\S]*openAddressEditorModal\(\);/);
+  assert.match(source, /addressEditorErrorMessage\.value = t\("customerAdmin\.feedback\.addressRequired"\)/);
+  assert.match(source, /addressEditorModalOpen\.value = false;[\s\S]*resetAddressDraft\(\);[\s\S]*await selectCustomer\(selectedCustomer\.value\.id, buildPreservedCustomerSelectionOptions\(\)\);/);
+  assert.doesNotMatch(source, /<form class="customer-admin-form-section" @submit\.prevent="submitAddress">[\s\S]*customer-tab-panel-addresses/);
+});
+
 test("customer list panel keeps a compact inline search row and renders clickable customer rows", () => {
   const listSectionMatch = source.match(
     /<section class="module-card customer-admin-panel customer-admin-list-panel" data-testid="customer-list-section">([\s\S]*?)<\/section>/,
@@ -434,19 +520,32 @@ test("customer-facing dropdowns use label-only option formatting", () => {
 
 test("non-overview customer tabs reuse the structured section pattern", () => {
   assert.match(source, /customer-tab-panel-contact-access[\s\S]*customer-tab-panel-contacts[\s\S]*customer-tab-panel-addresses[\s\S]*customer-tab-panel-portal/);
-  assert.match(source, /class="customer-admin-section customer-admin-section--contact-access customer-admin-contact-access"/);
-  assert.match(source, /class="customer-admin-contact-access-card customer-admin-contact-access-card--contacts"[\s\S]*data-testid="customer-contact-access-card-contacts"[\s\S]*customer-tab-panel-contacts/);
-  assert.match(source, /class="customer-admin-contact-access-card customer-admin-contact-access-card--addresses"[\s\S]*data-testid="customer-contact-access-card-addresses"[\s\S]*customer-tab-panel-addresses/);
-  assert.match(source, /class="customer-admin-contact-access-card customer-admin-contact-access-card--portal"[\s\S]*data-testid="customer-contact-access-card-portal"[\s\S]*customer-tab-panel-portal/);
-  assert.match(source, /customer-contact-access-card-contacts[\s\S]*customerAdmin\.contactAccess\.contactsTitle[\s\S]*customerAdmin\.contactAccess\.contactsDescription[\s\S]*customer-tab-panel-contacts/);
-  assert.match(source, /customer-contact-access-card-addresses[\s\S]*customerAdmin\.contactAccess\.addressesTitle[\s\S]*customerAdmin\.contactAccess\.addressesDescription[\s\S]*customer-tab-panel-addresses/);
-  assert.match(source, /customer-contact-access-card-portal[\s\S]*customerAdmin\.contactAccess\.portalTitle[\s\S]*customerAdmin\.contactAccess\.portalDescription[\s\S]*customer-tab-panel-portal/);
-  assert.match(source, /customer-tab-panel-contacts[\s\S]*customer-admin-form customer-admin-form--structured[\s\S]*customerAdmin\.contacts\.registerEyebrow[\s\S]*customerAdmin\.contacts\.editorEyebrow[\s\S]*customerAdmin\.fields\.notes/);
-  assert.match(source, /customer-tab-panel-addresses[\s\S]*customerAdmin\.addresses\.registerEyebrow[\s\S]*customerAdmin\.addresses\.editorEyebrow/);
+  assert.match(source, /class="customer-admin-section customer-admin-section--contact-access"/);
+  assert.match(source, /data-testid="customer-contacts-access-layout"/);
+  assert.match(source, /data-testid="customer-contacts-access-nav"/);
+  assert.match(source, /testId: "customer-contacts-access-nav-contacts"/);
+  assert.match(source, /testId: "customer-contacts-access-nav-addresses"/);
+  assert.match(source, /testId: "customer-contacts-access-nav-portal"/);
+  assert.match(source, /data-testid="customer-contacts-access-section-contacts"[\s\S]*customerAdmin\.contactAccess\.contactsTitle[\s\S]*customerAdmin\.contactAccess\.contactsDescription[\s\S]*customer-tab-panel-contacts/);
+  assert.match(source, /data-testid="customer-contacts-access-section-addresses"[\s\S]*customerAdmin\.contactAccess\.addressesTitle[\s\S]*customerAdmin\.contactAccess\.addressesDescription[\s\S]*customer-tab-panel-addresses/);
+  assert.match(source, /data-testid="customer-contacts-access-section-portal"[\s\S]*customerAdmin\.contactAccess\.portalTitle[\s\S]*customerAdmin\.contactAccess\.portalDescription[\s\S]*customer-tab-panel-portal/);
+  assert.match(source, /customer-contacts-access-section-contacts[\s\S]*customer-admin-form customer-admin-form--structured[\s\S]*customer-tab-panel-contacts[\s\S]*customerAdmin\.contacts\.registerEyebrow[\s\S]*customerAdmin\.contacts\.editorEyebrow[\s\S]*customerAdmin\.fields\.notes/);
+  assert.match(source, /customer-contacts-access-section-addresses[\s\S]*customer-tab-panel-addresses[\s\S]*customerAdmin\.addresses\.registerEyebrow[\s\S]*customerAdmin\.addresses\.editorEyebrow/);
   assert.match(source, /customer-tab-panel-commercial[\s\S]*customer-admin-editor-intro[\s\S]*customer-commercial-panel-billing-profile/);
   assert.match(source, /customer-tab-panel-portal[\s\S]*customerAdmin\.privacy\.title[\s\S]*customer-portal-access-section[\s\S]*customerAdmin\.portalAccess\.title[\s\S]*customerAdmin\.loginHistory\.title/);
   assert.match(source, /customer-tab-panel-history[\s\S]*customerAdmin\.history\.registerEyebrow[\s\S]*customerAdmin\.history\.attachmentEyebrow/);
   assert.match(source, /customer-tab-panel-employee-blocks[\s\S]*customerAdmin\.employeeBlocks\.registerEyebrow[\s\S]*customerAdmin\.employeeBlocks\.editorEyebrow/);
+  assert.match(source, /import \{ IconifyIcon \} from "@vben\/icons";/);
+  assert.match(source, /const customerContactAccessSections = computed/);
+  assert.match(source, /function selectCustomerContactAccessSection\(sectionId: string\)/);
+  assert.match(source, /function setupCustomerContactAccessSectionObserver\(\)/);
+  assert.match(source, /const activeContactAccessSection = ref<CustomerContactAccessSectionId>\("contacts"\)/);
+  assert.match(source, /customer-admin-contact-access-onepage/);
+  assert.match(source, /customer-admin-contact-access-nav-shell/);
+  assert.match(source, /customer-admin-contact-access-nav__link--active/);
+  assert.match(source, /customer-admin-contact-access-section-card/);
+  assert.match(source, /customer-admin-contact-access-section-card__header/);
+  assert.match(source, /customer-admin-contact-access-section-card \.customer-admin-form-section \+ \.customer-admin-form-section/);
 
   const contactAccessStart = source.indexOf('data-testid="customer-tab-panel-contact-access"');
   const commercialPanelStart = source.indexOf('data-testid="customer-tab-panel-commercial"');
@@ -455,6 +554,7 @@ test("non-overview customer tabs reuse the structured section pattern", () => {
   assert.equal(contactAccessSource.includes("customerAdmin.contacts.title"), false);
   assert.equal(contactAccessSource.includes("customerAdmin.addresses.title"), false);
   assert.equal(contactAccessSource.includes("customerAdmin.portal.title"), false);
+  assert.equal(contactAccessSource.includes("customer-admin-contact-access-card"), false);
 });
 
 test("billing-profile form surfaces inline validation summary and field-level error hooks", () => {

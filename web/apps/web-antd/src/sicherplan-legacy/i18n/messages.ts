@@ -1344,6 +1344,11 @@ export type MessageKey =
   | "customerAdmin.dashboard.kpis.standing"
   | "customerAdmin.dashboard.quickActionsEyebrow"
   | "customerAdmin.dashboard.quickActionsTitle"
+  | "customerAdmin.dashboard.latestOrdersEyebrow"
+  | "customerAdmin.dashboard.latestOrdersTitle"
+  | "customerAdmin.dashboard.latestOrdersEmptyTitle"
+  | "customerAdmin.dashboard.latestOrdersEmptyBody"
+  | "customerAdmin.dashboard.latestOrdersLoadError"
   | "customerAdmin.dashboard.latestPlansEyebrow"
   | "customerAdmin.dashboard.latestPlansTitle"
   | "customerAdmin.dashboard.latestPlansEmptyTitle"
@@ -1542,10 +1547,12 @@ export type MessageKey =
   | "customerAdmin.actions.archive"
   | "customerAdmin.actions.edit"
   | "customerAdmin.actions.addContact"
+  | "customerAdmin.actions.createNewContact"
   | "customerAdmin.actions.exportVCard"
   | "customerAdmin.actions.createContact"
   | "customerAdmin.actions.saveContact"
   | "customerAdmin.actions.addAddress"
+  | "customerAdmin.actions.createNewAddress"
   | "customerAdmin.actions.createAddress"
   | "customerAdmin.actions.createSharedAddress"
   | "customerAdmin.actions.createHrCatalogSamples"
@@ -3476,6 +3483,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.dashboard.kpis.standing": "Kundenstanding",
     "customerAdmin.dashboard.quickActionsEyebrow": "Schnellzugriffe",
     "customerAdmin.dashboard.quickActionsTitle": "Zum passenden Arbeitsbereich springen",
+    "customerAdmin.dashboard.latestOrdersEyebrow": "Aufträge",
+    "customerAdmin.dashboard.latestOrdersTitle": "Letzte 5 Aufträge",
+    "customerAdmin.dashboard.latestOrdersEmptyTitle": "Noch keine Aufträge vorhanden",
+    "customerAdmin.dashboard.latestOrdersEmptyBody":
+      "Für diesen Kunden sind aktuell keine Aufträge verfügbar.",
+    "customerAdmin.dashboard.latestOrdersLoadError": "Die letzten Aufträge konnten nicht geladen werden.",
     "customerAdmin.dashboard.latestPlansEyebrow": "Planung",
     "customerAdmin.dashboard.latestPlansTitle": "Letzte 5 Pläne",
     "customerAdmin.dashboard.latestPlansEmptyTitle": "Noch keine Pläne vorhanden",
@@ -3690,10 +3703,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.archive": "Archivieren",
     "customerAdmin.actions.edit": "Bearbeiten",
     "customerAdmin.actions.addContact": "Kontakt erfassen",
+    "customerAdmin.actions.createNewContact": "Neuen Kontakt anlegen",
     "customerAdmin.actions.exportVCard": "vCard",
     "customerAdmin.actions.createContact": "Kontakt anlegen",
     "customerAdmin.actions.saveContact": "Kontakt speichern",
     "customerAdmin.actions.addAddress": "Adresse verknüpfen",
+    "customerAdmin.actions.createNewAddress": "Neue Adresse anlegen",
     "customerAdmin.actions.createAddress": "Adresslink anlegen",
     "customerAdmin.actions.createSharedAddress": "Neue Adresse anlegen",
     "customerAdmin.actions.createHrCatalogSamples": "HR-Katalogbeispiele anlegen",
@@ -5680,6 +5695,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.dashboard.kpis.standing": "Customer standing",
     "customerAdmin.dashboard.quickActionsEyebrow": "Quick actions",
     "customerAdmin.dashboard.quickActionsTitle": "Jump to the relevant workspace",
+    "customerAdmin.dashboard.latestOrdersEyebrow": "Orders",
+    "customerAdmin.dashboard.latestOrdersTitle": "Latest 5 orders",
+    "customerAdmin.dashboard.latestOrdersEmptyTitle": "No orders yet",
+    "customerAdmin.dashboard.latestOrdersEmptyBody":
+      "No orders are currently available for this customer.",
+    "customerAdmin.dashboard.latestOrdersLoadError": "Latest orders could not be loaded.",
     "customerAdmin.dashboard.latestPlansEyebrow": "Planning",
     "customerAdmin.dashboard.latestPlansTitle": "Latest 5 plans",
     "customerAdmin.dashboard.latestPlansEmptyTitle": "No plans yet",
@@ -5894,10 +5915,12 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.actions.archive": "Archive",
     "customerAdmin.actions.edit": "Edit",
     "customerAdmin.actions.addContact": "Add contact",
+    "customerAdmin.actions.createNewContact": "Create new contact",
     "customerAdmin.actions.exportVCard": "vCard",
     "customerAdmin.actions.createContact": "Create contact",
     "customerAdmin.actions.saveContact": "Save contact",
     "customerAdmin.actions.addAddress": "Link address",
+    "customerAdmin.actions.createNewAddress": "Create new address",
     "customerAdmin.actions.createAddress": "Create address link",
     "customerAdmin.actions.createSharedAddress": "Create new address",
     "customerAdmin.actions.createHrCatalogSamples": "Create sample HR catalogs",

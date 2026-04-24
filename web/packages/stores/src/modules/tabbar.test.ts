@@ -99,6 +99,60 @@ describe('useAccessStore', () => {
     });
   });
 
+  it('uses one Customers tab when customer query params change inside the same module workspace', () => {
+    const store = useTabbarStore();
+    const baseTab = {
+      meta: {
+        fullPathKey: false,
+      },
+      name: 'SicherPlanCustomers',
+      path: '/admin/customers',
+    };
+
+    store.addTab({
+      ...baseTab,
+      fullPath: '/admin/customers',
+      meta: {
+        ...baseTab.meta,
+        title: 'Customers',
+      },
+      query: {},
+    } as any);
+    store.addTab({
+      ...baseTab,
+      fullPath: '/admin/customers?customer_id=c1&tab=dashboard',
+      meta: {
+        ...baseTab.meta,
+        title: 'Alpha Security',
+      },
+      query: { customer_id: 'c1', tab: 'dashboard' },
+    } as any);
+    store.addTab({
+      ...baseTab,
+      fullPath: '/admin/customers?customer_id=c2&tab=dashboard',
+      meta: {
+        ...baseTab.meta,
+        title: 'RheinForum Koln',
+      },
+      query: { customer_id: 'c2', tab: 'dashboard' },
+    } as any);
+    store.addTab({
+      ...baseTab,
+      fullPath: '/admin/customers',
+      meta: {
+        ...baseTab.meta,
+        title: 'Customers',
+      },
+      query: {},
+    } as any);
+
+    expect(store.tabs).toHaveLength(1);
+    expect(store.tabs[0]?.key).toBe('/admin/customers');
+    expect(store.tabs[0]?.name).toBe('SicherPlanCustomers');
+    expect(store.tabs[0]?.meta?.title).toBe('Customers');
+    expect(store.tabs[0]?.query).toEqual({});
+  });
+
   it('keeps default fullPath tab keys for other query-driven routes', () => {
     const store = useTabbarStore();
 

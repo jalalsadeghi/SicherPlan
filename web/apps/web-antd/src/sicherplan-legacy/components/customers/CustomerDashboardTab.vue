@@ -10,6 +10,11 @@ import {
   buildStaffingCoverageRoute,
 } from "#/features/sicherplan/dashboardCoverage.helpers";
 import {
+  listCustomerOrders,
+  type CustomerOrderListItem,
+  type CustomerOrderListFilters,
+} from "@/api/planningOrders";
+import {
   listStaffingCoverage,
   type CoverageFilterParams,
   type CoverageShiftItem,
@@ -34,6 +39,7 @@ interface StandingSummary {
 type CustomerDashboardFinanceTone = "good" | "restricted" | "warn";
 type CustomerDashboardStandingTone = StandingSummary["tone"];
 type LatestPlanStatusTone = "good" | "neutral" | "warn";
+type LatestOrderStatusTone = "good" | "neutral" | "warn";
 
 interface CalendarCellItem {
   route: string;
@@ -82,6 +88,9 @@ const coverageMonthItemsByDay = ref<Map<string, CoverageShiftItem[]>>(new Map())
 const coverageRequestVersion = ref(0);
 const coverageMonthCache = new Map<string, Map<string, CoverageShiftItem[]>>();
 const coverageMonthRequests = new Map<string, Promise<Map<string, CoverageShiftItem[]>>>();
+const latestOrders = ref<CustomerOrderListItem[]>([]);
+const latestOrdersError = ref("");
+const latestOrdersLoading = ref(false);
 
 const quickActions = computed(() => {
   const actions: Array<{ id: string; label: string; mode: "action" | "tab"; tabId?: DashboardTabId }> = [
@@ -114,6 +123,46 @@ const actionShortcuts = computed(() => {
 });
 
 const latestPlans = computed(() => props.dashboard?.planning_summary.latest_plans ?? []);
+const latestFivePlans = computed(() => latestPlans.value.slice(0, 5));
+
+function sortOrdersByLatestWindow(rows: CustomerOrderListItem[]) {
+  return [...rows].sort((left, right) => {
+    const leftStart = new Date(left.service_from).getTime();
+    const rightStart = new Date(right.service_from).getTime();
+    if (leftStart !== rightStart) {
+      return rightStart - leftStart;
+    }
+    const leftEnd = new Date(left.service_to).getTime();
+    const rightEnd = new Date(right.service_to).getTime();
+    if (leftEnd !== rightEnd) {
+      return rightEnd - leftEnd;
+    }
+    return right.order_no.localeCompare(left.order_no);
+  });
+}
+
+async function loadLatestOrders() {
+  if (!props.tenantId || !props.accessToken || !props.customer.id) {
+    latestOrders.value = [];
+    latestOrdersError.value = "";
+    return;
+  }
+
+  latestOrdersLoading.value = true;
+  latestOrdersError.value = "";
+  try {
+    const filters: CustomerOrderListFilters = {
+      customer_id: props.customer.id,
+    };
+    const rows = await listCustomerOrders(props.tenantId, props.accessToken, filters);
+    latestOrders.value = sortOrdersByLatestWindow(rows).slice(0, 5);
+  } catch {
+    latestOrders.value = [];
+    latestOrdersError.value = t("customerAdmin.dashboard.latestOrdersLoadError");
+  } finally {
+    latestOrdersLoading.value = false;
+  }
+}
 
 function resolveLatestPlanStatusTone(status: string): LatestPlanStatusTone {
   switch (status) {
@@ -129,6 +178,29 @@ function resolveLatestPlanStatusTone(status: string): LatestPlanStatusTone {
 
 function resolveLatestPlanTagColor(status: string) {
   switch (resolveLatestPlanStatusTone(status)) {
+    case "good":
+      return "success";
+    case "warn":
+      return "gold";
+    default:
+      return "default";
+  }
+}
+
+function resolveLatestOrderStatusTone(status: string): LatestOrderStatusTone {
+  switch (status) {
+    case "released":
+      return "good";
+    case "draft":
+    case "release_ready":
+      return "warn";
+    default:
+      return "neutral";
+  }
+}
+
+function resolveLatestOrderTagColor(status: string) {
+  switch (resolveLatestOrderStatusTone(status)) {
     case "good":
       return "success";
     case "warn":
@@ -424,9 +496,20 @@ function formatPlanWindow(plan: CustomerDashboardRead["planning_summary"]["lates
   return `${formatDate(plan.planning_from)}${plan.planning_to ? ` → ${formatDate(plan.planning_to)}` : ""}`;
 }
 
+function formatOrderWindow(order: CustomerOrderListItem) {
+  const formatDate = (value: string) =>
+    new Intl.DateTimeFormat(locale.value, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(new Date(value));
+  return `${formatDate(order.service_from)}${order.service_to ? ` → ${formatDate(order.service_to)}` : ""}`;
+}
+
 watch(
   () => [props.customer.id, props.tenantId, props.accessToken],
   () => {
+    void loadLatestOrders();
     void loadCoverageForVisibleMonth({ force: true });
   },
   { immediate: true },
@@ -481,22 +564,82 @@ watch(
         </Card>
       </section>
 
-      <section class="customer-dashboard-tab__row">
-        <Card :bordered="false" class="customer-dashboard-tab__panel">
+      <section
+        class="customer-dashboard-tab__row customer-dashboard-tab__row--second"
+        data-testid="customer-dashboard-second-row"
+      >
+        <Card
+          :bordered="false"
+          class="customer-dashboard-tab__panel customer-dashboard-tab__panel--equal"
+          data-testid="customer-dashboard-orders-card"
+        >
+          <div class="customer-dashboard-tab__panel-head">
+            <div>
+              <p class="eyebrow">{{ t("customerAdmin.dashboard.latestOrdersEyebrow") }}</p>
+              <h3>{{ t("customerAdmin.dashboard.latestOrdersTitle") }}</h3>
+            </div>
+          </div>
+          <div
+            v-if="latestOrders.length"
+            class="customer-dashboard-tab__list customer-dashboard-tab__list--stretch"
+          >
+            <div
+              v-for="order in latestOrders"
+              :key="order.id"
+              class="customer-dashboard-tab__list-row"
+              data-testid="customer-dashboard-orders-row"
+            >
+              <div>
+                <strong>{{ order.order_no }} · {{ order.title }}</strong>
+                <span>{{ formatOrderWindow(order) }}</span>
+              </div>
+              <Tag
+                class="customer-dashboard-tab__status-tag"
+                :color="resolveLatestOrderTagColor(order.release_state)"
+                :data-tone="resolveLatestOrderStatusTone(order.release_state)"
+                :data-status="order.release_state"
+              >
+                {{ order.release_state }}
+              </Tag>
+            </div>
+          </div>
+          <EmptyState
+            v-else-if="!latestOrdersLoading && !latestOrdersError"
+            data-testid="customer-dashboard-orders-empty"
+            :description="t('customerAdmin.dashboard.latestOrdersEmptyBody')"
+            :title="t('customerAdmin.dashboard.latestOrdersEmptyTitle')"
+          />
+          <EmptyState
+            v-else
+            data-testid="customer-dashboard-orders-empty"
+            :description="latestOrdersError || t('customerAdmin.dashboard.latestOrdersEmptyBody')"
+            :title="t('customerAdmin.dashboard.latestOrdersEmptyTitle')"
+          />
+        </Card>
+
+        <Card
+          :bordered="false"
+          class="customer-dashboard-tab__panel customer-dashboard-tab__panel--equal"
+          data-testid="customer-dashboard-plans-card"
+        >
           <div class="customer-dashboard-tab__panel-head">
             <div>
               <p class="eyebrow">{{ t("customerAdmin.dashboard.latestPlansEyebrow") }}</p>
               <h3>{{ t("customerAdmin.dashboard.latestPlansTitle") }}</h3>
             </div>
           </div>
-          <div v-if="latestPlans.length" class="customer-dashboard-tab__list">
+          <div
+            v-if="latestFivePlans.length"
+            class="customer-dashboard-tab__list customer-dashboard-tab__list--stretch"
+          >
             <div
-              v-for="plan in latestPlans"
+              v-for="plan in latestFivePlans"
               :key="plan.id"
               class="customer-dashboard-tab__list-row"
+              data-testid="customer-dashboard-plans-row"
             >
               <div>
-                <strong>{{ plan.label }}</strong>
+                <strong>{{ plan.order_no }} · {{ plan.label }}</strong>
                 <span>{{ formatPlanWindow(plan) }}</span>
               </div>
               <Tag
@@ -511,40 +654,41 @@ watch(
           </div>
           <EmptyState
             v-else
+            data-testid="customer-dashboard-plans-empty"
             :description="t('customerAdmin.dashboard.latestPlansEmptyBody')"
             :title="t('customerAdmin.dashboard.latestPlansEmptyTitle')"
           />
         </Card>
-
-        <Card :bordered="false" class="customer-dashboard-tab__panel">
-          <div class="customer-dashboard-tab__panel-head">
-            <div>
-              <p class="eyebrow">{{ t("customerAdmin.dashboard.quickActionsEyebrow") }}</p>
-              <h3>{{ t("customerAdmin.dashboard.quickActionsTitle") }}</h3>
-            </div>
-          </div>
-          <div class="customer-dashboard-tab__actions">
-            <button
-              v-for="action in quickActions"
-              :key="action.id"
-              type="button"
-              class="cta-button cta-secondary"
-              @click="selectTab(action.tabId!)"
-            >
-              {{ action.label }}
-            </button>
-            <button
-              v-for="action in actionShortcuts"
-              :key="action.id"
-              type="button"
-              class="cta-button"
-              @click="triggerShortcut(action.type)"
-            >
-              {{ action.label }}
-            </button>
-          </div>
-        </Card>
       </section>
+
+      <Card :bordered="false" class="customer-dashboard-tab__panel">
+        <div class="customer-dashboard-tab__panel-head">
+          <div>
+            <p class="eyebrow">{{ t("customerAdmin.dashboard.quickActionsEyebrow") }}</p>
+            <h3>{{ t("customerAdmin.dashboard.quickActionsTitle") }}</h3>
+          </div>
+        </div>
+        <div class="customer-dashboard-tab__actions">
+          <button
+            v-for="action in quickActions"
+            :key="action.id"
+            type="button"
+            class="cta-button cta-secondary"
+            @click="selectTab(action.tabId!)"
+          >
+            {{ action.label }}
+          </button>
+          <button
+            v-for="action in actionShortcuts"
+            :key="action.id"
+            type="button"
+            class="cta-button"
+            @click="triggerShortcut(action.type)"
+          >
+            {{ action.label }}
+          </button>
+        </div>
+      </Card>
 
       <div v-if="calendarError" class="customer-dashboard-tab__state" data-testid="customer-dashboard-calendar-error">
         {{ calendarError }}
@@ -700,16 +844,33 @@ watch(
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
 }
 
+.customer-dashboard-tab__row--second {
+  align-items: stretch;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .customer-dashboard-tab__panel-head {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
 }
 
+.customer-dashboard-tab__panel--equal {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 22rem;
+}
+
 .customer-dashboard-tab__list {
   display: grid;
   gap: 0.75rem;
   margin-top: 1rem;
+}
+
+.customer-dashboard-tab__list--stretch {
+  flex: 1 1 auto;
+  align-content: start;
 }
 
 .customer-dashboard-tab__list-row {

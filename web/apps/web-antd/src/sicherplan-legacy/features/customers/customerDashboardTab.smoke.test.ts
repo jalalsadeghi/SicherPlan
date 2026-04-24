@@ -10,6 +10,10 @@ const planningStaffingMocks = vi.hoisted(() => ({
   listStaffingCoverageMock: vi.fn(),
 }));
 
+const planningOrdersMocks = vi.hoisted(() => ({
+  listCustomerOrdersMock: vi.fn(),
+}));
+
 vi.mock("@/i18n", () => ({
   useI18n: () => ({
     locale: { value: "en-US" },
@@ -24,6 +28,10 @@ vi.mock("@/i18n", () => ({
 
 vi.mock("@/api/planningStaffing", () => ({
   listStaffingCoverage: planningStaffingMocks.listStaffingCoverageMock,
+}));
+
+vi.mock("@/api/planningOrders", () => ({
+  listCustomerOrders: planningOrdersMocks.listCustomerOrdersMock,
 }));
 
 const CardStub = defineComponent({
@@ -78,6 +86,26 @@ function buildDashboard(overrides: Record<string, unknown> = {}) {
       semantic_label: "released_invoice_total",
     },
     calendar_items: [],
+    ...overrides,
+  };
+}
+
+function buildOrderListItem(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "order-1",
+    tenant_id: "tenant-1",
+    customer_id: "customer-1",
+    requirement_type_id: "requirement-1",
+    patrol_route_id: null,
+    order_no: "ORD-1",
+    title: "Lobby coverage",
+    service_category_code: "guarding",
+    service_from: "2026-04-18",
+    service_to: "2026-04-19",
+    release_state: "released",
+    released_at: "2026-04-17T10:00:00Z",
+    status: "active",
+    version_no: 1,
     ...overrides,
   };
 }
@@ -180,6 +208,8 @@ describe("CustomerDashboardTab", () => {
   beforeEach(() => {
     planningStaffingMocks.listStaffingCoverageMock.mockReset();
     planningStaffingMocks.listStaffingCoverageMock.mockResolvedValue([]);
+    planningOrdersMocks.listCustomerOrdersMock.mockReset();
+    planningOrdersMocks.listCustomerOrdersMock.mockResolvedValue([]);
   });
 
   it("renders restricted finance state without leaking amounts", () => {
@@ -264,7 +294,7 @@ describe("CustomerDashboardTab", () => {
     expect(wrapper.get('[data-testid="customer-dashboard-kpi-standing"]').attributes("data-tone")).toBe("bad");
   });
 
-  it("renders empty latest-plans and empty calendar states cleanly", async () => {
+  it("renders empty orders/plans cards and empty calendar states cleanly", async () => {
     const wrapper = mountComponent({
       dashboard: buildDashboard({
         planning_summary: {
@@ -276,11 +306,139 @@ describe("CustomerDashboardTab", () => {
     });
     await flushPromises();
 
+    expect(wrapper.get('[data-testid="customer-dashboard-orders-empty"]').text()).toContain(
+      "customerAdmin.dashboard.latestOrdersEmptyTitle",
+    );
+    expect(wrapper.get('[data-testid="customer-dashboard-orders-empty"]').text()).toContain(
+      "customerAdmin.dashboard.latestOrdersEmptyBody",
+    );
+    expect(wrapper.get('[data-testid="customer-dashboard-plans-empty"]').text()).toContain(
+      "customerAdmin.dashboard.latestPlansEmptyTitle",
+    );
     expect(wrapper.text()).toContain("customerAdmin.dashboard.latestPlansEmptyTitle");
     expect(wrapper.text()).toContain("customerAdmin.dashboard.latestPlansEmptyBody");
     expect(wrapper.get(".dashboard-calendar-panel-stub").text()).toContain("customerAdmin.dashboard.calendarTitle");
     expect(wrapper.text()).not.toContain("customerAdmin.dashboard.calendarEmptyTitle");
     expect(wrapper.text()).not.toContain("customerAdmin.dashboard.calendarEmptyBody");
+  });
+
+  it("renders the second row as latest orders and latest plans with equal-height card hooks", async () => {
+    planningOrdersMocks.listCustomerOrdersMock.mockResolvedValue([
+      buildOrderListItem(),
+      buildOrderListItem({
+        id: "order-2",
+        order_no: "ORD-2",
+        title: "Night patrol",
+        service_from: "2026-04-21",
+        service_to: "2026-04-22",
+        release_state: "release_ready",
+      }),
+    ]);
+
+    const wrapper = mountComponent({
+      dashboard: buildDashboard({
+        planning_summary: {
+          total_plans_count: 2,
+          latest_plans: [
+            {
+              id: "plan-1",
+              order_id: "order-1",
+              order_no: "ORD-1",
+              label: "Plan Released",
+              status: "released",
+              planning_mode_code: "site",
+              planning_from: "2026-04-18",
+              planning_to: "2026-04-19",
+              released_at: "2026-04-17T10:00:00Z",
+            },
+          ],
+        },
+      }),
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-dashboard-second-row"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="customer-dashboard-orders-card"]').text()).toContain(
+      "customerAdmin.dashboard.latestOrdersTitle",
+    );
+    expect(wrapper.get('[data-testid="customer-dashboard-plans-card"]').text()).toContain(
+      "customerAdmin.dashboard.latestPlansTitle",
+    );
+    expect(wrapper.get('[data-testid="customer-dashboard-orders-card"]').classes()).toContain(
+      "customer-dashboard-tab__panel--equal",
+    );
+    expect(wrapper.get('[data-testid="customer-dashboard-plans-card"]').classes()).toContain(
+      "customer-dashboard-tab__panel--equal",
+    );
+    expect(wrapper.findAll('[data-testid="customer-dashboard-orders-row"]')).toHaveLength(2);
+    expect(wrapper.findAll('[data-testid="customer-dashboard-plans-row"]')).toHaveLength(1);
+  });
+
+  it("renders up to five latest orders sorted by service window", async () => {
+    planningOrdersMocks.listCustomerOrdersMock.mockResolvedValue([
+      buildOrderListItem({ id: "order-1", order_no: "ORD-1", service_from: "2026-04-18" }),
+      buildOrderListItem({ id: "order-2", order_no: "ORD-2", service_from: "2026-04-19" }),
+      buildOrderListItem({ id: "order-3", order_no: "ORD-3", service_from: "2026-04-20" }),
+      buildOrderListItem({ id: "order-4", order_no: "ORD-4", service_from: "2026-04-21" }),
+      buildOrderListItem({ id: "order-5", order_no: "ORD-5", service_from: "2026-04-22" }),
+      buildOrderListItem({ id: "order-6", order_no: "ORD-6", service_from: "2026-04-23" }),
+    ]);
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    const rows = wrapper.findAll('[data-testid="customer-dashboard-orders-row"]');
+    expect(rows).toHaveLength(5);
+    expect(rows[0]?.text()).toContain("ORD-6");
+    expect(rows[4]?.text()).toContain("ORD-2");
+    expect(wrapper.text()).not.toContain("ORD-1");
+    expect(planningOrdersMocks.listCustomerOrdersMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({ customer_id: "customer-1" }),
+    );
+  });
+
+  it("renders up to five latest plans in the plans card", async () => {
+    const wrapper = mountComponent({
+      dashboard: buildDashboard({
+        planning_summary: {
+          total_plans_count: 6,
+          latest_plans: [1, 2, 3, 4, 5, 6].map((index) => ({
+            id: `plan-${index}`,
+            order_id: `order-${index}`,
+            order_no: `ORD-${index}`,
+            label: `Plan ${index}`,
+            status: index === 1 ? "released" : "draft",
+            planning_mode_code: "site",
+            planning_from: `2026-04-${String(index).padStart(2, "0")}`,
+            planning_to: `2026-04-${String(index + 1).padStart(2, "0")}`,
+            released_at: index === 1 ? "2026-04-01T10:00:00Z" : null,
+          })),
+        },
+      }),
+    });
+    await flushPromises();
+
+    const rows = wrapper.findAll('[data-testid="customer-dashboard-plans-row"]');
+    expect(rows).toHaveLength(5);
+    expect(wrapper.text()).toContain("ORD-1");
+    expect(wrapper.text()).toContain("ORD-5");
+    expect(wrapper.text()).not.toContain("ORD-6 · Plan 6");
+  });
+
+  it("shows a clean orders empty state when latest orders cannot be loaded", async () => {
+    planningOrdersMocks.listCustomerOrdersMock.mockRejectedValue(new Error("boom"));
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-dashboard-orders-empty"]').text()).toContain(
+      "customerAdmin.dashboard.latestOrdersEmptyTitle",
+    );
+    expect(wrapper.get('[data-testid="customer-dashboard-orders-empty"]').text()).toContain(
+      "customerAdmin.dashboard.latestOrdersLoadError",
+    );
   });
 
   it("renders status badges for latest plans with release-state tones", () => {

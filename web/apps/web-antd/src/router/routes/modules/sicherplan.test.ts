@@ -5,36 +5,27 @@ import { describe, expect, it } from 'vitest';
 import sicherplanRoutes from './sicherplan';
 
 describe('sicherplan route authority', () => {
-  it('keeps customers hidden from platform admin and available to supported tenant-scoped roles', () => {
-    const customersSection = sicherplanRoutes.find(
-      (route) => route.name === 'SicherPlanCustomersSection',
-    );
-    const customersRoute = customersSection?.children?.find(
+  it('keeps customers hidden from platform admin and available to supported tenant-scoped roles as a direct route', () => {
+    const customersRoute = sicherplanRoutes.find(
       (route) => route.name === 'SicherPlanCustomers',
     );
 
-    expect(customersSection?.meta?.authority).toEqual([
-      'tenant_admin',
-      'dispatcher',
-      'accounting',
-      'controller_qm',
-    ]);
     expect(customersRoute?.meta?.authority).toEqual([
       'tenant_admin',
       'dispatcher',
       'accounting',
       'controller_qm',
     ]);
+    expect(customersRoute?.meta?.fullPathKey).toBe(false);
+    expect(customersRoute?.path).toBe('/admin/customers');
+    expect(customersRoute?.children).toEqual([]);
   });
 
   it('adds the hidden customer order workspace route with legacy new-plan alias for tenant admins only', () => {
-    const customersSection = sicherplanRoutes.find(
-      (route) => route.name === 'SicherPlanCustomersSection',
-    );
-    const orderWorkspaceRoute = customersSection?.children?.find(
+    const orderWorkspaceRoute = sicherplanRoutes.find(
       (route) => route.name === 'SicherPlanCustomerOrderWorkspace',
     );
-    const legacyNewPlanRoute = customersSection?.children?.find(
+    const legacyNewPlanRoute = sicherplanRoutes.find(
       (route) => route.name === 'SicherPlanCustomerNewPlan',
     );
 
@@ -129,7 +120,6 @@ describe('sicherplan route authority', () => {
   it('marks grouped sidebar sections as non-navigating menu containers', () => {
     const sectionNames = [
       'SicherPlanAdministrationSection',
-      'SicherPlanCustomersSection',
       'SicherPlanWorkforceSection',
       'SicherPlanOperationsSection',
       'SicherPlanFinanceSection',
@@ -143,5 +133,18 @@ describe('sicherplan route authority', () => {
       expect(route?.children?.length).toBeGreaterThan(0);
       expect(route?.meta?.menuContainer).toBe(true);
     }
+  });
+
+  it('flattens customers into one direct sidebar route instead of a Customers -> Customers group', () => {
+    const customersSection = sicherplanRoutes.find(
+      (route) => route.name === 'SicherPlanCustomersSection',
+    );
+    const customersRoute = sicherplanRoutes.find(
+      (route) => route.name === 'SicherPlanCustomers',
+    );
+
+    expect(customersSection).toBeUndefined();
+    expect(customersRoute?.meta?.menuContainer).not.toBe(true);
+    expect(customersRoute?.meta?.icon).toBe('lucide:users');
   });
 });
