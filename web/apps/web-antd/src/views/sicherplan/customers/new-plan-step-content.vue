@@ -2128,6 +2128,37 @@ function hasCommittedPlanningRecordSelection() {
   );
 }
 
+function hasStableLocalPlanningRecordSelectionForCurrentContext() {
+  const selectedRecord = selectedPlanningRecord.value;
+  const selectedId = selectedRecord?.id || selectedExistingPlanningRecordId.value || committedPlanningRecordId.value;
+  if (!selectedRecord || !selectedId || planningRecordDirty.value) {
+    return false;
+  }
+  return (
+    selectedRecord.id === selectedId &&
+    committedPlanningRecordId.value === selectedId &&
+    currentPlanningEntityScope.value?.planningEntityId === planningEntityIdForRecord(selectedRecord) &&
+    currentPlanningEntityScope.value?.planningEntityType === planningFamilyForRecord(selectedRecord) &&
+    currentPlanningModeCode.value === selectedRecord.planning_mode_code
+  );
+}
+
+function hasHydratedSelectedPlanningRecord(planningRecordId: string) {
+  const selectedRecord = selectedPlanningRecord.value;
+  if (!planningRecordId || !selectedRecord || planningRecordDirty.value) {
+    return false;
+  }
+  return (
+    selectedRecord.id === planningRecordId &&
+    selectedExistingPlanningRecordId.value === planningRecordId &&
+    editingExistingPlanningRecordId.value === planningRecordId &&
+    committedPlanningRecordId.value === planningRecordId &&
+    currentPlanningEntityScope.value?.planningEntityId === planningEntityIdForRecord(selectedRecord) &&
+    currentPlanningEntityScope.value?.planningEntityType === planningFamilyForRecord(selectedRecord) &&
+    currentPlanningModeCode.value === selectedRecord.planning_mode_code
+  );
+}
+
 function applyPlanningRecordDocumentsDraftPersistence(payload: Partial<OrderDocumentsDraftPersistence>) {
   withDraftSyncPaused(() => {
     Object.assign(planningRecordAttachmentDraft, {
@@ -3258,11 +3289,7 @@ async function hydrateExistingPlanningRecordSelection(planningRecordId: string) 
   if (!props.tenantId || !props.accessToken || !planningRecordId) {
     return;
   }
-  if (
-    selectedExistingPlanningRecordId.value === planningRecordId &&
-    committedPlanningRecordId.value === planningRecordId &&
-    !planningRecordDirty.value
-  ) {
+  if (hasHydratedSelectedPlanningRecord(planningRecordId)) {
     return;
   }
   selectedExistingPlanningRecordId.value = planningRecordId;
@@ -4069,6 +4096,22 @@ async function loadPlanningRecordState(isCurrent = () => true) {
   }
   if (!props.tenantId || !props.accessToken || !props.wizardState.planning_record_id) {
     if (!isCurrent()) {
+      return;
+    }
+    if (hasStableLocalPlanningRecordSelectionForCurrentContext()) {
+      if (persistedDocumentsDraft) {
+        applyPlanningRecordDocumentsDraftPersistence(persistedDocumentsDraft);
+      } else if (!hasPlanningRecordAttachmentDraftContent()) {
+        withDraftSyncPaused(() => {
+          resetPlanningRecordAttachmentDraft();
+        });
+      }
+      const activePlanningEntityId = currentPlanningEntityScope.value?.planningEntityId || planningEntityId.value;
+      if (currentPlanningModeCode.value === 'trade_fair') {
+        await refreshTradeFairZoneOptions(activePlanningEntityId, isCurrent);
+      } else {
+        await refreshTradeFairZoneOptions('', isCurrent);
+      }
       return;
     }
     const shouldAutoSelectSingleSavedRecord =

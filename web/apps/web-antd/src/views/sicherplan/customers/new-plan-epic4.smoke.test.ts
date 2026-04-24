@@ -1168,6 +1168,25 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(wrapper.findAll('[data-testid="customer-new-plan-edit-planning-record"]')).toHaveLength(0);
   });
 
+  it('keeps the existing planning record list visible after repeated async flushes for the same site context', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([
+      buildPlanningRecord({ id: 'record-1', name: 'RFK Nordtor Sommer' }),
+    ]);
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+    await settleLoadingRender();
+
+    expect(wrapper.findAll('[data-testid="customer-new-plan-existing-planning-record-row"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-existing-planning-records"]').text()).toContain('RFK Nordtor Sommer');
+  });
+
   it('selects an existing operational planning record for the wizard when the row is clicked', async () => {
     apiMocks.listPlanningRecordsMock.mockResolvedValue([buildPlanningRecord()]);
     const wrapper = mountStep('planning-record-overview', {
@@ -1207,6 +1226,120 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(await (wrapper.vm as any).submitCurrentStep()).toBe(true);
     expect(routerReplaceMock).not.toHaveBeenCalled();
     expect(wrapper.emitted('step-ui-state')?.some((event) => event[0] === 'planning-record-overview' && (event[1] as Record<string, unknown>).dirty === false && (event[1] as Record<string, unknown>).error === '')).toBe(true);
+  });
+
+  it('treats a second click on the same selected planning record row as a strict no-op', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([buildPlanningRecord()]);
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+
+    const row = wrapper.get('[data-testid="customer-new-plan-existing-planning-record-row"]');
+    await row.trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledTimes(1);
+    const savedContextCountAfterFirstClick = wrapper.emitted('saved-context')?.length ?? 0;
+    const successToastCountAfterFirstClick = notificationMocks.success.mock.calls.length;
+    const nameAfterFirstClick = (wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value;
+
+    await row.trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listPlanningRecordsMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted('saved-context')?.length ?? 0).toBe(savedContextCountAfterFirstClick);
+    expect(notificationMocks.success.mock.calls.length).toBe(successToastCountAfterFirstClick);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
+      nameAfterFirstClick,
+    );
+    expect(wrapper.get('[data-testid="customer-new-plan-existing-planning-record-row"]').classes()).toContain(
+      'sp-customer-plan-wizard-step__list-row--selected',
+    );
+    expect(routerReplaceMock).not.toHaveBeenCalled();
+    expect(routerPushMock).not.toHaveBeenCalled();
+  });
+
+  it('switches to a different existing planning record when a different row is clicked', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([
+      buildPlanningRecord({ id: 'record-1', name: 'Werk Nord Sommer' }),
+      buildPlanningRecord({ id: 'record-2', name: 'Werk Nord Nacht' }),
+    ]);
+    apiMocks.getPlanningRecordMock.mockImplementation((_tenantId, recordId: string) =>
+      Promise.resolve(
+        buildPlanningRecord({
+          id: recordId,
+          name: recordId === 'record-2' ? 'Werk Nord Nacht' : 'Werk Nord Sommer',
+        }),
+      ),
+    );
+
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+
+    const rows = wrapper.findAll('[data-testid="customer-new-plan-existing-planning-record-row"]');
+    await rows[0]!.trigger('click');
+    await flushPromises();
+    await rows[1]!.trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledTimes(2);
+    expect(apiMocks.getPlanningRecordMock).toHaveBeenLastCalledWith('tenant-1', 'record-2', 'token-1');
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord Nacht',
+    );
+    expect(wrapper.get('[data-testid="customer-new-plan-selected-planning-record-summary"]').text()).toContain(
+      'Werk Nord Nacht',
+    );
+  });
+
+  it('recovers safely when the selected row id matches but the hydrated planning record is missing', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([buildPlanningRecord()]);
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-new-plan-existing-planning-record-row"]').trigger('click');
+    await flushPromises();
+
+    const setupState = (wrapper.vm as any).$?.setupState;
+    setupState.selectedPlanningRecord = null;
+    setupState.editingExistingPlanningRecordId = '';
+    setupState.planningRecordDraft.name = '';
+    apiMocks.getPlanningRecordMock.mockClear();
+    const savedContextCountBeforeRecovery = wrapper.emitted('saved-context')?.length ?? 0;
+
+    await wrapper.get('[data-testid="customer-new-plan-existing-planning-record-row"]').trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledTimes(1);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord Sommer',
+    );
+    expect(wrapper.get('[data-testid="customer-new-plan-selected-planning-record-summary"]').text()).toContain(
+      'Werk Nord Sommer',
+    );
+    expect(wrapper.emitted('saved-context')?.length ?? 0).toBe(savedContextCountBeforeRecovery + 1);
+    expect(routerReplaceMock).not.toHaveBeenCalled();
+    expect(routerPushMock).not.toHaveBeenCalled();
   });
 
   it('does not re-bootstrap the planning-record step when parent route state catches up after local record selection', async () => {
@@ -1253,6 +1386,110 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledTimes(1);
     expect(wrapper.find('[data-testid="customer-new-plan-planning-record-loading"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="customer-new-plan-planning-record-detail-loading"]').exists()).toBe(false);
+  });
+
+  it('keeps the selected planning record stable when a late planning-context sync arrives without planning_record_id', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([buildPlanningRecord({ id: 'record-1', name: 'Werk Nord Sommer' })]);
+
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+      planning_record_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-existing-planning-record-row"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-selected-planning-record-summary"]').text()).toContain(
+      'Werk Nord Sommer',
+    );
+
+    await wrapper.setProps({
+      wizardState: {
+        ...(wrapper.props('wizardState') as CustomerNewPlanWizardState),
+        planning_entity_id: 'site-1',
+        planning_entity_type: 'site',
+        planning_mode_code: 'site',
+        planning_record_id: '',
+      },
+    });
+    await flushPromises();
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-testid="customer-new-plan-existing-planning-record-row"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-existing-planning-record-row"]').classes()).toContain(
+      'sp-customer-plan-wizard-step__list-row--selected',
+    );
+    expect(wrapper.get('[data-testid="customer-new-plan-selected-planning-record-summary"]').text()).toContain(
+      'Werk Nord Sommer',
+    );
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord Sommer',
+    );
+    expect(routerReplaceMock).not.toHaveBeenCalled();
+  });
+
+  it('ignores a stale empty planning-record list response after a newer selection has already populated the editor', async () => {
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+      planning_record_id: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+
+    const first = deferred<any[]>();
+    const second = deferred<any[]>();
+    apiMocks.listPlanningRecordsMock.mockReset();
+    apiMocks.listPlanningRecordsMock
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+
+    let firstCurrent = true;
+    const setupState = (wrapper.vm as any).$?.setupState;
+    void setupState.loadExistingPlanningRecordRows(() => firstCurrent);
+    await settleLoadingRender();
+
+    void setupState.loadExistingPlanningRecordRows(() => true);
+    await settleLoadingRender();
+
+    second.resolve([buildPlanningRecord({ id: 'record-1', name: 'Werk Nord Sommer' })]);
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-existing-planning-record-row"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-selected-planning-record-summary"]').text()).toContain(
+      'Werk Nord Sommer',
+    );
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord Sommer',
+    );
+
+    firstCurrent = false;
+    first.resolve([]);
+    await flushPromises();
+    await settleLoadingRender();
+
+    expect(wrapper.findAll('[data-testid="customer-new-plan-existing-planning-record-row"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-existing-planning-record-row"]').classes()).toContain(
+      'sp-customer-plan-wizard-step__list-row--selected',
+    );
+    expect(wrapper.get('[data-testid="customer-new-plan-selected-planning-record-summary"]').text()).toContain(
+      'Werk Nord Sommer',
+    );
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord Sommer',
+    );
+    expect(routerReplaceMock).not.toHaveBeenCalled();
   });
 
   it('clears selected existing record state when Planning entry changes', async () => {
