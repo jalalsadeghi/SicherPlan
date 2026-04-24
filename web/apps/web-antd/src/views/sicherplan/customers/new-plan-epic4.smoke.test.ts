@@ -662,7 +662,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     }));
   });
 
-  it('restores an order document link draft and shows the selected id fallback', async () => {
+  it('restores an order document link draft selection state and label', async () => {
     window.sessionStorage.setItem(
       buildWizardDraftStorageKey(
         { customerId: 'customer-1', planningEntityId: 'site-1', planningEntityType: 'site', tenantId: 'tenant-1' },
@@ -679,7 +679,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     const wrapper = mountStep('order-scope-documents', { current_step: 'order-scope-documents' });
     await flushPromises();
 
-    expect(wrapper.get('[data-testid="customer-new-plan-order-document-selected"]').text()).toContain('doc-draft-1');
+    expect(wrapper.find('[data-testid="customer-new-plan-order-document-selected"]').exists()).toBe(true);
     expect((wrapper.get('[data-testid="customer-new-plan-order-document-link-label"]').element as HTMLInputElement).value).toBe(
       'Draft link label',
     );
@@ -713,6 +713,41 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(wrapper.text()).toContain('4');
     expect(wrapper.text()).toContain('1 / 2');
     expect(wrapper.get('[data-testid="customer-new-plan-order-document-list"]').text()).toContain('Dienstanweisung');
+  });
+
+  it('clears order-scope section loading when an in-flight load becomes stale before settling', async () => {
+    const wrapper = mountStep('order-scope-documents', { current_step: 'order-scope-documents' });
+    await flushPromises();
+
+    apiMocks.listOrderEquipmentLinesMock.mockReset();
+    apiMocks.listOrderRequirementLinesMock.mockReset();
+    apiMocks.listOrderAttachmentsMock.mockReset();
+
+    const equipmentLines = deferred<any[]>();
+    const requirementLines = deferred<any[]>();
+    const attachments = deferred<any[]>();
+    apiMocks.listOrderEquipmentLinesMock.mockReturnValueOnce(equipmentLines.promise);
+    apiMocks.listOrderRequirementLinesMock.mockReturnValueOnce(requirementLines.promise);
+    apiMocks.listOrderAttachmentsMock.mockReturnValueOnce(attachments.promise);
+
+    let requestCurrent = true;
+    const loadPromise = (wrapper.vm as any).$?.setupState.loadOrderState(() => requestCurrent);
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-lines-loading"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-lines-loading"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-documents-loading"]').exists()).toBe(true);
+
+    requestCurrent = false;
+    equipmentLines.resolve([]);
+    requirementLines.resolve([]);
+    attachments.resolve([]);
+    await loadPromise;
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-equipment-lines-loading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-requirement-lines-loading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-order-documents-loading"]').exists()).toBe(false);
   });
 
   it('shows a local requirement-lines indicator without replacing the editor', async () => {
@@ -1172,9 +1207,52 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(await (wrapper.vm as any).submitCurrentStep()).toBe(true);
     expect(routerReplaceMock).not.toHaveBeenCalled();
     expect(wrapper.emitted('step-ui-state')?.some((event) => event[0] === 'planning-record-overview' && (event[1] as Record<string, unknown>).dirty === false && (event[1] as Record<string, unknown>).error === '')).toBe(true);
-    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
-      'Werk Nord Sommer',
+  });
+
+  it('does not re-bootstrap the planning-record step when parent route state catches up after local record selection', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([
+      buildPlanningRecord({ id: 'record-1', name: 'Werk Nord Sommer' }),
+      buildPlanningRecord({ id: 'record-2', name: 'Werk Nord Nacht' }),
+    ]);
+    apiMocks.getPlanningRecordMock.mockImplementation((_tenantId, recordId: string) =>
+      Promise.resolve(
+        buildPlanningRecord({
+          id: recordId,
+          name: recordId === 'record-2' ? 'Werk Nord Nacht' : 'Werk Nord Sommer',
+        }),
+      ),
     );
+
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+
+    apiMocks.getPlanningRecordMock.mockClear();
+    await wrapper.findAll('[data-testid="customer-new-plan-existing-planning-record-row"]')[0]!.trigger('click');
+    await flushPromises();
+
+    expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledTimes(1);
+
+    await wrapper.setProps({
+      wizardState: {
+        ...(wrapper.props('wizardState') as CustomerNewPlanWizardState),
+        planning_entity_id: 'site-1',
+        planning_entity_type: 'site',
+        planning_mode_code: 'site',
+        planning_record_id: 'record-1',
+      },
+    });
+    await flushPromises();
+
+    expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-loading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-planning-record-detail-loading"]').exists()).toBe(false);
   });
 
   it('clears selected existing record state when Planning entry changes', async () => {

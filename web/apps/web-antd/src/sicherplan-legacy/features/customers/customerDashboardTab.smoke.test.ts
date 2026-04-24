@@ -372,6 +372,8 @@ describe("CustomerDashboardTab", () => {
     );
     expect(wrapper.findAll('[data-testid="customer-dashboard-orders-row"]')).toHaveLength(2);
     expect(wrapper.findAll('[data-testid="customer-dashboard-plans-row"]')).toHaveLength(1);
+    expect(wrapper.text()).not.toContain("customerAdmin.dashboard.quickActionsTitle");
+    expect(wrapper.text()).not.toContain("customerAdmin.dashboard.quickActionsEyebrow");
   });
 
   it("renders up to five latest orders sorted by service window", async () => {
@@ -561,14 +563,15 @@ describe("CustomerDashboardTab", () => {
     expect(wrapper.text()).toContain("customerAdmin.dashboard.calendarSummary.atRisk");
   });
 
-  it("keeps commercial navigation visible for read users but hides invoice-party creation without write permission", () => {
+  it("keeps the dashboard free of the removed quick-actions section for read-only commercial users", () => {
     const wrapper = mountComponent({
       canReadCommercial: true,
       canWriteCommercial: false,
     });
 
-    expect(wrapper.text()).toContain("customerAdmin.tabs.commercial");
     expect(wrapper.text()).not.toContain("customerAdmin.actions.addInvoiceParty");
+    expect(wrapper.text()).not.toContain("customerAdmin.dashboard.quickActionsTitle");
+    expect(wrapper.text()).not.toContain("customerAdmin.dashboard.quickActionsEyebrow");
   });
 
   it("updates dashboard cards when the selected customer changes", async () => {

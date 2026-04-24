@@ -67,4 +67,9 @@ test("customer dashboard second row is composed from equal-height orders and pla
   assert.match(source, /customer-dashboard-tab__row--second/);
   assert.match(source, /customer-dashboard-tab__panel--equal/);
   assert.match(source, /customer-dashboard-tab__list--stretch/);
+  assert.doesNotMatch(source, /customerAdmin\.dashboard\.quickActionsEyebrow/);
+  assert.doesNotMatch(source, /customerAdmin\.dashboard\.quickActionsTitle/);
+  assert.doesNotMatch(source, /customer-dashboard-tab__actions/);
+  assert.doesNotMatch(source, /const quickActions = computed/);
+  assert.doesNotMatch(source, /const actionShortcuts = computed/);
 });

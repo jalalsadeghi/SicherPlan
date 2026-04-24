@@ -29,8 +29,6 @@ import type {
 } from "@/api/customers";
 import { useI18n } from "@/i18n";
 
-type DashboardTabId = "overview" | "contacts" | "addresses" | "commercial" | "portal" | "history";
-
 interface StandingSummary {
   label: string;
   tone: "bad" | "good" | "warn";
@@ -73,12 +71,6 @@ const props = defineProps<{
   tenantId: string;
 }>();
 
-const emit = defineEmits<{
-  createContact: [];
-  createInvoiceParty: [];
-  selectTab: [tabId: DashboardTabId];
-}>();
-
 const { t, locale } = useI18n();
 const activeDate = ref(new Date());
 const expandedDays = ref<string[]>([]);
@@ -92,35 +84,6 @@ const latestOrders = ref<CustomerOrderListItem[]>([]);
 const latestOrdersError = ref("");
 const latestOrdersLoading = ref(false);
 
-const quickActions = computed(() => {
-  const actions: Array<{ id: string; label: string; mode: "action" | "tab"; tabId?: DashboardTabId }> = [
-    { id: "overview", label: t("customerAdmin.tabs.overview"), mode: "tab", tabId: "overview" },
-    { id: "contacts", label: t("customerAdmin.tabs.contacts"), mode: "tab", tabId: "contacts" },
-    { id: "addresses", label: t("customerAdmin.tabs.addresses"), mode: "tab", tabId: "addresses" },
-    { id: "portal", label: t("customerAdmin.tabs.portal"), mode: "tab", tabId: "portal" },
-    { id: "history", label: t("customerAdmin.tabs.history"), mode: "tab", tabId: "history" },
-  ];
-  if (props.canReadCommercial) {
-    actions.splice(3, 0, {
-      id: "commercial",
-      label: t("customerAdmin.tabs.commercial"),
-      mode: "tab",
-      tabId: "commercial",
-    });
-  }
-  return actions;
-});
-
-const actionShortcuts = computed(() => {
-  const actions: Array<{ id: string; label: string; type: "contact" | "invoice_party" }> = [];
-  if (props.canManageContacts) {
-    actions.push({ id: "add-contact", label: t("customerAdmin.actions.addContact"), type: "contact" });
-  }
-  if (props.canWriteCommercial) {
-    actions.push({ id: "add-invoice-party", label: t("customerAdmin.actions.addInvoiceParty"), type: "invoice_party" });
-  }
-  return actions;
-});
 
 const latestPlans = computed(() => props.dashboard?.planning_summary.latest_plans ?? []);
 const latestFivePlans = computed(() => latestPlans.value.slice(0, 5));
@@ -474,18 +437,6 @@ function toggleCalendarDay(dateKey: string) {
   expandedDays.value = [...expandedDays.value, dateKey];
 }
 
-function selectTab(tabId: DashboardTabId) {
-  emit("selectTab", tabId);
-}
-
-function triggerShortcut(type: "contact" | "invoice_party") {
-  if (type === "contact") {
-    emit("createContact");
-    return;
-  }
-  emit("createInvoiceParty");
-}
-
 function formatPlanWindow(plan: CustomerDashboardRead["planning_summary"]["latest_plans"][number]) {
   const formatDate = (value: string) =>
     new Intl.DateTimeFormat(locale.value, {
@@ -660,35 +611,6 @@ watch(
           />
         </Card>
       </section>
-
-      <Card :bordered="false" class="customer-dashboard-tab__panel">
-        <div class="customer-dashboard-tab__panel-head">
-          <div>
-            <p class="eyebrow">{{ t("customerAdmin.dashboard.quickActionsEyebrow") }}</p>
-            <h3>{{ t("customerAdmin.dashboard.quickActionsTitle") }}</h3>
-          </div>
-        </div>
-        <div class="customer-dashboard-tab__actions">
-          <button
-            v-for="action in quickActions"
-            :key="action.id"
-            type="button"
-            class="cta-button cta-secondary"
-            @click="selectTab(action.tabId!)"
-          >
-            {{ action.label }}
-          </button>
-          <button
-            v-for="action in actionShortcuts"
-            :key="action.id"
-            type="button"
-            class="cta-button"
-            @click="triggerShortcut(action.type)"
-          >
-            {{ action.label }}
-          </button>
-        </div>
-      </Card>
 
       <div v-if="calendarError" class="customer-dashboard-tab__state" data-testid="customer-dashboard-calendar-error">
         {{ calendarError }}
@@ -897,13 +819,6 @@ watch(
   flex-shrink: 0;
   font-weight: 600;
   text-transform: none;
-}
-
-.customer-dashboard-tab__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 1rem;
 }
 
 .customer-dashboard-tab__calendar-empty {

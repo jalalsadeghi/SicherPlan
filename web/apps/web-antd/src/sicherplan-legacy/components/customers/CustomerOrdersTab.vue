@@ -4,8 +4,14 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { Card, Tag } from "ant-design-vue";
 
 import EmptyState from "#/components/sicherplan/empty-state.vue";
-import type { CustomerOrderListItem, CustomerOrderRead } from "@/api/planningOrders";
-import { getCustomerOrder, listCustomerOrders } from "@/api/planningOrders";
+import { listCustomers, type CustomerListItem } from "@/api/customers";
+import { listPlanningRecords, type PlanningListItem } from "@/api/planningAdmin";
+import {
+  formatPlanningOrderReferenceOption,
+} from "@/features/planning/planningOrders.helpers.js";
+import { formatPlanningCustomerOption } from "@/features/planning/planningAdmin.helpers.js";
+import type { CustomerOrderListItem, CustomerOrderRead, PlanningReferenceOptionRead } from "@/api/planningOrders";
+import { getCustomerOrder, listCustomerOrders, listServiceCategoryOptions } from "@/api/planningOrders";
 import { useI18n } from "@/i18n";
 
 type DisplayStateTone = "good" | "muted" | "neutral" | "warn";
@@ -53,6 +59,11 @@ const orderPreviewLoading = ref(false);
 const orderPreviewError = ref("");
 const orderPreviewModalOpen = ref(false);
 const orderPreviewRequestVersion = ref(0);
+const ORDER_PREVIEW_TOP_OFFSET = 25;
+const customerOptions = ref<CustomerListItem[]>([]);
+const serviceCategoryOptions = ref<PlanningReferenceOptionRead[]>([]);
+const requirementTypeOptions = ref<PlanningListItem[]>([]);
+const patrolRouteOptions = ref<PlanningListItem[]>([]);
 
 const sortOptions = computed(() => [
   { value: "createdAtDesc", label: t("customerAdmin.orders.sort.createdAtDesc") },
@@ -65,6 +76,30 @@ const sortOptions = computed(() => [
   { value: "releaseDateAsc", label: t("customerAdmin.orders.sort.releaseDateAsc") },
   { value: "status", label: t("customerAdmin.orders.sort.status") },
 ]);
+
+const serviceCategoryLabelMap = computed(
+  () => new Map(serviceCategoryOptions.value.map((option) => [option.code, option.label])),
+);
+const customerLabelMap = computed(
+  () =>
+    new Map(
+      customerOptions.value
+        .map((customer) => [customer.id, formatPlanningCustomerOption(customer)])
+        .filter((entry): entry is [string, string] => Boolean(entry[0] && entry[1])),
+    ),
+);
+const requirementTypeLabelMap = computed(
+  () =>
+    new Map(
+      requirementTypeOptions.value.map((record) => [record.id, formatPlanningOrderReferenceOption("requirement_type", record)]),
+    ),
+);
+const patrolRouteLabelMap = computed(
+  () =>
+    new Map(
+      patrolRouteOptions.value.map((record) => [record.id, formatPlanningOrderReferenceOption("patrol_route", record)]),
+    ),
+);
 
 function parseDateTimeValue(value: string | null | undefined) {
   if (!value) {
@@ -228,6 +263,19 @@ function resolveDisplayState(order: CustomerOrderListItem) {
   };
 }
 
+function formatReleaseStateLabel(releaseState: string | null | undefined) {
+  switch (releaseState) {
+    case "draft":
+      return t("coreAdmin.status.draft");
+    case "release_ready":
+      return t("coreAdmin.status.release_ready");
+    case "released":
+      return t("coreAdmin.status.released");
+    default:
+      return formatReadableValue(releaseState);
+  }
+}
+
 function mapTagColor(tone: DisplayStateTone) {
   switch (tone) {
     case "good":
@@ -252,6 +300,26 @@ function formatDateTime(value: string | null | undefined) {
     month: "2-digit",
     year: "numeric",
   }).format(new Date(value));
+}
+
+function formatReadableValue(value: string | null | undefined) {
+  return typeof value === "string" && value.trim() ? value.trim() : t("customerAdmin.summary.none");
+}
+
+function customerDisplayLabel(customerId: string | null | undefined) {
+  return customerLabelMap.value.get(customerId ?? "") || formatReadableValue(customerId);
+}
+
+function serviceCategoryDisplayLabel(serviceCategoryCode: string | null | undefined) {
+  return serviceCategoryLabelMap.value.get(serviceCategoryCode ?? "") || formatReadableValue(serviceCategoryCode);
+}
+
+function requirementTypeDisplayLabel(requirementTypeId: string | null | undefined) {
+  return requirementTypeLabelMap.value.get(requirementTypeId ?? "") || formatReadableValue(requirementTypeId);
+}
+
+function patrolRouteDisplayLabel(patrolRouteId: string | null | undefined) {
+  return patrolRouteLabelMap.value.get(patrolRouteId ?? "") || formatReadableValue(patrolRouteId);
 }
 
 function closeOrderDetail() {
@@ -346,6 +414,28 @@ async function loadOrders() {
   }
 }
 
+async function loadOrderPreviewLookups() {
+  if (!props.customerId || !props.tenantId || !props.accessToken) {
+    customerOptions.value = [];
+    serviceCategoryOptions.value = [];
+    requirementTypeOptions.value = [];
+    patrolRouteOptions.value = [];
+    return;
+  }
+
+  const [customers, serviceCategories, requirementTypes, patrolRoutes] = await Promise.allSettled([
+    listCustomers(props.tenantId, props.accessToken, {}),
+    listServiceCategoryOptions(props.tenantId, props.accessToken),
+    listPlanningRecords("requirement_type", props.tenantId, props.accessToken, { customer_id: props.customerId }),
+    listPlanningRecords("patrol_route", props.tenantId, props.accessToken, { customer_id: props.customerId }),
+  ]);
+
+  customerOptions.value = customers.status === "fulfilled" ? customers.value : [];
+  serviceCategoryOptions.value = serviceCategories.status === "fulfilled" ? serviceCategories.value : [];
+  requirementTypeOptions.value = requirementTypes.status === "fulfilled" ? requirementTypes.value : [];
+  patrolRouteOptions.value = patrolRoutes.status === "fulfilled" ? patrolRoutes.value : [];
+}
+
 watch(
   () => searchInput.value,
   (value) => {
@@ -365,6 +455,7 @@ watch(
     searchInput.value = "";
     activeSearch.value = "";
     void loadOrders();
+    void loadOrderPreviewLookups();
   },
   { immediate: true },
 );
@@ -496,6 +587,7 @@ onBeforeUnmount(() => {
     <div
       v-if="orderPreviewModalOpen"
       class="customer-admin-modal-backdrop customer-orders-tab__modal-backdrop"
+      :style="{ '--customer-orders-preview-top-offset': `calc(var(--sp-sticky-offset, 6.5rem) + ${ORDER_PREVIEW_TOP_OFFSET}px)` }"
       @click.self="closeOrderDetail"
     >
       <section
@@ -542,13 +634,13 @@ onBeforeUnmount(() => {
             >
               {{ resolveDisplayState(selectedOrderPreview).label }}
             </Tag>
-            <span>{{ t("customerAdmin.orders.rawReleaseState") }}: {{ selectedOrderPreview.release_state }}</span>
+            <span>{{ t("customerAdmin.orders.rawReleaseState") }}: {{ formatReleaseStateLabel(selectedOrderPreview.release_state) }}</span>
           </div>
 
           <dl class="customer-orders-tab__detail-grid">
             <div>
               <dt>{{ t("customerAdmin.orders.detail.customer") }}</dt>
-              <dd>{{ selectedOrderPreview.customer_id }}</dd>
+              <dd>{{ customerDisplayLabel(selectedOrderPreview.customer_id) }}</dd>
             </div>
             <div>
               <dt>{{ t("customerAdmin.orders.detail.serviceFrom") }}</dt>
@@ -560,15 +652,15 @@ onBeforeUnmount(() => {
             </div>
             <div>
               <dt>{{ t("customerAdmin.orders.detail.serviceCategory") }}</dt>
-              <dd>{{ selectedOrderPreview.service_category_code || t("customerAdmin.summary.none") }}</dd>
+              <dd>{{ serviceCategoryDisplayLabel(selectedOrderPreview.service_category_code) }}</dd>
             </div>
             <div>
               <dt>{{ t("customerAdmin.orders.detail.requirementType") }}</dt>
-              <dd>{{ selectedOrderPreview.requirement_type_id || t("customerAdmin.summary.none") }}</dd>
+              <dd>{{ requirementTypeDisplayLabel(selectedOrderPreview.requirement_type_id) }}</dd>
             </div>
             <div>
               <dt>{{ t("customerAdmin.orders.detail.patrolRoute") }}</dt>
-              <dd>{{ selectedOrderPreview.patrol_route_id || t("customerAdmin.summary.none") }}</dd>
+              <dd>{{ patrolRouteDisplayLabel(selectedOrderPreview.patrol_route_id) }}</dd>
             </div>
             <div>
               <dt>{{ t("customerAdmin.orders.detail.createdAt") }}</dt>
@@ -811,8 +903,10 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: 45;
   display: grid;
-  place-items: center;
-  padding: 1rem;
+  align-items: start;
+  justify-items: center;
+  overflow: auto;
+  padding: var(--customer-orders-preview-top-offset, calc(var(--sp-sticky-offset, 6.5rem) + 25px)) 1rem 1rem;
   background: rgb(15 23 42 / 38%);
 }
 
@@ -820,7 +914,7 @@ onBeforeUnmount(() => {
   width: min(100%, 760px);
   display: grid;
   gap: 1rem;
-  max-height: min(90vh, 860px);
+  max-height: calc(100vh - var(--customer-orders-preview-top-offset, calc(var(--sp-sticky-offset, 6.5rem) + 25px)) - 1rem);
   overflow: auto;
   padding: 1.25rem;
   border: 1px solid var(--sp-color-border-soft);
@@ -939,6 +1033,10 @@ onBeforeUnmount(() => {
 
   .customer-orders-tab__modal-header {
     flex-direction: column;
+  }
+
+  .customer-orders-tab__modal-backdrop {
+    padding-top: max(1rem, min(4.5rem, calc(var(--sp-sticky-offset, 6.5rem) * 0.6)));
   }
 }
 </style>

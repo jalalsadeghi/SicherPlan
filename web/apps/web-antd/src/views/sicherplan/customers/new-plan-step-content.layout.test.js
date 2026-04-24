@@ -141,10 +141,13 @@ test("order scope layout keeps action rows spaced and flattens document subsecti
   assert.match(source, /class="sp-customer-plan-wizard-step__document-subsection"/);
   assert.match(source, /class="sp-customer-plan-wizard-step__document-divider" aria-hidden="true"/);
   assert.match(source, /class="sp-customer-plan-wizard-step__list sp-customer-plan-wizard-step__document-list"/);
-  assert.match(source, /class="sp-customer-plan-wizard-step__list-action sp-customer-plan-wizard-step__list-action--compact"/);
-  assert.match(source, /\.sp-customer-plan-wizard-step__document-list \{[\s\S]*margin: 0\.35rem 0 0\.55rem;/);
-  assert.match(source, /\.sp-customer-plan-wizard-step__document-subsection \{[\s\S]*display: grid;[\s\S]*gap: 0\.95rem;/);
-  assert.match(source, /\.sp-customer-plan-wizard-step__document-divider \{[\s\S]*height: 1px;[\s\S]*margin: 0\.45rem 0;[\s\S]*background: var\(--sp-color-border-soft\);/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__list-action sp-customer-plan-wizard-step__list-action--compact sp-customer-plan-wizard-step__list-action--document-remove"/);
+  assert.match(source, /class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static sp-customer-plan-wizard-step__list-row--document"/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__document-list \{[\s\S]*margin: 0\.7rem 0 1rem;/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__document-subsection \{[\s\S]*display: grid;[\s\S]*gap: 1rem;/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__document-divider \{[\s\S]*height: 1px;[\s\S]*margin: 0\.85rem 0 0\.45rem;[\s\S]*background: var\(--sp-color-border-soft\);/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__list-row--document \{[\s\S]*align-items: flex-start;/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__list-action--document-remove \{[\s\S]*min-height: 1\.85rem;[\s\S]*padding: 0\.32rem 0\.6rem;/);
   assert.match(source, /customer-new-plan-order-scope-documents-card[\s\S]*customer-new-plan-order-document-upload-title/);
   assert.doesNotMatch(source, /customer-new-plan-order-document-link-id/);
   const documentsCardSource = source.slice(
@@ -153,7 +156,12 @@ test("order scope layout keeps action rows spaced and flattens document subsecti
   );
   assert.doesNotMatch(documentsCardSource, /class="sp-customer-plan-wizard-step__panel"/);
   assert.doesNotMatch(documentsCardSource, /manualDocumentId/);
-  assert.match(documentsCardSource, /data-testid="customer-new-plan-link-order-document"[\s\S]*data-testid="customer-new-plan-clear-order-document-draft"/);
+  assert.doesNotMatch(documentsCardSource, /documentSummary\(selectedOrderLinkDocument, orderAttachmentLink\.document_id\)/);
+  assert.match(documentsCardSource, /documentCustomerSummary\(selectedOrderLinkDocument\)/);
+  assert.match(documentsCardSource, /data-testid="customer-new-plan-attach-order-document"[\s\S]*v-if="hasOrderDocumentUploadDraftInput\(\)"[\s\S]*data-testid="customer-new-plan-clear-order-document-draft"/);
+  assert.match(documentsCardSource, /data-testid="customer-new-plan-link-order-document"[\s\S]*v-if="hasOrderDocumentLinkDraftInput\(\)"[\s\S]*data-testid="customer-new-plan-clear-order-document-draft"/);
+  assert.doesNotMatch(source, /documentSummary\(document, document\.id\)/);
+  assert.match(source, /documentCustomerSummary\(document\)/);
 });
 
 test("order scope prevents duplicate equipment and requirement selections locally", () => {
@@ -168,6 +176,29 @@ test("order scope prevents duplicate equipment and requirement selections locall
   assert.match(source, /data-testid="customer-new-plan-save-requirement-line"[\s\S]*:disabled="stepLoading \|\| requirementLineDuplicateActive"/);
   assert.match(source, /if \(!equipmentLineDraft\.equipment_item_id \|\| equipmentLineDraft\.required_qty < 1 \|\| equipmentLineDuplicateActive\.value\)/);
   assert.match(source, /requirementLineDuplicateActive\.value[\s\S]*setFeedback\('error', \$t\('sicherplan\.customerPlansWizard\.errors\.requirementLineInvalid'\)\)/);
+});
+
+test("order scope next-validation uses section-aware results, inline field errors, and invalid card styling", () => {
+  assert.match(source, /interface OrderScopeSectionValidationResult/);
+  assert.match(source, /const orderScopeSectionErrors = reactive<Record<OrderScopeSectionId, string>>/);
+  assert.match(source, /const orderScopeFieldErrors = reactive<Record<OrderScopeValidationFieldKey, string>>/);
+  assert.match(source, /function validateEquipmentStep\(\): OrderScopeSectionValidationResult \| null/);
+  assert.match(source, /function validateRequirementStep\(\): OrderScopeSectionValidationResult \| null/);
+  assert.match(source, /function validateDocumentsStep\(\): OrderScopeSectionValidationResult \| null/);
+  assert.match(source, /function applyOrderScopeValidationResults\(results: OrderScopeSectionValidationResult\[\]\)/);
+  assert.match(source, /function revealOrderScopeValidationResult\(result: OrderScopeSectionValidationResult\)/);
+  assert.match(source, /focusOrderScopeValidationTarget\(result\.focusSelector\)/);
+  assert.match(source, /data-testid="customer-new-plan-order-scope-equipment-error"/);
+  assert.match(source, /data-testid="customer-new-plan-order-scope-requirements-error"/);
+  assert.match(source, /data-testid="customer-new-plan-order-scope-documents-error"/);
+  assert.match(source, /data-testid="customer-new-plan-order-document-file-error"/);
+  assert.match(source, /data-testid="customer-new-plan-order-document-selection-error"/);
+  assert.match(source, /field-stack--invalid': Boolean\(orderScopeFieldErrors\.equipmentItem\)/);
+  assert.match(source, /field-stack--invalid': Boolean\(orderScopeFieldErrors\.requirementsType\)/);
+  assert.match(source, /field-stack--invalid': Boolean\(orderScopeFieldErrors\.documentsUploadTitle\)/);
+  assert.match(source, /sp-customer-plan-wizard-step__scope-card--invalid/);
+  assert.match(source, /\.sp-customer-plan-wizard-step__scope-card--invalid \{/);
+  assert.match(source, /\.cta-button--invalid \{/);
 });
 
 test("employee overview uses the same section nav offset and deterministic active-section tracking", () => {

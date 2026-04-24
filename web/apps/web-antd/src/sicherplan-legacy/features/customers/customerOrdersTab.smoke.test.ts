@@ -6,13 +6,24 @@ import { defineComponent } from "vue";
 
 import CustomerOrdersTab from "../../components/customers/CustomerOrdersTab.vue";
 
-const planningOrdersMocks = vi.hoisted(() => ({
-  getCustomerOrderMock: vi.fn(),
-  listCustomerOrdersMock: vi.fn(),
+const customerMocks = vi.hoisted(() => ({
+  listCustomersMock: vi.fn(),
+}));
+
+const planningAdminMocks = vi.hoisted(() => ({
   listPlanningRecordsMock: vi.fn(),
 }));
 
+const planningOrdersMocks = vi.hoisted(() => ({
+  getCustomerOrderMock: vi.fn(),
+  listCustomerOrdersMock: vi.fn(),
+  listServiceCategoryOptionsMock: vi.fn(),
+}));
+
 const translations: Record<string, string> = {
+  "coreAdmin.status.draft": "Draft",
+  "coreAdmin.status.release_ready": "Release ready",
+  "coreAdmin.status.released": "Released",
   "customerAdmin.actions.newOrder": "New order",
   "customerAdmin.filters.search": "Search",
   "customerAdmin.orders.emptyBody": "No matching orders are currently available for this customer.",
@@ -67,7 +78,23 @@ vi.mock("@/api/planningOrders", async () => {
     ...actual,
     getCustomerOrder: planningOrdersMocks.getCustomerOrderMock,
     listCustomerOrders: planningOrdersMocks.listCustomerOrdersMock,
-    listPlanningRecords: planningOrdersMocks.listPlanningRecordsMock,
+    listServiceCategoryOptions: planningOrdersMocks.listServiceCategoryOptionsMock,
+  };
+});
+
+vi.mock("@/api/customers", async () => {
+  const actual = await vi.importActual<typeof import("@/api/customers")>("@/api/customers");
+  return {
+    ...actual,
+    listCustomers: customerMocks.listCustomersMock,
+  };
+});
+
+vi.mock("@/api/planningAdmin", async () => {
+  const actual = await vi.importActual<typeof import("@/api/planningAdmin")>("@/api/planningAdmin");
+  return {
+    ...actual,
+    listPlanningRecords: planningAdminMocks.listPlanningRecordsMock,
   };
 });
 
@@ -141,12 +168,33 @@ function mountComponent(props: Record<string, unknown> = {}) {
 
 describe("CustomerOrdersTab", () => {
   beforeEach(() => {
+    customerMocks.listCustomersMock.mockReset();
+    customerMocks.listCustomersMock.mockResolvedValue([
+      { id: "customer-1", tenant_id: "tenant-1", customer_number: "CU-1001", name: "Nord Security", status: "active", version_no: 1 },
+    ]);
+    planningAdminMocks.listPlanningRecordsMock.mockReset();
+    planningAdminMocks.listPlanningRecordsMock.mockImplementation((entityKey: string) => {
+      if (entityKey === "requirement_type") {
+        return Promise.resolve([
+          { id: "security-service", tenant_id: "tenant-1", customer_id: "customer-1", code: "REQ-1", label: "Object protection", status: "active", version_no: 1 },
+        ]);
+      }
+      if (entityKey === "patrol_route") {
+        return Promise.resolve([
+          { id: "route-1", tenant_id: "tenant-1", customer_id: "customer-1", route_no: "R-7", name: "Night patrol", status: "active", version_no: 1 },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
     planningOrdersMocks.getCustomerOrderMock.mockReset();
     planningOrdersMocks.getCustomerOrderMock.mockResolvedValue(buildOrder());
     planningOrdersMocks.listCustomerOrdersMock.mockReset();
     planningOrdersMocks.listCustomerOrdersMock.mockResolvedValue([]);
-    planningOrdersMocks.listPlanningRecordsMock.mockReset();
-    planningOrdersMocks.listPlanningRecordsMock.mockResolvedValue([]);
+    planningOrdersMocks.listServiceCategoryOptionsMock.mockReset();
+    planningOrdersMocks.listServiceCategoryOptionsMock.mockResolvedValue([
+      { code: "guarding", label: "Guarding", description: null, sort_order: 1 },
+      { code: "event_security", label: "Event security", description: null, sort_order: 2 },
+    ]);
   });
 
   afterEach(() => {
@@ -214,7 +262,18 @@ describe("CustomerOrdersTab", () => {
         search: "Alpha",
       }),
     );
-    expect(planningOrdersMocks.listPlanningRecordsMock).not.toHaveBeenCalled();
+    expect(planningAdminMocks.listPlanningRecordsMock).toHaveBeenCalledWith(
+      "requirement_type",
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({ customer_id: "customer-1" }),
+    );
+    expect(planningAdminMocks.listPlanningRecordsMock).toHaveBeenCalledWith(
+      "patrol_route",
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({ customer_id: "customer-1" }),
+    );
     vi.useRealTimers();
   });
 
@@ -276,10 +335,20 @@ describe("CustomerOrdersTab", () => {
 
     expect(planningOrdersMocks.getCustomerOrderMock).toHaveBeenCalledWith("tenant-1", "order-preview-1", "token-1");
     const modal = wrapper.get('[data-testid="customer-orders-detail-modal"]');
+    const backdrop = wrapper.get(".customer-orders-tab__modal-backdrop");
     expect(modal.attributes("role")).toBe("dialog");
     expect(modal.attributes("aria-modal")).toBe("true");
+    expect(backdrop.attributes("style")).toContain("--customer-orders-preview-top-offset");
     expect(modal.text()).toContain("Museum night guarding");
     expect(modal.text()).toContain("O-2042");
+    expect(modal.text()).toContain("CU-1001 — Nord Security");
+    expect(modal.text()).toContain("Guarding");
+    expect(modal.text()).toContain("REQ-1 — Object protection");
+    expect(modal.text()).toContain("customerAdmin.summary.none");
+    expect(modal.text()).toContain("Release state: Released");
+    expect(modal.text()).not.toContain("customer-1");
+    expect(modal.text()).not.toContain("security-service");
+    expect(modal.text()).not.toContain("Release state: released");
     expect(modal.text()).toContain("Guard the museum gates.");
     expect(modal.text()).toContain("Use north entrance.");
     expect(modal.text()).toContain("Security concept PDF");
@@ -324,6 +393,41 @@ describe("CustomerOrdersTab", () => {
 
     expect(wrapper.get('[data-testid="customer-orders-detail-error"]').text()).toContain("Order details unavailable");
     expect(wrapper.get('[data-testid="customer-orders-detail-error"]').text()).toContain("Order details could not be loaded.");
+  });
+
+  it("renders readable labels for customer, service category, requirement type, and patrol route in the detail modal", async () => {
+    planningOrdersMocks.listCustomerOrdersMock.mockResolvedValue([
+      buildOrder({ id: "order-readable-1", order_no: "O-3001", title: "Readable order" }),
+    ]);
+    planningOrdersMocks.getCustomerOrderMock.mockResolvedValue(
+      buildOrder({
+        id: "order-readable-1",
+        customer_id: "customer-1",
+        order_no: "O-3001",
+        patrol_route_id: "route-1",
+        requirement_type_id: "security-service",
+        service_category_code: "event_security",
+        title: "Readable order",
+      }),
+    );
+
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-orders-card-open"]').trigger("click");
+    await flushPromises();
+
+    const modal = wrapper.get('[data-testid="customer-orders-detail-modal"]');
+    expect(modal.text()).toContain("CU-1001 — Nord Security");
+    expect(modal.text()).toContain("Event security");
+    expect(modal.text()).toContain("REQ-1 — Object protection");
+    expect(modal.text()).toContain("R-7 — Night patrol");
+    expect(modal.text()).toContain("Release state: Released");
+    expect(modal.text()).not.toContain("customer-1");
+    expect(modal.text()).not.toContain("event_security");
+    expect(modal.text()).not.toContain("security-service");
+    expect(modal.text()).not.toContain("route-1");
+    expect(modal.text()).not.toContain("Release state: released");
   });
 
   it("emits edit-order from the explicit Edit button without opening the preview modal", async () => {

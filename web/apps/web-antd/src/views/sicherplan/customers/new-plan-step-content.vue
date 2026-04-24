@@ -125,7 +125,24 @@ type PlanningEntityType = 'event_venue' | 'patrol_route' | 'site' | 'trade_fair'
 type PlanningSelectionMode = 'create_new' | 'use_existing';
 type OrderSelectionMode = 'create_new' | 'use_existing';
 type OrderScopeSectionId = 'documents' | 'equipment' | 'requirements';
+type OrderScopeValidationFieldKey =
+  | 'documentsLinkAction'
+  | 'documentsLinkSelection'
+  | 'documentsUploadAction'
+  | 'documentsUploadFile'
+  | 'documentsUploadTitle'
+  | 'equipmentAction'
+  | 'equipmentItem'
+  | 'requirementsAction'
+  | 'requirementsType';
 type DocumentPickerTarget = 'order' | 'planning-record';
+
+interface OrderScopeSectionValidationResult {
+  fieldErrors?: Partial<Record<OrderScopeValidationFieldKey, string>>;
+  focusSelector?: string;
+  message: string;
+  sectionId: OrderScopeSectionId;
+}
 interface ShiftPlanDraftPersistence {
   draft: Partial<typeof shiftPlanDraft>;
   selected_shift_plan_id: string;
@@ -222,6 +239,22 @@ const orderAttachmentDraft = reactive({
 const orderAttachmentLink = reactive({
   document_id: '',
   label: '',
+});
+const orderScopeSectionErrors = reactive<Record<OrderScopeSectionId, string>>({
+  documents: '',
+  equipment: '',
+  requirements: '',
+});
+const orderScopeFieldErrors = reactive<Record<OrderScopeValidationFieldKey, string>>({
+  documentsLinkAction: '',
+  documentsLinkSelection: '',
+  documentsUploadAction: '',
+  documentsUploadFile: '',
+  documentsUploadTitle: '',
+  equipmentAction: '',
+  equipmentItem: '',
+  requirementsAction: '',
+  requirementsType: '',
 });
 
 const planningRecordDraft = reactive({
@@ -827,6 +860,11 @@ const orderScopeSections = computed(() => [
     testId: 'customer-order-scope-nav-link-documents',
   },
 ]);
+const ORDER_SCOPE_FIELD_KEYS_BY_SECTION: Record<OrderScopeSectionId, OrderScopeValidationFieldKey[]> = {
+  documents: ['documentsUploadTitle', 'documentsUploadFile', 'documentsUploadAction', 'documentsLinkSelection', 'documentsLinkAction'],
+  equipment: ['equipmentItem', 'equipmentAction'],
+  requirements: ['requirementsType', 'requirementsAction'],
+};
 const stepRefreshContextKey = computed(() =>
   JSON.stringify({
     currentStepId: props.currentStepId,
@@ -900,6 +938,64 @@ function scrollToOrderScopeSection(sectionId: OrderScopeSectionId) {
     sectionElement?.scrollIntoView({
       behavior: 'smooth',
       block: 'start',
+    });
+  });
+}
+
+function clearOrderScopeValidationSection(sectionId: OrderScopeSectionId) {
+  orderScopeSectionErrors[sectionId] = '';
+  ORDER_SCOPE_FIELD_KEYS_BY_SECTION[sectionId].forEach((key) => {
+    orderScopeFieldErrors[key] = '';
+  });
+}
+
+function clearOrderScopeValidationState() {
+  clearOrderScopeValidationSection('equipment');
+  clearOrderScopeValidationSection('requirements');
+  clearOrderScopeValidationSection('documents');
+}
+
+function orderScopeSectionTitle(sectionId: OrderScopeSectionId) {
+  switch (sectionId) {
+    case 'equipment':
+      return $t('sicherplan.customerPlansWizard.orderScope.equipmentTitle');
+    case 'requirements':
+      return $t('sicherplan.customerPlansWizard.orderScope.requirementsTitle');
+    case 'documents':
+      return $t('sicherplan.customerPlansWizard.orderScope.documentsTitle');
+  }
+}
+
+function formatOrderScopeSectionMessage(sectionId: OrderScopeSectionId, errorKey: string) {
+  return `${orderScopeSectionTitle(sectionId)}: ${$t(errorKey as never)}`;
+}
+
+function resolveOrderScopeValidationTarget(selector?: string) {
+  if (!selector) {
+    return null;
+  }
+  return orderScopeOnePageRef.value?.querySelector<HTMLElement>(selector) ?? document.querySelector<HTMLElement>(selector);
+}
+
+function focusOrderScopeValidationTarget(selector?: string) {
+  void nextTick(() => {
+    resolveOrderScopeValidationTarget(selector)?.focus?.();
+  });
+}
+
+function revealOrderScopeValidationResult(result: OrderScopeSectionValidationResult) {
+  activeOrderScopeSection.value = result.sectionId;
+  suppressOrderScopeScrollSpy();
+  scrollToOrderScopeSection(result.sectionId);
+  focusOrderScopeValidationTarget(result.focusSelector);
+}
+
+function applyOrderScopeValidationResults(results: OrderScopeSectionValidationResult[]) {
+  clearOrderScopeValidationState();
+  results.forEach((result) => {
+    orderScopeSectionErrors[result.sectionId] = result.message;
+    Object.entries(result.fieldErrors ?? {}).forEach(([key, value]) => {
+      orderScopeFieldErrors[key as OrderScopeValidationFieldKey] = value;
     });
   });
 }
@@ -1337,18 +1433,31 @@ function buildDraftContext(): CustomerNewPlanWizardDraftContext | null {
   };
 }
 
-function buildStepExternalContextKey() {
+function buildStepExternalContextKey(
+  overrides: Partial<{
+    currentStepId: CustomerNewPlanWizardStepId;
+    customerId: string;
+    orderId: string;
+    planningEntityId: string;
+    planningEntityType: string;
+    planningModeCode: string;
+    planningRecordId: string;
+    shiftPlanId: string;
+    seriesId: string;
+    tenantId: string;
+  }> = {},
+) {
   return JSON.stringify({
-    currentStepId: props.currentStepId,
-    customerId: props.customer.id,
-    orderId: props.wizardState.order_id,
-    planningEntityId: props.wizardState.planning_entity_id,
-    planningEntityType: props.wizardState.planning_entity_type,
-    planningModeCode: props.wizardState.planning_mode_code,
-    planningRecordId: props.wizardState.planning_record_id,
-    shiftPlanId: props.wizardState.shift_plan_id,
-    seriesId: props.wizardState.series_id,
-    tenantId: props.tenantId,
+    currentStepId: overrides.currentStepId ?? props.currentStepId,
+    customerId: overrides.customerId ?? props.customer.id,
+    orderId: overrides.orderId ?? props.wizardState.order_id,
+    planningEntityId: overrides.planningEntityId ?? props.wizardState.planning_entity_id,
+    planningEntityType: overrides.planningEntityType ?? props.wizardState.planning_entity_type,
+    planningModeCode: overrides.planningModeCode ?? props.wizardState.planning_mode_code,
+    planningRecordId: overrides.planningRecordId ?? props.wizardState.planning_record_id,
+    shiftPlanId: overrides.shiftPlanId ?? props.wizardState.shift_plan_id,
+    seriesId: overrides.seriesId ?? props.wizardState.series_id,
+    tenantId: overrides.tenantId ?? props.tenantId,
   });
 }
 
@@ -3149,6 +3258,13 @@ async function hydrateExistingPlanningRecordSelection(planningRecordId: string) 
   if (!props.tenantId || !props.accessToken || !planningRecordId) {
     return;
   }
+  if (
+    selectedExistingPlanningRecordId.value === planningRecordId &&
+    committedPlanningRecordId.value === planningRecordId &&
+    !planningRecordDirty.value
+  ) {
+    return;
+  }
   selectedExistingPlanningRecordId.value = planningRecordId;
   committedPlanningRecordId.value = planningRecordId;
   const loadVersions = beginStepLoads('planningRecordDetail');
@@ -3174,6 +3290,14 @@ async function hydrateExistingPlanningRecordSelection(planningRecordId: string) 
     } else {
       await refreshTradeFairZoneOptions('');
     }
+    lastLoadedStepContextKey = buildStepExternalContextKey({
+      planningEntityId: planningEntityIdForRecord(record),
+      planningEntityType: planningFamilyForRecord(record),
+      planningModeCode: record.planning_mode_code,
+      planningRecordId: record.id,
+      shiftPlanId: '',
+      seriesId: '',
+    });
     setFeedback('success', $t('sicherplan.customerPlansWizard.messages.planningRecordSelected'));
     committedPlanningRecordId.value = record.id;
     emit('saved-context', {
@@ -3617,10 +3741,7 @@ function beginStepLoads(...keys: StepLoadKey[]) {
   return versions;
 }
 
-function finishStepLoads(versions: Map<StepLoadKey, number>, isCurrent = () => true) {
-  if (!isCurrent()) {
-    return;
-  }
+function finishStepLoads(versions: Map<StepLoadKey, number>, _isCurrent = () => true) {
   for (const [key, version] of versions) {
     if (stepLoadRequestVersion[key] === version) {
       stepLoadState[key] = false;
@@ -4637,43 +4758,66 @@ async function updateExistingOrder() {
   }
 }
 
-async function submitEquipmentStep() {
+function validateEquipmentStep(): OrderScopeSectionValidationResult | null {
   if (hasEquipmentLineDraftInput()) {
-    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.saveCurrentEquipmentLineBeforeContinue'));
-    emit('step-completion', 'order-scope-documents', false);
-    return false;
+    return {
+      fieldErrors: {
+        equipmentAction: formatOrderScopeSectionMessage('equipment', 'sicherplan.customerPlansWizard.errors.saveCurrentEquipmentLineBeforeContinue'),
+      },
+      focusSelector: selectedEquipmentLineId.value
+        ? '[data-testid="customer-new-plan-update-equipment-line"]'
+        : '[data-testid="customer-new-plan-save-equipment-line"]',
+      message: formatOrderScopeSectionMessage('equipment', 'sicherplan.customerPlansWizard.errors.saveCurrentEquipmentLineBeforeContinue'),
+      sectionId: 'equipment',
+    };
   }
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
-    return false;
+    return null;
   }
   if (!orderEquipmentLines.value.length) {
-    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.equipmentLineRequiredBeforeContinue'));
-    emit('step-completion', 'order-scope-documents', false);
-    return false;
+    return {
+      fieldErrors: {
+        equipmentItem: $t('sicherplan.customerPlansWizard.errors.equipmentLineRequiredBeforeContinue'),
+      },
+      focusSelector: '[data-testid="customer-new-plan-equipment-item"]',
+      message: formatOrderScopeSectionMessage('equipment', 'sicherplan.customerPlansWizard.errors.equipmentLineRequiredBeforeContinue'),
+      sectionId: 'equipment',
+    };
   }
-  emit('step-completion', 'order-scope-documents', true);
-  return true;
+  return null;
 }
 
-async function submitRequirementStep() {
+function validateRequirementStep(): OrderScopeSectionValidationResult | null {
   if (hasRequirementLineDraftInput()) {
-    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.saveCurrentRequirementLineBeforeContinue'));
-    emit('step-completion', 'order-scope-documents', false);
-    return false;
+    return {
+      fieldErrors: {
+        requirementsAction: formatOrderScopeSectionMessage('requirements', 'sicherplan.customerPlansWizard.errors.saveCurrentRequirementLineBeforeContinue'),
+      },
+      focusSelector: selectedRequirementLineId.value
+        ? '[data-testid="customer-new-plan-update-requirement-line"]'
+        : '[data-testid="customer-new-plan-save-requirement-line"]',
+      message: formatOrderScopeSectionMessage('requirements', 'sicherplan.customerPlansWizard.errors.saveCurrentRequirementLineBeforeContinue'),
+      sectionId: 'requirements',
+    };
   }
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
-    return false;
+    return null;
   }
   if (!orderRequirementLines.value.length) {
-    setFeedback('error', $t('sicherplan.customerPlansWizard.errors.requirementLineRequiredBeforeContinue'));
-    emit('step-completion', 'order-scope-documents', false);
-    return false;
+    return {
+      fieldErrors: {
+        requirementsType: $t('sicherplan.customerPlansWizard.errors.requirementLineRequiredBeforeContinue'),
+      },
+      focusSelector: '[data-testid="customer-new-plan-requirement-type"]',
+      message: formatOrderScopeSectionMessage('requirements', 'sicherplan.customerPlansWizard.errors.requirementLineRequiredBeforeContinue'),
+      sectionId: 'requirements',
+    };
   }
-  emit('step-completion', 'order-scope-documents', true);
-  return true;
+  return null;
 }
 
 function clearEquipmentLineDraftState() {
+  clearOrderScopeValidationSection('equipment');
   withDraftSyncPaused(() => {
     resetEquipmentLineDraft();
   });
@@ -4684,6 +4828,7 @@ function clearEquipmentLineDraftState() {
 }
 
 function clearRequirementLineDraftState() {
+  clearOrderScopeValidationSection('requirements');
   withDraftSyncPaused(() => {
     resetRequirementLineDraft();
   });
@@ -4694,6 +4839,7 @@ function clearRequirementLineDraftState() {
 }
 
 function clearOrderDocumentDraftState() {
+  clearOrderScopeValidationSection('documents');
   withDraftSyncPaused(() => {
     resetOrderAttachmentDraft();
   });
@@ -4731,6 +4877,71 @@ function clearPlanningRecordDraftState() {
   emit('step-ui-state', 'planning-record-overview', { dirty: false, error: '' });
 }
 
+function validateDocumentsStep(): OrderScopeSectionValidationResult | null {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.order_id || !hasAnyOrderDocumentDraftInput()) {
+    return null;
+  }
+
+  const uploadDraftActive = hasOrderDocumentUploadDraftInput();
+  const uploadDraftComplete = hasCompleteOrderDocumentUploadDraft();
+  const linkDraftActive = hasOrderDocumentLinkDraftInput();
+  const linkDraftComplete = hasCompleteOrderDocumentLinkDraft();
+  const fieldErrors: Partial<Record<OrderScopeValidationFieldKey, string>> = {};
+  let focusSelector = '';
+  let messageKey = '';
+
+  if (uploadDraftActive && !orderAttachmentDraft.title.trim()) {
+    fieldErrors.documentsUploadTitle = $t('sicherplan.customerPlansWizard.errors.documentTitleRequired');
+    focusSelector = '[data-testid="customer-new-plan-order-document-upload-title"]';
+    messageKey ||= 'sicherplan.customerPlansWizard.errors.completeCurrentOrderDocumentDraftBeforeContinue';
+  }
+
+  if (uploadDraftActive && !(orderAttachmentDraft.content_base64 && orderAttachmentDraft.file_name)) {
+    fieldErrors.documentsUploadFile = $t('sicherplan.customerPlansWizard.errors.documentFileRequired');
+    focusSelector ||= '[data-testid="customer-new-plan-order-document-file"]';
+    messageKey ||= 'sicherplan.customerPlansWizard.errors.completeCurrentOrderDocumentDraftBeforeContinue';
+  }
+
+  if (linkDraftActive && !orderAttachmentLink.document_id.trim()) {
+    fieldErrors.documentsLinkSelection = $t('sicherplan.customerPlansWizard.errors.existingDocumentSelectionRequired');
+    focusSelector ||= '[data-testid="customer-new-plan-order-document-picker-open"]';
+    messageKey ||= 'sicherplan.customerPlansWizard.errors.completeCurrentOrderDocumentDraftBeforeContinue';
+  }
+
+  if (uploadDraftActive && uploadDraftComplete) {
+    fieldErrors.documentsUploadAction = formatOrderScopeSectionMessage(
+      'documents',
+      'sicherplan.customerPlansWizard.errors.attachOrClearCurrentOrderDocumentBeforeContinue',
+    );
+    focusSelector ||= '[data-testid="customer-new-plan-attach-order-document"]';
+    messageKey ||= 'sicherplan.customerPlansWizard.errors.attachOrClearCurrentOrderDocumentBeforeContinue';
+  }
+
+  if (linkDraftActive && linkDraftComplete) {
+    fieldErrors.documentsLinkAction = formatOrderScopeSectionMessage(
+      'documents',
+      'sicherplan.customerPlansWizard.errors.linkOrClearCurrentOrderDocumentBeforeContinue',
+    );
+    focusSelector ||= '[data-testid="customer-new-plan-link-order-document"]';
+    messageKey ||= 'sicherplan.customerPlansWizard.errors.linkOrClearCurrentOrderDocumentBeforeContinue';
+  }
+
+  if (uploadDraftActive && linkDraftActive) {
+    messageKey = 'sicherplan.customerPlansWizard.errors.completeCurrentOrderDocumentDraftBeforeContinue';
+  }
+
+  if (!messageKey) {
+    return null;
+  }
+
+  return {
+    fieldErrors,
+    focusSelector,
+    message: formatOrderScopeSectionMessage('documents', messageKey),
+    sectionId: 'documents',
+  };
+}
+
 async function saveEquipmentLineDraft() {
   if (!props.tenantId || !props.accessToken || !props.wizardState.order_id) {
     return false;
@@ -4760,6 +4971,7 @@ async function saveEquipmentLineDraft() {
       });
     }
     orderEquipmentLines.value = await listOrderEquipmentLines(props.tenantId, props.wizardState.order_id, props.accessToken);
+    clearOrderScopeValidationSection('equipment');
     clearEquipmentLineDraftState();
     setFeedback(
       'success',
@@ -4796,6 +5008,7 @@ async function deleteEquipmentLine(line: OrderEquipmentLineRead) {
   try {
     await deleteOrderEquipmentLine(props.tenantId, props.wizardState.order_id, line.id, props.accessToken);
     orderEquipmentLines.value = await listOrderEquipmentLines(props.tenantId, props.wizardState.order_id, props.accessToken);
+    clearOrderScopeValidationSection('equipment');
     if (selectedEquipmentLineId.value === line.id) {
       clearEquipmentLineDraftState();
     } else {
@@ -4853,6 +5066,7 @@ async function saveRequirementLineDraft() {
       });
     }
     orderRequirementLines.value = await listOrderRequirementLines(props.tenantId, props.wizardState.order_id, props.accessToken);
+    clearOrderScopeValidationSection('requirements');
     clearRequirementLineDraftState();
     setFeedback(
       'success',
@@ -4885,6 +5099,7 @@ async function deleteRequirementLine(line: OrderRequirementLineRead) {
   try {
     await deleteOrderRequirementLine(props.tenantId, props.wizardState.order_id, line.id, props.accessToken);
     orderRequirementLines.value = await listOrderRequirementLines(props.tenantId, props.wizardState.order_id, props.accessToken);
+    clearOrderScopeValidationSection('requirements');
     if (selectedRequirementLineId.value === line.id) {
       clearRequirementLineDraftState();
     } else {
@@ -4937,22 +5152,27 @@ async function submitDocumentsStep() {
 }
 
 async function submitOrderScopeDocumentsStep(): Promise<CustomerNewPlanStepSubmitResult> {
-  const equipmentValid = await submitEquipmentStep();
-  if (!equipmentValid) {
+  const validationResults = [
+    validateEquipmentStep(),
+    validateRequirementStep(),
+    validateDocumentsStep(),
+  ].filter((result): result is OrderScopeSectionValidationResult => !!result);
+
+  if (validationResults.length) {
+    applyOrderScopeValidationResults(validationResults);
+    revealOrderScopeValidationResult(validationResults[0]);
+    setFeedback('error', validationResults[0].message);
+    emit('step-completion', 'order-scope-documents', false);
+    emit('step-ui-state', 'order-scope-documents', { dirty: true, error: 'validation_failed' });
     return {
       success: false,
       completedStepId: 'order-scope-documents',
       dirty: true,
+      error: 'validation_failed',
     };
   }
-  const requirementsValid = await submitRequirementStep();
-  if (!requirementsValid) {
-    return {
-      success: false,
-      completedStepId: 'order-scope-documents',
-      dirty: true,
-    };
-  }
+
+  clearOrderScopeValidationState();
   const documentsValid = await submitDocumentsStep();
   if (!documentsValid) {
     return {
@@ -4987,16 +5207,14 @@ function latestFileName(document: PlanningDocumentRead) {
   return versions[versions.length - 1]?.file_name || document.source_label || '';
 }
 
-function documentSummary(document: PlanningDocumentRead | null, fallbackId = '') {
+function documentCustomerSummary(document: PlanningDocumentRead | null) {
   if (!document) {
-    return fallbackId;
+    return '';
   }
-  const typeLabel = documentTypeLabel(document);
-  const fileName = latestFileName(document);
+  const sourceLabel = document.source_label?.trim() || '';
   return [
     document.title,
-    typeLabel,
-    fileName && fileName !== document.title ? fileName : '',
+    sourceLabel && sourceLabel !== document.title ? sourceLabel : '',
     document.current_version_no ? `v${document.current_version_no}` : '',
     document.status,
   ]
@@ -5013,11 +5231,9 @@ function planningRecordAttachmentDisplayTitle(document: PlanningDocumentRead) {
 }
 
 function documentRowMetadata(document: PlanningDocumentRead) {
-  const typeLabel = documentTypeLabel(document);
-  const fileName = latestFileName(document);
+  const sourceLabel = document.source_label?.trim() || '';
   return [
-    typeLabel,
-    fileName && fileName !== document.title ? fileName : '',
+    sourceLabel && sourceLabel !== document.title ? sourceLabel : '',
     document.current_version_no ? `v${document.current_version_no}` : '',
     document.status,
   ]
@@ -5076,6 +5292,7 @@ function selectDocumentForLink(document: PlanningDocumentRead) {
 }
 
 function clearSelectedOrderLinkDocument() {
+  clearOrderScopeValidationSection('documents');
   orderAttachmentLink.document_id = '';
   selectedOrderLinkDocument.value = null;
 }
@@ -5106,6 +5323,7 @@ async function attachUploadedOrderDocument() {
       title: orderAttachmentDraft.title.trim(),
     });
     orderAttachments.value = await listOrderAttachments(props.tenantId, props.wizardState.order_id, props.accessToken);
+    clearOrderScopeValidationSection('documents');
     withDraftSyncPaused(() => {
       resetOrderAttachmentDraft();
     });
@@ -5143,6 +5361,7 @@ async function linkExistingOrderDocument() {
       tenant_id: props.tenantId,
     });
     orderAttachments.value = await listOrderAttachments(props.tenantId, props.wizardState.order_id, props.accessToken);
+    clearOrderScopeValidationSection('documents');
     withDraftSyncPaused(() => {
       resetOrderAttachmentDraft();
     });
@@ -5259,6 +5478,7 @@ async function unlinkOrderDocument(documentId: string) {
   try {
     await unlinkOrderAttachment(props.tenantId, props.wizardState.order_id, documentId, props.accessToken);
     orderAttachments.value = await listOrderAttachments(props.tenantId, props.wizardState.order_id, props.accessToken);
+    clearOrderScopeValidationSection('documents');
     setFeedback('success', $t('sicherplan.customerPlansWizard.messages.orderDocumentUnlinked'));
     emit('step-ui-state', 'order-scope-documents', { dirty: false, error: '' });
     return true;
@@ -5973,6 +6193,40 @@ defineExpose({
   submitCurrentStep,
 });
 
+watch(
+  () => [equipmentLineDraft.equipment_item_id, equipmentLineDraft.required_qty, selectedEquipmentLineId.value, orderEquipmentLines.value.length],
+  () => {
+    clearOrderScopeValidationSection('equipment');
+  },
+);
+
+watch(
+  () => [
+    requirementLineDraft.requirement_type_id,
+    requirementLineDraft.min_qty,
+    requirementLineDraft.target_qty,
+    selectedRequirementLineId.value,
+    orderRequirementLines.value.length,
+  ],
+  () => {
+    clearOrderScopeValidationSection('requirements');
+  },
+);
+
+watch(
+  () => [
+    orderAttachmentDraft.title,
+    orderAttachmentDraft.file_name,
+    orderAttachmentDraft.content_base64,
+    orderAttachmentLink.document_id,
+    orderAttachmentLink.label,
+    orderAttachments.value.length,
+  ],
+  () => {
+    clearOrderScopeValidationSection('documents');
+  },
+);
+
 watch(planningFamily, async () => {
   if (draftSyncPaused.value || planningContextHydrationPaused.value || stepLoading.value) {
     return;
@@ -6651,12 +6905,20 @@ onBeforeUnmount(() => {
       <section
         id="customer-order-scope-section-equipment"
         class="sp-customer-plan-wizard-step__scope-card"
+        :class="{ 'sp-customer-plan-wizard-step__scope-card--invalid': Boolean(orderScopeSectionErrors.equipment) }"
         data-testid="customer-new-plan-order-scope-equipment-card"
       >
         <div data-testid="customer-new-plan-step-panel-equipment-lines">
           <header class="sp-customer-plan-wizard-step__scope-card-header">
             <h4>{{ $t('sicherplan.customerPlansWizard.orderScope.equipmentTitle') }}</h4>
           </header>
+      <p
+        v-if="orderScopeSectionErrors.equipment"
+        class="field-error sp-customer-plan-wizard-step__section-error"
+        data-testid="customer-new-plan-order-scope-equipment-error"
+      >
+        {{ orderScopeSectionErrors.equipment }}
+      </p>
       <div class="sp-customer-plan-wizard-step__scope-subsection">
         <div class="cta-row sp-customer-plan-wizard-step__scope-action-row">
           <button
@@ -6709,14 +6971,18 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
-      <div class="sp-customer-plan-wizard-step__scope-editor">
+      <div
+        class="sp-customer-plan-wizard-step__scope-editor"
+        :class="{ 'sp-customer-plan-wizard-step__scope-editor--invalid': Boolean(orderScopeSectionErrors.equipment) }"
+      >
         <div class="sp-customer-plan-wizard-step__grid">
-          <label class="field-stack">
+          <label class="field-stack" :class="{ 'field-stack--invalid': Boolean(orderScopeFieldErrors.equipmentItem) }">
             <span>{{ $t('sicherplan.customerPlansWizard.forms.equipmentItem') }}</span>
             <select
               v-model="equipmentLineDraft.equipment_item_id"
               data-testid="customer-new-plan-equipment-item"
               :disabled="equipmentItemsExhausted"
+              :aria-invalid="Boolean(orderScopeFieldErrors.equipmentItem)"
             >
               <option value="">{{ $t('sicherplan.customerPlansWizard.forms.equipmentItemPlaceholder') }}</option>
               <option v-for="option in availableEquipmentItemSelectOptions" :key="option.value" :value="option.value">
@@ -6737,6 +7003,9 @@ onBeforeUnmount(() => {
             >
               {{ $t('sicherplan.customerPlansWizard.errors.equipmentLineDuplicate') }}
             </span>
+            <p v-if="orderScopeFieldErrors.equipmentItem" class="field-error" data-testid="customer-new-plan-equipment-item-error">
+              {{ orderScopeFieldErrors.equipmentItem }}
+            </p>
           </label>
           <label class="field-stack">
             <span>{{ $t('sicherplan.customerPlansWizard.forms.requiredQty') }}</span>
@@ -6750,11 +7019,15 @@ onBeforeUnmount(() => {
         <p v-if="selectedEquipmentLineId" class="field-help" data-testid="customer-new-plan-equipment-editing">
           {{ $t('sicherplan.customerPlansWizard.forms.editingEquipmentLine') }}
         </p>
+        <p v-if="orderScopeFieldErrors.equipmentAction" class="field-error" data-testid="customer-new-plan-equipment-action-error">
+          {{ orderScopeFieldErrors.equipmentAction }}
+        </p>
         <div class="cta-row">
           <button
             v-if="selectedEquipmentLineId"
             type="button"
             class="cta-button"
+            :class="{ 'cta-button--invalid': Boolean(orderScopeFieldErrors.equipmentAction) }"
             data-testid="customer-new-plan-update-equipment-line"
             :disabled="stepLoading || equipmentLineDuplicateActive"
             @click="void saveEquipmentLineDraft()"
@@ -6765,6 +7038,7 @@ onBeforeUnmount(() => {
             v-else
             type="button"
             class="cta-button"
+            :class="{ 'cta-button--invalid': Boolean(orderScopeFieldErrors.equipmentAction) }"
             data-testid="customer-new-plan-save-equipment-line"
             :disabled="stepLoading || equipmentLineDuplicateActive"
             @click="void saveEquipmentLineDraft()"
@@ -6788,12 +7062,20 @@ onBeforeUnmount(() => {
       <section
         id="customer-order-scope-section-requirements"
         class="sp-customer-plan-wizard-step__scope-card"
+        :class="{ 'sp-customer-plan-wizard-step__scope-card--invalid': Boolean(orderScopeSectionErrors.requirements) }"
         data-testid="customer-new-plan-order-scope-requirements-card"
       >
         <div data-testid="customer-new-plan-step-panel-requirement-lines">
           <header class="sp-customer-plan-wizard-step__scope-card-header">
             <h4>{{ $t('sicherplan.customerPlansWizard.orderScope.requirementsTitle') }}</h4>
           </header>
+      <p
+        v-if="orderScopeSectionErrors.requirements"
+        class="field-error sp-customer-plan-wizard-step__section-error"
+        data-testid="customer-new-plan-order-scope-requirements-error"
+      >
+        {{ orderScopeSectionErrors.requirements }}
+      </p>
       <div class="sp-customer-plan-wizard-step__scope-subsection">
         <div class="cta-row sp-customer-plan-wizard-step__scope-action-row">
           <button
@@ -6846,16 +7128,26 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
-      <div class="sp-customer-plan-wizard-step__scope-editor">
+      <div
+        class="sp-customer-plan-wizard-step__scope-editor"
+        :class="{ 'sp-customer-plan-wizard-step__scope-editor--invalid': Boolean(orderScopeSectionErrors.requirements) }"
+      >
         <div class="sp-customer-plan-wizard-step__grid">
-          <label class="field-stack">
+          <label class="field-stack" :class="{ 'field-stack--invalid': Boolean(orderScopeFieldErrors.requirementsType) }">
             <span>{{ $t('sicherplan.customerPlansWizard.forms.requirementType') }}</span>
-            <select v-model="requirementLineDraft.requirement_type_id" data-testid="customer-new-plan-requirement-type">
+            <select
+              v-model="requirementLineDraft.requirement_type_id"
+              data-testid="customer-new-plan-requirement-type"
+              :aria-invalid="Boolean(orderScopeFieldErrors.requirementsType)"
+            >
               <option value="">{{ $t('sicherplan.customerPlansWizard.forms.requirementTypePlaceholder') }}</option>
               <option v-for="option in requirementTypeSelectOptions" :key="option.value" :value="option.value">
                 {{ option.label }}
               </option>
             </select>
+            <p v-if="orderScopeFieldErrors.requirementsType" class="field-error" data-testid="customer-new-plan-requirement-type-error">
+              {{ orderScopeFieldErrors.requirementsType }}
+            </p>
           </label>
           <label class="field-stack">
             <span>{{ $t('sicherplan.customerPlansWizard.forms.functionType') }}</span>
@@ -6898,11 +7190,15 @@ onBeforeUnmount(() => {
         >
           {{ $t('sicherplan.customerPlansWizard.errors.requirementLineDuplicate') }}
         </p>
+        <p v-if="orderScopeFieldErrors.requirementsAction" class="field-error" data-testid="customer-new-plan-requirement-action-error">
+          {{ orderScopeFieldErrors.requirementsAction }}
+        </p>
         <div class="cta-row">
           <button
             v-if="selectedRequirementLineId"
             type="button"
             class="cta-button"
+            :class="{ 'cta-button--invalid': Boolean(orderScopeFieldErrors.requirementsAction) }"
             data-testid="customer-new-plan-update-requirement-line"
             :disabled="stepLoading || requirementLineDuplicateActive"
             @click="void saveRequirementLineDraft()"
@@ -6913,6 +7209,7 @@ onBeforeUnmount(() => {
             v-else
             type="button"
             class="cta-button"
+            :class="{ 'cta-button--invalid': Boolean(orderScopeFieldErrors.requirementsAction) }"
             data-testid="customer-new-plan-save-requirement-line"
             :disabled="stepLoading || requirementLineDuplicateActive"
             @click="void saveRequirementLineDraft()"
@@ -6936,12 +7233,20 @@ onBeforeUnmount(() => {
       <section
         id="customer-order-scope-section-documents"
         class="sp-customer-plan-wizard-step__scope-card"
+        :class="{ 'sp-customer-plan-wizard-step__scope-card--invalid': Boolean(orderScopeSectionErrors.documents) }"
         data-testid="customer-new-plan-order-scope-documents-card"
       >
         <div class="sp-customer-plan-wizard-step__documents-panel" data-testid="customer-new-plan-step-panel-order-documents">
       <header class="sp-customer-plan-wizard-step__scope-card-header">
         <h4>{{ $t('sicherplan.customerPlansWizard.orderScope.documentsTitle') }}</h4>
       </header>
+      <p
+        v-if="orderScopeSectionErrors.documents"
+        class="field-error sp-customer-plan-wizard-step__section-error"
+        data-testid="customer-new-plan-order-scope-documents-error"
+      >
+        {{ orderScopeSectionErrors.documents }}
+      </p>
       <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.orderDocumentsOptional') }}</p>
       <LocalLoadingIndicator
         v-if="stepLoadState.orderDocuments"
@@ -6950,14 +7255,18 @@ onBeforeUnmount(() => {
       />
       <p v-if="stepLoadError.orderDocuments" class="field-help">{{ stepLoadError.orderDocuments }}</p>
       <div v-if="orderAttachments.length" class="sp-customer-plan-wizard-step__list sp-customer-plan-wizard-step__document-list" data-testid="customer-new-plan-order-document-list">
-        <div v-for="document in orderAttachments" :key="document.id" class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static">
+        <div
+          v-for="document in orderAttachments"
+          :key="document.id"
+          class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static sp-customer-plan-wizard-step__list-row--document"
+        >
           <div class="sp-customer-plan-wizard-step__document-row-copy">
             <strong>{{ orderAttachmentDisplayTitle(document) }}</strong>
             <span v-if="documentRowMetadata(document)">{{ documentRowMetadata(document) }}</span>
           </div>
           <button
             type="button"
-            class="sp-customer-plan-wizard-step__list-action sp-customer-plan-wizard-step__list-action--compact"
+            class="sp-customer-plan-wizard-step__list-action sp-customer-plan-wizard-step__list-action--compact sp-customer-plan-wizard-step__list-action--document-remove"
             data-testid="customer-new-plan-unlink-order-document"
             :disabled="stepLoading"
             @click.stop="void unlinkOrderDocument(document.id)"
@@ -6969,39 +7278,74 @@ onBeforeUnmount(() => {
       <p v-else-if="!stepLoadState.planningDocuments" class="field-help">
         {{ $t('sicherplan.customerPlansWizard.forms.noPlanningDocumentsYet') }}
       </p>
-      <section class="sp-customer-plan-wizard-step__document-subsection">
+      <section
+        class="sp-customer-plan-wizard-step__document-subsection"
+        :class="{ 'sp-customer-plan-wizard-step__document-subsection--invalid': Boolean(orderScopeFieldErrors.documentsUploadTitle || orderScopeFieldErrors.documentsUploadFile || orderScopeFieldErrors.documentsUploadAction) }"
+      >
         <header class="sp-customer-plan-wizard-step__document-subsection-header">
           <h5>{{ $t('sicherplan.customerPlansWizard.forms.uploadNewDocument') }}</h5>
         <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.uploadNewDocumentHelp') }}</p>
         </header>
         <div class="sp-customer-plan-wizard-step__grid">
-          <label class="field-stack">
+          <label class="field-stack" :class="{ 'field-stack--invalid': Boolean(orderScopeFieldErrors.documentsUploadTitle) }">
             <span>{{ $t('sicherplan.customerPlansWizard.forms.documentTitle') }}</span>
-            <input v-model="orderAttachmentDraft.title" data-testid="customer-new-plan-order-document-upload-title" />
+            <input
+              v-model="orderAttachmentDraft.title"
+              data-testid="customer-new-plan-order-document-upload-title"
+              :aria-invalid="Boolean(orderScopeFieldErrors.documentsUploadTitle)"
+            />
+            <p v-if="orderScopeFieldErrors.documentsUploadTitle" class="field-error" data-testid="customer-new-plan-order-document-upload-title-error">
+              {{ orderScopeFieldErrors.documentsUploadTitle }}
+            </p>
           </label>
           <label class="field-stack">
             <span>{{ $t('sicherplan.customerPlansWizard.forms.uploadLabel') }}</span>
             <input v-model="orderAttachmentDraft.label" data-testid="customer-new-plan-order-document-upload-label" />
           </label>
-          <label class="field-stack field-stack--wide">
+          <label class="field-stack field-stack--wide" :class="{ 'field-stack--invalid': Boolean(orderScopeFieldErrors.documentsUploadFile) }">
             <span>{{ $t('sicherplan.customerPlansWizard.forms.documentFile') }}</span>
-            <input data-testid="customer-new-plan-order-document-file" type="file" @change="onOrderAttachmentSelected" />
+            <input
+              data-testid="customer-new-plan-order-document-file"
+              type="file"
+              :aria-invalid="Boolean(orderScopeFieldErrors.documentsUploadFile)"
+              @change="onOrderAttachmentSelected"
+            />
+            <p v-if="orderScopeFieldErrors.documentsUploadFile" class="field-error" data-testid="customer-new-plan-order-document-file-error">
+              {{ orderScopeFieldErrors.documentsUploadFile }}
+            </p>
           </label>
         </div>
+        <p v-if="orderScopeFieldErrors.documentsUploadAction" class="field-error" data-testid="customer-new-plan-order-document-upload-action-error">
+          {{ orderScopeFieldErrors.documentsUploadAction }}
+        </p>
         <div class="cta-row">
           <button
             type="button"
             class="cta-button"
+            :class="{ 'cta-button--invalid': Boolean(orderScopeFieldErrors.documentsUploadAction) }"
             data-testid="customer-new-plan-attach-order-document"
             :disabled="stepLoading"
             @click="void attachUploadedOrderDocument()"
           >
             {{ $t('sicherplan.customerPlansWizard.actions.attachUploadedDocument') }}
           </button>
+          <button
+            v-if="hasOrderDocumentUploadDraftInput()"
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-clear-order-document-draft"
+            type="button"
+            :disabled="stepLoading"
+            @click="clearOrderDocumentDraftState"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.clearOrderDocumentDraft') }}
+          </button>
         </div>
       </section>
       <div class="sp-customer-plan-wizard-step__document-divider" aria-hidden="true"></div>
-      <section class="sp-customer-plan-wizard-step__document-subsection">
+      <section
+        class="sp-customer-plan-wizard-step__document-subsection"
+        :class="{ 'sp-customer-plan-wizard-step__document-subsection--invalid': Boolean(orderScopeFieldErrors.documentsLinkSelection || orderScopeFieldErrors.documentsLinkAction) }"
+      >
         <header class="sp-customer-plan-wizard-step__document-subsection-header">
           <h5>{{ $t('sicherplan.customerPlansWizard.forms.linkExistingDocument') }}</h5>
         <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.linkExistingDocumentHelp') }}</p>
@@ -7012,12 +7356,13 @@ onBeforeUnmount(() => {
           data-testid="customer-new-plan-order-document-selected"
         >
           <strong>{{ $t('sicherplan.customerPlansWizard.forms.documentPickerSelected') }}</strong>
-          <span>{{ documentSummary(selectedOrderLinkDocument, orderAttachmentLink.document_id) }}</span>
+          <span>{{ documentCustomerSummary(selectedOrderLinkDocument) }}</span>
         </div>
         <div class="cta-row">
           <button
             type="button"
             class="cta-button cta-secondary"
+            :class="{ 'cta-button--invalid': Boolean(orderScopeFieldErrors.documentsLinkSelection) }"
             data-testid="customer-new-plan-order-document-picker-open"
             :disabled="stepLoading"
             @click="openDocumentPicker('order')"
@@ -7035,16 +7380,23 @@ onBeforeUnmount(() => {
             {{ $t('sicherplan.customerPlansWizard.forms.documentPickerClear') }}
           </button>
         </div>
+        <p v-if="orderScopeFieldErrors.documentsLinkSelection" class="field-error" data-testid="customer-new-plan-order-document-selection-error">
+          {{ orderScopeFieldErrors.documentsLinkSelection }}
+        </p>
         <div class="sp-customer-plan-wizard-step__grid">
           <label class="field-stack">
             <span>{{ $t('sicherplan.customerPlansWizard.forms.linkLabel') }}</span>
             <input v-model="orderAttachmentLink.label" data-testid="customer-new-plan-order-document-link-label" />
           </label>
         </div>
+        <p v-if="orderScopeFieldErrors.documentsLinkAction" class="field-error" data-testid="customer-new-plan-order-document-link-action-error">
+          {{ orderScopeFieldErrors.documentsLinkAction }}
+        </p>
         <div class="cta-row">
           <button
             type="button"
             class="cta-button"
+            :class="{ 'cta-button--invalid': Boolean(orderScopeFieldErrors.documentsLinkAction) }"
             data-testid="customer-new-plan-link-order-document"
             :disabled="stepLoading"
             @click="void linkExistingOrderDocument()"
@@ -7052,7 +7404,7 @@ onBeforeUnmount(() => {
             {{ $t('sicherplan.customerPlansWizard.actions.linkExistingDocument') }}
           </button>
           <button
-            v-if="hasAnyOrderDocumentDraftInput()"
+            v-if="hasOrderDocumentLinkDraftInput()"
             class="cta-button cta-secondary"
             data-testid="customer-new-plan-clear-order-document-draft"
             type="button"
@@ -7410,7 +7762,7 @@ onBeforeUnmount(() => {
           data-testid="customer-new-plan-planning-document-selected"
         >
           <strong>{{ $t('sicherplan.customerPlansWizard.forms.documentPickerSelected') }}</strong>
-          <span>{{ documentSummary(selectedPlanningRecordLinkDocument, planningRecordAttachmentLink.document_id) }}</span>
+          <span>{{ documentCustomerSummary(selectedPlanningRecordLinkDocument) }}</span>
         </div>
         <div class="cta-row">
           <button
@@ -7992,7 +8344,7 @@ onBeforeUnmount(() => {
             @click="selectDocumentForLink(document)"
           >
             <strong>{{ document.title }}</strong>
-            <span>{{ documentSummary(document, document.id) }}</span>
+            <span>{{ documentCustomerSummary(document) }}</span>
           </button>
         </div>
         <p v-else-if="!documentPicker.loading" class="field-help">
@@ -8569,6 +8921,13 @@ onBeforeUnmount(() => {
   scroll-margin-top: var(--customer-order-scope-sticky-top, 6.5rem);
 }
 
+.sp-customer-plan-wizard-step__scope-card--invalid {
+  border-color: rgb(210 40 40 / 42%);
+  box-shadow:
+    0 0 0 3px rgb(210 40 40 / 10%),
+    var(--sp-elevation-sm, 0 10px 30px rgb(15 23 42 / 0.06));
+}
+
 .sp-customer-plan-wizard-step__scope-card-header {
   display: grid;
   gap: 0.25rem;
@@ -8615,6 +8974,10 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.sp-customer-plan-wizard-step__scope-editor--invalid {
+  padding: 0.1rem 0;
+}
+
 .sp-customer-plan-wizard-step__documents-panel {
   display: grid;
   gap: 1rem;
@@ -8622,7 +8985,7 @@ onBeforeUnmount(() => {
 }
 
 .sp-customer-plan-wizard-step__document-list {
-  margin: 0.35rem 0 0.55rem;
+  margin: 0.7rem 0 1rem;
 }
 
 .sp-customer-plan-wizard-step__document-row-copy {
@@ -8639,8 +9002,12 @@ onBeforeUnmount(() => {
 
 .sp-customer-plan-wizard-step__document-subsection {
   display: grid;
-  gap: 0.95rem;
+  gap: 1rem;
   min-width: 0;
+}
+
+.sp-customer-plan-wizard-step__document-subsection--invalid {
+  padding: 0.15rem 0;
 }
 
 .sp-customer-plan-wizard-step__document-subsection-header {
@@ -8657,7 +9024,7 @@ onBeforeUnmount(() => {
 
 .sp-customer-plan-wizard-step__document-divider {
   height: 1px;
-  margin: 0.45rem 0;
+  margin: 0.85rem 0 0.45rem;
   background: var(--sp-color-border-soft);
 }
 
@@ -8786,6 +9153,10 @@ onBeforeUnmount(() => {
   color: rgb(190 30 30);
   font-size: 0.78rem;
   font-weight: 650;
+}
+
+.sp-customer-plan-wizard-step__section-error {
+  margin-top: -0.1rem;
 }
 
 .field-stack--wide {
@@ -8930,6 +9301,10 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
+.sp-customer-plan-wizard-step__list-row--document {
+  align-items: flex-start;
+}
+
 .sp-customer-plan-wizard-step__info-summary {
   display: grid;
   gap: 0.3rem;
@@ -9047,6 +9422,11 @@ onBeforeUnmount(() => {
   line-height: 1.15;
 }
 
+.sp-customer-plan-wizard-step__list-action--document-remove {
+  min-height: 1.85rem;
+  padding: 0.32rem 0.6rem;
+}
+
 .sp-customer-plan-wizard-step__list-action:hover,
 .sp-customer-plan-wizard-step__list-action:focus-visible {
   border-color: color-mix(in srgb, var(--sp-color-danger) 54%, var(--sp-color-border-soft));
@@ -9096,17 +9476,6 @@ onBeforeUnmount(() => {
 .sp-customer-plan-wizard-step__document-selection span {
   color: var(--sp-color-text-secondary);
   overflow-wrap: anywhere;
-}
-
-.sp-customer-plan-wizard-step__manual-document-id {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.sp-customer-plan-wizard-step__manual-document-id summary {
-  cursor: pointer;
-  color: var(--sp-color-text-secondary);
-  font-weight: 600;
 }
 
 .planning-admin-checkbox {
@@ -9185,6 +9554,11 @@ onBeforeUnmount(() => {
   border: 1px solid var(--sp-color-border-soft);
   background: transparent;
   color: var(--sp-color-text-primary);
+}
+
+.cta-button--invalid {
+  border: 1px solid rgb(210 40 40 / 58%);
+  box-shadow: 0 0 0 3px rgb(210 40 40 / 10%);
 }
 
 .cta-button:disabled {

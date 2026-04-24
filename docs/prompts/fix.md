@@ -1,66 +1,108 @@
-Add/update regression tests for the Customers > Contacts & Access left-nav layout bug.
+You are working in the latest public SicherPlan repository.
+
+Context:
+The issue happens in the customer order workspace on the route:
+customers/order-workspace?customer_id=<id>
+step = planning-record-overview
+
+Observed behavior:
+In the "Planning record" step, the section "Existing planning records" shows an already available planning record.
+When the user clicks one of these existing planning-record options:
+- the selected record is eventually applied correctly,
+- the editor is populated correctly for editing,
+- BUT the page visibly refreshes / remounts once before returning to the same state.
 
 Goal:
-The left-side section navigation must stay sticky/visible without collapsing the page layout during scroll or click-to-scroll.
+Optimize this interaction so that selecting an existing planning record:
+1) selects the clicked record immediately,
+2) loads its values into the planning-record editor,
+3) preserves the correct route/query state if needed,
+4) does NOT cause a visible page refresh, hard reload, or unnecessary full remount.
 
-Required coverage:
+Important:
+Do not assume the cause.
+Validate the actual root cause first.
 
-Test 1 — Stable two-column structure
-1. Mount /admin/customers with Contacts & Access tab active.
-2. Assert the main layout has:
-   - left nav container
-   - right content container
-3. Assert the content container is a sibling of the nav container, not nested incorrectly.
-4. Assert the layout wrapper keeps its intended grid/flex classes.
+Possible root-cause areas to inspect:
+- click handler using href/full navigation instead of controlled state update
+- router push/replace behavior that remounts the page
+- route query sync that changes the page key
+- parent component keyed by route.fullPath or order/planning-record query params
+- watcher side effects that retrigger bootstrap load
+- selection logic that clears and rehydrates the entire step instead of patching editor state
+- global "load current step from route" logic that reruns as if entering the page fresh
+- forced refresh after selecting an existing planning record to reuse old loading code
 
-Test 2 — Sticky/fixed behavior does not remove layout width
-If the implementation uses fixed fallback:
-1. Simulate the scroll state where nav becomes fixed.
-2. Assert the nav shell gets the fixed/sticky class/state.
-3. Assert the layout still keeps a reserved nav column / placeholder width.
-4. Assert the content wrapper width/layout classes remain intact.
+Required investigation before coding:
+1) Find the exact component tree for:
+   - the planning-orders workspace view
+   - the order workspace stepper / step container
+   - the "Planning record" step
+   - the "Existing planning records" selectable list/card
+   - the planning-record editor state/model
+2) Identify how selection of an existing planning record currently works:
+   - local state only
+   - route query update
+   - store update
+   - fetch + re-bootstrap
+3) Identify exactly why the visible refresh happens:
+   - full browser reload
+   - route remount
+   - page-level reload state
+   - component key invalidation
+   - redundant async bootstrap cycle
 
-Test 3 — Click-to-scroll does not collapse layout
-1. Mock scrollIntoView.
-2. Click Addresses link.
-3. Assert scrollIntoView is called for Addresses section.
-4. Assert no layout-collapse class/state is introduced.
-5. Assert the content wrapper remains present and structurally separate from the nav.
+Required fix:
+- Replace the current selection flow with an in-place state update flow.
+- Selecting an existing planning record should patch/update the editor state directly without causing full page remount.
+- If route query synchronization is required, keep it minimal and non-disruptive.
+- If the selected planning record id must be reflected in the URL, do it in a way that does not visually reload the page.
+- Preserve current successful behavior:
+  - selected item remains visibly selected
+  - editor fields are populated correctly
+  - unsaved editor state handling remains safe
+  - step progression logic still works
 
-Test 4 — Active link behavior still works
-1. Mock IntersectionObserver or the current section-detection logic.
-2. Simulate Contacts active, then Addresses active, then Portal & Access active.
-3. Assert the active nav item changes correctly.
-4. Assert layout structure remains unchanged during those state changes.
+Technical guidance:
+- Prefer a local/editor-state update or controlled store update over full reinitialization.
+- If the root cause is route-key remounting, narrow the key so selection does not recreate the whole page.
+- If the root cause is query synchronization, use the least disruptive router update possible.
+- If the root cause is a shared bootstrap watcher, separate “initial page load” from “editor selection change”.
+- Avoid backend changes unless absolutely necessary and justified.
+- Keep changes scoped to this planning-record step and directly related helpers/state/components.
 
-Test 5 — No regression to Employees Overview pattern
-1. If a shared helper/composable is used, assert the Customers page uses the same pattern safely.
-2. Do not regress Employees Overview behavior.
+Validation requirement:
+Please validate my suggestion critically.
+If my assumption about the cause is wrong, fix the true cause and explain it clearly.
+Do not ship a cosmetic workaround.
+Do not just hide the refresh with loading masks.
+The goal is to remove the unnecessary remount/reload behavior itself.
 
-Test 6 — Responsive fallback
-1. Assert narrow-screen layout still behaves safely.
-2. The nav may become static/horizontal on small screens, but layout must not collapse.
+Manual scenarios you must test in code logic:
+1) initial entry into the Planning record step
+2) click an existing planning record once
+3) click another existing planning record
+4) click the same existing planning record again
+5) create-new mode then switch back to an existing record
+6) edit fields after selecting an existing record
+7) navigate to next step and back
+8) reload the route with planning-record-related query params already present
+9) verify no regression in selected-card styling, editor hydration, and next/previous navigation
 
-Commands:
-- run the relevant customer admin/frontend vitest suites
-- run vue-tsc --noEmit --skipLibCheck
-- include exact commands in final output
+Deliverables:
+1) Apply the fix.
+2) Summarize:
+   - changed files
+   - exact root cause
+   - why the page refresh/remount happened
+   - how the final solution avoids it
+3) Mention whether URL/query synchronization was preserved, changed, or reduced.
+4) Mention any remaining edge case if one still exists.
 
-Manual QA checklist:
-1. Open /admin/customers
-2. Go to Contacts & Access
-3. Confirm layout looks correct initially
-4. Scroll down
-5. Confirm left nav stays visible and page layout does NOT collapse
-6. Click Addresses
-7. Confirm scroll works and layout still does NOT collapse
-8. Click Portal & Access
-9. Confirm same result
-10. Confirm no console errors
-
-Final output must include:
-- files changed
-- tests added/updated
-- commands run
-- root cause of the collapse
-- proof the sticky nav works without reflow/collapse
+Acceptance criteria:
+- Clicking an item in "Existing planning records" updates selection and editor data in place.
+- No visible page refresh/remount occurs during that selection.
+- The selected record remains selected.
+- The editor still shows the correct planning-record data.
+- No regression in step navigation, validation, or editor behavior.
+- No unrelated pages changed.
