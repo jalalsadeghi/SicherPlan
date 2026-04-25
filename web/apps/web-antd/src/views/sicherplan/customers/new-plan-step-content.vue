@@ -177,6 +177,7 @@ const planningEntityId = ref('');
 const planningEntityLoading = ref(false);
 const planningEntityError = ref('');
 const planningEntityOptionsRequestSeq = ref(0);
+const planningRecordDetailRequestSeq = ref(0);
 const orderSelectionMode = ref<OrderSelectionMode>('use_existing');
 const customerOrderRows = ref<CustomerOrderListItem[]>([]);
 const customerOrderRowsLoading = ref(false);
@@ -3292,12 +3293,20 @@ async function hydrateExistingPlanningRecordSelection(planningRecordId: string) 
   if (hasHydratedSelectedPlanningRecord(planningRecordId)) {
     return;
   }
+  const requestSeq = planningRecordDetailRequestSeq.value + 1;
+  planningRecordDetailRequestSeq.value = requestSeq;
   selectedExistingPlanningRecordId.value = planningRecordId;
   committedPlanningRecordId.value = planningRecordId;
   const loadVersions = beginStepLoads('planningRecordDetail');
   stepLoadError.planningRecordDetail = '';
   try {
     const record = await getPlanningRecord(props.tenantId, planningRecordId, props.accessToken);
+    if (
+      requestSeq !== planningRecordDetailRequestSeq.value ||
+      selectedExistingPlanningRecordId.value !== planningRecordId
+    ) {
+      return;
+    }
     if (!planningRecordContextIsValid(record)) {
       stepLoadError.planningRecordDetail = $t('sicherplan.customerPlansWizard.errors.invalidPlanningRecordDetail');
       setFeedback('error', stepLoadError.planningRecordDetail);
@@ -3310,12 +3319,24 @@ async function hydrateExistingPlanningRecordSelection(planningRecordId: string) 
     clearStepDraft('planning-record-overview');
     clearDraftRestoreMessage();
     await loadPlanningEntityOptions();
+    if (
+      requestSeq !== planningRecordDetailRequestSeq.value ||
+      selectedExistingPlanningRecordId.value !== planningRecordId
+    ) {
+      return;
+    }
     planningEntityId.value = planningEntityIdForRecord(record);
     ensureSelectedPlanningEntityOption(record);
     if (record.planning_mode_code === 'trade_fair') {
       await refreshTradeFairZoneOptions(record.trade_fair_detail?.trade_fair_id ?? '');
     } else {
       await refreshTradeFairZoneOptions('');
+    }
+    if (
+      requestSeq !== planningRecordDetailRequestSeq.value ||
+      selectedExistingPlanningRecordId.value !== planningRecordId
+    ) {
+      return;
     }
     lastLoadedStepContextKey = buildStepExternalContextKey({
       planningEntityId: planningEntityIdForRecord(record),
@@ -7904,14 +7925,6 @@ onBeforeUnmount(() => {
           <strong>{{ row.name }}</strong>
           <span>{{ row.planning_from }} - {{ row.planning_to }}</span>
         </button>
-      </div>
-      <div
-        v-if="selectedShiftPlanSummary"
-        class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__list-row--static"
-        data-testid="customer-new-plan-selected-shift-plan-summary"
-      >
-        <strong>{{ $t('sicherplan.customerPlansWizard.forms.selectedShiftPlan') }}: {{ selectedShiftPlanSummary.name }}</strong>
-        <span>{{ selectedShiftPlanSummary.planning_from }} - {{ selectedShiftPlanSummary.planning_to }}</span>
       </div>
       <LocalLoadingIndicator
         v-if="stepLoadState.shiftPlanDetail"

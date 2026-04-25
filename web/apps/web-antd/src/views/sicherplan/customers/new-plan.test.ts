@@ -163,12 +163,6 @@ vi.mock('./new-plan-step-content.vue', () => ({
           >
             simulate missing commit
           </button>
-          <div
-            v-if="selectedShiftPlanId"
-            data-testid="customer-new-plan-selected-shift-plan-summary"
-          >
-            {{ shiftPlanName }} {{ shiftPlanFrom }} {{ shiftPlanTo }}
-          </div>
           <input data-testid="customer-new-plan-shift-plan-name" :value="shiftPlanName" />
           <input data-testid="customer-new-plan-shift-plan-from" :value="shiftPlanFrom" />
           <input data-testid="customer-new-plan-shift-plan-to" :value="shiftPlanTo" />
@@ -626,6 +620,37 @@ describe('CustomerNewPlanWizardView', () => {
     });
   });
 
+  it('returns to planning-record-overview from planning-record-documents without dropping planning_record_id', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+      step: 'planning-record-documents',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-previous"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('planning-record-overview');
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/order-workspace',
+      query: {
+        customer_id: 'customer-1',
+        order_id: 'order-1',
+        planning_entity_id: 'site-1',
+        planning_entity_type: 'site',
+        planning_mode_code: 'site',
+        planning_record_id: 'record-1',
+        step: 'planning-record-overview',
+      },
+    });
+  });
+
   it('advances to series-exceptions after a successful shift-plan save even when router.replace mutates the route immediately', async () => {
     routeState.query = {
       customer_id: 'customer-1',
@@ -695,7 +720,7 @@ describe('CustomerNewPlanWizardView', () => {
     await flushPromises();
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('shift-plan');
-    expect(wrapper.get('[data-testid="customer-new-plan-selected-shift-plan-summary"]').text()).toContain('Shift plan');
+    expect(wrapper.find('[data-testid="customer-new-plan-selected-shift-plan-summary"]').exists()).toBe(false);
     expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').element as HTMLInputElement).value).toContain('RheinForum');
     expect(routeState.query.shift_plan_id).toBeUndefined();
     expect(routerReplaceMock).not.toHaveBeenCalled();

@@ -1306,6 +1306,90 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     );
   });
 
+  it('keeps the newer selected planning record when an older detail response resolves late', async () => {
+    apiMocks.listPlanningRecordsMock.mockResolvedValue([
+      buildPlanningRecord({ id: 'record-1', name: 'Werk Nord Sommer' }),
+      buildPlanningRecord({ id: 'record-2', name: 'Werk Nord Nacht' }),
+    ]);
+    const firstDetail = deferred<ReturnType<typeof buildPlanningRecord>>();
+    const secondDetail = deferred<ReturnType<typeof buildPlanningRecord>>();
+    apiMocks.getPlanningRecordMock.mockImplementation((_tenantId, recordId: string) => {
+      if (recordId === 'record-1') {
+        return firstDetail.promise;
+      }
+      if (recordId === 'record-2') {
+        return secondDetail.promise;
+      }
+      return Promise.resolve(buildPlanningRecord({ id: recordId }));
+    });
+
+    const wrapper = mountStep('planning-record-overview', {
+      planning_entity_id: '',
+      planning_entity_type: '',
+      planning_mode_code: '',
+    });
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-planning-context-entry"]').setValue('site-1');
+    await flushPromises();
+
+    const rows = wrapper.findAll('[data-testid="customer-new-plan-existing-planning-record-row"]');
+    await rows[0]!.trigger('click');
+    await flushPromises();
+    await rows[1]!.trigger('click');
+    await flushPromises();
+
+    secondDetail.resolve(buildPlanningRecord({
+      id: 'record-2',
+      name: 'Werk Nord Nacht',
+      notes: 'Nachtnotiz',
+      planning_from: '2026-07-01',
+      planning_to: '2026-07-10',
+      site_detail: { site_id: 'site-1', watchbook_scope_note: 'Nacht-Wachbuch' },
+    }));
+    await flushPromises();
+
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord Nacht',
+    );
+    expect(wrapper.get('[data-testid="customer-new-plan-selected-planning-record-summary"]').text()).toContain(
+      'Werk Nord Nacht',
+    );
+    expect(rows[1]!.classes()).toContain('sp-customer-plan-wizard-step__list-row--selected');
+
+    firstDetail.resolve(buildPlanningRecord({
+      id: 'record-1',
+      name: 'Werk Nord Sommer',
+      notes: 'Sommernotiz',
+      site_detail: { site_id: 'site-1', watchbook_scope_note: 'Sommer-Wachbuch' },
+    }));
+    await flushPromises();
+    await settleLoadingRender();
+
+    expect(apiMocks.getPlanningRecordMock).toHaveBeenCalledTimes(2);
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord Nacht',
+    );
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-from"]').element as HTMLInputElement).value).toBe(
+      '2026-07-01',
+    );
+    expect((wrapper.get('[data-testid="customer-new-plan-planning-record-to"]').element as HTMLInputElement).value).toBe(
+      '2026-07-10',
+    );
+    expect(wrapper.get('[data-testid="customer-new-plan-selected-planning-record-summary"]').text()).toContain(
+      'Werk Nord Nacht',
+    );
+    expect(rows[1]!.classes()).toContain('sp-customer-plan-wizard-step__list-row--selected');
+    expect(wrapper.emitted('saved-context')?.at(-1)?.[0]).toEqual({
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-2',
+    });
+    expect(routerReplaceMock).not.toHaveBeenCalled();
+    expect(routerPushMock).not.toHaveBeenCalled();
+  });
+
   it('recovers safely when the selected row id matches but the hydrated planning record is missing', async () => {
     apiMocks.listPlanningRecordsMock.mockResolvedValue([buildPlanningRecord()]);
     const wrapper = mountStep('planning-record-overview', {
@@ -2328,6 +2412,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await flushPromises();
     await wrapper.get('[data-testid="customer-new-plan-planning-document-result-row"]').trigger('click');
     await flushPromises();
+    await settleLoadingRender();
     expect(wrapper.get('[data-testid="customer-new-plan-planning-document-selected"]').text()).toContain('Safety concept');
     apiMocks.linkPlanningRecordAttachmentMock.mockResolvedValue({
       id: 'doc-row-1',
@@ -2566,7 +2651,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(wrapper.emitted('saved-context')).toBeUndefined();
   });
 
-  it('selects an existing shift plan row locally and shows the selected summary without committing wizard context immediately', async () => {
+  it('selects an existing shift plan row locally without committing wizard context immediately', async () => {
     apiMocks.listShiftPlansMock.mockResolvedValue([
       buildShiftPlan(),
       buildShiftPlan({ id: 'plan-2', name: 'Werk Süd / Schichtplan', planning_from: '2026-06-02', planning_to: '2026-06-09' }),
@@ -2589,8 +2674,11 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(routerReplaceMock).not.toHaveBeenCalled();
     expect(wrapper.emitted('step-completion')).toBeUndefined();
     expect(wrapper.emitted('step-ui-state')?.at(-1)?.[0]).toBe('shift-plan');
-    expect(wrapper.get('[data-testid="customer-new-plan-selected-shift-plan-summary"]').text()).toContain('plan');
+    expect(wrapper.find('[data-testid="customer-new-plan-selected-shift-plan-summary"]').exists()).toBe(false);
     expect(rows[0]!.classes()).toContain('sp-customer-plan-wizard-step__list-row--selected');
+    expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord / Schichtplan',
+    );
   });
 
   it('continues with a selected existing shift plan without creating a duplicate', async () => {
@@ -2635,7 +2723,13 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(wrapper.emitted('saved-context')).toBeUndefined();
     expect(routerReplaceMock).not.toHaveBeenCalled();
     expect(wrapper.emitted('step-completion')).toBeUndefined();
-    expect(wrapper.find('[data-testid="customer-new-plan-selected-shift-plan-summary"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-selected-shift-plan-summary"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-new-plan-existing-shift-plan-row"]').classes()).toContain(
+      'sp-customer-plan-wizard-step__list-row--selected',
+    );
+    expect((wrapper.get('[data-testid="customer-new-plan-shift-plan-name"]').element as HTMLInputElement).value).toBe(
+      'Werk Nord / Schichtplan',
+    );
   });
 
   it('continues with the single auto-selected shift plan without creating a duplicate', async () => {
