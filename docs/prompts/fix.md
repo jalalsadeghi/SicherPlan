@@ -1,60 +1,63 @@
 You are working in the SicherPlan repository.
 
 Goal:
-Make the logged-in employee’s real profile photo available to the mobile app so the Start/Home hero banner can render it instead of only showing initials.
+Render the actual logged-in employee photo in the green Start/Home hero banner, replacing the current initials fallback.
 
-Primary files to inspect first:
-- backend/app/modules/employees/schemas.py
-- backend/app/modules/employees/self_service_service.py
-- backend/app/modules/employees/self_service_router.py
-- backend/app/modules/employees/repository.py
+Primary files:
+- mobile/lib/features/home/home_screen.dart
+- mobile/lib/widgets/brand_banner.dart
 - mobile/lib/api/mobile_backend.dart
-- mobile/lib/session/mobile_session_controller.dart
-- web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
+- mobile/lib/l10n/app_localizations.dart
 
-Observed symptom:
-The mobile Start screen now shows employee initials ("MN") instead of the old placeholder, but it still does not show the actual employee photo.
-The web/admin employee page already shows a real employee photo for Markus.
-So the mobile side is still missing real photo data or a usable download path.
+Context:
+The mobile Start screen currently shows initials (e.g. "MN"), which means the UI fallback works, but the actual employee photo is still not rendered.
+Assume the backend/mobile contract now exposes the required employee photo metadata or self-photo fetch path.
 
 Tasks:
-1. Trace how employee photo is currently stored and surfaced in the web/admin employee flow.
-   - Reuse the existing employee photo/document structure already present in the system.
-   - Do not introduce a new media subsystem.
+1. Update BrandBanner so it supports rendering a real employee photo/avatar.
+   - Use the actual logged-in employee photo when available.
+   - Keep layout balanced and mobile-first.
+   - Ensure clipping, sizing, and spacing are correct on narrow devices.
 
-2. Extend the employee mobile self-service contract with the smallest correct additive photo fields needed by mobile.
-   Prefer one of these patterns:
-   - photo_document_id + photo_current_version_no + photo_content_type
-   - or a resolved self-photo download path/url
-   Use the smallest robust solution that matches the existing employee photo model.
+2. Update HomeScreen so it passes real employee photo data into BrandBanner.
+   - Keep the hero card minimal.
+   - Preserve the compact greeting.
+   - Do not reintroduce removed clutter.
 
-3. If a photo download endpoint is required for mobile, add the smallest secure self-service endpoint for the authenticated employee to fetch only their own photo.
-   - Strictly scoped to the current authenticated employee.
-   - No cross-employee access.
-   - Reuse existing document/download infrastructure where possible.
+3. Preserve a robust fallback strategy:
+   - If the employee has no photo, show initials or a neutral fallback avatar.
+   - But if a real photo exists, initials must not be shown.
+   - Remove the old static placeholder logic from this hero use case.
 
-4. Ensure the contract works for both cases:
-   - employee has a photo
-   - employee has no photo
+4. If image loading requires authenticated requests:
+   - implement the smallest robust authenticated image-loading path
+   - avoid insecure public URLs
+   - keep it scoped to the logged-in employee context
 
 Constraints:
-- Keep auth strict.
-- Do not redesign unrelated employee APIs.
-- Do not broaden scope into full profile editing.
-- Keep changes additive and minimal.
+- Do not redesign unrelated screens.
+- Do not change auth/session semantics.
+- Keep the implementation narrow and production-oriented.
+- Favor a minimal, maintainable solution over adding heavy image infrastructure.
 
 Validation:
-- Add/update backend tests proving:
-  - mobile self-service returns photo metadata when the employee has a photo
-  - mobile self-service returns null/empty photo data when the employee has no photo
-  - any new self-photo endpoint only allows the authenticated employee to access their own image
-- Ask Codex to self-check whether the chosen solution is fully aligned with existing web/admin employee photo handling.
+- Add/update widget tests for:
+  - real employee photo rendered when available
+  - initials fallback rendered only when no photo is available
+  - old placeholder no longer appears
+  - narrow mobile layout remains clean
+- Ask Codex to self-validate that the final result exactly matches the user request:
+  employee photo before “Hallo Markus”.
 
 Before coding:
-- Summarize where the employee photo currently lives in the codebase and why mobile cannot render it yet.
-- State whether an existing document/photo flow can be reused directly.
+- Summarize why the screen currently shows initials instead of a real photo.
+- State the minimal rendering strategy you will implement.
 
 After coding:
 - List changed files.
-- Explain why the chosen contract is the smallest safe implementation.
-- Mention any runtime assumptions that still need local verification.
+- Explain whether the final mobile implementation uses:
+  - direct photo metadata,
+  - authenticated fetch,
+  - cached bytes,
+  - or another minimal mechanism.
+- Mention any remaining polish items that should be deferred.
