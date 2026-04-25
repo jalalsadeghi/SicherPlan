@@ -21,11 +21,7 @@ class _MemoryStore implements MobileSessionStore {
 }
 
 class _FakeBackend implements MobileBackendGateway {
-  _FakeBackend({
-    this.loginError,
-    this.restoreError,
-    this.contextOverride,
-  });
+  _FakeBackend({this.loginError, this.restoreError, this.contextOverride});
 
   final MobileApiException? loginError;
   final MobileApiException? restoreError;
@@ -49,29 +45,53 @@ class _FakeBackend implements MobileBackendGateway {
   );
 
   @override
-  Future<void> acknowledgeNotice(String accessToken, String tenantId, String noticeId, {String? acknowledgementText}) async {}
+  Future<void> acknowledgeNotice(
+    String accessToken,
+    String tenantId,
+    String noticeId, {
+    String? acknowledgementText,
+  }) async {}
 
   @override
-  Future<EmployeeEventApplicationItem> cancelEventApplication(String accessToken, {required String applicationId, required int? versionNo, String? decisionNote}) {
+  Future<EmployeeEventApplicationItem> cancelEventApplication(
+    String accessToken, {
+    required String applicationId,
+    required int? versionNo,
+    String? decisionNote,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  Future<EmployeeEventApplicationItem> createEventApplication(String accessToken, {required String planningRecordId, String? note}) {
+  Future<EmployeeEventApplicationItem> createEventApplication(
+    String accessToken, {
+    required String planningRecordId,
+    String? note,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  Future<List<int>> downloadOwnDocument(String accessToken, {required String documentId, required int versionNo}) async => <int>[];
+  Future<List<int>> downloadOwnDocument(
+    String accessToken, {
+    required String documentId,
+    required int versionNo,
+  }) async => <int>[];
 
   @override
-  Future<List<EmployeeMobileCredential>> fetchCredentials(String accessToken) async => const [];
+  Future<List<EmployeeMobileCredential>> fetchCredentials(
+    String accessToken,
+  ) async => const [];
 
   @override
-  Future<List<EmployeeMobileDocument>> fetchDocuments(String accessToken) async => const [];
+  Future<List<EmployeeMobileDocument>> fetchDocuments(
+    String accessToken,
+  ) async => const [];
 
   @override
-  Future<List<TimeCaptureEventItem>> fetchTimeEvents(String accessToken) async => const [];
+  Future<List<TimeCaptureEventItem>> fetchTimeEvents(
+    String accessToken,
+  ) async => const [];
 
   @override
   Future<WatchbookEntryItem> createWatchbookEntry(
@@ -84,12 +104,20 @@ class _FakeBackend implements MobileBackendGateway {
   }) async => throw UnimplementedError();
 
   @override
-  Future<PatrolRoundItem> abortPatrolRound(String accessToken, String patrolRoundId, PatrolRoundAbortPayload payload) {
+  Future<PatrolRoundItem> abortPatrolRound(
+    String accessToken,
+    String patrolRoundId,
+    PatrolRoundAbortPayload payload,
+  ) {
     throw UnimplementedError();
   }
 
   @override
-  Future<PatrolRoundItem> capturePatrolCheckpoint(String accessToken, String patrolRoundId, PatrolRoundCapturePayload payload) {
+  Future<PatrolRoundItem> capturePatrolCheckpoint(
+    String accessToken,
+    String patrolRoundId,
+    PatrolRoundCapturePayload payload,
+  ) {
     throw UnimplementedError();
   }
 
@@ -106,6 +134,11 @@ class _FakeBackend implements MobileBackendGateway {
     return contextOverride ??
         const EmployeeMobileContext(
           tenantId: 'tenant-1',
+          tenantCode: 'nord',
+          tenantName: 'SicherPlan Nord',
+          photoDocumentId: null,
+          photoCurrentVersionNo: null,
+          photoContentType: null,
           userId: 'user-1',
           employeeId: 'employee-1',
           personnelNo: 'EMP-1',
@@ -129,10 +162,16 @@ class _FakeBackend implements MobileBackendGateway {
   }
 
   @override
-  Future<List<EmployeeEventApplicationItem>> fetchEventApplications(String accessToken) async => const [];
+  Future<List<EmployeeEventApplicationItem>> fetchEventApplications(
+    String accessToken,
+  ) async => const [];
 
   @override
-  Future<NoticeItem> fetchNotice(String accessToken, String tenantId, String noticeId) async => const NoticeItem(
+  Future<NoticeItem> fetchNotice(
+    String accessToken,
+    String tenantId,
+    String noticeId,
+  ) async => const NoticeItem(
     id: 'notice-1',
     title: 'Notice',
     summary: null,
@@ -147,7 +186,10 @@ class _FakeBackend implements MobileBackendGateway {
   );
 
   @override
-  Future<NoticeFeedStatus> fetchNoticeFeedStatus(String accessToken, String tenantId) async => const NoticeFeedStatus(
+  Future<NoticeFeedStatus> fetchNoticeFeedStatus(
+    String accessToken,
+    String tenantId,
+  ) async => const NoticeFeedStatus(
     totalCount: 0,
     unreadCount: 0,
     mandatoryUnacknowledgedCount: 0,
@@ -155,13 +197,22 @@ class _FakeBackend implements MobileBackendGateway {
   );
 
   @override
-  Future<List<NoticeItem>> fetchNotices(String accessToken, String tenantId) async => const [];
+  Future<List<NoticeItem>> fetchNotices(
+    String accessToken,
+    String tenantId,
+  ) async => const [];
 
   @override
-  Future<List<EmployeeReleasedScheduleItem>> fetchReleasedSchedules(String accessToken) async => const [];
+  Future<List<EmployeeReleasedScheduleItem>> fetchReleasedSchedules(
+    String accessToken,
+  ) async => const [];
 
   @override
-  Future<WatchbookReadModel> fetchWatchbook(String accessToken, {required String tenantId, required String watchbookId}) async => WatchbookReadModel(
+  Future<WatchbookReadModel> fetchWatchbook(
+    String accessToken, {
+    required String tenantId,
+    required String watchbookId,
+  }) async => WatchbookReadModel(
     id: 'watchbook-1',
     contextType: 'site',
     logDate: DateTime.utc(2026, 1, 1),
@@ -173,26 +224,40 @@ class _FakeBackend implements MobileBackendGateway {
   );
 
   @override
-  Future<PatrolRoundItem?> fetchActivePatrolRound(String accessToken) async => null;
+  Future<PatrolRoundItem?> fetchActivePatrolRound(String accessToken) async =>
+      null;
 
   @override
-  Future<PatrolEvaluationItem> fetchPatrolEvaluation(String accessToken, String patrolRoundId) {
+  Future<PatrolEvaluationItem> fetchPatrolEvaluation(
+    String accessToken,
+    String patrolRoundId,
+  ) {
     throw UnimplementedError();
   }
 
   @override
-  Future<List<PatrolAvailableRouteItem>> fetchPatrolRoutes(String accessToken) async => const [];
+  Future<List<PatrolAvailableRouteItem>> fetchPatrolRoutes(
+    String accessToken,
+  ) async => const [];
 
   @override
-  Future<PatrolRoundItem> fetchPatrolRound(String accessToken, String patrolRoundId) {
+  Future<PatrolRoundItem> fetchPatrolRound(
+    String accessToken,
+    String patrolRoundId,
+  ) {
     throw UnimplementedError();
   }
 
   @override
-  Future<List<WatchbookListItem>> fetchWatchbooks(String accessToken, String tenantId) async => const [];
+  Future<List<WatchbookListItem>> fetchWatchbooks(
+    String accessToken,
+    String tenantId,
+  ) async => const [];
 
   @override
-  Future<(MobileCurrentUser, MobileAuthTokens)> login(MobileLoginPayload payload) async {
+  Future<(MobileCurrentUser, MobileAuthTokens)> login(
+    MobileLoginPayload payload,
+  ) async {
     if (loginError != null) {
       throw loginError!;
     }
@@ -200,7 +265,11 @@ class _FakeBackend implements MobileBackendGateway {
   }
 
   @override
-  Future<void> openNotice(String accessToken, String tenantId, String noticeId) async {}
+  Future<void> openNotice(
+    String accessToken,
+    String tenantId,
+    String noticeId,
+  ) async {}
 
   @override
   Future<WatchbookReadModel> openWatchbook(
@@ -225,7 +294,10 @@ class _FakeBackend implements MobileBackendGateway {
   );
 
   @override
-  Future<PatrolRoundItem> startPatrolRound(String accessToken, PatrolRoundStartPayload payload) {
+  Future<PatrolRoundItem> startPatrolRound(
+    String accessToken,
+    PatrolRoundStartPayload payload,
+  ) {
     throw UnimplementedError();
   }
 
@@ -251,17 +323,29 @@ class _FakeBackend implements MobileBackendGateway {
   );
 
   @override
-  Future<PatrolRoundItem> completePatrolRound(String accessToken, String patrolRoundId, PatrolRoundCompletePayload payload) {
+  Future<PatrolRoundItem> completePatrolRound(
+    String accessToken,
+    String patrolRoundId,
+    PatrolRoundCompletePayload payload,
+  ) {
     throw UnimplementedError();
   }
 
   @override
-  Future<EmployeeReleasedScheduleItem> respondToAssignment(String accessToken, {required String assignmentId, required String responseCode, required int? versionNo, String? note}) {
+  Future<EmployeeReleasedScheduleItem> respondToAssignment(
+    String accessToken, {
+    required String assignmentId,
+    required String responseCode,
+    required int? versionNo,
+    String? note,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  Future<(MobileCurrentUser, MobileAuthTokens)> restore(MobileAuthTokens tokens) async {
+  Future<(MobileCurrentUser, MobileAuthTokens)> restore(
+    MobileAuthTokens tokens,
+  ) async {
     if (restoreError != null) {
       throw restoreError!;
     }
@@ -271,14 +355,20 @@ class _FakeBackend implements MobileBackendGateway {
 
 void main() {
   test('bootstrap without stored session becomes unauthenticated', () async {
-    final controller = MobileSessionController(backend: _FakeBackend(), store: _MemoryStore());
+    final controller = MobileSessionController(
+      backend: _FakeBackend(),
+      store: _MemoryStore(),
+    );
     await controller.bootstrap();
     expect(controller.phase, MobileSessionPhase.unauthenticated);
   });
 
   test('login stores authenticated employee session', () async {
     final store = _MemoryStore();
-    final controller = MobileSessionController(backend: _FakeBackend(), store: store);
+    final controller = MobileSessionController(
+      backend: _FakeBackend(),
+      store: store,
+    );
     await controller.login(
       tenantCode: 'tenant-1',
       identifier: 'sysadmin',
@@ -293,7 +383,11 @@ void main() {
   test('wrong mobile role is rejected during bootstrap', () async {
     final store = _MemoryStore();
     store.value = StoredMobileSession(
-      tokens: const MobileAuthTokens(accessToken: 'a', refreshToken: 'r', sessionId: 's'),
+      tokens: const MobileAuthTokens(
+        accessToken: 'a',
+        refreshToken: 'r',
+        sessionId: 's',
+      ),
       user: const MobileCurrentUser(
         id: 'user-1',
         tenantId: 'tenant-1',
@@ -306,6 +400,11 @@ void main() {
       ),
       context: const EmployeeMobileContext(
         tenantId: 'tenant-1',
+        tenantCode: 'nord',
+        tenantName: 'SicherPlan Nord',
+        photoDocumentId: null,
+        photoCurrentVersionNo: null,
+        photoContentType: null,
         userId: 'user-1',
         employeeId: 'employee-1',
         personnelNo: 'EMP-1',
@@ -331,6 +430,11 @@ void main() {
       backend: _FakeBackend(
         contextOverride: const EmployeeMobileContext(
           tenantId: 'tenant-1',
+          tenantCode: 'nord',
+          tenantName: 'SicherPlan Nord',
+          photoDocumentId: null,
+          photoCurrentVersionNo: null,
+          photoContentType: null,
           userId: 'user-1',
           employeeId: 'employee-1',
           personnelNo: 'EMP-1',
@@ -361,7 +465,11 @@ void main() {
   test('invalid stored session clears back to unauthenticated', () async {
     final store = _MemoryStore();
     store.value = StoredMobileSession(
-      tokens: const MobileAuthTokens(accessToken: 'a', refreshToken: 'r', sessionId: 's'),
+      tokens: const MobileAuthTokens(
+        accessToken: 'a',
+        refreshToken: 'r',
+        sessionId: 's',
+      ),
       user: const MobileCurrentUser(
         id: 'user-1',
         tenantId: 'tenant-1',
@@ -374,6 +482,11 @@ void main() {
       ),
       context: const EmployeeMobileContext(
         tenantId: 'tenant-1',
+        tenantCode: 'nord',
+        tenantName: 'SicherPlan Nord',
+        photoDocumentId: null,
+        photoCurrentVersionNo: null,
+        photoContentType: null,
         userId: 'user-1',
         employeeId: 'employee-1',
         personnelNo: 'EMP-1',
@@ -397,7 +510,10 @@ void main() {
     );
     final controller = MobileSessionController(
       backend: _FakeBackend(
-        restoreError: const MobileApiException(statusCode: 401, messageKey: 'errors.iam.auth.invalid_access_token'),
+        restoreError: const MobileApiException(
+          statusCode: 401,
+          messageKey: 'errors.iam.auth.invalid_access_token',
+        ),
       ),
       store: store,
     );
@@ -409,7 +525,10 @@ void main() {
   test('login surfaces invalid credentials as unauthenticated state', () async {
     final controller = MobileSessionController(
       backend: _FakeBackend(
-        loginError: const MobileApiException(statusCode: 401, messageKey: 'errors.iam.auth.invalid_credentials'),
+        loginError: const MobileApiException(
+          statusCode: 401,
+          messageKey: 'errors.iam.auth.invalid_credentials',
+        ),
       ),
       store: _MemoryStore(),
     );

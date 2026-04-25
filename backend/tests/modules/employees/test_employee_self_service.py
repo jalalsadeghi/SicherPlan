@@ -149,12 +149,26 @@ class EmployeeSelfServiceTest(unittest.TestCase):
         self.assertEqual(raised.exception.message_key, "errors.employees.self_service.employee_inactive")
 
     def test_mobile_context_returns_operational_fields_only(self) -> None:
+        self.repository.employees["employee-1"].photo_document_id = "photo-doc-1"
+        self.repository.employees["employee-1"].photo_current_version_no = 3
+        self.repository.employees["employee-1"].photo_content_type = "image/jpeg"
         mobile_context = self.service.get_mobile_context(_employee_self_service_context("portal.employee.access"))
         self.assertEqual(mobile_context.employee_id, "employee-1")
+        self.assertEqual(mobile_context.tenant_code, "nord")
+        self.assertEqual(mobile_context.tenant_name, "SicherPlan Nord")
+        self.assertEqual(mobile_context.photo_document_id, "photo-doc-1")
+        self.assertEqual(mobile_context.photo_current_version_no, 3)
+        self.assertEqual(mobile_context.photo_content_type, "image/jpeg")
         self.assertEqual(mobile_context.personnel_no, "EMP-1001")
         self.assertEqual(mobile_context.work_email, "anna@example.com")
         self.assertIn("employee_user", mobile_context.role_keys)
         self.assertFalse(hasattr(mobile_context, "tax_id"))
+
+    def test_mobile_context_returns_empty_photo_metadata_when_employee_has_no_photo(self) -> None:
+        mobile_context = self.service.get_mobile_context(_employee_self_service_context("portal.employee.access"))
+        self.assertIsNone(mobile_context.photo_document_id)
+        self.assertIsNone(mobile_context.photo_current_version_no)
+        self.assertIsNone(mobile_context.photo_content_type)
 
     def test_update_profile_only_changes_whitelisted_operational_fields(self) -> None:
         employee = self.repository.employees["employee-1"]

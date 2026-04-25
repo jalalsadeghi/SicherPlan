@@ -10,7 +10,7 @@ from sqlalchemy import CheckConstraint, ForeignKeyConstraint
 
 from app.db import Base
 from app.errors import ApiException
-from app.modules.core.models import Branch, Mandate
+from app.modules.core.models import Branch, Mandate, Tenant
 from app.modules.employees.availability_service import EmployeeAvailabilityService
 from app.modules.employees.models import (
     Employee,
@@ -73,6 +73,19 @@ class FakeAvailabilityRepository:
     event_applications: dict[str, EmployeeEventApplication] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        self.tenant = Tenant(
+            id=self.tenant_id,
+            code="nord",
+            name="SicherPlan Nord",
+            legal_name="SicherPlan Nord GmbH",
+            default_locale="de",
+            default_currency="EUR",
+            timezone="Europe/Berlin",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            version_no=1,
+            status="active",
+        )
         self.branch = Branch(
             id=self.branch_id,
             tenant_id=self.tenant_id,
@@ -125,6 +138,11 @@ class FakeAvailabilityRepository:
         if row is None or row.tenant_id != tenant_id:
             return None
         return row
+
+    def get_tenant(self, tenant_id: str) -> Tenant | None:
+        if tenant_id != self.tenant.id:
+            return None
+        return self.tenant
 
     def list_availability_rules(
         self,

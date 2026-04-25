@@ -3,15 +3,19 @@ import 'package:flutter/material.dart';
 class BrandBanner extends StatelessWidget {
   const BrandBanner({
     required this.title,
-    required this.subtitle,
-    required this.tenantName,
+    this.subtitle,
+    this.tenantName,
+    this.avatar,
+    this.fallbackInitials,
     this.trailing,
     super.key,
   });
 
   final String title;
-  final String subtitle;
-  final String tenantName;
+  final String? subtitle;
+  final String? tenantName;
+  final Widget? avatar;
+  final String? fallbackInitials;
   final Widget? trailing;
 
   @override
@@ -39,23 +43,7 @@ class BrandBanner extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                alignment: Alignment.center,
-                child: const Text(
-                  'SP',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
+              avatar ?? _DefaultBannerAvatar(initials: fallbackInitials),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -68,36 +56,70 @@ class BrandBanner extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.88),
+                    if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        subtitle!,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.88),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
               if (trailing != null) ...[trailing!],
             ],
           ),
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              tenantName,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
+          if (tenantName != null && tenantName!.trim().isNotEmpty) ...[
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                tenantName!,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _DefaultBannerAvatar extends StatelessWidget {
+  const _DefaultBannerAvatar({this.initials});
+
+  final String? initials;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      alignment: Alignment.center,
+      child: initials != null && initials!.trim().isNotEmpty
+          ? Text(
+              initials!,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+              ),
+            )
+          : const Icon(Icons.person_rounded, color: Colors.white, size: 28),
     );
   }
 }

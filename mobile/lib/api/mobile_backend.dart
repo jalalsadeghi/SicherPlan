@@ -92,16 +92,16 @@ class MobileCurrentUser {
     Map<String, dynamic> codesJson,
   ) {
     final user = (loginJson['user'] as Map).cast<String, dynamic>();
-    final roles = (user['roles'] as List? ?? const [])
-        .cast<Map<String, dynamic>>()
-        .map((item) => item['role_key'] as String)
-        .toSet()
-        .toList()
-      ..sort();
-    final permissions = (codesJson['items'] as List? ?? const [])
-        .cast<String>()
-        .toList()
-      ..sort();
+    final roles =
+        (user['roles'] as List? ?? const [])
+            .cast<Map<String, dynamic>>()
+            .map((item) => item['role_key'] as String)
+            .toSet()
+            .toList()
+          ..sort();
+    final permissions =
+        (codesJson['items'] as List? ?? const []).cast<String>().toList()
+          ..sort();
     return MobileCurrentUser(
       id: user['id'] as String,
       tenantId: user['tenant_id'] as String,
@@ -142,6 +142,11 @@ class MobileCurrentUser {
 class EmployeeMobileContext {
   const EmployeeMobileContext({
     required this.tenantId,
+    required this.tenantCode,
+    required this.tenantName,
+    required this.photoDocumentId,
+    required this.photoCurrentVersionNo,
+    required this.photoContentType,
     required this.userId,
     required this.employeeId,
     required this.personnelNo,
@@ -164,6 +169,11 @@ class EmployeeMobileContext {
   });
 
   final String tenantId;
+  final String tenantCode;
+  final String tenantName;
+  final String? photoDocumentId;
+  final int? photoCurrentVersionNo;
+  final String? photoContentType;
   final String userId;
   final String employeeId;
   final String personnelNo;
@@ -184,9 +194,29 @@ class EmployeeMobileContext {
   final bool hasWatchbookAccess;
   final bool hasPatrolAccess;
 
+  bool get hasProfilePhoto =>
+      photoDocumentId != null && photoCurrentVersionNo != null;
+
+  String get tenantDisplayName {
+    final normalizedName = tenantName.trim();
+    final normalizedCode = tenantCode.trim();
+    if (normalizedName.isEmpty) {
+      return normalizedCode;
+    }
+    if (normalizedCode.isEmpty) {
+      return normalizedName;
+    }
+    return '$normalizedName ($normalizedCode)';
+  }
+
   factory EmployeeMobileContext.fromJson(Map<String, dynamic> json) {
     return EmployeeMobileContext(
       tenantId: json['tenant_id'] as String,
+      tenantCode: json['tenant_code'] as String? ?? '',
+      tenantName: json['tenant_name'] as String? ?? '',
+      photoDocumentId: json['photo_document_id'] as String?,
+      photoCurrentVersionNo: json['photo_current_version_no'] as int?,
+      photoContentType: json['photo_content_type'] as String?,
       userId: json['user_id'] as String,
       employeeId: json['employee_id'] as String,
       personnelNo: json['personnel_no'] as String,
@@ -211,6 +241,11 @@ class EmployeeMobileContext {
 
   Map<String, dynamic> toJson() => {
     'tenant_id': tenantId,
+    'tenant_code': tenantCode,
+    'tenant_name': tenantName,
+    'photo_document_id': photoDocumentId,
+    'photo_current_version_no': photoCurrentVersionNo,
+    'photo_content_type': photoContentType,
     'user_id': userId,
     'employee_id': employeeId,
     'personnel_no': personnelNo,
@@ -475,7 +510,9 @@ class EmployeeMobileDocument {
       contentType: json['content_type'] as String?,
       currentVersionNo: json['current_version_no'] as int?,
       shiftId: json['shift_id'] as String?,
-      scheduleDate: json['schedule_date'] != null ? DateTime.parse(json['schedule_date'] as String) : null,
+      scheduleDate: json['schedule_date'] != null
+          ? DateTime.parse(json['schedule_date'] as String)
+          : null,
     );
   }
 }
@@ -510,7 +547,9 @@ class EmployeeMobileCredential {
       credentialType: json['credential_type'] as String,
       encodedValue: json['encoded_value'] as String,
       validFrom: DateTime.parse(json['valid_from'] as String),
-      validUntil: json['valid_until'] != null ? DateTime.parse(json['valid_until'] as String) : null,
+      validUntil: json['valid_until'] != null
+          ? DateTime.parse(json['valid_until'] as String)
+          : null,
       status: json['status'] as String,
       badgeDocumentId: json['badge_document_id'] as String?,
       badgeFileName: json['badge_file_name'] as String?,
@@ -553,16 +592,25 @@ class NoticeItem {
       title: json['title'] as String,
       summary: json['summary'] as String?,
       languageCode: json['language_code'] as String,
-      mandatoryAcknowledgement: json['mandatory_acknowledgement'] as bool? ?? false,
+      mandatoryAcknowledgement:
+          json['mandatory_acknowledgement'] as bool? ?? false,
       status: json['status'] as String? ?? 'published',
-      acknowledgedAt: json['acknowledged_at'] != null ? DateTime.parse(json['acknowledged_at'] as String) : null,
-      openedAt: json['opened_at'] != null ? DateTime.parse(json['opened_at'] as String) : null,
-      attachmentDocumentIds: (json['attachment_document_ids'] as List? ?? const []).cast<String>(),
+      acknowledgedAt: json['acknowledged_at'] != null
+          ? DateTime.parse(json['acknowledged_at'] as String)
+          : null,
+      openedAt: json['opened_at'] != null
+          ? DateTime.parse(json['opened_at'] as String)
+          : null,
+      attachmentDocumentIds:
+          (json['attachment_document_ids'] as List? ?? const []).cast<String>(),
       attachments: (json['attachments'] as List? ?? const [])
           .cast<Map<String, dynamic>>()
           .map(NoticeAttachmentItem.fromJson)
           .toList(),
-      links: (json['links'] as List? ?? const []).cast<Map<String, dynamic>>().map(NoticeLinkItem.fromJson).toList(),
+      links: (json['links'] as List? ?? const [])
+          .cast<Map<String, dynamic>>()
+          .map(NoticeLinkItem.fromJson)
+          .toList(),
       body: json['body'] as String?,
     );
   }
@@ -634,7 +682,8 @@ class NoticeFeedStatus {
     return NoticeFeedStatus(
       totalCount: json['total_count'] as int? ?? 0,
       unreadCount: json['unread_count'] as int? ?? 0,
-      mandatoryUnacknowledgedCount: json['mandatory_unacknowledged_count'] as int? ?? 0,
+      mandatoryUnacknowledgedCount:
+          json['mandatory_unacknowledged_count'] as int? ?? 0,
       blockingRequired: json['blocking_required'] as bool? ?? false,
     );
   }
@@ -728,7 +777,10 @@ class WatchbookReadModel {
       summary: json['summary'] as String?,
       reviewStatusCode: json['review_status_code'] as String? ?? 'pending',
       closureStateCode: json['closure_state_code'] as String? ?? 'open',
-      entries: (json['entries'] as List? ?? const []).cast<Map<String, dynamic>>().map(WatchbookEntryItem.fromJson).toList(),
+      entries: (json['entries'] as List? ?? const [])
+          .cast<Map<String, dynamic>>()
+          .map(WatchbookEntryItem.fromJson)
+          .toList(),
     );
   }
 }
@@ -763,7 +815,9 @@ class PatrolCheckpointProgressItem {
       scanTypeCode: json['scan_type_code'] as String,
       minimumDwellSeconds: json['minimum_dwell_seconds'] as int? ?? 0,
       isCompleted: json['is_completed'] as bool? ?? false,
-      lastEventAt: json['last_event_at'] != null ? DateTime.parse(json['last_event_at'] as String) : null,
+      lastEventAt: json['last_event_at'] != null
+          ? DateTime.parse(json['last_event_at'] as String)
+          : null,
     );
   }
 
@@ -892,7 +946,8 @@ class PatrolRoundEventItem {
       actorUserId: json['actor_user_id'] as String,
       isPolicyCompliant: json['is_policy_compliant'] as bool? ?? false,
       clientEventId: json['client_event_id'] as String?,
-      attachmentDocumentIds: (json['attachment_document_ids'] as List? ?? const []).cast<String>(),
+      attachmentDocumentIds:
+          (json['attachment_document_ids'] as List? ?? const []).cast<String>(),
     );
   }
 
@@ -972,14 +1027,21 @@ class PatrolRoundItem {
       offlineSyncToken: json['offline_sync_token'] as String?,
       roundStatusCode: json['round_status_code'] as String,
       startedAt: DateTime.parse(json['started_at'] as String),
-      completedAt: json['completed_at'] != null ? DateTime.parse(json['completed_at'] as String) : null,
-      abortedAt: json['aborted_at'] != null ? DateTime.parse(json['aborted_at'] as String) : null,
+      completedAt: json['completed_at'] != null
+          ? DateTime.parse(json['completed_at'] as String)
+          : null,
+      abortedAt: json['aborted_at'] != null
+          ? DateTime.parse(json['aborted_at'] as String)
+          : null,
       abortReasonCode: json['abort_reason_code'] as String?,
       completionNote: json['completion_note'] as String?,
       totalCheckpointCount: json['total_checkpoint_count'] as int? ?? 0,
       completedCheckpointCount: json['completed_checkpoint_count'] as int? ?? 0,
       versionNo: json['version_no'] as int? ?? 1,
-      events: (json['events'] as List? ?? const []).cast<Map<String, dynamic>>().map(PatrolRoundEventItem.fromJson).toList(),
+      events: (json['events'] as List? ?? const [])
+          .cast<Map<String, dynamic>>()
+          .map(PatrolRoundEventItem.fromJson)
+          .toList(),
       checkpoints: (json['checkpoints'] as List? ?? const [])
           .cast<Map<String, dynamic>>()
           .map(PatrolCheckpointProgressItem.fromJson)
@@ -1187,19 +1249,28 @@ class PatrolEvaluationItem {
       mismatchCount: json['mismatch_count'] as int? ?? 0,
       watchbookId: json['watchbook_id'] as String?,
       summaryDocument: json['summary_document'] != null
-          ? EmployeeReleasedDocument.fromJson((json['summary_document'] as Map).cast<String, dynamic>())
+          ? EmployeeReleasedDocument.fromJson(
+              (json['summary_document'] as Map).cast<String, dynamic>(),
+            )
           : null,
       completionRatio: (json['completion_ratio'] as num?)?.toDouble() ?? 0,
-      complianceStatusCode: json['compliance_status_code'] as String? ?? 'attention_required',
+      complianceStatusCode:
+          json['compliance_status_code'] as String? ?? 'attention_required',
     );
   }
 }
 
 abstract class MobileBackendGateway {
-  Future<(MobileCurrentUser, MobileAuthTokens)> login(MobileLoginPayload payload);
-  Future<(MobileCurrentUser, MobileAuthTokens)> restore(MobileAuthTokens tokens);
+  Future<(MobileCurrentUser, MobileAuthTokens)> login(
+    MobileLoginPayload payload,
+  );
+  Future<(MobileCurrentUser, MobileAuthTokens)> restore(
+    MobileAuthTokens tokens,
+  );
   Future<EmployeeMobileContext> fetchMobileContext(String accessToken);
-  Future<List<EmployeeReleasedScheduleItem>> fetchReleasedSchedules(String accessToken);
+  Future<List<EmployeeReleasedScheduleItem>> fetchReleasedSchedules(
+    String accessToken,
+  );
   Future<List<TimeCaptureEventItem>> fetchTimeEvents(String accessToken);
   Future<TimeCaptureEventItem> captureOwnTimeEvent(
     String accessToken, {
@@ -1213,7 +1284,9 @@ abstract class MobileBackendGateway {
     required int? versionNo,
     String? note,
   });
-  Future<List<EmployeeEventApplicationItem>> fetchEventApplications(String accessToken);
+  Future<List<EmployeeEventApplicationItem>> fetchEventApplications(
+    String accessToken,
+  );
   Future<EmployeeEventApplicationItem> createEventApplication(
     String accessToken, {
     required String planningRecordId,
@@ -1228,10 +1301,22 @@ abstract class MobileBackendGateway {
   Future<List<EmployeeMobileDocument>> fetchDocuments(String accessToken);
   Future<List<EmployeeMobileCredential>> fetchCredentials(String accessToken);
   Future<List<NoticeItem>> fetchNotices(String accessToken, String tenantId);
-  Future<NoticeFeedStatus> fetchNoticeFeedStatus(String accessToken, String tenantId);
-  Future<NoticeItem> fetchNotice(String accessToken, String tenantId, String noticeId);
+  Future<NoticeFeedStatus> fetchNoticeFeedStatus(
+    String accessToken,
+    String tenantId,
+  );
+  Future<NoticeItem> fetchNotice(
+    String accessToken,
+    String tenantId,
+    String noticeId,
+  );
   Future<void> openNotice(String accessToken, String tenantId, String noticeId);
-  Future<void> acknowledgeNotice(String accessToken, String tenantId, String noticeId, {String? acknowledgementText});
+  Future<void> acknowledgeNotice(
+    String accessToken,
+    String tenantId,
+    String noticeId, {
+    String? acknowledgementText,
+  });
   Future<List<int>> downloadNoticeAttachment(
     String accessToken, {
     required String tenantId,
@@ -1243,7 +1328,10 @@ abstract class MobileBackendGateway {
     required String documentId,
     required int versionNo,
   });
-  Future<List<WatchbookListItem>> fetchWatchbooks(String accessToken, String tenantId);
+  Future<List<WatchbookListItem>> fetchWatchbooks(
+    String accessToken,
+    String tenantId,
+  );
   Future<WatchbookReadModel> openWatchbook(
     String accessToken, {
     required String tenantId,
@@ -1255,7 +1343,11 @@ abstract class MobileBackendGateway {
     String? shiftId,
     String? headline,
   });
-  Future<WatchbookReadModel> fetchWatchbook(String accessToken, {required String tenantId, required String watchbookId});
+  Future<WatchbookReadModel> fetchWatchbook(
+    String accessToken, {
+    required String tenantId,
+    required String watchbookId,
+  });
   Future<WatchbookEntryItem> createWatchbookEntry(
     String accessToken, {
     required String tenantId,
@@ -1266,12 +1358,33 @@ abstract class MobileBackendGateway {
   });
   Future<List<PatrolAvailableRouteItem>> fetchPatrolRoutes(String accessToken);
   Future<PatrolRoundItem?> fetchActivePatrolRound(String accessToken);
-  Future<PatrolRoundItem> startPatrolRound(String accessToken, PatrolRoundStartPayload payload);
-  Future<PatrolRoundItem> fetchPatrolRound(String accessToken, String patrolRoundId);
-  Future<PatrolRoundItem> capturePatrolCheckpoint(String accessToken, String patrolRoundId, PatrolRoundCapturePayload payload);
-  Future<PatrolRoundItem> completePatrolRound(String accessToken, String patrolRoundId, PatrolRoundCompletePayload payload);
-  Future<PatrolRoundItem> abortPatrolRound(String accessToken, String patrolRoundId, PatrolRoundAbortPayload payload);
-  Future<PatrolEvaluationItem> fetchPatrolEvaluation(String accessToken, String patrolRoundId);
+  Future<PatrolRoundItem> startPatrolRound(
+    String accessToken,
+    PatrolRoundStartPayload payload,
+  );
+  Future<PatrolRoundItem> fetchPatrolRound(
+    String accessToken,
+    String patrolRoundId,
+  );
+  Future<PatrolRoundItem> capturePatrolCheckpoint(
+    String accessToken,
+    String patrolRoundId,
+    PatrolRoundCapturePayload payload,
+  );
+  Future<PatrolRoundItem> completePatrolRound(
+    String accessToken,
+    String patrolRoundId,
+    PatrolRoundCompletePayload payload,
+  );
+  Future<PatrolRoundItem> abortPatrolRound(
+    String accessToken,
+    String patrolRoundId,
+    PatrolRoundAbortPayload payload,
+  );
+  Future<PatrolEvaluationItem> fetchPatrolEvaluation(
+    String accessToken,
+    String patrolRoundId,
+  );
 }
 
 class HttpMobileBackendGateway implements MobileBackendGateway {
@@ -1292,7 +1405,10 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
       final request = await client.openUrl(method, uri);
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       if (accessToken != null) {
-        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $accessToken');
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          'Bearer $accessToken',
+        );
       }
       if (body != null) {
         request.add(utf8.encode(jsonEncode(body)));
@@ -1300,14 +1416,20 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        final decoded = responseBody.isNotEmpty ? jsonDecode(responseBody) as Map<String, dynamic> : <String, dynamic>{};
+        final decoded = responseBody.isNotEmpty
+            ? jsonDecode(responseBody) as Map<String, dynamic>
+            : <String, dynamic>{};
         final errors = decoded['errors'];
         String messageKey = 'errors.platform.internal';
         if (errors is List && errors.isNotEmpty) {
           final item = (errors.first as Map).cast<String, dynamic>();
           messageKey = item['message_key'] as String? ?? messageKey;
         }
-        throw MobileApiException(statusCode: response.statusCode, messageKey: messageKey, body: decoded);
+        throw MobileApiException(
+          statusCode: response.statusCode,
+          messageKey: messageKey,
+          body: decoded,
+        );
       }
       if (responseBody.isEmpty) {
         return <String, dynamic>{};
@@ -1318,34 +1440,51 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
     }
   }
 
-  Future<List<dynamic>> _jsonList(String method, Uri uri, {String? accessToken}) async {
+  Future<List<dynamic>> _jsonList(
+    String method,
+    Uri uri, {
+    String? accessToken,
+  }) async {
     final client = HttpClient();
     try {
       final request = await client.openUrl(method, uri);
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       if (accessToken != null) {
-        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $accessToken');
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          'Bearer $accessToken',
+        );
       }
       final response = await request.close();
       final responseBody = await response.transform(utf8.decoder).join();
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        final decoded = responseBody.isNotEmpty ? jsonDecode(responseBody) as Map<String, dynamic> : <String, dynamic>{};
+        final decoded = responseBody.isNotEmpty
+            ? jsonDecode(responseBody) as Map<String, dynamic>
+            : <String, dynamic>{};
         final errors = decoded['errors'];
         String messageKey = 'errors.platform.internal';
         if (errors is List && errors.isNotEmpty) {
           final item = (errors.first as Map).cast<String, dynamic>();
           messageKey = item['message_key'] as String? ?? messageKey;
         }
-        throw MobileApiException(statusCode: response.statusCode, messageKey: messageKey, body: decoded);
+        throw MobileApiException(
+          statusCode: response.statusCode,
+          messageKey: messageKey,
+          body: decoded,
+        );
       }
-      return responseBody.isEmpty ? const [] : jsonDecode(responseBody) as List<dynamic>;
+      return responseBody.isEmpty
+          ? const []
+          : jsonDecode(responseBody) as List<dynamic>;
     } finally {
       client.close(force: true);
     }
   }
 
   @override
-  Future<(MobileCurrentUser, MobileAuthTokens)> login(MobileLoginPayload payload) async {
+  Future<(MobileCurrentUser, MobileAuthTokens)> login(
+    MobileLoginPayload payload,
+  ) async {
     final loginJson = await _jsonRequest(
       'POST',
       _uri('/api/auth/login'),
@@ -1358,19 +1497,37 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
       },
     );
     final tokens = MobileAuthTokens.fromLogin(loginJson);
-    final codesJson = await _jsonRequest('GET', _uri('/api/auth/codes'), accessToken: tokens.accessToken);
+    final codesJson = await _jsonRequest(
+      'GET',
+      _uri('/api/auth/codes'),
+      accessToken: tokens.accessToken,
+    );
     final user = MobileCurrentUser.fromAuthResponses(loginJson, codesJson);
     return (user, tokens);
   }
 
   @override
-  Future<(MobileCurrentUser, MobileAuthTokens)> restore(MobileAuthTokens tokens) async {
+  Future<(MobileCurrentUser, MobileAuthTokens)> restore(
+    MobileAuthTokens tokens,
+  ) async {
     try {
-      final meJson = await _jsonRequest('GET', _uri('/api/auth/me'), accessToken: tokens.accessToken);
-      final codesJson = await _jsonRequest('GET', _uri('/api/auth/codes'), accessToken: tokens.accessToken);
+      final meJson = await _jsonRequest(
+        'GET',
+        _uri('/api/auth/me'),
+        accessToken: tokens.accessToken,
+      );
+      final codesJson = await _jsonRequest(
+        'GET',
+        _uri('/api/auth/codes'),
+        accessToken: tokens.accessToken,
+      );
       final merged = {
         'user': meJson['user'],
-        'session': {'access_token': tokens.accessToken, 'refresh_token': tokens.refreshToken, 'session_id': tokens.sessionId},
+        'session': {
+          'access_token': tokens.accessToken,
+          'refresh_token': tokens.refreshToken,
+          'session_id': tokens.sessionId,
+        },
       };
       return (MobileCurrentUser.fromAuthResponses(merged, codesJson), tokens);
     } on MobileApiException catch (error) {
@@ -1384,11 +1541,20 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
       );
       final refreshedTokens = MobileAuthTokens(
         accessToken: (refreshJson['session'] as Map)['access_token'] as String,
-        refreshToken: (refreshJson['session'] as Map)['refresh_token'] as String,
+        refreshToken:
+            (refreshJson['session'] as Map)['refresh_token'] as String,
         sessionId: (refreshJson['session'] as Map)['session_id'] as String,
       );
-      final meJson = await _jsonRequest('GET', _uri('/api/auth/me'), accessToken: refreshedTokens.accessToken);
-      final codesJson = await _jsonRequest('GET', _uri('/api/auth/codes'), accessToken: refreshedTokens.accessToken);
+      final meJson = await _jsonRequest(
+        'GET',
+        _uri('/api/auth/me'),
+        accessToken: refreshedTokens.accessToken,
+      );
+      final codesJson = await _jsonRequest(
+        'GET',
+        _uri('/api/auth/codes'),
+        accessToken: refreshedTokens.accessToken,
+      );
       final merged = {
         'user': meJson['user'],
         'session': {
@@ -1397,27 +1563,46 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
           'session_id': refreshedTokens.sessionId,
         },
       };
-      return (MobileCurrentUser.fromAuthResponses(merged, codesJson), refreshedTokens);
+      return (
+        MobileCurrentUser.fromAuthResponses(merged, codesJson),
+        refreshedTokens,
+      );
     }
   }
 
   @override
   Future<EmployeeMobileContext> fetchMobileContext(String accessToken) async {
-    final json = await _jsonRequest('GET', _uri('/api/employee-self-service/me/mobile-context'), accessToken: accessToken);
+    final json = await _jsonRequest(
+      'GET',
+      _uri('/api/employee-self-service/me/mobile-context'),
+      accessToken: accessToken,
+    );
     return EmployeeMobileContext.fromJson(json);
   }
 
   @override
-  Future<List<EmployeeReleasedScheduleItem>> fetchReleasedSchedules(String accessToken) async {
-    final json = await _jsonRequest('GET', _uri('/api/employee-self-service/me/released-schedules'), accessToken: accessToken);
-    final items = (json['items'] as List? ?? const []).cast<Map<String, dynamic>>();
+  Future<List<EmployeeReleasedScheduleItem>> fetchReleasedSchedules(
+    String accessToken,
+  ) async {
+    final json = await _jsonRequest(
+      'GET',
+      _uri('/api/employee-self-service/me/released-schedules'),
+      accessToken: accessToken,
+    );
+    final items = (json['items'] as List? ?? const [])
+        .cast<Map<String, dynamic>>();
     return items.map(EmployeeReleasedScheduleItem.fromJson).toList();
   }
 
   @override
   Future<List<TimeCaptureEventItem>> fetchTimeEvents(String accessToken) async {
-    final json = await _jsonRequest('GET', _uri('/api/field/time-capture/me/events'), accessToken: accessToken);
-    final items = (json['items'] as List? ?? const []).cast<Map<String, dynamic>>();
+    final json = await _jsonRequest(
+      'GET',
+      _uri('/api/field/time-capture/me/events'),
+      accessToken: accessToken,
+    );
+    final items = (json['items'] as List? ?? const [])
+        .cast<Map<String, dynamic>>();
     return items.map(TimeCaptureEventItem.fromJson).toList();
   }
 
@@ -1446,7 +1631,9 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }) async {
     final json = await _jsonRequest(
       'POST',
-      _uri('/api/employee-self-service/me/released-schedules/$assignmentId/respond'),
+      _uri(
+        '/api/employee-self-service/me/released-schedules/$assignmentId/respond',
+      ),
       accessToken: accessToken,
       body: {
         'response_code': responseCode,
@@ -1458,9 +1645,18 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }
 
   @override
-  Future<List<EmployeeEventApplicationItem>> fetchEventApplications(String accessToken) async {
-    final items = await _jsonList('GET', _uri('/api/employee-self-service/me/event-applications'), accessToken: accessToken);
-    return items.cast<Map<String, dynamic>>().map(EmployeeEventApplicationItem.fromJson).toList();
+  Future<List<EmployeeEventApplicationItem>> fetchEventApplications(
+    String accessToken,
+  ) async {
+    final items = await _jsonList(
+      'GET',
+      _uri('/api/employee-self-service/me/event-applications'),
+      accessToken: accessToken,
+    );
+    return items
+        .cast<Map<String, dynamic>>()
+        .map(EmployeeEventApplicationItem.fromJson)
+        .toList();
   }
 
   @override
@@ -1487,7 +1683,9 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }) async {
     final json = await _jsonRequest(
       'POST',
-      _uri('/api/employee-self-service/me/event-applications/$applicationId/cancel'),
+      _uri(
+        '/api/employee-self-service/me/event-applications/$applicationId/cancel',
+      ),
       accessToken: accessToken,
       body: {'decision_note': decisionNote, 'version_no': versionNo},
     );
@@ -1495,21 +1693,38 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }
 
   @override
-  Future<List<EmployeeMobileDocument>> fetchDocuments(String accessToken) async {
-    final json = await _jsonRequest('GET', _uri('/api/employee-self-service/me/documents'), accessToken: accessToken);
-    final items = (json['items'] as List? ?? const []).cast<Map<String, dynamic>>();
+  Future<List<EmployeeMobileDocument>> fetchDocuments(
+    String accessToken,
+  ) async {
+    final json = await _jsonRequest(
+      'GET',
+      _uri('/api/employee-self-service/me/documents'),
+      accessToken: accessToken,
+    );
+    final items = (json['items'] as List? ?? const [])
+        .cast<Map<String, dynamic>>();
     return items.map(EmployeeMobileDocument.fromJson).toList();
   }
 
   @override
-  Future<List<EmployeeMobileCredential>> fetchCredentials(String accessToken) async {
-    final json = await _jsonRequest('GET', _uri('/api/employee-self-service/me/credentials'), accessToken: accessToken);
-    final items = (json['items'] as List? ?? const []).cast<Map<String, dynamic>>();
+  Future<List<EmployeeMobileCredential>> fetchCredentials(
+    String accessToken,
+  ) async {
+    final json = await _jsonRequest(
+      'GET',
+      _uri('/api/employee-self-service/me/credentials'),
+      accessToken: accessToken,
+    );
+    final items = (json['items'] as List? ?? const [])
+        .cast<Map<String, dynamic>>();
     return items.map(EmployeeMobileCredential.fromJson).toList();
   }
 
   @override
-  Future<List<NoticeItem>> fetchNotices(String accessToken, String tenantId) async {
+  Future<List<NoticeItem>> fetchNotices(
+    String accessToken,
+    String tenantId,
+  ) async {
     final items = await _jsonList(
       'GET',
       _uri('/api/platform/tenants/$tenantId/info/notices/my/feed'),
@@ -1519,27 +1734,58 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }
 
   @override
-  Future<NoticeFeedStatus> fetchNoticeFeedStatus(String accessToken, String tenantId) async {
-    final json = await _jsonRequest('GET', _uri('/api/platform/tenants/$tenantId/info/notices/my/feed/status'), accessToken: accessToken);
+  Future<NoticeFeedStatus> fetchNoticeFeedStatus(
+    String accessToken,
+    String tenantId,
+  ) async {
+    final json = await _jsonRequest(
+      'GET',
+      _uri('/api/platform/tenants/$tenantId/info/notices/my/feed/status'),
+      accessToken: accessToken,
+    );
     return NoticeFeedStatus.fromJson(json);
   }
 
   @override
-  Future<NoticeItem> fetchNotice(String accessToken, String tenantId, String noticeId) async {
-    final json = await _jsonRequest('GET', _uri('/api/platform/tenants/$tenantId/info/notices/my/feed/$noticeId'), accessToken: accessToken);
+  Future<NoticeItem> fetchNotice(
+    String accessToken,
+    String tenantId,
+    String noticeId,
+  ) async {
+    final json = await _jsonRequest(
+      'GET',
+      _uri('/api/platform/tenants/$tenantId/info/notices/my/feed/$noticeId'),
+      accessToken: accessToken,
+    );
     return NoticeItem.fromJson(json);
   }
 
   @override
-  Future<void> openNotice(String accessToken, String tenantId, String noticeId) async {
-    await _jsonRequest('POST', _uri('/api/platform/tenants/$tenantId/info/notices/$noticeId/open'), accessToken: accessToken, body: const {});
+  Future<void> openNotice(
+    String accessToken,
+    String tenantId,
+    String noticeId,
+  ) async {
+    await _jsonRequest(
+      'POST',
+      _uri('/api/platform/tenants/$tenantId/info/notices/$noticeId/open'),
+      accessToken: accessToken,
+      body: const {},
+    );
   }
 
   @override
-  Future<void> acknowledgeNotice(String accessToken, String tenantId, String noticeId, {String? acknowledgementText}) async {
+  Future<void> acknowledgeNotice(
+    String accessToken,
+    String tenantId,
+    String noticeId, {
+    String? acknowledgementText,
+  }) async {
     await _jsonRequest(
       'POST',
-      _uri('/api/platform/tenants/$tenantId/info/notices/$noticeId/acknowledge'),
+      _uri(
+        '/api/platform/tenants/$tenantId/info/notices/$noticeId/acknowledge',
+      ),
       accessToken: accessToken,
       body: {'acknowledgement_text': acknowledgementText},
     );
@@ -1554,13 +1800,26 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }) async {
     final client = HttpClient();
     try {
-      final request = await client.getUrl(_uri('/api/platform/tenants/$tenantId/documents/$documentId/versions/$versionNo/download'));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $accessToken');
+      final request = await client.getUrl(
+        _uri(
+          '/api/platform/tenants/$tenantId/documents/$documentId/versions/$versionNo/download',
+        ),
+      );
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer $accessToken',
+      );
       final response = await request.close();
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final responseBody = await response.transform(utf8.decoder).join();
-        final decoded = responseBody.isNotEmpty ? jsonDecode(responseBody) as Map<String, dynamic> : <String, dynamic>{};
-        throw MobileApiException(statusCode: response.statusCode, messageKey: 'errors.platform.internal', body: decoded);
+        final decoded = responseBody.isNotEmpty
+            ? jsonDecode(responseBody) as Map<String, dynamic>
+            : <String, dynamic>{};
+        throw MobileApiException(
+          statusCode: response.statusCode,
+          messageKey: 'errors.platform.internal',
+          body: decoded,
+        );
       }
       return response.fold<List<int>>(<int>[], (buffer, chunk) {
         buffer.addAll(chunk);
@@ -1579,13 +1838,26 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }) async {
     final client = HttpClient();
     try {
-      final request = await client.getUrl(_uri('/api/employee-self-service/me/documents/$documentId/versions/$versionNo/download'));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $accessToken');
+      final request = await client.getUrl(
+        _uri(
+          '/api/employee-self-service/me/documents/$documentId/versions/$versionNo/download',
+        ),
+      );
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer $accessToken',
+      );
       final response = await request.close();
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final responseBody = await response.transform(utf8.decoder).join();
-        final decoded = responseBody.isNotEmpty ? jsonDecode(responseBody) as Map<String, dynamic> : <String, dynamic>{};
-        throw MobileApiException(statusCode: response.statusCode, messageKey: 'errors.platform.internal', body: decoded);
+        final decoded = responseBody.isNotEmpty
+            ? jsonDecode(responseBody) as Map<String, dynamic>
+            : <String, dynamic>{};
+        throw MobileApiException(
+          statusCode: response.statusCode,
+          messageKey: 'errors.platform.internal',
+          body: decoded,
+        );
       }
       return response.fold<List<int>>(<int>[], (buffer, chunk) {
         buffer.addAll(chunk);
@@ -1597,9 +1869,19 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }
 
   @override
-  Future<List<WatchbookListItem>> fetchWatchbooks(String accessToken, String tenantId) async {
-    final items = await _jsonList('GET', _uri('/api/field/tenants/$tenantId/watchbooks'), accessToken: accessToken);
-    return items.cast<Map<String, dynamic>>().map(WatchbookListItem.fromJson).toList();
+  Future<List<WatchbookListItem>> fetchWatchbooks(
+    String accessToken,
+    String tenantId,
+  ) async {
+    final items = await _jsonList(
+      'GET',
+      _uri('/api/field/tenants/$tenantId/watchbooks'),
+      accessToken: accessToken,
+    );
+    return items
+        .cast<Map<String, dynamic>>()
+        .map(WatchbookListItem.fromJson)
+        .toList();
   }
 
   @override
@@ -1633,8 +1915,16 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }
 
   @override
-  Future<WatchbookReadModel> fetchWatchbook(String accessToken, {required String tenantId, required String watchbookId}) async {
-    final json = await _jsonRequest('GET', _uri('/api/field/tenants/$tenantId/watchbooks/$watchbookId'), accessToken: accessToken);
+  Future<WatchbookReadModel> fetchWatchbook(
+    String accessToken, {
+    required String tenantId,
+    required String watchbookId,
+  }) async {
+    final json = await _jsonRequest(
+      'GET',
+      _uri('/api/field/tenants/$tenantId/watchbooks/$watchbookId'),
+      accessToken: accessToken,
+    );
     return WatchbookReadModel.fromJson(json);
   }
 
@@ -1661,14 +1951,27 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }
 
   @override
-  Future<List<PatrolAvailableRouteItem>> fetchPatrolRoutes(String accessToken) async {
-    final items = await _jsonList('GET', _uri('/api/field/patrol/routes'), accessToken: accessToken);
-    return items.cast<Map<String, dynamic>>().map(PatrolAvailableRouteItem.fromJson).toList();
+  Future<List<PatrolAvailableRouteItem>> fetchPatrolRoutes(
+    String accessToken,
+  ) async {
+    final items = await _jsonList(
+      'GET',
+      _uri('/api/field/patrol/routes'),
+      accessToken: accessToken,
+    );
+    return items
+        .cast<Map<String, dynamic>>()
+        .map(PatrolAvailableRouteItem.fromJson)
+        .toList();
   }
 
   @override
   Future<PatrolRoundItem?> fetchActivePatrolRound(String accessToken) async {
-    final json = await _jsonRequest('GET', _uri('/api/field/patrol/rounds/active'), accessToken: accessToken);
+    final json = await _jsonRequest(
+      'GET',
+      _uri('/api/field/patrol/rounds/active'),
+      accessToken: accessToken,
+    );
     if (json.isEmpty || json['id'] == null) {
       return null;
     }
@@ -1676,7 +1979,10 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }
 
   @override
-  Future<PatrolRoundItem> startPatrolRound(String accessToken, PatrolRoundStartPayload payload) async {
+  Future<PatrolRoundItem> startPatrolRound(
+    String accessToken,
+    PatrolRoundStartPayload payload,
+  ) async {
     final json = await _jsonRequest(
       'POST',
       _uri('/api/field/patrol/rounds/start'),
@@ -1687,13 +1993,24 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }
 
   @override
-  Future<PatrolRoundItem> fetchPatrolRound(String accessToken, String patrolRoundId) async {
-    final json = await _jsonRequest('GET', _uri('/api/field/patrol/rounds/$patrolRoundId'), accessToken: accessToken);
+  Future<PatrolRoundItem> fetchPatrolRound(
+    String accessToken,
+    String patrolRoundId,
+  ) async {
+    final json = await _jsonRequest(
+      'GET',
+      _uri('/api/field/patrol/rounds/$patrolRoundId'),
+      accessToken: accessToken,
+    );
     return PatrolRoundItem.fromJson(json);
   }
 
   @override
-  Future<PatrolRoundItem> capturePatrolCheckpoint(String accessToken, String patrolRoundId, PatrolRoundCapturePayload payload) async {
+  Future<PatrolRoundItem> capturePatrolCheckpoint(
+    String accessToken,
+    String patrolRoundId,
+    PatrolRoundCapturePayload payload,
+  ) async {
     final json = await _jsonRequest(
       'POST',
       _uri('/api/field/patrol/rounds/$patrolRoundId/capture'),
@@ -1704,7 +2021,11 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }
 
   @override
-  Future<PatrolRoundItem> completePatrolRound(String accessToken, String patrolRoundId, PatrolRoundCompletePayload payload) async {
+  Future<PatrolRoundItem> completePatrolRound(
+    String accessToken,
+    String patrolRoundId,
+    PatrolRoundCompletePayload payload,
+  ) async {
     final json = await _jsonRequest(
       'POST',
       _uri('/api/field/patrol/rounds/$patrolRoundId/complete'),
@@ -1715,7 +2036,11 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }
 
   @override
-  Future<PatrolRoundItem> abortPatrolRound(String accessToken, String patrolRoundId, PatrolRoundAbortPayload payload) async {
+  Future<PatrolRoundItem> abortPatrolRound(
+    String accessToken,
+    String patrolRoundId,
+    PatrolRoundAbortPayload payload,
+  ) async {
     final json = await _jsonRequest(
       'POST',
       _uri('/api/field/patrol/rounds/$patrolRoundId/abort'),
@@ -1726,8 +2051,15 @@ class HttpMobileBackendGateway implements MobileBackendGateway {
   }
 
   @override
-  Future<PatrolEvaluationItem> fetchPatrolEvaluation(String accessToken, String patrolRoundId) async {
-    final json = await _jsonRequest('GET', _uri('/api/field/patrol/rounds/$patrolRoundId/evaluation'), accessToken: accessToken);
+  Future<PatrolEvaluationItem> fetchPatrolEvaluation(
+    String accessToken,
+    String patrolRoundId,
+  ) async {
+    final json = await _jsonRequest(
+      'GET',
+      _uri('/api/field/patrol/rounds/$patrolRoundId/evaluation'),
+      accessToken: accessToken,
+    );
     return PatrolEvaluationItem.fromJson(json);
   }
 }

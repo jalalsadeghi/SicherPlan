@@ -7,7 +7,7 @@ from datetime import timedelta
 from typing import Protocol
 
 from app.errors import ApiException
-from app.modules.core.models import Address
+from app.modules.core.models import Address, Tenant
 from app.modules.core.schemas import AddressRead
 from app.modules.employees.availability_service import EmployeeAvailabilityService
 from app.modules.employees.models import Employee, EmployeeAddressHistory
@@ -41,6 +41,7 @@ ALLOWED_SELF_SERVICE_RULE_KINDS = {"availability", "free_wish"}
 
 class EmployeeSelfServiceRepository(Protocol):
     def get_employee(self, tenant_id: str, employee_id: str) -> Employee | None: ...
+    def get_tenant(self, tenant_id: str) -> Tenant | None: ...
     def find_employee_by_user_id(self, tenant_id: str, user_id: str, *, exclude_id: str | None = None) -> Employee | None: ...
     def update_employee(self, row: Employee) -> Employee: ...
     def list_employee_address_history(self, tenant_id: str, employee_id: str) -> list[EmployeeAddressHistory]: ...
@@ -85,8 +86,14 @@ class EmployeeSelfService:
     def get_mobile_context(self, context: RequestAuthorizationContext) -> EmployeeMobileContextRead:
         employee_context = self._resolve_employee(context)
         employee = employee_context.employee
+        tenant = self.repository.get_tenant(employee.tenant_id)
         return EmployeeMobileContextRead(
             tenant_id=employee.tenant_id,
+            tenant_code=tenant.code if tenant is not None else employee.tenant_id,
+            tenant_name=tenant.name if tenant is not None else employee.tenant_id,
+            photo_document_id=getattr(employee, "photo_document_id", None),
+            photo_current_version_no=getattr(employee, "photo_current_version_no", None),
+            photo_content_type=getattr(employee, "photo_content_type", None),
             user_id=context.user_id,
             employee_id=employee.id,
             personnel_no=employee.personnel_no,

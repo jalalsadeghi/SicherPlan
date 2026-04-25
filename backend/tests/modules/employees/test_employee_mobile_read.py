@@ -98,6 +98,15 @@ class EmployeeMobileReadServiceTests(unittest.TestCase):
         self.repository.owner_documents = {
             ('tenant-1', 'hr.employee', 'employee-1'): [employee_doc],
         }
+        profile_photo = SimpleNamespace(
+            id='employee-photo-1',
+            title='Profilfoto',
+            metadata_json={'kind': 'profile_photo'},
+            current_version_no=1,
+            versions=[SimpleNamespace(version_no=1, file_name='profile.jpg', content_type='image/jpeg')],
+            links=[SimpleNamespace(owner_type='hr.employee', owner_id='employee-1', relation_type='profile_photo', linked_at=datetime.now(UTC))],
+        )
+        self.repository.owner_documents[('tenant-1', 'hr.employee', 'employee-1')].append(profile_photo)
         self.repository.list_credentials = lambda tenant_id, filters: [  # type: ignore[method-assign]
             row for row in self.repository.employee_credentials if row.employee_id == filters.employee_id
         ]
@@ -120,6 +129,10 @@ class EmployeeMobileReadServiceTests(unittest.TestCase):
         with self.assertRaises(ApiException) as raised:
             self.service.download_document(_context(), 'unknown-doc', 1)
         self.assertEqual(raised.exception.status_code, 404)
+
+    def test_download_allows_owned_profile_photo(self) -> None:
+        result = self.service.download_document(_context(), 'employee-photo-1', 1)
+        self.assertEqual(result.file_name, 'employee-photo-1.bin')
 
     def test_lists_credentials_for_own_employee(self) -> None:
         result = self.service.list_credentials(_context())

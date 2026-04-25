@@ -28,6 +28,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   late Future<List<EmployeeEventApplicationItem>> _applicationsFuture;
   final _planningRecordController = TextEditingController();
   final _applicationNoteController = TextEditingController();
+  DateTime? _visibleMonth;
 
   @override
   void initState() {
@@ -80,58 +81,108 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 icon: Icons.event_busy_outlined,
               );
             }
-            final grouped = <String, List<EmployeeReleasedScheduleItem>>{};
-            for (final item in schedules) {
-              final key = '${item.scheduleDate.year}-${item.scheduleDate.month.toString().padLeft(2, '0')}';
-              grouped.putIfAbsent(key, () => []).add(item);
-            }
+            final sortedSchedules = [
+              ...schedules,
+            ]..sort((left, right) => left.workStart.compareTo(right.workStart));
+            final minMonth = _monthStart(sortedSchedules.first.scheduleDate);
+            final maxMonth = _monthStart(sortedSchedules.last.scheduleDate);
+            final visibleMonth = _resolveVisibleMonth(minMonth, maxMonth);
+            final schedulesByDay = _groupSchedulesByDay(sortedSchedules);
             return Column(
-              children: grouped.entries.map((entry) {
-                final monthLabel = _monthLabel(entry.value.first.scheduleDate);
-                return Card(
+              children: [
+                Card(
                   margin: const EdgeInsets.only(bottom: 14),
                   child: Padding(
                     padding: const EdgeInsets.all(18),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(monthLabel, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: visibleMonth.isAfter(minMonth)
+                                  ? () => _changeVisibleMonth(-1)
+                                  : null,
+                              icon: const Icon(Icons.chevron_left_rounded),
+                            ),
+                            Expanded(
+                              child: Text(
+                                MaterialLocalizations.of(
+                                  context,
+                                ).formatMonthYear(visibleMonth),
+                                key: const ValueKey(
+                                  'schedule-calendar-month-label',
+                                ),
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: visibleMonth.isBefore(maxMonth)
+                                  ? () => _changeVisibleMonth(1)
+                                  : null,
+                              icon: const Icon(Icons.chevron_right_rounded),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 12),
-                        ...entry.value.map((item) => ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text('${_timeLabel(item.workStart)}-${_timeLabel(item.workEnd)} · ${item.shiftLabel}'),
-                              subtitle: Text(item.locationLabel ?? '-'),
-                              trailing: Chip(label: Text(_statusLabel(item))),
-                              onTap: () => _showShiftDetail(item),
-                            )),
+                        _CalendarMonthView(
+                          visibleMonth: visibleMonth,
+                          schedulesByDay: schedulesByDay,
+                          timeLabel: _timeLabel,
+                          statusLabel: _statusLabel,
+                          onDaySelected: _showDayDetail,
+                        ),
                       ],
                     ),
                   ),
-                );
-              }).toList(),
+                ),
+              ],
             );
           },
         ),
         Card(
+          key: const ValueKey('schedule-event-application-card'),
           margin: const EdgeInsets.only(top: 4),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              key: const ValueKey('schedule-event-application-tile'),
+              tilePadding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 4,
+              ),
+              childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+              initiallyExpanded: false,
+              title: Text(
+                l10n.eventApplicationTitle,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(l10n.eventApplicationSubtitle),
+              ),
               children: [
-                Text(l10n.eventApplicationTitle, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 8),
-                Text(l10n.eventApplicationSubtitle),
-                const SizedBox(height: 12),
                 TextField(
+                  key: const ValueKey(
+                    'event-application-planning-record-field',
+                  ),
                   controller: _planningRecordController,
-                  decoration: InputDecoration(labelText: l10n.eventApplicationPlanningRecordLabel),
+                  decoration: InputDecoration(
+                    labelText: l10n.eventApplicationPlanningRecordLabel,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
+                  key: const ValueKey('event-application-note-field'),
                   controller: _applicationNoteController,
                   maxLines: 2,
-                  decoration: InputDecoration(labelText: l10n.eventApplicationNoteLabel),
+                  decoration: InputDecoration(
+                    labelText: l10n.eventApplicationNoteLabel,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 FilledButton.icon(
@@ -187,11 +238,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   Future<List<EmployeeReleasedScheduleItem>> _loadSchedules() {
-    return widget.controller.withAccessToken(widget.backend.fetchReleasedSchedules);
+    return widget.controller.withAccessToken(
+      widget.backend.fetchReleasedSchedules,
+    );
   }
 
   Future<List<EmployeeEventApplicationItem>> _loadApplications() {
-    return widget.controller.withAccessToken(widget.backend.fetchEventApplications);
+    return widget.controller.withAccessToken(
+      widget.backend.fetchEventApplications,
+    );
   }
 
   void _refresh() {
@@ -201,9 +256,98 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     });
   }
 
-  String _monthLabel(DateTime value) => '${value.month.toString().padLeft(2, '0')}.${value.year}';
-  String _timeLabel(DateTime value) => '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
-  String _statusLabel(EmployeeReleasedScheduleItem item) => item.confirmationStatus == 'confirmed' ? context.l10n.mobileStatusConfirmed : context.l10n.mobileStatusAssigned;
+  String _timeLabel(DateTime value) =>
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  String _statusLabel(EmployeeReleasedScheduleItem item) =>
+      item.confirmationStatus == 'confirmed'
+      ? context.l10n.mobileStatusConfirmed
+      : context.l10n.mobileStatusAssigned;
+
+  DateTime _resolveVisibleMonth(DateTime minMonth, DateTime maxMonth) {
+    final current = _visibleMonth;
+    if (current == null ||
+        current.isBefore(minMonth) ||
+        current.isAfter(maxMonth)) {
+      _visibleMonth = minMonth;
+    }
+    return _visibleMonth!;
+  }
+
+  Map<DateTime, List<EmployeeReleasedScheduleItem>> _groupSchedulesByDay(
+    List<EmployeeReleasedScheduleItem> schedules,
+  ) {
+    final grouped = <DateTime, List<EmployeeReleasedScheduleItem>>{};
+    for (final item in schedules) {
+      final day = _dateOnly(item.scheduleDate);
+      grouped
+          .putIfAbsent(day, () => <EmployeeReleasedScheduleItem>[])
+          .add(item);
+    }
+    for (final items in grouped.values) {
+      items.sort((left, right) => left.workStart.compareTo(right.workStart));
+    }
+    return grouped;
+  }
+
+  DateTime _monthStart(DateTime value) => DateTime(value.year, value.month);
+  DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
+  void _changeVisibleMonth(int monthDelta) {
+    final visibleMonth = _visibleMonth;
+    if (visibleMonth == null) {
+      return;
+    }
+    setState(() {
+      _visibleMonth = DateTime(
+        visibleMonth.year,
+        visibleMonth.month + monthDelta,
+      );
+    });
+  }
+
+  Future<void> _showDayDetail(
+    DateTime day,
+    List<EmployeeReleasedScheduleItem> items,
+  ) async {
+    final localizations = MaterialLocalizations.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          child: SafeArea(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                Text(
+                  localizations.formatFullDate(day),
+                  key: const ValueKey('schedule-day-sheet-title'),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...items.map(
+                  (item) => ListTile(
+                    key: ValueKey('schedule-day-shift-${item.id}'),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      '${_timeLabel(item.workStart)}-${_timeLabel(item.workEnd)} · ${item.shiftLabel}',
+                    ),
+                    subtitle: Text(item.locationLabel ?? '-'),
+                    trailing: Chip(label: Text(_statusLabel(item))),
+                    onTap: () => _showShiftDetail(item),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _showShiftDetail(EmployeeReleasedScheduleItem item) async {
     final l10n = context.l10n;
@@ -217,9 +361,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             child: ListView(
               shrinkWrap: true,
               children: [
-                Text(item.shiftLabel, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                Text(
+                  item.shiftLabel,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 const SizedBox(height: 8),
-                Text('${_timeLabel(item.workStart)}-${_timeLabel(item.workEnd)}'),
+                Text(
+                  '${_timeLabel(item.workStart)}-${_timeLabel(item.workEnd)}',
+                ),
                 const SizedBox(height: 8),
                 Text(item.locationLabel ?? '-'),
                 if (item.meetingPoint != null) ...[
@@ -254,7 +405,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Text(l10n.scheduleDocumentsTitle, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                Text(
+                  l10n.scheduleDocumentsTitle,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 if (item.documents.isEmpty)
                   Text(l10n.scheduleDocumentsEmpty)
@@ -276,16 +432,23 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   Future<void> _copyMapUri(EmployeeReleasedScheduleItem item) async {
     final l10n = context.l10n;
-    final location = Uri.encodeComponent(item.locationLabel ?? item.meetingPoint ?? '');
+    final location = Uri.encodeComponent(
+      item.locationLabel ?? item.meetingPoint ?? '',
+    );
     final uri = 'https://www.google.com/maps/search/?api=1&query=$location';
     await Clipboard.setData(ClipboardData(text: uri));
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.scheduleMapCopied)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.scheduleMapCopied)));
   }
 
-  Future<void> _respond(EmployeeReleasedScheduleItem item, String responseCode) async {
+  Future<void> _respond(
+    EmployeeReleasedScheduleItem item,
+    String responseCode,
+  ) async {
     final l10n = context.l10n;
     await widget.controller.withAccessToken(
       (token) => widget.backend.respondToAssignment(
@@ -301,7 +464,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     Navigator.of(context).pop();
     _refresh();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(responseCode == 'confirm' ? l10n.scheduleConfirmDone : l10n.scheduleDeclineDone)),
+      SnackBar(
+        content: Text(
+          responseCode == 'confirm'
+              ? l10n.scheduleConfirmDone
+              : l10n.scheduleDeclineDone,
+        ),
+      ),
     );
   }
 
@@ -314,7 +483,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       (token) => widget.backend.createEventApplication(
         token,
         planningRecordId: planningRecordId,
-        note: _applicationNoteController.text.trim().isEmpty ? null : _applicationNoteController.text.trim(),
+        note: _applicationNoteController.text.trim().isEmpty
+            ? null
+            : _applicationNoteController.text.trim(),
       ),
     );
     _planningRecordController.clear();
@@ -323,7 +494,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       return;
     }
     _refresh();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.eventApplicationCreated)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.l10n.eventApplicationCreated)),
+    );
   }
 
   Future<void> _cancelApplication(EmployeeEventApplicationItem item) async {
@@ -338,12 +511,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       return;
     }
     _refresh();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.eventApplicationCancelled)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.l10n.eventApplicationCancelled)),
+    );
   }
 
   Future<void> _exportCalendar(EmployeeReleasedScheduleItem item) async {
-    final start = '${item.workStart.toUtc().toIso8601String().replaceAll('-', '').replaceAll(':', '').split('.').first}Z';
-    final end = '${item.workEnd.toUtc().toIso8601String().replaceAll('-', '').replaceAll(':', '').split('.').first}Z';
+    final start =
+        '${item.workStart.toUtc().toIso8601String().replaceAll('-', '').replaceAll(':', '').split('.').first}Z';
+    final end =
+        '${item.workEnd.toUtc().toIso8601String().replaceAll('-', '').replaceAll(':', '').split('.').first}Z';
     final ics = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
@@ -363,6 +540,207 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.scheduleCalendarExported(file.path))));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.l10n.scheduleCalendarExported(file.path))),
+    );
+  }
+}
+
+class _CalendarMonthView extends StatelessWidget {
+  const _CalendarMonthView({
+    required this.visibleMonth,
+    required this.schedulesByDay,
+    required this.timeLabel,
+    required this.statusLabel,
+    required this.onDaySelected,
+  });
+
+  final DateTime visibleMonth;
+  final Map<DateTime, List<EmployeeReleasedScheduleItem>> schedulesByDay;
+  final String Function(DateTime value) timeLabel;
+  final String Function(EmployeeReleasedScheduleItem item) statusLabel;
+  final Future<void> Function(
+    DateTime day,
+    List<EmployeeReleasedScheduleItem> items,
+  )
+  onDaySelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = MaterialLocalizations.of(context);
+    final orderedWeekdays = _orderedWeekdays(localizations);
+    final monthDays = _monthGridDays(localizations);
+
+    return Column(
+      children: [
+        Row(
+          children: orderedWeekdays
+              .map(
+                (weekday) => Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        weekday,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+              .toList(growable: false),
+        ),
+        GridView.builder(
+          key: const ValueKey('schedule-calendar-grid'),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: monthDays.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 0.9,
+          ),
+          itemBuilder: (context, index) {
+            final day = monthDays[index];
+            if (day == null) {
+              return const SizedBox.shrink();
+            }
+            final items =
+                schedulesByDay[day] ?? const <EmployeeReleasedScheduleItem>[];
+            final hasShifts = items.isNotEmpty;
+            final isCurrentMonth = day.month == visibleMonth.month;
+            return _CalendarDayCell(
+              day: day,
+              items: items,
+              hasShifts: hasShifts,
+              isCurrentMonth: isCurrentMonth,
+              onTap: hasShifts ? () => onDaySelected(day, items) : null,
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  List<String> _orderedWeekdays(MaterialLocalizations localizations) {
+    final weekdays = localizations.narrowWeekdays;
+    final firstDay = localizations.firstDayOfWeekIndex;
+    return List<String>.generate(
+      7,
+      (index) => weekdays[(firstDay + index) % 7],
+      growable: false,
+    );
+  }
+
+  List<DateTime?> _monthGridDays(MaterialLocalizations localizations) {
+    final firstOfMonth = DateTime(visibleMonth.year, visibleMonth.month, 1);
+    final lastOfMonth = DateTime(visibleMonth.year, visibleMonth.month + 1, 0);
+    final firstDayOffset =
+        (firstOfMonth.weekday % 7 - localizations.firstDayOfWeekIndex + 7) % 7;
+    final totalCells = ((firstDayOffset + lastOfMonth.day + 6) ~/ 7) * 7;
+    return List<DateTime?>.generate(totalCells, (index) {
+      final dayNumber = index - firstDayOffset + 1;
+      if (dayNumber < 1 || dayNumber > lastOfMonth.day) {
+        return null;
+      }
+      return DateTime(visibleMonth.year, visibleMonth.month, dayNumber);
+    }, growable: false);
+  }
+}
+
+class _CalendarDayCell extends StatelessWidget {
+  const _CalendarDayCell({
+    required this.day,
+    required this.items,
+    required this.hasShifts,
+    required this.isCurrentMonth,
+    required this.onTap,
+  });
+
+  final DateTime day;
+  final List<EmployeeReleasedScheduleItem> items;
+  final bool hasShifts;
+  final bool isCurrentMonth;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final firstShift = items.isEmpty ? null : items.first;
+    final shiftSummary = firstShift == null
+        ? null
+        : '${firstShift.workStart.hour.toString().padLeft(2, '0')}:${firstShift.workStart.minute.toString().padLeft(2, '0')} ${firstShift.shiftLabel}';
+
+    return InkWell(
+      key: ValueKey(
+        'schedule-calendar-day-${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}',
+      ),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: hasShifts
+              ? colors.primary.withValues(alpha: 0.12)
+              : colors.surfaceContainerHighest.withValues(alpha: 0.35),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: hasShifts
+                ? colors.primary.withValues(alpha: 0.5)
+                : colors.outlineVariant,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${day.day}',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: isCurrentMonth
+                      ? colors.onSurface
+                      : colors.onSurface.withValues(alpha: 0.45),
+                ),
+              ),
+              const Spacer(),
+              if (hasShifts) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.primary,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    items.length == 1 ? '1' : '${items.length}',
+                    key: ValueKey(
+                      'schedule-calendar-day-count-${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}',
+                    ),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: colors.onPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  shiftSummary!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

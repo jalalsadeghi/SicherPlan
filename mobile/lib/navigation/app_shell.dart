@@ -55,26 +55,29 @@ class _AppShellState extends State<AppShell> {
       builder: (context, _) {
         switch (widget.controller.phase) {
           case MobileSessionPhase.bootstrapping:
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
           case MobileSessionPhase.unauthenticated:
             return LoginScreen(
               busy: widget.controller.busy,
               messageKey: widget.controller.messageKey,
-              onLogin: ({
-                required tenantCode,
-                required identifier,
-                required password,
-                required deviceLabel,
-                required deviceId,
-              }) {
-                return widget.controller.login(
-                  tenantCode: tenantCode,
-                  identifier: identifier,
-                  password: password,
-                  deviceLabel: deviceLabel,
-                  deviceId: deviceId,
-                );
-              },
+              onLogin:
+                  ({
+                    required tenantCode,
+                    required identifier,
+                    required password,
+                    required deviceLabel,
+                    required deviceId,
+                  }) {
+                    return widget.controller.login(
+                      tenantCode: tenantCode,
+                      identifier: identifier,
+                      password: password,
+                      deviceLabel: deviceLabel,
+                      deviceId: deviceId,
+                    );
+                  },
             );
           case MobileSessionPhase.forbidden:
           case MobileSessionPhase.blocked:
@@ -83,7 +86,12 @@ class _AppShellState extends State<AppShell> {
               body: Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Text(context.l10n.backendMessage(widget.controller.messageKey ?? 'errors.platform.internal')),
+                  child: Text(
+                    context.l10n.backendMessage(
+                      widget.controller.messageKey ??
+                          'errors.platform.internal',
+                    ),
+                  ),
                 ),
               ),
             );
@@ -97,6 +105,8 @@ class _AppShellState extends State<AppShell> {
   Widget _buildAuthenticatedShell(BuildContext context) {
     final l10n = context.l10n;
     final destinations = _visibleDestinations();
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final compactNavigation = screenWidth < 430 && destinations.length > 4;
     if (!destinations.contains(_destination)) {
       _destination = destinations.first;
     }
@@ -107,13 +117,35 @@ class _AppShellState extends State<AppShell> {
         child: KeyedSubtree(
           key: ValueKey(_destination),
           child: switch (_destination) {
-            AppDestination.home => HomeScreen(config: widget.config, controller: widget.controller),
-            AppDestination.schedule => ScheduleScreen(controller: widget.controller, backend: widget.backend),
-            AppDestination.timeCapture => TimeCaptureScreen(controller: widget.controller, backend: widget.backend),
-            AppDestination.updates => InfoFeedScreen(controller: widget.controller, backend: widget.backend),
-            AppDestination.documents => DocumentsScreen(controller: widget.controller, backend: widget.backend),
-            AppDestination.watchbook => WatchbookScreen(controller: widget.controller, backend: widget.backend),
-            AppDestination.patrol => PatrolScreen(controller: widget.controller, backend: widget.backend),
+            AppDestination.home => HomeScreen(
+              config: widget.config,
+              controller: widget.controller,
+              backend: widget.backend,
+            ),
+            AppDestination.schedule => ScheduleScreen(
+              controller: widget.controller,
+              backend: widget.backend,
+            ),
+            AppDestination.timeCapture => TimeCaptureScreen(
+              controller: widget.controller,
+              backend: widget.backend,
+            ),
+            AppDestination.updates => InfoFeedScreen(
+              controller: widget.controller,
+              backend: widget.backend,
+            ),
+            AppDestination.documents => DocumentsScreen(
+              controller: widget.controller,
+              backend: widget.backend,
+            ),
+            AppDestination.watchbook => WatchbookScreen(
+              controller: widget.controller,
+              backend: widget.backend,
+            ),
+            AppDestination.patrol => PatrolScreen(
+              controller: widget.controller,
+              backend: widget.backend,
+            ),
             AppDestination.profile => ProfileScreen(
               config: widget.config,
               controller: widget.controller,
@@ -128,8 +160,16 @@ class _AppShellState extends State<AppShell> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: destinations.indexOf(_destination),
+        labelBehavior: compactNavigation
+            ? NavigationDestinationLabelBehavior.alwaysHide
+            : NavigationDestinationLabelBehavior.alwaysShow,
         destinations: destinations
-            .map((destination) => NavigationDestination(icon: Icon(destination.icon), label: l10n.navLabel(destination.id)))
+            .map(
+              (destination) => NavigationDestination(
+                icon: Icon(destination.icon),
+                label: l10n.navLabel(destination.id),
+              ),
+            )
             .toList(growable: false),
         onDestinationSelected: (index) {
           setState(() {

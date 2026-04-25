@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 
 class ShellScaffold extends StatelessWidget {
   const ShellScaffold({
-    required this.title,
-    required this.subtitle,
+    this.title,
+    this.subtitle,
     required this.children,
     this.actions,
     super.key,
   });
 
-  final String title;
-  final String subtitle;
+  final String? title;
+  final String? subtitle;
   final List<Widget> children;
   final List<Widget>? actions;
 
@@ -19,25 +19,21 @@ class ShellScaffold extends StatelessWidget {
     return SafeArea(
       child: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            pinned: true,
-            toolbarHeight: 88,
-            titleSpacing: 24,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall,
-                ),
-              ],
+          if (title != null && subtitle != null)
+            SliverAppBar(
+              pinned: true,
+              toolbarHeight: 88,
+              titleSpacing: 24,
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title!),
+                  const SizedBox(height: 4),
+                  Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+              actions: actions,
             ),
-            actions: actions,
-          ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 112),
             sliver: SliverList.list(children: children),

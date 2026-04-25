@@ -1126,6 +1126,11 @@ class EmployeeSelfServiceEventApplicationCancel(BaseModel):
 
 class EmployeeMobileContextRead(BaseModel):
     tenant_id: str
+    tenant_code: str
+    tenant_name: str
+    photo_document_id: str | None = None
+    photo_current_version_no: int | None = None
+    photo_content_type: str | None = None
     user_id: str
     employee_id: str
     personnel_no: str

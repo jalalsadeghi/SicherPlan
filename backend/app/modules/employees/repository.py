@@ -8,7 +8,7 @@ from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.modules.core.models import Address, Branch, LookupValue, Mandate
+from app.modules.core.models import Address, Branch, LookupValue, Mandate, Tenant
 from app.modules.core.schemas import LookupValueRead
 from app.modules.employees.models import (
     Employee,
@@ -50,6 +50,10 @@ from app.modules.platform_services.integration_models import ImportExportJob
 class SqlAlchemyEmployeeRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    def get_tenant(self, tenant_id: str) -> Tenant | None:
+        statement = select(Tenant).where(Tenant.id == tenant_id)
+        return self.session.scalars(statement).one_or_none()
 
     def list_employees(self, tenant_id: str, filters: EmployeeFilter | None = None) -> list[Employee]:
         statement = (
@@ -834,7 +838,10 @@ class SqlAlchemyEmployeeRepository:
         )
         if exclude_id is not None:
             statement = statement.where(Employee.id != exclude_id)
-        return self.session.scalars(statement).one_or_none()
+        employee = self.session.scalars(statement).one_or_none()
+        if employee is not None:
+            self._attach_profile_photo_metadata(tenant_id, [employee])
+        return employee
 
     def find_group_by_code(self, tenant_id: str, code: str, *, exclude_id: str | None = None) -> EmployeeGroup | None:
         statement = select(EmployeeGroup).where(EmployeeGroup.tenant_id == tenant_id, EmployeeGroup.code == code)

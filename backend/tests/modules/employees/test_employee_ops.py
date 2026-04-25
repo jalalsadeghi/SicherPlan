@@ -883,6 +883,19 @@ class EmployeeOpsServiceTest(unittest.TestCase):
             _context("employees.employee.write"),
         )
 
+        with self.assertRaises(ApiException) as raised:
+            self.build_auth_service().login(
+                LoginRequest(
+                    tenant_code="tenant-1",
+                    identifier="anna.user",
+                    password="OldSicherPasswort!123",
+                ),
+                ip_address="127.0.0.1",
+                user_agent="employee-app",
+            )
+
+        self.assertEqual(raised.exception.code, "iam.auth.invalid_credentials")
+
         login = self.build_auth_service().login(
             LoginRequest(
                 tenant_code="tenant-1",
