@@ -18,8 +18,12 @@ const authStore = useAuthStore();
 const loginRef =
   useTemplateRef<InstanceType<typeof AuthenticationLogin>>('loginRef');
 
+// Temporarily disabled for local login flows. Flip to true to restore the
+// SliderCaptcha field and failed-login captcha reset behavior.
+const LOGIN_SLIDER_CAPTCHA_ENABLED = false;
+
 const formSchema = computed((): VbenFormSchema[] => {
-  return [
+  const schema: VbenFormSchema[] = [
     {
       component: 'VbenInput',
       componentProps: {
@@ -54,18 +58,32 @@ const formSchema = computed((): VbenFormSchema[] => {
         default: () => $t('authentication.rememberMe'),
       }),
     },
-    {
+  ];
+
+  if (LOGIN_SLIDER_CAPTCHA_ENABLED) {
+    schema.push({
       component: markRaw(SliderCaptcha),
       fieldName: 'captcha',
       rules: z.boolean().refine((value) => value, {
         message: $t('authentication.verifyRequiredTip'),
       }),
-    },
-  ];
+    });
+  }
+
+  return schema;
 });
 
 async function onSubmit(params: Recordable<any>) {
-  authStore.authLogin(params).catch(() => {
+  const loginParams = { ...params };
+  if (!LOGIN_SLIDER_CAPTCHA_ENABLED) {
+    delete loginParams.captcha;
+  }
+
+  authStore.authLogin(loginParams).catch(() => {
+    if (!LOGIN_SLIDER_CAPTCHA_ENABLED) {
+      return;
+    }
+
     const formApi = loginRef.value?.getFormApi();
     formApi?.setFieldValue('captcha', false, false);
     formApi

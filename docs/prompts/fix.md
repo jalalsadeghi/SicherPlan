@@ -1,82 +1,91 @@
 You are working in the latest public SicherPlan repository.
 
 Target page:
-admin/employees
+Login page
 
-Observed bug:
-On first load of admin/employees, employee list rows show only initials/avatar fallback.
-When the user opens one employee dashboard/detail and returns to the list, that employee’s photo appears in the list.
-After opening another employee dashboard, that second employee’s photo also appears in the list.
-This means employee photos are currently loaded lazily only after opening employee detail/dashboard, not during initial list rendering.
+Main file to inspect:
+- web/apps/web-antd/src/views/_core/authentication/login.vue
+
+Related files to inspect if needed:
+- web/packages/locales/src/langs/en-US/ui.json
+- web/packages/locales/src/langs/de-DE/ui.json
+- any login/auth tests
+- auth store/login tests if they expect captcha
+
+Current implementation:
+The login form schema includes a SliderCaptcha field:
+- import { AuthenticationLogin, SliderCaptcha, z } from '@vben/common-ui'
+- fieldName: 'captcha'
+- rules require captcha to be true
+- onSubmit catches failed login, resets captcha to false, and calls SliderCaptcha.resume()
+
+User request:
+Temporarily remove the "Slider and drag" captcha from the login page.
+It must be easy to restore later.
 
 Goal:
-Fix employee list photos so that, on the first list load, all employees that already have profile photos show their real photo thumbnails immediately.
-Employees without photos should keep initials fallback.
+Disable/hide the SliderCaptcha from the login form for now, without deleting the implementation permanently and without breaking login validation.
 
-Relevant frontend files to inspect:
-- web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
-- web/apps/web-antd/src/sicherplan-legacy/components/employees/EmployeeDashboardTab.vue
-- web/apps/web-antd/src/sicherplan-legacy/api/employeeAdmin.ts
-- employeeAdmin layout/smoke tests
-
-Relevant backend/API areas to inspect:
-- employee list endpoint implementation:
-  GET /api/employees/tenants/{tenant_id}/employees
-- employee photo endpoint implementation:
-  GET /api/employees/tenants/{tenant_id}/employees/{employee_id}/photo
-- employee DTO/read models/schemas for list and detail
-- document/photo storage/linking logic
-
-Important current finding to validate:
-The frontend EmployeeListItem type appears not to contain photo/profile image metadata. If this is true, the initial list cannot reliably render photos without either:
-1) extending the list endpoint/read model to include safe photo thumbnail metadata/url, or
-2) adding a batch-safe frontend preload strategy, or
-3) adding/using an existing batch endpoint for employee photos.
-
-Do not implement an N+1 solution blindly.
-Do not fetch one full photo endpoint per employee without evaluating performance and list size.
-Do not rely on “open detail first” cache behavior.
-
-Please audit and decide the best implementation approach.
-
-Preferred solution if backend supports it:
-- Extend the employee list response with optional photo metadata suitable for list thumbnails, for example:
-  - photo_document_id
-  - photo_version_no
-  - photo_url / photo_download_url / profile_photo_url
-  - has_photo
-  - photo_content_type if needed
-- Update frontend EmployeeListItem type accordingly.
-- Render photo thumbnail from this data in employee list rows.
-- Keep initials fallback for rows without photo.
-
-Alternative solution if backend already has a safe helper:
-- Reuse any existing photo URL builder or document download route.
-- Avoid per-row full photo fetches if possible.
-
-Fallback solution only if backend change is not feasible in this task:
-- Implement a bounded/concurrency-limited preload for visible list rows only.
-- Cache photo results by employee_id.
-- Do not block list rendering.
-- Do not preload archived/hidden rows unnecessarily.
-- Explain why this fallback was chosen.
+Important:
+Do not simply hide the UI with CSS while keeping the required captcha validation active.
+Do not leave the form requiring `captcha: true` when the field is not visible.
+Do not break the login submit flow.
+Do not remove the code in a way that makes restoring hard.
+Do not change backend authentication unless it currently requires captcha and must be adjusted accordingly.
 
 Required investigation:
-1) Find how EmployeeDashboardTab receives/displays the photo.
-2) Find where the detail photo is loaded and cached in EmployeeAdminView.
-3) Check whether listEmployees returns any photo metadata.
-4) Check whether backend EmployeeListItem/EmployeeRead schema has photo fields.
-5) Check whether the backend can cheaply include current profile photo metadata in the list query without loading binary data.
-6) Check whether there is already a document/version download URL builder that can be safely used for thumbnails.
-7) Decide whether the fix should be frontend-only or frontend+backend.
+1) Confirm whether backend authLogin requires a captcha field or whether captcha is frontend-only validation.
+2) Confirm whether `authStore.authLogin(params)` sends captcha to backend or ignores it.
+3) Find any tests that assume captcha exists.
+4) Confirm whether other app variants also have login.vue with SliderCaptcha. For this task, focus on web-antd unless the project expects all variants to stay aligned.
 
-Expected output of this audit:
-- exact reason photos only appear after opening detail
-- whether list API currently lacks photo metadata
-- recommended implementation plan
-- files to change
-- test plan
+Preferred implementation:
+Add a small feature flag / local constant in login.vue, for example:
+`const LOGIN_SLIDER_CAPTCHA_ENABLED = false;`
+or use an existing config/env feature flag if one already exists.
 
-Please validate my suggested direction critically:
-If the list API already contains the required metadata but frontend ignores it, fix frontend only.
-If the list API truly lacks photo data, implement the safest API/read-model extension or explain why a frontend-only fallback is required.
+Then:
+- Keep SliderCaptcha import only if the feature is enabled, or keep it with a clear comment if dynamic import is not worth it.
+- Build formSchema so the captcha field is included only when `LOGIN_SLIDER_CAPTCHA_ENABLED === true`.
+- In onSubmit catch block, only reset/resume captcha if captcha is enabled.
+- If captcha is disabled, do not call `setFieldValue('captcha', false, false)` and do not call `getFieldComponentRef(...).resume()`.
+- Optionally strip `captcha` from submit params when disabled if it appears unexpectedly.
+- Add a short comment explaining that captcha is temporarily disabled and can be restored by flipping the flag.
+
+Example desired behavior:
+- Login page shows tenant code, identifier, password, remember me, login button, mobile login, QR code login, social login.
+- The "Slider and drag" component is not rendered.
+- Clicking Login does not fail because captcha is missing.
+- Failed login still shows normal login error.
+- No console error is caused by trying to access a non-existing captcha field.
+
+Validation:
+Please validate my suggestion critically.
+If the backend currently requires captcha, do not silently remove it only from frontend; instead identify the backend dependency and propose the minimal safe change.
+If captcha is frontend-only, keep the change frontend-only.
+
+Tests:
+Add/update tests if existing login tests exist:
+- captcha disabled: SliderCaptcha is not rendered.
+- form schema does not include captcha.
+- submit does not require captcha.
+- failed login does not call captcha resume when disabled.
+- if feature flag is later true, captcha field is included and old behavior can still work.
+
+Acceptance criteria:
+- The "Slider and drag" captcha no longer appears on login page.
+- Login form can submit without captcha.
+- Failed login handling does not throw errors.
+- Captcha code is not permanently deleted; it can be restored easily.
+- No unrelated login UI elements are removed.
+- No backend/auth regression.
+
+Deliverables:
+1) Apply code changes.
+2) Update tests if needed.
+3) Summarize:
+   - changed files
+   - how captcha was disabled
+   - how to re-enable it later
+   - whether backend needed any change
+   - validation performed
