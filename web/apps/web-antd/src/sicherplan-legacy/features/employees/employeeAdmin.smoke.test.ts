@@ -117,6 +117,24 @@ const translations: Record<string, string> = {
   "employeeAdmin.import.eyebrow": "Import / Export",
   "employeeAdmin.import.exportSummary": "Export ready",
   "employeeAdmin.import.title": "Import and export",
+  "employeeAdmin.access.diagnosticsEyebrow": "Diagnostics",
+  "employeeAdmin.access.diagnosticsTitle": "Mobile login readiness",
+  "employeeAdmin.access.diagnosticUserExists": "IAM user exists",
+  "employeeAdmin.access.diagnosticUserStatus": "User status is active",
+  "employeeAdmin.access.diagnosticUserArchived": "User is not archived",
+  "employeeAdmin.access.diagnosticPasswordLogin": "Password login is enabled",
+  "employeeAdmin.access.diagnosticPasswordHash": "Password hash exists",
+  "employeeAdmin.access.diagnosticEmployeeLinked": "Employee is linked to the IAM user",
+  "employeeAdmin.access.diagnosticEmployeeStatus": "Employee status is active",
+  "employeeAdmin.access.diagnosticEmployeeArchived": "Employee is not archived",
+  "employeeAdmin.access.diagnosticRoleAssignment": "employee_user role assignment is active",
+  "employeeAdmin.access.diagnosticPermission": "portal.employee.access permission is granted",
+  "employeeAdmin.access.linked": "Linked",
+  "employeeAdmin.access.linkedNo": "No",
+  "employeeAdmin.access.linkedYes": "Yes",
+  "employeeAdmin.access.loginReady": "Login ready",
+  "employeeAdmin.access.loginReadyNo": "No",
+  "employeeAdmin.access.loginReadyYes": "Yes",
   "employeeAdmin.list.eyebrow": "Employees",
   "employeeAdmin.list.title": "Employee list",
   "employeeAdmin.search.suggestionsEmpty": "No matching employees",
@@ -1455,6 +1473,45 @@ describe("EmployeeAdminView search dialog regression", () => {
     await clickButtonByText(wrapper, "employeeAdmin.actions.uploadDocument");
     await settle();
     expect(wrapper.get('[data-testid="employee-overview-editor-document-upload-modal"]').text()).toContain("employeeAdmin.documents.documentTypeHelp");
+  });
+
+  it("separates linked state from login readiness and renders access diagnostics", async () => {
+    apiMocks.getEmployeeAccessLinkMock.mockResolvedValue({
+      employee_id: "employee-markus",
+      tenant_id: "tenant-1",
+      user_id: "user-1",
+      username: "markus",
+      email: "markus@example.test",
+      full_name: "Markus Neumann",
+      app_access_enabled: false,
+      role_assignment_active: true,
+      diagnostics: {
+        user_exists: true,
+        user_status_active: true,
+        user_not_archived: true,
+        is_password_login_enabled: true,
+        has_password_hash: false,
+        employee_linked: true,
+        employee_status_active: true,
+        employee_not_archived: true,
+        employee_user_role_assignment_active: true,
+        portal_employee_access_granted: true,
+        can_mobile_login: false,
+      },
+    });
+
+    const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    const accessSection = wrapper.get('[data-testid="employee-overview-section-app-access"]');
+    expect(accessSection.text()).toContain("Linked");
+    expect(accessSection.text()).toContain("Login ready");
+    expect(accessSection.text()).toContain("Yes");
+    expect(accessSection.text()).toContain("No");
+    expect(wrapper.get('[data-testid="employee-access-diagnostics-section"]').text()).toContain("Password hash exists");
+    expect(wrapper.findAll('[data-testid="employee-access-diagnostics-row"]').length).toBeGreaterThanOrEqual(10);
   });
 
   it("preserves initial load, create flow, import/export, and detail tab switching", async () => {

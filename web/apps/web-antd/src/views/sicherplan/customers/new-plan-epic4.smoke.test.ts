@@ -606,13 +606,26 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await wrapper.get('[data-testid="customer-new-plan-order-document-search"]').trigger('keyup.enter');
 
     documents.resolve([
-      { id: 'doc-1', tenant_id: 'tenant-1', title: 'Customer contract RheinForum', current_version_no: 1, status: 'active' },
+      {
+        id: 'doc-1',
+        tenant_id: 'tenant-1',
+        title: 'Customer contract RheinForum with an intentionally long descriptive title for wrapping checks',
+        current_version_no: 1,
+        status: 'active',
+        document_type: { id: 'doc-type-1', key: 'contract', name: 'Contract document type with a long label' },
+        source_label: 'rheinforum-contract-attachment-final-version-signed.pdf',
+      },
       { id: 'doc-2', tenant_id: 'tenant-1', title: 'Security concept attachment', current_version_no: 2, status: 'active' },
     ]);
     await flushPromises();
 
     expect(wrapper.findAll('[data-testid="customer-new-plan-order-document-result-row"]')).toHaveLength(2);
-    expect(wrapper.text()).toContain('Customer contract RheinForum');
+    expect(wrapper.find('.sp-customer-plan-wizard-step__document-picker-modal').exists()).toBe(true);
+    expect(wrapper.find('.sp-customer-plan-wizard-step__document-picker-results').exists()).toBe(true);
+    expect(wrapper.find('.sp-customer-plan-wizard-step__document-picker-row').exists()).toBe(true);
+    expect(wrapper.find('.sp-customer-plan-wizard-step__document-picker-meta').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Customer contract RheinForum with an intentionally long descriptive title for wrapping checks');
+    expect(wrapper.text()).toContain('rheinforum-contract-attachment-final-version-signed.pdf');
     expect(wrapper.text()).toContain('Security concept attachment');
   });
 
@@ -2407,6 +2420,8 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     await wrapper.get('[data-testid="customer-new-plan-planning-document-picker-open"]').trigger('click');
     await flushPromises();
+    expect(wrapper.find('.sp-customer-plan-wizard-step__document-picker-modal').exists()).toBe(true);
+    expect(wrapper.find('.sp-customer-plan-wizard-step__document-picker-results').exists()).toBe(true);
     await wrapper.get('[data-testid="customer-new-plan-planning-document-search"]').setValue('Safety');
     await wrapper.get('[data-testid="customer-new-plan-planning-document-search"]').trigger('keyup.enter');
     await flushPromises();

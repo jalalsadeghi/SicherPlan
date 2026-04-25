@@ -5271,6 +5271,10 @@ function latestFileName(document: PlanningDocumentRead) {
   return versions[versions.length - 1]?.file_name || document.source_label || '';
 }
 
+function documentPickerTitle(document: PlanningDocumentRead) {
+  return document.title || latestFileName(document) || document.id;
+}
+
 function documentCustomerSummary(document: PlanningDocumentRead | null) {
   if (!document) {
     return '';
@@ -5284,6 +5288,19 @@ function documentCustomerSummary(document: PlanningDocumentRead | null) {
   ]
     .filter(Boolean)
     .join(' · ');
+}
+
+function documentPickerMetadata(document: PlanningDocumentRead) {
+  const typeLabel = documentTypeLabel(document);
+  const fileName = latestFileName(document);
+  const title = documentPickerTitle(document);
+  return [
+    typeLabel,
+    fileName && fileName !== title ? fileName : '',
+    document.id,
+    document.current_version_no ? `v${document.current_version_no}` : '',
+    document.status,
+  ].filter(Boolean);
 }
 
 function orderAttachmentDisplayTitle(document: PlanningDocumentRead) {
@@ -8370,11 +8387,14 @@ onBeforeUnmount(() => {
       v-model:open="documentPicker.open"
       :footer="null"
       :title="$t('sicherplan.customerPlansWizard.forms.documentPickerTitle')"
-      wrap-class-name="sp-customer-plan-wizard-modal"
+      wrap-class-name="sp-customer-plan-wizard-modal sp-customer-plan-wizard-modal--document-picker"
       @cancel="closeDocumentPicker"
     >
-      <div class="sp-customer-plan-wizard-step__modal" :data-testid="documentPickerTestId('picker-modal')">
-        <label class="field-stack">
+      <div
+        class="sp-customer-plan-wizard-step__modal sp-customer-plan-wizard-step__document-picker-modal"
+        :data-testid="documentPickerTestId('picker-modal')"
+      >
+        <label class="field-stack sp-customer-plan-wizard-step__document-picker-search">
           <span>{{ $t('sicherplan.customerPlansWizard.forms.documentPickerSearch') }}</span>
           <input
             v-model="documentPicker.search"
@@ -8390,17 +8410,30 @@ onBeforeUnmount(() => {
           <span v-if="documentPicker.loading" class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.documentPickerLoading') }}</span>
         </div>
         <p v-if="documentPicker.error" class="field-help">{{ documentPicker.error }}</p>
-        <div v-if="documentPicker.results.length" class="sp-customer-plan-wizard-step__list">
+        <div
+          v-if="documentPicker.results.length"
+          class="sp-customer-plan-wizard-step__list sp-customer-plan-wizard-step__document-picker-results"
+        >
           <button
             v-for="document in documentPicker.results"
             :key="document.id"
             type="button"
-            class="sp-customer-plan-wizard-step__list-row"
+            class="sp-customer-plan-wizard-step__list-row sp-customer-plan-wizard-step__document-picker-row"
             :data-testid="documentPickerTestId('result-row')"
             @click="selectDocumentForLink(document)"
           >
-            <strong>{{ document.title }}</strong>
-            <span>{{ documentCustomerSummary(document) }}</span>
+            <div class="sp-customer-plan-wizard-step__document-picker-copy">
+              <strong class="sp-customer-plan-wizard-step__document-picker-title">{{ documentPickerTitle(document) }}</strong>
+              <div class="sp-customer-plan-wizard-step__document-picker-meta">
+                <span
+                  v-for="entry in documentPickerMetadata(document)"
+                  :key="`${document.id}-${entry}`"
+                  class="sp-customer-plan-wizard-step__document-picker-meta-item"
+                >
+                  {{ entry }}
+                </span>
+              </div>
+            </div>
           </button>
         </div>
         <p v-else-if="!documentPicker.loading" class="field-help">
@@ -9627,6 +9660,69 @@ onBeforeUnmount(() => {
 .sp-customer-plan-wizard-step__modal {
   display: grid;
   gap: 0.85rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.sp-customer-plan-wizard-step__document-picker-modal {
+  overflow: hidden;
+}
+
+.sp-customer-plan-wizard-step__document-picker-search {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sp-customer-plan-wizard-step__document-picker-results {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  max-height: min(24rem, 60vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 0.1rem;
+}
+
+.sp-customer-plan-wizard-step__document-picker-row {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.sp-customer-plan-wizard-step__document-picker-copy {
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.sp-customer-plan-wizard-step__document-picker-title {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.sp-customer-plan-wizard-step__document-picker-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sp-customer-plan-wizard-step__document-picker-meta-item {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--sp-color-text-secondary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 :deep(.sp-customer-plan-wizard-modal .field-stack) {
@@ -9682,6 +9778,16 @@ onBeforeUnmount(() => {
   opacity: 0.72;
   cursor: not-allowed;
   background: color-mix(in srgb, var(--sp-color-surface-page) 72%, var(--sp-color-border-soft));
+}
+
+:deep(.sp-customer-plan-wizard-modal--document-picker .ant-modal) {
+  width: min(42rem, calc(100vw - 2rem)) !important;
+  max-width: calc(100vw - 2rem);
+}
+
+:deep(.sp-customer-plan-wizard-modal--document-picker .ant-modal-content),
+:deep(.sp-customer-plan-wizard-modal--document-picker .ant-modal-body) {
+  overflow: hidden;
 }
 
 @media (max-width: 960px) {

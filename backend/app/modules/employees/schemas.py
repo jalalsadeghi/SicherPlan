@@ -442,6 +442,21 @@ class EmployeeAccessLinkRead(BaseModel):
     full_name: str | None
     app_access_enabled: bool
     role_assignment_active: bool
+    diagnostics: "EmployeeAccessDiagnosticsRead"
+
+
+class EmployeeAccessDiagnosticsRead(BaseModel):
+    user_exists: bool
+    user_status_active: bool
+    user_not_archived: bool
+    is_password_login_enabled: bool
+    has_password_hash: bool
+    employee_linked: bool
+    employee_status_active: bool
+    employee_not_archived: bool
+    employee_user_role_assignment_active: bool
+    portal_employee_access_granted: bool
+    can_mobile_login: bool
 
 
 class EmployeeAccessCreateUserRequest(BaseModel):

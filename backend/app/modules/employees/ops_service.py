@@ -13,6 +13,7 @@ from app.errors import ApiException
 from app.modules.employees.models import Employee
 from app.modules.employees.schemas import (
     EmployeeAccessAttachExistingRequest,
+    EmployeeAccessDiagnosticsRead,
     EmployeeAccessCreateUserRequest,
     EmployeeAccessDetachRequest,
     EmployeeAccessLinkRead,
@@ -85,6 +86,7 @@ class EmployeeOpsRepository(Protocol):
     def revoke_active_sessions_for_user(self, user_id: str, *, reason: str, at_time: datetime) -> None: ...
     def get_role_by_key(self, role_key: str) -> Role | None: ...
     def find_role_assignment(self, tenant_id: str, user_id: str, role_key: str) -> UserRoleAssignment | None: ...
+    def list_permission_keys_for_user(self, user_id: str, *, at_time: datetime | None = None) -> list[str]: ...
     def create_role_assignment(self, row: UserRoleAssignment) -> UserRoleAssignment: ...
     def update_role_assignment(self, row: UserRoleAssignment) -> UserRoleAssignment: ...
     def create_job(self, row: ImportExportJob) -> ImportExportJob: ...
@@ -785,12 +787,10 @@ class EmployeeOpsService:
         self.repository.update_role_assignment(assignment)
 
     def _build_access_link_read(self, employee: Employee) -> EmployeeAccessLinkRead:
+        diagnostics = self._build_access_diagnostics(employee)
         user = None
-        active_assignment = None
         if employee.user_id:
             user = self.repository.get_user_account(employee.tenant_id, employee.user_id)
-            if user is not None:
-                active_assignment = self.repository.find_role_assignment(employee.tenant_id, user.id, "employee_user")
         return EmployeeAccessLinkRead(
             employee_id=employee.id,
             tenant_id=employee.tenant_id,
@@ -798,8 +798,57 @@ class EmployeeOpsService:
             username=user.username if user else None,
             email=user.email if user else None,
             full_name=user.full_name if user else None,
-            app_access_enabled=bool(user and user.is_password_login_enabled and active_assignment and active_assignment.archived_at is None),
-            role_assignment_active=bool(active_assignment and active_assignment.archived_at is None and active_assignment.status == "active"),
+            app_access_enabled=diagnostics.can_mobile_login,
+            role_assignment_active=diagnostics.employee_user_role_assignment_active,
+            diagnostics=diagnostics,
+        )
+
+    def _build_access_diagnostics(self, employee: Employee) -> EmployeeAccessDiagnosticsRead:
+        now = datetime.now(UTC)
+        user = None
+        assignment = None
+        permission_keys: set[str] = set()
+        if employee.user_id:
+            user = self.repository.get_user_account(employee.tenant_id, employee.user_id)
+            if user is not None:
+                assignment = self.repository.find_role_assignment(employee.tenant_id, user.id, "employee_user")
+                permission_keys = set(self.repository.list_permission_keys_for_user(user.id, at_time=now))
+        user_exists = user is not None
+        role_assignment_active = bool(assignment and assignment.status == "active" and assignment.archived_at is None)
+        user_status_active = bool(user and user.status == "active")
+        user_not_archived = bool(user and user.archived_at is None)
+        is_password_login_enabled = bool(user and user.is_password_login_enabled)
+        has_password_hash = bool(user and (user.password_hash or "").strip())
+        employee_linked = bool(employee.user_id and user_exists)
+        employee_status_active = employee.status == "active"
+        employee_not_archived = employee.archived_at is None
+        portal_employee_access_granted = "portal.employee.access" in permission_keys
+        can_mobile_login = all(
+            (
+                user_exists,
+                user_status_active,
+                user_not_archived,
+                is_password_login_enabled,
+                has_password_hash,
+                employee_linked,
+                employee_status_active,
+                employee_not_archived,
+                role_assignment_active,
+                portal_employee_access_granted,
+            )
+        )
+        return EmployeeAccessDiagnosticsRead(
+            user_exists=user_exists,
+            user_status_active=user_status_active,
+            user_not_archived=user_not_archived,
+            is_password_login_enabled=is_password_login_enabled,
+            has_password_hash=has_password_hash,
+            employee_linked=employee_linked,
+            employee_status_active=employee_status_active,
+            employee_not_archived=employee_not_archived,
+            employee_user_role_assignment_active=role_assignment_active,
+            portal_employee_access_granted=portal_employee_access_granted,
+            can_mobile_login=can_mobile_login,
         )
 
     def _create_result_document(

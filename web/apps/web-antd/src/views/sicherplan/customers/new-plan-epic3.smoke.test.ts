@@ -901,6 +901,7 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await nextTickFlush();
     await flushPromises();
     expect(wrapper.find('[data-testid="customer-new-plan-order-document-picker-modal"]').exists()).toBe(true);
+    expect(wrapper.find('.sp-customer-plan-wizard-step__document-picker-modal').exists()).toBe(true);
     await wrapper.get('[data-testid="customer-new-plan-order-document-search"]').setValue('Sicherheitskonzept');
     await wrapper.get('[data-testid="customer-new-plan-order-document-search"]').trigger('keyup.enter');
     await flushPromises();

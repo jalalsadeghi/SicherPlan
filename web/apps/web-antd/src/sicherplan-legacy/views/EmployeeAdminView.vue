@@ -593,12 +593,18 @@
                 <strong>{{ accessLink?.email || t("employeeAdmin.summary.none") }}</strong>
               </article>
               <article class="employee-admin-summary__card">
-                <span>{{ t("employeeAdmin.access.enabled") }}</span>
-                <strong>{{ accessLink?.app_access_enabled ? t("employeeAdmin.access.enabledYes") : t("employeeAdmin.access.enabledNo") }}</strong>
+                <span>{{ t("employeeAdmin.access.linked") }}</span>
+                <strong>{{ hasLinkedAccess ? t("employeeAdmin.access.linkedYes") : t("employeeAdmin.access.linkedNo") }}</strong>
               </article>
               <article class="employee-admin-summary__card">
-                <span>{{ t("employeeAdmin.access.roleAssignment") }}</span>
-                <strong>{{ accessLink?.role_assignment_active ? t("employeeAdmin.access.roleAssignmentYes") : t("employeeAdmin.access.roleAssignmentNo") }}</strong>
+                <span>{{ t("employeeAdmin.access.loginReady") }}</span>
+                <strong>
+                  {{
+                    accessLink?.diagnostics.can_mobile_login
+                      ? t("employeeAdmin.access.loginReadyYes")
+                      : t("employeeAdmin.access.loginReadyNo")
+                  }}
+                </strong>
               </article>
               <article class="employee-admin-summary__card">
                 <span>{{ t("employeeAdmin.access.manageFullName") }}</span>
@@ -706,6 +712,27 @@
                       {{ t("employeeAdmin.actions.detachAccessUser") }}
                     </button>
                   </div>
+                </div>
+              </section>
+
+              <section v-if="accessLink" class="employee-admin-form-section" data-testid="employee-access-diagnostics-section">
+                <div class="employee-admin-form-section__header">
+                  <p class="eyebrow">{{ t("employeeAdmin.access.diagnosticsEyebrow") }}</p>
+                  <h4>{{ t("employeeAdmin.access.diagnosticsTitle") }}</h4>
+                </div>
+                <div class="employee-admin-record-list employee-admin-access-diagnostics-list">
+                  <article
+                    v-for="check in employeeAccessDiagnosticChecks"
+                    :key="check.label"
+                    class="employee-admin-record employee-admin-access-diagnostic"
+                    data-testid="employee-access-diagnostics-row"
+                  >
+                    <div class="employee-admin-record__body">
+                      <strong>{{ check.label }}</strong>
+                      <span class="employee-admin-record__meta">{{ check.value ? t("employeeAdmin.access.enabledYes") : t("employeeAdmin.access.enabledNo") }}</span>
+                    </div>
+                    <StatusBadge :status="check.value ? 'active' : 'inactive'" />
+                  </article>
                 </div>
               </section>
 
@@ -2474,6 +2501,24 @@ const employeeWorkspaceLoadingText = computed(() =>
 );
 const resolvedTenantScopeId = computed(() => authStore.effectiveTenantScopeId);
 const hasLinkedAccess = computed(() => !!accessLink.value?.user_id);
+const employeeAccessDiagnosticChecks = computed(() => {
+  const diagnostics = accessLink.value?.diagnostics;
+  if (!diagnostics) {
+    return [];
+  }
+  return [
+    { label: t("employeeAdmin.access.diagnosticUserExists"), value: diagnostics.user_exists },
+    { label: t("employeeAdmin.access.diagnosticUserStatus"), value: diagnostics.user_status_active },
+    { label: t("employeeAdmin.access.diagnosticUserArchived"), value: diagnostics.user_not_archived },
+    { label: t("employeeAdmin.access.diagnosticPasswordLogin"), value: diagnostics.is_password_login_enabled },
+    { label: t("employeeAdmin.access.diagnosticPasswordHash"), value: diagnostics.has_password_hash },
+    { label: t("employeeAdmin.access.diagnosticEmployeeLinked"), value: diagnostics.employee_linked },
+    { label: t("employeeAdmin.access.diagnosticEmployeeStatus"), value: diagnostics.employee_status_active },
+    { label: t("employeeAdmin.access.diagnosticEmployeeArchived"), value: diagnostics.employee_not_archived },
+    { label: t("employeeAdmin.access.diagnosticRoleAssignment"), value: diagnostics.employee_user_role_assignment_active },
+    { label: t("employeeAdmin.access.diagnosticPermission"), value: diagnostics.portal_employee_access_granted },
+  ];
+});
 const selectedEmployeeLabel = computed(() =>
   selectedEmployee.value
     ? `${selectedEmployee.value.personnel_no} · ${selectedEmployee.value.first_name} ${selectedEmployee.value.last_name}`
@@ -5889,6 +5934,14 @@ onBeforeUnmount(() => {
 
 .employee-admin-advanced-access summary::-webkit-details-marker {
   display: none;
+}
+
+.employee-admin-access-diagnostics-list {
+  gap: 0.7rem;
+}
+
+.employee-admin-access-diagnostic {
+  align-items: center;
 }
 
 .employee-admin-form-grid--editor {

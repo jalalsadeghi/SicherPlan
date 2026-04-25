@@ -939,11 +939,29 @@ export type MessageKey =
   | "employeeAdmin.access.user"
   | "employeeAdmin.access.email"
   | "employeeAdmin.access.enabled"
+  | "employeeAdmin.access.linked"
+  | "employeeAdmin.access.linkedYes"
+  | "employeeAdmin.access.linkedNo"
+  | "employeeAdmin.access.loginReady"
+  | "employeeAdmin.access.loginReadyYes"
+  | "employeeAdmin.access.loginReadyNo"
   | "employeeAdmin.access.enabledYes"
   | "employeeAdmin.access.enabledNo"
   | "employeeAdmin.access.roleAssignment"
   | "employeeAdmin.access.roleAssignmentYes"
   | "employeeAdmin.access.roleAssignmentNo"
+  | "employeeAdmin.access.diagnosticsEyebrow"
+  | "employeeAdmin.access.diagnosticsTitle"
+  | "employeeAdmin.access.diagnosticUserExists"
+  | "employeeAdmin.access.diagnosticUserStatus"
+  | "employeeAdmin.access.diagnosticUserArchived"
+  | "employeeAdmin.access.diagnosticPasswordLogin"
+  | "employeeAdmin.access.diagnosticPasswordHash"
+  | "employeeAdmin.access.diagnosticEmployeeLinked"
+  | "employeeAdmin.access.diagnosticEmployeeStatus"
+  | "employeeAdmin.access.diagnosticEmployeeArchived"
+  | "employeeAdmin.access.diagnosticRoleAssignment"
+  | "employeeAdmin.access.diagnosticPermission"
   | "employeeAdmin.access.lead"
   | "employeeAdmin.access.stateCreateEyebrow"
   | "employeeAdmin.access.stateCreateTitle"
@@ -2964,11 +2982,29 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.access.user": "Benutzername",
     "employeeAdmin.access.email": "E-Mail",
     "employeeAdmin.access.enabled": "Zugang aktiv",
+    "employeeAdmin.access.linked": "Verknüpft",
+    "employeeAdmin.access.linkedYes": "Ja",
+    "employeeAdmin.access.linkedNo": "Nein",
+    "employeeAdmin.access.loginReady": "Login-bereit",
+    "employeeAdmin.access.loginReadyYes": "Ja",
+    "employeeAdmin.access.loginReadyNo": "Nein",
     "employeeAdmin.access.enabledYes": "Ja",
     "employeeAdmin.access.enabledNo": "Nein",
     "employeeAdmin.access.roleAssignment": "Rollenverknüpfung aktiv",
     "employeeAdmin.access.roleAssignmentYes": "Ja",
     "employeeAdmin.access.roleAssignmentNo": "Nein",
+    "employeeAdmin.access.diagnosticsEyebrow": "Diagnose",
+    "employeeAdmin.access.diagnosticsTitle": "Mobile-Login-Bereitschaft",
+    "employeeAdmin.access.diagnosticUserExists": "IAM-Benutzer existiert",
+    "employeeAdmin.access.diagnosticUserStatus": "Benutzerstatus ist aktiv",
+    "employeeAdmin.access.diagnosticUserArchived": "Benutzer ist nicht archiviert",
+    "employeeAdmin.access.diagnosticPasswordLogin": "Passwort-Login ist aktiviert",
+    "employeeAdmin.access.diagnosticPasswordHash": "Passwort-Hash ist vorhanden",
+    "employeeAdmin.access.diagnosticEmployeeLinked": "Mitarbeiter ist mit dem IAM-Benutzer verknüpft",
+    "employeeAdmin.access.diagnosticEmployeeStatus": "Mitarbeiterstatus ist aktiv",
+    "employeeAdmin.access.diagnosticEmployeeArchived": "Mitarbeiter ist nicht archiviert",
+    "employeeAdmin.access.diagnosticRoleAssignment": "Rolle employee_user ist aktiv",
+    "employeeAdmin.access.diagnosticPermission": "Berechtigung portal.employee.access ist vorhanden",
     "employeeAdmin.access.lead": "Jede Mitarbeiterakte darf genau einen verknüpften App-Zugang haben. Die Oberfläche folgt diesem Ein-Benutzer-Modell jetzt explizit.",
     "employeeAdmin.access.stateCreateEyebrow": "Kein verknüpfter Zugang",
     "employeeAdmin.access.stateCreateTitle": "App-Zugang neu anlegen",
@@ -5179,11 +5215,29 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.access.user": "Username",
     "employeeAdmin.access.email": "Email",
     "employeeAdmin.access.enabled": "Access enabled",
+    "employeeAdmin.access.linked": "Linked",
+    "employeeAdmin.access.linkedYes": "Yes",
+    "employeeAdmin.access.linkedNo": "No",
+    "employeeAdmin.access.loginReady": "Login ready",
+    "employeeAdmin.access.loginReadyYes": "Yes",
+    "employeeAdmin.access.loginReadyNo": "No",
     "employeeAdmin.access.enabledYes": "Yes",
     "employeeAdmin.access.enabledNo": "No",
     "employeeAdmin.access.roleAssignment": "Role assignment active",
     "employeeAdmin.access.roleAssignmentYes": "Yes",
     "employeeAdmin.access.roleAssignmentNo": "No",
+    "employeeAdmin.access.diagnosticsEyebrow": "Diagnostics",
+    "employeeAdmin.access.diagnosticsTitle": "Mobile login readiness",
+    "employeeAdmin.access.diagnosticUserExists": "IAM user exists",
+    "employeeAdmin.access.diagnosticUserStatus": "User status is active",
+    "employeeAdmin.access.diagnosticUserArchived": "User is not archived",
+    "employeeAdmin.access.diagnosticPasswordLogin": "Password login is enabled",
+    "employeeAdmin.access.diagnosticPasswordHash": "Password hash exists",
+    "employeeAdmin.access.diagnosticEmployeeLinked": "Employee is linked to the IAM user",
+    "employeeAdmin.access.diagnosticEmployeeStatus": "Employee status is active",
+    "employeeAdmin.access.diagnosticEmployeeArchived": "Employee is not archived",
+    "employeeAdmin.access.diagnosticRoleAssignment": "employee_user role assignment is active",
+    "employeeAdmin.access.diagnosticPermission": "portal.employee.access permission is granted",
     "employeeAdmin.access.lead": "Each employee file can have exactly one linked app-access account. This tab now follows that one-user-per-employee rule explicitly.",
     "employeeAdmin.access.stateCreateEyebrow": "No linked account",
     "employeeAdmin.access.stateCreateTitle": "Create app access",

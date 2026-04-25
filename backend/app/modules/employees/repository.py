@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -40,7 +42,7 @@ from app.modules.employees.schemas import (
     EmployeeQualificationFilter,
     EmployeeTimeAccountFilter,
 )
-from app.modules.iam.models import Role, UserAccount, UserRoleAssignment, UserSession
+from app.modules.iam.models import Permission, Role, RolePermission, UserAccount, UserRoleAssignment, UserSession
 from app.modules.platform_services.docs_models import Document, DocumentLink, DocumentVersion
 from app.modules.platform_services.integration_models import ImportExportJob
 
@@ -914,6 +916,26 @@ class SqlAlchemyEmployeeRepository:
             .options(selectinload(UserRoleAssignment.role))
         )
         return self.session.scalars(statement).one_or_none()
+
+    def list_permission_keys_for_user(self, user_id: str, *, at_time: datetime | None = None) -> list[str]:
+        now = at_time or datetime.now(UTC)
+        statement = (
+            select(Permission.key)
+            .join(RolePermission, RolePermission.permission_id == Permission.id)
+            .join(Role, Role.id == RolePermission.role_id)
+            .join(UserRoleAssignment, UserRoleAssignment.role_id == Role.id)
+            .where(
+                UserRoleAssignment.user_account_id == user_id,
+                UserRoleAssignment.status == "active",
+                UserRoleAssignment.archived_at.is_(None),
+                Role.status == "active",
+                Role.archived_at.is_(None),
+                or_(UserRoleAssignment.valid_from.is_(None), UserRoleAssignment.valid_from <= now),
+                or_(UserRoleAssignment.valid_until.is_(None), UserRoleAssignment.valid_until >= now),
+            )
+            .distinct()
+        )
+        return list(self.session.scalars(statement).all())
 
     def create_role_assignment(self, row: UserRoleAssignment) -> UserRoleAssignment:
         self.session.add(row)

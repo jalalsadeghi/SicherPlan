@@ -288,6 +288,21 @@ export interface EmployeeAccessLinkRead {
   full_name: string | null;
   app_access_enabled: boolean;
   role_assignment_active: boolean;
+  diagnostics: EmployeeAccessDiagnosticsRead;
+}
+
+export interface EmployeeAccessDiagnosticsRead {
+  user_exists: boolean;
+  user_status_active: boolean;
+  user_not_archived: boolean;
+  is_password_login_enabled: boolean;
+  has_password_hash: boolean;
+  employee_linked: boolean;
+  employee_status_active: boolean;
+  employee_not_archived: boolean;
+  employee_user_role_assignment_active: boolean;
+  portal_employee_access_granted: boolean;
+  can_mobile_login: boolean;
 }
 
 export interface EmployeeAccessUpdateUserRequest {
