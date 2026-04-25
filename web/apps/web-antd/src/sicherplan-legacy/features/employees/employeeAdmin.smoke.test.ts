@@ -698,6 +698,39 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(wrapper.get('[data-testid="employee-list-header-new-employee"]').classes()).toContain("employee-admin-header-action");
   });
 
+  it("preloads employee list thumbnails on first load from list photo metadata without opening detail first", async () => {
+    const { createObjectURLMock } = stubEmployeePhotoObjectUrls("blob:prefetched-markus-photo");
+    apiMocks.listEmployeesMock.mockResolvedValue([
+      buildEmployeeListItem("employee-markus", "P-2000", "Markus", "Neumann", {
+        work_email: "markus.neumann@example.test",
+        photo_document_id: "photo-document-1",
+        photo_current_version_no: 3,
+        photo_content_type: "image/png",
+      }),
+      leon,
+    ]);
+    apiMocks.downloadEmployeeDocumentMock.mockResolvedValue({
+      blob: new Blob(["prefetched-photo"], { type: "image/png" }),
+    });
+
+    const wrapper = await mountEmployeeAdmin();
+
+    expect(apiMocks.getEmployeePhotoMock).not.toHaveBeenCalled();
+    expect(apiMocks.downloadEmployeeDocumentMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "photo-document-1",
+      3,
+      "token-1",
+    );
+    expect(createObjectURLMock).toHaveBeenCalledTimes(1);
+
+    const rows = wrapper.findAll('[data-testid="employee-list-row"]');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.find('[data-testid="employee-list-row-avatar-image"]').attributes("src")).toBe("blob:prefetched-markus-photo");
+    expect(rows[1]?.find('[data-testid="employee-list-row-avatar-image"]').exists()).toBe(false);
+    expect(rows[1]?.find('[data-testid="employee-list-row-avatar"]').text()).toBe("LY");
+  });
+
   it("shows a cached employee photo thumbnail in the list row after the detail photo was loaded", async () => {
     const { createObjectURLMock } = stubEmployeePhotoObjectUrls("blob:markus-photo");
     apiMocks.getEmployeePhotoMock.mockResolvedValue({

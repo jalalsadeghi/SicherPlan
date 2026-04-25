@@ -2409,6 +2409,7 @@ const lastExportResult = ref<EmployeeExportResult | null>(null);
 const photoPreviewUrl = ref("");
 const employeeListPhotoPreviewUrls = reactive<Record<string, string>>({});
 const employeeListPhotoFailedIds = reactive<Record<string, boolean>>({});
+const employeeListPhotoPendingIds = reactive<Record<string, boolean>>({});
 const pendingEmployeeDocumentFile = ref<File | null>(null);
 const pendingEmployeeDocumentVersionFile = ref<File | null>(null);
 const pendingImportFile = ref<File | null>(null);
@@ -2442,6 +2443,7 @@ let overviewNavFloatingRaf: number | null = null;
 const employeeOverviewVisibleEntries = new Map<EmployeeOverviewSectionId, IntersectionObserverEntry>();
 const EXTRA_SECTION_NAV_TOP_OFFSET = 25;
 const OVERVIEW_NAV_FLOATING_MIN_WIDTH = 1081;
+const EMPLOYEE_LIST_PHOTO_PRELOAD_CONCURRENCY = 4;
 
 const documentUploadDraft = reactive({
   title: "",
@@ -3858,6 +3860,53 @@ function syncEmployeeListPhotoPreview(employeeId: string, previewUrl: string) {
   employeeListPhotoFailedIds[employeeId] = false;
 }
 
+async function preloadEmployeeListPhotos(rows: EmployeeListItem[]) {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken) {
+    return;
+  }
+
+  const queue = rows.filter(
+    (employee) =>
+      !!employee.photo_document_id
+      && !!employee.photo_current_version_no
+      && !employeeListPhotoPreviewUrls[employee.id]
+      && employeeListPhotoPendingIds[employee.id] !== true,
+  );
+  if (!queue.length) {
+    return;
+  }
+
+  const worker = async () => {
+    while (queue.length) {
+      const employee = queue.shift();
+      if (!employee?.photo_document_id || !employee.photo_current_version_no) {
+        continue;
+      }
+      employeeListPhotoPendingIds[employee.id] = true;
+      try {
+        const file = await downloadEmployeeDocument(
+          resolvedTenantScopeId.value!,
+          employee.photo_document_id,
+          employee.photo_current_version_no,
+          authStore.accessToken,
+        );
+        syncEmployeeListPhotoPreview(employee.id, URL.createObjectURL(file.blob));
+      } catch {
+        employeeListPhotoFailedIds[employee.id] = true;
+      } finally {
+        delete employeeListPhotoPendingIds[employee.id];
+      }
+    }
+  };
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(EMPLOYEE_LIST_PHOTO_PRELOAD_CONCURRENCY, queue.length) },
+      () => worker(),
+    ),
+  );
+}
+
 async function refreshEmployees(options: { autoSelectFirst?: boolean } = {}) {
   if (!resolvedTenantScopeId.value || !authStore.accessToken || !canRead.value) {
     branches.value = [];
@@ -3874,6 +3923,7 @@ async function refreshEmployees(options: { autoSelectFirst?: boolean } = {}) {
   loading.list = true;
   try {
     employees.value = await listEmployees(resolvedTenantScopeId.value, authStore.accessToken, filters);
+    void preloadEmployeeListPhotos(employees.value);
     if (selectedEmployeeId.value) {
       const stillSelected = employees.value.some((row) => row.id === selectedEmployeeId.value);
       if (stillSelected) {
@@ -4091,6 +4141,19 @@ async function refreshPhotoPreview() {
   clearPhotoPreview();
   if (!currentPhoto.value?.current_version_no || !authStore.accessToken || !resolvedTenantScopeId.value) {
     return;
+  }
+  if (selectedEmployeeId.value) {
+    const listEmployee = employees.value.find((employee) => employee.id === selectedEmployeeId.value);
+    const cachedUrl = employeeListPhotoPreviewUrls[selectedEmployeeId.value];
+    if (
+      cachedUrl
+      && listEmployee?.photo_document_id === currentPhoto.value.document_id
+      && listEmployee.photo_current_version_no === currentPhoto.value.current_version_no
+      && employeeListPhotoFailedIds[selectedEmployeeId.value] !== true
+    ) {
+      photoPreviewUrl.value = cachedUrl;
+      return;
+    }
   }
   try {
     const file = await downloadEmployeeDocument(
@@ -5306,13 +5369,13 @@ onBeforeUnmount(() => {
   flex-wrap: nowrap;
   align-items: center;
   gap: 0.8rem;
-  padding: 0.75rem 0.9rem;
+  padding: 0.4rem 0.4rem;
 }
 
 .employee-admin-employee-row__avatar {
-  width: 2.5rem;
-  height: 2.5rem;
-  flex: 0 0 2.5rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  flex: 0 0 3.5rem;
   display: grid;
   place-items: center;
   border-radius: 999px;

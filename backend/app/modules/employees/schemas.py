@@ -80,6 +80,9 @@ class EmployeeListItem(BaseModel):
     updated_at: datetime
     archived_at: datetime | None
     version_no: int
+    photo_document_id: str | None = None
+    photo_current_version_no: int | None = None
+    photo_content_type: str | None = None
 
 
 class EmployeeOperationalRead(EmployeeListItem):

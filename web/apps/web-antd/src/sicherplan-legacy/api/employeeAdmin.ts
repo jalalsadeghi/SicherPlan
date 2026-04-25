@@ -18,6 +18,9 @@ export interface EmployeeListItem {
   updated_at: string;
   archived_at: string | null;
   version_no: number;
+  photo_document_id?: string | null;
+  photo_current_version_no?: number | null;
+  photo_content_type?: string | null;
 }
 
 export interface EmployeeGroupRead {

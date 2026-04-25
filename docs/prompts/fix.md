@@ -3,112 +3,80 @@ You are working in the latest public SicherPlan repository.
 Target page:
 admin/employees
 
-Main file to inspect:
-- web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
-
-Related files to inspect:
-- EmployeeDashboardTab component used in the employee detail/dashboard view
-- employee admin API/types used by EmployeeAdminView
-- employeeAdmin layout/smoke tests:
-  - web/apps/web-antd/src/sicherplan-legacy/features/employees/employeeAdmin.layout.test.js
-  - web/apps/web-antd/src/sicherplan-legacy/features/employees/employeeAdmin.smoke.test.ts
-
-Observed UI:
-- In the employee detail/dashboard view, the employee photo is displayed correctly.
-- In the admin/employees list view, each employee row currently shows only initials/avatar fallback such as "MN", "LY", "EK", etc.
-- The user wants the real employee photo to be displayed in the list row as well, when available.
+Observed bug:
+On first load of admin/employees, employee list rows show only initials/avatar fallback.
+When the user opens one employee dashboard/detail and returns to the list, that employee’s photo appears in the list.
+After opening another employee dashboard, that second employee’s photo also appears in the list.
+This means employee photos are currently loaded lazily only after opening employee detail/dashboard, not during initial list rendering.
 
 Goal:
-Show the employee photo at the beginning of each employee row in the admin/employees list, using the same available photo source/pattern that already works in the employee dashboard/detail view.
+Fix employee list photos so that, on the first list load, all employees that already have profile photos show their real photo thumbnails immediately.
+Employees without photos should keep initials fallback.
 
-Important:
-Do not solve this by making one API request per employee row if the list can contain many employees.
-Do not introduce an N+1 photo loading problem.
-Do not change backend APIs unless you first prove that the frontend has no safe existing source or endpoint pattern for row photos.
-Do not break the initials fallback.
-Do not change employee detail/dashboard photo upload behavior.
-Do not change list/detail navigation.
-Do not change search/filter behavior.
+Relevant frontend files to inspect:
+- web/apps/web-antd/src/sicherplan-legacy/views/EmployeeAdminView.vue
+- web/apps/web-antd/src/sicherplan-legacy/components/employees/EmployeeDashboardTab.vue
+- web/apps/web-antd/src/sicherplan-legacy/api/employeeAdmin.ts
+- employeeAdmin layout/smoke tests
+
+Relevant backend/API areas to inspect:
+- employee list endpoint implementation:
+  GET /api/employees/tenants/{tenant_id}/employees
+- employee photo endpoint implementation:
+  GET /api/employees/tenants/{tenant_id}/employees/{employee_id}/photo
+- employee DTO/read models/schemas for list and detail
+- document/photo storage/linking logic
+
+Important current finding to validate:
+The frontend EmployeeListItem type appears not to contain photo/profile image metadata. If this is true, the initial list cannot reliably render photos without either:
+1) extending the list endpoint/read model to include safe photo thumbnail metadata/url, or
+2) adding a batch-safe frontend preload strategy, or
+3) adding/using an existing batch endpoint for employee photos.
+
+Do not implement an N+1 solution blindly.
+Do not fetch one full photo endpoint per employee without evaluating performance and list size.
+Do not rely on “open detail first” cache behavior.
+
+Please audit and decide the best implementation approach.
+
+Preferred solution if backend supports it:
+- Extend the employee list response with optional photo metadata suitable for list thumbnails, for example:
+  - photo_document_id
+  - photo_version_no
+  - photo_url / photo_download_url / profile_photo_url
+  - has_photo
+  - photo_content_type if needed
+- Update frontend EmployeeListItem type accordingly.
+- Render photo thumbnail from this data in employee list rows.
+- Keep initials fallback for rows without photo.
+
+Alternative solution if backend already has a safe helper:
+- Reuse any existing photo URL builder or document download route.
+- Avoid per-row full photo fetches if possible.
+
+Fallback solution only if backend change is not feasible in this task:
+- Implement a bounded/concurrency-limited preload for visible list rows only.
+- Cache photo results by employee_id.
+- Do not block list rendering.
+- Do not preload archived/hidden rows unnecessarily.
+- Explain why this fallback was chosen.
 
 Required investigation:
-1) Find how EmployeeDashboardTab receives and displays the employee photo.
-2) Identify where `photoPreviewUrl` or equivalent employee photo state is created in EmployeeAdminView.
-3) Check whether employee list rows already have any photo metadata, for example:
-   - photo_url
-   - photo_document_id
-   - avatar_url
-   - profile_photo_url
-   - current_photo_version
-   - document link / photo endpoint reference
-4) Check the employee admin API/types to see whether list employees include photo information.
-5) Check whether there is an existing safe helper/composable/API function for employee photos.
-6) Determine whether the list can reuse cached/loaded photo previews for employees whose detail was already opened.
-7) Validate whether a lightweight batch-safe approach exists before changing anything.
+1) Find how EmployeeDashboardTab receives/displays the photo.
+2) Find where the detail photo is loaded and cached in EmployeeAdminView.
+3) Check whether listEmployees returns any photo metadata.
+4) Check whether backend EmployeeListItem/EmployeeRead schema has photo fields.
+5) Check whether the backend can cheaply include current profile photo metadata in the list query without loading binary data.
+6) Check whether there is already a document/version download URL builder that can be safely used for thumbnails.
+7) Decide whether the fix should be frontend-only or frontend+backend.
 
-Preferred implementation:
-- If the employee list item already includes a photo URL or photo metadata, render it directly in the list avatar.
-- If the photo URL can be derived safely from existing list fields without additional per-row requests, derive it with a helper.
-- If the photo is only available after opening employee detail, then:
-  - keep initials fallback for rows without loaded photo,
-  - optionally use a small cache for photos already loaded in detail,
-  - do not fetch every row photo individually.
-- If a backend/API improvement is truly required, do not implement it blindly. First explain why and keep the frontend fallback stable.
+Expected output of this audit:
+- exact reason photos only appear after opening detail
+- whether list API currently lacks photo metadata
+- recommended implementation plan
+- files to change
+- test plan
 
-UI requirements:
-- The employee row still starts with the avatar area.
-- If photo is available:
-  - show image thumbnail in the avatar area.
-  - use object-fit: cover.
-  - keep the avatar size compact and aligned with the 2-line row layout.
-- If photo is not available or image load fails:
-  - show initials fallback exactly as now.
-- Add an image error handler so broken photo URLs fall back to initials.
-- Keep row height compact.
-- Keep status badge on the right.
-- Keep row clickable.
-
-Suggested helper names:
-- getEmployeeListPhotoUrl(employee)
-- getEmployeeInitials(employee)
-- markEmployeeListPhotoFailed(employee.id)
-- shouldShowEmployeeListPhoto(employee)
-
-Validation scenarios:
-1) Employee with photo:
-- list row displays real photo thumbnail.
-2) Employee without photo:
-- list row displays initials fallback.
-3) Broken photo URL:
-- image error hides broken image and shows initials fallback.
-4) Detail dashboard still displays photo correctly.
-5) Upload/change photo in detail:
-- if the list photo cache can be updated safely, update the selected employee row thumbnail after upload.
-- if not, do not break anything and mention limitation.
-6) Search/filter keeps photos/fallbacks correct.
-7) No extra API request per list row is introduced.
-
-Testing:
-Add/update tests in the closest employeeAdmin test file:
-- list row renders an img when photo data exists.
-- list row renders initials when photo data is missing.
-- image error falls back to initials if feasible in the test environment.
-- clicking a row still opens detail.
-- detail dashboard photo behavior is unchanged.
-
-Acceptance criteria:
-- Employee list rows show real employee photo thumbnails when available.
-- Rows without photo still show initials.
-- Broken images fall back to initials.
-- No N+1 row photo fetching is introduced.
-- Employee detail/dashboard photo remains unchanged.
-- No regression in search, advanced filters, import/export, create, or detail navigation.
-
-Deliverables:
-1) Apply code/CSS changes.
-2) Add/update tests.
-3) Summarize:
-   - changed files
-   - exact photo source used for list rows
-   - whether the list API already had photo data
-   - fallback behavior
-   - validation performed
+Please validate my suggested direction critically:
+If the list API already contains the required metadata but frontend ignores it, fix frontend only.
+If the list API truly lacks photo data, implement the safest API/read-model extension or explain why a frontend-only fallback is required.

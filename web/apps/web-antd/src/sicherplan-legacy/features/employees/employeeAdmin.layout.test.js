@@ -321,8 +321,16 @@ test("employee list moves import/export into a header modal and keeps compact cu
   assert.match(viewSource, /function markEmployeeListPhotoFailed\(employeeId: string\)/);
   assert.match(viewSource, /const employeeListPhotoPreviewUrls = reactive<Record<string, string>>\(\{\}\)/);
   assert.match(viewSource, /const employeeListPhotoFailedIds = reactive<Record<string, boolean>>\(\{\}\)/);
+  assert.match(viewSource, /const employeeListPhotoPendingIds = reactive<Record<string, boolean>>\(\{\}\)/);
+  assert.match(viewSource, /const EMPLOYEE_LIST_PHOTO_PRELOAD_CONCURRENCY = 4/);
   assert.match(viewSource, /function syncEmployeeListPhotoPreview\(employeeId: string, previewUrl: string\)/);
+  assert.match(viewSource, /async function preloadEmployeeListPhotos\(rows: EmployeeListItem\[\]\)/);
+  assert.match(viewSource, /!!employee\.photo_document_id[\s\S]*!!employee\.photo_current_version_no/);
+  assert.match(viewSource, /downloadEmployeeDocument\([\s\S]*employee\.photo_document_id,[\s\S]*employee\.photo_current_version_no,[\s\S]*authStore\.accessToken/);
+  assert.match(viewSource, /void preloadEmployeeListPhotos\(employees\.value\);/);
   assert.match(viewSource, /if \(selectedEmployeeId\.value\) {\s*syncEmployeeListPhotoPreview\(selectedEmployeeId\.value, photoPreviewUrl\.value\);\s*}/);
+  assert.match(viewSource, /listEmployee\?\.photo_document_id === currentPhoto\.value\.document_id/);
+  assert.match(viewSource, /listEmployee\.photo_current_version_no === currentPhoto\.value\.current_version_no/);
   assert.match(viewSource, /@click="openEmployeeWorkspace\(employee\.id\)"/);
   assert.match(viewSource, /:aria-label="`\$\{employee\.personnel_no\} · \$\{employee\.first_name\} \$\{employee\.last_name\}`"/);
   assert.match(viewSource, /class="employee-admin-filter-toolbar"/);

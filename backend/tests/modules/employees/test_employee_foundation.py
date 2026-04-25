@@ -476,6 +476,30 @@ class TestEmployeeService(unittest.TestCase):
         self.assertFalse(hasattr(operational, "tax_id"))
         self.assertEqual(private_profile.tax_id, "DE123")
 
+    def test_employee_list_can_expose_profile_photo_metadata_without_binary_payloads(self) -> None:
+        employee = self.service.create_employee(
+            "tenant-1",
+            EmployeeOperationalCreate(
+                tenant_id="tenant-1",
+                personnel_no="EMP-1001P",
+                first_name="Markus",
+                last_name="Neumann",
+            ),
+            _context("employees.employee.write"),
+        )
+        row = self.repository.get_employee("tenant-1", employee.id)
+        assert row is not None
+        setattr(row, "photo_document_id", "document-photo-1")
+        setattr(row, "photo_current_version_no", 4)
+        setattr(row, "photo_content_type", "image/png")
+
+        listed = self.service.list_operational_employees("tenant-1", _context("employees.employee.read"))
+
+        self.assertEqual(len(listed), 1)
+        self.assertEqual(listed[0].photo_document_id, "document-photo-1")
+        self.assertEqual(listed[0].photo_current_version_no, 4)
+        self.assertEqual(listed[0].photo_content_type, "image/png")
+
     def test_private_profile_uses_marital_status_code_and_accepts_legacy_alias(self) -> None:
         employee = self.service.create_employee(
             "tenant-1",

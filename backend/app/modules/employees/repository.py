@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -41,6 +41,7 @@ from app.modules.employees.schemas import (
     EmployeeTimeAccountFilter,
 )
 from app.modules.iam.models import Role, UserAccount, UserRoleAssignment, UserSession
+from app.modules.platform_services.docs_models import Document, DocumentLink, DocumentVersion
 from app.modules.platform_services.integration_models import ImportExportJob
 
 
@@ -78,9 +79,11 @@ class SqlAlchemyEmployeeRepository:
                         func.lower(Employee.last_name).like(like_term),
                         func.lower(func.coalesce(Employee.preferred_name, "")).like(like_term),
                         func.lower(func.coalesce(Employee.work_email, "")).like(like_term),
-                    )
                 )
-        return list(self.session.scalars(statement).all())
+        )
+        rows = list(self.session.scalars(statement).all())
+        self._attach_profile_photo_metadata(tenant_id, rows)
+        return rows
 
     def get_employee(self, tenant_id: str, employee_id: str) -> Employee | None:
         statement = (
@@ -94,6 +97,60 @@ class SqlAlchemyEmployeeRepository:
             )
         )
         return self.session.scalars(statement).one_or_none()
+
+    def _attach_profile_photo_metadata(self, tenant_id: str, employees: list[Employee]) -> None:
+        if not employees:
+            return
+
+        employee_ids = [employee.id for employee in employees]
+        photo_rows = self.session.execute(
+            select(
+                DocumentLink.owner_id.label("employee_id"),
+                Document.id.label("photo_document_id"),
+                Document.current_version_no.label("photo_current_version_no"),
+                DocumentVersion.content_type.label("photo_content_type"),
+            )
+            .join(
+                Document,
+                and_(
+                    Document.tenant_id == DocumentLink.tenant_id,
+                    Document.id == DocumentLink.document_id,
+                ),
+            )
+            .outerjoin(
+                DocumentVersion,
+                and_(
+                    DocumentVersion.tenant_id == Document.tenant_id,
+                    DocumentVersion.document_id == Document.id,
+                    DocumentVersion.version_no == Document.current_version_no,
+                ),
+            )
+            .where(
+                DocumentLink.tenant_id == tenant_id,
+                DocumentLink.owner_type == "hr.employee",
+                DocumentLink.relation_type == "profile_photo",
+                DocumentLink.owner_id.in_(employee_ids),
+                Document.archived_at.is_(None),
+                Document.current_version_no > 0,
+            )
+            .order_by(
+                DocumentLink.owner_id,
+                Document.updated_at.desc(),
+                DocumentLink.linked_at.desc(),
+                Document.current_version_no.desc(),
+            )
+        ).all()
+
+        latest_photo_by_employee_id: dict[str, object] = {}
+        for row in photo_rows:
+            if row.employee_id not in latest_photo_by_employee_id:
+                latest_photo_by_employee_id[row.employee_id] = row
+
+        for employee in employees:
+            photo = latest_photo_by_employee_id.get(employee.id)
+            setattr(employee, "photo_document_id", None if photo is None else photo.photo_document_id)
+            setattr(employee, "photo_current_version_no", None if photo is None else photo.photo_current_version_no)
+            setattr(employee, "photo_content_type", None if photo is None else photo.photo_content_type)
 
     def get_employee_private_profile(self, tenant_id: str, employee_id: str) -> EmployeePrivateProfile | None:
         statement = select(EmployeePrivateProfile).where(
