@@ -573,6 +573,8 @@ export type MessageKey =
   | "employeeAdmin.form.actionsTitle"
   | "employeeAdmin.filters.search"
   | "employeeAdmin.filters.searchPlaceholder"
+  | "employeeAdmin.filters.additionalTitle"
+  | "employeeAdmin.filters.searchEmployees"
   | "employeeAdmin.filters.status"
   | "employeeAdmin.filters.allStatuses"
   | "employeeAdmin.filters.includeArchived"
@@ -857,6 +859,9 @@ export type MessageKey =
   | "employeeAdmin.actions.rememberScope"
   | "employeeAdmin.actions.refresh"
   | "employeeAdmin.actions.search"
+  | "employeeAdmin.actions.advancedFilters"
+  | "employeeAdmin.actions.closeFilters"
+  | "employeeAdmin.actions.backToEmployeeList"
   | "employeeAdmin.actions.cancel"
   | "employeeAdmin.actions.clearFeedback"
   | "employeeAdmin.actions.newEmployee"
@@ -2586,6 +2591,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.form.actionsTitle": "Akte speichern oder zurücksetzen",
     "employeeAdmin.filters.search": "Suche",
     "employeeAdmin.filters.searchPlaceholder": "Personalnummer, Name, E-Mail oder Telefon",
+    "employeeAdmin.filters.additionalTitle": "Zusatzfilter",
+    "employeeAdmin.filters.searchEmployees": "Mitarbeiter suchen",
     "employeeAdmin.filters.status": "Status",
     "employeeAdmin.filters.allStatuses": "Alle Status",
     "employeeAdmin.filters.includeArchived": "Archivierte Datensätze einschliessen",
@@ -2877,6 +2884,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.rememberScope": "Scope merken",
     "employeeAdmin.actions.refresh": "Neu laden",
     "employeeAdmin.actions.search": "Suchen",
+    "employeeAdmin.actions.advancedFilters": "Erweiterte Filter",
+    "employeeAdmin.actions.closeFilters": "Filter schliessen",
+    "employeeAdmin.actions.backToEmployeeList": "Zur Mitarbeiterliste",
     "employeeAdmin.actions.cancel": "Schliessen",
     "employeeAdmin.actions.clearFeedback": "Hinweis schliessen",
     "employeeAdmin.actions.newEmployee": "Mitarbeiterakte anlegen",
@@ -4791,6 +4801,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.form.actionsTitle": "Save or reset the file",
     "employeeAdmin.filters.search": "Search",
     "employeeAdmin.filters.searchPlaceholder": "Personnel number, name, email, or phone",
+    "employeeAdmin.filters.additionalTitle": "Additional filters",
+    "employeeAdmin.filters.searchEmployees": "Search employees",
     "employeeAdmin.filters.status": "Status",
     "employeeAdmin.filters.allStatuses": "All statuses",
     "employeeAdmin.filters.includeArchived": "Include archived records",
@@ -5087,6 +5099,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.rememberScope": "Remember scope",
     "employeeAdmin.actions.refresh": "Reload",
     "employeeAdmin.actions.search": "Search",
+    "employeeAdmin.actions.advancedFilters": "Advanced filters",
+    "employeeAdmin.actions.closeFilters": "Close filters",
+    "employeeAdmin.actions.backToEmployeeList": "Back to employee list",
     "employeeAdmin.actions.cancel": "Close",
     "employeeAdmin.actions.clearFeedback": "Dismiss message",
     "employeeAdmin.actions.newEmployee": "Create employee file",

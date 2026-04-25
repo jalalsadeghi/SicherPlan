@@ -35,12 +35,17 @@ test("employee page does not render the top module intro hero", () => {
   assert.doesNotMatch(viewSource, /class="employee-admin-meta__pill"/);
 });
 
-test("employee workspace uses stacked full-width list and detail layout with embedded scope removed", () => {
+test("employee workspace uses customer-style list/detail mode shells with embedded scope removed", () => {
   assert.match(viewSource, /data-testid="employee-master-detail-layout"/);
+  assert.match(viewSource, /data-testid="employee-list-only-mode"/);
+  assert.match(viewSource, /data-testid="employee-detail-only-mode"/);
   assert.match(viewSource, /data-testid="employee-list-section"/);
   assert.match(viewSource, /data-testid="employee-detail-workspace"/);
   assert.match(viewSource, /v-if="!embedded && isPlatformAdmin" class="module-card employee-admin-scope"/);
   assert.match(viewSource, /\.employee-admin-grid\s*{\s*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.match(viewSource, /const hasEmployeeDetailWorkspace = computed\(\(\) => isCreatingEmployee\.value \|\| !!selectedEmployee\.value\)/);
+  assert.match(viewSource, /const employeeAdminDetailMode = computed\(\(\) => hasEmployeeDetailWorkspace\.value\)/);
+  assert.match(viewSource, /const employeeAdminListMode = computed\(\(\) => !employeeAdminDetailMode\.value\)/);
   assert.match(viewSource, /\.employee-admin-list-panel\s*{\s*position:\s*static;[\s\S]*top:\s*auto;/);
 });
 
@@ -205,8 +210,8 @@ test("existing employee detail prepends dashboard while create mode remains over
   assert.doesNotMatch(viewSource, /\{ id: "groups", label: t\("employeeAdmin\.tabs\.groups"\) \}/);
   assert.doesNotMatch(viewSource, /\{ id: "documents", label: t\("employeeAdmin\.tabs\.documents"\) \}/);
   assert.match(viewSource, /function startCreateEmployee\(\) \{[\s\S]*isCreatingEmployee\.value = true;[\s\S]*activeDetailTab\.value = "overview";/);
-  assert.match(viewSource, /selectEmployeeFromSearchResult\(employeeId: string\)[\s\S]*selectEmployee\(employeeId, \{ fallbackTab: "dashboard" \}\);[\s\S]*activeDetailTab\.value = "dashboard";/);
-  assert.match(viewSource, /selectEmployeeFromSuggestion\(employee: EmployeeListItem\)[\s\S]*selectEmployee\(employee\.id, \{ fallbackTab: "dashboard" \}\);[\s\S]*activeDetailTab\.value = "dashboard";/);
+  assert.match(viewSource, /selectEmployeeFromSearchResult\(employeeId: string\)[\s\S]*openEmployeeWorkspace\(employeeId, "dashboard"\);/);
+  assert.match(viewSource, /selectEmployeeFromSuggestion\(employee: EmployeeListItem\)[\s\S]*openEmployeeWorkspace\(employee\.id, "dashboard"\);/);
   assert.match(viewSource, /watch\(\s*\(\) => \[isCreatingEmployee\.value, !!selectedEmployee\.value, canReadPrivate\.value, activeDetailTab\.value\]/);
 });
 
@@ -270,43 +275,88 @@ test("employee workspace removes the redundant catalogs tab and keeps only light
   assert.doesNotMatch(viewSource, /submitQualificationTypeCatalog/);
 });
 
-test("employee search results render only inside a dismissible search dialog", () => {
+test("employee list uses a customer-style live-search toolbar with advanced filters dialog", () => {
   assert.match(viewSource, /data-testid="employee-search-select"/);
   assert.match(viewSource, /data-testid="employee-search-select-input"/);
-  assert.match(viewSource, /data-testid="employee-search-suggestions"/);
-  assert.match(viewSource, /data-testid="employee-search-suggestion-row"/);
-  assert.match(viewSource, /data-testid="employee-search-suggestion-empty"/);
-  assert.match(viewSource, /@keydown\.escape\.stop\.prevent="closeEmployeeSearchSuggestions"/);
-  assert.match(viewSource, /@keydown\.enter\.prevent="handleOpenEmployeeSearchResults"/);
-  assert.match(viewSource, /data-testid="employee-search-results-modal"/);
-  assert.match(viewSource, /data-testid="employee-search-result-close"/);
-  assert.match(viewSource, /data-testid="employee-search-result-empty"/);
-  assert.match(viewSource, /data-testid="employee-search-result-row"/);
-  assert.match(viewSource, /@click="selectEmployeeFromSearchResult\(employee\.id\)"/);
+  assert.match(viewSource, /data-testid="employee-list-filter-toolbar"/);
+  assert.match(viewSource, /data-testid="employee-advanced-filters-open"/);
+  assert.match(viewSource, /data-testid="employee-advanced-filters-dialog"/);
+  assert.match(viewSource, /data-testid="employee-advanced-filters-cancel"/);
+  assert.match(viewSource, /data-testid="employee-advanced-filters-search"/);
+  assert.match(viewSource, /data-testid="employee-advanced-filters-status"/);
+  assert.match(viewSource, /data-testid="employee-advanced-filters-default-branch"/);
+  assert.match(viewSource, /data-testid="employee-advanced-filters-default-mandate"/);
+  assert.match(viewSource, /data-testid="employee-advanced-filters-include-archived"/);
+  assert.match(viewSource, /data-testid="employee-advanced-filters-apply"/);
+  assert.match(viewSource, /const normalizedEmployeeListSearch = computed\(\(\) => normalizeEmployeeListSearchValue\(filters\.search\)\)/);
+  assert.match(viewSource, /const filteredEmployees = computed\(\(\) =>/);
+  assert.match(viewSource, /function employeeListSearchHaystack\(employee: EmployeeListItem\)/);
   assert.doesNotMatch(viewSource, /class="employee-admin-row"/);
   assert.match(viewSource, /\.employee-admin-record\s*{[\s\S]*padding:\s*1rem;[\s\S]*border-radius:\s*18px;[\s\S]*border:\s*1px solid var\(--sp-color-border-soft\);/);
 });
 
-test("employee list panel splits search and import-export into tabs and preserves tab-panel structure", () => {
-  assert.match(viewSource, /data-testid="employee-list-tabs"/);
-  assert.match(viewSource, /data-testid="employee-list-tab-search"/);
-  assert.match(viewSource, /data-testid="employee-list-tab-import-export"/);
-  assert.match(viewSource, /data-testid="employee-list-tab-panel-search"/);
-  assert.match(viewSource, /data-testid="employee-list-tab-panel-import-export"/);
-  assert.match(viewSource, /v-show="listPanelTab === 'search'"/);
-  assert.match(viewSource, /v-show="listPanelTab === 'import_export'"/);
-  assert.match(viewSource, /employee-list-tab-panel-search[\s\S]*employeeAdmin\.actions\.search/);
-  assert.match(viewSource, /employee-list-tab-panel-search[\s\S]*employeeAdmin\.actions\.newEmployee/);
-  assert.match(viewSource, /employee-list-tab-panel-search[\s\S]*data-testid="employee-search-select"/);
-  assert.match(viewSource, /class="employee-admin-filter-grid"/);
-  assert.match(viewSource, /class="employee-admin-filter-actions"/);
-  assert.match(viewSource, /class="cta-row employee-admin-filter-actions__buttons"/);
+test("employee list moves import/export into a header modal and keeps compact customer-style header actions", () => {
+  assert.match(viewSource, /data-testid="employee-list-header-import-export"/);
+  assert.match(viewSource, /data-testid="employee-list-header-new-employee"/);
+  assert.match(viewSource, /data-testid="employee-import-export-modal"/);
+  assert.match(viewSource, /data-testid="employee-import-export-close"/);
+  assert.match(viewSource, /data-testid="employee-import-export-panel"/);
+  assert.match(viewSource, /data-testid="employee-list-empty-state"/);
+  assert.match(viewSource, /data-testid="employee-list-rows"/);
+  assert.match(viewSource, /data-testid="employee-list-row"/);
+  assert.match(viewSource, /data-testid="employee-list-row-avatar"/);
+  assert.match(viewSource, /data-testid="employee-list-row-avatar-image"/);
+  assert.match(viewSource, /data-testid="employee-list-row-status"/);
+  assert.match(viewSource, /class="employee-admin-record employee-admin-list-row employee-admin-employee-row"/);
+  assert.match(viewSource, /class="employee-admin-employee-row__avatar"/);
+  assert.match(viewSource, /v-if="shouldShowEmployeeListPhoto\(employee\)"/);
+  assert.match(viewSource, /:src="getEmployeeListPhotoUrl\(employee\)"/);
+  assert.match(viewSource, /@error="markEmployeeListPhotoFailed\(employee\.id\)"/);
+  assert.match(viewSource, /class="employee-admin-record__body employee-admin-employee-row__body"/);
+  assert.match(viewSource, /class="employee-admin-employee-row__line employee-admin-employee-row__line--primary"/);
+  assert.match(viewSource, /class="employee-admin-record__meta employee-admin-employee-row__line employee-admin-employee-row__meta"/);
+  assert.match(viewSource, /function getEmployeeInitials\(employee: EmployeeListItem\)/);
+  assert.match(viewSource, /function getEmployeeListPhotoUrl\(employee: EmployeeListItem\)/);
+  assert.match(viewSource, /function shouldShowEmployeeListPhoto\(employee: EmployeeListItem\)/);
+  assert.match(viewSource, /function markEmployeeListPhotoFailed\(employeeId: string\)/);
+  assert.match(viewSource, /const employeeListPhotoPreviewUrls = reactive<Record<string, string>>\(\{\}\)/);
+  assert.match(viewSource, /const employeeListPhotoFailedIds = reactive<Record<string, boolean>>\(\{\}\)/);
+  assert.match(viewSource, /function syncEmployeeListPhotoPreview\(employeeId: string, previewUrl: string\)/);
+  assert.match(viewSource, /if \(selectedEmployeeId\.value\) {\s*syncEmployeeListPhotoPreview\(selectedEmployeeId\.value, photoPreviewUrl\.value\);\s*}/);
+  assert.match(viewSource, /@click="openEmployeeWorkspace\(employee\.id\)"/);
+  assert.match(viewSource, /:aria-label="`\$\{employee\.personnel_no\} · \$\{employee\.first_name\} \$\{employee\.last_name\}`"/);
+  assert.match(viewSource, /class="employee-admin-filter-toolbar"/);
+  assert.match(viewSource, /class="employee-admin-filter-toolbar__actions"/);
+  assert.match(viewSource, /class="employee-admin-list-header-actions"/);
+  assert.match(viewSource, /class="cta-button cta-secondary employee-admin-header-action"/);
+  assert.match(viewSource, /\.employee-admin-list-header-actions\s*{[\s\S]*align-items:\s*center;[\s\S]*gap:\s*0\.5rem;/);
+  assert.match(viewSource, /\.employee-admin-detail-header-actions\s*{[\s\S]*align-items:\s*center;[\s\S]*gap:\s*0\.5rem;/);
+  assert.match(viewSource, /\.employee-admin-header-action\s*{[\s\S]*min-height:\s*2\.15rem;[\s\S]*padding:\s*0\.42rem 0\.75rem;[\s\S]*border-radius:\s*999px;[\s\S]*font-size:\s*0\.84rem;/);
+  assert.match(viewSource, /class="cta-button cta-secondary employee-admin-back-button"/);
+  assert.match(viewSource, /\.employee-admin-back-button\s*{[\s\S]*min-height:\s*2rem;[\s\S]*padding:\s*0\.32rem 0\.68rem;[\s\S]*border-radius:\s*999px;[\s\S]*font-size:\s*0\.82rem;/);
+  assert.match(viewSource, /\.employee-admin-filter-toolbar\s*{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) auto/);
+  assert.match(viewSource, /\.employee-admin-employee-row\s*{[\s\S]*flex-wrap:\s*nowrap;[\s\S]*padding:\s*0\.75rem 0\.9rem;/);
+  assert.match(viewSource, /\.employee-admin-employee-row__avatar\s*{[\s\S]*border-radius:\s*999px/);
+  assert.match(viewSource, /\.employee-admin-employee-row__avatar-image\s*{[\s\S]*object-fit:\s*cover;/);
+  assert.match(viewSource, /\.employee-admin-employee-row__line\s*{[\s\S]*text-overflow:\s*ellipsis;[\s\S]*white-space:\s*nowrap;/);
   assert.match(viewSource, /\.employee-admin-filter-grid\s*{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(viewSource, /\.employee-admin-filter-grid--dialog\s*{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(viewSource, /@media \(max-width:\s*1280px\)[\s\S]*\.employee-admin-filter-grid\s*{[\s\S]*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(viewSource, /@media \(max-width:\s*720px\)[\s\S]*\.employee-admin-filter-toolbar\s*{[\s\S]*grid-template-columns:\s*1fr/);
   assert.match(viewSource, /@media \(max-width:\s*720px\)[\s\S]*\.employee-admin-filter-grid\s*{[\s\S]*grid-template-columns:\s*1fr/);
-  assert.match(viewSource, /employee-list-tab-panel-import-export[\s\S]*employeeAdmin\.actions\.loadImportFile/);
-  assert.match(viewSource, /employee-list-tab-panel-import-export[\s\S]*employeeAdmin\.actions\.importExecute/);
-  assert.match(viewSource, /employee-list-tab-panel-import-export[\s\S]*employeeAdmin\.actions\.exportEmployees/);
+  assert.match(viewSource, /employee-import-export-panel[\s\S]*employeeAdmin\.actions\.loadImportFile/);
+  assert.match(viewSource, /employee-import-export-panel[\s\S]*employeeAdmin\.actions\.importExecute/);
+  assert.match(viewSource, /employee-import-export-panel[\s\S]*employeeAdmin\.actions\.exportEmployees/);
+});
+
+test("employee admin removes plain-page auto-selection and adds explicit workspace entry/exit actions", () => {
+  assert.match(viewSource, /const \{ autoSelectFirst = false \} = options;/);
+  assert.match(viewSource, /await refreshEmployees\(\{ autoSelectFirst: false \}\)/);
+  assert.match(viewSource, /async function openEmployeeWorkspace\(employeeId: string, detailTab = "dashboard"\)/);
+  assert.match(viewSource, /async function returnToEmployeeList\(\)/);
+  assert.match(viewSource, /data-testid="employee-detail-back-to-list"/);
+  assert.match(viewSource, /employeeAdmin\.actions\.backToEmployeeList/);
+  assert.doesNotMatch(viewSource, /autoSelectFirst = true/);
 });
 
 test("employee workspace uses shared toast feedback instead of a persistent inline banner", () => {

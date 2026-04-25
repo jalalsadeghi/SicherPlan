@@ -88,7 +88,10 @@ const planningStaffingMocks = vi.hoisted(() => ({
 }));
 
 const translations: Record<string, string> = {
+  "employeeAdmin.actions.advancedFilters": "Advanced filters",
+  "employeeAdmin.actions.backToEmployeeList": "Back to employee list",
   "employeeAdmin.actions.cancel": "Cancel",
+  "employeeAdmin.actions.closeFilters": "Close filters",
   "employeeAdmin.actions.exportEmployees": "Export employees",
   "employeeAdmin.actions.importDryRun": "Dry run",
   "employeeAdmin.actions.importExecute": "Import execute",
@@ -103,8 +106,10 @@ const translations: Record<string, string> = {
   "employeeAdmin.fields.defaultBranchId": "Default branch",
   "employeeAdmin.fields.defaultMandateId": "Default mandate",
   "employeeAdmin.filters.allStatuses": "All statuses",
+  "employeeAdmin.filters.additionalTitle": "Additional filters",
   "employeeAdmin.filters.includeArchived": "Include archived",
   "employeeAdmin.filters.search": "Search",
+  "employeeAdmin.filters.searchEmployees": "Search employees",
   "employeeAdmin.filters.searchPlaceholder": "Personnel number or name",
   "employeeAdmin.filters.status": "Status",
   "employeeAdmin.import.continueOnError": "Continue on error",
@@ -533,6 +538,18 @@ function installIntersectionObserverMock() {
 
 const mountedWrappers: VueWrapper[] = [];
 
+function stubEmployeePhotoObjectUrls(urlByBlob = "blob:employee-photo") {
+  const createObjectURLMock = vi.fn(() => urlByBlob);
+  const revokeObjectURLMock = vi.fn();
+  const NativeUrl = globalThis.URL;
+  class UrlWithObjectUrls extends NativeUrl {
+    static createObjectURL = createObjectURLMock;
+    static revokeObjectURL = revokeObjectURLMock;
+  }
+  vi.stubGlobal("URL", UrlWithObjectUrls as unknown as typeof URL);
+  return { createObjectURLMock, revokeObjectURLMock };
+}
+
 async function mountEmployeeAdmin() {
   const wrapper = mount(EmployeeAdminView, {
     attachTo: document.body,
@@ -548,6 +565,12 @@ async function mountEmployeeAdmin() {
     },
   });
   mountedWrappers.push(wrapper);
+  await settle();
+  return wrapper;
+}
+
+async function openFirstEmployeeWorkspace(wrapper: VueWrapper<any>) {
+  await wrapper.get('[data-testid="employee-list-row"]').trigger("click");
   await settle();
   return wrapper;
 }
@@ -634,158 +657,176 @@ describe("EmployeeAdminView search dialog regression", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders a single-column full-width tools panel before the detail workspace", async () => {
+  it("renders a customer-style employee list card with header actions and a simple live-search toolbar", async () => {
     const wrapper = await mountEmployeeAdmin();
 
     const layout = wrapper.get('[data-testid="employee-master-detail-layout"]');
     const listSection = wrapper.get('[data-testid="employee-list-section"]');
-    const detailWorkspace = wrapper.get('[data-testid="employee-detail-workspace"]');
+    const filterToolbar = wrapper.get('[data-testid="employee-list-filter-toolbar"]');
+
     expect(wrapper.find(".employee-admin-hero").exists()).toBe(false);
     expect(wrapper.text()).not.toContain("MODULE CONTROL");
     expect(layout.classes()).toContain("employee-admin-grid");
-    expect(wrapper.html().indexOf('data-testid="employee-list-section"')).toBeLessThan(
-      wrapper.html().indexOf('data-testid="employee-detail-workspace"'),
-    );
-    expect(wrapper.find(".employee-admin-row").exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-detail-only-mode"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-detail-workspace"]').exists()).toBe(false);
     expect(listSection.classes()).toContain("employee-admin-list-panel");
-    expect(detailWorkspace.classes()).toContain("employee-admin-detail");
 
-    const searchPanel = wrapper.get('[data-testid="employee-list-tab-panel-search"]');
-    expect(wrapper.get('[data-testid="employee-list-tab-search"]').text()).toBe("Search");
-    expect(wrapper.get('[data-testid="employee-list-tab-import-export"]').text()).toBe("Import / Export");
-    expect(searchPanel.find('[data-testid="employee-search-select"]').exists()).toBe(true);
-    expect(searchPanel.findAll("select")).toHaveLength(3);
-    expect(searchPanel.find('input[type="checkbox"]').exists()).toBe(true);
-    expect(searchPanel.text()).toContain("Status");
-    expect(searchPanel.text()).toContain("Default branch");
-    expect(searchPanel.text()).toContain("Default mandate");
-    expect(searchPanel.text()).toContain("Include archived");
-    expect(searchPanel.text()).toContain("Create employee file");
+    expect(filterToolbar.find('[data-testid="employee-search-select"]').exists()).toBe(true);
+    expect(filterToolbar.text()).toContain("Search");
+    expect(filterToolbar.text()).toContain("Advanced filters");
+    expect(filterToolbar.text()).not.toContain("Status");
+    expect(filterToolbar.text()).not.toContain("Default branch");
+    expect(filterToolbar.text()).not.toContain("Default mandate");
+    expect(filterToolbar.text()).not.toContain("Include archived");
 
-    await wrapper.get('[data-testid="employee-list-tab-import-export"]').trigger("click");
-    const importExportPanel = wrapper.get('[data-testid="employee-list-tab-panel-import-export"]');
-    expect(importExportPanel.find('input[type="file"]').exists()).toBe(true);
-    expect(importExportPanel.find("textarea").exists()).toBe(true);
-    expect(importExportPanel.text()).toContain("Load import file");
-    expect(importExportPanel.text()).toContain("Dry run");
-    expect(importExportPanel.text()).toContain("Import execute");
-    expect(importExportPanel.text()).toContain("Export employees");
+    const headerText = wrapper.get('[data-testid="employee-list-section"]').find(".employee-admin-panel__header").text();
+    expect(headerText).toContain("Import / Export");
+    expect(headerText).toContain("Create employee file");
+    expect(wrapper.findAll('[data-testid="employee-list-row"]')).toHaveLength(2);
+    expect(wrapper.get('[data-testid="employee-list-rows"]').text()).toContain("P-2000 · Markus Neumann");
+    expect(wrapper.get('[data-testid="employee-list-rows"]').text()).toContain("P-2001 · Leon Yilmaz");
+    expect(wrapper.findAll('[data-testid="employee-list-row-avatar"]')).toHaveLength(2);
+    expect(wrapper.findAll('[data-testid="employee-list-row-avatar"]')[0]?.text()).toBe("MN");
+    expect(wrapper.findAll('[data-testid="employee-list-row-avatar"]')[1]?.text()).toBe("LY");
+    const firstRow = wrapper.findAll('[data-testid="employee-list-row"]')[0];
+    expect(firstRow?.classes()).toContain("employee-admin-employee-row");
+    expect(firstRow?.find(".employee-admin-employee-row__body").exists()).toBe(true);
+    expect(firstRow?.find(".employee-admin-employee-row__line--primary").text()).toContain("P-2000 · Markus Neumann");
+    expect(firstRow?.find(".employee-admin-employee-row__meta").text()).toContain("markus.neumann@example.test");
+    expect(wrapper.get('[data-testid="employee-list-header-import-export"]').classes()).toContain("employee-admin-header-action");
+    expect(wrapper.get('[data-testid="employee-list-header-new-employee"]').classes()).toContain("employee-admin-header-action");
   });
 
-  it("opens search results only in the dialog and passes the SearchSelect query", async () => {
+  it("shows a cached employee photo thumbnail in the list row after the detail photo was loaded", async () => {
+    const { createObjectURLMock } = stubEmployeePhotoObjectUrls("blob:markus-photo");
+    apiMocks.getEmployeePhotoMock.mockResolvedValue({
+      document_id: "photo-document-1",
+      relation_type: "employee_photo",
+      label: null,
+      title: "Markus photo",
+      document_type_key: "employee_photo",
+      file_name: "markus.png",
+      content_type: "image/png",
+      current_version_no: 3,
+      linked_at: "2026-04-01T08:00:00Z",
+    });
+    apiMocks.downloadEmployeeDocumentMock.mockResolvedValue({
+      blob: new Blob(["photo"], { type: "image/png" }),
+    });
+
     const wrapper = await mountEmployeeAdmin();
-    apiMocks.listEmployeesMock.mockClear();
-
-    const searchPanel = wrapper.get('[data-testid="employee-list-tab-panel-search"]');
-    await searchPanel.get('[data-testid="employee-search-select"] input').setValue("Markus");
-    await clickButtonByTextWithin(searchPanel, "Search");
-    await settle();
-
-    expect(apiMocks.listEmployeesMock).toHaveBeenCalledWith(
+    await openFirstEmployeeWorkspace(wrapper);
+    expect(createObjectURLMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.downloadEmployeeDocumentMock).toHaveBeenCalledWith(
       "tenant-1",
+      "photo-document-1",
+      3,
       "token-1",
-      expect.objectContaining({ search: "Markus" }),
     );
-    expect(wrapper.find('[data-testid="employee-search-results-modal"]').exists()).toBe(true);
-    expect(wrapper.findAll('[data-testid="employee-search-result-row"]')).toHaveLength(1);
-    expect(wrapper.find(".employee-admin-row").exists()).toBe(false);
+    expect(wrapper.get('[data-testid="employee-dashboard-photo-image"]').attributes("src")).toBe("blob:markus-photo");
 
-    const resultRow = wrapper.get('[data-testid="employee-search-result-row"]');
-    expect(resultRow.text()).toContain("P-2000");
-    expect(resultRow.text()).toContain("Markus Neumann");
-    expect(resultRow.text()).toContain("markus.neumann@example.test");
-    expect(resultRow.text()).toContain("active");
+    await wrapper.get('[data-testid="employee-detail-back-to-list"]').trigger("click");
+    await settle();
+
+    const rows = wrapper.findAll('[data-testid="employee-list-row"]');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.find('[data-testid="employee-list-row-avatar-image"]').attributes("src")).toBe("blob:markus-photo");
+    expect(rows[0]?.find('[data-testid="employee-list-row-avatar"]').text()).toBe("");
+    expect(rows[1]?.find('[data-testid="employee-list-row-avatar-image"]').exists()).toBe(false);
+    expect(rows[1]?.find('[data-testid="employee-list-row-avatar"]').text()).toBe("LY");
   });
 
-  it("shows live search suggestions while typing and selects an employee without opening the modal", async () => {
+  it("keeps initials fallback in the employee list when no photo has been loaded", async () => {
+    const wrapper = await mountEmployeeAdmin();
+
+    const avatars = wrapper.findAll('[data-testid="employee-list-row-avatar"]');
+    expect(avatars).toHaveLength(2);
+    expect(wrapper.find('[data-testid="employee-list-row-avatar-image"]').exists()).toBe(false);
+    expect(avatars[0]?.text()).toBe("MN");
+    expect(avatars[1]?.text()).toBe("LY");
+  });
+
+  it("falls back to initials when a cached employee list photo fails to load", async () => {
+    stubEmployeePhotoObjectUrls("blob:broken-markus-photo");
+    apiMocks.getEmployeePhotoMock.mockResolvedValue({
+      document_id: "photo-document-1",
+      relation_type: "employee_photo",
+      label: null,
+      title: "Broken Markus photo",
+      document_type_key: "employee_photo",
+      file_name: "markus.png",
+      content_type: "image/png",
+      current_version_no: 3,
+      linked_at: "2026-04-01T08:00:00Z",
+    });
+    apiMocks.downloadEmployeeDocumentMock.mockResolvedValue({
+      blob: new Blob(["broken-photo"], { type: "image/png" }),
+    });
+
+    const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
+    await wrapper.get('[data-testid="employee-detail-back-to-list"]').trigger("click");
+    await settle();
+
+    const firstRowImage = wrapper.findAll('[data-testid="employee-list-row"]')[0]?.get('[data-testid="employee-list-row-avatar-image"]');
+    await firstRowImage?.trigger("error");
+    await settle();
+
+    expect(wrapper.findAll('[data-testid="employee-list-row"]')[0]?.find('[data-testid="employee-list-row-avatar-image"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-testid="employee-list-row-avatar"]')[0]?.text()).toBe("MN");
+  });
+
+  it("filters the visible employee list live while typing in the main search input", async () => {
     const wrapper = await mountEmployeeAdmin();
     apiMocks.listEmployeesMock.mockClear();
-    apiMocks.getEmployeeMock.mockClear();
 
-    const searchPanel = wrapper.get('[data-testid="employee-list-tab-panel-search"]');
-    await searchPanel.get('[data-testid="employee-search-select-input"]').setValue("m");
-    await waitForEmployeeSearchDebounce();
-
-    expect(apiMocks.listEmployeesMock).toHaveBeenCalledWith(
-      "tenant-1",
-      "token-1",
-      expect.objectContaining({ search: "m" }),
-    );
-    expect(wrapper.find('[data-testid="employee-search-suggestions"]').exists()).toBe(true);
-    expect(wrapper.get('[data-testid="employee-search-suggestions"]').text()).toContain("Markus Neumann");
-
-    await searchPanel.get('[data-testid="employee-search-select-input"]').setValue("mark");
-    await waitForEmployeeSearchDebounce();
-    const suggestion = wrapper.get('[data-testid="employee-search-suggestion-row"]');
-    expect(suggestion.text()).toContain("P-2000");
-    expect(suggestion.text()).toContain("Markus Neumann");
-    expect(suggestion.text()).toContain("markus.neumann@example.test");
-    expect(suggestion.text()).toContain("active");
-    expect(wrapper.get('[data-testid="employee-search-suggestions"]').text()).not.toContain("Leon Yilmaz");
-
-    await suggestion.trigger("click");
+    const searchInput = wrapper.get('[data-testid="employee-search-select-input"]');
+    await searchInput.setValue("P-2001");
     await settle();
+    expect(apiMocks.listEmployeesMock).not.toHaveBeenCalled();
+    expect(wrapper.findAll('[data-testid="employee-list-row"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="employee-list-rows"]').text()).toContain("Leon Yilmaz");
+    expect(wrapper.get('[data-testid="employee-list-rows"]').text()).not.toContain("Markus Neumann");
 
-    expect(wrapper.find('[data-testid="employee-search-suggestions"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="employee-search-results-modal"]').exists()).toBe(false);
-    expect((searchPanel.get('[data-testid="employee-search-select-input"]').element as HTMLInputElement).value).toBe(
-      "P-2000 · Markus Neumann",
-    );
-    expect(apiMocks.getEmployeeMock).toHaveBeenCalledWith("tenant-1", "employee-markus", "token-1");
-    expect(wrapper.get('[data-testid="employee-detail-workspace"]').text()).toContain("Markus Neumann");
-    expect(wrapper.get('[data-testid="employee-tab-dashboard"]').classes()).toContain("active");
+    await searchInput.setValue("example.test");
+    await settle();
+    expect(wrapper.findAll('[data-testid="employee-list-row"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="employee-list-rows"]').text()).toContain("Markus Neumann");
+    expect(wrapper.get('[data-testid="employee-list-rows"]').text()).not.toContain("Leon Yilmaz");
+
+    await searchInput.setValue("missing");
+    await settle();
+    expect(wrapper.find('[data-testid="employee-list-empty-state"]').exists()).toBe(true);
+
+    await searchInput.setValue("");
+    await settle();
+    expect(wrapper.findAll('[data-testid="employee-list-row"]')).toHaveLength(2);
   });
 
-  it("matches employee suggestions by personnel number and work email fragments", async () => {
-    const wrapper = await mountEmployeeAdmin();
-    const searchPanel = wrapper.get('[data-testid="employee-list-tab-panel-search"]');
-
-    await searchPanel.get('[data-testid="employee-search-select-input"]').setValue("P-2001");
-    await waitForEmployeeSearchDebounce();
-    expect(wrapper.get('[data-testid="employee-search-suggestions"]').text()).toContain("Leon Yilmaz");
-    expect(wrapper.get('[data-testid="employee-search-suggestions"]').text()).not.toContain("Markus Neumann");
-
-    await searchPanel.get('[data-testid="employee-search-select-input"]').setValue("example.test");
-    await waitForEmployeeSearchDebounce();
-    expect(wrapper.get('[data-testid="employee-search-suggestions"]').text()).toContain("Markus Neumann");
-    expect(wrapper.get('[data-testid="employee-search-suggestions"]').text()).not.toContain("Leon Yilmaz");
-  });
-
-  it("shows a compact empty suggestion state while keeping Search modal behavior separate", async () => {
+  it("opens advanced filters in a dialog, applies removed filters, and keeps the applied state visible", async () => {
     const wrapper = await mountEmployeeAdmin();
 
-    const searchPanel = wrapper.get('[data-testid="employee-list-tab-panel-search"]');
-    await searchPanel.get('[data-testid="employee-search-select-input"]').setValue("none");
-    await waitForEmployeeSearchDebounce();
-
-    expect(wrapper.find('[data-testid="employee-search-suggestions"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="employee-search-suggestion-empty"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="employee-search-suggestion-empty"]').text()).toContain("No matching employees");
-    expect(wrapper.find('[data-testid="employee-search-results-modal"]').exists()).toBe(false);
-
-    await clickButtonByTextWithin(searchPanel, "Search");
+    await wrapper.get('[data-testid="employee-advanced-filters-open"]').trigger("click");
     await settle();
-    expect(wrapper.find('[data-testid="employee-search-results-modal"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="employee-search-result-empty"]').exists()).toBe(true);
-  });
 
-  it("sends include-archived, status, branch, and mandate filters to employee search", async () => {
-    const wrapper = await mountEmployeeAdmin();
+    const dialog = wrapper.get('[data-testid="employee-advanced-filters-dialog"]');
+    expect(dialog.text()).toContain("Additional filters");
+    expect(dialog.text()).toContain("Status");
+    expect(dialog.text()).toContain("Default branch");
+    expect(dialog.text()).toContain("Default mandate");
+    expect(dialog.text()).toContain("Include archived");
 
-    const searchPanel = wrapper.get('[data-testid="employee-list-tab-panel-search"]');
-    const selects = searchPanel.findAll("select");
-    const [statusSelect, branchSelect, mandateSelect] = selects;
-    expect(statusSelect).toBeDefined();
-    expect(branchSelect).toBeDefined();
-    expect(mandateSelect).toBeDefined();
-    await statusSelect!.setValue("active");
-    await branchSelect!.setValue("branch-1");
+    await dialog.get('[data-testid="employee-advanced-filters-search"]').setValue("mark");
+    await dialog.get('[data-testid="employee-advanced-filters-status"]').setValue("active");
+    await dialog.get('[data-testid="employee-advanced-filters-default-branch"]').setValue("branch-1");
     await settle();
-    await mandateSelect!.setValue("mandate-1");
-    await searchPanel.get('input[type="checkbox"]').setValue(true);
+    await dialog.get('[data-testid="employee-advanced-filters-default-mandate"]').setValue("mandate-1");
+    await dialog.get('[data-testid="employee-advanced-filters-include-archived"]').setValue(true);
+
     apiMocks.listEmployeesMock.mockClear();
-    await searchPanel.get('[data-testid="employee-search-select-input"]').setValue("m");
-    await waitForEmployeeSearchDebounce();
+    await dialog.get('[data-testid="employee-advanced-filters-apply"]').trigger("submit");
+    await settle();
 
     expect(apiMocks.listEmployeesMock).toHaveBeenCalledWith(
       "tenant-1",
@@ -794,29 +835,45 @@ describe("EmployeeAdminView search dialog regression", () => {
         default_branch_id: "branch-1",
         default_mandate_id: "mandate-1",
         include_archived: true,
-        search: "m",
+        search: "mark",
         status: "active",
       }),
     );
-    expect(wrapper.get('[data-testid="employee-search-suggestions"]').text()).toContain("Markus Neumann");
-    expect(wrapper.get('[data-testid="employee-search-suggestions"]').text()).not.toContain("Leon Yilmaz");
+    expect(wrapper.find('[data-testid="employee-advanced-filters-dialog"]').exists()).toBe(false);
+    expect((wrapper.get('[data-testid="employee-search-select-input"]').element as HTMLInputElement).value).toBe("mark");
+    expect(wrapper.findAll('[data-testid="employee-list-row"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="employee-list-rows"]').text()).toContain("Markus Neumann");
+
+    await wrapper.get('[data-testid="employee-advanced-filters-open"]').trigger("click");
+    await settle();
+    const reopenedDialog = wrapper.get('[data-testid="employee-advanced-filters-dialog"]');
+    expect((reopenedDialog.get('[data-testid="employee-advanced-filters-status"]').element as HTMLSelectElement).value).toBe("active");
+    expect((reopenedDialog.get('[data-testid="employee-advanced-filters-default-branch"]').element as HTMLSelectElement).value).toBe("branch-1");
+    expect((reopenedDialog.get('[data-testid="employee-advanced-filters-default-mandate"]').element as HTMLSelectElement).value).toBe("mandate-1");
+    expect((reopenedDialog.get('[data-testid="employee-advanced-filters-include-archived"]').element as HTMLInputElement).checked).toBe(true);
+
+    await reopenedDialog.get('[data-testid="employee-advanced-filters-cancel"]').trigger("click");
+    await settle();
+    expect(wrapper.find('[data-testid="employee-advanced-filters-dialog"]').exists()).toBe(false);
   });
 
-  it("selects a search result, closes the modal, and loads the dashboard detail", async () => {
+  it("moves import and export controls into a header-triggered modal without changing functionality", async () => {
     const wrapper = await mountEmployeeAdmin();
-    apiMocks.getEmployeeMock.mockClear();
 
-    const searchPanel = wrapper.get('[data-testid="employee-list-tab-panel-search"]');
-    await searchPanel.get('[data-testid="employee-search-select"] input').setValue("Markus");
-    await clickButtonByTextWithin(searchPanel, "Search");
-    await settle();
-    await wrapper.get('[data-testid="employee-search-result-row"]').trigger("click");
+    await wrapper.get('[data-testid="employee-list-header-import-export"]').trigger("click");
     await settle();
 
-    expect(wrapper.find('[data-testid="employee-search-results-modal"]').exists()).toBe(false);
-    expect(apiMocks.getEmployeeMock).toHaveBeenCalledWith("tenant-1", "employee-markus", "token-1");
-    expect(wrapper.get('[data-testid="employee-detail-workspace"]').text()).toContain("Markus Neumann");
-    expect(wrapper.get('[data-testid="employee-tab-dashboard"]').classes()).toContain("active");
+    const importExportModal = wrapper.get('[data-testid="employee-import-export-modal"]');
+    expect(importExportModal.find('input[type="file"]').exists()).toBe(true);
+    expect(importExportModal.find("textarea").exists()).toBe(true);
+    expect(importExportModal.text()).toContain("Load import file");
+    expect(importExportModal.text()).toContain("Dry run");
+    expect(importExportModal.text()).toContain("Import execute");
+    expect(importExportModal.text()).toContain("Export employees");
+
+    await wrapper.get('[data-testid="employee-import-export-close"]').trigger("click");
+    await settle();
+    expect(wrapper.find('[data-testid="employee-import-export-modal"]').exists()).toBe(false);
   });
 
   it("renders dashboard projects and calendar from shifts assigned to the selected employee only", async () => {
@@ -845,6 +902,8 @@ describe("EmployeeAdminView search dialog regression", () => {
 
     const wrapper = await mountEmployeeAdmin();
     await settle();
+    await wrapper.get('[data-testid="employee-list-row"]').trigger("click");
+    await settle();
 
     const projects = wrapper.get('[data-testid="employee-dashboard-projects"]');
     expect(projects.text()).toContain("City Center Patrol");
@@ -867,7 +926,7 @@ describe("EmployeeAdminView search dialog regression", () => {
 
   it("uploads a dashboard photo from the clickable avatar and keeps profile photo out of the tabs", async () => {
     const wrapper = await mountEmployeeAdmin();
-    await settle();
+    await openFirstEmployeeWorkspace(wrapper);
 
     expect(wrapper.find('[data-testid="employee-tab-profile_photo"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="employee-tab-panel-profile-photo"]').exists()).toBe(false);
@@ -906,7 +965,7 @@ describe("EmployeeAdminView search dialog regression", () => {
     apiMocks.uploadEmployeePhotoMock.mockReturnValue(upload.promise);
 
     const wrapper = await mountEmployeeAdmin();
-    await settle();
+    await openFirstEmployeeWorkspace(wrapper);
 
     const uploadPromise = (wrapper.vm as any).submitDashboardPhoto(
       new File(["photo-bytes"], "pending.png", { type: "image/png" }),
@@ -924,41 +983,15 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(wrapper.find('[data-testid="employee-dashboard-photo-uploading"]').exists()).toBe(false);
   });
 
-  it("shows an empty dialog state without stale result rows", async () => {
-    const wrapper = await mountEmployeeAdmin();
-
-    const searchPanel = wrapper.get('[data-testid="employee-list-tab-panel-search"]');
-    await searchPanel.get('[data-testid="employee-search-select"] input').setValue("Markus");
-    await clickButtonByTextWithin(searchPanel, "Search");
-    await settle();
-    expect(wrapper.findAll('[data-testid="employee-search-result-row"]')).toHaveLength(1);
-
-    await wrapper.get('[data-testid="employee-search-result-close"]').trigger("click");
-    await searchPanel.get('[data-testid="employee-search-select"] input').setValue("none");
-    await clickButtonByTextWithin(searchPanel, "Search");
-    await settle();
-
-    expect(wrapper.find('[data-testid="employee-search-results-modal"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="employee-search-result-empty"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="employee-search-result-empty"]').text()).toContain("No matching employees");
-    expect(wrapper.findAll('[data-testid="employee-search-result-row"]')).toHaveLength(0);
-  });
-
-  it("does not fetch search results without a token or read permission", async () => {
+  it("does not trigger employee reloads from live search without a token or read permission", async () => {
     authStoreState.accessToken = "";
     authStoreState.effectiveAccessToken = "";
     const missingTokenWrapper = await mountEmployeeAdmin();
     apiMocks.listEmployeesMock.mockClear();
 
     await missingTokenWrapper.get('[data-testid="employee-search-select-input"]').setValue("mark");
-    await waitForEmployeeSearchDebounce();
     expect(apiMocks.listEmployeesMock).not.toHaveBeenCalled();
-    expect(missingTokenWrapper.find('[data-testid="employee-search-suggestions"]').exists()).toBe(false);
-
-    await clickButtonByTextWithin(missingTokenWrapper.get('[data-testid="employee-list-tab-panel-search"]'), "Search");
-    await settle();
-    expect(apiMocks.listEmployeesMock).not.toHaveBeenCalled();
-    expect(missingTokenWrapper.find('[data-testid="employee-search-results-modal"]').exists()).toBe(false);
+    expect(missingTokenWrapper.findAll('[data-testid="employee-list-row"]')).toHaveLength(0);
 
     missingTokenWrapper.unmount();
     mountedWrappers.pop();
@@ -974,6 +1007,7 @@ describe("EmployeeAdminView search dialog regression", () => {
 
   it("shows only Dashboard and Overview as existing employee top-level tabs", async () => {
     const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
 
     expect(detailTabLabels(wrapper)).toEqual(["Dashboard", "Overview"]);
     expect(wrapper.get('[data-testid="employee-tab-dashboard"]').classes()).toContain("active");
@@ -996,6 +1030,9 @@ describe("EmployeeAdminView search dialog regression", () => {
     await clickButtonByText(wrapper, "Create employee file");
     await settle();
 
+    expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-detail-only-mode"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="employee-detail-back-to-list"]').classes()).toContain("employee-admin-back-button");
     expect(detailTabLabels(wrapper)).toEqual(["Overview"]);
     expect(wrapper.find('[data-testid="employee-tab-dashboard"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="employee-tab-overview"]').classes()).toContain("active");
@@ -1006,6 +1043,8 @@ describe("EmployeeAdminView search dialog regression", () => {
 
   it("renders Overview nav and section cards with private visibility controlled by permission", async () => {
     const wrapper = await mountEmployeeAdmin();
+    await wrapper.get('[data-testid="employee-list-row"]').trigger("click");
+    await settle();
     await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
     await settle();
 
@@ -1057,6 +1096,7 @@ describe("EmployeeAdminView search dialog regression", () => {
     authStoreState.effectiveRole = "dispatcher";
     authStoreState.activeRole = "dispatcher";
     const dispatcherWrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(dispatcherWrapper);
     await dispatcherWrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
     await settle();
 
@@ -1070,6 +1110,7 @@ describe("EmployeeAdminView search dialog regression", () => {
 
   it("renders clean link-style Overview nav items with real decorative icons", async () => {
     const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
     await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
     await settle();
 
@@ -1110,6 +1151,7 @@ describe("EmployeeAdminView search dialog regression", () => {
       scrollIntoViewMock(this, options);
     });
     const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
 
     await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
     const section = wrapper.get('[data-testid="employee-overview-section-documents"]');
@@ -1174,6 +1216,7 @@ describe("EmployeeAdminView search dialog regression", () => {
     });
 
     const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
     await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
     await settle();
 
@@ -1187,6 +1230,7 @@ describe("EmployeeAdminView search dialog regression", () => {
   it("updates the active Overview nav item from visible section position, not stale intersection ratio", async () => {
     const { instances, triggerIntersection } = installIntersectionObserverMock();
     const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
 
     await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
     await settle();
@@ -1247,6 +1291,7 @@ describe("EmployeeAdminView search dialog regression", () => {
   it("observes visible Overview sections, disconnects on unmount, and reinitializes when private visibility changes", async () => {
     const { instances } = installIntersectionObserverMock();
     const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
 
     await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
     await settle();
@@ -1274,6 +1319,7 @@ describe("EmployeeAdminView search dialog regression", () => {
 
   it("normalizes every former tab id to its Overview section without blank panels", async () => {
     const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
     const legacyTabIds = [
       "app_access",
       "qualifications",
@@ -1300,6 +1346,7 @@ describe("EmployeeAdminView search dialog regression", () => {
 
   it("keeps former tab functionality reachable inside Overview section cards", async () => {
     const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
     await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
     await settle();
 
@@ -1324,6 +1371,7 @@ describe("EmployeeAdminView search dialog regression", () => {
 
   it("does not render pure intro boxes or nested card styling inside the Overview page", async () => {
     const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
     await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
     await settle();
 
@@ -1335,6 +1383,7 @@ describe("EmployeeAdminView search dialog regression", () => {
 
   it("removes static explanatory lead copy while keeping functional Overview hints", async () => {
     const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
     await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
     await settle();
 
@@ -1379,17 +1428,11 @@ describe("EmployeeAdminView search dialog regression", () => {
     const wrapper = await mountEmployeeAdmin();
 
     expect(apiMocks.listEmployeesMock).toHaveBeenCalledWith("tenant-1", "token-1", expect.any(Object));
-    expect(apiMocks.getEmployeeMock).toHaveBeenCalledWith("tenant-1", "employee-markus", "token-1");
-    expect(wrapper.get('[data-testid="employee-detail-workspace"]').text()).toContain("Markus Neumann");
-    expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).toMatch(/Dashboard[\s\S]*Overview/);
-    expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).not.toContain("Profile photo");
-    expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).not.toContain("Documents");
-    expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).not.toContain("Qualifications");
-    expect(wrapper.get('[data-testid="employee-tab-dashboard"]').classes()).toContain("active");
-    expect(wrapper.get('[data-testid="employee-dashboard-hero"]').text()).toContain("Markus Neumann");
-    expect(wrapper.find('[data-testid="employee-dashboard-calendar"]').exists()).toBe(true);
+    expect(apiMocks.getEmployeeMock).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-detail-workspace"]').exists()).toBe(false);
 
-    await wrapper.get('[data-testid="employee-list-tab-import-export"]').trigger("click");
+    await wrapper.get('[data-testid="employee-list-header-import-export"]').trigger("click");
     await clickButtonByText(wrapper, "Export employees");
     await settle();
     expect(apiMocks.exportEmployeesMock).toHaveBeenCalledWith(
@@ -1401,6 +1444,26 @@ describe("EmployeeAdminView search dialog regression", () => {
       }),
     );
 
+    await wrapper.get('[data-testid="employee-import-export-close"]').trigger("click");
+    await settle();
+    await wrapper.get('[data-testid="employee-list-row"]').trigger("click");
+    await settle();
+
+    expect(apiMocks.getEmployeeMock).toHaveBeenCalledWith("tenant-1", "employee-markus", "token-1");
+    expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-detail-only-mode"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="employee-detail-workspace"]').text()).toContain("Markus Neumann");
+    expect(wrapper.get(".employee-admin-detail-header-actions").exists()).toBe(true);
+    expect(wrapper.get('[data-testid="employee-detail-back-to-list"]').classes()).toContain("employee-admin-back-button");
+    expect(wrapper.get(".employee-admin-detail-header-actions").find('[data-testid="status-badge"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).toMatch(/Dashboard[\s\S]*Overview/);
+    expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).not.toContain("Profile photo");
+    expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).not.toContain("Documents");
+    expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).not.toContain("Qualifications");
+    expect(wrapper.get('[data-testid="employee-tab-dashboard"]').classes()).toContain("active");
+    expect(wrapper.get('[data-testid="employee-dashboard-hero"]').text()).toContain("Markus Neumann");
+    expect(wrapper.find('[data-testid="employee-dashboard-calendar"]').exists()).toBe(true);
+
     await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
     await settle();
     expect(wrapper.get('[data-testid="employee-tab-overview"]').classes()).toContain("active");
@@ -1411,9 +1474,14 @@ describe("EmployeeAdminView search dialog regression", () => {
     await settle();
     expect(wrapper.get('[data-testid="employee-overview-nav-documents"]').classes()).toContain("employee-admin-overview-nav__link--active");
 
-    await wrapper.get('[data-testid="employee-list-tab-search"]').trigger("click");
+    await wrapper.get('[data-testid="employee-detail-back-to-list"]').trigger("click");
+    await settle();
+    expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-detail-workspace"]').exists()).toBe(false);
+
     await clickButtonByText(wrapper, "Create employee file");
     await settle();
+    expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="employee-detail-workspace"]').text()).toContain("Create employee");
     expect(wrapper.find('[data-testid="employee-tab-dashboard"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="employee-tab-overview"]').classes()).toContain("active");

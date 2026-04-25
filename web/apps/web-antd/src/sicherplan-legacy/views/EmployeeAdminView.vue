@@ -39,243 +39,291 @@
       busy-testid="employee-workspace-loading-overlay"
     >
       <div class="employee-admin-grid" data-testid="employee-master-detail-layout">
-      <section class="module-card employee-admin-panel employee-admin-list-panel" data-testid="employee-list-section">
-        <div class="employee-admin-panel__header">
-          <div>
-            <p class="eyebrow">{{ t("employeeAdmin.list.eyebrow") }}</p>
-            <h3>{{ t("employeeAdmin.list.title") }}</h3>
-          </div>
-          <StatusBadge :status="loading.list ? 'inactive' : 'active'" />
-        </div>
-
-        <nav class="employee-admin-tabs employee-admin-tabs--panel" data-testid="employee-list-tabs" aria-label="Employee list tools">
-          <button
-            type="button"
-            class="employee-admin-tab"
-            :class="{ active: listPanelTab === 'search' }"
-            data-testid="employee-list-tab-search"
-            @click="listPanelTab = 'search'"
-          >
-            {{ t("employeeAdmin.actions.search") }}
-          </button>
-          <button
-            type="button"
-            class="employee-admin-tab"
-            :class="{ active: listPanelTab === 'import_export' }"
-            data-testid="employee-list-tab-import-export"
-            @click="listPanelTab = 'import_export'"
-          >
-            {{ t("employeeAdmin.import.eyebrow") }}
-          </button>
-        </nav>
-
-        <section v-show="listPanelTab === 'search'" class="employee-admin-section employee-admin-tab-panel" data-testid="employee-list-tab-panel-search">
-          <div class="employee-admin-filter-grid">
-            <label class="field-stack employee-admin-search-field">
-              <span>{{ t("employeeAdmin.filters.search") }}</span>
-              <div class="employee-admin-search-select" data-testid="employee-search-select">
-                <input
-                  v-model="filters.search"
-                  :placeholder="t('employeeAdmin.filters.searchPlaceholder')"
-                  data-testid="employee-search-select-input"
-                  @keydown.escape.stop.prevent="closeEmployeeSearchSuggestions"
-                  @keydown.enter.prevent="handleOpenEmployeeSearchResults"
-                />
-                <div
-                  v-if="employeeSearchSuggestionsVisible"
-                  class="employee-admin-search-suggestions"
-                  data-testid="employee-search-suggestions"
-                  role="listbox"
+        <div v-if="employeeAdminListMode" class="employee-admin-mode-shell" data-testid="employee-list-only-mode">
+          <section class="module-card employee-admin-panel employee-admin-list-panel" data-testid="employee-list-section">
+            <div class="employee-admin-panel__header">
+              <div>
+                <p class="eyebrow">{{ t("employeeAdmin.list.eyebrow") }}</p>
+                <h3>{{ t("employeeAdmin.list.title") }}</h3>
+              </div>
+              <div class="employee-admin-list-header-actions">
+                <button
+                  class="cta-button cta-secondary employee-admin-header-action"
+                  data-testid="employee-list-header-import-export"
+                  type="button"
+                  @click="openImportExportDialog"
                 >
+                  {{ t("employeeAdmin.import.eyebrow") }}
+                </button>
+                <button
+                  class="cta-button cta-secondary employee-admin-header-action"
+                  data-testid="employee-list-header-new-employee"
+                  type="button"
+                  :disabled="!actionState.canCreate"
+                  @click="startCreateEmployee"
+                >
+                  {{ t("employeeAdmin.actions.newEmployee") }}
+                </button>
+                <StatusBadge :status="loading.list ? 'inactive' : 'active'" />
+              </div>
+            </div>
+
+            <div class="employee-admin-filter-toolbar" data-testid="employee-list-filter-toolbar">
+              <label class="field-stack employee-admin-search-field">
+                <span>{{ t("employeeAdmin.filters.search") }}</span>
+                <div class="employee-admin-search-select" data-testid="employee-search-select">
+                  <input
+                    v-model="filters.search"
+                    :placeholder="t('employeeAdmin.filters.searchPlaceholder')"
+                    data-testid="employee-search-select-input"
+                  />
+                </div>
+              </label>
+              <div class="employee-admin-filter-toolbar__actions">
+                <button
+                  class="cta-button cta-secondary"
+                  data-testid="employee-advanced-filters-open"
+                  type="button"
+                  @click="openAdvancedFiltersDialog"
+                >
+                  {{ t("employeeAdmin.actions.advancedFilters") }}
+                </button>
+              </div>
+            </div>
+
+            <p
+              v-if="!filteredEmployees.length"
+              class="employee-admin-list-empty"
+              data-testid="employee-list-empty-state"
+            >
+              {{ t("employeeAdmin.list.empty") }}
+            </p>
+            <div v-else class="employee-admin-record-list" data-testid="employee-list-rows">
+            <button
+              v-for="employee in filteredEmployees"
+              :key="employee.id"
+              type="button"
+              class="employee-admin-record employee-admin-list-row employee-admin-employee-row"
+              :class="{ selected: employee.id === selectedEmployeeId && employeeAdminDetailMode && !isCreatingEmployee }"
+              data-testid="employee-list-row"
+              :aria-label="`${employee.personnel_no} · ${employee.first_name} ${employee.last_name}`"
+              @click="openEmployeeWorkspace(employee.id)"
+            >
+              <div class="employee-admin-employee-row__avatar" data-testid="employee-list-row-avatar" aria-hidden="true">
+                <img
+                  v-if="shouldShowEmployeeListPhoto(employee)"
+                  :src="getEmployeeListPhotoUrl(employee)"
+                  :alt="`${employee.first_name} ${employee.last_name}`"
+                  class="employee-admin-employee-row__avatar-image"
+                  data-testid="employee-list-row-avatar-image"
+                  @error="markEmployeeListPhotoFailed(employee.id)"
+                />
+                <span v-else>{{ getEmployeeInitials(employee) }}</span>
+              </div>
+              <div class="employee-admin-record__body employee-admin-employee-row__body">
+                <strong class="employee-admin-employee-row__line employee-admin-employee-row__line--primary">
+                  {{ employee.personnel_no }} · {{ employee.first_name }} {{ employee.last_name }}
+                </strong>
+                <span class="employee-admin-record__meta employee-admin-employee-row__line employee-admin-employee-row__meta">
+                  <template v-if="employee.preferred_name">{{ employee.preferred_name }} · </template>{{ resolveEmployeeSuggestionContact(employee) }}
+                  <template v-if="formatEmployeeListContext(employee) !== t('employeeAdmin.summary.none')"> · {{ formatEmployeeListContext(employee) }}</template>
+                </span>
+              </div>
+              <StatusBadge :status="employee.status" data-testid="employee-list-row-status" />
+            </button>
+            </div>
+          </section>
+
+          <div
+            v-if="advancedFiltersModalOpen"
+            class="employee-admin-modal-backdrop"
+            data-testid="employee-advanced-filters-dialog-backdrop"
+            @click.self="closeAdvancedFiltersDialog"
+          >
+            <section
+              class="module-card employee-admin-modal"
+              aria-labelledby="employee-advanced-filters-title"
+              aria-modal="true"
+              role="dialog"
+              data-testid="employee-advanced-filters-dialog"
+            >
+              <form class="employee-admin-form-section" @submit.prevent="applyAdvancedFilters">
+                <div class="employee-admin-form-section__header employee-admin-form-section__header--split">
+                  <div>
+                    <p class="eyebrow">{{ t("employeeAdmin.filters.additionalTitle") }}</p>
+                    <h4 id="employee-advanced-filters-title">{{ t("employeeAdmin.filters.searchEmployees") }}</h4>
+                  </div>
                   <button
-                    v-for="employee in employeeSearchSuggestions"
-                    :key="employee.id"
+                    class="cta-button cta-secondary"
                     type="button"
-                    :aria-label="t('employeeAdmin.search.selectEmployee')"
-                    class="employee-admin-search-suggestion"
-                    data-testid="employee-search-suggestion-row"
-                    @click="selectEmployeeFromSuggestion(employee)"
+                    data-testid="employee-advanced-filters-cancel"
+                    @click="closeAdvancedFiltersDialog"
                   >
-                    <span class="employee-admin-search-suggestion__title">
-                      {{ employee.personnel_no }} · {{ employee.first_name }} {{ employee.last_name }}
-                    </span>
-                    <span v-if="employee.preferred_name" class="employee-admin-search-suggestion__meta">
-                      {{ employee.preferred_name }}
-                    </span>
-                    <span class="employee-admin-search-suggestion__meta">
-                      {{ resolveEmployeeSuggestionContact(employee) }}
-                    </span>
-                    <span class="employee-admin-search-suggestion__status">{{ employee.status }}</span>
+                    {{ t("employeeAdmin.actions.closeFilters") }}
                   </button>
-                  <p
-                    v-if="employeeSearchSuggestionEmptyVisible"
-                    class="employee-admin-search-suggestion-empty"
-                    data-testid="employee-search-suggestion-empty"
+                </div>
+
+                <div class="employee-admin-filter-grid employee-admin-filter-grid--dialog">
+                  <label class="field-stack employee-admin-search-field">
+                    <span>{{ t("employeeAdmin.filters.search") }}</span>
+                    <div class="employee-admin-search-select">
+                      <input
+                        v-model="filters.search"
+                        :placeholder="t('employeeAdmin.filters.searchPlaceholder')"
+                        data-testid="employee-advanced-filters-search"
+                      />
+                    </div>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.filters.status") }}</span>
+                    <select v-model="advancedFilterDraft.status" data-testid="employee-advanced-filters-status">
+                      <option value="">{{ t("employeeAdmin.filters.allStatuses") }}</option>
+                      <option value="active">{{ t("employeeAdmin.status.active") }}</option>
+                      <option value="inactive">{{ t("employeeAdmin.status.inactive") }}</option>
+                      <option value="archived">{{ t("employeeAdmin.status.archived") }}</option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.defaultBranchId") }}</span>
+                    <select
+                      v-model="advancedFilterDraft.default_branch_id"
+                      data-testid="employee-advanced-filters-default-branch"
+                    >
+                      <option value="">{{ t("employeeAdmin.summary.none") }}</option>
+                      <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
+                        {{ formatStructureLabel(branch) }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.fields.defaultMandateId") }}</span>
+                    <select
+                      v-model="advancedFilterDraft.default_mandate_id"
+                      data-testid="employee-advanced-filters-default-mandate"
+                    >
+                      <option value="">{{ t("employeeAdmin.summary.none") }}</option>
+                      <option
+                        v-for="mandate in filterMandateOptions(advancedFilterDraft.default_branch_id)"
+                        :key="mandate.id"
+                        :value="mandate.id"
+                      >
+                        {{ formatStructureLabel(mandate) }}
+                      </option>
+                    </select>
+                  </label>
+                </div>
+
+                <label class="employee-admin-checkbox">
+                  <input
+                    v-model="advancedFilterDraft.include_archived"
+                    data-testid="employee-advanced-filters-include-archived"
+                    type="checkbox"
+                  />
+                  <span>{{ t("employeeAdmin.filters.includeArchived") }}</span>
+                </label>
+
+                <div class="cta-row employee-admin-modal-actions">
+                  <button class="cta-button" data-testid="employee-advanced-filters-apply" type="submit">
+                    {{ t("employeeAdmin.actions.search") }}
+                  </button>
+                  <button class="cta-button cta-secondary" type="button" @click="closeAdvancedFiltersDialog">
+                    {{ t("employeeAdmin.actions.closeFilters") }}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+
+          <div
+            v-if="importExportModalOpen"
+            class="employee-admin-modal-backdrop"
+            data-testid="employee-import-export-modal-backdrop"
+            @click.self="closeImportExportDialog"
+          >
+            <section
+              class="module-card employee-admin-modal"
+              aria-labelledby="employee-import-export-title"
+              aria-modal="true"
+              role="dialog"
+              data-testid="employee-import-export-modal"
+            >
+              <div class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header employee-admin-form-section__header--split">
+                  <div>
+                    <p class="eyebrow">{{ t("employeeAdmin.import.eyebrow") }}</p>
+                    <h4 id="employee-import-export-title">{{ t("employeeAdmin.import.title") }}</h4>
+                  </div>
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="employee-import-export-close"
+                    @click="closeImportExportDialog"
                   >
-                    {{ t("employeeAdmin.search.suggestionsEmpty") }}
+                    {{ t("employeeAdmin.actions.cancel") }}
+                  </button>
+                </div>
+                <div data-testid="employee-import-export-panel">
+                  <input type="file" accept=".csv,text/csv" :disabled="!actionState.canImport" @change="onImportSelected" />
+                  <div class="cta-row">
+                    <button class="cta-button cta-secondary" type="button" :disabled="!pendingImportFile || !actionState.canImport" @click="loadImportFile">
+                      {{ t("employeeAdmin.actions.loadImportFile") }}
+                    </button>
+                    <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canImport" @click="importDraft.csv_text = buildEmployeeImportTemplateRows()">
+                      {{ t("employeeAdmin.actions.resetImportTemplate") }}
+                    </button>
+                    <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canExport" @click="runExport">
+                      {{ t("employeeAdmin.actions.exportEmployees") }}
+                    </button>
+                  </div>
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.import.csvLabel") }}</span>
+                    <textarea v-model="importDraft.csv_text" :disabled="!actionState.canImport" rows="7" />
+                  </label>
+                  <label class="employee-admin-checkbox">
+                    <input v-model="importDraft.continue_on_error" type="checkbox" :disabled="!actionState.canImport" />
+                    <span>{{ t("employeeAdmin.import.continueOnError") }}</span>
+                  </label>
+                  <div class="cta-row">
+                    <button class="cta-button" type="button" :disabled="!actionState.canImport" @click="runImportDryRun">
+                      {{ t("employeeAdmin.actions.importDryRun") }}
+                    </button>
+                    <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canImport" @click="runImportExecute">
+                      {{ t("employeeAdmin.actions.importExecute") }}
+                    </button>
+                  </div>
+                  <p v-if="importDryRunResult" class="field-help">
+                    {{ t("employeeAdmin.import.dryRunSummary", { total: importDryRunResult.total_rows, invalid: importDryRunResult.invalid_rows }) }}
+                  </p>
+                  <p v-if="lastImportResult" class="field-help">
+                    {{ t("employeeAdmin.import.executeSummary", { total: lastImportResult.total_rows, created: lastImportResult.created_employees, updated: lastImportResult.updated_employees }) }}
+                  </p>
+                  <p v-if="lastExportResult" class="field-help">
+                    {{ t("employeeAdmin.import.exportSummary", { rows: lastExportResult.row_count, documentId: lastExportResult.document_id }) }}
                   </p>
                 </div>
               </div>
-              <small v-if="loading.employeeSearch" class="employee-admin-field-help">
-                {{ t("employeeAdmin.search.suggestionsLoading") }}
-              </small>
-            </label>
-            <label class="field-stack">
-              <span>{{ t("employeeAdmin.filters.status") }}</span>
-              <select v-model="filters.status">
-                <option value="">{{ t("employeeAdmin.filters.allStatuses") }}</option>
-                <option value="active">{{ t("employeeAdmin.status.active") }}</option>
-                <option value="inactive">{{ t("employeeAdmin.status.inactive") }}</option>
-                <option value="archived">{{ t("employeeAdmin.status.archived") }}</option>
-              </select>
-            </label>
-            <label class="field-stack">
-              <span>{{ t("employeeAdmin.fields.defaultBranchId") }}</span>
-              <select v-model="filters.default_branch_id">
-                <option value="">{{ t("employeeAdmin.summary.none") }}</option>
-                <option v-for="branch in branchOptions" :key="branch.id" :value="branch.id">
-                  {{ formatStructureLabel(branch) }}
-                </option>
-              </select>
-            </label>
-            <label class="field-stack">
-              <span>{{ t("employeeAdmin.fields.defaultMandateId") }}</span>
-              <select v-model="filters.default_mandate_id">
-                <option value="">{{ t("employeeAdmin.summary.none") }}</option>
-                <option v-for="mandate in filterMandateOptions(filters.default_branch_id)" :key="mandate.id" :value="mandate.id">
-                  {{ formatStructureLabel(mandate) }}
-                </option>
-              </select>
-            </label>
+            </section>
           </div>
+        </div>
 
-          <div class="employee-admin-filter-actions">
-            <label class="employee-admin-checkbox">
-              <input v-model="filters.include_archived" type="checkbox" />
-              <span>{{ t("employeeAdmin.filters.includeArchived") }}</span>
-            </label>
-
-            <div class="cta-row employee-admin-filter-actions__buttons">
-              <button class="cta-button" type="button" @click="handleOpenEmployeeSearchResults">{{ t("employeeAdmin.actions.search") }}</button>
-              <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canCreate" @click="startCreateEmployee">
-                {{ t("employeeAdmin.actions.newEmployee") }}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section v-show="listPanelTab === 'import_export'" class="employee-admin-section employee-admin-tab-panel" data-testid="employee-list-tab-panel-import-export">
-          <div class="employee-admin-panel__header">
-            <div>
-              <p class="eyebrow">{{ t("employeeAdmin.import.eyebrow") }}</p>
-              <h3>{{ t("employeeAdmin.import.title") }}</h3>
-            </div>
-          </div>
-          <input type="file" accept=".csv,text/csv" :disabled="!actionState.canImport" @change="onImportSelected" />
-          <div class="cta-row">
-            <button class="cta-button cta-secondary" type="button" :disabled="!pendingImportFile || !actionState.canImport" @click="loadImportFile">
-              {{ t("employeeAdmin.actions.loadImportFile") }}
-            </button>
-            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canImport" @click="importDraft.csv_text = buildEmployeeImportTemplateRows()">
-              {{ t("employeeAdmin.actions.resetImportTemplate") }}
-            </button>
-            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canExport" @click="runExport">
-              {{ t("employeeAdmin.actions.exportEmployees") }}
-            </button>
-          </div>
-          <label class="field-stack">
-            <span>{{ t("employeeAdmin.import.csvLabel") }}</span>
-            <textarea v-model="importDraft.csv_text" :disabled="!actionState.canImport" rows="7" />
-          </label>
-          <label class="employee-admin-checkbox">
-            <input v-model="importDraft.continue_on_error" type="checkbox" :disabled="!actionState.canImport" />
-            <span>{{ t("employeeAdmin.import.continueOnError") }}</span>
-          </label>
-          <div class="cta-row">
-            <button class="cta-button" type="button" :disabled="!actionState.canImport" @click="runImportDryRun">
-              {{ t("employeeAdmin.actions.importDryRun") }}
-            </button>
-            <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canImport" @click="runImportExecute">
-              {{ t("employeeAdmin.actions.importExecute") }}
-            </button>
-          </div>
-          <p v-if="importDryRunResult" class="field-help">
-            {{ t("employeeAdmin.import.dryRunSummary", { total: importDryRunResult.total_rows, invalid: importDryRunResult.invalid_rows }) }}
-          </p>
-          <p v-if="lastImportResult" class="field-help">
-            {{ t("employeeAdmin.import.executeSummary", { total: lastImportResult.total_rows, created: lastImportResult.created_employees, updated: lastImportResult.updated_employees }) }}
-          </p>
-          <p v-if="lastExportResult" class="field-help">
-            {{ t("employeeAdmin.import.exportSummary", { rows: lastExportResult.row_count, documentId: lastExportResult.document_id }) }}
-          </p>
-        </section>
-
-      </section>
-
-      <div
-        v-if="employeeSearchModalOpen"
-        class="employee-admin-modal-backdrop"
-        data-testid="employee-search-results-modal-backdrop"
-        @click.self="closeEmployeeSearchResultsModal"
-      >
-        <section
-          class="module-card employee-admin-modal"
-          aria-labelledby="employee-search-results-title"
-          aria-modal="true"
-          role="dialog"
-          data-testid="employee-search-results-modal"
-        >
-          <div class="employee-admin-form-section__header employee-admin-form-section__header--split">
-            <div>
-              <p class="eyebrow">{{ t("employeeAdmin.searchResults.eyebrow") }}</p>
-              <h4 id="employee-search-results-title">{{ t("employeeAdmin.searchResults.title") }}</h4>
-            </div>
-            <button
-              class="cta-button cta-secondary"
-              type="button"
-              data-testid="employee-search-result-close"
-              @click="closeEmployeeSearchResultsModal"
-            >
-              {{ t("employeeAdmin.actions.cancel") }}
-            </button>
-          </div>
-          <p class="field-help">{{ t("employeeAdmin.searchResults.lead") }}</p>
-          <p v-if="loading.employeeSearch" class="employee-admin-list-empty">{{ t("employeeAdmin.searchResults.loading") }}</p>
-          <p v-else-if="employeeSearchError" class="employee-admin-list-empty">{{ employeeSearchError }}</p>
-          <p
-            v-else-if="!employeeSearchResults.length"
-            class="employee-admin-list-empty"
-            data-testid="employee-search-result-empty"
-          >
-            {{ t("employeeAdmin.searchResults.empty") }}
-          </p>
-          <div v-else class="employee-admin-record-list">
-            <button
-              v-for="employee in employeeSearchResults"
-              :key="employee.id"
-              type="button"
-              class="employee-admin-record employee-admin-search-result"
-              data-testid="employee-search-result-row"
-              @click="selectEmployeeFromSearchResult(employee.id)"
-            >
-              <div class="employee-admin-record__body">
-                <strong>{{ employee.personnel_no }} · {{ employee.first_name }} {{ employee.last_name }}</strong>
-                <p v-if="employee.preferred_name">{{ employee.preferred_name }}</p>
-                <p>{{ employee.work_email || employee.mobile_phone || t("employeeAdmin.summary.none") }}</p>
-              </div>
-              <StatusBadge :status="employee.status" />
-            </button>
-          </div>
-        </section>
-      </div>
-
+      <div v-else class="employee-admin-mode-shell" data-testid="employee-detail-only-mode">
       <section class="module-card employee-admin-panel employee-admin-detail" data-testid="employee-detail-workspace">
         <div class="employee-admin-panel__header">
           <div>
             <p class="eyebrow">{{ t("employeeAdmin.detail.eyebrow") }}</p>
             <h3>{{ detailWorkspaceTitle }}</h3>
           </div>
-          <StatusBadge v-if="selectedEmployee && !isCreatingEmployee" :status="selectedEmployee.status" />
+          <div class="employee-admin-detail-header-actions">
+            <button
+              class="cta-button cta-secondary employee-admin-back-button"
+              type="button"
+              data-testid="employee-detail-back-to-list"
+              @click="returnToEmployeeList"
+            >
+              {{ t("employeeAdmin.actions.backToEmployeeList") }}
+            </button>
+            <StatusBadge v-if="selectedEmployee && !isCreatingEmployee" :status="selectedEmployee.status" />
+          </div>
         </div>
 
         <nav class="employee-admin-tabs" data-testid="employee-detail-tabs" aria-label="Employee detail sections">
@@ -1986,6 +2034,7 @@
         </section>
       </section>
       </div>
+      </div>
     </SicherPlanLoadingOverlay>
   </section>
 </template>
@@ -2152,6 +2201,12 @@ const loading = reactive({
 
 const filters = reactive({
   search: "",
+  status: "",
+  default_branch_id: "",
+  default_mandate_id: "",
+  include_archived: false,
+});
+const advancedFilterDraft = reactive({
   status: "",
   default_branch_id: "",
   default_mandate_id: "",
@@ -2327,6 +2382,8 @@ const employeeSearchResults = ref<EmployeeListItem[]>([]);
 const employeeSearchSuggestions = ref<EmployeeListItem[]>([]);
 const employeeSearchSuggestionsSuppressed = ref(false);
 const employeeSearchError = ref("");
+const advancedFiltersModalOpen = ref(false);
+const importExportModalOpen = ref(false);
 const selectedEmployeeId = ref("");
 const selectedEmployee = ref<EmployeeOperationalRead | null>(null);
 const selectedPrivateProfile = ref<EmployeePrivateProfileRead | null>(null);
@@ -2350,11 +2407,12 @@ const importDryRunResult = ref<EmployeeImportDryRunResult | null>(null);
 const lastImportResult = ref<EmployeeImportExecuteResult | null>(null);
 const lastExportResult = ref<EmployeeExportResult | null>(null);
 const photoPreviewUrl = ref("");
+const employeeListPhotoPreviewUrls = reactive<Record<string, string>>({});
+const employeeListPhotoFailedIds = reactive<Record<string, boolean>>({});
 const pendingEmployeeDocumentFile = ref<File | null>(null);
 const pendingEmployeeDocumentVersionFile = ref<File | null>(null);
 const pendingImportFile = ref<File | null>(null);
 const isCreatingEmployee = ref(false);
-const listPanelTab = ref<"import_export" | "search">("search");
 const activeDetailTab = ref("overview");
 const activeOverviewSection = ref<EmployeeOverviewSectionId>("employee_file");
 const activeEmployeeOverviewEditor = ref<EmployeeOverviewEditorDialog>(null);
@@ -2425,6 +2483,9 @@ const detailWorkspaceTitle = computed(() => {
   }
   return selectedEmployeeLabel.value;
 });
+const hasEmployeeDetailWorkspace = computed(() => isCreatingEmployee.value || !!selectedEmployee.value);
+const employeeAdminDetailMode = computed(() => hasEmployeeDetailWorkspace.value);
+const employeeAdminListMode = computed(() => !employeeAdminDetailMode.value);
 const currentAddressSummary = computed(() => summarizeCurrentAddress(employeeAddresses.value));
 const employeeAddressTimeline = computed(() =>
   [...employeeAddresses.value].sort((left, right) => {
@@ -2549,23 +2610,14 @@ const privateProfileMaritalStatusIsLegacy = computed(() => {
 });
 const filteredEmployeeMandates = computed(() => filterMandateOptions(employeeDraft.default_branch_id));
 const employeeSearchQuery = computed(() => `${filters.search ?? ""}`.trim());
-const canRunEmployeeSearch = computed(() => !!resolvedTenantScopeId.value && !!authStore.accessToken && canRead.value);
-const employeeSearchSuggestionEmptyVisible = computed(
-  () =>
-    !!employeeSearchQuery.value
-    && canRunEmployeeSearch.value
-    && !loading.employeeSearch
-    && !employeeSearchSuggestions.value.length
-    && !employeeSearchError.value,
-);
-const employeeSearchSuggestionsVisible = computed(
-  () =>
-    !!employeeSearchQuery.value
-    && canRunEmployeeSearch.value
-    && !employeeSearchModalOpen.value
-    && !employeeSearchSuggestionsSuppressed.value
-    && (loading.employeeSearch || !!employeeSearchSuggestions.value.length || employeeSearchSuggestionEmptyVisible.value),
-);
+const normalizedEmployeeListSearch = computed(() => normalizeEmployeeListSearchValue(filters.search));
+const filteredEmployees = computed(() => {
+  const search = normalizedEmployeeListSearch.value;
+  if (!search) {
+    return employees.value;
+  }
+  return employees.value.filter((employee) => employeeListSearchHaystack(employee).includes(search));
+});
 const branchLabelMap = computed(() => new Map(branchOptions.value.map((branch) => [branch.id, formatStructureLabel(branch)])));
 const mandateLabelMap = computed(() => new Map(mandateOptions.value.map((mandate) => [mandate.id, formatStructureLabel(mandate)])));
 const selectedEmployeeBranchLabel = computed(() => {
@@ -2576,6 +2628,52 @@ const selectedEmployeeMandateLabel = computed(() => {
   const mandateId = selectedEmployee.value?.default_mandate_id;
   return mandateId ? mandateLabelMap.value.get(mandateId) ?? mandateId : "";
 });
+
+function formatEmployeeListContext(employee: EmployeeListItem) {
+  const parts = [
+    employee.default_branch_id ? branchLabelMap.value.get(employee.default_branch_id) ?? employee.default_branch_id : "",
+    employee.default_mandate_id ? mandateLabelMap.value.get(employee.default_mandate_id) ?? employee.default_mandate_id : "",
+  ].filter(Boolean);
+  return parts.join(" · ") || t("employeeAdmin.summary.none");
+}
+
+function getEmployeeInitials(employee: EmployeeListItem) {
+  return [employee.first_name, employee.last_name]
+    .map((value) => `${value ?? ""}`.trim().charAt(0))
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function getEmployeeListPhotoUrl(employee: EmployeeListItem) {
+  return employeeListPhotoPreviewUrls[employee.id] ?? "";
+}
+
+function shouldShowEmployeeListPhoto(employee: EmployeeListItem) {
+  return !!getEmployeeListPhotoUrl(employee) && employeeListPhotoFailedIds[employee.id] !== true;
+}
+
+function markEmployeeListPhotoFailed(employeeId: string) {
+  employeeListPhotoFailedIds[employeeId] = true;
+}
+
+function normalizeEmployeeListSearchValue(value: string | null | undefined) {
+  return `${value ?? ""}`.trim().toLocaleLowerCase();
+}
+
+function employeeListSearchHaystack(employee: EmployeeListItem) {
+  return [
+    employee.personnel_no,
+    employee.first_name,
+    employee.last_name,
+    employee.preferred_name,
+    employee.status,
+    resolveEmployeeSuggestionContact(employee),
+    formatEmployeeListContext(employee),
+  ]
+    .map((value) => normalizeEmployeeListSearchValue(value))
+    .join(" ");
+}
 const addressEditorEyebrowKey = computed(() => {
   switch (addressEditorMode.value) {
     case "close":
@@ -3201,6 +3299,40 @@ function buildEmployeeSearchParams(searchOverride?: string): EmployeeListFilters
   };
 }
 
+function syncAdvancedFilterDraftFromFilters() {
+  advancedFilterDraft.status = filters.status ?? "";
+  advancedFilterDraft.default_branch_id = filters.default_branch_id ?? "";
+  advancedFilterDraft.default_mandate_id = filters.default_mandate_id ?? "";
+  advancedFilterDraft.include_archived = !!filters.include_archived;
+}
+
+function openAdvancedFiltersDialog() {
+  syncAdvancedFilterDraftFromFilters();
+  advancedFiltersModalOpen.value = true;
+}
+
+function closeAdvancedFiltersDialog() {
+  syncAdvancedFilterDraftFromFilters();
+  advancedFiltersModalOpen.value = false;
+}
+
+async function applyAdvancedFilters() {
+  filters.status = advancedFilterDraft.status;
+  filters.default_branch_id = advancedFilterDraft.default_branch_id;
+  filters.default_mandate_id = advancedFilterDraft.default_mandate_id;
+  filters.include_archived = advancedFilterDraft.include_archived;
+  await refreshEmployees({ autoSelectFirst: false });
+  advancedFiltersModalOpen.value = false;
+}
+
+function openImportExportDialog() {
+  importExportModalOpen.value = true;
+}
+
+function closeImportExportDialog() {
+  importExportModalOpen.value = false;
+}
+
 function clearEmployeeSearchDebounce() {
   if (employeeSearchDebounceHandle) {
     clearTimeout(employeeSearchDebounceHandle);
@@ -3296,13 +3428,21 @@ async function handleOpenEmployeeSearchResults() {
   await runEmployeeSearch({ openModal: true });
 }
 
+async function openEmployeeWorkspace(employeeId: string, detailTab = "dashboard") {
+  closeAdvancedFiltersDialog();
+  closeImportExportDialog();
+  await selectEmployee(employeeId, { fallbackTab: detailTab });
+  if (!legacyEmployeeDetailTabIds.has(detailTab)) {
+    activeDetailTab.value = detailTab;
+  }
+}
+
 async function selectEmployeeFromSearchResult(employeeId: string) {
   employeeSearchModalOpen.value = false;
   employeeSearchSuggestions.value = [];
   employeeSearchSuggestionsSuppressed.value = true;
   employeeSearchError.value = "";
-  await selectEmployee(employeeId, { fallbackTab: "dashboard" });
-  activeDetailTab.value = "dashboard";
+  await openEmployeeWorkspace(employeeId, "dashboard");
 }
 
 async function selectEmployeeFromSuggestion(employee: EmployeeListItem) {
@@ -3314,8 +3454,15 @@ async function selectEmployeeFromSuggestion(employee: EmployeeListItem) {
   employeeSearchError.value = "";
   suppressNextEmployeeSearchWatch = true;
   filters.search = `${employee.personnel_no} · ${employee.first_name} ${employee.last_name}`;
-  await selectEmployee(employee.id, { fallbackTab: "dashboard" });
-  activeDetailTab.value = "dashboard";
+  await openEmployeeWorkspace(employee.id, "dashboard");
+}
+
+async function returnToEmployeeList() {
+  isCreatingEmployee.value = false;
+  resetSelectedEmployeeWorkspaceState();
+  closeAdvancedFiltersDialog();
+  closeImportExportDialog();
+  await nextTick();
 }
 
 async function loadTenantStructure() {
@@ -3642,6 +3789,8 @@ function editMembership(membership: EmployeeGroupMembershipRead) {
 }
 
 function startCreateEmployee() {
+  closeAdvancedFiltersDialog();
+  closeImportExportDialog();
   isCreatingEmployee.value = true;
   activeDetailTab.value = "overview";
   selectedEmployeeId.value = "";
@@ -3670,11 +3819,43 @@ function startCreateEmployee() {
   resetAccessDrafts();
 }
 
+function resetSelectedEmployeeWorkspaceState() {
+  selectedEmployeeId.value = "";
+  selectedEmployee.value = null;
+  selectedPrivateProfile.value = null;
+  employeeAddresses.value = [];
+  employeeNotes.value = [];
+  employeeQualifications.value = [];
+  employeeCredentials.value = [];
+  employeeAvailabilityRules.value = [];
+  employeeAbsences.value = [];
+  employeeDocuments.value = [];
+  currentPhoto.value = null;
+  accessLink.value = null;
+  selectedEmployeeDocumentId.value = "";
+  activeDetailTab.value = "overview";
+  activeOverviewSection.value = "employee_file";
+  activeEmployeeOverviewEditor.value = null;
+  syncPrivateProfileDraft(null);
+  clearPhotoPreview();
+  resetEmployeeDocumentDrafts();
+  resetAccessDrafts();
+}
+
 function clearPhotoPreview() {
-  if (photoPreviewUrl.value) {
+  if (photoPreviewUrl.value && !Object.values(employeeListPhotoPreviewUrls).includes(photoPreviewUrl.value)) {
     URL.revokeObjectURL(photoPreviewUrl.value);
   }
   photoPreviewUrl.value = "";
+}
+
+function syncEmployeeListPhotoPreview(employeeId: string, previewUrl: string) {
+  const previousUrl = employeeListPhotoPreviewUrls[employeeId];
+  if (previousUrl && previousUrl !== previewUrl) {
+    URL.revokeObjectURL(previousUrl);
+  }
+  employeeListPhotoPreviewUrls[employeeId] = previewUrl;
+  employeeListPhotoFailedIds[employeeId] = false;
 }
 
 async function refreshEmployees(options: { autoSelectFirst?: boolean } = {}) {
@@ -3689,7 +3870,7 @@ async function refreshEmployees(options: { autoSelectFirst?: boolean } = {}) {
     return;
   }
 
-  const { autoSelectFirst = true } = options;
+  const { autoSelectFirst = false } = options;
   loading.list = true;
   try {
     employees.value = await listEmployees(resolvedTenantScopeId.value, authStore.accessToken, filters);
@@ -3919,6 +4100,9 @@ async function refreshPhotoPreview() {
       authStore.accessToken,
     );
     photoPreviewUrl.value = URL.createObjectURL(file.blob);
+    if (selectedEmployeeId.value) {
+      syncEmployeeListPhotoPreview(selectedEmployeeId.value, photoPreviewUrl.value);
+    }
   } catch {
     photoPreviewUrl.value = "";
   }
@@ -4952,21 +5136,15 @@ watch(
 );
 
 watch(
-  () => filters.search,
-  (search) => {
-    clearEmployeeSearchDebounce();
-    if (suppressNextEmployeeSearchWatch) {
-      suppressNextEmployeeSearchWatch = false;
+  () => advancedFilterDraft.default_branch_id,
+  (branchId) => {
+    if (!advancedFilterDraft.default_mandate_id) {
       return;
     }
-    employeeSearchSuggestionsSuppressed.value = false;
-    if (!`${search ?? ""}`.trim()) {
-      resetEmployeeSearchState({ closeModal: true });
-      return;
+    const mandateStillValid = filterMandateOptions(branchId).some((mandate) => mandate.id === advancedFilterDraft.default_mandate_id);
+    if (!mandateStillValid) {
+      advancedFilterDraft.default_mandate_id = "";
     }
-    employeeSearchDebounceHandle = setTimeout(() => {
-      void runEmployeeSearch({ suppressFeedback: true });
-    }, 300);
   },
 );
 
@@ -5001,12 +5179,17 @@ onMounted(async () => {
   }
   tenantScopeInput.value = authStore.effectiveTenantScopeId || authStore.tenantScopeId;
   resetEmployeeDraft();
-  await refreshEmployees();
+  await refreshEmployees({ autoSelectFirst: false });
 });
 
 onBeforeUnmount(() => {
   clearEmployeeSearchDebounce();
-  clearPhotoPreview();
+  const previewUrls = new Set<string>([
+    photoPreviewUrl.value,
+    ...Object.values(employeeListPhotoPreviewUrls),
+  ].filter(Boolean));
+  previewUrls.forEach((url) => URL.revokeObjectURL(url));
+  photoPreviewUrl.value = "";
   disconnectEmployeeOverviewSectionObserver();
   teardownOverviewNavFloating();
 });
@@ -5027,6 +5210,12 @@ onBeforeUnmount(() => {
   gap: var(--sp-page-gap, 1.25rem);
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
+}
+
+.employee-admin-mode-shell {
+  display: grid;
+  gap: var(--sp-page-gap, 1.25rem);
+  min-width: 0;
 }
 
 .employee-admin-list-panel {
@@ -5059,11 +5248,25 @@ onBeforeUnmount(() => {
 
 .employee-admin-meta,
 .employee-admin-summary,
-.employee-admin-photo__controls {
+.employee-admin-photo__controls,
+.employee-admin-detail-header-actions,
+.employee-admin-list-header-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   min-width: 0;
+}
+
+.employee-admin-list-header-actions {
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.employee-admin-detail-header-actions {
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .employee-admin-photo {
@@ -5097,6 +5300,55 @@ onBeforeUnmount(() => {
   background: var(--sp-color-surface-page);
   text-align: left;
   cursor: pointer;
+}
+
+.employee-admin-employee-row {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem 0.9rem;
+}
+
+.employee-admin-employee-row__avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 65%, white);
+  color: var(--sp-color-primary-strong);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.employee-admin-employee-row__avatar-image {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+.employee-admin-employee-row__body {
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.employee-admin-employee-row__line {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.employee-admin-employee-row__line--primary {
+  font-size: 0.95rem;
+}
+
+.employee-admin-employee-row__meta {
+  font-size: 0.84rem;
 }
 
 .employee-admin-summary__card {
@@ -5163,6 +5415,35 @@ onBeforeUnmount(() => {
 
 .employee-admin-search-select input {
   width: 100%;
+}
+
+.employee-admin-filter-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+.employee-admin-filter-toolbar__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.employee-admin-header-action {
+  min-height: 2.15rem;
+  padding: 0.42rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.84rem;
+}
+
+.employee-admin-back-button {
+  min-height: 2rem;
+  padding: 0.32rem 0.68rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 650;
 }
 
 .employee-admin-search-suggestions {
@@ -5478,6 +5759,10 @@ onBeforeUnmount(() => {
   align-items: start;
 }
 
+.employee-admin-filter-grid--dialog {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .employee-admin-filter-actions {
   display: flex;
   flex-wrap: wrap;
@@ -5715,6 +6000,15 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 720px) {
+  .employee-admin-filter-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .employee-admin-filter-toolbar__actions,
+  .employee-admin-list-header-actions {
+    justify-content: flex-start;
+  }
+
   .employee-admin-filter-grid {
     grid-template-columns: 1fr;
   }
