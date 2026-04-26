@@ -57,6 +57,8 @@
                 </button>
                 <button
                   class="cta-button cta-secondary employee-admin-header-action"
+                  data-assistant-action="employees.create.open"
+                  data-assistant-page-id="E-01"
                   data-testid="employee-list-header-new-employee"
                   type="button"
                   :disabled="!actionState.canCreate"

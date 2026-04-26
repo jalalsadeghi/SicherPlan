@@ -13,11 +13,13 @@ class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({
     required this.controller,
     required this.backend,
+    this.nowProvider = DateTime.now,
     super.key,
   });
 
   final MobileSessionController controller;
   final MobileBackendGateway backend;
+  final DateTime Function() nowProvider;
 
   @override
   State<ScheduleScreen> createState() => _ScheduleScreenState();
@@ -66,19 +68,44 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   child: Center(child: CircularProgressIndicator()),
                 );
               }
-              if (snapshot.hasError) {
-                return HighlightCard(
-                  title: l10n.scheduleErrorTitle,
-                  subtitle: l10n.mobileLoadErrorSubtitle(snapshot.error),
-                  icon: Icons.error_outline_rounded,
-                );
-              }
               final schedules = snapshot.data ?? const [];
+              final hasError = snapshot.hasError;
               if (schedules.isEmpty) {
-                return HighlightCard(
-                  title: l10n.scheduleEmptyTitle,
-                  subtitle: l10n.scheduleEmptySubtitle,
-                  icon: Icons.event_busy_outlined,
+                final weekStarts = _buildCalendarWeekStarts(schedules);
+                return Column(
+                  children: [
+                    HighlightCard(
+                      title: hasError
+                          ? l10n.scheduleErrorTitle
+                          : l10n.scheduleEmptyTitle,
+                      subtitle: hasError
+                          ? l10n.mobileLoadErrorSubtitle(snapshot.error)
+                          : l10n.scheduleEmptySubtitle,
+                      icon: hasError
+                          ? Icons.error_outline_rounded
+                          : Icons.event_busy_outlined,
+                    ),
+                    const SizedBox(height: 14),
+                    Card(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: _ScheduleWeekList(
+                          key: const ValueKey('schedule-week-list'),
+                          weekStarts: weekStarts,
+                          schedulesByDay:
+                              const <
+                                DateTime,
+                                List<EmployeeReleasedScheduleItem>
+                              >{},
+                          timeLabel: _timeLabel,
+                          statusLabel: _statusLabel,
+                          isToday: _isToday,
+                          onShiftSelected: _showShiftDetail,
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               }
               final sortedSchedules = [...schedules]
@@ -86,9 +113,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   (left, right) => left.workStart.compareTo(right.workStart),
                 );
               final schedulesByDay = _groupSchedulesByDay(sortedSchedules);
-              final weekStarts = _buildWeekStarts(sortedSchedules);
+              final weekStarts = _buildCalendarWeekStarts(sortedSchedules);
               return Column(
                 children: [
+                  if (hasError)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: HighlightCard(
+                        title: l10n.scheduleErrorTitle,
+                        subtitle: l10n.mobileLoadErrorSubtitle(snapshot.error),
+                        icon: Icons.error_outline_rounded,
+                      ),
+                    ),
                   Card(
                     margin: const EdgeInsets.only(bottom: 14),
                     child: Padding(
@@ -256,11 +292,28 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return grouped;
   }
 
-  List<DateTime> _buildWeekStarts(
+  List<DateTime> _buildCalendarWeekStarts(
     List<EmployeeReleasedScheduleItem> schedules,
   ) {
-    final firstWeek = _weekStart(_dateOnly(schedules.first.scheduleDate));
-    final lastWeek = _weekStart(_dateOnly(schedules.last.scheduleDate));
+    final anchorWeek = _weekStart(_dateOnly(widget.nowProvider()));
+    final defaultStart = anchorWeek.subtract(const Duration(days: 28));
+    final defaultEnd = anchorWeek.add(const Duration(days: 84));
+    DateTime firstWeek = defaultStart;
+    DateTime lastWeek = defaultEnd;
+    if (schedules.isNotEmpty) {
+      final scheduleFirstWeek = _weekStart(
+        _dateOnly(schedules.first.scheduleDate),
+      ).subtract(const Duration(days: 28));
+      final scheduleLastWeek = _weekStart(
+        _dateOnly(schedules.last.scheduleDate),
+      ).add(const Duration(days: 84));
+      if (scheduleFirstWeek.isBefore(firstWeek)) {
+        firstWeek = scheduleFirstWeek;
+      }
+      if (scheduleLastWeek.isAfter(lastWeek)) {
+        lastWeek = scheduleLastWeek;
+      }
+    }
     final weekStarts = <DateTime>[];
     for (
       var cursor = firstWeek;
@@ -721,7 +774,8 @@ class _ScheduleDayGroup extends StatelessWidget {
           const SizedBox(height: 8),
           if (!hasShifts)
             Text(
-              l10n.scheduleNoShifts,
+              l10n.scheduleNoShift,
+              key: ValueKey('schedule-day-empty-${_isoDate(day)}'),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colors.onSurface.withValues(alpha: 0.68),
               ),

@@ -8,6 +8,7 @@ from sqlalchemy import engine_from_config, pool
 from app.config import settings
 from app.db import Base
 from app.db.alembic_versioning import configure_alembic_version_table_impl
+from app.modules.assistant import models as assistant_models  # noqa: F401
 from app.modules.core import models as core_models  # noqa: F401
 from app.modules.customers import models as customer_models  # noqa: F401
 from app.modules.employees import models as employee_models  # noqa: F401

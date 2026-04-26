@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi import Request
 from sqlalchemy.exc import OperationalError
@@ -14,6 +15,131 @@ from app.errors import unhandled_exception_handler
 
 
 class TestRuntimeConfig(unittest.TestCase):
+    def test_ai_settings_defaults_are_safe(self) -> None:
+        with patch.dict(os.environ, {}, clear=False):
+            for key in (
+                "SP_AI_ENABLED",
+                "SP_AI_PROVIDER",
+                "SP_OPENAI_API_KEY",
+                "SP_AI_RESPONSE_MODEL",
+                "SP_AI_EMBEDDING_MODEL",
+                "SP_AI_STORE_RESPONSES",
+                "SP_AI_MAX_TOOL_CALLS",
+                "SP_AI_MAX_CONTEXT_CHUNKS",
+                "SP_AI_MAX_INPUT_CHARS",
+                "SP_AI_TIMEOUT_SECONDS",
+                "SP_AI_RATE_LIMIT_PER_USER_PER_MINUTE",
+                "SP_AI_RATE_LIMIT_PER_TENANT_PER_MINUTE",
+                "SP_AI_REDACTION_ENABLED",
+                "SP_AI_AUDIT_ENABLED",
+            ):
+                os.environ.pop(key, None)
+            settings = AppSettings()
+
+        self.assertFalse(settings.ai_enabled)
+        self.assertEqual(settings.ai_provider, "mock")
+        self.assertEqual(settings.ai_response_model, "gpt-5.5-or-configured-model")
+        self.assertEqual(settings.ai_embedding_model, "text-embedding-3-small")
+        self.assertFalse(settings.ai_store_responses)
+        self.assertEqual(settings.ai_max_tool_calls, 8)
+        self.assertEqual(settings.ai_max_context_chunks, 8)
+        self.assertEqual(settings.ai_max_input_chars, 12000)
+        self.assertEqual(settings.ai_timeout_seconds, 45)
+        self.assertEqual(settings.ai_rate_limit_per_user_per_minute, 10)
+        self.assertEqual(settings.ai_rate_limit_per_tenant_per_minute, 100)
+        self.assertTrue(settings.ai_redaction_enabled)
+        self.assertTrue(settings.ai_audit_enabled)
+
+    def test_ai_disabled_does_not_require_openai_key(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SP_AI_ENABLED": "false",
+                "SP_AI_PROVIDER": "openai",
+                "SP_OPENAI_API_KEY": "",
+            },
+            clear=False,
+        ):
+            settings = AppSettings()
+
+        self.assertFalse(settings.ai_enabled)
+        self.assertEqual(settings.ai_provider, "openai")
+
+    def test_ai_mock_provider_does_not_require_openai_key(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SP_AI_ENABLED": "true",
+                "SP_AI_PROVIDER": "mock",
+                "SP_OPENAI_API_KEY": "",
+            },
+            clear=False,
+        ):
+            settings = AppSettings()
+
+        self.assertTrue(settings.ai_enabled)
+        self.assertEqual(settings.ai_provider, "mock")
+
+    def test_ai_openai_provider_accepts_api_key_when_enabled(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SP_AI_ENABLED": "true",
+                "SP_AI_PROVIDER": "openai",
+                "SP_OPENAI_API_KEY": "test-openai-key",
+            },
+            clear=False,
+        ):
+            settings = AppSettings()
+
+        self.assertTrue(settings.ai_enabled)
+        self.assertEqual(settings.ai_provider, "openai")
+
+    def test_ai_openai_provider_requires_key_when_enabled(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SP_AI_ENABLED": "true",
+                "SP_AI_PROVIDER": "openai",
+                "SP_OPENAI_API_KEY": "",
+            },
+            clear=False,
+        ):
+            with self.assertRaisesRegex(
+                ValueError,
+                "SP_OPENAI_API_KEY is required when SP_AI_ENABLED=true and SP_AI_PROVIDER=openai.",
+            ):
+                AppSettings()
+
+    def test_ai_invalid_provider_is_rejected(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SP_AI_ENABLED": "true",
+                "SP_AI_PROVIDER": "unknown",
+            },
+            clear=False,
+        ):
+            with self.assertRaisesRegex(
+                ValueError,
+                "Invalid SP_AI_PROVIDER value. Expected one of: mock, openai.",
+            ):
+                AppSettings()
+
+    def test_ai_openai_api_key_is_not_in_settings_repr(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SP_AI_ENABLED": "true",
+                "SP_AI_PROVIDER": "openai",
+                "SP_OPENAI_API_KEY": "super-secret-key",
+            },
+            clear=False,
+        ):
+            settings = AppSettings()
+
+        self.assertNotIn("super-secret-key", repr(settings))
+
     def test_parse_env_line_ignores_comments_and_strips_quotes(self) -> None:
         self.assertIsNone(_parse_env_line(""))
         self.assertIsNone(_parse_env_line("# comment"))

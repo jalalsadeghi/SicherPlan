@@ -13,6 +13,7 @@ from app.errors import ApiException, api_exception_handler, unhandled_exception_
 from app.health import router as health_router
 from app.logging_utils import configure_logging
 from app.middleware import RequestContextMiddleware
+from app.modules.assistant.router import router as assistant_router
 from app.modules.core.admin_router import router as core_admin_router
 from app.modules.customers.router import router as customers_router
 from app.modules.customers.portal_access_router import router as customer_portal_access_router
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
         )
     app.add_middleware(RequestContextMiddleware)
     app.include_router(health_router)
+    app.include_router(assistant_router)
     app.include_router(core_admin_router)
     app.include_router(customers_router)
     app.include_router(customer_portal_access_router)

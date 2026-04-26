@@ -1,0 +1,40 @@
+{
+  "widget": {
+    "title": "SicherPlan Assistant",
+    "description": "Schreibgeschützte Hilfe für Workflows, Schichten, Mitarbeitende, Planung, Finanzen, Berichte und Portale.",
+    "launcherLabel": "SicherPlan Assistant öffnen",
+    "closeLabel": "SicherPlan Assistant schließen",
+    "loadingLabel": "Assistant-Verfügbarkeit wird geladen",
+    "emptyTitle": "Fragen Sie zum aktuellen Arbeitsbereich",
+    "emptyBody": "Der Assistant erklärt Plattform-Workflows, diagnostiziert Sichtbarkeitsprobleme und öffnet sichere interne Links, die das Backend bereits freigegeben hat.",
+    "disabledBody": "Der Assistant ist für das aktuelle Konto oder diese Seite nicht verfügbar.",
+    "errorBody": "Die Assistant-Anfrage konnte gerade nicht abgeschlossen werden.",
+    "inputLabel": "Assistant-Nachricht",
+    "inputPlaceholder": "Fragen Sie zu SicherPlan-Workflows, Schichten, Mitarbeitenden, Planung, Finanzen, Berichten oder Portalen...",
+    "send": "Senden",
+    "sending": "Wird gesendet...",
+    "assistantLabel": "Assistant",
+    "userLabel": "Sie",
+    "diagnosisTitle": "Feststellungen",
+    "linksTitle": "Freigegebene Links",
+    "nextStepsTitle": "Nächste Schritte",
+    "missingPermissionsTitle": "Fehlende Berechtigungen",
+    "openLink": "Seite öffnen",
+    "confidence": "Sicherheit",
+    "feedback": {
+      "prompt": "War diese Antwort hilfreich?",
+      "helpful": "Hilfreich",
+      "notHelpful": "Nicht hilfreich",
+      "commentLabel": "Optionaler Hinweis",
+      "commentPlaceholder": "Kurze Rückmeldung, was gefehlt hat oder unklar war...",
+      "submit": "Feedback senden",
+      "submitted": "Danke für Ihr Feedback.",
+      "error": "Feedback konnte gerade nicht gesendet werden."
+    },
+    "severity": {
+      "blocking": "Blockierend",
+      "info": "Info",
+      "warning": "Warnung"
+    }
+  }
+}

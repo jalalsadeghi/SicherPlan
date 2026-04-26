@@ -116,6 +116,7 @@ class AppLocalizations {
       : 'Released shifts will appear here in the weekly view.';
   String scheduleWeekLabel(String start, String end) =>
       isGerman ? 'Woche $start - $end' : 'Week $start - $end';
+  String get scheduleNoShift => isGerman ? 'Keine Schicht' : 'No shift';
   String get scheduleNoShifts => isGerman ? 'Keine Schichten' : 'No shifts';
   String get scheduleShiftDetailsTitle =>
       isGerman ? 'Schichtdetails' : 'Shift details';

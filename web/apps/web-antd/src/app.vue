@@ -8,6 +8,7 @@ import { preferences, usePreferences } from '@vben/preferences';
 import { App, ConfigProvider, theme } from 'ant-design-vue';
 
 import { antdLocale } from '#/locales';
+import SicherPlanAssistantWidget from '#/components/sicherplan/assistant/SicherPlanAssistantWidget.vue';
 import { useLocaleStore } from '@/stores/locale';
 import { useThemeStore } from '@/stores/theme';
 import { themeTokens } from '@/theme/tokens';
@@ -78,6 +79,7 @@ watchEffect(() => {
   <ConfigProvider :locale="antdLocale" :theme="tokenTheme">
     <App>
       <RouterView />
+      <SicherPlanAssistantWidget />
     </App>
   </ConfigProvider>
 </template>

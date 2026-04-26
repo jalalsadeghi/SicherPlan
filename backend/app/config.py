@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from os import environ, getenv
 from pathlib import Path
 
@@ -165,6 +165,43 @@ class AppSettings:
         60,
     )
     security_rate_limit_report_export_max: int = _get_int("SP_SECURITY_RATE_LIMIT_REPORT_EXPORT_MAX", 20)
+    ai_enabled: bool = field(default_factory=lambda: _get_bool("SP_AI_ENABLED", False))
+    ai_provider: str = field(default_factory=lambda: _get_str("SP_AI_PROVIDER", "mock"))
+    ai_openai_api_key: str = field(default_factory=lambda: _get_str("SP_OPENAI_API_KEY"), repr=False)
+    ai_response_model: str = field(
+        default_factory=lambda: _get_str("SP_AI_RESPONSE_MODEL", "gpt-5.5-or-configured-model")
+    )
+    ai_embedding_model: str = field(
+        default_factory=lambda: _get_str("SP_AI_EMBEDDING_MODEL", "text-embedding-3-small")
+    )
+    ai_store_responses: bool = field(default_factory=lambda: _get_bool("SP_AI_STORE_RESPONSES", False))
+    ai_max_tool_calls: int = field(default_factory=lambda: _get_int("SP_AI_MAX_TOOL_CALLS", 8))
+    ai_max_context_chunks: int = field(default_factory=lambda: _get_int("SP_AI_MAX_CONTEXT_CHUNKS", 8))
+    ai_max_input_chars: int = field(default_factory=lambda: _get_int("SP_AI_MAX_INPUT_CHARS", 12000))
+    ai_timeout_seconds: int = field(default_factory=lambda: _get_int("SP_AI_TIMEOUT_SECONDS", 45))
+    ai_rate_limit_per_user_per_minute: int = field(
+        default_factory=lambda: _get_int("SP_AI_RATE_LIMIT_PER_USER_PER_MINUTE", 10)
+    )
+    ai_rate_limit_per_tenant_per_minute: int = field(
+        default_factory=lambda: _get_int("SP_AI_RATE_LIMIT_PER_TENANT_PER_MINUTE", 100)
+    )
+    ai_redaction_enabled: bool = field(default_factory=lambda: _get_bool("SP_AI_REDACTION_ENABLED", True))
+    ai_audit_enabled: bool = field(default_factory=lambda: _get_bool("SP_AI_AUDIT_ENABLED", True))
+
+    def __post_init__(self) -> None:
+        normalized_provider = self.ai_provider.strip().lower()
+        object.__setattr__(self, "ai_provider", normalized_provider)
+
+        allowed_providers = {"mock", "openai"}
+        if normalized_provider not in allowed_providers:
+            raise ValueError(
+                "Invalid SP_AI_PROVIDER value. Expected one of: mock, openai."
+            )
+
+        if self.ai_enabled and normalized_provider == "openai" and not self.ai_openai_api_key.strip():
+            raise ValueError(
+                "SP_OPENAI_API_KEY is required when SP_AI_ENABLED=true and SP_AI_PROVIDER=openai."
+            )
 
     @property
     def allowed_origins_list(self) -> tuple[str, ...]:

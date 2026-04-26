@@ -84,6 +84,28 @@ class TestSeedIamCatalog(unittest.TestCase):
         self.assertEqual(permission_keys["customers.portal_access.read"], ("customers", "portal_access_read"))
         self.assertEqual(permission_keys["employees.private.write"], ("employees", "private_write"))
         self.assertEqual(permission_keys["portal.customer.access"], ("portal_customer", "access"))
+        self.assertEqual(permission_keys["assistant.chat.access"], ("assistant", "chat_access"))
+        self.assertEqual(permission_keys["assistant.diagnostics.read"], ("assistant", "diagnostics_read"))
+        self.assertEqual(permission_keys["assistant.feedback.write"], ("assistant", "feedback_write"))
+        self.assertEqual(permission_keys["assistant.knowledge.read"], ("assistant", "knowledge_read"))
+        self.assertEqual(permission_keys["assistant.knowledge.reindex"], ("assistant", "knowledge_reindex"))
+        self.assertEqual(permission_keys["assistant.admin"], ("assistant", "admin"))
+
+    def test_seed_includes_all_assistant_permissions(self) -> None:
+        session = _FakeSession()
+        seed_iam_catalog(session)
+
+        permission_keys = {permission.key for permission in session.permissions}
+        self.assertTrue(
+            {
+                "assistant.chat.access",
+                "assistant.diagnostics.read",
+                "assistant.feedback.write",
+                "assistant.knowledge.read",
+                "assistant.knowledge.reindex",
+                "assistant.admin",
+            }.issubset(permission_keys)
+        )
 
     def test_role_catalog_includes_internal_and_portal_roles(self) -> None:
         session = _FakeSession()
@@ -132,6 +154,99 @@ class TestSeedIamCatalog(unittest.TestCase):
                 for row in session.role_permissions
             )
         )
+
+    def test_assistant_chat_access_is_granted_to_internal_and_portal_roles(self) -> None:
+        session = _FakeSession()
+        seed_iam_catalog(session)
+
+        roles = {role.key: role for role in session.roles}
+        permissions = {permission.key: permission for permission in session.permissions}
+        assistant_chat = permissions["assistant.chat.access"]
+
+        for role_key in (
+            "platform_admin",
+            "tenant_admin",
+            "dispatcher",
+            "accounting",
+            "controller_qm",
+            "customer_user",
+            "subcontractor_user",
+            "employee_user",
+        ):
+            role = roles[role_key]
+            self.assertTrue(
+                any(
+                    row.role_id == role.id and row.permission_id == assistant_chat.id
+                    for row in session.role_permissions
+                ),
+                role_key,
+            )
+
+    def test_assistant_diagnostics_read_is_not_granted_to_portal_roles(self) -> None:
+        session = _FakeSession()
+        seed_iam_catalog(session)
+
+        roles = {role.key: role for role in session.roles}
+        permissions = {permission.key: permission for permission in session.permissions}
+        diagnostics_read = permissions["assistant.diagnostics.read"]
+
+        for role_key in ("customer_user", "subcontractor_user", "employee_user"):
+            role = roles[role_key]
+            self.assertFalse(
+                any(
+                    row.role_id == role.id and row.permission_id == diagnostics_read.id
+                    for row in session.role_permissions
+                ),
+                role_key,
+            )
+
+    def test_assistant_reindex_and_admin_are_restricted_to_platform_admin(self) -> None:
+        session = _FakeSession()
+        seed_iam_catalog(session)
+
+        roles = {role.key: role for role in session.roles}
+        permissions = {permission.key: permission for permission in session.permissions}
+        reindex = permissions["assistant.knowledge.reindex"]
+        assistant_admin = permissions["assistant.admin"]
+
+        platform_admin = roles["platform_admin"]
+        self.assertTrue(
+            any(
+                row.role_id == platform_admin.id and row.permission_id == reindex.id
+                for row in session.role_permissions
+            )
+        )
+        self.assertTrue(
+            any(
+                row.role_id == platform_admin.id and row.permission_id == assistant_admin.id
+                for row in session.role_permissions
+            )
+        )
+
+        for role_key in (
+            "tenant_admin",
+            "dispatcher",
+            "accounting",
+            "controller_qm",
+            "customer_user",
+            "subcontractor_user",
+            "employee_user",
+        ):
+            role = roles[role_key]
+            self.assertFalse(
+                any(
+                    row.role_id == role.id and row.permission_id == reindex.id
+                    for row in session.role_permissions
+                ),
+                f"{role_key}:reindex",
+            )
+            self.assertFalse(
+                any(
+                    row.role_id == role.id and row.permission_id == assistant_admin.id
+                    for row in session.role_permissions
+                ),
+                f"{role_key}:admin",
+            )
 
 
 if __name__ == "__main__":

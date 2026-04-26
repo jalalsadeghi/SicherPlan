@@ -313,6 +313,20 @@ class _ScheduleBackend implements MobileBackendGateway {
   }
 }
 
+class _ErrorScheduleBackend extends _ScheduleBackend {
+  _ErrorScheduleBackend() : super(schedules: const []);
+
+  @override
+  Future<List<EmployeeReleasedScheduleItem>> fetchReleasedSchedules(
+    String accessToken,
+  ) async {
+    throw const MobileApiException(
+      statusCode: 500,
+      messageKey: 'errors.platform.internal',
+    );
+  }
+}
+
 Future<MobileSessionController> _buildAuthenticatedController(
   MobileBackendGateway backend,
 ) async {
@@ -333,12 +347,17 @@ Future<MobileSessionController> _buildAuthenticatedController(
 Widget _buildHarness({
   required MobileSessionController controller,
   required MobileBackendGateway backend,
+  DateTime Function()? nowProvider,
 }) {
   return MaterialApp(
     locale: const Locale('de'),
     supportedLocales: AppLocalizations.supportedLocales,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
-    home: ScheduleScreen(controller: controller, backend: backend),
+    home: ScheduleScreen(
+      controller: controller,
+      backend: backend,
+      nowProvider: nowProvider ?? DateTime.now,
+    ),
   );
 }
 
@@ -383,25 +402,76 @@ EmployeeReleasedScheduleItem _schedule({
 Future<void> _pumpSchedule(
   WidgetTester tester, {
   required _ScheduleBackend backend,
+  DateTime Function()? nowProvider,
 }) async {
   final controller = await _buildAuthenticatedController(backend);
   await tester.pumpWidget(
-    _buildHarness(controller: controller, backend: backend),
+    _buildHarness(
+      controller: controller,
+      backend: backend,
+      nowProvider: nowProvider,
+    ),
   );
   await tester.pumpAndSettle();
 }
 
 void main() {
-  testWidgets('schedule shows empty state when no released shifts exist', (
-    tester,
-  ) async {
-    final backend = _ScheduleBackend(schedules: const []);
+  DateTime fixedNow() => DateTime(2026, 4, 8, 10);
 
-    await _pumpSchedule(tester, backend: backend);
+  testWidgets(
+    'schedule keeps the calendar visible when no released shifts exist',
+    (tester) async {
+      final backend = _ScheduleBackend(schedules: const []);
 
-    expect(find.text('Keine freigegebenen Schichten'), findsOneWidget);
-    expect(find.byKey(const ValueKey('schedule-week-list')), findsNothing);
-  });
+      await _pumpSchedule(tester, backend: backend, nowProvider: fixedNow);
+
+      expect(find.text('Keine freigegebenen Schichten'), findsOneWidget);
+      expect(find.byKey(const ValueKey('schedule-week-list')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('schedule-week-section-2026-04-06')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('schedule-day-empty-2026-04-06')),
+        findsOneWidget,
+      );
+      expect(find.text('Keine Schicht'), findsWidgets);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('schedule-week-section-2026-06-29')),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('schedule-week-section-2026-06-29')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'schedule keeps the calendar visible when schedule loading fails',
+    (tester) async {
+      final backend = _ErrorScheduleBackend();
+      final controller = await _buildAuthenticatedController(backend);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          controller: controller,
+          backend: backend,
+          nowProvider: fixedNow,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Plan konnte nicht geladen werden'), findsOneWidget);
+      expect(find.byKey(const ValueKey('schedule-week-list')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('schedule-week-section-2026-04-06')),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'schedule renders a week-by-week vertical list instead of the old month grid',
@@ -423,7 +493,7 @@ void main() {
         ],
       );
 
-      await _pumpSchedule(tester, backend: backend);
+      await _pumpSchedule(tester, backend: backend, nowProvider: fixedNow);
 
       expect(find.byKey(const ValueKey('schedule-week-list')), findsOneWidget);
       expect(
@@ -462,7 +532,7 @@ void main() {
         ],
       );
 
-      await _pumpSchedule(tester, backend: backend);
+      await _pumpSchedule(tester, backend: backend, nowProvider: fixedNow);
 
       expect(
         find.byKey(const ValueKey('schedule-day-2026-04-02')),
@@ -502,7 +572,7 @@ void main() {
       ],
     );
 
-    await _pumpSchedule(tester, backend: backend);
+    await _pumpSchedule(tester, backend: backend, nowProvider: fixedNow);
 
     final firstY = tester
         .getTopLeft(
@@ -538,7 +608,7 @@ void main() {
       ],
     );
 
-    await _pumpSchedule(tester, backend: backend);
+    await _pumpSchedule(tester, backend: backend, nowProvider: fixedNow);
 
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('schedule-shift-late')),
@@ -564,7 +634,13 @@ void main() {
       ],
     );
 
-    await _pumpSchedule(tester, backend: backend);
+    await _pumpSchedule(tester, backend: backend, nowProvider: fixedNow);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('schedule-shift-a')),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('schedule-shift-a')));
     await tester.pumpAndSettle();
 
@@ -592,7 +668,13 @@ void main() {
         ],
       );
 
-      await _pumpSchedule(tester, backend: backend);
+      await _pumpSchedule(tester, backend: backend, nowProvider: fixedNow);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('schedule-shift-a')),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('schedule-shift-a')));
       await tester.pumpAndSettle();
       final dialogScroll = find.descendant(
@@ -632,9 +714,15 @@ void main() {
         ],
       );
 
-      await _pumpSchedule(tester, backend: backend);
+      await _pumpSchedule(tester, backend: backend, nowProvider: fixedNow);
       expect(backend.fetchReleasedSchedulesCalls, 1);
 
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('schedule-shift-a')),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('schedule-shift-a')));
       await tester.pumpAndSettle();
       final dialogScroll = find.descendant(
@@ -659,6 +747,12 @@ void main() {
       expect(backend.respondCalls, [('a', 'confirm')]);
       expect(backend.fetchReleasedSchedulesCalls, greaterThanOrEqualTo(2));
 
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('schedule-shift-a')),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('schedule-shift-a')));
       await tester.pumpAndSettle();
       final declineButton = find
@@ -698,7 +792,7 @@ void main() {
         ],
       );
 
-      await _pumpSchedule(tester, backend: backend);
+      await _pumpSchedule(tester, backend: backend, nowProvider: fixedNow);
 
       expect(find.byKey(const ValueKey('schedule-week-list')), findsOneWidget);
       expect(
