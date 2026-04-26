@@ -1,0 +1,33 @@
+"""Typed grounding context for provider-bound assistant requests."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from app.modules.assistant.schemas import AssistantMissingPermission
+
+
+class AssistantGroundingSource(BaseModel):
+    source_type: str
+    source_name: str | None = None
+    page_id: str | None = None
+    module_key: str | None = None
+    title: str | None = None
+    content: str | None = None
+    facts: dict[str, Any] = Field(default_factory=dict)
+    relevance_score: float | None = None
+    verified: bool = False
+    permission_checked: bool = False
+
+
+class AssistantGroundingContext(BaseModel):
+    detected_language: str
+    response_language: str
+    route_context: dict[str, Any] | None = None
+    auth_summary: dict[str, Any]
+    retrieval_plan: dict[str, Any]
+    sources: list[AssistantGroundingSource] = Field(default_factory=list)
+    missing_context: list[str] = Field(default_factory=list)
+    missing_permissions: list[AssistantMissingPermission] = Field(default_factory=list)

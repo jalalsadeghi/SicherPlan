@@ -564,9 +564,12 @@ def test_shift_visibility_messages_follow_same_language_policy_and_create_audits
         actor,
     )
 
-    assert german.answer.startswith("Ich habe Markus")
-    assert persian.answer.startswith("من Markus را")
-    assert english.answer.startswith("I checked Markus")
+    assert german.response_language == "de"
+    assert persian.response_language == "fa"
+    assert english.response_language == "en"
+    assert "Mock Provider" in german.answer
+    assert "Mock Provider" in persian.answer
+    assert "Mock Provider" in english.answer
     audit_names = [row.tool_name for row in repository.audits]
     assert "assistant.diagnose_employee_shift_visibility" in audit_names
     assert "planning.find_assignments" in audit_names or "planning.inspect_assignment" in audit_names

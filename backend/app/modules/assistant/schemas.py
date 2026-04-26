@@ -326,6 +326,30 @@ class AssistantFindUiActionRead(BaseModel):
     safe_note: str | None = None
 
 
+class AssistantGroundingFactRead(BaseModel):
+    kind: str
+    code: str
+    title: str
+    detail: str
+    page_id: str | None = None
+    action_key: str | None = None
+    verified: bool = True
+
+
+class AssistantWorkflowHelpInput(BaseModel):
+    intent: str = Field(min_length=1, max_length=120)
+    language_code: str | None = Field(default=None, max_length=16)
+
+
+class AssistantWorkflowHelpRead(BaseModel):
+    intent: str
+    title: str
+    facts: list[AssistantGroundingFactRead] = Field(default_factory=list)
+    allowed_links: list[AssistantNavigationLink] = Field(default_factory=list)
+    missing_permissions: list[AssistantMissingPermission] = Field(default_factory=list)
+    safe_note: str | None = None
+
+
 class AssistantNavigationEntityContextInput(BaseModel):
     employee_id: str | None = None
     shift_id: str | None = None

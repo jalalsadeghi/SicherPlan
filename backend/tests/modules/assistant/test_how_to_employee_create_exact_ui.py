@@ -6,7 +6,7 @@ from uuid import uuid4
 from app.modules.assistant.models import AssistantPageHelpManifest, AssistantPageRouteCatalog
 from app.modules.assistant.page_catalog_seed import ASSISTANT_PAGE_ROUTE_SEEDS
 from app.modules.assistant.page_help_seed import ASSISTANT_PAGE_HELP_SEEDS
-from app.modules.assistant.provider import MockAssistantProvider
+from app.modules.assistant.provider import AssistantProviderRequest, AssistantProviderResult, mock_provider_answer
 from app.modules.assistant.schemas import AssistantClientContextInput, AssistantMessageCreate
 from app.modules.assistant.service import AssistantRuntimeConfig, AssistantService
 from app.modules.assistant.tools import build_default_tool_registry
@@ -48,6 +48,30 @@ class _PageHelpRepository(InMemoryAssistantRepository):
         return None
 
 
+class _GroundedCapturingProvider:
+    def __init__(self, answer: str = "Grounded answer") -> None:
+        self.answer = answer
+        self.requests: list[AssistantProviderRequest] = []
+        self.call_count = 0
+
+    def generate(self, request: AssistantProviderRequest) -> AssistantProviderResult:
+        self.requests.append(request)
+        self.call_count += 1
+        return AssistantProviderResult(
+            final_response={
+                "answer": self.answer,
+                "confidence": "high",
+                "out_of_scope": False,
+                "diagnosis": [],
+                "links": [],
+                "missing_permissions": [],
+                "next_steps": [],
+                "tool_trace_id": None,
+            },
+            raw_text=self.answer,
+        )
+
+
 def _repository() -> _PageHelpRepository:
     repository = _PageHelpRepository()
     repository.page_help_rows = [
@@ -86,9 +110,9 @@ def _repository() -> _PageHelpRepository:
     return repository
 
 
-def _service(repository: _PageHelpRepository, provider: MockAssistantProvider) -> AssistantService:
+def _service(repository: _PageHelpRepository, provider, *, provider_mode: str = "mock") -> AssistantService:
     return AssistantService(
-        runtime_config=AssistantRuntimeConfig(enabled=True, provider_mode="mock", max_input_chars=500),
+        runtime_config=AssistantRuntimeConfig(enabled=True, provider_mode=provider_mode, max_input_chars=500),
         repository=repository,
         provider=provider,
         tool_registry=build_default_tool_registry(
@@ -111,9 +135,9 @@ def _context(*permissions: str) -> RequestAuthorizationContext:
     )
 
 
-def test_verified_employee_create_guidance_uses_exact_label_and_skips_provider() -> None:
+def test_persian_employee_create_goes_to_provider_with_verified_ui_facts() -> None:
     repository = _repository()
-    provider = MockAssistantProvider()
+    provider = _GroundedCapturingProvider(answer="پاسخ نهایی از مدل")
     conversation = repository.create_conversation(
         tenant_id="tenant-1",
         user_id="assistant-user-1",
@@ -126,46 +150,29 @@ def test_verified_employee_create_guidance_uses_exact_label_and_skips_provider()
     response = _service(repository, provider).add_message(
         conversation.id,
         AssistantMessageCreate(
-            message="چطور یک Employee جدید ثبت کنم؟",
+            message="چطور میتونم یک کارمند جدید بسازم؟",
             client_context=AssistantClientContextInput(ui_locale="fa"),
         ),
         _context("assistant.chat.access", "employees.employee.read", "employees.employee.write"),
     )
 
     assert response.out_of_scope is False
-    assert "Create employee file" in response.answer
-    assert "Create Employee or New Employee" not in response.answer
-    assert provider.call_count == 0
-
-
-def test_missing_permission_returns_safe_limitation_without_guessing() -> None:
-    repository = _repository()
-    provider = MockAssistantProvider()
-    conversation = repository.create_conversation(
-        tenant_id="tenant-1",
-        user_id="assistant-user-1",
-        title=None,
-        locale="de",
-        last_route_name=None,
-        last_route_path=None,
+    assert response.answer == "پاسخ نهایی از مدل"
+    assert provider.call_count == 1
+    assert provider.requests[0].grounding_context is not None
+    assert provider.requests[0].grounding_context["retrieval_plan"]["intent_category"] == "ui_action_question"
+    assert any(item["tool_name"] == "assistant.find_ui_action" for item in provider.requests[0].tool_results)
+    page_help_summary = next(item for item in provider.requests[0].tool_results if item["tool_name"] == "assistant.find_ui_action")
+    assert page_help_summary["summary"]["data"]["action"]["label"] == "Create employee file"
+    assert any(
+        source["source_type"] == "ui_action" and source["page_id"] == "E-01"
+        for source in provider.requests[0].grounding_context["sources"]
     )
 
-    response = _service(repository, provider).add_message(
-        conversation.id,
-        AssistantMessageCreate(message="Wie lege ich einen neuen Employee an?"),
-        _context("assistant.chat.access", "employees.employee.read"),
-    )
 
-    assert response.out_of_scope is False
-    assert "employees.employee.write" in response.answer
-    assert "Create Employee or New Employee" not in response.answer
-    assert provider.call_count == 0
-
-
-def test_unverified_page_help_returns_safe_uncertainty_instead_of_guessed_label() -> None:
+def test_provider_receives_page_help_facts_not_canned_answer() -> None:
     repository = _repository()
-    repository.page_help_rows = []
-    provider = MockAssistantProvider()
+    provider = _GroundedCapturingProvider(answer="Grounded employee guidance")
     conversation = repository.create_conversation(
         tenant_id="tenant-1",
         user_id="assistant-user-1",
@@ -181,7 +188,68 @@ def test_unverified_page_help_returns_safe_uncertainty_instead_of_guessed_label(
         _context("assistant.chat.access", "employees.employee.read", "employees.employee.write"),
     )
 
-    assert response.out_of_scope is False
-    assert "not confirmed" in response.answer
+    assert response.answer == "Grounded employee guidance"
     assert "Create Employee or New Employee" not in response.answer
-    assert provider.call_count == 0
+    assert response.answer != mock_provider_answer(response.response_language)
+    assert provider.call_count == 1
+    assert provider.requests[0].tool_results
+    assert provider.requests[0].grounding_context is not None
+
+
+def test_english_order_create_does_not_return_mock_when_openai_configured() -> None:
+    repository = _repository()
+    provider = _GroundedCapturingProvider(answer="To create a new order, start in Orders & Planning Records.")
+    conversation = repository.create_conversation(
+        tenant_id="tenant-1",
+        user_id="assistant-user-1",
+        title=None,
+        locale="en",
+        last_route_name=None,
+        last_route_path=None,
+    )
+
+    response = _service(repository, provider, provider_mode="openai").add_message(
+        conversation.id,
+        AssistantMessageCreate(message="I want to create a new order. how can I do?"),
+        _context("assistant.chat.access", "planning.order.read", "planning.record.read"),
+    )
+
+    assert response.out_of_scope is False
+    assert response.answer.startswith("To create a new order")
+    assert response.answer != mock_provider_answer(response.response_language)
+    assert provider.call_count == 1
+    assert any(item["tool_name"] == "assistant.search_workflow_help" for item in provider.requests[0].tool_results)
+    assert provider.requests[0].grounding_context is not None
+    assert provider.requests[0].grounding_context["retrieval_plan"]["workflow_intent"] == "order_create"
+    assert "P-02" in provider.requests[0].grounding_context["retrieval_plan"]["likely_page_ids"]
+
+
+def test_in_scope_page_without_verified_ui_action_stays_grounded_and_unverified() -> None:
+    repository = _repository()
+    provider = _GroundedCapturingProvider(
+        answer="The documented order workflow is available, but the exact current UI button label is not verified."
+    )
+    conversation = repository.create_conversation(
+        tenant_id="tenant-1",
+        user_id="assistant-user-1",
+        title=None,
+        locale="en",
+        last_route_name=None,
+        last_route_path=None,
+    )
+
+    response = _service(repository, provider, provider_mode="openai").add_message(
+        conversation.id,
+        AssistantMessageCreate(message="I want to create a new order. Tell me the exact button."),
+        _context("assistant.chat.access", "planning.order.read", "planning.record.read"),
+    )
+
+    assert response.out_of_scope is False
+    assert "not verified" in response.answer
+    assert provider.requests[0].grounding_context is not None
+    assert any(
+        source["source_type"] == "page_help_manifest"
+        and source["page_id"] == "P-02"
+        and source["verified"] is False
+        for source in provider.requests[0].grounding_context["sources"]
+    )

@@ -332,6 +332,7 @@ def build_default_tool_registry(
         InspectShiftVisibilityTool,
     )
     from app.modules.assistant.tools.user_tools import GetCurrentUserCapabilitiesTool
+    from app.modules.assistant.tools.workflow_help_tools import SearchWorkflowHelpTool
     from app.modules.planning.released_schedule_service import ReleasedScheduleService
     from app.modules.planning.validation_service import PlanningValidationService
 
@@ -344,6 +345,7 @@ def build_default_tool_registry(
     if page_catalog_repository is not None:
         registry.register(SearchAccessiblePagesTool(repository=page_catalog_repository))
         registry.register(BuildAllowedLinkTool(repository=page_catalog_repository))
+        registry.register(SearchWorkflowHelpTool(repository=page_catalog_repository))
     if employee_repository is not None:
         registry.register(SearchEmployeeByNameTool(repository=employee_repository))
         registry.register(GetEmployeeOperationalProfileTool(repository=employee_repository))

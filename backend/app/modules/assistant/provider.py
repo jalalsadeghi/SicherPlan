@@ -27,6 +27,8 @@ class AssistantProviderRequest:
     route_context: dict[str, Any] | None = None
     recent_messages: list[dict[str, Any]] = field(default_factory=list)
     knowledge_chunks: list[dict[str, Any]] = field(default_factory=list)
+    grounding_context: dict[str, Any] | None = None
+    tool_results: list[dict[str, Any]] = field(default_factory=list)
     available_tools: list[dict[str, Any]] = field(default_factory=list)
     max_tool_calls: int = 0
     max_input_chars: int = 12000
@@ -84,9 +86,8 @@ _MOCK_GERMAN = (
     "und der Backend-Tools erzeugt."
 )
 _MOCK_ENGLISH = (
-    "This is a test response from the Mock Provider for SicherPlan. "
-    "In the real version, the answer will be generated using documentation, user permissions, "
-    "and backend tools."
+    "[MOCK RAG] This response was generated in mock mode by the Mock Provider using grounded SicherPlan context. "
+    "Real provider mode will generate the final expert answer from the same facts."
 )
 
 
@@ -105,7 +106,10 @@ class MockAssistantProvider:
             raise self.raise_error
 
         started = perf_counter()
-        answer = _mock_answer(request.response_language)
+        answer = _mock_answer(
+            request.response_language,
+            grounding_context=request.grounding_context,
+        )
         diagnosis_finding, diagnosis_evidence = placeholder_diagnosis(request.response_language)
         duration_ms = max(int((perf_counter() - started) * 1000), 0)
         return AssistantProviderResult(
@@ -163,13 +167,46 @@ def build_assistant_provider(
     raise AssistantProviderConfigurationError("Unsupported assistant provider mode.")
 
 
-def _mock_answer(response_language: str) -> str:
+def _mock_answer(
+    response_language: str,
+    *,
+    grounding_context: dict[str, Any] | None = None,
+) -> str:
+    source_hint = _mock_source_hint(grounding_context)
     if response_language == "fa":
-        return _MOCK_PERSIAN
+        return f"[MOCK RAG] {source_hint} {_MOCK_PERSIAN}".strip()
     if response_language == "de":
-        return _MOCK_GERMAN
-    return _MOCK_ENGLISH
+        return f"[MOCK RAG] {source_hint} {_MOCK_GERMAN}".strip()
+    return f"{_MOCK_ENGLISH} {source_hint}".strip()
 
 
-def mock_provider_answer(response_language: str) -> str:
-    return _mock_answer(response_language)
+def _mock_source_hint(grounding_context: dict[str, Any] | None) -> str:
+    if not grounding_context:
+        return "No grounding sources were attached."
+    sources = grounding_context.get("sources")
+    if not isinstance(sources, list) or not sources:
+        return "No grounding sources were attached."
+    source_labels: list[str] = []
+    for item in sources[:4]:
+        if not isinstance(item, dict):
+            continue
+        page_id = str(item.get("page_id") or "").strip()
+        source_type = str(item.get("source_type") or "").strip()
+        title = str(item.get("title") or "").strip()
+        if page_id:
+            source_labels.append(page_id)
+        elif title:
+            source_labels.append(title)
+        elif source_type:
+            source_labels.append(source_type)
+    if not source_labels:
+        return "Grounding sources were attached."
+    return "Grounding sources: " + ", ".join(source_labels) + "."
+
+
+def mock_provider_answer(
+    response_language: str,
+    *,
+    grounding_context: dict[str, Any] | None = None,
+) -> str:
+    return _mock_answer(response_language, grounding_context=grounding_context)

@@ -7,6 +7,7 @@ import json
 import re
 from typing import Any
 
+from app.modules.assistant.grounding import AssistantGroundingContext
 from app.modules.assistant.schemas import AssistantKnowledgeChunkResult
 from app.modules.iam.authz import RequestAuthorizationContext
 
@@ -129,6 +130,7 @@ def build_assistant_prompt(
     knowledge_chunks: list[AssistantKnowledgeChunkResult],
     available_tools: list[AssistantToolDefinition],
     conversation_messages: list[AssistantMessageContext],
+    grounding_context: AssistantGroundingContext | None = None,
     tool_results: list[AssistantToolResultSummary] | None = None,
     max_context_chunks: int = 8,
     max_input_chars: int = 12000,
@@ -154,6 +156,7 @@ def build_assistant_prompt(
             _build_language_policy_section(detected_language, response_language),
             _build_auth_context_section(auth_context),
             _build_route_context_section(route_context),
+            _build_grounding_context_section(grounding_context),
             _build_tool_policy_section(available_tools),
             _build_tool_result_section(tool_results),
             _build_knowledge_section(
@@ -191,6 +194,7 @@ def build_language_instruction(response_language: str) -> str:
         ),
         route_context=None,
         knowledge_chunks=[],
+        grounding_context=None,
         available_tools=[],
         conversation_messages=[],
     )
@@ -236,7 +240,11 @@ def _build_security_policy_section(policy_version: str) -> str:
         "- You must not perform write actions.\n"
         "- For operational diagnostic questions, use available backend tools before giving a definitive answer.\n"
         "- For UI how-to questions, do not invent button names, tab names, field labels, menu labels, or click paths.\n"
-        "- Use verified page-help and UI-action tool output only for exact UI instructions.\n"
+        "- Use verified page-help, workflow-help, diagnostics, route catalog, and knowledge retrieval as grounded facts only.\n"
+        "- Use verified page-help and UI-action tool output only for exact UI labels and exact button guidance.\n"
+        "- You must produce the final answer yourself using grounded facts; do not treat page-help or workflow facts as canned prose to repeat verbatim.\n"
+        "- Use the grounding context package as the source of truth for page names, routes, UI actions, workflow dependencies, and diagnostics.\n"
+        "- If exact UI labels are unavailable in grounding context, state that the exact label is not verified.\n"
         "- If no verified UI action is available, say clearly that the exact current UI label cannot be confirmed.\n"
         "- Never offer guessed alternatives such as 'Create Employee or New Employee' unless both labels were explicitly returned by backend tools.\n"
         "- If tools are missing or permissions are insufficient, explain the limitation safely.\n"
@@ -305,12 +313,21 @@ def _build_tool_policy_section(available_tools: list[AssistantToolDefinition]) -
         "- Write actions are not available.\n"
         "- Tool outputs are already permission-filtered.\n"
         "- If no tool is available, explain limitations rather than inventing data.\n"
+        "- Use tool outputs, diagnostics, page-help manifests, workflow manifests, and knowledge chunks as evidence for your own answer.\n"
         "- Exact UI action instructions may be given only when verified page-help tools return them.\n"
         "- If verified UI metadata is missing, explain the workflow generally and state that the exact label is unconfirmed.\n"
+        "- Preserve product terms such as Employee, Shift Plan, Assignment, Release, and Staffing Board when that is clearer than translating them.\n"
         "- Never ask the user to run SQL.\n"
         "- Never fabricate database findings.\n"
         f"{_json_block({'available_tools': tools_payload})}"
     )
+
+
+def _build_grounding_context_section(grounding_context: AssistantGroundingContext | None) -> str:
+    if grounding_context is None:
+        return "Grounding context\n- grounding_sources: []"
+    payload = grounding_context.model_dump(mode="json")
+    return "Grounding context\n" + _json_block(redact_prompt_value(payload))
 
 
 def _build_tool_result_section(tool_results: list[AssistantToolResultSummary] | None) -> str:
@@ -355,6 +372,7 @@ def _build_structured_response_section() -> str:
         "Structured response contract\n"
         "- The backend wraps your result into the final assistant response schema.\n"
         "- Your structured output must include: answer, confidence, out_of_scope, diagnosis, links, missing_permissions, next_steps, tool_trace_id.\n"
+        "- The answer must be your own final explanation synthesized from grounded facts.\n"
         "- Keep diagnosis, links, permission limitations, and next steps in the same response language.\n"
         "- Do not include raw embeddings, raw tool payloads, secrets, or unrestricted records."
     )

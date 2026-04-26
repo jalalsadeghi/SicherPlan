@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from app.modules.assistant.workflow_help import detect_workflow_intent
+
 
 class AssistantIntentCategory(str, Enum):
     PLATFORM_RELATED = "platform_related"
@@ -38,7 +40,11 @@ _PLATFORM_KEYWORDS = {
     "shift",
     "shift plan",
     "assignment",
+    "assign",
+    "assgin",
     "planning",
+    "order",
+    "project",
     "staffing",
     "dispatch",
     "release",
@@ -72,6 +78,7 @@ _PLATFORM_KEYWORDS = {
     "schicht",
     "dienstplan",
     "einsatz",
+    "auftrag",
     "freigabe",
     "berechtigung",
     "kunde",
@@ -82,8 +89,14 @@ _PLATFORM_KEYWORDS = {
     "dokument",
     "پلتفرم",
     "کارمند",
+    "سفارش",
+    "پروژه",
     "شیفت",
     "برنامه",
+    "اختصاص",
+    "تخصیص",
+    "نسبت",
+    "نصبت",
     "دسترسی",
     "مشتری",
     "پیمانکار",
@@ -225,6 +238,17 @@ def classify_assistant_message(
             is_out_of_scope=True,
             is_unsafe=True,
             reason=_unsafe_reason(lowered, route_blob),
+            confidence="high",
+        )
+
+    workflow_intent = detect_workflow_intent(cleaned)
+    if workflow_intent is not None:
+        return AssistantClassificationResult(
+            category=AssistantIntentCategory.PLATFORM_RELATED,
+            is_platform_related=True,
+            is_out_of_scope=False,
+            is_unsafe=False,
+            reason=f"workflow_intent:{workflow_intent.intent}",
             confidence="high",
         )
 

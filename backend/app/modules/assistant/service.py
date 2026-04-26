@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import Any, Protocol
 
 from app.errors import ApiException
@@ -11,8 +12,8 @@ from app.modules.assistant.diagnostics import (
     DIAGNOSTIC_TOOL_NAME,
     extract_shift_visibility_input,
     is_shift_visibility_question,
-    render_shift_visibility_answer,
 )
+from app.modules.assistant.grounding import AssistantGroundingContext, AssistantGroundingSource
 from app.modules.assistant.knowledge.retriever import AssistantKnowledgeRetriever
 from app.modules.assistant.language import (
     choose_response_language,
@@ -23,24 +24,22 @@ from app.modules.assistant.language import (
 )
 from app.modules.assistant.page_help import (
     detect_ui_howto_intent,
-    missing_ui_action_permission_message,
-    no_verified_ui_label_message,
-    render_verified_employee_create_answer,
-    verified_ui_action_evidence,
-    verified_ui_action_finding,
 )
 from app.modules.assistant.prompt_builder import (
     AssistantMessageContext,
     AssistantToolDefinition as PromptToolDefinition,
+    AssistantToolResultSummary,
     build_assistant_prompt,
     summarize_auth_context,
 )
+from app.modules.assistant.retrieval_planner import build_retrieval_plan
 from app.modules.assistant.models import AssistantConversation, AssistantMessage
 from app.modules.assistant.provider import (
     AssistantProvider,
     AssistantProviderConfigurationError,
     AssistantProviderRequest,
     AssistantProviderRateLimitError,
+    AssistantProviderResult,
     AssistantProviderStructuredOutputError,
     AssistantProviderTimeoutError,
     AssistantProviderUnavailableError,
@@ -59,20 +58,19 @@ from app.modules.assistant.schemas import (
     AssistantConfidence,
     AssistantConversationCreate,
     AssistantConversationRead,
-    AssistantDiagnosisItem,
-    AssistantDiagnosisSeverity,
     AssistantFeedbackCreate,
     AssistantFeedbackRead,
     AssistantKnowledgeChunkResult,
     AssistantMessageCreate,
     AssistantPageHelpManifestRead,
     AssistantProviderStructuredOutput,
-    AssistantShiftVisibilityDiagnosticRead,
     AssistantStructuredResponse,
     AssistantRouteContextInput,
     AssistantScope,
+    AssistantMissingPermission,
 )
 from app.modules.assistant.tools import AssistantToolExecutionContext, AssistantToolRegistry
+from app.modules.assistant.workflow_help import detect_workflow_intent
 from app.modules.iam.authz import RequestAuthorizationContext
 
 
@@ -357,44 +355,31 @@ class AssistantService:
             assistant_answer = self._build_assistant_answer(response_language, classification)
             assistant_result_payload = self._build_refusal_provider_payload(classification, assistant_answer)
         else:
-            ui_help_payload = self._run_ui_howto_if_applicable(
+            grounding_context, initial_tool_results = self._build_grounding_context(
                 conversation=conversation,
                 cleaned_message=cleaned_message,
+                route_context=route_context,
+                detected_language=detected_language,
                 response_language=response_language,
                 actor=actor,
             )
-            if ui_help_payload is not None:
-                assistant_result_payload = ui_help_payload
-                assistant_answer = str(assistant_result_payload.get("answer", "")).strip()
-            else:
-                diagnostic_payload = self._run_shift_visibility_diagnostic_if_applicable(
-                    conversation=conversation,
-                    cleaned_message=cleaned_message,
-                    route_context=route_context,
-                    detected_language=detected_language,
-                    response_language=response_language,
-                    actor=actor,
+            assistant_result_payload = self._generate_in_scope_response(
+                conversation=conversation,
+                cleaned_message=cleaned_message,
+                route_context=route_context,
+                detected_language=detected_language,
+                response_language=response_language,
+                actor=actor,
+                grounding_context=grounding_context,
+                initial_tool_results=initial_tool_results,
+            )
+            assistant_answer = str(assistant_result_payload.get("answer", "")).strip()
+            if not assistant_answer:
+                raise ApiException(
+                    502,
+                    "assistant.provider.invalid_response",
+                    "errors.assistant.provider.invalid_response",
                 )
-                if diagnostic_payload is not None:
-                    assistant_result_payload = diagnostic_payload
-                    assistant_answer = str(assistant_result_payload.get("answer", "")).strip()
-                else:
-                    provider_request = self._build_provider_request(
-                        conversation=conversation,
-                        cleaned_message=cleaned_message,
-                        route_context=route_context,
-                        detected_language=detected_language,
-                        response_language=response_language,
-                        actor=actor,
-                    )
-                    assistant_result_payload = self._call_provider(provider_request)
-                    assistant_answer = str(assistant_result_payload.get("answer", "")).strip()
-                    if not assistant_answer:
-                        raise ApiException(
-                            502,
-                            "assistant.provider.invalid_response",
-                            "errors.assistant.provider.invalid_response",
-                        )
 
         assistant_message = AssistantMessage(
             conversation_id=conversation.id,
@@ -629,6 +614,253 @@ class AssistantService:
             return out_of_scope_refusal(response_language)
         raise RuntimeError("In-scope answers must be provided by the assistant provider.")
 
+    def _build_grounding_context(
+        self,
+        *,
+        conversation: AssistantConversation,
+        cleaned_message: str,
+        route_context: dict[str, Any] | None,
+        detected_language: str,
+        response_language: str,
+        actor: RequestAuthorizationContext,
+    ) -> tuple[AssistantGroundingContext, list[AssistantToolResultSummary]]:
+        plan = build_retrieval_plan(message=cleaned_message, route_context=route_context)
+        auth_summary = summarize_auth_context(actor)
+        knowledge_chunks = self._retrieve_knowledge_chunks(
+            query=cleaned_message,
+            response_language=response_language,
+            route_context=route_context,
+            actor=actor,
+            planned_page_ids=list(plan.likely_page_ids),
+            planned_module_keys=list(plan.likely_module_keys),
+        )
+
+        sources: list[AssistantGroundingSource] = []
+        missing_context: list[str] = []
+        if route_context:
+            sources.append(
+                AssistantGroundingSource(
+                    source_type="current_route",
+                    source_name="current_route",
+                    page_id=route_context.get("page_id"),
+                    module_key=str(route_context.get("page_id") or "")[:1] or None,
+                    title=route_context.get("route_name"),
+                    content=route_context.get("path"),
+                    facts=route_context,
+                    relevance_score=1.0,
+                    verified=False,
+                    permission_checked=True,
+                )
+            )
+
+        for chunk in knowledge_chunks:
+            sources.append(
+                AssistantGroundingSource(
+                    source_type="knowledge_chunk",
+                    source_name=chunk.source_name,
+                    page_id=chunk.page_id,
+                    module_key=chunk.module_key,
+                    title=chunk.title,
+                    content=chunk.content,
+                    facts={
+                        "rank": chunk.rank,
+                        "matched_by": chunk.matched_by,
+                        "source_type": chunk.source_type,
+                    },
+                    relevance_score=chunk.score,
+                    verified=True,
+                    permission_checked=True,
+                )
+            )
+        if "knowledge_chunks" in plan.required_sources and not knowledge_chunks:
+            missing_context.append("knowledge_chunks")
+
+        summaries: list[AssistantToolResultSummary] = []
+        if self.tool_registry is not None:
+            workflow_intent = detect_workflow_intent(cleaned_message)
+            ui_intent = detect_ui_howto_intent(cleaned_message)
+
+            if workflow_intent is not None:
+                workflow_result = self.execute_registered_tool(
+                    tool_name="assistant.search_workflow_help",
+                    input_data={
+                        "intent": workflow_intent.intent,
+                        "language_code": response_language,
+                    },
+                    actor=actor,
+                    conversation_id=conversation.id,
+                )
+                summaries.append(self._tool_result_to_summary(workflow_result))
+                sources.extend(self._grounding_sources_from_tool_result("workflow", workflow_result))
+
+            if ui_intent is not None:
+                ui_result = self.execute_registered_tool(
+                    tool_name="assistant.find_ui_action",
+                    input_data={
+                        "intent": ui_intent.intent,
+                        "page_id": ui_intent.page_id,
+                        "language_code": response_language,
+                    },
+                    actor=actor,
+                    conversation_id=conversation.id,
+                )
+                summaries.append(self._tool_result_to_summary(ui_result))
+                sources.extend(self._grounding_sources_from_tool_result("ui_action", ui_result))
+
+            for page_id in plan.likely_page_ids[:4]:
+                page_result = self.execute_registered_tool(
+                    tool_name="assistant.search_accessible_pages",
+                    input_data={"page_id": page_id, "limit": 1},
+                    actor=actor,
+                    conversation_id=conversation.id,
+                )
+                summaries.append(self._tool_result_to_summary(page_result))
+                sources.extend(self._grounding_sources_from_tool_result("page_route", page_result))
+
+                page_help_result = self.execute_registered_tool(
+                    tool_name="assistant.get_page_help_manifest",
+                    input_data={"page_id": page_id, "language_code": response_language},
+                    actor=actor,
+                    conversation_id=conversation.id,
+                )
+                summaries.append(self._tool_result_to_summary(page_help_result))
+                sources.extend(self._grounding_sources_from_tool_result("page_help_manifest", page_help_result))
+
+            if is_shift_visibility_question(cleaned_message, route_context):
+                diagnostic_input = extract_shift_visibility_input(
+                    message=cleaned_message,
+                    detected_language=detected_language,
+                    route_context=route_context,
+                )
+                diagnostic_result = self.execute_registered_tool(
+                    tool_name=DIAGNOSTIC_TOOL_NAME,
+                    input_data=diagnostic_input.model_dump(mode="json", exclude_none=True),
+                    actor=actor,
+                    conversation_id=conversation.id,
+                )
+                summaries.append(self._tool_result_to_summary(diagnostic_result))
+                sources.extend(self._grounding_sources_from_tool_result("diagnostic", diagnostic_result))
+
+        grounding_context = AssistantGroundingContext(
+            detected_language=detected_language,
+            response_language=response_language,
+            route_context=route_context,
+            auth_summary={
+                "tenant_scope": auth_summary.tenant_scope,
+                "scope_kind": auth_summary.scope_kind,
+                "current_user_type": auth_summary.current_user_type,
+                "role_keys": auth_summary.role_keys,
+                "permission_keys": auth_summary.permission_keys,
+            },
+            retrieval_plan=plan.to_dict(),
+            sources=sources[:20],
+            missing_context=missing_context,
+            missing_permissions=self._collect_missing_permissions_from_summaries(summaries),
+        )
+        return grounding_context, summaries
+
+    def _generate_in_scope_response(
+        self,
+        *,
+        conversation: AssistantConversation,
+        cleaned_message: str,
+        route_context: dict[str, Any] | None,
+        detected_language: str,
+        response_language: str,
+        actor: RequestAuthorizationContext,
+        grounding_context: AssistantGroundingContext,
+        initial_tool_results: list[AssistantToolResultSummary],
+    ) -> dict[str, Any]:
+        tool_results = list(initial_tool_results)
+        remaining_tool_calls = max(self.runtime_config.max_tool_calls, 0)
+        request = self._build_provider_request(
+            conversation=conversation,
+            cleaned_message=cleaned_message,
+            route_context=route_context,
+            detected_language=detected_language,
+            response_language=response_language,
+            actor=actor,
+            grounding_context=grounding_context,
+            tool_results=tool_results,
+        )
+
+        while True:
+            provider_result = self._call_provider(request)
+            requested_tool_calls = provider_result.requested_tool_calls or []
+            if not requested_tool_calls:
+                return self._merge_provider_payload_with_tool_results(
+                    provider_result.final_response,
+                    tool_results,
+                )
+
+            if self.tool_registry is None:
+                return self._merge_provider_payload_with_tool_results(
+                    provider_result.final_response,
+                    tool_results,
+                )
+
+            if remaining_tool_calls <= 0:
+                tool_results.append(
+                    AssistantToolResultSummary(
+                        tool_name="assistant.tool_loop_limit",
+                        summary={
+                            "code": "tool_call_limit_reached",
+                            "detail": "The assistant must answer using the already collected grounded facts because the tool-call budget is exhausted.",
+                        },
+                    )
+                )
+                request = self._build_provider_request(
+                    conversation=conversation,
+                    cleaned_message=cleaned_message,
+                    route_context=route_context,
+                    detected_language=detected_language,
+                    response_language=response_language,
+                    actor=actor,
+                    grounding_context=grounding_context,
+                    tool_results=tool_results,
+                    available_tools=[],
+                )
+                provider_result = self._call_provider(request)
+                return self._merge_provider_payload_with_tool_results(
+                    provider_result.final_response,
+                    tool_results,
+                )
+
+            executed_any = False
+            for requested_call in requested_tool_calls[:remaining_tool_calls]:
+                tool_name = str(requested_call.get("name") or "").strip()
+                if not tool_name:
+                    continue
+                arguments = self._parse_tool_call_arguments(requested_call.get("arguments"))
+                tool_result = self.execute_registered_tool(
+                    tool_name=tool_name,
+                    input_data=arguments,
+                    actor=actor,
+                    conversation_id=conversation.id,
+                )
+                tool_results.append(self._tool_result_to_summary(tool_result))
+                remaining_tool_calls -= 1
+                executed_any = True
+                if remaining_tool_calls <= 0:
+                    break
+
+            if not executed_any:
+                return self._merge_provider_payload_with_tool_results(
+                    provider_result.final_response,
+                    tool_results,
+                )
+
+            request = self._build_provider_request(
+                conversation=conversation,
+                cleaned_message=cleaned_message,
+                route_context=route_context,
+                detected_language=detected_language,
+                response_language=response_language,
+                actor=actor,
+                grounding_context=grounding_context,
+                tool_results=tool_results,
+            )
+
     def _build_provider_request(
         self,
         *,
@@ -638,6 +870,9 @@ class AssistantService:
         detected_language: str,
         response_language: str,
         actor: RequestAuthorizationContext,
+        grounding_context: AssistantGroundingContext,
+        tool_results: list[AssistantToolResultSummary] | None = None,
+        available_tools: list[dict[str, Any]] | None = None,
     ) -> AssistantProviderRequest:
         recent_messages = [
             AssistantMessageContext(
@@ -653,8 +888,12 @@ class AssistantService:
             response_language=response_language,
             route_context=route_context,
             actor=actor,
+            planned_page_ids=list(grounding_context.retrieval_plan.get("likely_page_ids", [])),
+            planned_module_keys=list(grounding_context.retrieval_plan.get("likely_module_keys", [])),
         )
-        available_tools = self.list_available_tools(actor=actor, conversation_id=conversation.id)
+        available_tools_payload = available_tools
+        if available_tools_payload is None:
+            available_tools_payload = self.list_available_tools(actor=actor, conversation_id=conversation.id)
         prompt_payload = build_assistant_prompt(
             user_message=cleaned_message,
             detected_language=detected_language,
@@ -662,16 +901,17 @@ class AssistantService:
             auth_context=summarize_auth_context(actor),
             route_context=route_context,
             knowledge_chunks=knowledge_chunks,
+            grounding_context=grounding_context,
             available_tools=[
                 PromptToolDefinition(
                     name=tool["function"]["name"],
                     description=tool["function"].get("description"),
                     required_permissions=[],
                 )
-                for tool in available_tools
+                for tool in available_tools_payload
             ],
             conversation_messages=recent_messages,
-            tool_results=None,
+            tool_results=tool_results,
             max_context_chunks=self.runtime_config.max_context_chunks,
             max_input_chars=self.runtime_config.max_input_chars,
         )
@@ -684,7 +924,9 @@ class AssistantService:
             route_context=route_context,
             recent_messages=prompt_payload.conversation_messages,
             knowledge_chunks=[item.model_dump(mode="json") for item in knowledge_chunks],
-            available_tools=available_tools,
+            grounding_context=grounding_context.model_dump(mode="json"),
+            tool_results=[{"tool_name": item.tool_name, "summary": item.summary} for item in (tool_results or [])],
+            available_tools=available_tools_payload,
             max_tool_calls=self.runtime_config.max_tool_calls,
             max_input_chars=self.runtime_config.max_input_chars,
             metadata={
@@ -701,15 +943,21 @@ class AssistantService:
         response_language: str,
         route_context: dict[str, Any] | None,
         actor: RequestAuthorizationContext,
+        planned_page_ids: list[str] | None = None,
+        planned_module_keys: list[str] | None = None,
     ) -> list[AssistantKnowledgeChunkResult]:
         if self.knowledge_retriever is None:
             return []
         page_id = None
         if route_context is not None:
             page_id = route_context.get("page_id")
+        if page_id is None and planned_page_ids:
+            page_id = planned_page_ids[0]
+        module_key = planned_module_keys[0] if planned_module_keys else None
         results = self.knowledge_retriever.retrieve_knowledge_chunks(
             query=query,
             language_code=response_language,
+            module_key=module_key if isinstance(module_key, str) else None,
             page_id=page_id if isinstance(page_id, str) else None,
             role_keys=sorted(actor.role_keys),
             permission_keys=sorted(actor.permission_keys),
@@ -717,205 +965,125 @@ class AssistantService:
         )
         return results
 
-    def _run_ui_howto_if_applicable(
-        self,
-        *,
-        conversation: AssistantConversation,
-        cleaned_message: str,
-        response_language: str,
-        actor: RequestAuthorizationContext,
-    ) -> dict[str, Any] | None:
-        intent = detect_ui_howto_intent(cleaned_message)
-        if intent is None:
-            return None
-        if self.tool_registry is None:
-            answer = no_verified_ui_label_message(response_language)
-            return {
-                "answer": answer,
-                "confidence": "medium",
-                "out_of_scope": False,
-                "diagnosis": [
-                    {
-                        "finding": answer,
-                        "severity": "info",
-                        "evidence": "No verified UI-action tool registry is available for exact page-help guidance.",
-                    }
-                ],
-                "links": [],
-                "missing_permissions": [],
-                "next_steps": [],
-                "tool_trace_id": None,
-            }
-
-        result = self.tool_registry.execute_tool(
-            tool_name="assistant.find_ui_action",
-            input_data={
-                "intent": intent.intent,
-                "page_id": intent.page_id,
-                "language_code": response_language,
-            },
-            context=self._build_tool_execution_context(
-                actor=actor,
-                conversation_id=conversation.id,
-                message_id=None,
-            ),
-        )
-        if not result.ok or result.data is None:
-            return None
-
-        payload = result.data
-        action = payload.get("action")
-        links: list[dict[str, Any]] = []
-        page_id = payload.get("page_id")
-        if isinstance(page_id, str):
-            link_result = self.tool_registry.execute_tool(
-                tool_name="navigation.build_allowed_link",
-                input_data={"page_id": page_id, "reason": "Open verified UI workspace"},
-                context=self._build_tool_execution_context(
-                    actor=actor,
-                    conversation_id=conversation.id,
-                    message_id=None,
-                ),
-            )
-            if (
-                link_result.ok
-                and link_result.data is not None
-                and link_result.data.get("allowed") is True
-                and isinstance(link_result.data.get("link"), dict)
-            ):
-                links = [link_result.data["link"]]
-
-        if not isinstance(action, dict):
-            answer = no_verified_ui_label_message(response_language)
-            return {
-                "answer": answer,
-                "confidence": "medium",
-                "out_of_scope": False,
-                "diagnosis": [
-                    {
-                        "finding": answer,
-                        "severity": "info",
-                        "evidence": payload.get("safe_note") or "No verified UI action is registered for this intent.",
-                    }
-                ],
-                "links": links,
-                "missing_permissions": payload.get("missing_permissions", []),
-                "next_steps": [],
-                "tool_trace_id": "assistant.find_ui_action",
-            }
-
-        if action.get("allowed") is not True:
-            missing_permissions = payload.get("missing_permissions", [])
-            permission = "employees.employee.write"
-            if missing_permissions and isinstance(missing_permissions[0], dict):
-                permission = str(missing_permissions[0].get("permission") or permission)
-            answer = missing_ui_action_permission_message(response_language, permission)
-            return {
-                "answer": answer,
-                "confidence": "high",
-                "out_of_scope": False,
-                "diagnosis": [
-                    {
-                        "finding": answer,
-                        "severity": "warning",
-                        "evidence": payload.get("safe_note")
-                        or "The verified UI action exists but is not allowed for the current user.",
-                    }
-                ],
-                "links": links,
-                "missing_permissions": missing_permissions,
-                "next_steps": [],
-                "tool_trace_id": "assistant.find_ui_action",
-            }
-
-        answer, next_steps = render_verified_employee_create_answer(
-            language_code=response_language,
-            manifest=payload,
-            action=action,
-        )
-        return {
-            "answer": answer,
-            "confidence": "high",
-            "out_of_scope": False,
-            "diagnosis": [
-                {
-                    "finding": verified_ui_action_finding(response_language),
-                    "severity": "info",
-                    "evidence": verified_ui_action_evidence(
-                        response_language,
-                        str(action.get("label", "")),
-                    ),
-                }
-            ],
-            "links": links,
-            "missing_permissions": [],
-            "next_steps": next_steps,
-            "tool_trace_id": "assistant.find_ui_action",
-        }
-
-    def _run_shift_visibility_diagnostic_if_applicable(
-        self,
-        *,
-        conversation: AssistantConversation,
-        cleaned_message: str,
-        route_context: dict[str, Any] | None,
-        detected_language: str,
-        response_language: str,
-        actor: RequestAuthorizationContext,
-    ) -> dict[str, Any] | None:
-        if self.tool_registry is None:
-            return None
-        if not is_shift_visibility_question(cleaned_message, route_context):
-            return None
-        diagnostic_input = extract_shift_visibility_input(
-            message=cleaned_message,
-            detected_language=detected_language,
-            route_context=route_context,
-        )
-        result = self.tool_registry.execute_tool(
-            tool_name=DIAGNOSTIC_TOOL_NAME,
-            input_data=diagnostic_input.model_dump(mode="json", exclude_none=True),
-            context=self._build_tool_execution_context(
-                actor=actor,
-                conversation_id=conversation.id,
-                message_id=None,
-            ),
-        )
-        if not result.ok or result.data is None:
-            return None
-        diagnostic = AssistantShiftVisibilityDiagnosticRead.model_validate(result.data)
-        return self._build_shift_visibility_payload(
-            diagnostic=diagnostic,
-            response_language=response_language,
-        )
+    @staticmethod
+    def _collect_missing_permissions_from_summaries(
+        summaries: list[AssistantToolResultSummary],
+    ) -> list[AssistantMissingPermission]:
+        seen: set[tuple[str, str]] = set()
+        results: list[AssistantMissingPermission] = []
+        for summary in summaries:
+            rows = summary.summary.get("missing_permissions", []) if isinstance(summary.summary, dict) else []
+            if not isinstance(rows, list):
+                continue
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                permission = str(row.get("permission") or "").strip()
+                reason = str(row.get("reason") or "").strip()
+                if not permission:
+                    continue
+                key = (permission, reason)
+                if key in seen:
+                    continue
+                seen.add(key)
+                results.append(AssistantMissingPermission(permission=permission, reason=reason))
+        return results
 
     @staticmethod
-    def _build_shift_visibility_payload(
-        *,
-        diagnostic: AssistantShiftVisibilityDiagnosticRead,
-        response_language: str,
-    ) -> dict[str, Any]:
-        diagnosis = [
-            AssistantDiagnosisItem(
-                finding=item.code,
-                severity=AssistantDiagnosisSeverity(str(item.severity)),
-                evidence=item.evidence,
-            ).model_dump(mode="json")
-            for item in diagnostic.findings[:8]
-        ]
-        confidence = diagnostic.confidence.value if isinstance(diagnostic.confidence, AssistantConfidence) else str(diagnostic.confidence)
-        return {
-            "answer": render_shift_visibility_answer(diagnostic, response_language=response_language),
-            "confidence": confidence,
-            "out_of_scope": False,
-            "diagnosis": diagnosis,
-            "links": [item.model_dump(mode="json") for item in diagnostic.links],
-            "missing_permissions": [item.model_dump(mode="json") for item in diagnostic.missing_permissions],
-            "next_steps": diagnostic.next_steps,
-            "tool_trace_id": DIAGNOSTIC_TOOL_NAME,
-        }
+    def _grounding_sources_from_tool_result(
+        source_type: str,
+        result: Any,
+    ) -> list[AssistantGroundingSource]:
+        payload = result.redacted_output if result.redacted_output is not None else result.data
+        if not isinstance(payload, dict):
+            return []
 
-    def _call_provider(self, request: AssistantProviderRequest) -> dict[str, Any]:
+        sources: list[AssistantGroundingSource] = []
+        if source_type == "workflow":
+            for fact in payload.get("facts", []) or []:
+                if not isinstance(fact, dict):
+                    continue
+                sources.append(
+                    AssistantGroundingSource(
+                        source_type="workflow",
+                        source_name=payload.get("intent"),
+                        page_id=fact.get("page_id"),
+                        title=fact.get("title"),
+                        content=fact.get("detail"),
+                        facts=fact,
+                        verified=bool(fact.get("verified", False)),
+                        permission_checked=True,
+                    )
+                )
+            return sources
+
+        if source_type == "ui_action":
+            sources.append(
+                AssistantGroundingSource(
+                    source_type="ui_action",
+                    source_name=payload.get("intent"),
+                    page_id=payload.get("page_id"),
+                    title=payload.get("page_title"),
+                    content=payload.get("safe_note"),
+                    facts=payload,
+                    verified=bool((payload.get("action") or {}).get("verified", False)),
+                    permission_checked=True,
+                )
+            )
+            return sources
+
+        if source_type == "page_help_manifest":
+            sources.append(
+                AssistantGroundingSource(
+                    source_type="page_help_manifest",
+                    source_name=payload.get("page_title"),
+                    page_id=payload.get("page_id"),
+                    module_key=payload.get("module_key"),
+                    title=payload.get("page_title"),
+                    content=payload.get("source_status"),
+                    facts=payload,
+                    verified=payload.get("source_status") == "verified",
+                    permission_checked=True,
+                )
+            )
+            return sources
+
+        if source_type == "page_route":
+            for page in payload.get("pages", []) or []:
+                if not isinstance(page, dict):
+                    continue
+                sources.append(
+                    AssistantGroundingSource(
+                        source_type="page_route",
+                        source_name=page.get("route_name"),
+                        page_id=page.get("page_id"),
+                        module_key=page.get("module_key"),
+                        title=page.get("label"),
+                        content=page.get("path_template"),
+                        facts=page,
+                        verified=True,
+                        permission_checked=True,
+                    )
+                )
+            return sources
+
+        if source_type == "diagnostic":
+            sources.append(
+                AssistantGroundingSource(
+                    source_type="diagnostic",
+                    source_name=payload.get("diagnostic_key"),
+                    page_id=None,
+                    module_key="planning",
+                    title=payload.get("summary"),
+                    content=payload.get("status"),
+                    facts=payload,
+                    verified=True,
+                    permission_checked=True,
+                )
+            )
+        return sources
+
+    def _call_provider(self, request: AssistantProviderRequest) -> AssistantProviderResult:
         try:
             result = self.provider.generate(request)
         except AssistantProviderConfigurationError as exc:
@@ -956,13 +1124,105 @@ class AssistantService:
                 "errors.assistant.provider.invalid_response",
             )
         try:
-            return AssistantProviderStructuredOutput.model_validate(result.final_response).model_dump(mode="json")
+            validated = AssistantProviderStructuredOutput.model_validate(result.final_response)
         except Exception as exc:
             raise ApiException(
                 502,
                 "assistant.provider.invalid_response",
                 "errors.assistant.provider.invalid_response",
             ) from exc
+        return AssistantProviderResult(
+            final_response=validated.model_dump(mode="json"),
+            raw_text=result.raw_text,
+            requested_tool_calls=result.requested_tool_calls,
+            usage=result.usage,
+            provider_name=result.provider_name,
+            provider_mode=result.provider_mode,
+            model_name=result.model_name,
+            latency_ms=result.latency_ms,
+            finish_reason=result.finish_reason,
+        )
+
+    @staticmethod
+    def _parse_tool_call_arguments(value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                return {}
+            if isinstance(parsed, dict):
+                return parsed
+        return {}
+
+    @staticmethod
+    def _tool_result_to_summary(result: Any) -> AssistantToolResultSummary:
+        summary: dict[str, Any] = {"ok": bool(result.ok)}
+        summary_missing_permissions: list[dict[str, str]] = []
+        if result.redacted_output is not None:
+            summary["data"] = result.redacted_output
+        elif result.data is not None:
+            summary["data"] = result.data
+        if result.error_code is not None:
+            summary["error_code"] = result.error_code
+        if result.error_message is not None:
+            summary["error_message"] = result.error_message
+        if result.missing_permissions:
+            summary_missing_permissions.extend(result.missing_permissions)
+        payload_data = summary.get("data")
+        if isinstance(payload_data, dict):
+            embedded_missing_permissions = payload_data.get("missing_permissions")
+            if isinstance(embedded_missing_permissions, list):
+                summary_missing_permissions.extend(
+                    row for row in embedded_missing_permissions if isinstance(row, dict)
+                )
+        if summary_missing_permissions:
+            summary["missing_permissions"] = summary_missing_permissions
+        return AssistantToolResultSummary(
+            tool_name=str(result.tool_name),
+            summary=summary,
+        )
+
+    @staticmethod
+    def _merge_provider_payload_with_tool_results(
+        provider_payload: dict[str, Any],
+        tool_results: list[AssistantToolResultSummary],
+    ) -> dict[str, Any]:
+        merged = dict(provider_payload)
+        permission_rows: list[dict[str, str]] = []
+        seen_permissions: set[tuple[str, str]] = set()
+
+        for row in provider_payload.get("missing_permissions", []) or []:
+            if not isinstance(row, dict):
+                continue
+            permission = str(row.get("permission") or "").strip()
+            reason = str(row.get("reason") or "").strip()
+            if not permission:
+                continue
+            key = (permission, reason)
+            if key in seen_permissions:
+                continue
+            seen_permissions.add(key)
+            permission_rows.append({"permission": permission, "reason": reason})
+
+        for tool_result in tool_results:
+            for row in tool_result.summary.get("missing_permissions", []) or []:
+                if not isinstance(row, dict):
+                    continue
+                permission = str(row.get("permission") or "").strip()
+                reason = str(row.get("reason") or "").strip()
+                if not permission:
+                    continue
+                key = (permission, reason)
+                if key in seen_permissions:
+                    continue
+                seen_permissions.add(key)
+                permission_rows.append({"permission": permission, "reason": reason})
+
+        if permission_rows:
+            merged["missing_permissions"] = permission_rows
+        return merged
 
     @staticmethod
     def _build_refusal_provider_payload(

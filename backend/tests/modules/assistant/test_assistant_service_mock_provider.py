@@ -216,3 +216,8 @@ def test_service_includes_retrieved_knowledge_chunks_in_provider_request() -> No
     assert len(provider.requests) == 1
     assert provider.requests[0].knowledge_chunks[0]["chunk_id"] == "chunk-1"
     assert provider.requests[0].knowledge_chunks[0]["page_id"] == "E-01"
+    assert provider.requests[0].grounding_context is not None
+    assert any(
+        source["source_type"] == "knowledge_chunk" and source["page_id"] == "E-01"
+        for source in provider.requests[0].grounding_context["sources"]
+    )

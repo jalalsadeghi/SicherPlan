@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from time import perf_counter
 from typing import Any, Callable
 
@@ -137,6 +138,14 @@ class OpenAIResponsesProvider(AssistantProvider):
         messages: list[dict[str, Any]] = []
         if request.system_instructions:
             messages.append({"role": "system", "content": request.system_instructions})
+        if request.grounding_context:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": "Grounding context package\n"
+                    + json.dumps(request.grounding_context, ensure_ascii=False, indent=2, sort_keys=True),
+                }
+            )
         for item in request.recent_messages:
             role = str(item.get("role", "")).strip()
             content = str(item.get("content", "")).strip()

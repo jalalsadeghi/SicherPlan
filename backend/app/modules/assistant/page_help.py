@@ -29,6 +29,8 @@ def is_employee_create_question(message: str) -> bool:
     lowered = message.strip().casefold()
     if not lowered:
         return False
+    if any(token in lowered for token in ("shift", "schicht", "شیفت", "شفت", "صیفت", "assign", "assgin", "اختصاص", "تخصیص", "نسبت", "نصبت", "order", "auftrag", "سفارش", "پروژه")):
+        return False
     if "employee" in lowered and any(
         token in lowered
         for token in ("create", "new", "anlegen", "neuen", "register", "registrieren", "ثبت", "چطور", "wie")

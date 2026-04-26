@@ -220,6 +220,7 @@ def test_service_lists_only_currently_allowed_default_tools() -> None:
         "assistant.get_current_page_context",
         "assistant.get_current_user_capabilities",
         "assistant.search_accessible_pages",
+        "assistant.search_workflow_help",
         "navigation.build_allowed_link",
     ]
 

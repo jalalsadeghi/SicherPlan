@@ -31,6 +31,7 @@ def test_mock_provider_returns_structured_response() -> None:
     assert result.provider_name == "mock"
     assert result.requested_tool_calls == []
     assert result.final_response["answer"] == mock_provider_answer("en")
+    assert result.final_response["answer"].startswith("[MOCK RAG]")
     assert result.final_response["out_of_scope"] is False
 
 
