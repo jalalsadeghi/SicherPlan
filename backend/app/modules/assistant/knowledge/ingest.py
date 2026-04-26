@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import hashlib
 from pathlib import Path
 
+from app.modules.assistant.page_catalog_seed import ASSISTANT_PAGE_ROUTE_SEEDS
+from app.modules.assistant.page_help_seed import ASSISTANT_PAGE_HELP_SEEDS
 from app.modules.assistant.knowledge.chunker import chunk_text
 from app.modules.assistant.knowledge.repository import AssistantKnowledgeRepository
 from app.modules.assistant.knowledge.source_loader import KnowledgeSourceLoader
@@ -151,3 +153,82 @@ def _chunk_to_row(chunk: ChunkedKnowledgeDocument) -> dict[str, object]:
         "permission_keys": chunk.metadata.permission_keys,
         "token_count": chunk.metadata.token_count,
     }
+
+
+def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSourceRegistration]:
+    docs_root = repo_root / "docs"
+    registrations: list[KnowledgeSourceRegistration] = [
+        KnowledgeSourceRegistration(
+            source_type="sprint_doc",
+            source_name="AI Assistant Sprint Plan",
+            source_path=str(docs_root / "sprint" / "AI-Assistant.md"),
+        ),
+        KnowledgeSourceRegistration(
+            source_type="repository_docs",
+            source_name="AI Assistant Architecture",
+            source_path=str(docs_root / "engineering" / "ai-assistant-architecture.md"),
+        ),
+        KnowledgeSourceRegistration(
+            source_type="repository_docs",
+            source_name="AI Assistant Security",
+            source_path=str(docs_root / "security" / "ai-assistant-security.md"),
+        ),
+        KnowledgeSourceRegistration(
+            source_type="manual",
+            source_name="AI Assistant QA Plan",
+            source_path=str(docs_root / "qa" / "ai-assistant-test-plan.md"),
+        ),
+    ]
+
+    generated_root = repo_root / "tmp" / "assistant-knowledge"
+    generated_root.mkdir(parents=True, exist_ok=True)
+    page_catalog_path = generated_root / "page-route-catalog.md"
+    page_help_path = generated_root / "page-help-manifest.md"
+    workflow_path = generated_root / "workflow-help.md"
+
+    page_catalog_lines = ["# Assistant Page Route Catalog", ""]
+    for seed in ASSISTANT_PAGE_ROUTE_SEEDS:
+        page_catalog_lines.append(
+            f"## {seed.page_id} {seed.label}\n\n"
+            f"- route_name: {seed.route_name}\n"
+            f"- path_template: {seed.path_template}\n"
+            f"- module_key: {seed.module_key}\n"
+            f"- required_permissions: {', '.join(seed.required_permissions) or 'none'}\n"
+        )
+    page_catalog_path.write_text("\n".join(page_catalog_lines), encoding="utf-8")
+
+    page_help_lines = ["# Assistant Page Help Manifest", ""]
+    for seed in ASSISTANT_PAGE_HELP_SEEDS:
+        page_help_lines.append(
+            f"## {seed.page_id} {seed.language_code or 'und'}\n\n"
+            f"- route_name: {seed.route_name}\n"
+            f"- path_template: {seed.path_template}\n"
+            f"- module_key: {seed.module_key}\n"
+            f"- status: {seed.status}\n"
+        )
+    page_help_path.write_text("\n".join(page_help_lines), encoding="utf-8")
+
+    workflow_lines = ["# Assistant Workflow Help", ""]
+    workflow_lines.append("This generated source summarizes verified workflow seeds used by the assistant.")
+    workflow_path.write_text("\n".join(workflow_lines), encoding="utf-8")
+
+    registrations.extend(
+        [
+            KnowledgeSourceRegistration(
+                source_type="repository_docs",
+                source_name="Assistant Page Route Catalog",
+                source_path=str(page_catalog_path),
+            ),
+            KnowledgeSourceRegistration(
+                source_type="repository_docs",
+                source_name="Assistant Page Help Manifest",
+                source_path=str(page_help_path),
+            ),
+            KnowledgeSourceRegistration(
+                source_type="repository_docs",
+                source_name="Assistant Workflow Help",
+                source_path=str(workflow_path),
+            ),
+        ]
+    )
+    return registrations

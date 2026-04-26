@@ -99,6 +99,9 @@ describe('assistant store', () => {
       enabled: true,
       can_chat: true,
       provider_mode: 'mock',
+      mock_provider_allowed: true,
+      openai_configured: false,
+      rag_enabled: false,
       supported_features: ['structured_responses'],
     });
 
@@ -115,6 +118,7 @@ describe('assistant store', () => {
       enabled: false,
       can_chat: false,
       provider_mode: 'mock',
+      mock_provider_allowed: false,
     });
 
     const store = useAssistantStore();
@@ -127,6 +131,7 @@ describe('assistant store', () => {
       enabled: true,
       can_chat: true,
       provider_mode: 'mock',
+      mock_provider_allowed: true,
     });
     createAssistantConversation.mockResolvedValue({
       id: 'conversation-1',
@@ -155,6 +160,7 @@ describe('assistant store', () => {
       enabled: true,
       can_chat: true,
       provider_mode: 'mock',
+      mock_provider_allowed: true,
     });
     createAssistantConversation.mockResolvedValue({
       id: 'conversation-1',

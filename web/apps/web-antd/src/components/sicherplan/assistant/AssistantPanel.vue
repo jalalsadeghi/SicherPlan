@@ -36,6 +36,7 @@ defineProps<{
   loadingConversation?: boolean;
   messages: AssistantUiMessage[];
   missingPermissionsTitle: string;
+  providerWarning?: null | string;
   nextStepsTitle: string;
   sendingMessage?: boolean;
   severityLabels: Record<string, string>;
@@ -88,6 +89,14 @@ defineExpose({ focusInput });
 
     <div v-if="errorVisible" class="sp-assistant-panel__error" data-testid="assistant-error-state">
       {{ errorBody }}
+    </div>
+
+    <div
+      v-if="providerWarning"
+      class="sp-assistant-panel__warning"
+      data-testid="assistant-provider-warning"
+    >
+      {{ providerWarning }}
     </div>
 
     <div v-if="loadingConversation" class="sp-assistant-panel__loading" data-testid="assistant-loading-state">
@@ -189,6 +198,16 @@ defineExpose({ focusInput });
   border: 1px solid rgb(191 73 73 / 0.28);
   border-radius: 0.8rem;
   background: rgb(191 73 73 / 0.08);
+  color: var(--sp-color-text-primary);
+  font-size: 0.83rem;
+  line-height: 1.45;
+}
+
+.sp-assistant-panel__warning {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgb(196 146 24 / 0.28);
+  border-radius: 0.8rem;
+  background: rgb(196 146 24 / 0.1);
   color: var(--sp-color-text-primary);
   font-size: 0.83rem;
   line-height: 1.45;

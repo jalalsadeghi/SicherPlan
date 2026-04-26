@@ -48,6 +48,9 @@ def _service(*, enabled: bool, provider_mode: str) -> AssistantService:
         runtime_config=AssistantRuntimeConfig(
             enabled=enabled,
             provider_mode=provider_mode,
+            openai_configured=provider_mode == "openai",
+            mock_provider_allowed=provider_mode == "mock",
+            response_model="gpt-5.5-mini" if provider_mode == "openai" else "mock-assistant-v1",
         ),
         repository=_NoopAssistantRepository(),
         provider=MockAssistantProvider(),
@@ -69,6 +72,9 @@ def test_assistant_capabilities_disabled_returns_disabled_state() -> None:
         payload = response.json()
         assert payload["enabled"] is False
         assert payload["provider_mode"] == "mock"
+        assert payload["openai_configured"] is False
+        assert payload["mock_provider_allowed"] is True
+        assert payload["rag_enabled"] is False
         assert payload["can_chat"] is False
         assert payload["can_run_diagnostics"] is False
         assert payload["can_reindex_knowledge"] is False
@@ -92,6 +98,8 @@ def test_assistant_capabilities_enabled_with_chat_permission() -> None:
         payload = response.json()
         assert payload["enabled"] is True
         assert payload["provider_mode"] == "mock"
+        assert payload["mock_provider_allowed"] is True
+        assert payload["rag_enabled"] is False
         assert payload["can_chat"] is True
         assert payload["can_run_diagnostics"] is False
         assert payload["can_reindex_knowledge"] is False
@@ -154,8 +162,11 @@ def test_assistant_capabilities_reindex_permission() -> None:
         assert response.status_code == 200
         payload = response.json()
         assert payload["provider_mode"] == "openai"
+        assert payload["openai_configured"] is True
+        assert payload["rag_enabled"] is True
         assert payload["can_reindex_knowledge"] is True
         assert "openai_provider_configured" in payload["supported_features"]
+        assert "rag_grounding" in payload["supported_features"]
 
     app.dependency_overrides.clear()
 

@@ -10,10 +10,22 @@ export type AssistantFindingSeverity = 'info' | 'warning' | 'blocking';
 export interface AssistantCapabilities {
   enabled: boolean;
   provider_mode?: 'openai' | 'mock' | string;
+  openai_configured?: boolean;
+  mock_provider_allowed?: boolean;
+  rag_enabled?: boolean;
   can_chat: boolean;
   can_run_diagnostics?: boolean;
   can_reindex_knowledge?: boolean;
   supported_features?: string[];
+}
+
+export interface AssistantProviderStatus {
+  provider_mode: 'openai' | 'mock' | string;
+  openai_configured: boolean;
+  model: string;
+  mock_provider_allowed: boolean;
+  store_responses: boolean;
+  rag_enabled: boolean;
 }
 
 export interface AssistantRouteContext {
@@ -258,6 +270,10 @@ export function normalizeAssistantApiError(error: unknown) {
 
 export function getAssistantCapabilities(): Promise<AssistantCapabilities> {
   return assistantApiRequest<AssistantCapabilities>('/assistant/capabilities');
+}
+
+export function getAssistantProviderStatus(): Promise<AssistantProviderStatus> {
+  return assistantApiRequest<AssistantProviderStatus>('/assistant/provider/status');
 }
 
 export function getAssistantPageHelp(

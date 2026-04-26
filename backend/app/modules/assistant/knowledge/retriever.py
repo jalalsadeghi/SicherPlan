@@ -10,6 +10,7 @@ from app.modules.assistant.knowledge.embeddings import (
     AssistantEmbeddingRetriever,
     NoopAssistantEmbeddingRetriever,
 )
+from app.modules.assistant.lexicon import expand_assistant_query
 from app.modules.assistant.knowledge.types import (
     DEFAULT_MAX_CHUNK_CHARS,
     KnowledgeChunkCandidate,
@@ -19,6 +20,11 @@ from app.modules.assistant.schemas import AssistantKnowledgeChunkResult
 
 TOKEN_RE = re.compile(r"[^\W_]+", re.UNICODE)
 WHITESPACE_RE = re.compile(r"\s+")
+STOPWORDS = {
+    "the", "a", "an", "and", "or", "to", "for", "of", "in", "on", "how", "do", "i", "it",
+    "wie", "ich", "einen", "eine", "einer", "einem", "eines", "fuer", "für", "und", "der", "die", "das", "den", "dem",
+    "چطور", "چطوری", "میتونم", "میتوانم", "باید", "یک", "جدید", "را", "برای", "کنم", "شود", "است", "از", "در",
+}
 
 
 class AssistantKnowledgeRetrieverRepository(Protocol):
@@ -36,13 +42,23 @@ class AssistantKnowledgeRetriever:
         *,
         repository: AssistantKnowledgeRetrieverRepository,
         embedding_retriever: AssistantEmbeddingRetriever | None = None,
+        retrieval_mode: str = "lexical",
+        embeddings_enabled: bool = False,
         max_context_chunks: int = 8,
         max_input_chars: int = 12000,
     ) -> None:
         self.repository = repository
         self.embedding_retriever = embedding_retriever or NoopAssistantEmbeddingRetriever()
+        self.retrieval_mode = retrieval_mode
+        self.embeddings_enabled = embeddings_enabled
         self.max_context_chunks = max(int(max_context_chunks), 1)
         self.max_input_chars = max(int(max_input_chars), 60)
+
+    @property
+    def effective_retrieval_mode(self) -> str:
+        if self.retrieval_mode in {"semantic", "hybrid"} and self.embeddings_enabled:
+            return self.retrieval_mode
+        return "lexical"
 
     def retrieve_knowledge_chunks(
         self,
@@ -51,6 +67,9 @@ class AssistantKnowledgeRetriever:
         language_code: str | None = None,
         module_key: str | None = None,
         page_id: str | None = None,
+        module_keys: list[str] | None = None,
+        page_ids: list[str] | None = None,
+        workflow_intent: str | None = None,
         role_keys: list[str] | None = None,
         permission_keys: list[str] | None = None,
         source_type: str | None = None,
@@ -59,6 +78,11 @@ class AssistantKnowledgeRetriever:
         cleaned_query = query.strip()
         if not cleaned_query:
             return []
+        expanded_query = expand_assistant_query(
+            cleaned_query,
+            workflow_intent=workflow_intent,
+            ui_page_id=page_id,
+        )
 
         capped_limit = min(max(int(limit), 1), self.max_context_chunks)
         candidate_limit = max(capped_limit * 12, 50)
@@ -69,24 +93,29 @@ class AssistantKnowledgeRetriever:
         lexical_results = self._score_lexical_candidates(
             candidates,
             query=cleaned_query,
+            expanded_query=expanded_query.expanded_query,
             language_code=language_code,
             module_key=module_key,
             page_id=page_id,
+            module_keys=module_keys or [],
+            page_ids=page_ids or [],
             role_keys=role_keys or [],
             permission_keys=permission_keys or [],
             source_type=source_type,
             limit=capped_limit,
         )
-        vector_results = self.embedding_retriever.retrieve(
-            query=cleaned_query,
-            language_code=language_code,
-            module_key=module_key,
-            page_id=page_id,
-            role_keys=role_keys or [],
-            permission_keys=permission_keys or [],
-            source_type=source_type,
-            limit=capped_limit,
-        )
+        vector_results: list[AssistantKnowledgeChunkResult] = []
+        if self.effective_retrieval_mode in {"semantic", "hybrid"}:
+            vector_results = self.embedding_retriever.retrieve(
+                query=expanded_query.expanded_query,
+                language_code=language_code,
+                module_key=module_key,
+                page_id=page_id,
+                role_keys=role_keys or [],
+                permission_keys=permission_keys or [],
+                source_type=source_type,
+                limit=capped_limit,
+            )
         return self._merge_results(lexical_results, vector_results, limit=capped_limit)
 
     def _score_lexical_candidates(
@@ -94,17 +123,24 @@ class AssistantKnowledgeRetriever:
         candidates: list[KnowledgeChunkCandidate],
         *,
         query: str,
+        expanded_query: str,
         language_code: str | None,
         module_key: str | None,
         page_id: str | None,
+        module_keys: list[str],
+        page_ids: list[str],
         role_keys: list[str],
         permission_keys: list[str],
         source_type: str | None,
         limit: int,
     ) -> list[AssistantKnowledgeChunkResult]:
         normalized_query = _normalize_text(query)
+        normalized_expanded_query = _normalize_text(expanded_query)
         query_tokens = Counter(_tokenize(normalized_query))
-        if not query_tokens and not page_id and not module_key:
+        expanded_query_tokens = Counter(_tokenize(normalized_expanded_query))
+        all_page_ids = _dedupe_list([*(page_ids or []), page_id] if page_id else list(page_ids or []))
+        all_module_keys = _dedupe_list([*(module_keys or []), module_key] if module_key else list(module_keys or []))
+        if not expanded_query_tokens and not all_page_ids and not all_module_keys:
             return []
 
         scored: list[tuple[float, KnowledgeChunkCandidate, str]] = []
@@ -112,10 +148,14 @@ class AssistantKnowledgeRetriever:
             score, matched_by = _score_candidate(
                 candidate,
                 normalized_query=normalized_query,
+                normalized_expanded_query=normalized_expanded_query,
                 query_tokens=query_tokens,
+                expanded_query_tokens=expanded_query_tokens,
                 language_code=language_code,
                 module_key=module_key,
                 page_id=page_id,
+                module_keys=all_module_keys,
+                page_ids=all_page_ids,
                 role_keys=role_keys,
                 permission_keys=permission_keys,
                 source_type=source_type,
@@ -196,10 +236,14 @@ def _score_candidate(
     candidate: KnowledgeChunkCandidate,
     *,
     normalized_query: str,
+    normalized_expanded_query: str,
     query_tokens: Counter[str],
+    expanded_query_tokens: Counter[str],
     language_code: str | None,
     module_key: str | None,
     page_id: str | None,
+    module_keys: list[str],
+    page_ids: list[str],
     role_keys: list[str],
     permission_keys: list[str],
     source_type: str | None,
@@ -212,7 +256,9 @@ def _score_candidate(
 
     overlap = sum(min(count, combined_tokens.get(token, 0)) for token, count in query_tokens.items())
     title_overlap = sum(min(count, title_tokens.get(token, 0)) for token, count in query_tokens.items())
-    unique_overlap = len(set(query_tokens).intersection(combined_tokens))
+    expanded_overlap = sum(min(count, combined_tokens.get(token, 0)) for token, count in expanded_query_tokens.items())
+    expanded_title_overlap = sum(min(count, title_tokens.get(token, 0)) for token, count in expanded_query_tokens.items())
+    unique_overlap = len(set(expanded_query_tokens).intersection(combined_tokens))
 
     score = 0.0
     matched_by = "metadata"
@@ -225,19 +271,39 @@ def _score_candidate(
     if title_overlap:
         score += title_overlap * 6.0
         matched_by = "lexical"
+    if expanded_overlap:
+        score += expanded_overlap * 2.5
+        matched_by = "lexical"
+    if expanded_title_overlap:
+        score += expanded_title_overlap * 3.0
+        matched_by = "lexical"
     if normalized_query and normalized_query in content_text:
         score += 18.0
         matched_by = "lexical"
     if normalized_query and normalized_query in title_text:
         score += 24.0
         matched_by = "lexical"
+    if normalized_expanded_query and normalized_expanded_query in content_text:
+        score += 8.0
+    if normalized_expanded_query and normalized_expanded_query in title_text:
+        score += 10.0
 
     if page_id is not None and candidate.page_id == page_id:
         score += 20.0
+    if page_ids and candidate.page_id in page_ids:
+        score += 18.0
+    elif page_ids and candidate.page_id is not None:
+        score -= 8.0
     if module_key is not None and candidate.module_key == module_key:
         score += 12.0
+    if module_keys and candidate.module_key in module_keys:
+        score += 10.0
+    elif module_keys and candidate.module_key is not None:
+        score -= 8.0
     if source_type is not None and candidate.source_type == source_type:
         score += 4.0
+    if candidate.source_type in {"manual", "repository_docs", "sprint_doc"}:
+        score += 2.0
     if language_code is not None:
         if candidate.language_code == language_code:
             score += 8.0
@@ -251,6 +317,16 @@ def _score_candidate(
     if permission_keys and set(permission_keys).intersection(candidate.permission_keys):
         score += 1.5
 
+    preferred_page_match = bool(page_ids and candidate.page_id in page_ids)
+    preferred_module_match = bool(module_keys and candidate.module_key in module_keys)
+    if (
+        (page_ids or module_keys)
+        and not preferred_page_match
+        and not preferred_module_match
+        and score < 15.0
+    ):
+        return 0.0, matched_by
+
     return score, matched_by
 
 
@@ -259,10 +335,22 @@ def _normalize_text(value: str) -> str:
 
 
 def _tokenize(value: str) -> list[str]:
-    return TOKEN_RE.findall(value)
+    return [token for token in TOKEN_RE.findall(value) if token not in STOPWORDS]
 
 
 def _truncate_text(value: str, max_chars: int) -> str:
     if len(value) <= max_chars:
         return value
     return value[: max_chars - 3].rstrip() + "..."
+
+
+def _dedupe_list(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        cleaned = str(value).strip()
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        result.append(cleaned)
+    return result

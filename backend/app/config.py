@@ -167,6 +167,7 @@ class AppSettings:
     security_rate_limit_report_export_max: int = _get_int("SP_SECURITY_RATE_LIMIT_REPORT_EXPORT_MAX", 20)
     ai_enabled: bool = field(default_factory=lambda: _get_bool("SP_AI_ENABLED", False))
     ai_provider: str = field(default_factory=lambda: _get_str("SP_AI_PROVIDER", "mock"))
+    ai_allow_mock_provider: bool = field(default_factory=lambda: _get_bool("SP_AI_ALLOW_MOCK_PROVIDER", False))
     ai_openai_api_key: str = field(default_factory=lambda: _get_str("SP_OPENAI_API_KEY"), repr=False)
     ai_response_model: str = field(
         default_factory=lambda: _get_str("SP_AI_RESPONSE_MODEL", "gpt-5.5-or-configured-model")
@@ -175,6 +176,9 @@ class AppSettings:
         default_factory=lambda: _get_str("SP_AI_EMBEDDING_MODEL", "text-embedding-3-small")
     )
     ai_store_responses: bool = field(default_factory=lambda: _get_bool("SP_AI_STORE_RESPONSES", False))
+    ai_retrieval_mode: str = field(default_factory=lambda: _get_str("SP_AI_RETRIEVAL_MODE", "lexical"))
+    ai_embeddings_enabled: bool = field(default_factory=lambda: _get_bool("SP_AI_EMBEDDINGS_ENABLED", False))
+    ai_retrieval_debug: bool = field(default_factory=lambda: _get_bool("SP_AI_RETRIEVAL_DEBUG", False))
     ai_max_tool_calls: int = field(default_factory=lambda: _get_int("SP_AI_MAX_TOOL_CALLS", 8))
     ai_max_context_chunks: int = field(default_factory=lambda: _get_int("SP_AI_MAX_CONTEXT_CHUNKS", 8))
     ai_max_input_chars: int = field(default_factory=lambda: _get_int("SP_AI_MAX_INPUT_CHARS", 12000))
@@ -191,16 +195,31 @@ class AppSettings:
     def __post_init__(self) -> None:
         normalized_provider = self.ai_provider.strip().lower()
         object.__setattr__(self, "ai_provider", normalized_provider)
+        normalized_retrieval_mode = self.ai_retrieval_mode.strip().lower()
+        object.__setattr__(self, "ai_retrieval_mode", normalized_retrieval_mode)
 
         allowed_providers = {"mock", "openai"}
         if normalized_provider not in allowed_providers:
             raise ValueError(
                 "Invalid SP_AI_PROVIDER value. Expected one of: mock, openai."
             )
+        allowed_retrieval_modes = {"lexical", "semantic", "hybrid"}
+        if normalized_retrieval_mode not in allowed_retrieval_modes:
+            raise ValueError(
+                "Invalid SP_AI_RETRIEVAL_MODE value. Expected one of: lexical, semantic, hybrid."
+            )
 
         if self.ai_enabled and normalized_provider == "openai" and not self.ai_openai_api_key.strip():
             raise ValueError(
                 "SP_OPENAI_API_KEY is required when SP_AI_ENABLED=true and SP_AI_PROVIDER=openai."
+            )
+        if (
+            self.ai_enabled
+            and normalized_provider == "openai"
+            and self.ai_response_model.strip() == "gpt-5.5-or-configured-model"
+        ):
+            raise ValueError(
+                "SP_AI_RESPONSE_MODEL must be set to a real model name when SP_AI_ENABLED=true and SP_AI_PROVIDER=openai."
             )
 
     @property
@@ -225,6 +244,26 @@ class AppSettings:
     @property
     def loaded_env_files(self) -> tuple[str, ...]:
         return tuple(str(path) for path in LOADED_ENV_FILES)
+
+    @property
+    def ai_openai_configured(self) -> bool:
+        return bool(
+            self.ai_openai_api_key.strip()
+            and self.ai_response_model.strip()
+            and self.ai_response_model.strip() != "gpt-5.5-or-configured-model"
+        )
+
+    @property
+    def ai_mock_provider_allowed(self) -> bool:
+        return self.env in {"test", "ci"} or self.ai_allow_mock_provider
+
+    @property
+    def ai_effective_retrieval_mode(self) -> str:
+        if self.ai_retrieval_mode == "semantic" and not self.ai_embeddings_enabled:
+            return "lexical"
+        if self.ai_retrieval_mode == "hybrid" and not self.ai_embeddings_enabled:
+            return "lexical"
+        return self.ai_retrieval_mode
 
 
 settings = AppSettings()

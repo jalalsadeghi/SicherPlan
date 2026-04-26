@@ -24,6 +24,7 @@ from app.modules.assistant.schemas import (
     AssistantFeedbackRead,
     AssistantPageHelpManifestRead,
     AssistantMessageCreate,
+    AssistantProviderStatusRead,
     AssistantStructuredResponse,
 )
 from app.modules.assistant.service import AssistantRuntimeConfig, AssistantService
@@ -48,6 +49,13 @@ def get_assistant_service(
         runtime_config=AssistantRuntimeConfig(
             enabled=settings.ai_enabled,
             provider_mode=settings.ai_provider,
+            env=settings.env,
+            openai_configured=settings.ai_openai_configured,
+            mock_provider_allowed=settings.ai_mock_provider_allowed,
+            response_model=settings.ai_response_model,
+            store_responses=settings.ai_store_responses,
+            retrieval_mode=settings.ai_effective_retrieval_mode,
+            retrieval_debug=settings.ai_retrieval_debug,
             max_input_chars=settings.ai_max_input_chars,
             max_tool_calls=settings.ai_max_tool_calls,
             max_context_chunks=settings.ai_max_context_chunks,
@@ -56,6 +64,8 @@ def get_assistant_service(
         provider=build_assistant_provider(settings),
         knowledge_retriever=AssistantKnowledgeRetriever(
             repository=AssistantKnowledgeRepository(session),
+            retrieval_mode=settings.ai_effective_retrieval_mode,
+            embeddings_enabled=settings.ai_embeddings_enabled,
             max_context_chunks=settings.ai_max_context_chunks,
             max_input_chars=settings.ai_max_input_chars,
         ),
@@ -75,6 +85,14 @@ def assistant_capabilities(
     service: Annotated[AssistantService, Depends(get_assistant_service)],
 ) -> AssistantCapabilitiesRead:
     return service.get_capabilities(context)
+
+
+@router.get("/provider/status", response_model=AssistantProviderStatusRead)
+def assistant_provider_status(
+    context: Annotated[RequestAuthorizationContext, Depends(get_request_authorization_context)],
+    service: Annotated[AssistantService, Depends(get_assistant_service)],
+) -> AssistantProviderStatusRead:
+    return service.get_provider_status(context)
 
 
 @router.get("/page-help/{page_id}", response_model=AssistantPageHelpManifestRead)

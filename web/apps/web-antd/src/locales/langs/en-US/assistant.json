@@ -5,6 +5,7 @@
     "launcherLabel": "Open SicherPlan Assistant",
     "closeLabel": "Close SicherPlan Assistant",
     "loadingLabel": "Assistant availability is loading",
+    "mockModeWarning": "Assistant is running in mock mode. This is for local development only.",
     "emptyTitle": "Ask about the current workspace",
     "emptyBody": "The assistant can explain platform workflows, diagnose visibility issues, and open safe internal links that the backend already approved.",
     "disabledBody": "The assistant is not available for the current account or page.",

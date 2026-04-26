@@ -18,6 +18,7 @@ import {
   getAssistantCapabilities,
   getAssistantConversation,
   getAssistantPageHelp,
+  getAssistantProviderStatus,
   normalizeAssistantApiError,
   sendAssistantMessage,
   submitAssistantFeedback,
@@ -36,6 +37,9 @@ describe('assistant api client', () => {
           enabled: true,
           can_chat: true,
           provider_mode: 'mock',
+          mock_provider_allowed: true,
+          openai_configured: false,
+          rag_enabled: false,
           supported_features: ['structured_responses'],
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -46,6 +50,7 @@ describe('assistant api client', () => {
       enabled: true,
       can_chat: true,
       provider_mode: 'mock',
+      mock_provider_allowed: true,
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -56,6 +61,35 @@ describe('assistant api client', () => {
           Authorization: 'Bearer access-1',
           'Accept-Language': 'de-DE',
         }),
+      }),
+    );
+  });
+
+  it('loads provider status without exposing secrets client-side', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          provider_mode: 'openai',
+          openai_configured: true,
+          model: 'gpt-5.5-mini',
+          mock_provider_allowed: false,
+          store_responses: false,
+          rag_enabled: true,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    await expect(getAssistantProviderStatus()).resolves.toMatchObject({
+      provider_mode: 'openai',
+      openai_configured: true,
+      rag_enabled: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/assistant/provider/status'),
+      expect.objectContaining({
+        method: 'GET',
       }),
     );
   });

@@ -20,9 +20,13 @@ class TestRuntimeConfig(unittest.TestCase):
             for key in (
                 "SP_AI_ENABLED",
                 "SP_AI_PROVIDER",
+                "SP_AI_ALLOW_MOCK_PROVIDER",
                 "SP_OPENAI_API_KEY",
                 "SP_AI_RESPONSE_MODEL",
                 "SP_AI_EMBEDDING_MODEL",
+                "SP_AI_RETRIEVAL_MODE",
+                "SP_AI_EMBEDDINGS_ENABLED",
+                "SP_AI_RETRIEVAL_DEBUG",
                 "SP_AI_STORE_RESPONSES",
                 "SP_AI_MAX_TOOL_CALLS",
                 "SP_AI_MAX_CONTEXT_CHUNKS",
@@ -38,8 +42,15 @@ class TestRuntimeConfig(unittest.TestCase):
 
         self.assertFalse(settings.ai_enabled)
         self.assertEqual(settings.ai_provider, "mock")
+        self.assertFalse(settings.ai_allow_mock_provider)
+        self.assertFalse(settings.ai_mock_provider_allowed)
+        self.assertFalse(settings.ai_openai_configured)
         self.assertEqual(settings.ai_response_model, "gpt-5.5-or-configured-model")
         self.assertEqual(settings.ai_embedding_model, "text-embedding-3-small")
+        self.assertEqual(settings.ai_retrieval_mode, "lexical")
+        self.assertEqual(settings.ai_effective_retrieval_mode, "lexical")
+        self.assertFalse(settings.ai_embeddings_enabled)
+        self.assertFalse(settings.ai_retrieval_debug)
         self.assertFalse(settings.ai_store_responses)
         self.assertEqual(settings.ai_max_tool_calls, 8)
         self.assertEqual(settings.ai_max_context_chunks, 8)
@@ -79,6 +90,7 @@ class TestRuntimeConfig(unittest.TestCase):
 
         self.assertTrue(settings.ai_enabled)
         self.assertEqual(settings.ai_provider, "mock")
+        self.assertFalse(settings.ai_mock_provider_allowed)
 
     def test_ai_openai_provider_accepts_api_key_when_enabled(self) -> None:
         with patch.dict(
@@ -87,6 +99,7 @@ class TestRuntimeConfig(unittest.TestCase):
                 "SP_AI_ENABLED": "true",
                 "SP_AI_PROVIDER": "openai",
                 "SP_OPENAI_API_KEY": "test-openai-key",
+                "SP_AI_RESPONSE_MODEL": "gpt-5.5-mini",
             },
             clear=False,
         ):
@@ -94,6 +107,7 @@ class TestRuntimeConfig(unittest.TestCase):
 
         self.assertTrue(settings.ai_enabled)
         self.assertEqual(settings.ai_provider, "openai")
+        self.assertTrue(settings.ai_openai_configured)
 
     def test_ai_openai_provider_requires_key_when_enabled(self) -> None:
         with patch.dict(
@@ -126,6 +140,62 @@ class TestRuntimeConfig(unittest.TestCase):
             ):
                 AppSettings()
 
+    def test_ai_invalid_retrieval_mode_is_rejected(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SP_AI_RETRIEVAL_MODE": "invalid",
+            },
+            clear=False,
+        ):
+            with self.assertRaisesRegex(
+                ValueError,
+                "Invalid SP_AI_RETRIEVAL_MODE value. Expected one of: lexical, semantic, hybrid.",
+            ):
+                AppSettings()
+
+    def test_ai_effective_retrieval_mode_falls_back_to_lexical_without_embeddings(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SP_AI_RETRIEVAL_MODE": "hybrid",
+                "SP_AI_EMBEDDINGS_ENABLED": "false",
+            },
+            clear=False,
+        ):
+            settings = AppSettings()
+
+        self.assertEqual(settings.ai_retrieval_mode, "hybrid")
+        self.assertEqual(settings.ai_effective_retrieval_mode, "lexical")
+
+    def test_ai_openai_provider_rejects_placeholder_model_when_enabled(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SP_AI_ENABLED": "true",
+                "SP_AI_PROVIDER": "openai",
+                "SP_OPENAI_API_KEY": "test-openai-key",
+                "SP_AI_RESPONSE_MODEL": "gpt-5.5-or-configured-model",
+            },
+            clear=False,
+        ):
+            with self.assertRaisesRegex(
+                ValueError,
+                "SP_AI_RESPONSE_MODEL must be set to a real model name when SP_AI_ENABLED=true and SP_AI_PROVIDER=openai.",
+            ):
+                AppSettings()
+
+    def test_ai_mock_provider_allowed_in_ci_and_explicit_local_override(self) -> None:
+        ci_settings = object.__new__(AppSettings)
+        object.__setattr__(ci_settings, "env", "ci")
+        object.__setattr__(ci_settings, "ai_allow_mock_provider", False)
+        self.assertTrue(ci_settings.ai_mock_provider_allowed)
+
+        local_settings = object.__new__(AppSettings)
+        object.__setattr__(local_settings, "env", "development")
+        object.__setattr__(local_settings, "ai_allow_mock_provider", True)
+        self.assertTrue(local_settings.ai_mock_provider_allowed)
+
     def test_ai_openai_api_key_is_not_in_settings_repr(self) -> None:
         with patch.dict(
             os.environ,
@@ -133,6 +203,7 @@ class TestRuntimeConfig(unittest.TestCase):
                 "SP_AI_ENABLED": "true",
                 "SP_AI_PROVIDER": "openai",
                 "SP_OPENAI_API_KEY": "super-secret-key",
+                "SP_AI_RESPONSE_MODEL": "gpt-5.5-mini",
             },
             clear=False,
         ):

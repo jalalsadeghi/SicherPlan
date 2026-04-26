@@ -244,6 +244,7 @@ def _build_security_policy_section(policy_version: str) -> str:
         "- Use verified page-help and UI-action tool output only for exact UI labels and exact button guidance.\n"
         "- You must produce the final answer yourself using grounded facts; do not treat page-help or workflow facts as canned prose to repeat verbatim.\n"
         "- Use the grounding context package as the source of truth for page names, routes, UI actions, workflow dependencies, and diagnostics.\n"
+        "- If the grounding context is incomplete or ambiguous, say what is missing and ask a clarifying question instead of inventing a workflow.\n"
         "- If exact UI labels are unavailable in grounding context, state that the exact label is not verified.\n"
         "- If no verified UI action is available, say clearly that the exact current UI label cannot be confirmed.\n"
         "- Never offer guessed alternatives such as 'Create Employee or New Employee' unless both labels were explicitly returned by backend tools.\n"

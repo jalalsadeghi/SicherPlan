@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.modules.assistant.diagnostics import is_shift_visibility_question
+from app.modules.assistant.lexicon import expand_assistant_query
 from app.modules.assistant.page_help import detect_ui_howto_intent
 from app.modules.assistant.workflow_help import WORKFLOW_HELP_SEEDS, detect_workflow_intent
 
@@ -15,6 +16,8 @@ class AssistantRetrievalPlan:
     intent_category: str
     workflow_intent: str | None = None
     ui_intent: str | None = None
+    expanded_query: str | None = None
+    concept_keys: tuple[str, ...] = ()
     likely_page_ids: tuple[str, ...] = ()
     likely_module_keys: tuple[str, ...] = ()
     required_sources: tuple[str, ...] = ()
@@ -25,6 +28,8 @@ class AssistantRetrievalPlan:
             "intent_category": self.intent_category,
             "workflow_intent": self.workflow_intent,
             "ui_intent": self.ui_intent,
+            "expanded_query": self.expanded_query,
+            "concept_keys": list(self.concept_keys),
             "likely_page_ids": list(self.likely_page_ids),
             "likely_module_keys": list(self.likely_module_keys),
             "required_sources": list(self.required_sources),
@@ -40,9 +45,14 @@ def build_retrieval_plan(
     workflow_intent = detect_workflow_intent(message)
     ui_intent = detect_ui_howto_intent(message)
     needs_diagnostics = is_shift_visibility_question(message, route_context)
+    expanded_query = expand_assistant_query(
+        message,
+        workflow_intent=workflow_intent.intent if workflow_intent is not None else None,
+        ui_page_id=ui_intent.page_id if ui_intent is not None else None,
+    )
 
-    likely_page_ids: list[str] = []
-    likely_module_keys: list[str] = []
+    likely_page_ids: list[str] = list(expanded_query.page_hints)
+    likely_module_keys: list[str] = list(expanded_query.module_hints)
     required_sources: list[str] = ["auth_context", "current_route"]
 
     if workflow_intent is not None:
@@ -68,7 +78,12 @@ def build_retrieval_plan(
     route_page_id = None
     if route_context is not None and isinstance(route_context.get("page_id"), str):
         route_page_id = str(route_context["page_id"]).strip() or None
-    if route_page_id is not None:
+    if (
+        route_page_id is not None
+        and workflow_intent is None
+        and ui_intent is None
+        and not needs_diagnostics
+    ):
         likely_page_ids.append(route_page_id)
         likely_module_keys.append(_module_key_for_page_id(route_page_id))
 
@@ -89,6 +104,8 @@ def build_retrieval_plan(
         intent_category=intent_category,
         workflow_intent=workflow_intent.intent if workflow_intent is not None else None,
         ui_intent=ui_intent.intent if ui_intent is not None else None,
+        expanded_query=expanded_query.expanded_query,
+        concept_keys=expanded_query.concept_keys,
         likely_page_ids=tuple(_dedupe_preserve_order(likely_page_ids)),
         likely_module_keys=tuple(_dedupe_preserve_order([key for key in likely_module_keys if key])),
         required_sources=tuple(_dedupe_preserve_order(required_sources)),
@@ -109,6 +126,8 @@ def _dedupe_preserve_order(values: list[str]) -> list[str]:
 
 
 def _module_key_for_page_id(page_id: str) -> str:
+    if page_id.startswith("PS"):
+        return "platform_services"
     if page_id.startswith("E"):
         return "employees"
     if page_id.startswith("P") or page_id.startswith("FD"):

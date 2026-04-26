@@ -13,10 +13,22 @@ from pydantic import BaseModel, ConfigDict, Field
 class AssistantCapabilitiesRead(BaseModel):
     enabled: bool
     provider_mode: str
+    openai_configured: bool = False
+    mock_provider_allowed: bool = False
+    rag_enabled: bool = False
     can_chat: bool
     can_run_diagnostics: bool
     can_reindex_knowledge: bool
     supported_features: list[str] = Field(default_factory=list)
+
+
+class AssistantProviderStatusRead(BaseModel):
+    provider_mode: str
+    openai_configured: bool
+    model: str
+    mock_provider_allowed: bool
+    store_responses: bool
+    rag_enabled: bool
 
 
 class AssistantRouteContextInput(BaseModel):

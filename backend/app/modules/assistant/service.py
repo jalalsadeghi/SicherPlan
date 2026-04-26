@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import logging
 from typing import Any, Protocol
 
 from app.errors import ApiException
@@ -15,6 +16,7 @@ from app.modules.assistant.diagnostics import (
 )
 from app.modules.assistant.grounding import AssistantGroundingContext, AssistantGroundingSource
 from app.modules.assistant.knowledge.retriever import AssistantKnowledgeRetriever
+from app.modules.assistant.lexicon import expand_assistant_query
 from app.modules.assistant.language import (
     choose_response_language,
     detect_message_language,
@@ -32,6 +34,7 @@ from app.modules.assistant.prompt_builder import (
     build_assistant_prompt,
     summarize_auth_context,
 )
+from app.modules.assistant.rag_orchestrator import AssistantRagOrchestrator
 from app.modules.assistant.retrieval_planner import build_retrieval_plan
 from app.modules.assistant.models import AssistantConversation, AssistantMessage
 from app.modules.assistant.provider import (
@@ -63,6 +66,7 @@ from app.modules.assistant.schemas import (
     AssistantKnowledgeChunkResult,
     AssistantMessageCreate,
     AssistantPageHelpManifestRead,
+    AssistantProviderStatusRead,
     AssistantProviderStructuredOutput,
     AssistantStructuredResponse,
     AssistantRouteContextInput,
@@ -73,14 +77,26 @@ from app.modules.assistant.tools import AssistantToolExecutionContext, Assistant
 from app.modules.assistant.workflow_help import detect_workflow_intent
 from app.modules.iam.authz import RequestAuthorizationContext
 
+logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class AssistantRuntimeConfig:
     enabled: bool
     provider_mode: str
+    env: str = "development"
+    openai_configured: bool = False
+    mock_provider_allowed: bool = True
+    response_model: str = ""
+    store_responses: bool = False
+    retrieval_mode: str = "lexical"
+    retrieval_debug: bool = False
     max_input_chars: int = 12000
     max_tool_calls: int = 8
     max_context_chunks: int = 8
+
+    @property
+    def rag_enabled(self) -> bool:
+        return self.enabled and self.provider_mode == "openai" and self.openai_configured
 
 
 class AssistantRepository(Protocol):
@@ -168,6 +184,9 @@ class AssistantService:
             return AssistantCapabilitiesRead(
                 enabled=False,
                 provider_mode=self.runtime_config.provider_mode,
+                openai_configured=self.runtime_config.openai_configured,
+                mock_provider_allowed=self.runtime_config.mock_provider_allowed,
+                rag_enabled=False,
                 can_chat=False,
                 can_run_diagnostics=False,
                 can_reindex_knowledge=False,
@@ -175,6 +194,8 @@ class AssistantService:
             )
 
         can_chat_value = can_user_chat(context)
+        if not self._provider_runtime_usable_for_chat():
+            can_chat_value = False
         can_run_diagnostics_value = can_user_run_diagnostics(context)
         can_reindex_value = can_user_reindex_knowledge(context)
 
@@ -183,19 +204,48 @@ class AssistantService:
             "structured_responses",
             "out_of_scope_policy",
         ]
+        if self.runtime_config.rag_enabled:
+            features.append("rag_grounding")
         if self.runtime_config.provider_mode == "mock":
             features.append("mock_provider")
-            features.append("mock_provider_ready")
+            if self.runtime_config.mock_provider_allowed:
+                features.append("mock_provider_allowed")
+            else:
+                features.append("mock_provider_blocked")
         elif self.runtime_config.provider_mode == "openai":
-            features.append("openai_provider_configured")
+            if self.runtime_config.openai_configured:
+                features.append("openai_provider_configured")
 
         return AssistantCapabilitiesRead(
             enabled=True,
             provider_mode=self.runtime_config.provider_mode,
+            openai_configured=self.runtime_config.openai_configured,
+            mock_provider_allowed=self.runtime_config.mock_provider_allowed,
+            rag_enabled=self.runtime_config.rag_enabled,
             can_chat=can_chat_value,
             can_run_diagnostics=can_run_diagnostics_value,
             can_reindex_knowledge=can_reindex_value,
             supported_features=features,
+        )
+
+    def get_provider_status(
+        self,
+        context: RequestAuthorizationContext,
+    ) -> AssistantProviderStatusRead:
+        if "assistant.admin" not in context.permission_keys:
+            raise ApiException(
+                403,
+                "iam.authorization.permission_denied",
+                "errors.iam.authorization.permission_denied",
+                {"permission_key": "assistant.admin"},
+            )
+        return AssistantProviderStatusRead(
+            provider_mode=self.runtime_config.provider_mode,
+            openai_configured=self.runtime_config.openai_configured,
+            model=self.runtime_config.response_model,
+            mock_provider_allowed=self.runtime_config.mock_provider_allowed,
+            store_responses=self.runtime_config.store_responses,
+            rag_enabled=self.runtime_config.rag_enabled,
         )
 
     def create_conversation(
@@ -355,7 +405,7 @@ class AssistantService:
             assistant_answer = self._build_assistant_answer(response_language, classification)
             assistant_result_payload = self._build_refusal_provider_payload(classification, assistant_answer)
         else:
-            grounding_context, initial_tool_results = self._build_grounding_context(
+            rag_result = self._build_rag_orchestrator().run(
                 conversation=conversation,
                 cleaned_message=cleaned_message,
                 route_context=route_context,
@@ -363,16 +413,7 @@ class AssistantService:
                 response_language=response_language,
                 actor=actor,
             )
-            assistant_result_payload = self._generate_in_scope_response(
-                conversation=conversation,
-                cleaned_message=cleaned_message,
-                route_context=route_context,
-                detected_language=detected_language,
-                response_language=response_language,
-                actor=actor,
-                grounding_context=grounding_context,
-                initial_tool_results=initial_tool_results,
-            )
+            assistant_result_payload = rag_result.provider_payload
             assistant_answer = str(assistant_result_payload.get("answer", "")).strip()
             if not assistant_answer:
                 raise ApiException(
@@ -457,6 +498,18 @@ class AssistantService:
                 "iam.authorization.permission_denied",
                 "errors.iam.authorization.permission_denied",
                 {"permission_key": ASSISTANT_CHAT_ACCESS},
+            )
+        if not self._provider_runtime_usable_for_chat():
+            if self.runtime_config.provider_mode == "mock":
+                raise ApiException(
+                    503,
+                    "assistant.provider.mock_not_allowed",
+                    "errors.assistant.provider.mock_not_allowed",
+                )
+            raise ApiException(
+                503,
+                "assistant.provider.unavailable",
+                "errors.assistant.provider.unavailable",
             )
 
     def _require_feedback_enabled(self, actor: RequestAuthorizationContext) -> None:
@@ -585,6 +638,11 @@ class AssistantService:
         provider_payload: dict[str, Any],
         classification: AssistantClassificationResult,
     ) -> AssistantStructuredResponse:
+        validated_links = self._validate_provider_links(
+            links_payload=provider_payload.get("links", []),
+            actor=actor,
+            conversation_id=conversation.id,
+        )
         return AssistantStructuredResponse(
             conversation_id=conversation.id,
             message_id=assistant_message.id,
@@ -597,10 +655,16 @@ class AssistantService:
             ),
             out_of_scope=bool(provider_payload.get("out_of_scope", classification.is_out_of_scope)),
             diagnosis=provider_payload.get("diagnosis", []),
-            links=provider_payload.get("links", []),
+            links=validated_links,
             missing_permissions=provider_payload.get("missing_permissions", []),
             next_steps=provider_payload.get("next_steps", []),
             tool_trace_id=provider_payload.get("tool_trace_id"),
+        )
+
+    def _build_rag_orchestrator(self) -> AssistantRagOrchestrator:
+        return AssistantRagOrchestrator(
+            build_grounding_context=self._build_grounding_context,
+            generate_in_scope_response=self._generate_in_scope_response,
         )
 
     @staticmethod
@@ -631,6 +695,7 @@ class AssistantService:
             response_language=response_language,
             route_context=route_context,
             actor=actor,
+            workflow_intent=plan.workflow_intent,
             planned_page_ids=list(plan.likely_page_ids),
             planned_module_keys=list(plan.likely_module_keys),
         )
@@ -757,6 +822,12 @@ class AssistantService:
             missing_context=missing_context,
             missing_permissions=self._collect_missing_permissions_from_summaries(summaries),
         )
+        if self.runtime_config.retrieval_debug:
+            self._log_retrieval_debug(
+                query=cleaned_message,
+                plan=plan.to_dict(),
+                grounding_context=grounding_context,
+            )
         return grounding_context, summaries
 
     def _generate_in_scope_response(
@@ -888,6 +959,7 @@ class AssistantService:
             response_language=response_language,
             route_context=route_context,
             actor=actor,
+            workflow_intent=grounding_context.retrieval_plan.get("workflow_intent"),
             planned_page_ids=list(grounding_context.retrieval_plan.get("likely_page_ids", [])),
             planned_module_keys=list(grounding_context.retrieval_plan.get("likely_module_keys", [])),
         )
@@ -932,6 +1004,8 @@ class AssistantService:
             metadata={
                 "request_id": actor.request_id,
                 "provider_mode": self.runtime_config.provider_mode,
+                "user_id": actor.user_id,
+                "tenant_id": actor.tenant_id,
                 **prompt_payload.metadata,
             },
         )
@@ -943,22 +1017,29 @@ class AssistantService:
         response_language: str,
         route_context: dict[str, Any] | None,
         actor: RequestAuthorizationContext,
+        workflow_intent: str | None,
         planned_page_ids: list[str] | None = None,
         planned_module_keys: list[str] | None = None,
     ) -> list[AssistantKnowledgeChunkResult]:
         if self.knowledge_retriever is None:
             return []
-        page_id = None
-        if route_context is not None:
+        expanded_query = expand_assistant_query(
+            query,
+            workflow_intent=workflow_intent,
+            ui_page_id=None,
+        )
+        page_id = planned_page_ids[0] if planned_page_ids else None
+        if page_id is None and route_context is not None:
             page_id = route_context.get("page_id")
-        if page_id is None and planned_page_ids:
-            page_id = planned_page_ids[0]
         module_key = planned_module_keys[0] if planned_module_keys else None
         results = self.knowledge_retriever.retrieve_knowledge_chunks(
             query=query,
             language_code=response_language,
             module_key=module_key if isinstance(module_key, str) else None,
             page_id=page_id if isinstance(page_id, str) else None,
+            module_keys=list(planned_module_keys or expanded_query.module_hints),
+            page_ids=list(planned_page_ids or expanded_query.page_hints),
+            workflow_intent=workflow_intent,
             role_keys=sorted(actor.role_keys),
             permission_keys=sorted(actor.permission_keys),
             limit=self.runtime_config.max_context_chunks,
@@ -988,6 +1069,41 @@ class AssistantService:
                 seen.add(key)
                 results.append(AssistantMissingPermission(permission=permission, reason=reason))
         return results
+
+    def _validate_provider_links(
+        self,
+        *,
+        links_payload: Any,
+        actor: RequestAuthorizationContext,
+        conversation_id: str,
+    ) -> list[dict[str, Any]]:
+        if self.tool_registry is None or not isinstance(links_payload, list) or not links_payload:
+            return []
+        validated: list[dict[str, Any]] = []
+        seen_page_ids: set[str] = set()
+        for row in links_payload:
+            if not isinstance(row, dict):
+                continue
+            page_id = str(row.get("page_id") or "").strip()
+            if not page_id or page_id in seen_page_ids:
+                continue
+            seen_page_ids.add(page_id)
+            tool_result = self.execute_registered_tool(
+                tool_name="navigation.build_allowed_link",
+                input_data={
+                    "page_id": page_id,
+                    "reason": self._sanitize_optional_text(str(row.get("reason") or row.get("label") or ""), 240),
+                },
+                actor=actor,
+                conversation_id=conversation_id,
+            )
+            link_payload = tool_result.data if isinstance(tool_result.data, dict) else {}
+            if not tool_result.ok or not link_payload.get("allowed"):
+                continue
+            safe_link = link_payload.get("link")
+            if isinstance(safe_link, dict):
+                validated.append(safe_link)
+        return validated
 
     @staticmethod
     def _grounding_sources_from_tool_result(
@@ -1084,33 +1200,104 @@ class AssistantService:
         return sources
 
     def _call_provider(self, request: AssistantProviderRequest) -> AssistantProviderResult:
+        grounding_sources = 0
+        grounding_attached = bool(request.grounding_context)
+        if request.grounding_context and isinstance(request.grounding_context.get("sources"), list):
+            grounding_sources = len(request.grounding_context["sources"])
+        attempted_openai = self.runtime_config.provider_mode == "openai"
+        self._log_provider_event(
+            event="assistant_provider_call_started",
+            request=request,
+            grounding_attached=grounding_attached,
+            grounding_sources=grounding_sources,
+            openai_request_attempted=attempted_openai,
+            provider_returned_successfully=False,
+            provider_latency_ms=None,
+            input_tokens=None,
+            output_tokens=None,
+        )
         try:
             result = self.provider.generate(request)
         except AssistantProviderConfigurationError as exc:
+            self._log_provider_event(
+                event="assistant_provider_call_finished",
+                request=request,
+                grounding_attached=grounding_attached,
+                grounding_sources=grounding_sources,
+                openai_request_attempted=attempted_openai,
+                provider_returned_successfully=False,
+                provider_latency_ms=None,
+                input_tokens=None,
+                output_tokens=None,
+            )
             raise ApiException(
                 503,
                 "assistant.provider.unavailable",
                 "errors.assistant.provider.unavailable",
             ) from exc
         except AssistantProviderTimeoutError as exc:
+            self._log_provider_event(
+                event="assistant_provider_call_finished",
+                request=request,
+                grounding_attached=grounding_attached,
+                grounding_sources=grounding_sources,
+                openai_request_attempted=attempted_openai,
+                provider_returned_successfully=False,
+                provider_latency_ms=None,
+                input_tokens=None,
+                output_tokens=None,
+            )
             raise ApiException(
                 504,
                 "assistant.provider.timeout",
                 "errors.assistant.provider.timeout",
             ) from exc
         except AssistantProviderRateLimitError as exc:
+            self._log_provider_event(
+                event="assistant_provider_call_finished",
+                request=request,
+                grounding_attached=grounding_attached,
+                grounding_sources=grounding_sources,
+                openai_request_attempted=attempted_openai,
+                provider_returned_successfully=False,
+                provider_latency_ms=None,
+                input_tokens=None,
+                output_tokens=None,
+            )
             raise ApiException(
                 503,
                 "assistant.provider.rate_limited",
                 "errors.assistant.provider.rate_limited",
             ) from exc
         except AssistantProviderUnavailableError as exc:
+            self._log_provider_event(
+                event="assistant_provider_call_finished",
+                request=request,
+                grounding_attached=grounding_attached,
+                grounding_sources=grounding_sources,
+                openai_request_attempted=attempted_openai,
+                provider_returned_successfully=False,
+                provider_latency_ms=None,
+                input_tokens=None,
+                output_tokens=None,
+            )
             raise ApiException(
                 503,
                 "assistant.provider.unavailable",
                 "errors.assistant.provider.unavailable",
             ) from exc
         except AssistantProviderStructuredOutputError as exc:
+            self._log_provider_event(
+                event="assistant_provider_call_finished",
+                request=request,
+                grounding_attached=grounding_attached,
+                grounding_sources=grounding_sources,
+                openai_request_attempted=attempted_openai,
+                provider_returned_successfully=False,
+                provider_latency_ms=None,
+                input_tokens=None,
+                output_tokens=None,
+            )
             raise ApiException(
                 502,
                 "assistant.provider.invalid_response",
@@ -1126,11 +1313,33 @@ class AssistantService:
         try:
             validated = AssistantProviderStructuredOutput.model_validate(result.final_response)
         except Exception as exc:
+            self._log_provider_event(
+                event="assistant_provider_call_finished",
+                request=request,
+                grounding_attached=grounding_attached,
+                grounding_sources=grounding_sources,
+                openai_request_attempted=attempted_openai,
+                provider_returned_successfully=False,
+                provider_latency_ms=result.latency_ms,
+                input_tokens=result.usage.input_tokens if result.usage else None,
+                output_tokens=result.usage.output_tokens if result.usage else None,
+            )
             raise ApiException(
                 502,
                 "assistant.provider.invalid_response",
                 "errors.assistant.provider.invalid_response",
             ) from exc
+        self._log_provider_event(
+            event="assistant_provider_call_finished",
+            request=request,
+            grounding_attached=grounding_attached,
+            grounding_sources=grounding_sources,
+            openai_request_attempted=attempted_openai,
+            provider_returned_successfully=True,
+            provider_latency_ms=result.latency_ms,
+            input_tokens=result.usage.input_tokens if result.usage else None,
+            output_tokens=result.usage.output_tokens if result.usage else None,
+        )
         return AssistantProviderResult(
             final_response=validated.model_dump(mode="json"),
             raw_text=result.raw_text,
@@ -1142,6 +1351,81 @@ class AssistantService:
             latency_ms=result.latency_ms,
             finish_reason=result.finish_reason,
         )
+
+    def _provider_runtime_usable_for_chat(self) -> bool:
+        if not self.runtime_config.enabled:
+            return False
+        if self.runtime_config.provider_mode == "openai":
+            return self.runtime_config.openai_configured
+        if self.runtime_config.provider_mode == "mock":
+            return self.runtime_config.mock_provider_allowed
+        return False
+
+    def _log_provider_event(
+        self,
+        *,
+        event: str,
+        request: AssistantProviderRequest,
+        grounding_attached: bool,
+        grounding_sources: int,
+        openai_request_attempted: bool,
+        provider_returned_successfully: bool,
+        provider_latency_ms: int | None,
+        input_tokens: int | None,
+        output_tokens: int | None,
+    ) -> None:
+        payload = {
+            "event": event,
+            "provider_mode": self.runtime_config.provider_mode,
+            "model_name": self.runtime_config.response_model,
+            "request_id": request.metadata.get("request_id"),
+            "conversation_id": request.conversation_id,
+            "user_id": request.metadata.get("user_id"),
+            "tenant_id": request.metadata.get("tenant_id"),
+            "grounding_attached": grounding_attached,
+            "grounding_source_count": grounding_sources,
+            "openai_request_attempted": openai_request_attempted,
+            "provider_returned_successfully": provider_returned_successfully,
+            "provider_latency_ms": provider_latency_ms,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+        }
+        logger.info(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+    def _log_retrieval_debug(
+        self,
+        *,
+        query: str,
+        plan: dict[str, Any],
+        grounding_context: AssistantGroundingContext,
+    ) -> None:
+        expanded_query = expand_assistant_query(
+            query,
+            workflow_intent=plan.get("workflow_intent"),
+            ui_page_id=None,
+        )
+        top_sources = [
+            {
+                "source_type": source.source_type,
+                "source_name": source.source_name,
+                "page_id": source.page_id,
+                "module_key": source.module_key,
+                "score": source.relevance_score,
+            }
+            for source in grounding_context.sources[:8]
+        ]
+        payload = {
+            "event": "assistant_retrieval_debug",
+            "query": query,
+            "expanded_query": expanded_query.expanded_query,
+            "concept_keys": list(expanded_query.concept_keys),
+            "workflow_intent": plan.get("workflow_intent"),
+            "ui_intent": plan.get("ui_intent"),
+            "likely_page_ids": plan.get("likely_page_ids", []),
+            "likely_module_keys": plan.get("likely_module_keys", []),
+            "top_sources": top_sources,
+        }
+        logger.info(json.dumps(payload, ensure_ascii=False, sort_keys=True))
 
     @staticmethod
     def _parse_tool_call_arguments(value: Any) -> dict[str, Any]:

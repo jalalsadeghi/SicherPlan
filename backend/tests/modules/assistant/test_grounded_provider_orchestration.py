@@ -86,9 +86,9 @@ class _CapturingProvider:
                 "tool_trace_id": None,
             },
             raw_text=self.answer,
-            provider_name="mock",
-            provider_mode="mock",
-            model_name="mock",
+            provider_name="fake-openai",
+            provider_mode="openai",
+            model_name="gpt-test",
         )
 
 
@@ -116,7 +116,12 @@ def test_persian_employee_assign_to_shift_not_routed_as_employee_create() -> Non
         last_route_path=None,
     )
     service = AssistantService(
-        runtime_config=AssistantRuntimeConfig(enabled=True, provider_mode="mock"),
+        runtime_config=AssistantRuntimeConfig(
+            enabled=True,
+            provider_mode="openai",
+            openai_configured=True,
+            response_model="gpt-5.5-mini",
+        ),
         repository=repository,
         provider=provider,
         tool_registry=build_default_tool_registry(
@@ -157,7 +162,12 @@ def test_persian_order_create_is_in_scope() -> None:
         last_route_path=None,
     )
     service = AssistantService(
-        runtime_config=AssistantRuntimeConfig(enabled=True, provider_mode="mock"),
+        runtime_config=AssistantRuntimeConfig(
+            enabled=True,
+            provider_mode="openai",
+            openai_configured=True,
+            response_model="gpt-5.5-mini",
+        ),
         repository=repository,
         provider=provider,
         tool_registry=build_default_tool_registry(
@@ -193,7 +203,12 @@ def test_shift_visibility_diagnostic_facts_go_to_provider() -> None:
         last_route_path=None,
     )
     service = AssistantService(
-        runtime_config=AssistantRuntimeConfig(enabled=True, provider_mode="mock"),
+        runtime_config=AssistantRuntimeConfig(
+            enabled=True,
+            provider_mode="openai",
+            openai_configured=True,
+            response_model="gpt-5.5-mini",
+        ),
         repository=repository,
         provider=provider,
         tool_registry=build_default_tool_registry(
@@ -231,6 +246,246 @@ def test_shift_visibility_diagnostic_facts_go_to_provider() -> None:
     )
 
 
+def test_persian_customer_plan_create_uses_provider_with_customer_and_planning_candidates() -> None:
+    repository = page_help_repository()
+    provider = _CapturingProvider("پاسخ مدل برای ثبت پلن مشتری")
+    conversation = repository.create_conversation(
+        tenant_id="tenant-1",
+        user_id="assistant-user-1",
+        title=None,
+        locale="fa",
+        last_route_name=None,
+        last_route_path=None,
+    )
+    service = AssistantService(
+        runtime_config=AssistantRuntimeConfig(
+            enabled=True,
+            provider_mode="openai",
+            openai_configured=True,
+            response_model="gpt-5.5-mini",
+        ),
+        repository=repository,
+        provider=provider,
+        tool_registry=build_default_tool_registry(
+            audit_repository=repository,
+            page_catalog_repository=repository,
+            page_help_repository=repository,
+        ),
+    )
+
+    response = service.add_message(
+        conversation.id,
+        AssistantMessageCreate(message="چطور میتونم یک پلن جدید برای مشتری ثبت کنم؟"),
+        _context("assistant.chat.access", "customers.customer.read", "planning.order.read", "planning.record.read", "planning.shift.read"),
+    )
+
+    assert response.out_of_scope is False
+    assert response.answer == "پاسخ مدل برای ثبت پلن مشتری"
+    assert provider.call_count == 1
+    assert response.answer != "[MOCK RAG]"
+    assert provider.requests[0].grounding_context is not None
+    assert {"C-01", "P-02"}.issubset(set(provider.requests[0].grounding_context["retrieval_plan"]["likely_page_ids"]))
+    assert "P-03" in provider.requests[0].grounding_context["retrieval_plan"]["likely_page_ids"]
+    assert any(item["tool_name"] == "assistant.search_workflow_help" for item in provider.requests[0].tool_results)
+
+
+def test_persian_customer_create_uses_provider_with_customer_workspace_candidate() -> None:
+    repository = page_help_repository()
+    provider = _CapturingProvider("پاسخ مدل برای ثبت مشتری")
+    conversation = repository.create_conversation(
+        tenant_id="tenant-1",
+        user_id="assistant-user-1",
+        title=None,
+        locale="fa",
+        last_route_name=None,
+        last_route_path=None,
+    )
+    service = AssistantService(
+        runtime_config=AssistantRuntimeConfig(
+            enabled=True,
+            provider_mode="openai",
+            openai_configured=True,
+            response_model="gpt-5.5-mini",
+        ),
+        repository=repository,
+        provider=provider,
+        tool_registry=build_default_tool_registry(
+            audit_repository=repository,
+            page_catalog_repository=repository,
+            page_help_repository=repository,
+        ),
+    )
+
+    response = service.add_message(
+        conversation.id,
+        AssistantMessageCreate(message="چطور باید مشتری ثبت کنم؟"),
+        _context("assistant.chat.access", "customers.customer.read"),
+    )
+
+    assert response.out_of_scope is False
+    assert response.answer == "پاسخ مدل برای ثبت مشتری"
+    assert provider.call_count == 1
+    assert provider.requests[0].grounding_context is not None
+    assert provider.requests[0].grounding_context["retrieval_plan"]["workflow_intent"] == "customer_create"
+    assert "C-01" in provider.requests[0].grounding_context["retrieval_plan"]["likely_page_ids"]
+    assert any(item["tool_name"] == "assistant.search_workflow_help" for item in provider.requests[0].tool_results)
+
+
+def test_contract_registration_stays_in_scope_and_can_ask_for_clarification() -> None:
+    repository = page_help_repository()
+    provider = _CapturingProvider("I need to know whether this is a customer, employee, subcontractor, or platform contract before I can give exact steps.")
+    conversation = repository.create_conversation(
+        tenant_id="tenant-1",
+        user_id="assistant-user-1",
+        title=None,
+        locale="fa",
+        last_route_name=None,
+        last_route_path=None,
+    )
+    service = AssistantService(
+        runtime_config=AssistantRuntimeConfig(
+            enabled=True,
+            provider_mode="openai",
+            openai_configured=True,
+            response_model="gpt-5.5-mini",
+        ),
+        repository=repository,
+        provider=provider,
+        tool_registry=build_default_tool_registry(
+            audit_repository=repository,
+            page_catalog_repository=repository,
+            page_help_repository=repository,
+        ),
+    )
+
+    response = service.add_message(
+        conversation.id,
+        AssistantMessageCreate(message="چطوری یک قرارداد جدید ثبت کنم؟"),
+        _context("assistant.chat.access"),
+    )
+
+    assert response.out_of_scope is False
+    assert response.answer.startswith("I need to know whether this is")
+    assert provider.call_count == 1
+    assert response.answer != "[MOCK RAG]"
+    assert provider.requests[0].grounding_context is not None
+    assert "PS-01" in provider.requests[0].grounding_context["retrieval_plan"]["likely_page_ids"]
+    assert any(item["tool_name"] == "assistant.search_workflow_help" for item in provider.requests[0].tool_results)
+
+
+def test_german_order_create_uses_provider_with_order_candidates() -> None:
+    repository = page_help_repository()
+    provider = _CapturingProvider("Beginnen Sie in Auftraege & Planungsdatensaetze.")
+    conversation = repository.create_conversation(
+        tenant_id="tenant-1",
+        user_id="assistant-user-1",
+        title=None,
+        locale="de",
+        last_route_name=None,
+        last_route_path=None,
+    )
+    service = AssistantService(
+        runtime_config=AssistantRuntimeConfig(
+            enabled=True,
+            provider_mode="openai",
+            openai_configured=True,
+            response_model="gpt-5.5-mini",
+        ),
+        repository=repository,
+        provider=provider,
+        tool_registry=build_default_tool_registry(
+            audit_repository=repository,
+            page_catalog_repository=repository,
+            page_help_repository=repository,
+        ),
+    )
+
+    response = service.add_message(
+        conversation.id,
+        AssistantMessageCreate(message="Wie kann ich einen neuen Auftrag erstellen?"),
+        _context("assistant.chat.access", "planning.order.read", "planning.record.read"),
+    )
+
+    assert response.out_of_scope is False
+    assert response.answer.startswith("Beginnen Sie")
+    assert provider.call_count == 1
+    assert provider.requests[0].grounding_context is not None
+    assert "P-02" in provider.requests[0].grounding_context["retrieval_plan"]["likely_page_ids"]
+    assert any(item["tool_name"] == "assistant.search_workflow_help" for item in provider.requests[0].tool_results)
+
+
+def test_provider_links_are_revalidated_and_invented_path_is_removed() -> None:
+    repository = page_help_repository()
+    provider = _CapturingProvider("Open the staffing workspace.")
+    conversation = repository.create_conversation(
+        tenant_id="tenant-1",
+        user_id="assistant-user-1",
+        title=None,
+        locale="en",
+        last_route_name=None,
+        last_route_path=None,
+    )
+
+    def generate_with_invented_link(request: AssistantProviderRequest) -> AssistantProviderResult:
+        provider.requests.append(request)
+        provider.call_count += 1
+        return AssistantProviderResult(
+            final_response={
+                "answer": provider.answer,
+                "confidence": "high",
+                "out_of_scope": False,
+                "diagnosis": [],
+                "links": [
+                    {
+                        "label": "Invented staffing link",
+                        "path": "/totally-invented",
+                        "route_name": "FakeRoute",
+                        "page_id": "P-04",
+                    },
+                    {
+                        "label": "Bad link without page id",
+                        "path": "/not-allowed",
+                    },
+                ],
+                "missing_permissions": [],
+                "next_steps": [],
+                "tool_trace_id": None,
+            },
+            raw_text=provider.answer,
+            provider_name="fake-openai",
+            provider_mode="openai",
+            model_name="gpt-test",
+        )
+
+    provider.generate = generate_with_invented_link  # type: ignore[method-assign]
+    service = AssistantService(
+        runtime_config=AssistantRuntimeConfig(
+            enabled=True,
+            provider_mode="openai",
+            openai_configured=True,
+            response_model="gpt-5.5-mini",
+        ),
+        repository=repository,
+        provider=provider,
+        tool_registry=build_default_tool_registry(
+            audit_repository=repository,
+            page_catalog_repository=repository,
+            page_help_repository=repository,
+        ),
+    )
+
+    response = service.add_message(
+        conversation.id,
+        AssistantMessageCreate(message="How can I assign a new employee to a shift?"),
+        _context("assistant.chat.access", "employees.employee.read", "planning.order.read", "planning.record.read", "planning.shift.read", "planning.staffing.read"),
+    )
+
+    assert response.out_of_scope is False
+    assert len(response.links) == 1
+    assert response.links[0].page_id == "P-04"
+    assert response.links[0].path == "/admin/planning-staffing"
+
+
 def test_openai_tool_call_loop_executes_registered_tools_only() -> None:
     repository = page_help_repository()
     provider = _ToolLoopProvider()
@@ -243,7 +498,13 @@ def test_openai_tool_call_loop_executes_registered_tools_only() -> None:
         last_route_path=None,
     )
     service = AssistantService(
-        runtime_config=AssistantRuntimeConfig(enabled=True, provider_mode="openai", max_tool_calls=4),
+        runtime_config=AssistantRuntimeConfig(
+            enabled=True,
+            provider_mode="openai",
+            openai_configured=True,
+            response_model="gpt-5.5-mini",
+            max_tool_calls=4,
+        ),
         repository=repository,
         provider=provider,
         tool_registry=build_default_tool_registry(

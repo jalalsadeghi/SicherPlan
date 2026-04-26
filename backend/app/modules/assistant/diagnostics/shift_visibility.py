@@ -959,25 +959,6 @@ def extract_shift_visibility_input(
     )
 
 
-def render_shift_visibility_answer(
-    diagnostic: AssistantShiftVisibilityDiagnosticRead,
-    *,
-    response_language: str,
-) -> str:
-    subject = diagnostic.employee.display_name or diagnostic.employee.employee_ref or _message(response_language, "the employee")
-    intro = {
-        "fa": f"من {subject} را در محدوده دسترسی فعلی شما بررسی کردم.",
-        "de": f"Ich habe {subject} im Rahmen Ihrer aktuellen Berechtigungen geprueft.",
-    }.get(response_language, f"I checked {subject} within your current access scope.")
-    if diagnostic.most_likely_causes:
-        explanation = diagnostic.most_likely_causes[0].explanation
-    else:
-        explanation = diagnostic.summary
-    if diagnostic.next_steps:
-        return f"{intro} {explanation} {diagnostic.next_steps[0]}".strip()
-    return f"{intro} {explanation}".strip()
-
-
 def _has_locator(input_data: AssistantShiftVisibilityDiagnosticInput) -> bool:
     employee_locator = bool(_clean_ref(input_data.employee_ref) or _clean_text(input_data.employee_name))
     date_locator = input_data.date is not None or input_data.date_from is not None or input_data.date_to is not None

@@ -5,6 +5,7 @@
     "launcherLabel": "SicherPlan Assistant öffnen",
     "closeLabel": "SicherPlan Assistant schließen",
     "loadingLabel": "Assistant-Verfügbarkeit wird geladen",
+    "mockModeWarning": "Der Assistant läuft im Mock-Modus. Das ist nur für die lokale Entwicklung gedacht.",
     "emptyTitle": "Fragen Sie zum aktuellen Arbeitsbereich",
     "emptyBody": "Der Assistant erklärt Plattform-Workflows, diagnostiziert Sichtbarkeitsprobleme und öffnet sichere interne Links, die das Backend bereits freigegeben hat.",
     "disabledBody": "Der Assistant ist für das aktuelle Konto oder diese Seite nicht verfügbar.",

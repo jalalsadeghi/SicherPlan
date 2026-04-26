@@ -112,7 +112,14 @@ def _repository() -> _PageHelpRepository:
 
 def _service(repository: _PageHelpRepository, provider, *, provider_mode: str = "mock") -> AssistantService:
     return AssistantService(
-        runtime_config=AssistantRuntimeConfig(enabled=True, provider_mode=provider_mode, max_input_chars=500),
+        runtime_config=AssistantRuntimeConfig(
+            enabled=True,
+            provider_mode=provider_mode,
+            openai_configured=provider_mode == "openai",
+            mock_provider_allowed=provider_mode == "mock",
+            response_model="gpt-5.5-mini" if provider_mode == "openai" else "mock-assistant-v1",
+            max_input_chars=500,
+        ),
         repository=repository,
         provider=provider,
         tool_registry=build_default_tool_registry(

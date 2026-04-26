@@ -47,6 +47,16 @@ const launcherLabel = computed(() =>
     ? $t('assistant.widget.loadingLabel')
     : $t('assistant.widget.launcherLabel'),
 );
+const providerWarning = computed(() => {
+  const capabilities = assistantStore.capabilities;
+  if (
+    capabilities?.provider_mode === 'mock'
+    && capabilities.mock_provider_allowed
+  ) {
+    return $t('assistant.widget.mockModeWarning');
+  }
+  return null;
+});
 
 const severityLabels = computed<Record<string, string>>(() => ({
   blocking: $t('assistant.widget.severity.blocking'),
@@ -185,6 +195,7 @@ onMounted(async () => {
         :loading-conversation="assistantStore.loadingConversation"
         :messages="assistantStore.messages"
         :missing-permissions-title="$t('assistant.widget.missingPermissionsTitle')"
+        :provider-warning="providerWarning"
         :next-steps-title="$t('assistant.widget.nextStepsTitle')"
         :sending-message="assistantStore.sendingMessage"
         :severity-labels="severityLabels"

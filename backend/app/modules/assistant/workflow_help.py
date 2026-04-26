@@ -32,6 +32,12 @@ def detect_workflow_intent(message: str) -> AssistantWorkflowIntent | None:
     if not lowered:
         return None
 
+    if _is_customer_plan_create(lowered):
+        return AssistantWorkflowIntent(intent="customer_plan_create")
+    if _is_customer_create(lowered):
+        return AssistantWorkflowIntent(intent="customer_create")
+    if _is_contract_registration(lowered):
+        return AssistantWorkflowIntent(intent="contract_registration")
     if _is_employee_assign_to_shift(lowered):
         return AssistantWorkflowIntent(intent="employee_assign_to_shift_workflow")
     if _is_order_create(lowered):
@@ -44,6 +50,44 @@ def detect_workflow_intent(message: str) -> AssistantWorkflowIntent | None:
 
 
 WORKFLOW_HELP_SEEDS: dict[str, AssistantWorkflowSeed] = {
+    "customer_create": AssistantWorkflowSeed(
+        intent="customer_create",
+        title="Customer creation workflow",
+        facts=(
+            AssistantWorkflowFactSeed(
+                code="customer_workspace",
+                title="Customer creation starts in the Customers workspace",
+                detail="Prime customer master creation belongs to the Customers workspace inside the current tenant.",
+                page_id="C-01",
+            ),
+        ),
+        linked_page_ids=("C-01",),
+    ),
+    "customer_plan_create": AssistantWorkflowSeed(
+        intent="customer_plan_create",
+        title="Customer planning setup workflow",
+        facts=(
+            AssistantWorkflowFactSeed(
+                code="customer_context_required",
+                title="Customer context is created or selected first",
+                detail="A customer context must exist before tenant staff can create planning records for that customer.",
+                page_id="C-01",
+            ),
+            AssistantWorkflowFactSeed(
+                code="planning_record_workspace",
+                title="Planning records and orders are prepared next",
+                detail="Customer-facing planning records and order setup continue in Orders & Planning Records.",
+                page_id="P-02",
+            ),
+            AssistantWorkflowFactSeed(
+                code="shift_followup_workspace",
+                title="Detailed shift planning follows after the planning record exists",
+                detail="Detailed shift structure usually continues in Shift Planning after the customer planning record is ready.",
+                page_id="P-03",
+            ),
+        ),
+        linked_page_ids=("C-01", "P-02", "P-03"),
+    ),
     "employee_create": AssistantWorkflowSeed(
         intent="employee_create",
         title="Employee creation workflow",
@@ -126,6 +170,31 @@ WORKFLOW_HELP_SEEDS: dict[str, AssistantWorkflowSeed] = {
         ),
         linked_page_ids=("C-01", "P-02", "P-03", "P-04"),
     ),
+    "contract_registration": AssistantWorkflowSeed(
+        intent="contract_registration",
+        title="Contract registration workflow",
+        facts=(
+            AssistantWorkflowFactSeed(
+                code="contract_registration_is_context_dependent",
+                title="Contract registration depends on the contract domain",
+                detail="The current assistant catalog does not verify one single contract-registration page for all contract types. Customer, employee, subcontractor, and platform contract handling can differ.",
+                page_id="PS-01",
+            ),
+            AssistantWorkflowFactSeed(
+                code="platform_services_reference",
+                title="Platform Services is the safe shared reference workspace",
+                detail="Platform Services is the conservative shared workspace candidate when the exact contract subtype is still unclear.",
+                page_id="PS-01",
+            ),
+            AssistantWorkflowFactSeed(
+                code="customer_or_order_context_may_apply",
+                title="Customer or order context may still be relevant",
+                detail="If the contract belongs to a customer engagement or planning record, related context may also live in Customers or Orders & Planning Records.",
+                page_id="C-01",
+            ),
+        ),
+        linked_page_ids=("PS-01", "C-01", "P-02"),
+    ),
     "shift_create_or_release": AssistantWorkflowSeed(
         intent="shift_create_or_release",
         title="Shift creation and release workflow",
@@ -163,6 +232,28 @@ def _is_employee_create(lowered: str) -> bool:
     )
 
 
+def _is_customer_create(lowered: str) -> bool:
+    customer_terms = ("customer", "kunde", "kunden", "مشتری")
+    create_terms = ("create", "new", "register", "anlegen", "erstellen", "erstelle", "ثبت", "بساز", "درست")
+    plan_terms = ("plan", "planung", "planning", "پلن", "برنامه", "auftrag", "order", "سفارش")
+    return (
+        any(term in lowered for term in customer_terms)
+        and any(term in lowered for term in create_terms)
+        and not any(term in lowered for term in plan_terms)
+    )
+
+
+def _is_customer_plan_create(lowered: str) -> bool:
+    customer_terms = ("customer", "kunde", "kunden", "مشتری")
+    plan_terms = ("plan", "planung", "planning", "planning record", "auftrag", "order", "پلن", "برنامه", "سفارش")
+    create_terms = ("create", "new", "register", "anlegen", "erstellen", "erstelle", "ثبت", "بساز", "درست")
+    return (
+        any(term in lowered for term in customer_terms)
+        and any(term in lowered for term in plan_terms)
+        and any(term in lowered for term in create_terms)
+    )
+
+
 def _is_employee_assign_to_shift(lowered: str) -> bool:
     employee_terms = ("employee", "mitarbeiter", "کارمند")
     shift_terms = ("shift", "schicht", "شیفت", "شفت", "صیفت")
@@ -174,8 +265,14 @@ def _is_employee_assign_to_shift(lowered: str) -> bool:
 
 def _is_order_create(lowered: str) -> bool:
     order_terms = ("order", "auftrag", "سفارش", "پروژه")
-    create_terms = ("create", "new", "erstellen", "anlegen", "ثبت", "بساز", "درست")
+    create_terms = ("create", "new", "erstellen", "erstelle", "anlegen", "ثبت", "بساز", "درست")
     return any(term in lowered for term in order_terms) and any(term in lowered for term in create_terms)
+
+
+def _is_contract_registration(lowered: str) -> bool:
+    contract_terms = ("contract", "vertrag", "قرارداد")
+    create_terms = ("create", "new", "register", "anlegen", "erstellen", "erstelle", "ثبت", "بساز", "درست")
+    return any(term in lowered for term in contract_terms) and any(term in lowered for term in create_terms)
 
 
 def _is_shift_create_or_release(lowered: str) -> bool:

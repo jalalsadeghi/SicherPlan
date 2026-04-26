@@ -18,6 +18,12 @@ const mocked = vi.hoisted(() => ({
   },
   pushMock: vi.fn(),
   storeState: null as null | {
+    capabilities?: null | {
+      mock_provider_allowed?: boolean;
+      openai_configured?: boolean;
+      provider_mode?: string;
+      rag_enabled?: boolean;
+    };
     canChat: boolean;
     captureCurrentRouteContext: ReturnType<typeof vi.fn>;
     closeAssistant: ReturnType<typeof vi.fn>;
@@ -98,6 +104,7 @@ describe('SicherPlanAssistantWidget', () => {
     };
 
     mocked.storeState = reactive({
+      capabilities: null,
       canChat: true,
       captureCurrentRouteContext: vi.fn(),
       closeAssistant: vi.fn(),
@@ -151,6 +158,12 @@ describe('SicherPlanAssistantWidget', () => {
   });
 
   it('shows the launcher for authenticated users with assistant chat capability', async () => {
+    mocked.storeState!.capabilities = {
+      provider_mode: 'openai',
+      openai_configured: true,
+      mock_provider_allowed: false,
+      rag_enabled: true,
+    };
     const wrapper = mountWidget();
     await flushUi();
 
@@ -158,6 +171,22 @@ describe('SicherPlanAssistantWidget', () => {
     expect(wrapper.find('[data-testid="assistant-widget"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('assistant.widget.launcherLabel');
     expect(wrapper.find('button[aria-label="assistant.widget.launcherLabel"]').exists()).toBe(true);
+  });
+
+  it('shows a mock mode warning only when mock mode is explicitly allowed', async () => {
+    mocked.storeState!.isOpen = true;
+    mocked.storeState!.capabilities = {
+      provider_mode: 'mock',
+      openai_configured: false,
+      mock_provider_allowed: true,
+      rag_enabled: false,
+    };
+
+    const wrapper = mountWidget();
+    await flushUi();
+
+    expect(wrapper.find('[data-testid="assistant-provider-warning"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('assistant.widget.mockModeWarning');
   });
 
   it('hides the launcher when assistant is disabled or chat is not allowed', async () => {
