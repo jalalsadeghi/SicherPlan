@@ -70,7 +70,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             Text(
                               l10n.mobileLoginFormTitle,
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(fontWeight: FontWeight.w800),
                             ),
                             const SizedBox(height: 8),
                             Text(l10n.mobileLoginFormSubtitle),
@@ -78,27 +79,45 @@ class _LoginScreenState extends State<LoginScreen> {
                             if (widget.messageKey != null) ...[
                               Text(
                                 l10n.backendMessage(widget.messageKey!),
-                                style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.w700),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                               const SizedBox(height: 16),
                             ],
                             TextFormField(
                               controller: _tenantController,
-                              decoration: InputDecoration(labelText: l10n.mobileLoginTenantLabel),
-                              validator: (value) => (value == null || value.trim().isEmpty) ? l10n.mobileValidationRequired : null,
+                              decoration: InputDecoration(
+                                labelText: l10n.mobileLoginTenantLabel,
+                              ),
+                              validator: (value) =>
+                                  (value == null || value.trim().isEmpty)
+                                  ? l10n.mobileValidationRequired
+                                  : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _identifierController,
-                              decoration: InputDecoration(labelText: l10n.mobileLoginIdentifierLabel),
-                              validator: (value) => (value == null || value.trim().isEmpty) ? l10n.mobileValidationRequired : null,
+                              decoration: InputDecoration(
+                                labelText: l10n.mobileLoginIdentifierLabel,
+                              ),
+                              validator: (value) =>
+                                  (value == null || value.trim().isEmpty)
+                                  ? l10n.mobileValidationRequired
+                                  : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _passwordController,
                               obscureText: true,
-                              decoration: InputDecoration(labelText: l10n.mobileLoginPasswordLabel),
-                              validator: (value) => (value == null || value.trim().isEmpty) ? l10n.mobileValidationRequired : null,
+                              decoration: InputDecoration(
+                                labelText: l10n.mobileLoginPasswordLabel,
+                              ),
+                              validator: (value) =>
+                                  (value == null || value.trim().isEmpty)
+                                  ? l10n.mobileValidationRequired
+                                  : null,
                             ),
                             const SizedBox(height: 18),
                             FilledButton.icon(
@@ -107,7 +126,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ? const SizedBox(
                                       width: 16,
                                       height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     )
                                   : const Icon(Icons.login_rounded),
                               label: Text(l10n.mobileLoginSubmit),

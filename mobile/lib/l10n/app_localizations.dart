@@ -112,8 +112,22 @@ class AppLocalizations {
   String get scheduleEmptyTitle =>
       isGerman ? 'Keine freigegebenen Schichten' : 'No released shifts';
   String get scheduleEmptySubtitle => isGerman
-      ? 'Sobald eine Schicht freigegeben ist, erscheint sie hier im Monatsplan.'
-      : 'Released shifts will appear here in the monthly view.';
+      ? 'Sobald eine Schicht freigegeben ist, erscheint sie hier in der Wochenansicht.'
+      : 'Released shifts will appear here in the weekly view.';
+  String scheduleWeekLabel(String start, String end) =>
+      isGerman ? 'Woche $start - $end' : 'Week $start - $end';
+  String get scheduleNoShifts => isGerman ? 'Keine Schichten' : 'No shifts';
+  String get scheduleShiftDetailsTitle =>
+      isGerman ? 'Schichtdetails' : 'Shift details';
+  String get scheduleCloseAction => isGerman ? 'Schliessen' : 'Close';
+  String get scheduleTodayLabel => isGerman ? 'Heute' : 'Today';
+  String get scheduleDateLabel => isGerman ? 'Datum' : 'Date';
+  String get scheduleTimeLabel => isGerman ? 'Zeit' : 'Time';
+  String get scheduleLocationLabel => isGerman ? 'Ort' : 'Location';
+  String get scheduleAssignmentStatusLabel =>
+      isGerman ? 'Zuweisungsstatus' : 'Assignment status';
+  String get scheduleConfirmationStatusLabel =>
+      isGerman ? 'Bestaetigungsstatus' : 'Confirmation status';
   String get scheduleMeetingPoint => isGerman ? 'Treffpunkt' : 'Meeting point';
   String get scheduleMapAction => isGerman ? 'Route kopieren' : 'Copy route';
   String get scheduleConfirmAction => isGerman ? 'Bestaetigen' : 'Confirm';
@@ -354,6 +368,7 @@ class AppLocalizations {
       : 'Loading failed: ${error ?? 'Unknown'}';
   String get mobileStatusConfirmed => isGerman ? 'Bestaetigt' : 'Confirmed';
   String get mobileStatusAssigned => isGerman ? 'Zugewiesen' : 'Assigned';
+  String get mobileStatusDeclined => isGerman ? 'Abgelehnt' : 'Declined';
   String get mobileLogoutAction => isGerman ? 'Abmelden' : 'Log out';
 
   String get eventApplicationTitle =>

@@ -19,10 +19,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      SicherPlanApp(
-        config: AppConfig.current,
-        storeOverride: _EmptyStore(),
-      ),
+      SicherPlanApp(config: AppConfig.current, storeOverride: _EmptyStore()),
     );
     for (var i = 0; i < 10; i++) {
       await tester.pump(const Duration(milliseconds: 100));

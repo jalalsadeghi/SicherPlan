@@ -94,17 +94,28 @@ class _InfoFeedScreenState extends State<InfoFeedScreen> {
                             Row(
                               children: [
                                 Icon(
-                                  notice.mandatoryAcknowledgement ? Icons.announcement_outlined : Icons.notifications_active_outlined,
+                                  notice.mandatoryAcknowledgement
+                                      ? Icons.announcement_outlined
+                                      : Icons.notifications_active_outlined,
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
                                     notice.title,
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w700),
                                   ),
                                 ),
-                                Chip(label: Text(notice.acknowledgedAt != null ? l10n.noticeAcknowledgedBadge : l10n.noticeUnreadBadge)),
+                                Chip(
+                                  label: Text(
+                                    notice.acknowledgedAt != null
+                                        ? l10n.noticeAcknowledgedBadge
+                                        : l10n.noticeUnreadBadge,
+                                  ),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 8),
@@ -117,7 +128,8 @@ class _InfoFeedScreenState extends State<InfoFeedScreen> {
                                   onPressed: () => _openNotice(notice),
                                   child: Text(l10n.noticeOpenAction),
                                 ),
-                                if (notice.mandatoryAcknowledgement && notice.acknowledgedAt == null)
+                                if (notice.mandatoryAcknowledgement &&
+                                    notice.acknowledgedAt == null)
                                   FilledButton.tonal(
                                     onPressed: () => _acknowledgeNotice(notice),
                                     child: Text(l10n.noticeAcknowledgeAction),
@@ -174,7 +186,14 @@ class _InfoFeedScreenState extends State<InfoFeedScreen> {
                   Wrap(
                     spacing: 8,
                     children: opened.links
-                        .map((link) => ActionChip(label: Text(link.label), onPressed: () => Clipboard.setData(ClipboardData(text: link.url))))
+                        .map(
+                          (link) => ActionChip(
+                            label: Text(link.label),
+                            onPressed: () => Clipboard.setData(
+                              ClipboardData(text: link.url),
+                            ),
+                          ),
+                        )
                         .toList(),
                   ),
                 if (opened.attachments.isNotEmpty) ...[
@@ -182,10 +201,14 @@ class _InfoFeedScreenState extends State<InfoFeedScreen> {
                   Wrap(
                     spacing: 8,
                     children: opened.attachments
-                        .where((attachment) => attachment.currentVersionNo != null)
+                        .where(
+                          (attachment) => attachment.currentVersionNo != null,
+                        )
                         .map(
                           (attachment) => ActionChip(
-                            label: Text(attachment.fileName ?? attachment.title),
+                            label: Text(
+                              attachment.fileName ?? attachment.title,
+                            ),
                             onPressed: () => _downloadAttachment(attachment),
                           ),
                         )
@@ -211,11 +234,15 @@ class _InfoFeedScreenState extends State<InfoFeedScreen> {
 
   Future<void> _acknowledgeNotice(NoticeItem notice) async {
     final tenantId = widget.controller.context?.tenantId ?? '';
-    await widget.controller.withAccessToken((token) => widget.backend.acknowledgeNotice(token, tenantId, notice.id));
+    await widget.controller.withAccessToken(
+      (token) => widget.backend.acknowledgeNotice(token, tenantId, notice.id),
+    );
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.noticeAcknowledgedDone)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.l10n.noticeAcknowledgedDone)),
+    );
     setState(() {
       _future = _load();
     });
@@ -234,6 +261,8 @@ class _InfoFeedScreenState extends State<InfoFeedScreen> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(attachment.fileName ?? attachment.title)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(attachment.fileName ?? attachment.title)),
+    );
   }
 }

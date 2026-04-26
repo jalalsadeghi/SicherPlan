@@ -28,7 +28,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   late Future<List<EmployeeEventApplicationItem>> _applicationsFuture;
   final _planningRecordController = TextEditingController();
   final _applicationNoteController = TextEditingController();
-  DateTime? _visibleMonth;
 
   @override
   void initState() {
@@ -47,193 +46,168 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return ShellScaffold(
-      title: l10n.scheduleTitle,
-      subtitle: l10n.scheduleSubtitle,
-      actions: [
-        IconButton(
-          onPressed: _refresh,
-          icon: const Icon(Icons.refresh_rounded),
-        ),
-      ],
-      children: [
-        FutureBuilder<List<EmployeeReleasedScheduleItem>>(
-          future: _schedulesFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            if (snapshot.hasError) {
-              return HighlightCard(
-                title: l10n.scheduleErrorTitle,
-                subtitle: l10n.mobileLoadErrorSubtitle(snapshot.error),
-                icon: Icons.error_outline_rounded,
-              );
-            }
-            final schedules = snapshot.data ?? const [];
-            if (schedules.isEmpty) {
-              return HighlightCard(
-                title: l10n.scheduleEmptyTitle,
-                subtitle: l10n.scheduleEmptySubtitle,
-                icon: Icons.event_busy_outlined,
-              );
-            }
-            final sortedSchedules = [
-              ...schedules,
-            ]..sort((left, right) => left.workStart.compareTo(right.workStart));
-            final minMonth = _monthStart(sortedSchedules.first.scheduleDate);
-            final maxMonth = _monthStart(sortedSchedules.last.scheduleDate);
-            final visibleMonth = _resolveVisibleMonth(minMonth, maxMonth);
-            final schedulesByDay = _groupSchedulesByDay(sortedSchedules);
-            return Column(
-              children: [
-                Card(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            IconButton(
-                              onPressed: visibleMonth.isAfter(minMonth)
-                                  ? () => _changeVisibleMonth(-1)
-                                  : null,
-                              icon: const Icon(Icons.chevron_left_rounded),
-                            ),
-                            Expanded(
-                              child: Text(
-                                MaterialLocalizations.of(
-                                  context,
-                                ).formatMonthYear(visibleMonth),
-                                key: const ValueKey(
-                                  'schedule-calendar-month-label',
-                                ),
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w800),
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: visibleMonth.isBefore(maxMonth)
-                                  ? () => _changeVisibleMonth(1)
-                                  : null,
-                              icon: const Icon(Icons.chevron_right_rounded),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _CalendarMonthView(
-                          visibleMonth: visibleMonth,
-                          schedulesByDay: schedulesByDay,
-                          timeLabel: _timeLabel,
-                          statusLabel: _statusLabel,
-                          onDaySelected: _showDayDetail,
-                        ),
-                      ],
+    return Scaffold(
+      body: ShellScaffold(
+        title: l10n.scheduleTitle,
+        subtitle: l10n.scheduleSubtitle,
+        actions: [
+          IconButton(
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+        children: [
+          FutureBuilder<List<EmployeeReleasedScheduleItem>>(
+            future: _schedulesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError) {
+                return HighlightCard(
+                  title: l10n.scheduleErrorTitle,
+                  subtitle: l10n.mobileLoadErrorSubtitle(snapshot.error),
+                  icon: Icons.error_outline_rounded,
+                );
+              }
+              final schedules = snapshot.data ?? const [];
+              if (schedules.isEmpty) {
+                return HighlightCard(
+                  title: l10n.scheduleEmptyTitle,
+                  subtitle: l10n.scheduleEmptySubtitle,
+                  icon: Icons.event_busy_outlined,
+                );
+              }
+              final sortedSchedules = [...schedules]
+                ..sort(
+                  (left, right) => left.workStart.compareTo(right.workStart),
+                );
+              final schedulesByDay = _groupSchedulesByDay(sortedSchedules);
+              final weekStarts = _buildWeekStarts(sortedSchedules);
+              return Column(
+                children: [
+                  Card(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: _ScheduleWeekList(
+                        key: const ValueKey('schedule-week-list'),
+                        weekStarts: weekStarts,
+                        schedulesByDay: schedulesByDay,
+                        timeLabel: _timeLabel,
+                        statusLabel: _statusLabel,
+                        isToday: _isToday,
+                        onShiftSelected: _showShiftDetail,
+                      ),
                     ),
                   ),
+                ],
+              );
+            },
+          ),
+          Card(
+            key: const ValueKey('schedule-event-application-card'),
+            margin: const EdgeInsets.only(top: 4),
+            child: Theme(
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                key: const ValueKey('schedule-event-application-tile'),
+                tilePadding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 4,
                 ),
-              ],
-            );
-          },
-        ),
-        Card(
-          key: const ValueKey('schedule-event-application-card'),
-          margin: const EdgeInsets.only(top: 4),
-          child: Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              key: const ValueKey('schedule-event-application-tile'),
-              tilePadding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 4,
-              ),
-              childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-              initiallyExpanded: false,
-              title: Text(
-                l10n.eventApplicationTitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(l10n.eventApplicationSubtitle),
-              ),
-              children: [
-                TextField(
-                  key: const ValueKey(
-                    'event-application-planning-record-field',
-                  ),
-                  controller: _planningRecordController,
-                  decoration: InputDecoration(
-                    labelText: l10n.eventApplicationPlanningRecordLabel,
+                childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                initiallyExpanded: false,
+                title: Text(
+                  l10n.eventApplicationTitle,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  key: const ValueKey('event-application-note-field'),
-                  controller: _applicationNoteController,
-                  maxLines: 2,
-                  decoration: InputDecoration(
-                    labelText: l10n.eventApplicationNoteLabel,
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(l10n.eventApplicationSubtitle),
+                ),
+                children: [
+                  TextField(
+                    key: const ValueKey(
+                      'event-application-planning-record-field',
+                    ),
+                    controller: _planningRecordController,
+                    decoration: InputDecoration(
+                      labelText: l10n.eventApplicationPlanningRecordLabel,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: _submitApplication,
-                  icon: const Icon(Icons.send_rounded),
-                  label: Text(l10n.eventApplicationSubmit),
-                ),
-                const SizedBox(height: 12),
-                FutureBuilder<List<EmployeeEventApplicationItem>>(
-                  future: _applicationsFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState != ConnectionState.done) {
-                      return const SizedBox.shrink();
-                    }
-                    if (snapshot.hasError) {
-                      return Text(l10n.mobileLoadErrorSubtitle(snapshot.error));
-                    }
-                    final items = snapshot.data ?? const [];
-                    if (items.isEmpty) {
-                      return Text(l10n.eventApplicationEmpty);
-                    }
-                    return Column(
-                      children: items
-                          .map(
-                            (item) => ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(item.planningRecordId),
-                              subtitle: Text(item.note ?? '-'),
-                              trailing: Wrap(
-                                spacing: 8,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Chip(label: Text(item.status)),
-                                  if (item.status == 'pending')
-                                    TextButton(
-                                      onPressed: () => _cancelApplication(item),
-                                      child: Text(l10n.eventApplicationCancel),
-                                    ),
-                                ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    key: const ValueKey('event-application-note-field'),
+                    controller: _applicationNoteController,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: l10n.eventApplicationNoteLabel,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: _submitApplication,
+                    icon: const Icon(Icons.send_rounded),
+                    label: Text(l10n.eventApplicationSubmit),
+                  ),
+                  const SizedBox(height: 12),
+                  FutureBuilder<List<EmployeeEventApplicationItem>>(
+                    future: _applicationsFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState != ConnectionState.done) {
+                        return const SizedBox.shrink();
+                      }
+                      if (snapshot.hasError) {
+                        return Text(
+                          l10n.mobileLoadErrorSubtitle(snapshot.error),
+                        );
+                      }
+                      final items = snapshot.data ?? const [];
+                      if (items.isEmpty) {
+                        return Text(l10n.eventApplicationEmpty);
+                      }
+                      return Column(
+                        children: items
+                            .map(
+                              (item) => ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(item.planningRecordId),
+                                subtitle: Text(item.note ?? '-'),
+                                trailing: Wrap(
+                                  spacing: 8,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Chip(label: Text(item.status)),
+                                    if (item.status == 'pending')
+                                      TextButton(
+                                        onPressed: () =>
+                                            _cancelApplication(item),
+                                        child: Text(
+                                          l10n.eventApplicationCancel,
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          )
-                          .toList(),
-                    );
-                  },
-                ),
-              ],
+                            )
+                            .toList(),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -258,20 +232,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   String _timeLabel(DateTime value) =>
       '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
-  String _statusLabel(EmployeeReleasedScheduleItem item) =>
-      item.confirmationStatus == 'confirmed'
-      ? context.l10n.mobileStatusConfirmed
-      : context.l10n.mobileStatusAssigned;
 
-  DateTime _resolveVisibleMonth(DateTime minMonth, DateTime maxMonth) {
-    final current = _visibleMonth;
-    if (current == null ||
-        current.isBefore(minMonth) ||
-        current.isAfter(maxMonth)) {
-      _visibleMonth = minMonth;
-    }
-    return _visibleMonth!;
-  }
+  String _statusLabel(String code) => switch (code) {
+    'confirmed' => context.l10n.mobileStatusConfirmed,
+    'declined' => context.l10n.mobileStatusDeclined,
+    'assigned' => context.l10n.mobileStatusAssigned,
+    _ => code,
+  };
 
   Map<DateTime, List<EmployeeReleasedScheduleItem>> _groupSchedulesByDay(
     List<EmployeeReleasedScheduleItem> schedules,
@@ -289,140 +256,181 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return grouped;
   }
 
-  DateTime _monthStart(DateTime value) => DateTime(value.year, value.month);
+  List<DateTime> _buildWeekStarts(
+    List<EmployeeReleasedScheduleItem> schedules,
+  ) {
+    final firstWeek = _weekStart(_dateOnly(schedules.first.scheduleDate));
+    final lastWeek = _weekStart(_dateOnly(schedules.last.scheduleDate));
+    final weekStarts = <DateTime>[];
+    for (
+      var cursor = firstWeek;
+      !cursor.isAfter(lastWeek);
+      cursor = cursor.add(const Duration(days: 7))
+    ) {
+      weekStarts.add(cursor);
+    }
+    return weekStarts;
+  }
+
   DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
 
-  void _changeVisibleMonth(int monthDelta) {
-    final visibleMonth = _visibleMonth;
-    if (visibleMonth == null) {
-      return;
-    }
-    setState(() {
-      _visibleMonth = DateTime(
-        visibleMonth.year,
-        visibleMonth.month + monthDelta,
-      );
-    });
-  }
+  DateTime _weekStart(DateTime value) => _dateOnly(
+    value,
+  ).subtract(Duration(days: value.weekday - DateTime.monday));
 
-  Future<void> _showDayDetail(
-    DateTime day,
-    List<EmployeeReleasedScheduleItem> items,
-  ) async {
-    final localizations = MaterialLocalizations.of(context);
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-          child: SafeArea(
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                Text(
-                  localizations.formatFullDate(day),
-                  key: const ValueKey('schedule-day-sheet-title'),
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...items.map(
-                  (item) => ListTile(
-                    key: ValueKey('schedule-day-shift-${item.id}'),
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      '${_timeLabel(item.workStart)}-${_timeLabel(item.workEnd)} · ${item.shiftLabel}',
-                    ),
-                    subtitle: Text(item.locationLabel ?? '-'),
-                    trailing: Chip(label: Text(_statusLabel(item))),
-                    onTap: () => _showShiftDetail(item),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  bool _isToday(DateTime value) {
+    final now = DateTime.now();
+    return value.year == now.year &&
+        value.month == now.month &&
+        value.day == now.day;
   }
 
   Future<void> _showShiftDetail(EmployeeReleasedScheduleItem item) async {
     final l10n = context.l10n;
-    await showModalBottomSheet<void>(
+    final localizations = MaterialLocalizations.of(context);
+    await showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-          child: SafeArea(
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                Text(
-                  item.shiftLabel,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
+      builder: (dialogContext) {
+        return Dialog(
+          key: ValueKey('schedule-shift-dialog-${item.id}'),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 24,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 560,
+              maxHeight: MediaQuery.of(dialogContext).size.height * 0.82,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.scheduleShiftDetailsTitle,
+                              style: Theme.of(dialogContext)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.shiftLabel,
+                              style: Theme.of(dialogContext)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: l10n.scheduleCloseAction,
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${_timeLabel(item.workStart)}-${_timeLabel(item.workEnd)}',
-                ),
-                const SizedBox(height: 8),
-                Text(item.locationLabel ?? '-'),
-                if (item.meetingPoint != null) ...[
-                  const SizedBox(height: 4),
-                  Text('${l10n.scheduleMeetingPoint}: ${item.meetingPoint}'),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        _ShiftDetailRow(
+                          label: l10n.scheduleDateLabel,
+                          value: localizations.formatFullDate(
+                            item.scheduleDate,
+                          ),
+                        ),
+                        _ShiftDetailRow(
+                          label: l10n.scheduleTimeLabel,
+                          value:
+                              '${_timeLabel(item.workStart)}-${_timeLabel(item.workEnd)}',
+                        ),
+                        _ShiftDetailRow(
+                          label: l10n.scheduleLocationLabel,
+                          value: item.locationLabel ?? '-',
+                        ),
+                        _ShiftDetailRow(
+                          label: l10n.scheduleMeetingPoint,
+                          value: item.meetingPoint ?? '-',
+                        ),
+                        _ShiftDetailRow(
+                          label: l10n.scheduleAssignmentStatusLabel,
+                          value: _statusLabel(item.assignmentStatus),
+                        ),
+                        _ShiftDetailRow(
+                          label: l10n.scheduleConfirmationStatusLabel,
+                          value: _statusLabel(item.confirmationStatus),
+                        ),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            FilledButton.icon(
+                              onPressed: () => _copyMapUri(item),
+                              icon: const Icon(Icons.map_outlined),
+                              label: Text(l10n.scheduleMapAction),
+                            ),
+                            FilledButton.tonalIcon(
+                              onPressed: () => _respond(item, 'confirm'),
+                              icon: const Icon(
+                                Icons.check_circle_outline_rounded,
+                              ),
+                              label: Text(l10n.scheduleConfirmAction),
+                            ),
+                            FilledButton.tonalIcon(
+                              onPressed: () => _respond(item, 'decline'),
+                              icon: const Icon(Icons.cancel_outlined),
+                              label: Text(l10n.scheduleDeclineAction),
+                            ),
+                            FilledButton.tonalIcon(
+                              onPressed: () => _exportCalendar(item),
+                              icon: const Icon(Icons.event_available_rounded),
+                              label: Text(l10n.scheduleCalendarExportAction),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          l10n.scheduleDocumentsTitle,
+                          style: Theme.of(dialogContext).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 8),
+                        if (item.documents.isEmpty)
+                          Text(l10n.scheduleDocumentsEmpty)
+                        else
+                          ...item.documents.map(
+                            (document) => ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(document.title),
+                              subtitle: Text(document.fileName ?? '-'),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: Text(l10n.scheduleCloseAction),
+                    ),
+                  ),
                 ],
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: () => _copyMapUri(item),
-                      icon: const Icon(Icons.map_outlined),
-                      label: Text(l10n.scheduleMapAction),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () => _respond(item, 'confirm'),
-                      icon: const Icon(Icons.check_circle_outline_rounded),
-                      label: Text(l10n.scheduleConfirmAction),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () => _respond(item, 'decline'),
-                      icon: const Icon(Icons.cancel_outlined),
-                      label: Text(l10n.scheduleDeclineAction),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () => _exportCalendar(item),
-                      icon: const Icon(Icons.event_available_rounded),
-                      label: Text(l10n.scheduleCalendarExportAction),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  l10n.scheduleDocumentsTitle,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (item.documents.isEmpty)
-                  Text(l10n.scheduleDocumentsEmpty)
-                else
-                  ...item.documents.map(
-                    (document) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(document.title),
-                      subtitle: Text(document.fileName ?? '-'),
-                    ),
-                  ),
-              ],
+              ),
             ),
           ),
         );
@@ -546,201 +554,301 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 }
 
-class _CalendarMonthView extends StatelessWidget {
-  const _CalendarMonthView({
-    required this.visibleMonth,
+class _ScheduleWeekList extends StatelessWidget {
+  const _ScheduleWeekList({
+    required this.weekStarts,
     required this.schedulesByDay,
     required this.timeLabel,
     required this.statusLabel,
-    required this.onDaySelected,
+    required this.isToday,
+    required this.onShiftSelected,
+    super.key,
   });
 
-  final DateTime visibleMonth;
+  final List<DateTime> weekStarts;
   final Map<DateTime, List<EmployeeReleasedScheduleItem>> schedulesByDay;
   final String Function(DateTime value) timeLabel;
-  final String Function(EmployeeReleasedScheduleItem item) statusLabel;
-  final Future<void> Function(
-    DateTime day,
-    List<EmployeeReleasedScheduleItem> items,
-  )
-  onDaySelected;
+  final String Function(String code) statusLabel;
+  final bool Function(DateTime day) isToday;
+  final Future<void> Function(EmployeeReleasedScheduleItem item)
+  onShiftSelected;
 
   @override
   Widget build(BuildContext context) {
-    final localizations = MaterialLocalizations.of(context);
-    final orderedWeekdays = _orderedWeekdays(localizations);
-    final monthDays = _monthGridDays(localizations);
-
     return Column(
       children: [
-        Row(
-          children: orderedWeekdays
-              .map(
-                (weekday) => Expanded(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        weekday,
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                ),
-              )
-              .toList(growable: false),
-        ),
-        GridView.builder(
-          key: const ValueKey('schedule-calendar-grid'),
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: monthDays.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 7,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 0.9,
+        for (var index = 0; index < weekStarts.length; index++) ...[
+          _ScheduleWeekSection(
+            weekStart: weekStarts[index],
+            schedulesByDay: schedulesByDay,
+            timeLabel: timeLabel,
+            statusLabel: statusLabel,
+            isToday: isToday,
+            onShiftSelected: onShiftSelected,
           ),
-          itemBuilder: (context, index) {
-            final day = monthDays[index];
-            if (day == null) {
-              return const SizedBox.shrink();
-            }
-            final items =
-                schedulesByDay[day] ?? const <EmployeeReleasedScheduleItem>[];
-            final hasShifts = items.isNotEmpty;
-            final isCurrentMonth = day.month == visibleMonth.month;
-            return _CalendarDayCell(
-              day: day,
-              items: items,
-              hasShifts: hasShifts,
-              isCurrentMonth: isCurrentMonth,
-              onTap: hasShifts ? () => onDaySelected(day, items) : null,
-            );
-          },
-        ),
+          if (index < weekStarts.length - 1) const SizedBox(height: 16),
+        ],
       ],
     );
   }
+}
 
-  List<String> _orderedWeekdays(MaterialLocalizations localizations) {
-    final weekdays = localizations.narrowWeekdays;
-    final firstDay = localizations.firstDayOfWeekIndex;
-    return List<String>.generate(
-      7,
-      (index) => weekdays[(firstDay + index) % 7],
-      growable: false,
+class _ScheduleWeekSection extends StatelessWidget {
+  const _ScheduleWeekSection({
+    required this.weekStart,
+    required this.schedulesByDay,
+    required this.timeLabel,
+    required this.statusLabel,
+    required this.isToday,
+    required this.onShiftSelected,
+  });
+
+  final DateTime weekStart;
+  final Map<DateTime, List<EmployeeReleasedScheduleItem>> schedulesByDay;
+  final String Function(DateTime value) timeLabel;
+  final String Function(String code) statusLabel;
+  final bool Function(DateTime day) isToday;
+  final Future<void> Function(EmployeeReleasedScheduleItem item)
+  onShiftSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final localizations = MaterialLocalizations.of(context);
+    final weekEnd = weekStart.add(const Duration(days: 6));
+
+    return Container(
+      key: ValueKey('schedule-week-section-${_isoDate(weekStart)}'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.scheduleWeekLabel(
+              localizations.formatShortMonthDay(weekStart),
+              localizations.formatShortMonthDay(weekEnd),
+            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 12),
+          for (var offset = 0; offset < 7; offset++) ...[
+            _ScheduleDayGroup(
+              day: weekStart.add(Duration(days: offset)),
+              items:
+                  schedulesByDay[weekStart.add(Duration(days: offset))] ??
+                  const <EmployeeReleasedScheduleItem>[],
+              timeLabel: timeLabel,
+              statusLabel: statusLabel,
+              isToday: isToday(weekStart.add(Duration(days: offset))),
+              onShiftSelected: onShiftSelected,
+            ),
+            if (offset < 6) const SizedBox(height: 10),
+          ],
+        ],
+      ),
     );
-  }
-
-  List<DateTime?> _monthGridDays(MaterialLocalizations localizations) {
-    final firstOfMonth = DateTime(visibleMonth.year, visibleMonth.month, 1);
-    final lastOfMonth = DateTime(visibleMonth.year, visibleMonth.month + 1, 0);
-    final firstDayOffset =
-        (firstOfMonth.weekday % 7 - localizations.firstDayOfWeekIndex + 7) % 7;
-    final totalCells = ((firstDayOffset + lastOfMonth.day + 6) ~/ 7) * 7;
-    return List<DateTime?>.generate(totalCells, (index) {
-      final dayNumber = index - firstDayOffset + 1;
-      if (dayNumber < 1 || dayNumber > lastOfMonth.day) {
-        return null;
-      }
-      return DateTime(visibleMonth.year, visibleMonth.month, dayNumber);
-    }, growable: false);
   }
 }
 
-class _CalendarDayCell extends StatelessWidget {
-  const _CalendarDayCell({
+class _ScheduleDayGroup extends StatelessWidget {
+  const _ScheduleDayGroup({
     required this.day,
     required this.items,
-    required this.hasShifts,
-    required this.isCurrentMonth,
-    required this.onTap,
+    required this.timeLabel,
+    required this.statusLabel,
+    required this.isToday,
+    required this.onShiftSelected,
   });
 
   final DateTime day;
   final List<EmployeeReleasedScheduleItem> items;
-  final bool hasShifts;
-  final bool isCurrentMonth;
-  final VoidCallback? onTap;
+  final String Function(DateTime value) timeLabel;
+  final String Function(String code) statusLabel;
+  final bool isToday;
+  final Future<void> Function(EmployeeReleasedScheduleItem item)
+  onShiftSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colors = Theme.of(context).colorScheme;
+    final hasShifts = items.isNotEmpty;
+
+    return Container(
+      key: ValueKey('schedule-day-${_isoDate(day)}'),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: hasShifts
+            ? colors.primary.withValues(alpha: 0.10)
+            : colors.surfaceContainerHighest.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: hasShifts
+              ? colors.primary.withValues(alpha: 0.38)
+              : colors.outlineVariant,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  MaterialLocalizations.of(context).formatFullDate(day),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: hasShifts
+                        ? colors.onSurface
+                        : colors.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ),
+              if (isToday)
+                Chip(
+                  label: Text(l10n.scheduleTodayLabel),
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (!hasShifts)
+            Text(
+              l10n.scheduleNoShifts,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colors.onSurface.withValues(alpha: 0.68),
+              ),
+            )
+          else
+            Column(
+              children: [
+                for (var index = 0; index < items.length; index++) ...[
+                  _ScheduleShiftCard(
+                    item: items[index],
+                    timeLabel: timeLabel,
+                    statusLabel: statusLabel,
+                    onTap: () => onShiftSelected(items[index]),
+                  ),
+                  if (index < items.length - 1) const SizedBox(height: 8),
+                ],
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScheduleShiftCard extends StatelessWidget {
+  const _ScheduleShiftCard({
+    required this.item,
+    required this.timeLabel,
+    required this.statusLabel,
+    required this.onTap,
+  });
+
+  final EmployeeReleasedScheduleItem item;
+  final String Function(DateTime value) timeLabel;
+  final String Function(String code) statusLabel;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final firstShift = items.isEmpty ? null : items.first;
-    final shiftSummary = firstShift == null
-        ? null
-        : '${firstShift.workStart.hour.toString().padLeft(2, '0')}:${firstShift.workStart.minute.toString().padLeft(2, '0')} ${firstShift.shiftLabel}';
 
     return InkWell(
-      key: ValueKey(
-        'schedule-calendar-day-${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}',
-      ),
+      key: ValueKey('schedule-shift-${item.id}'),
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Ink(
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: hasShifts
-              ? colors.primary.withValues(alpha: 0.12)
-              : colors.surfaceContainerHighest.withValues(alpha: 0.35),
+          color: colors.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: hasShifts
-                ? colors.primary.withValues(alpha: 0.5)
-                : colors.outlineVariant,
-          ),
+          border: Border.all(color: colors.outlineVariant),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${day.day}',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: isCurrentMonth
-                      ? colors.onSurface
-                      : colors.onSurface.withValues(alpha: 0.45),
-                ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 5,
+              height: 48,
+              decoration: BoxDecoration(
+                color: colors.primary,
+                borderRadius: BorderRadius.circular(999),
               ),
-              const Spacer(),
-              if (hasShifts) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.primary,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    items.length == 1 ? '1' : '${items.length}',
-                    key: ValueKey(
-                      'schedule-calendar-day-count-${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}',
-                    ),
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: colors.onPrimary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${timeLabel(item.workStart)}-${timeLabel(item.workEnd)}',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  shiftSummary!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
-                ),
-              ],
-            ],
-          ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.shiftLabel,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.locationLabel ?? '-',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Chip(
+              label: Text(statusLabel(item.confirmationStatus)),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
         ),
       ),
     );
   }
 }
+
+class _ShiftDetailRow extends StatelessWidget {
+  const _ShiftDetailRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 2),
+          Text(value),
+        ],
+      ),
+    );
+  }
+}
+
+String _isoDate(DateTime value) =>
+    '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';

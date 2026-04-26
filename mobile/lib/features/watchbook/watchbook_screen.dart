@@ -21,7 +21,8 @@ class WatchbookScreen extends StatefulWidget {
 }
 
 class _WatchbookScreenState extends State<WatchbookScreen> {
-  late Future<(List<WatchbookListItem>, List<EmployeeReleasedScheduleItem>)> _future;
+  late Future<(List<WatchbookListItem>, List<EmployeeReleasedScheduleItem>)>
+  _future;
   WatchbookReadModel? _selected;
   final TextEditingController _entryController = TextEditingController();
 
@@ -44,7 +45,9 @@ class _WatchbookScreenState extends State<WatchbookScreen> {
       title: l10n.watchbookTitle,
       subtitle: l10n.watchbookSubtitle,
       children: [
-        FutureBuilder<(List<WatchbookListItem>, List<EmployeeReleasedScheduleItem>)>(
+        FutureBuilder<
+          (List<WatchbookListItem>, List<EmployeeReleasedScheduleItem>)
+        >(
           future: _future,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
@@ -60,23 +63,38 @@ class _WatchbookScreenState extends State<WatchbookScreen> {
                 icon: Icons.error_outline_rounded,
               );
             }
-            final data = snapshot.data ?? (const <WatchbookListItem>[], const <EmployeeReleasedScheduleItem>[]);
+            final data =
+                snapshot.data ??
+                (
+                  const <WatchbookListItem>[],
+                  const <EmployeeReleasedScheduleItem>[],
+                );
             final watchbooks = data.$1;
             final schedules = data.$2;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (schedules.isNotEmpty) ...[
-                  Text(l10n.scheduleTitle, style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    l10n.scheduleTitle,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: schedules
-                        .where((item) => item.planningRecordId != null || item.orderId != null || item.siteId != null)
+                        .where(
+                          (item) =>
+                              item.planningRecordId != null ||
+                              item.orderId != null ||
+                              item.siteId != null,
+                        )
                         .map(
                           (item) => ActionChip(
-                            label: Text('${item.shiftLabel} · ${item.scheduleDate.toLocal().toString().split(' ').first}'),
+                            label: Text(
+                              '${item.shiftLabel} · ${item.scheduleDate.toLocal().toString().split(' ').first}',
+                            ),
                             onPressed: () => _openFromSchedule(item),
                           ),
                         )
@@ -95,25 +113,30 @@ class _WatchbookScreenState extends State<WatchbookScreen> {
                     (item) => Card(
                       child: ListTile(
                         title: Text(item.headline ?? item.contextType),
-                        subtitle: Text('${item.logDate.toLocal().toString().split(' ').first} · ${item.closureStateCode}'),
+                        subtitle: Text(
+                          '${item.logDate.toLocal().toString().split(' ').first} · ${item.closureStateCode}',
+                        ),
                         onTap: () => _loadWatchbook(item.id),
                       ),
                     ),
                   ),
                 if (_selected != null) ...[
                   const SizedBox(height: 16),
-                  Text(_selected!.headline ?? _selected!.contextType, style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    _selected!.headline ?? _selected!.contextType,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   const SizedBox(height: 8),
-                  ..._selected!.entries
-                      .map(
-                        (entry) => Card(
-                          child: ListTile(
-                            title: Text(entry.narrative),
-                            subtitle: Text('${entry.entryTypeCode} · ${entry.authorActorType}'),
-                          ),
+                  ..._selected!.entries.map(
+                    (entry) => Card(
+                      child: ListTile(
+                        title: Text(entry.narrative),
+                        subtitle: Text(
+                          '${entry.entryTypeCode} · ${entry.authorActorType}',
                         ),
-                      )
-                      ,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _entryController,
@@ -126,7 +149,9 @@ class _WatchbookScreenState extends State<WatchbookScreen> {
                   ),
                   const SizedBox(height: 8),
                   FilledButton(
-                    onPressed: _selected!.closureStateCode == 'open' ? _submitEntry : null,
+                    onPressed: _selected!.closureStateCode == 'open'
+                        ? _submitEntry
+                        : null,
                     child: Text(l10n.watchbookEntryAction),
                   ),
                 ],
@@ -138,7 +163,8 @@ class _WatchbookScreenState extends State<WatchbookScreen> {
     );
   }
 
-  Future<(List<WatchbookListItem>, List<EmployeeReleasedScheduleItem>)> _load() async {
+  Future<(List<WatchbookListItem>, List<EmployeeReleasedScheduleItem>)>
+  _load() async {
     final tenantId = widget.controller.context?.tenantId ?? '';
     return widget.controller.withAccessToken((token) async {
       final watchbooks = await widget.backend.fetchWatchbooks(token, tenantId);
@@ -150,7 +176,11 @@ class _WatchbookScreenState extends State<WatchbookScreen> {
   Future<void> _loadWatchbook(String watchbookId) async {
     final tenantId = widget.controller.context?.tenantId ?? '';
     final item = await widget.controller.withAccessToken(
-      (token) => widget.backend.fetchWatchbook(token, tenantId: tenantId, watchbookId: watchbookId),
+      (token) => widget.backend.fetchWatchbook(
+        token,
+        tenantId: tenantId,
+        watchbookId: watchbookId,
+      ),
     );
     if (!mounted) return;
     setState(() {
@@ -167,8 +197,8 @@ class _WatchbookScreenState extends State<WatchbookScreen> {
         contextType: item.planningRecordId != null
             ? 'planning_record'
             : item.orderId != null
-                ? 'order'
-                : 'site',
+            ? 'order'
+            : 'site',
         logDate: item.scheduleDate,
         planningRecordId: item.planningRecordId,
         orderId: item.orderId,
@@ -203,8 +233,8 @@ class _WatchbookScreenState extends State<WatchbookScreen> {
     setState(() {
       _future = _load();
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(context.l10n.watchbookEntrySaved)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(context.l10n.watchbookEntrySaved)));
   }
 }

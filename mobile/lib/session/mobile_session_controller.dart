@@ -37,7 +37,10 @@ class MobileSessionController extends ChangeNotifier {
   EmployeeMobileContext? get context => _context;
   String? get messageKey => _messageKey;
   bool get busy => _busy;
-  bool get isAuthenticated => _phase == MobileSessionPhase.authenticated && _tokens != null && _context != null;
+  bool get isAuthenticated =>
+      _phase == MobileSessionPhase.authenticated &&
+      _tokens != null &&
+      _context != null;
 
   Future<void> bootstrap() async {
     _phase = MobileSessionPhase.bootstrapping;
@@ -58,7 +61,9 @@ class MobileSessionController extends ChangeNotifier {
       await _store.clear();
       _clearState();
       _messageKey = error.messageKey;
-      _phase = error.statusCode == 401 ? MobileSessionPhase.unauthenticated : MobileSessionPhase.forbidden;
+      _phase = error.statusCode == 401
+          ? MobileSessionPhase.unauthenticated
+          : MobileSessionPhase.forbidden;
       notifyListeners();
     } catch (_) {
       _clearState();
@@ -112,10 +117,15 @@ class MobileSessionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<T> withAccessToken<T>(Future<T> Function(String accessToken) fn) async {
+  Future<T> withAccessToken<T>(
+    Future<T> Function(String accessToken) fn,
+  ) async {
     final accessToken = _tokens?.accessToken;
     if (accessToken == null) {
-      throw const MobileApiException(statusCode: 401, messageKey: 'errors.iam.auth.invalid_access_token');
+      throw const MobileApiException(
+        statusCode: 401,
+        messageKey: 'errors.iam.auth.invalid_access_token',
+      );
     }
     try {
       return await fn(accessToken);
@@ -134,13 +144,20 @@ class MobileSessionController extends ChangeNotifier {
   ) {
     final allowedRole = context.roleKeys.contains('employee_user');
     if (!allowedRole) {
-      throw const MobileApiException(statusCode: 403, messageKey: 'errors.iam.authorization.permission_denied');
+      throw const MobileApiException(
+        statusCode: 403,
+        messageKey: 'errors.iam.authorization.permission_denied',
+      );
     }
     _user = user;
     _tokens = tokens;
     _context = context;
     _phase = MobileSessionPhase.authenticated;
-    unawaited(_store.write(StoredMobileSession(tokens: tokens, user: user, context: context)));
+    unawaited(
+      _store.write(
+        StoredMobileSession(tokens: tokens, user: user, context: context),
+      ),
+    );
   }
 
   void _clearState() {

@@ -22,9 +22,15 @@ class StoredMobileSession {
 
   factory StoredMobileSession.fromJson(Map<String, dynamic> json) {
     return StoredMobileSession(
-      tokens: MobileAuthTokens.fromJson((json['tokens'] as Map).cast<String, dynamic>()),
-      user: MobileCurrentUser.fromJson((json['user'] as Map).cast<String, dynamic>()),
-      context: EmployeeMobileContext.fromJson((json['context'] as Map).cast<String, dynamic>()),
+      tokens: MobileAuthTokens.fromJson(
+        (json['tokens'] as Map).cast<String, dynamic>(),
+      ),
+      user: MobileCurrentUser.fromJson(
+        (json['user'] as Map).cast<String, dynamic>(),
+      ),
+      context: EmployeeMobileContext.fromJson(
+        (json['context'] as Map).cast<String, dynamic>(),
+      ),
     );
   }
 }
@@ -37,7 +43,10 @@ abstract class MobileSessionStore {
 
 class FileMobileSessionStore implements MobileSessionStore {
   FileMobileSessionStore({String? filePath})
-    : _file = File(filePath ?? '${Directory.systemTemp.path}/sicherplan_mobile_session.json');
+    : _file = File(
+        filePath ??
+            '${Directory.systemTemp.path}/sicherplan_mobile_session.json',
+      );
 
   final File _file;
 
@@ -50,7 +59,9 @@ class FileMobileSessionStore implements MobileSessionStore {
     if (raw.trim().isEmpty) {
       return null;
     }
-    return StoredMobileSession.fromJson((jsonDecode(raw) as Map).cast<String, dynamic>());
+    return StoredMobileSession.fromJson(
+      (jsonDecode(raw) as Map).cast<String, dynamic>(),
+    );
   }
 
   @override

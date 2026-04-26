@@ -25,9 +25,11 @@ class _MemoryStore implements MobileSessionStore {
 }
 
 class _FakeBackend extends Fake implements MobileBackendGateway {
-  _FakeBackend({required this.context});
+  _FakeBackend({required this.context, this.throwOnPhotoDownload = false});
 
   final EmployeeMobileContext context;
+  final bool throwOnPhotoDownload;
+  int downloadOwnDocumentCalls = 0;
   final List<int> photoBytes = const <int>[
     137,
     80,
@@ -132,6 +134,13 @@ class _FakeBackend extends Fake implements MobileBackendGateway {
     required String documentId,
     required int versionNo,
   }) async {
+    downloadOwnDocumentCalls += 1;
+    if (throwOnPhotoDownload) {
+      throw const MobileApiException(
+        statusCode: 500,
+        messageKey: 'errors.docs.download.failed',
+      );
+    }
     if (documentId == 'photo-doc-1' && versionNo == 1) {
       return photoBytes;
     }
@@ -200,6 +209,7 @@ void main() {
     WidgetTester tester, {
     Size size = const Size(390, 844),
     EmployeeMobileContext activeContext = context,
+    _FakeBackend? backend,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -241,7 +251,7 @@ void main() {
           enableMockAuth: false,
           enableOfflineCache: true,
         ),
-        backendOverride: _FakeBackend(context: activeContext),
+        backendOverride: backend ?? _FakeBackend(context: activeContext),
         storeOverride: store,
       ),
     );
@@ -290,10 +300,12 @@ void main() {
   testWidgets(
     'home uses the employee profile photo in the hero when available',
     (tester) async {
-      await pumpHome(tester);
+      final backend = _FakeBackend(context: context);
+      await pumpHome(tester, backend: backend);
       await tester.pump();
 
       expect(find.byType(Image), findsOneWidget);
+      expect(backend.downloadOwnDocumentCalls, 1);
       expect(find.text('SP'), findsNothing);
     },
   );
@@ -306,5 +318,29 @@ void main() {
 
     expect(find.text('AM'), findsOneWidget);
     expect(find.text('SP'), findsNothing);
+  });
+
+  testWidgets(
+    'home does not attempt image download when photo metadata is absent',
+    (tester) async {
+      final backend = _FakeBackend(context: noPhotoContext);
+      await pumpHome(tester, activeContext: noPhotoContext, backend: backend);
+      await tester.pump();
+
+      expect(find.text('AM'), findsOneWidget);
+      expect(backend.downloadOwnDocumentCalls, 0);
+    },
+  );
+
+  testWidgets('home falls back to initials when photo download fails', (
+    tester,
+  ) async {
+    final backend = _FakeBackend(context: context, throwOnPhotoDownload: true);
+    await pumpHome(tester, backend: backend);
+    await tester.pump();
+
+    expect(find.text('AM'), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+    expect(backend.downloadOwnDocumentCalls, 1);
   });
 }

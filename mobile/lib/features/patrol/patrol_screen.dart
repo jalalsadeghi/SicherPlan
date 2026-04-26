@@ -28,7 +28,9 @@ class _PatrolScreenState extends State<PatrolScreen> {
   late final PatrolController _patrolController;
   final TextEditingController _tokenController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
-  final TextEditingController _abortReasonController = TextEditingController(text: 'manual_stop');
+  final TextEditingController _abortReasonController = TextEditingController(
+    text: 'manual_stop',
+  );
   String _scanMethodCode = 'qr';
 
   @override
@@ -61,22 +63,34 @@ class _PatrolScreenState extends State<PatrolScreen> {
           subtitle: l10n.patrolSubtitle,
           actions: [
             IconButton(
-              onPressed: _patrolController.loading ? null : _patrolController.load,
+              onPressed: _patrolController.loading
+                  ? null
+                  : _patrolController.load,
               icon: const Icon(Icons.refresh_rounded),
             ),
             IconButton(
-              onPressed: _patrolController.syncing ? null : _patrolController.sync,
+              onPressed: _patrolController.syncing
+                  ? null
+                  : _patrolController.sync,
               icon: const Icon(Icons.sync_rounded),
             ),
           ],
           children: [
             HighlightCard(
-              title: l10n.patrolAccessTitle(widget.controller.context?.hasPatrolAccess ?? false),
-              subtitle: l10n.patrolAccessSubtitle(widget.controller.context?.hasPatrolAccess ?? false),
+              title: l10n.patrolAccessTitle(
+                widget.controller.context?.hasPatrolAccess ?? false,
+              ),
+              subtitle: l10n.patrolAccessSubtitle(
+                widget.controller.context?.hasPatrolAccess ?? false,
+              ),
               icon: Icons.shield_outlined,
               badge: _patrolController.pendingOperationCount > 0
-                  ? l10n.patrolQueuedBadge(_patrolController.pendingOperationCount)
-                  : l10n.patrolAccessBadge(widget.controller.context?.hasPatrolAccess ?? false),
+                  ? l10n.patrolQueuedBadge(
+                      _patrolController.pendingOperationCount,
+                    )
+                  : l10n.patrolAccessBadge(
+                      widget.controller.context?.hasPatrolAccess ?? false,
+                    ),
             ),
             if (_patrolController.messageKey != null)
               HighlightCard(
@@ -119,11 +133,18 @@ class _PatrolScreenState extends State<PatrolScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${route.routeNo} · ${route.routeName}', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    Text(
+                      '${route.routeNo} · ${route.routeName}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     Text(route.locationLabel ?? route.meetingPoint ?? '-'),
                     const SizedBox(height: 6),
-                    Text('${route.checkpointCount} ${l10n.patrolCheckpointCountLabel}'),
+                    Text(
+                      '${route.checkpointCount} ${l10n.patrolCheckpointCountLabel}',
+                    ),
                     const SizedBox(height: 12),
                     FilledButton.icon(
                       onPressed: () => _patrolController.startRound(route),
@@ -154,24 +175,54 @@ class _PatrolScreenState extends State<PatrolScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(route == null ? l10n.patrolInProgressTitle : '${route.routeNo} · ${route.routeName}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                Text(
+                  route == null
+                      ? l10n.patrolInProgressTitle
+                      : '${route.routeNo} · ${route.routeName}',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 8),
-                Text('${round.completedCheckpointCount}/${round.totalCheckpointCount} ${l10n.patrolCheckpointCountLabel}'),
+                Text(
+                  '${round.completedCheckpointCount}/${round.totalCheckpointCount} ${l10n.patrolCheckpointCountLabel}',
+                ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    Chip(label: Text(l10n.patrolStatusLabel(round.roundStatusCode))),
+                    Chip(
+                      label: Text(
+                        l10n.patrolStatusLabel(round.roundStatusCode),
+                      ),
+                    ),
                     if (_patrolController.pendingOperationCount > 0)
-                      Chip(label: Text(l10n.patrolQueuedBadge(_patrolController.pendingOperationCount))),
+                      Chip(
+                        label: Text(
+                          l10n.patrolQueuedBadge(
+                            _patrolController.pendingOperationCount,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
                 if (evaluation != null) ...[
                   const SizedBox(height: 12),
-                  Text(l10n.patrolEvaluationTitle, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    l10n.patrolEvaluationTitle,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: 6),
-                  Text(l10n.patrolEvaluationSummary(evaluation.complianceStatusCode, evaluation.exceptionCount, evaluation.manualCaptureCount)),
+                  Text(
+                    l10n.patrolEvaluationSummary(
+                      evaluation.complianceStatusCode,
+                      evaluation.exceptionCount,
+                      evaluation.manualCaptureCount,
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -184,11 +235,18 @@ class _PatrolScreenState extends State<PatrolScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(l10n.patrolCaptureTitle, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                Text(
+                  l10n.patrolCaptureTitle,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: _scanMethodCode,
-                  decoration: InputDecoration(labelText: l10n.patrolScanMethodLabel),
+                  decoration: InputDecoration(
+                    labelText: l10n.patrolScanMethodLabel,
+                  ),
                   items: const [
                     DropdownMenuItem(value: 'qr', child: Text('QR')),
                     DropdownMenuItem(value: 'barcode', child: Text('Barcode')),
@@ -222,11 +280,15 @@ class _PatrolScreenState extends State<PatrolScreen> {
             margin: const EdgeInsets.only(bottom: 10),
             child: ListTile(
               title: Text('${checkpoint.sequenceNo}. ${checkpoint.label}'),
-              subtitle: Text('${checkpoint.checkpointCode} · ${checkpoint.scanTypeCode}'),
+              subtitle: Text(
+                '${checkpoint.checkpointCode} · ${checkpoint.scanTypeCode}',
+              ),
               trailing: checkpoint.isCompleted
                   ? Chip(label: Text(l10n.patrolCheckpointDone))
                   : FilledButton.tonal(
-                      onPressed: round.roundStatusCode == 'active' ? () => _captureCheckpoint(checkpoint) : null,
+                      onPressed: round.roundStatusCode == 'active'
+                          ? () => _captureCheckpoint(checkpoint)
+                          : null,
                       child: Text(l10n.patrolCaptureAction),
                     ),
             ),
@@ -241,7 +303,9 @@ class _PatrolScreenState extends State<PatrolScreen> {
                 children: [
                   TextField(
                     controller: _abortReasonController,
-                    decoration: InputDecoration(labelText: l10n.patrolAbortReasonLabel),
+                    decoration: InputDecoration(
+                      labelText: l10n.patrolAbortReasonLabel,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -249,12 +313,20 @@ class _PatrolScreenState extends State<PatrolScreen> {
                     runSpacing: 8,
                     children: [
                       FilledButton.icon(
-                        onPressed: _patrolController.syncing ? null : () => _patrolController.completeRound(note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim()),
+                        onPressed: _patrolController.syncing
+                            ? null
+                            : () => _patrolController.completeRound(
+                                note: _noteController.text.trim().isEmpty
+                                    ? null
+                                    : _noteController.text.trim(),
+                              ),
                         icon: const Icon(Icons.check_circle_outline_rounded),
                         label: Text(l10n.patrolCompleteAction),
                       ),
                       FilledButton.tonalIcon(
-                        onPressed: _patrolController.syncing ? null : _abortRound,
+                        onPressed: _patrolController.syncing
+                            ? null
+                            : _abortRound,
                         icon: const Icon(Icons.cancel_outlined),
                         label: Text(l10n.patrolAbortAction),
                       ),
@@ -268,22 +340,31 @@ class _PatrolScreenState extends State<PatrolScreen> {
     );
   }
 
-  Future<void> _captureCheckpoint(PatrolCheckpointProgressItem checkpoint) async {
-    final attachments = _scanMethodCode == 'manual' && _noteController.text.trim().isNotEmpty
+  Future<void> _captureCheckpoint(
+    PatrolCheckpointProgressItem checkpoint,
+  ) async {
+    final attachments =
+        _scanMethodCode == 'manual' && _noteController.text.trim().isNotEmpty
         ? [
             PatrolEvidenceAttachmentPayload(
               title: 'manual-note',
               fileName: 'manual-note.txt',
               contentType: 'text/plain',
-              contentBase64: base64Encode(utf8.encode(_noteController.text.trim())),
+              contentBase64: base64Encode(
+                utf8.encode(_noteController.text.trim()),
+              ),
             ),
           ]
         : const <PatrolEvidenceAttachmentPayload>[];
     await _patrolController.captureCheckpoint(
       checkpoint: checkpoint,
       scanMethodCode: _scanMethodCode,
-      tokenValue: _tokenController.text.trim().isEmpty ? null : _tokenController.text.trim(),
-      note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
+      tokenValue: _tokenController.text.trim().isEmpty
+          ? null
+          : _tokenController.text.trim(),
+      note: _noteController.text.trim().isEmpty
+          ? null
+          : _noteController.text.trim(),
       reasonCode: _scanMethodCode == 'manual' ? 'manual_fallback' : null,
       attachments: attachments,
     );
@@ -304,7 +385,9 @@ class _PatrolScreenState extends State<PatrolScreen> {
             ),
           ];
     await _patrolController.abortRound(
-      abortReasonCode: _abortReasonController.text.trim().isEmpty ? 'manual_stop' : _abortReasonController.text.trim(),
+      abortReasonCode: _abortReasonController.text.trim().isEmpty
+          ? 'manual_stop'
+          : _abortReasonController.text.trim(),
       note: note.isEmpty ? null : note,
       attachments: attachments,
     );

@@ -81,20 +81,32 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                         padding: const EdgeInsets.all(18),
                         child: Row(
                           children: [
-                            Icon(Icons.description_outlined, color: Theme.of(context).colorScheme.primary),
+                            Icon(
+                              Icons.description_outlined,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(item.title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                                  Text(
+                                    item.title,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
                                   const SizedBox(height: 4),
-                                  Text('${item.fileName ?? '-'} • ${item.relationType}'),
+                                  Text(
+                                    '${item.fileName ?? '-'} • ${item.relationType}',
+                                  ),
                                 ],
                               ),
                             ),
                             const SizedBox(width: 8),
-                            if (item.scheduleDate != null) Chip(label: Text(_dateLabel(item.scheduleDate!))),
+                            if (item.scheduleDate != null)
+                              Chip(label: Text(_dateLabel(item.scheduleDate!))),
                             IconButton(
                               onPressed: () => _download(item),
                               icon: const Icon(Icons.download_rounded),
@@ -116,12 +128,15 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     return widget.controller.withAccessToken(widget.backend.fetchDocuments);
   }
 
-  String _dateLabel(DateTime value) => '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}';
+  String _dateLabel(DateTime value) =>
+      '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}';
 
   Future<void> _download(EmployeeMobileDocument item) async {
     final messenger = ScaffoldMessenger.of(context);
     if (item.currentVersionNo == null || item.fileName == null) {
-      messenger.showSnackBar(SnackBar(content: Text(context.l10n.documentsDownloadUnavailable)));
+      messenger.showSnackBar(
+        SnackBar(content: Text(context.l10n.documentsDownloadUnavailable)),
+      );
       return;
     }
     final bytes = await widget.controller.withAccessToken(
@@ -136,6 +151,8 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     if (!mounted) {
       return;
     }
-    messenger.showSnackBar(SnackBar(content: Text(context.l10n.documentsDownloaded(file.path))));
+    messenger.showSnackBar(
+      SnackBar(content: Text(context.l10n.documentsDownloaded(file.path))),
+    );
   }
 }

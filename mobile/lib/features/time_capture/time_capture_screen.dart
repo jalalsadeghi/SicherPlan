@@ -94,51 +94,90 @@ class _TimeCaptureScreenState extends State<TimeCaptureScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(l10n.timeCaptureFormTitle, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    Text(
+                      l10n.timeCaptureFormTitle,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Text(l10n.timeCaptureFormSubtitle),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
                       key: ValueKey('shift-${_selectedShiftId ?? ''}'),
                       initialValue: _selectedShiftId,
-                      decoration: InputDecoration(labelText: l10n.timeShiftLabel),
+                      decoration: InputDecoration(
+                        labelText: l10n.timeShiftLabel,
+                      ),
                       items: schedules
                           .map(
                             (item) => DropdownMenuItem<String>(
                               value: item.shiftId,
-                              child: Text('${_timeLabel(item.workStart)}-${_timeLabel(item.workEnd)} · ${item.shiftLabel}'),
+                              child: Text(
+                                '${_timeLabel(item.workStart)}-${_timeLabel(item.workEnd)} · ${item.shiftLabel}',
+                              ),
                             ),
                           )
                           .toList(growable: false),
-                      onChanged: (value) => setState(() => _selectedShiftId = value),
+                      onChanged: (value) =>
+                          setState(() => _selectedShiftId = value),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       key: ValueKey('event-$_selectedEventCode'),
                       initialValue: _selectedEventCode,
-                      decoration: InputDecoration(labelText: l10n.timeEventCodeLabel),
+                      decoration: InputDecoration(
+                        labelText: l10n.timeEventCodeLabel,
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'clock_in', child: Text('clock_in')),
-                        DropdownMenuItem(value: 'clock_out', child: Text('clock_out')),
-                        DropdownMenuItem(value: 'break_start', child: Text('break_start')),
-                        DropdownMenuItem(value: 'break_end', child: Text('break_end')),
+                        DropdownMenuItem(
+                          value: 'clock_in',
+                          child: Text('clock_in'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'clock_out',
+                          child: Text('clock_out'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'break_start',
+                          child: Text('break_start'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'break_end',
+                          child: Text('break_end'),
+                        ),
                       ],
-                      onChanged: (value) => setState(() => _selectedEventCode = value ?? 'clock_in'),
+                      onChanged: (value) => setState(
+                        () => _selectedEventCode = value ?? 'clock_in',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       key: ValueKey('scan-$_selectedScanMedium'),
                       initialValue: _selectedScanMedium,
-                      decoration: InputDecoration(labelText: l10n.timeScanMediumLabel),
+                      decoration: InputDecoration(
+                        labelText: l10n.timeScanMediumLabel,
+                      ),
                       items: const [
-                        DropdownMenuItem(value: 'manual', child: Text('manual')),
-                        DropdownMenuItem(value: 'app_badge', child: Text('app_badge')),
-                        DropdownMenuItem(value: 'barcode', child: Text('barcode')),
+                        DropdownMenuItem(
+                          value: 'manual',
+                          child: Text('manual'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'app_badge',
+                          child: Text('app_badge'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'barcode',
+                          child: Text('barcode'),
+                        ),
                         DropdownMenuItem(value: 'qr', child: Text('qr')),
                         DropdownMenuItem(value: 'nfc', child: Text('nfc')),
                         DropdownMenuItem(value: 'rfid', child: Text('rfid')),
                       ],
-                      onChanged: (value) => setState(() => _selectedScanMedium = value ?? 'manual'),
+                      onChanged: (value) => setState(
+                        () => _selectedScanMedium = value ?? 'manual',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -154,16 +193,26 @@ class _TimeCaptureScreenState extends State<TimeCaptureScreen> {
                         Expanded(
                           child: TextField(
                             controller: _latitudeController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                            decoration: InputDecoration(labelText: l10n.timeLatitudeLabel),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                              signed: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: l10n.timeLatitudeLabel,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: TextField(
                             controller: _longitudeController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                            decoration: InputDecoration(labelText: l10n.timeLongitudeLabel),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                              signed: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: l10n.timeLongitudeLabel,
+                            ),
                           ),
                         ),
                       ],
@@ -172,13 +221,19 @@ class _TimeCaptureScreenState extends State<TimeCaptureScreen> {
                     TextField(
                       controller: _noteController,
                       maxLines: 2,
-                      decoration: InputDecoration(labelText: l10n.timeNoteLabel),
+                      decoration: InputDecoration(
+                        labelText: l10n.timeNoteLabel,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     FilledButton.icon(
                       onPressed: _submitting ? null : _submit,
                       icon: _submitting
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : const Icon(Icons.timer_rounded),
                       label: Text(l10n.timeSubmitAction),
                     ),
@@ -215,7 +270,12 @@ class _TimeCaptureScreenState extends State<TimeCaptureScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(l10n.timeHistoryTitle, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    Text(
+                      l10n.timeHistoryTitle,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     ...items.map(
                       (item) => ListTile(
@@ -227,7 +287,9 @@ class _TimeCaptureScreenState extends State<TimeCaptureScreen> {
                               ? Icons.warning_amber_rounded
                               : Icons.block_outlined,
                         ),
-                        title: Text('${item.eventCode} · ${_timeLabel(item.occurredAt)}'),
+                        title: Text(
+                          '${item.eventCode} · ${_timeLabel(item.occurredAt)}',
+                        ),
                         subtitle: Text(
                           item.validationMessageKey == null
                               ? item.sourceChannelCode
@@ -247,7 +309,9 @@ class _TimeCaptureScreenState extends State<TimeCaptureScreen> {
   }
 
   Future<List<EmployeeReleasedScheduleItem>> _loadSchedules() {
-    return widget.controller.withAccessToken(widget.backend.fetchReleasedSchedules);
+    return widget.controller.withAccessToken(
+      widget.backend.fetchReleasedSchedules,
+    );
   }
 
   Future<List<TimeCaptureEventItem>> _loadEvents() {
@@ -261,7 +325,8 @@ class _TimeCaptureScreenState extends State<TimeCaptureScreen> {
     });
   }
 
-  String _timeLabel(DateTime value) => '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  String _timeLabel(DateTime value) =>
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 
   Future<void> _submit() async {
     if (_selectedShiftId == null) {
@@ -283,8 +348,12 @@ class _TimeCaptureScreenState extends State<TimeCaptureScreen> {
             occurredAt: DateTime.now().toUtc(),
             latitude: latitude,
             longitude: longitude,
-            note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
-            rawToken: _tokenController.text.trim().isEmpty ? null : _tokenController.text.trim(),
+            note: _noteController.text.trim().isEmpty
+                ? null
+                : _noteController.text.trim(),
+            rawToken: _tokenController.text.trim().isEmpty
+                ? null
+                : _tokenController.text.trim(),
             scanMediumCode: _selectedScanMedium,
             clientEventId: 'mobile-${DateTime.now().microsecondsSinceEpoch}',
           ),
@@ -296,13 +365,17 @@ class _TimeCaptureScreenState extends State<TimeCaptureScreen> {
       _latitudeController.clear();
       _longitudeController.clear();
       _refresh();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.timeSubmitSuccess)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.timeSubmitSuccess)));
     } catch (error) {
       if (!mounted) return;
-      final message = error is MobileApiException ? context.l10n.backendMessage(error.messageKey) : context.l10n.mobileLoadErrorSubtitle(error);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      final message = error is MobileApiException
+          ? context.l10n.backendMessage(error.messageKey)
+          : context.l10n.mobileLoadErrorSubtitle(error);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) {
         setState(() {

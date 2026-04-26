@@ -107,6 +107,15 @@ class EmployeeMobileReadServiceTests(unittest.TestCase):
             links=[SimpleNamespace(owner_type='hr.employee', owner_id='employee-1', relation_type='profile_photo', linked_at=datetime.now(UTC))],
         )
         self.repository.owner_documents[('tenant-1', 'hr.employee', 'employee-1')].append(profile_photo)
+        other_profile_photo = SimpleNamespace(
+            id='employee-photo-2',
+            title='Profilfoto Fremd',
+            metadata_json={'kind': 'profile_photo'},
+            current_version_no=1,
+            versions=[SimpleNamespace(version_no=1, file_name='profile-2.jpg', content_type='image/jpeg')],
+            links=[SimpleNamespace(owner_type='hr.employee', owner_id='employee-2', relation_type='profile_photo', linked_at=datetime.now(UTC))],
+        )
+        self.repository.owner_documents[('tenant-1', 'hr.employee', 'employee-2')] = [other_profile_photo]
         self.repository.list_credentials = lambda tenant_id, filters: [  # type: ignore[method-assign]
             row for row in self.repository.employee_credentials if row.employee_id == filters.employee_id
         ]
@@ -123,7 +132,10 @@ class EmployeeMobileReadServiceTests(unittest.TestCase):
     def test_lists_employee_and_shift_documents_with_scope(self) -> None:
         result = self.service.list_documents(_context())
         self.assertEqual(result.employee_id, 'employee-1')
-        self.assertEqual({item.document_id for item in result.items}, {'employee-doc-1', 'shift-doc-1'})
+        self.assertEqual(
+            {item.document_id for item in result.items},
+            {'employee-doc-1', 'employee-photo-1', 'shift-doc-1'},
+        )
 
     def test_download_rejects_unscoped_document(self) -> None:
         with self.assertRaises(ApiException) as raised:
@@ -133,6 +145,12 @@ class EmployeeMobileReadServiceTests(unittest.TestCase):
     def test_download_allows_owned_profile_photo(self) -> None:
         result = self.service.download_document(_context(), 'employee-photo-1', 1)
         self.assertEqual(result.file_name, 'employee-photo-1.bin')
+        self.assertEqual(result.content, b'123')
+
+    def test_download_rejects_another_employees_profile_photo(self) -> None:
+        with self.assertRaises(ApiException) as raised:
+            self.service.download_document(_context(), 'employee-photo-2', 1)
+        self.assertEqual(raised.exception.status_code, 404)
 
     def test_lists_credentials_for_own_employee(self) -> None:
         result = self.service.list_credentials(_context())

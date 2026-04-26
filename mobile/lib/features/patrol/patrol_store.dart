@@ -41,7 +41,9 @@ class StoredPatrolOperation {
         longitude: (item['longitude'] as num?)?.toDouble(),
         note: item['note'] as String?,
         reasonCode: item['reason_code'] as String?,
-        occurredAt: item['occurred_at'] != null ? DateTime.parse(item['occurred_at'] as String) : null,
+        occurredAt: item['occurred_at'] != null
+            ? DateTime.parse(item['occurred_at'] as String)
+            : null,
         offlineSequenceNo: item['offline_sequence_no'] as int?,
         clientEventId: item['client_event_id'] as String,
         attachments: (item['attachments'] as List? ?? const [])
@@ -63,7 +65,9 @@ class StoredPatrolOperation {
       complete = PatrolRoundCompletePayload(
         clientEventId: item['client_event_id'] as String,
         note: item['note'] as String?,
-        occurredAt: item['occurred_at'] != null ? DateTime.parse(item['occurred_at'] as String) : null,
+        occurredAt: item['occurred_at'] != null
+            ? DateTime.parse(item['occurred_at'] as String)
+            : null,
         offlineSequenceNo: item['offline_sequence_no'] as int?,
       );
     }
@@ -74,7 +78,9 @@ class StoredPatrolOperation {
         abortReasonCode: item['abort_reason_code'] as String,
         clientEventId: item['client_event_id'] as String,
         note: item['note'] as String?,
-        occurredAt: item['occurred_at'] != null ? DateTime.parse(item['occurred_at'] as String) : null,
+        occurredAt: item['occurred_at'] != null
+            ? DateTime.parse(item['occurred_at'] as String)
+            : null,
         offlineSequenceNo: item['offline_sequence_no'] as int?,
         attachments: (item['attachments'] as List? ?? const [])
             .cast<Map<String, dynamic>>()
@@ -116,19 +122,25 @@ class StoredPatrolQueue {
     'route': route.toJson(),
     'start_payload': startPayload.toJson(),
     'local_round': localRound.toJson(),
-    'pending_operations': pendingOperations.map((item) => item.toJson()).toList(),
+    'pending_operations': pendingOperations
+        .map((item) => item.toJson())
+        .toList(),
   };
 
   factory StoredPatrolQueue.fromJson(Map<String, dynamic> json) {
     final startPayload = (json['start_payload'] as Map).cast<String, dynamic>();
     return StoredPatrolQueue(
-      route: PatrolAvailableRouteItem.fromJson((json['route'] as Map).cast<String, dynamic>()),
+      route: PatrolAvailableRouteItem.fromJson(
+        (json['route'] as Map).cast<String, dynamic>(),
+      ),
       startPayload: PatrolRoundStartPayload(
         shiftId: startPayload['shift_id'] as String,
         patrolRouteId: startPayload['patrol_route_id'] as String,
         offlineSyncToken: startPayload['offline_sync_token'] as String,
       ),
-      localRound: PatrolRoundItem.fromJson((json['local_round'] as Map).cast<String, dynamic>()),
+      localRound: PatrolRoundItem.fromJson(
+        (json['local_round'] as Map).cast<String, dynamic>(),
+      ),
       pendingOperations: (json['pending_operations'] as List? ?? const [])
           .cast<Map<String, dynamic>>()
           .map(StoredPatrolOperation.fromJson)
@@ -145,7 +157,10 @@ abstract class PatrolOfflineStore {
 
 class FilePatrolOfflineStore implements PatrolOfflineStore {
   FilePatrolOfflineStore({String? filePath})
-    : _file = File(filePath ?? '${Directory.systemTemp.path}/sicherplan_mobile_patrol_queue.json');
+    : _file = File(
+        filePath ??
+            '${Directory.systemTemp.path}/sicherplan_mobile_patrol_queue.json',
+      );
 
   final File _file;
 
@@ -158,7 +173,9 @@ class FilePatrolOfflineStore implements PatrolOfflineStore {
     if (raw.trim().isEmpty) {
       return null;
     }
-    return StoredPatrolQueue.fromJson((jsonDecode(raw) as Map).cast<String, dynamic>());
+    return StoredPatrolQueue.fromJson(
+      (jsonDecode(raw) as Map).cast<String, dynamic>(),
+    );
   }
 
   @override

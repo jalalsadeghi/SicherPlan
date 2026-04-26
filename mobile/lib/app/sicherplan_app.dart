@@ -34,7 +34,9 @@ class _SicherPlanAppState extends State<SicherPlanApp> {
   void initState() {
     super.initState();
     _locale = Locale(widget.config.defaultLocale);
-    _backend = widget.backendOverride ?? HttpMobileBackendGateway(config: widget.config);
+    _backend =
+        widget.backendOverride ??
+        HttpMobileBackendGateway(config: widget.config);
     _controller = MobileSessionController(
       backend: _backend,
       store: widget.storeOverride ?? FileMobileSessionStore(),

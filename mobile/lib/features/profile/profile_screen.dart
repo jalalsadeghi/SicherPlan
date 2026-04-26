@@ -51,7 +51,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       title: l10n.profileTitle,
       subtitle: l10n.profileSubtitle,
       children: [
-        ThemeModeCard(themeMode: widget.themeMode, onChanged: widget.onThemeModeChanged),
+        ThemeModeCard(
+          themeMode: widget.themeMode,
+          onChanged: widget.onThemeModeChanged,
+        ),
         LocaleCard(
           locale: widget.locale,
           onChanged: (value) {
@@ -62,7 +65,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         HighlightCard(
           title: mobileContext.fullName,
-          subtitle: l10n.profileRoleSubtitle(mobileContext.tenantId, mobileContext.appRole),
+          subtitle: l10n.profileRoleSubtitle(
+            mobileContext.tenantId,
+            mobileContext.appRole,
+          ),
           icon: Icons.account_circle_outlined,
         ),
         FutureBuilder<List<EmployeeMobileCredential>>(
@@ -96,7 +102,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(l10n.credentialsTitle, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    Text(
+                      l10n.credentialsTitle,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     ...items.map((item) => _CredentialCard(item: item)),
                   ],
@@ -142,7 +153,12 @@ class _CredentialCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(item.credentialNo, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+          Text(
+            item.credentialNo,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
           const SizedBox(height: 6),
           Text(item.credentialType),
           const SizedBox(height: 12),
@@ -180,10 +196,14 @@ class _PseudoBarcodePainter extends CustomPainter {
     for (var i = 0; i < bytes.length; i++) {
       final normalized = (bytes[i] % 5) + 1;
       final left = i * barWidth * 2;
-      canvas.drawRect(Rect.fromLTWH(left, 8, barWidth * normalized / 2, size.height - 16), paint);
+      canvas.drawRect(
+        Rect.fromLTWH(left, 8, barWidth * normalized / 2, size.height - 16),
+        paint,
+      );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _PseudoBarcodePainter oldDelegate) => oldDelegate.value != value;
+  bool shouldRepaint(covariant _PseudoBarcodePainter oldDelegate) =>
+      oldDelegate.value != value;
 }

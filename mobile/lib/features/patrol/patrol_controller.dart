@@ -9,14 +9,20 @@ class PatrolController extends ChangeNotifier {
   PatrolController({
     required MobileBackendGateway backend,
     required PatrolOfflineStore store,
-    required Future<dynamic> Function(Future<dynamic> Function(String accessToken) action) withAccessToken,
+    required Future<dynamic> Function(
+      Future<dynamic> Function(String accessToken) action,
+    )
+    withAccessToken,
   }) : _backend = backend,
        _store = store,
        _withAccessToken = withAccessToken;
 
   final MobileBackendGateway _backend;
   final PatrolOfflineStore _store;
-  final Future<dynamic> Function(Future<dynamic> Function(String accessToken) action) _withAccessToken;
+  final Future<dynamic> Function(
+    Future<dynamic> Function(String accessToken) action,
+  )
+  _withAccessToken;
 
   List<PatrolAvailableRouteItem> _routes = const [];
   PatrolRoundItem? _activeRound;
@@ -51,9 +57,13 @@ class PatrolController extends ChangeNotifier {
       _routes = serverRoutes;
       if (serverRound != null) {
         _activeRound = serverRound;
-        _activeRoute = _routeForRound(serverRoutes, serverRound) ?? _activeRoute;
+        _activeRoute =
+            _routeForRound(serverRoutes, serverRound) ?? _activeRoute;
         _evaluation = null;
-        if (_queue != null && _queue!.startPayload.offlineSyncToken == serverRound.offlineSyncToken && _queue!.pendingOperations.isEmpty) {
+        if (_queue != null &&
+            _queue!.startPayload.offlineSyncToken ==
+                serverRound.offlineSyncToken &&
+            _queue!.pendingOperations.isEmpty) {
           _queue = null;
           await _store.clear();
         }
@@ -100,7 +110,12 @@ class PatrolController extends ChangeNotifier {
       events: const [],
       checkpoints: route.checkpoints,
     );
-    _queue = StoredPatrolQueue(route: route, startPayload: startPayload, localRound: localRound, pendingOperations: const []);
+    _queue = StoredPatrolQueue(
+      route: route,
+      startPayload: startPayload,
+      localRound: localRound,
+      pendingOperations: const [],
+    );
     _activeRoute = route;
     _activeRound = localRound;
     _evaluation = null;
@@ -131,7 +146,10 @@ class PatrolController extends ChangeNotifier {
       offlineSequenceNo: sequenceNo,
       attachments: attachments,
     );
-    final eventTypeCode = _isPolicyCompliant(checkpoint, scanMethodCode, tokenValue) ? 'checkpoint_scanned' : 'checkpoint_exception';
+    final eventTypeCode =
+        _isPolicyCompliant(checkpoint, scanMethodCode, tokenValue)
+        ? 'checkpoint_scanned'
+        : 'checkpoint_exception';
     final event = PatrolRoundEventItem(
       id: 'local-event-$sequenceNo',
       patrolRoundId: queue.localRound.id,
@@ -152,7 +170,14 @@ class PatrolController extends ChangeNotifier {
       route: queue.route,
       startPayload: queue.startPayload,
       localRound: _applyEvent(queue.localRound, queue.route, event),
-      pendingOperations: [...queue.pendingOperations, StoredPatrolOperation(type: 'capture', localSequenceNo: sequenceNo, capture: payload)],
+      pendingOperations: [
+        ...queue.pendingOperations,
+        StoredPatrolOperation(
+          type: 'capture',
+          localSequenceNo: sequenceNo,
+          capture: payload,
+        ),
+      ],
     );
     _activeRound = _queue!.localRound;
     await _store.write(_queue!);
@@ -181,15 +206,29 @@ class PatrolController extends ChangeNotifier {
       note: note,
       reasonCode: null,
       actorUserId: 'local',
-      isPolicyCompliant: queue.localRound.completedCheckpointCount >= queue.localRound.totalCheckpointCount,
+      isPolicyCompliant:
+          queue.localRound.completedCheckpointCount >=
+          queue.localRound.totalCheckpointCount,
       clientEventId: payload.clientEventId,
       attachmentDocumentIds: const [],
     );
     _queue = StoredPatrolQueue(
       route: queue.route,
       startPayload: queue.startPayload,
-      localRound: _finalizeLocalRound(queue.localRound, event, completed: true, note: note),
-      pendingOperations: [...queue.pendingOperations, StoredPatrolOperation(type: 'complete', localSequenceNo: sequenceNo, complete: payload)],
+      localRound: _finalizeLocalRound(
+        queue.localRound,
+        event,
+        completed: true,
+        note: note,
+      ),
+      pendingOperations: [
+        ...queue.pendingOperations,
+        StoredPatrolOperation(
+          type: 'complete',
+          localSequenceNo: sequenceNo,
+          complete: payload,
+        ),
+      ],
     );
     _activeRound = _queue!.localRound;
     await _store.write(_queue!);
@@ -231,8 +270,21 @@ class PatrolController extends ChangeNotifier {
     _queue = StoredPatrolQueue(
       route: queue.route,
       startPayload: queue.startPayload,
-      localRound: _finalizeLocalRound(queue.localRound, event, completed: false, note: note, abortReasonCode: abortReasonCode),
-      pendingOperations: [...queue.pendingOperations, StoredPatrolOperation(type: 'abort', localSequenceNo: sequenceNo, abort: payload)],
+      localRound: _finalizeLocalRound(
+        queue.localRound,
+        event,
+        completed: false,
+        note: note,
+        abortReasonCode: abortReasonCode,
+      ),
+      pendingOperations: [
+        ...queue.pendingOperations,
+        StoredPatrolOperation(
+          type: 'abort',
+          localSequenceNo: sequenceNo,
+          abort: payload,
+        ),
+      ],
     );
     _activeRound = _queue!.localRound;
     await _store.write(_queue!);
@@ -251,20 +303,45 @@ class PatrolController extends ChangeNotifier {
     try {
       PatrolRoundItem currentRound = queue.localRound;
       if (!currentRound.id.startsWith('local-')) {
-        currentRound = await _authorized((token) => _backend.fetchPatrolRound(token, currentRound.id));
+        currentRound = await _authorized(
+          (token) => _backend.fetchPatrolRound(token, currentRound.id),
+        );
       } else {
-        currentRound = await _authorized((token) => _backend.startPatrolRound(token, queue.startPayload));
+        currentRound = await _authorized(
+          (token) => _backend.startPatrolRound(token, queue.startPayload),
+        );
       }
       var remaining = List<StoredPatrolOperation>.from(queue.pendingOperations)
-        ..sort((left, right) => left.localSequenceNo.compareTo(right.localSequenceNo));
+        ..sort(
+          (left, right) =>
+              left.localSequenceNo.compareTo(right.localSequenceNo),
+        );
       while (remaining.isNotEmpty) {
         final current = remaining.first;
         if (current.capture != null) {
-          currentRound = await _authorized((token) => _backend.capturePatrolCheckpoint(token, currentRound.id, current.capture!));
+          currentRound = await _authorized(
+            (token) => _backend.capturePatrolCheckpoint(
+              token,
+              currentRound.id,
+              current.capture!,
+            ),
+          );
         } else if (current.complete != null) {
-          currentRound = await _authorized((token) => _backend.completePatrolRound(token, currentRound.id, current.complete!));
+          currentRound = await _authorized(
+            (token) => _backend.completePatrolRound(
+              token,
+              currentRound.id,
+              current.complete!,
+            ),
+          );
         } else if (current.abort != null) {
-          currentRound = await _authorized((token) => _backend.abortPatrolRound(token, currentRound.id, current.abort!));
+          currentRound = await _authorized(
+            (token) => _backend.abortPatrolRound(
+              token,
+              currentRound.id,
+              current.abort!,
+            ),
+          );
         }
         remaining = remaining.sublist(1);
         _queue = StoredPatrolQueue(
@@ -275,11 +352,15 @@ class PatrolController extends ChangeNotifier {
         );
         await _store.write(_queue!);
       }
-      _activeRound = currentRound.roundStatusCode == 'active' ? currentRound : currentRound;
+      _activeRound = currentRound.roundStatusCode == 'active'
+          ? currentRound
+          : currentRound;
       _activeRoute = queue.route;
       _evaluation = currentRound.roundStatusCode == 'active'
           ? null
-          : await _authorized((token) => _backend.fetchPatrolEvaluation(token, currentRound.id));
+          : await _authorized(
+              (token) => _backend.fetchPatrolEvaluation(token, currentRound.id),
+            );
       if (remaining.isEmpty) {
         if (currentRound.roundStatusCode == 'active') {
           _queue = StoredPatrolQueue(
@@ -309,7 +390,9 @@ class PatrolController extends ChangeNotifier {
     return 'errors.platform.internal';
   }
 
-  Future<T> _authorized<T>(Future<T> Function(String accessToken) action) async {
+  Future<T> _authorized<T>(
+    Future<T> Function(String accessToken) action,
+  ) async {
     final result = await _withAccessToken((accessToken) => action(accessToken));
     return result as T;
   }
@@ -322,9 +405,13 @@ class PatrolController extends ChangeNotifier {
     return queue;
   }
 
-  PatrolAvailableRouteItem? _routeForRound(List<PatrolAvailableRouteItem> routes, PatrolRoundItem round) {
+  PatrolAvailableRouteItem? _routeForRound(
+    List<PatrolAvailableRouteItem> routes,
+    PatrolRoundItem round,
+  ) {
     for (final route in routes) {
-      if (route.shiftId == round.shiftId && route.patrolRouteId == round.patrolRouteId) {
+      if (route.shiftId == round.shiftId &&
+          route.patrolRouteId == round.patrolRouteId) {
         return route;
       }
     }
@@ -335,15 +422,25 @@ class PatrolController extends ChangeNotifier {
     if (queue.pendingOperations.isEmpty) {
       return 1;
     }
-    return queue.pendingOperations.map((item) => item.localSequenceNo).reduce(max) + 1;
+    return queue.pendingOperations
+            .map((item) => item.localSequenceNo)
+            .reduce(max) +
+        1;
   }
 
-  PatrolRoundItem _applyEvent(PatrolRoundItem round, PatrolAvailableRouteItem route, PatrolRoundEventItem event) {
+  PatrolRoundItem _applyEvent(
+    PatrolRoundItem round,
+    PatrolAvailableRouteItem route,
+    PatrolRoundEventItem event,
+  ) {
     final completedCheckpointIds = <String>{
       for (final item in round.events)
-        if (item.eventTypeCode == 'checkpoint_scanned' && item.checkpointId != null) item.checkpointId!,
+        if (item.eventTypeCode == 'checkpoint_scanned' &&
+            item.checkpointId != null)
+          item.checkpointId!,
     };
-    if (event.eventTypeCode == 'checkpoint_scanned' && event.checkpointId != null) {
+    if (event.eventTypeCode == 'checkpoint_scanned' &&
+        event.checkpointId != null) {
       completedCheckpointIds.add(event.checkpointId!);
     }
     final checkpoints = route.checkpoints
@@ -356,7 +453,9 @@ class PatrolController extends ChangeNotifier {
             scanTypeCode: item.scanTypeCode,
             minimumDwellSeconds: item.minimumDwellSeconds,
             isCompleted: completedCheckpointIds.contains(item.checkpointId),
-            lastEventAt: event.checkpointId == item.checkpointId ? event.occurredAt : item.lastEventAt,
+            lastEventAt: event.checkpointId == item.checkpointId
+                ? event.occurredAt
+                : item.lastEventAt,
           ),
         )
         .toList();
@@ -415,7 +514,11 @@ class PatrolController extends ChangeNotifier {
     );
   }
 
-  bool _isPolicyCompliant(PatrolCheckpointProgressItem checkpoint, String scanMethodCode, String? tokenValue) {
+  bool _isPolicyCompliant(
+    PatrolCheckpointProgressItem checkpoint,
+    String scanMethodCode,
+    String? tokenValue,
+  ) {
     if (scanMethodCode == 'manual') {
       return true;
     }

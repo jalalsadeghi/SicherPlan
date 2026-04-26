@@ -27,6 +27,8 @@ class _ScheduleBackend implements MobileBackendGateway {
   _ScheduleBackend({required this.schedules});
 
   final List<EmployeeReleasedScheduleItem> schedules;
+  int fetchReleasedSchedulesCalls = 0;
+  final List<(String assignmentId, String responseCode)> respondCalls = [];
 
   final user = const MobileCurrentUser(
     id: 'user-1',
@@ -185,7 +187,10 @@ class _ScheduleBackend implements MobileBackendGateway {
   @override
   Future<List<EmployeeReleasedScheduleItem>> fetchReleasedSchedules(
     String accessToken,
-  ) async => schedules;
+  ) async {
+    fetchReleasedSchedulesCalls += 1;
+    return schedules;
+  }
 
   @override
   Future<List<TimeCaptureEventItem>> fetchTimeEvents(
@@ -242,6 +247,7 @@ class _ScheduleBackend implements MobileBackendGateway {
     required int? versionNo,
     String? note,
   }) async {
+    respondCalls.add((assignmentId, responseCode));
     return schedules.firstWhere((item) => item.id == assignmentId);
   }
 
@@ -342,6 +348,18 @@ EmployeeReleasedScheduleItem _schedule({
   required DateTime workStart,
   required DateTime workEnd,
   String shiftLabel = 'Tagdienst',
+  String assignmentStatus = 'assigned',
+  String confirmationStatus = 'assigned',
+  List<EmployeeReleasedDocument> documents = const [
+    EmployeeReleasedDocument(
+      documentId: 'doc-1',
+      title: 'Dienstanweisung',
+      fileName: 'dienstanweisung.pdf',
+      contentType: 'application/pdf',
+      currentVersionNo: 1,
+      relationType: 'deployment_output',
+    ),
+  ],
 }) {
   return EmployeeReleasedScheduleItem(
     id: id,
@@ -356,19 +374,21 @@ EmployeeReleasedScheduleItem _schedule({
     workEnd: workEnd,
     locationLabel: 'Objekt Nord',
     meetingPoint: 'Tor A',
-    assignmentStatus: 'assigned',
-    confirmationStatus: 'assigned',
-    documents: const [
-      EmployeeReleasedDocument(
-        documentId: 'doc-1',
-        title: 'Dienstanweisung',
-        fileName: 'dienstanweisung.pdf',
-        contentType: 'application/pdf',
-        currentVersionNo: 1,
-        relationType: 'deployment_output',
-      ),
-    ],
+    assignmentStatus: assignmentStatus,
+    confirmationStatus: confirmationStatus,
+    documents: documents,
   );
+}
+
+Future<void> _pumpSchedule(
+  WidgetTester tester, {
+  required _ScheduleBackend backend,
+}) async {
+  final controller = await _buildAuthenticatedController(backend);
+  await tester.pumpWidget(
+    _buildHarness(controller: controller, backend: backend),
+  );
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -376,19 +396,15 @@ void main() {
     tester,
   ) async {
     final backend = _ScheduleBackend(schedules: const []);
-    final controller = await _buildAuthenticatedController(backend);
 
-    await tester.pumpWidget(
-      _buildHarness(controller: controller, backend: backend),
-    );
-    await tester.pumpAndSettle();
+    await _pumpSchedule(tester, backend: backend);
 
     expect(find.text('Keine freigegebenen Schichten'), findsOneWidget);
-    expect(find.byKey(const ValueKey('schedule-calendar-grid')), findsNothing);
+    expect(find.byKey(const ValueKey('schedule-week-list')), findsNothing);
   });
 
   testWidgets(
-    'schedule renders a calendar month view with highlighted shift days',
+    'schedule renders a week-by-week vertical list instead of the old month grid',
     (tester) async {
       final backend = _ScheduleBackend(
         schedules: [
@@ -400,95 +416,143 @@ void main() {
           ),
           _schedule(
             id: 'b',
-            scheduleDate: DateTime(2026, 4, 2),
-            workStart: DateTime(2026, 4, 2, 18),
-            workEnd: DateTime(2026, 4, 2, 22),
-            shiftLabel: 'Abenddienst',
-          ),
-          _schedule(
-            id: 'c',
             scheduleDate: DateTime(2026, 4, 12),
             workStart: DateTime(2026, 4, 12, 6),
             workEnd: DateTime(2026, 4, 12, 14),
           ),
         ],
       );
-      final controller = await _buildAuthenticatedController(backend);
 
-      await tester.pumpWidget(
-        _buildHarness(controller: controller, backend: backend),
-      );
-      await tester.pumpAndSettle();
+      await _pumpSchedule(tester, backend: backend);
 
+      expect(find.byKey(const ValueKey('schedule-week-list')), findsOneWidget);
       expect(
         find.byKey(const ValueKey('schedule-calendar-grid')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('schedule-calendar-month-label')),
-        findsOneWidget,
-      );
-      expect(find.text('M'), findsWidgets);
-      expect(
-        find.byKey(const ValueKey('schedule-calendar-day-count-2026-04-02')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('event-application-planning-record-field')),
         findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('schedule-week-section-2026-03-30')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('schedule-week-section-2026-04-06')),
+        findsOneWidget,
       );
     },
   );
 
   testWidgets(
-    'schedule keeps event application collapsed so the calendar stays primary',
+    'days with shifts show entries directly and multiple shifts are sorted by start time',
     (tester) async {
       final backend = _ScheduleBackend(
         schedules: [
           _schedule(
-            id: 'a',
+            id: 'late',
+            scheduleDate: DateTime(2026, 4, 2),
+            workStart: DateTime(2026, 4, 2, 18),
+            workEnd: DateTime(2026, 4, 2, 22),
+            shiftLabel: 'Abenddienst',
+          ),
+          _schedule(
+            id: 'early',
             scheduleDate: DateTime(2026, 4, 2),
             workStart: DateTime(2026, 4, 2, 8),
             workEnd: DateTime(2026, 4, 2, 16),
           ),
         ],
       );
-      final controller = await _buildAuthenticatedController(backend);
 
-      await tester.pumpWidget(
-        _buildHarness(controller: controller, backend: backend),
-      );
-      await tester.pumpAndSettle();
+      await _pumpSchedule(tester, backend: backend);
 
       expect(
-        find.byKey(const ValueKey('schedule-calendar-grid')),
+        find.byKey(const ValueKey('schedule-day-2026-04-02')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const ValueKey('event-application-planning-record-field')),
-        findsNothing,
-      );
-
-      await tester.scrollUntilVisible(
-        find.text('Veranstaltungsbewerbung'),
-        300,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Veranstaltungsbewerbung'), findsOneWidget);
-
-      await tester.tap(find.text('Veranstaltungsbewerbung'));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const ValueKey('event-application-planning-record-field')),
+        find.byKey(const ValueKey('schedule-shift-early')),
         findsOneWidget,
       );
+      expect(find.byKey(const ValueKey('schedule-shift-late')), findsOneWidget);
+
+      final earlyY = tester
+          .getTopLeft(find.byKey(const ValueKey('schedule-shift-early')))
+          .dy;
+      final lateY = tester
+          .getTopLeft(find.byKey(const ValueKey('schedule-shift-late')))
+          .dy;
+      expect(earlyY, lessThan(lateY));
     },
   );
 
-  testWidgets('tapping a day with shifts opens day details', (tester) async {
+  testWidgets('multiple weeks render in chronological order', (tester) async {
+    final backend = _ScheduleBackend(
+      schedules: [
+        _schedule(
+          id: 'first',
+          scheduleDate: DateTime(2026, 4, 2),
+          workStart: DateTime(2026, 4, 2, 8),
+          workEnd: DateTime(2026, 4, 2, 16),
+        ),
+        _schedule(
+          id: 'second',
+          scheduleDate: DateTime(2026, 4, 12),
+          workStart: DateTime(2026, 4, 12, 8),
+          workEnd: DateTime(2026, 4, 12, 16),
+        ),
+      ],
+    );
+
+    await _pumpSchedule(tester, backend: backend);
+
+    final firstY = tester
+        .getTopLeft(
+          find.byKey(const ValueKey('schedule-week-section-2026-03-30')),
+        )
+        .dy;
+    final secondY = tester
+        .getTopLeft(
+          find.byKey(const ValueKey('schedule-week-section-2026-04-06')),
+        )
+        .dy;
+    expect(firstY, lessThan(secondY));
+  });
+
+  testWidgets('the user can scroll down to later weeks and shifts', (
+    tester,
+  ) async {
+    final backend = _ScheduleBackend(
+      schedules: [
+        _schedule(
+          id: 'first',
+          scheduleDate: DateTime(2026, 4, 2),
+          workStart: DateTime(2026, 4, 2, 8),
+          workEnd: DateTime(2026, 4, 2, 16),
+        ),
+        _schedule(
+          id: 'late',
+          scheduleDate: DateTime(2026, 5, 14),
+          workStart: DateTime(2026, 5, 14, 8),
+          workEnd: DateTime(2026, 5, 14, 16),
+          shiftLabel: 'Spaet im Plan',
+        ),
+      ],
+    );
+
+    await _pumpSchedule(tester, backend: backend);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('schedule-shift-late')),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Spaet im Plan'), findsOneWidget);
+  });
+
+  testWidgets('tapping a shift opens the detail dialog directly', (
+    tester,
+  ) async {
     final backend = _ScheduleBackend(
       schedules: [
         _schedule(
@@ -499,27 +563,63 @@ void main() {
         ),
       ],
     );
-    final controller = await _buildAuthenticatedController(backend);
 
-    await tester.pumpWidget(
-      _buildHarness(controller: controller, backend: backend),
-    );
+    await _pumpSchedule(tester, backend: backend);
+    await tester.tap(find.byKey(const ValueKey('schedule-shift-a')));
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.byKey(const ValueKey('schedule-calendar-day-2026-04-02')),
-    );
-    await tester.pumpAndSettle();
-
+    expect(find.byType(Dialog), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('schedule-day-sheet-title')),
+      find.byKey(const ValueKey('schedule-shift-dialog-a')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('schedule-day-shift-a')), findsOneWidget);
+    expect(find.text('Schichtdetails'), findsOneWidget);
+    expect(find.text('Tagdienst'), findsAtLeastNWidgets(1));
   });
 
   testWidgets(
-    'tapping a shift from day details opens existing shift detail sheet',
+    'the dialog shows date time location statuses and released documents',
+    (tester) async {
+      final backend = _ScheduleBackend(
+        schedules: [
+          _schedule(
+            id: 'a',
+            scheduleDate: DateTime(2026, 4, 2),
+            workStart: DateTime(2026, 4, 2, 8),
+            workEnd: DateTime(2026, 4, 2, 16),
+            confirmationStatus: 'confirmed',
+          ),
+        ],
+      );
+
+      await _pumpSchedule(tester, backend: backend);
+      await tester.tap(find.byKey(const ValueKey('schedule-shift-a')));
+      await tester.pumpAndSettle();
+      final dialogScroll = find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(Scrollable),
+      );
+      await tester.scrollUntilVisible(
+        find.text('Dienstanweisung'),
+        160,
+        scrollable: dialogScroll,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('08:00-16:00', skipOffstage: false), findsWidgets);
+      expect(find.text('Objekt Nord', skipOffstage: false), findsWidgets);
+      expect(find.text('Tor A', skipOffstage: false), findsOneWidget);
+      expect(find.text('Zugewiesen', skipOffstage: false), findsOneWidget);
+      expect(find.text('Bestaetigt', skipOffstage: false), findsWidgets);
+      expect(find.text('Dienstanweisung', skipOffstage: false), findsOneWidget);
+      expect(find.text('Route kopieren', skipOffstage: false), findsOneWidget);
+      expect(find.text('Kalenderexport', skipOffstage: false), findsOneWidget);
+      expect(find.text('Schliessen', skipOffstage: false), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'confirm and decline still call the backend response flow and refresh schedules',
     (tester) async {
       final backend = _ScheduleBackend(
         schedules: [
@@ -531,24 +631,98 @@ void main() {
           ),
         ],
       );
-      final controller = await _buildAuthenticatedController(backend);
 
-      await tester.pumpWidget(
-        _buildHarness(controller: controller, backend: backend),
+      await _pumpSchedule(tester, backend: backend);
+      expect(backend.fetchReleasedSchedulesCalls, 1);
+
+      await tester.tap(find.byKey(const ValueKey('schedule-shift-a')));
+      await tester.pumpAndSettle();
+      final dialogScroll = find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(Scrollable),
+      );
+      final confirmButton = find
+          .ancestor(
+            of: find.text('Bestaetigen').last,
+            matching: find.byType(FilledButton),
+          )
+          .last;
+      await tester.scrollUntilVisible(
+        confirmButton,
+        160,
+        scrollable: dialogScroll,
+      );
+      final confirm = tester.widget<FilledButton>(confirmButton);
+      confirm.onPressed!.call();
+      await tester.pumpAndSettle();
+
+      expect(backend.respondCalls, [('a', 'confirm')]);
+      expect(backend.fetchReleasedSchedulesCalls, greaterThanOrEqualTo(2));
+
+      await tester.tap(find.byKey(const ValueKey('schedule-shift-a')));
+      await tester.pumpAndSettle();
+      final declineButton = find
+          .ancestor(
+            of: find.text('Ablehnen').last,
+            matching: find.byType(FilledButton),
+          )
+          .last;
+      await tester.scrollUntilVisible(
+        declineButton,
+        160,
+        scrollable: find.descendant(
+          of: find.byType(Dialog),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      final decline = tester.widget<FilledButton>(declineButton);
+      decline.onPressed!.call();
+      await tester.pumpAndSettle();
+
+      expect(backend.respondCalls, [('a', 'confirm'), ('a', 'decline')]);
+      expect(backend.fetchReleasedSchedulesCalls, greaterThanOrEqualTo(3));
+    },
+  );
+
+  testWidgets(
+    'the event application panel stays collapsed by default and below the schedule area',
+    (tester) async {
+      final backend = _ScheduleBackend(
+        schedules: [
+          _schedule(
+            id: 'a',
+            scheduleDate: DateTime(2026, 4, 2),
+            workStart: DateTime(2026, 4, 2, 8),
+            workEnd: DateTime(2026, 4, 2, 16),
+          ),
+        ],
+      );
+
+      await _pumpSchedule(tester, backend: backend);
+
+      expect(find.byKey(const ValueKey('schedule-week-list')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('event-application-planning-record-field')),
+        findsNothing,
+      );
+      await tester.scrollUntilVisible(
+        find.text('Veranstaltungsbewerbung'),
+        300,
+        scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
+
+      expect(find.text('Veranstaltungsbewerbung'), findsOneWidget);
 
       await tester.tap(
-        find.byKey(const ValueKey('schedule-calendar-day-2026-04-02')),
+        find.byKey(const ValueKey('schedule-event-application-tile')),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('schedule-day-shift-a')));
-      await tester.pumpAndSettle();
 
-      expect(find.text('Tagdienst'), findsOneWidget);
-      expect(find.text('Route kopieren'), findsOneWidget);
-      expect(find.text('Kalenderexport'), findsOneWidget);
-      expect(find.text('Freigegebene Unterlagen'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('event-application-planning-record-field')),
+        findsOneWidget,
+      );
     },
   );
 }

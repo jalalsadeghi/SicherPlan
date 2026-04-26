@@ -66,10 +66,19 @@ class _FakePatrolBackend implements MobileBackendGateway {
   int captureCalls = 0;
 
   @override
-  Future<void> acknowledgeNotice(String accessToken, String tenantId, String noticeId, {String? acknowledgementText}) async {}
+  Future<void> acknowledgeNotice(
+    String accessToken,
+    String tenantId,
+    String noticeId, {
+    String? acknowledgementText,
+  }) async {}
 
   @override
-  Future<PatrolRoundItem> abortPatrolRound(String accessToken, String patrolRoundId, PatrolRoundAbortPayload payload) async {
+  Future<PatrolRoundItem> abortPatrolRound(
+    String accessToken,
+    String patrolRoundId,
+    PatrolRoundAbortPayload payload,
+  ) async {
     final current = round!;
     final event = PatrolRoundEventItem(
       id: 'event-abort',
@@ -113,14 +122,22 @@ class _FakePatrolBackend implements MobileBackendGateway {
   }
 
   @override
-  Future<PatrolRoundItem> capturePatrolCheckpoint(String accessToken, String patrolRoundId, PatrolRoundCapturePayload payload) async {
+  Future<PatrolRoundItem> capturePatrolCheckpoint(
+    String accessToken,
+    String patrolRoundId,
+    PatrolRoundCapturePayload payload,
+  ) async {
     captureCalls += 1;
     if (failNextCapture) {
       failNextCapture = false;
-      throw const MobileApiException(statusCode: 503, messageKey: 'errors.platform.internal');
+      throw const MobileApiException(
+        statusCode: 503,
+        messageKey: 'errors.platform.internal',
+      );
     }
     final current = round!;
-    final scanned = payload.scanMethodCode == 'manual' || payload.tokenValue != null;
+    final scanned =
+        payload.scanMethodCode == 'manual' || payload.tokenValue != null;
     final event = PatrolRoundEventItem(
       id: 'event-$captureCalls',
       patrolRoundId: current.id,
@@ -139,7 +156,9 @@ class _FakePatrolBackend implements MobileBackendGateway {
     );
     final completedIds = <String>{
       for (final item in current.events)
-        if (item.eventTypeCode == 'checkpoint_scanned' && item.checkpointId != null) item.checkpointId!,
+        if (item.eventTypeCode == 'checkpoint_scanned' &&
+            item.checkpointId != null)
+          item.checkpointId!,
       if (scanned && payload.checkpointId != null) payload.checkpointId!,
     };
     round = PatrolRoundItem(
@@ -172,7 +191,9 @@ class _FakePatrolBackend implements MobileBackendGateway {
               scanTypeCode: item.scanTypeCode,
               minimumDwellSeconds: item.minimumDwellSeconds,
               isCompleted: completedIds.contains(item.checkpointId),
-              lastEventAt: item.checkpointId == payload.checkpointId ? event.occurredAt : item.lastEventAt,
+              lastEventAt: item.checkpointId == payload.checkpointId
+                  ? event.occurredAt
+                  : item.lastEventAt,
             ),
           )
           .toList(),
@@ -181,7 +202,12 @@ class _FakePatrolBackend implements MobileBackendGateway {
   }
 
   @override
-  Future<EmployeeEventApplicationItem> cancelEventApplication(String accessToken, {required String applicationId, required int? versionNo, String? decisionNote}) {
+  Future<EmployeeEventApplicationItem> cancelEventApplication(
+    String accessToken, {
+    required String applicationId,
+    required int? versionNo,
+    String? decisionNote,
+  }) {
     throw UnimplementedError();
   }
 
@@ -195,7 +221,11 @@ class _FakePatrolBackend implements MobileBackendGateway {
   }
 
   @override
-  Future<PatrolRoundItem> completePatrolRound(String accessToken, String patrolRoundId, PatrolRoundCompletePayload payload) async {
+  Future<PatrolRoundItem> completePatrolRound(
+    String accessToken,
+    String patrolRoundId,
+    PatrolRoundCompletePayload payload,
+  ) async {
     final current = round!;
     final event = PatrolRoundEventItem(
       id: 'event-complete',
@@ -239,26 +269,50 @@ class _FakePatrolBackend implements MobileBackendGateway {
   }
 
   @override
-  Future<EmployeeEventApplicationItem> createEventApplication(String accessToken, {required String planningRecordId, String? note}) {
+  Future<EmployeeEventApplicationItem> createEventApplication(
+    String accessToken, {
+    required String planningRecordId,
+    String? note,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  Future<WatchbookEntryItem> createWatchbookEntry(String accessToken, {required String tenantId, required String watchbookId, required String entryTypeCode, required String narrative, String? trafficLightCode}) {
+  Future<WatchbookEntryItem> createWatchbookEntry(
+    String accessToken, {
+    required String tenantId,
+    required String watchbookId,
+    required String entryTypeCode,
+    required String narrative,
+    String? trafficLightCode,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  Future<List<int>> downloadNoticeAttachment(String accessToken, {required String tenantId, required String documentId, required int versionNo}) async => <int>[];
+  Future<List<int>> downloadNoticeAttachment(
+    String accessToken, {
+    required String tenantId,
+    required String documentId,
+    required int versionNo,
+  }) async => <int>[];
 
   @override
-  Future<List<int>> downloadOwnDocument(String accessToken, {required String documentId, required int versionNo}) async => <int>[];
+  Future<List<int>> downloadOwnDocument(
+    String accessToken, {
+    required String documentId,
+    required int versionNo,
+  }) async => <int>[];
 
   @override
-  Future<List<EmployeeMobileCredential>> fetchCredentials(String accessToken) async => const [];
+  Future<List<EmployeeMobileCredential>> fetchCredentials(
+    String accessToken,
+  ) async => const [];
 
   @override
-  Future<List<EmployeeMobileDocument>> fetchDocuments(String accessToken) async => const [];
+  Future<List<EmployeeMobileDocument>> fetchDocuments(
+    String accessToken,
+  ) async => const [];
 
   @override
   Future<EmployeeMobileContext> fetchMobileContext(String accessToken) {
@@ -266,27 +320,42 @@ class _FakePatrolBackend implements MobileBackendGateway {
   }
 
   @override
-  Future<NoticeItem> fetchNotice(String accessToken, String tenantId, String noticeId) {
+  Future<NoticeItem> fetchNotice(
+    String accessToken,
+    String tenantId,
+    String noticeId,
+  ) {
     throw UnimplementedError();
   }
 
   @override
-  Future<NoticeFeedStatus> fetchNoticeFeedStatus(String accessToken, String tenantId) {
+  Future<NoticeFeedStatus> fetchNoticeFeedStatus(
+    String accessToken,
+    String tenantId,
+  ) {
     throw UnimplementedError();
   }
 
   @override
-  Future<List<NoticeItem>> fetchNotices(String accessToken, String tenantId) async => const [];
+  Future<List<NoticeItem>> fetchNotices(
+    String accessToken,
+    String tenantId,
+  ) async => const [];
 
   @override
-  Future<List<EmployeeEventApplicationItem>> fetchEventApplications(String accessToken) async => const [];
+  Future<List<EmployeeEventApplicationItem>> fetchEventApplications(
+    String accessToken,
+  ) async => const [];
 
   @override
   Future<PatrolRoundItem?> fetchActivePatrolRound(String accessToken) async =>
       round?.roundStatusCode == 'active' ? round : null;
 
   @override
-  Future<PatrolEvaluationItem> fetchPatrolEvaluation(String accessToken, String patrolRoundId) async {
+  Future<PatrolEvaluationItem> fetchPatrolEvaluation(
+    String accessToken,
+    String patrolRoundId,
+  ) async {
     final current = round!;
     return PatrolEvaluationItem(
       patrolRoundId: current.id,
@@ -296,8 +365,12 @@ class _FakePatrolBackend implements MobileBackendGateway {
       roundStatusCode: current.roundStatusCode,
       totalCheckpointCount: current.totalCheckpointCount,
       completedCheckpointCount: current.completedCheckpointCount,
-      exceptionCount: current.events.where((item) => item.eventTypeCode == 'checkpoint_exception').length,
-      manualCaptureCount: current.events.where((item) => item.scanMethodCode == 'manual').length,
+      exceptionCount: current.events
+          .where((item) => item.eventTypeCode == 'checkpoint_exception')
+          .length,
+      manualCaptureCount: current.events
+          .where((item) => item.scanMethodCode == 'manual')
+          .length,
       mismatchCount: 0,
       watchbookId: current.watchbookId,
       summaryDocument: const EmployeeReleasedDocument(
@@ -308,56 +381,103 @@ class _FakePatrolBackend implements MobileBackendGateway {
         currentVersionNo: 1,
         relationType: 'summary_pdf',
       ),
-      completionRatio: current.totalCheckpointCount == 0 ? 1 : current.completedCheckpointCount / current.totalCheckpointCount,
-      complianceStatusCode: current.roundStatusCode == 'completed' ? 'compliant' : 'attention_required',
+      completionRatio: current.totalCheckpointCount == 0
+          ? 1
+          : current.completedCheckpointCount / current.totalCheckpointCount,
+      complianceStatusCode: current.roundStatusCode == 'completed'
+          ? 'compliant'
+          : 'attention_required',
     );
   }
 
   @override
-  Future<List<PatrolAvailableRouteItem>> fetchPatrolRoutes(String accessToken) async => routes;
+  Future<List<PatrolAvailableRouteItem>> fetchPatrolRoutes(
+    String accessToken,
+  ) async => routes;
 
   @override
-  Future<PatrolRoundItem> fetchPatrolRound(String accessToken, String patrolRoundId) async => round!;
+  Future<PatrolRoundItem> fetchPatrolRound(
+    String accessToken,
+    String patrolRoundId,
+  ) async => round!;
 
   @override
-  Future<List<EmployeeReleasedScheduleItem>> fetchReleasedSchedules(String accessToken) async => const [];
+  Future<List<EmployeeReleasedScheduleItem>> fetchReleasedSchedules(
+    String accessToken,
+  ) async => const [];
 
   @override
-  Future<List<TimeCaptureEventItem>> fetchTimeEvents(String accessToken) async => const [];
+  Future<List<TimeCaptureEventItem>> fetchTimeEvents(
+    String accessToken,
+  ) async => const [];
 
   @override
-  Future<List<WatchbookListItem>> fetchWatchbooks(String accessToken, String tenantId) async => const [];
+  Future<List<WatchbookListItem>> fetchWatchbooks(
+    String accessToken,
+    String tenantId,
+  ) async => const [];
 
   @override
-  Future<WatchbookReadModel> fetchWatchbook(String accessToken, {required String tenantId, required String watchbookId}) {
+  Future<WatchbookReadModel> fetchWatchbook(
+    String accessToken, {
+    required String tenantId,
+    required String watchbookId,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  Future<(MobileCurrentUser, MobileAuthTokens)> login(MobileLoginPayload payload) {
+  Future<(MobileCurrentUser, MobileAuthTokens)> login(
+    MobileLoginPayload payload,
+  ) {
     throw UnimplementedError();
   }
 
   @override
-  Future<void> openNotice(String accessToken, String tenantId, String noticeId) async {}
+  Future<void> openNotice(
+    String accessToken,
+    String tenantId,
+    String noticeId,
+  ) async {}
 
   @override
-  Future<WatchbookReadModel> openWatchbook(String accessToken, {required String tenantId, required String contextType, required DateTime logDate, String? siteId, String? orderId, String? planningRecordId, String? shiftId, String? headline}) {
+  Future<WatchbookReadModel> openWatchbook(
+    String accessToken, {
+    required String tenantId,
+    required String contextType,
+    required DateTime logDate,
+    String? siteId,
+    String? orderId,
+    String? planningRecordId,
+    String? shiftId,
+    String? headline,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  Future<EmployeeReleasedScheduleItem> respondToAssignment(String accessToken, {required String assignmentId, required String responseCode, required int? versionNo, String? note}) {
+  Future<EmployeeReleasedScheduleItem> respondToAssignment(
+    String accessToken, {
+    required String assignmentId,
+    required String responseCode,
+    required int? versionNo,
+    String? note,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  Future<(MobileCurrentUser, MobileAuthTokens)> restore(MobileAuthTokens tokens) {
+  Future<(MobileCurrentUser, MobileAuthTokens)> restore(
+    MobileAuthTokens tokens,
+  ) {
     throw UnimplementedError();
   }
 
   @override
-  Future<PatrolRoundItem> startPatrolRound(String accessToken, PatrolRoundStartPayload payload) async {
+  Future<PatrolRoundItem> startPatrolRound(
+    String accessToken,
+    PatrolRoundStartPayload payload,
+  ) async {
     round = PatrolRoundItem(
       id: 'round-1',
       tenantId: 'tenant-1',
