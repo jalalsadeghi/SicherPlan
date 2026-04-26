@@ -11,6 +11,8 @@ from app.config import AppSettings
 from app.modules.assistant.provider import (
     AssistantProvider,
     AssistantProviderConfigurationError,
+    AssistantProviderAuthenticationError,
+    AssistantProviderInvalidRequestError,
     AssistantProviderRequest,
     AssistantProviderResult,
     AssistantProviderStructuredOutputError,
@@ -23,6 +25,14 @@ from app.modules.assistant.schemas import AssistantProviderStructuredOutput
 
 
 OpenAIClientFactory = Callable[..., Any]
+
+
+def get_openai_sdk_info() -> tuple[bool, str | None]:
+    try:
+        import openai
+    except Exception:
+        return False, None
+    return True, getattr(openai, "__version__", None)
 
 
 def _default_openai_client_factory(**kwargs: Any) -> Any:
@@ -80,17 +90,35 @@ class OpenAIResponsesProvider(AssistantProvider):
         client = self._get_client()
         started = perf_counter()
         try:
-            response = client.responses.parse(
-                model=self.runtime.model_name,
-                input=self._build_input(request),
-                text_format=AssistantProviderStructuredOutput,
-                store=self.runtime.store_responses,
-                tools=request.available_tools,
-            )
+            call_kwargs = {
+                "model": self.runtime.model_name,
+                "input": self._build_input(request),
+                "text_format": AssistantProviderStructuredOutput,
+                "store": self.runtime.store_responses,
+            }
+            normalized_tools = self._normalize_tools_for_responses_api(request.available_tools)
+            if normalized_tools:
+                call_kwargs["tools"] = normalized_tools
+            response = client.responses.parse(**call_kwargs)
         except Exception as exc:
             raise self._map_provider_exception(exc) from exc
 
         latency_ms = max(int((perf_counter() - started) * 1000), 0)
+        requested_tool_calls = self._extract_tool_calls(response)
+        usage = self._extract_usage(response)
+        if requested_tool_calls:
+            return AssistantProviderResult(
+                final_response={},
+                raw_text=getattr(response, "output_text", None),
+                requested_tool_calls=requested_tool_calls,
+                usage=usage,
+                provider_name="openai",
+                provider_mode="openai",
+                model_name=self.runtime.model_name,
+                latency_ms=latency_ms,
+                finish_reason=getattr(response, "status", None),
+            )
+
         parsed = getattr(response, "output_parsed", None)
         if parsed is None:
             raise AssistantProviderStructuredOutputError("OpenAI provider returned no parsed structured output.")
@@ -111,8 +139,6 @@ class OpenAIResponsesProvider(AssistantProvider):
                     "OpenAI provider returned invalid structured output."
                 ) from exc
 
-        requested_tool_calls = self._extract_tool_calls(response)
-        usage = self._extract_usage(response)
         return AssistantProviderResult(
             final_response=payload,
             raw_text=getattr(response, "output_text", None),
@@ -151,8 +177,50 @@ class OpenAIResponsesProvider(AssistantProvider):
             content = str(item.get("content", "")).strip()
             if role and content:
                 messages.append({"role": role, "content": content})
+        for item in request.tool_results:
+            if not isinstance(item, dict):
+                continue
+            item_type = str(item.get("type") or "").strip()
+            if item_type != "function_call_output":
+                continue
+            call_id = str(item.get("call_id") or "").strip()
+            output = item.get("output")
+            if not output:
+                continue
+            payload: dict[str, Any] = {
+                "type": "function_call_output",
+                "output": str(output),
+            }
+            if call_id:
+                payload["call_id"] = call_id
+            messages.append(payload)
         messages.append({"role": "user", "content": request.user_message[: request.max_input_chars]})
         return messages
+
+    @staticmethod
+    def _normalize_tools_for_responses_api(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        normalized: list[dict[str, Any]] = []
+        for item in tools:
+            if not isinstance(item, dict):
+                continue
+            item_type = str(item.get("type") or "").strip()
+            if item_type != "function":
+                continue
+            function = item.get("function")
+            if not isinstance(function, dict):
+                continue
+            name = str(function.get("name") or "").strip()
+            if not name:
+                continue
+            normalized.append(
+                {
+                    "type": "function",
+                    "name": name,
+                    "description": function.get("description"),
+                    "parameters": function.get("parameters") or {"type": "object", "properties": {}},
+                }
+            )
+        return normalized
 
     @staticmethod
     def _extract_tool_calls(response: Any) -> list[dict[str, Any]]:
@@ -185,14 +253,90 @@ class OpenAIResponsesProvider(AssistantProvider):
     @staticmethod
     def _map_provider_exception(exc: Exception) -> Exception:
         name = type(exc).__name__
+        safe_message = str(exc).strip()[:240] or name
         if name == "APITimeoutError":
-            return AssistantProviderTimeoutError("OpenAI provider request timed out.")
+            return AssistantProviderTimeoutError(
+                "OpenAI provider request timed out.",
+                provider_error_type=name,
+                safe_message=safe_message,
+            )
         if name == "RateLimitError":
-            return AssistantProviderRateLimitError("OpenAI provider rate limited the request.")
-        if name in {"APIConnectionError", "APIStatusError", "APIError"}:
-            return AssistantProviderUnavailableError("OpenAI provider is unavailable.")
+            return AssistantProviderRateLimitError(
+                "OpenAI provider rate limited the request.",
+                provider_error_type=name,
+                safe_message=safe_message,
+            )
+        if name in {"AuthenticationError", "PermissionDeniedError"}:
+            return AssistantProviderAuthenticationError(
+                "OpenAI provider authentication failed.",
+                provider_error_type=name,
+                provider_error_code=getattr(exc, "code", None),
+                http_status=getattr(exc, "status_code", None),
+                safe_message=safe_message,
+            )
+        if name in {"BadRequestError", "UnprocessableEntityError"}:
+            return AssistantProviderInvalidRequestError(
+                "OpenAI provider request was invalid.",
+                provider_error_type=name,
+                provider_error_code=getattr(exc, "code", None),
+                http_status=getattr(exc, "status_code", None),
+                safe_message=safe_message,
+            )
+        if name == "APIStatusError":
+            status_code = getattr(exc, "status_code", None)
+            if status_code in {401, 403}:
+                return AssistantProviderAuthenticationError(
+                    "OpenAI provider authentication failed.",
+                    provider_error_type=name,
+                    provider_error_code=getattr(exc, "code", None),
+                    http_status=status_code,
+                    safe_message=safe_message,
+                )
+            if status_code == 429:
+                return AssistantProviderRateLimitError(
+                    "OpenAI provider rate limited the request.",
+                    provider_error_type=name,
+                    provider_error_code=getattr(exc, "code", None),
+                    http_status=status_code,
+                    safe_message=safe_message,
+                )
+            if status_code is not None and 400 <= status_code < 500:
+                return AssistantProviderInvalidRequestError(
+                    "OpenAI provider request was invalid.",
+                    provider_error_type=name,
+                    provider_error_code=getattr(exc, "code", None),
+                    http_status=status_code,
+                    safe_message=safe_message,
+                )
+            return AssistantProviderUnavailableError(
+                "OpenAI provider is unavailable.",
+                provider_error_type=name,
+                provider_error_code=getattr(exc, "code", None),
+                http_status=status_code,
+                safe_message=safe_message,
+            )
+        if name in {"APIConnectionError", "APIError"}:
+            return AssistantProviderUnavailableError(
+                "OpenAI provider is unavailable.",
+                provider_error_type=name,
+                provider_error_code=getattr(exc, "code", None),
+                http_status=getattr(exc, "status_code", None),
+                safe_message=safe_message,
+            )
+        if isinstance(exc, (TypeError, ValueError)):
+            return AssistantProviderInvalidRequestError(
+                "OpenAI provider request was invalid.",
+                provider_error_type=name,
+                safe_message=safe_message,
+            )
         if isinstance(exc, AssistantProviderConfigurationError):
             return exc
         if isinstance(exc, AssistantProviderStructuredOutputError):
             return exc
-        return AssistantProviderUnavailableError("OpenAI provider is unavailable.")
+        return AssistantProviderUnavailableError(
+            "OpenAI provider is unavailable.",
+            provider_error_type=name,
+            provider_error_code=getattr(exc, "code", None),
+            http_status=getattr(exc, "status_code", None),
+            safe_message=safe_message,
+        )

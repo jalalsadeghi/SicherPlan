@@ -17,7 +17,22 @@ def _request() -> AssistantProviderRequest:
         recent_messages=[],
         knowledge_chunks=[],
         grounding_context={"sources": [{"source_type": "page_route", "page_id": "P-04"}]},
-        available_tools=[{"type": "function", "function": {"name": "search_docs"}}],
+        available_tools=[
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_docs",
+                    "description": "Search internal docs.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string"},
+                        },
+                        "required": ["query"],
+                    },
+                },
+            }
+        ],
         max_tool_calls=8,
         max_input_chars=12000,
     )
@@ -79,5 +94,18 @@ def test_openai_provider_parses_tool_calls_from_response() -> None:
             "call_id": "call-1",
         }
     ]
-    assert client.responses.kwargs["tools"] == [{"type": "function", "function": {"name": "search_docs"}}]
+    assert client.responses.kwargs["tools"] == [
+        {
+            "type": "function",
+            "name": "search_docs",
+            "description": "Search internal docs.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                },
+                "required": ["query"],
+            },
+        }
+    ]
     assert any("Grounding context package" in row["content"] for row in client.responses.kwargs["input"])

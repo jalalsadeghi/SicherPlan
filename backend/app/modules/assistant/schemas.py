@@ -29,6 +29,17 @@ class AssistantProviderStatusRead(BaseModel):
     mock_provider_allowed: bool
     store_responses: bool
     rag_enabled: bool
+    sdk_available: bool
+    sdk_version: str | None = None
+
+
+class AssistantProviderSmokeTestRead(BaseModel):
+    ok: bool
+    provider_mode: str
+    model: str
+    answer: str | None = None
+    confidence: AssistantConfidence | None = None
+    error_code: str | None = None
 
 
 class AssistantRouteContextInput(BaseModel):

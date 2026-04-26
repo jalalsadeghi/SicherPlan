@@ -15,6 +15,7 @@ from app.modules.assistant.diagnostics import (
     is_shift_visibility_question,
 )
 from app.modules.assistant.grounding import AssistantGroundingContext, AssistantGroundingSource
+from app.modules.assistant.openai_client import get_openai_sdk_info
 from app.modules.assistant.knowledge.retriever import AssistantKnowledgeRetriever
 from app.modules.assistant.lexicon import expand_assistant_query
 from app.modules.assistant.language import (
@@ -40,6 +41,9 @@ from app.modules.assistant.models import AssistantConversation, AssistantMessage
 from app.modules.assistant.provider import (
     AssistantProvider,
     AssistantProviderConfigurationError,
+    AssistantProviderAuthenticationError,
+    AssistantProviderError,
+    AssistantProviderInvalidRequestError,
     AssistantProviderRequest,
     AssistantProviderRateLimitError,
     AssistantProviderResult,
@@ -67,6 +71,7 @@ from app.modules.assistant.schemas import (
     AssistantMessageCreate,
     AssistantPageHelpManifestRead,
     AssistantProviderStatusRead,
+    AssistantProviderSmokeTestRead,
     AssistantProviderStructuredOutput,
     AssistantStructuredResponse,
     AssistantRouteContextInput,
@@ -239,6 +244,7 @@ class AssistantService:
                 "errors.iam.authorization.permission_denied",
                 {"permission_key": "assistant.admin"},
             )
+        sdk_available, sdk_version = get_openai_sdk_info()
         return AssistantProviderStatusRead(
             provider_mode=self.runtime_config.provider_mode,
             openai_configured=self.runtime_config.openai_configured,
@@ -246,6 +252,57 @@ class AssistantService:
             mock_provider_allowed=self.runtime_config.mock_provider_allowed,
             store_responses=self.runtime_config.store_responses,
             rag_enabled=self.runtime_config.rag_enabled,
+            sdk_available=sdk_available,
+            sdk_version=sdk_version,
+        )
+
+    def run_provider_smoke_test(
+        self,
+        context: RequestAuthorizationContext,
+    ) -> AssistantProviderSmokeTestRead:
+        if "assistant.admin" not in context.permission_keys:
+            raise ApiException(
+                403,
+                "iam.authorization.permission_denied",
+                "errors.iam.authorization.permission_denied",
+                {"permission_key": "assistant.admin"},
+            )
+        request = AssistantProviderRequest(
+            conversation_id="assistant-provider-smoke-test",
+            user_message="Return a valid structured assistant response saying provider ok.",
+            system_instructions="Return a valid structured assistant response saying provider ok.",
+            response_language="en",
+            detected_language="en",
+            grounding_context={
+                "query": "provider smoke test",
+                "sources": [],
+                "auth_summary": {
+                    "tenant_scope": "none",
+                    "role_keys": [],
+                    "permission_keys": [],
+                },
+            },
+            available_tools=[],
+            max_tool_calls=0,
+            max_input_chars=256,
+            metadata={"request_id": context.request_id, "tenant_id": None, "user_id": context.user_id},
+        )
+        try:
+            result = self._call_provider(request)
+        except ApiException as exc:
+            return AssistantProviderSmokeTestRead(
+                ok=False,
+                provider_mode=self.runtime_config.provider_mode,
+                model=self.runtime_config.response_model,
+                error_code=exc.code,
+            )
+        return AssistantProviderSmokeTestRead(
+            ok=True,
+            provider_mode=self.runtime_config.provider_mode,
+            model=self.runtime_config.response_model,
+            answer=str(result.final_response.get("answer", "")) or result.raw_text,
+            confidence=AssistantConfidence(str(result.final_response.get("confidence", "low"))),
+            error_code=None,
         )
 
     def create_conversation(
@@ -843,6 +900,7 @@ class AssistantService:
         initial_tool_results: list[AssistantToolResultSummary],
     ) -> dict[str, Any]:
         tool_results = list(initial_tool_results)
+        provider_tool_results: list[dict[str, Any]] = []
         remaining_tool_calls = max(self.runtime_config.max_tool_calls, 0)
         request = self._build_provider_request(
             conversation=conversation,
@@ -853,6 +911,7 @@ class AssistantService:
             actor=actor,
             grounding_context=grounding_context,
             tool_results=tool_results,
+            provider_tool_results=provider_tool_results,
         )
 
         while True:
@@ -910,6 +969,12 @@ class AssistantService:
                     conversation_id=conversation.id,
                 )
                 tool_results.append(self._tool_result_to_summary(tool_result))
+                provider_tool_results.append(
+                    self._tool_result_to_provider_output(
+                        requested_call=requested_call,
+                        tool_result=tool_result,
+                    )
+                )
                 remaining_tool_calls -= 1
                 executed_any = True
                 if remaining_tool_calls <= 0:
@@ -930,6 +995,7 @@ class AssistantService:
                 actor=actor,
                 grounding_context=grounding_context,
                 tool_results=tool_results,
+                provider_tool_results=provider_tool_results,
             )
 
     def _build_provider_request(
@@ -943,6 +1009,7 @@ class AssistantService:
         actor: RequestAuthorizationContext,
         grounding_context: AssistantGroundingContext,
         tool_results: list[AssistantToolResultSummary] | None = None,
+        provider_tool_results: list[dict[str, Any]] | None = None,
         available_tools: list[dict[str, Any]] | None = None,
     ) -> AssistantProviderRequest:
         recent_messages = [
@@ -997,7 +1064,9 @@ class AssistantService:
             recent_messages=prompt_payload.conversation_messages,
             knowledge_chunks=[item.model_dump(mode="json") for item in knowledge_chunks],
             grounding_context=grounding_context.model_dump(mode="json"),
-            tool_results=[{"tool_name": item.tool_name, "summary": item.summary} for item in (tool_results or [])],
+            tool_results=list(provider_tool_results)
+            if provider_tool_results is not None
+            else [{"tool_name": item.tool_name, "summary": item.summary} for item in (tool_results or [])],
             available_tools=available_tools_payload,
             max_tool_calls=self.runtime_config.max_tool_calls,
             max_input_chars=self.runtime_config.max_input_chars,
@@ -1219,6 +1288,7 @@ class AssistantService:
         try:
             result = self.provider.generate(request)
         except AssistantProviderConfigurationError as exc:
+            self._log_provider_error(request=request, exc=exc, attempted_openai=attempted_openai)
             self._log_provider_event(
                 event="assistant_provider_call_finished",
                 request=request,
@@ -1232,27 +1302,11 @@ class AssistantService:
             )
             raise ApiException(
                 503,
-                "assistant.provider.unavailable",
+                exc.code,
                 "errors.assistant.provider.unavailable",
             ) from exc
-        except AssistantProviderTimeoutError as exc:
-            self._log_provider_event(
-                event="assistant_provider_call_finished",
-                request=request,
-                grounding_attached=grounding_attached,
-                grounding_sources=grounding_sources,
-                openai_request_attempted=attempted_openai,
-                provider_returned_successfully=False,
-                provider_latency_ms=None,
-                input_tokens=None,
-                output_tokens=None,
-            )
-            raise ApiException(
-                504,
-                "assistant.provider.timeout",
-                "errors.assistant.provider.timeout",
-            ) from exc
-        except AssistantProviderRateLimitError as exc:
+        except AssistantProviderAuthenticationError as exc:
+            self._log_provider_error(request=request, exc=exc, attempted_openai=attempted_openai)
             self._log_provider_event(
                 event="assistant_provider_call_finished",
                 request=request,
@@ -1266,27 +1320,11 @@ class AssistantService:
             )
             raise ApiException(
                 503,
-                "assistant.provider.rate_limited",
-                "errors.assistant.provider.rate_limited",
-            ) from exc
-        except AssistantProviderUnavailableError as exc:
-            self._log_provider_event(
-                event="assistant_provider_call_finished",
-                request=request,
-                grounding_attached=grounding_attached,
-                grounding_sources=grounding_sources,
-                openai_request_attempted=attempted_openai,
-                provider_returned_successfully=False,
-                provider_latency_ms=None,
-                input_tokens=None,
-                output_tokens=None,
-            )
-            raise ApiException(
-                503,
-                "assistant.provider.unavailable",
+                exc.code,
                 "errors.assistant.provider.unavailable",
             ) from exc
-        except AssistantProviderStructuredOutputError as exc:
+        except AssistantProviderInvalidRequestError as exc:
+            self._log_provider_error(request=request, exc=exc, attempted_openai=attempted_openai)
             self._log_provider_event(
                 event="assistant_provider_call_finished",
                 request=request,
@@ -1300,10 +1338,95 @@ class AssistantService:
             )
             raise ApiException(
                 502,
-                "assistant.provider.invalid_response",
+                exc.code,
+                "errors.assistant.provider.invalid_response",
+            ) from exc
+        except AssistantProviderTimeoutError as exc:
+            self._log_provider_error(request=request, exc=exc, attempted_openai=attempted_openai)
+            self._log_provider_event(
+                event="assistant_provider_call_finished",
+                request=request,
+                grounding_attached=grounding_attached,
+                grounding_sources=grounding_sources,
+                openai_request_attempted=attempted_openai,
+                provider_returned_successfully=False,
+                provider_latency_ms=None,
+                input_tokens=None,
+                output_tokens=None,
+            )
+            raise ApiException(
+                504,
+                exc.code,
+                "errors.assistant.provider.timeout",
+            ) from exc
+        except AssistantProviderRateLimitError as exc:
+            self._log_provider_error(request=request, exc=exc, attempted_openai=attempted_openai)
+            self._log_provider_event(
+                event="assistant_provider_call_finished",
+                request=request,
+                grounding_attached=grounding_attached,
+                grounding_sources=grounding_sources,
+                openai_request_attempted=attempted_openai,
+                provider_returned_successfully=False,
+                provider_latency_ms=None,
+                input_tokens=None,
+                output_tokens=None,
+            )
+            raise ApiException(
+                503,
+                exc.code,
+                "errors.assistant.provider.rate_limited",
+            ) from exc
+        except AssistantProviderUnavailableError as exc:
+            self._log_provider_error(request=request, exc=exc, attempted_openai=attempted_openai)
+            self._log_provider_event(
+                event="assistant_provider_call_finished",
+                request=request,
+                grounding_attached=grounding_attached,
+                grounding_sources=grounding_sources,
+                openai_request_attempted=attempted_openai,
+                provider_returned_successfully=False,
+                provider_latency_ms=None,
+                input_tokens=None,
+                output_tokens=None,
+            )
+            raise ApiException(
+                503,
+                exc.code,
+                "errors.assistant.provider.unavailable",
+            ) from exc
+        except AssistantProviderStructuredOutputError as exc:
+            self._log_provider_error(request=request, exc=exc, attempted_openai=attempted_openai)
+            self._log_provider_event(
+                event="assistant_provider_call_finished",
+                request=request,
+                grounding_attached=grounding_attached,
+                grounding_sources=grounding_sources,
+                openai_request_attempted=attempted_openai,
+                provider_returned_successfully=False,
+                provider_latency_ms=None,
+                input_tokens=None,
+                output_tokens=None,
+            )
+            raise ApiException(
+                502,
+                exc.code,
                 "errors.assistant.provider.invalid_response",
             ) from exc
 
+        if result.requested_tool_calls:
+            self._log_provider_event(
+                event="assistant_provider_call_finished",
+                request=request,
+                grounding_attached=grounding_attached,
+                grounding_sources=grounding_sources,
+                openai_request_attempted=attempted_openai,
+                provider_returned_successfully=True,
+                provider_latency_ms=result.latency_ms,
+                input_tokens=result.usage.input_tokens if result.usage else None,
+                output_tokens=result.usage.output_tokens if result.usage else None,
+            )
+            return result
         if not isinstance(result.final_response, dict):
             raise ApiException(
                 502,
@@ -1389,6 +1512,28 @@ class AssistantService:
             "provider_latency_ms": provider_latency_ms,
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
+        }
+        logger.info(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+    def _log_provider_error(
+        self,
+        *,
+        request: AssistantProviderRequest,
+        exc: AssistantProviderError,
+        attempted_openai: bool,
+    ) -> None:
+        payload = {
+            "event": "assistant_provider_error",
+            "provider_mode": self.runtime_config.provider_mode,
+            "model_name": self.runtime_config.response_model,
+            "request_id": request.metadata.get("request_id"),
+            "conversation_id": request.conversation_id,
+            "exception_class": type(exc).__name__,
+            "provider_error_type": getattr(exc, "provider_error_type", None),
+            "provider_error_code": getattr(exc, "provider_error_code", None),
+            "http_status": getattr(exc, "http_status", None),
+            "safe_message": getattr(exc, "safe_message", str(exc))[:240],
+            "openai_request_attempted": attempted_openai,
         }
         logger.info(json.dumps(payload, ensure_ascii=False, sort_keys=True))
 
@@ -1507,6 +1652,31 @@ class AssistantService:
         if permission_rows:
             merged["missing_permissions"] = permission_rows
         return merged
+
+    @staticmethod
+    def _tool_result_to_provider_output(
+        *,
+        requested_call: dict[str, Any],
+        tool_result: Any,
+    ) -> dict[str, Any]:
+        payload = tool_result.redacted_output
+        if payload is None:
+            payload = tool_result.data
+        if payload is None:
+            payload = {
+                "ok": tool_result.ok,
+                "error_code": tool_result.error_code,
+                "error_message": tool_result.error_message,
+                "missing_permissions": tool_result.missing_permissions,
+            }
+        result = {
+            "type": "function_call_output",
+            "output": json.dumps(payload, ensure_ascii=False, sort_keys=True),
+        }
+        call_id = str(requested_call.get("call_id") or "").strip()
+        if call_id:
+            result["call_id"] = call_id
+        return result
 
     @staticmethod
     def _build_refusal_provider_payload(

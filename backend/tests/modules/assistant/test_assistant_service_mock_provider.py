@@ -150,7 +150,7 @@ def test_service_maps_provider_error_to_safe_api_exception() -> None:
         )
     except ApiException as exc:
         assert exc.status_code == 503
-        assert exc.code == "assistant.provider.unavailable"
+        assert exc.code == "assistant.provider.configuration_error"
     else:
         raise AssertionError("Expected ApiException")
 

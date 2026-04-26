@@ -83,11 +83,12 @@ def test_provider_status_returns_safe_configuration_fields() -> None:
         openai_configured=True,
     ).get_provider_status(_context("assistant.admin"))
 
-    assert payload.model_dump(mode="json") == {
-        "provider_mode": "openai",
-        "openai_configured": True,
-        "model": "gpt-5.5-mini",
-        "mock_provider_allowed": False,
-        "store_responses": False,
-        "rag_enabled": True,
-    }
+    serialized = payload.model_dump(mode="json")
+    assert serialized["provider_mode"] == "openai"
+    assert serialized["openai_configured"] is True
+    assert serialized["model"] == "gpt-5.5-mini"
+    assert serialized["mock_provider_allowed"] is False
+    assert serialized["store_responses"] is False
+    assert serialized["rag_enabled"] is True
+    assert "sdk_available" in serialized
+    assert "sdk_version" in serialized

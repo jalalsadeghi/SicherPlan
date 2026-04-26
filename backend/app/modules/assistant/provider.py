@@ -55,25 +55,64 @@ class AssistantProvider(Protocol):
 class AssistantProviderError(RuntimeError):
     """Base provider error without sensitive payload data."""
 
+    code = "assistant.provider.unavailable"
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        provider_error_type: str | None = None,
+        provider_error_code: str | None = None,
+        http_status: int | None = None,
+        safe_message: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.provider_error_type = provider_error_type
+        self.provider_error_code = provider_error_code
+        self.http_status = http_status
+        self.safe_message = safe_message or message
+
 
 class AssistantProviderConfigurationError(AssistantProviderError):
     """Provider mode is invalid or not available in the current runtime."""
+
+    code = "assistant.provider.configuration_error"
 
 
 class AssistantProviderTimeoutError(AssistantProviderError):
     """Provider call timed out."""
 
+    code = "assistant.provider.timeout"
+
 
 class AssistantProviderUnavailableError(AssistantProviderError):
     """Provider call failed or is unavailable."""
+
+    code = "assistant.provider.unavailable"
 
 
 class AssistantProviderRateLimitError(AssistantProviderError):
     """Provider request was rate limited."""
 
+    code = "assistant.provider.rate_limited"
+
+
+class AssistantProviderAuthenticationError(AssistantProviderError):
+    """Provider authentication or project access failed."""
+
+    code = "assistant.provider.authentication_failed"
+
+
+class AssistantProviderInvalidRequestError(AssistantProviderError):
+    """Provider request shape or tool schema is invalid."""
+
+    code = "assistant.provider.invalid_request"
+
 
 class AssistantProviderStructuredOutputError(AssistantProviderError):
     """Provider returned invalid structured output."""
+
+    code = "assistant.provider.invalid_response"
 
 
 _MOCK_PERSIAN = (

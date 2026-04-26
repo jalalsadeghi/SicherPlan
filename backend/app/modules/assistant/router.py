@@ -25,6 +25,7 @@ from app.modules.assistant.schemas import (
     AssistantPageHelpManifestRead,
     AssistantMessageCreate,
     AssistantProviderStatusRead,
+    AssistantProviderSmokeTestRead,
     AssistantStructuredResponse,
 )
 from app.modules.assistant.service import AssistantRuntimeConfig, AssistantService
@@ -93,6 +94,14 @@ def assistant_provider_status(
     service: Annotated[AssistantService, Depends(get_assistant_service)],
 ) -> AssistantProviderStatusRead:
     return service.get_provider_status(context)
+
+
+@router.post("/provider/smoke-test", response_model=AssistantProviderSmokeTestRead)
+def assistant_provider_smoke_test(
+    context: Annotated[RequestAuthorizationContext, Depends(get_request_authorization_context)],
+    service: Annotated[AssistantService, Depends(get_assistant_service)],
+) -> AssistantProviderSmokeTestRead:
+    return service.run_provider_smoke_test(context)
 
 
 @router.get("/page-help/{page_id}", response_model=AssistantPageHelpManifestRead)
