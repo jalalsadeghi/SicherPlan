@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.modules.assistant.openai_client import OpenAIResponsesProvider
+from app.modules.assistant.tool_name_adapter import build_provider_tool_name_map, is_valid_provider_tool_name
 from app.modules.assistant.tools import build_default_tool_registry
 from app.modules.assistant.tools.base import AssistantToolExecutionContext
 from app.modules.iam.auth_schemas import AuthenticatedRoleScope
@@ -36,14 +37,19 @@ def test_available_tool_schemas_normalize_for_responses_api() -> None:
             scope_kind="tenant",
         )
     )
-    normalized = OpenAIResponsesProvider._normalize_tools_for_responses_api(tools)  # noqa: SLF001
+    internal_names = [item["function"]["name"] for item in tools]
+    provider_name_map = build_provider_tool_name_map(internal_names)
+    normalized = OpenAIResponsesProvider._normalize_tools_for_responses_api(tools, provider_name_map)  # noqa: SLF001
 
     assert normalized
     assert len(normalized) == len(tools)
+    assert any("." in name for name in internal_names)
     for item in normalized:
         assert item["type"] == "function"
         assert isinstance(item.get("name"), str) and item["name"]
+        assert is_valid_provider_tool_name(item["name"])
+        assert "." not in item["name"]
         assert "function" not in item
         assert isinstance(item.get("parameters"), dict)
         assert item["parameters"].get("type") == "object"
-
+    assert all("." in item["function"]["name"] for item in tools)

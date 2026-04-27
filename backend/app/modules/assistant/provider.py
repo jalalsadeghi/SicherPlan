@@ -30,6 +30,7 @@ class AssistantProviderRequest:
     grounding_context: dict[str, Any] | None = None
     tool_results: list[dict[str, Any]] = field(default_factory=list)
     available_tools: list[dict[str, Any]] = field(default_factory=list)
+    provider_tool_name_map: dict[str, str] = field(default_factory=dict)
     max_tool_calls: int = 0
     max_input_chars: int = 12000
     metadata: dict[str, Any] = field(default_factory=dict)

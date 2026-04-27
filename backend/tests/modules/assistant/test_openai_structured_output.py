@@ -33,6 +33,7 @@ def _request() -> AssistantProviderRequest:
                 },
             }
         ],
+        provider_tool_name_map={"search_docs": "search_docs"},
         max_tool_calls=8,
         max_input_chars=12000,
     )

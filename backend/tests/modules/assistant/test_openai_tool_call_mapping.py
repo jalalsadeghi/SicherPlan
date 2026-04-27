@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from app.modules.assistant.provider import AssistantProviderRequest, AssistantProviderResult
 from app.modules.assistant.schemas import AssistantMessageCreate
 from app.modules.assistant.service import AssistantRuntimeConfig, AssistantService
-from app.modules.assistant.tools import AssistantToolRegistry
+from app.modules.assistant.tools import AssistantToolAuditRecord, AssistantToolRegistry
 from app.modules.assistant.tools.base import (
     AssistantToolClassification,
     AssistantToolDefinition,
@@ -26,6 +26,15 @@ class _LookupInput(BaseModel):
 
 class _LookupOutput(BaseModel):
     summary: str
+
+
+class _CapturingAuditRepository:
+    def __init__(self) -> None:
+        self.records: list[AssistantToolAuditRecord] = []
+
+    def create_tool_call_audit(self, *, record: AssistantToolAuditRecord):
+        self.records.append(record)
+        return record
 
 
 class _LookupTool:
@@ -55,11 +64,12 @@ class _LookupTool:
 
 
 @dataclass
-class _LoopingProvider:
+class _MappingProvider:
     requests: list[AssistantProviderRequest]
 
-    def __init__(self) -> None:
+    def __init__(self, *, tool_name: str) -> None:
         self.requests = []
+        self.tool_name = tool_name
 
     def generate(self, request: AssistantProviderRequest) -> AssistantProviderResult:
         self.requests.append(request)
@@ -70,7 +80,7 @@ class _LoopingProvider:
                 requested_tool_calls=[
                     {
                         "id": "fc-1",
-                        "name": "assistant_lookup_docs",
+                        "name": self.tool_name,
                         "arguments": '{"query": "customer create"}',
                         "call_id": "call-1",
                     }
@@ -81,7 +91,7 @@ class _LoopingProvider:
             )
         return AssistantProviderResult(
             final_response={
-                "answer": "Open the customer workspace first.",
+                "answer": "Done",
                 "confidence": "high",
                 "out_of_scope": False,
                 "diagnosis": [],
@@ -90,7 +100,7 @@ class _LoopingProvider:
                 "next_steps": [],
                 "tool_trace_id": None,
             },
-            raw_text="Open the customer workspace first.",
+            raw_text="Done",
             provider_name="openai",
             provider_mode="openai",
             model_name="gpt-4o",
@@ -109,19 +119,8 @@ def _context() -> RequestAuthorizationContext:
     )
 
 
-def test_service_feeds_function_call_output_back_into_provider_loop() -> None:
+def _service(provider, registry: AssistantToolRegistry) -> tuple[AssistantService, InMemoryAssistantRepository]:
     repository = InMemoryAssistantRepository()
-    conversation = repository.create_conversation(
-        tenant_id="tenant-1",
-        user_id="assistant-user-1",
-        title=None,
-        locale="en",
-        last_route_name=None,
-        last_route_path=None,
-    )
-    provider = _LoopingProvider()
-    registry = AssistantToolRegistry()
-    registry.register(_LookupTool())
     service = AssistantService(
         runtime_config=AssistantRuntimeConfig(
             enabled=True,
@@ -137,6 +136,23 @@ def test_service_feeds_function_call_output_back_into_provider_loop() -> None:
         provider=provider,
         tool_registry=registry,
     )
+    return service, repository
+
+
+def test_provider_tool_call_name_is_mapped_back_to_internal_name_before_execution() -> None:
+    audit_repository = _CapturingAuditRepository()
+    registry = AssistantToolRegistry(audit_repository=audit_repository)
+    registry.register(_LookupTool())
+    provider = _MappingProvider(tool_name="assistant_lookup_docs")
+    service, repository = _service(provider, registry)
+    conversation = repository.create_conversation(
+        tenant_id="tenant-1",
+        user_id="assistant-user-1",
+        title=None,
+        locale="en",
+        last_route_name=None,
+        last_route_path=None,
+    )
 
     response = service.add_message(
         conversation.id,
@@ -144,16 +160,39 @@ def test_service_feeds_function_call_output_back_into_provider_loop() -> None:
         _context(),
     )
 
-    assert response.answer == "Open the customer workspace first."
-    assert len(provider.requests) == 2
-    assert provider.requests[0].tool_results == []
-    assert provider.requests[0].provider_tool_name_map == {
-        "assistant_lookup_docs": "assistant.lookup_docs",
-    }
+    assert response.answer == "Done"
+    matched = [record for record in audit_repository.records if record.tool_name == "assistant.lookup_docs"]
+    assert matched
+    assert matched[-1].tool_name == "assistant.lookup_docs"
+
+
+def test_unknown_provider_tool_name_is_rejected_safely() -> None:
+    audit_repository = _CapturingAuditRepository()
+    registry = AssistantToolRegistry(audit_repository=audit_repository)
+    registry.register(_LookupTool())
+    provider = _MappingProvider(tool_name="unknown_provider_tool")
+    service, repository = _service(provider, registry)
+    conversation = repository.create_conversation(
+        tenant_id="tenant-1",
+        user_id="assistant-user-1",
+        title=None,
+        locale="en",
+        last_route_name=None,
+        last_route_path=None,
+    )
+
+    response = service.add_message(
+        conversation.id,
+        AssistantMessageCreate(message="How do I create a customer?"),
+        _context(),
+    )
+
+    assert response.answer == "Done"
+    assert not any(record.tool_name == "assistant.lookup_docs" for record in audit_repository.records)
     assert provider.requests[1].tool_results == [
         {
             "type": "function_call_output",
             "call_id": "call-1",
-            "output": '{"summary": "Resolved customer create"}',
+            "output": '{"error_code": "assistant.tool.unknown_provider_tool_name", "error_message": "Unknown provider tool alias requested.", "ok": false, "provider_tool_name": "unknown_provider_tool"}',
         }
     ]

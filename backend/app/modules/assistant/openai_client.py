@@ -22,6 +22,7 @@ from app.modules.assistant.provider import (
     AssistantProviderRateLimitError,
 )
 from app.modules.assistant.schemas import AssistantProviderStructuredOutput
+from app.modules.assistant.tool_name_adapter import is_valid_provider_tool_name
 
 
 OpenAIClientFactory = Callable[..., Any]
@@ -96,7 +97,10 @@ class OpenAIResponsesProvider(AssistantProvider):
                 "text_format": AssistantProviderStructuredOutput,
                 "store": self.runtime.store_responses,
             }
-            normalized_tools = self._normalize_tools_for_responses_api(request.available_tools)
+            normalized_tools = self._normalize_tools_for_responses_api(
+                request.available_tools,
+                request.provider_tool_name_map,
+            )
             if normalized_tools:
                 call_kwargs["tools"] = normalized_tools
             response = client.responses.parse(**call_kwargs)
@@ -198,8 +202,13 @@ class OpenAIResponsesProvider(AssistantProvider):
         return messages
 
     @staticmethod
-    def _normalize_tools_for_responses_api(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _normalize_tools_for_responses_api(
+        tools: list[dict[str, Any]],
+        provider_tool_name_map: dict[str, str] | None = None,
+    ) -> list[dict[str, Any]]:
+        name_map = provider_tool_name_map or {}
         normalized: list[dict[str, Any]] = []
+        seen_names: set[str] = set()
         for item in tools:
             if not isinstance(item, dict):
                 continue
@@ -209,15 +218,39 @@ class OpenAIResponsesProvider(AssistantProvider):
             function = item.get("function")
             if not isinstance(function, dict):
                 continue
-            name = str(function.get("name") or "").strip()
-            if not name:
+            internal_name = str(function.get("name") or "").strip()
+            if not internal_name:
                 continue
+            name = next(
+                (provider_name for provider_name, mapped_name in name_map.items() if mapped_name == internal_name),
+                internal_name,
+            )
+            if not is_valid_provider_tool_name(name):
+                raise AssistantProviderInvalidRequestError(
+                    "OpenAI provider tool name is invalid.",
+                    provider_error_type="ToolNameValidationError",
+                    safe_message=f"Invalid provider tool name: {name}",
+                )
+            if name in seen_names:
+                raise AssistantProviderInvalidRequestError(
+                    "OpenAI provider tool names must be unique.",
+                    provider_error_type="ToolNameValidationError",
+                    safe_message=f"Duplicate provider tool name: {name}",
+                )
+            parameters = function.get("parameters") or {"type": "object", "properties": {}}
+            if not isinstance(parameters, dict) or parameters.get("type") != "object":
+                raise AssistantProviderInvalidRequestError(
+                    "OpenAI provider tool schema is invalid.",
+                    provider_error_type="ToolSchemaValidationError",
+                    safe_message=f"Invalid JSON schema for tool: {internal_name}",
+                )
+            seen_names.add(name)
             normalized.append(
                 {
                     "type": "function",
                     "name": name,
                     "description": function.get("description"),
-                    "parameters": function.get("parameters") or {"type": "object", "properties": {}},
+                    "parameters": parameters,
                 }
             )
         return normalized

@@ -80,6 +80,9 @@ def test_openai_provider_builds_expected_parse_request() -> None:
                     },
                 }
             ],
+            provider_tool_name_map={
+                "assistant_search_workflow_help": "assistant.search_workflow_help",
+            },
             max_tool_calls=8,
             max_input_chars=12000,
         )
@@ -93,7 +96,7 @@ def test_openai_provider_builds_expected_parse_request() -> None:
     assert call["tools"] == [
         {
             "type": "function",
-            "name": "assistant.search_workflow_help",
+            "name": "assistant_search_workflow_help",
             "description": "Search verified workflow help.",
             "parameters": {
                 "type": "object",
@@ -109,4 +112,3 @@ def test_openai_provider_builds_expected_parse_request() -> None:
     assert any(row.get("content") == "Previous answer" for row in input_rows if isinstance(row, dict))
     assert any(row.get("type") == "function_call_output" and row.get("call_id") == "call-1" for row in input_rows)
     assert any("Grounding context package" in row.get("content", "") for row in input_rows if isinstance(row, dict))
-

@@ -78,6 +78,7 @@ from app.modules.assistant.schemas import (
     AssistantScope,
     AssistantMissingPermission,
 )
+from app.modules.assistant.tool_name_adapter import build_provider_tool_name_map
 from app.modules.assistant.tools import AssistantToolExecutionContext, AssistantToolRegistry
 from app.modules.assistant.workflow_help import detect_workflow_intent
 from app.modules.iam.authz import RequestAuthorizationContext
@@ -958,8 +959,35 @@ class AssistantService:
 
             executed_any = False
             for requested_call in requested_tool_calls[:remaining_tool_calls]:
-                tool_name = str(requested_call.get("name") or "").strip()
-                if not tool_name:
+                provider_tool_name = str(requested_call.get("name") or "").strip()
+                if not provider_tool_name:
+                    continue
+                tool_name = self._resolve_internal_tool_name(
+                    provider_tool_name=provider_tool_name,
+                    provider_tool_name_map=request.provider_tool_name_map,
+                )
+                if tool_name is None:
+                    tool_results.append(
+                        AssistantToolResultSummary(
+                            tool_name="assistant.unknown_provider_tool_name",
+                            summary={
+                                "code": "unknown_provider_tool_name",
+                                "missing_permissions": [],
+                                "provider_tool_name": provider_tool_name,
+                                "detail": "The provider requested an unknown tool alias. The tool was not executed.",
+                            },
+                        )
+                    )
+                    provider_tool_results.append(
+                        self._unknown_provider_tool_output(
+                            requested_call=requested_call,
+                            provider_tool_name=provider_tool_name,
+                        )
+                    )
+                    remaining_tool_calls -= 1
+                    executed_any = True
+                    if remaining_tool_calls <= 0:
+                        break
                     continue
                 arguments = self._parse_tool_call_arguments(requested_call.get("arguments"))
                 tool_result = self.execute_registered_tool(
@@ -1033,6 +1061,9 @@ class AssistantService:
         available_tools_payload = available_tools
         if available_tools_payload is None:
             available_tools_payload = self.list_available_tools(actor=actor, conversation_id=conversation.id)
+        provider_tool_name_map = build_provider_tool_name_map(
+            [tool["function"]["name"] for tool in available_tools_payload if isinstance(tool, dict)]
+        )
         prompt_payload = build_assistant_prompt(
             user_message=cleaned_message,
             detected_language=detected_language,
@@ -1068,6 +1099,7 @@ class AssistantService:
             if provider_tool_results is not None
             else [{"tool_name": item.tool_name, "summary": item.summary} for item in (tool_results or [])],
             available_tools=available_tools_payload,
+            provider_tool_name_map=provider_tool_name_map,
             max_tool_calls=self.runtime_config.max_tool_calls,
             max_input_chars=self.runtime_config.max_input_chars,
             metadata={
@@ -1075,6 +1107,7 @@ class AssistantService:
                 "provider_mode": self.runtime_config.provider_mode,
                 "user_id": actor.user_id,
                 "tenant_id": actor.tenant_id,
+                "tool_name_map": dict(provider_tool_name_map),
                 **prompt_payload.metadata,
             },
         )
@@ -1677,6 +1710,38 @@ class AssistantService:
         if call_id:
             result["call_id"] = call_id
         return result
+
+    @staticmethod
+    def _unknown_provider_tool_output(
+        *,
+        requested_call: dict[str, Any],
+        provider_tool_name: str,
+    ) -> dict[str, Any]:
+        result = {
+            "type": "function_call_output",
+            "output": json.dumps(
+                {
+                    "ok": False,
+                    "error_code": "assistant.tool.unknown_provider_tool_name",
+                    "error_message": "Unknown provider tool alias requested.",
+                    "provider_tool_name": provider_tool_name,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        }
+        call_id = str(requested_call.get("call_id") or "").strip()
+        if call_id:
+            result["call_id"] = call_id
+        return result
+
+    @staticmethod
+    def _resolve_internal_tool_name(
+        *,
+        provider_tool_name: str,
+        provider_tool_name_map: dict[str, str],
+    ) -> str | None:
+        return provider_tool_name_map.get(provider_tool_name)
 
     @staticmethod
     def _build_refusal_provider_payload(
