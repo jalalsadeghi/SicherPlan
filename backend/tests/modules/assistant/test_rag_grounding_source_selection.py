@@ -69,6 +69,7 @@ def _candidate(
         source_type="repository_docs",
         source_path=f"/docs/{chunk_id}.md",
         chunk_index=0,
+        source_language="fa",
         title=title,
         content=content,
         language_code="fa",

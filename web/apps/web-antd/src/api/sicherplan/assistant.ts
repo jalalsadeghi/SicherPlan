@@ -63,6 +63,15 @@ export interface AssistantMissingPermission {
   reason?: null | string;
 }
 
+export interface AssistantSourceBasisItem {
+  source_type: string;
+  source_name?: null | string;
+  page_id?: null | string;
+  module_key?: null | string;
+  title?: null | string;
+  evidence: string;
+}
+
 export interface AssistantStructuredResponse {
   conversation_id: string;
   message_id: string;
@@ -77,6 +86,8 @@ export interface AssistantStructuredResponse {
   missing_permissions?: AssistantMissingPermission[];
   next_steps?: string[];
   tool_trace_id?: null | string;
+  rag_trace_id?: null | string;
+  source_basis?: AssistantSourceBasisItem[];
 }
 
 export interface AssistantMessage {

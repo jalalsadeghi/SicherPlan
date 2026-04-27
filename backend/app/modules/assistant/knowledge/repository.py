@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Iterable
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.modules.assistant.knowledge.types import KnowledgeChunkCandidate
@@ -45,6 +45,7 @@ class AssistantKnowledgeRepository:
         source_path: str,
         source_hash: str,
         source_version: str | None,
+        source_language: str | None,
         status: str,
     ) -> AssistantKnowledgeSource:
         now = datetime.now(UTC)
@@ -54,6 +55,7 @@ class AssistantKnowledgeRepository:
             source_path=source_path,
             source_hash=source_hash,
             source_version=source_version,
+            source_language=source_language,
             status=status,
             last_ingested_at=now,
         )
@@ -62,6 +64,7 @@ class AssistantKnowledgeRepository:
         source.source_path = source_path
         source.source_hash = source_hash
         source.source_version = source_version
+        source.source_language = source_language
         source.status = status
         source.last_ingested_at = now
         self.session.add(source)
@@ -86,13 +89,35 @@ class AssistantKnowledgeRepository:
                 language_code=chunk["language_code"],
                 module_key=chunk["module_key"],
                 page_id=chunk["page_id"],
+                content_preview=chunk["content_preview"],
+                workflow_keys=chunk["workflow_keys"],
                 role_keys=chunk["role_keys"],
                 permission_keys=chunk["permission_keys"],
+                api_families=chunk["api_families"],
+                domain_terms=chunk["domain_terms"],
+                language_aliases=chunk["language_aliases"],
                 embedding=None,
                 token_count=chunk["token_count"],
             )
             self.session.add(row)
         self.session.flush()
+
+    def purge_all(self) -> None:
+        self.session.execute(delete(AssistantKnowledgeChunk))
+        self.session.execute(delete(AssistantKnowledgeSource))
+        self.session.flush()
+
+    def count_active_chunks(self) -> int:
+        statement = (
+            select(func.count())
+            .select_from(AssistantKnowledgeChunk)
+            .join(
+                AssistantKnowledgeSource,
+                AssistantKnowledgeChunk.source_id == AssistantKnowledgeSource.id,
+            )
+            .where(AssistantKnowledgeSource.status == "active")
+        )
+        return int(self.session.scalar(statement) or 0)
 
     def list_active_chunk_candidates(
         self,
@@ -132,12 +157,18 @@ class AssistantKnowledgeRepository:
             source_type=source.source_type,
             source_path=source.source_path,
             chunk_index=chunk.chunk_index,
+            source_language=source.source_language,
             title=chunk.title,
             content=chunk.content,
             language_code=chunk.language_code,
             module_key=chunk.module_key,
             page_id=chunk.page_id,
+            content_preview=chunk.content_preview,
+            workflow_keys=list(chunk.workflow_keys or []),
             role_keys=list(chunk.role_keys or []),
             permission_keys=list(chunk.permission_keys or []),
+            api_families=list(chunk.api_families or []),
+            domain_terms=list(chunk.domain_terms or []),
+            language_aliases=list(chunk.language_aliases or []),
             token_count=chunk.token_count,
         )

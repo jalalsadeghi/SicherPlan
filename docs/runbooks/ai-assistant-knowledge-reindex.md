@@ -7,8 +7,9 @@ This runbook explains how the current SicherPlan assistant knowledge indexing wo
 Important current state:
 
 - the repository implements knowledge ingestion and retrieval services;
-- the repository does not yet expose a supported assistant knowledge reindex HTTP endpoint, CLI command, or admin UI;
-- reindex is currently a developer/operator maintenance action performed through backend code, not a productized runtime feature.
+- the repository now exposes a developer CLI reindex path;
+- there is still no supported assistant knowledge reindex HTTP endpoint or admin UI;
+- reindex remains a developer/operator maintenance action, not a productized runtime feature.
 
 ## When to Reindex
 
@@ -89,12 +90,39 @@ Blocked file patterns include:
 
 ### Supported today
 
-Developer-level backend invocation of:
+Developer/operator CLI:
 
-- `KnowledgeSourceLoader`
-- `AssistantKnowledgeRepository`
-- `AssistantKnowledgeIngestionService`
-- explicit `KnowledgeSourceRegistration` entries
+```bash
+cd backend
+PYTHONPATH=. python3 -m app.modules.assistant.knowledge.ingest --reindex
+```
+
+This command:
+
+- rebuilds the default assistant knowledge registrations;
+- regenerates the curated markdown sources under `tmp/assistant-knowledge/`;
+- purges existing `assistant.knowledge_*` rows when `--reindex` is provided;
+- ingests the curated documentation corpus again;
+- prints a JSON summary with source and chunk counts.
+
+Expected JSON keys now include:
+
+- `sources_registered`
+- `sources_indexed`
+- `sources_skipped_unchanged`
+- `chunks_created`
+- `chunks_active`
+- `failures`
+
+### Stage / Docker Compose
+
+If the stage stack runs the backend in Docker Compose, execute the same module inside the backend container:
+
+```bash
+docker compose exec backend sh -lc 'cd /app/backend && PYTHONPATH=. python3 -m app.modules.assistant.knowledge.ingest --reindex'
+```
+
+Use the actual compose service name and container workdir from the deployment if they differ.
 
 Relevant files:
 
@@ -106,7 +134,6 @@ Relevant files:
 
 - no `POST /api/assistant/knowledge/reindex`
 - no `GET /api/assistant/knowledge/status`
-- no repo management command
 - no admin UI button
 
 Treat any direct Python invocation as a controlled maintenance action, not a normal operator workflow.
@@ -155,7 +182,8 @@ Symptom:
 - actor has no `assistant.knowledge.reindex`
 
 Current note:
-- there is no route to deny yet, but the permission must still be treated as mandatory for any future operator surface.
+- the CLI is a maintenance operation and is not permission-enforced inside the process;
+- any future HTTP or UI operator surface must still require `assistant.knowledge.reindex`.
 
 ### Feature disabled
 

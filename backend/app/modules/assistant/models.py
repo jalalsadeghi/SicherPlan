@@ -214,6 +214,7 @@ class AssistantKnowledgeSource(UUIDPrimaryKeyMixin, TimestampedMixin, Base):
     source_path: Mapped[str] = mapped_column(String(500), nullable=False)
     source_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     source_version: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    source_language: Mapped[str | None] = mapped_column(String(16), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active", server_default="active")
     last_ingested_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
@@ -243,8 +244,13 @@ class AssistantKnowledgeChunk(UUIDPrimaryKeyMixin, Base):
     language_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
     module_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
     page_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    content_preview: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    workflow_keys: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     role_keys: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     permission_keys: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    api_families: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    domain_terms: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    language_aliases: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     embedding: Mapped[list[float] | dict[str, object] | None] = mapped_column(JSONB, nullable=True)
     token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

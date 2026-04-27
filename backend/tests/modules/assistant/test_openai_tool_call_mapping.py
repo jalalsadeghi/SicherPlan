@@ -189,10 +189,11 @@ def test_unknown_provider_tool_name_is_rejected_safely() -> None:
 
     assert response.answer == "Done"
     assert not any(record.tool_name == "assistant.lookup_docs" for record in audit_repository.records)
-    assert provider.requests[1].tool_results == [
-        {
+    assert any(
+        item == {
             "type": "function_call_output",
             "call_id": "call-1",
             "output": '{"error_code": "assistant.tool.unknown_provider_tool_name", "error_message": "Unknown provider tool alias requested.", "ok": false, "provider_tool_name": "unknown_provider_tool"}',
         }
-    ]
+        for item in provider.requests[1].tool_results
+    )

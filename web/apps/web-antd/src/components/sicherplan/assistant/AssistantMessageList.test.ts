@@ -43,6 +43,7 @@ describe('AssistantMessageList', () => {
         ],
         missingPermissionsTitle: 'Missing permissions',
         nextStepsTitle: 'Next steps',
+        sourcesTitle: 'Sources used',
         severityLabels: {
           blocking: 'Blocking',
           info: 'Info',
@@ -113,11 +114,21 @@ describe('AssistantMessageList', () => {
               ],
               next_steps: ['Open the planning workspace.'],
               out_of_scope: true,
+              source_basis: [
+                {
+                  source_type: 'workflow_help',
+                  source_name: 'contract_or_document_register',
+                  page_id: 'PS-01',
+                  title: 'Platform Services Workspace',
+                  evidence: 'Verified document workflow context exists in Platform Services.',
+                },
+              ],
             },
           },
         ],
         missingPermissionsTitle: 'Missing permissions',
         nextStepsTitle: 'Next steps',
+        sourcesTitle: 'Sources used',
         severityLabels: {
           blocking: 'Blocking',
           info: 'Info',
@@ -136,6 +147,8 @@ describe('AssistantMessageList', () => {
     expect(wrapper.text()).toContain('planning.staffing.read');
     expect(wrapper.text()).toContain('Next steps');
     expect(wrapper.text()).toContain('Open the planning workspace.');
+    expect(wrapper.text()).toContain('Sources used');
+    expect(wrapper.text()).toContain('PS-01 - Platform Services Workspace');
     expect(wrapper.text()).not.toContain('Links');
   });
 });

@@ -38,7 +38,7 @@ class _ToolLoopProvider:
                     {
                         "id": "tool-1",
                         "name": "assistant.search_workflow_help",
-                        "arguments": '{"intent":"order_create","language_code":"en"}',
+                        "arguments": '{"workflow_key":"customer_order_create","language_code":"en"}',
                         "call_id": "call-1",
                     }
                 ],
@@ -144,7 +144,7 @@ def test_persian_employee_assign_to_shift_not_routed_as_employee_create() -> Non
     assert "assistant.search_workflow_help" in tool_names
     assert "assistant.find_ui_action" not in tool_names
     assert provider.requests[0].grounding_context is not None
-    assert provider.requests[0].grounding_context["retrieval_plan"]["workflow_intent"] == "employee_assign_to_shift_workflow"
+    assert provider.requests[0].grounding_context["retrieval_plan"]["workflow_intent"] == "employee_assign_to_shift"
     assert {"E-01", "P-03", "P-04"}.issubset(
         set(provider.requests[0].grounding_context["retrieval_plan"]["likely_page_ids"])
     )

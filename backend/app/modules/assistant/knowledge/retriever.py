@@ -10,7 +10,7 @@ from app.modules.assistant.knowledge.embeddings import (
     AssistantEmbeddingRetriever,
     NoopAssistantEmbeddingRetriever,
 )
-from app.modules.assistant.lexicon import expand_assistant_query
+from app.modules.assistant.lexicon import expand_query_for_retrieval
 from app.modules.assistant.knowledge.types import (
     DEFAULT_MAX_CHUNK_CHARS,
     KnowledgeChunkCandidate,
@@ -78,14 +78,15 @@ class AssistantKnowledgeRetriever:
         cleaned_query = query.strip()
         if not cleaned_query:
             return []
-        expanded_query = expand_assistant_query(
+        expanded_query = expand_query_for_retrieval(
             cleaned_query,
+            language_code,
             workflow_intent=workflow_intent,
             ui_page_id=page_id,
         )
 
         capped_limit = min(max(int(limit), 1), self.max_context_chunks)
-        candidate_limit = max(capped_limit * 12, 50)
+        candidate_limit = max(capped_limit * 40, 200)
         candidates = self.repository.list_active_chunk_candidates(
             source_type=source_type,
             candidate_limit=candidate_limit,
@@ -94,6 +95,7 @@ class AssistantKnowledgeRetriever:
             candidates,
             query=cleaned_query,
             expanded_query=expanded_query.expanded_query,
+            workflow_intent=workflow_intent,
             language_code=language_code,
             module_key=module_key,
             page_id=page_id,
@@ -124,6 +126,7 @@ class AssistantKnowledgeRetriever:
         *,
         query: str,
         expanded_query: str,
+        workflow_intent: str | None,
         language_code: str | None,
         module_key: str | None,
         page_id: str | None,
@@ -151,6 +154,7 @@ class AssistantKnowledgeRetriever:
                 normalized_expanded_query=normalized_expanded_query,
                 query_tokens=query_tokens,
                 expanded_query_tokens=expanded_query_tokens,
+                workflow_intent=workflow_intent,
                 language_code=language_code,
                 module_key=module_key,
                 page_id=page_id,
@@ -182,13 +186,20 @@ class AssistantKnowledgeRetriever:
                     source_id=candidate.source_id,
                     source_name=candidate.source_name,
                     source_type=candidate.source_type,
+                    source_path=candidate.source_path,
+                    source_language=candidate.source_language,
                     title=candidate.title,
                     content=_truncate_text(candidate.content, max_chunk_chars),
+                    content_preview=candidate.content_preview or _truncate_text(candidate.content, 180),
                     language_code=candidate.language_code,
                     module_key=candidate.module_key,
                     page_id=candidate.page_id,
+                    workflow_keys=list(candidate.workflow_keys or []),
                     role_keys=list(candidate.role_keys),
                     permission_keys=list(candidate.permission_keys),
+                    api_families=list(candidate.api_families or []),
+                    domain_terms=list(candidate.domain_terms or []),
+                    language_aliases=list(candidate.language_aliases or []),
                     score=round(score, 4),
                     rank=rank,
                     matched_by=matched_by,
@@ -239,6 +250,7 @@ def _score_candidate(
     normalized_expanded_query: str,
     query_tokens: Counter[str],
     expanded_query_tokens: Counter[str],
+    workflow_intent: str | None,
     language_code: str | None,
     module_key: str | None,
     page_id: str | None,
@@ -250,7 +262,9 @@ def _score_candidate(
 ) -> tuple[float, str]:
     title_text = _normalize_text(candidate.title or "")
     content_text = _normalize_text(candidate.content)
-    combined_text = f"{title_text}\n{content_text}".strip()
+    alias_text = _normalize_text(" ".join(candidate.language_aliases or []))
+    domain_text = _normalize_text(" ".join(candidate.domain_terms or []))
+    combined_text = f"{title_text}\n{content_text}\n{alias_text}\n{domain_text}".strip()
     combined_tokens = Counter(_tokenize(combined_text))
     title_tokens = Counter(_tokenize(title_text))
 
@@ -287,23 +301,35 @@ def _score_candidate(
         score += 8.0
     if normalized_expanded_query and normalized_expanded_query in title_text:
         score += 10.0
+    if workflow_intent:
+        if workflow_intent in set(candidate.workflow_keys or []):
+            score += 35.0
+        elif candidate.workflow_keys:
+            score -= 18.0
+    if alias_text:
+        alias_tokens = Counter(_tokenize(alias_text))
+        alias_overlap = sum(min(count, alias_tokens.get(token, 0)) for token, count in expanded_query_tokens.items())
+        score += alias_overlap * 3.5
+    if domain_text:
+        domain_tokens = Counter(_tokenize(domain_text))
+        domain_overlap = sum(min(count, domain_tokens.get(token, 0)) for token, count in expanded_query_tokens.items())
+        score += domain_overlap * 2.5
 
     if page_id is not None and candidate.page_id == page_id:
         score += 20.0
     if page_ids and candidate.page_id in page_ids:
         score += 18.0
     elif page_ids and candidate.page_id is not None:
-        score -= 8.0
+        score -= 16.0
     if module_key is not None and candidate.module_key == module_key:
         score += 12.0
     if module_keys and candidate.module_key in module_keys:
         score += 10.0
     elif module_keys and candidate.module_key is not None:
-        score -= 8.0
+        score -= 14.0
     if source_type is not None and candidate.source_type == source_type:
         score += 4.0
-    if candidate.source_type in {"manual", "repository_docs", "sprint_doc"}:
-        score += 2.0
+    score += _source_type_boost(candidate.source_type)
     if language_code is not None:
         if candidate.language_code == language_code:
             score += 8.0
@@ -316,6 +342,14 @@ def _score_candidate(
         score += 1.5
     if permission_keys and set(permission_keys).intersection(candidate.permission_keys):
         score += 1.5
+
+    score += _intent_page_demotions(
+        candidate=candidate,
+        normalized_query=normalized_query,
+        workflow_intent=workflow_intent,
+        page_ids=page_ids,
+        module_keys=module_keys,
+    )
 
     preferred_page_match = bool(page_ids and candidate.page_id in page_ids)
     preferred_module_match = bool(module_keys and candidate.module_key in module_keys)
@@ -354,3 +388,46 @@ def _dedupe_list(values: list[str]) -> list[str]:
         seen.add(cleaned)
         result.append(cleaned)
     return result
+
+
+def _source_type_boost(source_type: str) -> float:
+    boosts = {
+        "ui_action_catalog": 9.0,
+        "page_help_manifest": 9.0,
+        "workflow_help": 8.0,
+        "operational_handbook": 7.0,
+        "user_manual": 7.0,
+        "implementation_data_model": 5.0,
+        "engineering_doc": 4.0,
+        "security_doc": 3.5,
+        "runbook": 3.0,
+        "api_export": 2.0,
+        "repository_docs": 3.0,
+        "manual": 3.0,
+        "sprint_doc": 2.0,
+        "role_page_coverage": 2.0,
+        "api_endpoint_map": 1.5,
+        "page_route_catalog": 1.0,
+    }
+    return boosts.get(source_type, 0.0)
+
+
+def _intent_page_demotions(
+    *,
+    candidate: KnowledgeChunkCandidate,
+    normalized_query: str,
+    workflow_intent: str | None,
+    page_ids: list[str],
+    module_keys: list[str],
+) -> float:
+    if candidate.page_id == "F-02" and "dashboard" not in normalized_query and "kpi" not in normalized_query:
+        if "F-02" not in page_ids and "dashboard" not in module_keys:
+            return -14.0
+    if candidate.page_id == "E-01":
+        employee_terms = ("employee", "mitarbeiter", "کارمند", "guard", "hr", "personal")
+        if workflow_intent not in {"employee_create", "employee_assign_to_shift", "employee_assign_to_shift_workflow"} and not any(
+            term in normalized_query for term in employee_terms
+        ):
+            if "E-01" not in page_ids and "employees" not in module_keys:
+                return -12.0
+    return 0.0

@@ -34,10 +34,11 @@ def test_persian_contract_registration_maps_to_platform_customer_or_order_contex
         route_context={"page_id": "F-02", "path": "/admin/dashboard"},
     )
 
-    assert plan.workflow_intent == "contract_registration"
+    assert plan.workflow_intent == "contract_or_document_register"
     assert "PS-01" in plan.likely_page_ids
     assert "C-01" in plan.likely_page_ids
     assert "P-02" in plan.likely_page_ids
+    assert "S-01" in plan.likely_page_ids
     assert "platform_services" in plan.likely_module_keys
 
 
@@ -47,7 +48,7 @@ def test_german_customer_order_maps_to_order_or_customer_plan_pages() -> None:
         route_context={"page_id": "E-01", "path": "/admin/employees"},
     )
 
-    assert plan.workflow_intent in {"order_create", "customer_plan_create"}
+    assert plan.workflow_intent == "customer_order_create"
     assert "P-02" in plan.likely_page_ids
     assert "C-01" in plan.likely_page_ids
     assert "E-01" not in plan.likely_page_ids

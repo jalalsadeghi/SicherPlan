@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.modules.assistant.knowledge.ingest import AssistantKnowledgeIngestionService
+from app.modules.assistant.knowledge.ingest import (
+    AssistantKnowledgeIngestionService,
+    build_default_knowledge_registrations,
+)
 from app.modules.assistant.knowledge.repository import AssistantKnowledgeRepository
 from app.modules.assistant.knowledge.source_loader import KnowledgeSourceLoader
 from app.modules.assistant.knowledge.types import KnowledgeSourceRegistration
@@ -36,6 +39,7 @@ class InMemoryKnowledgeRepository:
         source_path: str,
         source_hash: str,
         source_version: str | None,
+        source_language: str | None,
         status: str,
     ) -> AssistantKnowledgeSource:
         source = existing_source or AssistantKnowledgeSource(
@@ -45,6 +49,7 @@ class InMemoryKnowledgeRepository:
             source_path=source_path,
             source_hash=source_hash,
             source_version=source_version,
+            source_language=source_language,
             status=status,
             last_ingested_at=None,
             created_at=None,
@@ -56,6 +61,7 @@ class InMemoryKnowledgeRepository:
         source.source_path = source_path
         source.source_hash = source_hash
         source.source_version = source_version
+        source.source_language = source_language
         source.status = status
         self.sources[source_path] = source
         return source
@@ -155,3 +161,45 @@ def test_unsupported_pdf_fails_safely_if_not_implemented(tmp_path: Path) -> None
 
     assert result.sources_failed == 1
     assert "PDF extraction is not implemented" in result.failures[0].error
+
+
+def test_default_registrations_include_generated_corpus_seed_types(tmp_path: Path) -> None:
+    docs_root = tmp_path / "docs"
+    (docs_root / "sprint").mkdir(parents=True)
+    (docs_root / "engineering").mkdir(parents=True)
+    (docs_root / "security").mkdir(parents=True)
+    (docs_root / "qa").mkdir(parents=True)
+    (docs_root / "support").mkdir(parents=True)
+    (docs_root / "training").mkdir(parents=True)
+    (docs_root / "discovery").mkdir(parents=True)
+    for relative_path in (
+        "sprint/AI-Assistant.md",
+        "engineering/ai-assistant-architecture.md",
+        "security/ai-assistant-security.md",
+        "qa/ai-assistant-test-plan.md",
+        "support/hypercare-runbook.md",
+        "training/us-35-role-guides.md",
+        "discovery/us-1-t1-scope-review.md",
+    ):
+        (docs_root / relative_path).write_text("# Seed\n\nP-02\n", encoding="utf-8")
+
+    registrations = build_default_knowledge_registrations(tmp_path)
+    source_types = {item.source_type for item in registrations}
+
+    assert {
+        "page_route_catalog",
+        "page_help_manifest",
+        "workflow_help",
+        "ui_action_catalog",
+        "api_export",
+        "role_page_coverage",
+        "operational_handbook",
+        "user_manual",
+        "implementation_data_model",
+    }.issubset(source_types)
+
+
+def test_default_registrations_skip_missing_optional_docs(tmp_path: Path) -> None:
+    registrations = build_default_knowledge_registrations(tmp_path)
+    assert registrations
+    assert all(Path(item.source_path).exists() for item in registrations)

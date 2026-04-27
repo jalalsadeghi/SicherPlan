@@ -197,6 +197,7 @@ onMounted(async () => {
         :missing-permissions-title="$t('assistant.widget.missingPermissionsTitle')"
         :provider-warning="providerWarning"
         :next-steps-title="$t('assistant.widget.nextStepsTitle')"
+        :sources-title="$t('assistant.widget.sourcesTitle')"
         :sending-message="assistantStore.sendingMessage"
         :severity-labels="severityLabels"
         :submit-label="$t('assistant.widget.send')"

@@ -12,19 +12,37 @@ SUPPORTED_SOURCE_TYPES = {
     "json",
     "openapi",
     "sprint_doc",
+    "engineering_doc",
+    "security_doc",
+    "runbook",
+    "api_export",
     "repository_docs",
     "manual",
+    "page_route_catalog",
+    "page_help_manifest",
+    "workflow_help",
+    "ui_action_catalog",
+    "api_endpoint_map",
+    "role_page_coverage",
+    "operational_handbook",
+    "user_manual",
+    "implementation_data_model",
 }
 
 DEFERRED_SOURCE_TYPES = {"pdf", "xlsx"}
 
 DEFAULT_MAX_FILE_SIZE_BYTES = 512_000
-DEFAULT_MAX_CHUNK_CHARS = 4_000
-DEFAULT_MIN_CHUNK_CHARS = 400
-DEFAULT_CHUNK_OVERLAP_CHARS = 300
+DEFAULT_MAX_CHUNK_CHARS = 5_500
+DEFAULT_MIN_CHUNK_CHARS = 2_400
+DEFAULT_CHUNK_OVERLAP_CHARS = 700
 
 PAGE_ID_TO_MODULE_KEY = {
+    "F-02": "dashboard",
+    "PS-01": "platform_services",
+    "C-01": "customers",
     "E-01": "employees",
+    "S-01": "subcontractors",
+    "P-02": "planning",
     "P-03": "planning",
     "P-04": "planning",
     "P-05": "planning",
@@ -73,8 +91,13 @@ class ChunkMetadata:
     language_code: str | None
     module_key: str | None
     page_id: str | None
+    content_preview: str | None = None
+    workflow_keys: list[str] = field(default_factory=list)
     role_keys: list[str] = field(default_factory=list)
     permission_keys: list[str] = field(default_factory=list)
+    api_families: list[str] = field(default_factory=list)
+    domain_terms: list[str] = field(default_factory=list)
+    language_aliases: list[str] = field(default_factory=list)
     token_count: int | None = None
 
 
@@ -94,13 +117,19 @@ class KnowledgeChunkCandidate:
     source_type: str
     source_path: str
     chunk_index: int
+    source_language: str | None
     title: str | None
     content: str
     language_code: str | None
     module_key: str | None
     page_id: str | None
+    content_preview: str | None = None
+    workflow_keys: list[str] = field(default_factory=list)
     role_keys: list[str] = field(default_factory=list)
     permission_keys: list[str] = field(default_factory=list)
+    api_families: list[str] = field(default_factory=list)
+    domain_terms: list[str] = field(default_factory=list)
+    language_aliases: list[str] = field(default_factory=list)
     token_count: int | None = None
 
 

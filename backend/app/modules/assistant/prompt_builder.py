@@ -233,6 +233,7 @@ def _build_security_policy_section(policy_version: str) -> str:
         f"- policy_version: {policy_version}\n"
         "- You are the SicherPlan AI Assistant.\n"
         "- You only answer questions about the SicherPlan platform.\n"
+        "- For in-scope questions, answer using the provided RAG grounding context.\n"
         "- You must follow the current user's permissions, tenant scope, role scope, and page access.\n"
         "- You must not reveal data that was not returned by backend tools.\n"
         "- You must not infer or confirm existence of inaccessible records.\n"
@@ -243,9 +244,14 @@ def _build_security_policy_section(policy_version: str) -> str:
         "- Use verified page-help, workflow-help, diagnostics, route catalog, and knowledge retrieval as grounded facts only.\n"
         "- Use verified page-help and UI-action tool output only for exact UI labels and exact button guidance.\n"
         "- You must produce the final answer yourself using grounded facts; do not treat page-help or workflow facts as canned prose to repeat verbatim.\n"
+        "- Treat this as a RAG answer: use only grounded SicherPlan-specific sources for SicherPlan-specific claims.\n"
         "- Use the grounding context package as the source of truth for page names, routes, UI actions, workflow dependencies, and diagnostics.\n"
+        "- A page ID, route name, page title, or generic page hint alone is not enough for a detailed how-to answer.\n"
         "- If the grounding context is incomplete or ambiguous, say what is missing and ask a clarifying question instead of inventing a workflow.\n"
+        "- If a precise claim is not supported by grounding context, say that it is not verified.\n"
+        "- If only shallow page hints are available and no content-bearing source exists, do not give a full step-by-step workflow. State what is verified and ask a clarifying question if needed.\n"
         "- If exact UI labels are unavailable in grounding context, state that the exact label is not verified.\n"
+        "- Use source_basis only for retrieved grounded sources that actually support the answer.\n"
         "- If no verified UI action is available, say clearly that the exact current UI label cannot be confirmed.\n"
         "- Never offer guessed alternatives such as 'Create Employee or New Employee' unless both labels were explicitly returned by backend tools.\n"
         "- If tools are missing or permissions are insufficient, explain the limitation safely.\n"
@@ -328,6 +334,12 @@ def _build_grounding_context_section(grounding_context: AssistantGroundingContex
     if grounding_context is None:
         return "Grounding context\n- grounding_sources: []"
     payload = grounding_context.model_dump(mode="json")
+    missing_context = payload.get("missing_context", [])
+    if isinstance(missing_context, list) and "content_bearing_sources" in missing_context:
+        payload["rag_guidance"] = (
+            "Only shallow page hints were found. Do not invent exact SicherPlan steps. "
+            "State what is verified and ask a clarifying question if needed."
+        )
     return "Grounding context\n" + _json_block(redact_prompt_value(payload))
 
 
@@ -373,6 +385,8 @@ def _build_structured_response_section() -> str:
         "Structured response contract\n"
         "- The backend wraps your result into the final assistant response schema.\n"
         "- Your structured output must include: answer, confidence, out_of_scope, diagnosis, links, missing_permissions, next_steps, tool_trace_id.\n"
+        "- You may include source_basis, but only for retrieved grounded sources that support the answer.\n"
+        "- Each source_basis entry should use: source_type, source_name, page_id, module_key, title, evidence.\n"
         "- The answer must be your own final explanation synthesized from grounded facts.\n"
         "- Keep diagnosis, links, permission limitations, and next steps in the same response language.\n"
         "- Do not include raw embeddings, raw tool payloads, secrets, or unrestricted records."

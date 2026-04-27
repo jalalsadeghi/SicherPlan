@@ -182,6 +182,9 @@ class AppSettings:
     ai_max_tool_calls: int = field(default_factory=lambda: _get_int("SP_AI_MAX_TOOL_CALLS", 8))
     ai_max_context_chunks: int = field(default_factory=lambda: _get_int("SP_AI_MAX_CONTEXT_CHUNKS", 8))
     ai_max_input_chars: int = field(default_factory=lambda: _get_int("SP_AI_MAX_INPUT_CHARS", 12000))
+    ai_max_grounding_sources: int = field(default_factory=lambda: _get_int("SP_AI_MAX_GROUNDING_SOURCES", 10))
+    ai_max_grounding_chars_per_source: int = field(default_factory=lambda: _get_int("SP_AI_MAX_GROUNDING_CHARS_PER_SOURCE", 1200))
+    ai_max_total_grounding_chars: int = field(default_factory=lambda: _get_int("SP_AI_MAX_TOTAL_GROUNDING_CHARS", 9000))
     ai_timeout_seconds: int = field(default_factory=lambda: _get_int("SP_AI_TIMEOUT_SECONDS", 45))
     ai_rate_limit_per_user_per_minute: int = field(
         default_factory=lambda: _get_int("SP_AI_RATE_LIMIT_PER_USER_PER_MINUTE", 10)

@@ -68,6 +68,7 @@ def _candidate(
         source_type=source_type,
         source_path=source_path or f"/docs/{source_name.casefold().replace(' ', '-')}.md",
         chunk_index=chunk_index,
+        source_language=language_code,
         title=title,
         content=content,
         language_code=language_code,

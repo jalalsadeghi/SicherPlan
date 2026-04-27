@@ -17,6 +17,9 @@ class AssistantRetrievalPlan:
     workflow_intent: str | None = None
     ui_intent: str | None = None
     expanded_query: str | None = None
+    detected_terms: tuple[str, ...] = ()
+    expanded_terms_en: tuple[str, ...] = ()
+    expanded_terms_de: tuple[str, ...] = ()
     concept_keys: tuple[str, ...] = ()
     likely_page_ids: tuple[str, ...] = ()
     likely_module_keys: tuple[str, ...] = ()
@@ -29,6 +32,9 @@ class AssistantRetrievalPlan:
             "workflow_intent": self.workflow_intent,
             "ui_intent": self.ui_intent,
             "expanded_query": self.expanded_query,
+            "detected_terms": list(self.detected_terms),
+            "expanded_terms_en": list(self.expanded_terms_en),
+            "expanded_terms_de": list(self.expanded_terms_de),
             "concept_keys": list(self.concept_keys),
             "likely_page_ids": list(self.likely_page_ids),
             "likely_module_keys": list(self.likely_module_keys),
@@ -105,6 +111,9 @@ def build_retrieval_plan(
         workflow_intent=workflow_intent.intent if workflow_intent is not None else None,
         ui_intent=ui_intent.intent if ui_intent is not None else None,
         expanded_query=expanded_query.expanded_query,
+        detected_terms=expanded_query.detected_terms,
+        expanded_terms_en=expanded_query.expanded_terms_en,
+        expanded_terms_de=expanded_query.expanded_terms_de,
         concept_keys=expanded_query.concept_keys,
         likely_page_ids=tuple(_dedupe_preserve_order(likely_page_ids)),
         likely_module_keys=tuple(_dedupe_preserve_order([key for key in likely_module_keys if key])),
@@ -128,9 +137,13 @@ def _dedupe_preserve_order(values: list[str]) -> list[str]:
 def _module_key_for_page_id(page_id: str) -> str:
     if page_id.startswith("PS"):
         return "platform_services"
+    if page_id.startswith("F"):
+        return "dashboard"
     if page_id.startswith("E"):
         return "employees"
-    if page_id.startswith("P") or page_id.startswith("FD"):
+    if page_id.startswith("FD"):
+        return "field_execution"
+    if page_id.startswith("P"):
         return "planning"
     if page_id.startswith("C"):
         return "customers"

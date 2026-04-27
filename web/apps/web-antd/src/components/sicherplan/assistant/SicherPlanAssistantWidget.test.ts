@@ -279,6 +279,15 @@ describe('SicherPlanAssistantWidget', () => {
           ],
           next_steps: ['Schicht freigeben'],
           response_language: 'de',
+          source_basis: [
+            {
+              source_type: 'page_help_manifest',
+              source_name: 'SicherPlanPlanningShifts',
+              page_id: 'P-03',
+              title: 'Shift Planning',
+              evidence: 'Shift release guidance is documented for Shift Planning.',
+            },
+          ],
         },
       },
     ];
@@ -293,6 +302,8 @@ describe('SicherPlanAssistantWidget', () => {
     expect(wrapper.text()).toContain('assistant.widget.nextStepsTitle');
     expect(wrapper.text()).toContain('Schicht freigeben');
     expect(wrapper.text()).toContain('assistant.widget.linksTitle');
+    expect(wrapper.text()).toContain('assistant.widget.sourcesTitle');
+    expect(wrapper.text()).toContain('P-03 - Shift Planning');
 
     const linkButton = wrapper.find('.sp-assistant-link-card__action');
     await linkButton.trigger('click');

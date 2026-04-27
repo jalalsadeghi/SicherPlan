@@ -120,9 +120,9 @@ def test_persian_contract_registration_does_not_return_dashboard_only_sources() 
     results = _retriever().retrieve_knowledge_chunks(
         query="چطوری یک قرارداد جدید ثبت کنم؟",
         language_code="fa",
-        page_ids=["PS-01", "C-01", "P-02"],
-        module_keys=["platform_services", "customers", "planning"],
-        workflow_intent="contract_registration",
+        page_ids=["PS-01", "C-01", "P-02", "S-01"],
+        module_keys=["platform_services", "customers", "planning", "subcontractors"],
+        workflow_intent="contract_or_document_register",
         limit=4,
     )
 

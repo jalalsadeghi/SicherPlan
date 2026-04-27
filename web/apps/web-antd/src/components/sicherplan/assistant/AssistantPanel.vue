@@ -38,6 +38,7 @@ defineProps<{
   missingPermissionsTitle: string;
   providerWarning?: null | string;
   nextStepsTitle: string;
+  sourcesTitle: string;
   sendingMessage?: boolean;
   severityLabels: Record<string, string>;
   submitLabel: string;
@@ -122,6 +123,7 @@ defineExpose({ focusInput });
       :messages="messages"
       :missing-permissions-title="missingPermissionsTitle"
       :next-steps-title="nextStepsTitle"
+      :sources-title="sourcesTitle"
       :severity-labels="severityLabels"
       :user-label="userLabel"
       @submit-feedback="$emit('submit-feedback', $event)"

@@ -1,5 +1,9 @@
 <script lang="ts" setup>
-import type { AssistantLink, AssistantMissingPermission } from '#/api/sicherplan/assistant';
+import type {
+  AssistantLink,
+  AssistantMissingPermission,
+  AssistantSourceBasisItem,
+} from '#/api/sicherplan/assistant';
 import type { AssistantFeedbackRating } from '#/api/sicherplan/assistant';
 import type { AssistantUiMessage } from '#/store';
 
@@ -29,6 +33,7 @@ const props = defineProps<{
   messages: AssistantUiMessage[];
   missingPermissionsTitle: string;
   nextStepsTitle: string;
+  sourcesTitle: string;
   severityLabels: Record<string, string>;
   userLabel: string;
   assistantLabel: string;
@@ -58,6 +63,24 @@ watch(
 
 function missingPermissionKey(item: AssistantMissingPermission) {
   return `${item.permission}-${item.reason || ''}`;
+}
+
+function sourceBasisKey(item: AssistantSourceBasisItem) {
+  return [
+    item.source_type,
+    item.source_name || '',
+    item.page_id || '',
+    item.title || '',
+  ].join(':');
+}
+
+function sourceBasisLabel(item: AssistantSourceBasisItem) {
+  const head = item.page_id || item.module_key || item.source_name || item.source_type;
+  const tail = item.title || item.source_name;
+  if (tail && tail !== head) {
+    return `${head} - ${tail}`;
+  }
+  return head;
 }
 </script>
 
@@ -132,6 +155,23 @@ function missingPermissionKey(item: AssistantMissingPermission) {
             @open="emit('open-link', $event)"
           />
         </div>
+      </section>
+
+      <section
+        v-if="message.role !== 'user' && message.structured_response?.source_basis?.length"
+        class="sp-assistant-message__section"
+        data-testid="assistant-source-basis"
+      >
+        <h4>{{ sourcesTitle }}</h4>
+        <ul class="sp-assistant-message__bullet-list">
+          <li
+            v-for="item in message.structured_response?.source_basis || []"
+            :key="sourceBasisKey(item)"
+          >
+            <strong>{{ sourceBasisLabel(item) }}</strong>
+            <span v-if="item.evidence"> - {{ item.evidence }}</span>
+          </li>
+        </ul>
       </section>
 
       <AssistantFeedback

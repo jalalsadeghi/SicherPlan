@@ -130,6 +130,40 @@ class AssistantMissingPermission(BaseModel):
     reason: str
 
 
+class AssistantSourceBasisItem(BaseModel):
+    source_type: str
+    source_name: str | None = None
+    page_id: str | None = None
+    module_key: str | None = None
+    title: str | None = None
+    evidence: str
+
+
+class AssistantRagTraceTopSource(BaseModel):
+    source_id: str | None = None
+    source_type: str
+    source_name: str | None = None
+    page_id: str | None = None
+    module_key: str | None = None
+    title: str | None = None
+    score: float | None = None
+    content_preview: str | None = None
+
+
+class AssistantRagTraceRead(BaseModel):
+    trace_id: str
+    provider_called: bool
+    provider_mode: str
+    retrieval_executed: bool
+    grounding_attached: bool
+    grounding_source_count: int
+    content_bearing_source_count: int
+    source_type_counts: dict[str, int] = Field(default_factory=dict)
+    top_sources: list[AssistantRagTraceTopSource] = Field(default_factory=list)
+    missing_context: list[str] = Field(default_factory=list)
+    retrieval_plan: dict[str, Any] = Field(default_factory=dict)
+
+
 class AssistantStructuredResponse(BaseModel):
     conversation_id: str
     message_id: str
@@ -144,6 +178,9 @@ class AssistantStructuredResponse(BaseModel):
     missing_permissions: list[AssistantMissingPermission] = Field(default_factory=list)
     next_steps: list[str] = Field(default_factory=list)
     tool_trace_id: str | None = None
+    rag_trace_id: str | None = None
+    source_basis: list[AssistantSourceBasisItem] = Field(default_factory=list)
+    rag_trace: AssistantRagTraceRead | None = None
 
 
 class AssistantProviderStructuredOutput(BaseModel):
@@ -155,6 +192,7 @@ class AssistantProviderStructuredOutput(BaseModel):
     missing_permissions: list[AssistantMissingPermission] = Field(default_factory=list)
     next_steps: list[str] = Field(default_factory=list)
     tool_trace_id: str | None = None
+    source_basis: list[AssistantSourceBasisItem] = Field(default_factory=list)
 
 
 class AssistantKnowledgeIngestionFailureRead(BaseModel):
@@ -176,13 +214,20 @@ class AssistantKnowledgeChunkResult(BaseModel):
     source_id: str
     source_name: str
     source_type: str
+    source_path: str | None = None
+    source_language: str | None = None
     title: str | None = None
     content: str
+    content_preview: str | None = None
     language_code: str | None = None
     module_key: str | None = None
     page_id: str | None = None
+    workflow_keys: list[str] = Field(default_factory=list)
     role_keys: list[str] = Field(default_factory=list)
     permission_keys: list[str] = Field(default_factory=list)
+    api_families: list[str] = Field(default_factory=list)
+    domain_terms: list[str] = Field(default_factory=list)
+    language_aliases: list[str] = Field(default_factory=list)
     score: float
     rank: int
     matched_by: str
@@ -360,16 +405,53 @@ class AssistantGroundingFactRead(BaseModel):
 
 
 class AssistantWorkflowHelpInput(BaseModel):
-    intent: str = Field(min_length=1, max_length=120)
+    query: str | None = Field(default=None, max_length=400)
     language_code: str | None = Field(default=None, max_length=16)
+    workflow_key: str | None = Field(default=None, max_length=120)
+    intent: str | None = Field(default=None, max_length=120)
+    limit: int = Field(default=5, ge=1, le=5)
+
+
+class AssistantWorkflowSourceBasisRead(BaseModel):
+    source_type: str
+    source_name: str
+    page_id: str | None = None
+    module_key: str | None = None
+    evidence: str
+
+
+class AssistantWorkflowStepRead(BaseModel):
+    step_key: str
+    sequence: int
+    page_id: str | None = None
+    module_key: str | None = None
+    purpose: str
+    purpose_en: str
+    purpose_de: str
+    required_permissions: list[str] = Field(default_factory=list)
+    source_basis: list[AssistantWorkflowSourceBasisRead] = Field(default_factory=list)
+
+
+class AssistantWorkflowKnowledgeRead(BaseModel):
+    workflow_key: str
+    title: str
+    title_en: str
+    title_de: str
+    summary: str
+    summary_en: str
+    summary_de: str
+    intent_aliases_en: list[str] = Field(default_factory=list)
+    intent_aliases_de: list[str] = Field(default_factory=list)
+    steps: list[AssistantWorkflowStepRead] = Field(default_factory=list)
+    linked_page_ids: list[str] = Field(default_factory=list)
+    api_families: list[str] = Field(default_factory=list)
+    ambiguity_notes: list[str] = Field(default_factory=list)
+    source_basis: list[AssistantWorkflowSourceBasisRead] = Field(default_factory=list)
 
 
 class AssistantWorkflowHelpRead(BaseModel):
-    intent: str
-    title: str
-    facts: list[AssistantGroundingFactRead] = Field(default_factory=list)
-    allowed_links: list[AssistantNavigationLink] = Field(default_factory=list)
-    missing_permissions: list[AssistantMissingPermission] = Field(default_factory=list)
+    workflows: list[AssistantWorkflowKnowledgeRead] = Field(default_factory=list)
+    matched_workflow_keys: list[str] = Field(default_factory=list)
     safe_note: str | None = None
 
 

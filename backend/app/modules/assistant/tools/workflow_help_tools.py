@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any
 
 from pydantic import BaseModel
 
-from app.modules.assistant.models import AssistantPageRouteCatalog
-from app.modules.assistant.navigation import build_allowed_navigation_link
 from app.modules.assistant.schemas import (
-    AssistantGroundingFactRead,
     AssistantWorkflowHelpInput,
     AssistantWorkflowHelpRead,
+    AssistantWorkflowKnowledgeRead,
+    AssistantWorkflowSourceBasisRead,
+    AssistantWorkflowStepRead,
 )
 from app.modules.assistant.tools import (
     AssistantToolClassification,
@@ -20,21 +20,19 @@ from app.modules.assistant.tools import (
     AssistantToolResult,
     AssistantToolScopeBehavior,
 )
-from app.modules.assistant.workflow_help import WORKFLOW_HELP_SEEDS
-from app.modules.iam.auth_schemas import AuthenticatedRoleScope
-from app.modules.iam.authz import RequestAuthorizationContext
-
-
-class AssistantPageCatalogRepository(Protocol):
-    def get_page_route_by_page_id(self, *, page_id: str) -> AssistantPageRouteCatalog | None: ...
+from app.modules.assistant.workflow_help import (
+    AssistantWorkflowSeed,
+    resolve_workflow_key,
+    search_workflow_seeds,
+)
 
 
 class SearchWorkflowHelpTool:
-    def __init__(self, *, repository: AssistantPageCatalogRepository) -> None:
+    def __init__(self, *, repository: Any | None = None) -> None:
         self.repository = repository
         self.definition = AssistantToolDefinition(
             name="assistant.search_workflow_help",
-            description="Return verified workflow grounding facts and allowed workspace links for a known SicherPlan workflow intent.",
+            description="Return verified workflow manifests, ordered steps, and step-level source basis for a SicherPlan workflow question.",
             input_schema=AssistantWorkflowHelpInput,
             output_schema=AssistantWorkflowHelpRead,
             required_permissions=["assistant.chat.access"],
@@ -48,68 +46,97 @@ class SearchWorkflowHelpTool:
         input_data: BaseModel,
         context: AssistantToolExecutionContext,
     ) -> AssistantToolResult:
-        intent = str(getattr(input_data, "intent", "")).strip()
-        seed = WORKFLOW_HELP_SEEDS.get(intent)
-        if seed is None:
-            payload = AssistantWorkflowHelpRead(
-                intent=intent,
-                title=intent or "unknown workflow",
-                safe_note="No verified workflow grounding is registered for this intent.",
-            ).model_dump(mode="json")
-            return AssistantToolResult(ok=True, tool_name=self.definition.name, data=payload)
+        query = str(getattr(input_data, "query", "") or "").strip()
+        language_code = str(getattr(input_data, "language_code", "") or "").strip() or None
+        workflow_key = resolve_workflow_key(
+            getattr(input_data, "workflow_key", None) or getattr(input_data, "intent", None)
+        )
+        limit = int(getattr(input_data, "limit", 5) or 5)
 
-        facts = [
-            AssistantGroundingFactRead(
-                kind="workflow_fact",
-                code=fact.code,
-                title=fact.title,
-                detail=fact.detail,
-                page_id=fact.page_id,
-                action_key=fact.action_key,
-                verified=True,
-            )
-            for fact in seed.facts
-        ]
-        actor = _to_request_context(context)
-        allowed_links = []
-        missing_permissions = []
-        for page_id in seed.linked_page_ids:
-            page = self.repository.get_page_route_by_page_id(page_id=page_id)
-            if page is None:
-                continue
-            decision, link = build_allowed_navigation_link(
-                page=page,
-                context=actor,
-                entity_context=None,
-                reason=f"Open workspace for {seed.intent}",
-            )
-            if link is not None:
-                allowed_links.append(link)
-            elif decision.missing_permissions:
-                missing_permissions.extend(decision.missing_permissions)
+        matched = search_workflow_seeds(
+            query=query or None,
+            language_code=language_code,
+            workflow_key=workflow_key,
+            limit=limit,
+        )
+        if not matched and workflow_key is not None:
+            safe_note = "No verified workflow grounding is registered for this workflow key."
+        elif not matched:
+            safe_note = "No verified workflow grounding matched this query."
+        else:
+            safe_note = None
 
         payload = AssistantWorkflowHelpRead(
-            intent=seed.intent,
-            title=seed.title,
-            facts=facts,
-            allowed_links=allowed_links,
-            missing_permissions=missing_permissions,
-            safe_note=None,
+            workflows=[_to_workflow_read(seed=seed, language_code=language_code) for seed in matched],
+            matched_workflow_keys=[seed.workflow_key for seed in matched],
+            safe_note=safe_note,
         ).model_dump(mode="json")
         return AssistantToolResult(ok=True, tool_name=self.definition.name, data=payload)
 
 
-def _to_request_context(context: AssistantToolExecutionContext) -> RequestAuthorizationContext:
-    scopes = tuple(
-        AuthenticatedRoleScope(role_key=role_key, scope_type="tenant")
-        for role_key in sorted(context.role_keys)
-    ) or (AuthenticatedRoleScope(role_key="tenant_admin", scope_type="tenant"),)
-    return RequestAuthorizationContext(
-        session_id="assistant-tool-session",
-        user_id=context.user_id,
-        tenant_id=context.tenant_id,
-        role_keys=frozenset(context.role_keys),
-        permission_keys=frozenset(context.permission_keys),
-        scopes=scopes,
-        request_id="assistant-tool-request",
+def _to_workflow_read(*, seed: AssistantWorkflowSeed, language_code: str | None) -> AssistantWorkflowKnowledgeRead:
+    localized_title = seed.title_de if language_code == "de" else seed.title_en
+    localized_summary = seed.summary_de if language_code == "de" else seed.summary_en
+    source_basis = _dedupe_source_basis(
+        item
+        for step in seed.steps
+        for item in step.source_basis
     )
+    return AssistantWorkflowKnowledgeRead(
+        workflow_key=seed.workflow_key,
+        title=localized_title,
+        title_en=seed.title_en,
+        title_de=seed.title_de,
+        summary=localized_summary,
+        summary_en=seed.summary_en,
+        summary_de=seed.summary_de,
+        intent_aliases_en=list(seed.intent_aliases_en),
+        intent_aliases_de=list(seed.intent_aliases_de),
+        steps=[
+            AssistantWorkflowStepRead(
+                step_key=step.step_key,
+                sequence=step.sequence,
+                page_id=step.page_id,
+                module_key=step.module_key,
+                purpose=step.purpose_de if language_code == "de" else step.purpose_en,
+                purpose_en=step.purpose_en,
+                purpose_de=step.purpose_de,
+                required_permissions=list(step.required_permissions),
+                source_basis=[
+                    AssistantWorkflowSourceBasisRead(
+                        source_type=basis.source_type,
+                        source_name=basis.source_name,
+                        page_id=basis.page_id,
+                        module_key=basis.module_key,
+                        evidence=basis.evidence,
+                    )
+                    for basis in step.source_basis
+                ],
+            )
+            for step in seed.steps
+        ],
+        linked_page_ids=list(seed.linked_page_ids),
+        api_families=list(seed.api_families),
+        ambiguity_notes=list(seed.ambiguity_notes),
+        source_basis=source_basis,
+    )
+
+
+def _dedupe_source_basis(items) -> list[AssistantWorkflowSourceBasisRead]:
+    seen: set[tuple[str, str, str | None, str | None, str]] = set()
+    result: list[AssistantWorkflowSourceBasisRead] = []
+    for item in items:
+        key = (item.source_type, item.source_name, item.page_id, item.module_key, item.evidence)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(
+            AssistantWorkflowSourceBasisRead(
+                source_type=item.source_type,
+                source_name=item.source_name,
+                page_id=item.page_id,
+                module_key=item.module_key,
+                evidence=item.evidence,
+            )
+        )
+    return result

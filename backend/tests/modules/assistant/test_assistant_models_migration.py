@@ -103,6 +103,16 @@ class TestAssistantMetadata(unittest.TestCase):
         self.assertIn("ix_assistant_knowledge_chunk_source_index", indexes)
         self.assertIn("ix_assistant_knowledge_chunk_module_page", indexes)
         self.assertIn("ix_assistant_knowledge_chunk_language", indexes)
+        column_names = {column.name for column in AssistantKnowledgeChunk.__table__.columns}
+        self.assertIn("content_preview", column_names)
+        self.assertIn("workflow_keys", column_names)
+        self.assertIn("api_families", column_names)
+        self.assertIn("domain_terms", column_names)
+        self.assertIn("language_aliases", column_names)
+
+    def test_assistant_knowledge_source_has_source_language(self) -> None:
+        column_names = {column.name for column in AssistantKnowledgeSource.__table__.columns}
+        self.assertIn("source_language", column_names)
 
     def test_assistant_page_route_unique_page_path(self) -> None:
         unique_constraints = {

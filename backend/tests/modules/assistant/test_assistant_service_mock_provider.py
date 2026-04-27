@@ -176,6 +176,7 @@ def test_service_includes_retrieved_knowledge_chunks_in_provider_request() -> No
                     source_type="repository_docs",
                     source_path="/docs/planning.md",
                     chunk_index=0,
+                    source_language="en",
                     title="Employee app visibility",
                     content="If Markus is not visible in the employee app, check the linked employee access and release state.",
                     language_code="en",

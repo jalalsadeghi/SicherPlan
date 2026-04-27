@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import json
 import logging
 from typing import Any, Protocol
+from uuid import uuid4
 
 from app.errors import ApiException
 from app.modules.assistant.classifier import AssistantClassificationResult, classify_assistant_message
@@ -72,6 +73,9 @@ from app.modules.assistant.schemas import (
     AssistantPageHelpManifestRead,
     AssistantProviderStatusRead,
     AssistantProviderSmokeTestRead,
+    AssistantRagTraceRead,
+    AssistantRagTraceTopSource,
+    AssistantSourceBasisItem,
     AssistantProviderStructuredOutput,
     AssistantStructuredResponse,
     AssistantRouteContextInput,
@@ -99,6 +103,9 @@ class AssistantRuntimeConfig:
     max_input_chars: int = 12000
     max_tool_calls: int = 8
     max_context_chunks: int = 8
+    max_grounding_sources: int = 10
+    max_grounding_chars_per_source: int = 1200
+    max_total_grounding_chars: int = 9000
 
     @property
     def rag_enabled(self) -> bool:
@@ -462,6 +469,7 @@ class AssistantService:
         if classification.is_out_of_scope:
             assistant_answer = self._build_assistant_answer(response_language, classification)
             assistant_result_payload = self._build_refusal_provider_payload(classification, assistant_answer)
+            rag_trace = None
         else:
             rag_result = self._build_rag_orchestrator().run(
                 conversation=conversation,
@@ -472,6 +480,10 @@ class AssistantService:
                 actor=actor,
             )
             assistant_result_payload = rag_result.provider_payload
+            rag_trace = self._build_rag_trace(
+                grounding_context=rag_result.grounding_context,
+                provider_called=True,
+            )
             assistant_answer = str(assistant_result_payload.get("answer", "")).strip()
             if not assistant_answer:
                 raise ApiException(
@@ -499,6 +511,8 @@ class AssistantService:
             response_language=response_language,
             provider_payload=assistant_result_payload,
             classification=classification,
+            grounding_context=rag_result.grounding_context if not classification.is_out_of_scope else None,
+            rag_trace=rag_trace,
         )
         assistant_message.structured_payload = structured_response.model_dump(mode="json")
         assistant_message.structured_payload["classification"] = self._serialize_classification(classification)
@@ -695,12 +709,39 @@ class AssistantService:
         response_language: str,
         provider_payload: dict[str, Any],
         classification: AssistantClassificationResult,
+        grounding_context: AssistantGroundingContext | None = None,
+        rag_trace: AssistantRagTraceRead | None,
     ) -> AssistantStructuredResponse:
         validated_links = self._validate_provider_links(
             links_payload=provider_payload.get("links", []),
             actor=actor,
             conversation_id=conversation.id,
         )
+        confidence = AssistantConfidence(
+            str(provider_payload.get("confidence", classification.confidence))
+        )
+        if (
+            rag_trace is not None
+            and self._requires_content_bearing_sources(rag_trace.retrieval_plan)
+            and rag_trace.content_bearing_source_count <= 0
+        ):
+            confidence = AssistantConfidence.LOW
+        source_basis = self._build_validated_source_basis(
+            provider_payload=provider_payload,
+            grounding_context=grounding_context,
+            rag_trace=rag_trace,
+        )
+        if (
+            rag_trace is not None
+            and str(rag_trace.retrieval_plan.get("intent_category") or "").strip() == "ui_action_question"
+            and not any(item.source_type == "page_help_manifest" for item in source_basis)
+        ):
+            confidence = AssistantConfidence.LOW
+        answer_text = str(provider_payload.get("answer", "")).casefold()
+        if self._mentions_precise_ui_claim(answer_text) and not any(
+            item.source_type == "page_help_manifest" for item in source_basis
+        ):
+            confidence = AssistantConfidence.LOW
         return AssistantStructuredResponse(
             conversation_id=conversation.id,
             message_id=assistant_message.id,
@@ -708,15 +749,16 @@ class AssistantService:
             response_language=response_language,
             answer=str(provider_payload.get("answer", "")),
             scope=self._infer_scope(actor),
-            confidence=AssistantConfidence(
-                str(provider_payload.get("confidence", classification.confidence))
-            ),
+            confidence=confidence,
             out_of_scope=bool(provider_payload.get("out_of_scope", classification.is_out_of_scope)),
             diagnosis=provider_payload.get("diagnosis", []),
             links=validated_links,
             missing_permissions=provider_payload.get("missing_permissions", []),
             next_steps=provider_payload.get("next_steps", []),
             tool_trace_id=provider_payload.get("tool_trace_id"),
+            rag_trace_id=rag_trace.trace_id if rag_trace is not None else None,
+            source_basis=source_basis,
+            rag_trace=rag_trace,
         )
 
     def _build_rag_orchestrator(self) -> AssistantRagOrchestrator:
@@ -748,6 +790,11 @@ class AssistantService:
     ) -> tuple[AssistantGroundingContext, list[AssistantToolResultSummary]]:
         plan = build_retrieval_plan(message=cleaned_message, route_context=route_context)
         auth_summary = summarize_auth_context(actor)
+        expanded_query = expand_assistant_query(
+            cleaned_message,
+            workflow_intent=plan.workflow_intent,
+            ui_page_id=route_context.get("page_id") if isinstance(route_context, dict) else None,
+        )
         knowledge_chunks = self._retrieve_knowledge_chunks(
             query=cleaned_message,
             response_language=response_language,
@@ -763,6 +810,7 @@ class AssistantService:
         if route_context:
             sources.append(
                 AssistantGroundingSource(
+                    source_id=f"current_route:{route_context.get('page_id') or route_context.get('path') or 'unknown'}",
                     source_type="current_route",
                     source_name="current_route",
                     page_id=route_context.get("page_id"),
@@ -770,8 +818,9 @@ class AssistantService:
                     title=route_context.get("route_name"),
                     content=route_context.get("path"),
                     facts=route_context,
-                    relevance_score=1.0,
+                    score=1.0,
                     verified=False,
+                    content_bearing=False,
                     permission_checked=True,
                 )
             )
@@ -779,6 +828,7 @@ class AssistantService:
         for chunk in knowledge_chunks:
             sources.append(
                 AssistantGroundingSource(
+                    source_id=chunk.source_id or chunk.chunk_id,
                     source_type="knowledge_chunk",
                     source_name=chunk.source_name,
                     page_id=chunk.page_id,
@@ -789,9 +839,17 @@ class AssistantService:
                         "rank": chunk.rank,
                         "matched_by": chunk.matched_by,
                         "source_type": chunk.source_type,
+                        "source_path": chunk.source_path,
+                        "source_language": chunk.source_language,
+                        "content_preview": chunk.content_preview,
+                        "workflow_keys": list(chunk.workflow_keys),
+                        "api_families": list(chunk.api_families),
+                        "domain_terms": list(chunk.domain_terms),
+                        "language_aliases": list(chunk.language_aliases),
                     },
-                    relevance_score=chunk.score,
+                    score=chunk.score,
                     verified=True,
+                    content_bearing=True,
                     permission_checked=True,
                 )
             )
@@ -807,8 +865,10 @@ class AssistantService:
                 workflow_result = self.execute_registered_tool(
                     tool_name="assistant.search_workflow_help",
                     input_data={
-                        "intent": workflow_intent.intent,
+                        "query": cleaned_message,
+                        "workflow_key": workflow_intent.intent,
                         "language_code": response_language,
+                        "limit": 3,
                     },
                     actor=actor,
                     conversation_id=conversation.id,
@@ -864,6 +924,12 @@ class AssistantService:
                 summaries.append(self._tool_result_to_summary(diagnostic_result))
                 sources.extend(self._grounding_sources_from_tool_result("diagnostic", diagnostic_result))
 
+        compact_sources = self._build_compact_grounding_sources(
+            sources=sources,
+            cleaned_message=cleaned_message,
+            retrieval_plan=plan.to_dict(),
+        )
+
         grounding_context = AssistantGroundingContext(
             detected_language=detected_language,
             response_language=response_language,
@@ -876,7 +942,16 @@ class AssistantService:
                 "permission_keys": auth_summary.permission_keys,
             },
             retrieval_plan=plan.to_dict(),
-            sources=sources[:20],
+            query_expansion={
+                "original_query": expanded_query.original_query,
+                "detected_terms": list(expanded_query.detected_terms),
+                "expanded_terms_en": list(expanded_query.expanded_terms_en),
+                "expanded_terms_de": list(expanded_query.expanded_terms_de),
+                "expanded_query": expanded_query.expanded_query,
+                "likely_page_ids": list(expanded_query.likely_page_ids),
+                "likely_module_keys": list(expanded_query.likely_module_keys),
+            },
+            sources=compact_sources,
             missing_context=missing_context,
             missing_permissions=self._collect_missing_permissions_from_summaries(summaries),
         )
@@ -887,6 +962,224 @@ class AssistantService:
                 grounding_context=grounding_context,
             )
         return grounding_context, summaries
+
+    def _build_rag_trace(
+        self,
+        *,
+        grounding_context: AssistantGroundingContext,
+        provider_called: bool,
+    ) -> AssistantRagTraceRead:
+        source_type_counts: dict[str, int] = {}
+        top_sources: list[AssistantRagTraceTopSource] = []
+        content_bearing_sources = [
+            source for source in grounding_context.sources if self._is_content_bearing_source(source)
+        ]
+        for source in grounding_context.sources:
+            source_type_counts[source.source_type] = source_type_counts.get(source.source_type, 0) + 1
+        ordered_sources = sorted(
+            grounding_context.sources,
+            key=lambda item: (
+                0 if self._is_content_bearing_source(item) else 1,
+                self._source_priority(item.source_type),
+                -(item.score or 0.0),
+                item.source_type,
+                item.page_id or "",
+            ),
+        )
+        for source in ordered_sources[:5]:
+            top_sources.append(
+                AssistantRagTraceTopSource(
+                    source_id=source.source_id,
+                    source_type=source.source_type,
+                    source_name=source.source_name,
+                    page_id=source.page_id,
+                    module_key=source.module_key,
+                    title=source.title,
+                    score=source.score,
+                    content_preview=self._content_preview(source),
+                )
+            )
+        missing_context = list(grounding_context.missing_context)
+        if (
+            self._requires_content_bearing_sources(grounding_context.retrieval_plan)
+            and not content_bearing_sources
+            and "content_bearing_sources" not in missing_context
+        ):
+            missing_context.append("content_bearing_sources")
+        return AssistantRagTraceRead(
+            trace_id=str(uuid4()),
+            provider_called=provider_called,
+            provider_mode=self.runtime_config.provider_mode,
+            retrieval_executed=True,
+            grounding_attached=True,
+            grounding_source_count=len(grounding_context.sources),
+            content_bearing_source_count=len(content_bearing_sources),
+            source_type_counts=source_type_counts,
+            top_sources=top_sources,
+            missing_context=missing_context,
+            retrieval_plan=dict(grounding_context.retrieval_plan),
+        )
+
+    def _build_compact_grounding_sources(
+        self,
+        *,
+        sources: list[AssistantGroundingSource],
+        cleaned_message: str,
+        retrieval_plan: dict[str, Any],
+    ) -> list[AssistantGroundingSource]:
+        likely_page_ids = {str(item) for item in retrieval_plan.get("likely_page_ids", []) if str(item).strip()}
+        likely_module_keys = {str(item) for item in retrieval_plan.get("likely_module_keys", []) if str(item).strip()}
+        workflow_intent = str(retrieval_plan.get("workflow_intent") or "").strip() or None
+        intent_category = str(retrieval_plan.get("intent_category") or "").strip()
+        lowered = cleaned_message.casefold()
+        rich_pages = {
+            source.page_id
+            for source in sources
+            if source.page_id and source.source_type in {"knowledge_chunk", "workflow", "page_help_manifest", "ui_action", "diagnostic"}
+        }
+
+        ranked: list[tuple[float, AssistantGroundingSource, list[str]]] = []
+        for source in sources:
+            score, reasons = self._rank_grounding_source(
+                source=source,
+                lowered_message=lowered,
+                intent_category=intent_category,
+                workflow_intent=workflow_intent,
+                likely_page_ids=likely_page_ids,
+                likely_module_keys=likely_module_keys,
+                rich_pages=rich_pages,
+            )
+            if score <= 0:
+                continue
+            ranked.append((score, source, reasons))
+
+        ranked.sort(
+            key=lambda item: (
+                -(item[0]),
+                self._source_priority(item[1].source_type),
+                item[1].source_type,
+                item[1].page_id or "",
+                item[1].title or "",
+            ),
+        )
+
+        selected: list[AssistantGroundingSource] = []
+        total_chars = 0
+        max_sources = max(self.runtime_config.max_grounding_sources, 1)
+        for score, source, reasons in ranked:
+            if len(selected) >= max_sources:
+                break
+            prepared = self._prepare_grounding_source_for_prompt(
+                source=source,
+                score=score,
+                reasons=reasons,
+                remaining_chars=max(self.runtime_config.max_total_grounding_chars - total_chars, 0),
+            )
+            if prepared is None:
+                continue
+            selected.append(prepared)
+            total_chars += len(prepared.content or "") + len(json.dumps(prepared.facts, ensure_ascii=False))
+            if total_chars >= self.runtime_config.max_total_grounding_chars:
+                break
+        return selected
+
+    def _rank_grounding_source(
+        self,
+        *,
+        source: AssistantGroundingSource,
+        lowered_message: str,
+        intent_category: str,
+        workflow_intent: str | None,
+        likely_page_ids: set[str],
+        likely_module_keys: set[str],
+        rich_pages: set[str | None],
+    ) -> tuple[float, list[str]]:
+        score = float(source.score or 0.0)
+        reasons: list[str] = []
+
+        if self._is_content_bearing_source(source):
+            score += 25.0
+            reasons.append("content-bearing evidence")
+        elif source.source_type in {"page_route", "current_route"}:
+            reasons.append("shallow route hint")
+
+        facts = source.facts if isinstance(source.facts, dict) else {}
+        if workflow_intent:
+            workflow_keys = facts.get("workflow_keys") or []
+            if isinstance(workflow_keys, list) and workflow_intent in workflow_keys:
+                score += 24.0
+                reasons.append("exact workflow intent match")
+            if source.source_type == "workflow" and source.source_name == workflow_intent:
+                score += 24.0
+                reasons.append("exact workflow manifest")
+
+        if source.page_id and source.page_id in likely_page_ids:
+            score += 18.0
+            reasons.append(f"page match {source.page_id}")
+        elif source.page_id and likely_page_ids:
+            score -= 8.0
+
+        if source.module_key and source.module_key in likely_module_keys:
+            score += 12.0
+            reasons.append(f"module match {source.module_key}")
+        elif source.module_key and likely_module_keys:
+            score -= 6.0
+
+        if intent_category == "ui_action_question" and source.source_type == "page_help_manifest":
+            score += 16.0
+            reasons.append("UI manifest for UI question")
+        if intent_category == "workflow_how_to" and source.source_type == "workflow":
+            score += 16.0
+            reasons.append("workflow manifest for process question")
+        if intent_category == "workflow_how_to" and source.source_type in {"operational_handbook", "user_manual", "knowledge_chunk"}:
+            score += 10.0
+            reasons.append("content guidance for how-to question")
+        if any(token in lowered_message for token in ("api", "endpoint", "route", "sdk", "http")) and source.source_type in {"api_export", "knowledge_chunk"}:
+            score += 10.0
+            reasons.append("API-oriented source")
+
+        if source.page_id == "F-02" and "dashboard" not in lowered_message and "kpi" not in lowered_message:
+            score -= 18.0
+            reasons.append("dashboard source demoted")
+        employee_terms = ("employee", "mitarbeiter", "personal", "staff", "workforce", "guard", "کارمند")
+        if source.page_id == "E-01" and workflow_intent not in {"employee_create", "employee_assign_to_shift", "shift_release_to_employee_app"} and not any(term in lowered_message for term in employee_terms):
+            score -= 18.0
+            reasons.append("employee source demoted")
+        if source.source_type == "page_route" and source.page_id in rich_pages:
+            score -= 12.0
+            reasons.append("demoted shallow page route")
+        if len((source.content or "").strip()) < 24 and not facts:
+            score -= 14.0
+            reasons.append("tiny or empty source")
+        return score, reasons
+
+    def _prepare_grounding_source_for_prompt(
+        self,
+        *,
+        source: AssistantGroundingSource,
+        score: float,
+        reasons: list[str],
+        remaining_chars: int,
+    ) -> AssistantGroundingSource | None:
+        max_source_chars = min(self.runtime_config.max_grounding_chars_per_source, max(remaining_chars, 0))
+        if max_source_chars <= 0:
+            return None
+        content = self._truncate_grounding_text(source.content, max_source_chars)
+        trimmed_facts = self._trim_grounding_facts(
+            facts=source.facts,
+            max_chars=max_source_chars,
+        )
+        if not content and not trimmed_facts:
+            return None
+        return source.model_copy(
+            update={
+                "content": content,
+                "facts": trimmed_facts,
+                "score": round(score, 4),
+                "why_selected": reasons[:4],
+                "content_bearing": self._is_content_bearing_source(source),
+            }
+        )
 
     def _generate_in_scope_response(
         self,
@@ -1095,9 +1388,10 @@ class AssistantService:
             recent_messages=prompt_payload.conversation_messages,
             knowledge_chunks=[item.model_dump(mode="json") for item in knowledge_chunks],
             grounding_context=grounding_context.model_dump(mode="json"),
-            tool_results=list(provider_tool_results)
-            if provider_tool_results is not None
-            else [{"tool_name": item.tool_name, "summary": item.summary} for item in (tool_results or [])],
+            tool_results=self._build_provider_tool_results_payload(
+                tool_results=tool_results,
+                provider_tool_results=provider_tool_results,
+            ),
             available_tools=available_tools_payload,
             provider_tool_name_map=provider_tool_name_map,
             max_tool_calls=self.runtime_config.max_tool_calls,
@@ -1111,6 +1405,20 @@ class AssistantService:
                 **prompt_payload.metadata,
             },
         )
+
+    @staticmethod
+    def _build_provider_tool_results_payload(
+        *,
+        tool_results: list[AssistantToolResultSummary] | None,
+        provider_tool_results: list[dict[str, Any]] | None,
+    ) -> list[dict[str, Any]]:
+        summary_payload = [
+            {"tool_name": item.tool_name, "summary": item.summary}
+            for item in (tool_results or [])
+        ]
+        if not provider_tool_results:
+            return summary_payload
+        return summary_payload + list(provider_tool_results)
 
     def _retrieve_knowledge_chunks(
         self,
@@ -1218,26 +1526,45 @@ class AssistantService:
 
         sources: list[AssistantGroundingSource] = []
         if source_type == "workflow":
-            for fact in payload.get("facts", []) or []:
-                if not isinstance(fact, dict):
+            for workflow in payload.get("workflows", []) or []:
+                if not isinstance(workflow, dict):
                     continue
                 sources.append(
                     AssistantGroundingSource(
+                        source_id=f"workflow:{workflow.get('workflow_key')}:{workflow.get('workflow_key')}",
                         source_type="workflow",
-                        source_name=payload.get("intent"),
-                        page_id=fact.get("page_id"),
-                        title=fact.get("title"),
-                        content=fact.get("detail"),
-                        facts=fact,
-                        verified=bool(fact.get("verified", False)),
+                        source_name=workflow.get("workflow_key"),
+                        page_id=((workflow.get("linked_page_ids") or [None])[0]),
+                        title=workflow.get("title"),
+                        content=workflow.get("summary"),
+                        facts=workflow,
+                        verified=True,
                         permission_checked=True,
                     )
                 )
+                for step in workflow.get("steps", []) or []:
+                    if not isinstance(step, dict):
+                        continue
+                    sources.append(
+                        AssistantGroundingSource(
+                            source_id=f"workflow:{workflow.get('workflow_key')}:{step.get('step_key') or step.get('page_id') or 'step'}",
+                            source_type="workflow",
+                            source_name=workflow.get("workflow_key"),
+                            page_id=step.get("page_id"),
+                            module_key=step.get("module_key"),
+                            title=step.get("step_key"),
+                            content=step.get("purpose"),
+                            facts=step,
+                            verified=True,
+                            permission_checked=True,
+                        )
+                    )
             return sources
 
         if source_type == "ui_action":
             sources.append(
                 AssistantGroundingSource(
+                    source_id=f"ui_action:{payload.get('page_id') or 'unknown'}:{payload.get('intent') or 'action'}",
                     source_type="ui_action",
                     source_name=payload.get("intent"),
                     page_id=payload.get("page_id"),
@@ -1253,6 +1580,7 @@ class AssistantService:
         if source_type == "page_help_manifest":
             sources.append(
                 AssistantGroundingSource(
+                    source_id=f"page_help:{payload.get('page_id') or 'unknown'}",
                     source_type="page_help_manifest",
                     source_name=payload.get("page_title"),
                     page_id=payload.get("page_id"),
@@ -1272,6 +1600,7 @@ class AssistantService:
                     continue
                 sources.append(
                     AssistantGroundingSource(
+                        source_id=f"page_route:{page.get('page_id') or page.get('route_name') or 'unknown'}",
                         source_type="page_route",
                         source_name=page.get("route_name"),
                         page_id=page.get("page_id"),
@@ -1288,6 +1617,7 @@ class AssistantService:
         if source_type == "diagnostic":
             sources.append(
                 AssistantGroundingSource(
+                    source_id=f"diagnostic:{payload.get('diagnostic_key') or 'unknown'}",
                     source_type="diagnostic",
                     source_name=payload.get("diagnostic_key"),
                     page_id=None,
@@ -1588,7 +1918,8 @@ class AssistantService:
                 "source_name": source.source_name,
                 "page_id": source.page_id,
                 "module_key": source.module_key,
-                "score": source.relevance_score,
+                "score": source.score,
+                "why_selected": list(source.why_selected),
             }
             for source in grounding_context.sources[:8]
         ]
@@ -1596,7 +1927,9 @@ class AssistantService:
             "event": "assistant_retrieval_debug",
             "query": query,
             "expanded_query": expanded_query.expanded_query,
-            "concept_keys": list(expanded_query.concept_keys),
+            "detected_terms": list(expanded_query.detected_terms),
+            "expanded_terms_en": list(expanded_query.expanded_terms_en),
+            "expanded_terms_de": list(expanded_query.expanded_terms_de),
             "workflow_intent": plan.get("workflow_intent"),
             "ui_intent": plan.get("ui_intent"),
             "likely_page_ids": plan.get("likely_page_ids", []),
@@ -1604,6 +1937,269 @@ class AssistantService:
             "top_sources": top_sources,
         }
         logger.info(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+    @staticmethod
+    def _truncate_grounding_text(value: str | None, max_chars: int) -> str | None:
+        if not value:
+            return None
+        if len(value) <= max_chars:
+            return value
+        return value[: max(max_chars - 3, 1)].rstrip() + "..."
+
+    @staticmethod
+    def _trim_grounding_facts(
+        *,
+        facts: dict[str, Any],
+        max_chars: int,
+    ) -> dict[str, Any]:
+        if not isinstance(facts, dict) or not facts:
+            return {}
+        trimmed: dict[str, Any] = {}
+        used = 0
+        for key, value in facts.items():
+            if used >= max_chars:
+                break
+            if isinstance(value, str):
+                remaining = max(max_chars - used, 0)
+                trimmed_value = value if len(value) <= remaining else value[: max(remaining - 3, 1)].rstrip() + "..."
+                trimmed[key] = trimmed_value
+                used += len(trimmed_value)
+            elif isinstance(value, list):
+                limited = value[:8]
+                trimmed[key] = limited
+                used += len(json.dumps(limited, ensure_ascii=False))
+            elif isinstance(value, dict):
+                trimmed[key] = {sub_key: sub_value for sub_key, sub_value in list(value.items())[:8]}
+                used += len(json.dumps(trimmed[key], ensure_ascii=False))
+            else:
+                trimmed[key] = value
+                used += len(str(value))
+        return trimmed
+
+    @staticmethod
+    def _requires_content_bearing_sources(retrieval_plan: dict[str, Any]) -> bool:
+        intent_category = str(retrieval_plan.get("intent_category") or "").strip()
+        return intent_category in {"workflow_how_to", "ui_action_question"}
+
+    @staticmethod
+    def _is_content_bearing_source(source: AssistantGroundingSource) -> bool:
+        content = (source.content or "").strip()
+        facts = source.facts if isinstance(source.facts, dict) else {}
+        if source.source_type == "knowledge_chunk":
+            return bool(content)
+        if source.source_type == "workflow":
+            return bool(source.verified and content)
+        if source.source_type == "ui_action":
+            return bool(source.verified and (content or facts.get("action")))
+        if source.source_type == "page_help_manifest":
+            return bool(
+                source.verified
+                and (
+                    facts.get("actions")
+                    or facts.get("form_sections")
+                    or facts.get("post_create_steps")
+                    or facts.get("sidebar_path")
+                )
+            )
+        if source.source_type == "diagnostic":
+            return bool(
+                source.verified
+                and (
+                    facts.get("summary")
+                    or facts.get("findings")
+                    or content
+                )
+            )
+        return False
+
+    @staticmethod
+    def _content_preview(source: AssistantGroundingSource) -> str | None:
+        content = (source.content or "").strip()
+        if source.source_type == "page_help_manifest" and content in {"active", "verified", "unverified"}:
+            content = ""
+        if content:
+            return content[:160]
+        facts = source.facts if isinstance(source.facts, dict) else {}
+        if source.source_type == "ui_action":
+            action = facts.get("action")
+            if isinstance(action, dict):
+                label = str(action.get("label") or "").strip()
+                result = str(action.get("result") or "").strip()
+                location = str(action.get("location") or "").strip()
+                preview = " ".join(part for part in [label, location, result] if part)
+                if preview:
+                    return preview[:160]
+        if source.source_type == "page_help_manifest":
+            actions = facts.get("actions")
+            if isinstance(actions, list) and actions:
+                first = actions[0]
+                if isinstance(first, dict):
+                    label = str(first.get("label") or "").strip()
+                    result = str(first.get("result") or "").strip()
+                    preview = " ".join(part for part in [label, result] if part)
+                    if preview:
+                        return preview[:160]
+        for key in ("safe_note", "summary"):
+            value = str(facts.get(key) or "").strip()
+            if value:
+                return value[:160]
+        return None
+
+    @staticmethod
+    def _source_priority(source_type: str) -> int:
+        order = {
+            "ui_action": 0,
+            "workflow": 1,
+            "knowledge_chunk": 2,
+            "page_help_manifest": 3,
+            "diagnostic": 4,
+            "page_route": 5,
+            "current_route": 6,
+        }
+        return order.get(source_type, 99)
+
+    def _build_source_basis_from_rag_trace(
+        self,
+        rag_trace: AssistantRagTraceRead | None,
+    ) -> list[AssistantSourceBasisItem]:
+        if rag_trace is None:
+            return []
+        result: list[AssistantSourceBasisItem] = []
+        for source in rag_trace.top_sources:
+            evidence = (source.content_preview or "").strip()
+            if not evidence:
+                continue
+            result.append(
+                AssistantSourceBasisItem(
+                    source_type=self._normalize_source_basis_type(source.source_type),
+                    source_name=source.source_name,
+                    page_id=source.page_id,
+                    module_key=source.module_key,
+                    title=source.title,
+                    evidence=evidence,
+                )
+            )
+        return result[:4]
+
+    def _build_validated_source_basis(
+        self,
+        *,
+        provider_payload: dict[str, Any],
+        grounding_context: AssistantGroundingContext | None,
+        rag_trace: AssistantRagTraceRead | None,
+    ) -> list[AssistantSourceBasisItem]:
+        allowed_items = self._allowed_source_basis_items(grounding_context)
+        if not allowed_items:
+            return self._build_source_basis_from_rag_trace(rag_trace)
+
+        requested = provider_payload.get("source_basis")
+        if not isinstance(requested, list) or not requested:
+            return allowed_items[:4]
+
+        matched: list[AssistantSourceBasisItem] = []
+        seen_keys: set[tuple[str, str | None, str | None, str | None]] = set()
+        for item in requested:
+            if not isinstance(item, dict):
+                continue
+            match_key = self._requested_source_basis_key(item)
+            if match_key is None:
+                continue
+            allowed = next(
+                (candidate for candidate in allowed_items if self._source_basis_key(candidate) == match_key),
+                None,
+            )
+            if allowed is None:
+                continue
+            allowed_key = self._source_basis_key(allowed)
+            if allowed_key in seen_keys:
+                continue
+            matched.append(allowed)
+            seen_keys.add(allowed_key)
+        if matched:
+            return matched[:4]
+        return allowed_items[:4]
+
+    def _allowed_source_basis_items(
+        self,
+        grounding_context: AssistantGroundingContext | None,
+    ) -> list[AssistantSourceBasisItem]:
+        if grounding_context is None:
+            return []
+        ordered = sorted(
+            grounding_context.sources,
+            key=lambda item: (
+                0 if self._is_content_bearing_source(item) else 1,
+                self._source_priority(item.source_type),
+                -(item.score or 0.0),
+                item.page_id or "",
+                item.title or "",
+            ),
+        )
+        result: list[AssistantSourceBasisItem] = []
+        seen_keys: set[tuple[str, str | None, str | None, str | None]] = set()
+        for source in ordered:
+            if not self._is_content_bearing_source(source):
+                continue
+            evidence = self._content_preview(source)
+            if not evidence:
+                continue
+            item = AssistantSourceBasisItem(
+                source_type=self._normalize_source_basis_type(source.source_type),
+                source_name=source.source_name,
+                page_id=source.page_id,
+                module_key=source.module_key,
+                title=source.title,
+                evidence=evidence,
+            )
+            key = self._source_basis_key(item)
+            if key in seen_keys:
+                continue
+            result.append(item)
+            seen_keys.add(key)
+            if len(result) >= 4:
+                break
+        return result
+
+    @staticmethod
+    def _requested_source_basis_key(
+        item: dict[str, Any],
+    ) -> tuple[str, str | None, str | None, str | None] | None:
+        source_type = AssistantService._normalize_source_basis_type(str(item.get("source_type") or "").strip())
+        if not source_type:
+            return None
+        source_name = str(item.get("source_name") or "").strip() or None
+        page_id = str(item.get("page_id") or "").strip() or None
+        title = str(item.get("title") or "").strip() or None
+        return (source_type, source_name, page_id, title)
+
+    @staticmethod
+    def _source_basis_key(
+        item: AssistantSourceBasisItem,
+    ) -> tuple[str, str | None, str | None, str | None]:
+        return (item.source_type, item.source_name, item.page_id, item.title)
+
+    @staticmethod
+    def _normalize_source_basis_type(source_type: str) -> str:
+        normalized = source_type.strip()
+        if normalized == "workflow":
+            return "workflow_help"
+        if normalized == "ui_action":
+            return "page_help_manifest"
+        return normalized
+
+    @staticmethod
+    def _mentions_precise_ui_claim(answer_text: str) -> bool:
+        tokens = (
+            "exact button",
+            "button label",
+            "exact label",
+            "exact current ui label",
+            "schaltfläche",
+            "button namens",
+            "genaue bezeichnung",
+            "exakte bezeichnung",
+        )
+        return any(token in answer_text for token in tokens)
 
     @staticmethod
     def _parse_tool_call_arguments(value: Any) -> dict[str, Any]:
@@ -1704,6 +2300,7 @@ class AssistantService:
             }
         result = {
             "type": "function_call_output",
+            "tool_name": str(tool_result.tool_name),
             "output": json.dumps(payload, ensure_ascii=False, sort_keys=True),
         }
         call_id = str(requested_call.get("call_id") or "").strip()
@@ -1719,6 +2316,7 @@ class AssistantService:
     ) -> dict[str, Any]:
         result = {
             "type": "function_call_output",
+            "tool_name": "assistant.unknown_provider_tool_name",
             "output": json.dumps(
                 {
                     "ok": False,

@@ -227,7 +227,7 @@ def test_english_order_create_does_not_return_mock_when_openai_configured() -> N
     assert provider.call_count == 1
     assert any(item["tool_name"] == "assistant.search_workflow_help" for item in provider.requests[0].tool_results)
     assert provider.requests[0].grounding_context is not None
-    assert provider.requests[0].grounding_context["retrieval_plan"]["workflow_intent"] == "order_create"
+    assert provider.requests[0].grounding_context["retrieval_plan"]["workflow_intent"] == "customer_order_create"
     assert "P-02" in provider.requests[0].grounding_context["retrieval_plan"]["likely_page_ids"]
 
 

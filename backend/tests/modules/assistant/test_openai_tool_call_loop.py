@@ -146,14 +146,15 @@ def test_service_feeds_function_call_output_back_into_provider_loop() -> None:
 
     assert response.answer == "Open the customer workspace first."
     assert len(provider.requests) == 2
-    assert provider.requests[0].tool_results == []
+    assert any(item["tool_name"] == "assistant.search_workflow_help" for item in provider.requests[0].tool_results)
     assert provider.requests[0].provider_tool_name_map == {
         "assistant_lookup_docs": "assistant.lookup_docs",
     }
-    assert provider.requests[1].tool_results == [
-        {
+    assert any(
+        item == {
             "type": "function_call_output",
             "call_id": "call-1",
             "output": '{"summary": "Resolved customer create"}',
         }
-    ]
+        for item in provider.requests[1].tool_results
+    )
