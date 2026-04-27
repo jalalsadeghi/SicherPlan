@@ -9,6 +9,7 @@ import { ref } from 'vue';
 
 import { $t } from '#/locales';
 import { router } from '#/router';
+import { useAuthStore as useLegacyAuthStore } from '#/sicherplan-legacy/stores/auth';
 import { useAssistantStore } from '#/store';
 
 import AssistantLauncher from './AssistantLauncher.vue';
@@ -17,17 +18,25 @@ import AssistantPanel from './AssistantPanel.vue';
 defineOptions({ name: 'SicherPlanAssistantWidget' });
 
 const accessStore = useAccessStore();
+const legacyAuthStore = useLegacyAuthStore();
 const assistantStore = useAssistantStore();
 const panelRef = ref<InstanceType<typeof AssistantPanel> | null>(null);
 
 const currentRoute = computed(() => router.currentRoute.value);
-const isAuthenticated = computed(() => Boolean(accessStore.accessToken));
 const isPublicRoute = computed(() => {
   const route = currentRoute.value;
   return route.path === LOGIN_PATH || route.meta?.ignoreAccess === true;
 });
+const hasSessionContext = computed(() =>
+  Boolean(
+    accessStore.accessToken
+    || legacyAuthStore.effectiveAccessToken
+    || legacyAuthStore.sessionUser
+    || legacyAuthStore.sessionId,
+  ),
+);
 
-const shouldCheckCapabilities = computed(() => isAuthenticated.value && !isPublicRoute.value);
+const shouldCheckCapabilities = computed(() => !isPublicRoute.value && hasSessionContext.value);
 const shouldShowLauncher = computed(() => {
   if (!shouldCheckCapabilities.value) {
     return false;
@@ -65,13 +74,18 @@ const severityLabels = computed<Record<string, string>>(() => ({
 }));
 
 async function ensureCapabilities() {
-  if (!shouldCheckCapabilities.value) {
+  if (isPublicRoute.value) {
     return;
   }
   if (assistantStore.loadingCapabilities) {
     return;
   }
   try {
+    legacyAuthStore.syncFromPrimarySession();
+    if (!accessStore.accessToken && !legacyAuthStore.effectiveAccessToken) {
+      await legacyAuthStore.ensureSessionReady().catch(() => null);
+      legacyAuthStore.syncFromPrimarySession();
+    }
     await assistantStore.loadCapabilities();
   } catch {
     // The widget falls back to a safe hidden/error state via store flags.
@@ -136,6 +150,26 @@ watch(
   async (allowed) => {
     if (!allowed) {
       assistantStore.closeAssistant();
+      return;
+    }
+    await ensureCapabilities();
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [
+    accessStore.accessToken,
+    legacyAuthStore.effectiveAccessToken,
+    legacyAuthStore.sessionId,
+    legacyAuthStore.sessionUser?.id ?? '',
+    legacyAuthStore.isSessionResolving,
+  ] as const,
+  async () => {
+    if (isPublicRoute.value) {
+      return;
+    }
+    if (!hasSessionContext.value && !legacyAuthStore.isSessionResolving) {
       return;
     }
     await ensureCapabilities();

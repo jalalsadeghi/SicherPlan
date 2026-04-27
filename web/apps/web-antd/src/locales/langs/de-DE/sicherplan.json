@@ -750,6 +750,7 @@
       "previous": "Zurück",
       "next": "Weiter",
       "openPlanning": "Schichtplanung",
+      "loading": "Anfrage wird verarbeitet",
       "monthHint": "Schichten und Auftragsdaten werden pro Kalendertag zusammengefasst.",
       "coverageGood": "Abdeckung grün",
       "coverageWarn": "Abdeckung Warnung",

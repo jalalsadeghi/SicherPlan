@@ -25,8 +25,8 @@
       :text="planningStaffingWorkspaceLoadingText"
       busy-testid="planning-staffing-workspace-loading-overlay"
     >
-      <div class="planning-staffing-grid" data-testid="planning-staffing-workspace">
-      <section class="module-card planning-staffing-panel">
+      <div class="planning-staffing-workspace" data-testid="planning-staffing-workspace">
+      <section class="module-card planning-staffing-panel planning-staffing-filter-panel" data-testid="planning-staffing-filter-panel">
         <div class="planning-staffing-panel__header planning-staffing-panel__header--filters">
           <div>
             <p class="eyebrow">{{ tp("filtersTitle") }}</p>
@@ -131,14 +131,22 @@
         </div>
       </section>
 
-      <section class="module-card planning-staffing-panel">
+      <div class="planning-staffing-main-grid" data-testid="planning-staffing-main-grid">
+      <section
+        class="module-card planning-staffing-panel planning-staffing-coverage-panel"
+        data-testid="planning-staffing-shift-coverage-panel"
+      >
         <div class="planning-staffing-panel__header">
           <div>
             <p class="eyebrow">{{ tp("listTitle") }}</p>
             <h3>{{ tp("listTitle") }}</h3>
           </div>
         </div>
-        <div v-if="coverageRows.length" class="planning-staffing-list">
+        <div
+          v-if="coverageRows.length"
+          class="planning-staffing-list planning-staffing-list--scroll"
+          data-testid="planning-staffing-shift-coverage-scroll"
+        >
           <button
             v-for="row in coverageRows"
             :key="row.shift_id"
@@ -165,7 +173,14 @@
         <div class="planning-staffing-panel__header">
           <div>
             <p class="eyebrow">{{ tp("detailTitle") }}</p>
-            <h3>{{ selectedShift ? `${selectedShift.order_no} · ${selectedShift.shift_type_code}` : tp("detailTitle") }}</h3>
+            <h3>{{ selectedShiftContextTitle }}</h3>
+            <p
+              v-if="selectedShiftContextMeta"
+              class="planning-staffing-panel__lead planning-staffing-panel__lead--context"
+              data-testid="planning-staffing-selected-shift-context"
+            >
+              {{ selectedShiftContextMeta }}
+            </p>
           </div>
           <span v-if="selectedShift" class="planning-staffing-state" :data-tone="coverageTone(rowCoverageState(selectedShift))">
             {{ tp(statusKey(rowCoverageState(selectedShift))) }}
@@ -767,6 +782,7 @@
         <p v-else class="planning-staffing-list-empty">{{ tp("noSelection") }}</p>
       </section>
       </div>
+      </div>
     </SicherPlanLoadingOverlay>
 
     <Modal
@@ -1217,6 +1233,7 @@ import {
   PlanningStaffingApiError,
   type AssignmentUpdate,
   type AssignmentValidationRead,
+  type CoverageFilterParams,
   type CoverageShiftItem,
   type DemandGroupRead,
   type PlanningDispatchPreviewRead,
@@ -1324,12 +1341,19 @@ const planningRecordLookupSearch = ref("");
 const routeHydrationShiftId = ref("");
 const routeHydrationInFlight = ref(false);
 const feedback = reactive({ message: "", title: "", tone: "error" });
-const filters = reactive({
+const filters = reactive<CoverageFilterParams>({
+  customer_id: "",
   date_from: "2026-04-05T00:00",
   date_to: "2026-04-06T00:00",
   planning_record_id: "",
+  shift_plan_id: "",
+  order_id: "",
   planning_mode_code: "",
   workforce_scope_code: "",
+  function_type_id: "",
+  qualification_type_id: "",
+  release_state: "",
+  visibility_state: "",
   confirmation_state: "",
 });
 const staffingDraft = reactive({
@@ -1405,6 +1429,31 @@ function formatLocalDateTimeValue(value: Date) {
   const hours = String(value.getHours()).padStart(2, "0");
   const minutes = String(value.getMinutes()).padStart(2, "0");
   return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function formatShiftContextDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat(currentLocale.value === "en" ? "en-GB" : "de-DE", {
+    dateStyle: "medium",
+  }).format(date);
+}
+
+function formatShiftContextTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat(currentLocale.value === "en" ? "en-GB" : "de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatShiftContextTimeRange(startsAt: string, endsAt: string) {
+  return `${formatShiftContextTime(startsAt)}–${formatShiftContextTime(endsAt)}`;
 }
 
 function canonicalStaffingWindow(startsAt: string, endsAt: string) {
@@ -1505,6 +1554,17 @@ const planningRecordDisplayName = computed(() => {
     return resolvedPlanningRecord.value.name;
   }
   return relevantPlanningRecordId.value || "";
+});
+const selectedShiftContextTitle = computed(() => planningRecordDisplayName.value || tp("detailTitle"));
+const selectedShiftContextMeta = computed(() => {
+  if (!selectedShift.value) {
+    return "";
+  }
+  const dateLabel = formatShiftContextDate(selectedShift.value.starts_at);
+  const timeLabel = formatShiftContextTimeRange(selectedShift.value.starts_at, selectedShift.value.ends_at);
+  return [dateLabel, timeLabel, selectedShift.value.order_no, selectedShift.value.shift_type_code]
+    .filter(Boolean)
+    .join(" · ");
 });
 const hasPlanningContext = computed(() => Boolean(relevantPlanningRecordId.value));
 const selectableTeamMembers = computed(() => buildStaffingMemberOptions(teamMembers.value, staffingDraft.team_id));
@@ -1666,13 +1726,22 @@ function ruleText(ruleCode: string) {
   return key ? tp(key) : ruleCode;
 }
 
-function queryFilters(options: { includeShiftId?: boolean; shiftId?: string } = {}) {
-  const query = { ...filters } as Record<string, unknown>;
-  const shiftId = options.shiftId ?? selectedShiftId.value;
-  if (options.includeShiftId && shiftId) {
-    query.shift_id = shiftId;
-  }
-  return query;
+function queryFilters(): CoverageFilterParams {
+  return {
+    customer_id: filters.customer_id || undefined,
+    planning_record_id: filters.planning_record_id || undefined,
+    shift_plan_id: filters.shift_plan_id || undefined,
+    order_id: filters.order_id || undefined,
+    date_from: filters.date_from,
+    date_to: filters.date_to,
+    planning_mode_code: filters.planning_mode_code || undefined,
+    workforce_scope_code: filters.workforce_scope_code || undefined,
+    function_type_id: filters.function_type_id || undefined,
+    qualification_type_id: filters.qualification_type_id || undefined,
+    release_state: filters.release_state || undefined,
+    visibility_state: filters.visibility_state || undefined,
+    confirmation_state: filters.confirmation_state || undefined,
+  };
 }
 
 function exactShiftBoardFilters(shiftId: string) {
@@ -3205,7 +3274,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .planning-staffing-page,
-.planning-staffing-grid,
+.planning-staffing-workspace,
+.planning-staffing-main-grid,
 .planning-staffing-filter-grid,
 .planning-staffing-summary,
 .planning-staffing-detail,
@@ -3218,10 +3288,14 @@ onBeforeUnmount(() => {
   gap: 1rem;
 }
 
-.planning-staffing-grid {
+.planning-staffing-workspace {
+  gap: var(--sp-page-gap, 1.25rem);
+}
+
+.planning-staffing-main-grid {
   align-items: start;
   gap: var(--sp-page-gap, 1.25rem);
-  grid-template-columns: minmax(320px, 420px) minmax(300px, 420px) minmax(360px, 1fr);
+  grid-template-columns: minmax(320px, 420px) minmax(360px, 1fr);
 }
 
 .planning-staffing-meta,
@@ -3273,14 +3347,17 @@ onBeforeUnmount(() => {
   box-shadow: 0 20px 44px rgba(15, 23, 42, 0.05);
 }
 
-.planning-staffing-grid > .planning-staffing-panel:first-child {
+.planning-staffing-filter-panel {
+  width: 100%;
+}
+
+.planning-staffing-coverage-panel {
   width: 100%;
   max-width: 420px;
 }
 
-.planning-staffing-grid > .planning-staffing-panel:nth-child(2) {
-  width: 100%;
-  max-width: 420px;
+.planning-staffing-detail {
+  min-width: 0;
 }
 
 .planning-staffing-panel__header {
@@ -3292,6 +3369,10 @@ onBeforeUnmount(() => {
   font-size: 0.95rem;
   line-height: 1.45;
   margin: 0.35rem 0 0;
+}
+
+.planning-staffing-panel__lead--context {
+  font-weight: 600;
 }
 
 .planning-staffing-panel__header--filters {
@@ -3526,6 +3607,18 @@ onBeforeUnmount(() => {
   gap: 0.85rem;
 }
 
+.planning-staffing-list--scroll {
+  align-content: start;
+  max-height: clamp(24rem, 58vh, 44rem);
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.planning-staffing-coverage-panel {
+  display: flex;
+  flex-direction: column;
+}
+
 .planning-staffing-row {
   padding-top: 1.15rem;
   padding-bottom: 1.15rem;
@@ -3672,15 +3765,11 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1180px) {
-  .planning-staffing-grid {
+  .planning-staffing-main-grid {
     grid-template-columns: 1fr;
   }
 
-  .planning-staffing-grid > .planning-staffing-panel:first-child {
-    max-width: none;
-  }
-
-  .planning-staffing-grid > .planning-staffing-panel:nth-child(2) {
+  .planning-staffing-coverage-panel {
     max-width: none;
   }
 }

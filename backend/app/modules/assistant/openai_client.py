@@ -93,10 +93,16 @@ class OpenAIResponsesProvider(AssistantProvider):
         try:
             call_kwargs = {
                 "model": self.runtime.model_name,
-                "input": self._build_input(request),
                 "text_format": AssistantProviderStructuredOutput,
                 "store": self.runtime.store_responses,
             }
+            if request.previous_response_id:
+                call_kwargs["previous_response_id"] = request.previous_response_id
+                call_kwargs["input"] = self._build_previous_response_continuation_input(request)
+            elif request.previous_output_items and request.continuation_tool_outputs:
+                call_kwargs["input"] = self._build_stateless_continuation_input(request)
+            else:
+                call_kwargs["input"] = self._build_initial_input(request)
             normalized_tools = self._normalize_tools_for_responses_api(
                 request.available_tools,
                 request.provider_tool_name_map,
@@ -115,6 +121,8 @@ class OpenAIResponsesProvider(AssistantProvider):
                 final_response={},
                 raw_text=getattr(response, "output_text", None),
                 requested_tool_calls=requested_tool_calls,
+                response_id=getattr(response, "id", None),
+                output_items=self._extract_output_items(response),
                 usage=usage,
                 provider_name="openai",
                 provider_mode="openai",
@@ -147,6 +155,8 @@ class OpenAIResponsesProvider(AssistantProvider):
             final_response=payload,
             raw_text=getattr(response, "output_text", None),
             requested_tool_calls=requested_tool_calls,
+            response_id=getattr(response, "id", None),
+            output_items=self._extract_output_items(response),
             usage=usage,
             provider_name="openai",
             provider_mode="openai",
@@ -164,7 +174,7 @@ class OpenAIResponsesProvider(AssistantProvider):
         return self._client
 
     @staticmethod
-    def _build_input(request: AssistantProviderRequest) -> list[dict[str, Any]]:
+    def _build_initial_input(request: AssistantProviderRequest) -> list[dict[str, Any]]:
         messages: list[dict[str, Any]] = []
         if request.system_instructions:
             messages.append({"role": "system", "content": request.system_instructions})
@@ -181,25 +191,72 @@ class OpenAIResponsesProvider(AssistantProvider):
             content = str(item.get("content", "")).strip()
             if role and content:
                 messages.append({"role": role, "content": content})
-        for item in request.tool_results:
+        user_content = request.user_message[: request.max_input_chars]
+        if not messages or messages[-1].get("role") != "user" or messages[-1].get("content") != user_content:
+            messages.append({"role": "user", "content": user_content})
+        return messages
+
+    @classmethod
+    def _build_previous_response_continuation_input(
+        cls,
+        request: AssistantProviderRequest,
+    ) -> list[dict[str, Any]]:
+        return cls._normalize_function_call_outputs(request.continuation_tool_outputs)
+
+    @classmethod
+    def _build_stateless_continuation_input(
+        cls,
+        request: AssistantProviderRequest,
+    ) -> list[dict[str, Any]]:
+        messages = cls._build_initial_input(request)
+        messages.extend(cls._normalize_output_items(request.previous_output_items))
+        messages.extend(cls._normalize_function_call_outputs(request.continuation_tool_outputs))
+        return messages
+
+    @staticmethod
+    def _normalize_function_call_outputs(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        normalized: list[dict[str, Any]] = []
+        for item in items:
             if not isinstance(item, dict):
                 continue
             item_type = str(item.get("type") or "").strip()
             if item_type != "function_call_output":
                 continue
-            call_id = str(item.get("call_id") or "").strip()
             output = item.get("output")
-            if not output:
+            if output is None:
                 continue
             payload: dict[str, Any] = {
                 "type": "function_call_output",
                 "output": str(output),
             }
+            call_id = str(item.get("call_id") or "").strip()
             if call_id:
                 payload["call_id"] = call_id
-            messages.append(payload)
-        messages.append({"role": "user", "content": request.user_message[: request.max_input_chars]})
-        return messages
+            normalized.append(payload)
+        return normalized
+
+    @staticmethod
+    def _normalize_output_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        normalized: list[dict[str, Any]] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            item_type = str(item.get("type") or "").strip()
+            if not item_type:
+                continue
+            normalized_item = dict(item)
+            if item_type == "function_call":
+                name = str(item.get("name") or "").strip()
+                arguments = item.get("arguments")
+                if not name or arguments is None:
+                    continue
+                normalized_item["name"] = name
+                normalized_item["arguments"] = str(arguments)
+                call_id = str(item.get("call_id") or "").strip()
+                if call_id:
+                    normalized_item["call_id"] = call_id
+            normalized.append(normalized_item)
+        return normalized
 
     @staticmethod
     def _normalize_tools_for_responses_api(
@@ -263,15 +320,40 @@ class OpenAIResponsesProvider(AssistantProvider):
             item_type = getattr(item, "type", None)
             if item_type != "function_call":
                 continue
+            response_item = {
+                "type": "function_call",
+                "id": getattr(item, "id", None),
+                "call_id": getattr(item, "call_id", None),
+                "name": getattr(item, "name", None),
+                "arguments": getattr(item, "arguments", None),
+            }
             tool_calls.append(
                 {
                     "id": getattr(item, "id", None),
                     "name": getattr(item, "name", None),
+                    "provider_tool_name": getattr(item, "name", None),
                     "arguments": getattr(item, "arguments", None),
                     "call_id": getattr(item, "call_id", None),
+                    "response_item": response_item,
                 }
             )
         return tool_calls
+
+    @staticmethod
+    def _extract_output_items(response: Any) -> list[dict[str, Any]]:
+        output = getattr(response, "output", None) or []
+        items: list[dict[str, Any]] = []
+        for item in output:
+            item_type = getattr(item, "type", None)
+            if not item_type:
+                continue
+            normalized: dict[str, Any] = {"type": item_type}
+            for key in ("id", "call_id", "name", "arguments", "status"):
+                value = getattr(item, key, None)
+                if value is not None:
+                    normalized[key] = value
+            items.append(normalized)
+        return items
 
     @staticmethod
     def _extract_usage(response: Any) -> AssistantProviderUsage | None:

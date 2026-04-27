@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent } from "vue";
 
+import { moduleRegistry } from "../../../views/sicherplan/module-registry";
+
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -801,6 +803,10 @@ describe("PlanningStaffingCoverageView", () => {
     const firstPanel = wrapper.findAll(".planning-staffing-panel")[0];
 
     expect(wrapper.find('[data-testid="planning-staffing-workspace"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-staffing-filter-panel"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-staffing-main-grid"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-staffing-shift-coverage-panel"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="planning-staffing-shift-coverage-scroll"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="planning-staffing-workspace-loading-overlay"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="planning-staffing-planning-record-select"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="planning-staffing-refresh"]').exists()).toBe(true);
@@ -821,6 +827,30 @@ describe("PlanningStaffingCoverageView", () => {
     expect(mocks.listStaffingCoverageMock).toHaveBeenCalledWith("tenant-1", "token-1", expect.any(Object));
     expect(mocks.listFunctionTypesMock).toHaveBeenCalledWith("tenant-1", "token-1");
     expect(mocks.listQualificationTypesMock).toHaveBeenCalledWith("tenant-1", "token-1");
+  });
+
+  it("hides the shared module control intro for planning staffing via the module registry", () => {
+    const staffing = moduleRegistry["planning-staffing"];
+
+    expect(staffing?.showPageIntro).toBe(false);
+    expect(staffing?.showWorkspaceSectionHeader).toBe(false);
+  });
+
+  it("renders filters before the main workspace grid and shows selected shift context", async () => {
+    const wrapper = await mountView();
+    const workspace = wrapper.get('[data-testid="planning-staffing-workspace"]');
+    const filterPanel = wrapper.get('[data-testid="planning-staffing-filter-panel"]');
+    const mainGrid = wrapper.get('[data-testid="planning-staffing-main-grid"]');
+    const selectedContext = wrapper.get('[data-testid="planning-staffing-selected-shift-context"]');
+    const workspaceChildren = workspace.element.children;
+    const contextText = selectedContext.text();
+
+    expect(Array.from(workspaceChildren)).toEqual([filterPanel.element, mainGrid.element]);
+    expect(contextText).toContain("05.04.2026");
+    expect(contextText).toContain("ORD-1");
+    expect(contextText).toContain("site_day");
+    expect(contextText).toMatch(/\d{2}:\d{2}–\d{2}:\d{2}/);
+    expect(wrapper.text()).toContain("Planning 1");
   });
 
   it("shows the shared workspace overlay during a blocking staffing refresh and clears it afterwards", async () => {
@@ -1358,7 +1388,11 @@ describe("PlanningStaffingCoverageView", () => {
     expect(mocks.listStaffingCoverageMock).toHaveBeenLastCalledWith(
       "tenant-1",
       "token-1",
-      expect.objectContaining({ planning_record_id: "" }),
+      expect.objectContaining({
+        date_from: "2026-04-05T00:00",
+        date_to: "2026-04-06T00:00",
+        planning_record_id: undefined,
+      }),
     );
   });
 

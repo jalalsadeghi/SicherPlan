@@ -178,7 +178,12 @@ vi.mock('#/sicherplan-legacy/api/subcontractors', () => ({
 }));
 
 vi.mock('#/locales', () => ({
-  $t: (key: string) => key,
+  $t: (key: string) => {
+    if (key === 'sicherplan.dashboardView.calendar.loading') {
+      return 'Processing request';
+    }
+    return key;
+  },
 }));
 
 vi.mock('@vben/icons', () => ({
@@ -513,6 +518,9 @@ describe('SicherPlan dashboard session loading', () => {
     expect(wrapper.find('.sp-dashboard__calendar-grid').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-dashboard-calendar-loading-indicator"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="customer-dashboard-calendar-loading-indicator"]').text()).toContain(
+      'Processing request',
+    );
+    expect(wrapper.get('[data-testid="customer-dashboard-calendar-loading-indicator"]').text()).not.toContain(
       'workspace.loading.processing',
     );
     expect(wrapper.get('.sp-dashboard__calendar-topline strong').text()).not.toBe(initialMonthText);

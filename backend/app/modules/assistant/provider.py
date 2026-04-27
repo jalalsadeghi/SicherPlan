@@ -29,6 +29,9 @@ class AssistantProviderRequest:
     knowledge_chunks: list[dict[str, Any]] = field(default_factory=list)
     grounding_context: dict[str, Any] | None = None
     tool_results: list[dict[str, Any]] = field(default_factory=list)
+    continuation_tool_outputs: list[dict[str, Any]] = field(default_factory=list)
+    previous_response_id: str | None = None
+    previous_output_items: list[dict[str, Any]] = field(default_factory=list)
     available_tools: list[dict[str, Any]] = field(default_factory=list)
     provider_tool_name_map: dict[str, str] = field(default_factory=dict)
     max_tool_calls: int = 0
@@ -41,6 +44,8 @@ class AssistantProviderResult:
     final_response: dict[str, Any]
     raw_text: str | None
     requested_tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    response_id: str | None = None
+    output_items: list[dict[str, Any]] = field(default_factory=list)
     usage: AssistantProviderUsage | None = None
     provider_name: str = "mock"
     provider_mode: str = "mock"

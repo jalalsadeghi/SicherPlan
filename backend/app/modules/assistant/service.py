@@ -1335,6 +1335,9 @@ class AssistantService:
     ) -> dict[str, Any]:
         tool_results = list(initial_tool_results)
         provider_tool_results: list[dict[str, Any]] = []
+        previous_response_id: str | None = None
+        previous_output_items: list[dict[str, Any]] = []
+        provider_result: AssistantProviderResult | None = None
         remaining_tool_calls = max(self.runtime_config.max_tool_calls, 0)
         request = self._build_provider_request(
             conversation=conversation,
@@ -1346,10 +1349,15 @@ class AssistantService:
             grounding_context=grounding_context,
             tool_results=tool_results,
             provider_tool_results=provider_tool_results,
+            previous_response_id=self._continuation_response_id(previous_response_id),
+            previous_output_items=previous_output_items,
         )
 
         while True:
-            provider_result = self._call_provider(request)
+            if provider_result is None:
+                provider_result = self._call_provider(request)
+            previous_response_id = provider_result.response_id
+            previous_output_items = list(provider_result.output_items or [])
             requested_tool_calls = provider_result.requested_tool_calls or []
             if not requested_tool_calls:
                 return self._merge_provider_payload_with_tool_results(
@@ -1383,6 +1391,8 @@ class AssistantService:
                     grounding_context=grounding_context,
                     tool_results=tool_results,
                     available_tools=[],
+                    previous_response_id=self._continuation_response_id(previous_response_id),
+                    previous_output_items=previous_output_items,
                 )
                 provider_result = self._call_provider(request)
                 return self._merge_provider_payload_with_tool_results(
@@ -1391,10 +1401,16 @@ class AssistantService:
                 )
 
             executed_any = False
+            executed_call_ids: list[str] = []
             for requested_call in requested_tool_calls[:remaining_tool_calls]:
-                provider_tool_name = str(requested_call.get("name") or "").strip()
+                provider_tool_name = str(
+                    requested_call.get("provider_tool_name")
+                    or requested_call.get("name")
+                    or ""
+                ).strip()
                 if not provider_tool_name:
                     continue
+                call_id = str(requested_call.get("call_id") or "").strip()
                 tool_name = self._resolve_internal_tool_name(
                     provider_tool_name=provider_tool_name,
                     provider_tool_name_map=request.provider_tool_name_map,
@@ -1417,11 +1433,14 @@ class AssistantService:
                             provider_tool_name=provider_tool_name,
                         )
                     )
+                    if call_id:
+                        executed_call_ids.append(call_id)
                     remaining_tool_calls -= 1
                     executed_any = True
                     if remaining_tool_calls <= 0:
                         break
                     continue
+                requested_call["internal_tool_name"] = tool_name
                 arguments = self._parse_tool_call_arguments(requested_call.get("arguments"))
                 tool_result = self.execute_registered_tool(
                     tool_name=tool_name,
@@ -1436,6 +1455,8 @@ class AssistantService:
                         tool_result=tool_result,
                     )
                 )
+                if call_id:
+                    executed_call_ids.append(call_id)
                 remaining_tool_calls -= 1
                 executed_any = True
                 if remaining_tool_calls <= 0:
@@ -1457,7 +1478,36 @@ class AssistantService:
                 grounding_context=grounding_context,
                 tool_results=tool_results,
                 provider_tool_results=provider_tool_results,
+                previous_response_id=self._continuation_response_id(previous_response_id),
+                previous_output_items=previous_output_items,
             )
+            self._log_tool_call_continuation_event(
+                event="assistant_tool_call_continuation_started",
+                request=request,
+                response_id=previous_response_id,
+                call_ids=executed_call_ids,
+                provider_returned_successfully=False,
+                input_tokens=None,
+                output_tokens=None,
+            )
+            provider_result = self._call_provider(request)
+            self._log_tool_call_continuation_event(
+                event="assistant_tool_call_continuation_finished",
+                request=request,
+                response_id=previous_response_id,
+                call_ids=executed_call_ids,
+                provider_returned_successfully=True,
+                input_tokens=provider_result.usage.input_tokens if provider_result.usage else None,
+                output_tokens=provider_result.usage.output_tokens if provider_result.usage else None,
+            )
+            previous_response_id = provider_result.response_id
+            previous_output_items = list(provider_result.output_items or [])
+            requested_tool_calls = provider_result.requested_tool_calls or []
+            if not requested_tool_calls:
+                return self._merge_provider_payload_with_tool_results(
+                    provider_result.final_response,
+                    tool_results,
+                )
 
     def _build_provider_request(
         self,
@@ -1472,6 +1522,8 @@ class AssistantService:
         tool_results: list[AssistantToolResultSummary] | None = None,
         provider_tool_results: list[dict[str, Any]] | None = None,
         available_tools: list[dict[str, Any]] | None = None,
+        previous_response_id: str | None = None,
+        previous_output_items: list[dict[str, Any]] | None = None,
     ) -> AssistantProviderRequest:
         recent_messages = [
             AssistantMessageContext(
@@ -1528,10 +1580,10 @@ class AssistantService:
             recent_messages=prompt_payload.conversation_messages,
             knowledge_chunks=[item.model_dump(mode="json") for item in knowledge_chunks],
             grounding_context=grounding_context.model_dump(mode="json"),
-            tool_results=self._build_provider_tool_results_payload(
-                tool_results=tool_results,
-                provider_tool_results=provider_tool_results,
-            ),
+            tool_results=self._build_provider_tool_result_summaries(tool_results=tool_results),
+            continuation_tool_outputs=list(provider_tool_results or []),
+            previous_response_id=previous_response_id,
+            previous_output_items=list(previous_output_items or []),
             available_tools=available_tools_payload,
             provider_tool_name_map=provider_tool_name_map,
             max_tool_calls=self.runtime_config.max_tool_calls,
@@ -1542,23 +1594,42 @@ class AssistantService:
                 "user_id": actor.user_id,
                 "tenant_id": actor.tenant_id,
                 "tool_name_map": dict(provider_tool_name_map),
+                "continuation_mode": self._determine_continuation_mode(
+                    previous_response_id=previous_response_id,
+                    previous_output_items=previous_output_items,
+                    continuation_tool_outputs=provider_tool_results,
+                ),
                 **prompt_payload.metadata,
             },
         )
 
     @staticmethod
-    def _build_provider_tool_results_payload(
+    def _build_provider_tool_result_summaries(
         *,
         tool_results: list[AssistantToolResultSummary] | None,
-        provider_tool_results: list[dict[str, Any]] | None,
     ) -> list[dict[str, Any]]:
-        summary_payload = [
+        return [
             {"tool_name": item.tool_name, "summary": item.summary}
             for item in (tool_results or [])
         ]
-        if not provider_tool_results:
-            return summary_payload
-        return summary_payload + list(provider_tool_results)
+
+    @staticmethod
+    def _determine_continuation_mode(
+        *,
+        previous_response_id: str | None,
+        previous_output_items: list[dict[str, Any]] | None,
+        continuation_tool_outputs: list[dict[str, Any]] | None,
+    ) -> str:
+        if previous_response_id and continuation_tool_outputs:
+            return "previous_response_id"
+        if previous_output_items and continuation_tool_outputs:
+            return "stateless"
+        return "initial"
+
+    def _continuation_response_id(self, response_id: str | None) -> str | None:
+        if not self.runtime_config.store_responses:
+            return None
+        return response_id
 
     def _retrieve_knowledge_chunks(
         self,
@@ -2154,6 +2225,8 @@ class AssistantService:
             final_response=validated.model_dump(mode="json"),
             raw_text=result.raw_text,
             requested_tool_calls=result.requested_tool_calls,
+            response_id=result.response_id,
+            output_items=result.output_items,
             usage=result.usage,
             provider_name=result.provider_name,
             provider_mode=result.provider_mode,
@@ -2221,6 +2294,32 @@ class AssistantService:
             "http_status": getattr(exc, "http_status", None),
             "safe_message": getattr(exc, "safe_message", str(exc))[:240],
             "openai_request_attempted": attempted_openai,
+        }
+        logger.info(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+    def _log_tool_call_continuation_event(
+        self,
+        *,
+        event: str,
+        request: AssistantProviderRequest,
+        response_id: str | None,
+        call_ids: list[str],
+        provider_returned_successfully: bool,
+        input_tokens: int | None,
+        output_tokens: int | None,
+    ) -> None:
+        payload = {
+            "event": event,
+            "provider_mode": self.runtime_config.provider_mode,
+            "request_id": request.metadata.get("request_id"),
+            "conversation_id": request.conversation_id,
+            "response_id": response_id,
+            "tool_call_count": len(call_ids),
+            "call_ids": call_ids,
+            "continuation_mode": request.metadata.get("continuation_mode"),
+            "provider_returned_successfully": provider_returned_successfully,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
         }
         logger.info(json.dumps(payload, ensure_ascii=False, sort_keys=True))
 

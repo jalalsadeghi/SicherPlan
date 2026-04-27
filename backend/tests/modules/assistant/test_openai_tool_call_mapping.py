@@ -77,12 +77,30 @@ class _MappingProvider:
             return AssistantProviderResult(
                 final_response={},
                 raw_text=None,
+                response_id="resp-1",
+                output_items=[
+                    {
+                        "type": "function_call",
+                        "id": "fc-1",
+                        "call_id": "call-1",
+                        "name": self.tool_name,
+                        "arguments": '{"query": "customer create"}',
+                    }
+                ],
                 requested_tool_calls=[
                     {
                         "id": "fc-1",
                         "name": self.tool_name,
+                        "provider_tool_name": self.tool_name,
                         "arguments": '{"query": "customer create"}',
                         "call_id": "call-1",
+                        "response_item": {
+                            "type": "function_call",
+                            "id": "fc-1",
+                            "call_id": "call-1",
+                            "name": self.tool_name,
+                            "arguments": '{"query": "customer create"}',
+                        },
                     }
                 ],
                 provider_name="openai",
@@ -190,10 +208,9 @@ def test_unknown_provider_tool_name_is_rejected_safely() -> None:
     assert response.answer == "Done"
     assert not any(record.tool_name == "assistant.lookup_docs" for record in audit_repository.records)
     assert any(
-        item == {
-            "type": "function_call_output",
-            "call_id": "call-1",
-            "output": '{"error_code": "assistant.tool.unknown_provider_tool_name", "error_message": "Unknown provider tool alias requested.", "ok": false, "provider_tool_name": "unknown_provider_tool"}',
-        }
-        for item in provider.requests[1].tool_results
+        item.get("type") == "function_call_output"
+        and item.get("call_id") == "call-1"
+        and item.get("output")
+        == '{"error_code": "assistant.tool.unknown_provider_tool_name", "error_message": "Unknown provider tool alias requested.", "ok": false, "provider_tool_name": "unknown_provider_tool"}'
+        for item in provider.requests[1].continuation_tool_outputs
     )

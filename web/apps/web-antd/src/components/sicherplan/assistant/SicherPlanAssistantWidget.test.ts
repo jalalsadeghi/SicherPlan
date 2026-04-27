@@ -8,6 +8,14 @@ import type { AssistantUiMessage } from '#/store';
 
 const mocked = vi.hoisted(() => ({
   accessStoreState: null as null | { accessToken: string },
+  legacyAuthStoreState: null as null | {
+    effectiveAccessToken: string;
+    ensureSessionReady: ReturnType<typeof vi.fn>;
+    isSessionResolving: boolean;
+    sessionId: string;
+    sessionUser: null | { id: string };
+    syncFromPrimarySession: ReturnType<typeof vi.fn>;
+  },
   currentRoute: {
     value: {
       fullPath: '/admin/employees',
@@ -66,6 +74,10 @@ vi.mock('#/store', () => ({
   useAssistantStore: () => mocked.storeState,
 }));
 
+vi.mock('#/sicherplan-legacy/stores/auth', () => ({
+  useAuthStore: () => mocked.legacyAuthStoreState,
+}));
+
 import SicherPlanAssistantWidget from './SicherPlanAssistantWidget.vue';
 
 async function flushUi() {
@@ -102,6 +114,15 @@ describe('SicherPlanAssistantWidget', () => {
       path: '/admin/employees',
       query: {},
     };
+
+    mocked.legacyAuthStoreState = reactive({
+      effectiveAccessToken: 'access-1',
+      ensureSessionReady: vi.fn(async () => ({ id: 'user-1' })),
+      isSessionResolving: false,
+      sessionId: 'session-1',
+      sessionUser: { id: 'user-1' },
+      syncFromPrimarySession: vi.fn(),
+    });
 
     mocked.storeState = reactive({
       capabilities: null,
@@ -144,6 +165,9 @@ describe('SicherPlanAssistantWidget', () => {
     expect(mocked.storeState!.loadCapabilities).not.toHaveBeenCalled();
 
     mocked.accessStoreState!.accessToken = '';
+    mocked.legacyAuthStoreState!.effectiveAccessToken = '';
+    mocked.legacyAuthStoreState!.sessionId = '';
+    mocked.legacyAuthStoreState!.sessionUser = null;
     mocked.currentRoute.value = {
       fullPath: '/admin/employees',
       meta: {},
@@ -171,6 +195,41 @@ describe('SicherPlanAssistantWidget', () => {
     expect(wrapper.find('[data-testid="assistant-widget"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('assistant.widget.launcherLabel');
     expect(wrapper.find('button[aria-label="assistant.widget.launcherLabel"]').exists()).toBe(true);
+  });
+
+  it('loads capabilities on authenticated routes even when the primary access token is initially empty', async () => {
+    mocked.accessStoreState!.accessToken = '';
+    mocked.legacyAuthStoreState!.effectiveAccessToken = 'legacy-token-1';
+    mocked.legacyAuthStoreState!.sessionUser = { id: 'user-1' };
+    mocked.storeState!.loadCapabilities.mockImplementation(async () => {
+      mocked.storeState!.enabled = true;
+      mocked.storeState!.canChat = true;
+    });
+
+    mountWidget();
+    await flushUi();
+
+    expect(mocked.legacyAuthStoreState!.syncFromPrimarySession).toHaveBeenCalled();
+    expect(mocked.storeState!.loadCapabilities).toHaveBeenCalled();
+  });
+
+  it('loads assistant capabilities after session bootstrap resolves auth on an internal route', async () => {
+    mocked.accessStoreState!.accessToken = '';
+    mocked.legacyAuthStoreState!.effectiveAccessToken = '';
+    mocked.legacyAuthStoreState!.sessionId = 'session-1';
+    mocked.legacyAuthStoreState!.sessionUser = null;
+    mocked.legacyAuthStoreState!.ensureSessionReady.mockImplementation(async () => {
+      mocked.accessStoreState!.accessToken = 'access-1';
+      mocked.legacyAuthStoreState!.effectiveAccessToken = 'access-1';
+      mocked.legacyAuthStoreState!.sessionUser = { id: 'user-1' };
+      return mocked.legacyAuthStoreState!.sessionUser;
+    });
+
+    mountWidget();
+    await flushUi();
+
+    expect(mocked.legacyAuthStoreState!.ensureSessionReady).toHaveBeenCalled();
+    expect(mocked.storeState!.loadCapabilities).toHaveBeenCalled();
   });
 
   it('shows a mock mode warning only when mock mode is explicitly allowed', async () => {

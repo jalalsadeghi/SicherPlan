@@ -750,6 +750,7 @@
       "previous": "Previous",
       "next": "Next",
       "openPlanning": "Shift planning",
+      "loading": "Processing request",
       "monthHint": "Shifts and order dates are aggregated per calendar day.",
       "coverageGood": "Coverage good",
       "coverageWarn": "Coverage warning",

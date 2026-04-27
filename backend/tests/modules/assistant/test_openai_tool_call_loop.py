@@ -71,8 +71,26 @@ class _LoopingProvider:
                     {
                         "id": "fc-1",
                         "name": "assistant_lookup_docs",
+                        "provider_tool_name": "assistant_lookup_docs",
                         "arguments": '{"query": "customer create"}',
                         "call_id": "call-1",
+                        "response_item": {
+                            "type": "function_call",
+                            "id": "fc-1",
+                            "call_id": "call-1",
+                            "name": "assistant_lookup_docs",
+                            "arguments": '{"query": "customer create"}',
+                        },
+                    }
+                ],
+                response_id="resp-1",
+                output_items=[
+                    {
+                        "type": "function_call",
+                        "id": "fc-1",
+                        "call_id": "call-1",
+                        "name": "assistant_lookup_docs",
+                        "arguments": '{"query": "customer create"}',
                     }
                 ],
                 provider_name="openai",
@@ -150,11 +168,19 @@ def test_service_feeds_function_call_output_back_into_provider_loop() -> None:
     assert provider.requests[0].provider_tool_name_map == {
         "assistant_lookup_docs": "assistant.lookup_docs",
     }
-    assert any(
-        item == {
-            "type": "function_call_output",
+    assert provider.requests[1].previous_response_id is None
+    assert provider.requests[1].previous_output_items == [
+        {
+            "type": "function_call",
+            "id": "fc-1",
             "call_id": "call-1",
-            "output": '{"summary": "Resolved customer create"}',
+            "name": "assistant_lookup_docs",
+            "arguments": '{"query": "customer create"}',
         }
-        for item in provider.requests[1].tool_results
+    ]
+    assert any(
+        item.get("type") == "function_call_output"
+        and item.get("call_id") == "call-1"
+        and item.get("output") == '{"summary": "Resolved customer create"}'
+        for item in provider.requests[1].continuation_tool_outputs
     )

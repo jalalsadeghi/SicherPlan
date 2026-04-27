@@ -490,14 +490,18 @@ function queryString(params: Record<string, unknown>) {
 
 export function listStaffingCoverage(tenantId: string, accessToken: string, filters: CoverageFilterParams) {
   return request<CoverageShiftItem[]>(
-    `/api/planning/tenants/${tenantId}/ops/coverage${queryString(filters as Record<string, unknown>)}`,
+    `/api/planning/tenants/${tenantId}/ops/coverage${queryString(filters as unknown as Record<string, unknown>)}`,
     accessToken,
   );
 }
 
-export function listStaffingBoard(tenantId: string, accessToken: string, filters: Record<string, unknown>) {
+export function listStaffingBoard(
+  tenantId: string,
+  accessToken: string,
+  filters: CoverageFilterParams | Record<string, unknown>,
+) {
   return request<StaffingBoardShiftItem[]>(
-    `/api/planning/tenants/${tenantId}/ops/staffing-board${queryString(filters)}`,
+    `/api/planning/tenants/${tenantId}/ops/staffing-board${queryString(filters as Record<string, unknown>)}`,
     accessToken,
   );
 }

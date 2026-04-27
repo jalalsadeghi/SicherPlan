@@ -91,8 +91,26 @@ def test_openai_provider_parses_tool_calls_from_response() -> None:
         {
             "id": "fc-1",
             "name": "search_docs",
+            "provider_tool_name": "search_docs",
             "arguments": '{"query":"Markus"}',
             "call_id": "call-1",
+            "response_item": {
+                "type": "function_call",
+                "id": "fc-1",
+                "call_id": "call-1",
+                "name": "search_docs",
+                "arguments": '{"query":"Markus"}',
+            },
+        }
+    ]
+    assert result.response_id is None
+    assert result.output_items == [
+        {
+            "type": "function_call",
+            "id": "fc-1",
+            "call_id": "call-1",
+            "name": "search_docs",
+            "arguments": '{"query":"Markus"}',
         }
     ]
     assert client.responses.kwargs["tools"] == [
