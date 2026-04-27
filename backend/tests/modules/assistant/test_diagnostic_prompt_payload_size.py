@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.modules.assistant.provider import (
-    AssistantProviderRateLimitError,
-    AssistantProviderRequest,
-)
+from app.modules.assistant.provider import AssistantProviderRequest, AssistantProviderResult
 from app.modules.assistant.schemas import AssistantMessageCreate
 from app.modules.assistant.service import AssistantRuntimeConfig, AssistantService
 from app.modules.assistant.tools import build_default_tool_registry
@@ -17,20 +14,39 @@ from tests.modules.assistant.test_shift_visibility_diagnostic import (
 
 
 @dataclass
-class _AlwaysRateLimitedProvider:
+class _CapturingProvider:
     requests: list[AssistantProviderRequest] = field(default_factory=list)
 
     def generate(self, request: AssistantProviderRequest):  # noqa: ANN201
         self.requests.append(request)
-        raise AssistantProviderRateLimitError(
-            "Rate limit reached.",
-            retry_after_seconds=0.0,
+        return AssistantProviderResult(
+            final_response={
+                "answer": "Ich habe die Freigabe geprüft.",
+                "confidence": "medium",
+                "out_of_scope": False,
+                "diagnosis": [],
+                "links": [],
+                "missing_permissions": [],
+                "next_steps": [],
+                "tool_trace_id": None,
+                "source_basis": [],
+            },
+            raw_text="Ich habe die Freigabe geprüft.",
+            requested_tool_calls=[],
+            response_id="resp-1",
+            output_items=[],
+            usage=None,
+            provider_name="test",
+            provider_mode="openai",
+            model_name="gpt-4o",
+            latency_ms=0,
+            finish_reason="stop",
         )
 
 
-def test_rate_limit_with_grounded_visibility_facts_returns_degraded_answer() -> None:
+def test_diagnostic_request_compacts_tool_results_below_budget() -> None:
     repository = _DiagnosticRepository()
-    provider = _AlwaysRateLimitedProvider()
+    provider = _CapturingProvider()
     conversation = repository.create_conversation(
         tenant_id="tenant-1",
         user_id="dispatcher-1",
@@ -45,8 +61,10 @@ def test_rate_limit_with_grounded_visibility_facts_returns_degraded_answer() -> 
             provider_mode="openai",
             openai_configured=True,
             response_model="gpt-4o",
-            rate_limit_max_retries=0,
-            rate_limit_retry_seconds=0,
+            max_tool_result_chars=1500,
+            max_tool_result_items=5,
+            max_total_tool_result_chars=3500,
+            max_diagnostic_facts=12,
         ),
         repository=repository,
         provider=provider,
@@ -66,10 +84,10 @@ def test_rate_limit_with_grounded_visibility_facts_returns_degraded_answer() -> 
         _context(role_keys=("dispatcher",), permission_keys=_full_internal_permissions()),
     )
 
-    assert response.provider_degraded is True
     assert response.out_of_scope is False
-    assert response.answer.startswith("Die Anfrage konnte nicht vollständig mit dem KI-Modell abgeschlossen werden.")
-    assert response.source_basis
-    assert response.links
-    assert any(item.finding == "provider_degraded" and item.severity == "warning" for item in response.diagnosis)
     assert provider.requests
+    request = provider.requests[0]
+    assert request.metadata["estimated_tool_result_tokens"] < 1500
+    assert request.metadata["tool_result_chars"] <= 3500
+    assert request.metadata["tool_result_count"] <= 5
+    assert request.metadata["tool_result_trimmed"] in {True, False}

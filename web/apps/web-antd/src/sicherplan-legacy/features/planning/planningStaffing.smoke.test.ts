@@ -833,6 +833,30 @@ describe("PlanningStaffingCoverageView", () => {
     expect(mocks.listQualificationTypesMock).toHaveBeenCalledWith("tenant-1", "token-1");
   }, 10_000);
 
+  it("keeps the planning record field aligned when no records match the current filters", async () => {
+    mocks.listPlanningRecordsMock.mockResolvedValueOnce([]);
+
+    const wrapper = await mountView();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await flushPromises();
+    const planningRecordField = wrapper.get('[data-testid="planning-staffing-planning-record-select"]').element
+      .closest(".field-stack");
+    const status = wrapper.get('[data-testid="planning-staffing-planning-record-status"]');
+
+    expect(planningRecordField).not.toBeNull();
+    expect(wrapper.find('[data-testid="planning-staffing-planning-record-select"]').exists()).toBe(true);
+    expect(status.text()).toBe("Keine passenden Planungsdatensaetze");
+    expect(status.attributes("title")).toBe("Keine passenden Planungsdatensaetze fuer die aktuellen Filter gefunden.");
+    expect(planningRecordField?.textContent ?? "").not.toContain(
+      "Keine passenden Planungsdatensaetze fuer die aktuellen Filter gefunden.",
+    );
+    expect(wrapper.text()).toContain("Von");
+    expect(wrapper.text()).toContain("Bis");
+    expect(wrapper.text()).toContain("Planungsmodus auswaehlen");
+    expect(wrapper.text()).toContain("Workforce-Scope auswaehlen");
+    expect(wrapper.text()).toContain("Bestaetigungsstatus auswaehlen");
+  });
+
   it("hides the shared module control intro for planning staffing via the module registry", () => {
     const staffing = moduleRegistry["planning-staffing"];
 

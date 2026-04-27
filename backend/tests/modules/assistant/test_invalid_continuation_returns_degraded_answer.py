@@ -100,9 +100,6 @@ def test_invalid_continuation_after_tool_facts_returns_degraded_answer() -> None
     assert response.provider_degraded is True
     assert response.answer.startswith("Die Anfrage konnte nicht vollständig mit dem KI-Modell abgeschlossen werden.")
     assert response.source_basis
-    assert any(
-        item.finding == "Die Antwort wurde aus bereits geprüften SicherPlan-Kontexten erstellt."
-        for item in response.diagnosis
-    )
+    assert any(item.finding == "provider_degraded" and item.severity == "warning" for item in response.diagnosis)
     assert response.next_steps
     assert len(provider.requests) == 2

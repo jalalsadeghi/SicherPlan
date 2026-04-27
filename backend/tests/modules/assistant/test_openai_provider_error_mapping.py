@@ -5,6 +5,7 @@ from app.modules.assistant.provider import (
     AssistantProviderAuthenticationError,
     AssistantProviderInvalidRequestError,
     AssistantProviderRateLimitError,
+    AssistantProviderStructuredOutputTruncatedError,
     AssistantProviderTimeoutError,
     AssistantProviderUnavailableError,
 )
@@ -136,3 +137,21 @@ def test_openai_provider_maps_api_status_503_to_unavailable() -> None:
     else:
         raise AssertionError("Expected unavailable mapping")
 
+
+def test_openai_provider_maps_validation_eof_to_structured_output_truncation() -> None:
+    ValidationError = type("ValidationError", (Exception,), {})
+
+    class _Responses:
+        def parse(self, **kwargs):
+            raise ValidationError('1 validation error for AssistantProviderStructuredOutput Invalid JSON: EOF while parsing a string')
+
+    class _Client:
+        responses = _Responses()
+
+    try:
+        _provider(lambda **kwargs: _Client()).generate(_request())
+    except AssistantProviderStructuredOutputTruncatedError as exc:
+        assert exc.code == "assistant.provider.structured_output_truncated"
+        assert exc.provider_error_type == "StructuredOutputTruncated"
+    else:
+        raise AssertionError("Expected structured output truncation mapping")

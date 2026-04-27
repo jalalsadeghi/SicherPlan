@@ -38,7 +38,7 @@ class AssistantProviderRequest:
     provider_tool_name_map: dict[str, str] = field(default_factory=dict)
     max_tool_calls: int = 0
     max_input_chars: int = 12000
-    max_output_tokens: int = 900
+    max_output_tokens: int = 1200
     model_name_override: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -125,6 +125,12 @@ class AssistantProviderStructuredOutputError(AssistantProviderError):
     """Provider returned invalid structured output."""
 
     code = "assistant.provider.invalid_response"
+
+
+class AssistantProviderStructuredOutputTruncatedError(AssistantProviderStructuredOutputError):
+    """Provider returned truncated or incomplete structured output."""
+
+    code = "assistant.provider.structured_output_truncated"
 
 
 _MOCK_PERSIAN = (

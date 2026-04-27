@@ -31,6 +31,10 @@ class TestRuntimeConfig(unittest.TestCase):
                 "SP_AI_MAX_TOOL_CALLS",
                 "SP_AI_MAX_CONTEXT_CHUNKS",
                 "SP_AI_MAX_INPUT_CHARS",
+                "SP_AI_MIN_STRUCTURED_OUTPUT_TOKENS",
+                "SP_AI_MAX_OUTPUT_TOKENS",
+                "SP_AI_CONTINUATION_MAX_OUTPUT_TOKENS",
+                "SP_AI_DEGRADED_MAX_OUTPUT_TOKENS",
                 "SP_AI_TIMEOUT_SECONDS",
                 "SP_AI_RATE_LIMIT_PER_USER_PER_MINUTE",
                 "SP_AI_RATE_LIMIT_PER_TENANT_PER_MINUTE",
@@ -55,11 +59,30 @@ class TestRuntimeConfig(unittest.TestCase):
         self.assertEqual(settings.ai_max_tool_calls, 8)
         self.assertEqual(settings.ai_max_context_chunks, 8)
         self.assertEqual(settings.ai_max_input_chars, 12000)
+        self.assertEqual(settings.ai_min_structured_output_tokens, 800)
+        self.assertEqual(settings.ai_max_output_tokens, 1200)
+        self.assertEqual(settings.ai_continuation_max_output_tokens, 900)
+        self.assertEqual(settings.ai_degraded_max_output_tokens, 700)
         self.assertEqual(settings.ai_timeout_seconds, 45)
         self.assertEqual(settings.ai_rate_limit_per_user_per_minute, 10)
         self.assertEqual(settings.ai_rate_limit_per_tenant_per_minute, 100)
         self.assertTrue(settings.ai_redaction_enabled)
         self.assertTrue(settings.ai_audit_enabled)
+
+    def test_ai_output_token_settings_validate_structured_minimum(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SP_AI_MIN_STRUCTURED_OUTPUT_TOKENS": "800",
+                "SP_AI_MAX_OUTPUT_TOKENS": "600",
+            },
+            clear=False,
+        ):
+            with self.assertRaisesRegex(
+                ValueError,
+                "SP_AI_MAX_OUTPUT_TOKENS must be greater than or equal to SP_AI_MIN_STRUCTURED_OUTPUT_TOKENS.",
+            ):
+                AppSettings()
 
     def test_ai_disabled_does_not_require_openai_key(self) -> None:
         with patch.dict(

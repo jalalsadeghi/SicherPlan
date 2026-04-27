@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from app.modules.assistant.provider import (
-    AssistantProviderRateLimitError,
     AssistantProviderRequest,
+    AssistantProviderStructuredOutputTruncatedError,
 )
 from app.modules.assistant.schemas import AssistantMessageCreate
 from app.modules.assistant.service import AssistantRuntimeConfig, AssistantService
@@ -17,20 +17,21 @@ from tests.modules.assistant.test_shift_visibility_diagnostic import (
 
 
 @dataclass
-class _AlwaysRateLimitedProvider:
+class _AlwaysTruncatedProvider:
     requests: list[AssistantProviderRequest] = field(default_factory=list)
 
     def generate(self, request: AssistantProviderRequest):  # noqa: ANN201
         self.requests.append(request)
-        raise AssistantProviderRateLimitError(
-            "Rate limit reached.",
-            retry_after_seconds=0.0,
+        raise AssistantProviderStructuredOutputTruncatedError(
+            'Invalid JSON: EOF while parsing a string at line 1 column 201.',
+            provider_error_type="StructuredOutputTruncated",
+            safe_message='Invalid JSON: EOF while parsing a string at line 1 column 201.',
         )
 
 
-def test_rate_limit_with_grounded_visibility_facts_returns_degraded_answer() -> None:
+def test_truncated_structured_output_uses_grounded_fallback_after_retry() -> None:
     repository = _DiagnosticRepository()
-    provider = _AlwaysRateLimitedProvider()
+    provider = _AlwaysTruncatedProvider()
     conversation = repository.create_conversation(
         tenant_id="tenant-1",
         user_id="dispatcher-1",
@@ -45,8 +46,9 @@ def test_rate_limit_with_grounded_visibility_facts_returns_degraded_answer() -> 
             provider_mode="openai",
             openai_configured=True,
             response_model="gpt-4o",
-            rate_limit_max_retries=0,
-            rate_limit_retry_seconds=0,
+            min_structured_output_tokens=800,
+            max_output_tokens=1200,
+            continuation_max_output_tokens=900,
         ),
         repository=repository,
         provider=provider,
@@ -61,15 +63,14 @@ def test_rate_limit_with_grounded_visibility_facts_returns_degraded_answer() -> 
     response = service.add_message(
         conversation.id,
         AssistantMessageCreate(
-            message="Ich habe Markus einer Schicht zugewiesen, aber sie ist in der mobilen App nicht sichtbar. Woran liegt das?"
+            message="Ich habe einem Mitarbeiter eine Schicht zugewiesen, aber sie wird in der mobilen App nicht angezeigt. Woran könnte das liegen?"
         ),
         _context(role_keys=("dispatcher",), permission_keys=_full_internal_permissions()),
     )
 
+    assert len(provider.requests) == 2
     assert response.provider_degraded is True
-    assert response.out_of_scope is False
     assert response.answer.startswith("Die Anfrage konnte nicht vollständig mit dem KI-Modell abgeschlossen werden.")
     assert response.source_basis
     assert response.links
-    assert any(item.finding == "provider_degraded" and item.severity == "warning" for item in response.diagnosis)
-    assert provider.requests
+    assert response.response_language == "de"

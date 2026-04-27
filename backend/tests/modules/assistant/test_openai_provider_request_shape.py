@@ -85,7 +85,7 @@ def test_openai_provider_builds_expected_parse_request() -> None:
     call = client.responses.calls[0]
     assert call["model"] == "gpt-4o"
     assert call["store"] is False
-    assert call["max_output_tokens"] == 900
+    assert call["max_output_tokens"] == 1200
     assert call["text_format"].__name__ == "AssistantProviderStructuredOutput"
     assert call["tools"] == [
         {

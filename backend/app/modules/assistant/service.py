@@ -56,6 +56,7 @@ from app.modules.assistant.provider import (
     AssistantProviderRateLimitError,
     AssistantProviderResult,
     AssistantProviderStructuredOutputError,
+    AssistantProviderStructuredOutputTruncatedError,
     AssistantProviderTimeoutError,
     AssistantProviderUnavailableError,
     estimate_tokens,
@@ -130,8 +131,14 @@ class AssistantRuntimeConfig:
     max_total_grounding_chars: int = 4500
     max_recent_messages_for_model: int = 6
     max_recent_messages_for_continuation: int = 0
-    max_output_tokens: int = 900
-    continuation_max_output_tokens: int = 700
+    max_tool_result_chars: int = 1500
+    max_tool_result_items: int = 5
+    max_total_tool_result_chars: int = 3500
+    max_diagnostic_facts: int = 12
+    min_structured_output_tokens: int = 800
+    max_output_tokens: int = 1200
+    continuation_max_output_tokens: int = 900
+    degraded_max_output_tokens: int = 700
     rate_limit_retry_seconds: int = 6
     rate_limit_max_retries: int = 2
     fallback_response_model: str = ""
@@ -149,6 +156,7 @@ class AssistantProviderDegradedFallbackCandidate(Exception):
     tool_results: list[AssistantToolResultSummary]
     continuation_mode: str
     had_prior_provider_output: bool
+    provider_raw_text: str | None = None
 
 
 class AssistantRepository(Protocol):
@@ -332,6 +340,7 @@ class AssistantService:
             available_tools=[],
             max_tool_calls=0,
             max_input_chars=256,
+            max_output_tokens=self._target_structured_output_tokens(continuation=False),
             metadata={"request_id": context.request_id, "tenant_id": None, "user_id": context.user_id},
         )
         try:
@@ -536,6 +545,7 @@ class AssistantService:
                         tool_results=degraded.tool_results,
                         continuation_mode=degraded.continuation_mode,
                         provider_error_code=degraded.api_exception.code,
+                        provider_raw_text=degraded.provider_raw_text,
                     ),
                     degraded.tool_results,
                 )
@@ -1595,6 +1605,11 @@ class AssistantService:
             missing_context=missing_context,
             retrieval_plan=dict(grounding_context.retrieval_plan),
             query_expansion=dict(grounding_context.query_expansion),
+            tool_result_count=grounding_context.tool_result_count,
+            tool_result_chars=grounding_context.tool_result_chars,
+            estimated_tool_result_tokens=grounding_context.estimated_tool_result_tokens,
+            tool_result_trimmed=grounding_context.tool_result_trimmed,
+            tool_result_trim_reason=grounding_context.tool_result_trim_reason,
             grounding_trimmed=grounding_context.grounding_trimmed,
             trim_reason=grounding_context.trim_reason,
         )
@@ -2126,6 +2141,16 @@ class AssistantService:
             prompt_payload_metadata = dict(prompt_payload.metadata)
             request_grounding_context = trimmed_grounding_context.model_dump(mode="json")
 
+        provider_tool_summaries, tool_result_metadata = self._build_provider_tool_result_summaries(
+            tool_results=tool_results,
+            continuation_mode=continuation_mode,
+        )
+        grounding_context.tool_result_count = int(tool_result_metadata.get("tool_result_count", 0))
+        grounding_context.tool_result_chars = int(tool_result_metadata.get("tool_result_chars", 0))
+        grounding_context.estimated_tool_result_tokens = int(tool_result_metadata.get("estimated_tool_result_tokens", 0))
+        grounding_context.tool_result_trimmed = bool(tool_result_metadata.get("tool_result_trimmed", False))
+        grounding_context.tool_result_trim_reason = tool_result_metadata.get("tool_result_trim_reason")
+
         request = AssistantProviderRequest(
             conversation_id=conversation.id,
             user_message=user_message,
@@ -2136,7 +2161,7 @@ class AssistantService:
             recent_messages=prompt_recent_messages,
             knowledge_chunks=[item.model_dump(mode="json") for item in knowledge_chunks],
             grounding_context=request_grounding_context,
-            tool_results=self._build_provider_tool_result_summaries(tool_results=tool_results),
+            tool_results=provider_tool_summaries,
             continuation_tool_outputs=list(provider_tool_results or []),
             previous_response_id=previous_response_id,
             previous_output_items=list(previous_output_items or []),
@@ -2144,10 +2169,8 @@ class AssistantService:
             provider_tool_name_map=provider_tool_name_map,
             max_tool_calls=self.runtime_config.max_tool_calls,
             max_input_chars=self.runtime_config.max_input_chars,
-            max_output_tokens=(
-                self.runtime_config.continuation_max_output_tokens
-                if is_continuation
-                else self.runtime_config.max_output_tokens
+            max_output_tokens=self._target_structured_output_tokens(
+                continuation=is_continuation,
             ),
             metadata={
                 "request_id": actor.request_id,
@@ -2156,6 +2179,7 @@ class AssistantService:
                 "tenant_id": actor.tenant_id,
                 "tool_name_map": dict(provider_tool_name_map),
                 "continuation_mode": continuation_mode,
+                **tool_result_metadata,
                 **prompt_payload_metadata,
             },
         )
@@ -2164,15 +2188,72 @@ class AssistantService:
             grounding_context=grounding_context,
         )
 
-    @staticmethod
     def _build_provider_tool_result_summaries(
+        self,
         *,
         tool_results: list[AssistantToolResultSummary] | None,
-    ) -> list[dict[str, Any]]:
-        return [
-            {"tool_name": item.tool_name, "summary": item.summary}
-            for item in (tool_results or [])
-        ]
+        continuation_mode: str,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        if not tool_results:
+            return [], {
+                "tool_result_count": 0,
+                "tool_result_chars": 0,
+                "estimated_tool_result_tokens": 0,
+                "tool_result_trimmed": False,
+                "tool_result_trim_reason": None,
+            }
+
+        duplicate_grounding_tools = {
+            "assistant.search_accessible_pages",
+            "assistant.search_workflow_help",
+            "assistant.get_page_help_manifest",
+            "navigation.build_allowed_link",
+        }
+        payloads: list[dict[str, Any]] = []
+        trimmed = False
+        trim_reason: str | None = None
+        total_chars = 0
+        for item in tool_results:
+            if continuation_mode == "initial" and item.tool_name in duplicate_grounding_tools:
+                trimmed = True
+                trim_reason = trim_reason or "duplicate_grounding_context"
+                continue
+            payload = {"tool_name": item.tool_name, **item.summary}
+            serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+            if len(serialized) > self.runtime_config.max_tool_result_chars:
+                payload = self._truncate_tool_summary_payload(payload)
+                serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+                trimmed = True
+                trim_reason = trim_reason or "per_tool_result_limit"
+            if len(payloads) >= self.runtime_config.max_tool_result_items:
+                trimmed = True
+                trim_reason = trim_reason or "tool_result_item_limit"
+                break
+            if total_chars + len(serialized) > self.runtime_config.max_total_tool_result_chars:
+                trimmed = True
+                trim_reason = trim_reason or "total_tool_result_limit"
+                break
+            payloads.append(payload)
+            total_chars += len(serialized)
+        return payloads, {
+            "tool_result_count": len(payloads),
+            "tool_result_chars": total_chars,
+            "estimated_tool_result_tokens": estimate_tokens(payloads),
+            "tool_result_trimmed": trimmed,
+            "tool_result_trim_reason": trim_reason,
+        }
+
+    def _target_structured_output_tokens(
+        self,
+        *,
+        continuation: bool,
+    ) -> int:
+        configured = (
+            self.runtime_config.continuation_max_output_tokens
+            if continuation
+            else self.runtime_config.max_output_tokens
+        )
+        return max(configured, self.runtime_config.min_structured_output_tokens)
 
     @staticmethod
     def _determine_continuation_mode(
@@ -2286,18 +2367,20 @@ class AssistantService:
             else self.runtime_config.max_provider_input_tokens
         )
         adjusted = request
+        if adjusted.max_output_tokens < self.runtime_config.min_structured_output_tokens:
+            adjusted = replace(
+                adjusted,
+                max_output_tokens=self.runtime_config.min_structured_output_tokens,
+            )
         metrics = self._estimate_request_token_budget(adjusted)
         while metrics["estimated_input_tokens"] > budget:
             continuation_mode = str(adjusted.metadata.get("continuation_mode") or "initial")
-            if continuation_mode != "initial":
-                reduced_output_tokens = max(200, adjusted.max_output_tokens - 150)
-                if reduced_output_tokens == adjusted.max_output_tokens:
-                    break
-                adjusted = replace(adjusted, max_output_tokens=reduced_output_tokens)
-            elif adjusted.recent_messages:
+            if adjusted.recent_messages:
                 adjusted = replace(adjusted, recent_messages=adjusted.recent_messages[1:])
                 grounding_context.grounding_trimmed = True
                 grounding_context.trim_reason = "token_budget"
+            elif continuation_mode != "initial" and adjusted.previous_output_items:
+                adjusted = replace(adjusted, previous_output_items=adjusted.previous_output_items[-1:])
             elif adjusted.grounding_context and isinstance(adjusted.grounding_context.get("sources"), list):
                 current_sources = [
                     item for item in adjusted.grounding_context["sources"] if isinstance(item, dict)
@@ -2318,12 +2401,7 @@ class AssistantService:
                         grounding_context.trim_reason = "token_budget"
                         metrics = self._estimate_request_token_budget(adjusted)
                         continue
-                    reduced_output_tokens = max(200, adjusted.max_output_tokens - 150)
-                    if reduced_output_tokens == adjusted.max_output_tokens:
-                        break
-                    adjusted = replace(adjusted, max_output_tokens=reduced_output_tokens)
-                    metrics = self._estimate_request_token_budget(adjusted)
-                    continue
+                    break
                 adjusted_grounding_context = dict(adjusted.grounding_context)
                 adjusted_grounding_context["sources"] = trimmed_source_payloads
                 adjusted_grounding_context["grounding_trimmed"] = True
@@ -2333,11 +2411,10 @@ class AssistantService:
                 grounding_context.trim_reason = "token_budget"
             elif adjusted.knowledge_chunks:
                 adjusted = replace(adjusted, knowledge_chunks=adjusted.knowledge_chunks[:-1])
+            elif adjusted.tool_results:
+                adjusted = replace(adjusted, tool_results=adjusted.tool_results[: max(len(adjusted.tool_results) - 1, 0)])
             else:
-                reduced_output_tokens = max(200, adjusted.max_output_tokens - 150)
-                if reduced_output_tokens == adjusted.max_output_tokens:
-                    break
-                adjusted = replace(adjusted, max_output_tokens=reduced_output_tokens)
+                break
             metrics = self._estimate_request_token_budget(adjusted)
         adjusted.metadata.update(metrics)
         self._log_provider_token_budget(adjusted, metrics)
@@ -2996,6 +3073,7 @@ class AssistantService:
                 tool_results=list(tool_results),
                 continuation_mode=str(request.metadata.get("continuation_mode") or "initial"),
                 had_prior_provider_output=had_prior_provider_output,
+                provider_raw_text=request.metadata.get("provider_raw_text"),
             ) from exc
 
     @staticmethod
@@ -3009,10 +3087,13 @@ class AssistantService:
             "assistant.provider.rate_limited",
             "assistant.provider.timeout",
             "assistant.provider.unavailable",
+            "assistant.provider.authentication_failed",
+            "assistant.provider.configuration_error",
+            "assistant.provider.structured_output_truncated",
         }:
             return True
         if exc.code in {"assistant.provider.invalid_request", "assistant.provider.invalid_response"}:
-            return continuation_mode != "initial" or had_prior_provider_output
+            return True
         return False
 
     def _can_build_provider_degraded_response(
@@ -3036,12 +3117,15 @@ class AssistantService:
         tool_results: list[AssistantToolResultSummary],
         continuation_mode: str,
         provider_error_code: str,
+        provider_raw_text: str | None = None,
     ) -> dict[str, Any]:
         source_basis = self._allowed_source_basis_items(grounding_context)
+        salvaged_raw_text = self._salvage_provider_raw_text(provider_raw_text)
         diagnosis = self._build_provider_degraded_diagnosis(
             response_language=response_language,
             tool_results=tool_results,
             provider_error_code=provider_error_code,
+            salvaged_raw_text=salvaged_raw_text,
         )
         next_steps = self._build_provider_degraded_next_steps(
             response_language=response_language,
@@ -3053,6 +3137,7 @@ class AssistantService:
             source_basis=source_basis,
             diagnosis=diagnosis,
             has_links=bool(self._grounding_links(grounding_context)),
+            salvaged_raw_text=salvaged_raw_text,
         )
         confidence = (
             AssistantConfidence.MEDIUM
@@ -3078,50 +3163,67 @@ class AssistantService:
         response_language: str,
         tool_results: list[AssistantToolResultSummary],
         provider_error_code: str,
+        salvaged_raw_text: str | None = None,
     ) -> list[dict[str, str]]:
         items: list[dict[str, str]] = [
             {
                 "finding": self._provider_degraded_warning_text(response_language),
-                "severity": "info",
+                "severity": "warning",
                 "evidence": self._provider_degraded_evidence_text(response_language, provider_error_code),
             }
         ]
         seen_findings = {items[0]["finding"]}
+        if salvaged_raw_text and salvaged_raw_text not in seen_findings:
+            items.append(
+                {
+                    "finding": salvaged_raw_text,
+                    "severity": "info",
+                    "evidence": salvaged_raw_text,
+                }
+            )
+            seen_findings.add(salvaged_raw_text)
         for tool_result in tool_results:
-            payload = tool_result.summary.get("data")
-            if not isinstance(payload, dict):
+            summary_payload = tool_result.summary.get("summary")
+            if not isinstance(summary_payload, dict):
                 continue
-            findings = payload.get("findings")
-            if not isinstance(findings, list):
-                continue
-            for row in findings:
-                if not isinstance(row, dict):
-                    continue
-                finding = str(row.get("finding") or "").strip()
-                if not finding or finding in seen_findings:
-                    continue
-                severity = str(row.get("severity") or "info").strip() or "info"
-                evidence = str(row.get("evidence") or row.get("status") or "").strip() or finding
+            facts = summary_payload.get("facts")
+            if isinstance(facts, list):
+                for row in facts:
+                    finding = str(row or "").strip()
+                    if not finding or finding in seen_findings:
+                        continue
+                    items.append(
+                        {
+                            "finding": finding,
+                            "severity": "info",
+                            "evidence": finding,
+                        }
+                    )
+                    seen_findings.add(finding)
+                    if len(items) >= 5:
+                        return items
+            safe_note = str(summary_payload.get("safe_note") or "").strip()
+            if safe_note and safe_note not in seen_findings:
                 items.append(
                     {
-                        "finding": finding,
-                        "severity": severity if severity in {"info", "warning", "blocking"} else "info",
-                        "evidence": evidence,
+                        "finding": safe_note,
+                        "severity": "info",
+                        "evidence": safe_note,
                     }
                 )
-                seen_findings.add(finding)
+                seen_findings.add(safe_note)
                 if len(items) >= 5:
                     return items
-            summary_text = str(payload.get("summary") or "").strip()
-            if summary_text and summary_text not in seen_findings:
+            result_state = str(summary_payload.get("result_state") or "").strip()
+            if result_state and result_state not in seen_findings:
                 items.append(
                     {
-                        "finding": summary_text,
+                        "finding": result_state,
                         "severity": "info",
-                        "evidence": str(payload.get("status") or summary_text),
+                        "evidence": result_state,
                     }
                 )
-                seen_findings.add(summary_text)
+                seen_findings.add(result_state)
                 if len(items) >= 5:
                     return items
         return items
@@ -3144,20 +3246,18 @@ class AssistantService:
             steps.append(cleaned)
 
         for tool_result in tool_results:
-            payload = tool_result.summary.get("data")
-            if not isinstance(payload, dict):
+            summary_payload = tool_result.summary.get("summary")
+            if not isinstance(summary_payload, dict):
                 continue
-            next_steps = payload.get("next_steps")
-            if isinstance(next_steps, list):
-                for step in next_steps:
-                    if isinstance(step, str):
-                        append_step(step)
-            missing_input = payload.get("missing_input")
-            if isinstance(missing_input, list):
-                for field_name in missing_input:
+            missing_inputs = summary_payload.get("missing_inputs")
+            if isinstance(missing_inputs, list):
+                for field_name in missing_inputs:
                     if not isinstance(field_name, str):
                         continue
                     append_step(self._missing_diagnostic_input_text(response_language, field_name))
+            safe_note = str(summary_payload.get("safe_note") or "").strip()
+            if safe_note:
+                append_step(safe_note)
 
         for source in grounding_context.sources:
             if source.source_type != "missing_diagnostic_input":
@@ -3174,8 +3274,11 @@ class AssistantService:
         source_basis: list[AssistantSourceBasisItem],
         diagnosis: list[dict[str, str]],
         has_links: bool,
+        salvaged_raw_text: str | None = None,
     ) -> str:
         evidence_points: list[str] = []
+        if salvaged_raw_text:
+            evidence_points.append(salvaged_raw_text)
         for item in diagnosis[1:]:
             finding = str(item.get("finding") or "").strip()
             if finding:
@@ -3232,18 +3335,40 @@ class AssistantService:
     @staticmethod
     def _provider_degraded_warning_text(response_language: str) -> str:
         if response_language == "de":
-            return "Die Antwort wurde aus bereits geprüften SicherPlan-Kontexten erstellt."
+            return "provider_degraded"
         if response_language == "fa":
-            return "این پاسخ از کانتکست‌های از قبل بررسی‌شده SicherPlan ساخته شد."
-        return "This answer was assembled from already checked SicherPlan context."
+            return "provider_degraded"
+        return "provider_degraded"
 
     @staticmethod
     def _provider_degraded_evidence_text(response_language: str, provider_error_code: str) -> str:
         if response_language == "de":
-            return f"Der KI-Anbieter konnte die Anfrage gerade nicht vollständig abschließen ({provider_error_code})."
+            return f"Der KI-Anbieter konnte die vollständige Antwort nicht abschließen, aber es lagen bereits sichere SicherPlan-Kontexte vor ({provider_error_code})."
         if response_language == "fa":
-            return f"ارائه‌دهنده هوش مصنوعی فعلاً نتوانست درخواست را کامل کند ({provider_error_code})."
-        return f"The AI provider could not complete the request fully right now ({provider_error_code})."
+            return f"ارائه‌دهنده هوش مصنوعی نتوانست پاسخ کامل را نهایی کند، اما کانتکست‌های ایمن SicherPlan در دسترس بود ({provider_error_code})."
+        return f"The AI provider could not complete the full response, but SicherPlan grounding facts were available ({provider_error_code})."
+
+    @staticmethod
+    def _salvage_provider_raw_text(raw_text: str | None) -> str | None:
+        if not isinstance(raw_text, str):
+            return None
+        text = raw_text.strip().strip("`").strip()
+        if not text:
+            return None
+        answer_match = re.search(r'"answer"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"', text)
+        if answer_match:
+            try:
+                text = json.loads(f'"{answer_match.group(1)}"')
+            except Exception:
+                text = answer_match.group(1)
+        elif text.startswith("{") or text.startswith("["):
+            return None
+        text = text.replace("\x00", "").strip(" \n\r\t,")
+        if not text:
+            return None
+        if len(text) > 500:
+            text = text[:497].rstrip() + "..."
+        return text
 
     @staticmethod
     def _missing_diagnostic_input_text(response_language: str, field_name: str) -> str:
@@ -3259,7 +3384,7 @@ class AssistantService:
     ) -> AssistantProviderRequest:
         continuation_mode = str(request.metadata.get("continuation_mode") or "initial")
         reduced_output_tokens = max(
-            200,
+            self.runtime_config.min_structured_output_tokens,
             request.max_output_tokens - 150,
         )
         updated = replace(request, max_output_tokens=reduced_output_tokens)
@@ -3293,6 +3418,59 @@ class AssistantService:
         updated.metadata["rate_limit_retry_compacted"] = True
         return updated
 
+    def _build_truncation_retry_request(
+        self,
+        request: AssistantProviderRequest,
+    ) -> AssistantProviderRequest:
+        continuation_mode = str(request.metadata.get("continuation_mode") or "initial")
+        retry_output_tokens = max(
+            request.max_output_tokens + 200,
+            self._target_structured_output_tokens(
+                continuation=continuation_mode != "initial",
+            ),
+        )
+        compact_instruction = (
+            "\n\nCompact valid JSON only\n"
+            "- Return compact valid JSON only.\n"
+            "- Keep the answer concise but complete.\n"
+            "- Limit diagnosis to at most 3 items.\n"
+            "- Limit next_steps to at most 4 items.\n"
+            "- Limit links to at most 4 items.\n"
+            "- Limit source_basis to at most 4 items.\n"
+            "- Do not omit required schema fields.\n"
+        )
+        updated = replace(
+            request,
+            max_output_tokens=max(request.max_output_tokens, retry_output_tokens),
+            system_instructions=request.system_instructions + compact_instruction,
+        )
+        if updated.recent_messages:
+            updated = replace(updated, recent_messages=updated.recent_messages[-2:])
+        if updated.tool_results:
+            updated = replace(updated, tool_results=updated.tool_results[:2])
+        if updated.knowledge_chunks:
+            updated = replace(updated, knowledge_chunks=updated.knowledge_chunks[:2])
+        if updated.grounding_context and isinstance(updated.grounding_context.get("sources"), list):
+            sources = [
+                AssistantGroundingSource.model_validate(item)
+                for item in updated.grounding_context["sources"]
+                if isinstance(item, dict)
+            ]
+            trimmed_sources = self._trim_sources_by_char_budget(
+                sources=sources,
+                char_budget=max(self.runtime_config.max_total_grounding_chars // 3, 900),
+            )
+            adjusted_grounding_context = dict(updated.grounding_context)
+            adjusted_grounding_context["sources"] = [item.model_dump(mode="json") for item in trimmed_sources[:4]]
+            adjusted_grounding_context["grounding_trimmed"] = True
+            adjusted_grounding_context["trim_reason"] = "structured_output_retry"
+            updated = replace(updated, grounding_context=adjusted_grounding_context)
+        metrics = self._estimate_request_token_budget(updated)
+        updated.metadata.update(metrics)
+        updated.metadata["structured_output_retry_attempted"] = True
+        updated.metadata["structured_output_compact_mode"] = True
+        return updated
+
     def _call_provider(self, request: AssistantProviderRequest) -> AssistantProviderResult:
         grounding_sources = 0
         grounding_attached = bool(request.grounding_context)
@@ -3312,6 +3490,39 @@ class AssistantService:
         )
         try:
             result = self._invoke_provider_with_retry(request)
+        except AssistantProviderStructuredOutputTruncatedError as exc:
+            self._log_provider_error(request=request, exc=exc, attempted_openai=attempted_openai)
+            retry_attempted = bool(request.metadata.get("structured_output_retry_attempted"))
+            if not retry_attempted:
+                retry_request = self._build_truncation_retry_request(request)
+                self._log_provider_event(
+                    event="assistant_provider_structured_output_retry_started",
+                    request=retry_request,
+                    grounding_attached=bool(retry_request.grounding_context),
+                    grounding_sources=len(retry_request.grounding_context.get("sources", [])) if retry_request.grounding_context else 0,
+                    openai_request_attempted=attempted_openai,
+                    provider_returned_successfully=False,
+                    provider_latency_ms=None,
+                    input_tokens=None,
+                    output_tokens=None,
+                )
+                return self._call_provider(retry_request)
+            self._log_provider_event(
+                event="assistant_provider_call_finished",
+                request=request,
+                grounding_attached=grounding_attached,
+                grounding_sources=grounding_sources,
+                openai_request_attempted=attempted_openai,
+                provider_returned_successfully=False,
+                provider_latency_ms=None,
+                input_tokens=None,
+                output_tokens=None,
+            )
+            raise ApiException(
+                502,
+                exc.code,
+                "errors.assistant.provider.invalid_response",
+            ) from exc
         except AssistantProviderConfigurationError as exc:
             self._log_provider_error(request=request, exc=exc, attempted_openai=attempted_openai)
             self._log_provider_event(
@@ -3453,6 +3664,7 @@ class AssistantService:
             )
             return result
         if not isinstance(result.final_response, dict):
+            request.metadata["provider_raw_text"] = self._salvage_provider_raw_text(result.raw_text)
             raise ApiException(
                 502,
                 "assistant.provider.invalid_response",
@@ -3461,6 +3673,25 @@ class AssistantService:
         try:
             validated = AssistantProviderStructuredOutput.model_validate(result.final_response)
         except Exception as exc:
+            request.metadata["provider_raw_text"] = self._salvage_provider_raw_text(result.raw_text)
+            if (
+                not request.metadata.get("structured_output_retry_attempted")
+                and result.raw_text
+                and self._looks_like_truncated_structured_output_text(result.raw_text)
+            ):
+                retry_request = self._build_truncation_retry_request(request)
+                self._log_provider_event(
+                    event="assistant_provider_structured_output_retry_started",
+                    request=retry_request,
+                    grounding_attached=bool(retry_request.grounding_context),
+                    grounding_sources=len(retry_request.grounding_context.get("sources", [])) if retry_request.grounding_context else 0,
+                    openai_request_attempted=attempted_openai,
+                    provider_returned_successfully=False,
+                    provider_latency_ms=result.latency_ms,
+                    input_tokens=result.usage.input_tokens if result.usage else None,
+                    output_tokens=result.usage.output_tokens if result.usage else None,
+                )
+                return self._call_provider(retry_request)
             self._log_provider_event(
                 event="assistant_provider_call_finished",
                 request=request,
@@ -3501,6 +3732,19 @@ class AssistantService:
             latency_ms=result.latency_ms,
             finish_reason=result.finish_reason,
         )
+
+    @staticmethod
+    def _looks_like_truncated_structured_output_text(raw_text: str) -> bool:
+        text = raw_text.strip()
+        if not text:
+            return False
+        if text.count("{") > text.count("}"):
+            return True
+        if text.count("[") > text.count("]"):
+            return True
+        if text.count('"') % 2 == 1:
+            return True
+        return False
 
     def _provider_runtime_usable_for_chat(self) -> bool:
         if not self.runtime_config.enabled:
@@ -3952,27 +4196,27 @@ class AssistantService:
 
     @staticmethod
     def _tool_result_to_summary(result: Any) -> AssistantToolResultSummary:
-        summary: dict[str, Any] = {"ok": bool(result.ok)}
-        summary_missing_permissions: list[dict[str, str]] = []
-        if result.redacted_output is not None:
-            summary["data"] = result.redacted_output
-        elif result.data is not None:
-            summary["data"] = result.data
-        if result.error_code is not None:
-            summary["error_code"] = result.error_code
-        if result.error_message is not None:
-            summary["error_message"] = result.error_message
-        if result.missing_permissions:
-            summary_missing_permissions.extend(result.missing_permissions)
-        payload_data = summary.get("data")
-        if isinstance(payload_data, dict):
-            embedded_missing_permissions = payload_data.get("missing_permissions")
+        payload = result.redacted_output
+        if payload is None:
+            payload = result.data
+        summary_missing_permissions = [
+            row for row in (result.missing_permissions or []) if isinstance(row, dict)
+        ]
+        if isinstance(payload, dict):
+            embedded_missing_permissions = payload.get("missing_permissions")
             if isinstance(embedded_missing_permissions, list):
                 summary_missing_permissions.extend(
                     row for row in embedded_missing_permissions if isinstance(row, dict)
                 )
-        if summary_missing_permissions:
-            summary["missing_permissions"] = summary_missing_permissions
+        summary = AssistantService._summarize_tool_payload(
+            tool_name=str(result.tool_name),
+            ok=bool(result.ok),
+            payload=payload if isinstance(payload, dict) else {},
+            error_code=result.error_code,
+            error_message=result.error_message,
+            missing_permissions=summary_missing_permissions,
+            entity_refs=result.entity_refs if isinstance(result.entity_refs, dict) else None,
+        )
         return AssistantToolResultSummary(
             tool_name=str(result.tool_name),
             summary=summary,
@@ -4019,21 +4263,283 @@ class AssistantService:
         return merged
 
     @staticmethod
+    def _tool_result_payload_state(
+        *,
+        ok: bool,
+        payload: dict[str, Any],
+        missing_permissions: list[dict[str, str]],
+        error_code: str | None,
+    ) -> str:
+        if missing_permissions:
+            return "permission_limited"
+        if error_code or not ok:
+            return "failed"
+        missing_inputs = payload.get("missing_input") or payload.get("missing_inputs")
+        if isinstance(missing_inputs, list) and missing_inputs:
+            return "missing_input"
+        count = AssistantService._extract_tool_match_count(payload)
+        if count > 0:
+            return "found"
+        if payload.get("found") is False or payload.get("allowed") is False:
+            return "not_found"
+        return "found" if ok else "failed"
+
+    @staticmethod
+    def _extract_tool_match_count(payload: dict[str, Any]) -> int:
+        for key in ("match_count", "count", "page_count", "workflow_count"):
+            value = payload.get(key)
+            if isinstance(value, int):
+                return value
+        for key in ("matches", "pages", "workflows", "findings", "causes"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return len(value)
+        return 0
+
+    @staticmethod
+    def _summarize_tool_payload(
+        *,
+        tool_name: str,
+        ok: bool,
+        payload: dict[str, Any],
+        error_code: str | None,
+        error_message: str | None,
+        missing_permissions: list[dict[str, str]],
+        entity_refs: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        missing_inputs = AssistantService._extract_missing_inputs(payload)
+        facts, counts, safe_note = AssistantService._tool_specific_facts(tool_name=tool_name, payload=payload)
+        if error_message:
+            safe_note = error_message
+        summary = {
+            "ok": ok,
+            "summary": {
+                "result_state": AssistantService._tool_result_payload_state(
+                    ok=ok,
+                    payload=payload,
+                    missing_permissions=missing_permissions,
+                    error_code=error_code,
+                ),
+                "facts": facts,
+                "counts": counts,
+                "missing_inputs": missing_inputs,
+                "missing_permissions": missing_permissions,
+                "entity_refs": AssistantService._compact_entity_refs(entity_refs),
+                "safe_note": AssistantService._truncate_tool_text(safe_note, 220),
+            },
+        }
+        if missing_permissions:
+            summary["missing_permissions"] = missing_permissions
+        if error_code:
+            summary["error_code"] = error_code
+        return summary
+
+    @staticmethod
+    def _extract_missing_inputs(payload: dict[str, Any]) -> list[str]:
+        values = payload.get("missing_inputs")
+        if not isinstance(values, list):
+            values = payload.get("missing_input")
+        if not isinstance(values, list):
+            return []
+        result: list[str] = []
+        for value in values[:5]:
+            if isinstance(value, str):
+                cleaned = value.strip()
+                if cleaned:
+                    result.append(cleaned)
+        return result
+
+    @staticmethod
+    def _compact_entity_refs(entity_refs: dict[str, Any] | None) -> list[str]:
+        if not isinstance(entity_refs, dict):
+            return []
+        result: list[str] = []
+        for key, value in list(entity_refs.items())[:5]:
+            if value is None:
+                continue
+            result.append(f"{key}:{value}")
+        return result
+
+    @staticmethod
+    def _truncate_tool_text(value: Any, limit: int) -> str:
+        text = str(value or "").strip()
+        if len(text) <= limit:
+            return text
+        return text[: limit - 3].rstrip() + "..."
+
+    @staticmethod
+    def _tool_specific_facts(
+        *,
+        tool_name: str,
+        payload: dict[str, Any],
+    ) -> tuple[list[str], dict[str, int | bool], str]:
+        counts: dict[str, int | bool] = {}
+        facts: list[str] = []
+        safe_note = str(payload.get("safe_note") or payload.get("safe_message_key") or "").strip()
+
+        def append_fact(value: str) -> None:
+            cleaned = AssistantService._truncate_tool_text(value, 180)
+            if cleaned and cleaned not in facts:
+                facts.append(cleaned)
+
+        if tool_name == "employees.search_employee_by_name":
+            matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
+            counts["match_count"] = int(payload.get("match_count") or len(matches))
+            counts["truncated"] = bool(payload.get("truncated"))
+            for row in matches[:3]:
+                if not isinstance(row, dict):
+                    continue
+                append_fact(
+                    f"Employee match {row.get('display_name') or row.get('employee_ref')} "
+                    f"status={row.get('status')} active={row.get('is_active')}"
+                )
+        elif tool_name == "employees.get_employee_operational_profile":
+            employee = payload.get("employee") if isinstance(payload.get("employee"), dict) else None
+            counts["found"] = bool(payload.get("found"))
+            if employee is not None:
+                append_fact(
+                    f"Employee {employee.get('display_name') or employee.get('employee_ref')} "
+                    f"status={employee.get('status')} user_link={employee.get('has_user_link')} user_status={employee.get('user_status')}"
+                )
+        elif tool_name == "employees.get_employee_mobile_access_status":
+            access = payload.get("mobile_access") if isinstance(payload.get("mobile_access"), dict) else None
+            counts["found"] = bool(payload.get("found"))
+            if access is not None:
+                for key in ("account_status", "user_status", "role_status", "portal_access_status", "mobile_access_status"):
+                    value = access.get(key)
+                    if value:
+                        append_fact(f"{key}={value}")
+                for key in ("has_user_link", "employee_active", "employee_self_service_allowed", "mobile_visible"):
+                    if key in access:
+                        counts[key] = bool(access.get(key))
+        elif tool_name == "employees.get_employee_readiness_summary":
+            readiness = payload.get("readiness") if isinstance(payload.get("readiness"), dict) else None
+            counts["found"] = bool(payload.get("found"))
+            if readiness is not None:
+                append_fact(f"employee_status={readiness.get('employee_status')}")
+                append_fact(f"availability={readiness.get('availability_summary')}")
+                for row in readiness.get("blocking_reasons", [])[:4] if isinstance(readiness.get("blocking_reasons"), list) else []:
+                    if isinstance(row, dict):
+                        append_fact(row.get("message") or row.get("code") or "")
+        elif tool_name in {"planning.find_shifts", "planning.find_assignments"}:
+            matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
+            counts["match_count"] = int(payload.get("match_count") or len(matches))
+            counts["truncated"] = bool(payload.get("truncated"))
+            id_key = "shift_ref" if tool_name == "planning.find_shifts" else "assignment_ref"
+            for row in matches[:3]:
+                if not isinstance(row, dict):
+                    continue
+                append_fact(
+                    f"{id_key}={row.get(id_key)} status={row.get('status') or row.get('assignment_status')} "
+                    f"release={row.get('release_state') or row.get('shift_release_state')} visible={row.get('employee_visible') or row.get('is_visible_candidate_for_employee_app')}"
+                )
+        elif tool_name == "planning.inspect_assignment":
+            assignment = payload.get("assignment") if isinstance(payload.get("assignment"), dict) else None
+            counts["found"] = bool(payload.get("found"))
+            if assignment is not None:
+                append_fact(
+                    f"assignment_ref={assignment.get('assignment_ref')} status={assignment.get('assignment_status')} "
+                    f"actor_type={assignment.get('actor_type')} visible={assignment.get('is_active_for_schedule_visibility')}"
+                )
+                for row in assignment.get("blocking_reasons", [])[:4] if isinstance(assignment.get("blocking_reasons"), list) else []:
+                    if isinstance(row, dict):
+                        append_fact(row.get("message") or row.get("code") or "")
+        elif tool_name == "planning.inspect_shift_release_state":
+            release_state = payload.get("release_state") if isinstance(payload.get("release_state"), dict) else None
+            counts["found"] = bool(payload.get("found"))
+            if release_state is not None:
+                append_fact(
+                    f"shift_ref={release_state.get('shift_ref')} shift_state={release_state.get('shift_release_state')} "
+                    f"plan_state={release_state.get('shift_plan_status')} planning_record_state={release_state.get('planning_record_release_state')}"
+                )
+        elif tool_name == "planning.inspect_shift_visibility":
+            visibility = payload.get("visibility") if isinstance(payload.get("visibility"), dict) else None
+            counts["found"] = bool(payload.get("found"))
+            if visibility is not None:
+                append_fact(
+                    f"shift_ref={visibility.get('shift_ref')} employee_visible={visibility.get('employee_visible')} "
+                    f"customer_visible={visibility.get('customer_visible')} subcontractor_visible={visibility.get('subcontractor_visible')}"
+                )
+        elif tool_name == "field.inspect_released_schedule_visibility":
+            visibility = payload.get("visibility") if isinstance(payload.get("visibility"), dict) else None
+            counts["found"] = bool(payload.get("found", True))
+            if visibility is not None:
+                for key in ("status", "target_channel", "schedule_visibility_status", "assignment_status", "shift_release_state"):
+                    value = visibility.get(key)
+                    if value:
+                        append_fact(f"{key}={value}")
+                for row in visibility.get("findings", [])[:4] if isinstance(visibility.get("findings"), list) else []:
+                    if isinstance(row, dict):
+                        append_fact(row.get("message") or row.get("code") or "")
+        elif tool_name == "navigation.build_allowed_link":
+            link = payload.get("link") if isinstance(payload.get("link"), dict) else None
+            counts["allowed"] = bool(payload.get("allowed"))
+            if link is not None:
+                append_fact(f"Allowed link {link.get('label')} -> {link.get('page_id') or link.get('path')}")
+        elif tool_name == "assistant.search_accessible_pages":
+            pages = payload.get("pages") if isinstance(payload.get("pages"), list) else []
+            counts["page_count"] = len(pages)
+            counts["truncated"] = bool(payload.get("truncated"))
+            for row in pages[:3]:
+                if isinstance(row, dict):
+                    append_fact(f"Accessible page {row.get('label')} ({row.get('page_id')})")
+        elif tool_name == "assistant.search_workflow_help":
+            workflows = payload.get("workflows") if isinstance(payload.get("workflows"), list) else []
+            counts["workflow_count"] = len(workflows)
+            for row in workflows[:2]:
+                if isinstance(row, dict):
+                    append_fact(
+                        f"Workflow {row.get('workflow_key')} pages={','.join(row.get('linked_page_ids', [])[:4])}"
+                    )
+        elif tool_name == "assistant.get_page_help_manifest":
+            counts["page_found"] = bool(payload.get("page_id"))
+            append_fact(f"Page help {payload.get('page_title') or payload.get('page_id')} status={payload.get('source_status')}")
+            for row in payload.get("actions", [])[:3] if isinstance(payload.get("actions"), list) else []:
+                if isinstance(row, dict):
+                    append_fact(f"Action {row.get('action_key')} label={row.get('label')} status={row.get('label_status')}")
+        else:
+            for key in ("summary", "status", "safe_note", "message", "reason"):
+                value = payload.get(key)
+                if isinstance(value, str) and value.strip():
+                    append_fact(value)
+                    break
+            for key in ("findings", "causes", "pages", "matches"):
+                rows = payload.get(key)
+                if isinstance(rows, list):
+                    counts[f"{key}_count"] = len(rows)
+        return facts[:12], counts, safe_note
+
+    def _truncate_tool_summary_payload(
+        self,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        compact = dict(payload)
+        summary = dict(compact.get("summary") or {})
+        facts = summary.get("facts")
+        if isinstance(facts, list):
+            summary["facts"] = [
+                self._truncate_tool_text(item, 160)
+                for item in facts[: max(self.runtime_config.max_diagnostic_facts // 2, 3)]
+                if isinstance(item, str)
+            ]
+        entity_refs = summary.get("entity_refs")
+        if isinstance(entity_refs, list):
+            summary["entity_refs"] = [
+                self._truncate_tool_text(item, 80)
+                for item in entity_refs[:3]
+                if isinstance(item, str)
+            ]
+        summary["safe_note"] = self._truncate_tool_text(summary.get("safe_note"), 160)
+        compact["summary"] = summary
+        return compact
+
+    @staticmethod
     def _tool_result_to_provider_output(
         *,
         requested_call: dict[str, Any],
         tool_result: Any,
     ) -> dict[str, Any]:
-        payload = tool_result.redacted_output
-        if payload is None:
-            payload = tool_result.data
-        if payload is None:
-            payload = {
-                "ok": tool_result.ok,
-                "error_code": tool_result.error_code,
-                "error_message": tool_result.error_message,
-                "missing_permissions": tool_result.missing_permissions,
-            }
+        payload = AssistantService._tool_result_to_summary(tool_result).summary
         result = {
             "type": "function_call_output",
             "tool_name": str(tool_result.tool_name),

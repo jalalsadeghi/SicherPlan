@@ -1,7 +1,7 @@
 You are working in the SicherPlan repository.
 
 Goal:
-Clean up duplicated/low-value black section titles in the Staffing Coverage page.
+Fix the layout of the Planning record / Planungsdatensatz field in the Staffing Coverage filter panel.
 
 User-visible page:
 admin/planning-staffing
@@ -13,57 +13,94 @@ Tests to inspect/update:
 - web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.smoke.test.ts
 
 Current issue:
-Three cards show a green eyebrow/title and then repeat the same text again in black underneath. This creates visual clutter.
+In the "Filter und Scope" card, the Planning record / Planungsdatensatz field shows the message:
 
-Required changes:
+"Keine passenden Planungsdatensaetze fuer die aktuellen Filter gefunden."
 
-1. Filter und Scope card
-- Remove the black title/text:
-  "Filter und Scope"
-- Also remove the black role/tenant line:
-  "Rolle: tenant_admin · Mandant: ..."
-- Keep the green eyebrow/title:
-  "FILTER UND SCOPE"
+This message appears directly below the select field and increases the height of only this field column. As a result, the alignment and visual rhythm of the filter row are broken compared to the other fields.
 
-2. Schicht-Coverage card
-- Remove the black repeated title:
-  "Schicht-Coverage"
-- Keep the green eyebrow/title:
-  "SCHICHT-COVERAGE"
+Expected behavior:
+The Planning record field should display the "no matching planning records" information in a way that does not break the layout or disturb the alignment of the other filter fields.
 
-3. Schichtdetails card
-- Remove the black repeated title:
-  "Schichtdetails"
-- Keep the green eyebrow/title:
-  "SCHICHTDETAILS"
+Before coding:
+1. Read AGENTS.md.
+2. Inspect the current filter panel implementation around:
+   - `planning-staffing-planning-record-select`
+   - `filtersPlanningRecordEmpty`
+   - `filtersPlanningRecordNoMatch`
+   - `filtersPlanningRecordLoading`
+   - `planningRecordLookupError`
+3. Inspect existing field-help / Select styling patterns in the project.
+4. Do not change backend APIs.
+5. Do not change the planning record lookup request logic unless there is a proven bug.
+6. This task is primarily a frontend layout/UX fix.
 
-Important:
-- Do not remove the actual content, filters, counters, list, empty states, selected shift detail, tabs, or actions.
-- Do not change backend APIs.
-- Do not change data loading, filtering, staffing commands, or permissions.
-- This is only a frontend template cleanup.
+Required change:
+1. Keep the Planning record select field visible and aligned with the other filter fields.
+2. Do not render the long empty/help message as a normal paragraph that pushes the row height down.
+3. Use one of these safe UI patterns:
+   Option A — Compact inline status inside the field area:
+   - render a short muted status line with fixed/reserved height under the select, using one-line ellipsis.
+   - example: "Keine passenden Planungsdatensätze"
+   - keep full text in a title/tooltip.
+   
+   Option B — Tooltip/help icon:
+   - show a small info icon or compact hint next to the label.
+   - full message appears on hover/title.
+   
+   Option C — Dropdown empty state:
+   - if the Select component supports `notFoundContent`, render the no-match message inside the dropdown instead of below the field.
+   - this is preferred if compatible with the current Select implementation.
+
+4. The final layout must keep all filter fields in the same row height:
+   - Von
+   - Bis
+   - Planungsdatensatz
+   - Planungsmodus
+   - Workforce-Scope
+   - Bestaetigungsstatus
+5. Keep loading and error states visible, but compact:
+   - loading: short compact text or spinner
+   - error: compact one-line warning with tooltip/full title
+6. Preserve existing i18n keys if possible.
+7. If needed, add a shorter translation key, for example:
+   - `filtersPlanningRecordEmptyShort`
+   - DE: "Keine passenden Planungsdatensätze"
+   - EN: "No matching planning records"
+8. Do not hardcode visible German/English labels in the template if the page uses `tp(...)`.
 
 Implementation guidance:
-- In `PlanningStaffingCoverageView.vue`, inspect the panel headers around:
-  - `tp("filtersTitle")`
-  - `tp("listTitle")`
-  - `tp("detailTitle")`
-- These likely render both:
-  - `<p class="eyebrow">...</p>`
-  - `<h3>...</h3>`
-- For the three named panels, keep only the eyebrow and remove the redundant black `<h3>` / lead text.
-- If the detail header uses the black `<h3>` to show selected shift context, preserve selected shift context elsewhere if needed, but do not show repeated "Schichtdetails" when no shift is selected.
-- Make the smallest safe change.
+- Consider adding a small helper class, for example:
+  - `planning-staffing-field-help-compact`
+  - `planning-staffing-planning-record-hint`
+- Suggested CSS:
+  - min-height reserved for compact hint, or absolute positioning within the field stack
+  - font-size smaller than normal body text
+  - white-space: nowrap
+  - overflow: hidden
+  - text-overflow: ellipsis
+  - max-width: 100%
+- Keep accessibility:
+  - full message should be available via `title`, `aria-label`, or screen-reader friendly text.
+- Do not remove the message completely; make it compact and non-disruptive.
 
 Tests:
-Update tests only if they assert the duplicated black titles or role/tenant line.
+Update or add the smallest relevant test in `planningStaffing.smoke.test.ts`.
+
+Required test coverage:
+1. When no planning records match, the planning record field still renders.
+2. The no-match message is shown in a compact form or is available as dropdown empty content/tooltip.
+3. The long message is not rendered as a normal `field-help` paragraph that disrupts the filter grid.
+4. Other filter fields still render in the same filter panel.
+5. No API request payloads are changed.
 
 Acceptance criteria:
-- The three panels keep their green eyebrow labels.
-- The duplicate black labels are gone.
-- The role/tenant line under Filter und Scope is gone.
-- Staffing page layout and functionality are unchanged.
-- Existing tests pass.
+- The Planungsdatensatz field no longer breaks the filter row layout.
+- The no-match information is still available to the user.
+- The filter panel remains clean and aligned.
+- No backend changes.
+- Existing staffing loading/filtering behavior is unchanged.
+- Tests pass.
 
 Run:
 cd web
@@ -71,10 +108,10 @@ pnpm test -- planningStaffing
 pnpm lint
 pnpm typecheck
 
-If these exact commands are not available, inspect package.json and run the closest existing web test/lint/typecheck commands.
+If these exact scripts are unavailable, inspect package.json and run the closest existing web test/lint/typecheck commands.
 
 Final response:
-- Summarize the template cleanup.
+- Explain which UI pattern you chose.
 - List changed files.
 - List tests run and results.
 - Confirm this was frontend-only.

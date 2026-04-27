@@ -189,8 +189,14 @@ class AppSettings:
     ai_max_total_grounding_chars: int = field(default_factory=lambda: _get_int("SP_AI_MAX_TOTAL_GROUNDING_CHARS", 4500))
     ai_max_recent_messages_for_model: int = field(default_factory=lambda: _get_int("SP_AI_MAX_RECENT_MESSAGES_FOR_MODEL", 6))
     ai_max_recent_messages_for_continuation: int = field(default_factory=lambda: _get_int("SP_AI_MAX_RECENT_MESSAGES_FOR_CONTINUATION", 0))
-    ai_max_output_tokens: int = field(default_factory=lambda: _get_int("SP_AI_MAX_OUTPUT_TOKENS", 900))
-    ai_continuation_max_output_tokens: int = field(default_factory=lambda: _get_int("SP_AI_CONTINUATION_MAX_OUTPUT_TOKENS", 700))
+    ai_max_tool_result_chars: int = field(default_factory=lambda: _get_int("SP_AI_MAX_TOOL_RESULT_CHARS", 1500))
+    ai_max_tool_result_items: int = field(default_factory=lambda: _get_int("SP_AI_MAX_TOOL_RESULT_ITEMS", 5))
+    ai_max_total_tool_result_chars: int = field(default_factory=lambda: _get_int("SP_AI_MAX_TOTAL_TOOL_RESULT_CHARS", 3500))
+    ai_max_diagnostic_facts: int = field(default_factory=lambda: _get_int("SP_AI_MAX_DIAGNOSTIC_FACTS", 12))
+    ai_min_structured_output_tokens: int = field(default_factory=lambda: _get_int("SP_AI_MIN_STRUCTURED_OUTPUT_TOKENS", 800))
+    ai_max_output_tokens: int = field(default_factory=lambda: _get_int("SP_AI_MAX_OUTPUT_TOKENS", 1200))
+    ai_continuation_max_output_tokens: int = field(default_factory=lambda: _get_int("SP_AI_CONTINUATION_MAX_OUTPUT_TOKENS", 900))
+    ai_degraded_max_output_tokens: int = field(default_factory=lambda: _get_int("SP_AI_DEGRADED_MAX_OUTPUT_TOKENS", 700))
     ai_timeout_seconds: int = field(default_factory=lambda: _get_int("SP_AI_TIMEOUT_SECONDS", 45))
     ai_rate_limit_retry_seconds: int = field(default_factory=lambda: _get_int("SP_AI_RATE_LIMIT_RETRY_SECONDS", 6))
     ai_rate_limit_max_retries: int = field(default_factory=lambda: _get_int("SP_AI_RATE_LIMIT_MAX_RETRIES", 2))
@@ -229,6 +235,22 @@ class AppSettings:
         if normalized_quality_gate_mode not in allowed_quality_gate_modes:
             raise ValueError(
                 "Invalid SP_AI_RAG_QUALITY_GATE_MODE value. Expected one of: off, log_only, enforce_in_tests."
+            )
+        if self.ai_min_structured_output_tokens < 200:
+            raise ValueError(
+                "SP_AI_MIN_STRUCTURED_OUTPUT_TOKENS must be at least 200."
+            )
+        if self.ai_max_output_tokens < self.ai_min_structured_output_tokens:
+            raise ValueError(
+                "SP_AI_MAX_OUTPUT_TOKENS must be greater than or equal to SP_AI_MIN_STRUCTURED_OUTPUT_TOKENS."
+            )
+        if self.ai_continuation_max_output_tokens < self.ai_min_structured_output_tokens:
+            raise ValueError(
+                "SP_AI_CONTINUATION_MAX_OUTPUT_TOKENS must be greater than or equal to SP_AI_MIN_STRUCTURED_OUTPUT_TOKENS."
+            )
+        if self.ai_degraded_max_output_tokens < 200:
+            raise ValueError(
+                "SP_AI_DEGRADED_MAX_OUTPUT_TOKENS must be at least 200."
             )
 
         if self.ai_enabled and normalized_provider == "openai" and not self.ai_openai_api_key.strip():

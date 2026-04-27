@@ -42,7 +42,18 @@
             <input v-model="filters.date_to" type="datetime-local" />
           </label>
           <label class="field-stack">
-            <span>{{ tp("filtersPlanningRecord") }}</span>
+            <span class="planning-staffing-field-label">
+              <span>{{ tp("filtersPlanningRecord") }}</span>
+              <small
+                v-if="planningRecordFieldStatusShort"
+                class="planning-staffing-field-status"
+                :title="planningRecordFieldStatusTitle"
+                :aria-label="planningRecordFieldStatusTitle"
+                data-testid="planning-staffing-planning-record-status"
+              >
+                {{ planningRecordFieldStatusShort }}
+              </small>
+            </span>
             <Select
               :value="filters.planning_record_id || undefined"
               show-search
@@ -52,21 +63,13 @@
               :loading="planningRecordLookupLoading"
               :filter-option="false"
               :options="planningRecordSelectOptions"
+              :not-found-content="planningRecordDropdownEmptyContent"
               :placeholder="tp('filtersPlanningRecordPlaceholder')"
               data-testid="planning-staffing-planning-record-select"
               @search="handlePlanningRecordSearch"
               @change="handlePlanningRecordSelection"
               @clear="clearPlanningRecordSelection"
             />
-            <p v-if="planningRecordLookupLoading" class="field-help">{{ tp("filtersPlanningRecordLoading") }}</p>
-            <p v-else-if="planningRecordLookupError" class="field-help">{{ planningRecordLookupError }}</p>
-            <p v-else-if="!planningRecordOptions.length" class="field-help">{{ tp("filtersPlanningRecordEmpty") }}</p>
-            <p
-              v-else-if="filters.planning_record_id && !selectedPlanningRecordOptionLabel"
-              class="field-help"
-            >
-              {{ tp("filtersPlanningRecordNoMatch") }}
-            </p>
           </label>
           <label class="field-stack">
             <span>{{ tp("filtersPlanningMode") }}</span>
@@ -1537,6 +1540,45 @@ const selectedPlanningRecordOptionLabel = computed(
 const selectedPlanningRecordOption = computed(
   () => planningRecordOptions.value.find((record) => record.id === relevantPlanningRecordId.value) ?? null,
 );
+const planningRecordFieldStatusShort = computed(() => {
+  if (planningRecordLookupLoading.value) {
+    return tp("filtersPlanningRecordLoadingShort");
+  }
+  if (planningRecordLookupError.value) {
+    return tp("filtersPlanningRecordLookupErrorShort");
+  }
+  if (!planningRecordOptions.value.length) {
+    return tp("filtersPlanningRecordEmptyShort");
+  }
+  if (filters.planning_record_id && !selectedPlanningRecordOptionLabel.value) {
+    return tp("filtersPlanningRecordNoMatchShort");
+  }
+  return "";
+});
+const planningRecordFieldStatusTitle = computed(() => {
+  if (planningRecordLookupLoading.value) {
+    return tp("filtersPlanningRecordLoading");
+  }
+  if (planningRecordLookupError.value) {
+    return planningRecordLookupError.value;
+  }
+  if (!planningRecordOptions.value.length) {
+    return tp("filtersPlanningRecordEmpty");
+  }
+  if (filters.planning_record_id && !selectedPlanningRecordOptionLabel.value) {
+    return tp("filtersPlanningRecordNoMatch");
+  }
+  return "";
+});
+const planningRecordDropdownEmptyContent = computed(() => {
+  if (planningRecordLookupLoading.value) {
+    return tp("filtersPlanningRecordLoading");
+  }
+  if (planningRecordLookupError.value) {
+    return planningRecordLookupError.value;
+  }
+  return tp("filtersPlanningRecordEmpty");
+});
 const planningRecordDisplayName = computed(() => {
   if (selectedShift.value?.planning_record_name) {
     return selectedShift.value.planning_record_name;
@@ -3457,6 +3499,30 @@ onBeforeUnmount(() => {
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+}
+
+.planning-staffing-field-label {
+  align-items: baseline;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.planning-staffing-field-status {
+  color: rgba(15, 23, 42, 0.52);
+  display: inline-block;
+  flex: 0 1 auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.25;
+  max-width: 14rem;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 .planning-staffing-filter-grid input,

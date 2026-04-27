@@ -70,4 +70,4 @@ def test_oversized_grounding_is_trimmed_before_provider_request() -> None:
     assert request.grounding_context is not None
     assert request.grounding_context["grounding_trimmed"] is True
     assert request.grounding_context["trim_reason"] == "token_budget"
-    assert request.max_output_tokens == 900
+    assert request.max_output_tokens == 1200

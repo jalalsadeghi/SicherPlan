@@ -17,6 +17,7 @@ from app.modules.assistant.provider import (
     AssistantProviderRequest,
     AssistantProviderResult,
     AssistantProviderStructuredOutputError,
+    AssistantProviderStructuredOutputTruncatedError,
     AssistantProviderTimeoutError,
     AssistantProviderUnavailableError,
     AssistantProviderUsage,
@@ -45,6 +46,18 @@ def _default_openai_client_factory(**kwargs: Any) -> Any:
             "The OpenAI Python SDK is not installed for assistant openai mode."
         ) from exc
     return OpenAI(**kwargs)
+
+
+_TRUNCATION_ERROR_PATTERNS = (
+    "invalid json: eof",
+    "eof while parsing",
+    "unterminated string",
+    "unexpected end of json input",
+    "expected ',' delimiter",
+    "expecting ',' delimiter",
+    "expecting property name enclosed in double quotes",
+    "unclosed",
+)
 
 
 @dataclass(frozen=True)
@@ -374,6 +387,14 @@ class OpenAIResponsesProvider(AssistantProvider):
         name = type(exc).__name__
         safe_message = str(exc).strip()[:240] or name
         retry_after_seconds = _extract_retry_after_seconds(exc, safe_message)
+        if _looks_like_structured_output_truncation(name=name, safe_message=safe_message):
+            return AssistantProviderStructuredOutputTruncatedError(
+                "OpenAI provider returned truncated structured output.",
+                provider_error_type="StructuredOutputTruncated",
+                provider_error_code=getattr(exc, "code", None),
+                http_status=getattr(exc, "status_code", None),
+                safe_message=safe_message,
+            )
         if name == "APITimeoutError":
             return AssistantProviderTimeoutError(
                 "OpenAI provider request timed out.",
@@ -462,6 +483,13 @@ class OpenAIResponsesProvider(AssistantProvider):
             http_status=getattr(exc, "status_code", None),
             safe_message=safe_message,
         )
+
+
+def _looks_like_structured_output_truncation(*, name: str, safe_message: str) -> bool:
+    normalized = safe_message.strip().lower()
+    if name not in {"ValidationError", "ValueError", "JSONDecodeError"} and "invalid json" not in normalized:
+        return False
+    return any(pattern in normalized for pattern in _TRUNCATION_ERROR_PATTERNS)
 
 
 def _extract_retry_after_seconds(exc: Exception, safe_message: str) -> float | None:
