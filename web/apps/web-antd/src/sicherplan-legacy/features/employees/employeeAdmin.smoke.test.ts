@@ -129,12 +129,20 @@ const translations: Record<string, string> = {
   "employeeAdmin.access.diagnosticEmployeeArchived": "Employee is not archived",
   "employeeAdmin.access.diagnosticRoleAssignment": "employee_user role assignment is active",
   "employeeAdmin.access.diagnosticPermission": "portal.employee.access permission is granted",
+  "employeeAdmin.access.openDiagnostics": "Open login diagnostics",
+  "employeeAdmin.access.diagnosticsDialogTitle": "Login diagnostics",
+  "employeeAdmin.access.diagnosticsSummary": "{passed} of {total} login checks passed.",
+  "employeeAdmin.access.openResetPassword": "Reset password",
+  "employeeAdmin.access.resetPasswordDialogTitle": "Reset password",
   "employeeAdmin.access.linked": "Linked",
   "employeeAdmin.access.linkedNo": "No",
   "employeeAdmin.access.linkedYes": "Yes",
   "employeeAdmin.access.loginReady": "Login ready",
   "employeeAdmin.access.loginReadyNo": "No",
   "employeeAdmin.access.loginReadyYes": "Yes",
+  "employeeAdmin.addresses.showHistory": "Show address history",
+  "employeeAdmin.addresses.historyDialogTitle": "Address history",
+  "employeeAdmin.addresses.historyEmpty": "No address history is available.",
   "employeeAdmin.list.eyebrow": "Employees",
   "employeeAdmin.list.title": "Employee list",
   "employeeAdmin.search.suggestionsEmpty": "No matching employees",
@@ -561,8 +569,8 @@ function stubEmployeePhotoObjectUrls(urlByBlob = "blob:employee-photo") {
   const revokeObjectURLMock = vi.fn();
   const NativeUrl = globalThis.URL;
   class UrlWithObjectUrls extends NativeUrl {
-    static createObjectURL = createObjectURLMock;
-    static revokeObjectURL = revokeObjectURLMock;
+    static override createObjectURL = createObjectURLMock;
+    static override revokeObjectURL = revokeObjectURLMock;
   }
   vi.stubGlobal("URL", UrlWithObjectUrls as unknown as typeof URL);
   return { createObjectURLMock, revokeObjectURLMock };
@@ -744,7 +752,10 @@ describe("EmployeeAdminView search dialog regression", () => {
 
     const rows = wrapper.findAll('[data-testid="employee-list-row"]');
     expect(rows).toHaveLength(2);
-    expect(rows[0]?.find('[data-testid="employee-list-row-avatar-image"]').attributes("src")).toBe("blob:prefetched-markus-photo");
+    const firstImage = rows[0]?.find('[data-testid="employee-list-row-avatar-image"]');
+    expect(firstImage?.classes()).toContain("employee-admin-employee-row__avatar-image");
+    expect(firstImage?.attributes("src")).toBe("blob:prefetched-markus-photo");
+    expect(firstImage?.attributes("alt")).toBe("Markus Neumann");
     expect(rows[1]?.find('[data-testid="employee-list-row-avatar-image"]').exists()).toBe(false);
     expect(rows[1]?.find('[data-testid="employee-list-row-avatar"]').text()).toBe("LY");
   });
@@ -1475,7 +1486,134 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(wrapper.get('[data-testid="employee-overview-editor-document-upload-modal"]').text()).toContain("employeeAdmin.documents.documentTypeHelp");
   });
 
-  it("separates linked state from login readiness and renders access diagnostics", async () => {
+  it("moves address history into a dialog while keeping the current address inline", async () => {
+    apiMocks.listEmployeeAddressesMock.mockResolvedValue([
+      {
+        id: "address-current",
+        employee_id: "employee-markus",
+        tenant_id: "tenant-1",
+        address_id: "addr-current",
+        address_type: "home",
+        status: "active",
+        valid_from: "2026-01-01",
+        valid_to: null,
+        is_primary: true,
+        notes: null,
+        address: {
+          street_line_1: "Current Street 1",
+        },
+      },
+      {
+        id: "address-previous",
+        employee_id: "employee-markus",
+        tenant_id: "tenant-1",
+        address_id: "addr-previous",
+        address_type: "home",
+        status: "inactive",
+        valid_from: "2025-01-01",
+        valid_to: "2025-12-31",
+        is_primary: true,
+        notes: null,
+        address: {
+          street_line_1: "Previous Street 5",
+        },
+      },
+    ]);
+
+    const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    const addressesSection = wrapper.get('[data-testid="employee-overview-section-addresses"]');
+    expect(addressesSection.text()).toContain("Current Street 1");
+    expect(addressesSection.text()).not.toContain("Previous Street 5");
+    expect(wrapper.find('[data-testid="employee-address-history-dialog"]').exists()).toBe(false);
+
+    await wrapper.get('[data-testid="employee-address-history-open"]').trigger("click");
+    await settle();
+
+    const historyDialog = wrapper.get('[data-testid="employee-address-history-dialog"]');
+    expect(historyDialog.text()).toContain("Current Street 1");
+    expect(historyDialog.text()).toContain("Previous Street 5");
+
+    await wrapper.get('[data-testid="employee-address-history-close"]').trigger("click");
+    await settle();
+    expect(wrapper.find('[data-testid="employee-address-history-dialog"]').exists()).toBe(false);
+  });
+
+  it("moves reset password and detach access into the linked-account action row", async () => {
+    const linkedAccess = {
+      employee_id: "employee-markus",
+      tenant_id: "tenant-1",
+      user_id: "user-1",
+      username: "markus",
+      email: "markus@example.test",
+      full_name: "Markus Neumann",
+      app_access_enabled: false,
+      role_assignment_active: true,
+      diagnostics: {
+        user_exists: true,
+        user_status_active: true,
+        user_not_archived: true,
+        is_password_login_enabled: true,
+        has_password_hash: false,
+        employee_linked: true,
+        employee_status_active: true,
+        employee_not_archived: true,
+        employee_user_role_assignment_active: true,
+        portal_employee_access_granted: true,
+        can_mobile_login: false,
+      },
+    };
+    apiMocks.getEmployeeAccessLinkMock.mockResolvedValue(linkedAccess);
+    apiMocks.resetEmployeeAccessUserPasswordMock.mockResolvedValue(linkedAccess);
+    apiMocks.detachEmployeeAccessUserMock.mockResolvedValue(null);
+
+    const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    const accessSection = wrapper.get('[data-testid="employee-overview-section-app-access"]');
+    expect(accessSection.find('[data-testid="employee-access-reset-password-open"]').exists()).toBe(true);
+    expect(accessSection.find('[data-testid="employee-access-detach-button"]').exists()).toBe(true);
+    expect(accessSection.find('input[type="password"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-access-reset-password-dialog"]').exists()).toBe(false);
+
+    await wrapper.get('[data-testid="employee-access-reset-password-open"]').trigger("click");
+    await settle();
+
+    const resetDialog = wrapper.get('[data-testid="employee-access-reset-password-dialog"]');
+    const passwordInput = resetDialog.get('input[type="password"]');
+    await passwordInput.setValue("N3wPassw0rd!");
+    await wrapper.get('[data-testid="employee-access-reset-password-submit"]').trigger("click");
+    await settle();
+
+    expect(apiMocks.resetEmployeeAccessUserPasswordMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "employee-markus",
+      "token-1",
+      expect.objectContaining({
+        tenant_id: "tenant-1",
+        password: "N3wPassw0rd!",
+      }),
+    );
+    expect(wrapper.find('[data-testid="employee-access-reset-password-dialog"]').exists()).toBe(false);
+
+    await wrapper.get('[data-testid="employee-access-detach-button"]').trigger("click");
+    await settle();
+    expect(apiMocks.detachEmployeeAccessUserMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "employee-markus",
+      "token-1",
+      expect.objectContaining({
+        tenant_id: "tenant-1",
+      }),
+    );
+  });
+
+  it("keeps diagnostics inline as a summary and opens the full list in a dialog", async () => {
     apiMocks.getEmployeeAccessLinkMock.mockResolvedValue({
       employee_id: "employee-markus",
       tenant_id: "tenant-1",
@@ -1508,10 +1646,21 @@ describe("EmployeeAdminView search dialog regression", () => {
     const accessSection = wrapper.get('[data-testid="employee-overview-section-app-access"]');
     expect(accessSection.text()).toContain("Linked");
     expect(accessSection.text()).toContain("Login ready");
-    expect(accessSection.text()).toContain("Yes");
-    expect(accessSection.text()).toContain("No");
-    expect(wrapper.get('[data-testid="employee-access-diagnostics-section"]').text()).toContain("Password hash exists");
-    expect(wrapper.findAll('[data-testid="employee-access-diagnostics-row"]').length).toBeGreaterThanOrEqual(10);
+    expect(accessSection.text()).toContain("10 login checks");
+    expect(accessSection.text()).not.toContain("Password hash exists");
+    expect(accessSection.findAll('[data-testid="employee-access-diagnostics-row"]')).toHaveLength(0);
+    expect(wrapper.find('[data-testid="employee-access-diagnostics-dialog"]').exists()).toBe(false);
+
+    await wrapper.get('[data-testid="employee-access-diagnostics-open"]').trigger("click");
+    await settle();
+
+    const diagnosticsDialog = wrapper.get('[data-testid="employee-access-diagnostics-dialog"]');
+    expect(diagnosticsDialog.text()).toContain("Password hash exists");
+    expect(diagnosticsDialog.findAll('[data-testid="employee-access-diagnostics-row"]').length).toBeGreaterThanOrEqual(10);
+
+    await wrapper.get('[data-testid="employee-access-diagnostics-close"]').trigger("click");
+    await settle();
+    expect(wrapper.find('[data-testid="employee-access-diagnostics-dialog"]').exists()).toBe(false);
   });
 
   it("preserves initial load, create flow, import/export, and detail tab switching", async () => {
@@ -1543,7 +1692,7 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="employee-detail-only-mode"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="employee-detail-workspace"]').text()).toContain("Markus Neumann");
-    expect(wrapper.get(".employee-admin-detail-header-actions").exists()).toBe(true);
+    expect(wrapper.find(".employee-admin-detail-header-actions").exists()).toBe(true);
     expect(wrapper.get('[data-testid="employee-detail-back-to-list"]').classes()).toContain("employee-admin-back-button");
     expect(wrapper.get(".employee-admin-detail-header-actions").find('[data-testid="status-badge"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="employee-detail-tabs"]').text()).toMatch(/Dashboard[\s\S]*Overview/);
@@ -1576,5 +1725,35 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(wrapper.find('[data-testid="employee-tab-dashboard"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="employee-tab-overview"]').classes()).toContain("active");
     expect(wrapper.find('[data-testid="employee-overview-section-nav"]').exists()).toBe(false);
+  });
+
+  it("returns to list mode when the Employees sidebar route is reselected on the same path", async () => {
+    const wrapper = await mountEmployeeAdmin();
+
+    expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-detail-workspace"]').exists()).toBe(false);
+
+    await openFirstEmployeeWorkspace(wrapper);
+    expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-detail-workspace"]').exists()).toBe(true);
+
+    window.dispatchEvent(
+      new CustomEvent("sicherplan:admin-menu-reselect", {
+        detail: { to: "/admin/employees" },
+      }),
+    );
+    await settle();
+
+    expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-detail-workspace"]').exists()).toBe(false);
+
+    await openFirstEmployeeWorkspace(wrapper);
+    expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-detail-workspace"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="employee-detail-back-to-list"]').trigger("click");
+    await settle();
+    expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-detail-workspace"]').exists()).toBe(false);
   });
 });

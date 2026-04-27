@@ -306,6 +306,7 @@
               </div>
             </section>
           </div>
+
         </div>
 
       <div v-else class="employee-admin-mode-shell" data-testid="employee-detail-only-mode">
@@ -619,6 +620,17 @@
                   <p class="eyebrow">{{ t("employeeAdmin.access.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.access.title") }}</h4>
                 </div>
+                <div class="cta-row">
+                  <button
+                    v-if="accessLink"
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="employee-access-diagnostics-open"
+                    @click="openAccessDiagnosticsDialog"
+                  >
+                    {{ t("employeeAdmin.access.openDiagnostics") }}
+                  </button>
+                </div>
               </section>
 
               <section v-if="!hasLinkedAccess" class="employee-admin-form-section">
@@ -683,34 +695,22 @@
                     <button class="cta-button" type="button" :disabled="!actionState.canManageAccess" @click="updateAccessUser">
                       {{ t("employeeAdmin.actions.updateAccessUser") }}
                     </button>
-                  </div>
-                </div>
-
-                <div class="employee-admin-form-section employee-admin-form-section--nested">
-                  <div class="employee-admin-form-section__header">
-                    <p class="eyebrow">{{ t("employeeAdmin.access.resetEyebrow") }}</p>
-                    <h4>{{ t("employeeAdmin.access.resetTitle") }}</h4>
-                  </div>
-                  <div class="employee-admin-form-grid employee-admin-form-grid--editor">
-                    <label class="field-stack">
-                      <span>{{ t("employeeAdmin.access.resetPassword") }}</span>
-                      <input v-model="accessResetDraft.password" :disabled="!actionState.canManageAccess" type="password" />
-                    </label>
-                  </div>
-                  <div class="cta-row">
-                    <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess" @click="resetAccessPassword">
-                      {{ t("employeeAdmin.actions.resetAccessPassword") }}
+                    <button
+                      class="cta-button cta-secondary"
+                      type="button"
+                      data-testid="employee-access-reset-password-open"
+                      :disabled="!actionState.canManageAccess"
+                      @click="openResetPasswordDialog"
+                    >
+                      {{ t("employeeAdmin.access.openResetPassword") }}
                     </button>
-                  </div>
-                </div>
-
-                <div class="employee-admin-form-section employee-admin-form-section--nested">
-                  <div class="employee-admin-form-section__header">
-                    <p class="eyebrow">{{ t("employeeAdmin.access.detachEyebrow") }}</p>
-                    <h4>{{ t("employeeAdmin.access.detachTitle") }}</h4>
-                  </div>
-                  <div class="cta-row">
-                    <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAccess || !accessLink?.user_id" @click="detachAccessUser">
+                    <button
+                      class="cta-button cta-secondary"
+                      type="button"
+                      data-testid="employee-access-detach-button"
+                      :disabled="!actionState.canManageAccess || !accessLink?.user_id"
+                      @click="detachAccessUser"
+                    >
                       {{ t("employeeAdmin.actions.detachAccessUser") }}
                     </button>
                   </div>
@@ -722,20 +722,9 @@
                   <p class="eyebrow">{{ t("employeeAdmin.access.diagnosticsEyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.access.diagnosticsTitle") }}</h4>
                 </div>
-                <div class="employee-admin-record-list employee-admin-access-diagnostics-list">
-                  <article
-                    v-for="check in employeeAccessDiagnosticChecks"
-                    :key="check.label"
-                    class="employee-admin-record employee-admin-access-diagnostic"
-                    data-testid="employee-access-diagnostics-row"
-                  >
-                    <div class="employee-admin-record__body">
-                      <strong>{{ check.label }}</strong>
-                      <span class="employee-admin-record__meta">{{ check.value ? t("employeeAdmin.access.enabledYes") : t("employeeAdmin.access.enabledNo") }}</span>
-                    </div>
-                    <StatusBadge :status="check.value ? 'active' : 'inactive'" />
-                  </article>
-                </div>
+                <p class="field-help">
+                  {{ t("employeeAdmin.access.diagnosticsSummary", { passed: employeeAccessDiagnosticsPassedCount, total: employeeAccessDiagnosticChecks.length }) }}
+                </p>
               </section>
 
               <details class="employee-admin-advanced-access">
@@ -1152,6 +1141,16 @@
                   <p class="eyebrow">{{ t("employeeAdmin.addresses.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.addresses.title") }}</h4>
                 </div>
+                <div class="cta-row">
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="employee-address-history-open"
+                    @click="openAddressHistoryDialog"
+                  >
+                    {{ t("employeeAdmin.addresses.showHistory") }}
+                  </button>
+                </div>
               </section>
 
               <section class="employee-admin-form-section">
@@ -1184,44 +1183,6 @@
                 <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.addresses.currentEmpty") }}</p>
               </section>
 
-              <section class="employee-admin-form-section">
-                <div class="employee-admin-form-section__header">
-                  <p class="eyebrow">{{ t("employeeAdmin.addresses.historyEyebrow") }}</p>
-                  <h4>{{ t("employeeAdmin.addresses.historyTitle") }}</h4>
-                </div>
-                <div v-if="employeeAddressTimeline.length" class="employee-admin-record-list">
-                  <article v-for="addressRow in employeeAddressTimeline" :key="addressRow.id" class="employee-admin-record employee-admin-record--static">
-                    <div class="employee-admin-record__body">
-                      <strong>{{ addressRow.address?.street_line_1 || addressRow.address_id }}</strong>
-                      <span class="employee-admin-record__meta">{{ addressRow.valid_from }} · {{ addressRow.valid_to || t("employeeAdmin.summary.none") }}</span>
-                      <span class="employee-admin-record__meta">
-                        {{ addressRow.address_type === "home" ? t("employeeAdmin.addresses.typeHome") : t("employeeAdmin.addresses.typeMailing") }}
-                        ·
-                        {{ addressRow.valid_to ? t("employeeAdmin.addresses.closedBadge") : t("employeeAdmin.addresses.currentBadge") }}
-                      </span>
-                    </div>
-                    <div class="employee-admin-record__actions">
-                      <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="editAddress(addressRow)">
-                        {{ t("employeeAdmin.actions.editAddress") }}
-                      </button>
-                      <button
-                        v-if="!isEmployeeAddressCurrent(addressRow)"
-                        class="cta-button cta-secondary"
-                        type="button"
-                        :disabled="!actionState.canManageAddresses"
-                        @click="prepareAddressAsCurrent(addressRow)"
-                      >
-                        {{ t("employeeAdmin.actions.markCurrentAddress") }}
-                      </button>
-                      <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="prepareAddressValidityClose(addressRow)">
-                        {{ t("employeeAdmin.actions.closeAddressValidity") }}
-                      </button>
-                      <StatusBadge :status="addressRow.status" />
-                    </div>
-                  </article>
-                </div>
-                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.addresses.empty") }}</p>
-              </section>
             </div>
           </section>
           <section
@@ -1446,6 +1407,158 @@
             </div>
             </section>
           </section>
+          <div
+            v-if="addressHistoryDialogOpen"
+            class="employee-admin-modal-backdrop"
+            data-testid="employee-address-history-dialog"
+            @click.self="closeAddressHistoryDialog"
+          >
+            <section
+              class="module-card employee-admin-modal"
+              aria-labelledby="employee-address-history-title"
+              aria-modal="true"
+              role="dialog"
+            >
+              <div class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <div>
+                    <p class="eyebrow">{{ t("employeeAdmin.addresses.historyEyebrow") }}</p>
+                    <h4 id="employee-address-history-title">{{ t("employeeAdmin.addresses.historyDialogTitle") }}</h4>
+                  </div>
+                </div>
+                <div v-if="employeeAddressTimeline.length" class="employee-admin-record-list">
+                  <article v-for="addressRow in employeeAddressTimeline" :key="addressRow.id" class="employee-admin-record employee-admin-record--static">
+                    <div class="employee-admin-record__body">
+                      <strong>{{ addressRow.address?.street_line_1 || addressRow.address_id }}</strong>
+                      <span class="employee-admin-record__meta">{{ addressRow.valid_from }} · {{ addressRow.valid_to || t("employeeAdmin.summary.none") }}</span>
+                      <span class="employee-admin-record__meta">
+                        {{ addressRow.address_type === "home" ? t("employeeAdmin.addresses.typeHome") : t("employeeAdmin.addresses.typeMailing") }}
+                        ·
+                        {{ addressRow.valid_to ? t("employeeAdmin.addresses.closedBadge") : t("employeeAdmin.addresses.currentBadge") }}
+                      </span>
+                    </div>
+                    <div class="employee-admin-record__actions">
+                      <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="editAddressFromHistoryDialog(addressRow)">
+                        {{ t("employeeAdmin.actions.editAddress") }}
+                      </button>
+                      <button
+                        v-if="!isEmployeeAddressCurrent(addressRow)"
+                        class="cta-button cta-secondary"
+                        type="button"
+                        :disabled="!actionState.canManageAddresses"
+                        @click="prepareAddressAsCurrentFromHistoryDialog(addressRow)"
+                      >
+                        {{ t("employeeAdmin.actions.markCurrentAddress") }}
+                      </button>
+                      <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageAddresses" @click="prepareAddressValidityCloseFromHistoryDialog(addressRow)">
+                        {{ t("employeeAdmin.actions.closeAddressValidity") }}
+                      </button>
+                      <StatusBadge :status="addressRow.status" />
+                    </div>
+                  </article>
+                </div>
+                <p v-else class="employee-admin-list-empty">{{ t("employeeAdmin.addresses.historyEmpty") }}</p>
+                <div class="employee-admin-modal-actions">
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="employee-address-history-close"
+                    @click="closeAddressHistoryDialog"
+                  >
+                    {{ t("employeeAdmin.actions.cancel") }}
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+          <div
+            v-if="resetPasswordDialogOpen"
+            class="employee-admin-modal-backdrop"
+            data-testid="employee-access-reset-password-dialog"
+            @click.self="closeResetPasswordDialog"
+          >
+            <section
+              class="module-card employee-admin-modal"
+              aria-labelledby="employee-access-reset-password-title"
+              aria-modal="true"
+              role="dialog"
+            >
+              <div class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <div>
+                    <p class="eyebrow">{{ t("employeeAdmin.access.resetEyebrow") }}</p>
+                    <h4 id="employee-access-reset-password-title">{{ t("employeeAdmin.access.resetPasswordDialogTitle") }}</h4>
+                  </div>
+                </div>
+                <div class="employee-admin-form-grid employee-admin-form-grid--editor">
+                  <label class="field-stack">
+                    <span>{{ t("employeeAdmin.access.resetPassword") }}</span>
+                    <input v-model="accessResetDraft.password" :disabled="!actionState.canManageAccess" type="password" />
+                  </label>
+                </div>
+                <div class="employee-admin-modal-actions">
+                  <button class="cta-button cta-secondary" type="button" @click="closeResetPasswordDialog">
+                    {{ t("employeeAdmin.actions.cancel") }}
+                  </button>
+                  <button
+                    class="cta-button"
+                    type="button"
+                    data-testid="employee-access-reset-password-submit"
+                    :disabled="!actionState.canManageAccess"
+                    @click="resetAccessPassword"
+                  >
+                    {{ t("employeeAdmin.actions.resetAccessPassword") }}
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+          <div
+            v-if="accessDiagnosticsDialogOpen"
+            class="employee-admin-modal-backdrop"
+            data-testid="employee-access-diagnostics-dialog"
+            @click.self="closeAccessDiagnosticsDialog"
+          >
+            <section
+              class="module-card employee-admin-modal"
+              aria-labelledby="employee-access-diagnostics-title"
+              aria-modal="true"
+              role="dialog"
+            >
+              <div class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <div>
+                    <p class="eyebrow">{{ t("employeeAdmin.access.diagnosticsEyebrow") }}</p>
+                    <h4 id="employee-access-diagnostics-title">{{ t("employeeAdmin.access.diagnosticsDialogTitle") }}</h4>
+                  </div>
+                </div>
+                <div class="employee-admin-record-list employee-admin-access-diagnostics-list">
+                  <article
+                    v-for="check in employeeAccessDiagnosticChecks"
+                    :key="check.label"
+                    class="employee-admin-record employee-admin-access-diagnostic"
+                    data-testid="employee-access-diagnostics-row"
+                  >
+                    <div class="employee-admin-record__body">
+                      <strong>{{ check.label }}</strong>
+                      <span class="employee-admin-record__meta">{{ check.value ? t("employeeAdmin.access.enabledYes") : t("employeeAdmin.access.enabledNo") }}</span>
+                    </div>
+                    <StatusBadge :status="check.value ? 'active' : 'inactive'" />
+                  </article>
+                </div>
+                <div class="employee-admin-modal-actions">
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="employee-access-diagnostics-close"
+                    @click="closeAccessDiagnosticsDialog"
+                  >
+                    {{ t("employeeAdmin.actions.cancel") }}
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
           <div
             v-if="activeEmployeeOverviewEditor"
             class="employee-admin-modal-backdrop"
@@ -2207,6 +2320,7 @@ import {
   validateEmployeePrivateProfileDraft,
   validateEmployeeQualificationDraft,
 } from "@/features/employees/employeeAdmin.helpers.js";
+import { ADMIN_MENU_RESELECT_EVENT, type AdminMenuReselectDetail } from "../layouts/navigationEvents";
 import { hasPlanningStaffingPermission } from "@/features/planning/planningStaffing.helpers.js";
 import type { MessageKey } from "@/i18n/messages";
 import { useAuthStore } from "@/stores/auth";
@@ -2413,6 +2527,9 @@ const employeeSearchSuggestionsSuppressed = ref(false);
 const employeeSearchError = ref("");
 const advancedFiltersModalOpen = ref(false);
 const importExportModalOpen = ref(false);
+const addressHistoryDialogOpen = ref(false);
+const resetPasswordDialogOpen = ref(false);
+const accessDiagnosticsDialogOpen = ref(false);
 const selectedEmployeeId = ref("");
 const selectedEmployee = ref<EmployeeOperationalRead | null>(null);
 const selectedPrivateProfile = ref<EmployeePrivateProfileRead | null>(null);
@@ -2521,6 +2638,7 @@ const employeeAccessDiagnosticChecks = computed(() => {
     { label: t("employeeAdmin.access.diagnosticPermission"), value: diagnostics.portal_employee_access_granted },
   ];
 });
+const employeeAccessDiagnosticsPassedCount = computed(() => employeeAccessDiagnosticChecks.value.filter((check) => check.value).length);
 const selectedEmployeeLabel = computed(() =>
   selectedEmployee.value
     ? `${selectedEmployee.value.personnel_no} · ${selectedEmployee.value.first_name} ${selectedEmployee.value.last_name}`
@@ -3382,6 +3500,30 @@ function closeImportExportDialog() {
   importExportModalOpen.value = false;
 }
 
+function openAddressHistoryDialog() {
+  addressHistoryDialogOpen.value = true;
+}
+
+function closeAddressHistoryDialog() {
+  addressHistoryDialogOpen.value = false;
+}
+
+function openResetPasswordDialog() {
+  resetPasswordDialogOpen.value = true;
+}
+
+function closeResetPasswordDialog() {
+  resetPasswordDialogOpen.value = false;
+}
+
+function openAccessDiagnosticsDialog() {
+  accessDiagnosticsDialogOpen.value = true;
+}
+
+function closeAccessDiagnosticsDialog() {
+  accessDiagnosticsDialogOpen.value = false;
+}
+
 function clearEmployeeSearchDebounce() {
   if (employeeSearchDebounceHandle) {
     clearTimeout(employeeSearchDebounceHandle);
@@ -3512,6 +3654,17 @@ async function returnToEmployeeList() {
   closeAdvancedFiltersDialog();
   closeImportExportDialog();
   await nextTick();
+}
+
+function handleAdminMenuReselect(event: Event) {
+  const detail = (event as CustomEvent<AdminMenuReselectDetail>).detail;
+  if (detail?.to !== "/admin/employees") {
+    return;
+  }
+  if (!hasEmployeeDetailWorkspace.value) {
+    return;
+  }
+  void returnToEmployeeList();
 }
 
 async function loadTenantStructure() {
@@ -3811,6 +3964,21 @@ function prepareAddressValidityClose(row: EmployeeAddressHistoryRead) {
   addressDraft.valid_to = row.valid_to || new Date().toISOString().slice(0, 10);
 }
 
+function editAddressFromHistoryDialog(row: EmployeeAddressHistoryRead) {
+  closeAddressHistoryDialog();
+  editAddress(row);
+}
+
+function prepareAddressAsCurrentFromHistoryDialog(row: EmployeeAddressHistoryRead) {
+  closeAddressHistoryDialog();
+  prepareAddressAsCurrent(row);
+}
+
+function prepareAddressValidityCloseFromHistoryDialog(row: EmployeeAddressHistoryRead) {
+  closeAddressHistoryDialog();
+  prepareAddressValidityClose(row);
+}
+
 function resetAccessDrafts() {
   accessCreateDraft.username = "";
   accessCreateDraft.email = "";
@@ -3826,6 +3994,8 @@ function resetAccessDrafts() {
   accessAttachDraft.email = "";
   syncAccessCreateDraft(true);
   syncAccessManageDraft();
+  resetPasswordDialogOpen.value = false;
+  accessDiagnosticsDialogOpen.value = false;
 }
 
 function editMembership(membership: EmployeeGroupMembershipRead) {
@@ -3840,6 +4010,9 @@ function editMembership(membership: EmployeeGroupMembershipRead) {
 function startCreateEmployee() {
   closeAdvancedFiltersDialog();
   closeImportExportDialog();
+  closeAddressHistoryDialog();
+  closeResetPasswordDialog();
+  closeAccessDiagnosticsDialog();
   isCreatingEmployee.value = true;
   activeDetailTab.value = "overview";
   selectedEmployeeId.value = "";
@@ -3869,6 +4042,9 @@ function startCreateEmployee() {
 }
 
 function resetSelectedEmployeeWorkspaceState() {
+  closeAddressHistoryDialog();
+  closeResetPasswordDialog();
+  closeAccessDiagnosticsDialog();
   selectedEmployeeId.value = "";
   selectedEmployee.value = null;
   selectedPrivateProfile.value = null;
@@ -5032,6 +5208,8 @@ async function resetAccessPassword() {
       },
     );
     await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
+    accessResetDraft.password = "";
+    closeResetPasswordDialog();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.accessPasswordReset"));
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
@@ -5281,6 +5459,7 @@ function fileToBase64(file: File) {
 }
 
 onMounted(async () => {
+  window.addEventListener(ADMIN_MENU_RESELECT_EVENT, handleAdminMenuReselect as EventListener);
   authStore.syncFromPrimarySession();
   try {
     await authStore.ensureSessionReady();
@@ -5293,6 +5472,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener(ADMIN_MENU_RESELECT_EVENT, handleAdminMenuReselect as EventListener);
   clearEmployeeSearchDebounce();
   const previewUrls = new Set<string>([
     photoPreviewUrl.value,
@@ -5425,6 +5605,7 @@ onBeforeUnmount(() => {
   flex: 0 0 3.5rem;
   display: grid;
   place-items: center;
+  overflow: hidden;
   border-radius: 999px;
   background: color-mix(in srgb, var(--sp-color-primary-muted) 65%, white);
   color: var(--sp-color-primary-strong);
@@ -5436,8 +5617,10 @@ onBeforeUnmount(() => {
 .employee-admin-employee-row__avatar-image {
   width: 100%;
   height: 100%;
+  display: block;
   border-radius: inherit;
   object-fit: cover;
+  object-position: center;
 }
 
 .employee-admin-employee-row__body {

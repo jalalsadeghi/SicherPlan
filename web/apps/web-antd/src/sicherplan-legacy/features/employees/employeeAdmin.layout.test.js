@@ -21,9 +21,13 @@ function resolveWebAppPath(relativePath) {
 
 const viewPath = resolveWebAppPath("src/sicherplan-legacy/views/EmployeeAdminView.vue");
 const registryPath = resolveWebAppPath("src/views/sicherplan/module-registry.ts");
+const adminLayoutPath = resolveWebAppPath("src/sicherplan-legacy/layouts/AdminLayout.vue");
+const navigationEventsPath = resolveWebAppPath("src/sicherplan-legacy/layouts/navigationEvents.ts");
 
 const viewSource = readFileSync(viewPath, "utf8");
 const registrySource = readFileSync(registryPath, "utf8");
+const adminLayoutSource = readFileSync(adminLayoutPath, "utf8");
+const navigationEventsSource = readFileSync(navigationEventsPath, "utf8");
 
 test("employees module hides the shared workspace section header", () => {
   assert.match(registrySource, /customers:\s*{[\s\S]*showPageIntro:\s*false/);
@@ -255,6 +259,27 @@ test("employee dashboard owns profile photo entry point and the old photo tab is
   assert.doesNotMatch(viewSource, /employeeAdmin\.tabs\.profilePhoto/);
 });
 
+test("employee list avatar image is clipped and centered inside a fixed avatar container", () => {
+  assert.match(viewSource, /class="employee-admin-employee-row__avatar" data-testid="employee-list-row-avatar"/);
+  assert.match(viewSource, /class="employee-admin-employee-row__avatar-image"/);
+  assert.match(viewSource, /:alt="`\$\{employee\.first_name\} \$\{employee\.last_name\}`"/);
+  assert.match(viewSource, /\.employee-admin-employee-row__avatar\s*\{[\s\S]*width:\s*3\.5rem;[\s\S]*height:\s*3\.5rem;[\s\S]*flex:\s*0 0 3\.5rem;[\s\S]*overflow:\s*hidden;[\s\S]*border-radius:\s*999px;/);
+  assert.match(viewSource, /\.employee-admin-employee-row__avatar-image\s*\{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*display:\s*block;[\s\S]*object-fit:\s*cover;[\s\S]*object-position:\s*center;/);
+});
+
+test("employees sidebar reselect dispatches a same-route reset event and employee admin listens for it", () => {
+  assert.match(navigationEventsSource, /export const ADMIN_MENU_RESELECT_EVENT = "sicherplan:admin-menu-reselect";/);
+  assert.match(navigationEventsSource, /window\.dispatchEvent\(\s*new CustomEvent<AdminMenuReselectDetail>\(ADMIN_MENU_RESELECT_EVENT/);
+  assert.match(adminLayoutSource, /<RouterLink[\s\S]*custom[\s\S]*v-slot="\{ href, navigate, isActive \}"/);
+  assert.match(adminLayoutSource, /route\.path === to/);
+  assert.match(adminLayoutSource, /dispatchAdminMenuReselect\(to\)/);
+  assert.match(viewSource, /window\.addEventListener\(ADMIN_MENU_RESELECT_EVENT,\s*handleAdminMenuReselect as EventListener\)/);
+  assert.match(viewSource, /window\.removeEventListener\(ADMIN_MENU_RESELECT_EVENT,\s*handleAdminMenuReselect as EventListener\)/);
+  assert.match(viewSource, /detail\?\.to !== "\/admin\/employees"/);
+  assert.match(viewSource, /hasEmployeeDetailWorkspace\.value/);
+  assert.match(viewSource, /void returnToEmployeeList\(\)/);
+});
+
 test("employee workspace removes the redundant catalogs tab and keeps only lightweight handoff navigation", () => {
   assert.match(viewSource, /isEmployeeDetailTabDisabled\(tab\.id\)/);
   assert.match(viewSource, /data-testid="employee-open-catalogs"/);
@@ -343,7 +368,7 @@ test("employee list moves import/export into a header modal and keeps compact cu
   assert.match(viewSource, /class="cta-button cta-secondary employee-admin-back-button"/);
   assert.match(viewSource, /\.employee-admin-back-button\s*{[\s\S]*min-height:\s*2rem;[\s\S]*padding:\s*0\.32rem 0\.68rem;[\s\S]*border-radius:\s*999px;[\s\S]*font-size:\s*0\.82rem;/);
   assert.match(viewSource, /\.employee-admin-filter-toolbar\s*{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) auto/);
-  assert.match(viewSource, /\.employee-admin-employee-row\s*{[\s\S]*flex-wrap:\s*nowrap;[\s\S]*padding:\s*0\.75rem 0\.9rem;/);
+  assert.match(viewSource, /\.employee-admin-employee-row\s*{[\s\S]*flex-wrap:\s*nowrap;[\s\S]*align-items:\s*center;[\s\S]*padding:\s*0\.4rem 0\.4rem;/);
   assert.match(viewSource, /\.employee-admin-employee-row__avatar\s*{[\s\S]*border-radius:\s*999px/);
   assert.match(viewSource, /\.employee-admin-employee-row__avatar-image\s*{[\s\S]*object-fit:\s*cover;/);
   assert.match(viewSource, /\.employee-admin-employee-row__line\s*{[\s\S]*text-overflow:\s*ellipsis;[\s\S]*white-space:\s*nowrap;/);
@@ -411,12 +436,14 @@ test("overview sections preserve the old tab business flows", () => {
 });
 
 test("employee addresses overview section uses admin editor copy and removes released timeline wording", () => {
-  assert.match(viewSource, /employee-overview-section-addresses[\s\S]*employeeAdmin\.addresses\.empty/);
+  assert.match(viewSource, /employee-overview-section-addresses[\s\S]*employeeAdmin\.addresses\.showHistory/);
+  assert.match(viewSource, /employee-address-history-dialog/);
+  assert.match(viewSource, /employeeAdmin\.addresses\.historyDialogTitle/);
+  assert.match(viewSource, /employeeAdmin\.addresses\.historyEmpty/);
   assert.match(viewSource, /employee-overview-section-addresses[\s\S]*employeeAdmin\.feedback\.addressSaved/);
   assert.match(viewSource, /employee-overview-section-addresses[\s\S]*employeeAddressTimeline/);
   assert.match(viewSource, /employee-overview-section-addresses[\s\S]*prepareAddressAsCurrent/);
   assert.match(viewSource, /employee-overview-section-addresses[\s\S]*prepareAddressValidityClose/);
-  assert.match(viewSource, /employee-overview-section-addresses[\s\S]*isEmployeeAddressCurrent\(addressRow\)/);
   assert.match(viewSource, /currentEmployeeAddress[\s\S]*editAddress\(currentEmployeeAddress\)/);
   assert.match(viewSource, /currentEmployeeAddress[\s\S]*prepareAddressValidityClose\(currentEmployeeAddress\)/);
   assert.match(viewSource, /employeeAddressTimeline = computed\(\(\) =>[\s\S]*isEmployeeAddressCurrent/);
@@ -425,6 +452,9 @@ test("employee addresses overview section uses admin editor copy and removes rel
   assert.match(viewSource, /addressEditorMode\.value === "transition"/);
   assert.match(viewSource, /ignoreRowIds: \[currentSameTypeAddress\.id\]/);
   assert.match(viewSource, /employeeAdmin\.feedback\.addressTransitionEffectiveDate/);
+  assert.match(viewSource, /function editAddressFromHistoryDialog\(row: EmployeeAddressHistoryRead\)/);
+  assert.match(viewSource, /function prepareAddressAsCurrentFromHistoryDialog\(row: EmployeeAddressHistoryRead\)/);
+  assert.match(viewSource, /function prepareAddressValidityCloseFromHistoryDialog\(row: EmployeeAddressHistoryRead\)/);
   assert.doesNotMatch(viewSource, /Released address timeline/);
   assert.doesNotMatch(viewSource, /No released address history is available/);
   assert.doesNotMatch(viewSource, /onAddressCurrentToggle/);

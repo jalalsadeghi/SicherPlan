@@ -145,6 +145,7 @@ export interface AssistantPageHelpFormSection {
 export interface AssistantPageHelpAction {
   action_key: string;
   label: string;
+  label_status?: string;
   action_type?: string;
   selector?: null | string;
   test_id?: null | string;
@@ -164,8 +165,18 @@ export interface AssistantPageHelpManifest {
   module_key: string;
   language_code?: null | string;
   source_status?: string;
+  page_purpose?: null | string;
+  workflow_keys?: string[];
+  api_families?: string[];
   actions?: AssistantPageHelpAction[];
   form_sections?: AssistantPageHelpFormSection[];
+  source_basis?: Array<{
+    source_type: string;
+    source_name?: null | string;
+    page_id?: null | string;
+    module_key?: null | string;
+    evidence: string;
+  }>;
 }
 
 interface AssistantApiErrorPayload {

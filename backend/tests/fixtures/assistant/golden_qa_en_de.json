@@ -1,0 +1,307 @@
+[
+  {
+    "id": "de_product_overview",
+    "language": "de",
+    "question": "Bitte erklären Sie mir kurz und bündig, was diese Software genau macht.",
+    "expected_intent": "product_overview",
+    "expected_pages": [],
+    "required_concepts": [
+      "mandantenfähig",
+      "sicherheitsoperations-plattform",
+      "kunden",
+      "mitarbeiter",
+      "subunternehmer",
+      "planung",
+      "feldausführung",
+      "abrechnung",
+      "reporting"
+    ],
+    "forbidden_patterns": [
+      "ich bin nur dafür vorgesehen",
+      "out-of-scope"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  },
+  {
+    "id": "en_product_overview",
+    "language": "en",
+    "question": "Please briefly explain what this software does.",
+    "expected_intent": "product_overview",
+    "expected_pages": [],
+    "required_concepts": [
+      "multi-tenant",
+      "security operations platform",
+      "customers",
+      "employees",
+      "subcontractors",
+      "planning",
+      "field execution",
+      "billing",
+      "reporting"
+    ],
+    "forbidden_patterns": [
+      "i am only intended",
+      "out-of-scope"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  },
+  {
+    "id": "de_customer_create",
+    "language": "de",
+    "question": "Bitte erklären Sie mir genau, wie ich einen Kunden registrieren kann.",
+    "expected_intent": "customer_create",
+    "expected_pages": ["C-01"],
+    "required_concepts": [
+      "kunden-workspace",
+      "kundenstamm",
+      "kontakte",
+      "adressen",
+      "abrechnungsprofil",
+      "rechnungsempfänger",
+      "preis",
+      "berechtigung"
+    ],
+    "forbidden_patterns": [
+      "out-of-scope",
+      "nur die route"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  },
+  {
+    "id": "en_customer_create",
+    "language": "en",
+    "question": "How do I create a new customer?",
+    "expected_intent": "customer_create",
+    "expected_pages": ["C-01"],
+    "required_concepts": [
+      "customers workspace",
+      "customer master",
+      "contacts",
+      "addresses",
+      "billing profile",
+      "invoice parties",
+      "rate cards",
+      "permission"
+    ],
+    "forbidden_patterns": [
+      "out-of-scope",
+      "path only"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  },
+  {
+    "id": "de_employee_create",
+    "language": "de",
+    "question": "Ich möchte nun einen neuen Sicherheitsmitarbeiter auf der Plattform registrieren. Was muss ich tun?",
+    "expected_intent": "employee_create",
+    "expected_pages": ["E-01"],
+    "required_concepts": [
+      "mitarbeiter-workspace",
+      "mitarbeiterakte",
+      "identität",
+      "personalnummer",
+      "qualifikationen",
+      "verfügbarkeit",
+      "app-zugang",
+      "berechtigung"
+    ],
+    "forbidden_patterns": [
+      "out-of-scope"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  },
+  {
+    "id": "en_employee_create",
+    "language": "en",
+    "question": "How do I create a new security employee?",
+    "expected_intent": "employee_create",
+    "expected_pages": ["E-01"],
+    "required_concepts": [
+      "employees workspace",
+      "employee file",
+      "identity",
+      "personnel number",
+      "qualifications",
+      "availability",
+      "access link",
+      "permission"
+    ],
+    "forbidden_patterns": [
+      "out-of-scope"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  },
+  {
+    "id": "de_contract_register",
+    "language": "de",
+    "question": "Wie registriere ich einen neuen Vertrag?",
+    "expected_intent": "contract_or_document_register",
+    "expected_pages": ["PS-01", "C-01", "P-02", "S-01"],
+    "required_concepts": [
+      "kein eigenständiges vertragsmodul",
+      "plattformdienste",
+      "dokument",
+      "kundenkontext",
+      "auftragskontext",
+      "subunternehmer",
+      "rückfrage"
+    ],
+    "forbidden_patterns": [
+      "out-of-scope",
+      "vertragmodul"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  },
+  {
+    "id": "en_contract_register",
+    "language": "en",
+    "question": "How do I register a new contract?",
+    "expected_intent": "contract_or_document_register",
+    "expected_pages": ["PS-01", "C-01", "P-02", "S-01"],
+    "required_concepts": [
+      "no verified standalone contract module",
+      "platform services",
+      "document",
+      "customer context",
+      "order context",
+      "subcontractor",
+      "clarify"
+    ],
+    "forbidden_patterns": [
+      "out-of-scope"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  },
+  {
+    "id": "de_order_create",
+    "language": "de",
+    "question": "Wie erstelle ich einen neuen Auftrag für einen Kunden?",
+    "expected_intent": "customer_order_create",
+    "expected_pages": ["C-01", "P-02"],
+    "required_concepts": [
+      "kunde",
+      "auftrag",
+      "aufträge & planung",
+      "anforderungen",
+      "equipment",
+      "anhänge",
+      "planungsdatensatz"
+    ],
+    "forbidden_patterns": [
+      "out-of-scope"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  },
+  {
+    "id": "en_order_create",
+    "language": "en",
+    "question": "How do I create a new order for a customer?",
+    "expected_intent": "customer_order_create",
+    "expected_pages": ["C-01", "P-02"],
+    "required_concepts": [
+      "customer",
+      "order",
+      "orders & planning records",
+      "requirements",
+      "equipment",
+      "attachments",
+      "planning record"
+    ],
+    "forbidden_patterns": [
+      "out-of-scope"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  },
+  {
+    "id": "de_employee_assign",
+    "language": "de",
+    "question": "Wie weise ich einen Mitarbeiter einer Schicht zu?",
+    "expected_intent": "employee_assign_to_shift",
+    "expected_pages": ["E-01", "P-03", "P-04", "P-05"],
+    "required_concepts": [
+      "mitarbeiter",
+      "schicht",
+      "staffing board",
+      "qualifikation",
+      "verfügbarkeit",
+      "doppelbuchung",
+      "freigabe"
+    ],
+    "forbidden_patterns": [
+      "out-of-scope"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  },
+  {
+    "id": "en_employee_assign",
+    "language": "en",
+    "question": "How do I assign an employee to a shift?",
+    "expected_intent": "employee_assign_to_shift",
+    "expected_pages": ["E-01", "P-03", "P-04", "P-05"],
+    "required_concepts": [
+      "employee",
+      "shift",
+      "staffing board",
+      "qualification",
+      "availability",
+      "double booking",
+      "release"
+    ],
+    "forbidden_patterns": [
+      "out-of-scope"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  },
+  {
+    "id": "de_shift_release",
+    "language": "de",
+    "question": "Wie gebe ich eine Schicht für die Mitarbeiter-App frei?",
+    "expected_intent": "shift_release_to_employee_app",
+    "expected_pages": ["P-03", "P-04", "P-05", "ES-01"],
+    "required_concepts": [
+      "schicht",
+      "freigabe",
+      "mitarbeiter-app",
+      "besetzung",
+      "disposition",
+      "self-service"
+    ],
+    "forbidden_patterns": [
+      "out-of-scope"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  },
+  {
+    "id": "en_shift_release",
+    "language": "en",
+    "question": "How do I release a shift to the employee app?",
+    "expected_intent": "shift_release_to_employee_app",
+    "expected_pages": ["P-03", "P-04", "P-05", "ES-01"],
+    "required_concepts": [
+      "shift",
+      "release",
+      "employee app",
+      "staffing",
+      "dispatch",
+      "self-service"
+    ],
+    "forbidden_patterns": [
+      "out-of-scope"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 2
+  }
+]

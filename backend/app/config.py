@@ -192,6 +192,9 @@ class AppSettings:
     ai_rate_limit_per_tenant_per_minute: int = field(
         default_factory=lambda: _get_int("SP_AI_RATE_LIMIT_PER_TENANT_PER_MINUTE", 100)
     )
+    ai_rag_quality_gate_mode: str = field(
+        default_factory=lambda: _get_str("SP_AI_RAG_QUALITY_GATE_MODE", "off")
+    )
     ai_redaction_enabled: bool = field(default_factory=lambda: _get_bool("SP_AI_REDACTION_ENABLED", True))
     ai_audit_enabled: bool = field(default_factory=lambda: _get_bool("SP_AI_AUDIT_ENABLED", True))
 
@@ -200,6 +203,8 @@ class AppSettings:
         object.__setattr__(self, "ai_provider", normalized_provider)
         normalized_retrieval_mode = self.ai_retrieval_mode.strip().lower()
         object.__setattr__(self, "ai_retrieval_mode", normalized_retrieval_mode)
+        normalized_quality_gate_mode = self.ai_rag_quality_gate_mode.strip().lower()
+        object.__setattr__(self, "ai_rag_quality_gate_mode", normalized_quality_gate_mode)
 
         allowed_providers = {"mock", "openai"}
         if normalized_provider not in allowed_providers:
@@ -210,6 +215,11 @@ class AppSettings:
         if normalized_retrieval_mode not in allowed_retrieval_modes:
             raise ValueError(
                 "Invalid SP_AI_RETRIEVAL_MODE value. Expected one of: lexical, semantic, hybrid."
+            )
+        allowed_quality_gate_modes = {"off", "log_only", "enforce_in_tests"}
+        if normalized_quality_gate_mode not in allowed_quality_gate_modes:
+            raise ValueError(
+                "Invalid SP_AI_RAG_QUALITY_GATE_MODE value. Expected one of: off, log_only, enforce_in_tests."
             )
 
         if self.ai_enabled and normalized_provider == "openai" and not self.ai_openai_api_key.strip():

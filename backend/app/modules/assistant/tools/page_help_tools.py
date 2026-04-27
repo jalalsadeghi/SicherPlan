@@ -16,6 +16,7 @@ from app.modules.assistant.schemas import (
     AssistantPageHelpManifestInput,
     AssistantPageHelpManifestRead,
     AssistantPageHelpPostStepRead,
+    AssistantPageHelpSourceBasisRead,
     AssistantPageHelpSidebarItemRead,
     AssistantPageHelpVerifiedFromRead,
 )
@@ -70,14 +71,13 @@ def _filter_manifest_actions(
     for item in manifest_json.get("primary_actions", []):
         if not isinstance(item, dict):
             continue
-        if item.get("verified") is not True:
-            continue
         if not _is_action_allowed(item, context):
             continue
         actions.append(
             AssistantPageHelpActionRead(
                 action_key=str(item.get("action_key", "")),
                 label=str(item.get("label", "")),
+                label_status=str(item.get("label_status") or ("verified" if item.get("verified") is True else "unverified")),
                 action_type=str(item.get("action_type", "button")),
                 selector=item.get("selector"),
                 test_id=item.get("test_id"),
@@ -111,10 +111,25 @@ def _manifest_read_from_row(
         module_key=row.module_key,
         language_code=row.language_code,
         source_status=str(manifest_json.get("source_status") or row.status),
+        page_purpose=(
+            str(manifest_json.get("page_purpose"))
+            if isinstance(manifest_json.get("page_purpose"), str)
+            else None
+        ),
         sidebar_path=[
             AssistantPageHelpSidebarItemRead.model_validate(item)
             for item in manifest_json.get("sidebar_path", [])
             if isinstance(item, dict)
+        ],
+        workflow_keys=[
+            str(item)
+            for item in manifest_json.get("workflow_keys", [])
+            if isinstance(item, str) and item.strip()
+        ],
+        api_families=[
+            str(item)
+            for item in manifest_json.get("api_families", [])
+            if isinstance(item, str) and item.strip()
         ],
         actions=actions,
         form_sections=[
@@ -134,6 +149,11 @@ def _manifest_read_from_row(
         post_create_steps=[
             AssistantPageHelpPostStepRead.model_validate(item)
             for item in manifest_json.get("post_create_steps", [])
+            if isinstance(item, dict)
+        ],
+        source_basis=[
+            AssistantPageHelpSourceBasisRead.model_validate(item)
+            for item in manifest_json.get("source_basis", [])
             if isinstance(item, dict)
         ],
         verified_from=[
@@ -263,6 +283,7 @@ class FindUiActionTool:
             action=AssistantPageHelpActionRead(
                 action_key=str(action_entry.get("action_key", "")),
                 label=str(action_entry.get("label", "")),
+                label_status=str(action_entry.get("label_status") or ("verified" if action_entry.get("verified") is True else "unverified")),
                 action_type=str(action_entry.get("action_type", "button")),
                 selector=action_entry.get("selector"),
                 test_id=action_entry.get("test_id"),

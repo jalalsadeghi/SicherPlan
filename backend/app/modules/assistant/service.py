@@ -53,6 +53,7 @@ from app.modules.assistant.provider import (
     AssistantProviderUnavailableError,
 )
 from app.modules.assistant.policy import (
+    ASSISTANT_ADMIN,
     ASSISTANT_CHAT_ACCESS,
     ASSISTANT_FEEDBACK_WRITE,
     can_user_chat,
@@ -60,6 +61,7 @@ from app.modules.assistant.policy import (
     can_user_run_diagnostics,
     can_user_submit_feedback,
 )
+from app.modules.assistant.quality_gate import evaluate_rag_answer_quality
 from app.modules.assistant.schemas import (
     AssistantCapabilitiesRead,
     AssistantClientContextInput,
@@ -73,6 +75,8 @@ from app.modules.assistant.schemas import (
     AssistantPageHelpManifestRead,
     AssistantProviderStatusRead,
     AssistantProviderSmokeTestRead,
+    AssistantRagDebugSnapshotRead,
+    AssistantRagQualityGateRead,
     AssistantRagTraceRead,
     AssistantRagTraceTopSource,
     AssistantSourceBasisItem,
@@ -106,6 +110,7 @@ class AssistantRuntimeConfig:
     max_grounding_sources: int = 10
     max_grounding_chars_per_source: int = 1200
     max_total_grounding_chars: int = 9000
+    rag_quality_gate_mode: str = "off"
 
     @property
     def rag_enabled(self) -> bool:
@@ -514,12 +519,20 @@ class AssistantService:
             grounding_context=rag_result.grounding_context if not classification.is_out_of_scope else None,
             rag_trace=rag_trace,
         )
+        quality_gate = self._evaluate_quality_gate(
+            question=cleaned_message,
+            classification=classification,
+            response=structured_response,
+            rag_trace=rag_trace,
+        )
         assistant_message.structured_payload = structured_response.model_dump(mode="json")
         assistant_message.structured_payload["classification"] = self._serialize_classification(classification)
+        assistant_message.structured_payload["quality_gate"] = quality_gate.model_dump(mode="json")
         self.repository.update_message_payload(
             assistant_message,
             structured_payload=assistant_message.structured_payload,
         )
+        self._handle_quality_gate_result(quality_gate)
         return structured_response
 
     def submit_feedback(
@@ -557,6 +570,85 @@ class AssistantService:
         )
         return AssistantFeedbackRead.model_validate(feedback)
 
+    def get_rag_debug_snapshot(
+        self,
+        *,
+        conversation_id: str,
+        message_id: str,
+        actor: RequestAuthorizationContext,
+    ) -> AssistantRagDebugSnapshotRead:
+        self._require_admin(actor)
+        message = self.repository.get_message_for_conversation(
+            conversation_id=conversation_id,
+            message_id=message_id,
+        )
+        if message is None or message.role != "assistant":
+            raise ApiException(
+                404,
+                "assistant.message.not_found",
+                "errors.assistant.message.not_found",
+            )
+        if not actor.is_platform_admin and actor.tenant_id != message.tenant_id:
+            raise ApiException(
+                404,
+                "assistant.message.not_found",
+                "errors.assistant.message.not_found",
+            )
+        all_messages = self.repository.list_messages_for_conversation(conversation_id)
+        question = self._find_question_for_assistant_message(all_messages=all_messages, message_id=message.id)
+        structured_payload = message.structured_payload if isinstance(message.structured_payload, dict) else {}
+        rag_trace_payload = structured_payload.get("rag_trace")
+        rag_trace = (
+            AssistantRagTraceRead.model_validate(rag_trace_payload)
+            if isinstance(rag_trace_payload, dict)
+            else None
+        )
+        response = AssistantStructuredResponse.model_validate(
+            {
+                "conversation_id": structured_payload.get("conversation_id", conversation_id),
+                "message_id": structured_payload.get("message_id", message.id),
+                "detected_language": structured_payload.get("detected_language", message.detected_language or "unknown"),
+                "response_language": structured_payload.get("response_language", message.response_language or "unknown"),
+                "answer": structured_payload.get("answer", message.content),
+                "scope": structured_payload.get("scope", "unknown"),
+                "confidence": structured_payload.get("confidence", "low"),
+                "out_of_scope": structured_payload.get("out_of_scope", False),
+                "diagnosis": structured_payload.get("diagnosis", []),
+                "links": structured_payload.get("links", []),
+                "missing_permissions": structured_payload.get("missing_permissions", []),
+                "next_steps": structured_payload.get("next_steps", []),
+                "tool_trace_id": structured_payload.get("tool_trace_id"),
+                "rag_trace_id": structured_payload.get("rag_trace_id"),
+                "source_basis": structured_payload.get("source_basis", []),
+                "rag_trace": rag_trace_payload,
+            }
+        )
+        quality_gate = AssistantRagQualityGateRead.model_validate(
+            structured_payload.get("quality_gate")
+            or self._evaluate_quality_gate(
+                question=question,
+                classification=structured_payload.get("classification"),
+                response=response,
+                rag_trace=rag_trace,
+            ).model_dump(mode="json")
+        )
+        return AssistantRagDebugSnapshotRead(
+            question=question,
+            detected_language=response.detected_language,
+            classification=structured_payload.get("classification") if isinstance(structured_payload.get("classification"), dict) else {},
+            retrieval_plan=rag_trace.retrieval_plan if rag_trace is not None else {},
+            expanded_query=rag_trace.query_expansion if rag_trace is not None else {},
+            top_sources=rag_trace.top_sources if rag_trace is not None else [],
+            content_bearing_source_count=rag_trace.content_bearing_source_count if rag_trace is not None else 0,
+            grounding_sent_to_provider=rag_trace.grounding_attached if rag_trace is not None else False,
+            provider_called=rag_trace.provider_called if rag_trace is not None else False,
+            source_basis_returned=response.source_basis,
+            final_answer=response.answer,
+            confidence=response.confidence,
+            links=response.links,
+            quality_gate=quality_gate,
+        )
+
     def _require_chat_enabled(self, actor: RequestAuthorizationContext) -> None:
         if not self.runtime_config.enabled:
             raise ApiException(
@@ -583,6 +675,31 @@ class AssistantService:
                 "assistant.provider.unavailable",
                 "errors.assistant.provider.unavailable",
             )
+
+    @staticmethod
+    def _require_admin(actor: RequestAuthorizationContext) -> None:
+        if actor.is_platform_admin or actor.has_permission(ASSISTANT_ADMIN):
+            return
+        raise ApiException(
+            403,
+            "iam.authorization.permission_denied",
+            "errors.iam.authorization.permission_denied",
+            {"permission_key": ASSISTANT_ADMIN},
+        )
+
+    @staticmethod
+    def _find_question_for_assistant_message(
+        *,
+        all_messages: list[AssistantMessage],
+        message_id: str,
+    ) -> str:
+        target_index = next((index for index, item in enumerate(all_messages) if item.id == message_id), -1)
+        if target_index < 0:
+            return ""
+        for item in reversed(all_messages[:target_index]):
+            if item.role == "user":
+                return item.content
+        return ""
 
     def _require_feedback_enabled(self, actor: RequestAuthorizationContext) -> None:
         if not self.runtime_config.enabled:
@@ -1018,6 +1135,7 @@ class AssistantService:
             top_sources=top_sources,
             missing_context=missing_context,
             retrieval_plan=dict(grounding_context.retrieval_plan),
+            query_expansion=dict(grounding_context.query_expansion),
         )
 
     def _build_compact_grounding_sources(
@@ -2200,6 +2318,44 @@ class AssistantService:
             "exakte bezeichnung",
         )
         return any(token in answer_text for token in tokens)
+
+    @staticmethod
+    def _evaluate_quality_gate(
+        *,
+        question: str,
+        classification: AssistantClassificationResult | dict[str, Any] | None,
+        response: AssistantStructuredResponse,
+        rag_trace: AssistantRagTraceRead | None,
+    ) -> AssistantRagQualityGateRead:
+        classification_payload = (
+            classification
+            if isinstance(classification, dict)
+            else AssistantService._serialize_classification(classification) if classification is not None else {}
+        )
+        return evaluate_rag_answer_quality(
+            question=question,
+            classification=classification_payload,
+            response=response,
+            rag_trace=rag_trace,
+        )
+
+    def _handle_quality_gate_result(
+        self,
+        quality_gate: AssistantRagQualityGateRead,
+    ) -> None:
+        if quality_gate.passed or self.runtime_config.rag_quality_gate_mode == "off":
+            return
+        logger.warning(
+            "assistant_rag_quality_gate_failed",
+            extra={"failures": list(quality_gate.failures)},
+        )
+        if self.runtime_config.rag_quality_gate_mode == "enforce_in_tests":
+            raise ApiException(
+                502,
+                "assistant.rag_quality_gate.failed",
+                "errors.assistant.provider.invalid_response",
+                {"failures": list(quality_gate.failures)},
+            )
 
     @staticmethod
     def _parse_tool_call_arguments(value: Any) -> dict[str, Any]:

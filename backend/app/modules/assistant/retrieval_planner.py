@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.modules.assistant.classifier import is_product_overview_question
 from app.modules.assistant.diagnostics import is_shift_visibility_question
 from app.modules.assistant.lexicon import expand_assistant_query
 from app.modules.assistant.page_help import detect_ui_howto_intent
@@ -50,6 +51,7 @@ def build_retrieval_plan(
 ) -> AssistantRetrievalPlan:
     workflow_intent = detect_workflow_intent(message)
     ui_intent = detect_ui_howto_intent(message)
+    product_overview = is_product_overview_question(message)
     needs_diagnostics = is_shift_visibility_question(message, route_context)
     expanded_query = expand_assistant_query(
         message,
@@ -81,6 +83,9 @@ def build_retrieval_plan(
         likely_page_ids.extend(["E-01", "P-03", "P-04", "P-05", "ES-01"])
         likely_module_keys.extend(["employees", "planning"])
 
+    if product_overview:
+        required_sources.extend(["knowledge_chunks"])
+
     route_page_id = None
     if route_context is not None and isinstance(route_context.get("page_id"), str):
         route_page_id = str(route_context["page_id"]).strip() or None
@@ -100,6 +105,8 @@ def build_retrieval_plan(
         intent_category = "ui_action_question"
     elif workflow_intent is not None:
         intent_category = "workflow_how_to"
+    elif product_overview:
+        intent_category = "product_overview"
     elif route_page_id is not None:
         intent_category = "navigation_question"
         required_sources.extend(["page_route_catalog", "knowledge_chunks"])

@@ -162,6 +162,29 @@ class AssistantRagTraceRead(BaseModel):
     top_sources: list[AssistantRagTraceTopSource] = Field(default_factory=list)
     missing_context: list[str] = Field(default_factory=list)
     retrieval_plan: dict[str, Any] = Field(default_factory=dict)
+    query_expansion: dict[str, Any] = Field(default_factory=dict)
+
+
+class AssistantRagQualityGateRead(BaseModel):
+    passed: bool
+    failures: list[str] = Field(default_factory=list)
+
+
+class AssistantRagDebugSnapshotRead(BaseModel):
+    question: str
+    detected_language: str | None = None
+    classification: dict[str, Any] = Field(default_factory=dict)
+    retrieval_plan: dict[str, Any] = Field(default_factory=dict)
+    expanded_query: dict[str, Any] = Field(default_factory=dict)
+    top_sources: list[AssistantRagTraceTopSource] = Field(default_factory=list)
+    content_bearing_source_count: int = 0
+    grounding_sent_to_provider: bool = False
+    provider_called: bool = False
+    source_basis_returned: list[AssistantSourceBasisItem] = Field(default_factory=list)
+    final_answer: str = ""
+    confidence: AssistantConfidence | None = None
+    links: list[AssistantNavigationLink] = Field(default_factory=list)
+    quality_gate: AssistantRagQualityGateRead
 
 
 class AssistantStructuredResponse(BaseModel):
@@ -330,6 +353,7 @@ class AssistantPageHelpFormSectionRead(BaseModel):
 class AssistantPageHelpActionRead(BaseModel):
     action_key: str
     label: str
+    label_status: str = "verified"
     action_type: str = "button"
     selector: str | None = None
     test_id: str | None = None
@@ -353,6 +377,14 @@ class AssistantPageHelpVerifiedFromRead(BaseModel):
     evidence: str
 
 
+class AssistantPageHelpSourceBasisRead(BaseModel):
+    source_type: str
+    source_name: str | None = None
+    page_id: str | None = None
+    module_key: str | None = None
+    evidence: str
+
+
 class AssistantPageHelpManifestRead(BaseModel):
     page_id: str
     page_title: str
@@ -361,10 +393,14 @@ class AssistantPageHelpManifestRead(BaseModel):
     module_key: str
     language_code: str | None = None
     source_status: str = "unverified"
+    page_purpose: str | None = None
     sidebar_path: list[AssistantPageHelpSidebarItemRead] = Field(default_factory=list)
+    workflow_keys: list[str] = Field(default_factory=list)
+    api_families: list[str] = Field(default_factory=list)
     actions: list[AssistantPageHelpActionRead] = Field(default_factory=list)
     form_sections: list[AssistantPageHelpFormSectionRead] = Field(default_factory=list)
     post_create_steps: list[AssistantPageHelpPostStepRead] = Field(default_factory=list)
+    source_basis: list[AssistantPageHelpSourceBasisRead] = Field(default_factory=list)
     verified_from: list[AssistantPageHelpVerifiedFromRead] = Field(default_factory=list)
 
 

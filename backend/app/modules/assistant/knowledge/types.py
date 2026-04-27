@@ -21,6 +21,7 @@ SUPPORTED_SOURCE_TYPES = {
     "page_route_catalog",
     "page_help_manifest",
     "workflow_help",
+    "expert_knowledge_pack",
     "ui_action_catalog",
     "api_endpoint_map",
     "role_page_coverage",

@@ -26,6 +26,7 @@ from app.modules.assistant.schemas import (
     AssistantMessageCreate,
     AssistantProviderStatusRead,
     AssistantProviderSmokeTestRead,
+    AssistantRagDebugSnapshotRead,
     AssistantStructuredResponse,
 )
 from app.modules.assistant.service import AssistantRuntimeConfig, AssistantService
@@ -63,6 +64,7 @@ def get_assistant_service(
             max_grounding_sources=settings.ai_max_grounding_sources,
             max_grounding_chars_per_source=settings.ai_max_grounding_chars_per_source,
             max_total_grounding_chars=settings.ai_max_total_grounding_chars,
+            rag_quality_gate_mode=settings.ai_rag_quality_gate_mode,
         ),
         repository=repository,
         provider=build_assistant_provider(settings),
@@ -147,6 +149,23 @@ def add_assistant_message(
     service: Annotated[AssistantService, Depends(get_assistant_service)],
 ) -> AssistantStructuredResponse:
     return service.add_message(str(conversation_id), payload, context)
+
+
+@router.get(
+    "/conversations/{conversation_id}/messages/{message_id}/rag-debug",
+    response_model=AssistantRagDebugSnapshotRead,
+)
+def get_assistant_rag_debug_snapshot(
+    conversation_id: UUID,
+    message_id: UUID,
+    context: Annotated[RequestAuthorizationContext, Depends(get_request_authorization_context)],
+    service: Annotated[AssistantService, Depends(get_assistant_service)],
+) -> AssistantRagDebugSnapshotRead:
+    return service.get_rag_debug_snapshot(
+        conversation_id=str(conversation_id),
+        message_id=str(message_id),
+        actor=context,
+    )
 
 
 @router.post(

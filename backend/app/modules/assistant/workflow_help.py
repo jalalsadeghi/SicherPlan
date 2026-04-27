@@ -66,6 +66,8 @@ def detect_workflow_intent(message: str) -> AssistantWorkflowIntent | None:
 
     if _is_customer_plan_create(lowered):
         return AssistantWorkflowIntent(intent="customer_plan_create")
+    if _is_planning_record_create(lowered):
+        return AssistantWorkflowIntent(intent="planning_record_create")
     if _is_customer_order_create(lowered):
         return AssistantWorkflowIntent(intent="customer_order_create")
     if _is_customer_create(lowered):
@@ -191,8 +193,8 @@ CUSTOMER_CREATE = AssistantWorkflowSeed(
     title_de="Kundenstammdatensatz anlegen",
     summary_en="Customer setup starts in the Customers workspace and usually covers the customer master, contacts, addresses, billing profile, invoice parties, rate cards, portal privacy, and employee visibility blocks.",
     summary_de="Die Kundenanlage startet im Kunden-Workspace und umfasst in der Regel Kundenstamm, Kontakte, Adressen, Abrechnungsprofil, Rechnungsempfänger, Preisregeln, Portal-Datenschutz und Mitarbeitersperren.",
-    intent_aliases_en=("create customer", "new customer", "customer master", "create a new customer"),
-    intent_aliases_de=("kunde anlegen", "neuen kunden anlegen", "kundenstamm anlegen", "kunden erstellen"),
+    intent_aliases_en=("create customer", "register customer", "new customer", "customer master", "create a new customer"),
+    intent_aliases_de=("kunde anlegen", "kunden registrieren", "neuen kunden anlegen", "kundenstamm anlegen", "kunden erstellen"),
     linked_page_ids=("C-01",),
     api_families=("customers",),
     steps=(
@@ -266,8 +268,8 @@ CONTRACT_OR_DOCUMENT_REGISTER = AssistantWorkflowSeed(
     title_de="Vertrag oder Dokument im richtigen Fachkontext registrieren",
     summary_en="Contract registration is document-centered and context-dependent. The assistant must distinguish customer contract, order attachment, subcontractor agreement, or generic document handling instead of inventing a standalone contract workspace.",
     summary_de="Die Vertragsregistrierung ist dokumentenzentriert und kontextabhängig. Der Assistent muss zwischen Kundenvertrag, Auftragsanhang, Subunternehmervereinbarung oder generischer Dokumentablage unterscheiden, statt einen eigenständigen Vertrags-Workspace zu erfinden.",
-    intent_aliases_en=("register contract", "new contract", "register document", "upload agreement", "attach document"),
-    intent_aliases_de=("vertrag registrieren", "neuen vertrag anlegen", "dokument registrieren", "vereinbarung hochladen", "anhang hinzufügen"),
+    intent_aliases_en=("register contract", "register agreement", "new contract", "register document", "upload agreement", "attach document"),
+    intent_aliases_de=("vertrag registrieren", "vertragsdokument registrieren", "neuen vertrag anlegen", "dokument registrieren", "vereinbarung hochladen", "anhang hinzufügen"),
     linked_page_ids=("PS-01", "C-01", "P-02", "S-01"),
     api_families=("platform_services", "customers", "planning", "subcontractors"),
     ambiguity_notes=(
@@ -376,8 +378,8 @@ CUSTOMER_ORDER_CREATE = AssistantWorkflowSeed(
     title_de="Kundenauftrag und Planungsdatensatz anlegen",
     summary_en="A customer order belongs to an existing customer and continues into a planning record with attachments, commercial linkage, and operational preparation.",
     summary_de="Ein Kundenauftrag gehört zu einem bestehenden Kunden und wird mit Anhängen, kaufmännischer Verknüpfung und operativer Vorbereitung in einen Planungsdatensatz überführt.",
-    intent_aliases_en=("create order", "new customer order", "create plan for customer", "create customer order"),
-    intent_aliases_de=("auftrag erstellen", "neuen auftrag anlegen", "planung für kunden erstellen", "kundenauftrag anlegen"),
+    intent_aliases_en=("create order", "register order", "new customer order", "create plan for customer", "create customer order"),
+    intent_aliases_de=("auftrag erstellen", "auftrag registrieren", "neuen auftrag anlegen", "planung für kunden erstellen", "kundenauftrag anlegen"),
     linked_page_ids=("C-01", "P-02"),
     api_families=("customers", "planning"),
     steps=(
@@ -440,8 +442,8 @@ CUSTOMER_PLAN_CREATE = AssistantWorkflowSeed(
     title_de="Planungsdatensatz und konkrete Schichten für Kunden anlegen",
     summary_en="Planning starts with customer and order context, then continues from planning record setup into concrete shift planning.",
     summary_de="Die Planung startet mit Kunden- und Auftragskontext und geht dann vom Planungsdatensatz in die konkrete Schichtplanung über.",
-    intent_aliases_en=("create customer plan", "new plan for customer", "create planning record", "plan customer shifts"),
-    intent_aliases_de=("kundenplanung anlegen", "neuen plan für kunden erstellen", "planungsdatensatz anlegen", "kundenschichten planen"),
+    intent_aliases_en=("create customer plan", "new plan for customer", "create planning record", "plan customer shifts", "register planning record"),
+    intent_aliases_de=("kundenplanung anlegen", "neuen plan für kunden erstellen", "planungsdatensatz anlegen", "kundenschichten planen", "planungsdatensatz registrieren"),
     linked_page_ids=("C-01", "P-02", "P-03"),
     api_families=("customers", "planning"),
     steps=(
@@ -496,6 +498,56 @@ CUSTOMER_PLAN_CREATE = AssistantWorkflowSeed(
                     page_id="P-03",
                     module_key="planning",
                     evidence="This workflow moves from the planning record into concrete shift planning in P-03.",
+                ),
+            ),
+        ),
+    ),
+)
+
+PLANNING_RECORD_CREATE = AssistantWorkflowSeed(
+    workflow_key="planning_record_create",
+    title_en="Create a planning record",
+    title_de="Planungsdatensatz anlegen",
+    summary_en="Planning-record creation bridges customer or order setup into concrete shift planning and later staffing.",
+    summary_de="Die Anlage eines Planungsdatensatzes verbindet Kunden- oder Auftragseinrichtung mit konkreter Schichtplanung und späterem Staffing.",
+    intent_aliases_en=("create planning record", "planning record", "create planning package", "operational planning record"),
+    intent_aliases_de=("planungsdatensatz anlegen", "planungsdatensatz", "planungspaket anlegen", "einsatzplanung"),
+    linked_page_ids=("P-02", "P-03"),
+    api_families=("planning",),
+    steps=(
+        _step(
+            step_key="planning_record_owner",
+            sequence=1,
+            page_id="P-02",
+            module_key="planning",
+            purpose_en="Create the planning record under the order or planning package that owns the operational planning context and attachments.",
+            purpose_de="Den Planungsdatensatz unter dem Auftrag oder Planungspaket anlegen, das den operativen Planungskontext und die Anhänge trägt.",
+            required_permissions=("planning.record.read", "planning.record.write"),
+            source_basis=(
+                _basis(
+                    source_type="implementation_data_model",
+                    source_name="Generated Implementation Data Model",
+                    page_id="P-02",
+                    module_key="planning",
+                    evidence="Planning owns orders, planning records, shifts, staffing, releases, and planning-linked document packages.",
+                ),
+            ),
+        ),
+        _step(
+            step_key="handoff_to_shift_planning",
+            sequence=2,
+            page_id="P-03",
+            module_key="planning",
+            purpose_en="Continue into Shift Planning only after the planning record exists and the planning package is ready for concrete shifts.",
+            purpose_de="Erst nach der Anlage des Planungsdatensatzes in die Schichtplanung wechseln, wenn das Planungspaket für konkrete Schichten bereit ist.",
+            required_permissions=("planning.shift.read", "planning.shift.write"),
+            source_basis=(
+                _basis(
+                    source_type="workflow_help",
+                    source_name="Workflow Manifest",
+                    page_id="P-03",
+                    module_key="planning",
+                    evidence="Planning record setup leads into concrete shift planning before staffing.",
                 ),
             ),
         ),
@@ -836,6 +888,7 @@ CANONICAL_WORKFLOW_SEEDS: tuple[AssistantWorkflowSeed, ...] = (
     CONTRACT_OR_DOCUMENT_REGISTER,
     CUSTOMER_ORDER_CREATE,
     CUSTOMER_PLAN_CREATE,
+    PLANNING_RECORD_CREATE,
     EMPLOYEE_CREATE,
     EMPLOYEE_ASSIGN_TO_SHIFT,
     SHIFT_RELEASE_TO_EMPLOYEE_APP,
@@ -863,6 +916,8 @@ def _infer_language_code(lowered: str) -> str | None:
 def _detect_by_heuristics(lowered: str) -> str | None:
     if _is_customer_plan_create(lowered):
         return "customer_plan_create"
+    if _is_planning_record_create(lowered):
+        return "planning_record_create"
     if _is_customer_order_create(lowered):
         return "customer_order_create"
     if _is_customer_create(lowered):
@@ -904,13 +959,39 @@ def _is_employee_create(lowered: str) -> bool:
         return False
     return (
         ("employee" in lowered or "mitarbeiter" in lowered or "کارمند" in lowered)
-        and any(token in lowered for token in ("create", "new", "anlegen", "erstellen", "ثبت", "بساز", "درست"))
+        and any(
+            token in lowered
+            for token in (
+                "create",
+                "new",
+                "register",
+                "registrieren",
+                "registriere",
+                "anlegen",
+                "erstellen",
+                "ثبت",
+                "بساز",
+                "درست",
+            )
+        )
     )
 
 
 def _is_customer_create(lowered: str) -> bool:
     customer_terms = ("customer", "kunde", "kunden", "مشتری")
-    create_terms = ("create", "new", "register", "anlegen", "erstellen", "erstelle", "ثبت", "بساز", "درست")
+    create_terms = (
+        "create",
+        "new",
+        "register",
+        "registrieren",
+        "registriere",
+        "anlegen",
+        "erstellen",
+        "erstelle",
+        "ثبت",
+        "بساز",
+        "درست",
+    )
     plan_terms = ("plan", "planung", "planning", "planungssatz", "auftrag", "order", "پلن", "برنامه", "سفارش", "projekt")
     return (
         any(term in lowered for term in customer_terms)
@@ -921,7 +1002,19 @@ def _is_customer_create(lowered: str) -> bool:
 
 def _is_customer_order_create(lowered: str) -> bool:
     order_terms = ("order", "auftrag", "kundenauftrag", "سفارش", "projekt")
-    create_terms = ("create", "new", "register", "anlegen", "erstellen", "erstelle", "ثبت", "بساز", "درست")
+    create_terms = (
+        "create",
+        "new",
+        "register",
+        "registrieren",
+        "registriere",
+        "anlegen",
+        "erstellen",
+        "erstelle",
+        "ثبت",
+        "بساز",
+        "درست",
+    )
     return (
         any(term in lowered for term in order_terms)
         and any(term in lowered for term in create_terms)
@@ -931,12 +1024,42 @@ def _is_customer_order_create(lowered: str) -> bool:
 def _is_customer_plan_create(lowered: str) -> bool:
     customer_terms = ("customer", "kunde", "kunden", "مشتری")
     plan_terms = ("plan", "planung", "planning", "planning record", "planungsdatensatz", "پلن", "برنامه")
-    create_terms = ("create", "new", "register", "anlegen", "erstellen", "erstelle", "ثبت", "بساز", "درست")
+    create_terms = (
+        "create",
+        "new",
+        "register",
+        "registrieren",
+        "registriere",
+        "anlegen",
+        "erstellen",
+        "erstelle",
+        "ثبت",
+        "بساز",
+        "درست",
+    )
     return (
         any(term in lowered for term in customer_terms)
         and any(term in lowered for term in plan_terms)
         and any(term in lowered for term in create_terms)
     )
+
+
+def _is_planning_record_create(lowered: str) -> bool:
+    planning_terms = ("planning record", "planungsdatensatz", "planungspaket", "einsatzplanung")
+    create_terms = (
+        "create",
+        "new",
+        "register",
+        "registrieren",
+        "registriere",
+        "anlegen",
+        "erstellen",
+        "erstelle",
+        "ثبت",
+        "بساز",
+        "درست",
+    )
+    return any(term in lowered for term in planning_terms) and any(term in lowered for term in create_terms)
 
 
 def _is_employee_assign_to_shift(lowered: str) -> bool:

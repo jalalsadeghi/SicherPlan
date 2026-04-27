@@ -7,8 +7,8 @@ This generated source summarizes verified workflow seeds used by the assistant.
 - title_de: Kundenstammdatensatz anlegen
 - summary_en: Customer setup starts in the Customers workspace and usually covers the customer master, contacts, addresses, billing profile, invoice parties, rate cards, portal privacy, and employee visibility blocks.
 - summary_de: Die Kundenanlage startet im Kunden-Workspace und umfasst in der Regel Kundenstamm, Kontakte, Adressen, Abrechnungsprofil, Rechnungsempfänger, Preisregeln, Portal-Datenschutz und Mitarbeitersperren.
-- intent_aliases_en: create customer, new customer, customer master, create a new customer
-- intent_aliases_de: kunde anlegen, neuen kunden anlegen, kundenstamm anlegen, kunden erstellen
+- intent_aliases_en: create customer, register customer, new customer, customer master, create a new customer
+- intent_aliases_de: kunde anlegen, kunden registrieren, neuen kunden anlegen, kundenstamm anlegen, kunden erstellen
 - linked_page_ids: C-01
 - linked_pages_labeled: C-01 Customers Workspace
 - api_families: customers
@@ -40,8 +40,8 @@ This generated source summarizes verified workflow seeds used by the assistant.
 - title_de: Vertrag oder Dokument im richtigen Fachkontext registrieren
 - summary_en: Contract registration is document-centered and context-dependent. The assistant must distinguish customer contract, order attachment, subcontractor agreement, or generic document handling instead of inventing a standalone contract workspace.
 - summary_de: Die Vertragsregistrierung ist dokumentenzentriert und kontextabhängig. Der Assistent muss zwischen Kundenvertrag, Auftragsanhang, Subunternehmervereinbarung oder generischer Dokumentablage unterscheiden, statt einen eigenständigen Vertrags-Workspace zu erfinden.
-- intent_aliases_en: register contract, new contract, register document, upload agreement, attach document
-- intent_aliases_de: vertrag registrieren, neuen vertrag anlegen, dokument registrieren, vereinbarung hochladen, anhang hinzufügen
+- intent_aliases_en: register contract, register agreement, new contract, register document, upload agreement, attach document
+- intent_aliases_de: vertrag registrieren, vertragsdokument registrieren, neuen vertrag anlegen, dokument registrieren, vereinbarung hochladen, anhang hinzufügen
 - linked_page_ids: PS-01, C-01, P-02, S-01
 - linked_pages_labeled: PS-01 Platform Services Workspace, C-01 Customers Workspace, P-02 Orders & Planning Records, S-01 Subcontractors Workspace
 - api_families: platform_services, customers, planning, subcontractors
@@ -83,8 +83,8 @@ This generated source summarizes verified workflow seeds used by the assistant.
 - title_de: Kundenauftrag und Planungsdatensatz anlegen
 - summary_en: A customer order belongs to an existing customer and continues into a planning record with attachments, commercial linkage, and operational preparation.
 - summary_de: Ein Kundenauftrag gehört zu einem bestehenden Kunden und wird mit Anhängen, kaufmännischer Verknüpfung und operativer Vorbereitung in einen Planungsdatensatz überführt.
-- intent_aliases_en: create order, new customer order, create plan for customer, create customer order
-- intent_aliases_de: auftrag erstellen, neuen auftrag anlegen, planung für kunden erstellen, kundenauftrag anlegen
+- intent_aliases_en: create order, register order, new customer order, create plan for customer, create customer order
+- intent_aliases_de: auftrag erstellen, auftrag registrieren, neuen auftrag anlegen, planung für kunden erstellen, kundenauftrag anlegen
 - linked_page_ids: C-01, P-02
 - linked_pages_labeled: C-01 Customers Workspace, P-02 Orders & Planning Records
 - api_families: customers, planning
@@ -111,8 +111,8 @@ This generated source summarizes verified workflow seeds used by the assistant.
 - title_de: Planungsdatensatz und konkrete Schichten für Kunden anlegen
 - summary_en: Planning starts with customer and order context, then continues from planning record setup into concrete shift planning.
 - summary_de: Die Planung startet mit Kunden- und Auftragskontext und geht dann vom Planungsdatensatz in die konkrete Schichtplanung über.
-- intent_aliases_en: create customer plan, new plan for customer, create planning record, plan customer shifts
-- intent_aliases_de: kundenplanung anlegen, neuen plan für kunden erstellen, planungsdatensatz anlegen, kundenschichten planen
+- intent_aliases_en: create customer plan, new plan for customer, create planning record, plan customer shifts, register planning record
+- intent_aliases_de: kundenplanung anlegen, neuen plan für kunden erstellen, planungsdatensatz anlegen, kundenschichten planen, planungsdatensatz registrieren
 - linked_page_ids: C-01, P-02, P-03
 - linked_pages_labeled: C-01 Customers Workspace, P-02 Orders & Planning Records, P-03 Shift Planning
 - api_families: customers, planning
@@ -137,6 +137,32 @@ This generated source summarizes verified workflow seeds used by the assistant.
   required_permissions: planning.shift.read, planning.shift.write
   source_basis:
     - workflow_help / Workflow Manifest / P-03 / planning: This workflow moves from the planning record into concrete shift planning in P-03.
+
+## Create a planning record (planning_record_create)
+
+- title_de: Planungsdatensatz anlegen
+- summary_en: Planning-record creation bridges customer or order setup into concrete shift planning and later staffing.
+- summary_de: Die Anlage eines Planungsdatensatzes verbindet Kunden- oder Auftragseinrichtung mit konkreter Schichtplanung und späterem Staffing.
+- intent_aliases_en: create planning record, planning record, create planning package, operational planning record
+- intent_aliases_de: planungsdatensatz anlegen, planungsdatensatz, planungspaket anlegen, einsatzplanung
+- linked_page_ids: P-02, P-03
+- linked_pages_labeled: P-02 Orders & Planning Records, P-03 Shift Planning
+- api_families: planning
+
+### Steps
+
+- 1. planning_record_owner [page P-02 / module planning]
+  purpose_en: Create the planning record under the order or planning package that owns the operational planning context and attachments.
+  purpose_de: Den Planungsdatensatz unter dem Auftrag oder Planungspaket anlegen, das den operativen Planungskontext und die Anhänge trägt.
+  required_permissions: planning.record.read, planning.record.write
+  source_basis:
+    - implementation_data_model / Generated Implementation Data Model / P-02 / planning: Planning owns orders, planning records, shifts, staffing, releases, and planning-linked document packages.
+- 2. handoff_to_shift_planning [page P-03 / module planning]
+  purpose_en: Continue into Shift Planning only after the planning record exists and the planning package is ready for concrete shifts.
+  purpose_de: Erst nach der Anlage des Planungsdatensatzes in die Schichtplanung wechseln, wenn das Planungspaket für konkrete Schichten bereit ist.
+  required_permissions: planning.shift.read, planning.shift.write
+  source_basis:
+    - workflow_help / Workflow Manifest / P-03 / planning: Planning record setup leads into concrete shift planning before staffing.
 
 ## Create an employee file and operational readiness (employee_create)
 

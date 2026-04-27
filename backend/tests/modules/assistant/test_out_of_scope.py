@@ -107,6 +107,17 @@ class InMemoryAssistantRepository:
     def update_message_payload(self, message: AssistantMessage, *, structured_payload: dict[str, object]) -> None:
         message.structured_payload = structured_payload
 
+    def get_message_for_conversation(
+        self,
+        *,
+        conversation_id: str,
+        message_id: str,
+    ) -> AssistantMessage | None:
+        for message in self.messages.get(conversation_id, []):
+            if message.id == message_id:
+                return message
+        return None
+
     def _next_time(self) -> datetime:
         base = datetime(2026, 4, 26, 12, 0, 0, tzinfo=UTC)
         next_value = base + timedelta(seconds=self.counter)

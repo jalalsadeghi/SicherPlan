@@ -392,6 +392,7 @@ def _dedupe_list(values: list[str]) -> list[str]:
 
 def _source_type_boost(source_type: str) -> float:
     boosts = {
+        "expert_knowledge_pack": 9.5,
         "ui_action_catalog": 9.0,
         "page_help_manifest": 9.0,
         "workflow_help": 8.0,

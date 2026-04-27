@@ -257,6 +257,7 @@ def test_in_scope_page_without_verified_ui_action_stays_grounded_and_unverified(
     assert any(
         source["source_type"] == "page_help_manifest"
         and source["page_id"] == "P-02"
-        and source["verified"] is False
+        and source["verified"] is True
+        and bool(source.get("facts", {}).get("form_sections"))
         for source in provider.requests[0].grounding_context["sources"]
     )

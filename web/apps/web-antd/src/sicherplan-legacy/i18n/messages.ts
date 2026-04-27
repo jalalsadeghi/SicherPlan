@@ -721,6 +721,9 @@ export type MessageKey =
   | "employeeAdmin.addresses.currentEmpty"
   | "employeeAdmin.addresses.historyEyebrow"
   | "employeeAdmin.addresses.historyTitle"
+  | "employeeAdmin.addresses.showHistory"
+  | "employeeAdmin.addresses.historyDialogTitle"
+  | "employeeAdmin.addresses.historyEmpty"
   | "employeeAdmin.addresses.editorEyebrow"
   | "employeeAdmin.addresses.editorTitle"
   | "employeeAdmin.addresses.editorLead"
@@ -962,6 +965,9 @@ export type MessageKey =
   | "employeeAdmin.access.diagnosticEmployeeArchived"
   | "employeeAdmin.access.diagnosticRoleAssignment"
   | "employeeAdmin.access.diagnosticPermission"
+  | "employeeAdmin.access.openDiagnostics"
+  | "employeeAdmin.access.diagnosticsDialogTitle"
+  | "employeeAdmin.access.diagnosticsSummary"
   | "employeeAdmin.access.lead"
   | "employeeAdmin.access.stateCreateEyebrow"
   | "employeeAdmin.access.stateCreateTitle"
@@ -984,6 +990,8 @@ export type MessageKey =
   | "employeeAdmin.access.manageLead"
   | "employeeAdmin.access.resetEyebrow"
   | "employeeAdmin.access.resetTitle"
+  | "employeeAdmin.access.openResetPassword"
+  | "employeeAdmin.access.resetPasswordDialogTitle"
   | "employeeAdmin.access.resetLead"
   | "employeeAdmin.access.detachEyebrow"
   | "employeeAdmin.access.detachTitle"
@@ -2757,6 +2765,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.addresses.currentEmpty": "Keine aktuelle Adresse vorhanden.",
     "employeeAdmin.addresses.historyEyebrow": "Historie",
     "employeeAdmin.addresses.historyTitle": "Aktuelle und frühere Mitarbeiteradressen",
+    "employeeAdmin.addresses.showHistory": "Adresshistorie anzeigen",
+    "employeeAdmin.addresses.historyDialogTitle": "Adresshistorie",
+    "employeeAdmin.addresses.historyEmpty": "Keine Adresshistorie vorhanden.",
     "employeeAdmin.addresses.editorEyebrow": "Bearbeitung",
     "employeeAdmin.addresses.editorTitle": "Adresse anlegen oder bearbeiten",
     "employeeAdmin.addresses.editorLead": "Neue Adresshistorie wird mit Start- und optionalem Enddatum direkt über die Admin-Endpunkte gespeichert.",
@@ -3005,6 +3016,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.access.diagnosticEmployeeArchived": "Mitarbeiter ist nicht archiviert",
     "employeeAdmin.access.diagnosticRoleAssignment": "Rolle employee_user ist aktiv",
     "employeeAdmin.access.diagnosticPermission": "Berechtigung portal.employee.access ist vorhanden",
+    "employeeAdmin.access.openDiagnostics": "Login-Diagnose anzeigen",
+    "employeeAdmin.access.diagnosticsDialogTitle": "Login-Diagnose",
+    "employeeAdmin.access.diagnosticsSummary": "{passed} von {total} Login-Prüfungen erfüllt.",
     "employeeAdmin.access.lead": "Jede Mitarbeiterakte darf genau einen verknüpften App-Zugang haben. Die Oberfläche folgt diesem Ein-Benutzer-Modell jetzt explizit.",
     "employeeAdmin.access.stateCreateEyebrow": "Kein verknüpfter Zugang",
     "employeeAdmin.access.stateCreateTitle": "App-Zugang neu anlegen",
@@ -3027,6 +3041,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.access.manageLead": "Benutzername, E-Mail und Anzeigename des bereits verknüpften IAM-Kontos können hier direkt gepflegt werden.",
     "employeeAdmin.access.resetEyebrow": "Sicherheit",
     "employeeAdmin.access.resetTitle": "Passwort neu setzen",
+    "employeeAdmin.access.openResetPassword": "Passwort zurücksetzen",
+    "employeeAdmin.access.resetPasswordDialogTitle": "Passwort zurücksetzen",
     "employeeAdmin.access.resetLead": "Setzt ein neues Passwort für den verknüpften Zugang und beendet bestehende Sitzungen kontrolliert.",
     "employeeAdmin.access.detachEyebrow": "Trennen",
     "employeeAdmin.access.detachTitle": "Verknüpften Zugang lösen",
@@ -4985,6 +5001,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.addresses.currentEmpty": "No current address is available.",
     "employeeAdmin.addresses.historyEyebrow": "History",
     "employeeAdmin.addresses.historyTitle": "Current and past employee addresses",
+    "employeeAdmin.addresses.showHistory": "Show address history",
+    "employeeAdmin.addresses.historyDialogTitle": "Address history",
+    "employeeAdmin.addresses.historyEmpty": "No address history is available.",
     "employeeAdmin.addresses.editorEyebrow": "Editor",
     "employeeAdmin.addresses.editorTitle": "Create or edit address",
     "employeeAdmin.addresses.editorLead": "New address-history rows are stored through the admin employee-address endpoints with a start date and optional end date.",
@@ -5238,6 +5257,9 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.access.diagnosticEmployeeArchived": "Employee is not archived",
     "employeeAdmin.access.diagnosticRoleAssignment": "employee_user role assignment is active",
     "employeeAdmin.access.diagnosticPermission": "portal.employee.access permission is granted",
+    "employeeAdmin.access.openDiagnostics": "Open login diagnostics",
+    "employeeAdmin.access.diagnosticsDialogTitle": "Login diagnostics",
+    "employeeAdmin.access.diagnosticsSummary": "{passed} of {total} login checks passed.",
     "employeeAdmin.access.lead": "Each employee file can have exactly one linked app-access account. This tab now follows that one-user-per-employee rule explicitly.",
     "employeeAdmin.access.stateCreateEyebrow": "No linked account",
     "employeeAdmin.access.stateCreateTitle": "Create app access",
@@ -5260,6 +5282,8 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.access.manageLead": "Maintain username, email, and display name for the already-linked IAM account directly from this employee file.",
     "employeeAdmin.access.resetEyebrow": "Security",
     "employeeAdmin.access.resetTitle": "Reset password",
+    "employeeAdmin.access.openResetPassword": "Reset password",
+    "employeeAdmin.access.resetPasswordDialogTitle": "Reset password",
     "employeeAdmin.access.resetLead": "Sets a new password for the linked account and revokes existing sessions in a controlled way.",
     "employeeAdmin.access.detachEyebrow": "Detach",
     "employeeAdmin.access.detachTitle": "Detach linked account",

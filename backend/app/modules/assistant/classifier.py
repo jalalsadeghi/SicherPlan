@@ -218,6 +218,17 @@ _OUT_OF_SCOPE_PATTERNS = {
     "هوا",
 }
 
+_PRODUCT_OVERVIEW_TERMS = {
+    "what does sicherplan do",
+    "what does this software do",
+    "what is this platform used for",
+    "explain what this software does",
+    "was macht sicherplan",
+    "wofür ist diese plattform",
+    "was macht diese software",
+    "erklären sie mir kurz und bündig was diese software genau macht",
+}
+
 
 def classify_assistant_message(
     text: str,
@@ -249,6 +260,16 @@ def classify_assistant_message(
             is_out_of_scope=False,
             is_unsafe=False,
             reason=f"workflow_intent:{workflow_intent.intent}",
+            confidence="high",
+        )
+
+    if is_product_overview_question(cleaned):
+        return AssistantClassificationResult(
+            category=AssistantIntentCategory.PLATFORM_RELATED,
+            is_platform_related=True,
+            is_out_of_scope=False,
+            is_unsafe=False,
+            reason="product_overview",
             confidence="high",
         )
 
@@ -290,6 +311,15 @@ def classify_assistant_message(
         reason="no_sicherplan_platform_signal",
         confidence="medium",
     )
+
+
+def is_product_overview_question(text: str) -> bool:
+    lowered = text.strip().casefold()
+    if lowered in _PRODUCT_OVERVIEW_TERMS:
+        return True
+    software_terms = ("software", "plattform", "platform", "sicherplan")
+    overview_verbs = ("macht", "do", "does", "used for", "wofür", "explain", "erklär", "genau macht")
+    return any(term in lowered for term in software_terms) and any(term in lowered for term in overview_verbs)
 
 
 def _build_route_blob(route_context: dict[str, object] | None) -> str:

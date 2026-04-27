@@ -242,7 +242,11 @@ describe('assistant api client', () => {
           page_title: 'Employees Workspace',
           module_key: 'employees',
           source_status: 'verified',
-          actions: [{ action_key: 'employees.create.open', label: 'Create employee file' }],
+          page_purpose: 'Manage employees and operational readiness.',
+          workflow_keys: ['employee_create'],
+          api_families: ['employees'],
+          source_basis: [{ source_type: 'page_help_manifest', evidence: 'Verified in source' }],
+          actions: [{ action_key: 'employees.create.open', label: 'Create employee file', label_status: 'verified' }],
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -251,6 +255,7 @@ describe('assistant api client', () => {
     await expect(getAssistantPageHelp('E-01', 'fa')).resolves.toMatchObject({
       page_id: 'E-01',
       source_status: 'verified',
+      workflow_keys: ['employee_create'],
     });
 
     expect(fetchMock).toHaveBeenCalledWith(

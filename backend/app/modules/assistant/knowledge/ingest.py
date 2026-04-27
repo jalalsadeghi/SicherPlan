@@ -8,6 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from app.modules.assistant.expert_knowledge_pack import render_expert_knowledge_pack_markdown
 from app.modules.assistant.page_catalog_seed import ASSISTANT_PAGE_ROUTE_SEEDS
 from app.modules.assistant.page_help_seed import ASSISTANT_PAGE_HELP_SEEDS
 from app.modules.assistant.workflow_help import WORKFLOW_HELP_SEEDS
@@ -225,6 +226,7 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
     operational_handbook_path = generated_root / "operational-handbook-generated.md"
     user_manual_path = generated_root / "user-manual-generated.md"
     implementation_data_model_path = generated_root / "implementation-data-model-generated.md"
+    expert_knowledge_pack_path = generated_root / "expert-knowledge-pack.md"
 
     page_catalog_lines = ["# Assistant Page Route Catalog", ""]
     for seed in ASSISTANT_PAGE_ROUTE_SEEDS:
@@ -252,7 +254,7 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
             f"- module_key: {seed.module_key}\n"
             f"- status: {seed.status}\n"
             f"- page_title: {seed.manifest_json.get('page_title', seed.page_id)}\n"
-            f"- verified_actions: {len(actions)}\n"
+            f"- actions_registered: {len(actions)}\n"
             f"- verified_sections: {len(form_sections)}\n"
             f"- verified_post_steps: {len(post_steps)}\n"
         )
@@ -260,8 +262,9 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
             page_help_lines.append("### Actions\n")
             for action in actions:
                 page_help_lines.append(
-                    f"- {action.get('label') or action.get('action_key')}: "
-                    f"{action.get('result') or 'verified action'}"
+                    f"- {action.get('label') or action.get('action_key')} "
+                    f"[{action.get('label_status') or ('verified' if action.get('verified') else 'unverified')}]: "
+                    f"{action.get('result') or 'documented action'}"
                 )
         if form_sections:
             page_help_lines.append("\n### Sections\n")
@@ -289,9 +292,10 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
             ui_action_lines.append(
                 f"- action_key: {action.get('action_key')}\n"
                 f"  label: {action.get('label')}\n"
+                f"  label_status: {action.get('label_status') or ('verified' if action.get('verified') else 'unverified')}\n"
                 f"  location: {action.get('location')}\n"
                 f"  required_permissions: {', '.join(action.get('required_permissions') or []) or 'none'}\n"
-                f"  result: {action.get('result') or 'verified action'}\n"
+                f"  result: {action.get('result') or 'documented action'}\n"
             )
         ui_action_lines.append("")
     ui_action_path.write_text("\n".join(ui_action_lines), encoding="utf-8")
@@ -432,6 +436,7 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
         "- Contract-like content should be grounded as document ownership plus business context rather than as a fake standalone contract table or module.",
     ]
     implementation_data_model_path.write_text("\n".join(implementation_data_model_lines), encoding="utf-8")
+    expert_knowledge_pack_path.write_text(render_expert_knowledge_pack_markdown(), encoding="utf-8")
 
     registrations.extend(
         [
@@ -479,6 +484,11 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
                 source_type="implementation_data_model",
                 source_name="Generated Implementation Data Model",
                 source_path=str(implementation_data_model_path),
+            ),
+            KnowledgeSourceRegistration(
+                source_type="expert_knowledge_pack",
+                source_name="SicherPlan Expert Knowledge Pack",
+                source_path=str(expert_knowledge_pack_path),
             ),
         ]
     )

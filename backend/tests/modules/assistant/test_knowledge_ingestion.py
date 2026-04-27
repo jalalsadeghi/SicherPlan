@@ -190,6 +190,7 @@ def test_default_registrations_include_generated_corpus_seed_types(tmp_path: Pat
         "page_route_catalog",
         "page_help_manifest",
         "workflow_help",
+        "expert_knowledge_pack",
         "ui_action_catalog",
         "api_export",
         "role_page_coverage",
