@@ -125,6 +125,12 @@ class AssistantNavigationLink(BaseModel):
     reason: str | None = None
 
 
+class AssistantAnswerSegment(BaseModel):
+    type: str
+    text: str
+    link: AssistantNavigationLink | None = None
+
+
 class AssistantMissingPermission(BaseModel):
     permission: str
     reason: str
@@ -193,6 +199,7 @@ class AssistantStructuredResponse(BaseModel):
     detected_language: str
     response_language: str
     answer: str
+    answer_segments: list[AssistantAnswerSegment] = Field(default_factory=list)
     scope: AssistantScope
     confidence: AssistantConfidence
     out_of_scope: bool = False

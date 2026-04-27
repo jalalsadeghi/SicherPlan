@@ -43,6 +43,7 @@ describe('AssistantMessageList', () => {
         ],
         missingPermissionsTitle: 'Missing permissions',
         nextStepsTitle: 'Next steps',
+        processingLabel: 'Processing request',
         sourcesTitle: 'Sources used',
         severityLabels: {
           blocking: 'Blocking',
@@ -65,7 +66,7 @@ describe('AssistantMessageList', () => {
     ]);
   });
 
-  it('renders structured diagnosis, missing permissions, next steps, and out-of-scope answers as readable UI', () => {
+  it('renders structured diagnosis, missing permissions, next steps, and collapsible source basis as readable UI', async () => {
     const wrapper = mount(AssistantMessageList, {
       props: {
         assistantLabel: 'Assistant',
@@ -128,6 +129,7 @@ describe('AssistantMessageList', () => {
         ],
         missingPermissionsTitle: 'Missing permissions',
         nextStepsTitle: 'Next steps',
+        processingLabel: 'Processing request',
         sourcesTitle: 'Sources used',
         severityLabels: {
           blocking: 'Blocking',
@@ -148,7 +150,12 @@ describe('AssistantMessageList', () => {
     expect(wrapper.text()).toContain('Next steps');
     expect(wrapper.text()).toContain('Open the planning workspace.');
     expect(wrapper.text()).toContain('Sources used');
-    expect(wrapper.text()).toContain('PS-01 - Platform Services Workspace');
+    expect(wrapper.text()).not.toContain('Platform Services Workspace — contract_or_document_register');
+    const sourceToggle = wrapper.get('[data-testid="assistant-source-basis"] button');
+    expect(sourceToggle.attributes('aria-expanded')).toBe('false');
+    await sourceToggle.trigger('click');
+    expect(sourceToggle.attributes('aria-expanded')).toBe('true');
+    expect(wrapper.text()).toContain('Platform Services Workspace — contract_or_document_register');
     expect(wrapper.text()).not.toContain('Links');
   });
 });

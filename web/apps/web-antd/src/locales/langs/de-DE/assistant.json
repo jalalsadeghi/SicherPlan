@@ -12,6 +12,7 @@
     "errorBody": "Die Assistant-Anfrage konnte gerade nicht abgeschlossen werden.",
     "inputLabel": "Assistant-Nachricht",
     "inputPlaceholder": "Fragen Sie zu SicherPlan-Workflows, Schichten, Mitarbeitenden, Planung, Finanzen, Berichten oder Portalen...",
+    "processing": "Anfrage wird verarbeitet",
     "send": "Senden",
     "sending": "Wird gesendet...",
     "assistantLabel": "Assistant",

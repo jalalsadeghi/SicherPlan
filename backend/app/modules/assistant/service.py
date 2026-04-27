@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import logging
+import re
 from typing import Any, Protocol
 from uuid import uuid4
 
@@ -29,6 +30,7 @@ from app.modules.assistant.language import (
 from app.modules.assistant.page_help import (
     detect_ui_howto_intent,
 )
+from app.modules.assistant.page_catalog_seed import ASSISTANT_PAGE_ROUTE_SEEDS
 from app.modules.assistant.prompt_builder import (
     AssistantMessageContext,
     AssistantToolDefinition as PromptToolDefinition,
@@ -68,6 +70,7 @@ from app.modules.assistant.schemas import (
     AssistantConfidence,
     AssistantConversationCreate,
     AssistantConversationRead,
+    AssistantAnswerSegment,
     AssistantFeedbackCreate,
     AssistantFeedbackRead,
     AssistantKnowledgeChunkResult,
@@ -85,6 +88,7 @@ from app.modules.assistant.schemas import (
     AssistantRouteContextInput,
     AssistantScope,
     AssistantMissingPermission,
+    AssistantNavigationLink,
 )
 from app.modules.assistant.tool_name_adapter import build_provider_tool_name_map
 from app.modules.assistant.tools import AssistantToolExecutionContext, AssistantToolRegistry
@@ -92,6 +96,12 @@ from app.modules.assistant.workflow_help import detect_workflow_intent
 from app.modules.iam.authz import RequestAuthorizationContext
 
 logger = logging.getLogger(__name__)
+
+_PAGE_ID_PATTERN = re.compile(r"\b[A-Z]{1,4}-\d{2}\b")
+_PAGE_ID_SUFFIX_PATTERN_TEMPLATE = r"(?P<label>{label})\s*(?:\(\s*{page_id}\s*\)|[-–—]\s*{page_id})"
+_WHITESPACE_BEFORE_PUNCTUATION_PATTERN = re.compile(r"\s+([,.;:!?])")
+_MULTISPACE_PATTERN = re.compile(r"[ \t]{2,}")
+_SPACE_AROUND_NEWLINE_PATTERN = re.compile(r" *\n *")
 
 @dataclass(frozen=True)
 class AssistantRuntimeConfig:
@@ -834,6 +844,17 @@ class AssistantService:
             actor=actor,
             conversation_id=conversation.id,
         )
+        answer_text = str(provider_payload.get("answer", ""))
+        enriched_links = self._ensure_answer_links(
+            answer_text=answer_text,
+            validated_links=validated_links,
+            actor=actor,
+            conversation_id=conversation.id,
+        )
+        normalized_answer, answer_segments = self._normalize_user_facing_answer_links(
+            answer_text=answer_text,
+            allowed_links=enriched_links,
+        )
         confidence = AssistantConfidence(
             str(provider_payload.get("confidence", classification.confidence))
         )
@@ -864,12 +885,13 @@ class AssistantService:
             message_id=assistant_message.id,
             detected_language=detected_language,
             response_language=response_language,
-            answer=str(provider_payload.get("answer", "")),
+            answer=normalized_answer,
+            answer_segments=answer_segments,
             scope=self._infer_scope(actor),
             confidence=confidence,
             out_of_scope=bool(provider_payload.get("out_of_scope", classification.is_out_of_scope)),
             diagnosis=provider_payload.get("diagnosis", []),
-            links=validated_links,
+            links=enriched_links,
             missing_permissions=provider_payload.get("missing_permissions", []),
             next_steps=provider_payload.get("next_steps", []),
             tool_trace_id=provider_payload.get("tool_trace_id"),
@@ -1632,6 +1654,190 @@ class AssistantService:
             if isinstance(safe_link, dict):
                 validated.append(safe_link)
         return validated
+
+    def _ensure_answer_links(
+        self,
+        *,
+        answer_text: str,
+        validated_links: list[dict[str, Any]],
+        actor: RequestAuthorizationContext,
+        conversation_id: str,
+    ) -> list[dict[str, Any]]:
+        if self.tool_registry is None:
+            return validated_links
+        referenced_page_ids = self._extract_page_ids_from_answer(answer_text)
+        if not referenced_page_ids:
+            return validated_links
+        seen_page_ids = {
+            str(item.get("page_id") or "").strip()
+            for item in validated_links
+            if isinstance(item, dict)
+        }
+        enriched = list(validated_links)
+        for page_id in referenced_page_ids:
+            if page_id in seen_page_ids:
+                continue
+            tool_result = self.execute_registered_tool(
+                tool_name="navigation.build_allowed_link",
+                input_data={"page_id": page_id},
+                actor=actor,
+                conversation_id=conversation_id,
+            )
+            link_payload = tool_result.data if isinstance(tool_result.data, dict) else {}
+            if not tool_result.ok or not link_payload.get("allowed"):
+                continue
+            safe_link = link_payload.get("link")
+            if isinstance(safe_link, dict):
+                enriched.append(safe_link)
+                seen_page_ids.add(page_id)
+        return enriched
+
+    def _normalize_user_facing_answer_links(
+        self,
+        *,
+        answer_text: str,
+        allowed_links: list[dict[str, Any]],
+    ) -> tuple[str, list[AssistantAnswerSegment]]:
+        inline_aliases = self._collect_inline_page_aliases(answer_text)
+        page_label_map = self._build_page_label_map(allowed_links)
+        normalized = answer_text
+
+        for page_id, label in page_label_map.items():
+            page_pattern = re.escape(page_id)
+            normalized = re.sub(rf"\(\s*{page_pattern}\s*\)", "", normalized)
+            normalized = re.sub(rf"\s*[-–—]\s*{page_pattern}\b", "", normalized)
+            if not label:
+                continue
+            label_pattern = re.escape(label)
+            normalized = re.sub(
+                _PAGE_ID_SUFFIX_PATTERN_TEMPLATE.format(label=label_pattern, page_id=page_pattern),
+                label,
+                normalized,
+            )
+
+        normalized = _PAGE_ID_PATTERN.sub(
+            lambda match: page_label_map.get(match.group(0), ""),
+            normalized,
+        )
+        normalized = _MULTISPACE_PATTERN.sub(" ", normalized)
+        normalized = _SPACE_AROUND_NEWLINE_PATTERN.sub("\n", normalized)
+        normalized = _WHITESPACE_BEFORE_PUNCTUATION_PATTERN.sub(r"\1", normalized)
+        normalized = normalized.strip()
+
+        segments = self._build_answer_segments(
+            answer_text=normalized,
+            allowed_links=allowed_links,
+            inline_aliases=inline_aliases,
+        )
+        return normalized, segments
+
+    def _build_answer_segments(
+        self,
+        *,
+        answer_text: str,
+        allowed_links: list[dict[str, Any]],
+        inline_aliases: dict[str, str] | None = None,
+    ) -> list[AssistantAnswerSegment]:
+        if not answer_text:
+            return []
+        base_links = [
+            item
+            for item in (
+                AssistantNavigationLink.model_validate(link)
+                for link in allowed_links
+                if isinstance(link, dict)
+            )
+            if item.label and item.path
+        ]
+        links = list(base_links)
+        alias_map = inline_aliases or {}
+        for link in base_links:
+            alias = alias_map.get(str(link.page_id or "").strip())
+            if alias and alias != link.label:
+                links.append(link.model_copy(update={"label": alias}))
+        if not links:
+            return [AssistantAnswerSegment(type="text", text=answer_text)]
+
+        ordered_links = sorted(links, key=lambda item: len(item.label), reverse=True)
+        segments: list[AssistantAnswerSegment] = []
+        cursor = 0
+        while cursor < len(answer_text):
+            next_match: tuple[int, int, AssistantNavigationLink] | None = None
+            for link in ordered_links:
+                start = answer_text.find(link.label, cursor)
+                if start < 0:
+                    continue
+                end = start + len(link.label)
+                if next_match is None or start < next_match[0]:
+                    next_match = (start, end, link)
+            if next_match is None:
+                segments.append(AssistantAnswerSegment(type="text", text=answer_text[cursor:]))
+                break
+            start, end, link = next_match
+            if start > cursor:
+                segments.append(AssistantAnswerSegment(type="text", text=answer_text[cursor:start]))
+            segments.append(
+                AssistantAnswerSegment(
+                    type="link",
+                    text=answer_text[start:end],
+                    link=link,
+                )
+            )
+            cursor = end
+        return [segment for segment in segments if segment.text]
+
+    @staticmethod
+    def _extract_page_ids_from_answer(answer_text: str) -> list[str]:
+        seen: set[str] = set()
+        result: list[str] = []
+        for match in _PAGE_ID_PATTERN.finditer(answer_text):
+            page_id = match.group(0)
+            if page_id in seen:
+                continue
+            seen.add(page_id)
+            result.append(page_id)
+        return result
+
+    @staticmethod
+    def _build_page_label_map(allowed_links: list[dict[str, Any]]) -> dict[str, str]:
+        page_labels = {seed.page_id: seed.label for seed in ASSISTANT_PAGE_ROUTE_SEEDS}
+        for link in allowed_links:
+            if not isinstance(link, dict):
+                continue
+            page_id = str(link.get("page_id") or "").strip()
+            label = str(link.get("label") or "").strip()
+            if page_id and label:
+                page_labels[page_id] = label
+        return page_labels
+
+    @staticmethod
+    def _collect_inline_page_aliases(answer_text: str) -> dict[str, str]:
+        aliases: dict[str, str] = {}
+        for match in re.finditer(rf"(?P<context>[^\n()]{{1,120}})\(\s*(?P<page_id>{_PAGE_ID_PATTERN.pattern})\s*\)", answer_text):
+            page_id = str(match.group("page_id") or "").strip()
+            candidate = AssistantService._extract_inline_label_candidate(str(match.group("context") or ""))
+            if page_id and candidate:
+                aliases[page_id] = candidate
+        for match in re.finditer(rf"(?P<context>[^\n]{{1,120}})[-–—]\s*(?P<page_id>{_PAGE_ID_PATTERN.pattern})\b", answer_text):
+            page_id = str(match.group("page_id") or "").strip()
+            candidate = AssistantService._extract_inline_label_candidate(str(match.group("context") or ""))
+            if page_id and candidate:
+                aliases[page_id] = candidate
+        return aliases
+
+    @staticmethod
+    def _extract_inline_label_candidate(value: str) -> str | None:
+        cleaned = value.strip().strip("([{-–— ").strip()
+        for separator in (".", "!", "?", ":", ";", "\n"):
+            if separator in cleaned:
+                cleaned = cleaned.rsplit(separator, 1)[-1].strip()
+        for marker in (" im ", " in the ", " in ", " auf ", " on ", " unter ", " within "):
+            if marker in cleaned:
+                cleaned = cleaned.rsplit(marker, 1)[-1].strip()
+        cleaned = cleaned.strip(" '\"()[]{}")
+        if len(cleaned) < 2:
+            return None
+        return cleaned[-80:]
 
     @staticmethod
     def _grounding_sources_from_tool_result(

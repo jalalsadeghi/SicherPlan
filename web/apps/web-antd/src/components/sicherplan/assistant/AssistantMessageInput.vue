@@ -9,6 +9,7 @@ const props = defineProps<{
   placeholder: string;
   sending?: boolean;
   submitLabel: string;
+  sendingLabel?: string;
   value: string;
 }>();
 
@@ -61,7 +62,7 @@ defineExpose({ focus });
       :disabled="disabled || !value.trim()"
       type="submit"
     >
-      {{ sending ? `${submitLabel}...` : submitLabel }}
+      {{ sending ? (sendingLabel || `${submitLabel}...`) : submitLabel }}
     </button>
   </form>
 </template>

@@ -38,6 +38,7 @@ export interface AssistantUiMessage {
   detected_language?: null | string;
   feedback?: AssistantUiFeedbackState;
   id: string;
+  pending?: boolean;
   response_language?: null | string;
   role: 'assistant' | 'system_summary' | 'tool' | 'user';
   structured_response?: AssistantStructuredResponse | null;
@@ -206,6 +207,10 @@ function mapAssistantResponseToMessage(
   };
 }
 
+function makeLocalMessageId(prefix: string) {
+  return `local-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function persistAssistantState(state: AssistantState) {
   persistAssistantSessionState({
     activeConversationId: state.activeConversationId ?? '',
@@ -348,7 +353,10 @@ export const useAssistantStore = defineStore('assistant', () => {
       initial_route: routeContext,
       locale: preferences.app.locale,
     });
-    applyConversation(conversation);
+    activeConversationId.value = conversation.id;
+    if (messages.value.length === 0) {
+      applyConversation(conversation);
+    }
     persistAssistantState(state.value);
     return conversation.id;
   }
@@ -362,29 +370,41 @@ export const useAssistantStore = defineStore('assistant', () => {
     sendingMessage.value = true;
     error.value = null;
     const routeContext = captureCurrentRouteContext();
-    const conversationId = await startConversationIfNeeded();
 
     const optimisticUserMessage: AssistantUiMessage = {
-      id: `local-user-${Date.now()}`,
+      id: makeLocalMessageId('user'),
       role: 'user',
       content: cleaned,
     };
-    messages.value = [...messages.value, optimisticUserMessage];
+    const pendingAssistantMessage: AssistantUiMessage = {
+      id: makeLocalMessageId('assistant-pending'),
+      role: 'assistant',
+      content: '',
+      pending: true,
+    };
+    messages.value = [...messages.value, optimisticUserMessage, pendingAssistantMessage];
     draftInput.value = '';
     persistAssistantState(state.value);
 
     try {
+      const conversationId = await startConversationIfNeeded();
       const response = await sendAssistantMessage(conversationId, {
         message: cleaned,
         route_context: routeContext,
         client_context: buildAssistantClientContext(),
       });
       activeConversationId.value = response.conversation_id;
-      messages.value = [...messages.value, attachFeedbackState(mapAssistantResponseToMessage(response))];
+      const assistantMessage = attachFeedbackState(mapAssistantResponseToMessage(response));
+      messages.value = messages.value.map((item) =>
+        item.id === pendingAssistantMessage.id ? assistantMessage : item,
+      );
       persistAssistantState(state.value);
       return response;
     } catch (caught) {
-      messages.value = messages.value.filter((item) => item.id !== optimisticUserMessage.id);
+      messages.value = messages.value.filter(
+        (item) =>
+          item.id !== optimisticUserMessage.id && item.id !== pendingAssistantMessage.id,
+      );
       draftInput.value = cleaned;
       const normalized = normalizeAssistantApiError(caught);
       error.value = normalized.messageKey;

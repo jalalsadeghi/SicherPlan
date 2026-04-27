@@ -303,7 +303,13 @@ describe('SicherPlanAssistantWidget', () => {
     expect(wrapper.text()).toContain('Schicht freigeben');
     expect(wrapper.text()).toContain('assistant.widget.linksTitle');
     expect(wrapper.text()).toContain('assistant.widget.sourcesTitle');
-    expect(wrapper.text()).toContain('P-03 - Shift Planning');
+    expect(wrapper.text()).not.toContain('Shift Planning — SicherPlanPlanningShifts');
+
+    const sourceToggle = wrapper.get('[data-testid="assistant-source-basis"] button');
+    expect(sourceToggle.attributes('aria-expanded')).toBe('false');
+    await sourceToggle.trigger('click');
+    expect(sourceToggle.attributes('aria-expanded')).toBe('true');
+    expect(wrapper.text()).toContain('Shift Planning — SicherPlanPlanningShifts');
 
     const linkButton = wrapper.find('.sp-assistant-link-card__action');
     await linkButton.trigger('click');

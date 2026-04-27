@@ -12,6 +12,7 @@
     "errorBody": "The assistant request could not be completed right now.",
     "inputLabel": "Assistant message",
     "inputPlaceholder": "Ask about SicherPlan workflows, shifts, employees, planning, finance, reports, or portals...",
+    "processing": "Processing request",
     "send": "Send",
     "sending": "Sending...",
     "assistantLabel": "Assistant",

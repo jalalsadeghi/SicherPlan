@@ -38,8 +38,10 @@ defineProps<{
   missingPermissionsTitle: string;
   providerWarning?: null | string;
   nextStepsTitle: string;
+  processingLabel: string;
   sourcesTitle: string;
   sendingMessage?: boolean;
+  sendingLabel?: string;
   severityLabels: Record<string, string>;
   submitLabel: string;
   title: string;
@@ -123,6 +125,7 @@ defineExpose({ focusInput });
       :messages="messages"
       :missing-permissions-title="missingPermissionsTitle"
       :next-steps-title="nextStepsTitle"
+      :processing-label="processingLabel"
       :sources-title="sourcesTitle"
       :severity-labels="severityLabels"
       :user-label="userLabel"
@@ -136,6 +139,7 @@ defineExpose({ focusInput });
       :input-label="inputLabel"
       :placeholder="inputPlaceholder"
       :sending="sendingMessage"
+      :sending-label="sendingLabel"
       :submit-label="submitLabel"
       :value="draftInput"
       @submit="$emit('send')"

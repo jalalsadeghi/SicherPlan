@@ -1,8 +1,8 @@
 <script lang="ts" setup>
 import type {
+  AssistantAnswerSegment,
   AssistantLink,
   AssistantMissingPermission,
-  AssistantSourceBasisItem,
 } from '#/api/sicherplan/assistant';
 import type { AssistantFeedbackRating } from '#/api/sicherplan/assistant';
 import type { AssistantUiMessage } from '#/store';
@@ -12,6 +12,7 @@ import { nextTick, ref, watch } from 'vue';
 import AssistantFeedback from './AssistantFeedback.vue';
 import AssistantEvidenceList from './AssistantEvidenceList.vue';
 import AssistantLinkCard from './AssistantLinkCard.vue';
+import AssistantSourceBasis from './AssistantSourceBasis.vue';
 
 defineOptions({ name: 'AssistantMessageList' });
 
@@ -33,6 +34,7 @@ const props = defineProps<{
   messages: AssistantUiMessage[];
   missingPermissionsTitle: string;
   nextStepsTitle: string;
+  processingLabel: string;
   sourcesTitle: string;
   severityLabels: Record<string, string>;
   userLabel: string;
@@ -65,22 +67,17 @@ function missingPermissionKey(item: AssistantMissingPermission) {
   return `${item.permission}-${item.reason || ''}`;
 }
 
-function sourceBasisKey(item: AssistantSourceBasisItem) {
-  return [
-    item.source_type,
-    item.source_name || '',
-    item.page_id || '',
-    item.title || '',
-  ].join(':');
-}
-
-function sourceBasisLabel(item: AssistantSourceBasisItem) {
-  const head = item.page_id || item.module_key || item.source_name || item.source_type;
-  const tail = item.title || item.source_name;
-  if (tail && tail !== head) {
-    return `${head} - ${tail}`;
+function answerSegments(message: AssistantUiMessage): AssistantAnswerSegment[] {
+  const structured = message.structured_response;
+  if (structured?.answer_segments?.length) {
+    return structured.answer_segments;
   }
-  return head;
+  return [
+    {
+      type: 'text',
+      text: structured?.answer || message.content,
+    },
+  ];
 }
 </script>
 
@@ -107,7 +104,34 @@ function sourceBasisLabel(item: AssistantSourceBasisItem) {
         </span>
       </header>
 
-      <p class="sp-assistant-message__content">{{ message.structured_response?.answer || message.content }}</p>
+      <div
+        v-if="message.pending"
+        class="sp-assistant-message__pending"
+        data-testid="assistant-pending-indicator"
+        role="status"
+        aria-live="polite"
+      >
+        <IconifyIcon aria-hidden="true" icon="lucide:loader-circle" />
+        <span>{{ processingLabel }}</span>
+      </div>
+
+      <p v-else class="sp-assistant-message__content">
+        <template
+          v-for="(segment, index) in answerSegments(message)"
+          :key="`${message.id}-segment-${index}`"
+        >
+          <a
+            v-if="segment.type === 'link' && segment.link?.path"
+            class="sp-assistant-message__inline-link"
+            :aria-label="segment.link.label"
+            :href="segment.link.path"
+            @click.prevent="emit('open-link', segment.link)"
+          >
+            {{ segment.text }}
+          </a>
+          <span v-else>{{ segment.text }}</span>
+        </template>
+      </p>
 
       <AssistantEvidenceList
         v-if="message.role !== 'user' && message.structured_response?.diagnosis?.length"
@@ -157,25 +181,15 @@ function sourceBasisLabel(item: AssistantSourceBasisItem) {
         </div>
       </section>
 
-      <section
+      <AssistantSourceBasis
         v-if="message.role !== 'user' && message.structured_response?.source_basis?.length"
-        class="sp-assistant-message__section"
-        data-testid="assistant-source-basis"
-      >
-        <h4>{{ sourcesTitle }}</h4>
-        <ul class="sp-assistant-message__bullet-list">
-          <li
-            v-for="item in message.structured_response?.source_basis || []"
-            :key="sourceBasisKey(item)"
-          >
-            <strong>{{ sourceBasisLabel(item) }}</strong>
-            <span v-if="item.evidence"> - {{ item.evidence }}</span>
-          </li>
-        </ul>
-      </section>
+        :items="message.structured_response?.source_basis || []"
+        :message-id="message.id"
+        :title="sourcesTitle"
+      />
 
       <AssistantFeedback
-        v-if="message.role === 'assistant'"
+        v-if="message.role === 'assistant' && !message.pending"
         :comment-label="feedbackCommentLabel"
         :comment-placeholder="feedbackCommentPlaceholder"
         :error-label="feedbackErrorLabel"
@@ -276,6 +290,41 @@ function sourceBasisLabel(item: AssistantSourceBasisItem) {
   overflow-wrap: anywhere;
 }
 
+.sp-assistant-message__pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 999px;
+  background: rgb(40 170 170 / 0.08);
+  color: var(--sp-color-text-primary);
+  font-size: 0.83rem;
+  line-height: 1.35;
+}
+
+[data-theme='dark'] .sp-assistant-message__pending {
+  background: rgb(35 200 205 / 0.12);
+}
+
+.sp-assistant-message__pending :deep(svg) {
+  flex: 0 0 auto;
+  animation: sp-assistant-message-spin 1s linear infinite;
+}
+
+.sp-assistant-message__inline-link {
+  color: var(--sp-color-primary);
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
+  cursor: pointer;
+}
+
+.sp-assistant-message__inline-link:hover {
+  color: var(--sp-color-primary);
+}
+
 .sp-assistant-message__section {
   display: grid;
   gap: 0.55rem;
@@ -298,6 +347,15 @@ function sourceBasisLabel(item: AssistantSourceBasisItem) {
 .sp-assistant-message__links {
   display: grid;
   gap: 0.55rem;
+}
+
+@keyframes sp-assistant-message-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 640px) {

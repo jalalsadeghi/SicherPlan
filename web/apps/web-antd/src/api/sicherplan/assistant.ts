@@ -58,6 +58,12 @@ export interface AssistantLink {
   reason?: null | string;
 }
 
+export interface AssistantAnswerSegment {
+  type: 'link' | 'text' | string;
+  text: string;
+  link?: AssistantLink | null;
+}
+
 export interface AssistantMissingPermission {
   permission: string;
   reason?: null | string;
@@ -78,6 +84,7 @@ export interface AssistantStructuredResponse {
   detected_language?: AssistantLanguageCode | null;
   response_language?: AssistantLanguageCode | null;
   answer: string;
+  answer_segments?: AssistantAnswerSegment[];
   scope?: null | string;
   confidence?: AssistantConfidence;
   out_of_scope?: boolean;
