@@ -16,6 +16,7 @@ defineProps<{
   confidenceLabel: string;
   description: string;
   diagnosisTitle: string;
+  degradedWarning: string;
   draftInput: string;
   emptyBody: string;
   emptyTitle: string;
@@ -118,6 +119,7 @@ defineExpose({ focusInput });
       :feedback-submit-comment-label="feedbackSubmitCommentLabel"
       :feedback-submitted-label="feedbackSubmittedLabel"
       :diagnosis-title="diagnosisTitle"
+      :degraded-warning="degradedWarning"
       :empty-body="emptyBody"
       :empty-title="emptyTitle"
       :link-action-label="linkActionLabel"

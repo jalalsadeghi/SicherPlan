@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
+import math
 from time import perf_counter
 from typing import Any, Callable, Protocol
 
@@ -36,6 +38,8 @@ class AssistantProviderRequest:
     provider_tool_name_map: dict[str, str] = field(default_factory=dict)
     max_tool_calls: int = 0
     max_input_chars: int = 12000
+    max_output_tokens: int = 900
+    model_name_override: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -71,12 +75,14 @@ class AssistantProviderError(RuntimeError):
         provider_error_code: str | None = None,
         http_status: int | None = None,
         safe_message: str | None = None,
+        retry_after_seconds: float | None = None,
     ) -> None:
         super().__init__(message)
         self.provider_error_type = provider_error_type
         self.provider_error_code = provider_error_code
         self.http_status = http_status
         self.safe_message = safe_message or message
+        self.retry_after_seconds = retry_after_seconds
 
 
 class AssistantProviderConfigurationError(AssistantProviderError):
@@ -210,6 +216,26 @@ def build_assistant_provider(
 
         return OpenAIResponsesProvider.from_settings(settings, client_factory=openai_client_factory)
     raise AssistantProviderConfigurationError("Unsupported assistant provider mode.")
+
+
+def estimate_tokens(text_or_payload: Any) -> int:
+    if text_or_payload is None:
+        return 0
+    if isinstance(text_or_payload, str):
+        serialized = text_or_payload
+    else:
+        try:
+            serialized = json.dumps(text_or_payload, ensure_ascii=False, sort_keys=True)
+        except TypeError:
+            serialized = str(text_or_payload)
+    if not serialized:
+        return 0
+    structural_chars = sum(1 for char in serialized if char in "{}[],:\"")
+    newline_chars = serialized.count("\n")
+    estimated = math.ceil(len(serialized) / 3.5)
+    estimated += math.ceil(structural_chars / 12)
+    estimated += math.ceil(newline_chars / 8)
+    return max(estimated, 1)
 
 
 def _mock_answer(

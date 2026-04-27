@@ -35,3 +35,5 @@ class AssistantGroundingContext(BaseModel):
     sources: list[AssistantGroundingSource] = Field(default_factory=list)
     missing_context: list[str] = Field(default_factory=list)
     missing_permissions: list[AssistantMissingPermission] = Field(default_factory=list)
+    grounding_trimmed: bool = False
+    trim_reason: str | None = None

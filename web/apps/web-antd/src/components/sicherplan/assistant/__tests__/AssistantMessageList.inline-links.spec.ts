@@ -9,6 +9,7 @@ function buildProps(messages: any[]) {
   return {
     assistantLabel: 'Assistant',
     confidenceLabel: 'Confidence',
+    degradedWarning: 'Degraded answer',
     diagnosisTitle: 'Findings',
     emptyBody: 'Empty',
     emptyTitle: 'Nothing yet',

@@ -11,6 +11,7 @@ describe('AssistantMessageList', () => {
       props: {
         assistantLabel: 'Assistant',
         confidenceLabel: 'Confidence',
+        degradedWarning: 'Degraded answer',
         diagnosisTitle: 'Findings',
         emptyBody: 'Empty',
         emptyTitle: 'Nothing yet',
@@ -71,6 +72,7 @@ describe('AssistantMessageList', () => {
       props: {
         assistantLabel: 'Assistant',
         confidenceLabel: 'Confidence',
+        degradedWarning: 'Degraded answer',
         diagnosisTitle: 'Findings',
         emptyBody: 'Empty',
         emptyTitle: 'Nothing yet',
@@ -93,6 +95,7 @@ describe('AssistantMessageList', () => {
               answer: 'I checked the current scope and the request is out of scope.',
               confidence: 'high',
               conversation_id: 'conversation-1',
+              provider_degraded: true,
               diagnosis: [
                 {
                   evidence: 'Shift Plan release is still draft.',
@@ -141,6 +144,7 @@ describe('AssistantMessageList', () => {
     });
 
     expect(wrapper.text()).toContain('I checked the current scope and the request is out of scope.');
+    expect(wrapper.text()).toContain('Degraded answer');
     expect(wrapper.text()).toContain('Findings');
     expect(wrapper.text()).toContain('Blocking');
     expect(wrapper.text()).toContain('Shift Plan is not released.');

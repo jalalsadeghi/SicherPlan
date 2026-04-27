@@ -208,6 +208,7 @@ onMounted(async () => {
         :close-label="$t('assistant.widget.closeLabel')"
         :confidence-label="$t('assistant.widget.confidence')"
         :description="description"
+        :degraded-warning="$t('assistant.widget.degradedWarning')"
         :diagnosis-title="$t('assistant.widget.diagnosisTitle')"
         :draft-input="assistantStore.draftInput"
         :empty-body="$t('assistant.widget.emptyBody')"

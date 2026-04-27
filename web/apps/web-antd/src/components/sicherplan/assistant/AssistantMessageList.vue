@@ -27,6 +27,7 @@ const props = defineProps<{
   feedbackSubmitCommentLabel: string;
   feedbackSubmittedLabel: string;
   diagnosisTitle: string;
+  degradedWarning: string;
   emptyBody: string;
   emptyTitle: string;
   linkActionLabel: string;
@@ -111,7 +112,7 @@ function answerSegments(message: AssistantUiMessage): AssistantAnswerSegment[] {
         role="status"
         aria-live="polite"
       >
-        <IconifyIcon aria-hidden="true" icon="lucide:loader-circle" />
+        <span aria-hidden="true" class="sp-assistant-message__pending-dot" />
         <span>{{ processingLabel }}</span>
       </div>
 
@@ -139,6 +140,14 @@ function answerSegments(message: AssistantUiMessage): AssistantAnswerSegment[] {
         :severity-labels="severityLabels"
         :title="diagnosisTitle"
       />
+
+      <div
+        v-if="message.role !== 'user' && message.structured_response?.provider_degraded"
+        class="sp-assistant-message__degraded"
+        data-testid="assistant-provider-degraded"
+      >
+        {{ degradedWarning }}
+      </div>
 
       <section
         v-if="message.role !== 'user' && message.structured_response?.missing_permissions?.length"
@@ -293,25 +302,39 @@ function answerSegments(message: AssistantUiMessage): AssistantAnswerSegment[] {
 .sp-assistant-message__pending {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.35rem;
   width: fit-content;
   max-width: 100%;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid var(--sp-color-border-soft);
+  padding: 0.3rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--sp-color-primary-strong) 22%, transparent);
   border-radius: 999px;
-  background: rgb(40 170 170 / 0.08);
-  color: var(--sp-color-text-primary);
-  font-size: 0.83rem;
-  line-height: 1.35;
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 70%, white);
+  color: var(--sp-color-primary-strong);
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 [data-theme='dark'] .sp-assistant-message__pending {
-  background: rgb(35 200 205 / 0.12);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 58%, rgb(13 24 26));
 }
 
-.sp-assistant-message__pending :deep(svg) {
+.sp-assistant-message__pending-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: currentColor;
   flex: 0 0 auto;
-  animation: sp-assistant-message-spin 1s linear infinite;
+  animation: sp-assistant-message-pending-pulse 1s ease-in-out infinite;
+}
+
+.sp-assistant-message__degraded {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgb(196 146 24 / 0.22);
+  border-radius: 0.75rem;
+  background: rgb(196 146 24 / 0.08);
+  color: var(--sp-color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .sp-assistant-message__inline-link {
@@ -349,12 +372,16 @@ function answerSegments(message: AssistantUiMessage): AssistantAnswerSegment[] {
   gap: 0.55rem;
 }
 
-@keyframes sp-assistant-message-spin {
-  from {
-    transform: rotate(0deg);
+@keyframes sp-assistant-message-pending-pulse {
+  0%,
+  100% {
+    opacity: 0.38;
+    transform: scale(0.85);
   }
-  to {
-    transform: rotate(360deg);
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 

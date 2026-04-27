@@ -85,6 +85,7 @@ def test_openai_provider_builds_expected_parse_request() -> None:
     call = client.responses.calls[0]
     assert call["model"] == "gpt-4o"
     assert call["store"] is False
+    assert call["max_output_tokens"] == 900
     assert call["text_format"].__name__ == "AssistantProviderStructuredOutput"
     assert call["tools"] == [
         {
@@ -166,11 +167,13 @@ def test_openai_provider_builds_previous_response_continuation_request() -> None
             provider_tool_name_map={},
             max_tool_calls=8,
             max_input_chars=12000,
+            max_output_tokens=700,
         )
     )
 
     call = client.responses.calls[0]
     assert call["previous_response_id"] == "resp-1"
+    assert call["max_output_tokens"] == 700
     assert call["input"] == [
         {
             "type": "function_call_output",
@@ -250,13 +253,16 @@ def test_openai_provider_builds_stateless_continuation_request() -> None:
             provider_tool_name_map={},
             max_tool_calls=8,
             max_input_chars=12000,
+            max_output_tokens=700,
         )
     )
 
     call = client.responses.calls[0]
     input_rows = call["input"]
     assert "previous_response_id" not in call
-    assert any(row.get("role") == "user" for row in input_rows if isinstance(row, dict))
+    assert call["max_output_tokens"] == 700
+    assert not any(row.get("role") == "user" for row in input_rows if isinstance(row, dict))
+    assert any(row.get("role") == "system" for row in input_rows if isinstance(row, dict))
     function_call_index = next(index for index, row in enumerate(input_rows) if row.get("type") == "function_call")
     function_output_index = next(
         index for index, row in enumerate(input_rows) if row.get("type") == "function_call_output"

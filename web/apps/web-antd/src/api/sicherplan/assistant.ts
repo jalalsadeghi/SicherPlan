@@ -84,6 +84,7 @@ export interface AssistantStructuredResponse {
   detected_language?: AssistantLanguageCode | null;
   response_language?: AssistantLanguageCode | null;
   answer: string;
+  provider_degraded?: boolean;
   answer_segments?: AssistantAnswerSegment[];
   scope?: null | string;
   confidence?: AssistantConfidence;

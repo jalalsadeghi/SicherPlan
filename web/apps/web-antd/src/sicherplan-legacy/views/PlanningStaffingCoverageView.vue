@@ -30,10 +30,6 @@
         <div class="planning-staffing-panel__header planning-staffing-panel__header--filters">
           <div>
             <p class="eyebrow">{{ tp("filtersTitle") }}</p>
-            <h3>{{ tp("filtersTitle") }}</h3>
-            <p class="planning-staffing-panel__lead">
-              {{ tp("roleLabel") }}: {{ role }} · {{ tp("tenantScopeLabel") }}: {{ tenantScopeId || tp("scopeUnavailable") }}
-            </p>
           </div>
         </div>
         <div class="planning-staffing-filter-grid">
@@ -139,7 +135,6 @@
         <div class="planning-staffing-panel__header">
           <div>
             <p class="eyebrow">{{ tp("listTitle") }}</p>
-            <h3>{{ tp("listTitle") }}</h3>
           </div>
         </div>
         <div
@@ -173,7 +168,6 @@
         <div class="planning-staffing-panel__header">
           <div>
             <p class="eyebrow">{{ tp("detailTitle") }}</p>
-            <h3>{{ selectedShiftContextTitle }}</h3>
             <p
               v-if="selectedShiftContextMeta"
               class="planning-staffing-panel__lead planning-staffing-panel__lead--context"

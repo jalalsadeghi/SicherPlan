@@ -134,6 +134,7 @@ def build_assistant_prompt(
     tool_results: list[AssistantToolResultSummary] | None = None,
     max_context_chunks: int = 8,
     max_input_chars: int = 12000,
+    max_history_messages: int = _MAX_HISTORY_MESSAGES,
     policy_version: str = ASSISTANT_PROMPT_POLICY_VERSION,
 ) -> AssistantPromptPayload:
     capped_knowledge = knowledge_chunks[: max(int(max_context_chunks), 1)]
@@ -145,7 +146,7 @@ def build_assistant_prompt(
             "detected_language": item.detected_language,
             "response_language": item.response_language,
         }
-        for item in conversation_messages[-_MAX_HISTORY_MESSAGES:]
+        for item in conversation_messages[-max(int(max_history_messages), 0):]
         if item.role and item.content.strip()
     ]
 
@@ -240,6 +241,11 @@ def _build_security_policy_section(policy_version: str) -> str:
         "- You must not generate SQL or ask the user to run SQL.\n"
         "- You must not perform write actions.\n"
         "- For operational diagnostic questions, use available backend tools before giving a definitive answer.\n"
+        "- If diagnostic facts are present in grounding context, answer from those facts.\n"
+        "- If employee, date, shift, or assignment details are missing, ask for those details and still explain the verified generic check sequence.\n"
+        "- Do not request a tool when the available diagnostic facts already cover the likely checks for the known scenario.\n"
+        "- Only request a tool when the available diagnostic facts are insufficient and the missing input is already present.\n"
+        "- Do not invent actual employee, assignment, or shift records.\n"
         "- For UI how-to questions, do not invent button names, tab names, field labels, menu labels, or click paths.\n"
         "- Use verified page-help, workflow-help, diagnostics, route catalog, and knowledge retrieval as grounded facts only.\n"
         "- Use verified page-help and UI-action tool output only for exact UI labels and exact button guidance.\n"
@@ -338,8 +344,18 @@ def _build_tool_policy_section(available_tools: list[AssistantToolDefinition]) -
 def _build_grounding_context_section(grounding_context: AssistantGroundingContext | None) -> str:
     if grounding_context is None:
         return "Grounding context\n- grounding_sources: []"
-    payload = grounding_context.model_dump(mode="json")
-    missing_context = payload.get("missing_context", [])
+    payload = {
+        "detected_language": grounding_context.detected_language,
+        "response_language": grounding_context.response_language,
+        "retrieval_plan": grounding_context.retrieval_plan,
+        "query_expansion": grounding_context.query_expansion,
+        "grounding_source_count": len(grounding_context.sources),
+        "source_ids": [source.source_id for source in grounding_context.sources[:8] if source.source_id],
+        "missing_context": list(grounding_context.missing_context),
+        "grounding_trimmed": grounding_context.grounding_trimmed,
+        "trim_reason": grounding_context.trim_reason,
+    }
+    missing_context = payload["missing_context"]
     if isinstance(missing_context, list) and "content_bearing_sources" in missing_context:
         payload["rag_guidance"] = (
             "Only shallow page hints were found. Do not invent exact SicherPlan steps. "

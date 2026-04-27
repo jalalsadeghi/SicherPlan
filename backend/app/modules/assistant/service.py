@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 import logging
 import re
+from time import sleep
 from typing import Any, Protocol
 from uuid import uuid4
 
 from app.errors import ApiException
 from app.modules.assistant.classifier import AssistantClassificationResult, classify_assistant_message
+from app.modules.assistant.diagnostic_prefetch import (
+    AssistantDiagnosticPrefetchPlan,
+    plan_diagnostic_prefetch,
+)
 from app.modules.assistant.diagnostics import (
     DIAGNOSTIC_TOOL_NAME,
     extract_shift_visibility_input,
@@ -53,6 +58,7 @@ from app.modules.assistant.provider import (
     AssistantProviderStructuredOutputError,
     AssistantProviderTimeoutError,
     AssistantProviderUnavailableError,
+    estimate_tokens,
 )
 from app.modules.assistant.policy import (
     ASSISTANT_ADMIN,
@@ -115,16 +121,34 @@ class AssistantRuntimeConfig:
     retrieval_mode: str = "lexical"
     retrieval_debug: bool = False
     max_input_chars: int = 12000
+    max_provider_input_tokens: int = 14000
+    max_continuation_input_tokens: int = 5000
     max_tool_calls: int = 8
     max_context_chunks: int = 8
-    max_grounding_sources: int = 10
-    max_grounding_chars_per_source: int = 1200
-    max_total_grounding_chars: int = 9000
+    max_grounding_sources: int = 8
+    max_grounding_chars_per_source: int = 700
+    max_total_grounding_chars: int = 4500
+    max_recent_messages_for_model: int = 6
+    max_recent_messages_for_continuation: int = 0
+    max_output_tokens: int = 900
+    continuation_max_output_tokens: int = 700
+    rate_limit_retry_seconds: int = 6
+    rate_limit_max_retries: int = 2
+    fallback_response_model: str = ""
     rag_quality_gate_mode: str = "off"
 
     @property
     def rag_enabled(self) -> bool:
         return self.enabled and self.provider_mode == "openai" and self.openai_configured
+
+
+@dataclass(frozen=True)
+class AssistantProviderDegradedFallbackCandidate(Exception):
+    api_exception: ApiException
+    grounding_context: AssistantGroundingContext
+    tool_results: list[AssistantToolResultSummary]
+    continuation_mode: str
+    had_prior_provider_output: bool
 
 
 class AssistantRepository(Protocol):
@@ -485,18 +509,38 @@ class AssistantService:
             assistant_answer = self._build_assistant_answer(response_language, classification)
             assistant_result_payload = self._build_refusal_provider_payload(classification, assistant_answer)
             rag_trace = None
+            rag_grounding_context = None
         else:
-            rag_result = self._build_rag_orchestrator().run(
-                conversation=conversation,
-                cleaned_message=cleaned_message,
-                route_context=route_context,
-                detected_language=detected_language,
-                response_language=response_language,
-                actor=actor,
-            )
-            assistant_result_payload = rag_result.provider_payload
+            try:
+                rag_result = self._build_rag_orchestrator().run(
+                    conversation=conversation,
+                    cleaned_message=cleaned_message,
+                    route_context=route_context,
+                    detected_language=detected_language,
+                    response_language=response_language,
+                    actor=actor,
+                )
+                rag_grounding_context = rag_result.grounding_context
+                assistant_result_payload = rag_result.provider_payload
+            except AssistantProviderDegradedFallbackCandidate as degraded:
+                rag_grounding_context = degraded.grounding_context
+                if not self._can_build_provider_degraded_response(
+                    classification=classification,
+                    grounding_context=degraded.grounding_context,
+                ):
+                    raise degraded.api_exception
+                assistant_result_payload = self._merge_provider_payload_with_tool_results(
+                    self._build_provider_degraded_payload(
+                        response_language=response_language,
+                        grounding_context=degraded.grounding_context,
+                        tool_results=degraded.tool_results,
+                        continuation_mode=degraded.continuation_mode,
+                        provider_error_code=degraded.api_exception.code,
+                    ),
+                    degraded.tool_results,
+                )
             rag_trace = self._build_rag_trace(
-                grounding_context=rag_result.grounding_context,
+                grounding_context=rag_grounding_context,
                 provider_called=True,
             )
             assistant_answer = str(assistant_result_payload.get("answer", "")).strip()
@@ -526,7 +570,7 @@ class AssistantService:
             response_language=response_language,
             provider_payload=assistant_result_payload,
             classification=classification,
-            grounding_context=rag_result.grounding_context if not classification.is_out_of_scope else None,
+            grounding_context=rag_grounding_context if not classification.is_out_of_scope else None,
             rag_trace=rag_trace,
         )
         quality_gate = self._evaluate_quality_gate(
@@ -620,6 +664,7 @@ class AssistantService:
                 "detected_language": structured_payload.get("detected_language", message.detected_language or "unknown"),
                 "response_language": structured_payload.get("response_language", message.response_language or "unknown"),
                 "answer": structured_payload.get("answer", message.content),
+                "provider_degraded": structured_payload.get("provider_degraded", False),
                 "scope": structured_payload.get("scope", "unknown"),
                 "confidence": structured_payload.get("confidence", "low"),
                 "out_of_scope": structured_payload.get("out_of_scope", False),
@@ -844,10 +889,11 @@ class AssistantService:
             actor=actor,
             conversation_id=conversation.id,
         )
+        grounding_links = self._grounding_links(grounding_context)
         answer_text = str(provider_payload.get("answer", ""))
         enriched_links = self._ensure_answer_links(
             answer_text=answer_text,
-            validated_links=validated_links,
+            validated_links=self._merge_navigation_links(validated_links, grounding_links),
             actor=actor,
             conversation_id=conversation.id,
         )
@@ -886,6 +932,7 @@ class AssistantService:
             detected_language=detected_language,
             response_language=response_language,
             answer=normalized_answer,
+            provider_degraded=bool(provider_payload.get("provider_degraded", False)),
             answer_segments=answer_segments,
             scope=self._infer_scope(actor),
             confidence=confidence,
@@ -899,6 +946,43 @@ class AssistantService:
             source_basis=source_basis,
             rag_trace=rag_trace,
         )
+
+    @staticmethod
+    def _merge_navigation_links(
+        primary_links: list[dict[str, Any]],
+        secondary_links: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        merged: list[dict[str, Any]] = []
+        seen_keys: set[tuple[str, str]] = set()
+        for row in [*primary_links, *secondary_links]:
+            if not isinstance(row, dict):
+                continue
+            page_id = str(row.get("page_id") or "").strip()
+            path = str(row.get("path") or "").strip()
+            if not path:
+                continue
+            dedupe_key = (page_id, path)
+            if dedupe_key in seen_keys:
+                continue
+            seen_keys.add(dedupe_key)
+            merged.append(row)
+        return merged
+
+    @staticmethod
+    def _grounding_links(
+        grounding_context: AssistantGroundingContext | None,
+    ) -> list[dict[str, Any]]:
+        if grounding_context is None:
+            return []
+        links: list[dict[str, Any]] = []
+        for source in grounding_context.sources:
+            if source.source_type != "allowed_navigation_link":
+                continue
+            facts = source.facts if isinstance(source.facts, dict) else {}
+            link = facts.get("link")
+            if isinstance(link, dict):
+                links.append(link)
+        return links
 
     def _build_rag_orchestrator(self) -> AssistantRagOrchestrator:
         return AssistantRagOrchestrator(
@@ -928,6 +1012,11 @@ class AssistantService:
         actor: RequestAuthorizationContext,
     ) -> tuple[AssistantGroundingContext, list[AssistantToolResultSummary]]:
         plan = build_retrieval_plan(message=cleaned_message, route_context=route_context)
+        diagnostic_prefetch = plan_diagnostic_prefetch(
+            message=cleaned_message,
+            detected_language=detected_language,
+            route_context=route_context,
+        )
         auth_summary = summarize_auth_context(actor)
         expanded_query = expand_assistant_query(
             cleaned_message,
@@ -1048,7 +1137,16 @@ class AssistantService:
                 summaries.append(self._tool_result_to_summary(page_help_result))
                 sources.extend(self._grounding_sources_from_tool_result("page_help_manifest", page_help_result))
 
-            if is_shift_visibility_question(cleaned_message, route_context):
+            if diagnostic_prefetch is not None:
+                diagnostic_sources, diagnostic_summaries = self._build_diagnostic_prefetch_sources(
+                    conversation=conversation,
+                    actor=actor,
+                    response_language=response_language,
+                    plan=diagnostic_prefetch,
+                )
+                summaries.extend(diagnostic_summaries)
+                sources.extend(diagnostic_sources)
+            elif is_shift_visibility_question(cleaned_message, route_context):
                 diagnostic_input = extract_shift_visibility_input(
                     message=cleaned_message,
                     detected_language=detected_language,
@@ -1101,6 +1199,345 @@ class AssistantService:
                 grounding_context=grounding_context,
             )
         return grounding_context, summaries
+
+    def _build_diagnostic_prefetch_sources(
+        self,
+        *,
+        conversation: AssistantConversation,
+        actor: RequestAuthorizationContext,
+        response_language: str,
+        plan: AssistantDiagnosticPrefetchPlan,
+    ) -> tuple[list[AssistantGroundingSource], list[AssistantToolResultSummary]]:
+        if self.tool_registry is None:
+            return [], []
+
+        summaries: list[AssistantToolResultSummary] = []
+        sources: list[AssistantGroundingSource] = []
+        checks_completed: list[str] = []
+
+        capabilities_result = self.execute_registered_tool(
+            tool_name="assistant.get_current_user_capabilities",
+            input_data={},
+            actor=actor,
+            conversation_id=conversation.id,
+        )
+        summaries.append(self._tool_result_to_summary(capabilities_result))
+        checks_completed.append("current_user_capabilities")
+        sources.append(
+            self._diagnostic_tool_result_source(
+                source_name="Current User Capabilities",
+                tool_name="assistant.get_current_user_capabilities",
+                result=capabilities_result,
+                title="Assistant capability and role scope",
+            )
+        )
+
+        accessible_pages: list[dict[str, Any]] = []
+        for page_id in plan.likely_page_ids:
+            page_result = self.execute_registered_tool(
+                tool_name="assistant.search_accessible_pages",
+                input_data={"page_id": page_id, "limit": 1},
+                actor=actor,
+                conversation_id=conversation.id,
+            )
+            summaries.append(self._tool_result_to_summary(page_result))
+            checks_completed.append(f"accessible_page:{page_id}")
+            payload = page_result.data if isinstance(page_result.data, dict) else {}
+            page_rows = payload.get("pages", []) if isinstance(payload.get("pages"), list) else []
+            if page_rows:
+                accessible_pages.extend([row for row in page_rows if isinstance(row, dict)])
+            sources.append(
+                self._diagnostic_tool_result_source(
+                    source_name=f"Accessible page {page_id}",
+                    tool_name="assistant.search_accessible_pages",
+                    result=page_result,
+                    title=f"Accessible page hint {page_id}",
+                )
+            )
+
+        employee_ref = plan.employee_ref
+        employee_display_name = plan.employee_name
+        if plan.employee_name and employee_ref is None:
+            employee_search = self.execute_registered_tool(
+                tool_name="employees.search_employee_by_name",
+                input_data={"name": plan.employee_name, "limit": 5},
+                actor=actor,
+                conversation_id=conversation.id,
+            )
+            summaries.append(self._tool_result_to_summary(employee_search))
+            checks_completed.append("employee_search")
+            search_payload = employee_search.data if isinstance(employee_search.data, dict) else {}
+            matches = search_payload.get("matches", []) if isinstance(search_payload.get("matches"), list) else []
+            if len(matches) == 1 and isinstance(matches[0], dict):
+                employee_ref = str(matches[0].get("employee_ref") or "").strip() or None
+                employee_display_name = str(matches[0].get("display_name") or "").strip() or employee_display_name
+            sources.append(
+                self._diagnostic_tool_result_source(
+                    source_name="Employee search",
+                    tool_name="employees.search_employee_by_name",
+                    result=employee_search,
+                    title="Resolved employee candidate",
+                )
+            )
+
+        assignment_ref = plan.assignment_ref
+        shift_ref = plan.shift_ref
+        if employee_ref is not None:
+            profile_result = self.execute_registered_tool(
+                tool_name="employees.get_employee_operational_profile",
+                input_data={"employee_ref": employee_ref},
+                actor=actor,
+                conversation_id=conversation.id,
+            )
+            summaries.append(self._tool_result_to_summary(profile_result))
+            checks_completed.append("employee_operational_profile")
+            sources.append(
+                self._diagnostic_tool_result_source(
+                    source_name="Employee operational profile",
+                    tool_name="employees.get_employee_operational_profile",
+                    result=profile_result,
+                    title="Employee operational scope",
+                )
+            )
+
+            mobile_result = self.execute_registered_tool(
+                tool_name="employees.get_employee_mobile_access_status",
+                input_data={"employee_ref": employee_ref},
+                actor=actor,
+                conversation_id=conversation.id,
+            )
+            summaries.append(self._tool_result_to_summary(mobile_result))
+            checks_completed.append("employee_mobile_access")
+            sources.append(
+                self._diagnostic_tool_result_source(
+                    source_name="Employee mobile access",
+                    tool_name="employees.get_employee_mobile_access_status",
+                    result=mobile_result,
+                    title="Employee self-service and mobile access",
+                )
+            )
+
+            if plan.date_iso is not None:
+                readiness_result = self.execute_registered_tool(
+                    tool_name="employees.get_employee_readiness_summary",
+                    input_data={"employee_ref": employee_ref, "date": plan.date_iso},
+                    actor=actor,
+                    conversation_id=conversation.id,
+                )
+                summaries.append(self._tool_result_to_summary(readiness_result))
+                checks_completed.append("employee_readiness")
+                sources.append(
+                    self._diagnostic_tool_result_source(
+                        source_name="Employee readiness",
+                        tool_name="employees.get_employee_readiness_summary",
+                        result=readiness_result,
+                        title="Employee readiness on diagnostic date",
+                    )
+                )
+
+        if employee_ref is not None and plan.date_iso is not None:
+            assignment_search = self.execute_registered_tool(
+                tool_name="planning.find_assignments",
+                input_data={"employee_ref": employee_ref, "date": plan.date_iso, "limit": 10},
+                actor=actor,
+                conversation_id=conversation.id,
+            )
+            summaries.append(self._tool_result_to_summary(assignment_search))
+            checks_completed.append("planning.find_assignments")
+            assignment_payload = assignment_search.data if isinstance(assignment_search.data, dict) else {}
+            assignment_matches = assignment_payload.get("matches", []) if isinstance(assignment_payload.get("matches"), list) else []
+            if assignment_ref is None and len(assignment_matches) == 1 and isinstance(assignment_matches[0], dict):
+                assignment_ref = str(assignment_matches[0].get("assignment_ref") or "").strip() or None
+                shift_ref = shift_ref or (str(assignment_matches[0].get("shift_ref") or "").strip() or None)
+            sources.append(
+                self._diagnostic_tool_result_source(
+                    source_name="Planning assignments",
+                    tool_name="planning.find_assignments",
+                    result=assignment_search,
+                    title="Assignment candidates on diagnostic date",
+                )
+            )
+
+            shift_search = self.execute_registered_tool(
+                tool_name="planning.find_shifts",
+                input_data={"employee_ref": employee_ref, "date": plan.date_iso, "limit": 10},
+                actor=actor,
+                conversation_id=conversation.id,
+            )
+            summaries.append(self._tool_result_to_summary(shift_search))
+            checks_completed.append("planning.find_shifts")
+            shift_payload = shift_search.data if isinstance(shift_search.data, dict) else {}
+            shift_matches = shift_payload.get("matches", []) if isinstance(shift_payload.get("matches"), list) else []
+            if shift_ref is None and len(shift_matches) == 1 and isinstance(shift_matches[0], dict):
+                shift_ref = str(shift_matches[0].get("shift_ref") or "").strip() or None
+            sources.append(
+                self._diagnostic_tool_result_source(
+                    source_name="Planning shifts",
+                    tool_name="planning.find_shifts",
+                    result=shift_search,
+                    title="Shift candidates on diagnostic date",
+                )
+            )
+
+        if assignment_ref is not None:
+            assignment_result = self.execute_registered_tool(
+                tool_name="planning.inspect_assignment",
+                input_data={"assignment_ref": assignment_ref},
+                actor=actor,
+                conversation_id=conversation.id,
+            )
+            summaries.append(self._tool_result_to_summary(assignment_result))
+            checks_completed.append("planning.inspect_assignment")
+            assignment_payload = assignment_result.data if isinstance(assignment_result.data, dict) else {}
+            assignment_row = assignment_payload.get("assignment") if isinstance(assignment_payload.get("assignment"), dict) else {}
+            if shift_ref is None:
+                shift_ref = str(assignment_row.get("shift_ref") or "").strip() or None
+            sources.append(
+                self._diagnostic_tool_result_source(
+                    source_name="Assignment inspection",
+                    tool_name="planning.inspect_assignment",
+                    result=assignment_result,
+                    title="Assignment visibility status",
+                )
+            )
+
+        if shift_ref is not None:
+            shift_release = self.execute_registered_tool(
+                tool_name="planning.inspect_shift_release_state",
+                input_data={"shift_ref": shift_ref},
+                actor=actor,
+                conversation_id=conversation.id,
+            )
+            summaries.append(self._tool_result_to_summary(shift_release))
+            checks_completed.append("planning.inspect_shift_release_state")
+            sources.append(
+                self._diagnostic_tool_result_source(
+                    source_name="Shift release state",
+                    tool_name="planning.inspect_shift_release_state",
+                    result=shift_release,
+                    title="Shift release state for employee app",
+                )
+            )
+
+            shift_visibility = self.execute_registered_tool(
+                tool_name="planning.inspect_shift_visibility",
+                input_data={"shift_ref": shift_ref},
+                actor=actor,
+                conversation_id=conversation.id,
+            )
+            summaries.append(self._tool_result_to_summary(shift_visibility))
+            checks_completed.append("planning.inspect_shift_visibility")
+            sources.append(
+                self._diagnostic_tool_result_source(
+                    source_name="Shift visibility flags",
+                    tool_name="planning.inspect_shift_visibility",
+                    result=shift_visibility,
+                    title="Shift visibility flags for employee audience",
+                )
+            )
+
+        if employee_ref is not None and (assignment_ref is not None or shift_ref is not None or plan.date_iso is not None):
+            visibility_input: dict[str, Any] = {"employee_ref": employee_ref}
+            if assignment_ref is not None:
+                visibility_input["assignment_ref"] = assignment_ref
+            if shift_ref is not None:
+                visibility_input["shift_ref"] = shift_ref
+            if plan.date_iso is not None:
+                visibility_input["date"] = plan.date_iso
+            released_visibility = self.execute_registered_tool(
+                tool_name="field.inspect_released_schedule_visibility",
+                input_data=visibility_input,
+                actor=actor,
+                conversation_id=conversation.id,
+            )
+            summaries.append(self._tool_result_to_summary(released_visibility))
+            checks_completed.append("field.inspect_released_schedule_visibility")
+            sources.append(
+                self._diagnostic_tool_result_source(
+                    source_name="Released schedule visibility",
+                    tool_name="field.inspect_released_schedule_visibility",
+                    result=released_visibility,
+                    title="Released schedule visibility in employee app",
+                )
+            )
+
+        allowed_link_targets: list[dict[str, Any]] = []
+        for page_id in plan.likely_page_ids:
+            link_result = self.execute_registered_tool(
+                tool_name="navigation.build_allowed_link",
+                input_data={"page_id": page_id},
+                actor=actor,
+                conversation_id=conversation.id,
+            )
+            summaries.append(self._tool_result_to_summary(link_result))
+            payload = link_result.data if isinstance(link_result.data, dict) else {}
+            link_payload = payload.get("link") if isinstance(payload.get("link"), dict) else None
+            if payload.get("allowed") and link_payload is not None:
+                allowed_link_targets.append(link_payload)
+                sources.append(
+                    AssistantGroundingSource(
+                        source_id=f"allowed_link:{page_id}",
+                        source_type="allowed_navigation_link",
+                        source_name="Allowed navigation link",
+                        page_id=page_id,
+                        module_key=self._module_key_from_page_id(page_id),
+                        title=str(link_payload.get("label") or page_id),
+                        content=str(link_payload.get("reason") or "").strip() or None,
+                        facts={"link": link_payload},
+                        verified=True,
+                        permission_checked=True,
+                    )
+                )
+
+        sources.insert(
+            0,
+            AssistantGroundingSource(
+                source_id=f"diagnostic_prefetch:{plan.intent}",
+                source_type="diagnostic_fact",
+                source_name="Employee App Visibility Diagnostic",
+                page_id="ES-01",
+                module_key="field_execution",
+                title="Shift assigned but not visible in employee app",
+                content=(
+                    "Possible checked causes: employee account/mobile access, assignment status, "
+                    "shift release state, employee visibility flag, released schedule availability, "
+                    "absence and qualification readiness."
+                ),
+                facts={
+                    "intent": plan.intent,
+                    "employee_name": employee_display_name,
+                    "employee_ref": employee_ref,
+                    "assignment_ref": assignment_ref,
+                    "shift_ref": shift_ref,
+                    "date": plan.date_iso,
+                    "employee_resolved": bool(employee_ref),
+                    "date_present": bool(plan.date_iso),
+                    "checks_completed": checks_completed,
+                    "checks_missing_input": list(plan.checks_missing_input),
+                    "missing_input": list(plan.missing_inputs),
+                    "generic_check_sequence": list(plan.generic_check_sequence),
+                    "accessible_pages": [row.get("page_id") for row in accessible_pages if isinstance(row, dict)],
+                    "allowed_link_count": len(allowed_link_targets),
+                },
+                verified=True,
+                permission_checked=True,
+                content_bearing=True,
+            ),
+        )
+        for missing_input in plan.missing_inputs:
+            sources.append(
+                AssistantGroundingSource(
+                    source_id=f"missing_diagnostic_input:{missing_input}",
+                    source_type="missing_diagnostic_input",
+                    source_name="Missing diagnostic input",
+                    title=missing_input,
+                    content=f"The diagnostic is missing {missing_input}.",
+                    facts={"field": missing_input},
+                    verified=True,
+                    permission_checked=True,
+                )
+            )
+        return sources, summaries
 
     def _build_rag_trace(
         self,
@@ -1158,6 +1595,8 @@ class AssistantService:
             missing_context=missing_context,
             retrieval_plan=dict(grounding_context.retrieval_plan),
             query_expansion=dict(grounding_context.query_expansion),
+            grounding_trimmed=grounding_context.grounding_trimmed,
+            trim_reason=grounding_context.trim_reason,
         )
 
     def _build_compact_grounding_sources(
@@ -1206,7 +1645,36 @@ class AssistantService:
         selected: list[AssistantGroundingSource] = []
         total_chars = 0
         max_sources = max(self.runtime_config.max_grounding_sources, 1)
+        guaranteed_source_types = self._guaranteed_grounding_source_types(intent_category=intent_category)
+        selected_ids: set[str | None] = set()
+
+        for guaranteed_type in guaranteed_source_types:
+            guaranteed_candidate = next(
+                (
+                    (score, source, reasons)
+                    for score, source, reasons in ranked
+                    if source.source_type == guaranteed_type and source.source_id not in selected_ids
+                ),
+                None,
+            )
+            if guaranteed_candidate is None or len(selected) >= max_sources:
+                continue
+            score, source, reasons = guaranteed_candidate
+            prepared = self._prepare_grounding_source_for_prompt(
+                source=source,
+                score=score,
+                reasons=reasons,
+                remaining_chars=min(self.runtime_config.max_grounding_chars_per_source, 280),
+            )
+            if prepared is None:
+                continue
+            selected.append(prepared)
+            selected_ids.add(prepared.source_id)
+            total_chars += len(prepared.content or "") + len(json.dumps(prepared.facts, ensure_ascii=False))
+
         for score, source, reasons in ranked:
+            if source.source_id in selected_ids:
+                continue
             if len(selected) >= max_sources:
                 break
             prepared = self._prepare_grounding_source_for_prompt(
@@ -1218,10 +1686,38 @@ class AssistantService:
             if prepared is None:
                 continue
             selected.append(prepared)
+            selected_ids.add(prepared.source_id)
             total_chars += len(prepared.content or "") + len(json.dumps(prepared.facts, ensure_ascii=False))
             if total_chars >= self.runtime_config.max_total_grounding_chars:
                 break
+        for score, source, reasons in ranked:
+            if source.source_id in selected_ids or source.source_type not in guaranteed_source_types:
+                continue
+            prepared = self._prepare_grounding_source_for_prompt(
+                source=source,
+                score=score,
+                reasons=reasons,
+                remaining_chars=min(self.runtime_config.max_grounding_chars_per_source, 280),
+            )
+            if prepared is None:
+                continue
+            selected.append(prepared)
+            selected_ids.add(prepared.source_id)
+            total_chars += len(prepared.content or "") + len(json.dumps(prepared.facts, ensure_ascii=False))
         return selected
+
+    @staticmethod
+    def _guaranteed_grounding_source_types(*, intent_category: str) -> list[str]:
+        guaranteed = [
+            "ui_action",
+            "diagnostic",
+            "diagnostic_fact",
+            "missing_diagnostic_input",
+            "allowed_navigation_link",
+        ]
+        if intent_category == "ui_action_question":
+            guaranteed.append("page_help_manifest")
+        return guaranteed
 
     def _rank_grounding_source(
         self,
@@ -1274,6 +1770,15 @@ class AssistantService:
         if intent_category == "workflow_how_to" and source.source_type in {"operational_handbook", "user_manual", "knowledge_chunk"}:
             score += 10.0
             reasons.append("content guidance for how-to question")
+        if intent_category == "operational_diagnostic" and source.source_type in {"diagnostic_fact", "tool_result_summary", "diagnostic"}:
+            score += 22.0
+            reasons.append("diagnostic prefetch evidence")
+        if intent_category == "operational_diagnostic" and source.source_type == "missing_diagnostic_input":
+            score += 16.0
+            reasons.append("missing required diagnostic input")
+        if intent_category == "operational_diagnostic" and source.source_type == "allowed_navigation_link":
+            score += 6.0
+            reasons.append("safe navigation follow-up")
         if any(token in lowered_message for token in ("api", "endpoint", "route", "sdk", "http")) and source.source_type in {"api_export", "knowledge_chunk"}:
             score += 10.0
             reasons.append("API-oriented source")
@@ -1355,7 +1860,12 @@ class AssistantService:
 
         while True:
             if provider_result is None:
-                provider_result = self._call_provider(request)
+                provider_result = self._call_provider_with_fallback_capture(
+                    request=request,
+                    grounding_context=grounding_context,
+                    tool_results=tool_results,
+                    had_prior_provider_output=bool(previous_output_items),
+                )
             previous_response_id = provider_result.response_id
             previous_output_items = list(provider_result.output_items or [])
             requested_tool_calls = provider_result.requested_tool_calls or []
@@ -1394,7 +1904,12 @@ class AssistantService:
                     previous_response_id=self._continuation_response_id(previous_response_id),
                     previous_output_items=previous_output_items,
                 )
-                provider_result = self._call_provider(request)
+                provider_result = self._call_provider_with_fallback_capture(
+                    request=request,
+                    grounding_context=grounding_context,
+                    tool_results=tool_results,
+                    had_prior_provider_output=bool(previous_output_items),
+                )
                 return self._merge_provider_payload_with_tool_results(
                     provider_result.final_response,
                     tool_results,
@@ -1490,7 +2005,12 @@ class AssistantService:
                 input_tokens=None,
                 output_tokens=None,
             )
-            provider_result = self._call_provider(request)
+            provider_result = self._call_provider_with_fallback_capture(
+                request=request,
+                grounding_context=grounding_context,
+                tool_results=tool_results,
+                had_prior_provider_output=bool(previous_output_items),
+            )
             self._log_tool_call_continuation_event(
                 event="assistant_tool_call_continuation_finished",
                 request=request,
@@ -1525,6 +2045,32 @@ class AssistantService:
         previous_response_id: str | None = None,
         previous_output_items: list[dict[str, Any]] | None = None,
     ) -> AssistantProviderRequest:
+        continuation_mode = self._determine_continuation_mode(
+            previous_response_id=previous_response_id,
+            previous_output_items=previous_output_items,
+            continuation_tool_outputs=provider_tool_results,
+        )
+        is_continuation = continuation_mode != "initial"
+        available_tools_payload = available_tools
+        if available_tools_payload is None:
+            available_tools_payload = self.list_available_tools(actor=actor, conversation_id=conversation.id)
+        available_tools_payload = self._select_provider_available_tools(
+            available_tools=available_tools_payload,
+            grounding_context=grounding_context,
+        )
+        provider_tool_name_map = build_provider_tool_name_map(
+            [tool["function"]["name"] for tool in available_tools_payload if isinstance(tool, dict)]
+        )
+        recent_message_limit = (
+            self.runtime_config.max_recent_messages_for_continuation
+            if is_continuation
+            else self.runtime_config.max_recent_messages_for_model
+        )
+        recent_message_rows = self.repository.list_messages_for_conversation(conversation.id)
+        if recent_message_limit > 0:
+            recent_message_rows = recent_message_rows[-recent_message_limit:]
+        else:
+            recent_message_rows = []
         recent_messages = [
             AssistantMessageContext(
                 role=message.role,
@@ -1532,54 +2078,64 @@ class AssistantService:
                 detected_language=message.detected_language,
                 response_language=message.response_language,
             )
-            for message in self.repository.list_messages_for_conversation(conversation.id)[-10:]
+            for message in recent_message_rows
         ]
-        knowledge_chunks = self._retrieve_knowledge_chunks(
-            query=cleaned_message,
-            response_language=response_language,
-            route_context=route_context,
-            actor=actor,
-            workflow_intent=grounding_context.retrieval_plan.get("workflow_intent"),
-            planned_page_ids=list(grounding_context.retrieval_plan.get("likely_page_ids", [])),
-            planned_module_keys=list(grounding_context.retrieval_plan.get("likely_module_keys", [])),
-        )
-        available_tools_payload = available_tools
-        if available_tools_payload is None:
-            available_tools_payload = self.list_available_tools(actor=actor, conversation_id=conversation.id)
-        provider_tool_name_map = build_provider_tool_name_map(
-            [tool["function"]["name"] for tool in available_tools_payload if isinstance(tool, dict)]
-        )
-        prompt_payload = build_assistant_prompt(
-            user_message=cleaned_message,
-            detected_language=detected_language,
-            response_language=response_language,
-            auth_context=summarize_auth_context(actor),
-            route_context=route_context,
-            knowledge_chunks=knowledge_chunks,
-            grounding_context=grounding_context,
-            available_tools=[
-                PromptToolDefinition(
-                    name=tool["function"]["name"],
-                    description=tool["function"].get("description"),
-                    required_permissions=[],
-                )
-                for tool in available_tools_payload
-            ],
-            conversation_messages=recent_messages,
-            tool_results=tool_results,
-            max_context_chunks=self.runtime_config.max_context_chunks,
-            max_input_chars=self.runtime_config.max_input_chars,
-        )
-        return AssistantProviderRequest(
+        knowledge_chunks: list[AssistantKnowledgeChunkResult] = []
+        prompt_payload_metadata: dict[str, Any] = {}
+        system_instructions = "Use the tool outputs and prior response context to produce the final structured answer."
+        user_message = cleaned_message
+        prompt_recent_messages: list[dict[str, Any]] = []
+        request_grounding_context: dict[str, Any] | None = None
+
+        if not is_continuation:
+            knowledge_chunks = self._retrieve_knowledge_chunks(
+                query=cleaned_message,
+                response_language=response_language,
+                route_context=route_context,
+                actor=actor,
+                workflow_intent=grounding_context.retrieval_plan.get("workflow_intent"),
+                planned_page_ids=list(grounding_context.retrieval_plan.get("likely_page_ids", [])),
+                planned_module_keys=list(grounding_context.retrieval_plan.get("likely_module_keys", [])),
+            )
+            trimmed_grounding_context = self._trim_grounding_context_for_budget(grounding_context)
+            prompt_payload = build_assistant_prompt(
+                user_message=cleaned_message,
+                detected_language=detected_language,
+                response_language=response_language,
+                auth_context=summarize_auth_context(actor),
+                route_context=route_context,
+                knowledge_chunks=knowledge_chunks,
+                grounding_context=trimmed_grounding_context,
+                available_tools=[
+                    PromptToolDefinition(
+                        name=tool["function"]["name"],
+                        description=tool["function"].get("description"),
+                        required_permissions=[],
+                    )
+                    for tool in available_tools_payload
+                ],
+                conversation_messages=recent_messages,
+                tool_results=tool_results,
+                max_context_chunks=self.runtime_config.max_context_chunks,
+                max_input_chars=self.runtime_config.max_input_chars,
+                max_history_messages=self.runtime_config.max_recent_messages_for_model,
+            )
+            system_instructions = prompt_payload.system_instructions
+            user_message = prompt_payload.user_message
+            prompt_recent_messages = prompt_payload.conversation_messages
+            prompt_payload_metadata = dict(prompt_payload.metadata)
+            request_grounding_context = trimmed_grounding_context.model_dump(mode="json")
+
+        request = AssistantProviderRequest(
             conversation_id=conversation.id,
-            user_message=prompt_payload.user_message,
-            system_instructions=prompt_payload.system_instructions,
+            user_message=user_message,
+            system_instructions=system_instructions,
             response_language=response_language,
             detected_language=detected_language,
             route_context=route_context,
-            recent_messages=prompt_payload.conversation_messages,
+            recent_messages=prompt_recent_messages,
             knowledge_chunks=[item.model_dump(mode="json") for item in knowledge_chunks],
-            grounding_context=grounding_context.model_dump(mode="json"),
+            grounding_context=request_grounding_context,
             tool_results=self._build_provider_tool_result_summaries(tool_results=tool_results),
             continuation_tool_outputs=list(provider_tool_results or []),
             previous_response_id=previous_response_id,
@@ -1588,19 +2144,24 @@ class AssistantService:
             provider_tool_name_map=provider_tool_name_map,
             max_tool_calls=self.runtime_config.max_tool_calls,
             max_input_chars=self.runtime_config.max_input_chars,
+            max_output_tokens=(
+                self.runtime_config.continuation_max_output_tokens
+                if is_continuation
+                else self.runtime_config.max_output_tokens
+            ),
             metadata={
                 "request_id": actor.request_id,
                 "provider_mode": self.runtime_config.provider_mode,
                 "user_id": actor.user_id,
                 "tenant_id": actor.tenant_id,
                 "tool_name_map": dict(provider_tool_name_map),
-                "continuation_mode": self._determine_continuation_mode(
-                    previous_response_id=previous_response_id,
-                    previous_output_items=previous_output_items,
-                    continuation_tool_outputs=provider_tool_results,
-                ),
-                **prompt_payload.metadata,
+                "continuation_mode": continuation_mode,
+                **prompt_payload_metadata,
             },
+        )
+        return self._enforce_provider_token_budget(
+            request=request,
+            grounding_context=grounding_context,
         )
 
     @staticmethod
@@ -1625,6 +2186,230 @@ class AssistantService:
         if previous_output_items and continuation_tool_outputs:
             return "stateless"
         return "initial"
+
+    def _trim_grounding_context_for_budget(
+        self,
+        grounding_context: AssistantGroundingContext,
+    ) -> AssistantGroundingContext:
+        trimmed_context = grounding_context.model_copy(deep=True)
+        sources = list(trimmed_context.sources)
+        kept_sources = self._trim_sources_by_char_budget(
+            sources=sources,
+            char_budget=self.runtime_config.max_total_grounding_chars,
+        )
+        trimmed = len(kept_sources) < len(sources)
+        if trimmed:
+            grounding_context.grounding_trimmed = True
+            grounding_context.trim_reason = "token_budget"
+            trimmed_context.grounding_trimmed = True
+            trimmed_context.trim_reason = "token_budget"
+            trimmed_context.sources = kept_sources
+        return trimmed_context
+
+    def _trim_sources_by_char_budget(
+        self,
+        *,
+        sources: list[AssistantGroundingSource],
+        char_budget: int,
+    ) -> list[AssistantGroundingSource]:
+        if not sources:
+            return []
+        removable_priority = {
+            "current_route": 100,
+            "page_route": 90,
+            "allowed_navigation_link": 80,
+            "knowledge_chunk": 70,
+            "tool_result_summary": 60,
+            "diagnostic_fact": 10,
+            "workflow": 20,
+            "ui_action": 15,
+            "page_help_manifest": 25,
+            "diagnostic": 30,
+            "missing_diagnostic_input": 12,
+        }
+        prepared = [
+            source.model_copy(
+                update={
+                    "content": self._truncate_grounding_text(source.content, min(self.runtime_config.max_grounding_chars_per_source, 280)),
+                    "facts": self._trim_grounding_facts(facts=source.facts, max_chars=220),
+                }
+            )
+            for source in sources
+        ]
+        protected_source_ids: set[str | None] = set()
+        for protected_type in ("ui_action", "diagnostic", "diagnostic_fact", "workflow"):
+            first_match = next((source for source in prepared if source.source_type == protected_type), None)
+            if first_match is not None:
+                protected_source_ids.add(first_match.source_id)
+        total = sum(
+            len(source.content or "") + len(json.dumps(source.facts, ensure_ascii=False))
+            for source in prepared
+        )
+        if total <= char_budget:
+            return prepared
+        ordered = sorted(
+            prepared,
+            key=lambda source: (
+                removable_priority.get(source.source_type, 50),
+                0 if self._is_content_bearing_source(source) else 1,
+                source.score or 0.0,
+            ),
+            reverse=True,
+        )
+        removable_ids = [
+            source.source_id
+            for source in ordered
+            if source.source_id not in protected_source_ids
+        ]
+        kept = list(prepared)
+        while total > char_budget and removable_ids:
+            remove_id = removable_ids.pop(0)
+            next_kept = [source for source in kept if source.source_id != remove_id]
+            if not next_kept:
+                break
+            kept = next_kept
+            total = sum(
+                len(source.content or "") + len(json.dumps(source.facts, ensure_ascii=False))
+                for source in kept
+            )
+        return kept
+
+    def _enforce_provider_token_budget(
+        self,
+        *,
+        request: AssistantProviderRequest,
+        grounding_context: AssistantGroundingContext,
+    ) -> AssistantProviderRequest:
+        budget = (
+            self.runtime_config.max_continuation_input_tokens
+            if request.metadata.get("continuation_mode") != "initial"
+            else self.runtime_config.max_provider_input_tokens
+        )
+        adjusted = request
+        metrics = self._estimate_request_token_budget(adjusted)
+        while metrics["estimated_input_tokens"] > budget:
+            continuation_mode = str(adjusted.metadata.get("continuation_mode") or "initial")
+            if continuation_mode != "initial":
+                reduced_output_tokens = max(200, adjusted.max_output_tokens - 150)
+                if reduced_output_tokens == adjusted.max_output_tokens:
+                    break
+                adjusted = replace(adjusted, max_output_tokens=reduced_output_tokens)
+            elif adjusted.recent_messages:
+                adjusted = replace(adjusted, recent_messages=adjusted.recent_messages[1:])
+                grounding_context.grounding_trimmed = True
+                grounding_context.trim_reason = "token_budget"
+            elif adjusted.grounding_context and isinstance(adjusted.grounding_context.get("sources"), list):
+                current_sources = [
+                    item for item in adjusted.grounding_context["sources"] if isinstance(item, dict)
+                ]
+                trimmed_sources = self._trim_sources_by_char_budget(
+                    sources=[AssistantGroundingSource.model_validate(item) for item in current_sources],
+                    char_budget=max(self.runtime_config.max_total_grounding_chars // 2, 1200),
+                )
+                trimmed_source_payloads = [item.model_dump(mode="json") for item in trimmed_sources]
+                if trimmed_source_payloads == current_sources:
+                    if len(current_sources) > 1:
+                        adjusted_grounding_context = dict(adjusted.grounding_context)
+                        adjusted_grounding_context["sources"] = current_sources[:-1]
+                        adjusted_grounding_context["grounding_trimmed"] = True
+                        adjusted_grounding_context["trim_reason"] = "token_budget"
+                        adjusted = replace(adjusted, grounding_context=adjusted_grounding_context)
+                        grounding_context.grounding_trimmed = True
+                        grounding_context.trim_reason = "token_budget"
+                        metrics = self._estimate_request_token_budget(adjusted)
+                        continue
+                    reduced_output_tokens = max(200, adjusted.max_output_tokens - 150)
+                    if reduced_output_tokens == adjusted.max_output_tokens:
+                        break
+                    adjusted = replace(adjusted, max_output_tokens=reduced_output_tokens)
+                    metrics = self._estimate_request_token_budget(adjusted)
+                    continue
+                adjusted_grounding_context = dict(adjusted.grounding_context)
+                adjusted_grounding_context["sources"] = trimmed_source_payloads
+                adjusted_grounding_context["grounding_trimmed"] = True
+                adjusted_grounding_context["trim_reason"] = "token_budget"
+                adjusted = replace(adjusted, grounding_context=adjusted_grounding_context)
+                grounding_context.grounding_trimmed = True
+                grounding_context.trim_reason = "token_budget"
+            elif adjusted.knowledge_chunks:
+                adjusted = replace(adjusted, knowledge_chunks=adjusted.knowledge_chunks[:-1])
+            else:
+                reduced_output_tokens = max(200, adjusted.max_output_tokens - 150)
+                if reduced_output_tokens == adjusted.max_output_tokens:
+                    break
+                adjusted = replace(adjusted, max_output_tokens=reduced_output_tokens)
+            metrics = self._estimate_request_token_budget(adjusted)
+        adjusted.metadata.update(metrics)
+        self._log_provider_token_budget(adjusted, metrics)
+        return adjusted
+
+    def _estimate_request_token_budget(
+        self,
+        request: AssistantProviderRequest,
+    ) -> dict[str, Any]:
+        continuation = str(request.metadata.get("continuation_mode") or "initial") != "initial"
+        grounding_tokens = estimate_tokens(request.grounding_context) if not continuation else 0
+        history_tokens = estimate_tokens(request.recent_messages)
+        tool_result_tokens = estimate_tokens(request.tool_results) + estimate_tokens(request.continuation_tool_outputs)
+        tool_definition_tokens = estimate_tokens(request.available_tools)
+        instruction_tokens = estimate_tokens(request.system_instructions)
+        user_tokens = estimate_tokens(request.user_message)
+        previous_output_tokens = estimate_tokens(request.previous_output_items)
+        estimated_input_tokens = (
+            grounding_tokens
+            + history_tokens
+            + tool_result_tokens
+            + tool_definition_tokens
+            + instruction_tokens
+            + user_tokens
+            + previous_output_tokens
+        )
+        trimmed = bool(request.grounding_context and request.grounding_context.get("grounding_trimmed"))
+        return {
+            "estimated_input_tokens": estimated_input_tokens,
+            "estimated_grounding_tokens": grounding_tokens,
+            "estimated_history_tokens": history_tokens,
+            "estimated_tool_result_tokens": tool_result_tokens,
+            "estimated_tool_definition_tokens": tool_definition_tokens,
+            "estimated_instruction_tokens": instruction_tokens,
+            "estimated_previous_output_tokens": previous_output_tokens,
+            "trimmed": trimmed,
+            "continuation": continuation,
+        }
+
+    def _log_provider_token_budget(
+        self,
+        request: AssistantProviderRequest,
+        metrics: dict[str, Any],
+    ) -> None:
+        logger.info(
+            json.dumps(
+                {
+                    "event": "assistant_provider_token_budget",
+                    "estimated_input_tokens": metrics["estimated_input_tokens"],
+                    "estimated_grounding_tokens": metrics["estimated_grounding_tokens"],
+                    "estimated_history_tokens": metrics["estimated_history_tokens"],
+                    "estimated_tool_result_tokens": metrics["estimated_tool_result_tokens"],
+                    "trimmed": metrics["trimmed"],
+                    "continuation": metrics["continuation"],
+                    "request_id": request.metadata.get("request_id"),
+                    "conversation_id": request.conversation_id,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
+
+    @staticmethod
+    def _select_provider_available_tools(
+        *,
+        available_tools: list[dict[str, Any]],
+        grounding_context: AssistantGroundingContext,
+    ) -> list[dict[str, Any]]:
+        diagnostic_intent = str(grounding_context.retrieval_plan.get("diagnostic_intent") or "").strip()
+        if diagnostic_intent:
+            return []
+        return available_tools
 
     def _continuation_response_id(self, response_id: str | None) -> str | None:
         if not self.runtime_config.store_responses:
@@ -1690,6 +2475,128 @@ class AssistantService:
                 seen.add(key)
                 results.append(AssistantMissingPermission(permission=permission, reason=reason))
         return results
+
+    def _diagnostic_tool_result_source(
+        self,
+        *,
+        source_name: str,
+        tool_name: str,
+        result: Any,
+        title: str,
+    ) -> AssistantGroundingSource:
+        payload = result.redacted_output if isinstance(result.redacted_output, dict) else result.data
+        if not isinstance(payload, dict):
+            payload = {}
+        return AssistantGroundingSource(
+            source_id=f"tool_result_summary:{tool_name}",
+            source_type="tool_result_summary",
+            source_name=source_name,
+            page_id=self._first_page_id_from_payload(payload),
+            module_key=self._first_module_key_from_payload(payload),
+            title=title,
+            content=self._compact_diagnostic_payload_text(payload),
+            facts=payload,
+            verified=bool(result.ok),
+            permission_checked=True,
+            content_bearing=bool(payload),
+            score=self._diagnostic_tool_result_priority(tool_name),
+        )
+
+    @staticmethod
+    def _diagnostic_tool_result_priority(tool_name: str) -> float:
+        priorities = {
+            "field.inspect_released_schedule_visibility": 18.0,
+            "planning.inspect_shift_visibility": 16.0,
+            "planning.inspect_shift_release_state": 15.0,
+            "planning.inspect_assignment": 14.0,
+            "employees.get_employee_mobile_access_status": 13.0,
+            "employees.get_employee_readiness_summary": 12.0,
+            "employees.get_employee_operational_profile": 11.0,
+            "planning.find_assignments": 10.0,
+            "planning.find_shifts": 9.0,
+            "employees.search_employee_by_name": 8.0,
+            "assistant.search_accessible_pages": 2.0,
+            "assistant.get_current_user_capabilities": 2.0,
+        }
+        return priorities.get(tool_name, 4.0)
+
+    @staticmethod
+    def _compact_diagnostic_payload_text(payload: dict[str, Any]) -> str:
+        for key in (
+            "summary",
+            "safe_note",
+            "source_status",
+            "scope_kind",
+        ):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()[:220]
+        for key in ("mobile_access", "readiness", "release_state", "visibility", "assignment", "employee"):
+            value = payload.get(key)
+            if isinstance(value, dict):
+                for nested_key in ("summary", "visibility_state", "shift_release_state", "assignment_status", "status", "employee_status"):
+                    nested_value = value.get(nested_key)
+                    if isinstance(nested_value, str) and nested_value.strip():
+                        return nested_value.strip()[:220]
+        if payload.get("found") is False:
+            return "No directly visible record was confirmed in the current scope."
+        if isinstance(payload.get("matches"), list):
+            return f"Returned {len(payload['matches'])} candidate rows."
+        if isinstance(payload.get("pages"), list):
+            return f"Returned {len(payload['pages'])} accessible page hints."
+        return "Redacted diagnostic tool result."
+
+    @staticmethod
+    def _first_page_id_from_payload(payload: dict[str, Any]) -> str | None:
+        for key in ("page_id",):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        for collection_key in ("pages", "matches"):
+            rows = payload.get(collection_key)
+            if isinstance(rows, list):
+                for row in rows:
+                    if isinstance(row, dict):
+                        value = row.get("page_id")
+                        if isinstance(value, str) and value.strip():
+                            return value.strip()
+        for nested_key in ("assignment", "release_state", "visibility", "employee"):
+            nested = payload.get(nested_key)
+            if isinstance(nested, dict):
+                value = nested.get("page_id")
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+        return None
+
+    @staticmethod
+    def _first_module_key_from_payload(payload: dict[str, Any]) -> str | None:
+        value = payload.get("module_key")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        page_id = AssistantService._first_page_id_from_payload(payload)
+        if page_id is None:
+            return None
+        return AssistantService._module_key_from_page_id(page_id)
+
+    @staticmethod
+    def _module_key_from_page_id(page_id: str) -> str:
+        if page_id.startswith("PS"):
+            return "platform_services"
+        if page_id.startswith("FD"):
+            return "field_execution"
+        if page_id.startswith("FI"):
+            return "finance"
+        if page_id.startswith("F"):
+            return "dashboard"
+        if page_id.startswith("E"):
+            return "employees"
+        if page_id.startswith("P"):
+            return "planning"
+        if page_id.startswith("C"):
+            return "customers"
+        if page_id.startswith("S"):
+            return "subcontractors"
+        return "platform"
 
     def _validate_provider_links(
         self,
@@ -2026,6 +2933,366 @@ class AssistantService:
             )
         return sources
 
+    def _invoke_provider_with_retry(self, request: AssistantProviderRequest) -> AssistantProviderResult:
+        current_request = request
+        attempts_remaining = max(self.runtime_config.rate_limit_max_retries, 0)
+        fallback_model = self.runtime_config.fallback_response_model.strip() or None
+        fallback_used = False
+        while True:
+            try:
+                return self.provider.generate(current_request)
+            except AssistantProviderRateLimitError as exc:
+                if attempts_remaining > 0:
+                    attempts_remaining -= 1
+                    current_request = self._shrink_request_for_rate_limit_retry(current_request)
+                    retry_delay = min(
+                        max(exc.retry_after_seconds or 0.0, 0.0),
+                        max(float(self.runtime_config.rate_limit_retry_seconds), 0.0),
+                    )
+                    if retry_delay > 0:
+                        sleep(retry_delay)
+                    continue
+                if fallback_model and not fallback_used:
+                    fallback_used = True
+                    logger.info(
+                        json.dumps(
+                            {
+                                "event": "assistant_provider_model_fallback",
+                                "conversation_id": request.conversation_id,
+                                "request_id": request.metadata.get("request_id"),
+                                "from_model": request.model_name_override or self.runtime_config.response_model,
+                                "to_model": fallback_model,
+                            },
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        )
+                    )
+                    current_request = self._shrink_request_for_rate_limit_retry(
+                        replace(current_request, model_name_override=fallback_model)
+                    )
+                    continue
+                raise
+
+    def _call_provider_with_fallback_capture(
+        self,
+        *,
+        request: AssistantProviderRequest,
+        grounding_context: AssistantGroundingContext,
+        tool_results: list[AssistantToolResultSummary],
+        had_prior_provider_output: bool,
+    ) -> AssistantProviderResult:
+        try:
+            return self._call_provider(request)
+        except ApiException as exc:
+            if not self._is_provider_degraded_fallback_error(
+                exc=exc,
+                continuation_mode=str(request.metadata.get("continuation_mode") or "initial"),
+                had_prior_provider_output=had_prior_provider_output,
+            ):
+                raise
+            raise AssistantProviderDegradedFallbackCandidate(
+                api_exception=exc,
+                grounding_context=grounding_context,
+                tool_results=list(tool_results),
+                continuation_mode=str(request.metadata.get("continuation_mode") or "initial"),
+                had_prior_provider_output=had_prior_provider_output,
+            ) from exc
+
+    @staticmethod
+    def _is_provider_degraded_fallback_error(
+        *,
+        exc: ApiException,
+        continuation_mode: str,
+        had_prior_provider_output: bool,
+    ) -> bool:
+        if exc.code in {
+            "assistant.provider.rate_limited",
+            "assistant.provider.timeout",
+            "assistant.provider.unavailable",
+        }:
+            return True
+        if exc.code in {"assistant.provider.invalid_request", "assistant.provider.invalid_response"}:
+            return continuation_mode != "initial" or had_prior_provider_output
+        return False
+
+    def _can_build_provider_degraded_response(
+        self,
+        *,
+        classification: AssistantClassificationResult,
+        grounding_context: AssistantGroundingContext,
+    ) -> bool:
+        if classification.is_out_of_scope or classification.is_unsafe:
+            return False
+        return any(
+            self._is_content_bearing_source(source) or source.source_type == "diagnostic_fact"
+            for source in grounding_context.sources
+        )
+
+    def _build_provider_degraded_payload(
+        self,
+        *,
+        response_language: str,
+        grounding_context: AssistantGroundingContext,
+        tool_results: list[AssistantToolResultSummary],
+        continuation_mode: str,
+        provider_error_code: str,
+    ) -> dict[str, Any]:
+        source_basis = self._allowed_source_basis_items(grounding_context)
+        diagnosis = self._build_provider_degraded_diagnosis(
+            response_language=response_language,
+            tool_results=tool_results,
+            provider_error_code=provider_error_code,
+        )
+        next_steps = self._build_provider_degraded_next_steps(
+            response_language=response_language,
+            grounding_context=grounding_context,
+            tool_results=tool_results,
+        )
+        answer = self._build_provider_degraded_answer(
+            response_language=response_language,
+            source_basis=source_basis,
+            diagnosis=diagnosis,
+            has_links=bool(self._grounding_links(grounding_context)),
+        )
+        confidence = (
+            AssistantConfidence.MEDIUM
+            if len(source_basis) >= 2 or len(next_steps) >= 2
+            else AssistantConfidence.LOW
+        )
+        return {
+            "answer": answer,
+            "provider_degraded": True,
+            "confidence": confidence.value,
+            "out_of_scope": False,
+            "diagnosis": diagnosis,
+            "links": [],
+            "missing_permissions": self._collect_missing_permissions_from_summaries(tool_results),
+            "next_steps": next_steps[:4],
+            "tool_trace_id": f"provider_degraded:{continuation_mode}:{provider_error_code}",
+            "source_basis": [item.model_dump(mode="json") for item in source_basis[:4]],
+        }
+
+    def _build_provider_degraded_diagnosis(
+        self,
+        *,
+        response_language: str,
+        tool_results: list[AssistantToolResultSummary],
+        provider_error_code: str,
+    ) -> list[dict[str, str]]:
+        items: list[dict[str, str]] = [
+            {
+                "finding": self._provider_degraded_warning_text(response_language),
+                "severity": "info",
+                "evidence": self._provider_degraded_evidence_text(response_language, provider_error_code),
+            }
+        ]
+        seen_findings = {items[0]["finding"]}
+        for tool_result in tool_results:
+            payload = tool_result.summary.get("data")
+            if not isinstance(payload, dict):
+                continue
+            findings = payload.get("findings")
+            if not isinstance(findings, list):
+                continue
+            for row in findings:
+                if not isinstance(row, dict):
+                    continue
+                finding = str(row.get("finding") or "").strip()
+                if not finding or finding in seen_findings:
+                    continue
+                severity = str(row.get("severity") or "info").strip() or "info"
+                evidence = str(row.get("evidence") or row.get("status") or "").strip() or finding
+                items.append(
+                    {
+                        "finding": finding,
+                        "severity": severity if severity in {"info", "warning", "blocking"} else "info",
+                        "evidence": evidence,
+                    }
+                )
+                seen_findings.add(finding)
+                if len(items) >= 5:
+                    return items
+            summary_text = str(payload.get("summary") or "").strip()
+            if summary_text and summary_text not in seen_findings:
+                items.append(
+                    {
+                        "finding": summary_text,
+                        "severity": "info",
+                        "evidence": str(payload.get("status") or summary_text),
+                    }
+                )
+                seen_findings.add(summary_text)
+                if len(items) >= 5:
+                    return items
+        return items
+
+    def _build_provider_degraded_next_steps(
+        self,
+        *,
+        response_language: str,
+        grounding_context: AssistantGroundingContext,
+        tool_results: list[AssistantToolResultSummary],
+    ) -> list[str]:
+        steps: list[str] = []
+        seen: set[str] = set()
+
+        def append_step(value: str) -> None:
+            cleaned = value.strip()
+            if not cleaned or cleaned in seen:
+                return
+            seen.add(cleaned)
+            steps.append(cleaned)
+
+        for tool_result in tool_results:
+            payload = tool_result.summary.get("data")
+            if not isinstance(payload, dict):
+                continue
+            next_steps = payload.get("next_steps")
+            if isinstance(next_steps, list):
+                for step in next_steps:
+                    if isinstance(step, str):
+                        append_step(step)
+            missing_input = payload.get("missing_input")
+            if isinstance(missing_input, list):
+                for field_name in missing_input:
+                    if not isinstance(field_name, str):
+                        continue
+                    append_step(self._missing_diagnostic_input_text(response_language, field_name))
+
+        for source in grounding_context.sources:
+            if source.source_type != "missing_diagnostic_input":
+                continue
+            if source.content:
+                append_step(source.content)
+
+        return steps[:4]
+
+    def _build_provider_degraded_answer(
+        self,
+        *,
+        response_language: str,
+        source_basis: list[AssistantSourceBasisItem],
+        diagnosis: list[dict[str, str]],
+        has_links: bool,
+    ) -> str:
+        evidence_points: list[str] = []
+        for item in diagnosis[1:]:
+            finding = str(item.get("finding") or "").strip()
+            if finding:
+                evidence_points.append(finding)
+            if len(evidence_points) >= 4:
+                break
+        if not evidence_points:
+            for item in source_basis[:4]:
+                evidence = item.evidence.strip()
+                if evidence:
+                    evidence_points.append(evidence)
+        intro = self._provider_degraded_intro_text(response_language)
+        if evidence_points:
+            body = self._provider_degraded_points_text(response_language, evidence_points[:4])
+        else:
+            body = self._provider_degraded_no_points_text(response_language)
+        if has_links:
+            return f"{intro} {body} {self._provider_degraded_links_text(response_language)}".strip()
+        return f"{intro} {body}".strip()
+
+    @staticmethod
+    def _provider_degraded_intro_text(response_language: str) -> str:
+        if response_language == "de":
+            return "Die Anfrage konnte nicht vollständig mit dem KI-Modell abgeschlossen werden."
+        if response_language == "fa":
+            return "این درخواست با مدل هوش مصنوعی به طور کامل نهایی نشد."
+        return "The request could not be completed fully with the AI model."
+
+    @staticmethod
+    def _provider_degraded_points_text(response_language: str, evidence_points: list[str]) -> str:
+        joined = "; ".join(point.rstrip(".") for point in evidence_points if point.strip())
+        if response_language == "de":
+            return f"Auf Basis der bereits geprüften SicherPlan-Kontexte sollten Sie die folgenden Punkte kontrollieren: {joined}."
+        if response_language == "fa":
+            return f"بر اساس کانتکست‌های از قبل بررسی‌شده SicherPlan، این موارد را بررسی کنید: {joined}."
+        return f"Based on the already checked SicherPlan context, review these points: {joined}."
+
+    @staticmethod
+    def _provider_degraded_no_points_text(response_language: str) -> str:
+        if response_language == "de":
+            return "Es liegen bereits geprüfte SicherPlan-Kontexte vor, aber es konnten nur begrenzte sichere Hinweise zurückgegeben werden."
+        if response_language == "fa":
+            return "کانتکست‌های بررسی‌شده SicherPlan موجود است، اما فقط راهنمایی محدود و ایمن قابل بازگشت بود."
+        return "Verified SicherPlan context is available, but only limited safe guidance could be returned."
+
+    @staticmethod
+    def _provider_degraded_links_text(response_language: str) -> str:
+        if response_language == "de":
+            return "Nutzen Sie bei Bedarf die freigegebenen Links unten."
+        if response_language == "fa":
+            return "در صورت نیاز از لینک‌های مجاز زیر استفاده کنید."
+        return "Use the allowed links below if needed."
+
+    @staticmethod
+    def _provider_degraded_warning_text(response_language: str) -> str:
+        if response_language == "de":
+            return "Die Antwort wurde aus bereits geprüften SicherPlan-Kontexten erstellt."
+        if response_language == "fa":
+            return "این پاسخ از کانتکست‌های از قبل بررسی‌شده SicherPlan ساخته شد."
+        return "This answer was assembled from already checked SicherPlan context."
+
+    @staticmethod
+    def _provider_degraded_evidence_text(response_language: str, provider_error_code: str) -> str:
+        if response_language == "de":
+            return f"Der KI-Anbieter konnte die Anfrage gerade nicht vollständig abschließen ({provider_error_code})."
+        if response_language == "fa":
+            return f"ارائه‌دهنده هوش مصنوعی فعلاً نتوانست درخواست را کامل کند ({provider_error_code})."
+        return f"The AI provider could not complete the request fully right now ({provider_error_code})."
+
+    @staticmethod
+    def _missing_diagnostic_input_text(response_language: str, field_name: str) -> str:
+        if response_language == "de":
+            return f"Ergänzen Sie die fehlende Angabe: {field_name}."
+        if response_language == "fa":
+            return f"اطلاعات ناقص را کامل کنید: {field_name}."
+        return f"Provide the missing input: {field_name}."
+
+    def _shrink_request_for_rate_limit_retry(
+        self,
+        request: AssistantProviderRequest,
+    ) -> AssistantProviderRequest:
+        continuation_mode = str(request.metadata.get("continuation_mode") or "initial")
+        reduced_output_tokens = max(
+            200,
+            request.max_output_tokens - 150,
+        )
+        updated = replace(request, max_output_tokens=reduced_output_tokens)
+        if continuation_mode != "initial":
+            updated = replace(
+                updated,
+                available_tools=[],
+                recent_messages=[],
+                knowledge_chunks=[],
+                grounding_context=None,
+            )
+        elif updated.grounding_context and isinstance(updated.grounding_context.get("sources"), list):
+            sources = [
+                AssistantGroundingSource.model_validate(item)
+                for item in updated.grounding_context["sources"]
+                if isinstance(item, dict)
+            ]
+            trimmed_sources = self._trim_sources_by_char_budget(
+                sources=sources,
+                char_budget=max(self.runtime_config.max_total_grounding_chars // 2, 1000),
+            )
+            adjusted_grounding_context = dict(updated.grounding_context)
+            adjusted_grounding_context["sources"] = [item.model_dump(mode="json") for item in trimmed_sources]
+            adjusted_grounding_context["grounding_trimmed"] = True
+            adjusted_grounding_context["trim_reason"] = "token_budget"
+            updated = replace(updated, grounding_context=adjusted_grounding_context)
+        if updated.recent_messages:
+            updated = replace(updated, recent_messages=updated.recent_messages[-2:])
+        metrics = self._estimate_request_token_budget(updated)
+        updated.metadata.update(metrics)
+        updated.metadata["rate_limit_retry_compacted"] = True
+        return updated
+
     def _call_provider(self, request: AssistantProviderRequest) -> AssistantProviderResult:
         grounding_sources = 0
         grounding_attached = bool(request.grounding_context)
@@ -2044,7 +3311,7 @@ class AssistantService:
             output_tokens=None,
         )
         try:
-            result = self.provider.generate(request)
+            result = self._invoke_provider_with_retry(request)
         except AssistantProviderConfigurationError as exc:
             self._log_provider_error(request=request, exc=exc, attempted_openai=attempted_openai)
             self._log_provider_event(
@@ -2260,7 +3527,7 @@ class AssistantService:
         payload = {
             "event": event,
             "provider_mode": self.runtime_config.provider_mode,
-            "model_name": self.runtime_config.response_model,
+            "model_name": request.model_name_override or self.runtime_config.response_model,
             "request_id": request.metadata.get("request_id"),
             "conversation_id": request.conversation_id,
             "user_id": request.metadata.get("user_id"),
@@ -2272,6 +3539,7 @@ class AssistantService:
             "provider_latency_ms": provider_latency_ms,
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
+            "max_output_tokens": request.max_output_tokens,
         }
         logger.info(json.dumps(payload, ensure_ascii=False, sort_keys=True))
 
@@ -2285,7 +3553,7 @@ class AssistantService:
         payload = {
             "event": "assistant_provider_error",
             "provider_mode": self.runtime_config.provider_mode,
-            "model_name": self.runtime_config.response_model,
+            "model_name": request.model_name_override or self.runtime_config.response_model,
             "request_id": request.metadata.get("request_id"),
             "conversation_id": request.conversation_id,
             "exception_class": type(exc).__name__,
@@ -2433,6 +3701,10 @@ class AssistantService:
                     or content
                 )
             )
+        if source.source_type == "diagnostic_fact":
+            return bool(source.verified and content)
+        if source.source_type == "tool_result_summary":
+            return bool(source.verified and (content or facts))
         return False
 
     @staticmethod
@@ -2473,11 +3745,14 @@ class AssistantService:
         order = {
             "ui_action": 0,
             "workflow": 1,
-            "knowledge_chunk": 2,
-            "page_help_manifest": 3,
-            "diagnostic": 4,
-            "page_route": 5,
-            "current_route": 6,
+            "diagnostic_fact": 2,
+            "tool_result_summary": 3,
+            "knowledge_chunk": 4,
+            "page_help_manifest": 5,
+            "diagnostic": 6,
+            "allowed_navigation_link": 7,
+            "page_route": 8,
+            "current_route": 9,
         }
         return order.get(source_type, 99)
 

@@ -11,6 +11,7 @@ describe('AssistantMessageList pending state', () => {
       props: {
         assistantLabel: 'Assistant',
         confidenceLabel: 'Confidence',
+        degradedWarning: 'Degraded answer',
         diagnosisTitle: 'Findings',
         emptyBody: 'Empty',
         emptyTitle: 'Nothing yet',
@@ -48,19 +49,14 @@ describe('AssistantMessageList pending state', () => {
         },
         userLabel: 'You',
       },
-      global: {
-        stubs: {
-          IconifyIcon: {
-            template: '<span class="icon-stub" />',
-          },
-        },
-      },
     });
 
     const indicator = wrapper.get('[data-testid="assistant-pending-indicator"]');
     expect(indicator.attributes('role')).toBe('status');
     expect(indicator.attributes('aria-live')).toBe('polite');
     expect(indicator.text()).toContain('Processing request');
+    expect(indicator.find('.sp-assistant-message__pending-dot').exists()).toBe(true);
+    expect(indicator.find('.icon-stub').exists()).toBe(false);
   });
 
   it('scrolls to the newly added pending indicator', async () => {
@@ -68,6 +64,7 @@ describe('AssistantMessageList pending state', () => {
       props: {
         assistantLabel: 'Assistant',
         confidenceLabel: 'Confidence',
+        degradedWarning: 'Degraded answer',
         diagnosisTitle: 'Findings',
         emptyBody: 'Empty',
         emptyTitle: 'Nothing yet',
@@ -92,13 +89,6 @@ describe('AssistantMessageList pending state', () => {
           warning: 'Warning',
         },
         userLabel: 'You',
-      },
-      global: {
-        stubs: {
-          IconifyIcon: {
-            template: '<span class="icon-stub" />',
-          },
-        },
       },
     });
 

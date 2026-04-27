@@ -66,11 +66,13 @@ def test_previous_response_continuation_keeps_matching_call_id_without_fresh_use
                     "output": '{"status":"not_visible"}',
                 }
             ],
+            max_output_tokens=700,
         )
     )
 
     call = client.responses.calls[0]
     assert call["previous_response_id"] == "resp-1"
+    assert call["max_output_tokens"] == 700
     assert call["input"] == [
         {
             "type": "function_call_output",
@@ -129,13 +131,16 @@ def test_stateless_continuation_replays_function_call_before_tool_output() -> No
                     "output": '{"status":"not_visible"}',
                 }
             ],
+            max_output_tokens=700,
         )
     )
 
     call = client.responses.calls[0]
     input_rows = call["input"]
     assert "previous_response_id" not in call
-    assert sum(1 for row in input_rows if row.get("role") == "user") == 1
+    assert call["max_output_tokens"] == 700
+    assert sum(1 for row in input_rows if row.get("role") == "user") == 0
+    assert sum(1 for row in input_rows if row.get("role") == "system") == 1
     function_call_index = next(index for index, row in enumerate(input_rows) if row.get("type") == "function_call")
     function_output_index = next(
         index for index, row in enumerate(input_rows) if row.get("type") == "function_call_output"

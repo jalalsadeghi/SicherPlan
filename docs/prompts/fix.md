@@ -1,79 +1,80 @@
 You are working in the SicherPlan repository.
 
 Goal:
-Fix the wrong loading text in the Dashboard calendar.
+Clean up duplicated/low-value black section titles in the Staffing Coverage page.
 
-User-visible issue:
-On the Customers calendar, the loading indicator text is correct. On the main Dashboard calendar, the loading indicator displays the raw i18n key:
+User-visible page:
+admin/planning-staffing
 
-workspace.loading.processing
+Primary file:
+- web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue
 
-Expected behavior:
-The Dashboard calendar should show the translated human-readable loading text, the same way the Customers calendar does.
+Tests to inspect/update:
+- web/apps/web-antd/src/sicherplan-legacy/features/planning/planningStaffing.smoke.test.ts
 
-Primary files to inspect:
-- web/apps/web-antd/src/views/sicherplan/dashboard/index.vue
-- web/apps/web-antd/src/components/sicherplan/dashboard-calendar-panel.vue
-- web/apps/web-antd/src/sicherplan-legacy/components/customers/CustomerDashboardTab.vue
-- web/apps/web-antd/src/locales/langs/de-DE/
-- web/apps/web-antd/src/locales/langs/en-US/
-- any i18n/locale file where `workspace.loading.processing` or dashboard calendar labels are defined
+Current issue:
+Three cards show a green eyebrow/title and then repeat the same text again in black underneath. This creates visual clutter.
 
-Before coding:
-1. Read AGENTS.md.
-2. Inspect how `CustomerDashboardTab.vue` passes the loading label to `DashboardCalendarPanel`.
-3. Inspect how `views/sicherplan/dashboard/index.vue` currently passes `loading-label`.
-4. Find out why `$t('workspace.loading.processing')` is rendered as the raw key on the Dashboard page.
-5. Do not change backend APIs.
-6. Do not change calendar loading logic or data fetching.
-7. This is only an i18n/text fix.
+Required changes:
 
-Required fix:
-1. The Dashboard calendar loading indicator must not display `workspace.loading.processing`.
-2. Use a translated label that exists in the i18n namespace used by the Dashboard page.
-3. Prefer one of these safe solutions:
-   - Add a Dashboard-specific key, for example:
-     `sicherplan.dashboardView.calendar.loading`
-   - Or use an existing correctly translated dashboard/calendar loading key if one already exists.
-4. Suggested translations:
-   - de-DE: `Anfrage wird verarbeitet`
-   - en-US: `Processing request`
-5. Update `views/sicherplan/dashboard/index.vue` to pass the correct translated key to `DashboardCalendarPanel`, for example:
-   `:loading-label="$t('sicherplan.dashboardView.calendar.loading')"`
-6. Do not break the Customers calendar behavior.
-7. Do not hardcode English or German directly in the Vue template.
+1. Filter und Scope card
+- Remove the black title/text:
+  "Filter und Scope"
+- Also remove the black role/tenant line:
+  "Rolle: tenant_admin · Mandant: ..."
+- Keep the green eyebrow/title:
+  "FILTER UND SCOPE"
+
+2. Schicht-Coverage card
+- Remove the black repeated title:
+  "Schicht-Coverage"
+- Keep the green eyebrow/title:
+  "SCHICHT-COVERAGE"
+
+3. Schichtdetails card
+- Remove the black repeated title:
+  "Schichtdetails"
+- Keep the green eyebrow/title:
+  "SCHICHTDETAILS"
+
+Important:
+- Do not remove the actual content, filters, counters, list, empty states, selected shift detail, tabs, or actions.
+- Do not change backend APIs.
+- Do not change data loading, filtering, staffing commands, or permissions.
+- This is only a frontend template cleanup.
+
+Implementation guidance:
+- In `PlanningStaffingCoverageView.vue`, inspect the panel headers around:
+  - `tp("filtersTitle")`
+  - `tp("listTitle")`
+  - `tp("detailTitle")`
+- These likely render both:
+  - `<p class="eyebrow">...</p>`
+  - `<h3>...</h3>`
+- For the three named panels, keep only the eyebrow and remove the redundant black `<h3>` / lead text.
+- If the detail header uses the black `<h3>` to show selected shift context, preserve selected shift context elsewhere if needed, but do not show repeated "Schichtdetails" when no shift is selected.
+- Make the smallest safe change.
 
 Tests:
-Update or add the smallest relevant frontend test.
-
-Suggested test files to inspect:
-- web/apps/web-antd/src/views/sicherplan/dashboard/index.test.ts
-- web/apps/web-antd/src/components/sicherplan/dashboard-calendar-panel.test.ts
-
-Required test coverage:
-1. Dashboard calendar loading indicator renders a human-readable translated label.
-2. Dashboard calendar does not render the raw text `workspace.loading.processing`.
-3. `DashboardCalendarPanel` still accepts and displays the provided loading label.
-4. Customer calendar behavior is not changed.
+Update tests only if they assert the duplicated black titles or role/tenant line.
 
 Acceptance criteria:
-- Main Dashboard calendar loading text is correct.
-- No raw i18n key is visible.
-- Customers calendar loading text remains correct.
-- Frontend-only change.
-- Tests pass.
+- The three panels keep their green eyebrow labels.
+- The duplicate black labels are gone.
+- The role/tenant line under Filter und Scope is gone.
+- Staffing page layout and functionality are unchanged.
+- Existing tests pass.
 
 Run:
 cd web
-pnpm test -- dashboard
-pnpm test -- dashboard-calendar
+pnpm test -- planningStaffing
 pnpm lint
 pnpm typecheck
 
-If these exact scripts/filters do not exist, inspect package.json and run the closest existing web test/lint/typecheck commands.
+If these exact commands are not available, inspect package.json and run the closest existing web test/lint/typecheck commands.
 
 Final response:
-- Explain the root cause.
+- Summarize the template cleanup.
 - List changed files.
 - List tests run and results.
-- Confirm no backend changes were made.
+- Confirm this was frontend-only.

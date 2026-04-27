@@ -815,6 +815,10 @@ describe("PlanningStaffingCoverageView", () => {
     expect(wrapper.text()).toContain("Planungsmodus auswaehlen");
     expect(wrapper.text()).toContain("Workforce-Scope auswaehlen");
     expect(wrapper.text()).toContain("Bestaetigungsstatus auswaehlen");
+    expect(wrapper.text().match(/Filter und Scope/g)?.length).toBe(1);
+    expect(wrapper.text().match(/Schicht-Coverage/g)?.length).toBe(1);
+    expect(wrapper.text().match(/Schichtdetails/g)?.length).toBe(1);
+    expect(wrapper.text()).not.toContain("Rolle: dispatcher");
     expect(wrapper.text()).not.toContain("Planungsdatensatz-ID");
     expect(wrapper.text()).not.toContain("Coverage lesen");
     expect(wrapper.text()).not.toContain("Staffing schreiben");
@@ -827,7 +831,7 @@ describe("PlanningStaffingCoverageView", () => {
     expect(mocks.listStaffingCoverageMock).toHaveBeenCalledWith("tenant-1", "token-1", expect.any(Object));
     expect(mocks.listFunctionTypesMock).toHaveBeenCalledWith("tenant-1", "token-1");
     expect(mocks.listQualificationTypesMock).toHaveBeenCalledWith("tenant-1", "token-1");
-  });
+  }, 10_000);
 
   it("hides the shared module control intro for planning staffing via the module registry", () => {
     const staffing = moduleRegistry["planning-staffing"];

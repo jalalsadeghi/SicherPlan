@@ -315,6 +315,7 @@ describe('SicherPlanAssistantWidget', () => {
           confidence: 'high',
           conversation_id: 'conversation-1',
           detected_language: 'de',
+          provider_degraded: true,
           diagnosis: [
             {
               evidence: 'Freigabe fehlt',
@@ -355,6 +356,7 @@ describe('SicherPlanAssistantWidget', () => {
     await flushUi();
 
     expect(wrapper.text()).toContain('assistant.widget.diagnosisTitle');
+    expect(wrapper.text()).toContain('assistant.widget.degradedWarning');
     expect(wrapper.text()).toContain('Die Schicht ist noch nicht freigegeben.');
     expect(wrapper.text()).toContain('assistant.widget.missingPermissionsTitle');
     expect(wrapper.text()).toContain('planning.staffing.read');
@@ -363,6 +365,7 @@ describe('SicherPlanAssistantWidget', () => {
     expect(wrapper.text()).toContain('assistant.widget.linksTitle');
     expect(wrapper.text()).toContain('assistant.widget.sourcesTitle');
     expect(wrapper.text()).not.toContain('Shift Planning — SicherPlanPlanningShifts');
+    expect(wrapper.find('[data-testid="assistant-error-state"]').exists()).toBe(false);
 
     const sourceToggle = wrapper.get('[data-testid="assistant-source-basis"] button');
     expect(sourceToggle.attributes('aria-expanded')).toBe('false');

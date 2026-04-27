@@ -18,6 +18,7 @@
     "assistantLabel": "Assistant",
     "userLabel": "You",
     "diagnosisTitle": "Findings",
+    "degradedWarning": "This answer was assembled from already checked SicherPlan context because the AI provider could not complete the request fully right now.",
     "linksTitle": "Allowed links",
     "nextStepsTitle": "Next steps",
     "sourcesTitle": "Sources used",

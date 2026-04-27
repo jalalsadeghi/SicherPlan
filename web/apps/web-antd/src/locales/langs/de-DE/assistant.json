@@ -18,6 +18,7 @@
     "assistantLabel": "Assistant",
     "userLabel": "Sie",
     "diagnosisTitle": "Feststellungen",
+    "degradedWarning": "Diese Antwort wurde aus bereits geprüften SicherPlan-Kontexten erstellt, weil der KI-Anbieter die Anfrage gerade nicht vollständig abschließen konnte.",
     "linksTitle": "Freigegebene Links",
     "nextStepsTitle": "Nächste Schritte",
     "sourcesTitle": "Verwendete Quellen",

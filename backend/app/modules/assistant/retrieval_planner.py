@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.modules.assistant.classifier import is_product_overview_question
+from app.modules.assistant.diagnostic_prefetch import plan_diagnostic_prefetch
 from app.modules.assistant.diagnostics import is_shift_visibility_question
 from app.modules.assistant.lexicon import expand_assistant_query
 from app.modules.assistant.page_help import detect_ui_howto_intent
@@ -17,6 +18,7 @@ class AssistantRetrievalPlan:
     intent_category: str
     workflow_intent: str | None = None
     ui_intent: str | None = None
+    diagnostic_intent: str | None = None
     expanded_query: str | None = None
     detected_terms: tuple[str, ...] = ()
     expanded_terms_en: tuple[str, ...] = ()
@@ -26,12 +28,15 @@ class AssistantRetrievalPlan:
     likely_module_keys: tuple[str, ...] = ()
     required_sources: tuple[str, ...] = ()
     needs_diagnostics: bool = False
+    diagnostic_missing_inputs: tuple[str, ...] = ()
+    diagnostic_checks_missing_input: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "intent_category": self.intent_category,
             "workflow_intent": self.workflow_intent,
             "ui_intent": self.ui_intent,
+            "diagnostic_intent": self.diagnostic_intent,
             "expanded_query": self.expanded_query,
             "detected_terms": list(self.detected_terms),
             "expanded_terms_en": list(self.expanded_terms_en),
@@ -41,6 +46,8 @@ class AssistantRetrievalPlan:
             "likely_module_keys": list(self.likely_module_keys),
             "required_sources": list(self.required_sources),
             "needs_diagnostics": self.needs_diagnostics,
+            "diagnostic_missing_inputs": list(self.diagnostic_missing_inputs),
+            "diagnostic_checks_missing_input": list(self.diagnostic_checks_missing_input),
         }
 
 
@@ -52,7 +59,12 @@ def build_retrieval_plan(
     workflow_intent = detect_workflow_intent(message)
     ui_intent = detect_ui_howto_intent(message)
     product_overview = is_product_overview_question(message)
-    needs_diagnostics = is_shift_visibility_question(message, route_context)
+    diagnostic_prefetch = plan_diagnostic_prefetch(
+        message=message,
+        detected_language="unknown",
+        route_context=route_context,
+    )
+    needs_diagnostics = diagnostic_prefetch is not None or is_shift_visibility_question(message, route_context)
     expanded_query = expand_assistant_query(
         message,
         workflow_intent=workflow_intent.intent if workflow_intent is not None else None,
@@ -117,6 +129,7 @@ def build_retrieval_plan(
         intent_category=intent_category,
         workflow_intent=workflow_intent.intent if workflow_intent is not None else None,
         ui_intent=ui_intent.intent if ui_intent is not None else None,
+        diagnostic_intent=diagnostic_prefetch.intent if diagnostic_prefetch is not None else None,
         expanded_query=expanded_query.expanded_query,
         detected_terms=expanded_query.detected_terms,
         expanded_terms_en=expanded_query.expanded_terms_en,
@@ -126,6 +139,8 @@ def build_retrieval_plan(
         likely_module_keys=tuple(_dedupe_preserve_order([key for key in likely_module_keys if key])),
         required_sources=tuple(_dedupe_preserve_order(required_sources)),
         needs_diagnostics=needs_diagnostics,
+        diagnostic_missing_inputs=diagnostic_prefetch.missing_inputs if diagnostic_prefetch is not None else (),
+        diagnostic_checks_missing_input=diagnostic_prefetch.checks_missing_input if diagnostic_prefetch is not None else (),
     )
 
 

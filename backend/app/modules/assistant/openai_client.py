@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import re
 from time import perf_counter
 from typing import Any, Callable
 
@@ -92,9 +93,10 @@ class OpenAIResponsesProvider(AssistantProvider):
         started = perf_counter()
         try:
             call_kwargs = {
-                "model": self.runtime.model_name,
+                "model": request.model_name_override or self.runtime.model_name,
                 "text_format": AssistantProviderStructuredOutput,
                 "store": self.runtime.store_responses,
+                "max_output_tokens": request.max_output_tokens,
             }
             if request.previous_response_id:
                 call_kwargs["previous_response_id"] = request.previous_response_id
@@ -208,7 +210,9 @@ class OpenAIResponsesProvider(AssistantProvider):
         cls,
         request: AssistantProviderRequest,
     ) -> list[dict[str, Any]]:
-        messages = cls._build_initial_input(request)
+        messages: list[dict[str, Any]] = []
+        if request.system_instructions:
+            messages.append({"role": "system", "content": request.system_instructions})
         messages.extend(cls._normalize_output_items(request.previous_output_items))
         messages.extend(cls._normalize_function_call_outputs(request.continuation_tool_outputs))
         return messages
@@ -369,6 +373,7 @@ class OpenAIResponsesProvider(AssistantProvider):
     def _map_provider_exception(exc: Exception) -> Exception:
         name = type(exc).__name__
         safe_message = str(exc).strip()[:240] or name
+        retry_after_seconds = _extract_retry_after_seconds(exc, safe_message)
         if name == "APITimeoutError":
             return AssistantProviderTimeoutError(
                 "OpenAI provider request timed out.",
@@ -380,6 +385,7 @@ class OpenAIResponsesProvider(AssistantProvider):
                 "OpenAI provider rate limited the request.",
                 provider_error_type=name,
                 safe_message=safe_message,
+                retry_after_seconds=retry_after_seconds,
             )
         if name in {"AuthenticationError", "PermissionDeniedError"}:
             return AssistantProviderAuthenticationError(
@@ -414,6 +420,7 @@ class OpenAIResponsesProvider(AssistantProvider):
                     provider_error_code=getattr(exc, "code", None),
                     http_status=status_code,
                     safe_message=safe_message,
+                    retry_after_seconds=retry_after_seconds,
                 )
             if status_code is not None and 400 <= status_code < 500:
                 return AssistantProviderInvalidRequestError(
@@ -455,3 +462,22 @@ class OpenAIResponsesProvider(AssistantProvider):
             http_status=getattr(exc, "status_code", None),
             safe_message=safe_message,
         )
+
+
+def _extract_retry_after_seconds(exc: Exception, safe_message: str) -> float | None:
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    if headers is not None:
+        retry_after = headers.get("retry-after") or headers.get("Retry-After")
+        if retry_after is not None:
+            try:
+                return max(float(retry_after), 0.0)
+            except (TypeError, ValueError):
+                pass
+    match = re.search(r"try again in ([0-9]+(?:\.[0-9]+)?)s", safe_message, re.IGNORECASE)
+    if match:
+        try:
+            return max(float(match.group(1)), 0.0)
+        except ValueError:
+            return None
+    return None

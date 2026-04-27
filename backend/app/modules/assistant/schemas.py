@@ -169,6 +169,8 @@ class AssistantRagTraceRead(BaseModel):
     missing_context: list[str] = Field(default_factory=list)
     retrieval_plan: dict[str, Any] = Field(default_factory=dict)
     query_expansion: dict[str, Any] = Field(default_factory=dict)
+    grounding_trimmed: bool = False
+    trim_reason: str | None = None
 
 
 class AssistantRagQualityGateRead(BaseModel):
@@ -199,6 +201,7 @@ class AssistantStructuredResponse(BaseModel):
     detected_language: str
     response_language: str
     answer: str
+    provider_degraded: bool = False
     answer_segments: list[AssistantAnswerSegment] = Field(default_factory=list)
     scope: AssistantScope
     confidence: AssistantConfidence
@@ -215,6 +218,7 @@ class AssistantStructuredResponse(BaseModel):
 
 class AssistantProviderStructuredOutput(BaseModel):
     answer: str
+    provider_degraded: bool = False
     confidence: AssistantConfidence
     out_of_scope: bool = False
     diagnosis: list[AssistantDiagnosisItem] = Field(default_factory=list)
