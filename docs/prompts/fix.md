@@ -1,15 +1,15 @@
-Review the Employees workspace changes.
+Review the Credentials maintenance change in admin/employees.
 
 Check:
-1. Address history is moved into a dialog and no longer clutters the Overview page.
-2. Reset password is moved into a dialog and still calls the correct API.
-3. Detach access is in the same action row as Update linked access and Reset password, aligned to the right.
-4. Diagnostics are moved into a dialog and still show all readiness checks.
-5. Tall portrait employee photos in the list stay inside the avatar container without distortion or overflow.
-6. The detail/dashboard photo display was not broken.
-7. Clicking the sidebar Employees item while already inside an employee detail returns to the employee list.
-8. The Back to employee list button still works.
-9. No backend API or permission scope was changed.
-10. Tests were added or updated instead of weakened.
+1. Existing credentials have Edit and Archive/Revoke actions.
+2. Edit opens a dialog and only exposes fields supported by the backend update schema.
+3. Save uses PATCH/updateEmployeeCredential and includes version_no.
+4. Archive/Revoke uses PATCH/updateEmployeeCredential, not DELETE.
+5. No hard-delete endpoint or frontend delete behavior was introduced.
+6. Issue badge output still works.
+7. The UI remains compact and consistent with the Employees Overview page.
+8. Archived/revoked credentials are visually clear or removed from the active list according to existing backend list behavior.
+9. Tenant scope and employee scope are unchanged.
+10. Tests were added or updated and are meaningful.
 
 Run the relevant web tests, lint, and typecheck. Fix any regression with the smallest safe change.

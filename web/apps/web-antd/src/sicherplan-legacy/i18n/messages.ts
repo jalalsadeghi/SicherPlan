@@ -799,6 +799,11 @@ export type MessageKey =
   | "employeeAdmin.credentials.empty"
   | "employeeAdmin.credentials.editorEyebrow"
   | "employeeAdmin.credentials.editorTitle"
+  | "employeeAdmin.credentials.lifecycleEyebrow"
+  | "employeeAdmin.credentials.archiveDialogTitle"
+  | "employeeAdmin.credentials.revokeDialogTitle"
+  | "employeeAdmin.credentials.archiveConfirm"
+  | "employeeAdmin.credentials.revokeConfirm"
   | "employeeAdmin.credentials.credentialTypePlaceholder"
   | "employeeAdmin.credentials.encodedValueHelp"
   | "employeeAdmin.credentialType.company_id"
@@ -910,8 +915,11 @@ export type MessageKey =
   | "employeeAdmin.actions.editQualificationType"
   | "employeeAdmin.actions.uploadQualificationProof"
   | "employeeAdmin.actions.createCredential"
+  | "employeeAdmin.actions.editCredential"
   | "employeeAdmin.actions.saveCredential"
   | "employeeAdmin.actions.resetCredential"
+  | "employeeAdmin.actions.archiveCredential"
+  | "employeeAdmin.actions.revokeCredential"
   | "employeeAdmin.actions.issueCredentialBadge"
   | "employeeAdmin.actions.createAvailability"
   | "employeeAdmin.actions.saveAvailability"
@@ -1072,6 +1080,8 @@ export type MessageKey =
   | "employeeAdmin.feedback.qualificationTypeSaved"
   | "employeeAdmin.feedback.qualificationProofSaved"
   | "employeeAdmin.feedback.credentialSaved"
+  | "employeeAdmin.feedback.credentialArchived"
+  | "employeeAdmin.feedback.credentialRevoked"
   | "employeeAdmin.feedback.credentialBadgeIssued"
   | "employeeAdmin.feedback.availabilitySaved"
   | "employeeAdmin.feedback.absenceSaved"
@@ -2848,6 +2858,13 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.credentials.empty": "Noch keine Ausweise vorhanden.",
     "employeeAdmin.credentials.editorEyebrow": "Bearbeitung",
     "employeeAdmin.credentials.editorTitle": "Ausweis anlegen oder aktualisieren",
+    "employeeAdmin.credentials.lifecycleEyebrow": "Lebenszyklus",
+    "employeeAdmin.credentials.archiveDialogTitle": "Ausweis archivieren",
+    "employeeAdmin.credentials.revokeDialogTitle": "Ausweis widerrufen",
+    "employeeAdmin.credentials.archiveConfirm":
+      "Soll der Ausweis {credentialNo} archiviert werden?",
+    "employeeAdmin.credentials.revokeConfirm":
+      "Soll der Ausweis {credentialNo} widerrufen werden?",
     "employeeAdmin.credentials.credentialTypePlaceholder": "Ausweistyp auswählen",
     "employeeAdmin.credentials.encodedValueHelp":
       "QR-, Barcode- oder NFC-Daten gehören in den kodierten Wert.",
@@ -2961,8 +2978,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.editQualificationType": "Qualifikationstyp bearbeiten",
     "employeeAdmin.actions.uploadQualificationProof": "Nachweis hochladen",
     "employeeAdmin.actions.createCredential": "Ausweis anlegen",
+    "employeeAdmin.actions.editCredential": "Ausweis bearbeiten",
     "employeeAdmin.actions.saveCredential": "Ausweis speichern",
     "employeeAdmin.actions.resetCredential": "Ausweisformular leeren",
+    "employeeAdmin.actions.archiveCredential": "Ausweis archivieren",
+    "employeeAdmin.actions.revokeCredential": "Ausweis widerrufen",
     "employeeAdmin.actions.issueCredentialBadge": "Badge-Ausgabe erzeugen",
     "employeeAdmin.actions.createAvailability": "Verfügbarkeitsregel anlegen",
     "employeeAdmin.actions.saveAvailability": "Verfügbarkeitsregel speichern",
@@ -3180,6 +3200,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "Der Qualifikationsnachweis wurde hochgeladen.",
     "employeeAdmin.feedback.credentialSaved":
       "Der Ausweis wurde gespeichert.",
+    "employeeAdmin.feedback.credentialArchived":
+      "Der Ausweis wurde archiviert.",
+    "employeeAdmin.feedback.credentialRevoked":
+      "Der Ausweis wurde widerrufen.",
     "employeeAdmin.feedback.credentialBadgeIssued":
       "Die Badge-Ausgabe wurde erzeugt.",
     "employeeAdmin.feedback.availabilitySaved":
@@ -5087,6 +5111,13 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.credentials.empty": "No credentials have been recorded yet.",
     "employeeAdmin.credentials.editorEyebrow": "Editor",
     "employeeAdmin.credentials.editorTitle": "Create or update credential",
+    "employeeAdmin.credentials.lifecycleEyebrow": "Lifecycle",
+    "employeeAdmin.credentials.archiveDialogTitle": "Archive credential",
+    "employeeAdmin.credentials.revokeDialogTitle": "Revoke credential",
+    "employeeAdmin.credentials.archiveConfirm":
+      "Archive credential {credentialNo}?",
+    "employeeAdmin.credentials.revokeConfirm":
+      "Revoke credential {credentialNo}?",
     "employeeAdmin.credentials.credentialTypePlaceholder": "Select credential type",
     "employeeAdmin.credentials.encodedValueHelp":
       "QR, barcode, or NFC data belongs in the encoded value field.",
@@ -5202,8 +5233,11 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "employeeAdmin.actions.editQualificationType": "Edit qualification type",
     "employeeAdmin.actions.uploadQualificationProof": "Upload proof",
     "employeeAdmin.actions.createCredential": "Create credential",
+    "employeeAdmin.actions.editCredential": "Edit credential",
     "employeeAdmin.actions.saveCredential": "Save credential",
     "employeeAdmin.actions.resetCredential": "Clear credential form",
+    "employeeAdmin.actions.archiveCredential": "Archive credential",
+    "employeeAdmin.actions.revokeCredential": "Revoke credential",
     "employeeAdmin.actions.issueCredentialBadge": "Issue badge output",
     "employeeAdmin.actions.createAvailability": "Create availability rule",
     "employeeAdmin.actions.saveAvailability": "Save availability rule",
@@ -5422,6 +5456,10 @@ export const messages: Record<AppLocale, MessageCatalog> = {
       "The qualification proof was uploaded.",
     "employeeAdmin.feedback.credentialSaved":
       "The credential was saved.",
+    "employeeAdmin.feedback.credentialArchived":
+      "The credential was archived.",
+    "employeeAdmin.feedback.credentialRevoked":
+      "The credential was revoked.",
     "employeeAdmin.feedback.credentialBadgeIssued":
       "The badge output was issued.",
     "employeeAdmin.feedback.availabilitySaved":

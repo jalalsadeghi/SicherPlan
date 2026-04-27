@@ -213,6 +213,14 @@ const translations: Record<string, string> = {
   "employeeAdmin.dashboard.photo.change": "Change photo",
   "employeeAdmin.dashboard.photo.uploading": "Uploading photo...",
   "employeeAdmin.dashboard.photo.alt": "Employee photo",
+  "employeeAdmin.actions.editCredential": "Edit credential",
+  "employeeAdmin.actions.archiveCredential": "Archive credential",
+  "employeeAdmin.actions.revokeCredential": "Revoke credential",
+  "employeeAdmin.credentials.lifecycleEyebrow": "Lifecycle",
+  "employeeAdmin.credentials.archiveDialogTitle": "Archive credential",
+  "employeeAdmin.credentials.revokeDialogTitle": "Revoke credential",
+  "employeeAdmin.credentials.archiveConfirm": "Archive credential {credentialNo}?",
+  "employeeAdmin.credentials.revokeConfirm": "Revoke credential {credentialNo}?",
   "employeeAdmin.title": "Employees",
   "workspace.loading.processing": "Processing",
   "workspace.loading.reconcilingSession": "Reconciling session",
@@ -383,6 +391,28 @@ function buildEmployeeRead(id: string, personnelNo: string, firstName: string, l
     user_id: null,
     notes: null,
     group_memberships: [],
+    ...overrides,
+  };
+}
+
+function buildCredentialRead(id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    tenant_id: "tenant-1",
+    employee_id: "employee-markus",
+    credential_no: `CRED-${id}`,
+    credential_type: "work_badge",
+    encoded_value: `encoded-${id}`,
+    valid_from: "2026-04-01",
+    valid_until: null,
+    status: "issued",
+    issued_at: "2026-04-01T08:00:00Z",
+    revoked_at: null,
+    notes: "Initial note",
+    created_at: "2026-04-01T08:00:00Z",
+    updated_at: "2026-04-01T08:00:00Z",
+    archived_at: null,
+    version_no: 3,
     ...overrides,
   };
 }
@@ -1484,6 +1514,132 @@ describe("EmployeeAdminView search dialog regression", () => {
     await clickButtonByText(wrapper, "employeeAdmin.actions.uploadDocument");
     await settle();
     expect(wrapper.get('[data-testid="employee-overview-editor-document-upload-modal"]').text()).toContain("employeeAdmin.documents.documentTypeHelp");
+  });
+
+  it("supports explicit credential edit actions through the existing PATCH update path", async () => {
+    apiMocks.listEmployeeCredentialsMock.mockResolvedValue([
+      buildCredentialRead("credential-issued"),
+    ]);
+    apiMocks.updateEmployeeCredentialMock.mockResolvedValue(buildCredentialRead("credential-issued", {
+      encoded_value: "encoded-updated",
+      notes: "Updated note",
+      version_no: 4,
+    }));
+
+    const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    expect(wrapper.find('[data-testid="employee-credential-edit-open"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="employee-credential-edit-open"]').trigger("click");
+    await settle();
+
+    const dialog = wrapper.get('[data-testid="employee-credential-edit-dialog"]');
+    const encodedInput = dialog.findAll("input").at(1);
+    const notesInput = dialog.get("textarea");
+    await encodedInput?.setValue("encoded-updated");
+    await notesInput.setValue("Updated note");
+    await wrapper.get('[data-testid="employee-credential-edit-save"]').trigger("click");
+    await settle();
+
+    expect(apiMocks.updateEmployeeCredentialMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "credential-issued",
+      "token-1",
+      expect.objectContaining({
+        encoded_value: "encoded-updated",
+        valid_from: "2026-04-01",
+        valid_until: null,
+        notes: "Updated note",
+        version_no: 3,
+      }),
+    );
+    expect(wrapper.find('[data-testid="employee-credential-edit-dialog"]').exists()).toBe(false);
+  });
+
+  it("uses PATCH revoke or archive dialogs for existing credentials and keeps badge output available", async () => {
+    apiMocks.listEmployeeCredentialsMock.mockResolvedValue([
+      buildCredentialRead("credential-issued"),
+      buildCredentialRead("credential-draft", {
+        credential_no: "CRED-DRAFT",
+        status: "draft",
+        issued_at: null,
+        version_no: 7,
+      }),
+    ]);
+    apiMocks.updateEmployeeCredentialMock
+      .mockResolvedValueOnce(buildCredentialRead("credential-issued", { status: "revoked", revoked_at: "2026-04-03T10:00:00Z", version_no: 4 }))
+      .mockResolvedValueOnce(buildCredentialRead("credential-draft", { archived_at: "2026-04-03T11:00:00Z", version_no: 8 }));
+    apiMocks.issueEmployeeCredentialBadgeOutputMock.mockResolvedValue({
+      document_id: "badge-document-1",
+    });
+
+    const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    const lifecycleButtons = wrapper.findAll('[data-testid="employee-credential-archive-open"]');
+    expect(lifecycleButtons).toHaveLength(2);
+    await lifecycleButtons[0]!.trigger("click");
+    await settle();
+
+    const revokeDialog = wrapper.get('[data-testid="employee-credential-archive-dialog"]');
+    expect(revokeDialog.text()).toContain("Revoke credential");
+    expect(revokeDialog.text()).toContain("CRED-credential-issued");
+    await wrapper.get('[data-testid="employee-credential-archive-confirm"]').trigger("click");
+    await settle();
+
+    expect(apiMocks.updateEmployeeCredentialMock).toHaveBeenNthCalledWith(
+      1,
+      "tenant-1",
+      "credential-issued",
+      "token-1",
+      expect.objectContaining({
+        status: "revoked",
+        version_no: 3,
+      }),
+    );
+
+    const refreshedLifecycleButtons = wrapper.findAll('[data-testid="employee-credential-archive-open"]');
+    await refreshedLifecycleButtons[1]!.trigger("click");
+    await settle();
+
+    const archiveDialog = wrapper.get('[data-testid="employee-credential-archive-dialog"]');
+    expect(archiveDialog.text()).toContain("Archive credential");
+    expect(archiveDialog.text()).toContain("CRED-DRAFT");
+    await wrapper.get('[data-testid="employee-credential-archive-confirm"]').trigger("click");
+    await settle();
+
+    expect(apiMocks.updateEmployeeCredentialMock).toHaveBeenNthCalledWith(
+      2,
+      "tenant-1",
+      "credential-draft",
+      "token-1",
+      expect.objectContaining({
+        archived_at: expect.any(String),
+        version_no: 7,
+      }),
+    );
+
+    const issueBadgeButton = wrapper
+      .get('[data-testid="employee-overview-section-credentials"]')
+      .findAll("button")
+      .find((button) => button.text().trim() === "employeeAdmin.actions.issueCredentialBadge");
+    expect(issueBadgeButton).toBeTruthy();
+    await issueBadgeButton!.trigger("click");
+    await settle();
+
+    expect(apiMocks.issueEmployeeCredentialBadgeOutputMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "credential-issued",
+      "token-1",
+      expect.objectContaining({
+        title: "CRED-credential-issued-badge",
+      }),
+    );
   });
 
   it("moves address history into a dialog while keeping the current address inline", async () => {

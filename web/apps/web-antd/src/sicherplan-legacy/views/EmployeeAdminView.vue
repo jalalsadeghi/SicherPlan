@@ -892,6 +892,25 @@
                       <span class="employee-admin-record__meta">{{ credential.credential_type }} · {{ credential.valid_from }} · {{ credential.valid_until || t("employeeAdmin.summary.none") }}</span>
                     </button>
                     <div class="employee-admin-record__actions">
+                      <button
+                        class="cta-button cta-secondary"
+                        type="button"
+                        data-testid="employee-credential-edit-open"
+                        :disabled="!actionState.canManageCredentials"
+                        @click.stop="editCredential(credential)"
+                      >
+                        {{ t("employeeAdmin.actions.editCredential") }}
+                      </button>
+                      <button
+                        v-if="!credential.archived_at"
+                        class="cta-button cta-secondary"
+                        type="button"
+                        data-testid="employee-credential-archive-open"
+                        :disabled="!actionState.canManageCredentials"
+                        @click.stop="openCredentialLifecycleDialog(credential)"
+                      >
+                        {{ credentialLifecycleActionLabel(credential) }}
+                      </button>
                       <button class="cta-button cta-secondary" type="button" :disabled="!actionState.canManageCredentials" @click="issueCredentialBadge(credential)">
                         {{ t("employeeAdmin.actions.issueCredentialBadge") }}
                       </button>
@@ -1408,6 +1427,48 @@
             </section>
           </section>
           <div
+            v-if="credentialLifecycleDialogOpen"
+            class="employee-admin-modal-backdrop"
+            data-testid="employee-credential-archive-dialog"
+            @click.self="closeCredentialLifecycleDialog"
+          >
+            <section
+              class="module-card employee-admin-modal"
+              aria-labelledby="employee-credential-lifecycle-title"
+              aria-modal="true"
+              role="dialog"
+            >
+              <div class="employee-admin-form-section">
+                <div class="employee-admin-form-section__header">
+                  <div>
+                    <p class="eyebrow">{{ t("employeeAdmin.credentials.lifecycleEyebrow") }}</p>
+                    <h4 id="employee-credential-lifecycle-title">{{ credentialLifecycleDialogTitle }}</h4>
+                  </div>
+                </div>
+                <p class="field-help">{{ credentialLifecycleDialogBody }}</p>
+                <div class="employee-admin-modal-actions">
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="employee-credential-archive-cancel"
+                    @click="closeCredentialLifecycleDialog"
+                  >
+                    {{ t("employeeAdmin.actions.cancel") }}
+                  </button>
+                  <button
+                    class="cta-button"
+                    type="button"
+                    data-testid="employee-credential-archive-confirm"
+                    :disabled="!actionState.canManageCredentials"
+                    @click="confirmCredentialLifecycle"
+                  >
+                    {{ credentialLifecycleDialogActionLabel }}
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+          <div
             v-if="addressHistoryDialogOpen"
             class="employee-admin-modal-backdrop"
             data-testid="employee-address-history-dialog"
@@ -1682,7 +1743,7 @@
               data-testid="employee-overview-editor-credential-modal"
               role="dialog"
             >
-              <form class="employee-admin-form" @submit.prevent="submitCredential">
+              <form class="employee-admin-form" data-testid="employee-credential-edit-dialog" @submit.prevent="submitCredential">
                 <div class="employee-admin-form-section__header">
                   <p class="eyebrow">{{ t("employeeAdmin.credentials.editorEyebrow") }}</p>
                   <h4 id="employee-overview-editor-credential-title">{{ t("employeeAdmin.credentials.editorTitle") }}</h4>
@@ -1718,11 +1779,18 @@
                   </label>
                 </div>
                 <div class="cta-row">
-                  <button class="cta-button" type="submit" :disabled="!actionState.canManageCredentials">
+                  <button class="cta-button" type="submit" data-testid="employee-credential-edit-save" :disabled="!actionState.canManageCredentials">
                     {{ editingCredentialId ? t("employeeAdmin.actions.saveCredential") : t("employeeAdmin.actions.createCredential") }}
                   </button>
                   <button class="cta-button cta-secondary" type="button" @click="resetCredentialDraft">{{ t("employeeAdmin.actions.resetCredential") }}</button>
-                  <button class="cta-button cta-secondary" type="button" @click="closeEmployeeOverviewEditor">{{ t("employeeAdmin.actions.cancel") }}</button>
+                  <button
+                    class="cta-button cta-secondary"
+                    type="button"
+                    data-testid="employee-credential-edit-cancel"
+                    @click="closeEmployeeOverviewEditor"
+                  >
+                    {{ t("employeeAdmin.actions.cancel") }}
+                  </button>
                 </div>
               </form>
             </section>
@@ -2527,6 +2595,7 @@ const employeeSearchSuggestionsSuppressed = ref(false);
 const employeeSearchError = ref("");
 const advancedFiltersModalOpen = ref(false);
 const importExportModalOpen = ref(false);
+const credentialLifecycleDialogOpen = ref(false);
 const addressHistoryDialogOpen = ref(false);
 const resetPasswordDialogOpen = ref(false);
 const accessDiagnosticsDialogOpen = ref(false);
@@ -2575,6 +2644,8 @@ const addressTransitionSourceId = ref("");
 const addressEditorMode = ref<AddressEditorMode>("create");
 const editingQualificationId = ref("");
 const editingCredentialId = ref("");
+const selectedCredentialLifecycleId = ref("");
+const credentialLifecycleMode = ref<"archive" | "revoke" | null>(null);
 const editingAvailabilityRuleId = ref("");
 const editingAbsenceId = ref("");
 const selectedEmployeeDocumentId = ref("");
@@ -2677,6 +2748,9 @@ const selectedEmployeeDocument = computed(
 const selectedQualification = computed(
   () => employeeQualifications.value.find((qualification) => qualification.id === editingQualificationId.value) ?? null,
 );
+const selectedCredentialLifecycle = computed(
+  () => employeeCredentials.value.find((credential) => credential.id === selectedCredentialLifecycleId.value) ?? null,
+);
 const selectedQualificationProofs = computed(() =>
   editingQualificationId.value ? (qualificationProofsById[editingQualificationId.value] ?? []) : [],
 );
@@ -2692,6 +2766,27 @@ const employeeQualificationTypeOptions = computed(() =>
 );
 const selectedQualificationType = computed(
   () => qualificationTypes.value.find((row) => row.id === qualificationDraft.qualification_type_id) ?? null,
+);
+const credentialLifecycleDialogTitle = computed(() =>
+  credentialLifecycleMode.value === "revoke"
+    ? t("employeeAdmin.credentials.revokeDialogTitle" as never)
+    : t("employeeAdmin.credentials.archiveDialogTitle" as never),
+);
+const credentialLifecycleDialogBody = computed(() => {
+  const credential = selectedCredentialLifecycle.value;
+  if (!credential) {
+    return "";
+  }
+  const key =
+    credentialLifecycleMode.value === "revoke"
+      ? "employeeAdmin.credentials.revokeConfirm"
+      : "employeeAdmin.credentials.archiveConfirm";
+  return t(key as never, { credentialNo: credential.credential_no });
+});
+const credentialLifecycleDialogActionLabel = computed(() =>
+  credentialLifecycleMode.value === "revoke"
+    ? t("employeeAdmin.actions.revokeCredential" as never)
+    : t("employeeAdmin.actions.archiveCredential" as never),
 );
 const employeeCredentialTypeOptions = computed(() =>
   EMPLOYEE_CREDENTIAL_TYPE_OPTIONS.map((option) => ({
@@ -3500,6 +3595,30 @@ function closeImportExportDialog() {
   importExportModalOpen.value = false;
 }
 
+function resolveCredentialLifecycleMode(credential: EmployeeCredentialRead): "archive" | "revoke" {
+  return credential.status === "issued" ? "revoke" : "archive";
+}
+
+function credentialLifecycleActionLabel(credential: EmployeeCredentialRead) {
+  return t(
+    resolveCredentialLifecycleMode(credential) === "revoke"
+      ? ("employeeAdmin.actions.revokeCredential" as never)
+      : ("employeeAdmin.actions.archiveCredential" as never),
+  );
+}
+
+function openCredentialLifecycleDialog(credential: EmployeeCredentialRead) {
+  selectedCredentialLifecycleId.value = credential.id;
+  credentialLifecycleMode.value = resolveCredentialLifecycleMode(credential);
+  credentialLifecycleDialogOpen.value = true;
+}
+
+function closeCredentialLifecycleDialog() {
+  credentialLifecycleDialogOpen.value = false;
+  selectedCredentialLifecycleId.value = "";
+  credentialLifecycleMode.value = null;
+}
+
 function openAddressHistoryDialog() {
   addressHistoryDialogOpen.value = true;
 }
@@ -3835,6 +3954,7 @@ function resetCredentialDraft() {
   credentialDraft.valid_until = "";
   credentialDraft.notes = "";
   editingCredentialId.value = "";
+  closeCredentialLifecycleDialog();
 }
 
 function resetAvailabilityDraft() {
@@ -3886,6 +4006,7 @@ function editQualification(qualification: EmployeeQualificationRead) {
 }
 
 function editCredential(credential: EmployeeCredentialRead) {
+  closeCredentialLifecycleDialog();
   editingCredentialId.value = credential.id;
   credentialDraft.credential_no = credential.credential_no;
   credentialDraft.credential_type = credential.credential_type;
@@ -3996,6 +4117,7 @@ function resetAccessDrafts() {
   syncAccessManageDraft();
   resetPasswordDialogOpen.value = false;
   accessDiagnosticsDialogOpen.value = false;
+  closeCredentialLifecycleDialog();
 }
 
 function editMembership(membership: EmployeeGroupMembershipRead) {
@@ -4010,6 +4132,7 @@ function editMembership(membership: EmployeeGroupMembershipRead) {
 function startCreateEmployee() {
   closeAdvancedFiltersDialog();
   closeImportExportDialog();
+  closeCredentialLifecycleDialog();
   closeAddressHistoryDialog();
   closeResetPasswordDialog();
   closeAccessDiagnosticsDialog();
@@ -4814,6 +4937,35 @@ async function submitCredential() {
     await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
     closeEmployeeOverviewEditor();
     setFeedback("success", t("employeeAdmin.feedback.titleSuccess"), t("employeeAdmin.feedback.credentialSaved"));
+  } catch (error) {
+    const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
+    setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
+  } finally {
+    loading.action = false;
+  }
+}
+
+async function confirmCredentialLifecycle() {
+  const credential = selectedCredentialLifecycle.value;
+  const mode = credentialLifecycleMode.value;
+  if (!resolvedTenantScopeId.value || !authStore.accessToken || !credential || !mode) {
+    return;
+  }
+
+  loading.action = true;
+  try {
+    await updateEmployeeCredential(resolvedTenantScopeId.value, credential.id, authStore.accessToken, {
+      status: mode === "revoke" ? "revoked" : undefined,
+      archived_at: mode === "archive" ? new Date().toISOString() : undefined,
+      version_no: credential.version_no,
+    } as EmployeeCredentialUpdatePayload);
+    await selectEmployee(selectedEmployeeId.value, { preserveActiveTab: true });
+    closeCredentialLifecycleDialog();
+    setFeedback(
+      "success",
+      t("employeeAdmin.feedback.titleSuccess"),
+      t((mode === "revoke" ? "employeeAdmin.feedback.credentialRevoked" : "employeeAdmin.feedback.credentialArchived") as never),
+    );
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
     setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
