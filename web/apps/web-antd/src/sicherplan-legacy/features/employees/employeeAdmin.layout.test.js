@@ -200,6 +200,22 @@ test("employee overview moves heavy editor forms into accessible modals", () => 
   assert.match(viewSource, /openEmployeeOverviewEditor\(['"]document_version['"]\)/);
 });
 
+test("employee overview address-history and diagnostics buttons use split header action layout", () => {
+  assert.match(viewSource, /data-testid="employee-access-diagnostics-open"/);
+  assert.match(viewSource, /data-testid="employee-address-history-open"/);
+  assert.match(viewSource, /class="employee-admin-overview-section-card__header employee-admin-overview-section-card__header--split"/);
+  assert.match(viewSource, /class="employee-admin-overview-section-card__header-actions"/);
+  assert.match(viewSource, /class="cta-button cta-secondary employee-admin-header-action"/);
+  assert.match(
+    viewSource,
+    /\.employee-admin-overview-section-card__header--split\s*{[\s\S]*display:\s*flex;[\s\S]*flex-wrap:\s*wrap;[\s\S]*align-items:\s*flex-start;[\s\S]*justify-content:\s*space-between;[\s\S]*gap:\s*1rem;/,
+  );
+  assert.match(
+    viewSource,
+    /\.employee-admin-overview-section-card__header-actions\s*{[\s\S]*display:\s*flex;[\s\S]*flex-wrap:\s*wrap;[\s\S]*align-items:\s*center;[\s\S]*justify-content:\s*flex-end;[\s\S]*gap:\s*0\.5rem;/,
+  );
+});
+
 test("existing employee detail prepends dashboard while create mode remains overview only", () => {
   assert.match(viewSource, /const employeeDetailTabs = computed\(\(\) => \{[\s\S]*if \(isCreatingEmployee\.value\) \{[\s\S]*return \[\{ id: "overview", label: t\("employeeAdmin\.tabs\.overview"\) \}\];[\s\S]*return \[[\s\S]*\{ id: "dashboard", label: t\("employeeAdmin\.tabs\.dashboard"\) \},[\s\S]*\{ id: "overview", label: t\("employeeAdmin\.tabs\.overview"\) \},[\s\S]*\];/);
   assert.doesNotMatch(viewSource, /id: "profile_photo"/);

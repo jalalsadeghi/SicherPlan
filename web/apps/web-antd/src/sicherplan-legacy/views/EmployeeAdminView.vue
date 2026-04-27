@@ -615,15 +615,15 @@
               </article>
             </div>
             <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-overview-section-card__header">
+              <section class="employee-admin-overview-section-card__header employee-admin-overview-section-card__header--split">
                 <div>
                   <p class="eyebrow">{{ t("employeeAdmin.access.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.access.title") }}</h4>
                 </div>
-                <div class="cta-row">
+                <div class="employee-admin-overview-section-card__header-actions">
                   <button
                     v-if="accessLink"
-                    class="cta-button cta-secondary"
+                    class="cta-button cta-secondary employee-admin-header-action"
                     type="button"
                     data-testid="employee-access-diagnostics-open"
                     @click="openAccessDiagnosticsDialog"
@@ -1155,14 +1155,14 @@
             data-testid="employee-overview-section-addresses"
           >
             <div class="employee-admin-form employee-admin-form--structured">
-              <section class="employee-admin-overview-section-card__header">
+              <section class="employee-admin-overview-section-card__header employee-admin-overview-section-card__header--split">
                 <div>
                   <p class="eyebrow">{{ t("employeeAdmin.addresses.eyebrow") }}</p>
                   <h4>{{ t("employeeAdmin.addresses.title") }}</h4>
                 </div>
-                <div class="cta-row">
+                <div class="employee-admin-overview-section-card__header-actions">
                   <button
-                    class="cta-button cta-secondary"
+                    class="cta-button cta-secondary employee-admin-header-action"
                     type="button"
                     data-testid="employee-address-history-open"
                     @click="openAddressHistoryDialog"
@@ -6068,6 +6068,23 @@ onBeforeUnmount(() => {
   border: 0;
   border-radius: 0;
   background: transparent;
+}
+
+.employee-admin-overview-section-card__header--split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.employee-admin-overview-section-card__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .employee-admin-overview-section-card__header h4,

@@ -1685,8 +1685,16 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(addressesSection.text()).toContain("Current Street 1");
     expect(addressesSection.text()).not.toContain("Previous Street 5");
     expect(wrapper.find('[data-testid="employee-address-history-dialog"]').exists()).toBe(false);
+    const addressesHeader = addressesSection.get(".employee-admin-overview-section-card__header");
+    expect(addressesHeader.classes()).toContain("employee-admin-overview-section-card__header--split");
+    const addressesHeaderActions = addressesHeader.get(".employee-admin-overview-section-card__header-actions");
+    const addressHistoryButton = addressesSection.get('[data-testid="employee-address-history-open"]');
+    expect(addressHistoryButton.classes()).toContain("employee-admin-header-action");
+    expect(addressHistoryButton.element.closest(".employee-admin-overview-section-card__header-actions")).toBe(
+      addressesHeaderActions.element,
+    );
 
-    await wrapper.get('[data-testid="employee-address-history-open"]').trigger("click");
+    await addressHistoryButton.trigger("click");
     await settle();
 
     const historyDialog = wrapper.get('[data-testid="employee-address-history-dialog"]');
@@ -1806,8 +1814,16 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(accessSection.text()).not.toContain("Password hash exists");
     expect(accessSection.findAll('[data-testid="employee-access-diagnostics-row"]')).toHaveLength(0);
     expect(wrapper.find('[data-testid="employee-access-diagnostics-dialog"]').exists()).toBe(false);
+    const accessHeader = accessSection.get(".employee-admin-overview-section-card__header");
+    expect(accessHeader.classes()).toContain("employee-admin-overview-section-card__header--split");
+    const accessHeaderActions = accessHeader.get(".employee-admin-overview-section-card__header-actions");
+    const diagnosticsButton = accessSection.get('[data-testid="employee-access-diagnostics-open"]');
+    expect(diagnosticsButton.classes()).toContain("employee-admin-header-action");
+    expect(diagnosticsButton.element.closest(".employee-admin-overview-section-card__header-actions")).toBe(
+      accessHeaderActions.element,
+    );
 
-    await wrapper.get('[data-testid="employee-access-diagnostics-open"]').trigger("click");
+    await diagnosticsButton.trigger("click");
     await settle();
 
     const diagnosticsDialog = wrapper.get('[data-testid="employee-access-diagnostics-dialog"]');
