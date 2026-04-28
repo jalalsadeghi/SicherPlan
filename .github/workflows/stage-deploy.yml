@@ -47,6 +47,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify committed field/lookup corpus artifact is current
+        run: |
+          tmp_corpus="$(mktemp)"
+          PYTHONPATH=backend python -m app.modules.assistant.field_dictionary_export \
+            --repo-root . \
+            --output "$tmp_corpus"
+          if ! cmp --silent backend/app/modules/assistant/generated/field_lookup_corpus.json "$tmp_corpus"; then
+            echo "Generated field/lookup corpus artifact is stale. Regenerate backend/app/modules/assistant/generated/field_lookup_corpus.json." >&2
+            diff -u backend/app/modules/assistant/generated/field_lookup_corpus.json "$tmp_corpus" || true
+            exit 1
+          fi
+
       - name: Normalize image namespace for GHCR
         id: image_namespace
         run: echo "value=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
@@ -61,6 +78,32 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build backend stage image for smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile.stage
+          load: true
+          tags: sicherplan-backend-smoke:${{ github.sha }}
+
+      - name: Smoke test backend image field/lookup corpus
+        run: |
+          docker run --rm sicherplan-backend-smoke:${{ github.sha }} python - <<'PY'
+          from importlib.resources import files
+          from app.modules.assistant.field_dictionary import (
+              detect_field_or_lookup_signal,
+              field_definition_counts_by_module,
+          )
+
+          path = files("app.modules.assistant.generated").joinpath("field_lookup_corpus.json")
+          print(path)
+          print(path.is_file())
+          print(field_definition_counts_by_module())
+          assert detect_field_or_lookup_signal("was bedeutet Vertragsreferenz") is not None
+          assert detect_field_or_lookup_signal("was bedeutet Rechtlicher Name") is not None
+          assert detect_field_or_lookup_signal("was bedeutet Apfelkuchen") is None
+          PY
 
       - name: Build and push backend stage image
         uses: docker/build-push-action@v6

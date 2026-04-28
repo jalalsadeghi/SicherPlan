@@ -42,6 +42,14 @@ class AssistantProviderSmokeTestRead(BaseModel):
     error_code: str | None = None
 
 
+class AssistantFieldDictionaryStatusRead(BaseModel):
+    artifact_loaded: bool
+    artifact_version: str | None = None
+    field_count: int
+    lookup_count: int
+    counts_by_module: dict[str, int] = Field(default_factory=dict)
+
+
 class AssistantRouteContextInput(BaseModel):
     path: str | None = None
     route_name: str | None = None

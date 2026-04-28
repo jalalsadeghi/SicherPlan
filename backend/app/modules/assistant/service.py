@@ -21,6 +21,7 @@ from app.modules.assistant.diagnostics import (
     extract_shift_visibility_input,
     is_shift_visibility_question,
 )
+from app.modules.assistant.field_dictionary import get_field_lookup_corpus_status
 from app.modules.assistant.grounding import AssistantGroundingContext, AssistantGroundingSource
 from app.modules.assistant.openai_client import get_openai_sdk_info
 from app.modules.assistant.knowledge.retriever import AssistantKnowledgeRetriever
@@ -84,6 +85,7 @@ from app.modules.assistant.schemas import (
     AssistantAnswerSegment,
     AssistantFeedbackCreate,
     AssistantFeedbackRead,
+    AssistantFieldDictionaryStatusRead,
     AssistantKnowledgeChunkResult,
     AssistantMessageCreate,
     AssistantPageHelpManifestRead,
@@ -363,6 +365,20 @@ class AssistantService:
             answer=str(result.final_response.get("answer", "")) or result.raw_text,
             confidence=AssistantConfidence(str(result.final_response.get("confidence", "low"))),
             error_code=None,
+        )
+
+    def get_field_dictionary_status(
+        self,
+        context: RequestAuthorizationContext,
+    ) -> AssistantFieldDictionaryStatusRead:
+        self._require_admin(context)
+        status = get_field_lookup_corpus_status()
+        return AssistantFieldDictionaryStatusRead(
+            artifact_loaded=status.artifact_loaded,
+            artifact_version=status.artifact_version,
+            field_count=status.field_count,
+            lookup_count=status.lookup_count,
+            counts_by_module=status.counts_by_module,
         )
 
     def create_conversation(

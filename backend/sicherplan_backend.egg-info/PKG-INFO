@@ -1,11 +1,5 @@
-Metadata-Version: 2.4
+Metadata-Version: 2.1
 Name: sicherplan-backend
 Version: 0.1.0
 Summary: SicherPlan FastAPI backend workspace
 Requires-Python: >=3.12
-Requires-Dist: alembic>=1.14
-Requires-Dist: fastapi>=0.115
-Requires-Dist: openai>=1.99.0
-Requires-Dist: pydantic>=2.10
-Requires-Dist: psycopg[binary]>=3.2
-Requires-Dist: sqlalchemy>=2.0

@@ -4,13 +4,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import lru_cache
+import hashlib
+from importlib import resources
 import json
+import logging
 from pathlib import Path
 import re
 from typing import Any
 import unicodedata
 
 from app.modules.assistant.page_help_seed import ASSISTANT_PAGE_HELP_SEEDS
+
+
+LOGGER = logging.getLogger(__name__)
+_GENERATED_PACKAGE = "app.modules.assistant.generated"
+_GENERATED_CORPUS_FILENAME = "field_lookup_corpus.json"
+_FIELD_LOOKUP_SCHEMA_VERSION = 1
 
 
 _LEGACY_MESSAGES_PATH = Path("web/apps/web-antd/src/sicherplan-legacy/i18n/messages.ts")
@@ -190,12 +199,23 @@ class AssistantFieldLookupCorpus:
     lookup_definitions: tuple[LookupDefinition, ...]
 
 
+@dataclass(frozen=True)
+class AssistantFieldLookupCorpusStatus:
+    artifact_loaded: bool
+    artifact_version: str | None
+    field_count: int
+    lookup_count: int
+    counts_by_module: dict[str, int]
+
+
 def build_field_lookup_corpus(repo_root: Path | None = None) -> AssistantFieldLookupCorpus:
-    return _build_field_lookup_corpus(str((repo_root or _repo_root()).resolve()))
+    if repo_root is not None:
+        return _build_field_lookup_corpus_from_sources(str(repo_root.resolve()))
+    return _load_runtime_field_lookup_corpus()
 
 
 @lru_cache(maxsize=4)
-def _build_field_lookup_corpus(repo_root_str: str) -> AssistantFieldLookupCorpus:
+def _build_field_lookup_corpus_from_sources(repo_root_str: str) -> AssistantFieldLookupCorpus:
     repo_root = Path(repo_root_str)
     locale_labels = _extract_locale_labels(repo_root)
     vue_bindings = _extract_vue_field_bindings(repo_root)
@@ -353,6 +373,90 @@ def _build_field_lookup_corpus(repo_root_str: str) -> AssistantFieldLookupCorpus
         field_definitions=tuple(sorted(fields.values(), key=lambda item: item.field_key)),
         lookup_definitions=tuple(sorted(lookups.values(), key=lambda item: item.lookup_key)),
     )
+
+
+@lru_cache(maxsize=1)
+def _load_runtime_field_lookup_corpus() -> AssistantFieldLookupCorpus:
+    generated_corpus = load_generated_field_lookup_corpus()
+    if generated_corpus is not None:
+        return generated_corpus
+
+    repo_root = _repo_root()
+    if _has_live_field_lookup_sources(repo_root):
+        LOGGER.warning(
+            "assistant field/lookup corpus artifact missing; falling back to live source extraction from %s",
+            repo_root,
+        )
+        return _build_field_lookup_corpus_from_sources(str(repo_root.resolve()))
+
+    LOGGER.warning(
+        "assistant field/lookup corpus unavailable: neither packaged artifact nor live source files are present"
+    )
+    return AssistantFieldLookupCorpus(field_definitions=(), lookup_definitions=())
+
+
+def load_generated_field_lookup_corpus() -> AssistantFieldLookupCorpus | None:
+    payload = _load_generated_field_lookup_payload()
+    if payload is None:
+        return None
+    return _deserialize_corpus(payload)
+
+
+def _load_generated_field_lookup_payload() -> dict[str, Any] | None:
+    try:
+        package_root = resources.files(_GENERATED_PACKAGE)
+    except (FileNotFoundError, ModuleNotFoundError):
+        return None
+    artifact_path = package_root / _GENERATED_CORPUS_FILENAME
+    if not artifact_path.is_file():
+        return None
+    return json.loads(artifact_path.read_text(encoding="utf-8"))
+
+
+def get_field_lookup_corpus_status() -> AssistantFieldLookupCorpusStatus:
+    payload = _load_generated_field_lookup_payload()
+    artifact_loaded = payload is not None
+    corpus = load_generated_field_lookup_corpus() if artifact_loaded else _load_runtime_field_lookup_corpus()
+    counts_by_module = field_definition_counts_by_module() if corpus.field_definitions else {}
+    return AssistantFieldLookupCorpusStatus(
+        artifact_loaded=artifact_loaded,
+        artifact_version=str(payload.get("schema_version")) if isinstance(payload, dict) else None,
+        field_count=len(corpus.field_definitions),
+        lookup_count=len(corpus.lookup_definitions),
+        counts_by_module=counts_by_module,
+    )
+
+
+def export_field_lookup_corpus(
+    *,
+    repo_root: Path,
+    output_path: Path,
+) -> dict[str, Any]:
+    _validate_required_generation_sources(repo_root)
+    corpus = build_field_lookup_corpus(repo_root)
+    payload = _serialize_corpus(
+        corpus,
+        generated_from=[
+            "frontend_i18n",
+            "frontend_vue",
+            "typescript_api",
+            "backend_schema",
+            "page_help",
+        ],
+        source_hashes=_collect_source_hashes(repo_root),
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return {
+        "field_count": len(corpus.field_definitions),
+        "lookup_count": len(corpus.lookup_definitions),
+        "field_counts_by_module": field_definition_counts_by_module(repo_root),
+        "lookup_counts_by_module": lookup_definition_counts_by_module(repo_root),
+        "warnings": _generation_warnings(repo_root, corpus),
+    }
 
 
 def detect_field_or_lookup_signal(
@@ -1333,6 +1437,239 @@ def _default_lookup_meaning(value: str, language_code: str) -> str:
     }.get(value, f"Status value {value}.")
 
 
+def _serialize_corpus(
+    corpus: AssistantFieldLookupCorpus,
+    *,
+    generated_from: list[str],
+    source_hashes: dict[str, str],
+) -> dict[str, Any]:
+    return {
+        "schema_version": _FIELD_LOOKUP_SCHEMA_VERSION,
+        "generated_from": sorted({item for item in generated_from if item}),
+        "fields": [_serialize_field_definition(item) for item in corpus.field_definitions],
+        "lookups": [_serialize_lookup_definition(item) for item in corpus.lookup_definitions],
+        "source_hashes": dict(sorted(source_hashes.items())),
+    }
+
+
+def _deserialize_corpus(payload: dict[str, Any]) -> AssistantFieldLookupCorpus:
+    fields = tuple(
+        sorted(
+            (_deserialize_field_definition(item) for item in payload.get("fields", []) if isinstance(item, dict)),
+            key=lambda item: item.field_key,
+        )
+    )
+    lookups = tuple(
+        sorted(
+            (_deserialize_lookup_definition(item) for item in payload.get("lookups", []) if isinstance(item, dict)),
+            key=lambda item: item.lookup_key,
+        )
+    )
+    return AssistantFieldLookupCorpus(field_definitions=fields, lookup_definitions=lookups)
+
+
+def _serialize_field_definition(definition: FieldDefinition) -> dict[str, Any]:
+    return {
+        "aliases": sorted(set(definition.aliases)),
+        "binding_paths": sorted(set(definition.binding_paths)),
+        "canonical_name": definition.canonical_name,
+        "confidence": definition.confidence,
+        "definition_de": definition.definition_de,
+        "definition_en": definition.definition_en,
+        "entity_type": definition.entity_type,
+        "example_values": list(definition.example_values),
+        "field_key": definition.field_key,
+        "form_contexts": sorted(set(definition.form_contexts)),
+        "input_type": definition.input_type,
+        "label_keys": sorted(set(definition.label_keys)),
+        "labels": {key: sorted(set(values)) for key, values in sorted(definition.labels.items())},
+        "module_key": definition.module_key,
+        "page_id": definition.page_id,
+        "related_fields": sorted(set(definition.related_fields)),
+        "required": definition.required,
+        "route_names": sorted(set(definition.route_names)),
+        "schema_fields": sorted(set(definition.schema_fields)),
+        "sensitive": definition.sensitive,
+        "source_basis": [_serialize_source_basis(item) for item in definition.source_basis],
+    }
+
+
+def _deserialize_field_definition(payload: dict[str, Any]) -> FieldDefinition:
+    return FieldDefinition(
+        field_key=str(payload.get("field_key") or ""),
+        canonical_name=str(payload.get("canonical_name") or ""),
+        module_key=_optional_string(payload.get("module_key")),
+        page_id=_optional_string(payload.get("page_id")),
+        route_names=_string_list(payload.get("route_names")),
+        entity_type=_optional_string(payload.get("entity_type")),
+        form_contexts=_string_list(payload.get("form_contexts")),
+        input_type=_optional_string(payload.get("input_type")),
+        required=payload.get("required") if isinstance(payload.get("required"), bool) else None,
+        sensitive=bool(payload.get("sensitive", False)),
+        labels=_deserialize_labels(payload.get("labels")),
+        aliases=_string_list(payload.get("aliases")),
+        definition_en=_optional_string(payload.get("definition_en")),
+        definition_de=_optional_string(payload.get("definition_de")),
+        example_values=_string_list(payload.get("example_values")),
+        related_fields=_string_list(payload.get("related_fields")),
+        source_basis=[_deserialize_source_basis(item) for item in payload.get("source_basis", []) if isinstance(item, dict)],
+        confidence=str(payload.get("confidence") or "low"),
+        label_keys=_string_list(payload.get("label_keys")),
+        binding_paths=_string_list(payload.get("binding_paths")),
+        schema_fields=_string_list(payload.get("schema_fields")),
+    )
+
+
+def _serialize_lookup_definition(definition: LookupDefinition) -> dict[str, Any]:
+    return {
+        "aliases": sorted(set(definition.aliases)),
+        "confidence": definition.confidence,
+        "entity_type": definition.entity_type,
+        "labels": {key: sorted(set(values)) for key, values in sorted(definition.labels.items())},
+        "lookup_key": definition.lookup_key,
+        "module_key": definition.module_key,
+        "page_id": definition.page_id,
+        "source_basis": [_serialize_source_basis(item) for item in definition.source_basis],
+        "value_source_kind": definition.value_source_kind,
+        "values": [_serialize_lookup_value_definition(item) for item in definition.values],
+    }
+
+
+def _deserialize_lookup_definition(payload: dict[str, Any]) -> LookupDefinition:
+    return LookupDefinition(
+        lookup_key=str(payload.get("lookup_key") or ""),
+        module_key=_optional_string(payload.get("module_key")),
+        page_id=_optional_string(payload.get("page_id")),
+        entity_type=_optional_string(payload.get("entity_type")),
+        labels=_deserialize_labels(payload.get("labels")),
+        aliases=_string_list(payload.get("aliases")),
+        values=[_deserialize_lookup_value_definition(item) for item in payload.get("values", []) if isinstance(item, dict)],
+        value_source_kind=str(payload.get("value_source_kind") or "static"),
+        source_basis=[_deserialize_source_basis(item) for item in payload.get("source_basis", []) if isinstance(item, dict)],
+        confidence=str(payload.get("confidence") or "low"),
+    )
+
+
+def _serialize_lookup_value_definition(value: LookupValueDefinition) -> dict[str, Any]:
+    return {
+        "labels": dict(sorted(value.labels.items())),
+        "meaning_de": value.meaning_de,
+        "meaning_en": value.meaning_en,
+        "value": value.value,
+    }
+
+
+def _deserialize_lookup_value_definition(payload: dict[str, Any]) -> LookupValueDefinition:
+    labels_raw = payload.get("labels")
+    labels = {str(key): str(value) for key, value in labels_raw.items()} if isinstance(labels_raw, dict) else {}
+    return LookupValueDefinition(
+        value=str(payload.get("value") or ""),
+        labels=labels,
+        meaning_de=_optional_string(payload.get("meaning_de")),
+        meaning_en=_optional_string(payload.get("meaning_en")),
+    )
+
+
+def _serialize_source_basis(basis: FieldSourceBasis) -> dict[str, Any]:
+    return {
+        "evidence": basis.evidence,
+        "module_key": basis.module_key,
+        "page_id": basis.page_id,
+        "source_name": basis.source_name,
+        "source_type": basis.source_type,
+    }
+
+
+def _deserialize_source_basis(payload: dict[str, Any]) -> FieldSourceBasis:
+    return FieldSourceBasis(
+        source_type=str(payload.get("source_type") or ""),
+        source_name=str(payload.get("source_name") or ""),
+        evidence=str(payload.get("evidence") or ""),
+        page_id=_optional_string(payload.get("page_id")),
+        module_key=_optional_string(payload.get("module_key")),
+    )
+
+
+def _deserialize_labels(payload: Any) -> dict[str, list[str]]:
+    if not isinstance(payload, dict):
+        return {}
+    result: dict[str, list[str]] = {}
+    for key, value in payload.items():
+        if isinstance(value, list):
+            result[str(key)] = [str(item) for item in value if str(item).strip()]
+    return result
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item).strip()]
+
+
+def _optional_string(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _required_generation_sources(repo_root: Path) -> dict[str, Path]:
+    return {
+        "legacy_messages": repo_root / _LEGACY_MESSAGES_PATH,
+        "de_locale": repo_root / _DE_LOCALE_PATH,
+        "en_locale": repo_root / _EN_LOCALE_PATH,
+        "frontend_root": repo_root / "web/apps/web-antd/src",
+        "backend_modules": repo_root / "backend/app/modules",
+    }
+
+
+def _validate_required_generation_sources(repo_root: Path) -> None:
+    missing = [f"{name}:{path}" for name, path in _required_generation_sources(repo_root).items() if not path.exists()]
+    if missing:
+        raise FileNotFoundError(
+            "field/lookup corpus generation requires a full repository checkout; missing sources: "
+            + ", ".join(missing)
+        )
+
+
+def _has_live_field_lookup_sources(repo_root: Path) -> bool:
+    required = _required_generation_sources(repo_root)
+    return required["legacy_messages"].exists() and required["de_locale"].exists() and required["frontend_root"].exists()
+
+
+def _collect_source_hashes(repo_root: Path) -> dict[str, str]:
+    hashes: dict[str, str] = {}
+    for name, path in _required_generation_sources(repo_root).items():
+        if path.is_file():
+            hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
+        elif path.is_dir():
+            digest = hashlib.sha256()
+            for child in sorted(item for item in path.rglob("*") if item.is_file()):
+                relative = child.relative_to(repo_root).as_posix()
+                digest.update(relative.encode("utf-8"))
+                digest.update(b"\0")
+                digest.update(hashlib.sha256(child.read_bytes()).digest())
+            hashes[name] = digest.hexdigest()
+    page_help_seed_path = repo_root / "backend/app/modules/assistant/page_help_seed.py"
+    if page_help_seed_path.exists():
+        hashes["page_help_seed"] = hashlib.sha256(page_help_seed_path.read_bytes()).hexdigest()
+    return hashes
+
+
+def _generation_warnings(
+    repo_root: Path,
+    corpus: AssistantFieldLookupCorpus,
+) -> list[str]:
+    warnings: list[str] = []
+    if not (repo_root / _FA_LOCALE_PATH).exists():
+        warnings.append("fa_locale_missing")
+    if not corpus.field_definitions:
+        warnings.append("no_field_definitions_extracted")
+    if not corpus.lookup_definitions:
+        warnings.append("no_lookup_definitions_extracted")
+    return warnings
+
+
 def _split_legacy_messages(text: str) -> dict[str, str]:
     de_start = text.index("  de: {")
     en_start = text.index("  en: {")
@@ -1513,6 +1850,7 @@ def _repo_root() -> Path:
 
 __all__ = [
     "AssistantFieldLookupCorpus",
+    "AssistantFieldLookupCorpusStatus",
     "CorpusSignal",
     "FieldDefinition",
     "FieldSearchMatch",
@@ -1522,7 +1860,10 @@ __all__ = [
     "LookupValueDefinition",
     "build_field_lookup_corpus",
     "detect_field_or_lookup_signal",
+    "export_field_lookup_corpus",
     "field_definition_counts_by_module",
+    "get_field_lookup_corpus_status",
+    "load_generated_field_lookup_corpus",
     "lookup_definition_counts_by_module",
     "render_api_schema_field_markdown",
     "render_field_dictionary_markdown",

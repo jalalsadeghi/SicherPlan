@@ -1,0 +1,1 @@
+"""Packaged generated assistant artifacts."""

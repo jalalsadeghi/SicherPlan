@@ -22,6 +22,7 @@ from app.modules.assistant.schemas import (
     AssistantConversationRead,
     AssistantFeedbackCreate,
     AssistantFeedbackRead,
+    AssistantFieldDictionaryStatusRead,
     AssistantPageHelpManifestRead,
     AssistantMessageCreate,
     AssistantProviderStatusRead,
@@ -131,6 +132,14 @@ def assistant_provider_smoke_test(
     service: Annotated[AssistantService, Depends(get_assistant_service)],
 ) -> AssistantProviderSmokeTestRead:
     return service.run_provider_smoke_test(context)
+
+
+@router.get("/field-dictionary/status", response_model=AssistantFieldDictionaryStatusRead)
+def assistant_field_dictionary_status(
+    context: Annotated[RequestAuthorizationContext, Depends(get_request_authorization_context)],
+    service: Annotated[AssistantService, Depends(get_assistant_service)],
+) -> AssistantFieldDictionaryStatusRead:
+    return service.get_field_dictionary_status(context)
 
 
 @router.get("/page-help/{page_id}", response_model=AssistantPageHelpManifestRead)

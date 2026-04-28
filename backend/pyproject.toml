@@ -21,6 +21,9 @@ where = ["."]
 include = ["app*"]
 exclude = ["alembic*", "tests*", "scripts*"]
 
+[tool.setuptools.package-data]
+"app.modules.assistant.generated" = ["field_lookup_corpus.json"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
