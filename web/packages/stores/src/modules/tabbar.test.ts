@@ -178,6 +178,36 @@ describe('useAccessStore', () => {
     ]);
   });
 
+  it('updates the cached route snapshot for the same tab key without duplicating the cache entry', () => {
+    const store = useTabbarStore();
+    const component: any = { type: { name: 'CustomersViewStub' } };
+    const firstRoute: any = {
+      fullPath: '/admin/customers?customer_id=c1&tab=dashboard',
+      meta: { domCached: true, fullPathKey: false },
+      name: 'SicherPlanCustomers',
+      path: '/admin/customers',
+      query: { customer_id: 'c1', tab: 'dashboard' },
+    };
+    const secondRoute: any = {
+      fullPath: '/admin/customers?customer_id=c2&tab=orders',
+      meta: { domCached: true, fullPathKey: false },
+      name: 'SicherPlanCustomers',
+      path: '/admin/customers',
+      query: { customer_id: 'c2', tab: 'orders' },
+    };
+
+    store.addCachedRoute(component, firstRoute);
+    store.addCachedRoute(component, secondRoute);
+
+    expect(store.cachedRoutes.size).toBe(1);
+    const cachedRoute = store.cachedRoutes.get('/admin/customers');
+    expect(cachedRoute?.route.query).toEqual({
+      customer_id: 'c2',
+      tab: 'orders',
+    });
+    expect(cachedRoute?.component).toBe(component);
+  });
+
   it('closes all tabs', async () => {
     const store = useTabbarStore();
     store.addTab({

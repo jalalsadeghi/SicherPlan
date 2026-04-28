@@ -5,7 +5,9 @@ import { useRoute } from 'vue-router';
 import { preferences } from '@vben/preferences';
 import { getTabKey, storeToRefs, useTabbarStore } from '@vben/stores';
 
-import { transformComponent, useLayoutHook } from '../hooks';
+import { useLayoutHook } from '../hooks';
+
+import CachedRouteRenderer from './cached-route-renderer.vue';
 
 const route = useRoute();
 
@@ -74,21 +76,23 @@ const computedCurrentRouteKey = computed(() => {
 <template>
   <template v-if="computedShowView">
     <template v-for="item in computedCachedRoutes" :key="item.key">
-      <Transition
-        v-if="getEnabledTransition"
-        appear
-        mode="out-in"
-        :name="getTransitionName(item.route)"
-      >
-        <component
-          v-show="item.key === computedCurrentRouteKey"
-          :is="transformComponent(item.component, item.route)"
-        />
-      </Transition>
+        <Transition
+          v-if="getEnabledTransition"
+          appear
+          mode="out-in"
+          :name="getTransitionName(item.route)"
+        >
+          <CachedRouteRenderer
+            v-show="item.key === computedCurrentRouteKey"
+            :component="item.component"
+            :route="item.route"
+          />
+        </Transition>
       <template v-else>
-        <component
+        <CachedRouteRenderer
           v-show="item.key === computedCurrentRouteKey"
-          :is="transformComponent(item.component, item.route)"
+          :component="item.component"
+          :route="item.route"
         />
       </template>
     </template>

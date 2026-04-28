@@ -569,7 +569,9 @@ export const useTabbarStore = defineStore('core-tabbar', {
      */
     addCachedRoute(component: VNode, route: RouteLocationNormalizedLoaded) {
       const key = getTabKey(route);
-      if (this.cachedRoutes.has(key)) {
+      const existing = this.cachedRoutes.get(key);
+      if (existing) {
+        existing.route = markRaw(route);
         return;
       }
       this.cachedRoutes.set(key, {
