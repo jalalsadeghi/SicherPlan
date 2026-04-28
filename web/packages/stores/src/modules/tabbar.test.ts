@@ -99,7 +99,7 @@ describe('useAccessStore', () => {
     });
   });
 
-  it('uses one Customers tab when customer query params change inside the same module workspace', () => {
+  it('uses pageKey to keep a list tab and separate customer detail tabs under the same Customers route', () => {
     const store = useTabbarStore();
     const baseTab = {
       meta: {
@@ -120,37 +120,46 @@ describe('useAccessStore', () => {
     } as any);
     store.addTab({
       ...baseTab,
-      fullPath: '/admin/customers?customer_id=c1&tab=dashboard',
+      fullPath: '/admin/customers?customer_id=c1&tab=dashboard&pageKey=customers:detail:c1',
       meta: {
         ...baseTab.meta,
         title: 'Alpha Security',
       },
-      query: { customer_id: 'c1', tab: 'dashboard' },
+      query: { customer_id: 'c1', pageKey: 'customers:detail:c1', tab: 'dashboard' },
     } as any);
     store.addTab({
       ...baseTab,
-      fullPath: '/admin/customers?customer_id=c2&tab=dashboard',
+      fullPath: '/admin/customers?customer_id=c2&tab=dashboard&pageKey=customers:detail:c2',
       meta: {
         ...baseTab.meta,
         title: 'RheinForum Koln',
       },
-      query: { customer_id: 'c2', tab: 'dashboard' },
+      query: { customer_id: 'c2', pageKey: 'customers:detail:c2', tab: 'dashboard' },
     } as any);
     store.addTab({
       ...baseTab,
-      fullPath: '/admin/customers',
+      fullPath: '/admin/customers?customer_id=c1&tab=orders&pageKey=customers:detail:c1',
       meta: {
         ...baseTab.meta,
-        title: 'Customers',
+        title: 'Alpha Security',
       },
-      query: {},
+      query: { customer_id: 'c1', pageKey: 'customers:detail:c1', tab: 'orders' },
     } as any);
 
-    expect(store.tabs).toHaveLength(1);
-    expect(store.tabs[0]?.key).toBe('/admin/customers');
-    expect(store.tabs[0]?.name).toBe('SicherPlanCustomers');
+    expect(store.tabs).toHaveLength(3);
+    expect(store.tabs.map((tab) => tab.key)).toEqual([
+      '/admin/customers',
+      'customers:detail:c1',
+      'customers:detail:c2',
+    ]);
     expect(store.tabs[0]?.meta?.title).toBe('Customers');
-    expect(store.tabs[0]?.query).toEqual({});
+    expect(store.tabs[1]?.meta?.title).toBe('Alpha Security');
+    expect(store.tabs[1]?.query).toEqual({
+      customer_id: 'c1',
+      pageKey: 'customers:detail:c1',
+      tab: 'orders',
+    });
+    expect(store.tabs[2]?.meta?.title).toBe('RheinForum Koln');
   });
 
   it('keeps default fullPath tab keys for other query-driven routes', () => {

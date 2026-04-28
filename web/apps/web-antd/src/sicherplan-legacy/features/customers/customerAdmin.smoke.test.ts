@@ -14,6 +14,8 @@ const routeState = reactive({
 
 const routerPushMock = vi.fn();
 const routerReplaceMock = vi.fn();
+const setTabTitleMock = vi.fn();
+const setUpdateTimeMock = vi.fn();
 const showFeedbackToastMock = vi.fn();
 const createObjectUrlMock = vi.fn(() => "blob:customer-export");
 const revokeObjectUrlMock = vi.fn();
@@ -188,6 +190,13 @@ vi.mock("vue-router", () => ({
 
 vi.mock("@/stores/auth", () => ({
   useAuthStore: () => authStoreState,
+}));
+
+vi.mock("@vben/stores", () => ({
+  useTabbarStore: () => ({
+    setTabTitle: setTabTitleMock,
+    setUpdateTime: setUpdateTimeMock,
+  }),
 }));
 
 vi.mock("@/composables/useSicherPlanFeedback", () => ({
@@ -516,11 +525,20 @@ describe("CustomerAdminView search dialog", () => {
 
     routerPushMock.mockReset();
     routerReplaceMock.mockReset();
+    routerPushMock.mockImplementation(async (location: { path?: string; query?: Record<string, unknown> }) => {
+      if (location?.query) {
+        routeState.query = { ...location.query };
+      } else if (location?.path === "/admin/customers") {
+        routeState.query = {};
+      }
+    });
     routerReplaceMock.mockImplementation(async (location: { query?: Record<string, unknown> }) => {
       if (location?.query) {
         routeState.query = { ...location.query };
       }
     });
+    setTabTitleMock.mockReset();
+    setUpdateTimeMock.mockReset();
     showFeedbackToastMock.mockReset();
     createObjectUrlMock.mockClear();
     revokeObjectUrlMock.mockClear();
@@ -756,16 +774,19 @@ describe("CustomerAdminView search dialog", () => {
   it("opens a customer workspace only after clicking a customer row and updates the selected route", async () => {
     const wrapper = await mountCustomerAdmin();
     apiMocks.getCustomerMock.mockClear();
-    routerReplaceMock.mockClear();
+    routerPushMock.mockClear();
+    setTabTitleMock.mockClear();
 
     await wrapper.get('[data-testid="customer-list-row"]').trigger("click");
     await settle();
 
     expect(apiMocks.getCustomerMock).toHaveBeenCalledWith("tenant-1", "customer-default", "token-1");
-    expect(routerReplaceMock).toHaveBeenCalledWith(
+    expect(routerPushMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        path: "/admin/customers",
         query: expect.objectContaining({
           customer_id: "customer-default",
+          pageKey: "customers:detail:customer-default",
           tab: "dashboard",
         }),
       }),
@@ -778,6 +799,15 @@ describe("CustomerAdminView search dialog", () => {
     expect(routeState.meta.title).toBe("Alpha Security");
     expect(routeState.meta.title).not.toBe("Customers");
     expect(`${routeState.meta.title}`).not.toContain("...");
+    expect(setTabTitleMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: expect.objectContaining({
+          customer_id: "customer-default",
+          pageKey: "customers:detail:customer-default",
+        }),
+      }),
+      "Alpha Security",
+    );
     expect(wrapper.get('[data-testid="customer-detail-title"]').text()).toBe("Alpha Security");
     expect(wrapper.get('[data-testid="customer-detail-title"]').classes()).toContain("customer-admin-detail-title");
     expect(wrapper.get('[data-testid="customer-detail-workspace"]').text()).toContain("Workspace lead");
@@ -801,8 +831,7 @@ describe("CustomerAdminView search dialog", () => {
 
     expect(wrapper.find('[data-testid="customer-page-context-label"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="customer-page-context-label-full-title"]').exists()).toBe(false);
-    expect(routeState.meta.title).toBe("RheinForum International Security...");
-    expect(routeState.meta.title).not.toBe(longName);
+    expect(routeState.meta.title).toBe(longName);
     expect(wrapper.get('[data-testid="customer-detail-title"]').text()).toBe(longName);
   });
 
@@ -1052,7 +1081,7 @@ describe("CustomerAdminView search dialog", () => {
     await wrapper.get('[data-testid="customer-back-to-list"]').trigger("click");
     await settle();
 
-    expect(routerReplaceMock).toHaveBeenCalledWith({ query: {} });
+    expect(routerPushMock).toHaveBeenCalledWith({ path: "/admin/customers", query: {} });
     expect(wrapper.find('[data-testid="customer-list-only-mode"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-list-section"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-detail-workspace"]').exists()).toBe(false);
@@ -1082,13 +1111,34 @@ describe("CustomerAdminView search dialog", () => {
     await wrapper.get('[data-testid="customer-back-to-list"]').trigger("click");
     await settle();
 
-    expect(routerReplaceMock).toHaveBeenCalledWith({ query: {} });
+    expect(routerPushMock).toHaveBeenCalledWith({ path: "/admin/customers", query: {} });
     expect(wrapper.find('[data-testid="customer-list-only-mode"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-list-section"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-detail-workspace"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="customer-page-context-label"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="customer-page-context-label-full-title"]').exists()).toBe(false);
     expect(routeState.meta.title).toBe("Customers");
+  });
+
+  it("keeps the same pageKey when switching internal customer detail tabs", async () => {
+    routeState.query = {
+      customer_id: "customer-default",
+      pageKey: "customers:detail:customer-default",
+      tab: "dashboard",
+    };
+    const wrapper = await mountCustomerAdmin();
+    routerReplaceMock.mockClear();
+
+    await wrapper.get('[data-testid="customer-tab-orders"]').trigger("click");
+    await settle();
+
+    expect(routerReplaceMock).toHaveBeenCalledWith({
+      query: {
+        customer_id: "customer-default",
+        pageKey: "customers:detail:customer-default",
+        tab: "orders",
+      },
+    });
   });
 
   it("does not activate the full overlay while nested contact saves and same-customer refreshes are pending", async () => {

@@ -2263,6 +2263,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, type CSSProperties } from "vue";
 import { IconifyIcon } from "@vben/icons";
+import { useTabbarStore } from "@vben/stores";
 
 import { webAppConfig } from "@/config/env";
 import {
@@ -2410,6 +2411,7 @@ const { t } = useI18n();
 const authStore = useAuthStore();
 const route = useRoute();
 const router = useRouter();
+const tabbarStore = useTabbarStore();
 const { showFeedbackToast } = useSicherPlanFeedback();
 
 const customers = ref<CustomerListItem[]>([]);
@@ -2728,6 +2730,8 @@ const customerPageContextFullTitle = computed(() =>
     : t("customerAdmin.title"),
 );
 const customerPageContextLabel = computed(() => truncateCustomerContextLabel(customerPageContextFullTitle.value));
+const CUSTOMER_ADMIN_ROUTE_PATH = "/admin/customers";
+const CUSTOMER_DETAIL_PAGE_KEY_PREFIX = "customers:detail:";
 type CustomerContactAccessSectionId = "addresses" | "contacts" | "portal";
 type CustomerContactAccessSection = {
   id: CustomerContactAccessSectionId;
@@ -3120,6 +3124,28 @@ function truncateCustomerContextLabel(value: string, maxLength = 34) {
   return `${truncated.trimEnd()}...`;
 }
 
+function buildCustomerDetailPageKey(customerId: string) {
+  return `${CUSTOMER_DETAIL_PAGE_KEY_PREFIX}${customerId}`;
+}
+
+function normalizeRouteQueryValue(value: unknown) {
+  return Array.isArray(value) ? `${value[0] ?? ""}`.trim() : `${value ?? ""}`.trim();
+}
+
+function currentCustomerDetailPageKey() {
+  const pageKey = normalizeRouteQueryValue(route.query.pageKey);
+  return pageKey.startsWith(CUSTOMER_DETAIL_PAGE_KEY_PREFIX) ? pageKey : "";
+}
+
+async function syncCustomerTopTabTitle() {
+  const title = selectedCustomer.value && !isCreatingCustomer.value
+    ? selectedCustomer.value.name
+    : t("customerAdmin.title");
+  (route.meta as Record<string, unknown>).title = title;
+  tabbarStore.setUpdateTime();
+  await tabbarStore.setTabTitle(route, title);
+}
+
 function customerListSearchHaystack(customer: CustomerListItem) {
   return [
     customer.name,
@@ -3488,15 +3514,12 @@ async function applyAdvancedFilters() {
 
 async function openCustomerWorkspace(customerId: string, detailTab = "dashboard") {
   routeCustomerNotFound.value = false;
-  await selectCustomer(customerId, {
-    preferredDetailTab: detailTab,
-  });
-  activeDetailTab.value = detailTab;
-  await router.replace({
+  await router.push({
+    path: CUSTOMER_ADMIN_ROUTE_PATH,
     query: {
-      ...route.query,
       customer_id: customerId,
       tab: detailTab,
+      pageKey: buildCustomerDetailPageKey(customerId),
     },
   });
 }
@@ -4004,6 +4027,15 @@ function selectCustomerDetailTab(tabId: string) {
   if (activeDetailTab.value === "contact_access") {
     activeContactAccessSection.value = "contacts";
   }
+  if (selectedCustomer.value?.id) {
+    const nextQuery = {
+      ...route.query,
+      customer_id: selectedCustomer.value.id,
+      tab: activeDetailTab.value,
+      pageKey: currentCustomerDetailPageKey() ?? buildCustomerDetailPageKey(selectedCustomer.value.id),
+    };
+    void router.replace({ query: nextQuery });
+  }
 }
 
 function openCustomerAddressesTab() {
@@ -4204,10 +4236,10 @@ async function returnToCustomerList() {
   pendingRouteCustomerId.value = "";
   pendingRouteDetailTab.value = "";
   clearCustomerWorkspace();
-  const nextQuery = { ...route.query };
-  delete nextQuery.customer_id;
-  delete nextQuery.tab;
-  await router.replace({ query: nextQuery });
+  await router.push({
+    path: CUSTOMER_ADMIN_ROUTE_PATH,
+    query: {},
+  });
 }
 
 async function cancelCustomerEdit() {
@@ -5766,9 +5798,18 @@ watch(
 );
 
 watch(
-  () => customerPageContextLabel.value,
-  (label) => {
-    (route.meta as Record<string, unknown>).title = label;
+  () => [selectedCustomer.value?.id ?? "", route.query.customer_id, route.query.pageKey, isCreatingCustomer.value] as const,
+  async ([selectedCustomerId]) => {
+    const routeCustomerId = normalizeRouteQueryValue(route.query.customer_id);
+    if (selectedCustomerId && routeCustomerId === selectedCustomerId) {
+      await syncCustomerTopTabTitle();
+      return;
+    }
+    if (!routeCustomerId) {
+      await syncCustomerTopTabTitle();
+      return;
+    }
+    (route.meta as Record<string, unknown>).title = t("customerAdmin.title");
   },
   { immediate: true },
 );
