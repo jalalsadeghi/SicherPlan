@@ -1,0 +1,1 @@
+import"./vue.runtime.esm-bundler-B04b4lRK.js";import"./utils-CXreM6T2.js";import"./dayjs.min-0RNAsXmV.js";import"./defu-DhCqLmIY.js";import{n as e,t}from"./router-9qZbK3sc.js";import"./env-BE9ATpXg.js";import"./locales-t5eAEu7A.js";import"./useConfigInject-Du5-_XR2.js";import"./vue-types-C1S6w7Ce.js";import"./auth-Dxu9D91r.js";export{t as resetRoutes,e as router};

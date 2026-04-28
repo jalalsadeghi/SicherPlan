@@ -70,11 +70,19 @@ jobs:
       - name: Verify committed field/lookup corpus artifact is current
         working-directory: backend
         run: |
-          tmp_corpus="$(mktemp)"
+          tmp1="$(mktemp)"
+          tmp2="$(mktemp)"
           python -m app.modules.assistant.field_dictionary_export \
             --repo-root .. \
-            --output "$tmp_corpus"
-          if ! diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp_corpus"; then
+            --output "$tmp1"
+          python -m app.modules.assistant.field_dictionary_export \
+            --repo-root .. \
+            --output "$tmp2"
+          if ! diff -u "$tmp1" "$tmp2"; then
+            echo "Field/lookup corpus export is nondeterministic." >&2
+            exit 1
+          fi
+          if ! diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp1"; then
             echo "Generated field/lookup corpus artifact is stale. Regenerate backend/app/modules/assistant/generated/field_lookup_corpus.json." >&2
             exit 1
           fi

@@ -20,6 +20,18 @@ LOGGER = logging.getLogger(__name__)
 _GENERATED_PACKAGE = "app.modules.assistant.generated"
 _GENERATED_CORPUS_FILENAME = "field_lookup_corpus.json"
 _FIELD_LOOKUP_SCHEMA_VERSION = 1
+_HASH_EXCLUDED_DIR_NAMES = {
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "node_modules",
+    "dist",
+    "build",
+}
+_HASH_EXCLUDED_FILE_SUFFIXES = {".pyc", ".pyo"}
+_HASH_EXCLUDED_FILE_NAMES = {_GENERATED_CORPUS_FILENAME}
 
 
 _LEGACY_MESSAGES_PATH = Path("web/apps/web-antd/src/sicherplan-legacy/i18n/messages.ts")
@@ -804,7 +816,7 @@ def _extract_locale_labels(repo_root: Path) -> dict[str, dict[str, str]]:
 
 def _extract_vue_field_bindings(repo_root: Path) -> dict[str, dict[str, Any]]:
     bindings: dict[str, dict[str, Any]] = {}
-    for path in (repo_root / "web/apps/web-antd/src").rglob("*.vue"):
+    for path in _sorted_rglob(repo_root / "web/apps/web-antd/src", "*.vue"):
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
@@ -835,7 +847,7 @@ def _extract_vue_field_bindings(repo_root: Path) -> dict[str, dict[str, Any]]:
 
 def _extract_typescript_interfaces(repo_root: Path) -> dict[str, set[str]]:
     definitions: dict[str, set[str]] = {}
-    for path in (repo_root / "web/apps/web-antd/src").rglob("*.ts"):
+    for path in _sorted_rglob(repo_root / "web/apps/web-antd/src", "*.ts"):
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
@@ -862,7 +874,7 @@ def _extract_typescript_interfaces(repo_root: Path) -> dict[str, set[str]]:
 
 def _extract_backend_fields(repo_root: Path) -> dict[str, set[str]]:
     definitions: dict[str, set[str]] = {}
-    for path in (repo_root / "backend/app/modules").rglob("*"):
+    for path in _sorted_rglob(repo_root / "backend/app/modules", "*"):
         if path.suffix != ".py" or path.name not in {"schemas.py", "models.py"}:
             continue
         try:
@@ -1470,27 +1482,27 @@ def _deserialize_corpus(payload: dict[str, Any]) -> AssistantFieldLookupCorpus:
 
 def _serialize_field_definition(definition: FieldDefinition) -> dict[str, Any]:
     return {
-        "aliases": sorted(set(definition.aliases)),
-        "binding_paths": sorted(set(definition.binding_paths)),
+        "aliases": _sorted_unique_strings(definition.aliases),
+        "binding_paths": _sorted_unique_strings(definition.binding_paths),
         "canonical_name": definition.canonical_name,
         "confidence": definition.confidence,
         "definition_de": definition.definition_de,
         "definition_en": definition.definition_en,
         "entity_type": definition.entity_type,
-        "example_values": list(definition.example_values),
+        "example_values": _sorted_unique_strings(definition.example_values),
         "field_key": definition.field_key,
-        "form_contexts": sorted(set(definition.form_contexts)),
+        "form_contexts": _sorted_unique_strings(definition.form_contexts),
         "input_type": definition.input_type,
-        "label_keys": sorted(set(definition.label_keys)),
-        "labels": {key: sorted(set(values)) for key, values in sorted(definition.labels.items())},
+        "label_keys": _sorted_unique_strings(definition.label_keys),
+        "labels": {key: _sorted_unique_strings(values) for key, values in sorted(definition.labels.items())},
         "module_key": definition.module_key,
         "page_id": definition.page_id,
-        "related_fields": sorted(set(definition.related_fields)),
+        "related_fields": _sorted_unique_strings(definition.related_fields),
         "required": definition.required,
-        "route_names": sorted(set(definition.route_names)),
-        "schema_fields": sorted(set(definition.schema_fields)),
+        "route_names": _sorted_unique_strings(definition.route_names),
+        "schema_fields": _sorted_unique_strings(definition.schema_fields),
         "sensitive": definition.sensitive,
-        "source_basis": [_serialize_source_basis(item) for item in definition.source_basis],
+        "source_basis": [_serialize_source_basis(item) for item in _sorted_unique_source_basis(definition.source_basis)],
     }
 
 
@@ -1522,16 +1534,16 @@ def _deserialize_field_definition(payload: dict[str, Any]) -> FieldDefinition:
 
 def _serialize_lookup_definition(definition: LookupDefinition) -> dict[str, Any]:
     return {
-        "aliases": sorted(set(definition.aliases)),
+        "aliases": _sorted_unique_strings(definition.aliases),
         "confidence": definition.confidence,
         "entity_type": definition.entity_type,
-        "labels": {key: sorted(set(values)) for key, values in sorted(definition.labels.items())},
+        "labels": {key: _sorted_unique_strings(values) for key, values in sorted(definition.labels.items())},
         "lookup_key": definition.lookup_key,
         "module_key": definition.module_key,
         "page_id": definition.page_id,
-        "source_basis": [_serialize_source_basis(item) for item in definition.source_basis],
+        "source_basis": [_serialize_source_basis(item) for item in _sorted_unique_source_basis(definition.source_basis)],
         "value_source_kind": definition.value_source_kind,
-        "values": [_serialize_lookup_value_definition(item) for item in definition.values],
+        "values": [_serialize_lookup_value_definition(item) for item in _sorted_lookup_values(definition.values)],
     }
 
 
@@ -1603,7 +1615,7 @@ def _deserialize_labels(payload: Any) -> dict[str, list[str]]:
 def _string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [str(item) for item in value if str(item).strip()]
+    return _sorted_unique_strings(str(item) for item in value if str(item).strip())
 
 
 def _optional_string(value: Any) -> str | None:
@@ -1644,7 +1656,7 @@ def _collect_source_hashes(repo_root: Path) -> dict[str, str]:
             hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
         elif path.is_dir():
             digest = hashlib.sha256()
-            for child in sorted(item for item in path.rglob("*") if item.is_file()):
+            for child in _iter_hashable_files(path, repo_root):
                 relative = child.relative_to(repo_root).as_posix()
                 digest.update(relative.encode("utf-8"))
                 digest.update(b"\0")
@@ -1842,6 +1854,68 @@ def _append_unique(target: list[str], value: str | None) -> None:
         return
     if cleaned not in target:
         target.append(cleaned)
+
+
+def _sorted_unique_strings(values: Any) -> list[str]:
+    return sorted({str(value).strip() for value in values if str(value).strip()})
+
+
+def _source_basis_sort_key(basis: FieldSourceBasis) -> tuple[str, str, str, str, str]:
+    return (
+        basis.source_type,
+        basis.source_name,
+        basis.page_id or "",
+        basis.module_key or "",
+        basis.evidence,
+    )
+
+
+def _sorted_unique_source_basis(items: list[FieldSourceBasis]) -> list[FieldSourceBasis]:
+    unique: dict[tuple[str, str, str, str, str], FieldSourceBasis] = {}
+    for item in items:
+        unique[_source_basis_sort_key(item)] = item
+    return [unique[key] for key in sorted(unique)]
+
+
+def _lookup_value_sort_key(value: LookupValueDefinition) -> tuple[str, tuple[tuple[str, str], ...], str, str]:
+    return (
+        value.value,
+        tuple(sorted((str(key), str(label)) for key, label in value.labels.items())),
+        value.meaning_de or "",
+        value.meaning_en or "",
+    )
+
+
+def _sorted_lookup_values(values: list[LookupValueDefinition]) -> list[LookupValueDefinition]:
+    unique: dict[tuple[str, tuple[tuple[str, str], ...], str, str], LookupValueDefinition] = {}
+    for value in values:
+        unique[_lookup_value_sort_key(value)] = value
+    return [unique[key] for key in sorted(unique)]
+
+
+def _sorted_rglob(root: Path, pattern: str) -> list[Path]:
+    return sorted(root.rglob(pattern), key=lambda path: path.as_posix())
+
+
+def _is_excluded_hash_path(path: Path, repo_root: Path) -> bool:
+    relative = path.relative_to(repo_root)
+    if any(part in _HASH_EXCLUDED_DIR_NAMES for part in relative.parts):
+        return True
+    if any(part.endswith(".egg-info") for part in relative.parts):
+        return True
+    if path.name in _HASH_EXCLUDED_FILE_NAMES and "generated" in relative.parts:
+        return True
+    if path.suffix in _HASH_EXCLUDED_FILE_SUFFIXES:
+        return True
+    return False
+
+
+def _iter_hashable_files(root: Path, repo_root: Path) -> list[Path]:
+    return [
+        path
+        for path in _sorted_rglob(root, "*")
+        if path.is_file() and not _is_excluded_hash_path(path, repo_root)
+    ]
 
 
 def _repo_root() -> Path:

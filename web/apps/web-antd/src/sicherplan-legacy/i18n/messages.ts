@@ -3471,7 +3471,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "noticeAdmin.feedback.acknowledged": "Hinweis bestätigt",
     "noticeAdmin.feedback.error": "Notice-Aktion fehlgeschlagen.",
     "customerAdmin.eyebrow": "Kundenverwaltung",
-    "customerAdmin.title": "Kundenstamm, Kontakte und Adresslinks",
+    "customerAdmin.title": "Kunden",
     "customerAdmin.lead":
       "Diese erste CRM-Ansicht folgt dem Vben-Admin-Muster mit Listen-, Detail- und Pflegebereichen für Kunden, Kontakte und wiederverwendete Adressen.",
     "customerAdmin.permission.read": "Leserechte",
@@ -5728,7 +5728,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "noticeAdmin.feedback.acknowledged": "Notice acknowledged",
     "noticeAdmin.feedback.error": "The notice action failed.",
     "customerAdmin.eyebrow": "Customer management",
-    "customerAdmin.title": "Customer master, contacts, and address links",
+    "customerAdmin.title": "Customers",
     "customerAdmin.lead":
       "This first CRM workspace follows the Vben-style list/detail pattern for customer records, contacts, and reusable-address links.",
     "customerAdmin.permission.read": "Read access",
