@@ -44,7 +44,11 @@ from app.modules.assistant.prompt_builder import (
     summarize_auth_context,
 )
 from app.modules.assistant.rag_orchestrator import AssistantRagOrchestrator
-from app.modules.assistant.retrieval_planner import build_retrieval_plan
+from app.modules.assistant.retrieval_planner import (
+    FIELD_HELP_INTENT_CATEGORIES,
+    build_retrieval_plan,
+    extract_route_context_signals,
+)
 from app.modules.assistant.models import AssistantConversation, AssistantMessage
 from app.modules.assistant.provider import (
     AssistantProvider,
@@ -1114,6 +1118,52 @@ class AssistantService:
                 summaries.append(self._tool_result_to_summary(workflow_result))
                 sources.extend(self._grounding_sources_from_tool_result("workflow", workflow_result))
 
+            if plan.intent_category in FIELD_HELP_INTENT_CATEGORIES:
+                field_result = self.execute_registered_tool(
+                    tool_name="assistant.search_field_dictionary",
+                    input_data={
+                        "query": cleaned_message,
+                        "language_code": response_language,
+                        "page_id": route_context.get("page_id") if isinstance(route_context, dict) else None,
+                        "route_name": route_context.get("route_name") if isinstance(route_context, dict) else None,
+                        "limit": 5,
+                    },
+                    actor=actor,
+                    conversation_id=conversation.id,
+                )
+                summaries.append(self._tool_result_to_summary(field_result))
+                sources.extend(self._grounding_sources_from_tool_result("field_dictionary", field_result))
+
+                lookup_explanation_result = self.execute_registered_tool(
+                    tool_name="assistant.explain_lookup_or_option",
+                    input_data={
+                        "query": cleaned_message,
+                        "language_code": response_language,
+                        "page_id": route_context.get("page_id") if isinstance(route_context, dict) else None,
+                        "route_name": route_context.get("route_name") if isinstance(route_context, dict) else None,
+                        "limit": 5,
+                    },
+                    actor=actor,
+                    conversation_id=conversation.id,
+                )
+                summaries.append(self._tool_result_to_summary(lookup_explanation_result))
+                sources.extend(self._grounding_sources_from_tool_result("lookup_dictionary", lookup_explanation_result))
+
+                lookup_result = self.execute_registered_tool(
+                    tool_name="assistant.search_lookup_dictionary",
+                    input_data={
+                        "query": cleaned_message,
+                        "language_code": response_language,
+                        "page_id": route_context.get("page_id") if isinstance(route_context, dict) else None,
+                        "route_name": route_context.get("route_name") if isinstance(route_context, dict) else None,
+                        "limit": 5,
+                    },
+                    actor=actor,
+                    conversation_id=conversation.id,
+                )
+                summaries.append(self._tool_result_to_summary(lookup_result))
+                sources.extend(self._grounding_sources_from_tool_result("lookup_dictionary", lookup_result))
+
             if ui_intent is not None:
                 ui_result = self.execute_registered_tool(
                     tool_name="assistant.find_ui_action",
@@ -1170,6 +1220,16 @@ class AssistantService:
                 )
                 summaries.append(self._tool_result_to_summary(diagnostic_result))
                 sources.extend(self._grounding_sources_from_tool_result("diagnostic", diagnostic_result))
+
+            sources.extend(
+                self._build_route_context_navigation_sources(
+                    conversation=conversation,
+                    actor=actor,
+                    response_language=response_language,
+                    retrieval_plan=plan,
+                    route_context=route_context,
+                )
+            )
 
         compact_sources = self._build_compact_grounding_sources(
             sources=sources,
@@ -1732,6 +1792,8 @@ class AssistantService:
         ]
         if intent_category == "ui_action_question":
             guaranteed.append("page_help_manifest")
+        if intent_category in FIELD_HELP_INTENT_CATEGORIES:
+            guaranteed.extend(["field_dictionary", "lookup_dictionary", "page_help_manifest"])
         return guaranteed
 
     def _rank_grounding_source(
@@ -1785,6 +1847,15 @@ class AssistantService:
         if intent_category == "workflow_how_to" and source.source_type in {"operational_handbook", "user_manual", "knowledge_chunk"}:
             score += 10.0
             reasons.append("content guidance for how-to question")
+        if intent_category in FIELD_HELP_INTENT_CATEGORIES and source.source_type == "field_dictionary":
+            score += 20.0
+            reasons.append("field dictionary definition")
+        if intent_category in FIELD_HELP_INTENT_CATEGORIES and source.source_type == "lookup_dictionary":
+            score += 18.0
+            reasons.append("lookup dictionary definition")
+        if intent_category in FIELD_HELP_INTENT_CATEGORIES and source.source_type == "page_help_manifest":
+            score += 10.0
+            reasons.append("page-help field context")
         if intent_category == "operational_diagnostic" and source.source_type in {"diagnostic_fact", "tool_result_summary", "diagnostic"}:
             score += 22.0
             reasons.append("diagnostic prefetch evidence")
@@ -2205,8 +2276,10 @@ class AssistantService:
 
         duplicate_grounding_tools = {
             "assistant.search_accessible_pages",
-            "assistant.search_workflow_help",
             "assistant.get_page_help_manifest",
+            "assistant.search_field_dictionary",
+            "assistant.search_lookup_dictionary",
+            "assistant.explain_lookup_or_option",
             "navigation.build_allowed_link",
         }
         payloads: list[dict[str, Any]] = []
@@ -2318,7 +2391,15 @@ class AssistantService:
             for source in sources
         ]
         protected_source_ids: set[str | None] = set()
-        for protected_type in ("ui_action", "diagnostic", "diagnostic_fact", "workflow"):
+        for protected_type in (
+            "ui_action",
+            "diagnostic",
+            "diagnostic_fact",
+            "workflow",
+            "field_dictionary",
+            "lookup_dictionary",
+            "page_help_manifest",
+        ):
             first_match = next((source for source in prepared if source.source_type == protected_type), None)
             if first_match is not None:
                 protected_source_ids.add(first_match.source_id)
@@ -2552,6 +2633,202 @@ class AssistantService:
                 seen.add(key)
                 results.append(AssistantMissingPermission(permission=permission, reason=reason))
         return results
+
+    def _build_route_context_navigation_sources(
+        self,
+        *,
+        conversation: AssistantConversation,
+        actor: RequestAuthorizationContext,
+        response_language: str,
+        retrieval_plan: Any,
+        route_context: dict[str, Any] | None,
+    ) -> list[AssistantGroundingSource]:
+        if self.tool_registry is None:
+            return []
+
+        route_signals = extract_route_context_signals(route_context)
+        if (
+            not route_signals.get("customer_context_active")
+            and not route_signals.get("customer_order_workspace")
+            and route_signals.get("page_id") not in {"C-01", "C-02"}
+        ):
+            return []
+
+        workflow_intent = str(getattr(retrieval_plan, "workflow_intent", "") or "")
+        workflow_variant = str(getattr(retrieval_plan, "workflow_variant", "") or "")
+        if workflow_intent not in {
+            "customer_scoped_order_create",
+            "customer_order_create",
+            "contract_or_document_register",
+            "customer_plan_create",
+            "planning_record_create",
+        } and not workflow_variant:
+            return []
+
+        sources: list[AssistantGroundingSource] = []
+
+        customer_entity: dict[str, Any] = {}
+        if self._can_use_route_customer_id(actor=actor, customer_id=route_signals.get("customer_id")):
+            customer_entity["customer_id"] = route_signals.get("customer_id")
+        if customer_entity:
+            customer_entity["tab"] = "orders"
+        sources.extend(
+            self._build_navigation_sources_for_page(
+                conversation=conversation,
+                actor=actor,
+                page_id="C-01",
+                entity_context=customer_entity or None,
+                response_language=response_language,
+                link_kind="customer_orders_tab",
+            )
+        )
+
+        workspace_entity: dict[str, Any] = {}
+        if self._can_use_route_customer_id(actor=actor, customer_id=route_signals.get("customer_id")):
+            workspace_entity["customer_id"] = route_signals.get("customer_id")
+        for key in ("order_id", "planning_record_id", "shift_plan_id"):
+            if route_signals.get(key):
+                workspace_entity[key] = route_signals.get(key)
+        if workspace_entity or route_signals.get("customer_order_workspace"):
+            sources.extend(
+                self._build_navigation_sources_for_page(
+                    conversation=conversation,
+                    actor=actor,
+                    page_id="C-02",
+                    entity_context=workspace_entity or None,
+                    response_language=response_language,
+                    link_kind="customer_order_workspace",
+                )
+            )
+
+        staffing_entity: dict[str, Any] = {}
+        if self._can_use_route_customer_id(actor=actor, customer_id=route_signals.get("customer_id")):
+            staffing_entity["customer_id"] = route_signals.get("customer_id")
+        for key in ("planning_record_id", "date"):
+            if route_signals.get(key):
+                staffing_entity[key] = route_signals.get(key)
+        sources.extend(
+            self._build_navigation_sources_for_page(
+                conversation=conversation,
+                actor=actor,
+                page_id="P-04",
+                entity_context=staffing_entity or None,
+                response_language=response_language,
+                link_kind="staffing_handoff",
+            )
+        )
+        return sources
+
+    def _build_navigation_sources_for_page(
+        self,
+        *,
+        conversation: AssistantConversation,
+        actor: RequestAuthorizationContext,
+        page_id: str,
+        entity_context: dict[str, Any] | None,
+        response_language: str,
+        link_kind: str,
+    ) -> list[AssistantGroundingSource]:
+        tool_result = self.execute_registered_tool(
+            tool_name="navigation.build_allowed_link",
+            input_data={"page_id": page_id, "entity_context": entity_context or {}},
+            actor=actor,
+            conversation_id=conversation.id,
+        )
+        payload = tool_result.data if isinstance(tool_result.data, dict) else {}
+        link_payload = payload.get("link") if isinstance(payload.get("link"), dict) else None
+        if not tool_result.ok or not payload.get("allowed") or link_payload is None:
+            return []
+
+        localized_link = dict(link_payload)
+        localized_link["label"] = self._localized_navigation_label(link_kind, response_language)
+        reason = self._localized_navigation_reason(link_kind, response_language)
+        localized_link["reason"] = reason
+        return [
+            AssistantGroundingSource(
+                source_id=f"allowed_link:{page_id}:{link_kind}",
+                source_type="allowed_navigation_link",
+                source_name="Allowed navigation link",
+                page_id=page_id,
+                module_key=self._module_key_from_page_id(page_id),
+                title=str(localized_link.get("label") or page_id),
+                content=reason,
+                facts={"link": localized_link},
+                verified=True,
+                permission_checked=True,
+            )
+        ]
+
+    @staticmethod
+    def _can_use_route_customer_id(
+        *,
+        actor: RequestAuthorizationContext,
+        customer_id: Any,
+    ) -> bool:
+        if not isinstance(customer_id, str) or not customer_id.strip():
+            return False
+        scoped_customer_ids = {
+            scope.customer_id
+            for scope in actor.scopes
+            if getattr(scope, "customer_id", None)
+        }
+        if not scoped_customer_ids:
+            return True
+        return customer_id in scoped_customer_ids
+
+    @staticmethod
+    def _localized_navigation_label(link_kind: str, response_language: str) -> str:
+        language = (response_language or "").casefold()
+        labels = {
+            "customer_orders_tab": {
+                "de": "Orders-Tab des Kunden",
+                "fa": "تب Orders مشتری",
+                "default": "Customer Orders tab",
+            },
+            "customer_order_workspace": {
+                "de": "Order Workspace",
+                "fa": "Order workspace",
+                "default": "Order workspace",
+            },
+            "staffing_handoff": {
+                "de": "Staffing Coverage",
+                "fa": "Staffing Coverage",
+                "default": "Staffing Coverage",
+            },
+        }
+        bucket = labels.get(link_kind, {})
+        if language.startswith("de"):
+            return bucket.get("de", bucket.get("default", link_kind))
+        if language.startswith("fa"):
+            return bucket.get("fa", bucket.get("default", link_kind))
+        return bucket.get("default", link_kind)
+
+    @staticmethod
+    def _localized_navigation_reason(link_kind: str, response_language: str) -> str:
+        language = (response_language or "").casefold()
+        reasons = {
+            "customer_orders_tab": {
+                "de": "Kundenkontext mit Orders-Tab aus dem aktuellen Routenstatus.",
+                "fa": "زمینه مشتری و تب Orders از وضعیت فعلی مسیر تایید شد.",
+                "default": "Customer context and Orders tab verified from the current route context.",
+            },
+            "customer_order_workspace": {
+                "de": "Kundenbezogener Order-Workspace aus dem aktuellen Kundenkontext.",
+                "fa": "Order workspace مشتری از زمینه فعلی مسیر تایید شد.",
+                "default": "Customer-scoped order workspace verified from the current route context.",
+            },
+            "staffing_handoff": {
+                "de": "Staffing-Coverage-Übergabe aus dem Order-Workspace-Kontext.",
+                "fa": "مسیر Staffing Coverage از زمینه order workspace تایید شد.",
+                "default": "Staffing Coverage handoff verified from the customer order workspace context.",
+            },
+        }
+        bucket = reasons.get(link_kind, {})
+        if language.startswith("de"):
+            return bucket.get("de", bucket.get("default", link_kind))
+        if language.startswith("fa"):
+            return bucket.get("fa", bucket.get("default", link_kind))
+        return bucket.get("default", link_kind)
 
     def _diagnostic_tool_result_source(
         self,
@@ -2987,6 +3264,66 @@ class AssistantService:
                         title=page.get("label"),
                         content=page.get("path_template"),
                         facts=page,
+                        verified=True,
+                        permission_checked=True,
+                    )
+                )
+            return sources
+
+        if source_type == "field_dictionary":
+            for match in payload.get("matches", []) or []:
+                if not isinstance(match, dict):
+                    continue
+                sources.append(
+                    AssistantGroundingSource(
+                        source_id=f"field_dictionary:{match.get('field_key') or 'unknown'}",
+                        source_type="field_dictionary",
+                        source_name=match.get("field_key"),
+                        page_id=match.get("page_id"),
+                        module_key=match.get("module_key"),
+                        title=match.get("label"),
+                        content=match.get("definition"),
+                        facts=match,
+                        score=float(match.get("score") or 0.0),
+                        verified=True,
+                        permission_checked=True,
+                    )
+                )
+            return sources
+
+        if source_type == "lookup_dictionary":
+            for match in payload.get("matches", []) or []:
+                if not isinstance(match, dict):
+                    continue
+                content = match.get("value_source_kind")
+                matched_values = match.get("matched_values") if isinstance(match.get("matched_values"), list) else []
+                if matched_values:
+                    labels: list[str] = []
+                    for row in matched_values[:3]:
+                        if not isinstance(row, dict):
+                            continue
+                        labels.append(
+                            str(
+                                row.get("value")
+                                or (row.get("labels") or {}).get("de")
+                                or (row.get("labels") or {}).get("en")
+                                or ""
+                            ).strip()
+                        )
+                    labels = [item for item in labels if item]
+                    if labels:
+                        content = f"{match.get('value_source_kind')} matched={','.join(labels)}"
+                sources.append(
+                    AssistantGroundingSource(
+                        source_id=f"lookup_dictionary:{match.get('lookup_key') or 'unknown'}",
+                        source_type="lookup_dictionary",
+                        source_name=match.get("lookup_key"),
+                        page_id=match.get("page_id"),
+                        module_key=match.get("module_key"),
+                        title=match.get("label"),
+                        content=content,
+                        facts=match,
+                        score=float(match.get("score") or 0.0),
                         verified=True,
                         permission_checked=True,
                     )
@@ -3914,7 +4251,7 @@ class AssistantService:
     @staticmethod
     def _requires_content_bearing_sources(retrieval_plan: dict[str, Any]) -> bool:
         intent_category = str(retrieval_plan.get("intent_category") or "").strip()
-        return intent_category in {"workflow_how_to", "ui_action_question"}
+        return intent_category in {"workflow_how_to", "ui_action_question"} or intent_category in FIELD_HELP_INTENT_CATEGORIES
 
     @staticmethod
     def _is_content_bearing_source(source: AssistantGroundingSource) -> bool:
@@ -3922,6 +4259,10 @@ class AssistantService:
         facts = source.facts if isinstance(source.facts, dict) else {}
         if source.source_type == "knowledge_chunk":
             return bool(content)
+        if source.source_type == "field_dictionary":
+            return bool(source.verified and content)
+        if source.source_type == "lookup_dictionary":
+            return bool(source.verified and (content or facts.get("values")))
         if source.source_type == "workflow":
             return bool(source.verified and content)
         if source.source_type == "ui_action":
@@ -3987,16 +4328,18 @@ class AssistantService:
     @staticmethod
     def _source_priority(source_type: str) -> int:
         order = {
-            "ui_action": 0,
-            "workflow": 1,
-            "diagnostic_fact": 2,
-            "tool_result_summary": 3,
-            "knowledge_chunk": 4,
-            "page_help_manifest": 5,
-            "diagnostic": 6,
-            "allowed_navigation_link": 7,
-            "page_route": 8,
-            "current_route": 9,
+            "field_dictionary": 0,
+            "lookup_dictionary": 1,
+            "ui_action": 2,
+            "workflow": 3,
+            "diagnostic_fact": 4,
+            "tool_result_summary": 5,
+            "knowledge_chunk": 6,
+            "page_help_manifest": 7,
+            "diagnostic": 8,
+            "allowed_navigation_link": 9,
+            "page_route": 10,
+            "current_route": 11,
         }
         return order.get(source_type, 99)
 
@@ -4326,6 +4669,7 @@ class AssistantService:
                 "missing_permissions": missing_permissions,
                 "entity_refs": AssistantService._compact_entity_refs(entity_refs),
                 "safe_note": AssistantService._truncate_tool_text(safe_note, 220),
+                "data": AssistantService._tool_summary_data_snapshot(tool_name=tool_name, payload=payload),
             },
         }
         if missing_permissions:
@@ -4348,6 +4692,45 @@ class AssistantService:
                 if cleaned:
                     result.append(cleaned)
         return result
+
+    @staticmethod
+    def _tool_summary_data_snapshot(
+        *,
+        tool_name: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            return {}
+        if tool_name == "assistant.find_ui_action":
+            action = payload.get("action") if isinstance(payload.get("action"), dict) else None
+            return {
+                "page_id": payload.get("page_id"),
+                "page_title": payload.get("page_title"),
+                "intent": payload.get("intent"),
+                "source_status": payload.get("source_status"),
+                "action": {
+                    "action_key": action.get("action_key"),
+                    "label": action.get("label"),
+                    "label_status": action.get("label_status"),
+                    "location": action.get("location"),
+                    "verified": action.get("verified"),
+                } if action is not None else None,
+                "safe_note": payload.get("safe_note"),
+            }
+        if tool_name == "assistant.diagnose_employee_shift_visibility":
+            return {
+                "diagnostic_key": payload.get("diagnostic_key"),
+                "status": payload.get("status"),
+                "summary": payload.get("summary"),
+                "missing_input": payload.get("missing_input"),
+            }
+        simple: dict[str, Any] = {}
+        for key in ("page_id", "page_title", "workflow_key", "safe_note", "summary", "status", "diagnostic_key", "intent"):
+            value = payload.get(key)
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                if value not in (None, ""):
+                    simple[key] = value
+        return simple
 
     @staticmethod
     def _compact_entity_refs(entity_refs: dict[str, Any] | None) -> list[str]:
@@ -4491,6 +4874,41 @@ class AssistantService:
                     append_fact(
                         f"Workflow {row.get('workflow_key')} pages={','.join(row.get('linked_page_ids', [])[:4])}"
                     )
+        elif tool_name == "assistant.search_field_dictionary":
+            matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
+            counts["match_count"] = len(matches)
+            counts["ambiguous"] = bool(payload.get("ambiguous"))
+            for row in matches[:3]:
+                if isinstance(row, dict):
+                    append_fact(
+                        f"Field {row.get('field_key')} label={row.get('label')} page={row.get('page_id') or 'unknown'} confidence={row.get('confidence')}"
+                    )
+        elif tool_name == "assistant.search_lookup_dictionary":
+            matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
+            counts["match_count"] = len(matches)
+            counts["ambiguous"] = bool(payload.get("ambiguous"))
+            for row in matches[:3]:
+                if isinstance(row, dict):
+                    append_fact(
+                        f"Lookup {row.get('lookup_key')} label={row.get('label')} page={row.get('page_id') or 'unknown'}"
+                    )
+        elif tool_name == "assistant.explain_lookup_or_option":
+            matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
+            counts["match_count"] = len(matches)
+            counts["ambiguous"] = bool(payload.get("ambiguous"))
+            for row in matches[:3]:
+                if not isinstance(row, dict):
+                    continue
+                matched_values = row.get("matched_values") if isinstance(row.get("matched_values"), list) else []
+                if matched_values:
+                    first = matched_values[0] if isinstance(matched_values[0], dict) else {}
+                    append_fact(
+                        f"Lookup {row.get('lookup_key')} option={first.get('value') or (first.get('labels') or {}).get('en') or (first.get('labels') or {}).get('de')}"
+                    )
+                else:
+                    append_fact(
+                        f"Lookup {row.get('lookup_key')} label={row.get('label')} resolution={row.get('value_resolution')}"
+                    )
         elif tool_name == "assistant.get_page_help_manifest":
             counts["page_found"] = bool(payload.get("page_id"))
             append_fact(f"Page help {payload.get('page_title') or payload.get('page_id')} status={payload.get('source_status')}")
@@ -4610,6 +5028,7 @@ class AssistantService:
             "is_unsafe": classification.is_unsafe,
             "reason": classification.reason,
             "confidence": classification.confidence,
+            "intent": classification.intent,
         }
 
     @staticmethod

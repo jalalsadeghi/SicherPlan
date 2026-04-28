@@ -21,7 +21,9 @@ _PERSIAN_WORDS = {
 _GERMAN_WORDS = {
     "ich",
     "wie",
+    "was",
     "warum",
+    "passiert",
     "nicht",
     "mitarbeiter",
     "schicht",

@@ -185,6 +185,7 @@ def _preferred_page_id(
     if source_type == "workflow_help" and workflow_keys:
         workflow_map = {
             "customer_create": "C-01",
+            "customer_scoped_order_create": "C-02",
             "customer_order_create": "P-02",
             "customer_plan_create": "P-02",
             "planning_record_create": "P-02",
@@ -236,6 +237,7 @@ def _extract_workflow_keys(content: str) -> list[str]:
     return _dedupe_preserve_order(
         [item for item in matches if item in {
             "customer_create",
+            "customer_scoped_order_create",
             "customer_order_create",
             "customer_plan_create",
             "planning_record_create",

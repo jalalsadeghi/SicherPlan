@@ -29,3 +29,14 @@ def test_english_customer_order_query_expands_to_customer_and_planning_context()
     assert "customer order" in expanded.expanded_terms_en
     assert {"C-01", "P-02"}.issubset(set(expanded.likely_page_ids))
     assert {"customers", "planning"}.issubset(set(expanded.likely_module_keys))
+
+
+def test_customer_scoped_order_query_expands_to_customer_order_workspace_context() -> None:
+    expanded = expand_query_for_retrieval(
+        "Wie erstelle ich einen Auftrag direkt beim Kunden?",
+        "de",
+        workflow_intent="customer_scoped_order_create",
+    )
+
+    assert {"C-01", "C-02", "P-04"}.issubset(set(expanded.likely_page_ids))
+    assert {"customers", "planning"}.issubset(set(expanded.likely_module_keys))

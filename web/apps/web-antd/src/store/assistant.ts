@@ -70,6 +70,7 @@ interface AssistantState {
 const ASSISTANT_ROUTE_PAGE_IDS: Record<string, string> = {
   SicherPlanCoreAdmin: 'A-02',
   SicherPlanCustomers: 'C-01',
+  SicherPlanCustomerOrderWorkspace: 'C-02',
   SicherPlanDashboard: 'F-02',
   SicherPlanEmployees: 'E-01',
   SicherPlanFinanceActuals: 'FI-01',

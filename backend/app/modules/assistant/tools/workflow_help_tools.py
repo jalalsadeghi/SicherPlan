@@ -92,15 +92,25 @@ def _to_workflow_read(*, seed: AssistantWorkflowSeed, language_code: str | None)
         summary_de=seed.summary_de,
         intent_aliases_en=list(seed.intent_aliases_en),
         intent_aliases_de=list(seed.intent_aliases_de),
+        route_path=seed.route_path,
+        route_aliases=list(seed.route_aliases),
+        entry_points=list(seed.entry_points),
         steps=[
             AssistantWorkflowStepRead(
                 step_key=step.step_key,
                 sequence=step.sequence,
+                title=step.title_de if language_code == "de" else step.title_en,
+                title_en=step.title_en,
+                title_de=step.title_de,
                 page_id=step.page_id,
                 module_key=step.module_key,
                 purpose=step.purpose_de if language_code == "de" else step.purpose_en,
                 purpose_en=step.purpose_en,
                 purpose_de=step.purpose_de,
+                required_context=list(step.required_context),
+                creates_or_updates=list(step.creates_or_updates),
+                important_fields=list(step.important_fields),
+                api_functions=list(step.api_functions),
                 required_permissions=list(step.required_permissions),
                 source_basis=[
                     AssistantWorkflowSourceBasisRead(

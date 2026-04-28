@@ -475,11 +475,18 @@ class AssistantWorkflowSourceBasisRead(BaseModel):
 class AssistantWorkflowStepRead(BaseModel):
     step_key: str
     sequence: int
+    title: str | None = None
+    title_en: str | None = None
+    title_de: str | None = None
     page_id: str | None = None
     module_key: str | None = None
     purpose: str
     purpose_en: str
     purpose_de: str
+    required_context: list[str] = Field(default_factory=list)
+    creates_or_updates: list[str] = Field(default_factory=list)
+    important_fields: list[str] = Field(default_factory=list)
+    api_functions: list[str] = Field(default_factory=list)
     required_permissions: list[str] = Field(default_factory=list)
     source_basis: list[AssistantWorkflowSourceBasisRead] = Field(default_factory=list)
 
@@ -494,6 +501,9 @@ class AssistantWorkflowKnowledgeRead(BaseModel):
     summary_de: str
     intent_aliases_en: list[str] = Field(default_factory=list)
     intent_aliases_de: list[str] = Field(default_factory=list)
+    route_path: str | None = None
+    route_aliases: list[str] = Field(default_factory=list)
+    entry_points: list[str] = Field(default_factory=list)
     steps: list[AssistantWorkflowStepRead] = Field(default_factory=list)
     linked_page_ids: list[str] = Field(default_factory=list)
     api_families: list[str] = Field(default_factory=list)
@@ -507,14 +517,124 @@ class AssistantWorkflowHelpRead(BaseModel):
     safe_note: str | None = None
 
 
+class AssistantFieldDictionarySearchInput(BaseModel):
+    query: str = Field(min_length=1, max_length=160)
+    language_code: str | None = Field(default=None, max_length=16)
+    page_id: str | None = Field(default=None, max_length=120)
+    route_name: str | None = Field(default=None, max_length=255)
+    limit: int = Field(default=5, ge=1, le=10)
+
+
+class AssistantFieldDictionarySourceBasisRead(BaseModel):
+    source_type: str
+    source_name: str
+    evidence: str
+    page_id: str | None = None
+    module_key: str | None = None
+
+
+class AssistantFieldDictionaryMatchRead(BaseModel):
+    field_key: str
+    label: str
+    entity_type: str | None = None
+    module_key: str | None = None
+    page_id: str | None = None
+    definition: str | None = None
+    required: bool | None = None
+    confidence: str
+    score: float
+    source_basis: list[AssistantFieldDictionarySourceBasisRead] = Field(default_factory=list)
+
+
+class AssistantFieldDictionarySearchRead(BaseModel):
+    matches: list[AssistantFieldDictionaryMatchRead] = Field(default_factory=list)
+    ambiguous: bool = False
+    safe_note: str | None = None
+
+
+class AssistantLookupDictionarySearchInput(BaseModel):
+    query: str = Field(min_length=1, max_length=160)
+    language_code: str | None = Field(default=None, max_length=16)
+    page_id: str | None = Field(default=None, max_length=120)
+    route_name: str | None = Field(default=None, max_length=255)
+    limit: int = Field(default=5, ge=1, le=10)
+
+
+class AssistantLookupDictionaryValueRead(BaseModel):
+    value: str
+    labels: dict[str, str] = Field(default_factory=dict)
+    meaning_de: str | None = None
+    meaning_en: str | None = None
+
+
+class AssistantLookupDictionaryMatchRead(BaseModel):
+    lookup_key: str
+    label: str
+    entity_type: str | None = None
+    module_key: str | None = None
+    page_id: str | None = None
+    value_source_kind: str
+    values: list[AssistantLookupDictionaryValueRead] = Field(default_factory=list)
+    source_basis: list[AssistantFieldDictionarySourceBasisRead] = Field(default_factory=list)
+    confidence: str
+    score: float
+
+
+class AssistantLookupDictionarySearchRead(BaseModel):
+    matches: list[AssistantLookupDictionaryMatchRead] = Field(default_factory=list)
+    ambiguous: bool = False
+    safe_note: str | None = None
+
+
+class AssistantLookupExplanationInput(BaseModel):
+    query: str = Field(min_length=1, max_length=160)
+    language_code: str | None = Field(default=None, max_length=16)
+    page_id: str | None = Field(default=None, max_length=120)
+    route_name: str | None = Field(default=None, max_length=255)
+    limit: int = Field(default=5, ge=1, le=10)
+
+
+class AssistantLookupExplanationValueRead(BaseModel):
+    value: str
+    labels: dict[str, str] = Field(default_factory=dict)
+    meaning_de: str | None = None
+    meaning_en: str | None = None
+    matched: bool = False
+
+
+class AssistantLookupExplanationMatchRead(BaseModel):
+    lookup_key: str
+    label: str
+    entity_type: str | None = None
+    module_key: str | None = None
+    page_id: str | None = None
+    value_source_kind: str
+    value_resolution: str = "static"
+    confidence: str
+    score: float
+    values: list[AssistantLookupExplanationValueRead] = Field(default_factory=list)
+    matched_values: list[AssistantLookupExplanationValueRead] = Field(default_factory=list)
+    source_basis: list[AssistantFieldDictionarySourceBasisRead] = Field(default_factory=list)
+
+
+class AssistantLookupExplanationRead(BaseModel):
+    matches: list[AssistantLookupExplanationMatchRead] = Field(default_factory=list)
+    ambiguous: bool = False
+    missing_permissions: list[AssistantMissingPermission] = Field(default_factory=list)
+    safe_note: str | None = None
+
+
 class AssistantNavigationEntityContextInput(BaseModel):
     employee_id: str | None = None
     shift_id: str | None = None
     assignment_id: str | None = None
     planning_record_id: str | None = None
+    shift_plan_id: str | None = None
+    order_id: str | None = None
     customer_id: str | None = None
     subcontractor_id: str | None = None
     date: str | None = None
+    tab: str | None = None
 
 
 class AssistantNavigationLinkBuildInput(BaseModel):

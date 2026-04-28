@@ -5,10 +5,18 @@ import { $t } from '#/locales';
 const RouteSectionView = () => import('@/views/RouteSectionView.vue');
 const AdminModuleView = () => import('#/views/sicherplan/admin-module-view.vue');
 
+function cachedWorkspaceMeta(): Pick<RouteRecordRaw['meta'], 'domCached' | 'keepAlive'> {
+  return {
+    domCached: true,
+    keepAlive: true,
+  };
+}
+
 const routes: RouteRecordRaw[] = [
   {
     meta: {
       authority: ['platform_admin', 'tenant_admin', 'dispatcher', 'accounting', 'controller_qm'],
+      ...cachedWorkspaceMeta(),
       icon: 'lucide:shield-check',
       order: -10,
       title: $t('sicherplan.navigation.dashboard'),
@@ -37,6 +45,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['platform_admin', 'tenant_admin'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:building-2',
           moduleKey: 'core',
           title: $t('sicherplan.admin.core'),
@@ -48,6 +57,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['platform_admin', 'tenant_admin', 'controller_qm'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:layers-3',
           moduleKey: 'platform-services',
           title: $t('sicherplan.admin.platformServices'),
@@ -59,6 +69,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('#/views/sicherplan/tenant-users/index.vue'),
         meta: {
           authority: ['platform_admin'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:user-cog',
           title: $t('sicherplan.admin.tenantUsers'),
         },
@@ -69,6 +80,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('#/views/sicherplan/health/index.vue'),
         meta: {
           authority: ['platform_admin'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:activity',
           title: $t('sicherplan.admin.health'),
         },
@@ -81,6 +93,7 @@ const routes: RouteRecordRaw[] = [
     component: AdminModuleView,
     meta: {
       authority: ['tenant_admin', 'dispatcher', 'accounting', 'controller_qm'],
+      ...cachedWorkspaceMeta(),
       fullPathKey: false,
       icon: 'lucide:users',
       moduleKey: 'customers',
@@ -96,6 +109,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('#/views/sicherplan/customers/new-plan.vue'),
     meta: {
       authority: ['tenant_admin'],
+      ...cachedWorkspaceMeta(),
       fullPathKey: false,
       hideInMenu: true,
       icon: 'lucide:square-pen',
@@ -121,6 +135,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['tenant_admin', 'dispatcher', 'controller_qm'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:file-search-2',
           moduleKey: 'recruiting',
           title: $t('sicherplan.admin.recruiting'),
@@ -132,6 +147,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['tenant_admin', 'dispatcher', 'controller_qm'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:file-user',
           moduleKey: 'employees',
           title: $t('sicherplan.admin.employees'),
@@ -143,6 +159,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['tenant_admin', 'dispatcher', 'controller_qm'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:library-big',
           moduleKey: 'workforce-catalogs',
           title: $t('sicherplan.admin.workforceCatalogs'),
@@ -154,6 +171,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['tenant_admin', 'dispatcher', 'controller_qm'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:briefcase-business',
           moduleKey: 'subcontractors',
           title: $t('sicherplan.admin.subcontractors'),
@@ -180,6 +198,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['tenant_admin', 'dispatcher', 'controller_qm'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:map-pinned',
           moduleKey: 'planning',
           title: $t('sicherplan.admin.planning'),
@@ -191,6 +210,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['tenant_admin', 'dispatcher', 'accounting', 'controller_qm'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:clipboard-list',
           moduleKey: 'planning-orders',
           title: $t('sicherplan.admin.planningOrders'),
@@ -202,6 +222,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['tenant_admin', 'dispatcher', 'controller_qm'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:calendar-range',
           moduleKey: 'planning-shifts',
           title: $t('sicherplan.admin.planningShifts'),
@@ -213,6 +234,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['tenant_admin', 'dispatcher'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:users-round',
           moduleKey: 'planning-staffing',
           title: $t('sicherplan.admin.planningStaffing'),
@@ -239,6 +261,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['tenant_admin', 'accounting', 'controller_qm'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:badge-euro',
           moduleKey: 'finance-actuals',
           title: $t('sicherplan.admin.financeActuals'),
@@ -250,6 +273,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['tenant_admin', 'accounting', 'controller_qm'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:receipt-text',
           moduleKey: 'finance-payroll',
           title: $t('sicherplan.admin.financePayroll'),
@@ -261,6 +285,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['tenant_admin', 'accounting', 'controller_qm'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:file-text',
           moduleKey: 'finance-billing',
           title: $t('sicherplan.admin.financeBilling'),
@@ -272,6 +297,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['tenant_admin', 'accounting', 'controller_qm'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:hand-coins',
           moduleKey: 'finance-subcontractor-checks',
           title: $t('sicherplan.admin.financeSubcontractorChecks'),
@@ -298,6 +324,7 @@ const routes: RouteRecordRaw[] = [
         component: AdminModuleView,
         meta: {
           authority: ['tenant_admin', 'accounting', 'controller_qm'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:chart-column-big',
           moduleKey: 'reporting',
           title: $t('sicherplan.admin.reporting'),
@@ -320,6 +347,7 @@ const routes: RouteRecordRaw[] = [
         path: '/public/apply/:tenantCode',
         component: () => import('@/views/ApplicantPublicFormView.vue'),
         meta: {
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:file-user',
           title: $t('sicherplan.public.applicantForm'),
         },
@@ -354,6 +382,7 @@ const routes: RouteRecordRaw[] = [
             component: () => import('@/views/CustomerPortalAccessView.vue'),
             meta: {
               authority: ['customer_user'],
+              ...cachedWorkspaceMeta(),
               icon: 'lucide:layout-dashboard',
               title: $t('sicherplan.portal.customerOverview'),
             },
@@ -365,6 +394,7 @@ const routes: RouteRecordRaw[] = [
             props: { domain: 'orders' },
             meta: {
               authority: ['customer_user'],
+              ...cachedWorkspaceMeta(),
               icon: 'lucide:clipboard-list',
               title: $t('sicherplan.portal.customerOrders'),
             },
@@ -376,6 +406,7 @@ const routes: RouteRecordRaw[] = [
             props: { domain: 'schedules' },
             meta: {
               authority: ['customer_user'],
+              ...cachedWorkspaceMeta(),
               icon: 'lucide:calendar-range',
               title: $t('sicherplan.portal.customerSchedules'),
             },
@@ -386,6 +417,7 @@ const routes: RouteRecordRaw[] = [
             component: () => import('@/views/customer-portal/CustomerPortalWatchbooksView.vue'),
             meta: {
               authority: ['customer_user'],
+              ...cachedWorkspaceMeta(),
               icon: 'lucide:notebook-pen',
               title: $t('sicherplan.portal.customerWatchbooks'),
             },
@@ -397,6 +429,7 @@ const routes: RouteRecordRaw[] = [
             props: { domain: 'timesheets' },
             meta: {
               authority: ['customer_user'],
+              ...cachedWorkspaceMeta(),
               icon: 'lucide:file-clock',
               title: $t('sicherplan.portal.customerTimesheets'),
             },
@@ -408,6 +441,7 @@ const routes: RouteRecordRaw[] = [
             props: { domain: 'invoices' },
             meta: {
               authority: ['customer_user'],
+              ...cachedWorkspaceMeta(),
               icon: 'lucide:file-text',
               title: $t('sicherplan.portal.customerInvoices'),
             },
@@ -419,6 +453,7 @@ const routes: RouteRecordRaw[] = [
             props: { domain: 'reports' },
             meta: {
               authority: ['customer_user'],
+              ...cachedWorkspaceMeta(),
               icon: 'lucide:bar-chart-3',
               title: $t('sicherplan.portal.customerReports'),
             },
@@ -429,6 +464,7 @@ const routes: RouteRecordRaw[] = [
             component: () => import('@/views/customer-portal/CustomerPortalHistoryView.vue'),
             meta: {
               authority: ['customer_user'],
+              ...cachedWorkspaceMeta(),
               icon: 'lucide:history',
               title: $t('sicherplan.portal.customerHistory'),
             },
@@ -441,6 +477,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/SubcontractorPortalAccessView.vue'),
         meta: {
           authority: ['subcontractor_user'],
+          ...cachedWorkspaceMeta(),
           icon: 'lucide:briefcase-business',
           title: $t('sicherplan.portal.subcontractor'),
         },

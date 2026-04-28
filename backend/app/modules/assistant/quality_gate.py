@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.modules.assistant.classifier import is_product_overview_question
+from app.modules.assistant.retrieval_planner import FIELD_HELP_INTENT_CATEGORIES
 from app.modules.assistant.schemas import (
     AssistantConfidence,
     AssistantRagQualityGateRead,
@@ -31,7 +32,7 @@ def evaluate_rag_answer_quality(
     if rag_trace is None or not rag_trace.grounding_attached:
         failures.append("GROUNDING_NOT_ATTACHED")
 
-    if intent_category in {"workflow_how_to", "ui_action_question"} and (
+    if intent_category in {"workflow_how_to", "ui_action_question"} | FIELD_HELP_INTENT_CATEGORIES and (
         rag_trace is None or rag_trace.content_bearing_source_count <= 0
     ):
         failures.append("NO_CONTENT_BEARING_SOURCES")

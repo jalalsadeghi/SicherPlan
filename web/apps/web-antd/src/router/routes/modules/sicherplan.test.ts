@@ -4,6 +4,24 @@ import { describe, expect, it } from 'vitest';
 
 import sicherplanRoutes from './sicherplan';
 
+function findRouteByName(
+  name: string,
+  routes = sicherplanRoutes,
+): (typeof sicherplanRoutes)[number] | undefined {
+  for (const route of routes) {
+    if (route.name === name) {
+      return route;
+    }
+    if (route.children?.length) {
+      const match = findRouteByName(name, route.children as typeof sicherplanRoutes);
+      if (match) {
+        return match;
+      }
+    }
+  }
+  return undefined;
+}
+
 describe('sicherplan route authority', () => {
   it('keeps customers hidden from platform admin and available to supported tenant-scoped roles as a direct route', () => {
     const customersRoute = sicherplanRoutes.find(
@@ -146,5 +164,93 @@ describe('sicherplan route authority', () => {
     expect(customersSection).toBeUndefined();
     expect(customersRoute?.meta?.menuContainer).not.toBe(true);
     expect(customersRoute?.meta?.icon).toBe('lucide:users');
+  });
+
+  it('marks tabbed SicherPlan workspace routes as keepAlive and domCached', () => {
+    const cachedRouteNames = [
+      'SicherPlanDashboard',
+      'SicherPlanCoreAdmin',
+      'SicherPlanPlatformServices',
+      'SicherPlanTenantUsers',
+      'SicherPlanHealthDiagnostics',
+      'SicherPlanCustomers',
+      'SicherPlanCustomerOrderWorkspace',
+      'SicherPlanRecruiting',
+      'SicherPlanEmployees',
+      'SicherPlanWorkforceCatalogs',
+      'SicherPlanSubcontractors',
+      'SicherPlanPlanning',
+      'SicherPlanPlanningOrders',
+      'SicherPlanPlanningShifts',
+      'SicherPlanPlanningStaffing',
+      'SicherPlanFinanceActuals',
+      'SicherPlanFinancePayroll',
+      'SicherPlanFinanceBilling',
+      'SicherPlanFinanceSubcontractorChecks',
+      'SicherPlanReporting',
+      'SicherPlanCustomerPortalOverview',
+      'SicherPlanCustomerPortalOrders',
+      'SicherPlanCustomerPortalSchedules',
+      'SicherPlanCustomerPortalWatchbooks',
+      'SicherPlanCustomerPortalTimesheets',
+      'SicherPlanCustomerPortalInvoices',
+      'SicherPlanCustomerPortalReports',
+      'SicherPlanCustomerPortalHistory',
+      'SicherPlanSubcontractorPortal',
+      'SicherPlanApplicantForm',
+    ] as const;
+
+    for (const routeName of cachedRouteNames) {
+      const route = findRouteByName(routeName);
+      expect(route?.meta?.keepAlive, routeName).toBe(true);
+      expect(route?.meta?.domCached, routeName).toBe(true);
+    }
+  });
+
+  it('does not dom-cache pure menu container routes', () => {
+    const containerRouteNames = [
+      'SicherPlanAdministrationSection',
+      'SicherPlanWorkforceSection',
+      'SicherPlanOperationsSection',
+      'SicherPlanFinanceSection',
+      'SicherPlanReportingSection',
+      'SicherPlanPublic',
+      'SicherPlanPortal',
+      'SicherPlanCustomerPortalSection',
+    ] as const;
+
+    for (const routeName of containerRouteNames) {
+      const route = findRouteByName(routeName);
+      expect(route?.meta?.menuContainer, routeName).toBe(true);
+      expect(route?.meta?.domCached, routeName).not.toBe(true);
+    }
+  });
+
+  it('dom-caches AdminModuleView-powered routes because shared route names do not make KeepAlive reliable on their own', () => {
+    const adminModuleRouteNames = [
+      'SicherPlanCoreAdmin',
+      'SicherPlanPlatformServices',
+      'SicherPlanCustomers',
+      'SicherPlanRecruiting',
+      'SicherPlanEmployees',
+      'SicherPlanWorkforceCatalogs',
+      'SicherPlanSubcontractors',
+      'SicherPlanPlanning',
+      'SicherPlanPlanningOrders',
+      'SicherPlanPlanningShifts',
+      'SicherPlanPlanningStaffing',
+      'SicherPlanFinanceActuals',
+      'SicherPlanFinancePayroll',
+      'SicherPlanFinanceBilling',
+      'SicherPlanFinanceSubcontractorChecks',
+      'SicherPlanReporting',
+    ] as const;
+
+    for (const routeName of adminModuleRouteNames) {
+      const route = findRouteByName(routeName);
+      expect(route?.component, routeName).toBeDefined();
+      expect(route?.meta?.keepAlive, routeName).toBe(true);
+      expect(route?.meta?.domCached, routeName).toBe(true);
+    }
   });
 });

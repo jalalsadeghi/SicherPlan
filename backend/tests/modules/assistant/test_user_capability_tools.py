@@ -217,9 +217,12 @@ def test_service_lists_only_currently_allowed_default_tools() -> None:
     tools = _service(repository).list_available_tools(actor=_context("assistant.chat.access"))
 
     assert [tool["function"]["name"] for tool in tools] == [
+        "assistant.explain_lookup_or_option",
         "assistant.get_current_page_context",
         "assistant.get_current_user_capabilities",
         "assistant.search_accessible_pages",
+        "assistant.search_field_dictionary",
+        "assistant.search_lookup_dictionary",
         "assistant.search_workflow_help",
         "navigation.build_allowed_link",
     ]

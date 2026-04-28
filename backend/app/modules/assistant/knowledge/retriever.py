@@ -343,6 +343,11 @@ def _score_candidate(
     if permission_keys and set(permission_keys).intersection(candidate.permission_keys):
         score += 1.5
 
+    score += _workflow_specific_source_adjustments(
+        candidate=candidate,
+        normalized_query=normalized_query,
+        workflow_intent=workflow_intent,
+    )
     score += _intent_page_demotions(
         candidate=candidate,
         normalized_query=normalized_query,
@@ -392,6 +397,12 @@ def _dedupe_list(values: list[str]) -> list[str]:
 
 def _source_type_boost(source_type: str) -> float:
     boosts = {
+        "field_dictionary": 9.5,
+        "lookup_dictionary": 9.0,
+        "status_dictionary": 8.5,
+        "form_field_catalog": 8.5,
+        "api_schema_field": 7.0,
+        "frontend_i18n_label": 6.5,
         "expert_knowledge_pack": 9.5,
         "ui_action_catalog": 9.0,
         "page_help_manifest": 9.0,
@@ -431,4 +442,60 @@ def _intent_page_demotions(
         ):
             if "E-01" not in page_ids and "employees" not in module_keys:
                 return -12.0
+    if candidate.page_id == "P-02" and workflow_intent == "customer_scoped_order_create":
+        canonical_terms = (
+            "manage all orders",
+            "all orders",
+            "orders & planning records",
+            "orders and planning records",
+            "alle aufträge",
+            "wie verwalte ich alle aufträge",
+        )
+        if not any(term in normalized_query for term in canonical_terms):
+            return -10.0
     return 0.0
+
+
+def _workflow_specific_source_adjustments(
+    *,
+    candidate: KnowledgeChunkCandidate,
+    normalized_query: str,
+    workflow_intent: str | None,
+) -> float:
+    if workflow_intent != "customer_scoped_order_create":
+        return 0.0
+
+    boost = 0.0
+    source_haystack = " ".join(
+        item.casefold()
+        for item in (
+            candidate.source_name,
+            candidate.source_path or "",
+            candidate.title or "",
+        )
+        if item
+    )
+    preferred_markers = (
+        "customerorderstab.vue",
+        "customerorderstab",
+        "new-plan.vue",
+        "new-plan-step-content.vue",
+        "new-plan-wizard.steps.ts",
+        "planningorders.ts",
+        "planningshifts.ts",
+        "spr-cust-newplan-v1",
+        "customer orders tab",
+        "customer order workspace",
+    )
+    if candidate.page_id in {"C-01", "C-02", "P-04"}:
+        boost += 9.0
+    if any(marker in source_haystack for marker in preferred_markers):
+        boost += 16.0
+    if candidate.source_type in {"workflow_help", "page_help_manifest", "expert_knowledge_pack"}:
+        boost += 4.0
+    if candidate.page_id == "P-02" and not any(
+        term in normalized_query
+        for term in ("manage all orders", "all orders", "orders & planning records", "alle aufträge")
+    ):
+        boost -= 8.0
+    return boost

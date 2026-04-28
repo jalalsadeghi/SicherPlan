@@ -1,0 +1,410 @@
+[
+  {
+    "id": "en_customer_order_from_customer_page",
+    "language": "en",
+    "question": "How can I create a new order from the customer page?",
+    "route_context": {
+      "path": "/admin/customers",
+      "route_name": "SicherPlanCustomers",
+      "page_id": "C-01",
+      "query": {
+        "customer_id": "customer-1",
+        "tab": "orders"
+      }
+    },
+    "expected_intent": "customer_scoped_order_create",
+    "expected_pages": ["C-01", "C-02", "P-04"],
+    "required_concepts": [
+      "selected customer",
+      "Orders tab",
+      "New order",
+      "Order workspace",
+      "Order details",
+      "Order scope & documents",
+      "Planning record",
+      "Planning documents",
+      "Shift plan",
+      "Series & exceptions",
+      "Generate Series & Continue",
+      "Staffing Coverage"
+    ],
+    "forbidden_patterns": [
+      "only use Operations & Planning",
+      "standalone Contract module"
+    ],
+    "expected_links": [
+      "Customer Orders tab",
+      "Order workspace"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 3
+  },
+  {
+    "id": "de_customer_order_from_customer_page",
+    "language": "de",
+    "question": "Wie erstelle ich einen Auftrag direkt beim Kunden?",
+    "route_context": {
+      "path": "/admin/customers",
+      "route_name": "SicherPlanCustomers",
+      "page_id": "C-01",
+      "query": {
+        "customer_id": "customer-1",
+        "tab": "orders"
+      }
+    },
+    "expected_intent": "customer_scoped_order_create",
+    "expected_pages": ["C-01", "C-02", "P-04"],
+    "required_concepts": [
+      "ausgewählten kunden",
+      "orders-tab",
+      "New order",
+      "Order Workspace",
+      "Auftragsdetails",
+      "Auftragsumfang und Dokumente",
+      "Planungsdatensatz",
+      "Planungsdokumente",
+      "Schichtplan",
+      "Serien und Ausnahmen",
+      "Generate Series & Continue",
+      "Staffing Coverage"
+    ],
+    "forbidden_patterns": [
+      "nur operations & planning",
+      "eigenständiges vertragsmodul"
+    ],
+    "expected_links": [
+      "Orders-Tab des Kunden",
+      "Order Workspace"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 3
+  },
+  {
+    "id": "fa_customer_order_from_customer_page",
+    "language": "fa",
+    "question": "چطور از صفحه مشتری Order ثبت کنم؟",
+    "route_context": {
+      "path": "/admin/customers",
+      "route_name": "SicherPlanCustomers",
+      "page_id": "C-01",
+      "query": {
+        "customer_id": "customer-1",
+        "tab": "orders"
+      }
+    },
+    "expected_intent": "customer_scoped_order_create",
+    "expected_pages": ["C-01", "C-02", "P-04"],
+    "required_concepts": [
+      "مشتری انتخاب‌شده",
+      "تب Orders",
+      "New order",
+      "Order workspace",
+      "Order details",
+      "Order scope & documents",
+      "Planning record",
+      "Planning documents",
+      "Shift plan",
+      "Series & exceptions",
+      "Generate Series & Continue",
+      "Staffing Coverage"
+    ],
+    "forbidden_patterns": [
+      "فقط operations & planning",
+      "ماژول مستقل Contract"
+    ],
+    "expected_links": [
+      "تب Orders مشتری",
+      "Order workspace"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 3
+  },
+  {
+    "id": "en_customer_contract_from_orders_tab",
+    "language": "en",
+    "question": "How do I register a customer contract from the customer Orders tab?",
+    "route_context": {
+      "path": "/admin/customers",
+      "route_name": "SicherPlanCustomers",
+      "page_id": "C-01",
+      "query": {
+        "customer_id": "customer-1",
+        "tab": "orders"
+      }
+    },
+    "expected_intent": "customer_scoped_order_create",
+    "expected_pages": ["C-01", "C-02"],
+    "required_concepts": [
+      "selected customer",
+      "Orders tab",
+      "Order workspace",
+      "Order documents",
+      "Planning documents",
+      "standalone contract module",
+      "Generate Series & Continue"
+    ],
+    "forbidden_patterns": [
+      "only use Operations & Planning"
+    ],
+    "expected_links": [
+      "Customer Orders tab",
+      "Order workspace"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 3
+  },
+  {
+    "id": "de_customer_contract_from_orders_tab",
+    "language": "de",
+    "question": "Wie registriere ich einen Kundenvertrag im Kundenbereich?",
+    "route_context": {
+      "path": "/admin/customers",
+      "route_name": "SicherPlanCustomers",
+      "page_id": "C-01",
+      "query": {
+        "customer_id": "customer-1",
+        "tab": "orders"
+      }
+    },
+    "expected_intent": "customer_scoped_order_create",
+    "expected_pages": ["C-01", "C-02"],
+    "required_concepts": [
+      "ausgewählten kunden",
+      "orders-tab",
+      "Order Workspace",
+      "Auftragsdokumente",
+      "Planungsdokumente",
+      "eigenständiges vertragsmodul",
+      "Generate Series & Continue"
+    ],
+    "forbidden_patterns": [
+      "nur operations & planning"
+    ],
+    "expected_links": [
+      "Orders-Tab des Kunden",
+      "Order Workspace"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 3
+  },
+  {
+    "id": "fa_customer_contract_from_orders_tab",
+    "language": "fa",
+    "question": "چطور قرارداد مشتری را از تب Orders ثبت کنم؟",
+    "route_context": {
+      "path": "/admin/customers",
+      "route_name": "SicherPlanCustomers",
+      "page_id": "C-01",
+      "query": {
+        "customer_id": "customer-1",
+        "tab": "orders"
+      }
+    },
+    "expected_intent": "customer_scoped_order_create",
+    "expected_pages": ["C-01", "C-02"],
+    "required_concepts": [
+      "مشتری انتخاب‌شده",
+      "تب Orders",
+      "Order workspace",
+      "Order documents",
+      "Planning documents",
+      "ماژول مستقل Contract",
+      "Generate Series & Continue"
+    ],
+    "forbidden_patterns": [
+      "فقط operations & planning"
+    ],
+    "expected_links": [
+      "تب Orders مشتری",
+      "Order workspace"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 3
+  },
+  {
+    "id": "en_customer_contract_document_attachment",
+    "language": "en",
+    "question": "How do I attach a contract document to a customer order?",
+    "route_context": {
+      "path": "/admin/customers/order-workspace",
+      "route_name": "SicherPlanCustomerOrderWorkspace",
+      "page_id": "C-02",
+      "query": {
+        "customer_id": "customer-1",
+        "order_id": "order-1"
+      }
+    },
+    "expected_intent": "customer_scoped_order_create",
+    "expected_pages": ["C-02"],
+    "required_concepts": [
+      "Order workspace",
+      "Order documents",
+      "Planning documents",
+      "Order scope & documents"
+    ],
+    "forbidden_patterns": [
+      "standalone Contract module"
+    ],
+    "expected_links": [
+      "Order workspace"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 3
+  },
+  {
+    "id": "de_customer_contract_document_attachment",
+    "language": "de",
+    "question": "Wie füge ich ein Vertragsdokument zu einem Kundenauftrag hinzu?",
+    "route_context": {
+      "path": "/admin/customers/order-workspace",
+      "route_name": "SicherPlanCustomerOrderWorkspace",
+      "page_id": "C-02",
+      "query": {
+        "customer_id": "customer-1",
+        "order_id": "order-1"
+      }
+    },
+    "expected_intent": "customer_scoped_order_create",
+    "expected_pages": ["C-02"],
+    "required_concepts": [
+      "Order Workspace",
+      "Auftragsdokumente",
+      "Planungsdokumente",
+      "Auftragsumfang und Dokumente"
+    ],
+    "forbidden_patterns": [
+      "eigenständiges vertragsmodul"
+    ],
+    "expected_links": [
+      "Order Workspace"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 3
+  },
+  {
+    "id": "fa_customer_contract_document_attachment",
+    "language": "fa",
+    "question": "چطور فایل قرارداد را به Order مشتری وصل کنم؟",
+    "route_context": {
+      "path": "/admin/customers/order-workspace",
+      "route_name": "SicherPlanCustomerOrderWorkspace",
+      "page_id": "C-02",
+      "query": {
+        "customer_id": "customer-1",
+        "order_id": "order-1"
+      }
+    },
+    "expected_intent": "customer_scoped_order_create",
+    "expected_pages": ["C-02"],
+    "required_concepts": [
+      "Order workspace",
+      "Order documents",
+      "Planning documents",
+      "Order scope & documents"
+    ],
+    "forbidden_patterns": [
+      "فقط operations & planning"
+    ],
+    "expected_links": [
+      "Order workspace"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 3
+  },
+  {
+    "id": "en_generate_series_continue",
+    "language": "en",
+    "question": "What happens after Generate Series & Continue?",
+    "route_context": {
+      "path": "/admin/customers/order-workspace",
+      "route_name": "SicherPlanCustomerOrderWorkspace",
+      "page_id": "C-02",
+      "query": {
+        "customer_id": "customer-1",
+        "shift_plan_id": "shift-plan-1"
+      }
+    },
+    "expected_intent": "customer_scoped_order_create",
+    "expected_pages": ["C-02", "P-04"],
+    "required_concepts": [
+      "Order workspace",
+      "Series & exceptions",
+      "Generate Series & Continue",
+      "concrete shifts",
+      "Staffing Coverage"
+    ],
+    "forbidden_patterns": [
+      "only use Operations & Planning"
+    ],
+    "expected_links": [
+      "Order workspace",
+      "Staffing Coverage"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 3
+  },
+  {
+    "id": "de_generate_series_continue",
+    "language": "de",
+    "question": "Was passiert nach „Generate Series & Continue“?",
+    "route_context": {
+      "path": "/admin/customers/order-workspace",
+      "route_name": "SicherPlanCustomerOrderWorkspace",
+      "page_id": "C-02",
+      "query": {
+        "customer_id": "customer-1",
+        "shift_plan_id": "shift-plan-1"
+      }
+    },
+    "expected_intent": "customer_scoped_order_create",
+    "expected_pages": ["C-02", "P-04"],
+    "required_concepts": [
+      "Order Workspace",
+      "Serien und Ausnahmen",
+      "Generate Series & Continue",
+      "konkrete schichten",
+      "Staffing Coverage"
+    ],
+    "forbidden_patterns": [
+      "nur operations & planning"
+    ],
+    "expected_links": [
+      "Order Workspace",
+      "Staffing Coverage"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 3
+  },
+  {
+    "id": "fa_generate_series_continue",
+    "language": "fa",
+    "question": "بعد از Generate Series & Continue چه اتفاقی می‌افتد؟",
+    "route_context": {
+      "path": "/admin/customers/order-workspace",
+      "route_name": "SicherPlanCustomerOrderWorkspace",
+      "page_id": "C-02",
+      "query": {
+        "customer_id": "customer-1",
+        "shift_plan_id": "shift-plan-1"
+      }
+    },
+    "expected_intent": "customer_scoped_order_create",
+    "expected_pages": ["C-02", "P-04"],
+    "required_concepts": [
+      "Order workspace",
+      "Series & exceptions",
+      "Generate Series & Continue",
+      "شیفت‌های واقعی",
+      "Staffing Coverage"
+    ],
+    "forbidden_patterns": [
+      "فقط operations & planning"
+    ],
+    "expected_links": [
+      "Order workspace",
+      "Staffing Coverage"
+    ],
+    "requires_source_basis": true,
+    "min_content_bearing_sources": 3
+  }
+]

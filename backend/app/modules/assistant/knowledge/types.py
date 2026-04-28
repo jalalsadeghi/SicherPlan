@@ -28,6 +28,12 @@ SUPPORTED_SOURCE_TYPES = {
     "operational_handbook",
     "user_manual",
     "implementation_data_model",
+    "field_dictionary",
+    "lookup_dictionary",
+    "status_dictionary",
+    "form_field_catalog",
+    "api_schema_field",
+    "frontend_i18n_label",
 }
 
 DEFERRED_SOURCE_TYPES = {"pdf", "xlsx"}

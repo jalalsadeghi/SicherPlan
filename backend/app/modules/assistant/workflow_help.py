@@ -35,6 +35,12 @@ class AssistantWorkflowStepSeed:
     module_key: str | None
     purpose_en: str
     purpose_de: str
+    title_en: str = ""
+    title_de: str = ""
+    required_context: tuple[str, ...] = ()
+    creates_or_updates: tuple[str, ...] = ()
+    important_fields: tuple[str, ...] = ()
+    api_functions: tuple[str, ...] = ()
     required_permissions: tuple[str, ...] = ()
     source_basis: tuple[AssistantWorkflowSourceBasisSeed, ...] = ()
 
@@ -51,6 +57,9 @@ class AssistantWorkflowSeed:
     steps: tuple[AssistantWorkflowStepSeed, ...]
     linked_page_ids: tuple[str, ...]
     api_families: tuple[str, ...]
+    route_path: str | None = None
+    route_aliases: tuple[str, ...] = ()
+    entry_points: tuple[str, ...] = ()
     ambiguity_notes: tuple[str, ...] = ()
     legacy_keys: tuple[str, ...] = ()
 
@@ -68,6 +77,8 @@ def detect_workflow_intent(message: str) -> AssistantWorkflowIntent | None:
         return AssistantWorkflowIntent(intent="customer_plan_create")
     if _is_planning_record_create(lowered):
         return AssistantWorkflowIntent(intent="planning_record_create")
+    if _is_customer_scoped_order_create(lowered):
+        return AssistantWorkflowIntent(intent="customer_scoped_order_create")
     if _is_customer_order_create(lowered):
         return AssistantWorkflowIntent(intent="customer_order_create")
     if _is_customer_create(lowered):
@@ -93,8 +104,10 @@ def resolve_workflow_key(value: str | None) -> str | None:
     cleaned = str(value or "").strip()
     if not cleaned:
         return None
-    if cleaned in WORKFLOW_HELP_SEEDS:
-        return WORKFLOW_HELP_SEEDS[cleaned].workflow_key
+    lowered = cleaned.casefold()
+    for key, seed in WORKFLOW_HELP_SEEDS.items():
+        if key.casefold() == lowered:
+            return seed.workflow_key
     return None
 
 
@@ -168,20 +181,32 @@ def _step(
     *,
     step_key: str,
     sequence: int,
+    title_en: str = "",
+    title_de: str = "",
     page_id: str | None,
     module_key: str | None,
     purpose_en: str,
     purpose_de: str,
+    required_context: tuple[str, ...] = (),
+    creates_or_updates: tuple[str, ...] = (),
+    important_fields: tuple[str, ...] = (),
+    api_functions: tuple[str, ...] = (),
     required_permissions: tuple[str, ...] = (),
     source_basis: tuple[AssistantWorkflowSourceBasisSeed, ...] = (),
 ) -> AssistantWorkflowStepSeed:
     return AssistantWorkflowStepSeed(
         step_key=step_key,
         sequence=sequence,
+        title_en=title_en,
+        title_de=title_de,
         page_id=page_id,
         module_key=module_key,
         purpose_en=purpose_en,
         purpose_de=purpose_de,
+        required_context=required_context,
+        creates_or_updates=creates_or_updates,
+        important_fields=important_fields,
+        api_functions=api_functions,
         required_permissions=required_permissions,
         source_basis=source_basis,
     )
@@ -366,6 +391,336 @@ CONTRACT_OR_DOCUMENT_REGISTER = AssistantWorkflowSeed(
                     page_id="S-01",
                     module_key="subcontractors",
                     evidence="S-01 is the verified subcontractors workspace for tenant-scoped partner records.",
+                ),
+            ),
+        ),
+    ),
+)
+
+CUSTOMER_SCOPED_ORDER_CREATE = AssistantWorkflowSeed(
+    workflow_key="customer_scoped_order_create",
+    title_en="Create a customer-scoped order from the Customers workspace",
+    title_de="Kundenbezogenen Auftrag im Kundenbereich anlegen",
+    summary_en="The customer-scoped Orders tab opens a guided Order Workspace that creates or continues a customer order and its downstream planning setup before Staffing Coverage handoff.",
+    summary_de="Der kundenbezogene Orders-Tab öffnet einen geführten Order Workspace, in dem ein Kundenauftrag und die nachgelagerte Einsatzplanung bis zur Übergabe an Staffing Coverage erstellt oder fortgeführt werden.",
+    intent_aliases_en=(
+        "create order from customer page",
+        "create order from customer",
+        "customer orders tab",
+        "customer order workspace",
+        "order workspace",
+        "create order in customer workspace",
+        "create order from customers workspace",
+        "customer contract from customer page",
+    ),
+    intent_aliases_de=(
+        "auftrag direkt beim kunden",
+        "auftrag im kundenbereich",
+        "orders tab beim kunden",
+        "orders-tab beim kunden",
+        "kundenauftrag im kundenbereich",
+        "kundenvertrag im kundenbereich",
+        "vertrag im kundenbereich registrieren",
+        "auftragsbereich beim kunden",
+    ),
+    route_path="/admin/customers/order-workspace",
+    route_aliases=("/admin/customers/new-plan",),
+    entry_points=(
+        "Customers workspace",
+        "Selected customer detail",
+        "Orders tab",
+        "New order",
+        "Edit existing order",
+    ),
+    legacy_keys=(
+        "customer_order_from_customer_page",
+        "customer_contract_register_from_customer",
+        "customer_order_workspace_flow",
+        "customer_order_edit",
+        "customer_order_documents",
+        "planning_record_from_customer_order",
+        "shift_plan_from_customer_order",
+        "series_generation_from_customer_order",
+        "staffing_handoff_from_customer_order",
+    ),
+    linked_page_ids=("C-01", "C-02", "P-04"),
+    api_families=("customers", "planningOrders", "planningShifts", "platformDocuments"),
+    steps=(
+        _step(
+            step_key="order-details",
+            sequence=1,
+            title_en="Order details",
+            title_de="Auftragsdetails",
+            page_id="C-02",
+            module_key="customers",
+            purpose_en="Use the selected customer context, continue an existing order or create a new order, and persist the order record before later planning steps continue.",
+            purpose_de="Den ausgewählten Kundenkontext verwenden, einen bestehenden Auftrag fortführen oder einen neuen Auftrag anlegen und den Auftragsdatensatz speichern, bevor spätere Planungsschritte fortgesetzt werden.",
+            required_context=("customer_id",),
+            creates_or_updates=("CustomerOrder",),
+            important_fields=(
+                "order_no",
+                "title",
+                "service_category_code",
+                "requirement_type_id",
+                "patrol_route_id",
+                "service_from",
+                "service_to",
+                "security_concept_text",
+                "notes",
+                "release_state",
+            ),
+            api_functions=("listCustomerOrders", "getCustomerOrder", "createCustomerOrder", "updateCustomerOrder"),
+            required_permissions=("planning.order.read", "planning.order.write"),
+            source_basis=(
+                _basis(
+                    source_type="frontend_component",
+                    source_name="CustomerAdminView.vue",
+                    page_id="C-01",
+                    module_key="customers",
+                    evidence="The customer detail Orders tab starts the order workspace with customer_id from the selected customer context.",
+                ),
+                _basis(
+                    source_type="frontend_component",
+                    source_name="new-plan-step-content.vue",
+                    page_id="C-02",
+                    module_key="customers",
+                    evidence="The order-details step loads and saves order_no, title, service category, requirement type, patrol route, service window, security concept, notes, and release_state.",
+                ),
+                _basis(
+                    source_type="frontend_api",
+                    source_name="planningOrders.ts",
+                    page_id="C-02",
+                    module_key="planning",
+                    evidence="The order-details step imports listCustomerOrders, getCustomerOrder, createCustomerOrder, and updateCustomerOrder from the planningOrders API family.",
+                ),
+            ),
+        ),
+        _step(
+            step_key="order-scope-documents",
+            sequence=2,
+            title_en="Order scope & documents",
+            title_de="Auftragsumfang und Dokumente",
+            page_id="C-02",
+            module_key="customers",
+            purpose_en="Maintain order equipment lines, requirement lines, and order documents that belong to the customer order before the planning record is prepared.",
+            purpose_de="Equipment-Zeilen, Anforderungszeilen und Auftragsdokumente pflegen, die zum Kundenauftrag gehören, bevor der Planungsdatensatz vorbereitet wird.",
+            required_context=("customer_id", "order_id"),
+            creates_or_updates=("OrderEquipmentLine", "OrderRequirementLine", "OrderAttachmentLink"),
+            important_fields=(
+                "equipment_item_id",
+                "required_qty",
+                "requirement_type_id",
+                "function_type_id",
+                "qualification_type_id",
+                "min_qty",
+                "target_qty",
+                "notes",
+                "document_id",
+            ),
+            api_functions=(
+                "listOrderEquipmentLines",
+                "createOrderEquipmentLine",
+                "updateOrderEquipmentLine",
+                "deleteOrderEquipmentLine",
+                "listOrderRequirementLines",
+                "createOrderRequirementLine",
+                "updateOrderRequirementLine",
+                "deleteOrderRequirementLine",
+                "listOrderAttachments",
+                "createOrderAttachment",
+                "linkOrderAttachment",
+                "unlinkOrderAttachment",
+                "listDocuments",
+            ),
+            required_permissions=("planning.order.read", "planning.order.write"),
+            source_basis=(
+                _basis(
+                    source_type="frontend_component",
+                    source_name="new-plan-step-content.vue",
+                    page_id="C-02",
+                    module_key="customers",
+                    evidence="The order-scope-documents step contains equipment, requirements, and order-document sections, including duplicate guards and document picker flows.",
+                ),
+                _basis(
+                    source_type="frontend_api",
+                    source_name="planningOrders.ts",
+                    page_id="C-02",
+                    module_key="planning",
+                    evidence="The planningOrders API family exposes equipment-line, requirement-line, order-attachment, and document search endpoints used by this step.",
+                ),
+            ),
+        ),
+        _step(
+            step_key="planning-record-overview",
+            sequence=3,
+            title_en="Planning record overview",
+            title_de="Planungsdatensatz Übersicht",
+            page_id="C-02",
+            module_key="customers",
+            purpose_en="Create or update the planning record linked to the saved order and persist the planning_record_id before shift-plan work begins.",
+            purpose_de="Den mit dem gespeicherten Auftrag verknüpften Planungsdatensatz anlegen oder aktualisieren und die planning_record_id speichern, bevor die Schichtplanung beginnt.",
+            required_context=("customer_id", "order_id"),
+            creates_or_updates=("PlanningRecord",),
+            important_fields=(
+                "name",
+                "planning_mode_code",
+                "planning_from",
+                "planning_to",
+                "dispatcher_user_id",
+                "notes",
+                "status",
+                "site_detail_site_id",
+                "site_detail_watchbook_scope_note",
+                "event_detail_event_venue_id",
+                "event_detail_setup_note",
+                "trade_fair_detail_trade_fair_id",
+                "trade_fair_detail_trade_fair_zone_id",
+                "patrol_detail_patrol_route_id",
+                "patrol_detail_execution_note",
+            ),
+            api_functions=("listPlanningRecords", "getPlanningRecord", "createPlanningRecord", "updatePlanningRecord"),
+            required_permissions=("planning.record.read", "planning.record.write"),
+            source_basis=(
+                _basis(
+                    source_type="frontend_component",
+                    source_name="new-plan-step-content.vue",
+                    page_id="C-02",
+                    module_key="customers",
+                    evidence="The planning-record-overview step edits planning mode, planning window, dispatcher, notes, status, and planning-mode-specific detail fields while persisting planning_record_id.",
+                ),
+                _basis(
+                    source_type="frontend_api",
+                    source_name="planningOrders.ts",
+                    page_id="C-02",
+                    module_key="planning",
+                    evidence="The order workspace imports getPlanningRecord, listPlanningRecords, createPlanningRecord, and updatePlanningRecord for the planning-record step.",
+                ),
+            ),
+        ),
+        _step(
+            step_key="planning-record-documents",
+            sequence=4,
+            title_en="Planning record documents",
+            title_de="Planungsdokumente",
+            page_id="C-02",
+            module_key="customers",
+            purpose_en="Attach or link documents that belong to the planning record, separate from the customer order document package.",
+            purpose_de="Dokumente anhängen oder verknüpfen, die zum Planungsdatensatz gehören, getrennt vom Dokumentpaket des Kundenauftrags.",
+            required_context=("customer_id", "planning_record_id"),
+            creates_or_updates=("PlanningRecordAttachmentLink",),
+            important_fields=("document_id", "title", "document_type_id"),
+            api_functions=("listPlanningRecordAttachments", "createPlanningRecordAttachment", "linkPlanningRecordAttachment", "unlinkPlanningRecordAttachment", "listDocuments"),
+            required_permissions=("planning.record.read", "planning.record.write"),
+            source_basis=(
+                _basis(
+                    source_type="frontend_component",
+                    source_name="new-plan-step-content.vue",
+                    page_id="C-02",
+                    module_key="customers",
+                    evidence="The planning-record-documents step has its own upload and link flows and is separate from order documents in the wizard layout.",
+                ),
+                _basis(
+                    source_type="frontend_api",
+                    source_name="planningOrders.ts",
+                    page_id="C-02",
+                    module_key="planning",
+                    evidence="The planningOrders API family exposes planning-record attachment create, link, list, and unlink endpoints used by this step.",
+                ),
+            ),
+        ),
+        _step(
+            step_key="shift-plan",
+            sequence=5,
+            title_en="Shift plan",
+            title_de="Schichtplan",
+            page_id="C-02",
+            module_key="customers",
+            purpose_en="Create or update the shift plan linked to planning_record_id and prepare the workforce scope before the recurring series is saved.",
+            purpose_de="Den mit planning_record_id verknüpften Schichtplan anlegen oder aktualisieren und den Workforce Scope vorbereiten, bevor die Serienkonfiguration gespeichert wird.",
+            required_context=("customer_id", "planning_record_id"),
+            creates_or_updates=("ShiftPlan",),
+            important_fields=("name", "planning_from", "planning_to", "workforce_scope_code", "remarks"),
+            api_functions=("listShiftPlans", "createShiftPlan", "getShiftPlan", "updateShiftPlan"),
+            required_permissions=("planning.shift.read", "planning.shift.write"),
+            source_basis=(
+                _basis(
+                    source_type="frontend_component",
+                    source_name="new-plan-step-content.vue",
+                    page_id="C-02",
+                    module_key="customers",
+                    evidence="The shift-plan step selects or creates a shift plan and persists the shift_plan_id under the wizard state.",
+                ),
+                _basis(
+                    source_type="frontend_api",
+                    source_name="planningShifts.ts",
+                    page_id="C-02",
+                    module_key="planning",
+                    evidence="The planningShifts API family exposes listShiftPlans, createShiftPlan, getShiftPlan, and updateShiftPlan for this step.",
+                ),
+            ),
+        ),
+        _step(
+            step_key="series-exceptions",
+            sequence=6,
+            title_en="Series & exceptions",
+            title_de="Serien und Ausnahmen",
+            page_id="C-02",
+            module_key="customers",
+            purpose_en="Create or update the shift series, manage exceptions, and finish with Generate Series & Continue so the user lands in Staffing Coverage instead of staying inside the wizard.",
+            purpose_de="Die Schichtserie anlegen oder aktualisieren, Ausnahmen pflegen und mit Generate Series & Continue abschließen, damit der Nutzer in Staffing Coverage landet statt im Wizard zu bleiben.",
+            required_context=("customer_id", "shift_plan_id"),
+            creates_or_updates=("ShiftSeries", "ShiftSeriesException"),
+            important_fields=(
+                "shift_template_id",
+                "recurrence_code",
+                "interval_count",
+                "weekday_mask",
+                "timezone",
+                "date_from",
+                "date_to",
+                "local_start_time",
+                "local_end_time",
+                "default_break_minutes",
+                "shift_type_code",
+                "meeting_point",
+                "location_text",
+                "customer_visible_flag",
+                "subcontractor_visible_flag",
+                "stealth_mode_flag",
+                "from_date",
+                "to_date",
+                "regenerate_existing",
+            ),
+            api_functions=(
+                "listShiftTemplates",
+                "createShiftTemplate",
+                "getShiftTemplate",
+                "listShiftTypeOptions",
+                "listShiftSeries",
+                "createShiftSeries",
+                "getShiftSeries",
+                "updateShiftSeries",
+                "createShiftSeriesException",
+                "listShiftSeriesExceptions",
+                "updateShiftSeriesException",
+                "deleteShiftSeriesException",
+                "generateShiftSeries",
+            ),
+            required_permissions=("planning.shift.read", "planning.shift.write", "planning.staffing.read"),
+            source_basis=(
+                _basis(
+                    source_type="frontend_component",
+                    source_name="new-plan-step-content.vue",
+                    page_id="C-02",
+                    module_key="customers",
+                    evidence="The final wizard step edits shift series, exceptions, generation options, and builds a /admin/planning-staffing handoff route after Generate Series & Continue.",
+                ),
+                _basis(
+                    source_type="frontend_api",
+                    source_name="planningShifts.ts",
+                    page_id="C-02",
+                    module_key="planning",
+                    evidence="The planningShifts API family exposes shift template, shift series, shift-series exception, and generateShiftSeries endpoints used by the final step.",
                 ),
             ),
         ),
@@ -886,6 +1241,7 @@ ACTUALS_BILLING_PAYROLL_CHAIN = AssistantWorkflowSeed(
 CANONICAL_WORKFLOW_SEEDS: tuple[AssistantWorkflowSeed, ...] = (
     CUSTOMER_CREATE,
     CONTRACT_OR_DOCUMENT_REGISTER,
+    CUSTOMER_SCOPED_ORDER_CREATE,
     CUSTOMER_ORDER_CREATE,
     CUSTOMER_PLAN_CREATE,
     PLANNING_RECORD_CREATE,
@@ -918,6 +1274,8 @@ def _detect_by_heuristics(lowered: str) -> str | None:
         return "customer_plan_create"
     if _is_planning_record_create(lowered):
         return "planning_record_create"
+    if _is_customer_scoped_order_create(lowered):
+        return "customer_scoped_order_create"
     if _is_customer_order_create(lowered):
         return "customer_order_create"
     if _is_customer_create(lowered):
@@ -1018,6 +1376,53 @@ def _is_customer_order_create(lowered: str) -> bool:
     return (
         any(term in lowered for term in order_terms)
         and any(term in lowered for term in create_terms)
+    )
+
+
+def _is_customer_scoped_order_create(lowered: str) -> bool:
+    customer_context_terms = (
+        "customer page",
+        "customer workspace",
+        "customers workspace",
+        "customer area",
+        "orders tab",
+        "order workspace",
+        "customer context",
+        "kundenbereich",
+        "kundenkontext",
+        "orders-tab",
+        "orders tab",
+        "seite kunde",
+        "seite kunden",
+        "صفحه مشتری",
+        "تب orders",
+        "محیط مشتری",
+    )
+    customer_identity_terms = ("customer", "kunde", "kunden", "مشتری")
+    order_terms = ("order", "auftrag", "kundenauftrag", "vertrag", "contract", "سفارش", "قرارداد")
+    scoped_markers = (
+        "from customer",
+        "from the customer",
+        "customer page",
+        "customer workspace",
+        "customers workspace",
+        "orders tab",
+        "order workspace",
+        "directly",
+        "beim kunden",
+        "im kundenbereich",
+        "aus kundenseite",
+        "direkt",
+        "صفحه مشتری",
+        "تب orders",
+        "از صفحه",
+    )
+    return (
+        (
+            any(term in lowered for term in customer_context_terms)
+            or (any(term in lowered for term in customer_identity_terms) and any(term in lowered for term in scoped_markers))
+        )
+        and any(term in lowered for term in order_terms)
     )
 
 

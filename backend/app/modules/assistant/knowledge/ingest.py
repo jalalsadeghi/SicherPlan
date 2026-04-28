@@ -9,6 +9,13 @@ import json
 from pathlib import Path
 
 from app.modules.assistant.expert_knowledge_pack import render_expert_knowledge_pack_markdown
+from app.modules.assistant.field_dictionary import (
+    render_api_schema_field_markdown,
+    render_field_dictionary_markdown,
+    render_form_field_catalog_markdown,
+    render_frontend_i18n_label_markdown,
+    render_lookup_dictionary_markdown,
+)
 from app.modules.assistant.page_catalog_seed import ASSISTANT_PAGE_ROUTE_SEEDS
 from app.modules.assistant.page_help_seed import ASSISTANT_PAGE_HELP_SEEDS
 from app.modules.assistant.workflow_help import WORKFLOW_HELP_SEEDS
@@ -227,6 +234,12 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
     user_manual_path = generated_root / "user-manual-generated.md"
     implementation_data_model_path = generated_root / "implementation-data-model-generated.md"
     expert_knowledge_pack_path = generated_root / "expert-knowledge-pack.md"
+    field_dictionary_path = generated_root / "field-dictionary.md"
+    lookup_dictionary_path = generated_root / "lookup-dictionary.md"
+    status_dictionary_path = generated_root / "status-dictionary.md"
+    form_field_catalog_path = generated_root / "form-field-catalog.md"
+    frontend_i18n_label_path = generated_root / "frontend-i18n-labels.md"
+    api_schema_field_path = generated_root / "api-schema-fields.md"
 
     page_catalog_lines = ["# Assistant Page Route Catalog", ""]
     for seed in ASSISTANT_PAGE_ROUTE_SEEDS:
@@ -315,6 +328,9 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
         workflow_lines.append(f"- summary_de: {seed.summary_de}")
         workflow_lines.append(f"- intent_aliases_en: {', '.join(seed.intent_aliases_en)}")
         workflow_lines.append(f"- intent_aliases_de: {', '.join(seed.intent_aliases_de)}")
+        workflow_lines.append(f"- route_path: {seed.route_path or 'none'}")
+        workflow_lines.append(f"- route_aliases: {', '.join(seed.route_aliases) or 'none'}")
+        workflow_lines.append(f"- entry_points: {', '.join(seed.entry_points) or 'none'}")
         workflow_lines.append(f"- linked_page_ids: {', '.join(seed.linked_page_ids)}")
         workflow_lines.append(
             "- linked_pages_labeled: "
@@ -331,8 +347,19 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
             workflow_lines.append(
                 f"- {step.sequence}. {step.step_key} [page {step.page_id or 'none'} / module {step.module_key or 'none'}]"
             )
+            if step.title_en or step.title_de:
+                workflow_lines.append(f"  title_en: {step.title_en or 'none'}")
+                workflow_lines.append(f"  title_de: {step.title_de or 'none'}")
             workflow_lines.append(f"  purpose_en: {step.purpose_en}")
             workflow_lines.append(f"  purpose_de: {step.purpose_de}")
+            if step.required_context:
+                workflow_lines.append(f"  required_context: {', '.join(step.required_context)}")
+            if step.creates_or_updates:
+                workflow_lines.append(f"  creates_or_updates: {', '.join(step.creates_or_updates)}")
+            if step.important_fields:
+                workflow_lines.append(f"  important_fields: {', '.join(step.important_fields)}")
+            if step.api_functions:
+                workflow_lines.append(f"  api_functions: {', '.join(step.api_functions)}")
             workflow_lines.append(
                 f"  required_permissions: {', '.join(step.required_permissions) or 'none'}"
             )
@@ -437,6 +464,12 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
     ]
     implementation_data_model_path.write_text("\n".join(implementation_data_model_lines), encoding="utf-8")
     expert_knowledge_pack_path.write_text(render_expert_knowledge_pack_markdown(), encoding="utf-8")
+    field_dictionary_path.write_text(render_field_dictionary_markdown(repo_root), encoding="utf-8")
+    lookup_dictionary_path.write_text(render_lookup_dictionary_markdown(repo_root), encoding="utf-8")
+    status_dictionary_path.write_text(render_lookup_dictionary_markdown(repo_root), encoding="utf-8")
+    form_field_catalog_path.write_text(render_form_field_catalog_markdown(repo_root), encoding="utf-8")
+    frontend_i18n_label_path.write_text(render_frontend_i18n_label_markdown(repo_root), encoding="utf-8")
+    api_schema_field_path.write_text(render_api_schema_field_markdown(repo_root), encoding="utf-8")
 
     registrations.extend(
         [
@@ -489,6 +522,36 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
                 source_type="expert_knowledge_pack",
                 source_name="SicherPlan Expert Knowledge Pack",
                 source_path=str(expert_knowledge_pack_path),
+            ),
+            KnowledgeSourceRegistration(
+                source_type="field_dictionary",
+                source_name="Assistant Field Dictionary",
+                source_path=str(field_dictionary_path),
+            ),
+            KnowledgeSourceRegistration(
+                source_type="lookup_dictionary",
+                source_name="Assistant Lookup Dictionary",
+                source_path=str(lookup_dictionary_path),
+            ),
+            KnowledgeSourceRegistration(
+                source_type="status_dictionary",
+                source_name="Assistant Status Dictionary",
+                source_path=str(status_dictionary_path),
+            ),
+            KnowledgeSourceRegistration(
+                source_type="form_field_catalog",
+                source_name="Assistant Form Field Catalog",
+                source_path=str(form_field_catalog_path),
+            ),
+            KnowledgeSourceRegistration(
+                source_type="frontend_i18n_label",
+                source_name="Assistant Frontend i18n Label Catalog",
+                source_path=str(frontend_i18n_label_path),
+            ),
+            KnowledgeSourceRegistration(
+                source_type="api_schema_field",
+                source_name="Assistant API Schema Field Catalog",
+                source_path=str(api_schema_field_path),
             ),
         ]
     )

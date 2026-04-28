@@ -513,6 +513,227 @@ CONTRACT_OR_DOCUMENT_REGISTER_KNOWLEDGE = AssistantExpertKnowledgeSeed(
     ),
 )
 
+CUSTOMER_ORDERS_TAB_KNOWLEDGE = AssistantExpertKnowledgeSeed(
+    knowledge_key="customer_orders_tab",
+    title_en="Customer Orders tab entry point",
+    title_de="Orders-Tab beim Kunden als Einstieg",
+    summary_en="The selected customer detail view exposes an Orders tab that lists customer orders and launches the customer-scoped order workspace for new or existing orders.",
+    summary_de="Die Detailansicht des ausgewählten Kunden enthält einen Orders-Tab, der Kundenaufträge auflistet und den kundenbezogenen Order-Workspace für neue oder bestehende Aufträge startet.",
+    aliases_en=("customer orders tab", "orders tab in customer", "new order from customer page", "edit order from customer"),
+    aliases_de=("orders-tab beim kunden", "aufträge beim kunden", "neuer auftrag beim kunden", "auftrag beim kunden bearbeiten"),
+    linked_page_ids=("C-01", "C-02"),
+    module_keys=("customers", "planning"),
+    facts=(
+        _fact(
+            fact_key="tab_rendering_and_launch",
+            text_en="The Orders tab is rendered inside the selected customer detail view. It lists customer orders, emits start-new-order for a new order, and emits edit-order for an existing order workspace launch.",
+            text_de="Der Orders-Tab wird in der Detailansicht des ausgewählten Kunden gerendert. Er listet Kundenaufträge auf, sendet start-new-order für einen neuen Auftrag und edit-order für den Workspace-Start eines bestehenden Auftrags.",
+            page_ids=("C-01", "C-02"),
+            module_keys=("customers", "planning"),
+            source_basis=(
+                _basis(
+                    source_type="frontend_component",
+                    source_name="CustomerAdminView.vue",
+                    page_id="C-01",
+                    module_key="customers",
+                    evidence="CustomerAdminView renders CustomerOrdersTab inside the selected customer detail shell and handles start-new-order/edit-order events.",
+                ),
+                _basis(
+                    source_type="frontend_component",
+                    source_name="CustomerOrdersTab.vue",
+                    page_id="C-01",
+                    module_key="customers",
+                    evidence="CustomerOrdersTab exposes customer-orders-new-order and customer-orders-card-edit actions and emits start-new-order/edit-order events.",
+                ),
+            ),
+        ),
+        _fact(
+            fact_key="customer_context_is_fixed",
+            text_en="The customer_id comes from the selected customer context and is passed into the workspace route, so the flow is customer-scoped instead of a generic global order shell.",
+            text_de="Die customer_id stammt aus dem ausgewählten Kundenkontext und wird an die Workspace-Route übergeben, sodass der Ablauf kundenbezogen und kein generischer globaler Auftragsshell ist.",
+            page_ids=("C-01", "C-02"),
+            module_keys=("customers", "planning"),
+            source_basis=(
+                _basis(
+                    source_type="frontend_component",
+                    source_name="CustomerAdminView.vue",
+                    page_id="C-01",
+                    module_key="customers",
+                    evidence="The router push for new and edit order always includes customer_id from selectedCustomer.",
+                ),
+            ),
+        ),
+    ),
+)
+
+CUSTOMER_SCOPED_ORDER_WORKSPACE_KNOWLEDGE = AssistantExpertKnowledgeSeed(
+    knowledge_key="customer_scoped_order_workspace",
+    title_en="Customer-scoped order workspace",
+    title_de="Kundenbezogener Order-Workspace",
+    summary_en="The customer-scoped order workspace is a guided route under Customers that saves order, planning-record, shift-plan, and shift-series context step by step before handing off to Staffing Coverage.",
+    summary_de="Der kundenbezogene Order-Workspace ist eine geführte Route unter Kunden, die Auftrags-, Planungsdatensatz-, Schichtplan- und Schichtserienkontext schrittweise speichert, bevor sie an Staffing Coverage übergibt.",
+    aliases_en=("customer order workspace", "order workspace", "customer new plan", "customer scoped order workspace"),
+    aliases_de=("kunden order workspace", "auftragsworkspace", "neuer plan beim kunden", "kundenbezogener order-workspace"),
+    linked_page_ids=("C-02", "P-04"),
+    module_keys=("customers", "planning"),
+    facts=(
+        _fact(
+            fact_key="route_and_alias",
+            text_en="The canonical route is /admin/customers/order-workspace, and /admin/customers/new-plan is a route alias for the same page.",
+            text_de="Die kanonische Route ist /admin/customers/order-workspace, und /admin/customers/new-plan ist ein Routen-Alias für dieselbe Seite.",
+            page_ids=("C-02",),
+            module_keys=("customers",),
+            source_basis=(
+                _basis(
+                    source_type="frontend_route",
+                    source_name="sicherplan.ts",
+                    page_id="C-02",
+                    module_key="customers",
+                    evidence="SicherPlanCustomerOrderWorkspace is registered at /admin/customers/order-workspace with alias /admin/customers/new-plan.",
+                ),
+            ),
+        ),
+        _fact(
+            fact_key="wizard_steps",
+            text_en="The current guided steps are order-details, order-scope-documents, planning-record-overview, planning-record-documents, shift-plan, and series-exceptions.",
+            text_de="Die aktuellen geführten Schritte sind order-details, order-scope-documents, planning-record-overview, planning-record-documents, shift-plan und series-exceptions.",
+            page_ids=("C-02",),
+            module_keys=("customers",),
+            source_basis=(
+                _basis(
+                    source_type="frontend_component",
+                    source_name="new-plan-wizard.steps.ts",
+                    page_id="C-02",
+                    module_key="customers",
+                    evidence="The wizard step definition file registers the six current step IDs in this exact order.",
+                ),
+            ),
+        ),
+        _fact(
+            fact_key="staffing_handoff",
+            text_en="After Generate Series & Continue, concrete shifts are generated from the saved shift series and the user is redirected into /admin/planning-staffing with planning_record_id, date range, and first shift context.",
+            text_de="Nach Generate Series & Continue werden konkrete Schichten aus der gespeicherten Schichtserie erzeugt, und der Nutzer wird mit planning_record_id, Datumsfenster und erstem Schichtkontext nach /admin/planning-staffing weitergeleitet.",
+            page_ids=("C-02", "P-04"),
+            module_keys=("customers", "planning"),
+            source_basis=(
+                _basis(
+                    source_type="frontend_component",
+                    source_name="new-plan-step-content.vue",
+                    page_id="C-02",
+                    module_key="customers",
+                    evidence="buildStaffingHandoffRoute constructs a /admin/planning-staffing URL with date_from, date_to, planning_record_id, and shift_id after generation.",
+                ),
+            ),
+        ),
+    ),
+)
+
+CUSTOMER_ORDER_CREATE_FROM_CUSTOMER_KNOWLEDGE = AssistantExpertKnowledgeSeed(
+    knowledge_key="customer_order_create_from_customer",
+    title_en="Create an order from the customer page",
+    title_de="Auftrag aus der Kundenseite anlegen",
+    summary_en="This flow starts from Customers, stays tied to the selected customer, and uses the order workspace instead of forcing the user into the older Operations & Planning orders route first.",
+    summary_de="Dieser Ablauf startet bei Kunden, bleibt an den ausgewählten Kunden gebunden und verwendet den Order-Workspace, statt den Nutzer zuerst in die ältere Operations-&-Planning-Auftragsroute zu zwingen.",
+    aliases_en=("create order from customer page", "create order from customer", "customer page new order", "customer contract from customer page"),
+    aliases_de=("auftrag direkt beim kunden erstellen", "auftrag aus kundenseite", "kundenvertrag aus kundenseite", "auftrag im kundenbereich anlegen"),
+    linked_page_ids=("C-01", "C-02", "P-04"),
+    module_keys=("customers", "planning"),
+    facts=(
+        _fact(
+            fact_key="customer_scoped_entry",
+            text_en="The new order button lives in the selected customer's Orders tab and opens the guided order workspace with the selected customer context already fixed.",
+            text_de="Die Schaltfläche für den neuen Auftrag liegt im Orders-Tab des ausgewählten Kunden und öffnet den geführten Order-Workspace mit bereits fixiertem Kundenkontext.",
+            page_ids=("C-01", "C-02"),
+            module_keys=("customers", "planning"),
+            source_basis=(
+                _basis(
+                    source_type="frontend_component",
+                    source_name="CustomerOrdersTab.vue",
+                    page_id="C-01",
+                    module_key="customers",
+                    evidence="The Orders tab header contains a verified customer-orders-new-order action.",
+                ),
+                _basis(
+                    source_type="frontend_component",
+                    source_name="CustomerAdminView.vue",
+                    page_id="C-01",
+                    module_key="customers",
+                    evidence="handleStartCustomerNewOrder pushes to SicherPlanCustomerOrderWorkspace with customer_id from the selected customer.",
+                ),
+            ),
+        ),
+        _fact(
+            fact_key="order_vs_planning_documents",
+            text_en="Order documents stay attached to the order package, while planning-record documents are handled in a separate planning-record documents step. The assistant should explain that difference clearly.",
+            text_de="Auftragsdokumente bleiben am Auftragspaket, während Planungsdokumente in einem separaten Schritt für Planungsdatensatz-Dokumente behandelt werden. Der Assistent sollte diesen Unterschied klar erklären.",
+            page_ids=("C-02",),
+            module_keys=("customers", "planning"),
+            source_basis=(
+                _basis(
+                    source_type="frontend_component",
+                    source_name="new-plan-step-content.vue",
+                    page_id="C-02",
+                    module_key="customers",
+                    evidence="The order-scope-documents step and planning-record-documents step use separate document panels and separate order/planning attachment APIs.",
+                ),
+            ),
+        ),
+    ),
+)
+
+CUSTOMER_CONTRACT_REGISTER_FROM_CUSTOMER_KNOWLEDGE = AssistantExpertKnowledgeSeed(
+    knowledge_key="customer_contract_register_from_customer",
+    title_en="Register a customer contract from the customer page",
+    title_de="Kundenvertrag aus der Kundenseite registrieren",
+    summary_en="When users mean a contract in customer context, the assistant should map that question to the selected customer's Orders tab and order workspace unless the user clearly means a generic document upload.",
+    summary_de="Wenn Nutzer im Kundenkontext von einem Vertrag sprechen, sollte der Assistent die Frage auf den Orders-Tab des ausgewählten Kunden und den Order-Workspace abbilden, sofern nicht klar ein generischer Dokumentenupload gemeint ist.",
+    aliases_en=("customer contract", "register contract from customer", "contract from customer page"),
+    aliases_de=("kundenvertrag", "vertrag beim kunden registrieren", "vertrag aus kundenseite"),
+    linked_page_ids=("C-01", "C-02", "PS-01"),
+    module_keys=("customers", "planning", "platform_services"),
+    facts=(
+        _fact(
+            fact_key="no_standalone_contract_module_in_customer_flow",
+            text_en="The customer-scoped flow does not introduce a standalone contract module. Contract PDFs or files should be attached in order documents or planning-record documents depending on business ownership.",
+            text_de="Der kundenbezogene Ablauf führt kein eigenständiges Vertragsmodul ein. Vertrags-PDFs oder Dateien sollten je nach fachlicher Zugehörigkeit bei Auftragsdokumenten oder Planungsdokumenten angehängt werden.",
+            page_ids=("C-02", "PS-01"),
+            module_keys=("customers", "planning", "platform_services"),
+            source_basis=(
+                _basis(
+                    source_type="frontend_component",
+                    source_name="new-plan-step-content.vue",
+                    page_id="C-02",
+                    module_key="customers",
+                    evidence="The order workspace has separate order-document and planning-record-document attachment flows rather than a dedicated contract module.",
+                ),
+                _basis(
+                    source_type="implementation_data_model",
+                    source_name="Generated Implementation Data Model",
+                    page_id="PS-01",
+                    module_key="platform_services",
+                    evidence="Document ownership remains centralized while business meaning stays with the owning order or planning context.",
+                ),
+            ),
+        ),
+        _fact(
+            fact_key="customer_context_contract_mapping",
+            text_en="If the user says contract or Vertrag in customer context, the assistant should first explain the customer Orders tab and order workspace path, then clarify whether the file belongs to the order package or the planning-record package.",
+            text_de="Wenn der Nutzer im Kundenkontext Vertrag oder contract sagt, sollte der Assistent zuerst den Pfad über Orders-Tab und Order-Workspace erklären und dann klären, ob die Datei zum Auftragspaket oder zum Planungsdatensatz-Paket gehört.",
+            page_ids=("C-01", "C-02"),
+            module_keys=("customers", "planning"),
+            source_basis=(
+                _basis(
+                    source_type="workflow_help",
+                    source_name="Assistant Workflow Help",
+                    page_id="C-02",
+                    module_key="customers",
+                    evidence="The customer-scoped order workflow is the guided customer-context route for order and planning setup before Staffing Coverage handoff.",
+                ),
+            ),
+        ),
+    ),
+)
+
 EMPLOYEE_ASSIGN_TO_SHIFT_KNOWLEDGE = AssistantExpertKnowledgeSeed(
     knowledge_key="employee_assign_to_shift",
     title_en="Assign an employee to a shift",
@@ -595,6 +816,10 @@ EMPLOYEE_ASSIGN_TO_SHIFT_KNOWLEDGE = AssistantExpertKnowledgeSeed(
 EXPERT_KNOWLEDGE_PACKS: tuple[AssistantExpertKnowledgeSeed, ...] = (
     PRODUCT_OVERVIEW,
     CUSTOMER_CREATE_KNOWLEDGE,
+    CUSTOMER_ORDERS_TAB_KNOWLEDGE,
+    CUSTOMER_SCOPED_ORDER_WORKSPACE_KNOWLEDGE,
+    CUSTOMER_ORDER_CREATE_FROM_CUSTOMER_KNOWLEDGE,
+    CUSTOMER_CONTRACT_REGISTER_FROM_CUSTOMER_KNOWLEDGE,
     CUSTOMER_ORDER_CREATE_KNOWLEDGE,
     CUSTOMER_PLAN_CREATE_KNOWLEDGE,
     PLANNING_RECORD_CREATE_KNOWLEDGE,

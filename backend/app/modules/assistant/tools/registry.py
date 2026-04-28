@@ -303,6 +303,9 @@ def build_default_tool_registry(
     page_help_repository: Any | None = None,
     employee_repository: Any | None = None,
     planning_repository: Any | None = None,
+    customer_repository: Any | None = None,
+    subcontractor_repository: Any | None = None,
+    core_repository: Any | None = None,
 ) -> AssistantToolRegistry:
     from app.modules.assistant.diagnostics.released_schedule_visibility import (
         ReleasedScheduleVisibilityDiagnostics,
@@ -318,6 +321,11 @@ def build_default_tool_registry(
         GetEmployeeOperationalProfileTool,
         GetEmployeeReadinessSummaryTool,
         SearchEmployeeByNameTool,
+    )
+    from app.modules.assistant.tools.field_dictionary_tools import (
+        ExplainLookupOrOptionTool,
+        SearchFieldDictionaryTool,
+        SearchLookupDictionaryTool,
     )
     from app.modules.assistant.tools.field_tools import InspectReleasedScheduleVisibilityTool
     from app.modules.assistant.tools.navigation_tools import BuildAllowedLinkTool, SearchAccessiblePagesTool
@@ -339,6 +347,15 @@ def build_default_tool_registry(
     registry = AssistantToolRegistry(audit_repository=audit_repository)
     registry.register(GetCurrentUserCapabilitiesTool())
     registry.register(GetCurrentPageContextTool())
+    registry.register(SearchFieldDictionaryTool())
+    registry.register(SearchLookupDictionaryTool())
+    registry.register(
+        ExplainLookupOrOptionTool(
+            customer_repository=customer_repository,
+            subcontractor_repository=subcontractor_repository,
+            core_repository=core_repository,
+        )
+    )
     if page_help_repository is not None:
         registry.register(GetPageHelpManifestTool(repository=page_help_repository))
         registry.register(FindUiActionTool(repository=page_help_repository))

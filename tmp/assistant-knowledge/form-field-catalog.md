@@ -1,0 +1,220 @@
+# Assistant Form Field Catalog
+
+- assignment.actor_kind: page=P-04 input=input contexts=planning_staffing.demand_and_assignment, employee_assign_to_shift, shift_release_to_employee_app
+- assignment.date_from: page=P-04 input=input contexts=planning_staffing.filters_and_scope, employee_assign_to_shift, shift_release_to_employee_app
+- assignment.date_to: page=P-04 input=input contexts=planning_staffing.filters_and_scope, employee_assign_to_shift, shift_release_to_employee_app
+- assignment.demand_group_id: page=P-04 input=input contexts=planning_staffing.demand_and_assignment, employee_assign_to_shift, shift_release_to_employee_app
+- assignment.member_ref: page=P-04 input=input contexts=planning_staffing.demand_and_assignment, employee_assign_to_shift, shift_release_to_employee_app
+- assignment.planning_mode_code: page=P-04 input=input contexts=planning_staffing.filters_and_scope, employee_assign_to_shift, shift_release_to_employee_app
+- assignment.planning_record_id: page=P-04 input=input contexts=planning_staffing.filters_and_scope, employee_assign_to_shift, shift_release_to_employee_app
+- assignment.subcontractor_releases: page=P-04 input=input contexts=planning_staffing.teams_and_releases, employee_assign_to_shift, shift_release_to_employee_app
+- assignment.team_id: page=P-04 input=input contexts=planning_staffing.demand_and_assignment, employee_assign_to_shift, shift_release_to_employee_app
+- assignment.team_name: page=P-04 input=input contexts=planning_staffing.teams_and_releases, employee_assign_to_shift, shift_release_to_employee_app
+- assignment.team_scope: page=P-04 input=input contexts=planning_staffing.teams_and_releases, employee_assign_to_shift, shift_release_to_employee_app
+- customer.address: page=C-01 input=input contexts=customers.contacts_addresses_billing, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.address_id: page=C-01 input=unknown contexts=none
+- customer.address_type: page=C-01 input=select contexts=none
+- customer.amount_mode: page=C-01 input=unknown contexts=none
+- customer.bank_account_holder: page=C-01 input=text contexts=none
+- customer.bank_bic: page=C-01 input=text contexts=none
+- customer.bank_iban: page=C-01 input=text contexts=none
+- customer.bank_name: page=C-01 input=text contexts=none
+- customer.billing_address: page=C-01 input=select contexts=none
+- customer.billing_note: page=C-01 input=textarea contexts=none
+- customer.billing_unit: page=C-01 input=select contexts=none
+- customer.city: page=C-01 input=text contexts=none
+- customer.classification_lookup_id: page=C-01 input=input contexts=customers.master_profile, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.company_name: page=C-01 input=text contexts=none
+- customer.contact_name: page=C-01 input=select contexts=none
+- customer.contact_title: page=C-01 input=text contexts=none
+- customer.contract_reference: page=C-01 input=text contexts=none
+- customer.country_code: page=C-01 input=select contexts=none
+- customer.currency_code: page=C-01 input=text contexts=none
+- customer.customer_number: page=C-01 input=input contexts=customers.master_profile, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.customer_status_lookup_id: page=C-01 input=select contexts=none
+- customer.debtor_number: page=C-01 input=text contexts=none
+- customer.default_branch_id: page=C-01 input=select contexts=none
+- customer.default_mandate_id: page=C-01 input=select contexts=none
+- customer.document_id: page=C-01 input=text contexts=none
+- customer.dunning_policy_code: page=C-01 input=select contexts=none
+- customer.e_invoice_enabled: page=C-01 input=checkbox contexts=none
+- customer.effective_from: page=C-01 input=text contexts=none
+- customer.effective_to: page=C-01 input=text contexts=none
+- customer.email: page=C-01 input=input contexts=customers.contacts_addresses_billing, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.employee_id: page=C-01 input=text contexts=none
+- customer.external_ref: page=C-01 input=text contexts=none
+- customer.fixed_amount: page=C-01 input=number contexts=none
+- customer.full_name: page=C-01 input=input contexts=customers.contacts_addresses_billing, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.function_label: page=C-01 input=text contexts=none
+- customer.function_type_id: page=C-01 input=select contexts=none
+- customer.history_entry: page=C-01 input=select contexts=none
+- customer.invoice_email: page=C-01 input=input contexts=customers.contacts_addresses_billing, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.invoice_layout_code: page=C-01 input=select contexts=none
+- customer.invoice_layout_lookup_id: page=C-01 input=select contexts=none
+- customer.is_billing_contact: page=C-01 input=unknown contexts=none
+- customer.is_default: page=C-01 input=unknown contexts=none
+- customer.is_default_invoice_party: page=C-01 input=unknown contexts=none
+- customer.is_primary_contact: page=C-01 input=checkbox contexts=none
+- customer.label: page=C-01 input=text contexts=none
+- customer.legal_form_lookup_id: page=C-01 input=select contexts=none
+- customer.legal_name: page=C-01 input=input contexts=customers.master_profile, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.leitweg_id: page=C-01 input=text contexts=none
+- customer.lifecycle_status: page=C-01 input=input contexts=customers.list_and_search, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.line_kind: page=C-01 input=select contexts=none
+- customer.locale: page=C-01 input=select contexts=none
+- customer.minimum_quantity: page=C-01 input=number contexts=none
+- customer.mobile: page=C-01 input=textarea contexts=none
+- customer.name: page=C-01 input=input contexts=customers.master_profile, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.note: page=C-01 input=textarea contexts=none
+- customer.notes: page=C-01 input=textarea contexts=none
+- customer.payment_terms_days: page=C-01 input=input contexts=customers.contacts_addresses_billing, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.payment_terms_note: page=C-01 input=text contexts=none
+- customer.percent_value: page=C-01 input=number contexts=none
+- customer.person_names_released: page=C-01 input=unknown contexts=none
+- customer.phone: page=C-01 input=input contexts=customers.contacts_addresses_billing, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.planning_mode_code: page=C-01 input=select contexts=none
+- customer.postal_code: page=C-01 input=text contexts=none
+- customer.qualification_type_id: page=C-01 input=select contexts=none
+- customer.ranking_lookup_id: page=C-01 input=input contexts=customers.master_profile, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.rate_kind: page=C-01 input=text contexts=none
+- customer.reason: page=C-01 input=text contexts=none
+- customer.region_code: page=C-01 input=text contexts=none
+- customer.search: page=C-01 input=input contexts=customers.list_and_search, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.shipping_method_code: page=C-01 input=select contexts=none
+- customer.sort_order: page=C-01 input=number contexts=none
+- customer.state: page=C-01 input=text contexts=none
+- customer.street_line1: page=C-01 input=text contexts=none
+- customer.street_line2: page=C-01 input=text contexts=none
+- customer.surcharge_type: page=C-01 input=select contexts=none
+- customer.tax_exempt: page=C-01 input=text contexts=none
+- customer.tax_exemption_reason: page=C-01 input=text contexts=none
+- customer.tax_number: page=C-01 input=text contexts=none
+- customer.temporary_password: page=C-01 input=text contexts=none
+- customer.time_from_minute: page=C-01 input=text contexts=none
+- customer.time_to_minute: page=C-01 input=text contexts=none
+- customer.unit_price: page=C-01 input=number contexts=none
+- customer.user_id: page=C-01 input=unknown contexts=none
+- customer.username: page=C-01 input=text contexts=none
+- customer.vat_id: page=C-01 input=input contexts=customers.contacts_addresses_billing, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
+- customer.weekday_mask: page=C-01 input=unknown contexts=none
+- customer.weekdays: page=C-01 input=unknown contexts=none
+- customer_order.date_from: page=C-02 input=input contexts=customer_order_workspace.series_exceptions, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.date_to: page=C-02 input=input contexts=customer_order_workspace.series_exceptions, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.equipment_lines: page=C-02 input=input contexts=customer_order_workspace.order_scope_documents, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.name: page=C-02 input=input contexts=customer_order_workspace.shift_plan, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.order_documents: page=C-02 input=input contexts=customer_order_workspace.order_scope_documents, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.order_no: page=C-02 input=input contexts=customer_order_workspace.order_details, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.planning_documents: page=C-02 input=input contexts=customer_order_workspace.planning_record_documents, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.planning_from: page=C-02 input=input contexts=customer_order_workspace.planning_record_overview, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.planning_mode_code: page=C-02 input=input contexts=customer_order_workspace.planning_record_overview, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.planning_to: page=C-02 input=input contexts=customer_order_workspace.planning_record_overview, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.recurrence_code: page=C-02 input=input contexts=customer_order_workspace.series_exceptions, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.requirement_lines: page=C-02 input=input contexts=customer_order_workspace.order_scope_documents, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.requirement_type_id: page=C-02 input=input contexts=customer_order_workspace.order_details, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.service_category_code: page=C-02 input=input contexts=customer_order_workspace.order_details, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.service_from: page=C-02 input=input contexts=customer_order_workspace.order_details, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.service_to: page=C-02 input=input contexts=customer_order_workspace.order_details, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.shift_template_id: page=C-02 input=input contexts=customer_order_workspace.series_exceptions, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.title: page=C-02 input=input contexts=customer_order_workspace.order_details, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- customer_order.workforce_scope_code: page=C-02 input=input contexts=customer_order_workspace.shift_plan, customer_scoped_order_create, customer_plan_create, customer_contract_register_from_customer
+- dispatch.audience_code: page=P-05 input=input contexts=planning_outputs.documents, shift_release_to_employee_app, employee_assign_to_shift
+- dispatch.dispatch_audience_employees: page=P-05 input=input contexts=planning_outputs.dispatch, shift_release_to_employee_app, employee_assign_to_shift
+- dispatch.dispatch_audience_subcontractors: page=P-05 input=input contexts=planning_outputs.dispatch, shift_release_to_employee_app, employee_assign_to_shift
+- dispatch.dispatch_recipients: page=P-05 input=input contexts=planning_outputs.dispatch, shift_release_to_employee_app, employee_assign_to_shift
+- dispatch.file_name: page=P-05 input=input contexts=planning_outputs.documents, shift_release_to_employee_app, employee_assign_to_shift
+- dispatch.variant_code: page=P-05 input=input contexts=planning_outputs.documents, shift_release_to_employee_app, employee_assign_to_shift
+- document.document_title: page=PS-01 input=input contexts=platform_services.documents, contract_or_document_register
+- document.document_version: page=PS-01 input=input contexts=platform_services.documents, contract_or_document_register
+- document.download: page=PS-01 input=input contexts=platform_services.links, contract_or_document_register
+- document.link_target: page=PS-01 input=input contexts=platform_services.links, contract_or_document_register
+- document.owner_context: page=PS-01 input=input contexts=platform_services.documents, contract_or_document_register
+- document.upload: page=PS-01 input=input contexts=platform_services.links, contract_or_document_register
+- employee.absence_type: page=E-01 input=text contexts=none
+- employee.assign_group: page=E-01 input=select contexts=none
+- employee.bank_account_holder: page=E-01 input=text contexts=none
+- employee.bank_bic: page=E-01 input=text contexts=none
+- employee.bank_iban: page=E-01 input=text contexts=none
+- employee.birth_date: page=E-01 input=text contexts=none
+- employee.certificate_no: page=E-01 input=text contexts=none
+- employee.completed_at: page=E-01 input=textarea contexts=none
+- employee.credential_no: page=E-01 input=select contexts=none
+- employee.credential_type: page=E-01 input=select contexts=none
+- employee.decision_note: page=E-01 input=textarea contexts=none
+- employee.default_branch_id: page=E-01 input=select contexts=none
+- employee.default_mandate_id: page=E-01 input=select contexts=none
+- employee.document_file: page=E-01 input=unknown contexts=none
+- employee.document_id: page=E-01 input=text contexts=none
+- employee.document_label: page=E-01 input=select contexts=none
+- employee.document_relation_type: page=E-01 input=select contexts=none
+- employee.document_title: page=E-01 input=text contexts=none
+- employee.document_type_key: page=E-01 input=select contexts=none
+- employee.document_version_target: page=E-01 input=select contexts=none
+- employee.emergency_contact_name: page=E-01 input=text contexts=none
+- employee.emergency_contact_phone: page=E-01 input=text contexts=none
+- employee.employment_type_code: page=E-01 input=select contexts=none
+- employee.encoded_value: page=E-01 input=text contexts=none
+- employee.ends_at: page=E-01 input=select contexts=none
+- employee.ends_on: page=E-01 input=text contexts=none
+- employee.first_name: page=E-01 input=input contexts=employee.identity
+- employee.function_type: page=E-01 input=select contexts=none
+- employee.granted_internally: page=E-01 input=unknown contexts=none
+- employee.group_code: page=E-01 input=text contexts=none
+- employee.group_description: page=E-01 input=text contexts=none
+- employee.group_name: page=E-01 input=text contexts=none
+- employee.hire_date: page=E-01 input=text contexts=none
+- employee.issued_at: page=E-01 input=text contexts=none
+- employee.issuing_authority: page=E-01 input=textarea contexts=none
+- employee.last_name: page=E-01 input=input contexts=employee.identity
+- employee.marital_status: page=E-01 input=select contexts=none
+- employee.membership_notes: page=E-01 input=text contexts=none
+- employee.mobile_phone: page=E-01 input=text contexts=none
+- employee.nationality_country_code: page=E-01 input=text contexts=none
+- employee.note_body: page=E-01 input=textarea contexts=none
+- employee.note_title: page=E-01 input=text contexts=none
+- employee.note_type: page=E-01 input=select contexts=none
+- employee.notes: page=E-01 input=textarea contexts=none
+- employee.personnel_no: page=E-01 input=input contexts=employee.identity
+- employee.place_of_birth: page=E-01 input=text contexts=none
+- employee.preferred_name: page=E-01 input=text contexts=none
+- employee.private_email: page=E-01 input=text contexts=none
+- employee.private_phone: page=E-01 input=text contexts=none
+- employee.proof_file: page=E-01 input=unknown contexts=none
+- employee.qualification_type: page=E-01 input=select contexts=none
+- employee.record_kind: page=E-01 input=select contexts=none
+- employee.recurrence_type: page=E-01 input=select contexts=none
+- employee.reminder_at: page=E-01 input=text contexts=none
+- employee.rule_kind: page=E-01 input=select contexts=none
+- employee.social_security_no: page=E-01 input=text contexts=none
+- employee.starts_at: page=E-01 input=text contexts=none
+- employee.starts_on: page=E-01 input=text contexts=none
+- employee.status: page=E-01 input=select contexts=none
+- employee.target_monthly_hours: page=E-01 input=number contexts=none
+- employee.target_weekly_hours: page=E-01 input=number contexts=none
+- employee.tax_id: page=E-01 input=text contexts=none
+- employee.termination_date: page=E-01 input=select contexts=none
+- employee.user_id: page=E-01 input=unknown contexts=none
+- employee.valid_from: page=E-01 input=text contexts=none
+- employee.valid_until: page=E-01 input=text contexts=none
+- employee.weekdays: page=E-01 input=unknown contexts=none
+- employee.work_email: page=E-01 input=text contexts=none
+- employee.work_phone: page=E-01 input=text contexts=none
+- planning_record.customer: page=P-02 input=input contexts=planning_orders.order_scope, customer_order_create, customer_plan_create, contract_or_document_register
+- planning_record.date_window: page=P-02 input=input contexts=planning_orders.order_scope, customer_order_create, customer_plan_create, contract_or_document_register
+- planning_record.equipment_lines: page=P-02 input=input contexts=planning_orders.requirements, customer_order_create, customer_plan_create, contract_or_document_register
+- planning_record.order_documents: page=P-02 input=input contexts=planning_orders.requirements, customer_order_create, customer_plan_create, contract_or_document_register
+- planning_record.planning_documents: page=P-02 input=input contexts=planning_orders.requirements, customer_order_create, customer_plan_create, contract_or_document_register
+- planning_record.requirement_lines: page=P-02 input=input contexts=planning_orders.requirements, customer_order_create, customer_plan_create, contract_or_document_register
+- planning_record.service_category: page=P-02 input=input contexts=planning_orders.order_scope, customer_order_create, customer_plan_create, contract_or_document_register
+- shift_plan.code: page=P-03 input=input contexts=planning_shifts.templates, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
+- shift_plan.customer_visible_flag: page=P-03 input=input contexts=planning_shifts.concrete_shift_and_release, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
+- shift_plan.ends_at: page=P-03 input=input contexts=planning_shifts.concrete_shift_and_release, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
+- shift_plan.label: page=P-03 input=input contexts=planning_shifts.templates, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
+- shift_plan.local_end_time: page=P-03 input=input contexts=planning_shifts.templates, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
+- shift_plan.local_start_time: page=P-03 input=input contexts=planning_shifts.templates, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
+- shift_plan.planning_from: page=P-03 input=input contexts=planning_shifts.plans_and_series, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
+- shift_plan.planning_record_id: page=P-03 input=input contexts=planning_shifts.plans_and_series, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
+- shift_plan.planning_to: page=P-03 input=input contexts=planning_shifts.plans_and_series, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
+- shift_plan.recurrence_code: page=P-03 input=input contexts=planning_shifts.plans_and_series, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
+- shift_plan.release_state: page=P-03 input=input contexts=planning_shifts.concrete_shift_and_release, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
+- shift_plan.starts_at: page=P-03 input=input contexts=planning_shifts.concrete_shift_and_release, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
+- shift_plan.subcontractor_visible_flag: page=P-03 input=input contexts=planning_shifts.concrete_shift_and_release, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app

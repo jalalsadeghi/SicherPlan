@@ -31,9 +31,12 @@ from app.modules.assistant.schemas import (
 )
 from app.modules.assistant.service import AssistantRuntimeConfig, AssistantService
 from app.modules.assistant.tools import build_default_tool_registry
+from app.modules.core.admin_repository import SqlAlchemyCoreAdminRepository
+from app.modules.customers.repository import SqlAlchemyCustomerRepository
 from app.modules.employees.repository import SqlAlchemyEmployeeRepository
 from app.modules.iam.authz import RequestAuthorizationContext, get_request_authorization_context
 from app.modules.planning.repository import SqlAlchemyPlanningRepository
+from app.modules.subcontractors.repository import SqlAlchemySubcontractorRepository
 
 
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
@@ -43,8 +46,11 @@ def get_assistant_service(
     session: Annotated[Session, Depends(get_db_session)],
 ) -> AssistantService:
     repository = SqlAlchemyAssistantRepository(session)
+    core_repository = SqlAlchemyCoreAdminRepository(session)
+    customer_repository = SqlAlchemyCustomerRepository(session)
     employee_repository = SqlAlchemyEmployeeRepository(session)
     planning_repository = SqlAlchemyPlanningRepository(session)
+    subcontractor_repository = SqlAlchemySubcontractorRepository(session)
     seed_assistant_page_route_catalog(session)
     seed_assistant_page_help_manifest(session)
     return AssistantService(
@@ -96,6 +102,9 @@ def get_assistant_service(
             page_help_repository=repository,
             employee_repository=employee_repository,
             planning_repository=planning_repository,
+            customer_repository=customer_repository,
+            subcontractor_repository=subcontractor_repository,
+            core_repository=core_repository,
         ),
     )
 

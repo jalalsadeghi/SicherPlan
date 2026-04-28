@@ -78,6 +78,26 @@ describe('assistant store', () => {
     expect(context.query).toEqual({ assignment_id: 'assignment-1' });
   });
 
+  it('maps the customer order workspace route to C-02 and keeps safe customer query context', () => {
+    routerCurrentRoute.value = {
+      name: 'SicherPlanCustomerOrderWorkspace',
+      path: '/admin/customers/order-workspace',
+      query: { customer_id: 'cust-1', order_id: 'ord-7', user_id: 'should-be-removed' },
+      meta: {
+        title: 'Order Workspace',
+      },
+    };
+
+    const context = buildAssistantRouteContext();
+
+    expect(context).toMatchObject({
+      path: '/admin/customers/order-workspace',
+      route_name: 'SicherPlanCustomerOrderWorkspace',
+      page_id: 'C-02',
+    });
+    expect(context.query).toEqual({ customer_id: 'cust-1', order_id: 'ord-7' });
+  });
+
   it('starts with safe empty state when nothing is persisted', () => {
     const store = useAssistantStore();
 

@@ -54,6 +54,17 @@ def test_german_and_english_workflow_queries_resolve_to_verified_workflows() -> 
     assert german_workflow["title"] == german_workflow["title_de"]
     assert {"C-01", "P-02"}.issubset(set(german_workflow["linked_page_ids"]))
 
+    customer_scoped_result = tool.execute(
+        input_data=AssistantWorkflowHelpInput(
+            query="Wie erstelle ich einen Auftrag direkt beim Kunden?",
+            language_code="de",
+        ),
+        context=_context(),
+    )
+    customer_scoped_workflow = customer_scoped_result.data["workflows"][0]
+    assert customer_scoped_workflow["workflow_key"] == "customer_scoped_order_create"
+    assert {"C-01", "C-02", "P-04"}.issubset(set(customer_scoped_workflow["linked_page_ids"]))
+
 
 def test_contract_query_matches_contract_workflow_in_german_and_english() -> None:
     tool = SearchWorkflowHelpTool()

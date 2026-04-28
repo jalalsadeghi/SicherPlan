@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from app.modules.assistant.field_dictionary import detect_field_or_lookup_signal
 from app.modules.assistant.workflow_help import detect_workflow_intent
 
 
@@ -22,6 +23,7 @@ class AssistantClassificationResult:
     is_unsafe: bool
     reason: str
     confidence: str
+    intent: str | None = None
 
 
 _PLATFORM_KEYWORDS = {
@@ -250,6 +252,7 @@ def classify_assistant_message(
             is_unsafe=True,
             reason=_unsafe_reason(lowered, route_blob),
             confidence="high",
+            intent=None,
         )
 
     workflow_intent = detect_workflow_intent(cleaned)
@@ -261,6 +264,18 @@ def classify_assistant_message(
             is_unsafe=False,
             reason=f"workflow_intent:{workflow_intent.intent}",
             confidence="high",
+            intent=workflow_intent.intent,
+        )
+
+    if _is_customer_order_workspace_follow_up(cleaned, route_context):
+        return AssistantClassificationResult(
+            category=AssistantIntentCategory.PLATFORM_RELATED,
+            is_platform_related=True,
+            is_out_of_scope=False,
+            is_unsafe=False,
+            reason="customer_order_workspace_follow_up",
+            confidence="medium",
+            intent="customer_order_workspace_follow_up",
         )
 
     if is_product_overview_question(cleaned):
@@ -271,6 +286,23 @@ def classify_assistant_message(
             is_unsafe=False,
             reason="product_overview",
             confidence="high",
+            intent="product_overview",
+        )
+
+    field_lookup_signal = detect_field_or_lookup_signal(
+        cleaned,
+        page_id=str((route_context or {}).get("page_id") or "").strip() or None,
+        route_name=str((route_context or {}).get("route_name") or "").strip() or None,
+    )
+    if field_lookup_signal is not None:
+        return AssistantClassificationResult(
+            category=AssistantIntentCategory.PLATFORM_RELATED,
+            is_platform_related=True,
+            is_out_of_scope=False,
+            is_unsafe=False,
+            reason="field_or_lookup_dictionary_match",
+            confidence="medium" if field_lookup_signal.ambiguous else "high",
+            intent=field_lookup_signal.intent_category,
         )
 
     if _contains_any(lowered, _PLATFORM_KEYWORDS):
@@ -281,6 +313,7 @@ def classify_assistant_message(
             is_unsafe=False,
             reason="platform_keyword_match",
             confidence="high",
+            intent=None,
         )
 
     if route_blob and _contains_any(route_blob, _ROUTE_HINTS) and _contains_any(lowered, _WEAK_PLATFORM_TERMS):
@@ -291,6 +324,7 @@ def classify_assistant_message(
             is_unsafe=False,
             reason="route_context_platform_signal",
             confidence="medium",
+            intent=None,
         )
 
     if _contains_any(lowered, _OUT_OF_SCOPE_PATTERNS):
@@ -301,6 +335,7 @@ def classify_assistant_message(
             is_unsafe=False,
             reason="out_of_scope_topic_match",
             confidence="high",
+            intent=None,
         )
 
     return AssistantClassificationResult(
@@ -310,6 +345,7 @@ def classify_assistant_message(
         is_unsafe=False,
         reason="no_sicherplan_platform_signal",
         confidence="medium",
+        intent=None,
     )
 
 
@@ -331,6 +367,53 @@ def _build_route_blob(route_context: dict[str, object] | None) -> str:
         if isinstance(value, str):
             parts.append(value.lower())
     return " ".join(parts)
+
+
+def _is_customer_order_workspace_follow_up(
+    text: str,
+    route_context: dict[str, object] | None,
+) -> bool:
+    if not route_context:
+        return False
+    page_id = str(route_context.get("page_id") or "").strip()
+    query = route_context.get("query")
+    tab = str(query.get("tab") or "").strip().casefold() if isinstance(query, dict) else ""
+    lowered = text.casefold()
+    if page_id == "C-02":
+        follow_up_terms = (
+            "generate series",
+            "continue",
+            "order workspace",
+            "order documents",
+            "planning documents",
+            "planning record",
+            "shift plan",
+            "series",
+            "ausnahmen",
+            "schichtplan",
+            "auftragsdokument",
+            "planungsdokument",
+            "planungsdatensatz",
+            "سری",
+            "shift plan",
+            "planning documents",
+            "order documents",
+        )
+        return any(term in lowered for term in follow_up_terms)
+    if page_id == "C-01" and tab == "orders":
+        customer_order_terms = (
+            "orders tab",
+            "new order",
+            "edit",
+            "contract",
+            "vertrag",
+            "auftrag",
+            "order",
+            "قرارداد",
+            "سفارش",
+        )
+        return any(term in lowered for term in customer_order_terms)
+    return False
 
 
 def _contains_any(text: str, patterns: set[str]) -> bool:

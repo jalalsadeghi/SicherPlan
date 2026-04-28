@@ -60,6 +60,8 @@ class TestAssistantPageRouteCatalogSeed(unittest.TestCase):
         seed_assistant_page_route_catalog(session)
 
         by_page_id = {row.page_id: row for row in session.page_routes}
+        self.assertEqual(by_page_id["C-02"].route_name, "SicherPlanCustomerOrderWorkspace")
+        self.assertEqual(by_page_id["C-02"].path_template, "/admin/customers/order-workspace")
         self.assertEqual(by_page_id["P-04"].route_name, "SicherPlanPlanningStaffing")
         self.assertEqual(by_page_id["P-04"].path_template, "/admin/planning-staffing")
         self.assertEqual(by_page_id["CP-01"].route_name, "SicherPlanCustomerPortalOverview")

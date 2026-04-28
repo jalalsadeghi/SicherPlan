@@ -9,13 +9,26 @@ def test_core_workspace_page_help_contains_richer_metadata() -> None:
     customers = service.get_page_help_manifest(
         page_id="C-01",
         language_code="en",
-        actor=_context("assistant.chat.access", "customers.customer.read", "customers.customer.write"),
+        actor=_context("assistant.chat.access", "customers.customer.read", "customers.customer.write", "planning.order.write"),
     )
     assert customers.page_purpose
-    assert customers.workflow_keys == ["customer_create", "customer_order_create", "customer_plan_create"]
-    assert customers.api_families == ["customers"]
+    assert "customer_scoped_order_create" in customers.workflow_keys
+    assert "customers" in customers.api_families
+    assert "planningOrders" in customers.api_families
     assert customers.source_basis
     assert any(action.label_status == "verified" for action in customers.actions)
+    assert any(action.action_key == "customers.orders.new_order" for action in customers.actions)
+
+    customer_workspace = service.get_page_help_manifest(
+        page_id="C-02",
+        language_code="en",
+        actor=_context("assistant.chat.access", "planning.order.read", "planning.order.write", "planning.shift.write", "planning.staffing.read"),
+    )
+    assert customer_workspace.page_purpose
+    assert "customer_scoped_order_create" in customer_workspace.workflow_keys
+    assert "planningOrders" in customer_workspace.api_families
+    assert any(action.action_key == "customer.order_workspace.generate_continue" for action in customer_workspace.actions)
+    assert any(section.section_key == "customer_order_workspace.series_exceptions" for section in customer_workspace.form_sections)
 
     planning_orders = service.get_page_help_manifest(
         page_id="P-02",

@@ -1,0 +1,157 @@
+# Assistant Frontend i18n Label Catalog
+
+- customer.address: keys=customerAdmin.fields.address de=Adresse en=Address
+- customer.address_id: keys=customerAdmin.fields.addressId de=Adress-ID en=Address ID
+- customer.address_type: keys=customerAdmin.fields.addressType de=Adresstyp en=Address type
+- customer.amount_mode: keys=customerAdmin.fields.amountMode de=Betragsmodus en=Amount mode
+- customer.bank_account_holder: keys=customerAdmin.fields.bankAccountHolder de=Kontoinhaber en=Account holder
+- customer.bank_bic: keys=customerAdmin.fields.bankBic de=BIC en=BIC
+- customer.bank_iban: keys=customerAdmin.fields.bankIban de=IBAN en=IBAN
+- customer.bank_name: keys=customerAdmin.fields.bankName de=Bankname en=Bank name
+- customer.billing_address: keys=customerAdmin.fields.billingAddress de=Rechnungsadresse en=Billing address
+- customer.billing_note: keys=customerAdmin.fields.billingNote de=Abrechnungsnotiz en=Billing note
+- customer.billing_unit: keys=customerAdmin.fields.billingUnit de=Abrechnungseinheit en=Billing unit
+- customer.city: keys=customerAdmin.fields.city de=Ort en=City
+- customer.classification_lookup_id: keys=customerAdmin.fields.classificationLookupId de=Klassifikation en=Classification
+- customer.company_name: keys=customerAdmin.fields.companyName de=Firmenname en=Company name
+- customer.contact_name: keys=customerAdmin.fields.contactName de=Ansprechpartner en=Contact name
+- customer.contact_title: keys=customerAdmin.fields.contactTitle de=Titel en=Title
+- customer.contract_reference: keys=customerAdmin.fields.contractReference de=Vertragsreferenz en=Contract reference
+- customer.country_code: keys=customerAdmin.fields.countryCode de=Ländercode en=Country code
+- customer.currency_code: keys=customerAdmin.fields.currencyCode de=Währung en=Currency
+- customer.customer_number: keys=customerAdmin.fields.customerNumber de=Kundennummer en=Customer number
+- customer.customer_status_lookup_id: keys=customerAdmin.fields.customerStatusLookupId de=Kundenstatus-Metadaten en=Customer status metadata
+- customer.debtor_number: keys=customerAdmin.fields.debtorNumber de=Debitorennummer en=Debtor number
+- customer.default_branch_id: keys=customerAdmin.fields.defaultBranchId de=Standardniederlassung en=Default branch
+- customer.default_mandate_id: keys=customerAdmin.fields.defaultMandateId de=Standardmandat en=Default mandate
+- customer.document_id: keys=customerAdmin.fields.documentId de=Dokument-ID en=Document ID
+- customer.dunning_policy_code: keys=customerAdmin.fields.dunningPolicyCode de=Mahnprofil en=Dunning policy
+- customer.e_invoice_enabled: keys=customerAdmin.fields.eInvoiceEnabled de=E-Rechnung aktiviert en=E-invoicing enabled
+- customer.effective_from: keys=customerAdmin.fields.effectiveFrom de=Gültig ab en=Effective from
+- customer.effective_to: keys=customerAdmin.fields.effectiveTo de=Gültig bis en=Effective to
+- customer.email: keys=customerAdmin.fields.email de=E-Mail en=Email
+- customer.employee_id: keys=customerAdmin.fields.employeeId de=Mitarbeiter-ID en=Employee ID
+- customer.external_ref: keys=customerAdmin.fields.externalRef de=Externe Referenz en=External reference
+- customer.fixed_amount: keys=customerAdmin.fields.fixedAmount de=Fixbetrag en=Fixed amount
+- customer.full_name: keys=customerAdmin.fields.fullName de=Vollständiger Name en=Full name
+- customer.function_label: keys=customerAdmin.fields.functionLabel de=Funktion en=Function
+- customer.function_type_id: keys=customerAdmin.fields.functionTypeId de=Funktions-ID en=Function ID
+- customer.history_entry: keys=customerAdmin.fields.historyEntry de=Historieneintrag en=History entry
+- customer.invoice_email: keys=customerAdmin.fields.invoiceEmail de=Rechnungs-E-Mail en=Invoice email
+- customer.invoice_layout_code: keys=customerAdmin.fields.invoiceLayoutCode de=Rechnungslayout en=Invoice layout
+- customer.invoice_layout_lookup_id: keys=customerAdmin.fields.invoiceLayoutLookupId de=Rechnungslayout en=Invoice layout
+- customer.is_billing_contact: keys=customerAdmin.fields.isBillingContact de=Als Rechnungskontakt markieren en=Mark as billing contact
+- customer.is_default: keys=customerAdmin.fields.isDefault de=Als Standardadresse markieren en=Mark as default address
+- customer.is_default_invoice_party: keys=customerAdmin.fields.isDefaultInvoiceParty de=Als Standard-Rechnungspartei markieren en=Mark as default invoice party
+- customer.is_primary_contact: keys=customerAdmin.fields.isPrimaryContact de=Als Primärkontakt markieren en=Mark as primary contact
+- customer.label: keys=customerAdmin.fields.label de=Bezeichnung en=Label
+- customer.legal_form_lookup_id: keys=customerAdmin.fields.legalFormLookupId de=Rechtsform en=Legal form
+- customer.legal_name: keys=customerAdmin.fields.legalName de=Rechtlicher Name en=Legal name
+- customer.leitweg_id: keys=customerAdmin.fields.leitwegId de=Leitweg-/Routing-ID en=Leitweg/routing ID
+- customer.lifecycle_status: keys=customerAdmin.fields.lifecycleStatus de=Lifecycle-Status en=Lifecycle status
+- customer.line_kind: keys=customerAdmin.fields.lineKind de=Zeilenart en=Line kind
+- customer.locale: keys=customerAdmin.fields.locale de=Sprache en=Locale
+- customer.minimum_quantity: keys=customerAdmin.fields.minimumQuantity de=Mindestmenge en=Minimum quantity
+- customer.mobile: keys=customerAdmin.fields.mobile de=Mobil en=Mobile
+- customer.name: keys=customerAdmin.fields.name de=Anzeigename en=Display name
+- customer.note: keys=customerAdmin.fields.note de=Hinweis en=Note
+- customer.notes: keys=customerAdmin.fields.notes de=Notizen en=Notes
+- customer.payment_terms_days: keys=customerAdmin.fields.paymentTermsDays de=Zahlungsziel in Tagen en=Payment terms days, Payment terms in days
+- customer.payment_terms_note: keys=customerAdmin.fields.paymentTermsNote de=Zahlungsbedingung en=Payment note
+- customer.percent_value: keys=customerAdmin.fields.percentValue de=Prozentwert en=Percent value
+- customer.person_names_released: keys=customerAdmin.fields.personNamesReleased de=Personennamen im Portal freigeben en=Release personal names in portal
+- customer.phone: keys=customerAdmin.fields.phone de=Telefon en=Phone
+- customer.planning_mode_code: keys=customerAdmin.fields.planningModeCode de=Planungsmodus en=Planning mode
+- customer.postal_code: keys=customerAdmin.fields.postalCode de=Postleitzahl en=Postal code
+- customer.qualification_type_id: keys=customerAdmin.fields.qualificationTypeId de=Qualifikations-ID en=Qualification ID
+- customer.ranking_lookup_id: keys=customerAdmin.fields.rankingLookupId de=Ranking en=Ranking
+- customer.rate_kind: keys=customerAdmin.fields.rateKind de=Preisart en=Rate kind
+- customer.reason: keys=customerAdmin.fields.reason de=Begründung en=Reason
+- customer.region_code: keys=customerAdmin.fields.regionCode de=Regionscode en=Region code
+- customer.shipping_method_code: keys=customerAdmin.fields.shippingMethodCode de=Versandweg en=Dispatch method
+- customer.sort_order: keys=customerAdmin.fields.sortOrder de=Sortierung en=Sort order
+- customer.state: keys=customerAdmin.fields.state de=Bundesland / Region en=State / region
+- customer.street_line1: keys=customerAdmin.fields.streetLine1 de=Straße und Hausnummer en=Street and house number
+- customer.street_line2: keys=customerAdmin.fields.streetLine2 de=Adresszusatz en=Address line 2
+- customer.surcharge_type: keys=customerAdmin.fields.surchargeType de=Zuschlagstyp en=Surcharge type
+- customer.tax_exempt: keys=customerAdmin.fields.taxExempt de=Steuerbefreit en=Tax exempt
+- customer.tax_exemption_reason: keys=customerAdmin.fields.taxExemptionReason de=Grund für Steuerbefreiung en=Tax-exemption reason
+- customer.tax_number: keys=customerAdmin.fields.taxNumber de=Steuernummer en=Tax number
+- customer.temporary_password: keys=customerAdmin.fields.temporaryPassword de=Temporäres Passwort en=Temporary password
+- customer.time_from_minute: keys=customerAdmin.fields.timeFromMinute de=Von Minute en=From minute
+- customer.time_to_minute: keys=customerAdmin.fields.timeToMinute de=Bis Minute en=To minute
+- customer.unit_price: keys=customerAdmin.fields.unitPrice de=Einzelpreis en=Unit price
+- customer.user_id: keys=customerAdmin.fields.userId de=Portal-Benutzer-ID en=Portal user ID
+- customer.username: keys=customerAdmin.fields.username de=Benutzername en=Username
+- customer.vat_id: keys=customerAdmin.fields.vatId de=USt-IdNr. en=VAT ID
+- customer.weekday_mask: keys=customerAdmin.fields.weekdayMask de=Wochentagsmaske en=Weekday mask
+- customer.weekdays: keys=customerAdmin.fields.weekdays de=Wochentage en=Weekdays
+- employee.absence_type: keys=employeeAdmin.fields.absenceType de=Abwesenheitsart en=Absence type
+- employee.assign_group: keys=employeeAdmin.fields.assignGroup de=Gruppe zuordnen en=Assign group
+- employee.bank_account_holder: keys=employeeAdmin.fields.bankAccountHolder de=Kontoinhaber en=Bank account holder
+- employee.bank_bic: keys=employeeAdmin.fields.bankBic de=BIC en=Bank BIC
+- employee.bank_iban: keys=employeeAdmin.fields.bankIban de=IBAN en=Bank IBAN
+- employee.birth_date: keys=employeeAdmin.fields.birthDate de=Geburtsdatum en=Birth date
+- employee.certificate_no: keys=employeeAdmin.fields.certificateNo de=Zertifikatsnummer en=Certificate number
+- employee.completed_at: keys=employeeAdmin.fields.completedAt de=Erledigt am en=Completed on
+- employee.credential_no: keys=employeeAdmin.fields.credentialNo de=Ausweisnummer en=Credential number
+- employee.credential_type: keys=employeeAdmin.fields.credentialType de=Ausweistyp en=Credential type
+- employee.decision_note: keys=employeeAdmin.fields.decisionNote de=Entscheidungsnotiz en=Decision note
+- employee.default_branch_id: keys=employeeAdmin.fields.defaultBranchId de=Standardniederlassung en=Default branch
+- employee.default_mandate_id: keys=employeeAdmin.fields.defaultMandateId de=Standardmandat en=Default mandate
+- employee.document_file: keys=employeeAdmin.fields.documentFile de=Datei en=File
+- employee.document_id: keys=employeeAdmin.fields.documentId de=Dokument-ID en=Document ID
+- employee.document_label: keys=employeeAdmin.fields.documentLabel de=Bezeichnung en=Label
+- employee.document_relation_type: keys=employeeAdmin.fields.documentRelationType de=Dokumentrelation en=Document relation
+- employee.document_title: keys=employeeAdmin.fields.documentTitle de=Dokumenttitel en=Document title
+- employee.document_type_key: keys=employeeAdmin.fields.documentTypeKey de=Dokumenttyp en=Document type
+- employee.document_version_target: keys=employeeAdmin.fields.documentVersionTarget de=Version zu Dokument en=Version target document
+- employee.emergency_contact_name: keys=employeeAdmin.fields.emergencyContactName de=Notfallkontakt en=Emergency contact name
+- employee.emergency_contact_phone: keys=employeeAdmin.fields.emergencyContactPhone de=Telefon Notfallkontakt en=Emergency contact phone
+- employee.employment_type_code: keys=employeeAdmin.fields.employmentTypeCode de=Beschäftigungsart en=Employment type
+- employee.encoded_value: keys=employeeAdmin.fields.encodedValue de=Kodierter Wert en=Encoded value
+- employee.ends_at: keys=employeeAdmin.fields.endsAt de=Endet am en=Ends at
+- employee.ends_on: keys=employeeAdmin.fields.endsOn de=Endet am en=Ends on
+- employee.first_name: keys=employeeAdmin.fields.firstName de=Vorname en=First name
+- employee.function_type: keys=employeeAdmin.fields.functionType de=Funktionstyp en=Function type
+- employee.granted_internally: keys=employeeAdmin.fields.grantedInternally de=Intern vergeben en=Granted internally
+- employee.group_code: keys=employeeAdmin.fields.groupCode de=Gruppencode en=Group code
+- employee.group_description: keys=employeeAdmin.fields.groupDescription de=Gruppenbeschreibung en=Group description
+- employee.group_name: keys=employeeAdmin.fields.groupName de=Gruppenname en=Group name
+- employee.hire_date: keys=employeeAdmin.fields.hireDate de=Eintrittsdatum en=Hire date
+- employee.issued_at: keys=employeeAdmin.fields.issuedAt de=Ausgestellt am en=Issued on
+- employee.issuing_authority: keys=employeeAdmin.fields.issuingAuthority de=Ausstellende Stelle en=Issuing authority
+- employee.last_name: keys=employeeAdmin.fields.lastName de=Nachname en=Last name
+- employee.marital_status: keys=employeeAdmin.fields.maritalStatus de=Familienstand en=Marital status
+- employee.membership_notes: keys=employeeAdmin.fields.membershipNotes de=Zuordnungsnotiz en=Assignment notes
+- employee.mobile_phone: keys=employeeAdmin.fields.mobilePhone de=Mobilnummer en=Mobile phone
+- employee.nationality_country_code: keys=employeeAdmin.fields.nationalityCountryCode de=Nationalität-Ländercode en=Nationality country code
+- employee.note_body: keys=employeeAdmin.fields.noteBody de=Inhalt en=Content
+- employee.note_title: keys=employeeAdmin.fields.noteTitle de=Notiztitel en=Note title
+- employee.note_type: keys=employeeAdmin.fields.noteType de=Notiztyp en=Note type
+- employee.notes: keys=employeeAdmin.fields.notes de=Operative Notizen en=Operational notes
+- employee.personnel_no: keys=employeeAdmin.fields.personnelNo de=Personalnummer en=Personnel number
+- employee.place_of_birth: keys=employeeAdmin.fields.placeOfBirth de=Geburtsort en=Place of birth
+- employee.preferred_name: keys=employeeAdmin.fields.preferredName de=Rufname en=Preferred name
+- employee.private_email: keys=employeeAdmin.fields.privateEmail de=Private E-Mail en=Private email
+- employee.private_phone: keys=employeeAdmin.fields.privatePhone de=Privattelefon en=Private phone
+- employee.proof_file: keys=employeeAdmin.fields.proofFile de=Nachweisdatei en=Proof file
+- employee.qualification_type: keys=employeeAdmin.fields.qualificationType de=Qualifikationstyp en=Qualification type
+- employee.record_kind: keys=employeeAdmin.fields.recordKind de=Eintragstyp en=Record kind
+- employee.recurrence_type: keys=employeeAdmin.fields.recurrenceType de=Wiederholung en=Recurrence
+- employee.reminder_at: keys=employeeAdmin.fields.reminderAt de=Erinnerungsdatum en=Reminder date
+- employee.rule_kind: keys=employeeAdmin.fields.ruleKind de=Regelart en=Rule kind
+- employee.social_security_no: keys=employeeAdmin.fields.socialSecurityNo de=Sozialversicherungsnummer en=Social security number
+- employee.starts_at: keys=employeeAdmin.fields.startsAt de=Beginnt am en=Starts at
+- employee.starts_on: keys=employeeAdmin.fields.startsOn de=Beginnt am en=Starts on
+- employee.status: keys=employeeAdmin.fields.status de=Status en=Status
+- employee.target_monthly_hours: keys=employeeAdmin.fields.targetMonthlyHours de=Monats-Sollstunden en=Target monthly hours
+- employee.target_weekly_hours: keys=employeeAdmin.fields.targetWeeklyHours de=Wochen-Sollstunden en=Target weekly hours
+- employee.tax_id: keys=employeeAdmin.fields.taxId de=Steuer-ID en=Tax ID
+- employee.termination_date: keys=employeeAdmin.fields.terminationDate de=Austrittsdatum en=Termination date
+- employee.user_id: keys=employeeAdmin.fields.userId de=Benutzerkonto-ID en=User account ID
+- employee.valid_from: keys=employeeAdmin.fields.validFrom de=Gültig ab en=Valid from
+- employee.valid_until: keys=employeeAdmin.fields.validUntil de=Gültig bis en=Valid until
+- employee.weekdays: keys=employeeAdmin.fields.weekdays de=Wochentage en=Weekdays
+- employee.work_email: keys=employeeAdmin.fields.workEmail de=Dienst-E-Mail en=Work email
+- employee.work_phone: keys=employeeAdmin.fields.workPhone de=Diensttelefon en=Work phone

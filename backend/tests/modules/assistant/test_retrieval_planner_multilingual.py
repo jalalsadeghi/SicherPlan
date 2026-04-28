@@ -52,3 +52,14 @@ def test_german_customer_order_maps_to_order_or_customer_plan_pages() -> None:
     assert "P-02" in plan.likely_page_ids
     assert "C-01" in plan.likely_page_ids
     assert "E-01" not in plan.likely_page_ids
+
+
+def test_customer_page_order_question_maps_to_customer_order_workspace() -> None:
+    plan = build_retrieval_plan(
+        message="Wie erstelle ich einen Auftrag direkt beim Kunden?",
+        route_context={"page_id": "F-02", "path": "/admin/dashboard"},
+    )
+
+    assert plan.workflow_intent == "customer_scoped_order_create"
+    assert {"C-01", "C-02", "P-04"}.issubset(set(plan.likely_page_ids))
+    assert "planning" in plan.likely_module_keys
