@@ -253,4 +253,18 @@ describe('sicherplan route authority', () => {
       expect(route?.meta?.domCached, routeName).toBe(true);
     }
   });
+
+  it('keeps Employees cached while employee detail top tabs intentionally rely on query.pageKey instead of route duplication', () => {
+    const employeesRoute = findRouteByName('SicherPlanEmployees');
+
+    expect(employeesRoute?.path).toBe('/admin/employees');
+    expect(employeesRoute?.meta?.keepAlive).toBe(true);
+    expect(employeesRoute?.meta?.domCached).toBe(true);
+    expect(employeesRoute?.meta?.authority).toEqual([
+      'tenant_admin',
+      'dispatcher',
+      'controller_qm',
+    ]);
+    expect(employeesRoute?.meta?.moduleKey).toBe('employees');
+  });
 });

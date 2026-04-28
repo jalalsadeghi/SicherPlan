@@ -162,6 +162,65 @@ describe('useAccessStore', () => {
     expect(store.tabs[2]?.meta?.title).toBe('RheinForum Koln');
   });
 
+  it('uses pageKey to keep a list tab and separate employee detail tabs under the same Employees route', () => {
+    const store = useTabbarStore();
+    const baseTab = {
+      meta: {
+        title: 'Employees',
+      },
+      name: 'SicherPlanEmployees',
+      path: '/admin/employees',
+    };
+
+    store.addTab({
+      ...baseTab,
+      fullPath: '/admin/employees',
+      query: {},
+    } as any);
+    store.addTab({
+      ...baseTab,
+      fullPath: '/admin/employees?employee_id=e1&tab=dashboard&pageKey=employees:detail:e1',
+      meta: {
+        ...baseTab.meta,
+        title: 'Leon Yilmaz',
+      },
+      query: { employee_id: 'e1', pageKey: 'employees:detail:e1', tab: 'dashboard' },
+    } as any);
+    store.addTab({
+      ...baseTab,
+      fullPath: '/admin/employees?employee_id=e2&tab=dashboard&pageKey=employees:detail:e2',
+      meta: {
+        ...baseTab.meta,
+        title: 'Markus Neumann',
+      },
+      query: { employee_id: 'e2', pageKey: 'employees:detail:e2', tab: 'dashboard' },
+    } as any);
+    store.addTab({
+      ...baseTab,
+      fullPath: '/admin/employees?employee_id=e1&tab=overview&pageKey=employees:detail:e1',
+      meta: {
+        ...baseTab.meta,
+        title: 'Leon Yilmaz',
+      },
+      query: { employee_id: 'e1', pageKey: 'employees:detail:e1', tab: 'overview' },
+    } as any);
+
+    expect(store.tabs).toHaveLength(3);
+    expect(store.tabs.map((tab) => tab.key)).toEqual([
+      '/admin/employees',
+      'employees:detail:e1',
+      'employees:detail:e2',
+    ]);
+    expect(store.tabs[0]?.meta?.title).toBe('Employees');
+    expect(store.tabs[1]?.meta?.title).toBe('Leon Yilmaz');
+    expect(store.tabs[1]?.query).toEqual({
+      employee_id: 'e1',
+      pageKey: 'employees:detail:e1',
+      tab: 'overview',
+    });
+    expect(store.tabs[2]?.meta?.title).toBe('Markus Neumann');
+  });
+
   it('keeps default fullPath tab keys for other query-driven routes', () => {
     const store = useTabbarStore();
 

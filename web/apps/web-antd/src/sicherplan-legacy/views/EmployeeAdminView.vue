@@ -2251,9 +2251,10 @@
 
 <script setup lang="ts">
 import { IconifyIcon } from "@vben/icons";
+import { useTabbarStore } from "@vben/stores";
 import type { CSSProperties } from "vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import { listBranches, listMandates, type BranchRead, type MandateRead } from "@/api/coreAdmin";
 import {
@@ -2399,8 +2400,12 @@ withDefaults(defineProps<{ embedded?: boolean }>(), {
 
 const { t } = useI18n();
 const authStore = useAuthStore();
+const route = useRoute();
 const router = useRouter();
+const tabbarStore = useTabbarStore();
 const { showFeedbackToast } = useSicherPlanFeedback();
+const EMPLOYEE_ADMIN_ROUTE_PATH = "/admin/employees";
+const EMPLOYEE_DETAIL_PAGE_KEY_PREFIX = "employees:detail:";
 
 const loading = reactive({
   list: false,
@@ -2714,6 +2719,11 @@ const selectedEmployeeLabel = computed(() =>
   selectedEmployee.value
     ? `${selectedEmployee.value.personnel_no} · ${selectedEmployee.value.first_name} ${selectedEmployee.value.last_name}`
     : t("employeeAdmin.detail.emptyTitle"),
+);
+const selectedEmployeeFullName = computed(() =>
+  selectedEmployee.value
+    ? `${selectedEmployee.value.first_name} ${selectedEmployee.value.last_name}`.trim()
+    : "",
 );
 const detailWorkspaceTitle = computed(() => {
   if (isCreatingEmployee.value) {
@@ -3122,6 +3132,43 @@ function resolveEmployeeDocumentRelationLabel(relationType: string) {
   return match?.label ?? relationType;
 }
 
+function buildEmployeeDetailPageKey(employeeId: string) {
+  return `${EMPLOYEE_DETAIL_PAGE_KEY_PREFIX}${employeeId}`;
+}
+
+function normalizeRouteQueryValue(value: unknown) {
+  return Array.isArray(value) ? `${value[0] ?? ""}`.trim() : `${value ?? ""}`.trim();
+}
+
+function currentEmployeeDetailPageKey() {
+  const pageKey = normalizeRouteQueryValue(route.query.pageKey);
+  return pageKey.startsWith(EMPLOYEE_DETAIL_PAGE_KEY_PREFIX) ? pageKey : "";
+}
+
+async function syncEmployeeTopTabTitle() {
+  const routeEmployeeId = normalizeRouteQueryValue(route.query.employee_id);
+  const title = routeEmployeeId && selectedEmployee.value?.id === routeEmployeeId && !isCreatingEmployee.value
+    ? selectedEmployeeFullName.value || t("employeeAdmin.title")
+    : t("employeeAdmin.title");
+  (route.meta as Record<string, unknown>).title = title;
+  tabbarStore.setUpdateTime();
+  await tabbarStore.setTabTitle(route, title);
+}
+
+async function replaceEmployeeDetailRouteQuery(tabId: string) {
+  if (!selectedEmployee.value?.id || isCreatingEmployee.value) {
+    return;
+  }
+  await router.replace({
+    query: {
+      ...route.query,
+      employee_id: selectedEmployee.value.id,
+      pageKey: currentEmployeeDetailPageKey() || buildEmployeeDetailPageKey(selectedEmployee.value.id),
+      tab: tabId,
+    },
+  });
+}
+
 function setFeedback(tone: "error" | "neutral" | "success", title: string, message: string) {
   showFeedbackToast({
     key: "employee-admin-feedback",
@@ -3147,6 +3194,9 @@ function selectEmployeeDetailTab(tabId: string) {
   if (tabId === "overview") {
     activeOverviewSection.value = "employee_file";
   }
+  if (!legacyEmployeeDetailTabIds.has(tabId)) {
+    void replaceEmployeeDetailRouteQuery(tabId);
+  }
 }
 
 function selectOverviewSection(sectionId: string) {
@@ -3160,6 +3210,7 @@ function openEmployeeOverviewSection(sectionId: string) {
   activeOverviewSection.value = normalizeOverviewSectionId(sectionId);
   suppressOverviewScrollSpy();
   scrollToOverviewSection(activeOverviewSection.value);
+  void replaceEmployeeDetailRouteQuery("overview");
 }
 
 function normalizeOverviewSectionId(sectionId: string): EmployeeOverviewSectionId {
@@ -3741,10 +3792,15 @@ async function handleOpenEmployeeSearchResults() {
 async function openEmployeeWorkspace(employeeId: string, detailTab = "dashboard") {
   closeAdvancedFiltersDialog();
   closeImportExportDialog();
+  await router.push({
+    path: EMPLOYEE_ADMIN_ROUTE_PATH,
+    query: {
+      employee_id: employeeId,
+      pageKey: buildEmployeeDetailPageKey(employeeId),
+      tab: detailTab,
+    },
+  });
   await selectEmployee(employeeId, { fallbackTab: detailTab });
-  if (!legacyEmployeeDetailTabIds.has(detailTab)) {
-    activeDetailTab.value = detailTab;
-  }
 }
 
 async function selectEmployeeFromSearchResult(employeeId: string) {
@@ -3768,10 +3824,14 @@ async function selectEmployeeFromSuggestion(employee: EmployeeListItem) {
 }
 
 async function returnToEmployeeList() {
-  isCreatingEmployee.value = false;
-  resetSelectedEmployeeWorkspaceState();
   closeAdvancedFiltersDialog();
   closeImportExportDialog();
+  isCreatingEmployee.value = false;
+  resetSelectedEmployeeWorkspaceState();
+  await router.push({
+    path: EMPLOYEE_ADMIN_ROUTE_PATH,
+    query: {},
+  });
   await nextTick();
 }
 
@@ -4473,6 +4533,10 @@ async function selectEmployee(employeeId: string, options: SelectEmployeeOptions
         employeeDetailTabs.value.map((tab) => tab.id),
         fallbackTab,
       );
+    }
+    const routeEmployeeId = normalizeRouteQueryValue(route.query.employee_id);
+    if (routeEmployeeId === employeeId) {
+      await replaceEmployeeDetailRouteQuery(activeDetailTab.value);
     }
     await refreshPhotoPreview();
   } catch (error) {
@@ -5490,6 +5554,23 @@ watch(
 );
 
 watch(
+  () => [selectedEmployee.value?.id ?? "", route.query.employee_id, route.query.pageKey, isCreatingEmployee.value] as const,
+  async ([selectedEmployeeId]) => {
+    const routeEmployeeId = normalizeRouteQueryValue(route.query.employee_id);
+    if (selectedEmployeeId && routeEmployeeId === selectedEmployeeId) {
+      await syncEmployeeTopTabTitle();
+      return;
+    }
+    if (!routeEmployeeId) {
+      await syncEmployeeTopTabTitle();
+      return;
+    }
+    (route.meta as Record<string, unknown>).title = t("employeeAdmin.title");
+  },
+  { immediate: true },
+);
+
+watch(
   () => [
     activeDetailTab.value,
     selectedEmployee.value?.id,
@@ -5621,6 +5702,14 @@ onMounted(async () => {
   tenantScopeInput.value = authStore.effectiveTenantScopeId || authStore.tenantScopeId;
   resetEmployeeDraft();
   await refreshEmployees({ autoSelectFirst: false });
+  const routeEmployeeId = normalizeRouteQueryValue(route.query.employee_id);
+  if (routeEmployeeId) {
+    await selectEmployee(routeEmployeeId, {
+      fallbackTab: normalizeRouteQueryValue(route.query.tab) || "dashboard",
+    });
+  } else {
+    await syncEmployeeTopTabTitle();
+  }
 });
 
 onBeforeUnmount(() => {

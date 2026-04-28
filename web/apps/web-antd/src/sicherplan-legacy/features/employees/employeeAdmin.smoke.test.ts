@@ -6,7 +6,15 @@ import { defineComponent, reactive } from "vue";
 
 import EmployeeAdminView from "../../views/EmployeeAdminView.vue";
 
+const routeState = reactive({
+  meta: {} as Record<string, unknown>,
+  query: {} as Record<string, unknown>,
+});
+
 const routerPushMock = vi.fn();
+const routerReplaceMock = vi.fn();
+const setTabTitleMock = vi.fn();
+const setUpdateTimeMock = vi.fn();
 const showFeedbackToastMock = vi.fn();
 
 const authStoreState = reactive({
@@ -243,8 +251,17 @@ vi.mock("@/i18n", () => ({
 }));
 
 vi.mock("vue-router", () => ({
+  useRoute: () => routeState,
   useRouter: () => ({
     push: routerPushMock,
+    replace: routerReplaceMock,
+  }),
+}));
+
+vi.mock("@vben/stores", () => ({
+  useTabbarStore: () => ({
+    setTabTitle: setTabTitleMock,
+    setUpdateTime: setUpdateTimeMock,
   }),
 }));
 
@@ -626,7 +643,12 @@ async function mountEmployeeAdmin() {
 }
 
 async function openFirstEmployeeWorkspace(wrapper: VueWrapper<any>) {
-  await wrapper.get('[data-testid="employee-list-row"]').trigger("click");
+  const firstRow = wrapper.find('[data-testid="employee-list-row"]');
+  if (!firstRow.exists()) {
+    await settle();
+    return wrapper;
+  }
+  await firstRow.trigger("click");
   await settle();
   return wrapper;
 }
@@ -637,6 +659,9 @@ function detailTabLabels(wrapper: VueWrapper<any>) {
 
 describe("EmployeeAdminView search dialog regression", () => {
   beforeEach(() => {
+    routeState.meta = {};
+    routeState.query = {};
+
     authStoreState.accessToken = "token-1";
     authStoreState.activeRole = "tenant_admin";
     authStoreState.effectiveAccessToken = "token-1";
@@ -650,6 +675,19 @@ describe("EmployeeAdminView search dialog regression", () => {
     authStoreState.setTenantScopeId.mockClear();
 
     routerPushMock.mockReset();
+    routerReplaceMock.mockReset();
+    routerPushMock.mockImplementation(async (location: { path?: string; query?: Record<string, unknown> } | string) => {
+      if (typeof location === "string") {
+        routeState.query = {};
+        return;
+      }
+      routeState.query = location.query ? { ...location.query } : {};
+    });
+    routerReplaceMock.mockImplementation(async (location: { query?: Record<string, unknown> }) => {
+      routeState.query = location.query ? { ...location.query } : {};
+    });
+    setTabTitleMock.mockReset();
+    setUpdateTimeMock.mockReset();
     showFeedbackToastMock.mockReset();
 
     Object.values(apiMocks).forEach((mock) => mock.mockReset());
@@ -752,6 +790,73 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(firstRow?.find(".employee-admin-employee-row__meta").text()).toContain("markus.neumann@example.test");
     expect(wrapper.get('[data-testid="employee-list-header-import-export"]').classes()).toContain("employee-admin-header-action");
     expect(wrapper.get('[data-testid="employee-list-header-new-employee"]').classes()).toContain("employee-admin-header-action");
+    expect(routeState.meta.title).toBe("Employees");
+  });
+
+  it("opens employee detail workspaces through pageKey-backed top-tab routing and syncs the employee title", async () => {
+    const wrapper = await mountEmployeeAdmin();
+
+    await wrapper.findAll('[data-testid="employee-list-row"]')[1]!.trigger("click");
+    await settle();
+
+    expect(routerPushMock).toHaveBeenCalledWith({
+      path: "/admin/employees",
+      query: {
+        employee_id: "employee-leon",
+        pageKey: "employees:detail:employee-leon",
+        tab: "dashboard",
+      },
+    });
+    expect(routeState.query).toEqual({
+      employee_id: "employee-leon",
+      pageKey: "employees:detail:employee-leon",
+      tab: "dashboard",
+    });
+    expect(routeState.meta.title).toBe("Leon Yilmaz");
+    expect(setTabTitleMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        meta: expect.objectContaining({ title: "Leon Yilmaz" }),
+        query: expect.objectContaining({
+          employee_id: "employee-leon",
+          pageKey: "employees:detail:employee-leon",
+        }),
+      }),
+      "Leon Yilmaz",
+    );
+  });
+
+  it("keeps the same pageKey when switching internal employee detail tabs and routes back to the list without pageKey", async () => {
+    const wrapper = await mountEmployeeAdmin();
+
+    await openFirstEmployeeWorkspace(wrapper);
+    routerReplaceMock.mockClear();
+    routerPushMock.mockClear();
+
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    expect(routerReplaceMock).toHaveBeenCalledWith({
+      query: {
+        employee_id: "employee-markus",
+        pageKey: "employees:detail:employee-markus",
+        tab: "overview",
+      },
+    });
+    expect(routeState.query).toEqual({
+      employee_id: "employee-markus",
+      pageKey: "employees:detail:employee-markus",
+      tab: "overview",
+    });
+
+    await wrapper.get('[data-testid="employee-detail-back-to-list"]').trigger("click");
+    await settle();
+
+    expect(routerPushMock).toHaveBeenCalledWith({
+      path: "/admin/employees",
+      query: {},
+    });
+    expect(routeState.query).toEqual({});
+    expect(routeState.meta.title).toBe("Employees");
   });
 
   it("preloads employee list thumbnails on first load from list photo metadata without opening detail first", async () => {
