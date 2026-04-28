@@ -51,16 +51,31 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Smoke test field_dictionary_export import
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from app.modules.assistant.field_dictionary_export import main
+          print("field_dictionary_export import ok")
+          PY
 
       - name: Verify committed field/lookup corpus artifact is current
+        working-directory: backend
         run: |
           tmp_corpus="$(mktemp)"
-          PYTHONPATH=backend python -m app.modules.assistant.field_dictionary_export \
-            --repo-root . \
+          python -m app.modules.assistant.field_dictionary_export \
+            --repo-root .. \
             --output "$tmp_corpus"
-          if ! cmp --silent backend/app/modules/assistant/generated/field_lookup_corpus.json "$tmp_corpus"; then
+          if ! diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp_corpus"; then
             echo "Generated field/lookup corpus artifact is stale. Regenerate backend/app/modules/assistant/generated/field_lookup_corpus.json." >&2
-            diff -u backend/app/modules/assistant/generated/field_lookup_corpus.json "$tmp_corpus" || true
             exit 1
           fi
 

@@ -5,10 +5,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from app.modules.assistant.field_dictionary import export_field_lookup_corpus
-
 
 def main() -> int:
+    from app.modules.assistant.field_dictionary import export_field_lookup_corpus
+
     parser = argparse.ArgumentParser(description="Export the SicherPlan assistant field/lookup corpus artifact.")
     parser.add_argument(
         "--repo-root",
