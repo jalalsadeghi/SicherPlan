@@ -1247,6 +1247,7 @@ import {
 } from "@/api/planningStaffing";
 import SicherPlanLoadingOverlay from "@/components/SicherPlanLoadingOverlay.vue";
 import { planningStaffingMessages } from "@/i18n/planningStaffing.messages";
+import { useIsRouteCachePaneActive } from "@vben/layouts/route-cached";
 import {
   listSubcontractorWorkers,
   type SubcontractorWorkerListItem,
@@ -1285,6 +1286,7 @@ const RULE_TEXT_MAP = {
 
 const primaryAuthStore = usePrimaryAuthStore();
 const authStore = useAuthStore();
+const isRouteCachePaneActive = useIsRouteCachePaneActive();
 const localeStore = useLocaleStore();
 const route = useRoute();
 
@@ -3152,12 +3154,18 @@ async function recoverSessionAndRefresh() {
 }
 
 function handleVisibilityChange() {
+  if (!isRouteCachePaneActive.value) {
+    return;
+  }
   if (document.visibilityState === "visible") {
     void recoverSessionAndRefresh();
   }
 }
 
 function handleWindowFocus() {
+  if (!isRouteCachePaneActive.value) {
+    return;
+  }
   void recoverSessionAndRefresh();
 }
 

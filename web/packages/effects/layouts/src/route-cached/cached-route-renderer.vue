@@ -2,12 +2,13 @@
 import type { VNode } from 'vue';
 import type { RouteLocationNormalizedLoadedGeneric } from 'vue-router';
 
-import { computed, provide, shallowReactive, watch } from 'vue';
+import { cloneVNode, computed, provide, shallowReactive, watch } from 'vue';
 import { routeLocationKey } from 'vue-router';
 
 import { transformComponent } from '../hooks';
 
 interface Props {
+  cacheKey: string;
   component?: VNode;
   route: RouteLocationNormalizedLoadedGeneric;
 }
@@ -41,10 +42,14 @@ const renderedComponent = computed(() => {
   if (!props.component) {
     return undefined;
   }
-  return transformComponent(props.component, localRoute);
+  const component = transformComponent(props.component, localRoute);
+  if (!component) {
+    return undefined;
+  }
+  return cloneVNode(component, { key: props.cacheKey });
 });
 </script>
 
 <template>
-  <component :is="renderedComponent" />
+  <component :is="renderedComponent" :key="cacheKey" />
 </template>

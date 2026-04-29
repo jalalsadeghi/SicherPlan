@@ -1301,11 +1301,13 @@ import {
 } from "@/features/planning/planningOrders.helpers.js";
 import { formatPlanningCustomerOption, hasPlanningPermission } from "@/features/planning/planningAdmin.helpers.js";
 import { planningOrdersMessages } from "@/i18n/planningOrders.messages";
+import { useIsRouteCachePaneActive } from "@vben/layouts/route-cached";
 import { useLocaleStore } from "@/stores/locale";
 import { useAuthStore } from "@/stores/auth";
 
 const authStore = useAuthStore();
 const primaryAuthStore = usePrimaryAuthStore();
+const isRouteCachePaneActive = useIsRouteCachePaneActive();
 const localeStore = useLocaleStore();
 const router = useRouter();
 const { showFeedbackToast } = useSicherPlanFeedback();
@@ -3378,6 +3380,9 @@ async function refreshPlanningOrdersData() {
 }
 
 async function recoverSessionAndRefreshPlanningOrders() {
+  if (!isRouteCachePaneActive.value) {
+    return;
+  }
   if (typeof document !== "undefined" && document.visibilityState === "hidden") {
     return;
   }

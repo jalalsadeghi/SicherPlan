@@ -558,6 +558,7 @@
               <div class="customer-admin-contact-access-content">
                 <section
                   id="customer-contacts-access-section-contacts"
+                  :ref="(element) => setCustomerContactAccessSectionRef('contacts', element)"
                   class="customer-admin-contact-access-section-card"
                   data-testid="customer-contacts-access-section-contacts"
                 >
@@ -621,6 +622,7 @@
 
                 <section
                   id="customer-contacts-access-section-addresses"
+                  :ref="(element) => setCustomerContactAccessSectionRef('addresses', element)"
                   class="customer-admin-contact-access-section-card"
                   data-testid="customer-contacts-access-section-addresses"
                 >
@@ -687,6 +689,7 @@
 
                 <section
                   id="customer-contacts-access-section-portal"
+                  :ref="(element) => setCustomerContactAccessSectionRef('portal', element)"
                   class="customer-admin-contact-access-section-card"
                   data-testid="customer-contacts-access-section-portal"
                 >
@@ -2399,6 +2402,10 @@ import {
   unlinkCustomerPortalAccess,
   updateCustomerPortalAccessStatus,
 } from "#/api/sicherplan/customer-portal-access";
+import {
+  useIsRouteCachePaneActive,
+  useRouteCacheScrollTarget,
+} from "@vben/layouts/route-cached";
 import { useI18n } from "@/i18n";
 import { useAuthStore } from "@/stores/auth";
 import { useRoute, useRouter } from "vue-router";
@@ -2413,6 +2420,8 @@ const route = useRoute();
 const router = useRouter();
 const tabbarStore = useTabbarStore();
 const { showFeedbackToast } = useSicherPlanFeedback();
+const isRouteCachePaneActive = useIsRouteCachePaneActive();
+const routeCacheScrollTarget = useRouteCacheScrollTarget();
 
 const customers = ref<CustomerListItem[]>([]);
 const customerHistory = ref<CustomerHistoryEntryRead[]>([]);
@@ -2454,6 +2463,11 @@ const addressEditorModalOpen = ref(false);
 const addressEditorErrorMessage = ref("");
 const contactAccessOnePageRef = ref<HTMLElement | null>(null);
 const contactAccessNavShellRef = ref<HTMLElement | null>(null);
+const customerContactAccessSectionRefs = reactive<Record<"addresses" | "contacts" | "portal", HTMLElement | null>>({
+  addresses: null,
+  contacts: null,
+  portal: null,
+});
 const contactAccessNavFloatingMode = ref<"fixed" | "pinned" | "static">("static");
 const contactAccessNavFloatingStyle = ref<CSSProperties>({});
 const pendingRouteCustomerId = ref("");
@@ -2745,6 +2759,7 @@ let customerContactAccessSectionObserver: IntersectionObserver | null = null;
 let suppressContactAccessScrollSpyUntil = 0;
 let contactAccessNavScrollTargets: Array<HTMLElement | Window> = [];
 let contactAccessNavFloatingRaf: number | null = null;
+let customerContactAccessVisibilityObserver: MutationObserver | null = null;
 const customerContactAccessVisibleEntries = new Map<CustomerContactAccessSectionId, IntersectionObserverEntry>();
 const detailTabLabelKeys = {
   dashboard: "customerAdmin.tabs.dashboard",
@@ -3137,13 +3152,44 @@ function currentCustomerDetailPageKey() {
   return pageKey.startsWith(CUSTOMER_DETAIL_PAGE_KEY_PREFIX) ? pageKey : "";
 }
 
+function isCustomerDetailQuery(customerId: string, pageKey = normalizeRouteQueryValue(route.query.pageKey)) {
+  return !!customerId && pageKey === buildCustomerDetailPageKey(customerId);
+}
+
+function buildCustomerDetailTabTarget(customerId: string, detailTab = activeDetailTab.value) {
+  return {
+    key: buildCustomerDetailPageKey(customerId),
+    meta: route.meta,
+    name: route.name,
+    path: CUSTOMER_ADMIN_ROUTE_PATH,
+    query: {
+      customer_id: customerId,
+      pageKey: buildCustomerDetailPageKey(customerId),
+      tab: detailTab,
+    },
+  };
+}
+
 async function syncCustomerTopTabTitle() {
   const title = selectedCustomer.value && !isCreatingCustomer.value
     ? selectedCustomer.value.name
     : t("customerAdmin.title");
   (route.meta as Record<string, unknown>).title = title;
   tabbarStore.setUpdateTime();
-  await tabbarStore.setTabTitle(route, title);
+  if (selectedCustomer.value?.id && isCustomerDetailQuery(selectedCustomer.value.id)) {
+    await tabbarStore.setTabTitle(buildCustomerDetailTabTarget(selectedCustomer.value.id) as any, title);
+    return;
+  }
+  await tabbarStore.setTabTitle(
+    {
+      key: CUSTOMER_ADMIN_ROUTE_PATH,
+      meta: route.meta,
+      name: route.name,
+      path: CUSTOMER_ADMIN_ROUTE_PATH,
+      query: {},
+    } as any,
+    title,
+  );
 }
 
 function customerListSearchHaystack(customer: CustomerListItem) {
@@ -3188,6 +3234,14 @@ function resolveCustomerContactAccessSectionElementId(sectionId: CustomerContact
   return `customer-contacts-access-section-${sectionId}`;
 }
 
+function setCustomerContactAccessSectionRef(sectionId: CustomerContactAccessSectionId, element: Element | null) {
+  customerContactAccessSectionRefs[sectionId] = element instanceof HTMLElement ? element : null;
+}
+
+function resolveCustomerContactAccessSectionElement(sectionId: CustomerContactAccessSectionId) {
+  return customerContactAccessSectionRefs[sectionId];
+}
+
 function suppressCustomerContactAccessScrollSpy() {
   if (typeof window === "undefined") {
     return;
@@ -3195,9 +3249,17 @@ function suppressCustomerContactAccessScrollSpy() {
   suppressContactAccessScrollSpyUntil = window.performance.now() + 650;
 }
 
+function isCustomerContactAccessInstanceVisible() {
+  const element = contactAccessOnePageRef.value;
+  if (!element || !isRouteCachePaneActive.value) {
+    return false;
+  }
+  return element.getClientRects().length > 0;
+}
+
 function scrollToCustomerContactAccessSection(sectionId: CustomerContactAccessSectionId) {
   void nextTick(() => {
-    const sectionElement = document.getElementById(resolveCustomerContactAccessSectionElementId(sectionId));
+    const sectionElement = resolveCustomerContactAccessSectionElement(sectionId);
     if (sectionElement && typeof sectionElement.scrollIntoView === "function") {
       sectionElement.scrollIntoView({
         behavior: "smooth",
@@ -3214,17 +3276,19 @@ function selectCustomerContactAccessSection(sectionId: string) {
 }
 
 function resolveCustomerContactAccessSectionIdFromElement(element: Element): CustomerContactAccessSectionId | null {
-  const sectionId = element.id.replace(/^customer-contacts-access-section-/, "");
-  const normalizedSectionId = normalizeCustomerContactAccessSectionId(sectionId);
-  return customerContactAccessSections.value.some((section) => section.id === normalizedSectionId)
-    ? normalizedSectionId
-    : null;
+  const matchingEntry = Object.entries(customerContactAccessSectionRefs).find(([, sectionElement]) => sectionElement === element);
+  return (matchingEntry?.[0] as CustomerContactAccessSectionId | undefined) ?? null;
 }
 
 function disconnectCustomerContactAccessSectionObserver() {
   customerContactAccessSectionObserver?.disconnect();
   customerContactAccessSectionObserver = null;
   customerContactAccessVisibleEntries.clear();
+}
+
+function disconnectCustomerContactAccessVisibilityObserver() {
+  customerContactAccessVisibilityObserver?.disconnect();
+  customerContactAccessVisibilityObserver = null;
 }
 
 function isCustomerContactAccessScrollableAncestor(element: HTMLElement) {
@@ -3247,7 +3311,10 @@ function findCustomerContactAccessScrollContainers() {
 }
 
 function resolveContactAccessIntersectionRoot() {
-  return findCustomerContactAccessScrollContainers()[0] ?? null;
+  if (!isCustomerContactAccessInstanceVisible()) {
+    return null;
+  }
+  return findCustomerContactAccessScrollContainers()[0] ?? (routeCacheScrollTarget.value instanceof HTMLElement ? routeCacheScrollTarget.value : null);
 }
 
 function resolveCustomerContactAccessStickyTop() {
@@ -3317,6 +3384,7 @@ function updateContactAccessNavFloating() {
     activeDetailTab.value !== "contact_access"
     || !onePageElement
     || !navShell
+    || !isCustomerContactAccessInstanceVisible()
     || !window.matchMedia(`(min-width: ${CUSTOMER_CONTACT_ACCESS_NAV_FLOATING_MIN_WIDTH}px)`).matches
   ) {
     resetContactAccessNavFloating();
@@ -3376,7 +3444,15 @@ function setupContactAccessNavFloating() {
     return;
   }
 
-  contactAccessNavScrollTargets = [window, ...findCustomerContactAccessScrollContainers()];
+  if (!isCustomerContactAccessInstanceVisible()) {
+    return;
+  }
+
+  const scrollTarget = routeCacheScrollTarget.value;
+  contactAccessNavScrollTargets = [
+    scrollTarget,
+    ...findCustomerContactAccessScrollContainers().filter((target) => target !== scrollTarget),
+  ];
   contactAccessNavScrollTargets.forEach((target) =>
     target.addEventListener("scroll", scheduleContactAccessNavFloatingUpdate, { passive: true }),
   );
@@ -3387,12 +3463,16 @@ function setupContactAccessNavFloating() {
 function setupCustomerContactAccessSectionObserver() {
   disconnectCustomerContactAccessSectionObserver();
 
-  if (activeDetailTab.value !== "contact_access" || typeof window.IntersectionObserver === "undefined") {
+  if (
+    activeDetailTab.value !== "contact_access"
+    || typeof window.IntersectionObserver === "undefined"
+    || !isCustomerContactAccessInstanceVisible()
+  ) {
     return;
   }
 
   const sectionElements = customerContactAccessSections.value
-    .map((section) => document.getElementById(resolveCustomerContactAccessSectionElementId(section.id)))
+    .map((section) => resolveCustomerContactAccessSectionElement(section.id))
     .filter((element): element is HTMLElement => !!element);
 
   if (!sectionElements.length) {
@@ -3402,6 +3482,9 @@ function setupCustomerContactAccessSectionObserver() {
   const stickyTop = resolveCustomerContactAccessStickyTop();
   customerContactAccessSectionObserver = new IntersectionObserver(
     (entries) => {
+      if (!isCustomerContactAccessInstanceVisible()) {
+        return;
+      }
       if (window.performance.now() < suppressContactAccessScrollSpyUntil) {
         return;
       }
@@ -3431,6 +3514,37 @@ function setupCustomerContactAccessSectionObserver() {
   );
 
   sectionElements.forEach((element) => customerContactAccessSectionObserver?.observe(element));
+}
+
+function handleCustomerContactAccessVisibilityChange() {
+  if (activeDetailTab.value !== "contact_access") {
+    return;
+  }
+  if (!isCustomerContactAccessInstanceVisible()) {
+    disconnectCustomerContactAccessSectionObserver();
+    teardownContactAccessNavFloating();
+    return;
+  }
+  void nextTick(() => {
+    setupContactAccessNavFloating();
+    setupCustomerContactAccessSectionObserver();
+  });
+}
+
+function setupCustomerContactAccessVisibilityObserver() {
+  disconnectCustomerContactAccessVisibilityObserver();
+
+  if (typeof window.MutationObserver === "undefined" || !contactAccessOnePageRef.value) {
+    return;
+  }
+
+  customerContactAccessVisibilityObserver = new MutationObserver(() => {
+    handleCustomerContactAccessVisibilityChange();
+  });
+  customerContactAccessVisibilityObserver.observe(contactAccessOnePageRef.value, {
+    attributeFilter: ["class", "style"],
+    attributes: true,
+  });
 }
 
 function syncSurchargeWeekdayMask() {
@@ -3514,6 +3628,7 @@ async function applyAdvancedFilters() {
 
 async function openCustomerWorkspace(customerId: string, detailTab = "dashboard") {
   routeCustomerNotFound.value = false;
+  const title = customers.value.find((customer) => customer.id === customerId)?.name;
   await router.push({
     path: CUSTOMER_ADMIN_ROUTE_PATH,
     query: {
@@ -3522,9 +3637,15 @@ async function openCustomerWorkspace(customerId: string, detailTab = "dashboard"
       pageKey: buildCustomerDetailPageKey(customerId),
     },
   });
+  if (title) {
+    await tabbarStore.setTabTitle(buildCustomerDetailTabTarget(customerId, detailTab) as any, title);
+  }
 }
 
 function handleCustomerSearchWindowKeydown(event: KeyboardEvent) {
+  if (!isRouteCachePaneActive.value) {
+    return;
+  }
   if (event.key === "Escape" && advancedFiltersModalOpen.value) {
     closeAdvancedFiltersDialog();
   }
@@ -5791,6 +5912,7 @@ watch(
     }
     activeContactAccessSection.value = "contacts";
     await nextTick();
+    setupCustomerContactAccessVisibilityObserver();
     setupContactAccessNavFloating();
     setupCustomerContactAccessSectionObserver();
   },
@@ -5918,6 +6040,7 @@ watch(
 
 onMounted(() => {
   window.addEventListener("keydown", handleCustomerSearchWindowKeydown);
+  setupCustomerContactAccessVisibilityObserver();
   authStore.syncFromPrimarySession();
   resetCustomerDraft();
   resetContactDraft();
@@ -5942,6 +6065,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleCustomerSearchWindowKeydown);
+  disconnectCustomerContactAccessVisibilityObserver();
   disconnectCustomerContactAccessSectionObserver();
   teardownContactAccessNavFloating();
 });

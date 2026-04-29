@@ -17,6 +17,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./route-cached": {
+      "types": "./src/route-cached/index.ts",
+      "default": "./src/route-cached/index.ts"
     }
   },
   "dependencies": {

@@ -801,6 +801,7 @@ describe("CustomerAdminView search dialog", () => {
     expect(`${routeState.meta.title}`).not.toContain("...");
     expect(setTabTitleMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        key: "customers:detail:customer-default",
         query: expect.objectContaining({
           customer_id: "customer-default",
           pageKey: "customers:detail:customer-default",
@@ -1419,6 +1420,35 @@ describe("CustomerAdminView search dialog", () => {
     await settle();
 
     expect(wrapper.get('[data-testid="customer-contacts-access-nav-addresses"]').attributes("aria-current")).toBe("true");
+  });
+
+  it("keeps contact-access nav state isolated across multiple mounted customer detail tabs", async () => {
+    apiMocks.listCustomersMock.mockImplementation(async () => [
+      buildCustomerListItem("customer-rhein", "RheinForum Köln", "K-1000", "active"),
+      buildCustomerListItem("customer-hafen", "HafenKontor Köln", "K-1001", "active"),
+    ]);
+    routeState.query = {
+      customer_id: "customer-rhein",
+      pageKey: "customers:detail:customer-rhein",
+      tab: "contact_access",
+    };
+    const rheinWrapper = await mountCustomerAdmin();
+
+    routeState.query = {
+      customer_id: "customer-hafen",
+      pageKey: "customers:detail:customer-hafen",
+      tab: "contact_access",
+    };
+    const hafenWrapper = await mountCustomerAdmin();
+
+    await rheinWrapper.get('[data-testid="customer-contacts-access-nav-addresses"]').trigger("click");
+    await hafenWrapper.get('[data-testid="customer-contacts-access-nav-portal"]').trigger("click");
+    await settle();
+
+    expect(rheinWrapper.get('[data-testid="customer-contacts-access-nav-addresses"]').attributes("aria-current")).toBe("true");
+    expect(rheinWrapper.get('[data-testid="customer-contacts-access-nav-portal"]').attributes("aria-current")).toBeUndefined();
+    expect(hafenWrapper.get('[data-testid="customer-contacts-access-nav-portal"]').attributes("aria-current")).toBe("true");
+    expect(hafenWrapper.get('[data-testid="customer-contacts-access-nav-addresses"]').attributes("aria-current")).toBeUndefined();
   });
 
   it("renders Orders as the customer detail tab label and no longer shows Plans", async () => {

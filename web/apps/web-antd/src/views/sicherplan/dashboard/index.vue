@@ -36,6 +36,7 @@ import {
   coverageTone,
   resolvePlanningStaffingCoverageState,
 } from '#/sicherplan-legacy/features/planning/planningStaffing.helpers';
+import { useIsRouteCachePaneActive } from '@vben/layouts/route-cached';
 
 defineOptions({ name: 'SicherPlanDashboard' });
 
@@ -63,6 +64,7 @@ interface CalendarCellItem {
 const accessStore = useAccessStore();
 const legacyAuthStore = useLegacyAuthStore();
 const userStore = useUserStore();
+const isRouteCachePaneActive = useIsRouteCachePaneActive();
 
 const loading = ref(false);
 const activeDate = ref(new Date());
@@ -430,12 +432,18 @@ async function recoverSessionAndLoadDashboard() {
 }
 
 function handleVisibilityChange() {
+  if (!isRouteCachePaneActive.value) {
+    return;
+  }
   if (document.visibilityState === 'visible') {
     void recoverSessionAndLoadDashboard();
   }
 }
 
 function handleWindowFocus() {
+  if (!isRouteCachePaneActive.value) {
+    return;
+  }
   void recoverSessionAndLoadDashboard();
 }
 

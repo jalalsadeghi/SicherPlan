@@ -17,6 +17,8 @@ function makeCachedRoute(key: string, route: any) {
 }
 
 describe('RouteCachedView scroll isolation', () => {
+  let hasRouteCacheSessionState: (cacheKey: string) => boolean;
+  let resetRouteCacheSessionState: () => void;
   let RouteCachedView: any;
   let mockedState: {
     cachedRoutesRef: ReturnType<typeof ref<Map<string, any>>>;
@@ -100,6 +102,9 @@ describe('RouteCachedView scroll isolation', () => {
       }),
     }));
 
+    const sessionModule = await import('./route-cache-session');
+    hasRouteCacheSessionState = sessionModule.hasRouteCacheSessionState;
+    resetRouteCacheSessionState = sessionModule.resetRouteCacheSessionState;
     RouteCachedView = (await import('./route-cached-view.vue')).default;
 
     Object.defineProperty(document, 'scrollingElement', {
@@ -117,6 +122,7 @@ describe('RouteCachedView scroll isolation', () => {
   });
 
   afterEach(() => {
+    resetRouteCacheSessionState();
     vi.restoreAllMocks();
   });
 
@@ -209,12 +215,22 @@ describe('RouteCachedView scroll isolation', () => {
     await nextTick();
     document.documentElement.scrollTop = 700;
     document.documentElement.dispatchEvent(new Event('scroll'));
+    setRoute('/admin/employees', { employee_id: 'e2', pageKey: 'employees:detail:e2', tab: 'overview' });
+    await nextTick();
+    document.documentElement.scrollTop = 920;
+    document.documentElement.dispatchEvent(new Event('scroll'));
+
+    expect(hasRouteCacheSessionState('employees:detail:e1')).toBe(true);
+    expect(hasRouteCacheSessionState('employees:detail:e2')).toBe(true);
 
     mockedState.tabsRef.value = [
       { meta: { domCached: true }, path: '/admin/dashboard' },
       { meta: { domCached: true }, path: '/admin/employees', query: { employee_id: 'e1', pageKey: 'employees:detail:e1', tab: 'overview' } },
     ];
     await nextTick();
+
+    expect(hasRouteCacheSessionState('employees:detail:e2')).toBe(false);
+    expect(hasRouteCacheSessionState('employees:detail:e1')).toBe(true);
 
     setRoute('/admin/dashboard');
     await nextTick();

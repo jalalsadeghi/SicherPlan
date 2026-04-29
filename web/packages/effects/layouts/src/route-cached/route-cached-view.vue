@@ -11,8 +11,13 @@ import CachedRouteRenderer from './cached-route-renderer.vue';
 import {
   getRouteCacheScrollTarget,
   readRouteCacheScrollTop,
-  writeRouteCacheScrollTop,
 } from './route-cache-scroll';
+import RouteCachePane from './route-cache-pane.vue';
+import {
+  cleanupMissingRouteCacheSessions,
+  restoreRouteCacheSessionScrollPosition,
+  saveRouteCacheSessionScrollPosition,
+} from './route-cache-session';
 
 const route = useRoute();
 
@@ -36,17 +41,6 @@ const computedCachedRouteKeys = computed(() => {
   return unref(getTabs)
     .filter((item) => item.meta.domCached)
     .map((item) => getTabKey(item));
-});
-
-/**
- * 监听缓存路由变化，删除不存在的缓存路由
- */
-watch(computedCachedRouteKeys, (keys) => {
-  unref(getCachedRoutes).forEach((item) => {
-    if (!keys.includes(item.key)) {
-      removeCachedRoute(item.key);
-    }
-  });
 });
 
 /**
@@ -76,8 +70,6 @@ const computedShowView = computed(() => unref(computedCachedRoutes).length > 0);
 const computedCurrentRouteKey = computed(() => {
   return getTabKey(route);
 });
-
-const cachedScrollPositions = new Map<string, number>();
 
 let activeScrollTarget: HTMLElement | null = null;
 let pendingRestoreFrame: number | null = null;
@@ -118,11 +110,11 @@ function saveScrollPosition(key = unref(computedCurrentRouteKey)) {
   if (!key) {
     return;
   }
-  cachedScrollPositions.set(key, readRouteCacheScrollTop(document));
+  saveRouteCacheSessionScrollPosition(key, readRouteCacheScrollTop(document));
 }
 
 function restoreScrollPosition(key: string) {
-  writeRouteCacheScrollTop(cachedScrollPositions.get(key) ?? 0, document);
+  restoreRouteCacheSessionScrollPosition(key, document);
 }
 
 function scheduleRestoreScrollPosition(key: string) {
@@ -130,7 +122,8 @@ function scheduleRestoreScrollPosition(key: string) {
   attachScrollListener();
   restoreScrollPosition(key);
   void nextTick(() => {
-    pendingRestoreFrame = window.requestAnimationFrame(() => {
+    pendingRestoreFrame = -1;
+    const frameId = window.requestAnimationFrame(() => {
       pendingRestoreFrame = null;
       if (unref(computedCurrentRouteKey) !== key) {
         return;
@@ -138,6 +131,9 @@ function scheduleRestoreScrollPosition(key: string) {
       attachScrollListener();
       restoreScrollPosition(key);
     });
+    if (pendingRestoreFrame !== null) {
+      pendingRestoreFrame = frameId;
+    }
   });
 }
 
@@ -145,10 +141,14 @@ function handleActiveScroll() {
   if (pendingSaveFrame !== null) {
     return;
   }
-  pendingSaveFrame = window.requestAnimationFrame(() => {
+  pendingSaveFrame = -1;
+  const frameId = window.requestAnimationFrame(() => {
     pendingSaveFrame = null;
     saveScrollPosition();
   });
+  if (pendingSaveFrame !== null) {
+    pendingSaveFrame = frameId;
+  }
 }
 
 watch(
@@ -165,10 +165,10 @@ watch(
 );
 
 watch(computedCachedRouteKeys, (keys) => {
-  const activeKeys = new Set(keys);
-  for (const key of [...cachedScrollPositions.keys()]) {
-    if (!activeKeys.has(key)) {
-      cachedScrollPositions.delete(key);
+  cleanupMissingRouteCacheSessions(keys);
+  for (const item of unref(getCachedRoutes).values()) {
+    if (!keys.includes(item.key)) {
+      removeCachedRoute(item.key);
     }
   }
 });
@@ -177,13 +177,17 @@ onBeforeUnmount(() => {
   cancelPendingRestore();
   cancelPendingSave();
   detachScrollListener();
-  cachedScrollPositions.clear();
 });
 </script>
 
 <template>
   <template v-if="computedShowView">
     <template v-for="item in computedCachedRoutes" :key="item.key">
+      <RouteCachePane
+        :active="item.key === computedCurrentRouteKey"
+        :cache-key="item.key"
+        :route="item.route"
+      >
         <Transition
           v-if="getEnabledTransition"
           appear
@@ -191,18 +195,19 @@ onBeforeUnmount(() => {
           :name="getTransitionName(item.route)"
         >
           <CachedRouteRenderer
-            v-show="item.key === computedCurrentRouteKey"
+            :cache-key="item.key"
             :component="item.component"
             :route="item.route"
           />
         </Transition>
-      <template v-else>
-        <CachedRouteRenderer
-          v-show="item.key === computedCurrentRouteKey"
-          :component="item.component"
-          :route="item.route"
-        />
-      </template>
+        <template v-else>
+          <CachedRouteRenderer
+            :cache-key="item.key"
+            :component="item.component"
+            :route="item.route"
+          />
+        </template>
+      </RouteCachePane>
     </template>
   </template>
 </template>

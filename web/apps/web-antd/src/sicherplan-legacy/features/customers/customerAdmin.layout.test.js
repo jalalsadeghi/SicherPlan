@@ -1,12 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 
-const viewPath = resolve(
-  process.cwd(),
-  "web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue",
-);
+const viewPath = new URL("../../views/CustomerAdminView.vue", import.meta.url);
 const source = readFileSync(viewPath, "utf8");
 
 test("customer workspace splits list-only and detail-only modes with detail tabs", () => {
@@ -53,7 +49,10 @@ test("customer detail mode updates app-shell title without rendering a duplicate
   assert.match(source, /const customerPageContextFullTitle = computed/);
   assert.match(source, /const customerPageContextLabel = computed\(\(\) => truncateCustomerContextLabel/);
   assert.match(source, /function truncateCustomerContextLabel\(value: string, maxLength = 34\)/);
-  assert.match(source, /\(route\.meta as Record<string, unknown>\)\.title = label/);
+  assert.match(source, /\(route\.meta as Record<string, unknown>\)\.title = title/);
+  assert.match(source, /function buildCustomerDetailTabTarget\(customerId: string, detailTab = activeDetailTab\.value\)/);
+  assert.match(source, /await tabbarStore\.setTabTitle\(buildCustomerDetailTabTarget\(selectedCustomer\.value\.id\) as any, title\)/);
+  assert.doesNotMatch(source, /setTabTitle\(route, title\)/);
   assert.doesNotMatch(source, /class="customer-admin-context-bar"/);
   assert.doesNotMatch(source, /\.customer-admin-context-bar/);
   assert.match(source, /class="customer-admin-detail-title"/);
@@ -65,6 +64,8 @@ test("customer detail mode updates app-shell title without rendering a duplicate
 });
 
 test("contacts and access nav reuses the employee-style floating shell behavior", () => {
+  assert.match(source, /useIsRouteCachePaneActive/);
+  assert.match(source, /useRouteCacheScrollTarget/);
   assert.match(source, /ref="contactAccessOnePageRef"/);
   assert.match(source, /ref="contactAccessNavShellRef"/);
   assert.match(source, /const contactAccessNavFloatingMode = ref<"fixed" \| "pinned" \| "static">\("static"\)/);
@@ -78,6 +79,8 @@ test("contacts and access nav reuses the employee-style floating shell behavior"
   assert.match(source, /function isCustomerContactAccessScrollableAncestor\(element: HTMLElement\)/);
   assert.match(source, /function findCustomerContactAccessScrollContainers\(\)/);
   assert.match(source, /function resolveContactAccessIntersectionRoot\(\)/);
+  assert.match(source, /function setCustomerContactAccessSectionRef\(sectionId: CustomerContactAccessSectionId, element: Element \| null\)/);
+  assert.match(source, /function resolveCustomerContactAccessSectionElement\(sectionId: CustomerContactAccessSectionId\)/);
   assert.match(source, /function resetContactAccessNavFloating\(\)/);
   assert.match(source, /function cancelContactAccessNavFloatingFrame\(\)/);
   assert.match(source, /function scrollToCustomerContactAccessSection\(sectionId: CustomerContactAccessSectionId\)/);
@@ -88,10 +91,13 @@ test("contacts and access nav reuses the employee-style floating shell behavior"
   assert.match(source, /contactAccessNavFloatingMode\.value = "pinned"/);
   assert.match(source, /contactAccessNavFloatingMode\.value = "fixed"/);
   assert.match(source, /function scheduleContactAccessNavFloatingUpdate\(\)/);
+  assert.match(source, /function setupCustomerContactAccessVisibilityObserver\(\)/);
+  assert.doesNotMatch(source, /document\.getElementById\(resolveCustomerContactAccessSectionElementId/);
   assert.match(source, /window\.requestAnimationFrame\(updateContactAccessNavFloating\)/);
   assert.match(source, /function teardownContactAccessNavFloating\(\)/);
   assert.match(source, /function setupContactAccessNavFloating\(\)/);
-  assert.match(source, /contactAccessNavScrollTargets = \[window, \.\.\.findCustomerContactAccessScrollContainers\(\)\]/);
+  assert.match(source, /const scrollTarget = routeCacheScrollTarget\.value/);
+  assert.match(source, /contactAccessNavScrollTargets = \[[\s\S]*scrollTarget,[\s\S]*findCustomerContactAccessScrollContainers\(\)\.filter/);
   assert.match(source, /target\.addEventListener\("scroll", scheduleContactAccessNavFloatingUpdate, \{ passive: true \}\)/);
   assert.match(source, /window\.addEventListener\("resize", scheduleContactAccessNavFloatingUpdate, \{ passive: true \}\)/);
   assert.match(source, /setupContactAccessNavFloating\(\);[\s\S]*setupCustomerContactAccessSectionObserver\(\);/);
@@ -241,7 +247,7 @@ test("customer search locally filters visible list rows without suggestion or mo
   assert.doesNotMatch(source, /data-testid="customer-search-result-close"/);
   assert.match(source, /window\.addEventListener\("keydown", handleCustomerSearchWindowKeydown\)/);
   assert.match(source, /event\.key === "Escape"/);
-  assert.match(source, /await router\.replace\([\s\S]*customer_id: customerId,[\s\S]*tab: detailTab/);
+  assert.match(source, /await router\.push\([\s\S]*customer_id: customerId,[\s\S]*tab: detailTab,[\s\S]*pageKey: buildCustomerDetailPageKey\(customerId\)/);
 });
 
 test("plain customers route stays list-first and customer_id query owns workspace selection", () => {
@@ -253,8 +259,7 @@ test("plain customers route stays list-first and customer_id query owns workspac
   assert.match(source, /tab: detailTab/);
   assert.match(source, /data-testid="customer-detail-empty-state"/);
   assert.match(source, /async function returnToCustomerList\(\)/);
-  assert.match(source, /delete nextQuery\.customer_id/);
-  assert.match(source, /delete nextQuery\.tab/);
+  assert.match(source, /await router\.push\(\{[\s\S]*path: CUSTOMER_ADMIN_ROUTE_PATH,[\s\S]*query: \{\},/);
   assert.match(source, /routeCustomerNotFound/);
   assert.doesNotMatch(source, /else if \(customers\.value\[0\] && !isCreatingCustomer\.value\)/);
   assert.doesNotMatch(source, /await selectCustomer\(customers\.value\[0\]\.id\)/);

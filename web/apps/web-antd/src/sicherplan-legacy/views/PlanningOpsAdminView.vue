@@ -826,6 +826,7 @@ import {
   validatePlanningCreateDraft,
 } from "@/features/planning/planningAdmin.helpers.js";
 import { planningAdminMessages } from "@/i18n/planningAdmin.messages";
+import { useIsRouteCachePaneActive } from "@vben/layouts/route-cached";
 import { useAuthStore } from "@/stores/auth";
 import { useLocaleStore } from "@/stores/locale";
 
@@ -838,6 +839,7 @@ defineProps({
 
 const authStore = useAuthStore();
 const primaryAuthStore = usePrimaryAuthStore();
+const isRouteCachePaneActive = useIsRouteCachePaneActive();
 const localeStore = useLocaleStore();
 const route = useRoute();
 const router = useRouter();
@@ -1152,12 +1154,18 @@ async function recoverSessionAndRefreshPlanningOps() {
 }
 
 function handleVisibilityChange() {
+  if (!isRouteCachePaneActive.value) {
+    return;
+  }
   if (document.visibilityState === "visible") {
     void recoverSessionAndRefreshPlanningOps();
   }
 }
 
 function handleWindowFocus() {
+  if (!isRouteCachePaneActive.value) {
+    return;
+  }
   void recoverSessionAndRefreshPlanningOps();
 }
 
