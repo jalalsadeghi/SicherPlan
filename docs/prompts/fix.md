@@ -1,26 +1,30 @@
 /review
 
-Please review the Employee Overview side-navigation isolation fix.
+Please review the global per-tab scroll isolation fix.
 
-Check:
-1. Does each employee detail tab have isolated Overview section refs?
-2. Does selectOverviewSection avoid document.getElementById/document.querySelector/global selectors?
-3. Are duplicated static ids no longer used as scroll targets?
-4. Do hidden cached employee tabs ignore scroll/observer updates?
-5. Can Markus Neumann stay on Addresses while Emir Kaya stays on Notes?
-6. Do Emir and Sarah side links work while Markus is still open?
-7. Does switching top employee tabs preserve each employee’s own Overview scroll/active section?
-8. Does closing one employee tab no longer affect whether other employee tabs’ side links work?
-9. Are the Employees list tab and employee detail top-tab behavior unchanged?
-10. Are Customers tabs unaffected?
-11. Are domCached/keepAlive, route authority, moduleKey, sidebar structure, and pageKey behavior unchanged?
-12. Were backend/API files untouched?
-13. What tests were added or updated and what commands were run?
+Check these points carefully:
+1. Is scroll state keyed by getTabKey(route), including pageKey-based tabs?
+2. Does Dashboard keep its own scroll position independent of Employees and employee detail tabs?
+3. Does Markus Neumann restore to its own Overview section after switching away and back?
+4. Does scrolling Markus Neumann no longer affect Dashboard, Employees list, Emir Kaya, Sarah Becker, Customers, or other tabs?
+5. Are new tabs initialized at top unless they have stored scroll state?
+6. Is scroll saved before switching away from a tab?
+7. Is scroll restored early enough to avoid visible flicker/jump?
+8. Is the correct scroll container detected?
+9. Are hidden domCached routes prevented from writing scroll state?
+10. Is scroll state cleaned up when a cached tab is closed?
+11. Does manual tab refresh/reload still work?
+12. Is CachedRouteRenderer route context isolation preserved?
+13. Are Customers and Employees detail pageKey tabs still working?
+14. Are route authority, moduleKey, sidebar structure, icons, domCached, keepAlive, and tab titles unchanged?
+15. Were backend/API files untouched?
+16. Which tests were added or updated and what commands were run?
 
 Please report:
 - exact root cause
 - files changed
 - implementation summary
+- scroll container chosen and why
 - tests added/updated
 - commands run
 - remaining risks

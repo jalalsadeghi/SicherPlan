@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, unref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, unref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { preferences } from '@vben/preferences';
@@ -8,6 +8,11 @@ import { getTabKey, storeToRefs, useTabbarStore } from '@vben/stores';
 import { useLayoutHook } from '../hooks';
 
 import CachedRouteRenderer from './cached-route-renderer.vue';
+import {
+  getRouteCacheScrollTarget,
+  readRouteCacheScrollTop,
+  writeRouteCacheScrollTop,
+} from './route-cache-scroll';
 
 const route = useRoute();
 
@@ -70,6 +75,109 @@ const computedShowView = computed(() => unref(computedCachedRoutes).length > 0);
 
 const computedCurrentRouteKey = computed(() => {
   return getTabKey(route);
+});
+
+const cachedScrollPositions = new Map<string, number>();
+
+let activeScrollTarget: HTMLElement | null = null;
+let pendingRestoreFrame: number | null = null;
+let pendingSaveFrame: number | null = null;
+
+function cancelPendingRestore() {
+  if (pendingRestoreFrame !== null) {
+    window.cancelAnimationFrame(pendingRestoreFrame);
+    pendingRestoreFrame = null;
+  }
+}
+
+function cancelPendingSave() {
+  if (pendingSaveFrame !== null) {
+    window.cancelAnimationFrame(pendingSaveFrame);
+    pendingSaveFrame = null;
+  }
+}
+
+function detachScrollListener() {
+  activeScrollTarget?.removeEventListener('scroll', handleActiveScroll);
+  activeScrollTarget = null;
+}
+
+function attachScrollListener() {
+  const nextTarget = getRouteCacheScrollTarget(document);
+  if (activeScrollTarget === nextTarget) {
+    return;
+  }
+  detachScrollListener();
+  activeScrollTarget = nextTarget;
+  activeScrollTarget.addEventListener('scroll', handleActiveScroll, {
+    passive: true,
+  });
+}
+
+function saveScrollPosition(key = unref(computedCurrentRouteKey)) {
+  if (!key) {
+    return;
+  }
+  cachedScrollPositions.set(key, readRouteCacheScrollTop(document));
+}
+
+function restoreScrollPosition(key: string) {
+  writeRouteCacheScrollTop(cachedScrollPositions.get(key) ?? 0, document);
+}
+
+function scheduleRestoreScrollPosition(key: string) {
+  cancelPendingRestore();
+  attachScrollListener();
+  restoreScrollPosition(key);
+  void nextTick(() => {
+    pendingRestoreFrame = window.requestAnimationFrame(() => {
+      pendingRestoreFrame = null;
+      if (unref(computedCurrentRouteKey) !== key) {
+        return;
+      }
+      attachScrollListener();
+      restoreScrollPosition(key);
+    });
+  });
+}
+
+function handleActiveScroll() {
+  if (pendingSaveFrame !== null) {
+    return;
+  }
+  pendingSaveFrame = window.requestAnimationFrame(() => {
+    pendingSaveFrame = null;
+    saveScrollPosition();
+  });
+}
+
+watch(
+  computedCurrentRouteKey,
+  (key, previousKey) => {
+    if (previousKey) {
+      saveScrollPosition(previousKey);
+    }
+    if (key) {
+      scheduleRestoreScrollPosition(key);
+    }
+  },
+  { flush: 'sync', immediate: true },
+);
+
+watch(computedCachedRouteKeys, (keys) => {
+  const activeKeys = new Set(keys);
+  for (const key of [...cachedScrollPositions.keys()]) {
+    if (!activeKeys.has(key)) {
+      cachedScrollPositions.delete(key);
+    }
+  }
+});
+
+onBeforeUnmount(() => {
+  cancelPendingRestore();
+  cancelPendingSave();
+  detachScrollListener();
+  cachedScrollPositions.clear();
 });
 </script>
 
