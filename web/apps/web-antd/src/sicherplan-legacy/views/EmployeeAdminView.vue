@@ -2609,6 +2609,8 @@ type EmployeeOverviewEditorDialog =
 const tenantScopeInput = ref(authStore.effectiveTenantScopeId || authStore.tenantScopeId || "");
 const branches = ref<BranchRead[]>([]);
 const mandates = ref<MandateRead[]>([]);
+let tenantStructureRequest: null | Promise<void> = null;
+let tenantStructureLoadedScopeKey = "";
 const employees = ref<EmployeeListItem[]>([]);
 const employeeSearchModalOpen = ref(false);
 const employeeSearchResults = ref<EmployeeListItem[]>([]);
@@ -2950,17 +2952,17 @@ const branchLabelMap = computed(() => new Map(branchOptions.value.map((branch) =
 const mandateLabelMap = computed(() => new Map(mandateOptions.value.map((mandate) => [mandate.id, formatStructureLabel(mandate)])));
 const selectedEmployeeBranchLabel = computed(() => {
   const branchId = selectedEmployee.value?.default_branch_id;
-  return branchId ? branchLabelMap.value.get(branchId) ?? branchId : "";
+  return branchId ? branchLabelMap.value.get(branchId) ?? "" : "";
 });
 const selectedEmployeeMandateLabel = computed(() => {
   const mandateId = selectedEmployee.value?.default_mandate_id;
-  return mandateId ? mandateLabelMap.value.get(mandateId) ?? mandateId : "";
+  return mandateId ? mandateLabelMap.value.get(mandateId) ?? "" : "";
 });
 
 function formatEmployeeListContext(employee: EmployeeListItem) {
   const parts = [
-    employee.default_branch_id ? branchLabelMap.value.get(employee.default_branch_id) ?? employee.default_branch_id : "",
-    employee.default_mandate_id ? mandateLabelMap.value.get(employee.default_mandate_id) ?? employee.default_mandate_id : "",
+    employee.default_branch_id ? branchLabelMap.value.get(employee.default_branch_id) ?? "" : "",
+    employee.default_mandate_id ? mandateLabelMap.value.get(employee.default_mandate_id) ?? "" : "",
   ].filter(Boolean);
   return parts.join(" · ") || t("employeeAdmin.summary.none");
 }
@@ -4224,6 +4226,7 @@ async function loadTenantStructure() {
   if (!resolvedTenantScopeId.value || !authStore.accessToken || !canRead.value) {
     branches.value = [];
     mandates.value = [];
+    tenantStructureLoadedScopeKey = "";
     return;
   }
 
@@ -4235,6 +4238,41 @@ async function loadTenantStructure() {
 
   branches.value = branchRecords;
   mandates.value = mandateRecords;
+}
+
+function currentTenantStructureScopeKey() {
+  if (!resolvedTenantScopeId.value || !canRead.value) {
+    return "";
+  }
+  return `${resolvedTenantScopeId.value}:${effectiveRole.value}`;
+}
+
+async function ensureTenantStructureLoaded(options: { forceReload?: boolean } = {}) {
+  const { forceReload = false } = options;
+  const scopeKey = currentTenantStructureScopeKey();
+  if (!scopeKey || !authStore.accessToken) {
+    branches.value = [];
+    mandates.value = [];
+    tenantStructureLoadedScopeKey = "";
+    return;
+  }
+  if (!forceReload && tenantStructureLoadedScopeKey === scopeKey) {
+    return;
+  }
+  if (!forceReload && tenantStructureRequest) {
+    return tenantStructureRequest;
+  }
+  const request = loadTenantStructure()
+    .then(() => {
+      tenantStructureLoadedScopeKey = scopeKey;
+    })
+    .finally(() => {
+      if (tenantStructureRequest === request) {
+        tenantStructureRequest = null;
+      }
+    });
+  tenantStructureRequest = request;
+  return request;
 }
 
 function resetEmployeeDraft() {
@@ -4729,10 +4767,11 @@ async function refreshEmployees(options: { autoSelectFirst?: boolean } = {}) {
 
   let catalogRefreshFailed = false;
   try {
-    await loadTenantStructure();
+    await ensureTenantStructureLoaded({ forceReload: true });
   } catch {
     branches.value = [];
     mandates.value = [];
+    tenantStructureLoadedScopeKey = "";
     catalogRefreshFailed = true;
   }
 
@@ -5000,6 +5039,12 @@ async function selectEmployee(employeeId: string, options: SelectEmployeeOptions
   try {
     const employee = await loadEmployeeCore(employeeId, { forceReload });
     selectedEmployee.value = employee;
+    if (
+      (employee.default_branch_id && !branchLabelMap.value.get(employee.default_branch_id))
+      || (employee.default_mandate_id && !mandateLabelMap.value.get(employee.default_mandate_id))
+    ) {
+      void ensureTenantStructureLoaded();
+    }
     routeEmployeeDisplayName.value = selectedEmployeeFullName.value || formatEmployeeFullName(employee);
     syncEmployeeDraft(employee);
     resetNoteDraft();
@@ -6272,6 +6317,7 @@ onMounted(async () => {
   tenantScopeInput.value = authStore.effectiveTenantScopeId || authStore.tenantScopeId;
   resetEmployeeDraft();
   if (routeHasDirectEmployeeDetail.value) {
+    void ensureTenantStructureLoaded();
     if (!selectedEmployee.value && !loading.detail) {
       await syncEmployeeWorkspaceFromRoute();
     }

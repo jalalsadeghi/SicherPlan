@@ -102,7 +102,7 @@
               class="cta-button cta-secondary"
               type="button"
               data-testid="planning-staffing-refresh"
-              :disabled="loading"
+              :disabled="loading || mainLoadPending"
               @click="refreshAll"
             >
               {{ tp("refresh") }}
@@ -134,6 +134,7 @@
       <section
         class="module-card planning-staffing-panel planning-staffing-coverage-panel"
         data-testid="planning-staffing-shift-coverage-panel"
+        :data-busy="mainLoadPending ? 'true' : 'false'"
       >
         <div class="planning-staffing-panel__header">
           <div>
@@ -157,17 +158,21 @@
               <strong>{{ row.starts_at }} · {{ row.shift_type_code }}</strong>
               <span>{{ tp("columnOrder") }}: {{ row.order_no }}</span>
               <span>{{ tp("columnPlanning") }}: {{ row.planning_record_name }}</span>
-              <span v-if="rowCoverageState(row) === 'setup_required'" class="field-help">{{ tp("coverageSetupRequiredHint") }}</span>
+              <span v-if="coverageStateForShift(row.shift_id) === 'setup_required'" class="field-help">{{ tp("coverageSetupRequiredHint") }}</span>
             </div>
-            <span class="planning-staffing-state" :data-tone="coverageTone(rowCoverageState(row))">
-              {{ tp(statusKey(rowCoverageState(row))) }}
+            <span class="planning-staffing-state" :data-tone="coverageTone(coverageStateForShift(row.shift_id))">
+              {{ tp(statusKey(coverageStateForShift(row.shift_id))) }}
             </span>
           </button>
         </div>
         <p v-else class="planning-staffing-list-empty">{{ tp("listEmpty") }}</p>
       </section>
 
-      <section class="module-card planning-staffing-panel planning-staffing-detail">
+      <section
+        class="module-card planning-staffing-panel planning-staffing-detail"
+        data-testid="planning-staffing-detail-panel"
+        :data-busy="planningStaffingDetailBusy ? 'true' : 'false'"
+      >
         <div class="planning-staffing-panel__header">
           <div>
             <p class="eyebrow">{{ tp("detailTitle") }}</p>
@@ -179,8 +184,8 @@
               {{ selectedShiftContextMeta }}
             </p>
           </div>
-          <span v-if="selectedShift" class="planning-staffing-state" :data-tone="coverageTone(rowCoverageState(selectedShift))">
-            {{ tp(statusKey(rowCoverageState(selectedShift))) }}
+          <span v-if="selectedShift" class="planning-staffing-state" :data-tone="coverageTone(coverageStateForShift(selectedShift.shift_id))">
+            {{ tp(statusKey(coverageStateForShift(selectedShift.shift_id))) }}
           </span>
         </div>
 
@@ -1177,7 +1182,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from "vue";
 import { useRoute } from "vue-router";
 import { Modal, Select } from "ant-design-vue";
 
@@ -1295,8 +1300,11 @@ const role = computed(() => authStore.effectiveRole || "tenant_admin");
 const tenantScopeId = computed(() => authStore.effectiveTenantScopeId || authStore.tenantScopeId || "");
 const accessToken = computed(() => authStore.effectiveAccessToken || authStore.accessToken || "");
 
-const coverageRows = ref<CoverageShiftItem[]>([]);
-const boardRows = ref<StaffingBoardShiftItem[]>([]);
+const coverageRows = shallowRef<CoverageShiftItem[]>([]);
+const boardRows = shallowRef<StaffingBoardShiftItem[]>([]);
+const coverageRowsById = shallowRef(new Map<string, CoverageShiftItem>());
+const boardRowsById = shallowRef(new Map<string, StaffingBoardShiftItem>());
+const coverageStatesByShiftId = shallowRef(new Map<string, string>());
 const demandGroupRows = ref<DemandGroupRead[]>([]);
 const functionTypeOptions = ref<FunctionTypeRead[]>([]);
 const qualificationTypeOptions = ref<QualificationTypeRead[]>([]);
@@ -1326,13 +1334,15 @@ const dispatchAudienceSubcontractors = ref(false);
 const overrideRuleCode = ref("");
 const overrideReason = ref("");
 const loading = ref(false);
+const mainLoadPending = ref(false);
+const detailLoadPending = ref(false);
 const savingOverride = ref(false);
 const savingDemandGroup = ref(false);
 const savingTeam = ref(false);
 const savingTeamMember = ref(false);
 const assignmentEditorLoading = ref(false);
 const assignmentEditorSaving = ref(false);
-const planningRecordOptions = ref<PlanningRecordListItem[]>([]);
+const planningRecordOptions = shallowRef<PlanningRecordListItem[]>([]);
 const resolvedPlanningRecord = ref<null | PlanningRecordRead>(null);
 const planningRecordLookupLoading = ref(false);
 const planningRecordLookupError = ref("");
@@ -1341,6 +1351,21 @@ const routeHydrationShiftId = ref("");
 const routeHydrationInFlight = ref(false);
 const feedback = reactive({ message: "", title: "", tone: "error" });
 const filters = reactive<CoverageFilterParams>({
+  customer_id: "",
+  date_from: "2026-04-05T00:00",
+  date_to: "2026-04-06T00:00",
+  planning_record_id: "",
+  shift_plan_id: "",
+  order_id: "",
+  planning_mode_code: "",
+  workforce_scope_code: "",
+  function_type_id: "",
+  qualification_type_id: "",
+  release_state: "",
+  visibility_state: "",
+  confirmation_state: "",
+});
+const appliedFilters = reactive<CoverageFilterParams>({
   customer_id: "",
   date_from: "2026-04-05T00:00",
   date_to: "2026-04-06T00:00",
@@ -1502,9 +1527,9 @@ const shiftDetailTabs = [
   { id: "outputs_dispatch", labelKey: "detailTabOutputsDispatch" },
 ] as const;
 
-const selectedShift = computed(() => coverageRows.value.find((row) => row.shift_id === selectedShiftId.value) ?? null);
-const selectedBoardShift = computed(() => boardRows.value.find((row) => row.id === selectedShiftId.value) ?? null);
-const relevantPlanningRecordId = computed(() => selectedShift.value?.planning_record_id || filters.planning_record_id || "");
+const selectedShift = computed(() => coverageRowsById.value.get(selectedShiftId.value) ?? null);
+const selectedBoardShift = computed(() => boardRowsById.value.get(selectedShiftId.value) ?? null);
+const relevantPlanningRecordId = computed(() => selectedShift.value?.planning_record_id || appliedFilters.planning_record_id || "");
 const availableTeams = computed(() =>
   planningTeams.value.filter(
     (team) =>
@@ -1688,6 +1713,17 @@ const planningStaffingWorkspaceBusy = computed(
     || assignmentEditorLoading.value
     || assignmentEditorSaving.value,
 );
+const planningStaffingDetailBusy = computed(
+  () =>
+    mainLoadPending.value
+    || detailLoadPending.value
+    || assignmentEditorLoading.value
+    || assignmentEditorSaving.value
+    || savingDemandGroup.value
+    || savingTeam.value
+    || savingTeamMember.value
+    || savingOverride.value,
+);
 const planningStaffingWorkspaceLoadingText = computed(() => {
   if (assignmentEditorLoading.value) {
     return tp("workspaceLoadingAssignmentOpen");
@@ -1707,7 +1743,7 @@ const planningStaffingWorkspaceLoadingText = computed(() => {
   if (savingOverride.value) {
     return tp("workspaceLoadingOverride");
   }
-  if (loading.value) {
+  if (loading.value || mainLoadPending.value) {
     return tp("workspaceLoading");
   }
   return "";
@@ -1759,6 +1795,34 @@ function statusKey(state: string) {
   return "statusRed";
 }
 
+function syncAppliedFiltersFromDraft() {
+  appliedFilters.customer_id = filters.customer_id || "";
+  appliedFilters.planning_record_id = filters.planning_record_id || "";
+  appliedFilters.shift_plan_id = filters.shift_plan_id || "";
+  appliedFilters.order_id = filters.order_id || "";
+  appliedFilters.date_from = filters.date_from;
+  appliedFilters.date_to = filters.date_to;
+  appliedFilters.planning_mode_code = filters.planning_mode_code || "";
+  appliedFilters.workforce_scope_code = filters.workforce_scope_code || "";
+  appliedFilters.function_type_id = filters.function_type_id || "";
+  appliedFilters.qualification_type_id = filters.qualification_type_id || "";
+  appliedFilters.release_state = filters.release_state || "";
+  appliedFilters.visibility_state = filters.visibility_state || "";
+  appliedFilters.confirmation_state = filters.confirmation_state || "";
+}
+
+function appliedFiltersKey() {
+  return JSON.stringify({
+    tenantId: tenantScopeId.value,
+    date_from: appliedFilters.date_from,
+    date_to: appliedFilters.date_to,
+    planning_record_id: appliedFilters.planning_record_id || "",
+    planning_mode_code: appliedFilters.planning_mode_code || "",
+    workforce_scope_code: appliedFilters.workforce_scope_code || "",
+    confirmation_state: appliedFilters.confirmation_state || "",
+  });
+}
+
 function ruleText(ruleCode: string) {
   const key = RULE_TEXT_MAP[ruleCode as keyof typeof RULE_TEXT_MAP];
   return key ? tp(key) : ruleCode;
@@ -1766,27 +1830,27 @@ function ruleText(ruleCode: string) {
 
 function queryFilters(): CoverageFilterParams {
   return {
-    customer_id: filters.customer_id || undefined,
-    planning_record_id: filters.planning_record_id || undefined,
-    shift_plan_id: filters.shift_plan_id || undefined,
-    order_id: filters.order_id || undefined,
-    date_from: filters.date_from,
-    date_to: filters.date_to,
-    planning_mode_code: filters.planning_mode_code || undefined,
-    workforce_scope_code: filters.workforce_scope_code || undefined,
-    function_type_id: filters.function_type_id || undefined,
-    qualification_type_id: filters.qualification_type_id || undefined,
-    release_state: filters.release_state || undefined,
-    visibility_state: filters.visibility_state || undefined,
-    confirmation_state: filters.confirmation_state || undefined,
+    customer_id: appliedFilters.customer_id || undefined,
+    planning_record_id: appliedFilters.planning_record_id || undefined,
+    shift_plan_id: appliedFilters.shift_plan_id || undefined,
+    order_id: appliedFilters.order_id || undefined,
+    date_from: appliedFilters.date_from,
+    date_to: appliedFilters.date_to,
+    planning_mode_code: appliedFilters.planning_mode_code || undefined,
+    workforce_scope_code: appliedFilters.workforce_scope_code || undefined,
+    function_type_id: appliedFilters.function_type_id || undefined,
+    qualification_type_id: appliedFilters.qualification_type_id || undefined,
+    release_state: appliedFilters.release_state || undefined,
+    visibility_state: appliedFilters.visibility_state || undefined,
+    confirmation_state: appliedFilters.confirmation_state || undefined,
   };
 }
 
 function exactShiftBoardFilters(shiftId: string) {
   return {
-    date_from: filters.date_from,
-    date_to: filters.date_to,
-    planning_record_id: filters.planning_record_id || undefined,
+    date_from: appliedFilters.date_from,
+    date_to: appliedFilters.date_to,
+    planning_record_id: appliedFilters.planning_record_id || undefined,
     shift_id: shiftId,
   };
 }
@@ -1812,19 +1876,85 @@ function rowCoverageState(row: CoverageShiftItem | null) {
   return resolvePlanningStaffingCoverageState(row.coverage_state, row.demand_groups);
 }
 
+function rebuildCoverageRowIndexes(rows: CoverageShiftItem[]) {
+  const rowsById = new Map<string, CoverageShiftItem>();
+  const statesById = new Map<string, string>();
+  for (const row of rows) {
+    rowsById.set(row.shift_id, row);
+    statesById.set(row.shift_id, rowCoverageState(row));
+  }
+  coverageRowsById.value = rowsById;
+  coverageStatesByShiftId.value = statesById;
+}
+
+function rebuildBoardRowIndexes(rows: StaffingBoardShiftItem[]) {
+  const rowsById = new Map<string, StaffingBoardShiftItem>();
+  for (const row of rows) {
+    rowsById.set(row.id, row);
+  }
+  boardRowsById.value = rowsById;
+}
+
+function replaceCoverageRows(rows: CoverageShiftItem[]) {
+  coverageRows.value = rows;
+  rebuildCoverageRowIndexes(rows);
+}
+
+function replaceBoardRows(rows: StaffingBoardShiftItem[]) {
+  boardRows.value = rows;
+  rebuildBoardRowIndexes(rows);
+}
+
+function coverageStateForShift(shiftId: string) {
+  return coverageStatesByShiftId.value.get(shiftId) ?? "red";
+}
+
 const planningRecordLookupCache = new Map<string, PlanningRecordListItem[]>();
+const planningRecordLookupRequests = new Map<string, Promise<PlanningRecordListItem[]>>();
 const assignmentDetailCache = new Map<string, AssignmentRead>();
 const assignmentValidationCache = new Map<string, AssignmentValidationRead>();
 const assignmentOverrideCache = new Map<string, any[]>();
 const assignmentInspectionRequests = new Map<string, Promise<void>>();
+const supportRequestCache = new Map<string, Promise<any>>();
+const demandGroupCache = new Map<string, DemandGroupRead[]>();
+const teamCache = new Map<string, TeamRead[]>();
+const teamMemberCache = new Map<string, TeamMemberRead[]>();
+const employeeOptionsCache = new Map<string, EmployeeListItem[]>();
+const subcontractorReleaseCache = new Map<string, SubcontractorReleaseRead[]>();
+const subcontractorWorkerCache = new Map<string, SubcontractorWorkerListItem[]>();
+const shiftValidationCache = new Map<string, ShiftReleaseValidationRead>();
+const shiftOutputsCache = new Map<string, PlanningOutputDocumentRead[]>();
+const functionTypeCache = new Map<string, FunctionTypeRead[]>();
+const qualificationTypeCache = new Map<string, QualificationTypeRead[]>();
+const mainLoadRequests = new Map<string, Promise<void>>();
+let mainLoadVersion = 0;
+let detailLoadVersion = 0;
 let planningRecordLookupRequestId = 0;
 let planningRecordLookupTimer: ReturnType<typeof setTimeout> | null = null;
 
 function staffingFilters() {
   return {
     shift_id: selectedShiftId.value,
-    planning_record_id: filters.planning_record_id,
+    planning_record_id: appliedFilters.planning_record_id,
   };
+}
+
+function supportCacheKey(kind: string, key: string) {
+  return `${kind}:${tenantScopeId.value}:${key}`;
+}
+
+function dedupeSupportRequest<T>(key: string, loader: () => Promise<T>): Promise<T> {
+  const existing = supportRequestCache.get(key);
+  if (existing) {
+    return existing as Promise<T>;
+  }
+  const request = loader().finally(() => {
+    if (supportRequestCache.get(key) === request) {
+      supportRequestCache.delete(key);
+    }
+  });
+  supportRequestCache.set(key, request);
+  return request;
 }
 
 function coverageStateForCounts(
@@ -1861,7 +1991,7 @@ function deriveCoverageRowFromBoardShift(boardShift: StaffingBoardShiftItem): Co
       group.released_partner_qty,
     ),
   }));
-  const assignedCount = filters.confirmation_state === "confirmed_only"
+  const assignedCount = appliedFilters.confirmation_state === "confirmed_only"
     ? demandGroups.reduce((sum, group) => sum + group.confirmed_count, 0)
     : demandGroups.reduce((sum, group) => sum + group.assigned_count, 0);
   const confirmedCount = demandGroups.reduce((sum, group) => sum + group.confirmed_count, 0);
@@ -1924,7 +2054,7 @@ function patchShiftAssignments(
   mutateAssignments: (rows: StaffingBoardAssignmentItem[]) => StaffingBoardAssignmentItem[],
 ) {
   let nextBoardShift: StaffingBoardShiftItem | null = null;
-  boardRows.value = boardRows.value.map((row) => {
+  const patchedBoardRows = boardRows.value.map((row) => {
     if (row.id !== shiftId) {
       return row;
     }
@@ -1946,12 +2076,13 @@ function patchShiftAssignments(
     };
     return nextBoardShift;
   });
+  replaceBoardRows(patchedBoardRows);
 
   if (!nextBoardShift) {
     return;
   }
 
-  coverageRows.value = coverageRows.value.map((row) => {
+  const patchedCoverageRows = coverageRows.value.map((row) => {
     if (row.shift_id !== shiftId) {
       return row;
     }
@@ -1972,7 +2103,7 @@ function patchShiftAssignments(
         group.released_partner_qty,
       ),
     }));
-    const assignedCount = filters.confirmation_state === "confirmed_only"
+    const assignedCount = appliedFilters.confirmation_state === "confirmed_only"
       ? nextCoverageDemandGroups.reduce((sum, group) => sum + group.confirmed_count, 0)
       : nextCoverageDemandGroups.reduce((sum, group) => sum + group.assigned_count, 0);
     const confirmedCount = nextCoverageDemandGroups.reduce((sum, group) => sum + group.confirmed_count, 0);
@@ -1996,6 +2127,7 @@ function patchShiftAssignments(
       demand_groups: nextCoverageDemandGroups,
     };
   });
+  replaceCoverageRows(patchedCoverageRows);
 
   selectedDemandGroupId.value = resolveSelectedDemandGroupId(nextBoardShift, selectedDemandGroupId.value);
 }
@@ -2080,7 +2212,9 @@ async function refreshVisibleShiftValidations() {
     return;
   }
   try {
-    shiftValidations.value = await getShiftReleaseValidations(tenantScopeId.value, accessToken.value, selectedShiftId.value);
+    const key = supportCacheKey("validations", selectedShiftId.value);
+    shiftValidationCache.delete(key);
+    await loadShiftValidationsForSelectedShift();
   } catch {
     // Keep the visible shift state stable if validation refresh fails in the background.
   }
@@ -2406,22 +2540,33 @@ async function loadPlanningRecordOptions(search = "") {
     planningRecordLookupError.value = "";
     return;
   }
+  const requestId = ++planningRecordLookupRequestId;
   const cacheKey = buildPlanningRecordLookupCacheKey(search);
   const cached = planningRecordLookupCache.get(cacheKey);
   if (cached) {
-    planningRecordOptions.value = cached;
-    planningRecordLookupError.value = "";
+    if (requestId === planningRecordLookupRequestId) {
+      planningRecordOptions.value = cached;
+      planningRecordLookupError.value = "";
+    }
     return;
   }
   planningRecordLookupLoading.value = true;
   planningRecordLookupError.value = "";
-  const requestId = ++planningRecordLookupRequestId;
   try {
-    const rows = await listPlanningRecords(
-      tenantScopeId.value,
-      accessToken.value,
-      buildPlanningStaffingPlanningRecordLookupFilters(filters, search),
-    );
+    let request = planningRecordLookupRequests.get(cacheKey);
+    if (!request) {
+      request = listPlanningRecords(
+        tenantScopeId.value,
+        accessToken.value,
+        buildPlanningStaffingPlanningRecordLookupFilters(filters, search),
+      ).finally(() => {
+        if (planningRecordLookupRequests.get(cacheKey) === request) {
+          planningRecordLookupRequests.delete(cacheKey);
+        }
+      });
+      planningRecordLookupRequests.set(cacheKey, request);
+    }
+    const rows = await request;
     if (requestId !== planningRecordLookupRequestId) {
       return;
     }
@@ -2528,142 +2673,380 @@ function dispatchAudienceCodes() {
   return codes;
 }
 
-async function refreshSupportingData() {
-  if (!tenantScopeId.value || !accessToken.value || !relevantPlanningRecordId.value) {
-    demandGroupRows.value = [];
-    planningTeams.value = [];
-    teamMembers.value = [];
-    employeeOptions.value = [];
-    subcontractorWorkerOptions.value = [];
-    subcontractorReleases.value = [];
-    return;
-  }
-  const [demandGroups, teams, members, releases, employees] = await Promise.all([
-    selectedShiftId.value
-      ? listDemandGroups(tenantScopeId.value, accessToken.value, staffingFilters())
-      : Promise.resolve([]),
-    listTeams(tenantScopeId.value, accessToken.value, { planning_record_id: relevantPlanningRecordId.value }),
-    listTeamMembers(tenantScopeId.value, accessToken.value, {}),
-    selectedShiftId.value
-      ? listSubcontractorReleases(tenantScopeId.value, accessToken.value, staffingFilters())
-      : Promise.resolve([]),
-    listEmployees(tenantScopeId.value, accessToken.value, { status: "active" }),
-  ]);
-  const workerRows = releases.length
-    ? (
-        await Promise.all(
-          [...new Set(releases.map((row) => row.subcontractor_id).filter(Boolean))].map((subcontractorId) =>
-            listSubcontractorWorkers(tenantScopeId.value, subcontractorId, accessToken.value, { status: "active" }),
-          ),
-        )
-      ).flat()
-    : [];
-  demandGroupRows.value = demandGroups;
-  planningTeams.value = teams;
-  teamMembers.value = members;
-  employeeOptions.value = employees.filter((row) => row.archived_at == null && row.status === "active");
-  subcontractorWorkerOptions.value = workerRows.filter((row) => row.archived_at == null && row.status === "active");
-  subcontractorReleases.value = releases;
-  if (!availableTeams.value.some((team) => team.id === staffingDraft.team_id)) {
-    staffingDraft.team_id = "";
-    staffingDraft.member_ref = "";
-  }
-  if (!availableTeams.value.some((team) => team.id === selectedTeamId.value)) {
-    selectedTeamId.value = availableTeams.value[0]?.id ?? "";
-  }
-}
-
 async function loadDemandGroupCatalogOptions() {
   if (!tenantScopeId.value || !accessToken.value) {
     functionTypeOptions.value = [];
     qualificationTypeOptions.value = [];
     return;
   }
-  const [functionTypes, qualificationTypes] = await Promise.all([
-    listFunctionTypes(tenantScopeId.value, accessToken.value),
-    listQualificationTypes(tenantScopeId.value, accessToken.value),
-  ]);
+  const functionTypeKey = supportCacheKey("function-types", "");
+  const qualificationTypeKey = supportCacheKey("qualification-types", "");
+  const functionTypes = functionTypeCache.get(functionTypeKey)
+    ?? await dedupeSupportRequest(functionTypeKey, () => listFunctionTypes(tenantScopeId.value, accessToken.value))
+      .then((rows) => {
+        functionTypeCache.set(functionTypeKey, rows);
+        return rows;
+      });
+  const qualificationTypes = qualificationTypeCache.get(qualificationTypeKey)
+    ?? await dedupeSupportRequest(qualificationTypeKey, () => listQualificationTypes(tenantScopeId.value, accessToken.value))
+      .then((rows) => {
+        qualificationTypeCache.set(qualificationTypeKey, rows);
+        return rows;
+      });
   functionTypeOptions.value = functionTypes.filter((row) => row.status === "active" && row.archived_at == null);
   qualificationTypeOptions.value = qualificationTypes.filter((row) => row.status === "active" && row.archived_at == null);
 }
 
-async function refreshAll() {
+async function loadDemandGroupsForSelectedShift() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
+    demandGroupRows.value = [];
+    return;
+  }
+  const key = supportCacheKey("demand-groups", selectedShiftId.value);
+  const rows = demandGroupCache.get(key)
+    ?? await dedupeSupportRequest(key, () => listDemandGroups(tenantScopeId.value, accessToken.value, staffingFilters()))
+      .then((result) => {
+        demandGroupCache.set(key, result);
+        return result;
+      });
+  if (selectedShiftId.value) {
+    demandGroupRows.value = rows;
+  }
+}
+
+async function loadTeamsForPlanningContext() {
+  if (!tenantScopeId.value || !accessToken.value || !relevantPlanningRecordId.value) {
+    planningTeams.value = [];
+    return;
+  }
+  const contextId = relevantPlanningRecordId.value;
+  const key = supportCacheKey("teams", contextId);
+  const rows = teamCache.get(key)
+    ?? await dedupeSupportRequest(key, () => listTeams(tenantScopeId.value, accessToken.value, { planning_record_id: contextId }))
+      .then((result) => {
+        teamCache.set(key, result);
+        return result;
+      });
+  if (relevantPlanningRecordId.value === contextId) {
+    planningTeams.value = rows;
+  }
+}
+
+async function loadTeamMembersForTenant() {
+  if (!tenantScopeId.value || !accessToken.value) {
+    teamMembers.value = [];
+    return;
+  }
+  const key = supportCacheKey("team-members", "");
+  const rows = teamMemberCache.get(key)
+    ?? await dedupeSupportRequest(key, () => listTeamMembers(tenantScopeId.value, accessToken.value, {}))
+      .then((result) => {
+        teamMemberCache.set(key, result);
+        return result;
+      });
+  teamMembers.value = rows;
+}
+
+async function loadActiveEmployeesForTenant() {
+  if (!tenantScopeId.value || !accessToken.value) {
+    employeeOptions.value = [];
+    return;
+  }
+  const key = supportCacheKey("employees-active", "");
+  const rows = employeeOptionsCache.get(key)
+    ?? await dedupeSupportRequest(key, () => listEmployees(tenantScopeId.value, accessToken.value, { status: "active" }))
+      .then((result) => {
+        employeeOptionsCache.set(key, result);
+        return result;
+      });
+  employeeOptions.value = rows.filter((row) => row.archived_at == null && row.status === "active");
+}
+
+async function loadSubcontractorReleasesForSelectedShift() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
+    subcontractorReleases.value = [];
+    return;
+  }
+  const shiftId = selectedShiftId.value;
+  const key = supportCacheKey("subcontractor-releases", shiftId);
+  const rows = subcontractorReleaseCache.get(key)
+    ?? await dedupeSupportRequest(key, () => listSubcontractorReleases(tenantScopeId.value, accessToken.value, staffingFilters()))
+      .then((result) => {
+        subcontractorReleaseCache.set(key, result);
+        return result;
+      });
+  if (selectedShiftId.value === shiftId) {
+    subcontractorReleases.value = rows;
+  }
+}
+
+async function loadSubcontractorWorkersForCurrentReleases() {
+  if (!tenantScopeId.value || !accessToken.value) {
+    subcontractorWorkerOptions.value = [];
+    return;
+  }
+  const subcontractorIds = [...new Set(subcontractorReleases.value.map((row) => row.subcontractor_id).filter(Boolean))];
+  if (!subcontractorIds.length) {
+    subcontractorWorkerOptions.value = [];
+    return;
+  }
+  const key = supportCacheKey("subcontractor-workers", subcontractorIds.slice().sort().join(","));
+  const rows = subcontractorWorkerCache.get(key)
+    ?? await dedupeSupportRequest(
+      key,
+      async () => (
+        await Promise.all(
+          subcontractorIds.map((subcontractorId) =>
+            listSubcontractorWorkers(tenantScopeId.value, subcontractorId, accessToken.value, { status: "active" }),
+          ),
+        )
+      ).flat(),
+    ).then((result) => {
+      subcontractorWorkerCache.set(key, result);
+      return result;
+    });
+  subcontractorWorkerOptions.value = rows.filter((row) => row.archived_at == null && row.status === "active");
+}
+
+async function loadShiftValidationsForSelectedShift() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
+    shiftValidations.value = null;
+    return;
+  }
+  const shiftId = selectedShiftId.value;
+  const key = supportCacheKey("validations", shiftId);
+  const rows = shiftValidationCache.get(key)
+    ?? await dedupeSupportRequest(key, () => getShiftReleaseValidations(tenantScopeId.value, accessToken.value, shiftId))
+      .then((result) => {
+        shiftValidationCache.set(key, result);
+        return result;
+      });
+  if (selectedShiftId.value === shiftId) {
+    shiftValidations.value = rows;
+  }
+}
+
+async function loadShiftOutputsForSelectedShift() {
+  if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
+    shiftOutputs.value = [];
+    return;
+  }
+  const shiftId = selectedShiftId.value;
+  const key = supportCacheKey("outputs", shiftId);
+  const rows = shiftOutputsCache.get(key)
+    ?? await dedupeSupportRequest(key, () => listShiftOutputs(tenantScopeId.value, accessToken.value, shiftId))
+      .then((result) => {
+        shiftOutputsCache.set(key, result);
+        return result;
+      });
+  if (selectedShiftId.value === shiftId) {
+    shiftOutputs.value = rows;
+  }
+}
+
+async function loadDemandStaffingSupport() {
+  await Promise.all([
+    loadDemandGroupsForSelectedShift(),
+    loadTeamsForPlanningContext(),
+    loadTeamMembersForTenant(),
+  ]);
+}
+
+async function loadAssignmentsSupport() {
+  await Promise.all([
+    loadTeamsForPlanningContext(),
+    loadActiveEmployeesForTenant(),
+    loadSubcontractorReleasesForSelectedShift(),
+  ]);
+  await loadSubcontractorWorkersForCurrentReleases();
+}
+
+async function loadTeamsReleasesSupport() {
+  await Promise.all([
+    loadTeamsForPlanningContext(),
+    loadTeamMembersForTenant(),
+    loadActiveEmployeesForTenant(),
+    loadSubcontractorReleasesForSelectedShift(),
+  ]);
+  await loadSubcontractorWorkersForCurrentReleases();
+  if (!availableTeams.value.some((team) => team.id === selectedTeamId.value)) {
+    selectedTeamId.value = availableTeams.value[0]?.id ?? "";
+  }
+  if (!availableTeams.value.some((team) => team.id === staffingDraft.team_id)) {
+    staffingDraft.team_id = "";
+    staffingDraft.member_ref = "";
+  }
+}
+
+async function loadValidationsSupport() {
+  await loadShiftValidationsForSelectedShift();
+  if (selectedAssignmentId.value) {
+    await loadSelectedAssignmentMeta();
+  }
+}
+
+async function loadOutputsDispatchSupport() {
+  await loadShiftOutputsForSelectedShift();
+}
+
+async function loadActiveShiftDetailSupport() {
+  if (!isRouteCachePaneActive.value) {
+    return;
+  }
+  if (!selectedShiftId.value) {
+    return;
+  }
+  if (activeShiftDetailTab.value === "demand_staffing") {
+    await loadDemandStaffingSupport();
+    return;
+  }
+  if (activeShiftDetailTab.value === "validations") {
+    await loadValidationsSupport();
+    return;
+  }
+  if (activeShiftDetailTab.value === "assignments") {
+    await loadAssignmentsSupport();
+    return;
+  }
+  if (activeShiftDetailTab.value === "teams_releases") {
+    await loadTeamsReleasesSupport();
+    return;
+  }
+  if (activeShiftDetailTab.value === "outputs_dispatch") {
+    await loadOutputsDispatchSupport();
+  }
+}
+
+async function startSelectedShiftDetailLoad(version = ++detailLoadVersion) {
+  detailLoadPending.value = true;
+  try {
+    await loadSelectedShiftDetails();
+  } finally {
+    if (version === detailLoadVersion) {
+      detailLoadPending.value = false;
+    }
+  }
+}
+
+async function refreshAll(options: { applyDraftFilters?: boolean; force?: boolean } = {}) {
   clearFeedback();
   if (!tenantScopeId.value || !accessToken.value) {
     return;
   }
-  loading.value = true;
-  try {
-    if (routeHydrationShiftId.value) {
-      await normalizeRouteHydrationWindow();
+  if (options.applyDraftFilters !== false) {
+    syncAppliedFiltersFromDraft();
+  }
+  mainLoadPending.value = true;
+  if (routeHydrationShiftId.value) {
+    await normalizeRouteHydrationWindow();
+    syncAppliedFiltersFromDraft();
+  }
+  const requestKey = appliedFiltersKey();
+  if (!options.force) {
+    const inflight = mainLoadRequests.get(requestKey);
+    if (inflight) {
+      return inflight;
     }
-    const requestedShiftId = routeHydrationShiftId.value || "";
-    const [coverage, board] = await Promise.all([
-      listStaffingCoverage(tenantScopeId.value, accessToken.value, queryFilters()),
-      listStaffingBoard(tenantScopeId.value, accessToken.value, queryFilters()),
-    ]);
-    let hydratedBoard = board;
-    let exactShiftBoard = requestedShiftId
-      ? hydratedBoard.find((row) => row.id === requestedShiftId) ?? null
-      : null;
+  }
+  const requestVersion = ++mainLoadVersion;
+  const request = (async () => {
+    try {
+      const requestedShiftId = routeHydrationShiftId.value || "";
+      const [coverage, board] = await Promise.all([
+        listStaffingCoverage(tenantScopeId.value, accessToken.value, queryFilters()),
+        listStaffingBoard(tenantScopeId.value, accessToken.value, queryFilters()),
+      ]);
+      let hydratedBoard = board;
+      let exactShiftBoard = requestedShiftId
+        ? hydratedBoard.find((row) => row.id === requestedShiftId) ?? null
+        : null;
 
-    if (requestedShiftId && !exactShiftBoard) {
-      const exactBoardRows = await listStaffingBoard(
-        tenantScopeId.value,
-        accessToken.value,
-        exactShiftBoardFilters(requestedShiftId),
-      );
-      exactShiftBoard = exactBoardRows.find((row) => row.id === requestedShiftId) ?? null;
-      if (exactShiftBoard && !hydratedBoard.some((row) => row.id === exactShiftBoard?.id)) {
-        hydratedBoard = [exactShiftBoard, ...hydratedBoard];
+      if (requestedShiftId && !exactShiftBoard) {
+        const exactBoardRows = await listStaffingBoard(
+          tenantScopeId.value,
+          accessToken.value,
+          exactShiftBoardFilters(requestedShiftId),
+        );
+        if (requestVersion !== mainLoadVersion) {
+          return;
+        }
+        exactShiftBoard = exactBoardRows.find((row) => row.id === requestedShiftId) ?? null;
+        if (exactShiftBoard && !hydratedBoard.some((row) => row.id === exactShiftBoard?.id)) {
+          hydratedBoard = [exactShiftBoard, ...hydratedBoard];
+        }
+      }
+
+      let hydratedCoverage = coverage;
+      if (exactShiftBoard && !hydratedCoverage.some((row) => row.shift_id === exactShiftBoard?.id)) {
+        hydratedCoverage = [deriveCoverageRowFromBoardShift(exactShiftBoard), ...hydratedCoverage];
+      }
+      if (requestVersion !== mainLoadVersion) {
+        return;
+      }
+
+      replaceCoverageRows(hydratedCoverage);
+      replaceBoardRows(hydratedBoard);
+      if (requestedShiftId && exactShiftBoard) {
+        selectedShiftId.value = requestedShiftId;
+        routeHydrationShiftId.value = "";
+      } else if (!coverageRows.value.find((row) => row.shift_id === selectedShiftId.value)) {
+        selectedShiftId.value = coverageRows.value[0]?.shift_id ?? "";
+        routeHydrationShiftId.value = "";
+      }
+      if (!selectedShiftId.value) {
+        selectedDemandGroupId.value = "";
+        selectedAssignmentId.value = "";
+        shiftValidations.value = null;
+        assignmentValidations.value = null;
+        assignmentOverrides.value = [];
+        shiftOutputs.value = [];
+        dispatchPreview.value = null;
+        demandGroupRows.value = [];
+        planningTeams.value = [];
+        teamMembers.value = [];
+        employeeOptions.value = [];
+        subcontractorWorkerOptions.value = [];
+        subcontractorReleases.value = [];
+        detailLoadVersion += 1;
+        detailLoadPending.value = false;
+        if (relevantPlanningRecordId.value) {
+          void loadTeamsForPlanningContext();
+        }
+        return;
+      }
+      detailLoadVersion += 1;
+      const detailVersion = detailLoadVersion;
+      await nextTick();
+      if (requestVersion !== mainLoadVersion) {
+        return;
+      }
+      mainLoadPending.value = false;
+      routeHydrationInFlight.value = false;
+      void startSelectedShiftDetailLoad(detailVersion);
+      return;
+    } catch (error) {
+      if (requestVersion === mainLoadVersion) {
+        handleApiError(error);
+      }
+    } finally {
+      if (requestVersion === mainLoadVersion) {
+        routeHydrationInFlight.value = false;
+        mainLoadPending.value = false;
       }
     }
-
-    let hydratedCoverage = coverage;
-    if (exactShiftBoard && !hydratedCoverage.some((row) => row.shift_id === exactShiftBoard?.id)) {
-      hydratedCoverage = [deriveCoverageRowFromBoardShift(exactShiftBoard), ...hydratedCoverage];
+  })();
+  mainLoadRequests.set(requestKey, request);
+  return request.finally(() => {
+    if (mainLoadRequests.get(requestKey) === request) {
+      mainLoadRequests.delete(requestKey);
     }
-
-    coverageRows.value = hydratedCoverage;
-    boardRows.value = hydratedBoard;
-    if (requestedShiftId && exactShiftBoard) {
-      selectedShiftId.value = requestedShiftId;
-      routeHydrationShiftId.value = "";
-    } else if (!coverageRows.value.find((row) => row.shift_id === selectedShiftId.value)) {
-      selectedShiftId.value = coverageRows.value[0]?.shift_id ?? "";
-      routeHydrationShiftId.value = "";
-    }
-    if (!selectedShiftId.value) {
-      selectedDemandGroupId.value = "";
-      selectedAssignmentId.value = "";
-      shiftValidations.value = null;
-      assignmentValidations.value = null;
-      assignmentOverrides.value = [];
-      shiftOutputs.value = [];
-      dispatchPreview.value = null;
-      await refreshSupportingData();
-      return;
-    }
-    await loadSelectedShiftDetails();
-  } catch (error) {
-    handleApiError(error);
-  } finally {
-    routeHydrationInFlight.value = false;
-    loading.value = false;
-  }
+  });
 }
 
 async function loadSelectedShiftDetails() {
   if (!tenantScopeId.value || !accessToken.value || !selectedShiftId.value) {
     return;
   }
-  const [validations, outputs] = await Promise.all([
-    getShiftReleaseValidations(tenantScopeId.value, accessToken.value, selectedShiftId.value),
-    listShiftOutputs(tenantScopeId.value, accessToken.value, selectedShiftId.value),
-    refreshSupportingData(),
-  ]);
-  shiftValidations.value = validations;
-  shiftOutputs.value = outputs;
   selectedDemandGroupId.value = resolveSelectedDemandGroupId(selectedBoardShift.value, selectedDemandGroupId.value);
   const boardShift = selectedBoardShift.value;
   if (!boardShift?.assignments?.length) {
@@ -2674,12 +3057,13 @@ async function loadSelectedShiftDetails() {
     }
     assignmentValidations.value = null;
     assignmentOverrides.value = [];
+    await loadActiveShiftDetailSupport();
     return;
   }
   if (!boardShift.assignments.some((row) => row.id === selectedAssignmentId.value)) {
     selectedAssignmentId.value = "";
   }
-  await loadSelectedAssignmentDetails();
+  await loadActiveShiftDetailSupport();
 }
 
 async function loadSelectedAssignmentDetails() {
@@ -2830,7 +3214,9 @@ async function submitDemandGroup() {
         })
       : await createDemandGroup(tenantScopeId.value, accessToken.value, payload);
     selectedDemandGroupId.value = result.id;
-    await refreshAll();
+    const shiftKey = supportCacheKey("demand-groups", selectedShiftId.value);
+    demandGroupCache.delete(shiftKey);
+    await refreshAll({ applyDraftFilters: false, force: true });
     closeDemandGroupDialog();
   } catch (error) {
     handleApiError(error);
@@ -3008,7 +3394,11 @@ async function submitTeam() {
     }
     selectedTeamId.value = team.id;
     staffingDraft.team_id = team.id;
-    await refreshSupportingData();
+    const teamKey = supportCacheKey("teams", relevantPlanningRecordId.value);
+    const memberKey = supportCacheKey("team-members", "");
+    teamCache.delete(teamKey);
+    teamMemberCache.delete(memberKey);
+    await loadTeamsReleasesSupport();
     closeTeamDialog();
   } catch (error) {
     handleApiError(error);
@@ -3049,7 +3439,8 @@ async function submitTeamMember() {
       await createTeamMember(tenantScopeId.value, accessToken.value, payload);
     }
     selectedTeamId.value = teamMemberDraft.team_id;
-    await refreshSupportingData();
+    teamMemberCache.delete(supportCacheKey("team-members", ""));
+    await loadTeamsReleasesSupport();
     closeTeamMemberDialog();
   } catch (error) {
     handleApiError(error);
@@ -3102,7 +3493,8 @@ async function generateOutput(audienceCode: "customer" | "internal") {
       variant_code: "deployment_plan",
       audience_code: audienceCode,
     });
-    shiftOutputs.value = await listShiftOutputs(tenantScopeId.value, accessToken.value, selectedShiftId.value);
+    shiftOutputsCache.delete(supportCacheKey("outputs", selectedShiftId.value));
+    await loadShiftOutputsForSelectedShift();
   } finally {
     loading.value = false;
   }
@@ -3141,50 +3533,40 @@ async function submitOverride() {
   }
 }
 
-async function recoverSessionAndRefresh() {
-  if (document.visibilityState === "hidden") {
-    return;
-  }
-  const ready = await ensureStaffingSessionReady();
-  if (!ready || !actionState.value.canReadCoverage) {
-    return;
-  }
-  await loadPlanningRecordOptions();
-  await refreshAll();
-}
-
-function handleVisibilityChange() {
-  if (!isRouteCachePaneActive.value) {
-    return;
-  }
-  if (document.visibilityState === "visible") {
-    void recoverSessionAndRefresh();
-  }
-}
-
-function handleWindowFocus() {
-  if (!isRouteCachePaneActive.value) {
-    return;
-  }
-  void recoverSessionAndRefresh();
-}
-
 watch(selectedShiftId, async () => {
   activeShiftDetailTab.value = "demand_staffing";
   if (demandGroupDialogOpen.value) {
     closeDemandGroupDialog();
   }
-  if (!loading.value && !routeHydrationInFlight.value) {
+  if (!loading.value && !mainLoadPending.value && !detailLoadPending.value && !routeHydrationInFlight.value) {
     try {
-      await loadSelectedShiftDetails();
+      await startSelectedShiftDetailLoad();
     } catch (error) {
       handleApiError(error);
     }
   }
 });
 
+watch(activeShiftDetailTab, async () => {
+  if (!loading.value && !mainLoadPending.value && !routeHydrationInFlight.value) {
+    const version = ++detailLoadVersion;
+    detailLoadPending.value = true;
+    try {
+      await loadActiveShiftDetailSupport();
+      if (version === detailLoadVersion) {
+        detailLoadPending.value = false;
+      }
+    } catch (error) {
+      if (version === detailLoadVersion) {
+        detailLoadPending.value = false;
+      }
+      handleApiError(error);
+    }
+  }
+});
+
 watch(selectedAssignmentId, async () => {
-  if (!loading.value && !assignmentEditorLoading.value && !assignmentEditorSaving.value) {
+  if (!loading.value && !mainLoadPending.value && !assignmentEditorLoading.value && !assignmentEditorSaving.value) {
     try {
       await loadSelectedAssignmentDetails();
     } catch (error) {
@@ -3238,6 +3620,9 @@ watch(
 watch(
   () => [authStore.effectiveRole, authStore.effectiveTenantScopeId, authStore.effectiveAccessToken, authStore.sessionUser?.id ?? ""],
   ([nextRole, nextTenantScopeId, nextAccessToken], [prevRole, prevTenantScopeId, prevAccessToken]) => {
+    if (!isRouteCachePaneActive.value) {
+      return;
+    }
     if (!nextRole || !nextTenantScopeId || !nextAccessToken) {
       return;
     }
@@ -3248,7 +3633,7 @@ watch(
     ) {
       return;
     }
-    void refreshAll();
+    void refreshAll({ force: true });
   },
 );
 
@@ -3282,14 +3667,13 @@ watch(
 onMounted(async () => {
   routeHydrationInFlight.value = true;
   applyRouteQueryContext();
+  syncAppliedFiltersFromDraft();
   authStore.syncFromPrimarySession();
   const sessionReady = await ensureStaffingSessionReady();
   if (!sessionReady || !tenantScopeId.value || !accessToken.value || !actionState.value.canReadCoverage) {
     routeHydrationInFlight.value = false;
     return;
   }
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-  window.addEventListener("focus", handleWindowFocus);
   await loadDemandGroupCatalogOptions();
   await refreshAll();
 });
@@ -3297,6 +3681,9 @@ onMounted(async () => {
 watch(
   () => route.fullPath,
   () => {
+    if (!isRouteCachePaneActive.value) {
+      return;
+    }
     routeHydrationInFlight.value = true;
     const changed = applyRouteQueryContext();
     if (!changed || !tenantScopeId.value || !accessToken.value || !actionState.value.canReadCoverage) {
@@ -3311,8 +3698,6 @@ onBeforeUnmount(() => {
   if (planningRecordLookupTimer) {
     clearTimeout(planningRecordLookupTimer);
   }
-  document.removeEventListener("visibilitychange", handleVisibilityChange);
-  window.removeEventListener("focus", handleWindowFocus);
 });
 </script>
 

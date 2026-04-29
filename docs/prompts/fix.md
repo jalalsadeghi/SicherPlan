@@ -1,47 +1,97 @@
-Fix field/lookup corpus freshness check so unrelated frontend changes do not make the generated artifact stale.
+We need to optimize the initial search/load performance of /admin/planning-staffing after fixing repeated reloads.
 
-Current issue:
-The Stage Deploy workflow fails before Docker image build in:
-Verify committed field/lookup corpus artifact is current
+Current state:
+Repeated reloads after normal clicks should already be fixed.
+Now focus only on making the intentional "Load staffing" action faster and more responsive.
 
-The exporter is deterministic: tmp1 and tmp2 match.
-The committed artifact differs only in source_hashes.frontend_root:
-old frontend_root != regenerated frontend_root
+Files:
+- web/apps/web-antd/src/sicherplan-legacy/views/PlanningStaffingCoverageView.vue
+- web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts
+- backend files only if frontend optimization is insufficient
 
-field_count and lookup_count are unchanged:
-field_count=219
-lookup_count=10
+Task:
+Profile and optimize the intentional load.
 
-Root cause:
-field_lookup_corpus.json stores a broad frontend_root hash. This hash changes for unrelated frontend changes, even when the extracted field/lookup corpus does not change. Therefore CI fails too often and blocks backend image builds even when corpus content is unchanged.
+Step 1 — Measure current intentional load:
+For one Load staffing action with a large date range, record:
+- number of coverage rows
+- number of staffing-board rows
+- response time for coverage
+- response time for staffing-board
+- time to first visible list row
+- time to selected shift detail ready
+- number of rendered DOM rows
+- browser main-thread time if measurable
 
-Tasks:
-1. Inspect backend/app/modules/assistant/field_dictionary.py, especially _collect_source_hashes and any helper used to hash frontend_root.
-2. Verify exactly which files are included in frontend_root.
-3. Replace the broad frontend_root hash with semantic hashes over extraction-relevant data only.
-4. Do not hash the entire web/apps/web-antd/src tree.
-5. Compute stable hashes from normalized extracted inputs, for example:
-   - locale labels used by corpus extraction;
-   - legacy messages used by corpus extraction;
-   - Vue form bindings extracted by the corpus extractor;
-   - TypeScript API interface fields extracted by the corpus extractor;
-   - backend schema fields extracted by the corpus extractor;
-   - page help seed data.
-6. If keeping a diagnostic frontend_root hash is useful, keep it outside the freshness-compared artifact, or mark it as diagnostic only and exclude it from CI diff.
-7. Ensure the committed artifact changes only when effective corpus content or semantic extraction inputs change.
-8. Regenerate backend/app/modules/assistant/generated/field_lookup_corpus.json after the fix.
-9. Update the CI check to compare deterministic semantic artifact output.
-10. Add tests:
-   - changing an unrelated frontend style/component text that is not used by extractor must not change artifact output;
-   - changing a field label in de-DE/en-US locale must change artifact output;
-   - changing a v-model field binding used by extractor must change artifact output;
-   - exporter remains deterministic;
-   - Vertragsreferenz and Rechtlicher Name remain in-scope;
-   - Apfelkuchen remains out-of-scope.
+Step 2 — Keep UI responsive:
+When Load staffing is clicked:
+- show filter panel immediately
+- show loading state only for affected panels, not the entire page if possible
+- render results incrementally if feasible
+- avoid blocking the UI while all support data loads
+
+Step 3 — Avoid auto-select heavy detail:
+If the first selected shift causes many support requests, consider:
+- selecting first shift visually but not loading heavy detail until detail panel is visible/needed
+- or loading only the default tab’s minimal data
+- do not load all detail tabs for the first shift upfront
+
+Step 4 — Large list rendering:
+If coverageRows can be large:
+- consider virtualized list or windowed rendering for the left shift coverage list
+- at minimum, avoid expensive computed formatting for every row on every render
+- memoize row labels and coverage states by shift_id/version
+
+Step 5 — Stable computed data:
+Avoid computed values that rebuild huge arrays/maps on every reactive change.
+Use:
+- shallowRef for large arrays
+- stable Maps keyed by shift_id
+- computed only over the current subset when possible
+
+Step 6 — Planning record dropdown:
+The planning record lookup should not reload the full planning records list on every filter/search keystroke.
+Use:
+- debounced search
+- cache by tenant + date range + search term
+- minimum search length if appropriate
+- do not block staffing load on dropdown options unless required
+
+Step 7 — Optional backend optimization only if necessary:
+If coverage + staffing-board are inherently slow due to backend:
+Propose a backend read-optimized endpoint, but do not implement unless frontend profiling proves it is needed.
+
+Possible endpoint:
+GET /api/planning/tenants/{tenant_id}/ops/staffing-workspace
+
+It could return:
+- coverage summary
+- coverage rows
+- staffing board rows
+- planning record labels needed for the selected range
+But keep it read-only and tenant-scoped.
+
+Backend constraints:
+- preserve tenant isolation
+- preserve permissions
+- do not include unnecessary employee/private data
+- keep existing endpoints unchanged
+
+Tests:
+A. Performance-focused unit/component tests:
+- one Load staffing call triggers exactly one coverage and one board call
+- first row renders before selected-shift heavy details finish
+- large arrays are not rebuilt when unrelated state changes
+
+B. Lazy detail test:
+- outputs/validations/teams/releases do not load until related tab is active
+
+C. Dropdown lookup test:
+- planning record search is debounced/cached
 
 Acceptance criteria:
-- The current workflow no longer fails only because frontend_root changed.
-- Unrelated frontend changes do not require refreshing field_lookup_corpus.json.
-- Real field/lookup/i18n/schema changes still require refreshing the artifact.
-- Docker image build step is reached.
-- Tests pass.
+- Intentional Load staffing action is visibly faster.
+- Main UI is responsive while data loads.
+- Heavy detail data does not block list rendering.
+- Large result list does not cause unnecessary recomputation.
+- Backend changes are avoided unless proven necessary.

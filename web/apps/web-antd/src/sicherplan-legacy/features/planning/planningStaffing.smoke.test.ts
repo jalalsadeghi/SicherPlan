@@ -27,6 +27,8 @@ const routeState = {
   query: {} as Record<string, unknown>,
 };
 
+const routeCachePaneActive = vi.hoisted(() => ({ value: true }));
+
 const mocks = vi.hoisted(() => ({
   assignStaffingMock: vi.fn(async () => ({
     tenant_id: "tenant-1",
@@ -663,6 +665,10 @@ vi.mock("ant-design-vue", async () => {
   };
 });
 
+vi.mock("@vben/layouts", () => ({
+  useIsRouteCachePaneActive: () => routeCachePaneActive,
+}));
+
 async function mountView() {
   const { default: PlanningStaffingCoverageView } = await import("../../views/PlanningStaffingCoverageView.vue");
   const wrapper = mount(PlanningStaffingCoverageView);
@@ -689,6 +695,7 @@ describe("PlanningStaffingCoverageView", () => {
     sessionState.role = "dispatcher";
     sessionState.tenantId = "tenant-1";
     sessionState.accessToken = "token-1";
+    routeCachePaneActive.value = true;
     routeState.fullPath = "/admin/planning-staffing";
     routeState.query = {};
     for (const mock of Object.values(mocks)) {
@@ -833,6 +840,157 @@ describe("PlanningStaffingCoverageView", () => {
     expect(mocks.listQualificationTypesMock).toHaveBeenCalledWith("tenant-1", "token-1");
   }, 10_000);
 
+  it("does not run the main coverage and board load when only draft filters change", async () => {
+    const wrapper = await mountView();
+    mocks.listStaffingCoverageMock.mockClear();
+    mocks.listStaffingBoardMock.mockClear();
+
+    const inputs = wrapper.findAll('input[type="datetime-local"]');
+    await inputs[0]!.setValue("2026-04-10T00:00");
+    await inputs[1]!.setValue("2026-04-11T00:00");
+    await flushPromises();
+
+    expect(mocks.listStaffingCoverageMock).not.toHaveBeenCalled();
+    expect(mocks.listStaffingBoardMock).not.toHaveBeenCalled();
+
+    await wrapper.get('[data-testid="planning-staffing-refresh"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.listStaffingCoverageMock).toHaveBeenCalledTimes(1);
+    expect(mocks.listStaffingBoardMock).toHaveBeenCalledTimes(1);
+    expect(mocks.listStaffingCoverageMock).toHaveBeenLastCalledWith(
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({
+        date_from: "2026-04-10T00:00",
+        date_to: "2026-04-11T00:00",
+      }),
+    );
+  });
+
+  it("does not rerun the main load on normal clicks or window focus", async () => {
+    const wrapper = await mountView();
+    const initialCoverageCalls = mocks.listStaffingCoverageMock.mock.calls.length;
+    const initialBoardCalls = mocks.listStaffingBoardMock.mock.calls.length;
+
+    await wrapper.get('[data-testid="planning-staffing-filter-panel"]').trigger("click");
+    await wrapper.get('.planning-staffing-row').trigger("click");
+    await clickDetailTab(wrapper, "validations");
+    window.dispatchEvent(new Event("focus"));
+    document.dispatchEvent(new Event("visibilitychange"));
+    await flushPromises();
+
+    expect(mocks.listStaffingCoverageMock).toHaveBeenCalledTimes(initialCoverageCalls);
+    expect(mocks.listStaffingBoardMock).toHaveBeenCalledTimes(initialBoardCalls);
+  });
+
+  it("deduplicates in-flight main loads for the same applied filter key", async () => {
+    const coverageDeferred = createDeferred<any[]>();
+    const boardDeferred = createDeferred<any[]>();
+    const wrapper = await mountView();
+    mocks.listStaffingCoverageMock.mockClear();
+    mocks.listStaffingBoardMock.mockClear();
+    mocks.listStaffingCoverageMock.mockImplementationOnce(async () => coverageDeferred.promise);
+    mocks.listStaffingBoardMock.mockImplementationOnce(async () => boardDeferred.promise);
+
+    await wrapper.get('[data-testid="planning-staffing-refresh"]').trigger("click");
+    await wrapper.get('[data-testid="planning-staffing-refresh"]').trigger("click");
+    await Promise.resolve();
+
+    expect(mocks.listStaffingCoverageMock).toHaveBeenCalledTimes(1);
+    expect(mocks.listStaffingBoardMock).toHaveBeenCalledTimes(1);
+
+    coverageDeferred.resolve([
+      {
+        shift_id: "shift-2",
+        planning_record_id: "planning-1",
+        shift_plan_id: "plan-1",
+        order_id: "order-1",
+        order_no: "ORD-1",
+        planning_record_name: "Planning 1",
+        planning_mode_code: "site",
+        workforce_scope_code: "internal",
+        starts_at: "2026-04-05T08:00:00Z",
+        ends_at: "2026-04-05T16:00:00Z",
+        shift_type_code: "site_day",
+        location_text: "Berlin",
+        meeting_point: "Gate A",
+        min_required_qty: 1,
+        target_required_qty: 2,
+        assigned_count: 1,
+        confirmed_count: 1,
+        released_partner_qty: 0,
+        coverage_state: "yellow",
+        demand_groups: [],
+      },
+    ] as any);
+    boardDeferred.resolve([
+      {
+        id: "shift-2",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        shift_plan_id: "plan-1",
+        order_id: "order-1",
+        order_no: "ORD-1",
+        planning_record_name: "Planning 1",
+        planning_mode_code: "site",
+        workforce_scope_code: "internal",
+        starts_at: "2026-04-05T08:00:00Z",
+        ends_at: "2026-04-05T16:00:00Z",
+        shift_type_code: "site_day",
+        release_state: "draft",
+        status: "active",
+        location_text: "Berlin",
+        meeting_point: "Gate A",
+        demand_groups: [],
+        assignments: [],
+      },
+    ] as any);
+    await flushPromises();
+  });
+
+  it("lazy-loads selected shift support data by active detail tab", async () => {
+    const wrapper = await mountView();
+
+    expect(mocks.listDemandGroupsMock).toHaveBeenCalledTimes(1);
+    expect(mocks.listTeamsMock).toHaveBeenCalledTimes(1);
+    expect(mocks.listTeamMembersMock).toHaveBeenCalledTimes(1);
+    expect(mocks.listEmployeesMock).not.toHaveBeenCalled();
+    expect(mocks.listSubcontractorReleasesMock).not.toHaveBeenCalled();
+    expect(mocks.getShiftReleaseValidationsMock).not.toHaveBeenCalled();
+    expect(mocks.listShiftOutputsMock).not.toHaveBeenCalled();
+
+    await clickDetailTab(wrapper, "validations");
+    expect(mocks.getShiftReleaseValidationsMock).toHaveBeenCalledTimes(1);
+    expect(mocks.listShiftOutputsMock).not.toHaveBeenCalled();
+
+    await clickDetailTab(wrapper, "teams_releases");
+    expect(mocks.listTeamsMock).toHaveBeenCalledTimes(1);
+    expect(mocks.listTeamMembersMock).toHaveBeenCalledTimes(1);
+    expect(mocks.listEmployeesMock).toHaveBeenCalledTimes(1);
+    expect(mocks.listSubcontractorReleasesMock).toHaveBeenCalledTimes(1);
+
+    await clickDetailTab(wrapper, "outputs_dispatch");
+    expect(mocks.listShiftOutputsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reload from route changes while the cached pane is inactive", async () => {
+    const wrapper = await mountView();
+    mocks.listStaffingCoverageMock.mockClear();
+    mocks.listStaffingBoardMock.mockClear();
+    routeCachePaneActive.value = false;
+    routeState.fullPath = "/admin/planning-staffing?date_from=2026-04-10T00:00&date_to=2026-04-11T00:00";
+    routeState.query = {
+      date_from: "2026-04-10T00:00",
+      date_to: "2026-04-11T00:00",
+    };
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+
+    expect(mocks.listStaffingCoverageMock).not.toHaveBeenCalled();
+    expect(mocks.listStaffingBoardMock).not.toHaveBeenCalled();
+  });
+
   it("keeps the planning record field aligned when no records match the current filters", async () => {
     mocks.listPlanningRecordsMock.mockResolvedValueOnce([]);
 
@@ -855,6 +1013,32 @@ describe("PlanningStaffingCoverageView", () => {
     expect(wrapper.text()).toContain("Planungsmodus auswaehlen");
     expect(wrapper.text()).toContain("Workforce-Scope auswaehlen");
     expect(wrapper.text()).toContain("Bestaetigungsstatus auswaehlen");
+  });
+
+  it("debounces and caches planning record search lookups", async () => {
+    vi.useFakeTimers();
+    try {
+      const wrapper = await mountView();
+      await vi.runOnlyPendingTimersAsync();
+      await flushPromises();
+      mocks.listPlanningRecordsMock.mockClear();
+
+      (wrapper.vm as any).handlePlanningRecordSearch("plan");
+      (wrapper.vm as any).handlePlanningRecordSearch("plan");
+      await vi.advanceTimersByTimeAsync(249);
+      expect(mocks.listPlanningRecordsMock).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(1);
+      await flushPromises();
+      expect(mocks.listPlanningRecordsMock).toHaveBeenCalledTimes(1);
+
+      (wrapper.vm as any).handlePlanningRecordSearch("plan");
+      await vi.advanceTimersByTimeAsync(250);
+      await flushPromises();
+      expect(mocks.listPlanningRecordsMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("hides the shared module control intro for planning staffing via the module registry", () => {
@@ -881,7 +1065,7 @@ describe("PlanningStaffingCoverageView", () => {
     expect(wrapper.text()).toContain("Planning 1");
   });
 
-  it("shows the shared workspace overlay during a blocking staffing refresh and clears it afterwards", async () => {
+  it("keeps the workspace interactive during a blocking staffing refresh and marks only the affected panels busy", async () => {
     const wrapper = await mountView();
     const coverageDeferred = createDeferred<any[]>();
     const boardDeferred = createDeferred<any[]>();
@@ -892,8 +1076,9 @@ describe("PlanningStaffingCoverageView", () => {
     await Promise.resolve();
 
     const overlay = wrapper.get('[data-testid="planning-staffing-workspace-loading-overlay"]');
-    expect(overlay.attributes("data-busy")).toBe("true");
-    expect(overlay.text()).toContain("Staffing-Arbeitsbereich wird geladen.");
+    expect(overlay.attributes("data-busy")).toBe("false");
+    expect(wrapper.get('[data-testid="planning-staffing-shift-coverage-panel"]').attributes("data-busy")).toBe("true");
+    expect(wrapper.get('[data-testid="planning-staffing-detail-panel"]').attributes("data-busy")).toBe("true");
 
     coverageDeferred.resolve([
       {
@@ -981,7 +1166,99 @@ describe("PlanningStaffingCoverageView", () => {
     ] as any);
     await flushPromises();
 
-    expect(overlay.attributes("data-busy")).toBe("false");
+    expect(wrapper.get('[data-testid="planning-staffing-shift-coverage-panel"]').attributes("data-busy")).toBe("false");
+    expect(wrapper.get('[data-testid="planning-staffing-detail-panel"]').attributes("data-busy")).toBe("false");
+  });
+
+  it("renders the first coverage row before selected-shift detail support finishes", async () => {
+    const wrapper = await mountView();
+    const coverageDeferred = createDeferred<any[]>();
+    const boardDeferred = createDeferred<any[]>();
+    const demandGroupsDeferred = createDeferred<any[]>();
+    mocks.listStaffingCoverageMock.mockClear();
+    mocks.listStaffingBoardMock.mockClear();
+    mocks.listDemandGroupsMock.mockImplementationOnce(async () => demandGroupsDeferred.promise);
+    mocks.listStaffingCoverageMock.mockImplementationOnce(() => coverageDeferred.promise);
+    mocks.listStaffingBoardMock.mockImplementationOnce(() => boardDeferred.promise);
+
+    await wrapper.get('[data-testid="planning-staffing-refresh"]').trigger("click");
+    await Promise.resolve();
+
+    coverageDeferred.resolve([
+      {
+        shift_id: "shift-1",
+        planning_record_id: "planning-1",
+        shift_plan_id: "plan-1",
+        order_id: "order-1",
+        order_no: "ORD-1",
+        planning_record_name: "Planning 1",
+        planning_mode_code: "site",
+        workforce_scope_code: "internal",
+        starts_at: "2026-04-05T08:00:00Z",
+        ends_at: "2026-04-05T16:00:00Z",
+        shift_type_code: "site_day",
+        location_text: "Berlin",
+        meeting_point: "Gate A",
+        min_required_qty: 1,
+        target_required_qty: 2,
+        assigned_count: 1,
+        confirmed_count: 1,
+        released_partner_qty: 0,
+        coverage_state: "yellow",
+        demand_groups: [],
+      },
+    ] as any);
+    boardDeferred.resolve([
+      {
+        id: "shift-1",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-1",
+        shift_plan_id: "plan-1",
+        order_id: "order-1",
+        order_no: "ORD-1",
+        planning_record_name: "Planning 1",
+        planning_mode_code: "site",
+        workforce_scope_code: "internal",
+        starts_at: "2026-04-05T08:00:00Z",
+        ends_at: "2026-04-05T16:00:00Z",
+        shift_type_code: "site_day",
+        release_state: "draft",
+        status: "active",
+        location_text: "Berlin",
+        meeting_point: "Gate A",
+        demand_groups: [],
+        assignments: [],
+      },
+    ] as any);
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-testid="planning-staffing-shift-coverage-scroll"]').exists()).toBe(true);
+    expect(wrapper.find(".planning-staffing-row").exists()).toBe(true);
+    expect(wrapper.get('[data-testid="planning-staffing-workspace-loading-overlay"]').attributes("data-busy")).toBe("false");
+    expect(mocks.listDemandGroupsMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('[data-testid="planning-staffing-demand-group-list"]').exists()).toBe(false);
+
+    demandGroupsDeferred.resolve([
+      {
+        id: "dg-1",
+        tenant_id: "tenant-1",
+        shift_id: "shift-2",
+        function_type_id: "func-1",
+        qualification_type_id: null,
+        min_qty: 1,
+        target_qty: 2,
+        mandatory_flag: true,
+        sort_order: 100,
+        remark: null,
+        status: "active",
+        version_no: 1,
+        created_at: "2026-04-05T08:00:00Z",
+        updated_at: "2026-04-05T08:00:00Z",
+        archived_at: null,
+      },
+    ] as any);
+    await flushPromises();
   });
 
   it("normalizes raw deep-link shift windows to the canonical staffing day window before exact hydration", async () => {
@@ -2085,7 +2362,7 @@ describe("PlanningStaffingCoverageView", () => {
     expect(wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').classes()).toContain("selected");
   });
 
-  it("clears assignment selection after refresh when the selected assignment disappears instead of selecting another row", async () => {
+  it("does not change assignment selection on window focus when main reload is disabled", async () => {
     mocks.listStaffingBoardMock.mockResolvedValueOnce([
       {
         id: "shift-1",
@@ -2205,8 +2482,9 @@ describe("PlanningStaffingCoverageView", () => {
     window.dispatchEvent(new Event("focus"));
     await flushPromises();
 
-    expect(wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-2"]').classes()).not.toContain("selected");
-    expect(wrapper.find(".planning-staffing-assignment-validation-summary").exists()).toBe(false);
+    expect(wrapper.get('[data-testid="planning-staffing-assignment-row-assignment-1"]').classes()).toContain("selected");
+    expect(wrapper.find('[data-testid="planning-staffing-assignment-row-assignment-2"]').exists()).toBe(false);
+    expect(wrapper.find(".planning-staffing-assignment-validation-summary").exists()).toBe(true);
   });
 
   it("resets and cancels the assignment modal without changing unrelated page state", async () => {

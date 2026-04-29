@@ -895,8 +895,8 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(wrapper.find('[data-testid="employee-detail-loading-state"]').exists()).toBe(true);
     expect(apiMocks.getEmployeeMock).toHaveBeenCalledTimes(1);
     expect(apiMocks.listEmployeesMock).not.toHaveBeenCalled();
-    expect(coreAdminMocks.listBranchesMock).not.toHaveBeenCalled();
-    expect(coreAdminMocks.listMandatesMock).not.toHaveBeenCalled();
+    expect(coreAdminMocks.listBranchesMock).toHaveBeenCalledTimes(1);
+    expect(coreAdminMocks.listMandatesMock).toHaveBeenCalledTimes(1);
     expect(apiMocks.listEmployeeNotesMock).not.toHaveBeenCalled();
     expect(apiMocks.listEmployeeDocumentsMock).not.toHaveBeenCalled();
     expect(apiMocks.listEmployeeQualificationsMock).not.toHaveBeenCalled();
@@ -919,6 +919,56 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(apiMocks.listEmployeesMock).not.toHaveBeenCalled();
     expect(apiMocks.listEmployeeNotesMock).not.toHaveBeenCalled();
     expect(apiMocks.listEmployeeAddressesMock).not.toHaveBeenCalled();
+  });
+
+  it("shows safe placeholders for branch and mandate chips until lightweight structure labels are available", async () => {
+    const branchDeferred = createDeferred<any[]>();
+    const mandateDeferred = createDeferred<any[]>();
+    routeState.query = {
+      employee_id: "employee-markus",
+      pageKey: "employees:detail:employee-markus",
+      tab: "dashboard",
+    };
+    coreAdminMocks.listBranchesMock.mockReturnValue(branchDeferred.promise);
+    coreAdminMocks.listMandatesMock.mockReturnValue(mandateDeferred.promise);
+    apiMocks.getEmployeeMock.mockResolvedValue(
+      buildEmployeeRead("employee-markus", "P-2000", "Markus", "Neumann", {
+        work_email: "markus.neumann@example.test",
+        default_branch_id: "branch-1",
+        default_mandate_id: "mandate-1",
+      }),
+    );
+
+    const wrapper = await mountEmployeeAdmin();
+    await settle();
+
+    const summary = wrapper.get('[data-testid="employee-dashboard-summary"]').text();
+    expect(summary).toContain("markus.neumann@example.test");
+    expect(summary).not.toContain("branch-1");
+    expect(summary).not.toContain("mandate-1");
+    expect(summary).toContain("None");
+
+    branchDeferred.resolve([
+      { id: "branch-1", tenant_id: "tenant-1", code: "BR-1", name: "Berlin", status: "active", archived_at: null },
+    ]);
+    mandateDeferred.resolve([
+      {
+        id: "mandate-1",
+        tenant_id: "tenant-1",
+        branch_id: "branch-1",
+        code: "MAN-1",
+        name: "Berlin Mitte",
+        status: "active",
+        archived_at: null,
+      },
+    ]);
+    await settle();
+
+    const updatedSummary = wrapper.get('[data-testid="employee-dashboard-summary"]').text();
+    expect(updatedSummary).toContain("BR-1 - Berlin");
+    expect(updatedSummary).toContain("MAN-1 - Berlin Mitte");
+    expect(updatedSummary).not.toContain("branch-1");
+    expect(updatedSummary).not.toContain("mandate-1");
   });
 
   it("lazy-loads overview data until the overview tab is opened", async () => {
