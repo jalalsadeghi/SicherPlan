@@ -16,18 +16,24 @@ export const CUSTOMER_PERMISSION_MATRIX = {
 export const CUSTOMER_DETAIL_TAB_ORDER = [
   "dashboard",
   "overview",
-  "contact_access",
-  "commercial",
   "orders",
-  "history",
-  "employee_blocks",
 ];
 
 const CUSTOMER_DETAIL_TAB_ALIASES = {
-  addresses: "contact_access",
-  contacts: "contact_access",
+  addresses: "overview",
+  billing_profile: "overview",
+  commercial: "overview",
+  contact_access: "overview",
+  contacts: "overview",
+  employee_blocks: "overview",
+  history: "overview",
+  invoice_parties: "overview",
   plans: "orders",
-  portal: "contact_access",
+  portal: "overview",
+  portal_access: "overview",
+  rate_cards: "overview",
+  rate_lines: "overview",
+  surcharges: "overview",
 };
 
 export const CUSTOMER_COMMERCIAL_TAB_ORDER = [
@@ -52,7 +58,6 @@ export const CUSTOMER_OVERVIEW_SECTION_ORDER = [
   "rate_cards",
   "rate_lines",
   "surcharges",
-  "orders",
   "history",
   "employee_blocks",
 ];
@@ -107,16 +112,30 @@ const CUSTOMER_OVERVIEW_SECTION_TEST_IDS = {
 
 const CUSTOMER_ROUTE_TAB_TO_OVERVIEW_SECTION = {
   addresses: "addresses",
+  billing_profile: "billing_profile",
   commercial: "billing_profile",
   contact_access: "contacts",
   contacts: "contacts",
   dashboard: "master_data",
   employee_blocks: "employee_blocks",
   history: "history",
-  orders: "orders",
+  invoice_parties: "invoice_parties",
   overview: "master_data",
-  plans: "orders",
   portal: "portal_access",
+  rate_cards: "rate_cards",
+  rate_lines: "rate_lines",
+  surcharges: "surcharges",
+};
+
+const CUSTOMER_OVERVIEW_ROUTE_TAB_ALIASES = {
+  addresses: "addresses",
+  billing_profile: "billing_profile",
+  contacts: "contacts",
+  employee_blocks: "employee_blocks",
+  history: "history",
+  invoice_parties: "invoice_parties",
+  master_data: "overview",
+  portal_access: "portal",
   rate_cards: "rate_cards",
   rate_lines: "rate_lines",
   surcharges: "surcharges",
@@ -419,13 +438,6 @@ export function buildCustomerOverviewSections({
 
   const standaloneSections = [
     {
-      icon: CUSTOMER_OVERVIEW_SECTION_ICONS.orders,
-      id: "orders",
-      labelKey: CUSTOMER_OVERVIEW_SECTION_LABEL_KEYS.orders,
-      testId: CUSTOMER_OVERVIEW_SECTION_TEST_IDS.orders,
-      visible: showDetailSections && !!canReadOrders,
-    },
-    {
       icon: CUSTOMER_OVERVIEW_SECTION_ICONS.history,
       id: "history",
       labelKey: CUSTOMER_OVERVIEW_SECTION_LABEL_KEYS.history,
@@ -462,6 +474,10 @@ export function resolveCustomerOverviewSectionId(activeTab, { hasRateCards } = {
     return "rate_cards";
   }
   return rawSectionId;
+}
+
+export function customerOverviewRouteTabForSection(sectionId) {
+  return CUSTOMER_OVERVIEW_ROUTE_TAB_ALIASES[sectionId] ?? "overview";
 }
 
 export function normalizeCustomerCommercialTab(activeTab) {

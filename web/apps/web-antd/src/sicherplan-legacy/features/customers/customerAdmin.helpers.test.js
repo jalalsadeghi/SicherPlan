@@ -237,7 +237,7 @@ test("customer detail tabs default to overview-first and hide commercial without
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    ["dashboard", "overview", "contact_access", "orders", "history", "employee_blocks"],
+    ["dashboard", "overview", "orders"],
   );
   assert.deepEqual(
     buildCustomerDetailTabs({
@@ -246,7 +246,7 @@ test("customer detail tabs default to overview-first and hide commercial without
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    ["dashboard", "overview", "contact_access", "commercial", "orders", "history", "employee_blocks"],
+    ["dashboard", "overview", "orders"],
   );
   assert.equal(
     buildCustomerDetailTabs({
@@ -264,7 +264,7 @@ test("customer detail tabs default to overview-first and hide commercial without
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    ["dashboard", "overview", "contact_access", "commercial", "history", "employee_blocks"],
+    ["dashboard", "overview"],
   );
 });
 
@@ -294,7 +294,7 @@ test("customer detail tab state falls back to dashboard for existing customers a
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    "dashboard",
+    "overview",
   );
   assert.equal(
     normalizeCustomerDetailTab("orders", {
@@ -330,7 +330,7 @@ test("customer detail tab state falls back to dashboard for existing customers a
       hasSelectedCustomer: true,
       isCreatingCustomer: false,
     }),
-    "contact_access",
+    "overview",
   );
   for (const legacyTabId of ["contacts", "addresses", "portal"]) {
     assert.equal(
@@ -340,7 +340,7 @@ test("customer detail tab state falls back to dashboard for existing customers a
         hasSelectedCustomer: true,
         isCreatingCustomer: false,
       }),
-      "contact_access",
+      "overview",
     );
   }
   assert.equal(
@@ -383,7 +383,6 @@ test("customer overview section registry respects create mode, permissions, and 
     "billing_profile",
     "invoice_parties",
     "rate_cards",
-    "orders",
     "history",
     "employee_blocks",
   ]);
@@ -397,7 +396,6 @@ test("customer overview section registry respects create mode, permissions, and 
     "rate_cards",
     "rate_lines",
     "surcharges",
-    "orders",
     "history",
     "employee_blocks",
   ]);
@@ -410,8 +408,6 @@ test("customer overview section resolver maps legacy route tabs into unified ove
   assert.equal(resolveCustomerOverviewSectionId("addresses"), "addresses");
   assert.equal(resolveCustomerOverviewSectionId("portal"), "portal_access");
   assert.equal(resolveCustomerOverviewSectionId("commercial"), "billing_profile");
-  assert.equal(resolveCustomerOverviewSectionId("plans"), "orders");
-  assert.equal(resolveCustomerOverviewSectionId("orders"), "orders");
   assert.equal(resolveCustomerOverviewSectionId("history"), "history");
   assert.equal(resolveCustomerOverviewSectionId("employee_blocks"), "employee_blocks");
   assert.equal(resolveCustomerOverviewSectionId("rate_lines", { hasRateCards: false }), "rate_cards");

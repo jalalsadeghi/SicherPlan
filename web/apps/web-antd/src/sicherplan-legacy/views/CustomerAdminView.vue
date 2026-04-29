@@ -276,7 +276,44 @@
           </div>
 
           <template v-if="hasDetailWorkspace">
+          <nav
+            v-if="customerDetailTabs.length"
+            class="customer-admin-tabs"
+            aria-label="Customer detail sections"
+            data-testid="customer-detail-tabs"
+          >
+            <button
+              v-for="tab in customerDetailTabs"
+              :key="tab.id"
+              type="button"
+              class="customer-admin-tab"
+              :class="{ active: tab.id === activeDetailTab }"
+              :data-testid="`customer-tab-${tab.id}`"
+              @click="selectCustomerDetailTab(tab.id)"
+            >
+              {{ tab.label }}
+            </button>
+          </nav>
+
+          <CustomerDashboardTab
+            v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'dashboard'"
+            :access-token="accessToken"
+            :can-read-commercial="canReadCommercial"
+            :can-write-commercial="canWriteCommercial"
+            :can-manage-contacts="actionState.canManageContacts"
+            :customer="selectedCustomer"
+            :dashboard="customerDashboard"
+            :error="customerDashboardError"
+            :loading="loading.dashboard"
+            :standing="selectedCustomerStanding"
+            :tenant-id="tenantScopeId"
+            @create-contact="handleDashboardCreateContact"
+            @create-invoice-party="handleDashboardCreateInvoiceParty"
+            @select-tab="selectCustomerDetailTab"
+          />
+
           <section
+            v-if="activeDetailTab === 'overview'"
             ref="customerOverviewOnePageRef"
             class="customer-admin-overview-layout"
             data-testid="customer-overview-workspace"
@@ -349,22 +386,6 @@
             data-testid="customer-overview-section-master-data"
             :ref="(element) => setCustomerOverviewSectionRef('master_data', element)"
           >
-          <CustomerDashboardTab
-            v-if="selectedCustomer && !isCreatingCustomer"
-            :access-token="accessToken"
-            :can-read-commercial="canReadCommercial"
-            :can-write-commercial="canWriteCommercial"
-            :can-manage-contacts="actionState.canManageContacts"
-            :customer="selectedCustomer"
-            :dashboard="customerDashboard"
-            :error="customerDashboardError"
-            :loading="loading.dashboard"
-            :standing="selectedCustomerStanding"
-            :tenant-id="tenantScopeId"
-            @create-contact="handleDashboardCreateContact"
-            @create-invoice-party="handleDashboardCreateInvoiceParty"
-            @select-tab="selectCustomerDetailTab"
-          />
             <div v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-summary">
             <article class="customer-admin-summary__card">
               <span>{{ t("customerAdmin.summary.primaryContact") }}</span>
@@ -2057,22 +2078,6 @@
           </section>
 
           <section
-            v-if="selectedCustomer && !isCreatingCustomer && canReadCustomerOrders"
-            class="customer-admin-section"
-            data-testid="customer-overview-section-orders"
-            :ref="(element) => setCustomerOverviewSectionRef('orders', element)"
-          >
-            <CustomerOrdersTab
-              :access-token="accessToken"
-              :can-start-new-order="canStartCustomerOrderWizard"
-              :customer-id="selectedCustomer.id"
-              :tenant-id="tenantScopeId"
-              @edit-order="handleEditCustomerOrder"
-              @start-new-order="handleStartCustomerNewOrder"
-            />
-          </section>
-
-          <section
             v-if="selectedCustomer && !isCreatingCustomer"
             class="customer-admin-section"
             data-testid="customer-overview-section-history"
@@ -2238,6 +2243,16 @@
           </section>
             </div>
           </section>
+
+          <CustomerOrdersTab
+            v-if="selectedCustomer && !isCreatingCustomer && canReadCustomerOrders && activeDetailTab === 'orders'"
+            :access-token="accessToken"
+            :can-start-new-order="canStartCustomerOrderWizard"
+            :customer-id="selectedCustomer.id"
+            :tenant-id="tenantScopeId"
+            @edit-order="handleEditCustomerOrder"
+            @start-new-order="handleStartCustomerNewOrder"
+          />
         </template>
 
         <section v-else class="customer-admin-empty" data-testid="customer-detail-empty-state">
@@ -2368,6 +2383,7 @@ import {
   formatPrimaryContactSummary,
   hasCustomerPermission,
   mapCustomerApiMessage,
+  customerOverviewRouteTabForSection,
   normalizeCustomerCommercialTab,
   normalizeCustomerDetailTab,
   normalizeCustomerPricingRulesTab,
@@ -3219,31 +3235,6 @@ function normalizeCustomerOverviewSectionId(sectionId: string): CustomerOverview
   return "master_data";
 }
 
-function customerOverviewRouteTabForSection(sectionId: CustomerOverviewSectionId) {
-  switch (sectionId) {
-    case "contacts":
-      return "contacts";
-    case "addresses":
-      return "addresses";
-    case "portal_access":
-      return "portal";
-    case "billing_profile":
-    case "invoice_parties":
-    case "rate_cards":
-    case "rate_lines":
-    case "surcharges":
-      return "commercial";
-    case "orders":
-      return "orders";
-    case "history":
-      return "history";
-    case "employee_blocks":
-      return "employee_blocks";
-    default:
-      return "overview";
-  }
-}
-
 function syncOverviewSectionFromDetailTab(detailTab: string) {
   const nextSection = normalizeCustomerOverviewSectionId(
     resolveCustomerOverviewSectionId(detailTab, {
@@ -3263,6 +3254,18 @@ function syncOverviewSectionFromDetailTab(detailTab: string) {
       hasRateCards: !!commercialProfile.value?.rate_cards.length,
     });
   }
+}
+
+function resolveCustomerRouteTabForDetailSelection(rawTabId: string, normalizedTabId: string) {
+  if (normalizedTabId === "overview") {
+    const normalizedSectionId = normalizeCustomerOverviewSectionId(
+      resolveCustomerOverviewSectionId(rawTabId, {
+        hasRateCards: !!commercialProfile.value?.rate_cards.length,
+      }),
+    );
+    return customerOverviewRouteTabForSection(normalizedSectionId);
+  }
+  return normalizedTabId;
 }
 
 function setCustomerOverviewSectionRef(sectionId: string, element: Element | null) {
@@ -3522,13 +3525,20 @@ function cancelContactAccessNavFloatingFrame() {
   }
 }
 
+function isContactAccessOverviewActive() {
+  return activeDetailTab.value === "overview"
+    && (activeOverviewSection.value === "contacts"
+      || activeOverviewSection.value === "addresses"
+      || activeOverviewSection.value === "portal_access");
+}
+
 function updateContactAccessNavFloating() {
   contactAccessNavFloatingRaf = null;
 
   const onePageElement = contactAccessOnePageRef.value;
   const navShell = contactAccessNavShellRef.value;
   if (
-    activeDetailTab.value !== "contact_access"
+    !isContactAccessOverviewActive()
     || !onePageElement
     || !navShell
     || !isCustomerContactAccessInstanceVisible()
@@ -3587,7 +3597,7 @@ function teardownContactAccessNavFloating() {
 function setupContactAccessNavFloating() {
   teardownContactAccessNavFloating();
 
-  if (activeDetailTab.value !== "contact_access" || !contactAccessOnePageRef.value || !contactAccessNavShellRef.value) {
+  if (!isContactAccessOverviewActive() || !contactAccessOnePageRef.value || !contactAccessNavShellRef.value) {
     return;
   }
 
@@ -3611,7 +3621,7 @@ function setupCustomerContactAccessSectionObserver() {
   disconnectCustomerContactAccessSectionObserver();
 
   if (
-    activeDetailTab.value !== "contact_access"
+    !isContactAccessOverviewActive()
     || typeof window.IntersectionObserver === "undefined"
     || !isCustomerContactAccessInstanceVisible()
   ) {
@@ -3664,7 +3674,7 @@ function setupCustomerContactAccessSectionObserver() {
 }
 
 function handleCustomerContactAccessVisibilityChange() {
-  if (activeDetailTab.value !== "contact_access") {
+  if (!isContactAccessOverviewActive()) {
     return;
   }
   if (!isCustomerContactAccessInstanceVisible()) {
@@ -4297,7 +4307,7 @@ function selectCustomerDetailTab(tabId: string) {
     const nextQuery = {
       ...route.query,
       customer_id: selectedCustomer.value.id,
-      tab: activeDetailTab.value,
+      tab: resolveCustomerRouteTabForDetailSelection(tabId, activeDetailTab.value),
       pageKey: currentCustomerDetailPageKey() ?? buildCustomerDetailPageKey(selectedCustomer.value.id),
     };
     void router.replace({ query: nextQuery });
@@ -4423,10 +4433,9 @@ function handleDashboardCreateContact() {
 }
 
 function handleDashboardCreateInvoiceParty() {
-  activeDetailTab.value = "commercial";
-  activeOverviewSection.value = "invoice_parties";
+  activeDetailTab.value = "overview";
   startCreateInvoiceParty();
-  scrollToCustomerOverviewSection("invoice_parties");
+  selectCustomerOverviewSection("invoice_parties");
 }
 
 function handleStartCustomerNewOrder() {
@@ -6051,7 +6060,7 @@ watch(
 watch(
   () => activeDetailTab.value,
   (tabId) => {
-    if (tabId === "commercial") {
+    if (tabId === "overview") {
       activeCommercialTab.value = normalizeCustomerCommercialTab(activeCommercialTab.value);
     }
   },
@@ -6059,9 +6068,9 @@ watch(
 );
 
 watch(
-  () => [activeDetailTab.value, selectedCustomer.value?.id ?? ""] as const,
-  async ([tabId]) => {
-    if (tabId !== "contact_access") {
+  () => [activeDetailTab.value, activeOverviewSection.value, selectedCustomer.value?.id ?? ""] as const,
+  async () => {
+    if (!isContactAccessOverviewActive()) {
       activeContactAccessSection.value = "contacts";
       disconnectCustomerContactAccessSectionObserver();
       teardownContactAccessNavFloating();
