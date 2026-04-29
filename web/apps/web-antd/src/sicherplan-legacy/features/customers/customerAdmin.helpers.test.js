@@ -399,6 +399,9 @@ test("customer overview section registry respects create mode, permissions, and 
     "history",
     "employee_blocks",
   ]);
+  assert.equal(detailSections[0]?.id, "master_data");
+  assert.equal(detailSections[0]?.testId, "customer-overview-nav-master-data");
+  assert.equal(Array.isArray(detailSections[0]?.children), false);
 });
 
 test("customer overview section resolver maps legacy route tabs into unified overview sections", () => {

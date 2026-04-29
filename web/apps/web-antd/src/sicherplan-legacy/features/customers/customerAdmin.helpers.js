@@ -70,7 +70,6 @@ const CUSTOMER_OVERVIEW_SECTION_LABEL_KEYS = {
   history: "customerAdmin.tabs.history",
   invoice_parties: "customerAdmin.commercial.invoiceTitle",
   master_data: "customerAdmin.tabs.overview",
-  orders: "customerAdmin.tabs.orders",
   portal_access: "customerAdmin.contactAccess.portalTitle",
   rate_cards: "customerAdmin.commercial.rateCardsTitle",
   rate_lines: "customerAdmin.commercial.rateLinesTitle",
@@ -87,7 +86,6 @@ const CUSTOMER_OVERVIEW_SECTION_ICONS = {
   history: "lucide:history",
   invoice_parties: "lucide:file-text",
   master_data: "lucide:layout-dashboard",
-  orders: "lucide:clipboard-list",
   portal_access: "lucide:key-round",
   pricing_rules: "lucide:calculator",
   rate_cards: "lucide:badge-cent",
@@ -103,7 +101,6 @@ const CUSTOMER_OVERVIEW_SECTION_TEST_IDS = {
   history: "customer-overview-nav-history",
   invoice_parties: "customer-overview-nav-invoice-parties",
   master_data: "customer-overview-nav-master-data",
-  orders: "customer-overview-nav-orders",
   portal_access: "customer-overview-nav-portal-access",
   rate_cards: "customer-overview-nav-rate-cards",
   rate_lines: "customer-overview-nav-rate-lines",
@@ -330,19 +327,10 @@ export function buildCustomerOverviewSections({
   const showDetailSections = hasSelectedCustomer && !isCreatingCustomer;
 
   const overviewSection = {
-    children: [
-      {
-        groupId: "overview",
-        icon: CUSTOMER_OVERVIEW_SECTION_ICONS.master_data,
-        id: "master_data",
-        labelKey: CUSTOMER_OVERVIEW_SECTION_LABEL_KEYS.master_data,
-        testId: CUSTOMER_OVERVIEW_SECTION_TEST_IDS.master_data,
-        visible: true,
-      },
-    ],
     icon: CUSTOMER_OVERVIEW_SECTION_ICONS.master_data,
-    id: "overview",
-    labelKey: "customerAdmin.tabs.overview",
+    id: "master_data",
+    labelKey: CUSTOMER_OVERVIEW_SECTION_LABEL_KEYS.master_data,
+    testId: CUSTOMER_OVERVIEW_SECTION_TEST_IDS.master_data,
     visible: true,
   };
 

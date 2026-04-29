@@ -334,11 +334,30 @@
                     <span>{{ t(sectionGroup.labelKey) }}</span>
                   </button>
                   <div v-else class="customer-admin-overview-nav__group">
-                    <div class="customer-admin-overview-nav__group-label">
-                      <IconifyIcon class="customer-admin-overview-nav__icon" :icon="sectionGroup.icon" aria-hidden="true" />
-                      <span>{{ t(sectionGroup.labelKey) }}</span>
-                    </div>
-                    <div class="customer-admin-overview-nav__children">
+                    <button
+                      type="button"
+                      class="customer-admin-overview-nav__group-toggle"
+                      :class="{ 'customer-admin-overview-nav__group-toggle--active': getCustomerOverviewParentGroupIds(activeOverviewSection).includes(sectionGroup.id as CustomerOverviewGroupId) }"
+                      :data-testid="`customer-overview-group-${sectionGroup.id}`"
+                      @click="toggleCustomerOverviewGroup(sectionGroup.id as CustomerOverviewGroupId)"
+                    >
+                      <span class="customer-admin-overview-nav__group-label">
+                        <IconifyIcon class="customer-admin-overview-nav__icon" :icon="sectionGroup.icon" aria-hidden="true" />
+                        <span>{{ t(sectionGroup.labelKey) }}</span>
+                      </span>
+                      <IconifyIcon
+                        class="customer-admin-overview-nav__chevron"
+                        :class="{ 'customer-admin-overview-nav__chevron--expanded': isCustomerOverviewGroupExpanded(sectionGroup.id) }"
+                        icon="lucide:chevron-down"
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <div
+                      v-show="isCustomerOverviewGroupExpanded(sectionGroup.id)"
+                      class="customer-admin-overview-nav__children"
+                      :data-testid="`customer-overview-group-children-${sectionGroup.id}`"
+                      :class="{ 'customer-admin-overview-nav__children--collapsed': !isCustomerOverviewGroupExpanded(sectionGroup.id) }"
+                    >
                       <template v-for="section in sectionGroup.children ?? []" :key="section.id">
                         <button
                           v-if="section.testId"
@@ -353,11 +372,30 @@
                           <span>{{ t(section.labelKey) }}</span>
                         </button>
                         <div v-else class="customer-admin-overview-nav__group customer-admin-overview-nav__group--nested">
-                          <div class="customer-admin-overview-nav__group-label">
-                            <IconifyIcon class="customer-admin-overview-nav__icon" :icon="section.icon" aria-hidden="true" />
-                            <span>{{ t(section.labelKey) }}</span>
-                          </div>
-                          <div class="customer-admin-overview-nav__children">
+                          <button
+                            type="button"
+                            class="customer-admin-overview-nav__group-toggle customer-admin-overview-nav__group-toggle--nested"
+                            :class="{ 'customer-admin-overview-nav__group-toggle--active': getCustomerOverviewParentGroupIds(activeOverviewSection).includes(section.id as CustomerOverviewGroupId) }"
+                            :data-testid="`customer-overview-group-${section.id}`"
+                            @click="toggleCustomerOverviewGroup(section.id as CustomerOverviewGroupId)"
+                          >
+                            <span class="customer-admin-overview-nav__group-label">
+                              <IconifyIcon class="customer-admin-overview-nav__icon" :icon="section.icon" aria-hidden="true" />
+                              <span>{{ t(section.labelKey) }}</span>
+                            </span>
+                            <IconifyIcon
+                              class="customer-admin-overview-nav__chevron"
+                              :class="{ 'customer-admin-overview-nav__chevron--expanded': isCustomerOverviewGroupExpanded(section.id) }"
+                              icon="lucide:chevron-down"
+                              aria-hidden="true"
+                            />
+                          </button>
+                          <div
+                            v-show="isCustomerOverviewGroupExpanded(section.id)"
+                            class="customer-admin-overview-nav__children"
+                            :data-testid="`customer-overview-group-children-${section.id}`"
+                            :class="{ 'customer-admin-overview-nav__children--collapsed': !isCustomerOverviewGroupExpanded(section.id) }"
+                          >
                             <button
                               v-for="childSection in section.children ?? []"
                               :key="childSection.id"
@@ -2775,6 +2813,7 @@ type CustomerOverviewSectionId =
   | "orders"
   | "history"
   | "employee_blocks";
+type CustomerOverviewGroupId = "contacts_access" | "commercial" | "pricing_rules";
 const CUSTOMER_CONTACT_ACCESS_NAV_TOP_OFFSET = 25;
 const CUSTOMER_CONTACT_ACCESS_NAV_FLOATING_MIN_WIDTH = 1081;
 let customerContactAccessSectionObserver: IntersectionObserver | null = null;
@@ -2814,6 +2853,11 @@ const customerOverviewSections = computed(() =>
     selectedCustomer: selectedCustomer.value,
   }),
 );
+const expandedCustomerOverviewGroups = reactive<Record<CustomerOverviewGroupId, boolean>>({
+  contacts_access: false,
+  commercial: false,
+  pricing_rules: false,
+});
 const customerOverviewNavGroups = computed(() =>
   customerOverviewSections.value
     .filter((section) => section.visible)
@@ -2825,6 +2869,25 @@ const customerOverviewNavGroups = computed(() =>
       })),
     })),
 );
+const customerOverviewParentGroupIdsBySection = computed(() => {
+  const sectionParents = new Map<string, CustomerOverviewGroupId[]>();
+  const visit = (node: any, parents: CustomerOverviewGroupId[] = []) => {
+    if (!node?.visible) {
+      return;
+    }
+    const nextParents = node.testId ? parents : [...parents, node.id as CustomerOverviewGroupId];
+    if (node.testId) {
+      sectionParents.set(node.id, parents);
+    }
+    for (const child of node.children ?? []) {
+      visit(child, nextParents);
+    }
+  };
+  for (const section of customerOverviewSections.value) {
+    visit(section);
+  }
+  return sectionParents;
+});
 const secondaryCustomerDetailTabIds = new Set(["history", "employee_blocks"]);
 const primaryCustomerDetailTabs = computed(() =>
   customerDetailTabs.value.filter((tab) => !secondaryCustomerDetailTabIds.has(tab.id)),
@@ -3235,6 +3298,35 @@ function normalizeCustomerOverviewSectionId(sectionId: string): CustomerOverview
   return "master_data";
 }
 
+function getCustomerOverviewParentGroupIds(sectionId: string) {
+  return customerOverviewParentGroupIdsBySection.value.get(sectionId) ?? [];
+}
+
+function expandGroupsForCustomerOverviewSection(sectionId: string) {
+  for (const groupId of getCustomerOverviewParentGroupIds(sectionId)) {
+    expandedCustomerOverviewGroups[groupId] = true;
+  }
+}
+
+function isCustomerOverviewGroupExpanded(groupId: string) {
+  return expandedCustomerOverviewGroups[groupId as CustomerOverviewGroupId] ?? true;
+}
+
+function toggleCustomerOverviewGroup(groupId: CustomerOverviewGroupId) {
+  expandedCustomerOverviewGroups[groupId] = !expandedCustomerOverviewGroups[groupId];
+}
+
+function resolveCustomerOverviewScrollTop(sectionId: CustomerOverviewSectionId) {
+  const sectionElement = resolveCustomerOverviewSectionElement(sectionId);
+  const scrollTarget = routeCacheScrollTarget.value instanceof HTMLElement ? routeCacheScrollTarget.value : null;
+  if (!sectionElement || !scrollTarget) {
+    return null;
+  }
+  const sectionRect = sectionElement.getBoundingClientRect();
+  const targetRect = scrollTarget.getBoundingClientRect();
+  return Math.max(0, scrollTarget.scrollTop + sectionRect.top - targetRect.top - 16);
+}
+
 function syncOverviewSectionFromDetailTab(detailTab: string) {
   const nextSection = normalizeCustomerOverviewSectionId(
     resolveCustomerOverviewSectionId(detailTab, {
@@ -3242,6 +3334,7 @@ function syncOverviewSectionFromDetailTab(detailTab: string) {
     }),
   );
   activeOverviewSection.value = nextSection;
+  expandGroupsForCustomerOverviewSection(nextSection);
   if (nextSection === "contacts" || nextSection === "addresses" || nextSection === "portal_access") {
     activeContactAccessSection.value = nextSection === "portal_access" ? "portal" : (nextSection as CustomerContactAccessSectionId);
   }
@@ -3278,19 +3371,26 @@ function resolveCustomerOverviewSectionElement(sectionId: string) {
 
 function scrollToCustomerOverviewSection(sectionId: CustomerOverviewSectionId) {
   void nextTick(() => {
-    const sectionElement = resolveCustomerOverviewSectionElement(sectionId);
-    if (sectionElement && typeof sectionElement.scrollIntoView === "function") {
-      sectionElement.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+    const scrollTarget = routeCacheScrollTarget.value instanceof HTMLElement ? routeCacheScrollTarget.value : null;
+    const nextScrollTop = resolveCustomerOverviewScrollTop(sectionId);
+    if (!scrollTarget || nextScrollTop == null) {
+      return;
     }
+    if (typeof scrollTarget.scrollTo === "function") {
+      scrollTarget.scrollTo({
+        top: nextScrollTop,
+        behavior: "smooth",
+      });
+      return;
+    }
+    scrollTarget.scrollTop = nextScrollTop;
   });
 }
 
 function selectCustomerOverviewSection(sectionId: string) {
   const normalizedSectionId = normalizeCustomerOverviewSectionId(sectionId);
   activeOverviewSection.value = normalizedSectionId;
+  expandGroupsForCustomerOverviewSection(normalizedSectionId);
   if (normalizedSectionId === "contacts" || normalizedSectionId === "addresses" || normalizedSectionId === "portal_access") {
     activeContactAccessSection.value = normalizedSectionId === "portal_access" ? "portal" : (normalizedSectionId as CustomerContactAccessSectionId);
   }
@@ -4674,13 +4774,16 @@ async function selectCustomer(customerId: string, options: SelectCustomerOptions
       await refreshEmployeeBlocks();
       await refreshPortalPrivacy();
       await refreshCustomerPortalAccess();
+      const finalOverviewDetailTab = options.preserveDetailTab
+        ? (normalizeRouteQueryValue(route.query.tab) || activeDetailTab.value || options.fallbackDetailTab || "dashboard")
+        : desiredDetailTab;
       activeDetailTab.value = normalizeCustomerDetailTab(activeDetailTab.value || options.fallbackDetailTab || "dashboard", {
         canReadCommercial: canReadCommercial.value,
         canReadOrders: canReadCustomerOrders.value,
         hasSelectedCustomer: !!selectedCustomer.value,
         isCreatingCustomer: isCreatingCustomer.value,
       });
-      syncOverviewSectionFromDetailTab(activeDetailTab.value || options.fallbackDetailTab || "dashboard");
+      syncOverviewSectionFromDetailTab(finalOverviewDetailTab);
       const preservedCommercialProfile = commercialProfile.value as CustomerCommercialProfileRead | null;
       const preservedRateCards = preservedCommercialProfile ? preservedCommercialProfile.rate_cards : [];
       activeCommercialTab.value = normalizeCustomerCommercialTab(activeCommercialTab.value || options.fallbackCommercialTab || "billing_profile");
@@ -6044,6 +6147,14 @@ watch(
 );
 
 watch(
+  () => activeOverviewSection.value,
+  (sectionId) => {
+    expandGroupsForCustomerOverviewSection(sectionId);
+  },
+  { immediate: true },
+);
+
+watch(
   () => [selectedCustomer.value?.id ?? "", isCreatingCustomer.value, canReadCommercial.value, canReadCustomerOrders.value],
   () => {
     activeDetailTab.value = normalizeCustomerDetailTab(activeDetailTab.value, {
@@ -6544,6 +6655,228 @@ onBeforeUnmount(() => {
 
 .customer-admin-tabs--sub {
   margin-top: 0.25rem;
+}
+
+.customer-admin-overview-layout {
+  --customer-overview-sticky-top: calc(var(--sp-sticky-offset, 6.5rem) + 25px);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+  min-width: 0;
+}
+
+.customer-admin-overview-nav-shell {
+  grid-column: 1;
+  position: sticky;
+  top: var(--customer-overview-sticky-top, 6.5rem);
+  align-self: start;
+  z-index: 2;
+  min-width: 0;
+  max-height: calc(100vh - var(--customer-overview-sticky-top, 6.5rem) - 1rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.customer-admin-overview-nav {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.25rem 0;
+  border: 0;
+  background: transparent;
+}
+
+.customer-admin-overview-nav__group {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.customer-admin-overview-nav__group--nested {
+  gap: 0.25rem;
+}
+
+.customer-admin-overview-nav__group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.2rem 0.35rem 0.2rem 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.customer-admin-overview-nav__group-toggle--nested {
+  padding-left: 0.4rem;
+}
+
+.customer-admin-overview-nav__group-toggle:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--sp-color-primary) 38%, transparent);
+  outline-offset: 2px;
+}
+
+.customer-admin-overview-nav__group-toggle--active .customer-admin-overview-nav__group-label {
+  color: var(--sp-color-primary-strong);
+}
+
+.customer-admin-overview-nav__group-label {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.35rem 0.35rem 0.2rem 0.75rem;
+  color: var(--sp-color-text-secondary);
+  font-size: 0.84rem;
+  font-weight: 700;
+  min-width: 0;
+}
+
+.customer-admin-overview-nav__chevron {
+  width: 1rem;
+  height: 1rem;
+  color: var(--sp-color-text-secondary);
+  flex: 0 0 auto;
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.customer-admin-overview-nav__group-toggle--active .customer-admin-overview-nav__chevron {
+  color: var(--sp-color-primary-strong);
+}
+
+.customer-admin-overview-nav__chevron--expanded {
+  transform: rotate(180deg);
+}
+
+.customer-admin-overview-nav__children {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.customer-admin-overview-nav__children--collapsed {
+  display: none;
+}
+
+.customer-admin-overview-nav__link {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.35rem 0.55rem 0.75rem;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--sp-color-text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.customer-admin-overview-nav__link--child {
+  padding-left: 1.15rem;
+}
+
+.customer-admin-overview-nav__link--grandchild {
+  padding-left: 1.55rem;
+}
+
+.customer-admin-overview-nav__link:hover,
+.customer-admin-overview-nav__link:focus-visible {
+  color: var(--sp-color-primary-strong);
+  background: color-mix(in srgb, var(--sp-color-primary-muted) 36%, transparent);
+  outline: none;
+}
+
+.customer-admin-overview-nav__link:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--sp-color-primary) 38%, transparent);
+  outline-offset: 2px;
+}
+
+.customer-admin-overview-nav__link--active {
+  border-left-color: var(--sp-color-primary);
+  color: var(--sp-color-primary-strong);
+  font-weight: 700;
+}
+
+.customer-admin-overview-nav__icon {
+  width: 1.08rem;
+  height: 1.08rem;
+  color: currentColor;
+}
+
+.customer-admin-overview-content {
+  grid-column: 2;
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.customer-admin-overview-section {
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem;
+  border: 1px solid var(--sp-color-border-soft);
+  border-radius: 1.25rem;
+  background: var(--sp-color-surface-card);
+  min-width: 0;
+  scroll-margin-top: var(--customer-overview-sticky-top, 6.5rem);
+}
+
+.customer-admin-overview-section .customer-admin-panel__header,
+.customer-admin-overview-section .customer-admin-editor-intro {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.customer-admin-overview-section .customer-admin-form-section,
+.customer-admin-overview-section .customer-admin-form-actions,
+.customer-admin-overview-section .customer-admin-section,
+.customer-admin-overview-section .customer-admin-contact-access-onepage,
+.customer-admin-overview-section .customer-admin-summary,
+.customer-admin-overview-section .customer-admin-lifecycle {
+  min-width: 0;
+}
+
+.customer-admin-overview-section .customer-admin-form-section,
+.customer-admin-overview-section .customer-admin-form-actions {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.customer-admin-overview-section > .customer-admin-form,
+.customer-admin-overview-section > .customer-admin-section,
+.customer-admin-overview-section > .customer-admin-contact-access-onepage,
+.customer-admin-overview-section > .customer-admin-editor-intro,
+.customer-admin-overview-section > .customer-admin-lifecycle,
+.customer-admin-overview-section > .customer-admin-summary {
+  min-width: 0;
+}
+
+.customer-admin-overview-section .customer-admin-panel__header + .customer-admin-form,
+.customer-admin-overview-section .customer-admin-panel__header + .customer-admin-section,
+.customer-admin-overview-section .customer-admin-editor-intro + .customer-admin-form,
+.customer-admin-overview-section .customer-admin-form-section + .customer-admin-form-section,
+.customer-admin-overview-section .customer-admin-form-section + .customer-admin-form-actions,
+.customer-admin-overview-section .customer-admin-lifecycle + .customer-admin-form,
+.customer-admin-overview-section .customer-admin-summary + .customer-admin-lifecycle,
+.customer-admin-overview-section .customer-admin-summary + .customer-admin-form {
+  border-top: 1px solid var(--sp-color-border-soft);
+  padding-top: 1rem;
 }
 
 .customer-admin-contact-access-onepage {
@@ -7059,16 +7392,74 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1080px) {
+  .customer-admin-overview-layout,
   .customer-admin-contact-access-onepage {
     grid-template-columns: 1fr;
     display: grid;
   }
 
+  .customer-admin-overview-nav-shell,
   .customer-admin-contact-access-nav-shell {
     grid-column: 1;
     position: static;
     max-height: none;
     overflow: visible;
+  }
+
+  .customer-admin-overview-content,
+  .customer-admin-overview-nav-shell,
+  .customer-admin-overview-nav,
+  .customer-admin-overview-nav__children,
+  .customer-admin-overview-nav__group,
+  .customer-admin-overview-nav__group--nested,
+  .customer-admin-overview-section,
+  .customer-admin-contact-access-nav-shell--fixed,
+  .customer-admin-contact-access-nav-shell--pinned {
+    min-width: 0;
+  }
+
+  .customer-admin-overview-nav {
+    display: flex;
+    overflow-x: auto;
+    padding: 0.25rem 0 0.5rem;
+  }
+
+  .customer-admin-overview-nav-shell {
+    overflow: visible;
+  }
+
+  .customer-admin-overview-content,
+  .customer-admin-contact-access-content {
+    grid-column: 1;
+  }
+
+  .customer-admin-overview-nav__group,
+  .customer-admin-overview-nav__group--nested,
+  .customer-admin-overview-nav__children {
+    display: contents;
+  }
+
+  .customer-admin-overview-nav__group-label {
+    display: none;
+  }
+
+  .customer-admin-overview-nav__group-toggle {
+    display: none;
+  }
+
+  .customer-admin-overview-nav__link,
+  .customer-admin-overview-nav__link--child,
+  .customer-admin-overview-nav__link--grandchild,
+  .customer-admin-contact-access-nav__link {
+    min-width: max-content;
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+    padding: 0.55rem 0.75rem;
+  }
+
+  .customer-admin-overview-nav__link--active,
+  .customer-admin-contact-access-nav__link--active {
+    border-bottom-color: var(--sp-color-primary);
   }
 
   .customer-admin-contact-access-nav-shell--fixed,
@@ -7080,21 +7471,6 @@ onBeforeUnmount(() => {
     display: flex;
     overflow-x: auto;
     padding: 0.25rem 0 0.5rem;
-  }
-
-  .customer-admin-contact-access-content {
-    grid-column: 1;
-  }
-
-  .customer-admin-contact-access-nav__link {
-    min-width: max-content;
-    border-left: 0;
-    border-bottom: 2px solid transparent;
-    padding: 0.55rem 0.75rem;
-  }
-
-  .customer-admin-contact-access-nav__link--active {
-    border-bottom-color: var(--sp-color-primary);
   }
 }
 

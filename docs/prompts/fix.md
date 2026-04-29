@@ -1,41 +1,18 @@
-We need to fix the broken Customer detail layout after the previous one-page refactor.
+We need to refine the Customer Overview left-side navigation behavior.
 
-Current problem:
-The previous implementation put almost everything into one large page and broke the Customer detail UI.
-The page now looks visually broken:
-- the left navigation appears as unstyled text/icons near the top
-- content sections are stacked without the previous polished layout
-- the old Contacts & Access side-nav styling is no longer preserved
-- Dashboard, Overview and Orders are not shown as the intended main detail tabs
+Current status:
+The visual styling of the Customer Overview left navigation is now fixed and looks close to the Employee Overview style.
 
-Correct desired behavior:
-Customer detail must have exactly these main in-page tabs:
-1. Dashboard
-2. Overview
-3. Orders
-
-Inside the Overview tab only, show a left-side section navigation with the same visual style as the previous Contacts & Access side navigation.
-
-Overview tab should contain these sections in this order:
-1. Master data / General customer data
-2. Contacts & Access
-   - Contacts
-   - Addresses
-   - Portal & Access
-3. Commercial
-   - Billing profile
-   - Invoice parties
+Remaining issues:
+1. Clicking nav links does not scroll to the related section.
+   Example: clicking "Service and function-based prices" does nothing.
+2. The "Overview" link should not have a duplicated child/sub-item. It should be a single standalone nav item.
+3. Groups with children should be collapsible/expandable, so the left nav is cleaner:
+   - Contacts & Access
+   - Commercial
    - Pricing rules
-     - Rate cards
-     - Rate lines
-     - Surcharges
-4. History
-5. Employee blocks
-
-Important:
-Orders must NOT be inside the Overview side navigation.
-Orders must remain a separate main tab.
-Dashboard must remain a separate main tab.
+   should be collapsible groups.
+   Their children should be visible only when the group is expanded.
 
 Relevant files:
 - web/apps/web-antd/src/sicherplan-legacy/views/CustomerAdminView.vue
@@ -43,196 +20,179 @@ Relevant files:
 - web/apps/web-antd/src/sicherplan-legacy/features/customers/customerAdmin.layout.test.js
 - web/apps/web-antd/src/sicherplan-legacy/features/customers/customerAdmin.helpers.test.js
 
-Current helper issue:
-CUSTOMER_OVERVIEW_SECTION_ORDER currently includes "orders".
-This is wrong for the desired UX.
-Orders must be removed from the overview section registry and remain a top-level detail tab.
+Do not change:
+- backend/API files
+- main customer detail tabs: Dashboard, Overview, Orders
+- customer list tab behavior
+- customer detail pageKey behavior
+- customer tab titles
+- Employee Overview behavior
+- route-cache/session/scroll architecture
 
-Task:
-Repair the Customer detail structure and styling.
+Task 1 — Fix nav click scrolling:
+Find the function that handles Customer Overview nav clicks, likely:
+- selectCustomerOverviewSection(sectionId)
+- setCustomerOverviewSectionRef(...)
+- customerOverviewSectionRefs
+- customerOverviewOnePageRef
+- useRouteCacheScrollTarget / route-cache scroll target if used
 
-Step 1 — Restore top-level Customer detail tabs:
-The top-level in-page tab bar must show:
-- Dashboard
+Fix it so clicking any visible nav link scrolls to the correct local section.
+
+Requirements:
+- Use instance-local section refs, not document.getElementById or global querySelector.
+- The scroll target must be the correct route-cache pane/main scroll container.
+- The function must work for:
+  - Overview/master data
+  - Contacts
+  - Addresses
+  - Portal & Access
+  - Billing profile
+  - Invoice parties
+  - Rate cards
+  - Rate lines
+  - Surcharges
+  - History
+  - Employee blocks
+- If a section is hidden because of gating, do not scroll to it.
+- If the user clicks a grandchild such as "Service and function-based prices", it must scroll to the rate lines section.
+- Keep pageKey unchanged.
+- Do not create a new top tab.
+- Optionally update query.section for deep linking, but do not break existing query.tab compatibility.
+
+Task 2 — Remove duplicate Overview child:
+Currently the nav appears to show:
 - Overview
-- Orders
+  - Overview
 
-Rules:
-- If isCreatingCustomer is true, show only Overview.
-- If selectedCustomer exists:
-  - show Dashboard
-  - show Overview
-  - show Orders only if canReadOrders
-- Do not show Contacts & Access or Commercial as top-level tabs anymore.
-- Do not show History and Employee blocks as top-level tabs.
+This is wrong.
+Make Overview a single standalone nav link.
 
-Step 2 — Keep Dashboard as its own tab:
-When activeDetailTab === "dashboard":
-- render CustomerDashboardTab only
-- do not render the full Overview one-page content
-- keep the previous dashboard layout intact
+Expected:
+- Overview
+- Contacts & Access
+  - Contacts
+  - Addresses
+  - Portal & Access
+- Commercial
+  - Billing profile
+  - Invoice parties
+  - Pricing rules
+    - Rate cards
+    - Service and function-based prices
+    - Time, weekday, and region surcharges
+- History
+- Employee blocks
 
-Step 3 — Keep Orders as its own tab:
-When activeDetailTab === "orders":
-- render CustomerOrdersTab only
-- do not render Orders inside Overview
-- preserve existing order edit/start-new-order behavior
+Task 3 — Make groups collapsible:
+Implement collapsible groups in Customer Overview nav.
 
-Step 4 — Build Overview tab as one-page workspace:
-When activeDetailTab === "overview":
-Render a clean two-column layout:
-- left: sticky side navigation
-- right: section content
+Groups:
+- Contacts & Access
+- Commercial
+- Pricing rules
 
-Use the same visual style as the old Contacts & Access side nav:
-- customer-admin-contact-access-nav-shell
-- customer-admin-contact-access-nav
-- customer-admin-contact-access-nav__link
-or copy/rename these classes carefully to:
-- customer-admin-overview-nav-shell
-- customer-admin-overview-nav
-- customer-admin-overview-nav__link
+Behavior:
+1. Each group header has a chevron/indicator.
+2. Clicking the group header toggles expanded/collapsed.
+3. If a group itself also maps to a section, clicking should either:
+   - toggle only, if it is purely a group label
+   - or scroll to its first child and expand
+   Choose the safest/clearest UX and keep it consistent.
+4. If a child/grandchild inside a collapsed group is the active section, the parent group should auto-expand.
+5. On initial load:
+   - Overview is standalone and active by default.
+   - Groups are collapsed by default, unless the active section belongs to that group.
+6. When user clicks a child:
+   - scroll to the section
+   - mark that child active
+   - keep its parent group expanded
+7. Collapsed/expanded state should be local to the customer tab/session.
+   It must not affect another customer tab.
 
-The final UI must visually match the old Contacts & Access side navigation style.
+Implementation hint:
+Use a local reactive state, for example:
+const expandedCustomerOverviewGroups = ref(new Set(['contacts_access', 'commercial', ...]))
 
-Step 5 — Fix the section registry:
-Update customerAdmin.helpers.js:
-- CUSTOMER_DETAIL_TAB_ORDER should effectively support only:
-  dashboard, overview, orders
-  for the main visible detail tabs
-- Keep aliases for old URLs:
-  contact_access, contacts, addresses, portal -> overview section
-  commercial, billing_profile, invoice_parties, rate_cards, rate_lines, surcharges -> overview section
-  history, employee_blocks -> overview section
-  plans -> orders
-- Remove "orders" from CUSTOMER_OVERVIEW_SECTION_ORDER.
-- Remove Orders from buildCustomerOverviewSections.
-- Keep History and Employee blocks inside Overview side navigation if they are still required.
-- Keep commercial/rate-card gating:
-  - Rate cards visible when Commercial is available
-  - Rate lines and Surcharges visible only after hasRateCards is true
+or a plain object:
+const expandedCustomerOverviewGroups = reactive<Record<string, boolean>>({})
 
-Step 6 — Route/query compatibility:
-Old URLs must still work.
+Add helpers:
+- isCustomerOverviewGroupExpanded(groupId)
+- toggleCustomerOverviewGroup(groupId)
+- expandGroupsForCustomerOverviewSection(sectionId)
+- getCustomerOverviewParentGroupIds(sectionId)
 
-Examples:
-- tab=dashboard -> activeDetailTab dashboard
-- tab=overview -> activeDetailTab overview, section master_data
-- tab=contact_access or tab=contacts -> activeDetailTab overview, section contacts
-- tab=addresses -> activeDetailTab overview, section addresses
-- tab=portal -> activeDetailTab overview, section portal_access
-- tab=commercial -> activeDetailTab overview, section billing_profile
-- tab=rate_cards -> activeDetailTab overview, section rate_cards
-- tab=rate_lines -> activeDetailTab overview, section rate_lines, only if hasRateCards; otherwise rate_cards
-- tab=surcharges -> activeDetailTab overview, section surcharges, only if hasRateCards; otherwise rate_cards
-- tab=orders or tab=plans -> activeDetailTab orders
-- tab=history -> activeDetailTab overview, section history
-- tab=employee_blocks -> activeDetailTab overview, section employee_blocks
+Task 4 — Preserve styling:
+The collapsible group headers and child links must keep the polished side-nav style.
+Do not return to raw inline text.
 
-Do not create new top app tabs for internal Overview sections.
-Keep pageKey unchanged.
+Add or reuse classes:
+- customer-admin-overview-nav__group-toggle
+- customer-admin-overview-nav__chevron
+- customer-admin-overview-nav__children
+- customer-admin-overview-nav__children--collapsed
+- customer-admin-overview-nav__link--child
+- customer-admin-overview-nav__link--grandchild
 
-Step 7 — Fix markup/layout:
-In CustomerAdminView.vue:
-- Do not place the side nav directly above the content.
-- It must be inside a proper layout wrapper:
-  <section class="customer-admin-overview-onepage">
-    <aside class="customer-admin-overview-nav-shell">...</aside>
-    <div class="customer-admin-overview-content">...</div>
-  </section>
-- Ensure the nav is visually left aligned and sticky/pinned like the old Contacts & Access nav.
-- Ensure content cards start to the right of the nav and use full available width.
-- Do not let nav text/icons collapse into raw inline text.
+Use the same visual language as Employee Overview:
+- vertical layout
+- left active border/indicator
+- proper icon spacing
+- child indentation
+- readable labels
+- no cramped inline content
 
-Step 8 — Preserve creation gating:
-When creating a new customer:
-- only Overview tab is visible
-- only master data / general customer form is visible
-- Contacts & Access, Commercial, History, Employee blocks are hidden until the customer exists
+Task 5 — Tests:
+Add or update tests.
 
-Step 9 — Preserve commercial gating:
-Inside Overview > Commercial:
-- Billing profile visible if canReadCommercial and customer exists
-- Invoice parties visible if canReadCommercial and customer exists
-- Pricing rules visible if canReadCommercial and customer exists
-- Rate cards visible first
-- Rate lines and Surcharges visible only if hasRateCards is true
+A. Navigation click scroll test:
+- Mount CustomerAdminView in Overview mode.
+- Mock section refs / scroll target.
+- Click "Service and function-based prices".
+- Assert select/scroll target is rate_lines.
+- Assert activeOverviewSection becomes rate_lines.
 
-Step 10 — Preserve functionality:
-Do not break:
-- customer creation
-- customer master data edit
-- lifecycle controls
-- contacts create/edit/archive
-- addresses create/edit/archive
-- portal access/privacy controls
-- billing profile
-- invoice parties
-- pricing rules
-- rate cards/rate lines/surcharges
-- orders tab
-- customer top app tab title
-- customer list tab
-- pageKey behavior
-- route-cache/session isolation
-- scroll isolation
+B. Overview duplicate test:
+- Overview appears once as a standalone nav link.
+- There is no child Overview under Overview.
 
-Step 11 — Do not change backend:
-This is a frontend layout/navigation repair only.
-Do not change backend code or API endpoints.
+C. Collapsible groups test:
+- Contacts & Access group can collapse/expand.
+- Commercial group can collapse/expand.
+- Pricing rules group can collapse/expand.
+- Children are hidden when collapsed and visible when expanded.
 
-Tests required:
-A. Top tab visibility:
-- Creating customer: only Overview main tab visible.
-- Existing customer: Dashboard, Overview, Orders visible according to permissions.
-- Contacts & Access and Commercial are not top-level tabs.
-- History and Employee blocks are not top-level tabs.
+D. Active child auto-expand test:
+- If route/query maps to rate_lines, Commercial and Pricing rules are expanded on load.
+- Rate lines is active.
 
-B. Overview side nav:
-- Overview tab shows left side nav.
-- Side nav visually/layout structurally uses overview/contact-access nav classes.
-- Sections are ordered:
-  Master data
-  Contacts
-  Addresses
-  Portal & Access
-  Billing profile
-  Invoice parties
-  Rate cards
-  Rate lines if hasRateCards
-  Surcharges if hasRateCards
-  History
-  Employee blocks
+E. Gating test:
+- Without rate cards, Rate lines and Surcharges are not visible.
+- With rate cards, they appear under Pricing rules.
 
-C. Orders separation:
-- Orders is not inside Overview side nav.
-- Orders tab renders CustomerOrdersTab.
-
-D. Dashboard separation:
-- Dashboard tab renders CustomerDashboardTab only.
-- It does not render the giant Overview one-page content.
-
-E. Route compatibility:
-- tab=contact_access maps to Overview + contacts section.
-- tab=commercial maps to Overview + billing_profile section.
-- tab=orders maps to Orders tab.
-- tab=history maps to Overview + history section.
-
-F. Pricing gating:
-- Without rate cards: Rate cards visible, Rate lines/Surcharges hidden.
-- With rate cards: all three visible.
+F. Regression:
+- Main tabs remain Dashboard, Overview, Orders.
+- Dashboard does not render Overview side nav.
+- Orders does not render Overview side nav.
+- No backend/API changes.
 
 Acceptance criteria:
-- Customer detail UI is no longer visually broken.
-- Main tabs are exactly Dashboard, Overview, Orders.
-- Overview contains the one-page side navigation.
-- Side nav matches the old Contacts & Access style.
-- Orders remains a separate main tab.
-- Dashboard remains a separate main tab.
-- Existing business actions still work.
-- No backend/API changes.
+- Clicking every visible left nav item scrolls to the correct section.
+- Overview is a single standalone link with no duplicate child.
+- Contacts & Access, Commercial, and Pricing rules are collapsible.
+- Active section auto-expands its parent groups.
+- Collapsed groups make the nav cleaner.
+- Styling remains consistent with the Employee Overview navigation.
+- Dashboard/Overview/Orders main tabs remain unchanged.
+- Backend/API files remain untouched.
 - Tests pass.
 
 Before coding:
-First summarize the current broken implementation and state exactly which parts will be reverted or restructured.
-Do not do a broad rewrite. Make the smallest safe repair.
+First inspect why selectCustomerOverviewSection currently does not scroll. Report whether the cause is:
+- missing refs,
+- wrong section id mapping,
+- wrong scroll container,
+- collapsed/missing target,
+- or a no-op handler.
+Then implement the smallest safe fix.

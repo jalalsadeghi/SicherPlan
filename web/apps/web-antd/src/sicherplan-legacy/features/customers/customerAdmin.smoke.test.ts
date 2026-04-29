@@ -20,6 +20,7 @@ const showFeedbackToastMock = vi.fn();
 const createObjectUrlMock = vi.fn(() => "blob:customer-export");
 const revokeObjectUrlMock = vi.fn();
 const scrollIntoViewMock = vi.fn();
+const scrollToMock = vi.fn();
 type IntersectionObserverCallbackRef = ((entries: IntersectionObserverEntry[]) => void) | null;
 let intersectionObserverCallback: IntersectionObserverCallbackRef = null;
 
@@ -385,13 +386,14 @@ function buildCustomerRead(id: string, name: string, customerNumber: string, ove
   };
 }
 
-function buildCommercialProfile() {
+function buildCommercialProfile(overrides: Record<string, unknown> = {}) {
   return {
     billing_profile: null,
     invoice_parties: [],
     rate_cards: [],
     rate_lines: [],
     surcharge_rules: [],
+    ...overrides,
   };
 }
 
@@ -552,6 +554,8 @@ describe("CustomerAdminView search dialog", () => {
     });
     scrollIntoViewMock.mockReset();
     HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
+    scrollToMock.mockReset();
+    HTMLElement.prototype.scrollTo = scrollToMock;
     intersectionObserverCallback = null;
     class MockIntersectionObserver {
       callback: IntersectionObserverCallback;
@@ -1382,6 +1386,70 @@ describe("CustomerAdminView search dialog", () => {
     expect(wrapper.get('[data-testid="customer-overview-nav-addresses"]').attributes("aria-current")).toBe("true");
   });
 
+  it("uses the route-cache scroll target for overview nav clicks", async () => {
+    apiMocks.getCustomerCommercialProfileMock.mockResolvedValue(buildCommercialProfile({
+      rate_cards: [{ id: "rate-card-1", effective_from: "2026-04-01", effective_to: null, currency_code: "EUR", rate_kind: "service", notes: null, rate_lines: [], surcharge_rules: [] }],
+    }));
+    const wrapper = await mountSelectedCustomer("overview");
+
+    expect(wrapper.get('[data-testid="customer-overview-group-children-pricing_rules"]').classes()).toContain("customer-admin-overview-nav__children--collapsed");
+
+    await wrapper.get('[data-testid="customer-overview-group-commercial"]').trigger("click");
+    await settle();
+    await wrapper.get('[data-testid="customer-overview-group-pricing_rules"]').trigger("click");
+    await settle();
+    await wrapper.get('[data-testid="customer-overview-nav-rate-lines"]').trigger("click");
+    await settle();
+
+    expect(wrapper.get('[data-testid="customer-overview-nav-rate-lines"]').attributes("aria-current")).toBe("true");
+    expect(routerReplaceMock).toHaveBeenCalledWith(expect.objectContaining({
+      query: expect.objectContaining({ tab: "rate_lines" }),
+    }));
+    expect(scrollToMock).toHaveBeenCalled();
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps Overview as a single standalone nav item with no duplicate child", async () => {
+    const wrapper = await mountSelectedCustomer("overview");
+
+    expect(wrapper.findAll('[data-testid="customer-overview-nav-master-data"]')).toHaveLength(1);
+    expect(wrapper.find('[data-testid="customer-overview-group-overview"]').exists()).toBe(false);
+  });
+
+  it("supports collapsing and expanding the overview nav groups", async () => {
+    apiMocks.getCustomerCommercialProfileMock.mockResolvedValue(buildCommercialProfile({
+      rate_cards: [{ id: "rate-card-1", effective_from: "2026-04-01", effective_to: null, currency_code: "EUR", rate_kind: "service", notes: null, rate_lines: [], surcharge_rules: [] }],
+    }));
+    const wrapper = await mountSelectedCustomer("overview");
+
+    expect(wrapper.get('[data-testid="customer-overview-group-children-contacts_access"]').classes()).toContain("customer-admin-overview-nav__children--collapsed");
+    expect(wrapper.get('[data-testid="customer-overview-group-children-commercial"]').classes()).toContain("customer-admin-overview-nav__children--collapsed");
+
+    await wrapper.get('[data-testid="customer-overview-group-contacts_access"]').trigger("click");
+    await settle();
+    expect(wrapper.get('[data-testid="customer-overview-group-children-contacts_access"]').classes()).not.toContain("customer-admin-overview-nav__children--collapsed");
+
+    await wrapper.get('[data-testid="customer-overview-group-contacts_access"]').trigger("click");
+    await settle();
+    expect(wrapper.get('[data-testid="customer-overview-group-children-contacts_access"]').classes()).toContain("customer-admin-overview-nav__children--collapsed");
+
+    await wrapper.get('[data-testid="customer-overview-group-commercial"]').trigger("click");
+    await settle();
+    expect(wrapper.get('[data-testid="customer-overview-group-children-commercial"]').classes()).not.toContain("customer-admin-overview-nav__children--collapsed");
+  });
+
+  it("auto-expands commercial and pricing rules when the active route targets rate lines", async () => {
+    apiMocks.getCustomerCommercialProfileMock.mockResolvedValue(buildCommercialProfile({
+      rate_cards: [{ id: "rate-card-1", effective_from: "2026-04-01", effective_to: null, currency_code: "EUR", rate_kind: "service", notes: null, rate_lines: [], surcharge_rules: [] }],
+    }));
+    const wrapper = await mountSelectedCustomer("rate_lines");
+
+    expect(wrapper.get('[data-testid="customer-tab-overview"]').classes()).toContain("active");
+    expect(wrapper.get('[data-testid="customer-overview-group-children-commercial"]').classes()).not.toContain("customer-admin-overview-nav__children--collapsed");
+    expect(wrapper.get('[data-testid="customer-overview-group-children-pricing_rules"]').classes()).not.toContain("customer-admin-overview-nav__children--collapsed");
+    expect(wrapper.get('[data-testid="customer-overview-nav-rate-lines"]').attributes("aria-current")).toBe("true");
+  });
+
   it("keeps contact-access overview navigation usable across multiple mounted customer detail tabs", async () => {
     apiMocks.listCustomersMock.mockImplementation(async () => [
       buildCustomerListItem("customer-rhein", "RheinForum Köln", "K-1000", "active"),
@@ -1407,7 +1475,7 @@ describe("CustomerAdminView search dialog", () => {
 
     expect(rheinWrapper.find('[data-testid="customer-overview-section-addresses"]').exists()).toBe(true);
     expect(hafenWrapper.find('[data-testid="customer-overview-section-portal-access"]').exists()).toBe(true);
-    expect(scrollIntoViewMock).toHaveBeenCalled();
+    expect(scrollToMock).toHaveBeenCalled();
   });
 
   it("renders Orders as a separate main tab and no longer shows a Plans tab", async () => {
