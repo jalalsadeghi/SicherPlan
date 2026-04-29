@@ -1,5 +1,5 @@
 <template>
-  <section class="employee-admin-page">
+  <section ref="employeeAdminPageRef" class="employee-admin-page">
     <div v-if="!embedded && isPlatformAdmin" class="module-card employee-admin-scope" :class="{ 'employee-admin-scope--embedded': embedded }">
       <label class="field-stack">
         <span>{{ t("employeeAdmin.scope.label") }}</span>
@@ -400,6 +400,7 @@
             <div class="employee-admin-overview-content">
           <section
             id="employee-overview-section-file"
+            :ref="(target) => setOverviewSectionRef('employee_file', target)"
             class="employee-admin-overview-section-card"
             data-testid="employee-overview-section-file"
           >
@@ -583,6 +584,7 @@
           <section
             v-if="isEmployeeOverviewSectionVisible('app_access')"
             id="employee-overview-section-app-access"
+            :ref="(target) => setOverviewSectionRef('app_access', target)"
             class="employee-admin-overview-section-card"
             data-testid="employee-overview-section-app-access"
           >
@@ -777,6 +779,7 @@
           <section
             v-if="isEmployeeOverviewSectionVisible('qualifications')"
             id="employee-overview-section-qualifications"
+            :ref="(target) => setOverviewSectionRef('qualifications', target)"
             class="employee-admin-overview-section-card"
             data-testid="employee-overview-section-qualifications"
           >
@@ -859,6 +862,7 @@
           <section
             v-if="isEmployeeOverviewSectionVisible('credentials')"
             id="employee-overview-section-credentials"
+            :ref="(target) => setOverviewSectionRef('credentials', target)"
             class="employee-admin-overview-section-card"
             data-testid="employee-overview-section-credentials"
           >
@@ -926,6 +930,7 @@
           <section
             v-if="isEmployeeOverviewSectionVisible('availability')"
             id="employee-overview-section-availability"
+            :ref="(target) => setOverviewSectionRef('availability', target)"
             class="employee-admin-overview-section-card"
             data-testid="employee-overview-section-availability"
           >
@@ -971,6 +976,7 @@
           <section
             v-if="isEmployeeOverviewSectionVisible('private_profile')"
             id="employee-overview-section-private-profile"
+            :ref="(target) => setOverviewSectionRef('private_profile', target)"
             class="employee-admin-overview-section-card"
             data-testid="employee-overview-section-private-profile"
           >
@@ -1151,6 +1157,7 @@
           <section
             v-if="isEmployeeOverviewSectionVisible('addresses')"
             id="employee-overview-section-addresses"
+            :ref="(target) => setOverviewSectionRef('addresses', target)"
             class="employee-admin-overview-section-card"
             data-testid="employee-overview-section-addresses"
           >
@@ -1207,6 +1214,7 @@
           <section
             v-if="isEmployeeOverviewSectionVisible('absences')"
             id="employee-overview-section-absences"
+            :ref="(target) => setOverviewSectionRef('absences', target)"
             class="employee-admin-overview-section-card"
             data-testid="employee-overview-section-absences"
           >
@@ -1252,6 +1260,7 @@
           <section
             v-if="isEmployeeOverviewSectionVisible('notes')"
             id="employee-overview-section-notes"
+            :ref="(target) => setOverviewSectionRef('notes', target)"
             class="employee-admin-overview-section-card"
             data-testid="employee-overview-section-notes"
           >
@@ -1298,6 +1307,7 @@
           <section
             v-if="isEmployeeOverviewSectionVisible('groups')"
             id="employee-overview-section-groups"
+            :ref="(target) => setOverviewSectionRef('groups', target)"
             class="employee-admin-overview-section-card"
             data-testid="employee-overview-section-groups"
           >
@@ -1363,6 +1373,7 @@
           <section
             v-if="isEmployeeOverviewSectionVisible('documents')"
             id="employee-overview-section-documents"
+            :ref="(target) => setOverviewSectionRef('documents', target)"
             class="employee-admin-overview-section-card"
             data-testid="employee-overview-section-documents"
           >
@@ -2232,6 +2243,12 @@
           </div>
         </template>
 
+        <section v-else-if="routeHasSelectedEmployee" class="employee-admin-empty" data-testid="employee-detail-loading-state">
+          <p class="eyebrow">{{ t("employeeAdmin.detail.eyebrow") }}</p>
+          <h3>{{ detailWorkspaceTitle }}</h3>
+          <p>{{ t("workspace.loading.processing") }}</p>
+        </section>
+
         <section v-else class="employee-admin-empty">
           <p class="eyebrow">{{ t("employeeAdmin.detail.emptyEyebrow") }}</p>
           <h3>{{ t("employeeAdmin.detail.emptyTitle") }}</h3>
@@ -2252,7 +2269,7 @@
 <script setup lang="ts">
 import { IconifyIcon } from "@vben/icons";
 import { useTabbarStore } from "@vben/stores";
-import type { CSSProperties } from "vue";
+import type { CSSProperties, ComponentPublicInstance } from "vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -2637,8 +2654,22 @@ const isCreatingEmployee = ref(false);
 const activeDetailTab = ref("overview");
 const activeOverviewSection = ref<EmployeeOverviewSectionId>("employee_file");
 const activeEmployeeOverviewEditor = ref<EmployeeOverviewEditorDialog>(null);
+const employeeAdminPageRef = ref<HTMLElement | null>(null);
 const overviewOnePageRef = ref<HTMLElement | null>(null);
 const overviewNavShellRef = ref<HTMLElement | null>(null);
+const overviewSectionRefs = reactive<Record<EmployeeOverviewSectionId, HTMLElement | null>>({
+  absences: null,
+  addresses: null,
+  app_access: null,
+  availability: null,
+  credentials: null,
+  documents: null,
+  employee_file: null,
+  groups: null,
+  notes: null,
+  private_profile: null,
+  qualifications: null,
+});
 const overviewNavFloatingMode = ref<"fixed" | "pinned" | "static">("static");
 const overviewNavFloatingStyle = ref<CSSProperties>({});
 const editingNoteId = ref("");
@@ -2659,10 +2690,23 @@ let employeeSearchDebounceHandle: ReturnType<typeof setTimeout> | null = null;
 let employeeSearchRequestSeq = 0;
 let suppressNextEmployeeSearchWatch = false;
 let employeeOverviewSectionObserver: IntersectionObserver | null = null;
+let overviewVisibilityObserver: MutationObserver | null = null;
 let suppressOverviewScrollSpyUntil = 0;
 let overviewNavScrollTargets: Array<HTMLElement | Window> = [];
+let overviewScrollStateTarget: HTMLElement | Window | null = null;
 let overviewNavFloatingRaf: number | null = null;
+let overviewScrollRestoreRaf: number | null = null;
 const employeeOverviewVisibleEntries = new Map<EmployeeOverviewSectionId, IntersectionObserverEntry>();
+const overviewViewportStateByPageKey = reactive<
+  Record<
+    string,
+    {
+      scrollTop: number;
+      section: EmployeeOverviewSectionId;
+      source: "scroll" | "section";
+    }
+  >
+>({});
 const EXTRA_SECTION_NAV_TOP_OFFSET = 25;
 const OVERVIEW_NAV_FLOATING_MIN_WIDTH = 1081;
 const EMPLOYEE_LIST_PHOTO_PRELOAD_CONCURRENCY = 4;
@@ -2725,13 +2769,20 @@ const selectedEmployeeFullName = computed(() =>
     ? `${selectedEmployee.value.first_name} ${selectedEmployee.value.last_name}`.trim()
     : "",
 );
+const routeEmployeeId = computed(() => normalizeRouteQueryValue(route.query.employee_id));
+const routeHasSelectedEmployee = computed(() => !!routeEmployeeId.value);
+const routeRequestedDetailTab = computed(() => normalizeRouteQueryValue(route.query.tab) || "dashboard");
+const routeEmployeeDisplayName = ref("");
 const detailWorkspaceTitle = computed(() => {
   if (isCreatingEmployee.value) {
     return t("employeeAdmin.detail.newTitle");
   }
+  if (routeHasSelectedEmployee.value && !selectedEmployee.value) {
+    return routeEmployeeDisplayName.value || t("employeeAdmin.title");
+  }
   return selectedEmployeeLabel.value;
 });
-const hasEmployeeDetailWorkspace = computed(() => isCreatingEmployee.value || !!selectedEmployee.value);
+const hasEmployeeDetailWorkspace = computed(() => isCreatingEmployee.value || routeHasSelectedEmployee.value || !!selectedEmployee.value);
 const employeeAdminDetailMode = computed(() => hasEmployeeDetailWorkspace.value);
 const employeeAdminListMode = computed(() => !employeeAdminDetailMode.value);
 const currentAddressSummary = computed(() => summarizeCurrentAddress(employeeAddresses.value));
@@ -2919,6 +2970,26 @@ function getEmployeeInitials(employee: EmployeeListItem) {
 
 function getEmployeeListPhotoUrl(employee: EmployeeListItem) {
   return employeeListPhotoPreviewUrls[employee.id] ?? "";
+}
+
+function findEmployeeListItem(employeeId: string) {
+  return employees.value.find((employee) => employee.id === employeeId) ?? null;
+}
+
+function formatEmployeeFullName(employee: null | Pick<EmployeeListItem, "first_name" | "last_name">) {
+  return `${employee?.first_name ?? ""} ${employee?.last_name ?? ""}`.trim();
+}
+
+function syncRouteEmployeeDisplayName(employeeId: string) {
+  if (!employeeId) {
+    routeEmployeeDisplayName.value = "";
+    return;
+  }
+  if (selectedEmployee.value?.id === employeeId) {
+    routeEmployeeDisplayName.value = selectedEmployeeFullName.value;
+    return;
+  }
+  routeEmployeeDisplayName.value = formatEmployeeFullName(findEmployeeListItem(employeeId));
 }
 
 function shouldShowEmployeeListPhoto(employee: EmployeeListItem) {
@@ -3136,6 +3207,15 @@ function buildEmployeeDetailPageKey(employeeId: string) {
   return `${EMPLOYEE_DETAIL_PAGE_KEY_PREFIX}${employeeId}`;
 }
 
+function isEmployeeDetailQuery(query: Record<string, unknown>) {
+  const employeeId = normalizeRouteQueryValue(query.employee_id);
+  const pageKey = normalizeRouteQueryValue(query.pageKey);
+  if (!employeeId || !pageKey) {
+    return false;
+  }
+  return pageKey === buildEmployeeDetailPageKey(employeeId) || pageKey.startsWith(EMPLOYEE_DETAIL_PAGE_KEY_PREFIX);
+}
+
 function normalizeRouteQueryValue(value: unknown) {
   return Array.isArray(value) ? `${value[0] ?? ""}`.trim() : `${value ?? ""}`.trim();
 }
@@ -3145,14 +3225,69 @@ function currentEmployeeDetailPageKey() {
   return pageKey.startsWith(EMPLOYEE_DETAIL_PAGE_KEY_PREFIX) ? pageKey : "";
 }
 
+function currentOverviewStateKey() {
+  const pageKey = currentEmployeeDetailPageKey();
+  if (pageKey) {
+    return pageKey;
+  }
+  if (selectedEmployee.value?.id) {
+    return buildEmployeeDetailPageKey(selectedEmployee.value.id);
+  }
+  return "";
+}
+
+function buildEmployeeDetailLocation(employeeId: string, tab = "dashboard") {
+  return {
+    name: "SicherPlanEmployees",
+    path: EMPLOYEE_ADMIN_ROUTE_PATH,
+    query: {
+      employee_id: employeeId,
+      pageKey: buildEmployeeDetailPageKey(employeeId),
+      tab,
+    },
+  };
+}
+
+function buildEmployeeDetailTabTarget(employeeId: string, tab = "dashboard") {
+  const pageKey = buildEmployeeDetailPageKey(employeeId);
+  return {
+    fullPath: `${EMPLOYEE_ADMIN_ROUTE_PATH}?employee_id=${encodeURIComponent(employeeId)}&pageKey=${encodeURIComponent(pageKey)}&tab=${encodeURIComponent(tab)}`,
+    key: pageKey,
+    meta: {
+      ...route.meta,
+      fullPathKey: false,
+    },
+    name: "SicherPlanEmployees",
+    path: EMPLOYEE_ADMIN_ROUTE_PATH,
+    query: {
+      employee_id: employeeId,
+      pageKey,
+      tab,
+    },
+  };
+}
+
 async function syncEmployeeTopTabTitle() {
-  const routeEmployeeId = normalizeRouteQueryValue(route.query.employee_id);
-  const title = routeEmployeeId && selectedEmployee.value?.id === routeEmployeeId && !isCreatingEmployee.value
-    ? selectedEmployeeFullName.value || t("employeeAdmin.title")
-    : t("employeeAdmin.title");
+  if (!isEmployeeDetailQuery(route.query as Record<string, unknown>) || isCreatingEmployee.value) {
+    (route.meta as Record<string, unknown>).title = t("employeeAdmin.title");
+    tabbarStore.setUpdateTime();
+    await tabbarStore.setTabTitle(
+      {
+        ...route,
+        key: EMPLOYEE_ADMIN_ROUTE_PATH,
+        path: EMPLOYEE_ADMIN_ROUTE_PATH,
+        query: {},
+      } as any,
+      t("employeeAdmin.title"),
+    );
+    return;
+  }
+
+  const employeeId = normalizeRouteQueryValue(route.query.employee_id);
+  const title = selectedEmployeeFullName.value || routeEmployeeDisplayName.value || t("employeeAdmin.title");
   (route.meta as Record<string, unknown>).title = title;
   tabbarStore.setUpdateTime();
-  await tabbarStore.setTabTitle(route, title);
+  await tabbarStore.setTabTitle(buildEmployeeDetailTabTarget(employeeId, routeRequestedDetailTab.value) as any, title);
 }
 
 async function replaceEmployeeDetailRouteQuery(tabId: string) {
@@ -3201,6 +3336,7 @@ function selectEmployeeDetailTab(tabId: string) {
 
 function selectOverviewSection(sectionId: string) {
   activeOverviewSection.value = normalizeOverviewSectionId(sectionId);
+  saveOverviewViewportState("section");
   suppressOverviewScrollSpy();
   scrollToOverviewSection(activeOverviewSection.value);
 }
@@ -3208,6 +3344,7 @@ function selectOverviewSection(sectionId: string) {
 function openEmployeeOverviewSection(sectionId: string) {
   activeDetailTab.value = "overview";
   activeOverviewSection.value = normalizeOverviewSectionId(sectionId);
+  saveOverviewViewportState("section");
   suppressOverviewScrollSpy();
   scrollToOverviewSection(activeOverviewSection.value);
   void replaceEmployeeDetailRouteQuery("overview");
@@ -3222,10 +3359,36 @@ function normalizeOverviewSectionId(sectionId: string): EmployeeOverviewSectionI
   return "employee_file";
 }
 
+function setOverviewSectionRef(
+  sectionId: EmployeeOverviewSectionId,
+  target: Element | ComponentPublicInstance | null,
+) {
+  if (target instanceof HTMLElement) {
+    overviewSectionRefs[sectionId] = target;
+    return;
+  }
+  if (target && "$el" in target && target.$el instanceof HTMLElement) {
+    overviewSectionRefs[sectionId] = target.$el;
+    return;
+  }
+  overviewSectionRefs[sectionId] = null;
+}
+
+function resolveOverviewSectionElement(sectionId: EmployeeOverviewSectionId) {
+  return overviewSectionRefs[sectionId];
+}
+
 function scrollToOverviewSection(sectionId: EmployeeOverviewSectionId) {
+  scrollToOverviewSectionWithBehavior(sectionId, "smooth");
+}
+
+function scrollToOverviewSectionWithBehavior(
+  sectionId: EmployeeOverviewSectionId,
+  behavior: ScrollBehavior,
+) {
   void nextTick(() => {
-    document.getElementById(resolveOverviewSectionElementId(sectionId))?.scrollIntoView({
-      behavior: "smooth",
+    resolveOverviewSectionElement(sectionId)?.scrollIntoView({
+      behavior,
       block: "start",
     });
   });
@@ -3239,21 +3402,177 @@ function isEmployeeOverviewSectionVisible(sectionId: EmployeeOverviewSectionId) 
   return employeeOverviewSections.value.some((section) => section.id === sectionId && section.visible);
 }
 
-function resolveOverviewSectionElementId(sectionId: EmployeeOverviewSectionId) {
-  return `employee-overview-section-${sectionId === "employee_file" ? "file" : sectionId.replaceAll("_", "-")}`;
-}
-
 function resolveOverviewSectionIdFromElement(element: Element): EmployeeOverviewSectionId | null {
-  const sectionSuffix = element.id.replace(/^employee-overview-section-/, "");
-  const sectionId = sectionSuffix === "file" ? "employee_file" : sectionSuffix.replaceAll("-", "_");
-  const matchingSection = visibleEmployeeOverviewSections.value.find((section) => section.id === sectionId);
-  return matchingSection?.id ?? null;
+  const matchingEntry = Object.entries(overviewSectionRefs).find(([, sectionElement]) => sectionElement === element);
+  return (matchingEntry?.[0] as EmployeeOverviewSectionId | undefined) ?? null;
 }
 
 function disconnectEmployeeOverviewSectionObserver() {
   employeeOverviewSectionObserver?.disconnect();
   employeeOverviewSectionObserver = null;
   employeeOverviewVisibleEntries.clear();
+}
+
+function disconnectOverviewVisibilityObserver() {
+  overviewVisibilityObserver?.disconnect();
+  overviewVisibilityObserver = null;
+}
+
+function isOverviewInstanceVisible() {
+  const overviewElement = overviewOnePageRef.value;
+  if (!overviewElement) {
+    return false;
+  }
+  return overviewElement.getClientRects().length > 0;
+}
+
+function resolveOverviewScrollStateTarget() {
+  return resolveOverviewIntersectionRoot() ?? window;
+}
+
+function readOverviewScrollTop(target: HTMLElement | Window) {
+  if (target === window) {
+    return (
+      window.scrollY ||
+      window.pageYOffset ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      0
+    );
+  }
+  return target.scrollTop;
+}
+
+function writeOverviewScrollTop(target: HTMLElement | Window, scrollTop: number) {
+  if (target === window) {
+    window.scrollTo({ top: scrollTop, behavior: "auto" });
+    document.documentElement.scrollTop = scrollTop;
+    document.body.scrollTop = scrollTop;
+    return;
+  }
+  target.scrollTop = scrollTop;
+}
+
+function saveOverviewViewportState(source: "scroll" | "section" = "scroll") {
+  if (activeDetailTab.value !== "overview") {
+    return;
+  }
+  if (source === "scroll" && !isOverviewInstanceVisible()) {
+    return;
+  }
+  const pageKey = currentOverviewStateKey();
+  if (!pageKey) {
+    return;
+  }
+  overviewViewportStateByPageKey[pageKey] = {
+    scrollTop: isOverviewInstanceVisible() ? readOverviewScrollTop(resolveOverviewScrollStateTarget()) : 0,
+    section: activeOverviewSection.value,
+    source,
+  };
+}
+
+function clearOverviewViewportState(pageKey = currentOverviewStateKey()) {
+  if (!pageKey) {
+    return;
+  }
+  delete overviewViewportStateByPageKey[pageKey];
+}
+
+function cancelOverviewScrollRestoreFrame() {
+  if (overviewScrollRestoreRaf !== null) {
+    window.cancelAnimationFrame(overviewScrollRestoreRaf);
+    overviewScrollRestoreRaf = null;
+  }
+}
+
+function restoreOverviewViewportState() {
+  cancelOverviewScrollRestoreFrame();
+  if (activeDetailTab.value !== "overview" || !isOverviewInstanceVisible()) {
+    return;
+  }
+
+  const pageKey = currentOverviewStateKey();
+  const savedState = pageKey ? overviewViewportStateByPageKey[pageKey] : undefined;
+  if (!savedState) {
+    scrollToOverviewSectionWithBehavior(activeOverviewSection.value, "auto");
+    return;
+  }
+
+  activeOverviewSection.value = normalizeOverviewSectionId(savedState.section);
+  if (savedState.source === "section") {
+    scrollToOverviewSectionWithBehavior(savedState.section, "auto");
+    return;
+  }
+  writeOverviewScrollTop(resolveOverviewScrollStateTarget(), savedState.scrollTop);
+}
+
+function scheduleOverviewViewportStateRestore() {
+  cancelOverviewScrollRestoreFrame();
+  overviewScrollRestoreRaf = window.requestAnimationFrame(() => {
+    overviewScrollRestoreRaf = null;
+    restoreOverviewViewportState();
+  });
+}
+
+function handleOverviewScrollStateChanged() {
+  if (activeDetailTab.value !== "overview" || !isOverviewInstanceVisible()) {
+    return;
+  }
+  saveOverviewViewportState("scroll");
+}
+
+function teardownOverviewScrollStateTracking() {
+  cancelOverviewScrollRestoreFrame();
+  overviewScrollStateTarget?.removeEventListener("scroll", handleOverviewScrollStateChanged);
+  overviewScrollStateTarget = null;
+}
+
+function setupOverviewScrollStateTracking() {
+  teardownOverviewScrollStateTracking();
+
+  if (activeDetailTab.value !== "overview" || !isOverviewInstanceVisible()) {
+    return;
+  }
+
+  overviewScrollStateTarget = resolveOverviewScrollStateTarget();
+  overviewScrollStateTarget.addEventListener("scroll", handleOverviewScrollStateChanged, { passive: true });
+}
+
+function handleOverviewVisibilityChange() {
+  if (activeDetailTab.value !== "overview") {
+    return;
+  }
+
+  if (!isOverviewInstanceVisible()) {
+    saveOverviewViewportState("scroll");
+    disconnectEmployeeOverviewSectionObserver();
+    teardownOverviewNavFloating();
+    teardownOverviewScrollStateTracking();
+    return;
+  }
+
+  void nextTick(() => {
+    setupEmployeeOverviewSectionObserver();
+    setupOverviewNavFloating();
+    setupOverviewScrollStateTracking();
+    scheduleOverviewViewportStateRestore();
+  });
+}
+
+function setupOverviewVisibilityObserver() {
+  disconnectOverviewVisibilityObserver();
+
+  if (typeof window.MutationObserver === "undefined" || !employeeAdminPageRef.value) {
+    return;
+  }
+
+  overviewVisibilityObserver = new MutationObserver(() => {
+    handleOverviewVisibilityChange();
+  });
+  overviewVisibilityObserver.observe(employeeAdminPageRef.value, {
+    attributeFilter: ["class", "style"],
+    attributes: true,
+  });
 }
 
 function resolveOverviewStickyTop() {
@@ -3344,6 +3663,7 @@ function updateOverviewNavFloating() {
     activeDetailTab.value !== "overview" ||
     !overviewElement ||
     !navShell ||
+    !isOverviewInstanceVisible() ||
     !window.matchMedia(`(min-width: ${OVERVIEW_NAV_FLOATING_MIN_WIDTH}px)`).matches
   ) {
     resetOverviewNavFloating();
@@ -3399,7 +3719,12 @@ function teardownOverviewNavFloating() {
 function setupOverviewNavFloating() {
   teardownOverviewNavFloating();
 
-  if (activeDetailTab.value !== "overview" || !overviewOnePageRef.value || !overviewNavShellRef.value) {
+  if (
+    activeDetailTab.value !== "overview" ||
+    !overviewOnePageRef.value ||
+    !overviewNavShellRef.value ||
+    !isOverviewInstanceVisible()
+  ) {
     return;
   }
 
@@ -3414,12 +3739,16 @@ function setupOverviewNavFloating() {
 function setupEmployeeOverviewSectionObserver() {
   disconnectEmployeeOverviewSectionObserver();
 
-  if (activeDetailTab.value !== "overview" || typeof window.IntersectionObserver === "undefined") {
+  if (
+    activeDetailTab.value !== "overview" ||
+    typeof window.IntersectionObserver === "undefined" ||
+    !isOverviewInstanceVisible()
+  ) {
     return;
   }
 
   const sectionElements = visibleEmployeeOverviewSections.value
-    .map((section) => document.getElementById(resolveOverviewSectionElementId(section.id)))
+    .map((section) => resolveOverviewSectionElement(section.id))
     .filter((element): element is HTMLElement => !!element);
 
   if (!sectionElements.length) {
@@ -3429,6 +3758,9 @@ function setupEmployeeOverviewSectionObserver() {
   const stickyTop = resolveOverviewStickyTop();
   employeeOverviewSectionObserver = new IntersectionObserver(
     (entries) => {
+      if (!isOverviewInstanceVisible()) {
+        return;
+      }
       if (window.performance.now() < suppressOverviewScrollSpyUntil) {
         return;
       }
@@ -3792,15 +4124,15 @@ async function handleOpenEmployeeSearchResults() {
 async function openEmployeeWorkspace(employeeId: string, detailTab = "dashboard") {
   closeAdvancedFiltersDialog();
   closeImportExportDialog();
-  await router.push({
-    path: EMPLOYEE_ADMIN_ROUTE_PATH,
-    query: {
-      employee_id: employeeId,
-      pageKey: buildEmployeeDetailPageKey(employeeId),
-      tab: detailTab,
-    },
-  });
-  await selectEmployee(employeeId, { fallbackTab: detailTab });
+  const employee = findEmployeeListItem(employeeId);
+  const employeeDisplayName = formatEmployeeFullName(employee);
+  routeEmployeeDisplayName.value = employeeDisplayName;
+  await router.push(buildEmployeeDetailLocation(employeeId, detailTab));
+  if (employeeDisplayName) {
+    (route.meta as Record<string, unknown>).title = employeeDisplayName;
+    tabbarStore.setUpdateTime();
+    await tabbarStore.setTabTitle(buildEmployeeDetailTabTarget(employeeId, detailTab) as any, employeeDisplayName);
+  }
 }
 
 async function selectEmployeeFromSearchResult(employeeId: string) {
@@ -3827,6 +4159,7 @@ async function returnToEmployeeList() {
   closeAdvancedFiltersDialog();
   closeImportExportDialog();
   isCreatingEmployee.value = false;
+  routeEmployeeDisplayName.value = "";
   resetSelectedEmployeeWorkspaceState();
   await router.push({
     path: EMPLOYEE_ADMIN_ROUTE_PATH,
@@ -4228,6 +4561,7 @@ function resetSelectedEmployeeWorkspaceState() {
   closeAddressHistoryDialog();
   closeResetPasswordDialog();
   closeAccessDiagnosticsDialog();
+  clearOverviewViewportState();
   selectedEmployeeId.value = "";
   selectedEmployee.value = null;
   selectedPrivateProfile.value = null;
@@ -4329,6 +4663,7 @@ async function refreshEmployees(options: { autoSelectFirst?: boolean } = {}) {
   loading.list = true;
   try {
     employees.value = await listEmployees(resolvedTenantScopeId.value, authStore.accessToken, filters);
+    syncRouteEmployeeDisplayName(routeEmployeeId.value);
     void preloadEmployeeListPhotos(employees.value);
     if (selectedEmployeeId.value) {
       const stillSelected = employees.value.some((row) => row.id === selectedEmployeeId.value);
@@ -4457,6 +4792,7 @@ async function selectEmployee(employeeId: string, options: SelectEmployeeOptions
   const desiredTab = preserveActiveTab ? activeDetailTab.value : fallbackTab;
   isCreatingEmployee.value = false;
   selectedEmployeeId.value = employeeId;
+  syncRouteEmployeeDisplayName(employeeId);
   loading.detail = true;
   try {
     const [
@@ -4481,6 +4817,7 @@ async function selectEmployee(employeeId: string, options: SelectEmployeeOptions
         : Promise.resolve(null),
     ]);
     selectedEmployee.value = employee;
+    routeEmployeeDisplayName.value = selectedEmployeeFullName.value || formatEmployeeFullName(employee);
     employeeNotes.value = notes;
     employeeDocuments.value = documents;
     employeeQualifications.value = qualifications;
@@ -4545,6 +4882,55 @@ async function selectEmployee(employeeId: string, options: SelectEmployeeOptions
   } finally {
     loading.detail = false;
   }
+}
+
+function applyRouteRequestedDetailTab(tabId: string) {
+  if (legacyEmployeeDetailTabIds.has(tabId)) {
+    activeDetailTab.value = "overview";
+    activeOverviewSection.value = normalizeOverviewSectionId(tabId);
+    return;
+  }
+  if (tabId === "overview") {
+    const previousDetailTab = activeDetailTab.value;
+    activeDetailTab.value = "overview";
+    if (
+      !overviewViewportStateByPageKey[currentOverviewStateKey()] ||
+      activeOverviewSection.value === "employee_file" ||
+      previousDetailTab !== "overview"
+    ) {
+      activeOverviewSection.value = "employee_file";
+    }
+    return;
+  }
+  activeDetailTab.value = resolveEmployeeDetailTab(
+    tabId,
+    employeeDetailTabs.value.map((tab) => tab.id),
+    "dashboard",
+  );
+}
+
+async function syncEmployeeWorkspaceFromRoute() {
+  if (isCreatingEmployee.value) {
+    return;
+  }
+  const employeeId = routeEmployeeId.value;
+  if (!employeeId) {
+    routeEmployeeDisplayName.value = "";
+    resetSelectedEmployeeWorkspaceState();
+    await syncEmployeeTopTabTitle();
+    return;
+  }
+
+  syncRouteEmployeeDisplayName(employeeId);
+  applyRouteRequestedDetailTab(routeRequestedDetailTab.value);
+
+  if (selectedEmployee.value?.id === employeeId && !loading.detail) {
+    await syncEmployeeTopTabTitle();
+    return;
+  }
+
+  await selectEmployee(employeeId, { fallbackTab: routeRequestedDetailTab.value });
+  await syncEmployeeTopTabTitle();
 }
 
 async function refreshPhotoPreview() {
@@ -5556,16 +5942,23 @@ watch(
 watch(
   () => [selectedEmployee.value?.id ?? "", route.query.employee_id, route.query.pageKey, isCreatingEmployee.value] as const,
   async ([selectedEmployeeId]) => {
-    const routeEmployeeId = normalizeRouteQueryValue(route.query.employee_id);
-    if (selectedEmployeeId && routeEmployeeId === selectedEmployeeId) {
+    if (selectedEmployeeId && routeEmployeeId.value === selectedEmployeeId) {
       await syncEmployeeTopTabTitle();
       return;
     }
-    if (!routeEmployeeId) {
+    if (!routeHasSelectedEmployee.value) {
       await syncEmployeeTopTabTitle();
       return;
     }
     (route.meta as Record<string, unknown>).title = t("employeeAdmin.title");
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [route.query.employee_id, route.query.tab] as const,
+  () => {
+    void syncEmployeeWorkspaceFromRoute();
   },
   { immediate: true },
 );
@@ -5580,10 +5973,13 @@ watch(
   () => {
     disconnectEmployeeOverviewSectionObserver();
     teardownOverviewNavFloating();
+    teardownOverviewScrollStateTracking();
     if (activeDetailTab.value === "overview") {
       void nextTick(() => {
         setupEmployeeOverviewSectionObserver();
         setupOverviewNavFloating();
+        setupOverviewScrollStateTracking();
+        scheduleOverviewViewportStateRestore();
       });
     }
   },
@@ -5693,6 +6089,7 @@ function fileToBase64(file: File) {
 
 onMounted(async () => {
   window.addEventListener(ADMIN_MENU_RESELECT_EVENT, handleAdminMenuReselect as EventListener);
+  setupOverviewVisibilityObserver();
   authStore.syncFromPrimarySession();
   try {
     await authStore.ensureSessionReady();
@@ -5702,14 +6099,7 @@ onMounted(async () => {
   tenantScopeInput.value = authStore.effectiveTenantScopeId || authStore.tenantScopeId;
   resetEmployeeDraft();
   await refreshEmployees({ autoSelectFirst: false });
-  const routeEmployeeId = normalizeRouteQueryValue(route.query.employee_id);
-  if (routeEmployeeId) {
-    await selectEmployee(routeEmployeeId, {
-      fallbackTab: normalizeRouteQueryValue(route.query.tab) || "dashboard",
-    });
-  } else {
-    await syncEmployeeTopTabTitle();
-  }
+  await syncEmployeeWorkspaceFromRoute();
 });
 
 onBeforeUnmount(() => {
@@ -5721,8 +6111,11 @@ onBeforeUnmount(() => {
   ].filter(Boolean));
   previewUrls.forEach((url) => URL.revokeObjectURL(url));
   photoPreviewUrl.value = "";
+  disconnectOverviewVisibilityObserver();
   disconnectEmployeeOverviewSectionObserver();
   teardownOverviewNavFloating();
+  teardownOverviewScrollStateTracking();
+  Object.keys(overviewViewportStateByPageKey).forEach((pageKey) => delete overviewViewportStateByPageKey[pageKey]);
 });
 </script>
 

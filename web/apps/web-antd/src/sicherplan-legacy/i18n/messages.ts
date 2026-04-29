@@ -2520,7 +2520,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "recruitingAdmin.common.yes": "Ja",
     "recruitingAdmin.common.no": "Nein",
     "employeeAdmin.eyebrow": "Mitarbeiter",
-    "employeeAdmin.title": "Mitarbeiterakte und operative Pflege",
+    "employeeAdmin.title": "Mitarbeiter",
     "employeeAdmin.lead":
       "Diese Mitarbeiteransicht arbeitet direkt gegen die operative HR-API, hält private Bereiche getrennt und nutzt den zentralen Dokumentendienst für Profilfoto und Dateinachweise.",
     "employeeAdmin.permission.read": "Leserecht",
@@ -4770,7 +4770,7 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "recruitingAdmin.common.yes": "Yes",
     "recruitingAdmin.common.no": "No",
     "employeeAdmin.eyebrow": "Employees",
-    "employeeAdmin.title": "Employee file and operational maintenance",
+    "employeeAdmin.title": "Employees",
     "employeeAdmin.lead":
       "This employee workspace talks directly to the operational HR API, keeps private sections separated, and uses the shared document service for profile photos and supporting files.",
     "employeeAdmin.permission.read": "Read permission",

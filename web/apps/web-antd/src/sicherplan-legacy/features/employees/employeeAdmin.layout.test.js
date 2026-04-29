@@ -47,7 +47,8 @@ test("employee workspace uses customer-style list/detail mode shells with embedd
   assert.match(viewSource, /data-testid="employee-detail-workspace"/);
   assert.match(viewSource, /v-if="!embedded && isPlatformAdmin" class="module-card employee-admin-scope"/);
   assert.match(viewSource, /\.employee-admin-grid\s*{\s*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
-  assert.match(viewSource, /const hasEmployeeDetailWorkspace = computed\(\(\) => isCreatingEmployee\.value \|\| !!selectedEmployee\.value\)/);
+  assert.match(viewSource, /const routeHasSelectedEmployee = computed\(\(\) => !!routeEmployeeId\.value\)/);
+  assert.match(viewSource, /const hasEmployeeDetailWorkspace = computed\(\(\) => isCreatingEmployee\.value \|\| routeHasSelectedEmployee\.value \|\| !!selectedEmployee\.value\)/);
   assert.match(viewSource, /const employeeAdminDetailMode = computed\(\(\) => hasEmployeeDetailWorkspace\.value\)/);
   assert.match(viewSource, /const employeeAdminListMode = computed\(\(\) => !employeeAdminDetailMode\.value\)/);
   assert.match(viewSource, /\.employee-admin-list-panel\s*{\s*position:\s*static;[\s\S]*top:\s*auto;/);
@@ -99,6 +100,17 @@ test("employee detail uses dashboard and overview top-level tabs with one-page o
   assert.match(viewSource, /employee-admin-overview-nav__link--active/);
   assert.match(viewSource, /ref="overviewOnePageRef"/);
   assert.match(viewSource, /ref="overviewNavShellRef"/);
+  assert.match(viewSource, /ref="employeeAdminPageRef"/);
+  assert.match(viewSource, /const overviewSectionRefs = reactive<Record<EmployeeOverviewSectionId, HTMLElement \| null>>\(/);
+  assert.match(viewSource, /const overviewViewportStateByPageKey = reactive</);
+  assert.match(viewSource, /function setOverviewSectionRef\(/);
+  assert.match(viewSource, /resolveOverviewSectionElement\(sectionId\)\?\.scrollIntoView/);
+  assert.match(viewSource, /function isOverviewInstanceVisible\(\)/);
+  assert.match(viewSource, /function resolveOverviewScrollStateTarget\(\)/);
+  assert.match(viewSource, /function saveOverviewViewportState\(source: "scroll" \| "section" = "scroll"\)/);
+  assert.match(viewSource, /function restoreOverviewViewportState\(\)/);
+  assert.match(viewSource, /function setupOverviewVisibilityObserver\(\)/);
+  assert.match(viewSource, /new MutationObserver\(/);
   assert.match(viewSource, /overviewNavFloatingMode === 'fixed'/);
   assert.match(viewSource, /overviewNavFloatingMode === 'pinned'/);
   assert.match(viewSource, /class="employee-admin-overview-nav-shell"/);
@@ -112,6 +124,8 @@ test("employee detail uses dashboard and overview top-level tabs with one-page o
   assert.match(viewSource, /function resolveActiveEmployeeOverviewSection\(sectionElements: HTMLElement\[\]\)/);
   assert.match(viewSource, /distance:\s*Math\.abs\(rect\.top - stickyTop\)/);
   assert.match(viewSource, /isCurrentOrNear:\s*rect\.top <= stickyTop \+ activeLineTolerance/);
+  assert.doesNotMatch(viewSource, /document\.getElementById\(resolveOverviewSectionElementId/);
+  assert.doesNotMatch(viewSource, /document\.querySelector(All)?\([^)]*employee-overview-section/);
   assert.match(viewSource, /--employee-overview-sticky-top:\s*calc\(var\(--sp-sticky-offset,\s*6\.5rem\) \+ 25px\)/);
   assert.match(viewSource, /\.employee-admin-overview-onepage\s*\{[\s\S]*grid-template-columns:\s*minmax\(190px,\s*240px\) minmax\(0,\s*1fr\)/);
   assert.match(viewSource, /\.employee-admin-overview-onepage\s*\{[\s\S]*align-items:\s*start/);
@@ -132,7 +146,7 @@ test("employee detail uses dashboard and overview top-level tabs with one-page o
   assert.match(viewSource, /@media \(max-width: 1080px\)[\s\S]*\.employee-admin-overview-nav-shell\s*\{[\s\S]*position:\s*static/);
   assert.match(viewSource, /@media \(max-width: 1080px\)[\s\S]*\.employee-admin-overview-nav-shell\s*\{[\s\S]*overflow:\s*visible/);
   assert.match(viewSource, /@media \(max-width: 1080px\)[\s\S]*\.employee-admin-overview-nav\s*\{[\s\S]*overflow-x:\s*auto/);
-  assert.match(viewSource, /scrollIntoView\(\{\s*behavior:\s*"smooth",\s*block:\s*"start"/);
+  assert.match(viewSource, /function scrollToOverviewSectionWithBehavior\([\s\S]*scrollIntoView\(\{[\s\S]*behavior,[\s\S]*block:\s*"start"/);
   assert.match(viewSource, /data-testid="employee-overview-section-file"/);
   assert.match(viewSource, /data-testid="employee-overview-section-app-access"/);
   assert.doesNotMatch(viewSource, /data-testid="employee-tab-panel-profile-photo"/);

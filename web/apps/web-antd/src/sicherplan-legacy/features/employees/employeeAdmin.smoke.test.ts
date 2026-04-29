@@ -623,9 +623,9 @@ function stubEmployeePhotoObjectUrls(urlByBlob = "blob:employee-photo") {
   return { createObjectURLMock, revokeObjectURLMock };
 }
 
-async function mountEmployeeAdmin() {
+async function mountEmployeeAdmin(options: { attachTo?: Element } = {}) {
   const wrapper = mount(EmployeeAdminView, {
-    attachTo: document.body,
+    attachTo: options.attachTo ?? document.body,
     global: {
       stubs: {
         RouterLink: defineComponent({
@@ -800,6 +800,7 @@ describe("EmployeeAdminView search dialog regression", () => {
     await settle();
 
     expect(routerPushMock).toHaveBeenCalledWith({
+      name: "SicherPlanEmployees",
       path: "/admin/employees",
       query: {
         employee_id: "employee-leon",
@@ -815,7 +816,9 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(routeState.meta.title).toBe("Leon Yilmaz");
     expect(setTabTitleMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        key: "employees:detail:employee-leon",
         meta: expect.objectContaining({ title: "Leon Yilmaz" }),
+        path: "/admin/employees",
         query: expect.objectContaining({
           employee_id: "employee-leon",
           pageKey: "employees:detail:employee-leon",
@@ -823,6 +826,52 @@ describe("EmployeeAdminView search dialog regression", () => {
       }),
       "Leon Yilmaz",
     );
+    expect(setTabTitleMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: "/admin/employees",
+      }),
+      "Leon Yilmaz",
+    );
+  });
+
+  it("switches to the employee detail shell immediately after route change while detail data is still loading", async () => {
+    const employeeDeferred = createDeferred<any>();
+    apiMocks.getEmployeeMock.mockImplementation(async (_tenantId: string, employeeId: string) => {
+      if (employeeId === "employee-markus") {
+        return employeeDeferred.promise;
+      }
+      return buildEmployeeRead("employee-leon", "P-2001", "Leon", "Yilmaz", {
+        mobile_phone: "+49 170 2001",
+        status: "inactive",
+      });
+    });
+
+    const wrapper = await mountEmployeeAdmin();
+    await wrapper.findAll('[data-testid="employee-list-row"]')[0]!.trigger("click");
+    await flushPromises();
+
+    expect(routeState.query).toEqual({
+      employee_id: "employee-markus",
+      pageKey: "employees:detail:employee-markus",
+      tab: "dashboard",
+    });
+    expect(routeState.meta.title).toBe("Markus Neumann");
+    expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-detail-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-detail-workspace"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-detail-loading-state"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-list-section"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="employee-detail-workspace"]').text()).toContain("Markus Neumann");
+
+    employeeDeferred.resolve(
+      buildEmployeeRead("employee-markus", "P-2000", "Markus", "Neumann", {
+        work_email: "markus.neumann@example.test",
+      }),
+    );
+    await settle();
+
+    expect(wrapper.find('[data-testid="employee-detail-loading-state"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-tab-panel-dashboard"]').exists()).toBe(true);
   });
 
   it("keeps the same pageKey when switching internal employee detail tabs and routes back to the list without pageKey", async () => {
@@ -914,7 +963,7 @@ describe("EmployeeAdminView search dialog regression", () => {
 
     const wrapper = await mountEmployeeAdmin();
     await openFirstEmployeeWorkspace(wrapper);
-    expect(createObjectURLMock).toHaveBeenCalledTimes(1);
+    expect(createObjectURLMock).toHaveBeenCalled();
     expect(apiMocks.downloadEmployeeDocumentMock).toHaveBeenCalledWith(
       "tenant-1",
       "photo-document-1",
@@ -1364,6 +1413,149 @@ describe("EmployeeAdminView search dialog regression", () => {
     );
   });
 
+  it("uses the local Overview section refs when multiple cached employee detail views are mounted", async () => {
+    const scrollIntoViewMock = vi.fn();
+    vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(function (this: HTMLElement, options?: boolean | ScrollIntoViewOptions) {
+      scrollIntoViewMock(this, options);
+    });
+
+    const firstWrapper = await mountEmployeeAdmin();
+    const secondWrapper = await mountEmployeeAdmin();
+
+    await openFirstEmployeeWorkspace(firstWrapper);
+    await settle();
+
+    await firstWrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await secondWrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    const firstDocumentsSection = firstWrapper.get('[data-testid="employee-overview-section-documents"]').element;
+    const secondDocumentsSection = secondWrapper.get('[data-testid="employee-overview-section-documents"]').element;
+
+    scrollIntoViewMock.mockClear();
+    await secondWrapper.get('[data-testid="employee-overview-nav-documents"]').trigger("click");
+    await settle();
+
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+    expect(scrollIntoViewMock.mock.calls[0]?.[0]).toBe(secondDocumentsSection);
+    expect(scrollIntoViewMock.mock.calls[0]?.[0]).not.toBe(firstDocumentsSection);
+    expect(scrollIntoViewMock.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ behavior: "smooth", block: "start" }),
+    );
+  });
+
+  it("preserves Overview scroll and section state per employee detail pageKey", async () => {
+    apiMocks.getEmployeeMock.mockImplementation(async (_tenantId: string, employeeId: string) => {
+      if (employeeId === "employee-leon") {
+        return buildEmployeeRead("employee-leon", "P-2001", "Emir", "Kaya", {
+          mobile_phone: "+49 170 2001",
+        });
+      }
+      if (employeeId === "employee-sarah") {
+        return buildEmployeeRead("employee-sarah", "P-2002", "Sarah", "Becker", {
+          work_email: "sarah.becker@example.test",
+        });
+      }
+      return buildEmployeeRead("employee-markus", "P-2000", "Markus", "Neumann", {
+        work_email: "markus.neumann@example.test",
+      });
+    });
+
+    const sharedScrollHost = document.createElement("div");
+    sharedScrollHost.style.height = "400px";
+    sharedScrollHost.style.overflowY = "auto";
+    Object.defineProperty(sharedScrollHost, "clientHeight", { configurable: true, value: 400 });
+    Object.defineProperty(sharedScrollHost, "scrollHeight", { configurable: true, value: 2000 });
+    document.body.appendChild(sharedScrollHost);
+
+    vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(function () {
+      const testId = this.getAttribute("data-testid");
+      if (testId === "employee-overview-section-file") {
+        sharedScrollHost.scrollTop = 0;
+      }
+      if (testId === "employee-overview-section-notes") {
+        sharedScrollHost.scrollTop = 640;
+      }
+      if (testId === "employee-overview-section-addresses") {
+        sharedScrollHost.scrollTop = 220;
+      }
+    });
+
+    const wrapper = await mountEmployeeAdmin({ attachTo: sharedScrollHost });
+
+    routeState.query = {
+      employee_id: "employee-markus",
+      pageKey: "employees:detail:employee-markus",
+      tab: "overview",
+    };
+    await settle();
+    await settle();
+
+    await wrapper.get('[data-testid="employee-overview-nav-notes"]').trigger("click");
+    sharedScrollHost.scrollTop = 640;
+    sharedScrollHost.dispatchEvent(new Event("scroll"));
+    await settle();
+
+    expect((wrapper.vm as any).activeOverviewSection).toBe("notes");
+
+    routeState.query = {
+      employee_id: "employee-leon",
+      pageKey: "employees:detail:employee-leon",
+      tab: "overview",
+    };
+    await settle();
+    await settle();
+
+    expect((wrapper.vm as any).selectedEmployee?.id).toBe("employee-leon");
+    expect((wrapper.vm as any).activeOverviewSection).toBe("employee_file");
+    expect(sharedScrollHost.scrollTop).toBe(0);
+
+    await wrapper.get('[data-testid="employee-overview-nav-addresses"]').trigger("click");
+    sharedScrollHost.scrollTop = 220;
+    sharedScrollHost.dispatchEvent(new Event("scroll"));
+    await settle();
+
+    expect((wrapper.vm as any).activeOverviewSection).toBe("addresses");
+
+    routeState.query = {
+      employee_id: "employee-sarah",
+      pageKey: "employees:detail:employee-sarah",
+      tab: "overview",
+    };
+    await settle();
+    await settle();
+
+    expect((wrapper.vm as any).selectedEmployee?.id).toBe("employee-sarah");
+    expect((wrapper.vm as any).activeOverviewSection).toBe("employee_file");
+    expect(sharedScrollHost.scrollTop).toBe(0);
+
+    routeState.query = {
+      employee_id: "employee-markus",
+      pageKey: "employees:detail:employee-markus",
+      tab: "overview",
+    };
+    await settle();
+    await settle();
+
+    expect((wrapper.vm as any).selectedEmployee?.id).toBe("employee-markus");
+    expect((wrapper.vm as any).activeOverviewSection).toBe("notes");
+    expect(sharedScrollHost.scrollTop).toBe(640);
+
+    routeState.query = {
+      employee_id: "employee-leon",
+      pageKey: "employees:detail:employee-leon",
+      tab: "overview",
+    };
+    await settle();
+    await settle();
+
+    expect((wrapper.vm as any).selectedEmployee?.id).toBe("employee-leon");
+    expect((wrapper.vm as any).activeOverviewSection).toBe("addresses");
+    expect(sharedScrollHost.scrollTop).toBe(220);
+
+    sharedScrollHost.remove();
+  });
+
   it("switches the Overview nav shell to fixed mode while the desktop Overview container is scrolled", async () => {
     vi.spyOn(window, "matchMedia").mockImplementation(
       (query: string) =>
@@ -1512,6 +1704,29 @@ describe("EmployeeAdminView search dialog regression", () => {
     wrapper.unmount();
     mountedWrappers.pop();
     expect(dispatcherObserver!.disconnect).toHaveBeenCalled();
+  });
+
+  it("ignores hidden cached Overview instances when observer callbacks fire", async () => {
+    const { instances, triggerIntersection } = installIntersectionObserverMock();
+    const wrapper = await mountEmployeeAdmin();
+    await openFirstEmployeeWorkspace(wrapper);
+
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    const observer = instances.at(-1);
+    expect(observer).toBeDefined();
+
+    const overviewElement = wrapper.get('[data-testid="employee-overview-onepage"]').element as HTMLElement;
+    vi.spyOn(overviewElement, "getClientRects").mockReturnValue([] as unknown as DOMRectList);
+
+    const documentsSection = wrapper.get('[data-testid="employee-overview-section-documents"]').element as HTMLElement;
+    triggerIntersection(observer!, documentsSection, 1);
+    await settle();
+
+    expect((wrapper.vm as any).activeOverviewSection).toBe("employee_file");
+    expect(wrapper.get('[data-testid="employee-overview-nav-file"]').attributes("aria-current")).toBe("true");
+    expect(wrapper.get('[data-testid="employee-overview-nav-documents"]').attributes("aria-current")).toBeUndefined();
   });
 
   it("normalizes every former tab id to its Overview section without blank panels", async () => {

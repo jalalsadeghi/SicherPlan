@@ -221,6 +221,53 @@ describe('useAccessStore', () => {
     expect(store.tabs[2]?.meta?.title).toBe('Markus Neumann');
   });
 
+  it('updates only the targeted employee detail tab title and does not rename the Employees list tab', async () => {
+    const store = useTabbarStore();
+    store.addTab({
+      fullPath: '/admin/employees',
+      key: '/admin/employees',
+      meta: { title: 'Employees' },
+      name: 'SicherPlanEmployees',
+      path: '/admin/employees',
+      query: {},
+    } as any);
+    store.addTab({
+      fullPath: '/admin/employees?employee_id=e1&pageKey=employees:detail:e1&tab=dashboard',
+      key: 'employees:detail:e1',
+      meta: { title: 'Employees' },
+      name: 'SicherPlanEmployees',
+      path: '/admin/employees',
+      query: { employee_id: 'e1', pageKey: 'employees:detail:e1', tab: 'dashboard' },
+    } as any);
+    store.addTab({
+      fullPath: '/admin/employees?employee_id=e2&pageKey=employees:detail:e2&tab=dashboard',
+      key: 'employees:detail:e2',
+      meta: { title: 'Employees' },
+      name: 'SicherPlanEmployees',
+      path: '/admin/employees',
+      query: { employee_id: 'e2', pageKey: 'employees:detail:e2', tab: 'dashboard' },
+    } as any);
+
+    await store.setTabTitle(
+      {
+        key: 'employees:detail:e2',
+        meta: { fullPathKey: false },
+        name: 'SicherPlanEmployees',
+        path: '/admin/employees',
+        query: { employee_id: 'e2', pageKey: 'employees:detail:e2', tab: 'dashboard' },
+      } as any,
+      'Leon Yilmaz',
+    );
+
+    expect(store.tabs[0]?.key).toBe('/admin/employees');
+    expect(store.tabs[0]?.meta?.title).toBe('Employees');
+    expect(store.tabs[0]?.meta?.newTabTitle).toBeUndefined();
+    expect(store.tabs[1]?.key).toBe('employees:detail:e1');
+    expect(store.tabs[1]?.meta?.newTabTitle).toBeUndefined();
+    expect(store.tabs[2]?.key).toBe('employees:detail:e2');
+    expect(store.tabs[2]?.meta?.newTabTitle).toBe('Leon Yilmaz');
+  });
+
   it('keeps default fullPath tab keys for other query-driven routes', () => {
     const store = useTabbarStore();
 
