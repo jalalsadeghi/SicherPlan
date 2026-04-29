@@ -82,6 +82,26 @@ test("customer overview contains contacts, commercial, history, and employee blo
   assert.doesNotMatch(source, /data-testid="customer-overview-section-orders"/);
 });
 
+test("customer overview content sections use the shared overview card wrapper", () => {
+  assert.match(source, /class="module-card customer-admin-tab-panel customer-admin-overview-section customer-admin-overview-section-card"[\s\S]*data-testid="customer-overview-section-master-data"/);
+  assert.match(source, /class="module-card customer-admin-contact-access-section-card customer-admin-overview-section customer-admin-overview-section-card"[\s\S]*data-testid="customer-overview-section-contacts"/);
+  assert.match(source, /class="module-card customer-admin-contact-access-section-card customer-admin-overview-section customer-admin-overview-section-card"[\s\S]*data-testid="customer-overview-section-addresses"/);
+  assert.match(source, /class="module-card customer-admin-contact-access-section-card customer-admin-overview-section customer-admin-overview-section-card"[\s\S]*data-testid="customer-overview-section-portal-access"/);
+  assert.match(source, /class="module-card customer-admin-section customer-admin-overview-section customer-admin-overview-section-card"[\s\S]*data-testid="customer-overview-section-billing-profile"/);
+  assert.match(source, /class="module-card customer-admin-section customer-admin-overview-section customer-admin-overview-section-card"[\s\S]*data-testid="customer-overview-section-invoice-parties"/);
+  assert.match(source, /class="module-card customer-admin-section customer-admin-overview-section customer-admin-overview-section-card"[\s\S]*data-testid="customer-overview-section-rate-cards"/);
+});
+
+test("contacts and commercial overview sections no longer use the old nested content gutter", () => {
+  assert.match(source, /class="customer-admin-overview-section-group"[\s\S]*data-testid="customer-overview-section-contacts-access"/);
+  assert.match(source, /class="customer-admin-overview-section-stack"/);
+  assert.doesNotMatch(source, /customer-admin-contact-access-content--stacked/);
+  assert.match(source, /class="customer-admin-overview-section-group"[\s\S]*data-testid="customer-overview-section-commercial"/);
+  assert.match(source, /\.customer-admin-overview-section-group\s*\{/);
+  assert.match(source, /\.customer-admin-overview-section-stack\s*\{/);
+  assert.match(source, /\.customer-admin-overview-section-card\s*\{/);
+});
+
 test("pricing-rule section visibility still depends on rate-card availability", () => {
   assert.match(source, /customerOverviewSectionVisible\('rate_lines'\) && selectedRateCard/);
   assert.match(source, /customerOverviewSectionVisible\('surcharges'\) && selectedRateCard/);

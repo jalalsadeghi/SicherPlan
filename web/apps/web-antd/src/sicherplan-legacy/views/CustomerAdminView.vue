@@ -420,7 +420,7 @@
 
             <div class="customer-admin-overview-content">
           <section
-            class="customer-admin-tab-panel customer-admin-overview-section"
+            class="module-card customer-admin-tab-panel customer-admin-overview-section customer-admin-overview-section-card"
             data-testid="customer-overview-section-master-data"
             :ref="(element) => setCustomerOverviewSectionRef('master_data', element)"
           >
@@ -603,17 +603,17 @@
             </form>
           </section>
 
-          <section
+          <div
             v-if="selectedCustomer && !isCreatingCustomer"
-            class="customer-admin-section customer-admin-section--contact-access"
+            class="customer-admin-overview-section-group"
             data-testid="customer-overview-section-contacts-access"
             :ref="(element) => setCustomerOverviewSectionRef('contacts', element)"
           >
-              <div class="customer-admin-contact-access-content customer-admin-contact-access-content--stacked">
+              <div class="customer-admin-overview-section-stack">
                 <section
                   id="customer-contacts-access-section-contacts"
                   :ref="(element) => { setCustomerContactAccessSectionRef('contacts', element); setCustomerOverviewSectionRef('contacts', element); }"
-                  class="customer-admin-contact-access-section-card"
+                  class="module-card customer-admin-contact-access-section-card customer-admin-overview-section customer-admin-overview-section-card"
                   data-testid="customer-overview-section-contacts"
                 >
                   <div class="customer-admin-form customer-admin-form--structured">
@@ -677,7 +677,7 @@
                 <section
                   id="customer-contacts-access-section-addresses"
                   :ref="(element) => { setCustomerContactAccessSectionRef('addresses', element); setCustomerOverviewSectionRef('addresses', element); }"
-                  class="customer-admin-contact-access-section-card"
+                  class="module-card customer-admin-contact-access-section-card customer-admin-overview-section customer-admin-overview-section-card"
                   data-testid="customer-overview-section-addresses"
                 >
                   <div class="customer-admin-form customer-admin-form--structured">
@@ -744,7 +744,7 @@
                 <section
                   id="customer-contacts-access-section-portal"
                   :ref="(element) => { setCustomerContactAccessSectionRef('portal', element); setCustomerOverviewSectionRef('portal_access', element); }"
-                  class="customer-admin-contact-access-section-card"
+                  class="module-card customer-admin-contact-access-section-card customer-admin-overview-section customer-admin-overview-section-card"
                   data-testid="customer-overview-section-portal-access"
                 >
                   <div class="customer-admin-form customer-admin-form--structured">
@@ -1241,52 +1241,53 @@
                 </div>
               </section>
             </div>
-          </section>
+          </div>
 
-          <section
+          <div
             v-if="selectedCustomer && !isCreatingCustomer && canReadCommercial"
-            class="customer-admin-section"
+            class="customer-admin-overview-section-group"
             data-testid="customer-overview-section-commercial"
           >
-            <div class="customer-admin-form customer-admin-form--structured">
-            <section class="customer-admin-editor-intro">
-              <div>
-                <p class="eyebrow">{{ t("customerAdmin.commercial.eyebrow") }}</p>
-                <h4>{{ t("customerAdmin.commercial.title") }}</h4>
-              </div>
-              <p class="field-help">{{ t("customerAdmin.commercial.lead") }}</p>
-            </section>
-
-            <div class="customer-admin-summary">
-              <article class="customer-admin-summary__card">
-                <span>{{ t("customerAdmin.commercial.summary.billingProfile") }}</span>
-                <strong>
-                  {{
-                    commercialProfile?.billing_profile
-                      ? commercialProfile.billing_profile.invoice_email || t("customerAdmin.summary.none")
-                      : t("customerAdmin.commercial.summary.missing")
-                  }}
-                </strong>
-              </article>
-              <article class="customer-admin-summary__card">
-                <span>{{ t("customerAdmin.commercial.summary.invoiceParties") }}</span>
-                <strong>{{ commercialProfile?.invoice_parties.length ?? 0 }}</strong>
-              </article>
-              <article class="customer-admin-summary__card">
-                <span>{{ t("customerAdmin.commercial.summary.rateCards") }}</span>
-                <strong>{{ commercialProfile?.rate_cards.length ?? 0 }}</strong>
-              </article>
-              <article class="customer-admin-summary__card">
-                <span>{{ t("customerAdmin.commercial.summary.selectedRateCard") }}</span>
-                <strong>{{ selectedRateCard?.rate_kind || t("customerAdmin.summary.none") }}</strong>
-              </article>
-            </div>
-
             <section
-              class="customer-admin-section"
+              class="module-card customer-admin-section customer-admin-overview-section customer-admin-overview-section-card"
               data-testid="customer-overview-section-billing-profile"
               :ref="(element) => setCustomerOverviewSectionRef('billing_profile', element)"
             >
+              <div class="customer-admin-overview-section-header-stack">
+                <section class="customer-admin-editor-intro">
+                  <div>
+                    <p class="eyebrow">{{ t("customerAdmin.commercial.eyebrow") }}</p>
+                    <h4>{{ t("customerAdmin.commercial.title") }}</h4>
+                  </div>
+                  <p class="field-help">{{ t("customerAdmin.commercial.lead") }}</p>
+                </section>
+
+                <div class="customer-admin-summary">
+                  <article class="customer-admin-summary__card">
+                    <span>{{ t("customerAdmin.commercial.summary.billingProfile") }}</span>
+                    <strong>
+                      {{
+                        commercialProfile?.billing_profile
+                          ? commercialProfile.billing_profile.invoice_email || t("customerAdmin.summary.none")
+                          : t("customerAdmin.commercial.summary.missing")
+                      }}
+                    </strong>
+                  </article>
+                  <article class="customer-admin-summary__card">
+                    <span>{{ t("customerAdmin.commercial.summary.invoiceParties") }}</span>
+                    <strong>{{ commercialProfile?.invoice_parties.length ?? 0 }}</strong>
+                  </article>
+                  <article class="customer-admin-summary__card">
+                    <span>{{ t("customerAdmin.commercial.summary.rateCards") }}</span>
+                    <strong>{{ commercialProfile?.rate_cards.length ?? 0 }}</strong>
+                  </article>
+                  <article class="customer-admin-summary__card">
+                    <span>{{ t("customerAdmin.commercial.summary.selectedRateCard") }}</span>
+                    <strong>{{ selectedRateCard?.rate_kind || t("customerAdmin.summary.none") }}</strong>
+                  </article>
+                </div>
+              </div>
+
               <div class="customer-admin-form-section__header">
                 <div>
                   <p class="eyebrow">{{ t("customerAdmin.commercial.billingEyebrow") }}</p>
@@ -1428,7 +1429,7 @@
             </section>
 
             <section
-              class="customer-admin-section"
+              class="module-card customer-admin-section customer-admin-overview-section customer-admin-overview-section-card"
               data-testid="customer-overview-section-invoice-parties"
               :ref="(element) => setCustomerOverviewSectionRef('invoice_parties', element)"
             >
@@ -1541,15 +1542,15 @@
               </form>
             </section>
 
-            <section
-              class="customer-admin-section"
+            <div
+              class="customer-admin-overview-section-group"
               data-testid="customer-overview-section-pricing-rules"
             >
-              <section
-                class="customer-admin-section"
-                data-testid="customer-overview-section-rate-cards"
-                :ref="(element) => setCustomerOverviewSectionRef('rate_cards', element)"
-              >
+            <section
+              class="module-card customer-admin-section customer-admin-overview-section customer-admin-overview-section-card"
+              data-testid="customer-overview-section-rate-cards"
+              :ref="(element) => setCustomerOverviewSectionRef('rate_cards', element)"
+            >
                 <div class="customer-admin-panel__header">
                   <div>
                     <p class="eyebrow">{{ t("customerAdmin.commercial.rateCardsEyebrow") }}</p>
@@ -1669,7 +1670,7 @@
 
               <section
                 v-if="customerOverviewSectionVisible('rate_lines') && selectedRateCard"
-                class="customer-admin-section"
+                class="module-card customer-admin-section customer-admin-overview-section customer-admin-overview-section-card"
                 data-testid="customer-overview-section-rate-lines"
                 :ref="(element) => setCustomerOverviewSectionRef('rate_lines', element)"
               >
@@ -1888,7 +1889,7 @@
 
               <section
                 v-if="customerOverviewSectionVisible('surcharges') && selectedRateCard"
-                class="customer-admin-section"
+                class="module-card customer-admin-section customer-admin-overview-section customer-admin-overview-section-card"
                 data-testid="customer-overview-section-surcharges"
                 :ref="(element) => setCustomerOverviewSectionRef('surcharges', element)"
               >
@@ -2111,13 +2112,12 @@
                   </div>
                 </form>
               </section>
-            </section>
             </div>
-          </section>
+          </div>
 
           <section
             v-if="selectedCustomer && !isCreatingCustomer"
-            class="customer-admin-section"
+            class="module-card customer-admin-section customer-admin-overview-section customer-admin-overview-section-card"
             data-testid="customer-overview-section-history"
             :ref="(element) => setCustomerOverviewSectionRef('history', element)"
           >
@@ -2195,7 +2195,7 @@
 
           <section
             v-if="selectedCustomer && !isCreatingCustomer"
-            class="customer-admin-section"
+            class="module-card customer-admin-section customer-admin-overview-section customer-admin-overview-section-card"
             data-testid="customer-overview-section-employee-blocks"
             :ref="(element) => setCustomerOverviewSectionRef('employee_blocks', element)"
           >
@@ -6820,6 +6820,16 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.customer-admin-overview-section-group {
+  display: contents;
+}
+
+.customer-admin-overview-section-stack {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
 .customer-admin-overview-section {
   display: grid;
   gap: 1rem;
@@ -6829,6 +6839,17 @@ onBeforeUnmount(() => {
   background: var(--sp-color-surface-card);
   min-width: 0;
   scroll-margin-top: var(--customer-overview-sticky-top, 6.5rem);
+}
+
+.customer-admin-overview-section-card {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.customer-admin-overview-section-header-stack {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
 }
 
 .customer-admin-overview-section .customer-admin-panel__header,
