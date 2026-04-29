@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, is_dataclass
 from functools import lru_cache
 import hashlib
 from importlib import resources
@@ -1650,22 +1650,13 @@ def _has_live_field_lookup_sources(repo_root: Path) -> bool:
 
 
 def _collect_source_hashes(repo_root: Path) -> dict[str, str]:
-    hashes: dict[str, str] = {}
-    for name, path in _required_generation_sources(repo_root).items():
-        if path.is_file():
-            hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
-        elif path.is_dir():
-            digest = hashlib.sha256()
-            for child in _iter_hashable_files(path, repo_root):
-                relative = child.relative_to(repo_root).as_posix()
-                digest.update(relative.encode("utf-8"))
-                digest.update(b"\0")
-                digest.update(hashlib.sha256(child.read_bytes()).digest())
-            hashes[name] = digest.hexdigest()
-    page_help_seed_path = repo_root / "backend/app/modules/assistant/page_help_seed.py"
-    if page_help_seed_path.exists():
-        hashes["page_help_seed"] = hashlib.sha256(page_help_seed_path.read_bytes()).hexdigest()
-    return hashes
+    return {
+        "backend_schema_fields": _semantic_hash(_extract_backend_fields(repo_root)),
+        "locale_labels": _semantic_hash(_extract_locale_labels(repo_root)),
+        "page_help_seed_data": _semantic_hash(_serialize_page_help_seeds()),
+        "typescript_interfaces": _semantic_hash(_extract_typescript_interfaces(repo_root)),
+        "vue_field_bindings": _semantic_hash(_extract_vue_field_bindings(repo_root)),
+    }
 
 
 def _generation_warnings(
@@ -1916,6 +1907,57 @@ def _iter_hashable_files(root: Path, repo_root: Path) -> list[Path]:
         for path in _sorted_rglob(root, "*")
         if path.is_file() and not _is_excluded_hash_path(path, repo_root)
     ]
+
+
+def _semantic_hash(value: Any) -> str:
+    normalized = _normalize_semantic_hash_value(value)
+    payload = json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _normalize_semantic_hash_value(value: Any) -> Any:
+    if is_dataclass(value):
+        return _normalize_semantic_hash_value(value.__dict__)
+    if isinstance(value, dict):
+        return {
+            str(key): _normalize_semantic_hash_value(nested)
+            for key, nested in sorted(value.items(), key=lambda item: str(item[0]))
+        }
+    if isinstance(value, set):
+        return sorted(_normalize_semantic_hash_value(item) for item in value)
+    if isinstance(value, (list, tuple)):
+        return [_normalize_semantic_hash_value(item) for item in value]
+    if isinstance(value, Path):
+        return value.as_posix()
+    return value
+
+
+def _serialize_page_help_seeds() -> list[dict[str, Any]]:
+    payload: list[dict[str, Any]] = []
+    for seed in sorted(
+        ASSISTANT_PAGE_HELP_SEEDS,
+        key=lambda item: (
+            item.page_id,
+            item.language_code or "",
+            item.route_name or "",
+            item.path_template or "",
+            item.module_key,
+        ),
+    ):
+        payload.append(
+            {
+                "language_code": seed.language_code,
+                "manifest_json": seed.manifest_json,
+                "manifest_version": seed.manifest_version,
+                "module_key": seed.module_key,
+                "page_id": seed.page_id,
+                "path_template": seed.path_template,
+                "route_name": seed.route_name,
+                "status": seed.status,
+                "verified_from": seed.verified_from,
+            }
+        )
+    return payload
 
 
 def _repo_root() -> Path:

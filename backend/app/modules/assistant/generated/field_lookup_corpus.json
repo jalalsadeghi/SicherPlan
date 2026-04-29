@@ -45706,11 +45706,10 @@
   ],
   "schema_version": 1,
   "source_hashes": {
-    "backend_modules": "4cdfb3ee738f35719401c2f834bac57e3671f3afb6b42329577ca21fcd6371fa",
-    "de_locale": "8111fa2a83ba15dcbdbe313140dbc958eebec2c493c2f0e6b36d870ad1c76da4",
-    "en_locale": "6c14f8faad1960332cf343e07f9b9f870ea67a7d8e8759cb1da566b3dc1346d7",
-    "frontend_root": "1d1cf687501c990b1ae56d6e48c39b5067803d53272672cc1aebc5ed683c730b",
-    "legacy_messages": "b7e6e29042c0e45e9aa301e659f8859fc0c8e668e8aa0d40abc8bdd39ed66df0",
-    "page_help_seed": "3687a7fa3f888778a6dc8f93a56aa145c256686b68853badf4344ca17f215fd0"
+    "backend_schema_fields": "3ebe39f7d26173ff49abdcc0c1221061fbc4668b59b1b3d5d17c476ad5cb23a0",
+    "locale_labels": "ffef1143342bf31b91cd02ad4c2a485a851fa33b4a345dd180bd5aae42a2adbe",
+    "page_help_seed_data": "f5dfd6a3ee268268020855336f57ba526ec9e245620feda137812602f24aa0de",
+    "typescript_interfaces": "f4c60df1524f976e1f41511a3d113e3bf4cd90c1a9d49bf85c69d97debff89c7",
+    "vue_field_bindings": "8606e1e5527c4a1ca4fbea8c5866b4517bbbfdb2f41f3d2516b4aa899f0e9918"
   }
 }

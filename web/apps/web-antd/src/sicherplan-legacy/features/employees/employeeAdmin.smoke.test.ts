@@ -874,6 +874,86 @@ describe("EmployeeAdminView search dialog regression", () => {
     expect(wrapper.find('[data-testid="employee-tab-panel-dashboard"]').exists()).toBe(true);
   });
 
+  it("opens a direct employee dashboard route with a minimal boot path", async () => {
+    const employeeDeferred = createDeferred<any>();
+    routeState.query = {
+      employee_id: "employee-markus",
+      pageKey: "employees:detail:employee-markus",
+      tab: "dashboard",
+    };
+    apiMocks.getEmployeeMock.mockImplementation(async (_tenantId: string, employeeId: string) => {
+      if (employeeId === "employee-markus") {
+        return employeeDeferred.promise;
+      }
+      return buildEmployeeRead("employee-leon", "P-2001", "Leon", "Yilmaz");
+    });
+
+    const wrapper = await mountEmployeeAdmin();
+
+    expect(wrapper.find('[data-testid="employee-list-only-mode"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="employee-detail-only-mode"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="employee-detail-loading-state"]').exists()).toBe(true);
+    expect(apiMocks.getEmployeeMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listEmployeesMock).not.toHaveBeenCalled();
+    expect(coreAdminMocks.listBranchesMock).not.toHaveBeenCalled();
+    expect(coreAdminMocks.listMandatesMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeNotesMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeDocumentsMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeQualificationsMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeCredentialsMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeAvailabilityRulesMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeAbsencesMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeAddressesMock).not.toHaveBeenCalled();
+    expect(apiMocks.getEmployeePrivateProfileMock).not.toHaveBeenCalled();
+    expect(apiMocks.getEmployeeAccessLinkMock).not.toHaveBeenCalled();
+
+    employeeDeferred.resolve(
+      buildEmployeeRead("employee-markus", "P-2000", "Markus", "Neumann", {
+        work_email: "markus.neumann@example.test",
+      }),
+    );
+    await settle();
+
+    expect(wrapper.find('[data-testid="employee-tab-panel-dashboard"]').exists()).toBe(true);
+    expect(apiMocks.getEmployeeMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listEmployeesMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeNotesMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeAddressesMock).not.toHaveBeenCalled();
+  });
+
+  it("lazy-loads overview data until the overview tab is opened", async () => {
+    routeState.query = {
+      employee_id: "employee-markus",
+      pageKey: "employees:detail:employee-markus",
+      tab: "dashboard",
+    };
+
+    const wrapper = await mountEmployeeAdmin();
+    await settle();
+
+    expect(wrapper.find('[data-testid="employee-tab-panel-dashboard"]').exists()).toBe(true);
+    expect(apiMocks.listEmployeeNotesMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeAddressesMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeDocumentsMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeQualificationsMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeCredentialsMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeAvailabilityRulesMock).not.toHaveBeenCalled();
+    expect(apiMocks.listEmployeeAbsencesMock).not.toHaveBeenCalled();
+    expect(apiMocks.getEmployeePrivateProfileMock).not.toHaveBeenCalled();
+    expect(apiMocks.getEmployeeAccessLinkMock).not.toHaveBeenCalled();
+
+    await wrapper.get('[data-testid="employee-tab-overview"]').trigger("click");
+    await settle();
+
+    expect(wrapper.find('[data-testid="employee-tab-panel-overview"]').exists()).toBe(true);
+    expect(apiMocks.listEmployeeAddressesMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listEmployeeNotesMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listEmployeeDocumentsMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listEmployeeQualificationsMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listEmployeeCredentialsMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listEmployeeAvailabilityRulesMock).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the same pageKey when switching internal employee detail tabs and routes back to the list without pageKey", async () => {
     const wrapper = await mountEmployeeAdmin();
 

@@ -2707,6 +2707,10 @@ const overviewViewportStateByPageKey = reactive<
     }
   >
 >({});
+const employeeDetailCache = new Map<string, EmployeeOperationalRead>();
+const employeeDetailRequests = new Map<string, Promise<EmployeeOperationalRead>>();
+const employeeSectionRequests = new Map<string, Promise<void>>();
+const employeeSectionLoadStateByKey = reactive<Record<string, EmployeeOverviewSectionLoadState>>({});
 const EXTRA_SECTION_NAV_TOP_OFFSET = 25;
 const OVERVIEW_NAV_FLOATING_MIN_WIDTH = 1081;
 const EMPLOYEE_LIST_PHOTO_PRELOAD_CONCURRENCY = 4;
@@ -2771,6 +2775,7 @@ const selectedEmployeeFullName = computed(() =>
 );
 const routeEmployeeId = computed(() => normalizeRouteQueryValue(route.query.employee_id));
 const routeHasSelectedEmployee = computed(() => !!routeEmployeeId.value);
+const routeHasDirectEmployeeDetail = computed(() => isEmployeeDetailQuery(route.query as Record<string, unknown>));
 const routeRequestedDetailTab = computed(() => normalizeRouteQueryValue(route.query.tab) || "dashboard");
 const routeEmployeeDisplayName = ref("");
 const detailWorkspaceTitle = computed(() => {
@@ -3187,8 +3192,11 @@ const visibleEmployeeOverviewSections = computed(() => employeeOverviewSections.
 
 type SelectEmployeeOptions = {
   fallbackTab?: string;
+  forceReload?: boolean;
   preserveActiveTab?: boolean;
 };
+
+type EmployeeOverviewSectionLoadState = Partial<Record<EmployeeOverviewSectionId, boolean>>;
 
 function formatStructureLabel(record: BranchRead | MandateRead) {
   return formatEmployeeStructureLabel(record);
@@ -3234,6 +3242,36 @@ function currentOverviewStateKey() {
     return buildEmployeeDetailPageKey(selectedEmployee.value.id);
   }
   return "";
+}
+
+function employeeDetailCacheKey(employeeId: string) {
+  return `${resolvedTenantScopeId.value ?? ""}:${employeeId}`;
+}
+
+function employeeSectionRequestKey(employeeId: string, sectionId: EmployeeOverviewSectionId) {
+  return `${employeeDetailCacheKey(employeeId)}:${sectionId}`;
+}
+
+function employeeSectionLoadState(employeeId: string) {
+  const key = employeeDetailCacheKey(employeeId);
+  if (!employeeSectionLoadStateByKey[key]) {
+    employeeSectionLoadStateByKey[key] = {};
+  }
+  return employeeSectionLoadStateByKey[key]!;
+}
+
+function resetEmployeeSectionLoadState(employeeId: string) {
+  const key = employeeDetailCacheKey(employeeId);
+  delete employeeSectionLoadStateByKey[key];
+}
+
+function invalidateEmployeeDetailCache(employeeId: string) {
+  const baseKey = employeeDetailCacheKey(employeeId);
+  employeeDetailCache.delete(baseKey);
+  resetEmployeeSectionLoadState(employeeId);
+  Array.from(employeeSectionRequests.keys())
+    .filter((key) => key.startsWith(`${baseKey}:`))
+    .forEach((key) => employeeSectionRequests.delete(key));
 }
 
 function buildEmployeeDetailLocation(employeeId: string, tab = "dashboard") {
@@ -4166,6 +4204,9 @@ async function returnToEmployeeList() {
     query: {},
   });
   await nextTick();
+  if (!employees.value.length) {
+    await refreshEmployees({ autoSelectFirst: false });
+  }
 }
 
 function handleAdminMenuReselect(event: Event) {
@@ -4784,50 +4825,182 @@ async function loadQualificationProofs(qualificationId: string) {
   );
 }
 
+async function loadEmployeeCore(employeeId: string, options: { forceReload?: boolean } = {}) {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken) {
+    throw new Error("employee_core_unavailable");
+  }
+  const cacheKey = employeeDetailCacheKey(employeeId);
+  if (!options.forceReload) {
+    const cached = employeeDetailCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+    const inflight = employeeDetailRequests.get(cacheKey);
+    if (inflight) {
+      return inflight;
+    }
+  }
+  const request = getEmployee(resolvedTenantScopeId.value, employeeId, authStore.accessToken)
+    .then((employee) => {
+      employeeDetailCache.set(cacheKey, employee);
+      return employee;
+    })
+    .finally(() => {
+      if (employeeDetailRequests.get(cacheKey) === request) {
+        employeeDetailRequests.delete(cacheKey);
+      }
+    });
+  employeeDetailRequests.set(cacheKey, request);
+  return request;
+}
+
+async function loadEmployeeOverviewSection(
+  employeeId: string,
+  sectionId: EmployeeOverviewSectionId,
+  options: { forceReload?: boolean } = {},
+) {
+  if (!resolvedTenantScopeId.value || !authStore.accessToken) {
+    return;
+  }
+  const loadState = employeeSectionLoadState(employeeId);
+  if (loadState[sectionId] && !options.forceReload) {
+    return;
+  }
+  const requestKey = employeeSectionRequestKey(employeeId, sectionId);
+  if (!options.forceReload) {
+    const inflight = employeeSectionRequests.get(requestKey);
+    if (inflight) {
+      return inflight;
+    }
+  }
+  const request = (async () => {
+    switch (sectionId) {
+      case "employee_file": {
+        currentPhoto.value = await getEmployeePhoto(resolvedTenantScopeId.value!, employeeId, authStore.accessToken);
+        await refreshPhotoPreview();
+        break;
+      }
+      case "app_access": {
+        accessLink.value = actionState.value.canManageAccess
+          ? await getEmployeeAccessLink(resolvedTenantScopeId.value!, employeeId, authStore.accessToken)
+          : null;
+        break;
+      }
+      case "qualifications": {
+        const [qualifications, functionTypeRows, qualificationTypeRows] = await Promise.all([
+          listEmployeeQualifications(resolvedTenantScopeId.value!, employeeId, authStore.accessToken),
+          functionTypes.value.length ? Promise.resolve(functionTypes.value) : listFunctionTypes(resolvedTenantScopeId.value!, authStore.accessToken),
+          qualificationTypes.value.length ? Promise.resolve(qualificationTypes.value) : listQualificationTypes(resolvedTenantScopeId.value!, authStore.accessToken),
+        ]);
+        employeeQualifications.value = qualifications;
+        functionTypes.value = functionTypeRows;
+        qualificationTypes.value = qualificationTypeRows;
+        Object.keys(qualificationProofsById).forEach((key) => delete qualificationProofsById[key]);
+        const [firstQualification] = qualifications;
+        if (firstQualification) {
+          await loadQualificationProofs(firstQualification.id);
+        }
+        break;
+      }
+      case "credentials": {
+        employeeCredentials.value = await listEmployeeCredentials(resolvedTenantScopeId.value!, employeeId, authStore.accessToken);
+        break;
+      }
+      case "availability": {
+        employeeAvailabilityRules.value = await listEmployeeAvailabilityRules(resolvedTenantScopeId.value!, employeeId, authStore.accessToken);
+        break;
+      }
+      case "private_profile": {
+        if (!canReadPrivate.value) {
+          syncPrivateProfileDraft(null);
+          maritalStatusOptions.value = [];
+          maritalStatusLookupError.value = "";
+          break;
+        }
+        const [privateProfile, maritalOptions] = await Promise.all([
+          getEmployeePrivateProfile(resolvedTenantScopeId.value!, employeeId, authStore.accessToken).catch((error) => {
+            if (error instanceof EmployeeAdminApiError && error.statusCode === 404) {
+              return null;
+            }
+            throw error;
+          }),
+          listEmployeePrivateProfileMaritalStatusOptions(resolvedTenantScopeId.value!, authStore.accessToken).catch(() => {
+            maritalStatusLookupError.value = t("employeeAdmin.privateProfile.maritalStatusLoadError");
+            return [];
+          }),
+        ]);
+        maritalStatusOptions.value = maritalOptions;
+        syncPrivateProfileDraft(privateProfile);
+        break;
+      }
+      case "addresses": {
+        employeeAddresses.value = canReadPrivate.value
+          ? await listEmployeeAddresses(resolvedTenantScopeId.value!, employeeId, authStore.accessToken)
+          : [];
+        break;
+      }
+      case "absences": {
+        employeeAbsences.value = canReadPrivate.value
+          ? await listEmployeeAbsences(resolvedTenantScopeId.value!, employeeId, authStore.accessToken)
+          : [];
+        break;
+      }
+      case "notes": {
+        employeeNotes.value = await listEmployeeNotes(resolvedTenantScopeId.value!, employeeId, authStore.accessToken);
+        break;
+      }
+      case "groups": {
+        employeeGroups.value = await listEmployeeGroups(resolvedTenantScopeId.value!, authStore.accessToken);
+        break;
+      }
+      case "documents": {
+        employeeDocuments.value = await listEmployeeDocuments(resolvedTenantScopeId.value!, employeeId, authStore.accessToken);
+        break;
+      }
+    }
+    loadState[sectionId] = true;
+  })().finally(() => {
+    if (employeeSectionRequests.get(requestKey) === request) {
+      employeeSectionRequests.delete(requestKey);
+    }
+  });
+  employeeSectionRequests.set(requestKey, request);
+  return request;
+}
+
+async function loadEmployeeOverviewBundle(employeeId: string, options: { forceReload?: boolean } = {}) {
+  await Promise.all([
+    loadEmployeeOverviewSection(employeeId, "employee_file", options),
+    loadEmployeeOverviewSection(employeeId, "app_access", options),
+    loadEmployeeOverviewSection(employeeId, "qualifications", options),
+    loadEmployeeOverviewSection(employeeId, "credentials", options),
+    loadEmployeeOverviewSection(employeeId, "availability", options),
+    loadEmployeeOverviewSection(employeeId, "private_profile", options),
+    loadEmployeeOverviewSection(employeeId, "addresses", options),
+    loadEmployeeOverviewSection(employeeId, "absences", options),
+    loadEmployeeOverviewSection(employeeId, "notes", options),
+    loadEmployeeOverviewSection(employeeId, "groups", options),
+    loadEmployeeOverviewSection(employeeId, "documents", options),
+  ]);
+}
+
 async function selectEmployee(employeeId: string, options: SelectEmployeeOptions = {}) {
   if (!resolvedTenantScopeId.value || !authStore.accessToken) {
     return;
   }
-  const { preserveActiveTab = false, fallbackTab = "dashboard" } = options;
+  const { preserveActiveTab = false, fallbackTab = "dashboard", forceReload = preserveActiveTab } = options;
   const desiredTab = preserveActiveTab ? activeDetailTab.value : fallbackTab;
   isCreatingEmployee.value = false;
   selectedEmployeeId.value = employeeId;
   syncRouteEmployeeDisplayName(employeeId);
+  if (forceReload) {
+    invalidateEmployeeDetailCache(employeeId);
+  }
   loading.detail = true;
   try {
-    const [
-      employee,
-      notes,
-      documents,
-      photo,
-      qualifications,
-      credentials,
-      availabilityRules,
-      absencesOrNull,
-    ] = await Promise.all([
-      getEmployee(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
-      listEmployeeNotes(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
-      listEmployeeDocuments(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
-      getEmployeePhoto(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
-      listEmployeeQualifications(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
-      listEmployeeCredentials(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
-      listEmployeeAvailabilityRules(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
-      canReadPrivate.value
-        ? listEmployeeAbsences(resolvedTenantScopeId.value, employeeId, authStore.accessToken)
-        : Promise.resolve(null),
-    ]);
+    const employee = await loadEmployeeCore(employeeId, { forceReload });
     selectedEmployee.value = employee;
     routeEmployeeDisplayName.value = selectedEmployeeFullName.value || formatEmployeeFullName(employee);
-    employeeNotes.value = notes;
-    employeeDocuments.value = documents;
-    employeeQualifications.value = qualifications;
-    employeeCredentials.value = credentials;
-    employeeAvailabilityRules.value = availabilityRules;
-    employeeAbsences.value = absencesOrNull ?? [];
-    currentPhoto.value = photo;
-    accessLink.value = actionState.value.canManageAccess
-      ? await getEmployeeAccessLink(resolvedTenantScopeId.value, employeeId, authStore.accessToken)
-      : null;
     syncEmployeeDraft(employee);
     resetNoteDraft();
     resetMembershipDraft();
@@ -4839,27 +5012,16 @@ async function selectEmployee(employeeId: string, options: SelectEmployeeOptions
     resetEmployeeDocumentDrafts();
     syncPrivateProfileDraft(null);
     resetAccessDrafts();
-    if (canReadPrivate.value) {
-      const [addresses, privateProfile] = await Promise.all([
-        listEmployeeAddresses(resolvedTenantScopeId.value, employeeId, authStore.accessToken),
-        getEmployeePrivateProfile(resolvedTenantScopeId.value, employeeId, authStore.accessToken).catch((error) => {
-          if (error instanceof EmployeeAdminApiError && error.statusCode === 404) {
-            return null;
-          }
-          throw error;
-        }),
-      ]);
-      employeeAddresses.value = addresses;
-      syncPrivateProfileDraft(privateProfile);
-    } else {
-      employeeAddresses.value = [];
-      syncPrivateProfileDraft(null);
-    }
-    Object.keys(qualificationProofsById).forEach((key) => delete qualificationProofsById[key]);
-    const [firstQualification] = qualifications;
-    if (firstQualification) {
-      await loadQualificationProofs(firstQualification.id);
-    }
+    employeeAddresses.value = [];
+    employeeNotes.value = [];
+    employeeQualifications.value = [];
+    employeeCredentials.value = [];
+    employeeAvailabilityRules.value = [];
+    employeeAbsences.value = [];
+    employeeDocuments.value = [];
+    employeeGroups.value = [];
+    currentPhoto.value = null;
+    accessLink.value = null;
     if (legacyEmployeeDetailTabIds.has(desiredTab)) {
       openEmployeeOverviewSection(desiredTab);
     } else if (desiredTab === "profile_photo") {
@@ -4875,7 +5037,11 @@ async function selectEmployee(employeeId: string, options: SelectEmployeeOptions
     if (routeEmployeeId === employeeId) {
       await replaceEmployeeDetailRouteQuery(activeDetailTab.value);
     }
-    await refreshPhotoPreview();
+    if (activeDetailTab.value === "dashboard") {
+      void loadEmployeeOverviewSection(employeeId, "employee_file", { forceReload });
+    } else if (activeDetailTab.value === "overview") {
+      void loadEmployeeOverviewBundle(employeeId, { forceReload });
+    }
   } catch (error) {
     const key = error instanceof EmployeeAdminApiError ? mapEmployeeApiMessage(error.messageKey) : "employeeAdmin.feedback.error";
     setFeedback("error", t("employeeAdmin.feedback.titleError"), t(key as never));
@@ -5970,17 +6136,24 @@ watch(
     canReadPrivate.value,
     visibleEmployeeOverviewSections.value.map((section) => section.id).join("|"),
   ] as const,
-  () => {
+  ([detailTab, selectedEmployeeId]) => {
     disconnectEmployeeOverviewSectionObserver();
     teardownOverviewNavFloating();
     teardownOverviewScrollStateTracking();
-    if (activeDetailTab.value === "overview") {
+    if (detailTab === "overview") {
       void nextTick(() => {
         setupEmployeeOverviewSectionObserver();
         setupOverviewNavFloating();
         setupOverviewScrollStateTracking();
         scheduleOverviewViewportStateRestore();
       });
+    }
+    if (selectedEmployeeId) {
+      if (detailTab === "overview") {
+        void loadEmployeeOverviewBundle(selectedEmployeeId);
+      } else if (detailTab === "dashboard") {
+        void loadEmployeeOverviewSection(selectedEmployeeId, "employee_file");
+      }
     }
   },
   { immediate: true },
@@ -6098,6 +6271,12 @@ onMounted(async () => {
   }
   tenantScopeInput.value = authStore.effectiveTenantScopeId || authStore.tenantScopeId;
   resetEmployeeDraft();
+  if (routeHasDirectEmployeeDetail.value) {
+    if (!selectedEmployee.value && !loading.detail) {
+      await syncEmployeeWorkspaceFromRoute();
+    }
+    return;
+  }
   await refreshEmployees({ autoSelectFirst: false });
   await syncEmployeeWorkspaceFromRoute();
 });
