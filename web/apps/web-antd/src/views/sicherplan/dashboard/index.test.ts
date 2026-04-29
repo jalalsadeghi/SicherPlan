@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
-import { defineComponent, h, reactive } from 'vue';
+import { defineComponent, h, reactive, ref } from 'vue';
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
@@ -114,12 +114,22 @@ const {
   listTenantsMock,
 } = mockState;
 
-vi.mock('@vben/preferences', () => ({
-  preferences: {
-    app: {
-      locale: 'en-US',
+vi.mock('@vben/preferences', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@vben/preferences')>();
+  return {
+    ...actual,
+    preferences: {
+      ...actual.preferences,
+      app: {
+        ...actual.preferences.app,
+        locale: 'en-US',
+      },
     },
-  },
+  };
+});
+
+vi.mock('@vben/layouts', () => ({
+  useIsRouteCachePaneActive: () => ref(true),
 }));
 
 vi.mock('@vben/stores', () => ({

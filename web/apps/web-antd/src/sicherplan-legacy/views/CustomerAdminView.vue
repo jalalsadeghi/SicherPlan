@@ -2405,7 +2405,7 @@ import {
 import {
   useIsRouteCachePaneActive,
   useRouteCacheScrollTarget,
-} from "@vben/layouts/route-cached";
+} from "@vben/layouts";
 import { useI18n } from "@/i18n";
 import { useAuthStore } from "@/stores/auth";
 import { useRoute, useRouter } from "vue-router";

@@ -1301,7 +1301,7 @@ import {
 } from "@/features/planning/planningOrders.helpers.js";
 import { formatPlanningCustomerOption, hasPlanningPermission } from "@/features/planning/planningAdmin.helpers.js";
 import { planningOrdersMessages } from "@/i18n/planningOrders.messages";
-import { useIsRouteCachePaneActive } from "@vben/layouts/route-cached";
+import { useIsRouteCachePaneActive } from "@vben/layouts";
 import { useLocaleStore } from "@/stores/locale";
 import { useAuthStore } from "@/stores/auth";
 

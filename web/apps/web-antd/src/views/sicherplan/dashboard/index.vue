@@ -36,7 +36,7 @@ import {
   coverageTone,
   resolvePlanningStaffingCoverageState,
 } from '#/sicherplan-legacy/features/planning/planningStaffing.helpers';
-import { useIsRouteCachePaneActive } from '@vben/layouts/route-cached';
+import { useIsRouteCachePaneActive } from '@vben/layouts';
 
 defineOptions({ name: 'SicherPlanDashboard' });
 

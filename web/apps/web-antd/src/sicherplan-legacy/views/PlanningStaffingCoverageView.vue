@@ -1247,7 +1247,7 @@ import {
 } from "@/api/planningStaffing";
 import SicherPlanLoadingOverlay from "@/components/SicherPlanLoadingOverlay.vue";
 import { planningStaffingMessages } from "@/i18n/planningStaffing.messages";
-import { useIsRouteCachePaneActive } from "@vben/layouts/route-cached";
+import { useIsRouteCachePaneActive } from "@vben/layouts";
 import {
   listSubcontractorWorkers,
   type SubcontractorWorkerListItem,

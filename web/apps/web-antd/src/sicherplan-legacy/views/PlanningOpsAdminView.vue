@@ -826,7 +826,7 @@ import {
   validatePlanningCreateDraft,
 } from "@/features/planning/planningAdmin.helpers.js";
 import { planningAdminMessages } from "@/i18n/planningAdmin.messages";
-import { useIsRouteCachePaneActive } from "@vben/layouts/route-cached";
+import { useIsRouteCachePaneActive } from "@vben/layouts";
 import { useAuthStore } from "@/stores/auth";
 import { useLocaleStore } from "@/stores/locale";
 
