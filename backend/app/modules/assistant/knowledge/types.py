@@ -31,6 +31,7 @@ SUPPORTED_SOURCE_TYPES = {
     "field_dictionary",
     "lookup_dictionary",
     "status_dictionary",
+    "platform_term_dictionary",
     "form_field_catalog",
     "api_schema_field",
     "frontend_i18n_label",

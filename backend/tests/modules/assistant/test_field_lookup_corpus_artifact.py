@@ -19,6 +19,7 @@ def test_generated_field_lookup_corpus_artifact_exists() -> None:
     assert "frontend_i18n" in payload["generated_from"]
     assert payload["fields"]
     assert payload["lookups"]
+    assert payload["terms"]
 
 
 def test_generated_field_lookup_corpus_contains_known_terms() -> None:
@@ -27,6 +28,7 @@ def test_generated_field_lookup_corpus_contains_known_terms() -> None:
 
     fields = {item.field_key: item for item in corpus.field_definitions}
     lookups = {item.lookup_key: item for item in corpus.lookup_definitions}
+    terms = {item.term_key: item for item in corpus.term_definitions}
 
     assert "customer.contract_reference" in fields
     assert "Vertragsreferenz" in fields["customer.contract_reference"].labels["de"]
@@ -36,3 +38,4 @@ def test_generated_field_lookup_corpus_contains_known_terms() -> None:
     assert "Rechtlicher Name" in fields["customer.legal_name"].labels["de"]
 
     assert "planning.release_state" in lookups
+    assert "planning.staffing.demand_groups" in terms

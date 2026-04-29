@@ -326,6 +326,7 @@ def build_default_tool_registry(
         ExplainLookupOrOptionTool,
         SearchFieldDictionaryTool,
         SearchLookupDictionaryTool,
+        SearchPlatformTermsTool,
     )
     from app.modules.assistant.tools.field_tools import InspectReleasedScheduleVisibilityTool
     from app.modules.assistant.tools.navigation_tools import BuildAllowedLinkTool, SearchAccessiblePagesTool
@@ -349,6 +350,7 @@ def build_default_tool_registry(
     registry.register(GetCurrentPageContextTool())
     registry.register(SearchFieldDictionaryTool())
     registry.register(SearchLookupDictionaryTool())
+    registry.register(SearchPlatformTermsTool())
     registry.register(
         ExplainLookupOrOptionTool(
             customer_repository=customer_repository,

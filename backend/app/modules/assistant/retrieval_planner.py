@@ -8,7 +8,7 @@ from typing import Any
 from app.modules.assistant.classifier import is_product_overview_question
 from app.modules.assistant.diagnostic_prefetch import plan_diagnostic_prefetch
 from app.modules.assistant.diagnostics import is_shift_visibility_question
-from app.modules.assistant.field_dictionary import detect_field_or_lookup_signal
+from app.modules.assistant.field_dictionary import detect_field_or_lookup_signal, detect_platform_term_signal
 from app.modules.assistant.lexicon import expand_assistant_query
 from app.modules.assistant.page_help import detect_ui_howto_intent
 from app.modules.assistant.workflow_help import WORKFLOW_HELP_SEEDS, detect_workflow_intent
@@ -20,6 +20,13 @@ FIELD_HELP_INTENT_CATEGORIES = {
     "form_help_question",
     "column_meaning_question",
     "tab_action_label_question",
+    "platform_term_meaning_question",
+    "ui_label_meaning_question",
+    "domain_concept_question",
+    "section_title_question",
+    "action_label_question",
+    "validation_rule_meaning_question",
+    "status_or_option_meaning_question",
 }
 
 
@@ -129,6 +136,18 @@ def build_retrieval_plan(
         page_id=route_signals.get("page_id"),
         route_name=route_signals.get("route_name"),
     )
+    platform_term_signal = detect_platform_term_signal(
+        message,
+        page_id=route_signals.get("page_id"),
+        route_name=route_signals.get("route_name"),
+    )
+    use_field_lookup_signal = field_lookup_signal is not None
+    if field_lookup_signal is not None and platform_term_signal is not None:
+        if field_lookup_signal.intent_category not in {"lookup_meaning_question", "status_meaning_question"}:
+            field_top_score = field_lookup_signal.field_matches[0].score if field_lookup_signal.field_matches else -1.0
+            term_top_score = platform_term_signal.term_matches[0].score if platform_term_signal.term_matches else -1.0
+            if term_top_score >= field_top_score:
+                use_field_lookup_signal = False
     needs_diagnostics = diagnostic_prefetch is not None or is_shift_visibility_question(message, route_context)
     expanded_query = expand_assistant_query(
         message,
@@ -163,7 +182,7 @@ def build_retrieval_plan(
     if product_overview:
         required_sources.extend(["knowledge_chunks"])
 
-    if field_lookup_signal is not None:
+    if use_field_lookup_signal and field_lookup_signal is not None:
         required_sources.extend(["field_dictionary", "lookup_dictionary", "page_help_manifest", "knowledge_chunks"])
         for match in field_lookup_signal.field_matches[:3]:
             if match.page_id:
@@ -180,6 +199,27 @@ def build_retrieval_plan(
             likely_module_keys.insert(0, _module_key_for_page_id(str(route_signals["page_id"])))
         if field_lookup_signal.intent_category == "form_help_question":
             required_sources.extend(["page_route_catalog"])
+
+    if platform_term_signal is not None:
+        required_sources.extend(
+            [
+                "platform_term_dictionary",
+                "page_help_manifest",
+                "workflow_help",
+                "page_route_catalog",
+                "field_dictionary",
+                "lookup_dictionary",
+                "knowledge_chunks",
+            ]
+        )
+        for match in platform_term_signal.term_matches[:3]:
+            if match.page_id:
+                likely_page_ids.append(match.page_id)
+            if match.module_key:
+                likely_module_keys.append(match.module_key)
+        if route_signals.get("page_id"):
+            likely_page_ids.insert(0, str(route_signals["page_id"]))
+            likely_module_keys.insert(0, _module_key_for_page_id(str(route_signals["page_id"])))
 
     if route_signals.get("customer_context_active") and workflow_intent is not None and workflow_intent.intent == "customer_scoped_order_create":
         likely_page_ids[:0] = ["C-01", "C-02", "P-04"]
@@ -212,8 +252,10 @@ def build_retrieval_plan(
         intent_category = "workflow_how_to"
     elif product_overview:
         intent_category = "product_overview"
-    elif field_lookup_signal is not None:
+    elif use_field_lookup_signal and field_lookup_signal is not None:
         intent_category = field_lookup_signal.intent_category
+    elif platform_term_signal is not None:
+        intent_category = platform_term_signal.intent_category
     elif route_page_id is not None:
         intent_category = "navigation_question"
         required_sources.extend(["page_route_catalog", "knowledge_chunks"])

@@ -276,43 +276,81 @@
           </div>
 
           <template v-if="hasDetailWorkspace">
-          <nav
-            v-if="customerDetailTabs.length"
-            class="customer-admin-tabs customer-admin-tabs--split"
-            aria-label="Customer detail sections"
-            data-testid="customer-detail-tabs"
+          <section
+            ref="customerOverviewOnePageRef"
+            class="customer-admin-overview-layout"
+            data-testid="customer-overview-workspace"
           >
-            <div class="customer-admin-tabs__primary">
-              <button
-                v-for="tab in primaryCustomerDetailTabs"
-                :key="tab.id"
-                type="button"
-                class="customer-admin-tab"
-                :class="{ active: tab.id === activeDetailTab }"
-                :data-testid="`customer-tab-${tab.id}`"
-                @click="selectCustomerDetailTab(tab.id)"
-              >
-                {{ tab.label }}
-              </button>
-            </div>
-            <div class="customer-admin-tabs__secondary">
-              <button
-                v-for="tab in secondaryCustomerDetailTabs"
-                :key="tab.id"
-                type="button"
-                class="customer-admin-tab-link"
-                :class="{ active: tab.id === activeDetailTab }"
-                :aria-current="tab.id === activeDetailTab ? 'page' : undefined"
-                :data-testid="`customer-tab-${tab.id}`"
-                @click="selectCustomerDetailTab(tab.id)"
-              >
-                {{ tab.label }}
-              </button>
-            </div>
-          </nav>
+            <aside class="customer-admin-overview-nav-shell" data-testid="customer-overview-section-nav">
+              <nav class="customer-admin-overview-nav" aria-label="Customer overview sections">
+                <template v-for="sectionGroup in customerOverviewNavGroups" :key="sectionGroup.id">
+                  <button
+                    v-if="sectionGroup.testId"
+                    type="button"
+                    class="customer-admin-overview-nav__link"
+                    :class="{ 'customer-admin-overview-nav__link--active': activeOverviewSection === sectionGroup.id }"
+                    :aria-current="activeOverviewSection === sectionGroup.id ? 'true' : undefined"
+                    :data-testid="sectionGroup.testId"
+                    @click="selectCustomerOverviewSection(sectionGroup.id)"
+                  >
+                    <IconifyIcon class="customer-admin-overview-nav__icon" :icon="sectionGroup.icon" aria-hidden="true" />
+                    <span>{{ t(sectionGroup.labelKey) }}</span>
+                  </button>
+                  <div v-else class="customer-admin-overview-nav__group">
+                    <div class="customer-admin-overview-nav__group-label">
+                      <IconifyIcon class="customer-admin-overview-nav__icon" :icon="sectionGroup.icon" aria-hidden="true" />
+                      <span>{{ t(sectionGroup.labelKey) }}</span>
+                    </div>
+                    <div class="customer-admin-overview-nav__children">
+                      <template v-for="section in sectionGroup.children ?? []" :key="section.id">
+                        <button
+                          v-if="section.testId"
+                          type="button"
+                          class="customer-admin-overview-nav__link customer-admin-overview-nav__link--child"
+                          :class="{ 'customer-admin-overview-nav__link--active': activeOverviewSection === section.id }"
+                          :aria-current="activeOverviewSection === section.id ? 'true' : undefined"
+                          :data-testid="section.testId"
+                          @click="selectCustomerOverviewSection(section.id)"
+                        >
+                          <IconifyIcon class="customer-admin-overview-nav__icon" :icon="section.icon" aria-hidden="true" />
+                          <span>{{ t(section.labelKey) }}</span>
+                        </button>
+                        <div v-else class="customer-admin-overview-nav__group customer-admin-overview-nav__group--nested">
+                          <div class="customer-admin-overview-nav__group-label">
+                            <IconifyIcon class="customer-admin-overview-nav__icon" :icon="section.icon" aria-hidden="true" />
+                            <span>{{ t(section.labelKey) }}</span>
+                          </div>
+                          <div class="customer-admin-overview-nav__children">
+                            <button
+                              v-for="childSection in section.children ?? []"
+                              :key="childSection.id"
+                              type="button"
+                              class="customer-admin-overview-nav__link customer-admin-overview-nav__link--grandchild"
+                              :class="{ 'customer-admin-overview-nav__link--active': activeOverviewSection === childSection.id }"
+                              :aria-current="activeOverviewSection === childSection.id ? 'true' : undefined"
+                              :data-testid="childSection.testId"
+                              @click="selectCustomerOverviewSection(childSection.id)"
+                            >
+                              <IconifyIcon class="customer-admin-overview-nav__icon" :icon="childSection.icon" aria-hidden="true" />
+                              <span>{{ t(childSection.labelKey) }}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </nav>
+            </aside>
 
+            <div class="customer-admin-overview-content">
+          <section
+            class="customer-admin-tab-panel customer-admin-overview-section"
+            data-testid="customer-overview-section-master-data"
+            :ref="(element) => setCustomerOverviewSectionRef('master_data', element)"
+          >
           <CustomerDashboardTab
-            v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'dashboard'"
+            v-if="selectedCustomer && !isCreatingCustomer"
             :access-token="accessToken"
             :can-read-commercial="canReadCommercial"
             :can-write-commercial="canWriteCommercial"
@@ -327,18 +365,6 @@
             @create-invoice-party="handleDashboardCreateInvoiceParty"
             @select-tab="selectCustomerDetailTab"
           />
-
-          <CustomerOrdersTab
-            v-if="selectedCustomer && !isCreatingCustomer && canReadCustomerOrders && activeDetailTab === 'orders'"
-            :access-token="accessToken"
-            :can-start-new-order="canStartCustomerOrderWizard"
-            :customer-id="selectedCustomer.id"
-            :tenant-id="tenantScopeId"
-            @edit-order="handleEditCustomerOrder"
-            @start-new-order="handleStartCustomerNewOrder"
-          />
-
-          <section v-if="activeDetailTab === 'overview'" class="customer-admin-tab-panel" data-testid="customer-tab-panel-overview">
             <div v-if="selectedCustomer && !isCreatingCustomer" class="customer-admin-summary">
             <article class="customer-admin-summary__card">
               <span>{{ t("customerAdmin.summary.primaryContact") }}</span>
@@ -519,48 +545,17 @@
           </section>
 
           <section
-            v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'contact_access'"
+            v-if="selectedCustomer && !isCreatingCustomer"
             class="customer-admin-section customer-admin-section--contact-access"
-            data-testid="customer-tab-panel-contact-access"
+            data-testid="customer-overview-section-contacts-access"
+            :ref="(element) => setCustomerOverviewSectionRef('contacts', element)"
           >
-            <section
-              ref="contactAccessOnePageRef"
-              class="customer-admin-contact-access-onepage"
-              data-testid="customer-contacts-access-layout"
-            >
-              <aside
-                ref="contactAccessNavShellRef"
-                class="customer-admin-contact-access-nav-shell"
-                :class="{
-                  'customer-admin-contact-access-nav-shell--fixed': contactAccessNavFloatingMode === 'fixed',
-                  'customer-admin-contact-access-nav-shell--pinned': contactAccessNavFloatingMode === 'pinned',
-                }"
-                :style="contactAccessNavFloatingStyle"
-                data-testid="customer-contacts-access-nav"
-              >
-                <nav class="customer-admin-contact-access-nav" aria-label="Customer contacts and access sections">
-                  <button
-                    v-for="section in customerContactAccessSections"
-                    :key="section.id"
-                    type="button"
-                    class="customer-admin-contact-access-nav__link"
-                    :class="{ 'customer-admin-contact-access-nav__link--active': section.id === activeContactAccessSection }"
-                    :aria-current="section.id === activeContactAccessSection ? 'true' : undefined"
-                    :data-testid="section.testId"
-                    @click="selectCustomerContactAccessSection(section.id)"
-                  >
-                    <IconifyIcon class="customer-admin-contact-access-nav__icon" :icon="section.icon" aria-hidden="true" />
-                    <span>{{ section.label }}</span>
-                  </button>
-                </nav>
-              </aside>
-
-              <div class="customer-admin-contact-access-content">
+              <div class="customer-admin-contact-access-content customer-admin-contact-access-content--stacked">
                 <section
                   id="customer-contacts-access-section-contacts"
-                  :ref="(element) => setCustomerContactAccessSectionRef('contacts', element)"
+                  :ref="(element) => { setCustomerContactAccessSectionRef('contacts', element); setCustomerOverviewSectionRef('contacts', element); }"
                   class="customer-admin-contact-access-section-card"
-                  data-testid="customer-contacts-access-section-contacts"
+                  data-testid="customer-overview-section-contacts"
                 >
                   <div class="customer-admin-form customer-admin-form--structured">
                     <section class="customer-admin-contact-access-section-card__header">
@@ -622,9 +617,9 @@
 
                 <section
                   id="customer-contacts-access-section-addresses"
-                  :ref="(element) => setCustomerContactAccessSectionRef('addresses', element)"
+                  :ref="(element) => { setCustomerContactAccessSectionRef('addresses', element); setCustomerOverviewSectionRef('addresses', element); }"
                   class="customer-admin-contact-access-section-card"
-                  data-testid="customer-contacts-access-section-addresses"
+                  data-testid="customer-overview-section-addresses"
                 >
                   <div class="customer-admin-form customer-admin-form--structured">
                     <section class="customer-admin-contact-access-section-card__header">
@@ -689,9 +684,9 @@
 
                 <section
                   id="customer-contacts-access-section-portal"
-                  :ref="(element) => setCustomerContactAccessSectionRef('portal', element)"
+                  :ref="(element) => { setCustomerContactAccessSectionRef('portal', element); setCustomerOverviewSectionRef('portal_access', element); }"
                   class="customer-admin-contact-access-section-card"
-                  data-testid="customer-contacts-access-section-portal"
+                  data-testid="customer-overview-section-portal-access"
                 >
                   <div class="customer-admin-form customer-admin-form--structured">
                     <section class="customer-admin-contact-access-section-card__header">
@@ -876,7 +871,6 @@
                   </div>
                 </section>
               </div>
-            </section>
 
             <div
               v-if="contactEditorModalOpen"
@@ -1191,9 +1185,9 @@
           </section>
 
           <section
-            v-if="selectedCustomer && !isCreatingCustomer && canReadCommercial && activeDetailTab === 'commercial'"
+            v-if="selectedCustomer && !isCreatingCustomer && canReadCommercial"
             class="customer-admin-section"
-            data-testid="customer-tab-panel-commercial"
+            data-testid="customer-overview-section-commercial"
           >
             <div class="customer-admin-form customer-admin-form--structured">
             <section class="customer-admin-editor-intro">
@@ -1229,24 +1223,10 @@
               </article>
             </div>
 
-            <nav class="customer-admin-tabs customer-admin-tabs--sub" aria-label="Commercial detail sections" data-testid="customer-commercial-tabs">
-              <button
-                v-for="tab in commercialTabs"
-                :key="tab.id"
-                type="button"
-                class="customer-admin-tab customer-admin-tab--sub"
-                :class="{ active: tab.id === activeCommercialTab }"
-                :data-testid="`customer-commercial-tab-${tab.id}`"
-                @click="activeCommercialTab = tab.id"
-              >
-                {{ tab.label }}
-              </button>
-            </nav>
-
             <section
-              v-if="activeCommercialTab === 'billing_profile'"
               class="customer-admin-section"
-              data-testid="customer-commercial-panel-billing-profile"
+              data-testid="customer-overview-section-billing-profile"
+              :ref="(element) => setCustomerOverviewSectionRef('billing_profile', element)"
             >
               <div class="customer-admin-form-section__header">
                 <div>
@@ -1389,9 +1369,9 @@
             </section>
 
             <section
-              v-if="activeCommercialTab === 'invoice_parties'"
               class="customer-admin-section"
-              data-testid="customer-commercial-panel-invoice-parties"
+              data-testid="customer-overview-section-invoice-parties"
+              :ref="(element) => setCustomerOverviewSectionRef('invoice_parties', element)"
             >
               <div class="customer-admin-form-section__header">
                 <div>
@@ -1503,27 +1483,13 @@
             </section>
 
             <section
-              v-if="activeCommercialTab === 'pricing_rules'"
               class="customer-admin-section"
-              data-testid="customer-commercial-panel-pricing-rules"
+              data-testid="customer-overview-section-pricing-rules"
             >
-              <div class="customer-admin-tabs customer-admin-tabs--sub" data-testid="customer-pricing-rules-tabs">
-                <button
-                  v-for="tab in pricingRulesTabs"
-                  :key="tab.id"
-                  type="button"
-                  class="customer-admin-tab customer-admin-tab--sub"
-                  :class="{ active: tab.id === activePricingRulesTab }"
-                  @click="activePricingRulesTab = tab.id"
-                >
-                  {{ tab.label }}
-                </button>
-              </div>
-
               <section
-                v-if="activePricingRulesTab === 'rate_cards'"
                 class="customer-admin-section"
-                data-testid="customer-pricing-rules-panel-rate-cards"
+                data-testid="customer-overview-section-rate-cards"
+                :ref="(element) => setCustomerOverviewSectionRef('rate_cards', element)"
               >
                 <div class="customer-admin-panel__header">
                   <div>
@@ -1643,9 +1609,10 @@
               </section>
 
               <section
-                v-if="activePricingRulesTab === 'rate_lines' && selectedRateCard"
+                v-if="customerOverviewSectionVisible('rate_lines') && selectedRateCard"
                 class="customer-admin-section"
-                data-testid="customer-pricing-rules-panel-rate-lines"
+                data-testid="customer-overview-section-rate-lines"
+                :ref="(element) => setCustomerOverviewSectionRef('rate_lines', element)"
               >
                 <div class="customer-admin-panel__header">
                   <div>
@@ -1861,9 +1828,10 @@
               </section>
 
               <section
-                v-if="activePricingRulesTab === 'surcharges' && selectedRateCard"
+                v-if="customerOverviewSectionVisible('surcharges') && selectedRateCard"
                 class="customer-admin-section"
-                data-testid="customer-pricing-rules-panel-surcharges"
+                data-testid="customer-overview-section-surcharges"
+                :ref="(element) => setCustomerOverviewSectionRef('surcharges', element)"
               >
                 <div class="customer-admin-panel__header">
                   <div>
@@ -2089,9 +2057,26 @@
           </section>
 
           <section
-            v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'history'"
+            v-if="selectedCustomer && !isCreatingCustomer && canReadCustomerOrders"
             class="customer-admin-section"
-            data-testid="customer-tab-panel-history"
+            data-testid="customer-overview-section-orders"
+            :ref="(element) => setCustomerOverviewSectionRef('orders', element)"
+          >
+            <CustomerOrdersTab
+              :access-token="accessToken"
+              :can-start-new-order="canStartCustomerOrderWizard"
+              :customer-id="selectedCustomer.id"
+              :tenant-id="tenantScopeId"
+              @edit-order="handleEditCustomerOrder"
+              @start-new-order="handleStartCustomerNewOrder"
+            />
+          </section>
+
+          <section
+            v-if="selectedCustomer && !isCreatingCustomer"
+            class="customer-admin-section"
+            data-testid="customer-overview-section-history"
+            :ref="(element) => setCustomerOverviewSectionRef('history', element)"
           >
             <div class="customer-admin-form customer-admin-form--structured">
               <section class="customer-admin-editor-intro">
@@ -2166,9 +2151,10 @@
           </section>
 
           <section
-            v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'employee_blocks'"
+            v-if="selectedCustomer && !isCreatingCustomer"
             class="customer-admin-section"
-            data-testid="customer-tab-panel-employee-blocks"
+            data-testid="customer-overview-section-employee-blocks"
+            :ref="(element) => setCustomerOverviewSectionRef('employee_blocks', element)"
           >
             <div class="customer-admin-form customer-admin-form--structured">
               <section class="customer-admin-editor-intro">
@@ -2248,6 +2234,8 @@
                   </button>
                 </div>
               </form>
+            </div>
+          </section>
             </div>
           </section>
         </template>
@@ -2371,6 +2359,7 @@ import {
   CUSTOMER_COMMERCIAL_TAB_ORDER,
   buildCustomerDetailTabs,
   buildCustomerDraftPayload,
+  buildCustomerOverviewSections,
   buildCustomerReferenceMaps,
   buildLifecyclePayload,
   deriveCustomerActionState,
@@ -2387,6 +2376,7 @@ import {
   resolveCustomerAdminSectionVisibility,
   resolveCustomerAdminSessionScope,
   resolveCustomerCancelSelection,
+  resolveCustomerOverviewSectionId,
 } from "@/features/customers/customerAdmin.helpers.js";
 import {
   EmployeeAdminApiError,
@@ -2463,11 +2453,13 @@ const addressEditorModalOpen = ref(false);
 const addressEditorErrorMessage = ref("");
 const contactAccessOnePageRef = ref<HTMLElement | null>(null);
 const contactAccessNavShellRef = ref<HTMLElement | null>(null);
+const customerOverviewOnePageRef = ref<HTMLElement | null>(null);
 const customerContactAccessSectionRefs = reactive<Record<"addresses" | "contacts" | "portal", HTMLElement | null>>({
   addresses: null,
   contacts: null,
   portal: null,
 });
+const customerOverviewSectionRefs = reactive<Record<string, HTMLElement | null>>({});
 const contactAccessNavFloatingMode = ref<"fixed" | "pinned" | "static">("static");
 const contactAccessNavFloatingStyle = ref<CSSProperties>({});
 const pendingRouteCustomerId = ref("");
@@ -2475,6 +2467,7 @@ const pendingRouteDetailTab = ref("");
 const customerWorkspaceInitialLoadComplete = ref(false);
 const routeCustomerNotFound = ref(false);
 const activeContactAccessSection = ref<CustomerContactAccessSectionId>("contacts");
+const activeOverviewSection = ref("master_data");
 const billingProfileErrorState = reactive<{
   summaryTitle: string;
   summaryBody: string;
@@ -2753,6 +2746,19 @@ type CustomerContactAccessSection = {
   label: string;
   testId: string;
 };
+type CustomerOverviewSectionId =
+  | "master_data"
+  | "contacts"
+  | "addresses"
+  | "portal_access"
+  | "billing_profile"
+  | "invoice_parties"
+  | "rate_cards"
+  | "rate_lines"
+  | "surcharges"
+  | "orders"
+  | "history"
+  | "employee_blocks";
 const CUSTOMER_CONTACT_ACCESS_NAV_TOP_OFFSET = 25;
 const CUSTOMER_CONTACT_ACCESS_NAV_FLOATING_MIN_WIDTH = 1081;
 let customerContactAccessSectionObserver: IntersectionObserver | null = null;
@@ -2780,6 +2786,28 @@ const customerDetailTabs = computed(() =>
     id: tabId,
     label: t(detailTabLabelKeys[tabId as keyof typeof detailTabLabelKeys] as never),
   })),
+);
+const customerOverviewSections = computed(() =>
+  buildCustomerOverviewSections({
+    canReadCommercial: canReadCommercial.value,
+    canReadOrders: canReadCustomerOrders.value,
+    canSeeEmployeeBlocks: !!selectedCustomer.value && !isCreatingCustomer.value,
+    canSeeHistory: !!selectedCustomer.value && !isCreatingCustomer.value,
+    hasRateCards: !!commercialProfile.value?.rate_cards.length,
+    isCreatingCustomer: isCreatingCustomer.value,
+    selectedCustomer: selectedCustomer.value,
+  }),
+);
+const customerOverviewNavGroups = computed(() =>
+  customerOverviewSections.value
+    .filter((section) => section.visible)
+    .map((section) => ({
+      ...section,
+      children: (section.children ?? []).filter((child) => child.visible).map((child) => ({
+        ...child,
+        children: (child.children ?? []).filter((grandchild) => grandchild.visible),
+      })),
+    })),
 );
 const secondaryCustomerDetailTabIds = new Set(["history", "employee_blocks"]);
 const primaryCustomerDetailTabs = computed(() =>
@@ -3005,6 +3033,20 @@ const selectedPortalAccessContact = computed(() =>
 const selectedRateCard = computed(() =>
   commercialProfile.value?.rate_cards.find((row) => row.id === selectedRateCardId.value) ?? null,
 );
+const customerOverviewVisibleSectionIds = computed(() => {
+  const visibleIds: string[] = [];
+  const appendSectionIds = (section) => {
+    if (!section?.visible) {
+      return;
+    }
+    if (section.testId) {
+      visibleIds.push(section.id);
+    }
+    (section.children ?? []).forEach(appendSectionIds);
+  };
+  customerOverviewSections.value.forEach(appendSectionIds);
+  return new Set(visibleIds);
+});
 const pricingRulesTabs = computed(() => {
   const hasRateCards = !!commercialProfile.value?.rate_cards.length;
   const tabIds = hasRateCards ? ["rate_cards", "rate_lines", "surcharges"] : ["rate_cards"];
@@ -3168,6 +3210,111 @@ function buildCustomerDetailTabTarget(customerId: string, detailTab = activeDeta
       tab: detailTab,
     },
   };
+}
+
+function normalizeCustomerOverviewSectionId(sectionId: string): CustomerOverviewSectionId {
+  if (customerOverviewVisibleSectionIds.value.has(sectionId)) {
+    return sectionId as CustomerOverviewSectionId;
+  }
+  return "master_data";
+}
+
+function customerOverviewRouteTabForSection(sectionId: CustomerOverviewSectionId) {
+  switch (sectionId) {
+    case "contacts":
+      return "contacts";
+    case "addresses":
+      return "addresses";
+    case "portal_access":
+      return "portal";
+    case "billing_profile":
+    case "invoice_parties":
+    case "rate_cards":
+    case "rate_lines":
+    case "surcharges":
+      return "commercial";
+    case "orders":
+      return "orders";
+    case "history":
+      return "history";
+    case "employee_blocks":
+      return "employee_blocks";
+    default:
+      return "overview";
+  }
+}
+
+function syncOverviewSectionFromDetailTab(detailTab: string) {
+  const nextSection = normalizeCustomerOverviewSectionId(
+    resolveCustomerOverviewSectionId(detailTab, {
+      hasRateCards: !!commercialProfile.value?.rate_cards.length,
+    }),
+  );
+  activeOverviewSection.value = nextSection;
+  if (nextSection === "contacts" || nextSection === "addresses" || nextSection === "portal_access") {
+    activeContactAccessSection.value = nextSection === "portal_access" ? "portal" : (nextSection as CustomerContactAccessSectionId);
+  }
+  if (nextSection === "billing_profile" || nextSection === "invoice_parties") {
+    activeCommercialTab.value = nextSection;
+  }
+  if (nextSection === "rate_cards" || nextSection === "rate_lines" || nextSection === "surcharges") {
+    activeCommercialTab.value = "pricing_rules";
+    activePricingRulesTab.value = normalizeCustomerPricingRulesTab(nextSection, {
+      hasRateCards: !!commercialProfile.value?.rate_cards.length,
+    });
+  }
+}
+
+function setCustomerOverviewSectionRef(sectionId: string, element: Element | null) {
+  customerOverviewSectionRefs[sectionId] = element instanceof HTMLElement ? element : null;
+}
+
+function resolveCustomerOverviewSectionElement(sectionId: string) {
+  return customerOverviewSectionRefs[sectionId] ?? null;
+}
+
+function scrollToCustomerOverviewSection(sectionId: CustomerOverviewSectionId) {
+  void nextTick(() => {
+    const sectionElement = resolveCustomerOverviewSectionElement(sectionId);
+    if (sectionElement && typeof sectionElement.scrollIntoView === "function") {
+      sectionElement.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  });
+}
+
+function selectCustomerOverviewSection(sectionId: string) {
+  const normalizedSectionId = normalizeCustomerOverviewSectionId(sectionId);
+  activeOverviewSection.value = normalizedSectionId;
+  if (normalizedSectionId === "contacts" || normalizedSectionId === "addresses" || normalizedSectionId === "portal_access") {
+    activeContactAccessSection.value = normalizedSectionId === "portal_access" ? "portal" : (normalizedSectionId as CustomerContactAccessSectionId);
+  }
+  if (normalizedSectionId === "billing_profile" || normalizedSectionId === "invoice_parties") {
+    activeCommercialTab.value = normalizedSectionId;
+  }
+  if (normalizedSectionId === "rate_cards" || normalizedSectionId === "rate_lines" || normalizedSectionId === "surcharges") {
+    activeCommercialTab.value = "pricing_rules";
+    activePricingRulesTab.value = normalizeCustomerPricingRulesTab(normalizedSectionId, {
+      hasRateCards: !!commercialProfile.value?.rate_cards.length,
+    });
+  }
+  if (selectedCustomer.value?.id) {
+    void router.replace({
+      query: {
+        ...route.query,
+        customer_id: selectedCustomer.value.id,
+        pageKey: currentCustomerDetailPageKey() || buildCustomerDetailPageKey(selectedCustomer.value.id),
+        tab: customerOverviewRouteTabForSection(normalizedSectionId),
+      },
+    });
+  }
+  scrollToCustomerOverviewSection(normalizedSectionId);
+}
+
+function customerOverviewSectionVisible(sectionId: string) {
+  return customerOverviewVisibleSectionIds.value.has(sectionId);
 }
 
 async function syncCustomerTopTabTitle() {
@@ -4145,9 +4292,7 @@ function selectCustomerDetailTab(tabId: string) {
     hasSelectedCustomer: !!selectedCustomer.value,
     isCreatingCustomer: isCreatingCustomer.value,
   });
-  if (activeDetailTab.value === "contact_access") {
-    activeContactAccessSection.value = "contacts";
-  }
+  syncOverviewSectionFromDetailTab(tabId);
   if (selectedCustomer.value?.id) {
     const nextQuery = {
       ...route.query,
@@ -4160,7 +4305,7 @@ function selectCustomerDetailTab(tabId: string) {
 }
 
 function openCustomerAddressesTab() {
-  selectCustomerDetailTab("addresses");
+  selectCustomerOverviewSection("addresses");
 }
 
 function editRateCard(rateCard: CustomerRateCardRead) {
@@ -4232,6 +4377,7 @@ function startCreateCustomer() {
   previousSelectedCustomer.value = selectedCustomer.value;
   isCreatingCustomer.value = true;
   activeDetailTab.value = "overview";
+  activeOverviewSection.value = "master_data";
   activeCommercialTab.value = "billing_profile";
   selectedCustomerId.value = "";
   selectedCustomer.value = null;
@@ -4267,17 +4413,20 @@ function startCreateAddress() {
 
 function startCreateInvoiceParty() {
   activeCommercialTab.value = "invoice_parties";
+  activeOverviewSection.value = "invoice_parties";
   resetInvoicePartyDraft();
 }
 
 function handleDashboardCreateContact() {
-  selectCustomerDetailTab("contacts");
+  selectCustomerOverviewSection("contacts");
   startCreateContact();
 }
 
 function handleDashboardCreateInvoiceParty() {
   activeDetailTab.value = "commercial";
+  activeOverviewSection.value = "invoice_parties";
   startCreateInvoiceParty();
+  scrollToCustomerOverviewSection("invoice_parties");
 }
 
 function handleStartCustomerNewOrder() {
@@ -4310,18 +4459,21 @@ function handleEditCustomerOrder(orderId: string) {
 function startCreateRateCard() {
   activeCommercialTab.value = "pricing_rules";
   activePricingRulesTab.value = "rate_cards";
+  activeOverviewSection.value = "rate_cards";
   resetRateCardDraft();
 }
 
 function startCreateRateLine() {
   activeCommercialTab.value = "pricing_rules";
   activePricingRulesTab.value = "rate_lines";
+  activeOverviewSection.value = normalizeCustomerOverviewSectionId("rate_lines");
   resetRateLineDraft();
 }
 
 function startCreateSurchargeRule() {
   activeCommercialTab.value = "pricing_rules";
   activePricingRulesTab.value = "surcharges";
+  activeOverviewSection.value = normalizeCustomerOverviewSectionId("surcharges");
   resetSurchargeRuleDraft();
 }
 
@@ -4331,6 +4483,7 @@ function clearCustomerWorkspace() {
   previousSelectedCustomer.value = null;
   isCreatingCustomer.value = false;
   activeDetailTab.value = "";
+  activeOverviewSection.value = "master_data";
   customerDashboard.value = null;
   customerDashboardError.value = "";
   customerHistory.value = [];
@@ -4498,6 +4651,7 @@ async function selectCustomer(customerId: string, options: SelectCustomerOptions
         hasSelectedCustomer: !!selectedCustomer.value,
         isCreatingCustomer: isCreatingCustomer.value,
       });
+      syncOverviewSectionFromDetailTab(desiredDetailTab);
       activeCommercialTab.value = normalizeCustomerCommercialTab(desiredCommercialTab);
       activePricingRulesTab.value = normalizeCustomerPricingRulesTab(desiredPricingRulesTab, {
         hasRateCards: false,
@@ -4517,6 +4671,7 @@ async function selectCustomer(customerId: string, options: SelectCustomerOptions
         hasSelectedCustomer: !!selectedCustomer.value,
         isCreatingCustomer: isCreatingCustomer.value,
       });
+      syncOverviewSectionFromDetailTab(activeDetailTab.value || options.fallbackDetailTab || "dashboard");
       const preservedCommercialProfile = commercialProfile.value as CustomerCommercialProfileRead | null;
       const preservedRateCards = preservedCommercialProfile ? preservedCommercialProfile.rate_cards : [];
       activeCommercialTab.value = normalizeCustomerCommercialTab(activeCommercialTab.value || options.fallbackCommercialTab || "billing_profile");
@@ -5864,6 +6019,7 @@ watch(
         hasSelectedCustomer: !!selectedCustomer.value,
         isCreatingCustomer: isCreatingCustomer.value,
       });
+      syncOverviewSectionFromDetailTab(nextContext.detailTab || activeDetailTab.value);
       return;
     }
     if (customers.value.some((row) => row.id === nextContext.customerId)) {
@@ -5887,6 +6043,7 @@ watch(
       hasSelectedCustomer: !!selectedCustomer.value,
       isCreatingCustomer: isCreatingCustomer.value,
     });
+    syncOverviewSectionFromDetailTab(normalizeRouteQueryValue(route.query.tab) || activeDetailTab.value);
   },
   { immediate: true },
 );
@@ -5950,6 +6107,9 @@ watch(
         selectedRateCardId.value,
         commercialProfile.value?.rate_cards ?? [],
       );
+    }
+    if (activeOverviewSection.value === "rate_lines" || activeOverviewSection.value === "surcharges") {
+      activeOverviewSection.value = normalizeCustomerOverviewSectionId(activePricingRulesTab.value);
     }
   },
   { immediate: true },

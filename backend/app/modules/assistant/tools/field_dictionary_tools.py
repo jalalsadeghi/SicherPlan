@@ -9,8 +9,10 @@ from pydantic import BaseModel
 from app.modules.assistant.field_dictionary import (
     explain_lookup_query,
     get_lookup_definition,
+    get_platform_term_definition,
     search_field_dictionary,
     search_lookup_dictionary,
+    search_platform_terms,
 )
 from app.modules.assistant.schemas import (
     AssistantFieldDictionaryMatchRead,
@@ -26,6 +28,9 @@ from app.modules.assistant.schemas import (
     AssistantLookupDictionarySearchRead,
     AssistantLookupDictionaryValueRead,
     AssistantMissingPermission,
+    AssistantPlatformTermMatchRead,
+    AssistantPlatformTermSearchInput,
+    AssistantPlatformTermSearchRead,
 )
 from app.modules.assistant.tools import (
     AssistantToolClassification,
@@ -237,6 +242,64 @@ class ExplainLookupOrOptionTool:
         return values, matched_values, "dynamic", None
 
 
+class SearchPlatformTermsTool:
+    def __init__(self) -> None:
+        self.definition = AssistantToolDefinition(
+            name="assistant.search_platform_terms",
+            description="Search verified SicherPlan platform UI terms and domain concepts such as Demand groups.",
+            input_schema=AssistantPlatformTermSearchInput,
+            output_schema=AssistantPlatformTermSearchRead,
+            required_permissions=["assistant.chat.access"],
+            scope_behavior=AssistantToolScopeBehavior.CURRENT_USER,
+            classification=AssistantToolClassification.READ_ONLY,
+        )
+
+    def execute(
+        self,
+        *,
+        input_data: BaseModel,
+        context: AssistantToolExecutionContext,
+    ) -> AssistantToolResult:
+        del context
+        matches = search_platform_terms(
+            query=str(getattr(input_data, "query", "") or ""),
+            language_code=getattr(input_data, "language_code", None),
+            page_id=getattr(input_data, "page_id", None),
+            route_name=getattr(input_data, "route_name", None),
+            limit=int(getattr(input_data, "limit", 5) or 5),
+        )
+        payload = AssistantPlatformTermSearchRead(
+            matches=[
+                AssistantPlatformTermMatchRead(
+                    term_key=item.term_key,
+                    label=item.label,
+                    module_key=item.module_key,
+                    page_id=item.page_id,
+                    concept_type=item.concept_type,
+                    ui_term_type=item.ui_term_type,
+                    definition=item.definition,
+                    ui_contexts=list(getattr(get_platform_term_definition(item.term_key), "ui_contexts", [])),
+                    related_terms=list(getattr(get_platform_term_definition(item.term_key), "related_terms", [])),
+                    confidence=item.confidence,
+                    score=item.score,
+                    source_basis=[
+                        AssistantFieldDictionarySourceBasisRead(
+                            source_type=basis.source_type,
+                            source_name=basis.source_name,
+                            evidence=basis.evidence,
+                            page_id=basis.page_id,
+                            module_key=basis.module_key,
+                        )
+                        for basis in item.source_basis
+                    ],
+                )
+                for item in matches
+            ],
+            ambiguous=_is_ambiguous_platform_term_result(matches),
+            safe_note=None if matches else "No verified platform term matched this query.",
+        ).model_dump(mode="json")
+        return AssistantToolResult(ok=True, tool_name=self.definition.name, data=payload)
+
 class SearchLookupDictionaryTool:
     def __init__(self) -> None:
         self.definition = AssistantToolDefinition(
@@ -312,6 +375,12 @@ def _is_ambiguous_lookup_result(matches) -> bool:  # noqa: ANN001, ANN202
     if len(matches) < 2:
         return False
     return matches[0].score == matches[1].score and matches[0].lookup_key != matches[1].lookup_key
+
+
+def _is_ambiguous_platform_term_result(matches) -> bool:  # noqa: ANN001, ANN202
+    if len(matches) < 2:
+        return False
+    return matches[0].score == matches[1].score and matches[0].term_key != matches[1].term_key
 
 
 def _is_ambiguous_lookup_explanation(matches: list[AssistantLookupExplanationMatchRead]) -> bool:

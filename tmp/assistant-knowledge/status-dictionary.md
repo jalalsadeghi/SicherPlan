@@ -26,9 +26,9 @@
 - entity_type: Customer
 - value_source_kind: tenant_lookup
 - confidence: medium
-- labels_de: Klassifikation
+- labels_de: Klassifizierung
 - labels_en: Classification
-- aliases: classification_lookup_id, Classification, Klassifikation
+- aliases: classification_lookup_id, Classification, Klassifizierung, Klassifikation, طبقه‌بندی, طبقه‌بندی مشتری
 - source_basis:
   - [typescript_api_interface] CustomerReferenceDataRead: CustomerReferenceDataRead exposes tenant-scoped options used for classification_lookup_id.
 
@@ -85,6 +85,72 @@
 - confidence: medium
 - labels_de: Ranking
 - labels_en: Ranking
-- aliases: ranking_lookup_id, Ranking, Ranking
+- aliases: ranking_lookup_id, Ranking, Ranking, رتبه‌بندی
 - source_basis:
   - [typescript_api_interface] CustomerReferenceDataRead: CustomerReferenceDataRead exposes tenant-scoped options used for ranking_lookup_id.
+
+## planning.customer_visible_flag
+
+- module_key: planning
+- page_id: P-03
+- entity_type: ShiftPlan
+- value_source_kind: static
+- confidence: medium
+- labels_de: Kunde sichtbar
+- labels_en: Customer visible
+- aliases: customer visible, kunde sichtbar, customer visibility, قابل مشاهده برای مشتری
+- values:
+  - true: de=Sichtbar | en=Visible
+  - false: de=Nicht sichtbar | en=Not visible
+- source_basis:
+  - [backend_schema] Planning visibility flags: Planning read models expose customer visibility as an explicit boolean release flag.
+
+## planning.employee_visible
+
+- module_key: planning
+- page_id: P-03
+- entity_type: Shift
+- value_source_kind: static
+- confidence: medium
+- labels_de: Mitarbeiter sichtbar
+- labels_en: Employee visible
+- aliases: employee visible, mitarbeiter sichtbar, employee app visible, app visible, قابل مشاهده برای کارمند
+- values:
+  - true: de=Sichtbar | en=Visible
+  - false: de=Nicht sichtbar | en=Not visible
+- source_basis:
+  - [backend_schema] Planning shift read model: Planning shift read schemas expose employee_visible as the employee-app visibility result for a shift.
+
+## planning.release_state
+
+- module_key: planning
+- page_id: P-03
+- entity_type: ShiftPlan
+- value_source_kind: static
+- confidence: medium
+- labels_de: Freigabestatus
+- labels_en: Release status
+- aliases: release state, release status, freigabestatus, release_ready, released, draft, وضعیت انتشار
+- values:
+  - draft: de=Entwurf | en=Draft
+  - release_ready: de=Freigabereif | en=Release ready
+  - released: de=Freigegeben | en=Released
+- source_basis:
+  - [backend_schema] Planning release state catalog: Planning services and schemas use draft, release_ready, and released as the verified release-state values.
+
+## planning.workforce_scope_code
+
+- module_key: planning
+- page_id: P-03
+- entity_type: ShiftPlan
+- value_source_kind: static
+- confidence: medium
+- labels_de: Einsatzkraefte-Scope
+- labels_en: Workforce scope
+- aliases: workforce scope, scope, mixed, internal, subcontractor, einsatzkraefte-scope, نوع پوشش نیرو
+- values:
+  - internal: de=Intern | en=Internal
+  - subcontractor: de=Subunternehmer | en=Subcontractor
+  - mixed: de=Gemischt | en=Mixed
+- source_basis:
+  - [backend_schema] Planning models: Planning models constrain workforce_scope_code to internal, subcontractor, or mixed.

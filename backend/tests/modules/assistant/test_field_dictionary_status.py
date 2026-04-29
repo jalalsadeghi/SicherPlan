@@ -10,4 +10,5 @@ def test_field_dictionary_status_reports_packaged_artifact() -> None:
     assert status.artifact_version == "1"
     assert status.field_count > 0
     assert status.lookup_count > 0
+    assert status.term_count > 0
     assert status.counts_by_module.get("customers", 0) > 0

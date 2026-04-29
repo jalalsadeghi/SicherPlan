@@ -106,6 +106,22 @@ def test_system_prompt_contains_same_language_rule() -> None:
     assert "Keep technical SicherPlan platform terms unchanged" in prompt.system_instructions
 
 
+def test_system_prompt_contains_platform_term_guidance() -> None:
+    prompt = build_assistant_prompt(
+        user_message="was bedeutet Demand groups",
+        detected_language="de",
+        response_language="de",
+        auth_context=_auth_summary(),
+        route_context={"page_id": "P-04", "path": "/admin/planning-staffing"},
+        knowledge_chunks=[],
+        available_tools=[],
+        conversation_messages=[],
+    )
+
+    assert "known UI term, section title, action label, validation label, or platform concept" in prompt.system_instructions
+    assert "Use the platform term corpus together with related workflow, page-help, field, and lookup facts" in prompt.system_instructions
+
+
 def test_system_prompt_contains_no_inaccessible_record_existence_rule() -> None:
     prompt = build_assistant_prompt(
         user_message="Is there a hidden payroll record?",

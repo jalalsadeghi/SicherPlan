@@ -47,6 +47,7 @@ class AssistantFieldDictionaryStatusRead(BaseModel):
     artifact_version: str | None = None
     field_count: int
     lookup_count: int
+    term_count: int = 0
     counts_by_module: dict[str, int] = Field(default_factory=dict)
 
 
@@ -556,6 +557,35 @@ class AssistantFieldDictionaryMatchRead(BaseModel):
 
 class AssistantFieldDictionarySearchRead(BaseModel):
     matches: list[AssistantFieldDictionaryMatchRead] = Field(default_factory=list)
+    ambiguous: bool = False
+    safe_note: str | None = None
+
+
+class AssistantPlatformTermSearchInput(BaseModel):
+    query: str = Field(min_length=1, max_length=160)
+    language_code: str | None = Field(default=None, max_length=16)
+    page_id: str | None = Field(default=None, max_length=120)
+    route_name: str | None = Field(default=None, max_length=255)
+    limit: int = Field(default=5, ge=1, le=10)
+
+
+class AssistantPlatformTermMatchRead(BaseModel):
+    term_key: str
+    label: str
+    module_key: str | None = None
+    page_id: str | None = None
+    concept_type: str
+    ui_term_type: str
+    definition: str | None = None
+    ui_contexts: list[str] = Field(default_factory=list)
+    related_terms: list[str] = Field(default_factory=list)
+    confidence: str
+    score: float
+    source_basis: list[AssistantFieldDictionarySourceBasisRead] = Field(default_factory=list)
+
+
+class AssistantPlatformTermSearchRead(BaseModel):
+    matches: list[AssistantPlatformTermMatchRead] = Field(default_factory=list)
     ambiguous: bool = False
     safe_note: str | None = None
 

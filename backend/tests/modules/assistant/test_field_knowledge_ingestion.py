@@ -21,6 +21,7 @@ def test_default_registrations_include_field_and_lookup_corpus() -> None:
     assert {
         "field_dictionary",
         "lookup_dictionary",
+        "platform_term_dictionary",
         "status_dictionary",
         "form_field_catalog",
         "frontend_i18n_label",
@@ -33,7 +34,7 @@ def test_field_dictionary_ingestion_creates_content_bearing_chunks() -> None:
     registrations = [
         item
         for item in build_default_knowledge_registrations(repo_root)
-        if item.source_type in {"field_dictionary", "lookup_dictionary"}
+        if item.source_type in {"field_dictionary", "lookup_dictionary", "platform_term_dictionary"}
     ]
     repository = InMemoryKnowledgeRepository()
     service = AssistantKnowledgeIngestionService(
@@ -48,3 +49,7 @@ def test_field_dictionary_ingestion_creates_content_bearing_chunks() -> None:
     field_chunks = repository.chunks_by_path[str(Path(field_path).resolve())]
     assert field_chunks
     assert any("Rechtlicher Name" in str(chunk["content"]) for chunk in field_chunks)
+    term_path = next(item.source_path for item in registrations if item.source_type == "platform_term_dictionary")
+    term_chunks = repository.chunks_by_path[str(Path(term_path).resolve())]
+    assert term_chunks
+    assert any("Demand groups" in str(chunk["content"]) for chunk in term_chunks)

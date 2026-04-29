@@ -223,6 +223,7 @@ def test_service_lists_only_currently_allowed_default_tools() -> None:
         "assistant.search_accessible_pages",
         "assistant.search_field_dictionary",
         "assistant.search_lookup_dictionary",
+        "assistant.search_platform_terms",
         "assistant.search_workflow_help",
         "navigation.build_allowed_link",
     ]

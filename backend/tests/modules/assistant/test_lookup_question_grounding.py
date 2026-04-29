@@ -120,7 +120,9 @@ def test_lookup_question_attaches_dynamic_lookup_grounding_to_provider() -> None
     assert grounding["retrieval_plan"]["intent_category"] == "lookup_meaning_question"
     lookup_sources = [item for item in grounding["sources"] if item["source_type"] == "lookup_dictionary"]
     assert lookup_sources
-    first = lookup_sources[0]
+    first = next(
+        item for item in lookup_sources if isinstance(item.get("facts"), dict) and item["facts"].get("value_resolution") == "dynamic"
+    )
     assert first["source_name"] == "customer.classification_lookup_id"
     matched_values = first["facts"].get("matched_values") or []
     assert first["facts"]["value_resolution"] == "dynamic"

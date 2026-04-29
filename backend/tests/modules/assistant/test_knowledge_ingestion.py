@@ -193,6 +193,7 @@ def test_default_registrations_include_generated_corpus_seed_types(tmp_path: Pat
         "expert_knowledge_pack",
         "field_dictionary",
         "lookup_dictionary",
+        "platform_term_dictionary",
         "status_dictionary",
         "form_field_catalog",
         "frontend_i18n_label",

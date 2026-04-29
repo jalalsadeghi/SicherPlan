@@ -397,6 +397,7 @@ def _dedupe_list(values: list[str]) -> list[str]:
 
 def _source_type_boost(source_type: str) -> float:
     boosts = {
+        "platform_term_dictionary": 9.75,
         "field_dictionary": 9.5,
         "lookup_dictionary": 9.0,
         "status_dictionary": 8.5,

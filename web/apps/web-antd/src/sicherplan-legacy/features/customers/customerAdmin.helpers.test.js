@@ -4,8 +4,10 @@ import assert from "node:assert/strict";
 import {
   buildCustomerCommercialLocation,
   CUSTOMER_COMMERCIAL_TAB_ORDER,
+  CUSTOMER_OVERVIEW_SECTION_ORDER,
   CUSTOMER_PRICING_RULES_TAB_ORDER,
   buildCustomerDetailTabs,
+  buildCustomerOverviewSections,
   buildCustomerPricingRulesTabs,
   buildLifecyclePayload,
   buildCustomerDraftPayload,
@@ -20,12 +22,32 @@ import {
   normalizeCustomerCommercialTab,
   normalizeCustomerDetailTab,
   normalizeCustomerPricingRulesTab,
+  resolveCustomerOverviewSectionId,
   resolveCustomerSelectedRateCardId,
   resolveCustomerAdminRouteContext,
   resolveCustomerAdminSectionVisibility,
   resolveCustomerAdminSessionScope,
   resolveCustomerCancelSelection,
 } from "./customerAdmin.helpers.js";
+
+function expectVisibleSectionIds(sectionTree, expectedIds) {
+  const visibleIds = [];
+  const visit = (node) => {
+    if (!node?.visible) {
+      return;
+    }
+    if (node.testId) {
+      visibleIds.push(node.id);
+    }
+    for (const child of node.children ?? []) {
+      visit(child);
+    }
+  };
+  for (const node of sectionTree) {
+    visit(node);
+  }
+  assert.deepEqual(visibleIds, expectedIds);
+}
 
 test("tenant admin has read and write permissions", () => {
   assert.equal(hasCustomerPermission("tenant_admin", "customers.customer.read"), true);
@@ -332,6 +354,69 @@ test("customer detail tab state falls back to dashboard for existing customers a
   );
 });
 
+test("customer overview section registry respects create mode, permissions, and rate-card gating", () => {
+  const createModeSections = buildCustomerOverviewSections({
+    canReadCommercial: true,
+    canReadOrders: true,
+    canSeeEmployeeBlocks: true,
+    canSeeHistory: true,
+    hasRateCards: true,
+    isCreatingCustomer: true,
+    selectedCustomer: null,
+  });
+  expectVisibleSectionIds(createModeSections, ["master_data"]);
+
+  const detailSections = buildCustomerOverviewSections({
+    canReadCommercial: true,
+    canReadOrders: true,
+    canSeeEmployeeBlocks: true,
+    canSeeHistory: true,
+    hasRateCards: false,
+    isCreatingCustomer: false,
+    selectedCustomer: { id: "customer-1" },
+  });
+  expectVisibleSectionIds(detailSections, [
+    "master_data",
+    "contacts",
+    "addresses",
+    "portal_access",
+    "billing_profile",
+    "invoice_parties",
+    "rate_cards",
+    "orders",
+    "history",
+    "employee_blocks",
+  ]);
+  assert.deepEqual(CUSTOMER_OVERVIEW_SECTION_ORDER, [
+    "master_data",
+    "contacts",
+    "addresses",
+    "portal_access",
+    "billing_profile",
+    "invoice_parties",
+    "rate_cards",
+    "rate_lines",
+    "surcharges",
+    "orders",
+    "history",
+    "employee_blocks",
+  ]);
+});
+
+test("customer overview section resolver maps legacy route tabs into unified overview sections", () => {
+  assert.equal(resolveCustomerOverviewSectionId("dashboard"), "master_data");
+  assert.equal(resolveCustomerOverviewSectionId("overview"), "master_data");
+  assert.equal(resolveCustomerOverviewSectionId("contacts"), "contacts");
+  assert.equal(resolveCustomerOverviewSectionId("addresses"), "addresses");
+  assert.equal(resolveCustomerOverviewSectionId("portal"), "portal_access");
+  assert.equal(resolveCustomerOverviewSectionId("commercial"), "billing_profile");
+  assert.equal(resolveCustomerOverviewSectionId("plans"), "orders");
+  assert.equal(resolveCustomerOverviewSectionId("orders"), "orders");
+  assert.equal(resolveCustomerOverviewSectionId("history"), "history");
+  assert.equal(resolveCustomerOverviewSectionId("employee_blocks"), "employee_blocks");
+  assert.equal(resolveCustomerOverviewSectionId("rate_lines", { hasRateCards: false }), "rate_cards");
+});
+
 test("commercial subtab state falls back to billing profile", () => {
   assert.deepEqual(CUSTOMER_COMMERCIAL_TAB_ORDER, [
     "billing_profile",
@@ -370,7 +455,7 @@ test("pricing-rules subtab state and selected rate card fall back safely", () =>
 test("customer admin route context extracts customer deep-link state", () => {
   assert.deepEqual(
     resolveCustomerAdminRouteContext({ customer_id: "customer-1", tab: "plans" }),
-    { customerId: "customer-1", detailTab: "orders" },
+    { customerId: "customer-1", detailTab: "plans" },
   );
   assert.deepEqual(
     resolveCustomerAdminRouteContext({ customer_id: ["customer-1"], tab: null }),

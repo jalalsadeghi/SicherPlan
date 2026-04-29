@@ -110,6 +110,16 @@ from app.modules.iam.authz import RequestAuthorizationContext
 
 logger = logging.getLogger(__name__)
 
+_PLATFORM_TERM_INTENT_CATEGORIES = {
+    "platform_term_meaning_question",
+    "ui_label_meaning_question",
+    "domain_concept_question",
+    "section_title_question",
+    "action_label_question",
+    "validation_rule_meaning_question",
+    "status_or_option_meaning_question",
+}
+
 _PAGE_ID_PATTERN = re.compile(r"\b[A-Z]{1,4}-\d{2}\b")
 _PAGE_ID_SUFFIX_PATTERN_TEMPLATE = r"(?P<label>{label})\s*(?:\(\s*{page_id}\s*\)|[-–—]\s*{page_id})"
 _WHITESPACE_BEFORE_PUNCTUATION_PATTERN = re.compile(r"\s+([,.;:!?])")
@@ -1135,6 +1145,80 @@ class AssistantService:
                 sources.extend(self._grounding_sources_from_tool_result("workflow", workflow_result))
 
             if plan.intent_category in FIELD_HELP_INTENT_CATEGORIES:
+                platform_term_result = self.execute_registered_tool(
+                    tool_name="assistant.search_platform_terms",
+                    input_data={
+                        "query": cleaned_message,
+                        "language_code": response_language,
+                        "page_id": route_context.get("page_id") if isinstance(route_context, dict) else None,
+                        "route_name": route_context.get("route_name") if isinstance(route_context, dict) else None,
+                        "limit": 5,
+                    },
+                    actor=actor,
+                    conversation_id=conversation.id,
+                )
+                summaries.append(self._tool_result_to_summary(platform_term_result))
+                sources.extend(self._grounding_sources_from_tool_result("platform_term_dictionary", platform_term_result))
+                top_platform_term = self._top_platform_term_match(platform_term_result.data)
+                if top_platform_term is not None:
+                    workflow_result = self.execute_registered_tool(
+                        tool_name="assistant.search_workflow_help",
+                        input_data={
+                            "query": self._platform_term_workflow_query(top_platform_term),
+                            "language_code": response_language,
+                            "workflow_key": self._platform_term_workflow_key(top_platform_term),
+                            "limit": 3,
+                        },
+                        actor=actor,
+                        conversation_id=conversation.id,
+                    )
+                    summaries.append(self._tool_result_to_summary(workflow_result))
+                    sources.extend(self._grounding_sources_from_tool_result("workflow", workflow_result))
+
+                    for related_query in self._platform_term_related_queries(top_platform_term):
+                        related_field_result = self.execute_registered_tool(
+                            tool_name="assistant.search_field_dictionary",
+                            input_data={
+                                "query": related_query,
+                                "language_code": response_language,
+                                "page_id": top_platform_term.get("page_id"),
+                                "route_name": route_context.get("route_name") if isinstance(route_context, dict) else None,
+                                "limit": 2,
+                            },
+                            actor=actor,
+                            conversation_id=conversation.id,
+                        )
+                        summaries.append(self._tool_result_to_summary(related_field_result))
+                        sources.extend(self._grounding_sources_from_tool_result("field_dictionary", related_field_result))
+
+                        related_lookup_result = self.execute_registered_tool(
+                            tool_name="assistant.search_lookup_dictionary",
+                            input_data={
+                                "query": related_query,
+                                "language_code": response_language,
+                                "page_id": top_platform_term.get("page_id"),
+                                "route_name": route_context.get("route_name") if isinstance(route_context, dict) else None,
+                                "limit": 2,
+                            },
+                            actor=actor,
+                            conversation_id=conversation.id,
+                        )
+                        summaries.append(self._tool_result_to_summary(related_lookup_result))
+                        sources.extend(self._grounding_sources_from_tool_result("lookup_dictionary", related_lookup_result))
+
+                    term_page_id = str(top_platform_term.get("page_id") or "").strip() or None
+                    if term_page_id is not None:
+                        sources.extend(
+                            self._build_navigation_sources_for_page(
+                                conversation=conversation,
+                                actor=actor,
+                                page_id=term_page_id,
+                                entity_context=None,
+                                response_language=response_language,
+                                link_kind=self._platform_term_link_kind(term_page_id),
+                            )
+                        )
+
                 field_result = self.execute_registered_tool(
                     tool_name="assistant.search_field_dictionary",
                     input_data={
@@ -1809,7 +1893,9 @@ class AssistantService:
         if intent_category == "ui_action_question":
             guaranteed.append("page_help_manifest")
         if intent_category in FIELD_HELP_INTENT_CATEGORIES:
-            guaranteed.extend(["field_dictionary", "lookup_dictionary", "page_help_manifest"])
+            guaranteed.extend(["platform_term_dictionary", "field_dictionary", "lookup_dictionary", "page_help_manifest"])
+        if intent_category in _PLATFORM_TERM_INTENT_CATEGORIES:
+            guaranteed.append("workflow")
         return guaranteed
 
     def _rank_grounding_source(
@@ -1866,12 +1952,18 @@ class AssistantService:
         if intent_category in FIELD_HELP_INTENT_CATEGORIES and source.source_type == "field_dictionary":
             score += 20.0
             reasons.append("field dictionary definition")
+        if intent_category in FIELD_HELP_INTENT_CATEGORIES and source.source_type == "platform_term_dictionary":
+            score += 22.0
+            reasons.append("platform term definition")
         if intent_category in FIELD_HELP_INTENT_CATEGORIES and source.source_type == "lookup_dictionary":
             score += 18.0
             reasons.append("lookup dictionary definition")
         if intent_category in FIELD_HELP_INTENT_CATEGORIES and source.source_type == "page_help_manifest":
             score += 10.0
             reasons.append("page-help field context")
+        if intent_category in _PLATFORM_TERM_INTENT_CATEGORIES and source.source_type == "workflow":
+            score += 14.0
+            reasons.append("workflow context for platform term")
         if intent_category == "operational_diagnostic" and source.source_type in {"diagnostic_fact", "tool_result_summary", "diagnostic"}:
             score += 22.0
             reasons.append("diagnostic prefetch evidence")
@@ -2293,6 +2385,7 @@ class AssistantService:
         duplicate_grounding_tools = {
             "assistant.search_accessible_pages",
             "assistant.get_page_help_manifest",
+            "assistant.search_platform_terms",
             "assistant.search_field_dictionary",
             "assistant.search_lookup_dictionary",
             "assistant.explain_lookup_or_option",
@@ -2408,10 +2501,12 @@ class AssistantService:
         ]
         protected_source_ids: set[str | None] = set()
         for protected_type in (
+            "allowed_navigation_link",
             "ui_action",
             "diagnostic",
             "diagnostic_fact",
             "workflow",
+            "platform_term_dictionary",
             "field_dictionary",
             "lookup_dictionary",
             "page_help_manifest",
@@ -2776,6 +2871,61 @@ class AssistantService:
         ]
 
     @staticmethod
+    def _top_platform_term_match(payload: Any) -> dict[str, Any] | None:
+        if not isinstance(payload, dict):
+            return None
+        matches = payload.get("matches")
+        if not isinstance(matches, list):
+            return None
+        for row in matches:
+            if isinstance(row, dict):
+                return row
+        return None
+
+    @staticmethod
+    def _platform_term_related_queries(match: dict[str, Any]) -> list[str]:
+        related = match.get("related_terms")
+        if not isinstance(related, list):
+            return []
+        result: list[str] = []
+        seen: set[str] = set()
+        for item in related:
+            cleaned = str(item or "").strip()
+            if not cleaned:
+                continue
+            normalized = cleaned.casefold()
+            if normalized in {"assignment", "staffing actions"}:
+                continue
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            result.append(cleaned)
+            if len(result) >= 5:
+                break
+        return result
+
+    @staticmethod
+    def _platform_term_workflow_key(match: dict[str, Any]) -> str | None:
+        page_id = str(match.get("page_id") or "").strip()
+        if page_id == "P-04":
+            return "employee_assign_to_shift"
+        return None
+
+    @staticmethod
+    def _platform_term_workflow_query(match: dict[str, Any]) -> str:
+        label = str(match.get("label") or match.get("term_key") or "platform term").strip()
+        page_id = str(match.get("page_id") or "").strip()
+        if page_id == "P-04":
+            return f"{label} staffing assignment"
+        return label
+
+    @staticmethod
+    def _platform_term_link_kind(page_id: str) -> str:
+        if page_id == "P-04":
+            return "platform_term_staffing_coverage"
+        return "platform_term_workspace"
+
+    @staticmethod
     def _can_use_route_customer_id(
         *,
         actor: RequestAuthorizationContext,
@@ -2811,6 +2961,16 @@ class AssistantService:
                 "fa": "Staffing Coverage",
                 "default": "Staffing Coverage",
             },
+            "platform_term_staffing_coverage": {
+                "de": "Staffing Coverage",
+                "fa": "Staffing Coverage",
+                "default": "Staffing Coverage",
+            },
+            "platform_term_workspace": {
+                "de": "Relevanter Workspace",
+                "fa": "Relevant workspace",
+                "default": "Relevant workspace",
+            },
         }
         bucket = labels.get(link_kind, {})
         if language.startswith("de"):
@@ -2837,6 +2997,16 @@ class AssistantService:
                 "de": "Staffing-Coverage-Übergabe aus dem Order-Workspace-Kontext.",
                 "fa": "مسیر Staffing Coverage از زمینه order workspace تایید شد.",
                 "default": "Staffing Coverage handoff verified from the customer order workspace context.",
+            },
+            "platform_term_staffing_coverage": {
+                "de": "Staffing Coverage ist der relevante Workspace fuer diesen Begriff. Dort muss eine Schicht ausgewaehlt werden, um Demand Groups zu sehen oder anzulegen.",
+                "fa": "Staffing Coverage فضای مرتبط با این اصطلاح است. برای دیدن یا ایجاد Demand Groups باید یک شیفت انتخاب شود.",
+                "default": "Staffing Coverage is the relevant workspace for this term. A shift must be selected there to view or create Demand Groups.",
+            },
+            "platform_term_workspace": {
+                "de": "Relevanter Workspace fuer diesen Begriff.",
+                "fa": "فضای مرتبط با این اصطلاح.",
+                "default": "Relevant workspace for this term.",
             },
         }
         bucket = reasons.get(link_kind, {})
@@ -3295,6 +3465,27 @@ class AssistantService:
                         source_id=f"field_dictionary:{match.get('field_key') or 'unknown'}",
                         source_type="field_dictionary",
                         source_name=match.get("field_key"),
+                        page_id=match.get("page_id"),
+                        module_key=match.get("module_key"),
+                        title=match.get("label"),
+                        content=match.get("definition"),
+                        facts=match,
+                        score=float(match.get("score") or 0.0),
+                        verified=True,
+                        permission_checked=True,
+                    )
+                )
+            return sources
+
+        if source_type == "platform_term_dictionary":
+            for match in payload.get("matches", []) or []:
+                if not isinstance(match, dict):
+                    continue
+                sources.append(
+                    AssistantGroundingSource(
+                        source_id=f"platform_term_dictionary:{match.get('term_key') or 'unknown'}",
+                        source_type="platform_term_dictionary",
+                        source_name=match.get("term_key"),
                         page_id=match.get("page_id"),
                         module_key=match.get("module_key"),
                         title=match.get("label"),
@@ -4275,6 +4466,8 @@ class AssistantService:
         facts = source.facts if isinstance(source.facts, dict) else {}
         if source.source_type == "knowledge_chunk":
             return bool(content)
+        if source.source_type == "platform_term_dictionary":
+            return bool(source.verified and content)
         if source.source_type == "field_dictionary":
             return bool(source.verified and content)
         if source.source_type == "lookup_dictionary":
@@ -4344,6 +4537,7 @@ class AssistantService:
     @staticmethod
     def _source_priority(source_type: str) -> int:
         order = {
+            "platform_term_dictionary": 0,
             "field_dictionary": 0,
             "lookup_dictionary": 1,
             "ui_action": 2,
@@ -4898,6 +5092,15 @@ class AssistantService:
                 if isinstance(row, dict):
                     append_fact(
                         f"Field {row.get('field_key')} label={row.get('label')} page={row.get('page_id') or 'unknown'} confidence={row.get('confidence')}"
+                    )
+        elif tool_name == "assistant.search_platform_terms":
+            matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []
+            counts["match_count"] = len(matches)
+            counts["ambiguous"] = bool(payload.get("ambiguous"))
+            for row in matches[:3]:
+                if isinstance(row, dict):
+                    append_fact(
+                        f"Term {row.get('term_key')} label={row.get('label')} page={row.get('page_id') or 'unknown'} confidence={row.get('confidence')}"
                     )
         elif tool_name == "assistant.search_lookup_dictionary":
             matches = payload.get("matches") if isinstance(payload.get("matches"), list) else []

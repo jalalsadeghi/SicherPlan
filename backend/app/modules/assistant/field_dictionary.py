@@ -95,6 +95,443 @@ _STATUS_HELP_TERMS = (
     "وضعیت انتشار",
 )
 _GENERIC_AMBIGUOUS_LABELS = {"status", "state", "code", "type", "name", "label"}
+_GENERIC_PLATFORM_TERM_QUERIES = {
+    "group",
+    "groups",
+    "type",
+    "types",
+    "action",
+    "actions",
+    "mode",
+    "modes",
+    "title",
+    "titles",
+    "status",
+}
+_MESSAGE_FILE_CONTEXT = {
+    "planningStaffing.messages.ts": ("planning", "P-04", ["SicherPlanPlanningStaffing"], "staffing_workspace"),
+    "planningShifts.messages.ts": ("planning", "P-03", ["SicherPlanPlanningShifts"], "shift_planning_workspace"),
+    "planningOrders.messages.ts": ("planning", "P-02", ["SicherPlanPlanningOrders"], "planning_orders_workspace"),
+    "customerAdmin.messages.ts": ("customers", "C-01", ["SicherPlanCustomers"], "customer_admin_workspace"),
+    "employeeAdmin.messages.ts": ("employees", "E-01", ["SicherPlanEmployees"], "employee_admin_workspace"),
+}
+_TERM_SUFFIX_TYPES = (
+    ("Placeholder", "filter_label"),
+    ("Title", "section_title"),
+    ("Empty", "empty_state"),
+    ("Hint", "hint_text"),
+    ("Lead", "hint_text"),
+    ("Action", "action_label"),
+    ("Label", "field_label"),
+)
+_TERM_PREFIX_TYPES = (
+    ("fields", "field_label"),
+    ("detailTab", "tab_title"),
+    ("filters", "filter_label"),
+    ("status", "status_label"),
+    ("rule", "validation_rule"),
+    ("column", "column_label"),
+)
+_EXCLUDED_PLATFORM_TERM_KEYS = {
+    "title",
+    "lead",
+    "eyebrow",
+    "refresh",
+    "error",
+    "saveSuccess",
+    "clearFeedback",
+}
+_PLATFORM_TERM_OVERRIDES = {
+    "planning.staffing.demand_groups": {
+        "source_keys": {
+            "demandGroupsTitle",
+            "demandGroupsEmpty",
+            "demandGroupsSetupRequired",
+            "demandGroupPlaceholder",
+            "demandGroupEditorTitle",
+            "demandGroupCreateTitle",
+            "demandGroupEditTitle",
+            "demandGroupSetupLead",
+            "demandGroupCreateAction",
+            "demandGroupEditSelectedAction",
+            "demandGroupSaveAction",
+            "demandGroupUpdateAction",
+            "demandGroupFunctionType",
+            "demandGroupQualificationType",
+            "demandGroupMinQty",
+            "demandGroupTargetQty",
+            "demandGroupSortOrder",
+            "demandGroupSortOrderHint",
+            "demandGroupMandatoryFlag",
+            "demandGroupMandatoryHint",
+            "demandGroupRemark",
+            "fieldsDemandGroup",
+            "staffingActionsDemandGroupRequired",
+        },
+        "canonical_name": "demand_groups",
+        "module_key": "planning",
+        "page_id": "P-04",
+        "route_names": ["SicherPlanPlanningStaffing"],
+        "concept_type": "staffing_concept",
+        "ui_term_type": "domain_concept",
+        "labels": {
+            "de": ["Demand Groups", "Demand Group"],
+            "en": ["Demand groups", "Demand group"],
+        },
+        "aliases": [
+            "demand groups",
+            "demand group",
+            "demand-group",
+            "demand group setup",
+            "fieldsDemandGroup",
+            "demandGroupsTitle",
+            "demandGroupEditorTitle",
+        ],
+        "ui_contexts": [
+            "Shift Coverage",
+            "Demand and staffing tab",
+            "Demand Group setup",
+            "Staffing actions",
+        ],
+        "related_terms": [
+            "shift coverage",
+            "minimum quantity",
+            "target quantity",
+            "function type",
+            "qualification",
+            "mandatory demand group",
+            "assignment",
+        ],
+        "definition_en": (
+            "Demand groups are staffing requirement groups for a shift. They define which function type is needed, "
+            "which qualification may be required, the minimum and target quantity, ordering, and whether the group is mandatory. "
+            "A shift cannot be staffed meaningfully until at least one demand group exists."
+        ),
+        "definition_de": (
+            "Demand Groups sind Bedarfsgruppen bzw. Staffing-Slots fuer eine Schicht. Sie definieren benoetigten Funktionstyp, "
+            "optionale Qualifikation, Mindest- und Zielmenge, Sortierung und Pflichtstatus. Eine Schicht kann erst sinnvoll staffed werden, "
+            "wenn mindestens eine Demand Group angelegt wurde."
+        ),
+    },
+    "planning.staffing.staffing_actions": {
+        "source_keys": {
+            "staffingActionsTitle",
+            "staffingActionsHint",
+            "assignAction",
+            "substituteAction",
+            "unassignAction",
+            "staffingActionsDemandGroupRequired",
+        },
+        "canonical_name": "staffing_actions",
+        "module_key": "planning",
+        "page_id": "P-04",
+        "route_names": ["SicherPlanPlanningStaffing"],
+        "concept_type": "staffing_concept",
+        "ui_term_type": "domain_concept",
+        "labels": {
+            "de": ["Staffing-Aktionen", "Staffing Aktionen"],
+            "en": ["Staffing actions"],
+        },
+        "aliases": [
+            "staffing-aktionen",
+            "staffing aktionen",
+            "staffing actions",
+            "assign",
+            "substitute",
+            "unassign",
+        ],
+        "ui_contexts": [
+            "Staffing Coverage",
+            "Demand and staffing tab",
+            "Assignment actions",
+        ],
+        "related_terms": [
+            "demand groups",
+            "assignment",
+            "substitute",
+            "unassign",
+            "shift coverage",
+        ],
+        "definition_en": (
+            "Staffing actions are the verified assignment commands in Staffing Coverage. They let the user assign, substitute, "
+            "or remove staffing for the selected shift and demand group after the required setup and validations are satisfied."
+        ),
+        "definition_de": (
+            "Staffing-Aktionen sind die verifizierten Besetzungsaktionen in Staffing Coverage. Damit kann der Nutzer fuer die "
+            "ausgewaehlte Schicht und Demand Group zuweisen, ersetzen oder entfernen, sobald Setup und Validierungen passen."
+        ),
+    },
+    "planning.staffing.release_gates": {
+        "source_keys": {
+            "title",
+            "lead",
+            "validationTitle",
+            "releaseStateTitle",
+            "releaseAction",
+            "visibilityRequiresRelease",
+            "outputReleaseRequired",
+            "dispatchReleaseRequired",
+            "releaseBlocked",
+        },
+        "canonical_name": "release_gates",
+        "module_key": "planning",
+        "page_id": "P-04",
+        "route_names": ["SicherPlanPlanningStaffing"],
+        "concept_type": "staffing_concept",
+        "ui_term_type": "domain_concept",
+        "labels": {
+            "de": ["Release-Gates", "Release Gates"],
+            "en": ["Release gates", "Release-Gates"],
+        },
+        "aliases": [
+            "release-gates",
+            "release gates",
+            "freigabegates",
+            "freigabesperren",
+        ],
+        "ui_contexts": [
+            "Staffing Coverage",
+            "Release validations",
+            "Release state and visibility",
+        ],
+        "related_terms": [
+            "release",
+            "visibility",
+            "outputs",
+            "dispatch messages",
+            "validations",
+        ],
+        "definition_en": (
+            "Release gates are the release-dependent checks in Staffing Coverage. They determine whether a shift may be released, "
+            "made visible, used for outputs, or used for dispatch. If a gate is still failing, downstream actions stay blocked."
+        ),
+        "definition_de": (
+            "Release-Gates sind die freigabeabhaengigen Pruefungen in Staffing Coverage. Sie steuern, ob eine Schicht freigegeben, "
+            "sichtbar gemacht, fuer Outputs verwendet oder fuer Dispatch genutzt werden darf. Solange ein Gate blockiert, bleiben Folgeaktionen gesperrt."
+        ),
+    },
+    "planning.staffing.override_evidence": {
+        "source_keys": {
+            "assignmentOverridesTitle",
+            "assignmentOverridesEmpty",
+            "overrideTitle",
+            "overrideReasonLabel",
+            "overrideReasonPlaceholder",
+            "overrideAction",
+            "overrideHint",
+            "overrideUnavailable",
+            "workspaceLoadingOverride",
+            "saveSuccess",
+        },
+        "canonical_name": "override_evidence",
+        "module_key": "planning",
+        "page_id": "P-04",
+        "route_names": ["SicherPlanPlanningStaffing"],
+        "concept_type": "staffing_concept",
+        "ui_term_type": "domain_concept",
+        "labels": {
+            "de": ["Override-Nachweise", "Override Nachweise"],
+            "en": ["Override evidence"],
+        },
+        "aliases": [
+            "override-nachweise",
+            "override nachweise",
+            "override evidence",
+            "override proof",
+            "override proofs",
+        ],
+        "ui_contexts": [
+            "Assignment validations",
+            "Override recording",
+            "Append-only evidence",
+        ],
+        "related_terms": [
+            "assignment validations",
+            "override",
+            "reason",
+            "backend-approved blocker",
+        ],
+        "definition_en": (
+            "Override evidence is the append-only record explaining why a backend-approved staffing blocker was overridden. "
+            "It documents the reason, keeps the override auditable, and does not delete the original validation result."
+        ),
+        "definition_de": (
+            "Override-Nachweise sind die append-only Nachweise dafuer, warum ein backend-freigegebener Staffing-Blocker uebersteuert wurde. "
+            "Sie dokumentieren die Begruendung, halten den Override revisionssicher fest und loeschen das urspruengliche Validierungsergebnis nicht."
+        ),
+    },
+    "planning.staffing.partner_releases": {
+        "source_keys": {
+            "detailTabTeamsReleases",
+            "teamReleaseTitle",
+            "subcontractorReleasesTitle",
+            "subcontractorReleasesEmpty",
+            "assignmentSourceSubcontractorRelease",
+            "columnReleased",
+        },
+        "canonical_name": "partner_releases",
+        "module_key": "planning",
+        "page_id": "P-04",
+        "route_names": ["SicherPlanPlanningStaffing"],
+        "concept_type": "staffing_concept",
+        "ui_term_type": "domain_concept",
+        "labels": {
+            "de": ["Partnerfreigaben"],
+            "en": ["Partner releases", "Subcontractor releases"],
+        },
+        "aliases": [
+            "partnerfreigaben",
+            "partner freigaben",
+            "partner releases",
+            "subcontractor releases",
+        ],
+        "ui_contexts": [
+            "Teams and partner releases",
+            "Staffing Coverage",
+            "Released partners",
+        ],
+        "related_terms": [
+            "subcontractor releases",
+            "released partners",
+            "visibility",
+            "team releases",
+        ],
+        "definition_en": (
+            "Partner releases are the verified subcontractor-release records for a shift. They show which partner or partner worker "
+            "has been released into the staffing flow and whether partner-side follow-up can proceed."
+        ),
+        "definition_de": (
+            "Partnerfreigaben sind die verifizierten Subunternehmer-Freigaben fuer eine Schicht. Sie zeigen, welcher Partner oder "
+            "welcher Partner-Mitarbeiter in den Staffing-Ablauf freigegeben wurde und ob die Partnerfolgeprozesse weiterlaufen duerfen."
+        ),
+    },
+    "planning.staffing.dispatch_messages": {
+        "source_keys": {
+            "detailTabOutputsDispatch",
+            "dispatchTitle",
+            "dispatchPreviewAction",
+            "dispatchQueueAction",
+            "dispatchAudienceEmployees",
+            "dispatchAudienceSubcontractors",
+            "dispatchRecipients",
+            "dispatchQueuedSuccess",
+            "dispatchReleaseRequired",
+            "dispatchNoRecipients",
+        },
+        "canonical_name": "dispatch_messages",
+        "module_key": "planning",
+        "page_id": "P-04",
+        "route_names": ["SicherPlanPlanningStaffing"],
+        "concept_type": "staffing_concept",
+        "ui_term_type": "domain_concept",
+        "labels": {
+            "de": ["Dispatch-Nachrichten", "Dispatch Nachrichten"],
+            "en": ["Dispatch messages"],
+        },
+        "aliases": [
+            "dispatch-nachrichten",
+            "dispatch nachrichten",
+            "dispatch messages",
+            "dispatch message",
+        ],
+        "ui_contexts": [
+            "Outputs and dispatch",
+            "Message preview",
+            "Recipient queueing",
+        ],
+        "related_terms": [
+            "dispatch",
+            "release",
+            "recipients",
+            "outputs",
+        ],
+        "definition_en": (
+            "Dispatch messages are the verified outbound staffing messages for the selected shift. They preview and queue messages "
+            "to assigned employees or released partners after release requirements and permitted recipients are satisfied."
+        ),
+        "definition_de": (
+            "Dispatch-Nachrichten sind die verifizierten ausgehenden Staffing-Nachrichten fuer die ausgewaehlte Schicht. Sie zeigen "
+            "Vorschau und Queueing fuer zugewiesene Mitarbeiter oder freigegebene Partner, sobald Freigabevoraussetzungen und Empfaenger passen."
+        ),
+    },
+    "planning.staffing.minimum_staffing": {
+        "source_keys": {
+            "ruleMinimumStaffing",
+        },
+        "canonical_name": "minimum_staffing",
+        "module_key": "planning",
+        "page_id": "P-04",
+        "route_names": ["SicherPlanPlanningStaffing"],
+        "concept_type": "staffing_concept",
+        "ui_term_type": "domain_concept",
+        "labels": {
+            "de": ["Mindestbesetzung"],
+            "en": ["Minimum staffing"],
+        },
+        "aliases": [
+            "mindestbesetzung",
+            "minimum staffing",
+            "minimum staffing not reached",
+        ],
+        "ui_contexts": [
+            "Release validations",
+            "Coverage validations",
+        ],
+        "related_terms": [
+            "demand groups",
+            "target quantity",
+            "assigned",
+            "confirmed",
+        ],
+        "definition_en": (
+            "Minimum staffing is the lower staffing threshold for the shift. If the required minimum is not met, validations can block "
+            "release or indicate that the shift is still operationally under-covered."
+        ),
+        "definition_de": (
+            "Mindestbesetzung ist die untere Besetzungsschwelle einer Schicht. Wenn das geforderte Minimum nicht erreicht ist, "
+            "koennen Validierungen die Freigabe blockieren oder anzeigen, dass die Schicht operativ noch unterdeckt ist."
+        ),
+    },
+    "planning.staffing.mandatory_proofs": {
+        "source_keys": {
+            "ruleMandatoryDocuments",
+        },
+        "canonical_name": "mandatory_proofs",
+        "module_key": "planning",
+        "page_id": "P-04",
+        "route_names": ["SicherPlanPlanningStaffing"],
+        "concept_type": "staffing_concept",
+        "ui_term_type": "domain_concept",
+        "labels": {
+            "de": ["Pflichtnachweise"],
+            "en": ["Mandatory proofs", "Mandatory documents"],
+        },
+        "aliases": [
+            "pflichtnachweise",
+            "mandatory proofs",
+            "mandatory proof",
+            "mandatory documents",
+        ],
+        "ui_contexts": [
+            "Assignment validations",
+            "Release validations",
+        ],
+        "related_terms": [
+            "qualification",
+            "documents",
+            "assignment validations",
+            "release gates",
+        ],
+        "definition_en": (
+            "Mandatory proofs are the required qualification or document evidences for the staffing flow. If they are missing or not valid "
+            "at the shift time, validations can block assignment, release, or downstream visibility."
+        ),
+        "definition_de": (
+            "Pflichtnachweise sind die erforderlichen Qualifikations- oder Dokumentnachweise fuer den Staffing-Ablauf. Wenn sie fehlen "
+            "oder zum Schichtzeitpunkt nicht gueltig sind, koennen Validierungen Zuweisung, Freigabe oder Folge-Sichtbarkeit blockieren."
+        ),
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -153,6 +590,39 @@ class LookupDefinition:
     confidence: str = "low"
 
 
+@dataclass
+class PlatformTermDefinition:
+    term_key: str
+    canonical_name: str
+    module_key: str | None
+    page_id: str | None
+    route_names: list[str] = field(default_factory=list)
+    concept_type: str = "domain_concept"
+    ui_term_type: str = "domain_concept"
+    ui_contexts: list[str] = field(default_factory=list)
+    labels: dict[str, list[str]] = field(default_factory=dict)
+    aliases: list[str] = field(default_factory=list)
+    definition_en: str | None = None
+    definition_de: str | None = None
+    related_terms: list[str] = field(default_factory=list)
+    source_basis: list[FieldSourceBasis] = field(default_factory=list)
+    confidence: str = "low"
+
+
+@dataclass(frozen=True)
+class PlatformTermSearchMatch:
+    term_key: str
+    label: str
+    module_key: str | None
+    page_id: str | None
+    concept_type: str
+    ui_term_type: str
+    definition: str | None
+    source_basis: list[FieldSourceBasis]
+    confidence: str
+    score: float
+
+
 @dataclass(frozen=True)
 class FieldSearchMatch:
     field_key: str
@@ -202,6 +672,7 @@ class CorpusSignal:
     lookup_matches: tuple[LookupSearchMatch, ...]
     ambiguous: bool
     intent_category: str
+    term_matches: tuple[PlatformTermSearchMatch, ...] = ()
     matched_via_route_context: bool = False
 
 
@@ -209,6 +680,7 @@ class CorpusSignal:
 class AssistantFieldLookupCorpus:
     field_definitions: tuple[FieldDefinition, ...]
     lookup_definitions: tuple[LookupDefinition, ...]
+    term_definitions: tuple[PlatformTermDefinition, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -217,6 +689,7 @@ class AssistantFieldLookupCorpusStatus:
     artifact_version: str | None
     field_count: int
     lookup_count: int
+    term_count: int
     counts_by_module: dict[str, int]
 
 
@@ -380,10 +853,16 @@ def _build_field_lookup_corpus_from_sources(repo_root_str: str) -> AssistantFiel
     lookups.update(_build_lookup_definitions(locale_labels, vue_bindings))
     for lookup in lookups.values():
         lookup.confidence = _lookup_confidence(lookup)
+    terms = _build_platform_term_definitions(
+        repo_root=repo_root,
+        locale_labels=locale_labels,
+        backend_fields=backend_fields,
+    )
 
     return AssistantFieldLookupCorpus(
         field_definitions=tuple(sorted(fields.values(), key=lambda item: item.field_key)),
         lookup_definitions=tuple(sorted(lookups.values(), key=lambda item: item.lookup_key)),
+        term_definitions=tuple(sorted(terms.values(), key=lambda item: item.term_key)),
     )
 
 
@@ -404,7 +883,7 @@ def _load_runtime_field_lookup_corpus() -> AssistantFieldLookupCorpus:
     LOGGER.warning(
         "assistant field/lookup corpus unavailable: neither packaged artifact nor live source files are present"
     )
-    return AssistantFieldLookupCorpus(field_definitions=(), lookup_definitions=())
+    return AssistantFieldLookupCorpus(field_definitions=(), lookup_definitions=(), term_definitions=())
 
 
 def load_generated_field_lookup_corpus() -> AssistantFieldLookupCorpus | None:
@@ -435,6 +914,7 @@ def get_field_lookup_corpus_status() -> AssistantFieldLookupCorpusStatus:
         artifact_version=str(payload.get("schema_version")) if isinstance(payload, dict) else None,
         field_count=len(corpus.field_definitions),
         lookup_count=len(corpus.lookup_definitions),
+        term_count=len(corpus.term_definitions),
         counts_by_module=counts_by_module,
     )
 
@@ -465,8 +945,10 @@ def export_field_lookup_corpus(
     return {
         "field_count": len(corpus.field_definitions),
         "lookup_count": len(corpus.lookup_definitions),
+        "term_count": len(corpus.term_definitions),
         "field_counts_by_module": field_definition_counts_by_module(repo_root),
         "lookup_counts_by_module": lookup_definition_counts_by_module(repo_root),
+        "term_counts_by_module": term_definition_counts_by_module(repo_root),
         "warnings": _generation_warnings(repo_root, corpus),
     }
 
@@ -537,6 +1019,40 @@ def detect_field_or_lookup_signal(
             route_context_form_help=route_context_form_help,
         ),
         matched_via_route_context=route_context_form_help and not field_matches and not lookup_matches,
+    )
+
+
+def detect_platform_term_signal(
+    text: str,
+    *,
+    page_id: str | None = None,
+    route_name: str | None = None,
+) -> CorpusSignal | None:
+    normalized_query = _extract_field_probe(text)
+    if normalized_query is None:
+        return None
+    if normalized_query in _GENERIC_PLATFORM_TERM_QUERIES:
+        return None
+    term_matches = search_platform_terms(
+        query=normalized_query,
+        language_code=None,
+        page_id=page_id,
+        route_name=route_name,
+        limit=5,
+    )
+    if not term_matches:
+        return None
+    return CorpusSignal(
+        normalized_query=normalized_query,
+        field_matches=(),
+        lookup_matches=(),
+        term_matches=tuple(term_matches),
+        ambiguous=_is_ambiguous_term_signal(
+            normalized_query=normalized_query,
+            term_matches=term_matches,
+        ),
+        intent_category=_infer_platform_term_intent_category(term_matches[0]),
+        matched_via_route_context=False,
     )
 
 
@@ -620,12 +1136,63 @@ def search_lookup_dictionary(
     return matches[: max(int(limit), 1)]
 
 
+def search_platform_terms(
+    *,
+    query: str,
+    language_code: str | None,
+    page_id: str | None,
+    route_name: str | None,
+    limit: int = 5,
+    repo_root: Path | None = None,
+) -> list[PlatformTermSearchMatch]:
+    normalized_query = _extract_field_probe(query) or _normalize_query(query)
+    if not normalized_query:
+        return []
+    corpus = build_field_lookup_corpus(repo_root)
+    matches: list[PlatformTermSearchMatch] = []
+    for definition in corpus.term_definitions:
+        score = _score_platform_term_definition(
+            definition=definition,
+            query=normalized_query,
+            page_id=page_id,
+            route_name=route_name,
+        )
+        if score <= 0:
+            continue
+        matches.append(
+            PlatformTermSearchMatch(
+                term_key=definition.term_key,
+                label=_localized_platform_term_label(definition, language_code),
+                module_key=definition.module_key,
+                page_id=definition.page_id,
+                concept_type=definition.concept_type,
+                ui_term_type=definition.ui_term_type,
+                definition=_localized_platform_term_definition(definition, language_code),
+                source_basis=list(definition.source_basis),
+                confidence=definition.confidence,
+                score=score,
+            )
+        )
+    matches.sort(key=lambda item: (-item.score, item.term_key))
+    return matches[: max(int(limit), 1)]
+
+
 def get_lookup_definition(
     lookup_key: str,
     repo_root: Path | None = None,
 ) -> LookupDefinition | None:
     for definition in build_field_lookup_corpus(repo_root).lookup_definitions:
         if definition.lookup_key == lookup_key:
+            return definition
+    return None
+
+
+def get_platform_term_definition(
+    term_key: str,
+    repo_root: Path | None = None,
+) -> PlatformTermDefinition | None:
+    for definition in build_field_lookup_corpus(repo_root).term_definitions:
+        if definition.term_key == term_key:
             return definition
     return None
 
@@ -790,6 +1357,332 @@ def lookup_definition_counts_by_module(repo_root: Path | None = None) -> dict[st
         key = definition.module_key or "unknown"
         counts[key] = counts.get(key, 0) + 1
     return counts
+
+
+def term_definition_counts_by_module(repo_root: Path | None = None) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for definition in build_field_lookup_corpus(repo_root).term_definitions:
+        key = definition.module_key or "unknown"
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def render_platform_term_dictionary_markdown(repo_root: Path | None = None) -> str:
+    corpus = build_field_lookup_corpus(repo_root)
+    lines = ["# Assistant Platform Term Dictionary", ""]
+    for definition in corpus.term_definitions:
+        lines.extend(
+            [
+                f"## {definition.term_key}",
+                "",
+                f"- canonical_name: {definition.canonical_name}",
+                f"- module_key: {definition.module_key or 'unknown'}",
+                f"- page_id: {definition.page_id or 'unknown'}",
+                f"- concept_type: {definition.concept_type}",
+                f"- ui_term_type: {definition.ui_term_type}",
+                f"- route_names: {', '.join(definition.route_names) or 'none'}",
+                f"- ui_contexts: {', '.join(definition.ui_contexts) or 'none'}",
+                f"- labels_de: {', '.join(definition.labels.get('de', [])) or 'none'}",
+                f"- labels_en: {', '.join(definition.labels.get('en', [])) or 'none'}",
+                f"- definition_de: {definition.definition_de or 'n/a'}",
+                f"- definition_en: {definition.definition_en or 'n/a'}",
+                f"- related_terms: {', '.join(definition.related_terms) or 'none'}",
+                f"- aliases: {', '.join(definition.aliases) or 'none'}",
+            ]
+        )
+        if definition.source_basis:
+            lines.append("- source_basis:")
+            for basis in definition.source_basis[:8]:
+                lines.append(f"  - [{basis.source_type}] {basis.source_name}: {basis.evidence}")
+        lines.append("")
+    return "\n".join(lines).strip() + "\n"
+
+
+def _build_platform_term_definitions(
+    *,
+    repo_root: Path,
+    locale_labels: dict[str, dict[str, str]],
+    backend_fields: dict[str, set[str]],
+) -> dict[str, PlatformTermDefinition]:
+    del locale_labels, backend_fields
+    definitions: dict[str, PlatformTermDefinition] = {}
+    for row in _extract_platform_term_rows(repo_root):
+        override = _platform_term_override_for_source_key(row["source_key"])
+        if override is not None:
+            term_key = str(override["term_key"])
+            definition = definitions.setdefault(
+                term_key,
+                PlatformTermDefinition(
+                    term_key=term_key,
+                    canonical_name=str(override["canonical_name"]),
+                    module_key=_optional_string(override.get("module_key")),
+                    page_id=_optional_string(override.get("page_id")),
+                    route_names=_sorted_unique_strings(override.get("route_names", [])),
+                    concept_type=str(override.get("concept_type") or "domain_concept"),
+                    ui_term_type=str(override.get("ui_term_type") or "domain_concept"),
+                    ui_contexts=_sorted_unique_strings(override.get("ui_contexts", [])),
+                    labels={key: _sorted_unique_strings(values) for key, values in dict(override.get("labels", {})).items()},
+                    aliases=_sorted_unique_strings(override.get("aliases", [])),
+                    definition_en=_optional_string(override.get("definition_en")),
+                    definition_de=_optional_string(override.get("definition_de")),
+                    related_terms=_sorted_unique_strings(override.get("related_terms", [])),
+                    source_basis=[],
+                    confidence="high",
+                ),
+            )
+        else:
+            term_key = _default_platform_term_key(row)
+            label_en = row["labels"].get("en", [row["canonical_name"]])[0]
+            label_de = row["labels"].get("de", [label_en])[0]
+            definition = definitions.setdefault(
+                term_key,
+                PlatformTermDefinition(
+                    term_key=term_key,
+                    canonical_name=row["canonical_name"],
+                    module_key=row["module_key"],
+                    page_id=row["page_id"],
+                    route_names=list(row["route_names"]),
+                    concept_type="domain_concept" if row["ui_term_type"] in {"hint_text", "empty_state"} else "ui_term",
+                    ui_term_type=row["ui_term_type"],
+                    ui_contexts=[],
+                    labels={},
+                    aliases=[],
+                    definition_en=f"{label_en} is a verified visible SicherPlan UI term in the {row['file_stem']} context.",
+                    definition_de=f"{label_de} ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext {row['file_stem']}.",
+                    related_terms=[],
+                    source_basis=[],
+                    confidence="medium",
+                ),
+            )
+
+        for language_code, values in row["labels"].items():
+            for value in values:
+                _add_label(definition.labels, language_code, value)
+                _append_unique(definition.aliases, value)
+        _append_unique(definition.aliases, row["source_key"])
+        _append_unique(definition.ui_contexts, row["ui_context"])
+        definition.source_basis.append(
+            FieldSourceBasis(
+                source_type=row["source_type"],
+                source_name=row["source_name"],
+                page_id=row["page_id"],
+                module_key=row["module_key"],
+                evidence=row["evidence"],
+            )
+        )
+
+    _apply_platform_term_overrides(definitions)
+    for definition in definitions.values():
+        definition.route_names = _sorted_unique_strings(definition.route_names)
+        definition.ui_contexts = _sorted_unique_strings(definition.ui_contexts)
+        definition.aliases = _sorted_unique_strings(definition.aliases)
+        definition.related_terms = _sorted_unique_strings(definition.related_terms)
+        definition.source_basis = _sorted_unique_source_basis(definition.source_basis)
+        definition.confidence = _platform_term_confidence(definition)
+    return definitions
+
+
+def _extract_platform_term_rows(repo_root: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    i18n_root = repo_root / "web/apps/web-antd/src/sicherplan-legacy/i18n"
+    for path in _sorted_rglob(i18n_root, "*.messages.ts"):
+        module_key, page_id, route_names, file_context = _message_file_context(path.name)
+        for source_key, bundle in _parse_messages_ts_file(path).items():
+            ui_term_type = _classify_platform_term_key(source_key)
+            if ui_term_type is None:
+                continue
+            labels = {code: [text] for code, text in bundle.items() if text}
+            rows.append(
+                {
+                    "source_key": source_key,
+                    "canonical_name": _canonicalize_platform_term_key(source_key),
+                    "labels": labels,
+                    "module_key": module_key,
+                    "page_id": page_id,
+                    "route_names": route_names,
+                    "ui_term_type": ui_term_type,
+                    "ui_context": _humanize_platform_key(source_key),
+                    "source_type": "frontend_i18n_label",
+                    "source_name": path.name,
+                    "evidence": f"{source_key} defines the visible UI term in {path.name}.",
+                    "file_stem": file_context,
+                }
+            )
+    locale_paths = [
+        repo_root / _DE_LOCALE_PATH,
+        repo_root / _EN_LOCALE_PATH,
+        repo_root / _FA_LOCALE_PATH,
+    ]
+    for path in locale_paths:
+        if not path.exists():
+            continue
+        language_code = "de" if "de-DE" in path.as_posix() else "en" if "en-US" in path.as_posix() else "fa"
+        flattened = _flatten_json(json.loads(path.read_text(encoding="utf-8")))
+        for key, value in flattened.items():
+            if not isinstance(value, str):
+                continue
+            source_key = key.split(".")[-1]
+            ui_term_type = _classify_platform_term_key(source_key)
+            if ui_term_type is None:
+                continue
+            rows.append(
+                {
+                    "source_key": source_key,
+                    "canonical_name": _canonicalize_platform_term_key(source_key),
+                    "labels": {language_code: [value]},
+                    "module_key": None,
+                    "page_id": None,
+                    "route_names": [],
+                    "ui_term_type": ui_term_type,
+                    "ui_context": _humanize_platform_key(source_key),
+                    "source_type": "frontend_locale",
+                    "source_name": path.name,
+                    "evidence": f"{key} defines a visible localized UI term in {path.name}.",
+                    "file_stem": "locale_catalog",
+                }
+            )
+    return rows
+
+
+def _parse_messages_ts_file(path: Path) -> dict[str, dict[str, str]]:
+    text = path.read_text(encoding="utf-8")
+    labels: dict[str, dict[str, str]] = {}
+    language_code: str | None = None
+    depth = 0
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("de: {"):
+            language_code = "de"
+            depth = 1
+            continue
+        if stripped.startswith("en: {"):
+            language_code = "en"
+            depth = 1
+            continue
+        if language_code is None:
+            continue
+        depth += line.count("{") - line.count("}")
+        if depth <= 0:
+            language_code = None
+            depth = 0
+            continue
+        match = re.match(r'^\s*(?P<key>[A-Za-z0-9_]+):\s*"(?P<value>(?:[^"\\]|\\.)*)",?\s*$', line)
+        if match:
+            labels.setdefault(match.group("key"), {})[language_code] = _unescape_locale_value(match.group("value"))
+    return labels
+
+
+def _message_file_context(file_name: str) -> tuple[str | None, str | None, list[str], str]:
+    module_key, page_id, route_names, file_context = _MESSAGE_FILE_CONTEXT.get(file_name, (None, None, [], Path(file_name).stem))
+    return module_key, page_id, list(route_names), file_context
+
+
+def _classify_platform_term_key(source_key: str) -> str | None:
+    if source_key in _EXCLUDED_PLATFORM_TERM_KEYS:
+        return None
+    if _platform_term_override_for_source_key(source_key) is not None:
+        return "domain_concept"
+    for prefix, ui_term_type in _TERM_PREFIX_TYPES:
+        if source_key.startswith(prefix):
+            return ui_term_type
+    for suffix, ui_term_type in _TERM_SUFFIX_TYPES:
+        if source_key.endswith(suffix):
+            return ui_term_type
+    return None
+
+
+def _canonicalize_platform_term_key(source_key: str) -> str:
+    if source_key.startswith("fields"):
+        source_key = source_key[len("fields") :]
+    elif source_key.startswith("detailTab"):
+        source_key = source_key[len("detailTab") :]
+    elif source_key.startswith("filters"):
+        source_key = source_key[len("filters") :]
+    for suffix, _ in _TERM_SUFFIX_TYPES:
+        if source_key.endswith(suffix):
+            source_key = source_key[: -len(suffix)]
+            break
+    if source_key.endswith("s") and len(source_key) > 4:
+        source_key = source_key[:-1]
+    return _normalize_field_name(source_key)
+
+
+def _default_platform_term_key(row: dict[str, Any]) -> str:
+    module_key = row.get("module_key") or "platform"
+    file_stem = str(row.get("file_stem") or "ui")
+    return f"{module_key}.{file_stem}.{row['canonical_name']}"
+
+
+def _humanize_platform_key(source_key: str) -> str:
+    cleaned = source_key
+    for prefix, _ in _TERM_PREFIX_TYPES:
+        if cleaned.startswith(prefix):
+            cleaned = cleaned[len(prefix) :]
+            break
+    cleaned = re.sub(r"(?!^)([A-Z])", r" \1", cleaned).strip()
+    return cleaned or source_key
+
+
+def _platform_term_override_for_source_key(source_key: str) -> dict[str, Any] | None:
+    for term_key, payload in _PLATFORM_TERM_OVERRIDES.items():
+        if source_key in payload["source_keys"]:
+            override = dict(payload)
+            override["term_key"] = term_key
+            return override
+    return None
+
+
+def _apply_platform_term_overrides(definitions: dict[str, PlatformTermDefinition]) -> None:
+    definition = definitions.get("planning.staffing.demand_groups")
+    if definition is None:
+        return
+    definition.source_basis.extend(
+        [
+            FieldSourceBasis(
+                source_type="frontend_component",
+                source_name="PlanningStaffingCoverageView.vue",
+                page_id="P-04",
+                module_key="planning",
+                evidence="PlanningStaffingCoverageView.vue renders Demand Groups in the Demand and staffing tab and blocks staffing actions until a demand group exists.",
+            ),
+            FieldSourceBasis(
+                source_type="frontend_helper",
+                source_name="planningStaffing.helpers.js",
+                page_id="P-04",
+                module_key="planning",
+                evidence="planningStaffing.helpers.js treats shifts without demand_groups as setup_required coverage.",
+            ),
+            FieldSourceBasis(
+                source_type="frontend_api",
+                source_name="planningStaffing.ts",
+                page_id="P-04",
+                module_key="planning",
+                evidence="planningStaffing.ts exposes createDemandGroup and updateDemandGroup APIs for staffing workspace demand-group setup.",
+            ),
+            FieldSourceBasis(
+                source_type="backend_schema",
+                source_name="schemas.py",
+                page_id="P-04",
+                module_key="planning",
+                evidence="Planning schemas define demand groups with function_type_id, qualification_type_id, min_qty, target_qty, sort_order, mandatory_flag, and remark.",
+            ),
+            FieldSourceBasis(
+                source_type="backend_service",
+                source_name="staffing_service.py",
+                page_id="P-04",
+                module_key="planning",
+                evidence="Planning staffing service enforces demand-group-backed staffing operations before shift staffing can proceed meaningfully.",
+            ),
+        ]
+    )
+
+
+def _platform_term_confidence(definition: PlatformTermDefinition) -> str:
+    if definition.definition_de and definition.definition_en and len(definition.source_basis) >= 3:
+        return "high"
+    if definition.source_basis:
+        return "medium"
+    return "low"
 
 
 def _extract_locale_labels(repo_root: Path) -> dict[str, dict[str, str]]:
@@ -1314,6 +2207,27 @@ def _localized_lookup_label(definition: LookupDefinition, language_code: str | N
     return definition.lookup_key
 
 
+def _localized_platform_term_label(definition: PlatformTermDefinition, language_code: str | None) -> str:
+    if language_code and definition.labels.get(language_code):
+        return _preferred_platform_term_label(definition.labels[language_code], definition.canonical_name)
+    if definition.labels.get("de"):
+        return _preferred_platform_term_label(definition.labels["de"], definition.canonical_name)
+    if definition.labels.get("en"):
+        return _preferred_platform_term_label(definition.labels["en"], definition.canonical_name)
+    return definition.canonical_name
+
+
+def _localized_platform_term_definition(
+    definition: PlatformTermDefinition,
+    language_code: str | None,
+) -> str | None:
+    if language_code == "de":
+        return definition.definition_de or definition.definition_en
+    if language_code == "en":
+        return definition.definition_en or definition.definition_de
+    return definition.definition_de or definition.definition_en
+
+
 def _score_field_definition(
     *,
     definition: FieldDefinition,
@@ -1380,6 +2294,67 @@ def _score_lookup_definition(
         score += 5.0
     elif definition.confidence == "medium":
         score += 2.0
+    return score
+
+
+def _score_platform_term_definition(
+    *,
+    definition: PlatformTermDefinition,
+    query: str,
+    page_id: str | None,
+    route_name: str | None,
+) -> float:
+    score = 0.0
+
+    def _apply(values: list[str], *, exact: float, contains_query: float, query_contains: float) -> None:
+        nonlocal score
+        for value in values:
+            normalized = _normalize_query(value)
+            if not normalized:
+                continue
+            if normalized in _GENERIC_PLATFORM_TERM_QUERIES and normalized != query:
+                continue
+            if normalized == query:
+                score = max(score, exact)
+            elif _contains_token_phrase(normalized, query):
+                score = max(score, contains_query)
+            elif _contains_token_phrase(query, normalized):
+                score = max(score, query_contains)
+
+    _apply(
+        [definition.term_key, definition.canonical_name],
+        exact=102.0,
+        contains_query=92.0,
+        query_contains=84.0,
+    )
+    _apply(
+        list(definition.aliases or []) + [item for values in definition.labels.values() for item in values],
+        exact=110.0,
+        contains_query=100.0,
+        query_contains=90.0,
+    )
+    _apply(
+        list(definition.related_terms or []),
+        exact=86.0,
+        contains_query=74.0,
+        query_contains=58.0,
+    )
+    _apply(
+        list(definition.ui_contexts or []),
+        exact=72.0,
+        contains_query=62.0,
+        query_contains=48.0,
+    )
+    if score <= 0:
+        return 0.0
+    if definition.page_id and page_id == definition.page_id:
+        score += 12.0
+    if route_name and route_name in definition.route_names:
+        score += 8.0
+    if definition.confidence == "high":
+        score += 6.0
+    elif definition.confidence == "medium":
+        score += 3.0
     return score
 
 
@@ -1460,6 +2435,7 @@ def _serialize_corpus(
         "generated_from": sorted({item for item in generated_from if item}),
         "fields": [_serialize_field_definition(item) for item in corpus.field_definitions],
         "lookups": [_serialize_lookup_definition(item) for item in corpus.lookup_definitions],
+        "terms": [_serialize_platform_term_definition(item) for item in corpus.term_definitions],
         "source_hashes": dict(sorted(source_hashes.items())),
     }
 
@@ -1477,7 +2453,21 @@ def _deserialize_corpus(payload: dict[str, Any]) -> AssistantFieldLookupCorpus:
             key=lambda item: item.lookup_key,
         )
     )
-    return AssistantFieldLookupCorpus(field_definitions=fields, lookup_definitions=lookups)
+    terms = tuple(
+        sorted(
+            (
+                _deserialize_platform_term_definition(item)
+                for item in payload.get("terms", [])
+                if isinstance(item, dict)
+            ),
+            key=lambda item: item.term_key,
+        )
+    )
+    return AssistantFieldLookupCorpus(
+        field_definitions=fields,
+        lookup_definitions=lookups,
+        term_definitions=terms,
+    )
 
 
 def _serialize_field_definition(definition: FieldDefinition) -> dict[str, Any]:
@@ -1547,6 +2537,26 @@ def _serialize_lookup_definition(definition: LookupDefinition) -> dict[str, Any]
     }
 
 
+def _serialize_platform_term_definition(definition: PlatformTermDefinition) -> dict[str, Any]:
+    return {
+        "aliases": _sorted_unique_strings(definition.aliases),
+        "canonical_name": definition.canonical_name,
+        "concept_type": definition.concept_type,
+        "confidence": definition.confidence,
+        "definition_de": definition.definition_de,
+        "definition_en": definition.definition_en,
+        "labels": {key: _sorted_unique_strings(values) for key, values in sorted(definition.labels.items())},
+        "module_key": definition.module_key,
+        "page_id": definition.page_id,
+        "related_terms": _sorted_unique_strings(definition.related_terms),
+        "route_names": _sorted_unique_strings(definition.route_names),
+        "source_basis": [_serialize_source_basis(item) for item in _sorted_unique_source_basis(definition.source_basis)],
+        "term_key": definition.term_key,
+        "ui_contexts": _sorted_unique_strings(definition.ui_contexts),
+        "ui_term_type": definition.ui_term_type,
+    }
+
+
 def _deserialize_lookup_definition(payload: dict[str, Any]) -> LookupDefinition:
     return LookupDefinition(
         lookup_key=str(payload.get("lookup_key") or ""),
@@ -1557,6 +2567,26 @@ def _deserialize_lookup_definition(payload: dict[str, Any]) -> LookupDefinition:
         aliases=_string_list(payload.get("aliases")),
         values=[_deserialize_lookup_value_definition(item) for item in payload.get("values", []) if isinstance(item, dict)],
         value_source_kind=str(payload.get("value_source_kind") or "static"),
+        source_basis=[_deserialize_source_basis(item) for item in payload.get("source_basis", []) if isinstance(item, dict)],
+        confidence=str(payload.get("confidence") or "low"),
+    )
+
+
+def _deserialize_platform_term_definition(payload: dict[str, Any]) -> PlatformTermDefinition:
+    return PlatformTermDefinition(
+        term_key=str(payload.get("term_key") or ""),
+        canonical_name=str(payload.get("canonical_name") or ""),
+        module_key=_optional_string(payload.get("module_key")),
+        page_id=_optional_string(payload.get("page_id")),
+        route_names=_string_list(payload.get("route_names")),
+        concept_type=str(payload.get("concept_type") or "domain_concept"),
+        ui_term_type=str(payload.get("ui_term_type") or "domain_concept"),
+        ui_contexts=_string_list(payload.get("ui_contexts")),
+        labels=_deserialize_labels(payload.get("labels")),
+        aliases=_string_list(payload.get("aliases")),
+        definition_en=_optional_string(payload.get("definition_en")),
+        definition_de=_optional_string(payload.get("definition_de")),
+        related_terms=_string_list(payload.get("related_terms")),
         source_basis=[_deserialize_source_basis(item) for item in payload.get("source_basis", []) if isinstance(item, dict)],
         confidence=str(payload.get("confidence") or "low"),
     )
@@ -1670,6 +2700,8 @@ def _generation_warnings(
         warnings.append("no_field_definitions_extracted")
     if not corpus.lookup_definitions:
         warnings.append("no_lookup_definitions_extracted")
+    if not corpus.term_definitions:
+        warnings.append("no_platform_term_definitions_extracted")
     return warnings
 
 
@@ -1754,6 +2786,55 @@ def _is_ambiguous_signal(
         if candidate_page_id != top_page_id or candidate_module_key != top_module_key:
             return True
     return normalized_query in _GENERIC_AMBIGUOUS_LABELS
+
+
+def _is_ambiguous_term_signal(
+    *,
+    normalized_query: str,
+    term_matches: list[PlatformTermSearchMatch],
+) -> bool:
+    if len(term_matches) <= 1:
+        return False
+    top_match = term_matches[0]
+    for candidate in term_matches[1:3]:
+        if candidate.term_key == top_match.term_key:
+            continue
+        if candidate.score < top_match.score - 12.0:
+            continue
+        if candidate.page_id != top_match.page_id or candidate.module_key != top_match.module_key:
+            return True
+    return normalized_query in _GENERIC_AMBIGUOUS_LABELS
+
+
+def _infer_platform_term_intent_category(match: PlatformTermSearchMatch) -> str:
+    if match.ui_term_type == "action_label":
+        return "action_label_question"
+    if match.ui_term_type == "section_title":
+        return "section_title_question"
+    if match.ui_term_type == "validation_rule":
+        return "validation_rule_meaning_question"
+    if match.ui_term_type == "status_label":
+        return "status_or_option_meaning_question"
+    if match.concept_type in {"staffing_concept", "domain_concept"}:
+        return "platform_term_meaning_question"
+    if match.ui_term_type in {"field_label", "filter_label", "tab_title", "empty_state", "hint_text"}:
+        return "ui_label_meaning_question"
+    return "domain_concept_question"
+
+
+def _preferred_platform_term_label(labels: list[str], canonical_name: str) -> str:
+    if not labels:
+        return canonical_name
+    canonical_tokens = set(_tokenize_query(canonical_name.replace("_", " ")))
+    ranked = sorted(
+        labels,
+        key=lambda item: (
+            0 if canonical_tokens and canonical_tokens.issubset(set(_tokenize_query(item))) else 1,
+            len(item),
+            item.casefold(),
+        ),
+    )
+    return ranked[0]
 
 
 def _infer_field_lookup_intent_category(
@@ -1974,11 +3055,15 @@ __all__ = [
     "LookupDefinition",
     "LookupSearchMatch",
     "LookupValueDefinition",
+    "PlatformTermDefinition",
+    "PlatformTermSearchMatch",
     "build_field_lookup_corpus",
     "detect_field_or_lookup_signal",
+    "detect_platform_term_signal",
     "export_field_lookup_corpus",
     "field_definition_counts_by_module",
     "get_field_lookup_corpus_status",
+    "get_platform_term_definition",
     "load_generated_field_lookup_corpus",
     "lookup_definition_counts_by_module",
     "render_api_schema_field_markdown",
@@ -1986,6 +3071,9 @@ __all__ = [
     "render_form_field_catalog_markdown",
     "render_frontend_i18n_label_markdown",
     "render_lookup_dictionary_markdown",
+    "render_platform_term_dictionary_markdown",
     "search_field_dictionary",
     "search_lookup_dictionary",
+    "search_platform_terms",
+    "term_definition_counts_by_module",
 ]

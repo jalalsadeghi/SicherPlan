@@ -41,8 +41,8 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: P-04 manifest section planning_staffing.filters_and_scope includes field date_from labeled From.
   - [page_help_manifest] Assistant Page Help Manifest: P-04 manifest section planning_staffing.filters_and_scope includes field date_from labeled Von.
-  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_from.
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field date_from.
+  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_from.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_from.
   - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_from.
   - [backend_schema] AssistantFieldReleasedScheduleVisibilityInput: AssistantFieldReleasedScheduleVisibilityInput includes field date_from.
@@ -68,8 +68,8 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: P-04 manifest section planning_staffing.filters_and_scope includes field date_to labeled To.
   - [page_help_manifest] Assistant Page Help Manifest: P-04 manifest section planning_staffing.filters_and_scope includes field date_to labeled Bis.
-  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_to.
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field date_to.
+  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_to.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_to.
   - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_to.
   - [backend_schema] AssistantFieldReleasedScheduleVisibilityInput: AssistantFieldReleasedScheduleVisibilityInput includes field date_to.
@@ -143,12 +143,12 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: P-04 manifest section planning_staffing.filters_and_scope includes field planning_mode_code labeled Planning mode.
   - [page_help_manifest] Assistant Page Help Manifest: P-04 manifest section planning_staffing.filters_and_scope includes field planning_mode_code labeled Planungsmodus.
-  - [typescript_api_interface] CustomerNewPlanWizardState: CustomerNewPlanWizardState includes field planning_mode_code.
-  - [typescript_api_interface] CoverageShiftItem: CoverageShiftItem includes field planning_mode_code.
-  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field planning_mode_code.
-  - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field planning_mode_code.
-  - [typescript_api_interface] FinanceBillingTimesheetLineRead: FinanceBillingTimesheetLineRead includes field planning_mode_code.
   - [typescript_api_interface] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_mode_code.
+  - [typescript_api_interface] CustomerRateLineRead: CustomerRateLineRead includes field planning_mode_code.
+  - [typescript_api_interface] CustomerRateLinePayload: CustomerRateLinePayload includes field planning_mode_code.
+  - [typescript_api_interface] FinanceBillingTimesheetLineRead: FinanceBillingTimesheetLineRead includes field planning_mode_code.
+  - [typescript_api_interface] PlanningRecordListItem: PlanningRecordListItem includes field planning_mode_code.
+  - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field planning_mode_code.
 
 ## assignment.planning_record_id
 
@@ -170,12 +170,12 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: P-04 manifest section planning_staffing.filters_and_scope includes field planning_record_id labeled Planning record.
   - [page_help_manifest] Assistant Page Help Manifest: P-04 manifest section planning_staffing.filters_and_scope includes field planning_record_id labeled Planungsdatensatz.
-  - [typescript_api_interface] CustomerNewPlanWizardState: CustomerNewPlanWizardState includes field planning_record_id.
-  - [typescript_api_interface] CoverageShiftItem: CoverageShiftItem includes field planning_record_id.
-  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field planning_record_id.
-  - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field planning_record_id.
-  - [typescript_api_interface] TeamRead: TeamRead includes field planning_record_id.
-  - [typescript_api_interface] TeamCreate: TeamCreate includes field planning_record_id.
+  - [typescript_api_interface] CustomerDashboardCalendarItemRead: CustomerDashboardCalendarItemRead includes field planning_record_id.
+  - [typescript_api_interface] FinanceBillingTimesheetLineRead: FinanceBillingTimesheetLineRead includes field planning_record_id.
+  - [typescript_api_interface] FinanceBillingTimesheetRead: FinanceBillingTimesheetRead includes field planning_record_id.
+  - [typescript_api_interface] PlanningCommercialLinkRead: PlanningCommercialLinkRead includes field planning_record_id.
+  - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_record_id.
+  - [typescript_api_interface] PlanningBoardShiftListItem: PlanningBoardShiftListItem includes field planning_record_id.
 
 ## assignment.subcontractor_releases
 
@@ -290,10 +290,10 @@
   - [page_help_manifest] Assistant Page Help Manifest: C-01 manifest section customers.contacts_addresses_billing includes field address labeled Adresse.
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.address defines labels Address, Adresse.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds addressDraft.address_id next to customerAdmin.fields.address.
+  - [typescript_api_interface] CustomerInvoicePartyRead: CustomerInvoicePartyRead includes field address.
   - [typescript_api_interface] EmployeeAddressHistoryCreatePayload: EmployeeAddressHistoryCreatePayload includes field address.
   - [typescript_api_interface] EmployeeAddressHistoryUpdatePayload: EmployeeAddressHistoryUpdatePayload includes field address.
-  - [typescript_api_interface] CustomerInvoicePartyRead: CustomerInvoicePartyRead includes field address.
-  - [backend_schema] CustomerInvoiceParty: CustomerInvoiceParty includes field address.
+  - [backend_schema] Branch: Branch includes field address.
 
 ## customer.address_id
 
@@ -314,13 +314,13 @@
 - aliases: address_id, customerAdmin.fields.addressId, Adress-ID, Address ID, Customer
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.addressId defines labels Address ID, Adress-ID.
-  - [typescript_api_interface] EmployeeAddressHistoryRead: EmployeeAddressHistoryRead includes field address_id.
-  - [typescript_api_interface] EmployeeAddressHistoryCreatePayload: EmployeeAddressHistoryCreatePayload includes field address_id.
-  - [typescript_api_interface] EmployeeAddressHistoryUpdatePayload: EmployeeAddressHistoryUpdatePayload includes field address_id.
   - [typescript_api_interface] BranchRead: BranchRead includes field address_id.
   - [typescript_api_interface] TenantOnboardingPayload: TenantOnboardingPayload includes field address_id.
   - [typescript_api_interface] BranchCreatePayload: BranchCreatePayload includes field address_id.
   - [typescript_api_interface] BranchUpdatePayload: BranchUpdatePayload includes field address_id.
+  - [typescript_api_interface] CustomerAddressRead: CustomerAddressRead includes field address_id.
+  - [typescript_api_interface] CustomerInvoicePartyRead: CustomerInvoicePartyRead includes field address_id.
+  - [typescript_api_interface] CustomerInvoicePartyPayload: CustomerInvoicePartyPayload includes field address_id.
 
 ## customer.address_type
 
@@ -341,12 +341,12 @@
 - aliases: address_type, customerAdmin.fields.addressType, addressDraft.address_type, Adresstyp, Address type, Customer
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.addressType defines labels Address type, Adresstyp.
-  - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds addressDraft.address_type next to customerAdmin.fields.addressType.
+  - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds addressDraft.address_type next to customerAdmin.fields.addressType.
+  - [typescript_api_interface] CustomerAddressRead: CustomerAddressRead includes field address_type.
+  - [typescript_api_interface] CustomerAddressPayload: CustomerAddressPayload includes field address_type.
   - [typescript_api_interface] EmployeeAddressHistoryRead: EmployeeAddressHistoryRead includes field address_type.
   - [typescript_api_interface] EmployeeAddressHistoryCreatePayload: EmployeeAddressHistoryCreatePayload includes field address_type.
   - [typescript_api_interface] EmployeeAddressHistoryUpdatePayload: EmployeeAddressHistoryUpdatePayload includes field address_type.
-  - [typescript_api_interface] CustomerAddressRead: CustomerAddressRead includes field address_type.
-  - [typescript_api_interface] CustomerAddressPayload: CustomerAddressPayload includes field address_type.
   - [backend_schema] CustomerAddressLink: CustomerAddressLink includes field address_type.
 
 ## customer.amount_mode
@@ -389,11 +389,11 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.bankAccountHolder defines labels Account holder, Kontoinhaber.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds billingProfileDraft.bank_account_holder next to customerAdmin.fields.bankAccountHolder.
+  - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field bank_account_holder.
+  - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field bank_account_holder.
   - [typescript_api_interface] EmployeePrivateProfileRead: EmployeePrivateProfileRead includes field bank_account_holder.
   - [typescript_api_interface] EmployeePrivateProfileWritePayload: EmployeePrivateProfileWritePayload includes field bank_account_holder.
   - [typescript_api_interface] EmployeePrivateProfileUpdatePayload: EmployeePrivateProfileUpdatePayload includes field bank_account_holder.
-  - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field bank_account_holder.
-  - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field bank_account_holder.
   - [typescript_api_interface] SubcontractorFinanceProfileRead: SubcontractorFinanceProfileRead includes field bank_account_holder.
 
 ## customer.bank_bic
@@ -416,11 +416,11 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.bankBic defines labels BIC, BIC.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds billingProfileDraft.bank_bic next to customerAdmin.fields.bankBic.
+  - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field bank_bic.
+  - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field bank_bic.
   - [typescript_api_interface] EmployeePrivateProfileRead: EmployeePrivateProfileRead includes field bank_bic.
   - [typescript_api_interface] EmployeePrivateProfileWritePayload: EmployeePrivateProfileWritePayload includes field bank_bic.
   - [typescript_api_interface] EmployeePrivateProfileUpdatePayload: EmployeePrivateProfileUpdatePayload includes field bank_bic.
-  - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field bank_bic.
-  - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field bank_bic.
   - [typescript_api_interface] SubcontractorFinanceProfileRead: SubcontractorFinanceProfileRead includes field bank_bic.
 
 ## customer.bank_iban
@@ -443,11 +443,11 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.bankIban defines labels IBAN, IBAN.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds billingProfileDraft.bank_iban next to customerAdmin.fields.bankIban.
+  - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field bank_iban.
+  - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field bank_iban.
   - [typescript_api_interface] EmployeePrivateProfileRead: EmployeePrivateProfileRead includes field bank_iban.
   - [typescript_api_interface] EmployeePrivateProfileWritePayload: EmployeePrivateProfileWritePayload includes field bank_iban.
   - [typescript_api_interface] EmployeePrivateProfileUpdatePayload: EmployeePrivateProfileUpdatePayload includes field bank_iban.
-  - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field bank_iban.
-  - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field bank_iban.
   - [typescript_api_interface] SubcontractorFinanceProfileRead: SubcontractorFinanceProfileRead includes field bank_iban.
 
 ## customer.bank_name
@@ -568,16 +568,16 @@
 - definition_de: Feld Ort im Kontext von Customer.
 - definition_en: City field used in the Customer context.
 - related_fields: none
-- aliases: city, customerAdmin.fields.city, addressDraft.city, Ort, City, Customer
+- aliases: city, customerAdmin.fields.city, addressDirectoryDraft.city, Ort, City, Customer
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.city defines labels City, Ort.
-  - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds addressDraft.city next to customerAdmin.fields.city.
-  - [typescript_api_interface] EmployeeAddressHistoryRead: EmployeeAddressHistoryRead includes field city.
-  - [typescript_api_interface] EmployeeAddressWriteAddressInput: EmployeeAddressWriteAddressInput includes field city.
+  - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds addressDirectoryDraft.city next to customerAdmin.fields.city.
   - [typescript_api_interface] CustomerAddressRead: CustomerAddressRead includes field city.
   - [typescript_api_interface] CustomerAvailableAddressRead: CustomerAvailableAddressRead includes field city.
   - [typescript_api_interface] CustomerAvailableAddressCreatePayload: CustomerAvailableAddressCreatePayload includes field city.
-  - [backend_schema] EmployeeAddressWriteAddress: EmployeeAddressWriteAddress includes field city.
+  - [typescript_api_interface] EmployeeAddressHistoryRead: EmployeeAddressHistoryRead includes field city.
+  - [typescript_api_interface] EmployeeAddressWriteAddressInput: EmployeeAddressWriteAddressInput includes field city.
+  - [backend_schema] Address: Address includes field city.
 
 ## customer.classification_lookup_id
 
@@ -716,7 +716,7 @@
 - entity_type: Customer
 - route_names: none
 - form_contexts: none
-- input_type: select
+- input_type: text
 - required: unknown
 - confidence: high
 - labels_de: Ländercode
@@ -724,16 +724,16 @@
 - definition_de: Feld Ländercode im Kontext von Customer.
 - definition_en: Country code field used in the Customer context.
 - related_fields: none
-- aliases: country_code, customerAdmin.fields.countryCode, addressDraft.country_code, Ländercode, Country code, Customer
+- aliases: country_code, customerAdmin.fields.countryCode, addressDirectoryDraft.country_code, Ländercode, Country code, Customer
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.countryCode defines labels Country code, Ländercode.
-  - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds addressDraft.country_code next to customerAdmin.fields.countryCode.
-  - [typescript_api_interface] EmployeeAddressHistoryRead: EmployeeAddressHistoryRead includes field country_code.
-  - [typescript_api_interface] EmployeeAddressWriteAddressInput: EmployeeAddressWriteAddressInput includes field country_code.
+  - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds addressDirectoryDraft.country_code next to customerAdmin.fields.countryCode.
   - [typescript_api_interface] CustomerAddressRead: CustomerAddressRead includes field country_code.
   - [typescript_api_interface] CustomerAvailableAddressRead: CustomerAvailableAddressRead includes field country_code.
   - [typescript_api_interface] CustomerAvailableAddressCreatePayload: CustomerAvailableAddressCreatePayload includes field country_code.
-  - [backend_schema] EmployeeAddressWriteAddress: EmployeeAddressWriteAddress includes field country_code.
+  - [typescript_api_interface] EmployeeAddressHistoryRead: EmployeeAddressHistoryRead includes field country_code.
+  - [typescript_api_interface] EmployeeAddressWriteAddressInput: EmployeeAddressWriteAddressInput includes field country_code.
+  - [backend_schema] Address: Address includes field country_code.
 
 ## customer.currency_code
 
@@ -755,12 +755,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.currencyCode defines labels Currency, Währung.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds rateCardDraft.currency_code next to customerAdmin.fields.currencyCode.
-  - [typescript_api_interface] FinanceActualLineItem: FinanceActualLineItem includes field currency_code.
-  - [typescript_api_interface] FinanceBillingInvoiceRead: FinanceBillingInvoiceRead includes field currency_code.
   - [typescript_api_interface] CustomerPortalInvoiceRead: CustomerPortalInvoiceRead includes field currency_code.
-  - [typescript_api_interface] PayrollTariffRateRead: PayrollTariffRateRead includes field currency_code.
-  - [typescript_api_interface] PayrollSurchargeRuleRead: PayrollSurchargeRuleRead includes field currency_code.
-  - [typescript_api_interface] EmployeePayProfileRead: EmployeePayProfileRead includes field currency_code.
+  - [typescript_api_interface] CustomerDashboardFinanceSummaryRead: CustomerDashboardFinanceSummaryRead includes field currency_code.
+  - [typescript_api_interface] CustomerSurchargeRuleRead: CustomerSurchargeRuleRead includes field currency_code.
+  - [typescript_api_interface] CustomerRateCardRead: CustomerRateCardRead includes field currency_code.
+  - [typescript_api_interface] CustomerRateCardPayload: CustomerRateCardPayload includes field currency_code.
+  - [typescript_api_interface] CustomerSurchargeRulePayload: CustomerSurchargeRulePayload includes field currency_code.
 
 ## customer.customer_number
 
@@ -778,7 +778,7 @@
 - definition_de: Feld Kundennummer im Kontext von Customer.
 - definition_en: Customer number field used in the Customer context.
 - related_fields: none
-- aliases: customer_number, Customer number, Kundennummer, customerAdmin.fields.customerNumber, customerDraft.customer_number, Customer
+- aliases: customer_number, Customer number, Kundennummer, customerAdmin.fields.customerNumber, customerDraft.customer_number, Customer, شماره مشتری
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: C-01 manifest section customers.master_profile includes field customer_number labeled Customer number.
   - [page_help_manifest] Assistant Page Help Manifest: C-01 manifest section customers.master_profile includes field customer_number labeled Kundennummer.
@@ -787,7 +787,7 @@
   - [typescript_api_interface] CustomerPortalContextRead: CustomerPortalContextRead includes field customer_number.
   - [typescript_api_interface] CustomerListItem: CustomerListItem includes field customer_number.
   - [typescript_api_interface] CustomerCreatePayload: CustomerCreatePayload includes field customer_number.
-  - [backend_schema] CustomerRevenueReportRow: CustomerRevenueReportRow includes field customer_number.
+  - [backend_schema] Customer: Customer includes field customer_number.
 
 ## customer.customer_status_lookup_id
 
@@ -863,11 +863,11 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.defaultBranchId defines labels Default branch, Standardniederlassung.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds advancedFilterDraft.default_branch_id next to customerAdmin.fields.defaultBranchId.
-  - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field default_branch_id.
-  - [typescript_api_interface] EmployeeListFilters: EmployeeListFilters includes field default_branch_id.
   - [typescript_api_interface] CustomerListItem: CustomerListItem includes field default_branch_id.
   - [typescript_api_interface] CustomerFilterParams: CustomerFilterParams includes field default_branch_id.
   - [typescript_api_interface] CustomerCreatePayload: CustomerCreatePayload includes field default_branch_id.
+  - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field default_branch_id.
+  - [typescript_api_interface] EmployeeListFilters: EmployeeListFilters includes field default_branch_id.
   - [backend_schema] Customer: Customer includes field default_branch_id.
 
 ## customer.default_mandate_id
@@ -890,10 +890,10 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.defaultMandateId defines labels Default mandate, Standardmandat.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds advancedFilterDraft.default_mandate_id next to customerAdmin.fields.defaultMandateId.
-  - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field default_mandate_id.
-  - [typescript_api_interface] EmployeeListFilters: EmployeeListFilters includes field default_mandate_id.
   - [typescript_api_interface] CustomerFilterParams: CustomerFilterParams includes field default_mandate_id.
   - [typescript_api_interface] CustomerCreatePayload: CustomerCreatePayload includes field default_mandate_id.
+  - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field default_mandate_id.
+  - [typescript_api_interface] EmployeeListFilters: EmployeeListFilters includes field default_mandate_id.
   - [backend_schema] Customer: Customer includes field default_mandate_id.
   - [backend_schema] CustomerFilter: CustomerFilter includes field default_mandate_id.
 
@@ -917,12 +917,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.documentId defines labels Document ID, Dokument-ID.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds historyAttachmentDraft.document_id next to customerAdmin.fields.documentId.
-  - [typescript_api_interface] PlanningOutputDocumentRead: PlanningOutputDocumentRead includes field document_id.
+  - [typescript_api_interface] CustomerPortalDocumentRefRead: CustomerPortalDocumentRefRead includes field document_id.
+  - [typescript_api_interface] CustomerHistoryAttachmentRead: CustomerHistoryAttachmentRead includes field document_id.
+  - [typescript_api_interface] CustomerHistoryAttachmentLinkPayload: CustomerHistoryAttachmentLinkPayload includes field document_id.
+  - [typescript_api_interface] CustomerExportResult: CustomerExportResult includes field document_id.
+  - [typescript_api_interface] CustomerVCardResult: CustomerVCardResult includes field document_id.
   - [typescript_api_interface] EmployeeDocumentListItemRead: EmployeeDocumentListItemRead includes field document_id.
-  - [typescript_api_interface] EmployeeDocumentLinkPayload: EmployeeDocumentLinkPayload includes field document_id.
-  - [typescript_api_interface] EmployeeExportResult: EmployeeExportResult includes field document_id.
-  - [typescript_api_interface] NoticeAttachmentRead: NoticeAttachmentRead includes field document_id.
-  - [typescript_api_interface] SubcontractorWorkerQualificationProofLinkCreate: SubcontractorWorkerQualificationProofLinkCreate includes field document_id.
 
 ## customer.dunning_policy_code
 
@@ -971,9 +971,9 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.eInvoiceEnabled defines labels E-Rechnung aktiviert, E-invoicing enabled.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds billingProfileDraft.tax_exempt next to customerAdmin.fields.eInvoiceEnabled.
-  - [typescript_api_interface] FinanceBillingInvoiceRead: FinanceBillingInvoiceRead includes field e_invoice_enabled.
   - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field e_invoice_enabled.
   - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field e_invoice_enabled.
+  - [typescript_api_interface] FinanceBillingInvoiceRead: FinanceBillingInvoiceRead includes field e_invoice_enabled.
   - [typescript_api_interface] PlanningCommercialLinkRead: PlanningCommercialLinkRead includes field e_invoice_enabled.
   - [backend_schema] CustomerBillingProfile: CustomerBillingProfile includes field e_invoice_enabled.
   - [backend_schema] CustomerBillingProfileCreate: CustomerBillingProfileCreate includes field e_invoice_enabled.
@@ -998,12 +998,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.effectiveFrom defines labels Effective from, Gültig ab.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds rateCardDraft.effective_from next to customerAdmin.fields.effectiveFrom.
-  - [typescript_api_interface] PayrollTariffTableListItem: PayrollTariffTableListItem includes field effective_from.
-  - [typescript_api_interface] EmployeePayProfileRead: EmployeePayProfileRead includes field effective_from.
   - [typescript_api_interface] CustomerEmployeeBlockRead: CustomerEmployeeBlockRead includes field effective_from.
   - [typescript_api_interface] CustomerSurchargeRuleRead: CustomerSurchargeRuleRead includes field effective_from.
   - [typescript_api_interface] CustomerRateCardRead: CustomerRateCardRead includes field effective_from.
   - [typescript_api_interface] CustomerRateCardPayload: CustomerRateCardPayload includes field effective_from.
+  - [typescript_api_interface] CustomerSurchargeRulePayload: CustomerSurchargeRulePayload includes field effective_from.
+  - [typescript_api_interface] CustomerEmployeeBlockPayload: CustomerEmployeeBlockPayload includes field effective_from.
 
 ## customer.effective_to
 
@@ -1054,10 +1054,10 @@
   - [page_help_manifest] Assistant Page Help Manifest: C-01 manifest section customers.contacts_addresses_billing includes field email labeled E-Mail.
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.email defines labels E-Mail, Email.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds contactDraft.email next to customerAdmin.fields.email.
-  - [typescript_api_interface] TenantAdminUserListItem: TenantAdminUserListItem includes field email.
-  - [typescript_api_interface] TenantAdminUserCreatePayload: TenantAdminUserCreatePayload includes field email.
   - [typescript_api_interface] CustomerPortalAccessListItem: CustomerPortalAccessListItem includes field email.
   - [typescript_api_interface] CustomerPortalAccessCreatePayload: CustomerPortalAccessCreatePayload includes field email.
+  - [typescript_api_interface] TenantAdminUserListItem: TenantAdminUserListItem includes field email.
+  - [typescript_api_interface] TenantAdminUserCreatePayload: TenantAdminUserCreatePayload includes field email.
 
 ## customer.employee_id
 
@@ -1079,12 +1079,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.employeeId defines labels Employee ID, Mitarbeiter-ID.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds employeeBlockDraft.employee_id next to customerAdmin.fields.employeeId.
-  - [typescript_api_interface] StaffingBoardAssignmentItem: StaffingBoardAssignmentItem includes field employee_id.
-  - [typescript_api_interface] AssignmentRead: AssignmentRead includes field employee_id.
-  - [typescript_api_interface] TeamMemberRead: TeamMemberRead includes field employee_id.
-  - [typescript_api_interface] TeamMemberCreate: TeamMemberCreate includes field employee_id.
-  - [typescript_api_interface] TeamMemberUpdate: TeamMemberUpdate includes field employee_id.
-  - [typescript_api_interface] StaffingAssignCommand: StaffingAssignCommand includes field employee_id.
+  - [typescript_api_interface] CustomerEmployeeBlockRead: CustomerEmployeeBlockRead includes field employee_id.
+  - [typescript_api_interface] CustomerEmployeeBlockPayload: CustomerEmployeeBlockPayload includes field employee_id.
+  - [typescript_api_interface] EmployeeGroupMembershipRead: EmployeeGroupMembershipRead includes field employee_id.
+  - [typescript_api_interface] EmployeePrivateProfileRead: EmployeePrivateProfileRead includes field employee_id.
+  - [typescript_api_interface] EmployeePrivateProfileWritePayload: EmployeePrivateProfileWritePayload includes field employee_id.
+  - [typescript_api_interface] EmployeeAddressHistoryRead: EmployeeAddressHistoryRead includes field employee_id.
 
 ## customer.external_ref
 
@@ -1102,7 +1102,7 @@
 - definition_de: Feld Externe Referenz im Kontext von Customer.
 - definition_en: External reference field used in the Customer context.
 - related_fields: none
-- aliases: external_ref, customerAdmin.fields.externalRef, customerDraft.external_ref, Externe Referenz, External reference, Customer
+- aliases: external_ref, customerAdmin.fields.externalRef, customerDraft.external_ref, Externe Referenz, External reference, Customer, ارجاع خارجی
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.externalRef defines labels External reference, Externe Referenz.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds customerDraft.external_ref next to customerAdmin.fields.externalRef.
@@ -1133,9 +1133,9 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.fixedAmount defines labels Fixbetrag, Fixed amount.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds surchargeRuleDraft.fixed_amount next to customerAdmin.fields.fixedAmount.
-  - [typescript_api_interface] PayrollSurchargeRuleRead: PayrollSurchargeRuleRead includes field fixed_amount.
   - [typescript_api_interface] CustomerSurchargeRuleRead: CustomerSurchargeRuleRead includes field fixed_amount.
   - [typescript_api_interface] CustomerSurchargeRulePayload: CustomerSurchargeRulePayload includes field fixed_amount.
+  - [typescript_api_interface] PayrollSurchargeRuleRead: PayrollSurchargeRuleRead includes field fixed_amount.
   - [backend_schema] CustomerSurchargeRule: CustomerSurchargeRule includes field fixed_amount.
   - [backend_schema] CustomerSurchargeRuleCreate: CustomerSurchargeRuleCreate includes field fixed_amount.
   - [backend_schema] CustomerSurchargeRuleUpdate: CustomerSurchargeRuleUpdate includes field fixed_amount.
@@ -1162,10 +1162,10 @@
   - [page_help_manifest] Assistant Page Help Manifest: C-01 manifest section customers.contacts_addresses_billing includes field full_name labeled Vollständiger Name.
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.fullName defines labels Full name, Vollständiger Name.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds contactDraft.full_name next to customerAdmin.fields.fullName.
-  - [typescript_api_interface] TenantAdminUserListItem: TenantAdminUserListItem includes field full_name.
-  - [typescript_api_interface] TenantAdminUserCreatePayload: TenantAdminUserCreatePayload includes field full_name.
   - [typescript_api_interface] CustomerPortalAccessListItem: CustomerPortalAccessListItem includes field full_name.
   - [typescript_api_interface] CustomerPortalAccessCreatePayload: CustomerPortalAccessCreatePayload includes field full_name.
+  - [typescript_api_interface] TenantAdminUserListItem: TenantAdminUserListItem includes field full_name.
+  - [typescript_api_interface] TenantAdminUserCreatePayload: TenantAdminUserCreatePayload includes field full_name.
 
 ## customer.function_label
 
@@ -1214,12 +1214,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.functionTypeId defines labels Function ID, Funktions-ID.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds rateLineDraft.function_type_id next to customerAdmin.fields.functionTypeId.
-  - [typescript_api_interface] CoverageDemandGroupItem: CoverageDemandGroupItem includes field function_type_id.
-  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field function_type_id.
-  - [typescript_api_interface] StaffingBoardDemandGroupItem: StaffingBoardDemandGroupItem includes field function_type_id.
-  - [typescript_api_interface] DemandGroupRead: DemandGroupRead includes field function_type_id.
-  - [typescript_api_interface] DemandGroupCreate: DemandGroupCreate includes field function_type_id.
-  - [typescript_api_interface] DemandGroupUpdate: DemandGroupUpdate includes field function_type_id.
+  - [typescript_api_interface] CustomerRateLineRead: CustomerRateLineRead includes field function_type_id.
+  - [typescript_api_interface] CustomerRateLinePayload: CustomerRateLinePayload includes field function_type_id.
+  - [typescript_api_interface] EmployeeQualificationRead: EmployeeQualificationRead includes field function_type_id.
+  - [typescript_api_interface] EmployeeQualificationCreatePayload: EmployeeQualificationCreatePayload includes field function_type_id.
+  - [typescript_api_interface] EmployeeQualificationUpdatePayload: EmployeeQualificationUpdatePayload includes field function_type_id.
+  - [typescript_api_interface] PayrollTariffRateRead: PayrollTariffRateRead includes field function_type_id.
 
 ## customer.history_entry
 
@@ -1264,10 +1264,10 @@
   - [page_help_manifest] Assistant Page Help Manifest: C-01 manifest section customers.contacts_addresses_billing includes field invoice_email labeled Rechnungs-E-Mail.
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.invoiceEmail defines labels Invoice email, Rechnungs-E-Mail.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds billingProfileDraft.invoice_email next to customerAdmin.fields.invoiceEmail.
-  - [typescript_api_interface] FinanceBillingInvoiceRead: FinanceBillingInvoiceRead includes field invoice_email.
   - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field invoice_email.
   - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field invoice_email.
   - [typescript_api_interface] CustomerInvoicePartyRead: CustomerInvoicePartyRead includes field invoice_email.
+  - [typescript_api_interface] CustomerInvoicePartyPayload: CustomerInvoicePartyPayload includes field invoice_email.
 
 ## customer.invoice_layout_code
 
@@ -1443,12 +1443,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.label defines labels Bezeichnung, Label.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds addressDraft.label next to customerAdmin.fields.label.
-  - [typescript_api_interface] DashboardQuickAction: DashboardQuickAction includes field label.
   - [typescript_api_interface] AssistantLink: AssistantLink includes field label.
   - [typescript_api_interface] AssistantPageHelpField: AssistantPageHelpField includes field label.
   - [typescript_api_interface] AssistantPageHelpAction: AssistantPageHelpAction includes field label.
-  - [typescript_api_interface] EmployeePrivateProfileMaritalStatusOptionRead: EmployeePrivateProfileMaritalStatusOptionRead includes field label.
-  - [typescript_api_interface] EmployeeDocumentListItemRead: EmployeeDocumentListItemRead includes field label.
+  - [typescript_api_interface] LookupValueRead: LookupValueRead includes field label.
+  - [typescript_api_interface] LookupValueCreatePayload: LookupValueCreatePayload includes field label.
+  - [typescript_api_interface] LookupValueUpdatePayload: LookupValueUpdatePayload includes field label.
 
 ## customer.legal_form_lookup_id
 
@@ -1493,15 +1493,15 @@
 - definition_de: Offizieller rechtlicher Name des Kunden oder der juristischen Einheit, der in Verträgen, Rechnungen und offiziellen Dokumenten verwendet wird.
 - definition_en: Official legal name of the customer or legal entity used for contracts, invoices, and formal documents.
 - related_fields: customer.name, customer.customer_number, customer.external_ref
-- aliases: legal_name, Legal name, Rechtlicher Name, customerAdmin.fields.legalName, customerDraft.legal_name, Customer
+- aliases: legal_name, Legal name, Rechtlicher Name, customerAdmin.fields.legalName, customerDraft.legal_name, Customer, نام قانونی
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: C-01 manifest section customers.master_profile includes field legal_name labeled Legal name.
   - [page_help_manifest] Assistant Page Help Manifest: C-01 manifest section customers.master_profile includes field legal_name labeled Rechtlicher Name.
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.legalName defines labels Legal name, Rechtlicher Name.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds customerDraft.legal_name next to customerAdmin.fields.legalName.
+  - [typescript_api_interface] SubcontractorPortalContextRead: SubcontractorPortalContextRead includes field legal_name.
   - [typescript_api_interface] TenantOnboardingPayload: TenantOnboardingPayload includes field legal_name.
   - [typescript_api_interface] TenantUpdatePayload: TenantUpdatePayload includes field legal_name.
-  - [typescript_api_interface] SubcontractorPortalContextRead: SubcontractorPortalContextRead includes field legal_name.
   - [typescript_api_interface] CustomerCreatePayload: CustomerCreatePayload includes field legal_name.
 
 ## customer.leitweg_id
@@ -1524,9 +1524,9 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.leitwegId defines labels Leitweg-/Routing-ID, Leitweg/routing ID.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds billingProfileDraft.leitweg_id next to customerAdmin.fields.leitwegId.
-  - [typescript_api_interface] FinanceBillingInvoiceRead: FinanceBillingInvoiceRead includes field leitweg_id.
   - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field leitweg_id.
   - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field leitweg_id.
+  - [typescript_api_interface] FinanceBillingInvoiceRead: FinanceBillingInvoiceRead includes field leitweg_id.
   - [backend_schema] CustomerBillingProfile: CustomerBillingProfile includes field leitweg_id.
   - [backend_schema] CustomerBillingProfileCreate: CustomerBillingProfileCreate includes field leitweg_id.
   - [backend_schema] CustomerBillingProfileUpdate: CustomerBillingProfileUpdate includes field leitweg_id.
@@ -1554,9 +1554,9 @@
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.lifecycleStatus defines labels Lifecycle status, Lifecycle-Status.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds customerDraft.status next to customerAdmin.fields.lifecycleStatus.
   - [typescript_api_interface] CustomerFilterParams: CustomerFilterParams includes field lifecycle_status.
-  - [typescript_api_interface] SubcontractorListFilters: SubcontractorListFilters includes field lifecycle_status.
   - [typescript_api_interface] CustomerOrderListFilters: CustomerOrderListFilters includes field lifecycle_status.
   - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field lifecycle_status.
+  - [typescript_api_interface] SubcontractorListFilters: SubcontractorListFilters includes field lifecycle_status.
 
 ## customer.line_kind
 
@@ -1605,11 +1605,11 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.locale defines labels Locale, Sprache.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds portalAccessDraft.locale next to customerAdmin.fields.locale.
-  - [typescript_api_interface] TenantAdminUserListItem: TenantAdminUserListItem includes field locale.
-  - [typescript_api_interface] TenantAdminUserCreatePayload: TenantAdminUserCreatePayload includes field locale.
+  - [typescript_api_interface] AssistantConversation: AssistantConversation includes field locale.
   - [typescript_api_interface] CustomerPortalAccessListItem: CustomerPortalAccessListItem includes field locale.
   - [typescript_api_interface] CustomerPortalAccessCreatePayload: CustomerPortalAccessCreatePayload includes field locale.
-  - [typescript_api_interface] AssistantConversation: AssistantConversation includes field locale.
+  - [typescript_api_interface] TenantAdminUserListItem: TenantAdminUserListItem includes field locale.
+  - [typescript_api_interface] TenantAdminUserCreatePayload: TenantAdminUserCreatePayload includes field locale.
   - [typescript_api_interface] AuthenticatedUser: AuthenticatedUser includes field locale.
 
 ## customer.minimum_quantity
@@ -1659,12 +1659,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.mobile defines labels Mobil, Mobile.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds contactDraft.mobile next to customerAdmin.fields.mobile.
-  - [typescript_api_interface] SubcontractorWorkerListItem: SubcontractorWorkerListItem includes field mobile.
-  - [typescript_api_interface] SubcontractorPortalWorkerCreate: SubcontractorPortalWorkerCreate includes field mobile.
-  - [typescript_api_interface] SubcontractorPortalWorkerUpdate: SubcontractorPortalWorkerUpdate includes field mobile.
-  - [typescript_api_interface] SubcontractorPortalWorkerRead: SubcontractorPortalWorkerRead includes field mobile.
   - [typescript_api_interface] CustomerPortalContextRead: CustomerPortalContextRead includes field mobile.
   - [typescript_api_interface] SubcontractorPortalContextRead: SubcontractorPortalContextRead includes field mobile.
+  - [typescript_api_interface] CustomerContactRead: CustomerContactRead includes field mobile.
+  - [typescript_api_interface] CustomerContactPayload: CustomerContactPayload includes field mobile.
+  - [typescript_api_interface] SubcontractorWorkerListItem: SubcontractorWorkerListItem includes field mobile.
+  - [typescript_api_interface] SubcontractorPortalWorkerCreate: SubcontractorPortalWorkerCreate includes field mobile.
 
 ## customer.name
 
@@ -1689,9 +1689,9 @@
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.name defines labels Anzeigename, Display name.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds customerDraft.name next to customerAdmin.fields.name.
   - [typescript_api_interface] TenantListItem: TenantListItem includes field name.
-  - [typescript_api_interface] TeamRead: TeamRead includes field name.
-  - [typescript_api_interface] TeamCreate: TeamCreate includes field name.
-  - [typescript_api_interface] TeamUpdate: TeamUpdate includes field name.
+  - [typescript_api_interface] CustomerPortalContextRead: CustomerPortalContextRead includes field name.
+  - [typescript_api_interface] BranchRead: BranchRead includes field name.
+  - [typescript_api_interface] MandateRead: MandateRead includes field name.
 
 ## customer.note
 
@@ -1740,12 +1740,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.notes defines labels Notes, Notizen.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds customerDraft.notes next to customerAdmin.fields.notes.
-  - [typescript_api_interface] TeamMemberRead: TeamMemberRead includes field notes.
-  - [typescript_api_interface] TeamRead: TeamRead includes field notes.
-  - [typescript_api_interface] TeamCreate: TeamCreate includes field notes.
-  - [typescript_api_interface] TeamUpdate: TeamUpdate includes field notes.
-  - [typescript_api_interface] TeamMemberCreate: TeamMemberCreate includes field notes.
-  - [typescript_api_interface] TeamMemberUpdate: TeamMemberUpdate includes field notes.
+  - [typescript_api_interface] MandateRead: MandateRead includes field notes.
+  - [typescript_api_interface] TenantOnboardingPayload: TenantOnboardingPayload includes field notes.
+  - [typescript_api_interface] MandateCreatePayload: MandateCreatePayload includes field notes.
+  - [typescript_api_interface] MandateUpdatePayload: MandateUpdatePayload includes field notes.
+  - [typescript_api_interface] CustomerContactRead: CustomerContactRead includes field notes.
+  - [typescript_api_interface] CustomerRateLineRead: CustomerRateLineRead includes field notes.
 
 ## customer.payment_terms_days
 
@@ -1769,9 +1769,9 @@
   - [page_help_manifest] Assistant Page Help Manifest: C-01 manifest section customers.contacts_addresses_billing includes field payment_terms_days labeled Zahlungsziel in Tagen.
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.paymentTermsDays defines labels Payment terms in days, Zahlungsziel in Tagen.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds billingProfileDraft.payment_terms_days next to customerAdmin.fields.paymentTermsDays.
-  - [typescript_api_interface] FinanceBillingInvoiceRead: FinanceBillingInvoiceRead includes field payment_terms_days.
   - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field payment_terms_days.
   - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field payment_terms_days.
+  - [typescript_api_interface] FinanceBillingInvoiceRead: FinanceBillingInvoiceRead includes field payment_terms_days.
   - [typescript_api_interface] SubcontractorFinanceProfileRead: SubcontractorFinanceProfileRead includes field payment_terms_days.
 
 ## customer.payment_terms_note
@@ -1821,9 +1821,9 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.percentValue defines labels Percent value, Prozentwert.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds surchargeRuleDraft.percent_value next to customerAdmin.fields.percentValue.
-  - [typescript_api_interface] PayrollSurchargeRuleRead: PayrollSurchargeRuleRead includes field percent_value.
   - [typescript_api_interface] CustomerSurchargeRuleRead: CustomerSurchargeRuleRead includes field percent_value.
   - [typescript_api_interface] CustomerSurchargeRulePayload: CustomerSurchargeRulePayload includes field percent_value.
+  - [typescript_api_interface] PayrollSurchargeRuleRead: PayrollSurchargeRuleRead includes field percent_value.
   - [backend_schema] CustomerSurchargeRule: CustomerSurchargeRule includes field percent_value.
   - [backend_schema] CustomerSurchargeRuleCreate: CustomerSurchargeRuleCreate includes field percent_value.
   - [backend_schema] CustomerSurchargeRuleUpdate: CustomerSurchargeRuleUpdate includes field percent_value.
@@ -1874,10 +1874,10 @@
   - [page_help_manifest] Assistant Page Help Manifest: C-01 manifest section customers.contacts_addresses_billing includes field phone labeled Telefon.
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.phone defines labels Phone, Telefon.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds contactDraft.phone next to customerAdmin.fields.phone.
-  - [typescript_api_interface] SubcontractorPortalWorkerCreate: SubcontractorPortalWorkerCreate includes field phone.
-  - [typescript_api_interface] SubcontractorPortalWorkerUpdate: SubcontractorPortalWorkerUpdate includes field phone.
-  - [typescript_api_interface] SubcontractorPortalWorkerRead: SubcontractorPortalWorkerRead includes field phone.
   - [typescript_api_interface] CustomerPortalContextRead: CustomerPortalContextRead includes field phone.
+  - [typescript_api_interface] SubcontractorPortalContextRead: SubcontractorPortalContextRead includes field phone.
+  - [typescript_api_interface] CustomerContactRead: CustomerContactRead includes field phone.
+  - [typescript_api_interface] CustomerContactPayload: CustomerContactPayload includes field phone.
 
 ## customer.planning_mode_code
 
@@ -1899,12 +1899,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.planningModeCode defines labels Planning mode, Planungsmodus.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds rateLineDraft.planning_mode_code next to customerAdmin.fields.planningModeCode.
-  - [typescript_api_interface] CustomerNewPlanWizardState: CustomerNewPlanWizardState includes field planning_mode_code.
-  - [typescript_api_interface] CoverageShiftItem: CoverageShiftItem includes field planning_mode_code.
-  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field planning_mode_code.
-  - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field planning_mode_code.
-  - [typescript_api_interface] FinanceBillingTimesheetLineRead: FinanceBillingTimesheetLineRead includes field planning_mode_code.
   - [typescript_api_interface] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_mode_code.
+  - [typescript_api_interface] CustomerRateLineRead: CustomerRateLineRead includes field planning_mode_code.
+  - [typescript_api_interface] CustomerRateLinePayload: CustomerRateLinePayload includes field planning_mode_code.
+  - [typescript_api_interface] FinanceBillingTimesheetLineRead: FinanceBillingTimesheetLineRead includes field planning_mode_code.
+  - [typescript_api_interface] PlanningRecordListItem: PlanningRecordListItem includes field planning_mode_code.
+  - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field planning_mode_code.
 
 ## customer.postal_code
 
@@ -1922,16 +1922,16 @@
 - definition_de: Feld Postleitzahl im Kontext von Customer.
 - definition_en: Postal code field used in the Customer context.
 - related_fields: none
-- aliases: postal_code, customerAdmin.fields.postalCode, addressDraft.postal_code, Postleitzahl, Postal code, Customer
+- aliases: postal_code, customerAdmin.fields.postalCode, addressDirectoryDraft.postal_code, Postleitzahl, Postal code, Customer
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.postalCode defines labels Postal code, Postleitzahl.
-  - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds addressDraft.postal_code next to customerAdmin.fields.postalCode.
-  - [typescript_api_interface] EmployeeAddressHistoryRead: EmployeeAddressHistoryRead includes field postal_code.
-  - [typescript_api_interface] EmployeeAddressWriteAddressInput: EmployeeAddressWriteAddressInput includes field postal_code.
+  - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds addressDirectoryDraft.postal_code next to customerAdmin.fields.postalCode.
   - [typescript_api_interface] CustomerAddressRead: CustomerAddressRead includes field postal_code.
   - [typescript_api_interface] CustomerAvailableAddressRead: CustomerAvailableAddressRead includes field postal_code.
   - [typescript_api_interface] CustomerAvailableAddressCreatePayload: CustomerAvailableAddressCreatePayload includes field postal_code.
-  - [backend_schema] EmployeeAddressWriteAddress: EmployeeAddressWriteAddress includes field postal_code.
+  - [typescript_api_interface] EmployeeAddressHistoryRead: EmployeeAddressHistoryRead includes field postal_code.
+  - [typescript_api_interface] EmployeeAddressWriteAddressInput: EmployeeAddressWriteAddressInput includes field postal_code.
+  - [backend_schema] Address: Address includes field postal_code.
 
 ## customer.qualification_type_id
 
@@ -1953,12 +1953,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.qualificationTypeId defines labels Qualification ID, Qualifikations-ID.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds rateLineDraft.qualification_type_id next to customerAdmin.fields.qualificationTypeId.
-  - [typescript_api_interface] CoverageDemandGroupItem: CoverageDemandGroupItem includes field qualification_type_id.
-  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field qualification_type_id.
-  - [typescript_api_interface] StaffingBoardDemandGroupItem: StaffingBoardDemandGroupItem includes field qualification_type_id.
-  - [typescript_api_interface] DemandGroupRead: DemandGroupRead includes field qualification_type_id.
-  - [typescript_api_interface] DemandGroupCreate: DemandGroupCreate includes field qualification_type_id.
-  - [typescript_api_interface] DemandGroupUpdate: DemandGroupUpdate includes field qualification_type_id.
+  - [typescript_api_interface] CustomerRateLineRead: CustomerRateLineRead includes field qualification_type_id.
+  - [typescript_api_interface] CustomerRateLinePayload: CustomerRateLinePayload includes field qualification_type_id.
+  - [typescript_api_interface] EmployeeQualificationRead: EmployeeQualificationRead includes field qualification_type_id.
+  - [typescript_api_interface] EmployeeQualificationCreatePayload: EmployeeQualificationCreatePayload includes field qualification_type_id.
+  - [typescript_api_interface] EmployeeQualificationUpdatePayload: EmployeeQualificationUpdatePayload includes field qualification_type_id.
+  - [typescript_api_interface] PayrollTariffRateRead: PayrollTariffRateRead includes field qualification_type_id.
 
 ## customer.ranking_lookup_id
 
@@ -2061,9 +2061,9 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.regionCode defines labels Region code, Regionscode.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds surchargeRuleDraft.region_code next to customerAdmin.fields.regionCode.
-  - [typescript_api_interface] PayrollTariffTableListItem: PayrollTariffTableListItem includes field region_code.
   - [typescript_api_interface] CustomerSurchargeRuleRead: CustomerSurchargeRuleRead includes field region_code.
   - [typescript_api_interface] CustomerSurchargeRulePayload: CustomerSurchargeRulePayload includes field region_code.
+  - [typescript_api_interface] PayrollTariffTableListItem: PayrollTariffTableListItem includes field region_code.
   - [backend_schema] CustomerSurchargeRule: CustomerSurchargeRule includes field region_code.
   - [backend_schema] CustomerSurchargeRuleCreate: CustomerSurchargeRuleCreate includes field region_code.
   - [backend_schema] CustomerSurchargeRuleUpdate: CustomerSurchargeRuleUpdate includes field region_code.
@@ -2088,12 +2088,12 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: C-01 manifest section customers.list_and_search includes field search labeled Search.
   - [page_help_manifest] Assistant Page Help Manifest: C-01 manifest section customers.list_and_search includes field search labeled Suche.
-  - [typescript_api_interface] EmployeeListFilters: EmployeeListFilters includes field search.
   - [typescript_api_interface] CustomerFilterParams: CustomerFilterParams includes field search.
   - [typescript_api_interface] CustomerExportPayload: CustomerExportPayload includes field search.
+  - [typescript_api_interface] EmployeeListFilters: EmployeeListFilters includes field search.
+  - [typescript_api_interface] CustomerOrderListFilters: CustomerOrderListFilters includes field search.
+  - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field search.
   - [typescript_api_interface] RecruitingApplicantFilterParams: RecruitingApplicantFilterParams includes field search.
-  - [typescript_api_interface] SubcontractorListFilters: SubcontractorListFilters includes field search.
-  - [typescript_api_interface] SubcontractorWorkerListFilters: SubcontractorWorkerListFilters includes field search.
 
 ## customer.shipping_method_code
 
@@ -2142,12 +2142,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.sortOrder defines labels Sort order, Sortierung.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds rateLineDraft.sort_order next to customerAdmin.fields.sortOrder.
-  - [typescript_api_interface] DemandGroupRead: DemandGroupRead includes field sort_order.
-  - [typescript_api_interface] DemandGroupCreate: DemandGroupCreate includes field sort_order.
-  - [typescript_api_interface] DemandGroupUpdate: DemandGroupUpdate includes field sort_order.
-  - [typescript_api_interface] EmployeePrivateProfileMaritalStatusOptionRead: EmployeePrivateProfileMaritalStatusOptionRead includes field sort_order.
-  - [typescript_api_interface] FinanceBillingTimesheetLineRead: FinanceBillingTimesheetLineRead includes field sort_order.
-  - [typescript_api_interface] FinanceBillingInvoiceLineRead: FinanceBillingInvoiceLineRead includes field sort_order.
+  - [typescript_api_interface] LookupValueRead: LookupValueRead includes field sort_order.
+  - [typescript_api_interface] LookupValueCreatePayload: LookupValueCreatePayload includes field sort_order.
+  - [typescript_api_interface] LookupValueUpdatePayload: LookupValueUpdatePayload includes field sort_order.
+  - [typescript_api_interface] CustomerHistoryEntryRead: CustomerHistoryEntryRead includes field sort_order.
+  - [typescript_api_interface] CustomerRateLineRead: CustomerRateLineRead includes field sort_order.
+  - [typescript_api_interface] CustomerSurchargeRuleRead: CustomerSurchargeRuleRead includes field sort_order.
 
 ## customer.state
 
@@ -2165,10 +2165,10 @@
 - definition_de: Feld Bundesland / Region im Kontext von Customer.
 - definition_en: State / region field used in the Customer context.
 - related_fields: none
-- aliases: state, customerAdmin.fields.state, addressDraft.state_region, Bundesland / Region, State / region, Customer
+- aliases: state, customerAdmin.fields.state, addressDirectoryDraft.state, Bundesland / Region, State / region, Customer
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.state defines labels Bundesland / Region, State / region.
-  - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds addressDraft.state_region next to customerAdmin.fields.state.
+  - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds addressDirectoryDraft.state next to customerAdmin.fields.state.
   - [typescript_api_interface] CustomerAddressRead: CustomerAddressRead includes field state.
   - [typescript_api_interface] CustomerAvailableAddressRead: CustomerAvailableAddressRead includes field state.
   - [typescript_api_interface] CustomerAvailableAddressCreatePayload: CustomerAvailableAddressCreatePayload includes field state.
@@ -2191,10 +2191,10 @@
 - definition_de: Feld Straße und Hausnummer im Kontext von Customer.
 - definition_en: Street and house number field used in the Customer context.
 - related_fields: none
-- aliases: street_line1, customerAdmin.fields.streetLine1, addressDraft.street_line_1, Straße und Hausnummer, Street and house number, Customer
+- aliases: street_line1, customerAdmin.fields.streetLine1, addressDirectoryDraft.street_line_1, Straße und Hausnummer, Street and house number, Customer
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.streetLine1 defines labels Straße und Hausnummer, Street and house number.
-  - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds addressDraft.street_line_1 next to customerAdmin.fields.streetLine1.
+  - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds addressDirectoryDraft.street_line_1 next to customerAdmin.fields.streetLine1.
 
 ## customer.street_line2
 
@@ -2212,10 +2212,10 @@
 - definition_de: Feld Adresszusatz im Kontext von Customer.
 - definition_en: Address line 2 field used in the Customer context.
 - related_fields: none
-- aliases: street_line2, customerAdmin.fields.streetLine2, addressDraft.street_line_2, Adresszusatz, Address line 2, Customer
+- aliases: street_line2, customerAdmin.fields.streetLine2, addressDirectoryDraft.street_line_2, Adresszusatz, Address line 2, Customer
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.streetLine2 defines labels Address line 2, Adresszusatz.
-  - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds addressDraft.street_line_2 next to customerAdmin.fields.streetLine2.
+  - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds addressDirectoryDraft.street_line_2 next to customerAdmin.fields.streetLine2.
 
 ## customer.surcharge_type
 
@@ -2345,12 +2345,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.temporaryPassword defines labels Temporary password, Temporäres Passwort.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds portalAccessDraft.temporary_password next to customerAdmin.fields.temporaryPassword.
-  - [typescript_api_interface] TenantAdminUserCreatePayload: TenantAdminUserCreatePayload includes field temporary_password.
-  - [typescript_api_interface] TenantAdminPasswordResponse: TenantAdminPasswordResponse includes field temporary_password.
   - [typescript_api_interface] CustomerPortalAccessCreatePayload: CustomerPortalAccessCreatePayload includes field temporary_password.
   - [typescript_api_interface] CustomerPortalAccessPasswordResetPayload: CustomerPortalAccessPasswordResetPayload includes field temporary_password.
   - [typescript_api_interface] CustomerPortalAccessPasswordResponse: CustomerPortalAccessPasswordResponse includes field temporary_password.
-  - [backend_schema] TenantAdminUserCreate: TenantAdminUserCreate includes field temporary_password.
+  - [typescript_api_interface] TenantAdminUserCreatePayload: TenantAdminUserCreatePayload includes field temporary_password.
+  - [typescript_api_interface] TenantAdminPasswordResponse: TenantAdminPasswordResponse includes field temporary_password.
+  - [backend_schema] CustomerPortalAccessCreate: CustomerPortalAccessCreate includes field temporary_password.
 
 ## customer.time_from_minute
 
@@ -2426,11 +2426,11 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.unitPrice defines labels Einzelpreis, Unit price.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds rateLineDraft.unit_price next to customerAdmin.fields.unitPrice.
-  - [typescript_api_interface] SubcontractorPortalInvoiceCheckLineRead: SubcontractorPortalInvoiceCheckLineRead includes field unit_price.
-  - [typescript_api_interface] FinanceSubcontractorInvoiceCheckLineRead: FinanceSubcontractorInvoiceCheckLineRead includes field unit_price.
-  - [typescript_api_interface] FinanceBillingInvoiceLineRead: FinanceBillingInvoiceLineRead includes field unit_price.
   - [typescript_api_interface] CustomerRateLineRead: CustomerRateLineRead includes field unit_price.
   - [typescript_api_interface] CustomerRateLinePayload: CustomerRateLinePayload includes field unit_price.
+  - [typescript_api_interface] FinanceBillingInvoiceLineRead: FinanceBillingInvoiceLineRead includes field unit_price.
+  - [typescript_api_interface] FinanceSubcontractorInvoiceCheckLineRead: FinanceSubcontractorInvoiceCheckLineRead includes field unit_price.
+  - [typescript_api_interface] SubcontractorPortalInvoiceCheckLineRead: SubcontractorPortalInvoiceCheckLineRead includes field unit_price.
   - [backend_schema] CustomerRateLine: CustomerRateLine includes field unit_price.
 
 ## customer.user_id
@@ -2453,11 +2453,11 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.userId defines labels Portal user ID, Portal-Benutzer-ID.
   - [typescript_api_interface] CustomerPortalAccessListItem: CustomerPortalAccessListItem includes field user_id.
-  - [typescript_api_interface] EmployeeAccessLinkRead: EmployeeAccessLinkRead includes field user_id.
   - [typescript_api_interface] CustomerPortalContextRead: CustomerPortalContextRead includes field user_id.
   - [typescript_api_interface] SubcontractorPortalContextRead: SubcontractorPortalContextRead includes field user_id.
   - [typescript_api_interface] CustomerContactRead: CustomerContactRead includes field user_id.
   - [typescript_api_interface] CustomerContactPayload: CustomerContactPayload includes field user_id.
+  - [typescript_api_interface] EmployeeAccessLinkRead: EmployeeAccessLinkRead includes field user_id.
   - [typescript_api_interface] SubcontractorContactRead: SubcontractorContactRead includes field user_id.
 
 ## customer.username
@@ -2480,12 +2480,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.username defines labels Benutzername, Username.
   - [frontend_component] CustomerAdminView.vue: CustomerAdminView.vue binds portalAccessDraft.username next to customerAdmin.fields.username.
-  - [typescript_api_interface] TenantAdminUserListItem: TenantAdminUserListItem includes field username.
-  - [typescript_api_interface] TenantAdminUserCreatePayload: TenantAdminUserCreatePayload includes field username.
   - [typescript_api_interface] CustomerPortalAccessListItem: CustomerPortalAccessListItem includes field username.
   - [typescript_api_interface] CustomerPortalAccessCreatePayload: CustomerPortalAccessCreatePayload includes field username.
+  - [typescript_api_interface] TenantAdminUserListItem: TenantAdminUserListItem includes field username.
+  - [typescript_api_interface] TenantAdminUserCreatePayload: TenantAdminUserCreatePayload includes field username.
+  - [typescript_api_interface] AuthenticatedUser: AuthenticatedUser includes field username.
   - [typescript_api_interface] EmployeeAccessLinkRead: EmployeeAccessLinkRead includes field username.
-  - [typescript_api_interface] EmployeeAccessUpdateUserRequest: EmployeeAccessUpdateUserRequest includes field username.
 
 ## customer.vat_id
 
@@ -2533,12 +2533,12 @@
 - aliases: weekday_mask, customerAdmin.fields.weekdayMask, Wochentagsmaske, Weekday mask, Customer
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: customerAdmin.fields.weekdayMask defines labels Weekday mask, Wochentagsmaske.
+  - [typescript_api_interface] CustomerSurchargeRuleRead: CustomerSurchargeRuleRead includes field weekday_mask.
+  - [typescript_api_interface] CustomerSurchargeRulePayload: CustomerSurchargeRulePayload includes field weekday_mask.
   - [typescript_api_interface] EmployeeAvailabilityRuleRead: EmployeeAvailabilityRuleRead includes field weekday_mask.
   - [typescript_api_interface] EmployeeAvailabilityRuleCreatePayload: EmployeeAvailabilityRuleCreatePayload includes field weekday_mask.
   - [typescript_api_interface] EmployeeAvailabilityRuleUpdatePayload: EmployeeAvailabilityRuleUpdatePayload includes field weekday_mask.
   - [typescript_api_interface] PayrollSurchargeRuleRead: PayrollSurchargeRuleRead includes field weekday_mask.
-  - [typescript_api_interface] CustomerSurchargeRuleRead: CustomerSurchargeRuleRead includes field weekday_mask.
-  - [typescript_api_interface] CustomerSurchargeRulePayload: CustomerSurchargeRulePayload includes field weekday_mask.
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field weekday_mask.
 
 ## customer.weekdays
@@ -2581,8 +2581,8 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.series_exceptions includes field date_from labeled Date from.
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.series_exceptions includes field date_from labeled Datum von.
-  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_from.
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field date_from.
+  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_from.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_from.
   - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_from.
   - [backend_schema] AssistantFieldReleasedScheduleVisibilityInput: AssistantFieldReleasedScheduleVisibilityInput includes field date_from.
@@ -2608,8 +2608,8 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.series_exceptions includes field date_to labeled Date to.
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.series_exceptions includes field date_to labeled Datum bis.
-  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_to.
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field date_to.
+  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_to.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_to.
   - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_to.
   - [backend_schema] AssistantFieldReleasedScheduleVisibilityInput: AssistantFieldReleasedScheduleVisibilityInput includes field date_to.
@@ -2659,11 +2659,11 @@
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.shift_plan includes field name labeled Shift plan name.
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.shift_plan includes field name labeled Name Schichtplan.
   - [typescript_api_interface] TenantListItem: TenantListItem includes field name.
-  - [typescript_api_interface] TeamRead: TeamRead includes field name.
-  - [typescript_api_interface] TeamCreate: TeamCreate includes field name.
-  - [typescript_api_interface] TeamUpdate: TeamUpdate includes field name.
-  - [typescript_api_interface] EmployeeGroupRead: EmployeeGroupRead includes field name.
+  - [typescript_api_interface] CustomerPortalContextRead: CustomerPortalContextRead includes field name.
   - [typescript_api_interface] BranchRead: BranchRead includes field name.
+  - [typescript_api_interface] MandateRead: MandateRead includes field name.
+  - [typescript_api_interface] TenantOnboardingPayload: TenantOnboardingPayload includes field name.
+  - [typescript_api_interface] TenantUpdatePayload: TenantUpdatePayload includes field name.
 
 ## customer_order.order_documents
 
@@ -2706,11 +2706,11 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.order_details includes field order_no labeled Order no.
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.order_details includes field order_no labeled Auftragsnummer.
+  - [typescript_api_interface] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field order_no.
+  - [typescript_api_interface] CustomerOrderListItem: CustomerOrderListItem includes field order_no.
+  - [typescript_api_interface] PlanningBoardShiftListItem: PlanningBoardShiftListItem includes field order_no.
   - [typescript_api_interface] CoverageShiftItem: CoverageShiftItem includes field order_no.
   - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field order_no.
-  - [typescript_api_interface] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field order_no.
-  - [typescript_api_interface] PlanningBoardShiftListItem: PlanningBoardShiftListItem includes field order_no.
-  - [typescript_api_interface] CustomerOrderListItem: CustomerOrderListItem includes field order_no.
   - [typescript_api_interface] EmployeeProjectContext: EmployeeProjectContext includes field order_no.
 
 ## customer_order.planning_documents
@@ -2755,9 +2755,9 @@
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.planning_record_overview includes field planning_from labeled Planning from.
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.planning_record_overview includes field planning_from labeled Planung von.
   - [typescript_api_interface] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_from.
-  - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_from.
   - [typescript_api_interface] PlanningRecordListItem: PlanningRecordListItem includes field planning_from.
   - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field planning_from.
+  - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_from.
   - [backend_schema] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_from.
   - [backend_schema] PlanningRecord: PlanningRecord includes field planning_from.
 
@@ -2781,12 +2781,12 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.planning_record_overview includes field planning_mode_code labeled Planning mode.
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.planning_record_overview includes field planning_mode_code labeled Planungsmodus.
-  - [typescript_api_interface] CustomerNewPlanWizardState: CustomerNewPlanWizardState includes field planning_mode_code.
-  - [typescript_api_interface] CoverageShiftItem: CoverageShiftItem includes field planning_mode_code.
-  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field planning_mode_code.
-  - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field planning_mode_code.
-  - [typescript_api_interface] FinanceBillingTimesheetLineRead: FinanceBillingTimesheetLineRead includes field planning_mode_code.
   - [typescript_api_interface] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_mode_code.
+  - [typescript_api_interface] CustomerRateLineRead: CustomerRateLineRead includes field planning_mode_code.
+  - [typescript_api_interface] CustomerRateLinePayload: CustomerRateLinePayload includes field planning_mode_code.
+  - [typescript_api_interface] FinanceBillingTimesheetLineRead: FinanceBillingTimesheetLineRead includes field planning_mode_code.
+  - [typescript_api_interface] PlanningRecordListItem: PlanningRecordListItem includes field planning_mode_code.
+  - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field planning_mode_code.
 
 ## customer_order.planning_to
 
@@ -2809,9 +2809,9 @@
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.planning_record_overview includes field planning_to labeled Planning to.
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.planning_record_overview includes field planning_to labeled Planung bis.
   - [typescript_api_interface] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_to.
-  - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_to.
   - [typescript_api_interface] PlanningRecordListItem: PlanningRecordListItem includes field planning_to.
   - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field planning_to.
+  - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_to.
   - [backend_schema] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_to.
   - [backend_schema] PlanningRecord: PlanningRecord includes field planning_to.
 
@@ -3020,9 +3020,9 @@
   - [typescript_api_interface] AssistantSourceBasisItem: AssistantSourceBasisItem includes field title.
   - [typescript_api_interface] AssistantConversation: AssistantConversation includes field title.
   - [typescript_api_interface] AssistantPageHelpFormSection: AssistantPageHelpFormSection includes field title.
-  - [typescript_api_interface] PlanningOutputDocumentRead: PlanningOutputDocumentRead includes field title.
-  - [typescript_api_interface] EmployeeNoteRead: EmployeeNoteRead includes field title.
-  - [typescript_api_interface] EmployeeDocumentListItemRead: EmployeeDocumentListItemRead includes field title.
+  - [typescript_api_interface] CustomerPortalDocumentRefRead: CustomerPortalDocumentRefRead includes field title.
+  - [typescript_api_interface] CustomerPortalHistoryEntryRead: CustomerPortalHistoryEntryRead includes field title.
+  - [typescript_api_interface] CustomerPortalOrderListItemRead: CustomerPortalOrderListItemRead includes field title.
 
 ## customer_order.workforce_scope_code
 
@@ -3044,11 +3044,11 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.shift_plan includes field workforce_scope_code labeled Workforce scope.
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.shift_plan includes field workforce_scope_code labeled Workforce Scope.
+  - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field workforce_scope_code.
+  - [typescript_api_interface] PlanningBoardShiftListItem: PlanningBoardShiftListItem includes field workforce_scope_code.
   - [typescript_api_interface] CoverageShiftItem: CoverageShiftItem includes field workforce_scope_code.
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field workforce_scope_code.
   - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field workforce_scope_code.
-  - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field workforce_scope_code.
-  - [typescript_api_interface] PlanningBoardShiftListItem: PlanningBoardShiftListItem includes field workforce_scope_code.
   - [backend_schema] ShiftPlan: ShiftPlan includes field workforce_scope_code.
 
 ## dispatch.audience_code
@@ -3161,12 +3161,12 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: P-05 manifest section planning_outputs.documents includes field file_name labeled File name.
   - [page_help_manifest] Assistant Page Help Manifest: P-05 manifest section planning_outputs.documents includes field file_name labeled Dateiname.
-  - [typescript_api_interface] PlanningOutputDocumentRead: PlanningOutputDocumentRead includes field file_name.
+  - [typescript_api_interface] CustomerPortalDocumentRefRead: CustomerPortalDocumentRefRead includes field file_name.
+  - [typescript_api_interface] CustomerHistoryAttachmentRead: CustomerHistoryAttachmentRead includes field file_name.
+  - [typescript_api_interface] CustomerExportResult: CustomerExportResult includes field file_name.
+  - [typescript_api_interface] CustomerVCardResult: CustomerVCardResult includes field file_name.
   - [typescript_api_interface] EmployeeDocumentListItemRead: EmployeeDocumentListItemRead includes field file_name.
   - [typescript_api_interface] EmployeeDocumentUploadPayload: EmployeeDocumentUploadPayload includes field file_name.
-  - [typescript_api_interface] EmployeeDocumentVersionPayload: EmployeeDocumentVersionPayload includes field file_name.
-  - [typescript_api_interface] EmployeeExportResult: EmployeeExportResult includes field file_name.
-  - [typescript_api_interface] EmployeeQualificationProofUploadPayload: EmployeeQualificationProofUploadPayload includes field file_name.
 
 ## dispatch.variant_code
 
@@ -3344,9 +3344,9 @@
   - [typescript_api_interface] EmployeeAbsenceRead: EmployeeAbsenceRead includes field absence_type.
   - [typescript_api_interface] EmployeeAbsenceCreatePayload: EmployeeAbsenceCreatePayload includes field absence_type.
   - [typescript_api_interface] EmployeeAbsenceUpdatePayload: EmployeeAbsenceUpdatePayload includes field absence_type.
-  - [backend_schema] AbsenceVisibilityReportRow: AbsenceVisibilityReportRow includes field absence_type.
   - [backend_schema] EmployeeAbsence: EmployeeAbsence includes field absence_type.
   - [backend_schema] EmployeeAbsenceFilter: EmployeeAbsenceFilter includes field absence_type.
+  - [backend_schema] EmployeeAbsenceCreate: EmployeeAbsenceCreate includes field absence_type.
 
 ## employee.assign_group
 
@@ -3389,11 +3389,11 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.bankAccountHolder defines labels Bank account holder, Kontoinhaber.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds privateProfileDraft.bank_account_holder next to employeeAdmin.fields.bankAccountHolder.
+  - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field bank_account_holder.
+  - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field bank_account_holder.
   - [typescript_api_interface] EmployeePrivateProfileRead: EmployeePrivateProfileRead includes field bank_account_holder.
   - [typescript_api_interface] EmployeePrivateProfileWritePayload: EmployeePrivateProfileWritePayload includes field bank_account_holder.
   - [typescript_api_interface] EmployeePrivateProfileUpdatePayload: EmployeePrivateProfileUpdatePayload includes field bank_account_holder.
-  - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field bank_account_holder.
-  - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field bank_account_holder.
   - [typescript_api_interface] SubcontractorFinanceProfileRead: SubcontractorFinanceProfileRead includes field bank_account_holder.
 
 ## employee.bank_bic
@@ -3416,11 +3416,11 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.bankBic defines labels BIC, Bank BIC.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds privateProfileDraft.bank_bic next to employeeAdmin.fields.bankBic.
+  - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field bank_bic.
+  - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field bank_bic.
   - [typescript_api_interface] EmployeePrivateProfileRead: EmployeePrivateProfileRead includes field bank_bic.
   - [typescript_api_interface] EmployeePrivateProfileWritePayload: EmployeePrivateProfileWritePayload includes field bank_bic.
   - [typescript_api_interface] EmployeePrivateProfileUpdatePayload: EmployeePrivateProfileUpdatePayload includes field bank_bic.
-  - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field bank_bic.
-  - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field bank_bic.
   - [typescript_api_interface] SubcontractorFinanceProfileRead: SubcontractorFinanceProfileRead includes field bank_bic.
 
 ## employee.bank_iban
@@ -3443,11 +3443,11 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.bankIban defines labels Bank IBAN, IBAN.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds privateProfileDraft.bank_iban next to employeeAdmin.fields.bankIban.
+  - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field bank_iban.
+  - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field bank_iban.
   - [typescript_api_interface] EmployeePrivateProfileRead: EmployeePrivateProfileRead includes field bank_iban.
   - [typescript_api_interface] EmployeePrivateProfileWritePayload: EmployeePrivateProfileWritePayload includes field bank_iban.
   - [typescript_api_interface] EmployeePrivateProfileUpdatePayload: EmployeePrivateProfileUpdatePayload includes field bank_iban.
-  - [typescript_api_interface] CustomerBillingProfileRead: CustomerBillingProfileRead includes field bank_iban.
-  - [typescript_api_interface] CustomerBillingProfilePayload: CustomerBillingProfilePayload includes field bank_iban.
   - [typescript_api_interface] SubcontractorFinanceProfileRead: SubcontractorFinanceProfileRead includes field bank_iban.
 
 ## employee.birth_date
@@ -3526,10 +3526,10 @@
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds noteDraft.completed_at next to employeeAdmin.fields.completedAt.
   - [typescript_api_interface] EmployeeNoteRead: EmployeeNoteRead includes field completed_at.
   - [typescript_api_interface] ReportingDeliveryJob: ReportingDeliveryJob includes field completed_at.
-  - [backend_schema] ReportingDeliveryJobRead: ReportingDeliveryJobRead includes field completed_at.
-  - [backend_schema] PatrolRound: PatrolRound includes field completed_at.
-  - [backend_schema] PatrolRoundRead: PatrolRoundRead includes field completed_at.
   - [backend_schema] EmployeeNote: EmployeeNote includes field completed_at.
+  - [backend_schema] EmployeeNoteUpdate: EmployeeNoteUpdate includes field completed_at.
+  - [backend_schema] EmployeeNoteRead: EmployeeNoteRead includes field completed_at.
+  - [backend_schema] PatrolRound: PatrolRound includes field completed_at.
 
 ## employee.credential_no
 
@@ -3632,11 +3632,11 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.defaultBranchId defines labels Default branch, Standardniederlassung.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds advancedFilterDraft.default_branch_id next to employeeAdmin.fields.defaultBranchId.
-  - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field default_branch_id.
-  - [typescript_api_interface] EmployeeListFilters: EmployeeListFilters includes field default_branch_id.
   - [typescript_api_interface] CustomerListItem: CustomerListItem includes field default_branch_id.
   - [typescript_api_interface] CustomerFilterParams: CustomerFilterParams includes field default_branch_id.
   - [typescript_api_interface] CustomerCreatePayload: CustomerCreatePayload includes field default_branch_id.
+  - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field default_branch_id.
+  - [typescript_api_interface] EmployeeListFilters: EmployeeListFilters includes field default_branch_id.
   - [backend_schema] Customer: Customer includes field default_branch_id.
 
 ## employee.default_mandate_id
@@ -3659,10 +3659,10 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.defaultMandateId defines labels Default mandate, Standardmandat.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds advancedFilterDraft.default_mandate_id next to employeeAdmin.fields.defaultMandateId.
-  - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field default_mandate_id.
-  - [typescript_api_interface] EmployeeListFilters: EmployeeListFilters includes field default_mandate_id.
   - [typescript_api_interface] CustomerFilterParams: CustomerFilterParams includes field default_mandate_id.
   - [typescript_api_interface] CustomerCreatePayload: CustomerCreatePayload includes field default_mandate_id.
+  - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field default_mandate_id.
+  - [typescript_api_interface] EmployeeListFilters: EmployeeListFilters includes field default_mandate_id.
   - [backend_schema] Customer: Customer includes field default_mandate_id.
   - [backend_schema] CustomerFilter: CustomerFilter includes field default_mandate_id.
 
@@ -3706,12 +3706,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.documentId defines labels Document ID, Dokument-ID.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds documentLinkDraft.document_id next to employeeAdmin.fields.documentId.
-  - [typescript_api_interface] PlanningOutputDocumentRead: PlanningOutputDocumentRead includes field document_id.
+  - [typescript_api_interface] CustomerPortalDocumentRefRead: CustomerPortalDocumentRefRead includes field document_id.
+  - [typescript_api_interface] CustomerHistoryAttachmentRead: CustomerHistoryAttachmentRead includes field document_id.
+  - [typescript_api_interface] CustomerHistoryAttachmentLinkPayload: CustomerHistoryAttachmentLinkPayload includes field document_id.
+  - [typescript_api_interface] CustomerExportResult: CustomerExportResult includes field document_id.
+  - [typescript_api_interface] CustomerVCardResult: CustomerVCardResult includes field document_id.
   - [typescript_api_interface] EmployeeDocumentListItemRead: EmployeeDocumentListItemRead includes field document_id.
-  - [typescript_api_interface] EmployeeDocumentLinkPayload: EmployeeDocumentLinkPayload includes field document_id.
-  - [typescript_api_interface] EmployeeExportResult: EmployeeExportResult includes field document_id.
-  - [typescript_api_interface] NoticeAttachmentRead: NoticeAttachmentRead includes field document_id.
-  - [typescript_api_interface] SubcontractorWorkerQualificationProofLinkCreate: SubcontractorWorkerQualificationProofLinkCreate includes field document_id.
 
 ## employee.document_label
 
@@ -3798,12 +3798,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.documentTypeKey defines labels Document type, Dokumenttyp.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds documentUploadDraft.document_type_key next to employeeAdmin.fields.documentTypeKey.
-  - [typescript_api_interface] EmployeeDocumentListItemRead: EmployeeDocumentListItemRead includes field document_type_key.
-  - [typescript_api_interface] EmployeeDocumentUploadPayload: EmployeeDocumentUploadPayload includes field document_type_key.
-  - [typescript_api_interface] SubcontractorWorkerQualificationProofRead: SubcontractorWorkerQualificationProofRead includes field document_type_key.
   - [typescript_api_interface] CustomerPortalDocumentRefRead: CustomerPortalDocumentRefRead includes field document_type_key.
   - [typescript_api_interface] CustomerHistoryAttachmentRead: CustomerHistoryAttachmentRead includes field document_type_key.
+  - [typescript_api_interface] EmployeeDocumentListItemRead: EmployeeDocumentListItemRead includes field document_type_key.
+  - [typescript_api_interface] EmployeeDocumentUploadPayload: EmployeeDocumentUploadPayload includes field document_type_key.
   - [typescript_api_interface] ApplicantAttachmentRead: ApplicantAttachmentRead includes field document_type_key.
+  - [typescript_api_interface] SubcontractorWorkerQualificationProofRead: SubcontractorWorkerQualificationProofRead includes field document_type_key.
 
 ## employee.document_version_target
 
@@ -3903,9 +3903,9 @@
   - [typescript_api_interface] PayrollTariffRateRead: PayrollTariffRateRead includes field employment_type_code.
   - [typescript_api_interface] PayrollSurchargeRuleRead: PayrollSurchargeRuleRead includes field employment_type_code.
   - [typescript_api_interface] EmployeePayProfileRead: EmployeePayProfileRead includes field employment_type_code.
-  - [backend_schema] PayrollBasisReportRow: PayrollBasisReportRow includes field employment_type_code.
   - [backend_schema] Employee: Employee includes field employment_type_code.
   - [backend_schema] EmployeeOperationalCreate: EmployeeOperationalCreate includes field employment_type_code.
+  - [backend_schema] EmployeeOperationalUpdate: EmployeeOperationalUpdate includes field employment_type_code.
 
 ## employee.encoded_value
 
@@ -3954,12 +3954,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.endsAt defines labels Endet am, Ends at.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds availabilityDraft.ends_at next to employeeAdmin.fields.endsAt.
-  - [typescript_api_interface] CoverageShiftItem: CoverageShiftItem includes field ends_at.
-  - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field ends_at.
+  - [typescript_api_interface] CustomerDashboardCalendarItemRead: CustomerDashboardCalendarItemRead includes field ends_at.
   - [typescript_api_interface] EmployeeAvailabilityRuleRead: EmployeeAvailabilityRuleRead includes field ends_at.
   - [typescript_api_interface] EmployeeAvailabilityRuleCreatePayload: EmployeeAvailabilityRuleCreatePayload includes field ends_at.
   - [typescript_api_interface] EmployeeAvailabilityRuleUpdatePayload: EmployeeAvailabilityRuleUpdatePayload includes field ends_at.
-  - [typescript_api_interface] CustomerDashboardCalendarItemRead: CustomerDashboardCalendarItemRead includes field ends_at.
+  - [typescript_api_interface] ShiftListItem: ShiftListItem includes field ends_at.
+  - [typescript_api_interface] PlanningBoardShiftListItem: PlanningBoardShiftListItem includes field ends_at.
 
 ## employee.ends_on
 
@@ -3984,9 +3984,9 @@
   - [typescript_api_interface] EmployeeAbsenceRead: EmployeeAbsenceRead includes field ends_on.
   - [typescript_api_interface] EmployeeAbsenceCreatePayload: EmployeeAbsenceCreatePayload includes field ends_on.
   - [typescript_api_interface] EmployeeAbsenceUpdatePayload: EmployeeAbsenceUpdatePayload includes field ends_on.
-  - [backend_schema] AbsenceVisibilityReportRow: AbsenceVisibilityReportRow includes field ends_on.
   - [backend_schema] EmployeeAbsence: EmployeeAbsence includes field ends_on.
   - [backend_schema] EmployeeAbsenceCreate: EmployeeAbsenceCreate includes field ends_on.
+  - [backend_schema] EmployeeAbsenceUpdate: EmployeeAbsenceUpdate includes field ends_on.
 
 ## employee.first_name
 
@@ -4011,9 +4011,9 @@
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.firstName defines labels First name, Vorname.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds employeeDraft.first_name next to employeeAdmin.fields.firstName.
   - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field first_name.
+  - [typescript_api_interface] ApplicantListItem: ApplicantListItem includes field first_name.
+  - [typescript_api_interface] RecruitingApplicantSubmissionPayload: RecruitingApplicantSubmissionPayload includes field first_name.
   - [typescript_api_interface] SubcontractorWorkerListItem: SubcontractorWorkerListItem includes field first_name.
-  - [typescript_api_interface] SubcontractorPortalWorkerCreate: SubcontractorPortalWorkerCreate includes field first_name.
-  - [typescript_api_interface] SubcontractorPortalWorkerUpdate: SubcontractorPortalWorkerUpdate includes field first_name.
 
 ## employee.function_type
 
@@ -4035,12 +4035,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.functionType defines labels Function type, Funktionstyp.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds qualificationDraft.function_type_id next to employeeAdmin.fields.functionType.
-  - [typescript_api_interface] EmployeeQualificationRead: EmployeeQualificationRead includes field function_type.
   - [typescript_api_interface] CustomerRateLineRead: CustomerRateLineRead includes field function_type.
+  - [typescript_api_interface] EmployeeQualificationRead: EmployeeQualificationRead includes field function_type.
   - [backend_schema] CustomerRateLine: CustomerRateLine includes field function_type.
   - [backend_schema] CustomerRateLineRead: CustomerRateLineRead includes field function_type.
-  - [backend_schema] OrderRequirementLine: OrderRequirementLine includes field function_type.
-  - [backend_schema] DemandGroup: DemandGroup includes field function_type.
+  - [backend_schema] EmployeeQualification: EmployeeQualification includes field function_type.
+  - [backend_schema] EmployeeAllowance: EmployeeAllowance includes field function_type.
 
 ## employee.granted_internally
 
@@ -4153,11 +4153,11 @@
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.hireDate defines labels Eintrittsdatum, Hire date.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds employeeDraft.hire_date next to employeeAdmin.fields.hireDate.
   - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field hire_date.
-  - [backend_schema] EmployeeActivityReportRow: EmployeeActivityReportRow includes field hire_date.
   - [backend_schema] Employee: Employee includes field hire_date.
   - [backend_schema] EmployeeOperationalCreate: EmployeeOperationalCreate includes field hire_date.
   - [backend_schema] EmployeeOperationalUpdate: EmployeeOperationalUpdate includes field hire_date.
   - [backend_schema] EmployeeListItem: EmployeeListItem includes field hire_date.
+  - [backend_schema] EmployeeActivityReportRow: EmployeeActivityReportRow includes field hire_date.
 
 ## employee.issued_at
 
@@ -4179,12 +4179,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.issuedAt defines labels Ausgestellt am, Issued on.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds qualificationDraft.issued_at next to employeeAdmin.fields.issuedAt.
+  - [typescript_api_interface] CurrentSessionResponse: CurrentSessionResponse includes field issued_at.
   - [typescript_api_interface] EmployeeQualificationRead: EmployeeQualificationRead includes field issued_at.
   - [typescript_api_interface] EmployeeQualificationCreatePayload: EmployeeQualificationCreatePayload includes field issued_at.
   - [typescript_api_interface] EmployeeQualificationUpdatePayload: EmployeeQualificationUpdatePayload includes field issued_at.
   - [typescript_api_interface] EmployeeCredentialRead: EmployeeCredentialRead includes field issued_at.
-  - [typescript_api_interface] SubcontractorPortalWorkerQualificationCreate: SubcontractorPortalWorkerQualificationCreate includes field issued_at.
-  - [typescript_api_interface] SubcontractorPortalWorkerQualificationUpdate: SubcontractorPortalWorkerQualificationUpdate includes field issued_at.
+  - [typescript_api_interface] FinanceBillingInvoiceRead: FinanceBillingInvoiceRead includes field issued_at.
 
 ## employee.issuing_authority
 
@@ -4236,9 +4236,9 @@
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.lastName defines labels Last name, Nachname.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds employeeDraft.last_name next to employeeAdmin.fields.lastName.
   - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field last_name.
+  - [typescript_api_interface] ApplicantListItem: ApplicantListItem includes field last_name.
+  - [typescript_api_interface] RecruitingApplicantSubmissionPayload: RecruitingApplicantSubmissionPayload includes field last_name.
   - [typescript_api_interface] SubcontractorWorkerListItem: SubcontractorWorkerListItem includes field last_name.
-  - [typescript_api_interface] SubcontractorPortalWorkerCreate: SubcontractorPortalWorkerCreate includes field last_name.
-  - [typescript_api_interface] SubcontractorPortalWorkerUpdate: SubcontractorPortalWorkerUpdate includes field last_name.
 
 ## employee.marital_status
 
@@ -4423,12 +4423,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.notes defines labels Operational notes, Operative Notizen.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds employeeDraft.notes next to employeeAdmin.fields.notes.
-  - [typescript_api_interface] TeamMemberRead: TeamMemberRead includes field notes.
-  - [typescript_api_interface] TeamRead: TeamRead includes field notes.
-  - [typescript_api_interface] TeamCreate: TeamCreate includes field notes.
-  - [typescript_api_interface] TeamUpdate: TeamUpdate includes field notes.
-  - [typescript_api_interface] TeamMemberCreate: TeamMemberCreate includes field notes.
-  - [typescript_api_interface] TeamMemberUpdate: TeamMemberUpdate includes field notes.
+  - [typescript_api_interface] MandateRead: MandateRead includes field notes.
+  - [typescript_api_interface] TenantOnboardingPayload: TenantOnboardingPayload includes field notes.
+  - [typescript_api_interface] MandateCreatePayload: MandateCreatePayload includes field notes.
+  - [typescript_api_interface] MandateUpdatePayload: MandateUpdatePayload includes field notes.
+  - [typescript_api_interface] CustomerContactRead: CustomerContactRead includes field notes.
+  - [typescript_api_interface] CustomerRateLineRead: CustomerRateLineRead includes field notes.
 
 ## employee.personnel_no
 
@@ -4605,12 +4605,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.qualificationType defines labels Qualification type, Qualifikationstyp.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds qualificationDraft.qualification_type_id next to employeeAdmin.fields.qualificationType.
-  - [typescript_api_interface] EmployeeQualificationRead: EmployeeQualificationRead includes field qualification_type.
   - [typescript_api_interface] CustomerRateLineRead: CustomerRateLineRead includes field qualification_type.
+  - [typescript_api_interface] EmployeeQualificationRead: EmployeeQualificationRead includes field qualification_type.
   - [backend_schema] CustomerRateLine: CustomerRateLine includes field qualification_type.
   - [backend_schema] CustomerRateLineRead: CustomerRateLineRead includes field qualification_type.
-  - [backend_schema] OrderRequirementLine: OrderRequirementLine includes field qualification_type.
-  - [backend_schema] DemandGroup: DemandGroup includes field qualification_type.
+  - [backend_schema] EmployeeQualification: EmployeeQualification includes field qualification_type.
+  - [backend_schema] EmployeeAllowance: EmployeeAllowance includes field qualification_type.
 
 ## employee.record_kind
 
@@ -4766,12 +4766,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.startsAt defines labels Beginnt am, Starts at.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds availabilityDraft.starts_at next to employeeAdmin.fields.startsAt.
-  - [typescript_api_interface] CoverageShiftItem: CoverageShiftItem includes field starts_at.
-  - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field starts_at.
+  - [typescript_api_interface] CustomerDashboardCalendarItemRead: CustomerDashboardCalendarItemRead includes field starts_at.
   - [typescript_api_interface] EmployeeAvailabilityRuleRead: EmployeeAvailabilityRuleRead includes field starts_at.
   - [typescript_api_interface] EmployeeAvailabilityRuleCreatePayload: EmployeeAvailabilityRuleCreatePayload includes field starts_at.
   - [typescript_api_interface] EmployeeAvailabilityRuleUpdatePayload: EmployeeAvailabilityRuleUpdatePayload includes field starts_at.
-  - [typescript_api_interface] CustomerDashboardCalendarItemRead: CustomerDashboardCalendarItemRead includes field starts_at.
+  - [typescript_api_interface] ShiftListItem: ShiftListItem includes field starts_at.
+  - [typescript_api_interface] PlanningBoardShiftListItem: PlanningBoardShiftListItem includes field starts_at.
 
 ## employee.starts_on
 
@@ -4796,9 +4796,9 @@
   - [typescript_api_interface] EmployeeAbsenceRead: EmployeeAbsenceRead includes field starts_on.
   - [typescript_api_interface] EmployeeAbsenceCreatePayload: EmployeeAbsenceCreatePayload includes field starts_on.
   - [typescript_api_interface] EmployeeAbsenceUpdatePayload: EmployeeAbsenceUpdatePayload includes field starts_on.
-  - [backend_schema] AbsenceVisibilityReportRow: AbsenceVisibilityReportRow includes field starts_on.
   - [backend_schema] EmployeeAbsence: EmployeeAbsence includes field starts_on.
   - [backend_schema] EmployeeAbsenceCreate: EmployeeAbsenceCreate includes field starts_on.
+  - [backend_schema] EmployeeAbsenceUpdate: EmployeeAbsenceUpdate includes field starts_on.
 
 ## employee.status
 
@@ -4820,12 +4820,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.status defines labels Status, Status.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds employeeDraft.status next to employeeAdmin.fields.status.
-  - [typescript_api_interface] AssistantUiFeedbackState: AssistantUiFeedbackState includes field status.
-  - [typescript_api_interface] TenantListItem: TenantListItem includes field status.
-  - [typescript_api_interface] TenantAdminUserListItem: TenantAdminUserListItem includes field status.
-  - [typescript_api_interface] TenantAdminUserCreatePayload: TenantAdminUserCreatePayload includes field status.
+  - [typescript_api_interface] AssistantConversation: AssistantConversation includes field status.
   - [typescript_api_interface] CustomerPortalAccessListItem: CustomerPortalAccessListItem includes field status.
   - [typescript_api_interface] CustomerPortalAccessCreatePayload: CustomerPortalAccessCreatePayload includes field status.
+  - [typescript_api_interface] CustomerPortalAccessStatusPayload: CustomerPortalAccessStatusPayload includes field status.
+  - [typescript_api_interface] TenantListItem: TenantListItem includes field status.
+  - [typescript_api_interface] TenantAdminUserListItem: TenantAdminUserListItem includes field status.
 
 ## employee.target_monthly_hours
 
@@ -4925,11 +4925,11 @@
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.terminationDate defines labels Austrittsdatum, Termination date.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds employeeDraft.termination_date next to employeeAdmin.fields.terminationDate.
   - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field termination_date.
-  - [backend_schema] EmployeeActivityReportRow: EmployeeActivityReportRow includes field termination_date.
   - [backend_schema] Employee: Employee includes field termination_date.
   - [backend_schema] EmployeeOperationalCreate: EmployeeOperationalCreate includes field termination_date.
   - [backend_schema] EmployeeOperationalUpdate: EmployeeOperationalUpdate includes field termination_date.
   - [backend_schema] EmployeeListItem: EmployeeListItem includes field termination_date.
+  - [backend_schema] EmployeeActivityReportRow: EmployeeActivityReportRow includes field termination_date.
 
 ## employee.user_id
 
@@ -4951,11 +4951,11 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.userId defines labels Benutzerkonto-ID, User account ID.
   - [typescript_api_interface] CustomerPortalAccessListItem: CustomerPortalAccessListItem includes field user_id.
-  - [typescript_api_interface] EmployeeAccessLinkRead: EmployeeAccessLinkRead includes field user_id.
   - [typescript_api_interface] CustomerPortalContextRead: CustomerPortalContextRead includes field user_id.
   - [typescript_api_interface] SubcontractorPortalContextRead: SubcontractorPortalContextRead includes field user_id.
   - [typescript_api_interface] CustomerContactRead: CustomerContactRead includes field user_id.
   - [typescript_api_interface] CustomerContactPayload: CustomerContactPayload includes field user_id.
+  - [typescript_api_interface] EmployeeAccessLinkRead: EmployeeAccessLinkRead includes field user_id.
   - [typescript_api_interface] SubcontractorContactRead: SubcontractorContactRead includes field user_id.
 
 ## employee.valid_from
@@ -4978,12 +4978,12 @@
 - source_basis:
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.validFrom defines labels Gültig ab, Valid from.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds credentialDraft.valid_from next to employeeAdmin.fields.validFrom.
-  - [typescript_api_interface] TeamMemberRead: TeamMemberRead includes field valid_from.
-  - [typescript_api_interface] TeamMemberCreate: TeamMemberCreate includes field valid_from.
-  - [typescript_api_interface] TeamMemberUpdate: TeamMemberUpdate includes field valid_from.
   - [typescript_api_interface] EmployeeGroupMembershipRead: EmployeeGroupMembershipRead includes field valid_from.
   - [typescript_api_interface] EmployeeAddressHistoryRead: EmployeeAddressHistoryRead includes field valid_from.
   - [typescript_api_interface] EmployeeAddressHistoryCreatePayload: EmployeeAddressHistoryCreatePayload includes field valid_from.
+  - [typescript_api_interface] EmployeeAddressHistoryUpdatePayload: EmployeeAddressHistoryUpdatePayload includes field valid_from.
+  - [typescript_api_interface] EmployeeCredentialRead: EmployeeCredentialRead includes field valid_from.
+  - [typescript_api_interface] EmployeeCredentialCreatePayload: EmployeeCredentialCreatePayload includes field valid_from.
 
 ## employee.valid_until
 
@@ -5241,6 +5241,27 @@
   - [page_help_manifest] Assistant Page Help Manifest: P-02 manifest section planning_orders.order_scope includes field service_category labeled Service category.
   - [page_help_manifest] Assistant Page Help Manifest: P-02 manifest section planning_orders.order_scope includes field service_category labeled Leistungskategorie.
 
+## shift.shift_type_code
+
+- canonical_name: shift_type_code
+- module_key: planning
+- page_id: P-03
+- entity_type: Shift
+- route_names: SicherPlanPlanningShifts
+- form_contexts: planning.shift, planning_shifts.concrete_shift_and_release
+- input_type: select
+- required: False
+- confidence: high
+- labels_de: Schichttyp
+- labels_en: Shift type
+- definition_de: Der Schichttyp beschreibt, welche Art von Schicht geplant oder freigegeben wird, und wird in Vorlagen, Serien und konkreten Schichten verwendet.
+- definition_en: Shift type identifies what kind of shift is being planned or released and is used across templates, series, and concrete shifts.
+- related_fields: none
+- aliases: Schichttyp, shift type, shift_type_code, نوع شیفت
+- source_basis:
+  - [frontend_locale] planningShifts.messages.ts: planningShifts.messages.ts defines the verified field label Schichttyp / Shift type for the planning shifts workspace.
+  - [backend_schema] Planning schemas: Planning schemas persist shift_type_code across templates, series, and concrete shifts.
+
 ## shift_plan.code
 
 - canonical_name: code
@@ -5262,11 +5283,11 @@
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.templates includes field code labeled Code.
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.templates includes field code labeled Code.
   - [typescript_api_interface] TenantListItem: TenantListItem includes field code.
-  - [typescript_api_interface] FinanceActualDiscrepancy: FinanceActualDiscrepancy includes field code.
-  - [typescript_api_interface] EmployeeGroupRead: EmployeeGroupRead includes field code.
-  - [typescript_api_interface] EmployeePrivateProfileMaritalStatusOptionRead: EmployeePrivateProfileMaritalStatusOptionRead includes field code.
-  - [typescript_api_interface] FunctionTypeRead: FunctionTypeRead includes field code.
-  - [typescript_api_interface] FunctionTypeCreatePayload: FunctionTypeCreatePayload includes field code.
+  - [typescript_api_interface] BranchRead: BranchRead includes field code.
+  - [typescript_api_interface] MandateRead: MandateRead includes field code.
+  - [typescript_api_interface] LookupValueRead: LookupValueRead includes field code.
+  - [typescript_api_interface] TenantOnboardingPayload: TenantOnboardingPayload includes field code.
+  - [typescript_api_interface] BranchCreatePayload: BranchCreatePayload includes field code.
 
 ## shift_plan.customer_visible_flag
 
@@ -5315,12 +5336,12 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.concrete_shift_and_release includes field ends_at labeled Ends at.
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.concrete_shift_and_release includes field ends_at labeled Endet um.
-  - [typescript_api_interface] CoverageShiftItem: CoverageShiftItem includes field ends_at.
-  - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field ends_at.
+  - [typescript_api_interface] CustomerDashboardCalendarItemRead: CustomerDashboardCalendarItemRead includes field ends_at.
   - [typescript_api_interface] EmployeeAvailabilityRuleRead: EmployeeAvailabilityRuleRead includes field ends_at.
   - [typescript_api_interface] EmployeeAvailabilityRuleCreatePayload: EmployeeAvailabilityRuleCreatePayload includes field ends_at.
   - [typescript_api_interface] EmployeeAvailabilityRuleUpdatePayload: EmployeeAvailabilityRuleUpdatePayload includes field ends_at.
-  - [typescript_api_interface] CustomerDashboardCalendarItemRead: CustomerDashboardCalendarItemRead includes field ends_at.
+  - [typescript_api_interface] ShiftListItem: ShiftListItem includes field ends_at.
+  - [typescript_api_interface] PlanningBoardShiftListItem: PlanningBoardShiftListItem includes field ends_at.
 
 ## shift_plan.label
 
@@ -5342,12 +5363,12 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.templates includes field label labeled Label.
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.templates includes field label labeled Bezeichnung.
-  - [typescript_api_interface] DashboardQuickAction: DashboardQuickAction includes field label.
   - [typescript_api_interface] AssistantLink: AssistantLink includes field label.
   - [typescript_api_interface] AssistantPageHelpField: AssistantPageHelpField includes field label.
   - [typescript_api_interface] AssistantPageHelpAction: AssistantPageHelpAction includes field label.
-  - [typescript_api_interface] EmployeePrivateProfileMaritalStatusOptionRead: EmployeePrivateProfileMaritalStatusOptionRead includes field label.
-  - [typescript_api_interface] EmployeeDocumentListItemRead: EmployeeDocumentListItemRead includes field label.
+  - [typescript_api_interface] LookupValueRead: LookupValueRead includes field label.
+  - [typescript_api_interface] LookupValueCreatePayload: LookupValueCreatePayload includes field label.
+  - [typescript_api_interface] LookupValueUpdatePayload: LookupValueUpdatePayload includes field label.
 
 ## shift_plan.local_end_time
 
@@ -5422,9 +5443,9 @@
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.plans_and_series includes field planning_from labeled Planning from.
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.plans_and_series includes field planning_from labeled Planung von.
   - [typescript_api_interface] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_from.
-  - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_from.
   - [typescript_api_interface] PlanningRecordListItem: PlanningRecordListItem includes field planning_from.
   - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field planning_from.
+  - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_from.
   - [backend_schema] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_from.
   - [backend_schema] PlanningRecord: PlanningRecord includes field planning_from.
 
@@ -5448,12 +5469,12 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.plans_and_series includes field planning_record_id labeled Planning record.
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.plans_and_series includes field planning_record_id labeled Planungsdatensatz.
-  - [typescript_api_interface] CustomerNewPlanWizardState: CustomerNewPlanWizardState includes field planning_record_id.
-  - [typescript_api_interface] CoverageShiftItem: CoverageShiftItem includes field planning_record_id.
-  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field planning_record_id.
-  - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field planning_record_id.
-  - [typescript_api_interface] TeamRead: TeamRead includes field planning_record_id.
-  - [typescript_api_interface] TeamCreate: TeamCreate includes field planning_record_id.
+  - [typescript_api_interface] CustomerDashboardCalendarItemRead: CustomerDashboardCalendarItemRead includes field planning_record_id.
+  - [typescript_api_interface] FinanceBillingTimesheetLineRead: FinanceBillingTimesheetLineRead includes field planning_record_id.
+  - [typescript_api_interface] FinanceBillingTimesheetRead: FinanceBillingTimesheetRead includes field planning_record_id.
+  - [typescript_api_interface] PlanningCommercialLinkRead: PlanningCommercialLinkRead includes field planning_record_id.
+  - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_record_id.
+  - [typescript_api_interface] PlanningBoardShiftListItem: PlanningBoardShiftListItem includes field planning_record_id.
 
 ## shift_plan.planning_to
 
@@ -5476,9 +5497,9 @@
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.plans_and_series includes field planning_to labeled Planning to.
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.plans_and_series includes field planning_to labeled Planung bis.
   - [typescript_api_interface] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_to.
-  - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_to.
   - [typescript_api_interface] PlanningRecordListItem: PlanningRecordListItem includes field planning_to.
   - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field planning_to.
+  - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_to.
   - [backend_schema] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_to.
   - [backend_schema] PlanningRecord: PlanningRecord includes field planning_to.
 
@@ -5528,12 +5549,12 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.concrete_shift_and_release includes field release_state labeled Release state.
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.concrete_shift_and_release includes field release_state labeled Freigabestatus.
-  - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field release_state.
-  - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field release_state.
+  - [typescript_api_interface] CustomerOrderListItem: CustomerOrderListItem includes field release_state.
+  - [typescript_api_interface] CustomerOrderListFilters: CustomerOrderListFilters includes field release_state.
+  - [typescript_api_interface] PlanningRecordListItem: PlanningRecordListItem includes field release_state.
+  - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field release_state.
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field release_state.
   - [typescript_api_interface] ShiftListItem: ShiftListItem includes field release_state.
-  - [typescript_api_interface] ShiftReleaseDiagnosticsRead: ShiftReleaseDiagnosticsRead includes field release_state.
-  - [typescript_api_interface] PlanningBoardShiftListItem: PlanningBoardShiftListItem includes field release_state.
 
 ## shift_plan.starts_at
 
@@ -5555,12 +5576,12 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.concrete_shift_and_release includes field starts_at labeled Starts at.
   - [page_help_manifest] Assistant Page Help Manifest: P-03 manifest section planning_shifts.concrete_shift_and_release includes field starts_at labeled Startet um.
-  - [typescript_api_interface] CoverageShiftItem: CoverageShiftItem includes field starts_at.
-  - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field starts_at.
+  - [typescript_api_interface] CustomerDashboardCalendarItemRead: CustomerDashboardCalendarItemRead includes field starts_at.
   - [typescript_api_interface] EmployeeAvailabilityRuleRead: EmployeeAvailabilityRuleRead includes field starts_at.
   - [typescript_api_interface] EmployeeAvailabilityRuleCreatePayload: EmployeeAvailabilityRuleCreatePayload includes field starts_at.
   - [typescript_api_interface] EmployeeAvailabilityRuleUpdatePayload: EmployeeAvailabilityRuleUpdatePayload includes field starts_at.
-  - [typescript_api_interface] CustomerDashboardCalendarItemRead: CustomerDashboardCalendarItemRead includes field starts_at.
+  - [typescript_api_interface] ShiftListItem: ShiftListItem includes field starts_at.
+  - [typescript_api_interface] PlanningBoardShiftListItem: PlanningBoardShiftListItem includes field starts_at.
 
 ## shift_plan.subcontractor_visible_flag
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from app.modules.assistant.field_dictionary import detect_field_or_lookup_signal
+from app.modules.assistant.field_dictionary import detect_field_or_lookup_signal, detect_platform_term_signal
 from app.modules.assistant.workflow_help import detect_workflow_intent
 
 
@@ -294,7 +294,13 @@ def classify_assistant_message(
         page_id=str((route_context or {}).get("page_id") or "").strip() or None,
         route_name=str((route_context or {}).get("route_name") or "").strip() or None,
     )
-    if field_lookup_signal is not None:
+    platform_term_signal = detect_platform_term_signal(
+        cleaned,
+        page_id=str((route_context or {}).get("page_id") or "").strip() or None,
+        route_name=str((route_context or {}).get("route_name") or "").strip() or None,
+    )
+
+    if field_lookup_signal is not None and not _prefer_platform_term_signal(field_lookup_signal, platform_term_signal):
         return AssistantClassificationResult(
             category=AssistantIntentCategory.PLATFORM_RELATED,
             is_platform_related=True,
@@ -303,6 +309,16 @@ def classify_assistant_message(
             reason="field_or_lookup_dictionary_match",
             confidence="medium" if field_lookup_signal.ambiguous else "high",
             intent=field_lookup_signal.intent_category,
+        )
+    if platform_term_signal is not None:
+        return AssistantClassificationResult(
+            category=AssistantIntentCategory.PLATFORM_RELATED,
+            is_platform_related=True,
+            is_out_of_scope=False,
+            is_unsafe=False,
+            reason="platform_term_dictionary_match",
+            confidence="medium" if platform_term_signal.ambiguous else "high",
+            intent=platform_term_signal.intent_category,
         )
 
     if _contains_any(lowered, _PLATFORM_KEYWORDS):
@@ -418,6 +434,16 @@ def _is_customer_order_workspace_follow_up(
 
 def _contains_any(text: str, patterns: set[str]) -> bool:
     return any(pattern in text for pattern in patterns)
+
+
+def _prefer_platform_term_signal(field_signal, platform_term_signal) -> bool:  # noqa: ANN001
+    if field_signal is None or platform_term_signal is None:
+        return False
+    if field_signal.intent_category in {"lookup_meaning_question", "status_meaning_question"}:
+        return False
+    field_top_score = field_signal.field_matches[0].score if field_signal.field_matches else -1.0
+    term_top_score = platform_term_signal.term_matches[0].score if platform_term_signal.term_matches else -1.0
+    return term_top_score >= field_top_score
 
 
 def _unsafe_reason(lowered: str, route_blob: str) -> str:

@@ -1130,7 +1130,7 @@ describe("CustomerAdminView search dialog", () => {
     const wrapper = await mountCustomerAdmin();
     routerReplaceMock.mockClear();
 
-    await wrapper.get('[data-testid="customer-tab-orders"]').trigger("click");
+    await wrapper.get('[data-testid="customer-overview-nav-orders"]').trigger("click");
     await settle();
 
     expect(routerReplaceMock).toHaveBeenCalledWith({
@@ -1146,7 +1146,7 @@ describe("CustomerAdminView search dialog", () => {
     const wrapper = await mountSelectedCustomer("contact_access");
     expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
 
-    const contactPanel = wrapper.get('[data-testid="customer-contacts-access-section-contacts"]');
+    const contactPanel = wrapper.get('[data-testid="customer-overview-section-contacts"]');
     await contactPanel.get('[data-testid="customer-contact-register-create"]').trigger("click");
     await settle();
     const contactModal = wrapper.get('[data-testid="customer-contact-editor-modal"]');
@@ -1159,7 +1159,7 @@ describe("CustomerAdminView search dialog", () => {
     await flushPromises();
 
     expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
-    expect(wrapper.find('[data-testid="customer-tab-panel-contact-access"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-overview-section-contacts"]').exists()).toBe(true);
 
     const detailRefresh = deferred<ReturnType<typeof buildCustomerRead>>();
     apiMocks.getCustomerMock.mockReturnValueOnce(detailRefresh.promise);
@@ -1167,13 +1167,13 @@ describe("CustomerAdminView search dialog", () => {
     await flushPromises();
 
     expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
-    expect(wrapper.find('[data-testid="customer-tab-panel-contact-access"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-overview-section-contacts"]').exists()).toBe(true);
 
     detailRefresh.resolve(buildCustomerRead("customer-default", "Alpha Security", "K-0001"));
     await settle();
 
     expect(wrapper.get('[data-testid="customer-loading-overlay"]').attributes("data-busy")).toBe("false");
-    expect(wrapper.find('[data-testid="customer-tab-panel-contact-access"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-overview-section-contacts"]').exists()).toBe(true);
   });
 
   it("keeps route-based customer selection working in detail-only mode", async () => {
@@ -1313,60 +1313,27 @@ describe("CustomerAdminView search dialog", () => {
     expect(wrapper.find('[data-testid="customer-dashboard-tab-stub"]').exists()).toBe(false);
   });
 
-  it("renders contact access as the only contacts-addresses-portal top-level tab with right-side history links", async () => {
+  it("renders one overview nav with grouped customer detail sections", async () => {
     const wrapper = await mountSelectedCustomer("contact_access");
 
-    const contactAccessTab = wrapper.get('[data-testid="customer-tab-contact_access"]');
-    expect(contactAccessTab.text()).toContain("Contacts & Access");
-    expect(contactAccessTab.classes()).toContain("customer-admin-tab");
-    expect(contactAccessTab.classes()).toContain("active");
-    expect(wrapper.find('[data-testid="customer-tab-contacts"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="customer-tab-addresses"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="customer-tab-portal"]').exists()).toBe(false);
-
-    const historyTab = wrapper.get('[data-testid="customer-tab-history"]');
-    const employeeBlocksTab = wrapper.get('[data-testid="customer-tab-employee_blocks"]');
-    expect(historyTab.classes()).toContain("customer-admin-tab-link");
-    expect(historyTab.classes()).not.toContain("customer-admin-tab");
-    expect(employeeBlocksTab.classes()).toContain("customer-admin-tab-link");
-
-    await historyTab.trigger("click");
-    await settle();
-    expect(wrapper.get('[data-testid="customer-tab-history"]').classes()).toContain("active");
-    expect(wrapper.get('[data-testid="customer-tab-history"]').attributes("aria-current")).toBe("page");
-    expect(wrapper.find('[data-testid="customer-tab-panel-history"]').exists()).toBe(true);
-
-    await employeeBlocksTab.trigger("click");
-    await settle();
-    expect(wrapper.get('[data-testid="customer-tab-employee_blocks"]').classes()).toContain("active");
-    expect(wrapper.get('[data-testid="customer-tab-employee_blocks"]').attributes("aria-current")).toBe("page");
-    expect(wrapper.find('[data-testid="customer-tab-panel-employee-blocks"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-detail-tabs"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="customer-overview-section-nav"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="customer-overview-nav-contacts"]').text()).toContain("Contacts");
+    expect(wrapper.get('[data-testid="customer-overview-nav-addresses"]').text()).toContain("Addresses");
+    expect(wrapper.get('[data-testid="customer-overview-nav-portal-access"]').text()).toContain("Portal & Access");
+    expect(wrapper.get('[data-testid="customer-overview-nav-orders"]').text()).toContain("Orders");
+    expect(wrapper.get('[data-testid="customer-overview-nav-history"]').text()).toContain("History");
+    expect(wrapper.get('[data-testid="customer-overview-nav-employee-blocks"]').text()).toContain("Employee blocks");
   });
 
-  it("renders contact access with employee-overview style section nav and one section container per area", async () => {
+  it("renders the overview page as one scrollable set of section cards", async () => {
     const wrapper = await mountSelectedCustomer("contact_access");
 
     const html = wrapper.html();
-    const contactAccessPanel = wrapper.get('[data-testid="customer-tab-panel-contact-access"]');
-    const onePageLayout = wrapper.get('[data-testid="customer-contacts-access-layout"]');
-    const nav = wrapper.get('[data-testid="customer-contacts-access-nav"]');
-    const contentShell = onePageLayout.get(".customer-admin-contact-access-content");
-    const contactsSection = wrapper.get('[data-testid="customer-contacts-access-section-contacts"]');
-    const addressesSection = wrapper.get('[data-testid="customer-contacts-access-section-addresses"]');
-    const portalSection = wrapper.get('[data-testid="customer-contacts-access-section-portal"]');
-    const directLayoutChildren = Array.from(onePageLayout.element.children).map((child) =>
-      child.getAttribute("data-testid"),
-    );
-    expect(directLayoutChildren).toEqual([
-      "customer-contacts-access-nav",
-      null,
-    ]);
-    expect(contentShell.classes()).toContain("customer-admin-contact-access-content");
-    expect(nav.text()).toContain("Contacts");
-    expect(nav.text()).toContain("Addresses");
-    expect(nav.text()).toContain("Portal & Access");
-    expect(wrapper.findAll(".customer-admin-contact-access-nav__link")).toHaveLength(3);
-    expect(wrapper.get('[data-testid="customer-contacts-access-nav-contacts"]').attributes("aria-current")).toBe("true");
+    const overviewWorkspace = wrapper.get('[data-testid="customer-overview-workspace"]');
+    const contactsSection = wrapper.get('[data-testid="customer-overview-section-contacts"]');
+    const addressesSection = wrapper.get('[data-testid="customer-overview-section-addresses"]');
+    const portalSection = wrapper.get('[data-testid="customer-overview-section-portal-access"]');
     expect(contactsSection.classes()).toContain("customer-admin-contact-access-section-card");
     expect(addressesSection.classes()).toContain("customer-admin-contact-access-section-card");
     expect(portalSection.classes()).toContain("customer-admin-contact-access-section-card");
@@ -1376,10 +1343,6 @@ describe("CustomerAdminView search dialog", () => {
     expect(addressesSection.text()).toContain("Link and maintain customer addresses.");
     expect(portalSection.text()).toContain("Portal & Access");
     expect(portalSection.text()).toContain("Control portal access and login history.");
-    expect(contactAccessPanel.findAll(".customer-admin-editor-intro")).toHaveLength(0);
-    expect(contactAccessPanel.text()).not.toContain("Contact maintenance");
-    expect(contactAccessPanel.text()).not.toContain("Address links");
-    expect(contactAccessPanel.text()).not.toContain("Portal controls and releases");
     expect(wrapper.find('[data-testid="customer-tab-panel-contacts"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-tab-panel-addresses"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-tab-panel-portal"]').exists()).toBe(true);
@@ -1396,33 +1359,28 @@ describe("CustomerAdminView search dialog", () => {
     expect(contactsSection.text()).toContain("Create new contact");
     expect(addressesSection.find('[data-testid="customer-address-editor-modal"]').exists()).toBe(false);
     expect(addressesSection.text()).toContain("Create new address");
-    expect(html.indexOf('data-testid="customer-tab-panel-contact-access"')).toBeLessThan(
-      html.indexOf('data-testid="customer-contacts-access-layout"'),
+    expect(overviewWorkspace.exists()).toBe(true);
+    expect(html.indexOf('data-testid="customer-overview-section-contacts"')).toBeLessThan(
+      html.indexOf('data-testid="customer-overview-section-addresses"'),
     );
-    expect(html.indexOf('data-testid="customer-contacts-access-section-contacts"')).toBeLessThan(
-      html.indexOf('data-testid="customer-contacts-access-section-addresses"'),
+    expect(html.indexOf('data-testid="customer-overview-section-addresses"')).toBeLessThan(
+      html.indexOf('data-testid="customer-overview-section-portal-access"'),
     );
-    expect(html.indexOf('data-testid="customer-contacts-access-section-addresses"')).toBeLessThan(
-      html.indexOf('data-testid="customer-contacts-access-section-portal"'),
-    );
-
-    await wrapper.get('[data-testid="customer-contacts-access-nav-portal"]').trigger("click");
+    await wrapper.get('[data-testid="customer-overview-nav-portal-access"]').trigger("click");
     await settle();
-    expect(wrapper.get('[data-testid="customer-contacts-access-nav-portal"]').attributes("aria-current")).toBe("true");
-    expect(onePageLayout.get(".customer-admin-contact-access-content").classes()).toContain("customer-admin-contact-access-content");
-    expect(onePageLayout.find('[data-testid="customer-contacts-access-nav"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="customer-overview-nav-portal-access"]').attributes("aria-current")).toBe("true");
   });
 
   it("keeps the left nav interactive like Employees Overview on click", async () => {
     const wrapper = await mountSelectedCustomer("contact_access");
 
-    await wrapper.get('[data-testid="customer-contacts-access-nav-addresses"]').trigger("click");
+    await wrapper.get('[data-testid="customer-overview-nav-addresses"]').trigger("click");
     await settle();
 
-    expect(wrapper.get('[data-testid="customer-contacts-access-nav-addresses"]').attributes("aria-current")).toBe("true");
+    expect(wrapper.get('[data-testid="customer-overview-nav-addresses"]').attributes("aria-current")).toBe("true");
   });
 
-  it("keeps contact-access nav state isolated across multiple mounted customer detail tabs", async () => {
+  it("keeps contact-access overview navigation usable across multiple mounted customer detail tabs", async () => {
     apiMocks.listCustomersMock.mockImplementation(async () => [
       buildCustomerListItem("customer-rhein", "RheinForum Köln", "K-1000", "active"),
       buildCustomerListItem("customer-hafen", "HafenKontor Köln", "K-1001", "active"),
@@ -1441,22 +1399,21 @@ describe("CustomerAdminView search dialog", () => {
     };
     const hafenWrapper = await mountCustomerAdmin();
 
-    await rheinWrapper.get('[data-testid="customer-contacts-access-nav-addresses"]').trigger("click");
-    await hafenWrapper.get('[data-testid="customer-contacts-access-nav-portal"]').trigger("click");
+    await rheinWrapper.get('[data-testid="customer-overview-nav-addresses"]').trigger("click");
+    await hafenWrapper.get('[data-testid="customer-overview-nav-portal-access"]').trigger("click");
     await settle();
 
-    expect(rheinWrapper.get('[data-testid="customer-contacts-access-nav-addresses"]').attributes("aria-current")).toBe("true");
-    expect(rheinWrapper.get('[data-testid="customer-contacts-access-nav-portal"]').attributes("aria-current")).toBeUndefined();
-    expect(hafenWrapper.get('[data-testid="customer-contacts-access-nav-portal"]').attributes("aria-current")).toBe("true");
-    expect(hafenWrapper.get('[data-testid="customer-contacts-access-nav-addresses"]').attributes("aria-current")).toBeUndefined();
+    expect(rheinWrapper.find('[data-testid="customer-overview-section-addresses"]').exists()).toBe(true);
+    expect(hafenWrapper.find('[data-testid="customer-overview-section-portal-access"]').exists()).toBe(true);
+    expect(scrollIntoViewMock).toHaveBeenCalled();
   });
 
-  it("renders Orders as the customer detail tab label and no longer shows Plans", async () => {
+  it("renders Orders as an overview section and no longer shows a separate Plans tab", async () => {
     const wrapper = await mountSelectedCustomer("orders");
 
-    const ordersTab = wrapper.get('[data-testid="customer-tab-orders"]');
-    expect(ordersTab.text()).toBe("Orders");
-    expect(ordersTab.classes()).toContain("active");
+    const ordersNav = wrapper.get('[data-testid="customer-overview-nav-orders"]');
+    expect(ordersNav.text()).toBe("Orders");
+    expect(ordersNav.attributes("aria-current")).toBe("true");
     expect(wrapper.find('[data-testid="customer-tab-plans"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="customer-orders-tab-stub"]').exists()).toBe(true);
     expect(wrapper.text()).not.toContain("Plans");
@@ -1505,7 +1462,7 @@ describe("CustomerAdminView search dialog", () => {
   it("keeps contact creation working from the merged contact access tab", async () => {
     const wrapper = await mountSelectedCustomer("contact_access");
 
-    const contactPanel = wrapper.get('[data-testid="customer-contacts-access-section-contacts"]');
+    const contactPanel = wrapper.get('[data-testid="customer-overview-section-contacts"]');
     expect(contactPanel.text()).toContain("Mira Contact");
     await contactPanel.get('[data-testid="customer-contact-register-create"]').trigger("click");
     await settle();
@@ -1532,7 +1489,7 @@ describe("CustomerAdminView search dialog", () => {
   it("opens the same contact editor modal for edit mode and keeps validation errors inside it", async () => {
     const wrapper = await mountSelectedCustomer("contact_access");
 
-    const contactPanel = wrapper.get('[data-testid="customer-contacts-access-section-contacts"]');
+    const contactPanel = wrapper.get('[data-testid="customer-overview-section-contacts"]');
     await clickButtonByTextWithin(contactPanel, "Edit");
     await settle();
 
@@ -1567,7 +1524,7 @@ describe("CustomerAdminView search dialog", () => {
   it("keeps address creation and shared-address modal behavior working from contact access", async () => {
     const wrapper = await mountSelectedCustomer("contact_access");
 
-    const addressPanel = wrapper.get('[data-testid="customer-contacts-access-section-addresses"]');
+    const addressPanel = wrapper.get('[data-testid="customer-overview-section-addresses"]');
     expect(addressPanel.text()).toContain("Alte Strasse 1");
     await addressPanel.get('[data-testid="customer-address-register-create"]').trigger("click");
     await settle();
@@ -1619,7 +1576,7 @@ describe("CustomerAdminView search dialog", () => {
   it("opens the same address editor modal for edit mode and keeps validation errors inside it", async () => {
     const wrapper = await mountSelectedCustomer("contact_access");
 
-    const addressPanel = wrapper.get('[data-testid="customer-contacts-access-section-addresses"]');
+    const addressPanel = wrapper.get('[data-testid="customer-overview-section-addresses"]');
     await clickButtonByTextWithin(addressPanel, "Edit");
     await settle();
 
@@ -1667,7 +1624,7 @@ describe("CustomerAdminView search dialog", () => {
     ]);
     const wrapper = await mountSelectedCustomer("contact_access");
 
-    const portalCard = wrapper.get('[data-testid="customer-contacts-access-section-portal"]');
+    const portalCard = wrapper.get('[data-testid="customer-overview-section-portal-access"]');
     const portalPanel = wrapper.get('[data-testid="customer-tab-panel-portal"]');
     expect(portalCard.text()).toContain("Portal & Access");
     expect(portalCard.text()).toContain("Control portal access and login history.");
@@ -1697,21 +1654,21 @@ describe("CustomerAdminView search dialog", () => {
     expect(wrapper.find('[data-testid="customer-portal-access-password-modal"]').exists()).toBe(true);
   });
 
-  it("keeps history refresh and employee block creation working from right-side links", async () => {
+  it("keeps history refresh and employee block creation working from overview nav links", async () => {
     const wrapper = await mountSelectedCustomer("dashboard");
 
-    await wrapper.get('[data-testid="customer-tab-history"]').trigger("click");
+    await wrapper.get('[data-testid="customer-overview-nav-history"]').trigger("click");
     await settle();
-    expect(wrapper.find('[data-testid="customer-tab-panel-history"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-overview-section-history"]').exists()).toBe(true);
     apiMocks.listCustomerHistoryMock.mockClear();
     await clickButtonByText(wrapper, "Refresh history");
     await settle();
     expect(apiMocks.listCustomerHistoryMock).toHaveBeenCalledWith("tenant-1", "customer-default", "token-1");
 
-    await wrapper.get('[data-testid="customer-tab-employee_blocks"]').trigger("click");
+    await wrapper.get('[data-testid="customer-overview-nav-employee-blocks"]').trigger("click");
     await settle();
-    expect(wrapper.find('[data-testid="customer-tab-panel-employee-blocks"]').exists()).toBe(true);
-    const employeePanel = wrapper.get('[data-testid="customer-tab-panel-employee-blocks"]');
+    expect(wrapper.find('[data-testid="customer-overview-section-employee-blocks"]').exists()).toBe(true);
+    const employeePanel = wrapper.get('[data-testid="customer-overview-section-employee-blocks"]');
     const inputs = employeePanel.findAll("input");
     await inputs[0]!.setValue("employee-1");
     await inputs[1]!.setValue("Do not schedule");
@@ -1736,21 +1693,41 @@ describe("CustomerAdminView search dialog", () => {
     const wrapper = await mountSelectedCustomer("dashboard");
 
     for (const testId of ["dashboard-select-contacts", "dashboard-select-addresses", "dashboard-select-portal"]) {
+      routerReplaceMock.mockClear();
       await wrapper.get(`[data-testid="${testId}"]`).trigger("click");
       await settle();
-      expect(wrapper.get('[data-testid="customer-tab-contact_access"]').classes()).toContain("active");
-      expect(wrapper.find('[data-testid="customer-tab-panel-contact-access"]').exists()).toBe(true);
-      await wrapper.get('[data-testid="customer-tab-dashboard"]').trigger("click");
+      if (testId === "dashboard-select-contacts") {
+        expect(routerReplaceMock).toHaveBeenCalledWith(expect.objectContaining({
+          query: expect.objectContaining({ tab: "contact_access" }),
+        }));
+      }
+      if (testId === "dashboard-select-addresses") {
+        expect(routerReplaceMock).toHaveBeenCalledWith(expect.objectContaining({
+          query: expect.objectContaining({ tab: "contact_access" }),
+        }));
+      }
+      if (testId === "dashboard-select-portal") {
+        expect(routerReplaceMock).toHaveBeenCalledWith(expect.objectContaining({
+          query: expect.objectContaining({ tab: "contact_access" }),
+        }));
+      }
+      await wrapper.get('[data-testid="customer-overview-nav-master-data"]').trigger("click");
       await settle();
     }
   });
 
-  it("normalizes legacy direct route tabs to contact access without a blank panel", async () => {
-    for (const legacyTabId of ["contacts", "addresses", "portal"]) {
+  it("normalizes legacy direct route tabs into the unified overview sections", async () => {
+    const expectations = {
+      addresses: "customer-overview-nav-addresses",
+      contacts: "customer-overview-nav-contacts",
+      portal: "customer-overview-nav-portal-access",
+    } as const;
+
+    for (const legacyTabId of Object.keys(expectations) as Array<keyof typeof expectations>) {
       const wrapper = await mountSelectedCustomer(legacyTabId);
 
-      expect(wrapper.get('[data-testid="customer-tab-contact_access"]').classes()).toContain("active");
-      expect(wrapper.find('[data-testid="customer-tab-panel-contact-access"]').exists()).toBe(true);
+      expect(wrapper.find(`[data-testid="${expectations[legacyTabId]}"]`).exists()).toBe(true);
+      expect(wrapper.find('[data-testid="customer-overview-workspace"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="customer-tab-panel-contacts"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="customer-tab-panel-addresses"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="customer-tab-panel-portal"]').exists()).toBe(true);
@@ -1759,10 +1736,10 @@ describe("CustomerAdminView search dialog", () => {
     }
   });
 
-  it("normalizes legacy plans route state to the Orders tab without a blank panel", async () => {
+  it("normalizes legacy plans route state to the Orders overview section", async () => {
     const wrapper = await mountSelectedCustomer("plans");
 
-    expect(wrapper.get('[data-testid="customer-tab-orders"]').classes()).toContain("active");
+    expect(wrapper.get('[data-testid="customer-overview-nav-orders"]').attributes("aria-current")).toBe("true");
     expect(wrapper.find('[data-testid="customer-orders-tab-stub"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-tab-plans"]').exists()).toBe(false);
     expect(wrapper.text()).toContain("Orders");

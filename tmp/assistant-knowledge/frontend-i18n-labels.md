@@ -155,3 +155,4 @@
 - employee.weekdays: keys=employeeAdmin.fields.weekdays de=Wochentage en=Weekdays
 - employee.work_email: keys=employeeAdmin.fields.workEmail de=Dienst-E-Mail en=Work email
 - employee.work_phone: keys=employeeAdmin.fields.workPhone de=Diensttelefon en=Work phone
+- shift.shift_type_code: keys=planningShifts.fieldsShiftType de=Schichttyp en=Shift type

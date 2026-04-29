@@ -28,7 +28,7 @@
 - customer.contact_name: page=C-01 input=select contexts=none
 - customer.contact_title: page=C-01 input=text contexts=none
 - customer.contract_reference: page=C-01 input=text contexts=none
-- customer.country_code: page=C-01 input=select contexts=none
+- customer.country_code: page=C-01 input=text contexts=none
 - customer.currency_code: page=C-01 input=text contexts=none
 - customer.customer_number: page=C-01 input=input contexts=customers.master_profile, customer_create, customer_scoped_order_create, customer_order_create, customer_plan_create
 - customer.customer_status_lookup_id: page=C-01 input=select contexts=none
@@ -205,6 +205,7 @@
 - planning_record.planning_documents: page=P-02 input=input contexts=planning_orders.requirements, customer_order_create, customer_plan_create, contract_or_document_register
 - planning_record.requirement_lines: page=P-02 input=input contexts=planning_orders.requirements, customer_order_create, customer_plan_create, contract_or_document_register
 - planning_record.service_category: page=P-02 input=input contexts=planning_orders.order_scope, customer_order_create, customer_plan_create, contract_or_document_register
+- shift.shift_type_code: page=P-03 input=select contexts=planning.shift, planning_shifts.concrete_shift_and_release
 - shift_plan.code: page=P-03 input=input contexts=planning_shifts.templates, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
 - shift_plan.customer_visible_flag: page=P-03 input=input contexts=planning_shifts.concrete_shift_and_release, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app
 - shift_plan.ends_at: page=P-03 input=input contexts=planning_shifts.concrete_shift_and_release, customer_plan_create, employee_assign_to_shift, shift_release_to_employee_app

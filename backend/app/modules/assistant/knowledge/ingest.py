@@ -15,6 +15,7 @@ from app.modules.assistant.field_dictionary import (
     render_form_field_catalog_markdown,
     render_frontend_i18n_label_markdown,
     render_lookup_dictionary_markdown,
+    render_platform_term_dictionary_markdown,
 )
 from app.modules.assistant.page_catalog_seed import ASSISTANT_PAGE_ROUTE_SEEDS
 from app.modules.assistant.page_help_seed import ASSISTANT_PAGE_HELP_SEEDS
@@ -237,6 +238,7 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
     field_dictionary_path = generated_root / "field-dictionary.md"
     lookup_dictionary_path = generated_root / "lookup-dictionary.md"
     status_dictionary_path = generated_root / "status-dictionary.md"
+    platform_term_dictionary_path = generated_root / "platform-term-dictionary.md"
     form_field_catalog_path = generated_root / "form-field-catalog.md"
     frontend_i18n_label_path = generated_root / "frontend-i18n-labels.md"
     api_schema_field_path = generated_root / "api-schema-fields.md"
@@ -467,6 +469,7 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
     field_dictionary_path.write_text(render_field_dictionary_markdown(repo_root), encoding="utf-8")
     lookup_dictionary_path.write_text(render_lookup_dictionary_markdown(repo_root), encoding="utf-8")
     status_dictionary_path.write_text(render_lookup_dictionary_markdown(repo_root), encoding="utf-8")
+    platform_term_dictionary_path.write_text(render_platform_term_dictionary_markdown(repo_root), encoding="utf-8")
     form_field_catalog_path.write_text(render_form_field_catalog_markdown(repo_root), encoding="utf-8")
     frontend_i18n_label_path.write_text(render_frontend_i18n_label_markdown(repo_root), encoding="utf-8")
     api_schema_field_path.write_text(render_api_schema_field_markdown(repo_root), encoding="utf-8")
@@ -537,6 +540,11 @@ def build_default_knowledge_registrations(repo_root: Path) -> list[KnowledgeSour
                 source_type="status_dictionary",
                 source_name="Assistant Status Dictionary",
                 source_path=str(status_dictionary_path),
+            ),
+            KnowledgeSourceRegistration(
+                source_type="platform_term_dictionary",
+                source_name="Assistant Platform Term Dictionary",
+                source_path=str(platform_term_dictionary_path),
             ),
             KnowledgeSourceRegistration(
                 source_type="form_field_catalog",
