@@ -1386,7 +1386,7 @@ describe("CustomerAdminView search dialog", () => {
     expect(wrapper.get('[data-testid="customer-overview-nav-addresses"]').attributes("aria-current")).toBe("true");
   });
 
-  it("uses the route-cache scroll target for overview nav clicks", async () => {
+  it("uses local section refs and section scrolling for overview nav clicks", async () => {
     apiMocks.getCustomerCommercialProfileMock.mockResolvedValue(buildCommercialProfile({
       rate_cards: [{ id: "rate-card-1", effective_from: "2026-04-01", effective_to: null, currency_code: "EUR", rate_kind: "service", notes: null, rate_lines: [], surcharge_rules: [] }],
     }));
@@ -1405,8 +1405,7 @@ describe("CustomerAdminView search dialog", () => {
     expect(routerReplaceMock).toHaveBeenCalledWith(expect.objectContaining({
       query: expect.objectContaining({ tab: "rate_lines" }),
     }));
-    expect(scrollToMock).toHaveBeenCalled();
-    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+    expect(scrollIntoViewMock).toHaveBeenCalled();
   });
 
   it("keeps Overview as a single standalone nav item with no duplicate child", async () => {
@@ -1475,7 +1474,7 @@ describe("CustomerAdminView search dialog", () => {
 
     expect(rheinWrapper.find('[data-testid="customer-overview-section-addresses"]').exists()).toBe(true);
     expect(hafenWrapper.find('[data-testid="customer-overview-section-portal-access"]').exists()).toBe(true);
-    expect(scrollToMock).toHaveBeenCalled();
+    expect(scrollIntoViewMock).toHaveBeenCalled();
   });
 
   it("renders Orders as a separate main tab and no longer shows a Plans tab", async () => {

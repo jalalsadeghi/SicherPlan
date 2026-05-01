@@ -1,5 +1,5 @@
 <template>
-  <section class="customer-admin-page">
+  <section ref="customerAdminPageRef" class="customer-admin-page">
     <section v-if="sectionVisibility.showGovernanceHero" class="module-card customer-admin-hero">
       <div>
         <p class="eyebrow">{{ t("customerAdmin.eyebrow") }}</p>
@@ -318,7 +318,16 @@
             class="customer-admin-overview-layout"
             data-testid="customer-overview-workspace"
           >
-            <aside class="customer-admin-overview-nav-shell" data-testid="customer-overview-section-nav">
+            <aside
+              class="customer-admin-overview-nav-shell"
+              :class="{
+                'customer-admin-overview-nav-shell--fixed': customerOverviewNavFloatingMode === 'fixed',
+                'customer-admin-overview-nav-shell--pinned': customerOverviewNavFloatingMode === 'pinned',
+              }"
+              :style="customerOverviewNavFloatingStyle"
+              ref="customerOverviewNavShellRef"
+              data-testid="customer-overview-section-nav"
+            >
               <nav class="customer-admin-overview-nav" aria-label="Customer overview sections">
                 <template v-for="sectionGroup in customerOverviewNavGroups" :key="sectionGroup.id">
                   <button
@@ -2505,9 +2514,11 @@ const contactEditorModalOpen = ref(false);
 const contactEditorErrorMessage = ref("");
 const addressEditorModalOpen = ref(false);
 const addressEditorErrorMessage = ref("");
+const customerAdminPageRef = ref<HTMLElement | null>(null);
 const contactAccessOnePageRef = ref<HTMLElement | null>(null);
 const contactAccessNavShellRef = ref<HTMLElement | null>(null);
 const customerOverviewOnePageRef = ref<HTMLElement | null>(null);
+const customerOverviewNavShellRef = ref<HTMLElement | null>(null);
 const customerContactAccessSectionRefs = reactive<Record<"addresses" | "contacts" | "portal", HTMLElement | null>>({
   addresses: null,
   contacts: null,
@@ -2516,6 +2527,8 @@ const customerContactAccessSectionRefs = reactive<Record<"addresses" | "contacts
 const customerOverviewSectionRefs = reactive<Record<string, HTMLElement | null>>({});
 const contactAccessNavFloatingMode = ref<"fixed" | "pinned" | "static">("static");
 const contactAccessNavFloatingStyle = ref<CSSProperties>({});
+const customerOverviewNavFloatingMode = ref<"fixed" | "pinned" | "static">("static");
+const customerOverviewNavFloatingStyle = ref<CSSProperties>({});
 const pendingRouteCustomerId = ref("");
 const pendingRouteDetailTab = ref("");
 const customerWorkspaceInitialLoadComplete = ref(false);
@@ -2816,12 +2829,20 @@ type CustomerOverviewSectionId =
 type CustomerOverviewGroupId = "contacts_access" | "commercial" | "pricing_rules";
 const CUSTOMER_CONTACT_ACCESS_NAV_TOP_OFFSET = 25;
 const CUSTOMER_CONTACT_ACCESS_NAV_FLOATING_MIN_WIDTH = 1081;
+const CUSTOMER_OVERVIEW_NAV_TOP_OFFSET = 25;
+const CUSTOMER_OVERVIEW_NAV_FLOATING_MIN_WIDTH = 1081;
 let customerContactAccessSectionObserver: IntersectionObserver | null = null;
+let customerOverviewSectionObserver: IntersectionObserver | null = null;
 let suppressContactAccessScrollSpyUntil = 0;
+let suppressCustomerOverviewScrollSpyUntil = 0;
 let contactAccessNavScrollTargets: Array<HTMLElement | Window> = [];
 let contactAccessNavFloatingRaf: number | null = null;
+let customerOverviewNavScrollTargets: Array<HTMLElement | Window> = [];
+let customerOverviewNavFloatingRaf: number | null = null;
 let customerContactAccessVisibilityObserver: MutationObserver | null = null;
+let customerOverviewVisibilityObserver: MutationObserver | null = null;
 const customerContactAccessVisibleEntries = new Map<CustomerContactAccessSectionId, IntersectionObserverEntry>();
+const customerOverviewVisibleEntries = new Map<CustomerOverviewSectionId, IntersectionObserverEntry>();
 const detailTabLabelKeys = {
   dashboard: "customerAdmin.tabs.dashboard",
   overview: "customerAdmin.tabs.overview",
@@ -3316,17 +3337,6 @@ function toggleCustomerOverviewGroup(groupId: CustomerOverviewGroupId) {
   expandedCustomerOverviewGroups[groupId] = !expandedCustomerOverviewGroups[groupId];
 }
 
-function resolveCustomerOverviewScrollTop(sectionId: CustomerOverviewSectionId) {
-  const sectionElement = resolveCustomerOverviewSectionElement(sectionId);
-  const scrollTarget = routeCacheScrollTarget.value instanceof HTMLElement ? routeCacheScrollTarget.value : null;
-  if (!sectionElement || !scrollTarget) {
-    return null;
-  }
-  const sectionRect = sectionElement.getBoundingClientRect();
-  const targetRect = scrollTarget.getBoundingClientRect();
-  return Math.max(0, scrollTarget.scrollTop + sectionRect.top - targetRect.top - 16);
-}
-
 function syncOverviewSectionFromDetailTab(detailTab: string) {
   const nextSection = normalizeCustomerOverviewSectionId(
     resolveCustomerOverviewSectionId(detailTab, {
@@ -3346,6 +3356,10 @@ function syncOverviewSectionFromDetailTab(detailTab: string) {
     activePricingRulesTab.value = normalizeCustomerPricingRulesTab(nextSection, {
       hasRateCards: !!commercialProfile.value?.rate_cards.length,
     });
+  }
+  if (activeDetailTab.value === "overview") {
+    suppressCustomerOverviewScrollSpy();
+    scrollToCustomerOverviewSectionWithBehavior(nextSection, "auto");
   }
 }
 
@@ -3370,24 +3384,21 @@ function resolveCustomerOverviewSectionElement(sectionId: string) {
 }
 
 function scrollToCustomerOverviewSection(sectionId: CustomerOverviewSectionId) {
-  void nextTick(() => {
-    const scrollTarget = routeCacheScrollTarget.value instanceof HTMLElement ? routeCacheScrollTarget.value : null;
-    const nextScrollTop = resolveCustomerOverviewScrollTop(sectionId);
-    if (!scrollTarget || nextScrollTop == null) {
-      return;
-    }
-    if (typeof scrollTarget.scrollTo === "function") {
-      scrollTarget.scrollTo({
-        top: nextScrollTop,
-        behavior: "smooth",
-      });
-      return;
-    }
-    scrollTarget.scrollTop = nextScrollTop;
+  return scrollToCustomerOverviewSectionWithBehavior(sectionId, "smooth");
+}
+
+async function scrollToCustomerOverviewSectionWithBehavior(
+  sectionId: CustomerOverviewSectionId,
+  behavior: ScrollBehavior,
+) {
+  await nextTick();
+  resolveCustomerOverviewSectionElement(sectionId)?.scrollIntoView({
+    behavior,
+    block: "start",
   });
 }
 
-function selectCustomerOverviewSection(sectionId: string) {
+async function selectCustomerOverviewSection(sectionId: string) {
   const normalizedSectionId = normalizeCustomerOverviewSectionId(sectionId);
   activeOverviewSection.value = normalizedSectionId;
   expandGroupsForCustomerOverviewSection(normalizedSectionId);
@@ -3403,8 +3414,9 @@ function selectCustomerOverviewSection(sectionId: string) {
       hasRateCards: !!commercialProfile.value?.rate_cards.length,
     });
   }
+  suppressCustomerOverviewScrollSpy();
   if (selectedCustomer.value?.id) {
-    void router.replace({
+    await router.replace({
       query: {
         ...route.query,
         customer_id: selectedCustomer.value.id,
@@ -3413,7 +3425,290 @@ function selectCustomerOverviewSection(sectionId: string) {
       },
     });
   }
-  scrollToCustomerOverviewSection(normalizedSectionId);
+  await scrollToCustomerOverviewSection(normalizedSectionId);
+}
+
+function suppressCustomerOverviewScrollSpy() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  suppressCustomerOverviewScrollSpyUntil = window.performance.now() + 650;
+}
+
+function disconnectCustomerOverviewSectionObserver() {
+  customerOverviewSectionObserver?.disconnect();
+  customerOverviewSectionObserver = null;
+  customerOverviewVisibleEntries.clear();
+}
+
+function disconnectCustomerOverviewVisibilityObserver() {
+  customerOverviewVisibilityObserver?.disconnect();
+  customerOverviewVisibilityObserver = null;
+}
+
+function isCustomerOverviewInstanceVisible() {
+  const overviewElement = customerOverviewOnePageRef.value;
+  if (!overviewElement || !isRouteCachePaneActive.value) {
+    return false;
+  }
+  return overviewElement.getClientRects().length > 0;
+}
+
+function resolveCustomerOverviewSectionIdFromElement(element: Element): CustomerOverviewSectionId | null {
+  const matchingEntry = Object.entries(customerOverviewSectionRefs).find(([, sectionElement]) => sectionElement === element);
+  return (matchingEntry?.[0] as CustomerOverviewSectionId | undefined) ?? null;
+}
+
+function isCustomerOverviewScrollableAncestor(element: HTMLElement) {
+  const overflowY = window.getComputedStyle(element).overflowY;
+  return /(auto|scroll|overlay)/.test(overflowY) && element.scrollHeight > element.clientHeight;
+}
+
+function findCustomerOverviewScrollContainers() {
+  const containers: HTMLElement[] = [];
+  let parent = customerOverviewOnePageRef.value?.parentElement ?? null;
+
+  while (parent && parent !== document.body) {
+    if (isCustomerOverviewScrollableAncestor(parent)) {
+      containers.push(parent);
+    }
+    parent = parent.parentElement;
+  }
+
+  return containers;
+}
+
+function resolveCustomerOverviewIntersectionRoot() {
+  return findCustomerOverviewScrollContainers()[0] ?? null;
+}
+
+function resolveCustomerOverviewStickyTop() {
+  const navShell = customerOverviewNavShellRef.value;
+  if (navShell) {
+    const top = Number.parseFloat(window.getComputedStyle(navShell).top);
+    if (Number.isFinite(top)) {
+      return top;
+    }
+  }
+
+  const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize);
+  const baseTop = (Number.isFinite(rootFontSize) ? rootFontSize : 16) * 6.5;
+  return baseTop + CUSTOMER_OVERVIEW_NAV_TOP_OFFSET;
+}
+
+function resolveActiveCustomerOverviewSection(sectionElements: HTMLElement[]) {
+  const stickyTop = resolveCustomerOverviewStickyTop();
+  const activeLineTolerance = 32;
+  const visibleSections = sectionElements
+    .map((element) => {
+      const sectionId = resolveCustomerOverviewSectionIdFromElement(element);
+      if (!sectionId || !customerOverviewVisibleEntries.has(sectionId)) {
+        return null;
+      }
+      const rect = element.getBoundingClientRect();
+      return {
+        distance: Math.abs(rect.top - stickyTop),
+        isCurrentOrNear: rect.top <= stickyTop + activeLineTolerance,
+        rectTop: rect.top,
+        sectionId,
+      };
+    })
+    .filter((entry): entry is Exclude<typeof entry, null> => !!entry);
+
+  const currentSections = visibleSections.filter((section) => section.isCurrentOrNear);
+  const [bestSection] = (currentSections.length ? currentSections : visibleSections).sort((left, right) => {
+    if (left.distance !== right.distance) {
+      return left.distance - right.distance;
+    }
+    return left.rectTop - right.rectTop;
+  });
+
+  return bestSection?.sectionId ?? null;
+}
+
+function resetCustomerOverviewNavFloating() {
+  customerOverviewNavFloatingMode.value = "static";
+  customerOverviewNavFloatingStyle.value = {};
+}
+
+function cancelCustomerOverviewNavFloatingFrame() {
+  if (customerOverviewNavFloatingRaf !== null) {
+    window.cancelAnimationFrame(customerOverviewNavFloatingRaf);
+    customerOverviewNavFloatingRaf = null;
+  }
+}
+
+function updateCustomerOverviewNavFloating() {
+  customerOverviewNavFloatingRaf = null;
+
+  const overviewElement = customerOverviewOnePageRef.value;
+  const navShell = customerOverviewNavShellRef.value;
+  if (
+    activeDetailTab.value !== "overview" ||
+    !overviewElement ||
+    !navShell ||
+    !isCustomerOverviewInstanceVisible() ||
+    !window.matchMedia(`(min-width: ${CUSTOMER_OVERVIEW_NAV_FLOATING_MIN_WIDTH}px)`).matches
+  ) {
+    resetCustomerOverviewNavFloating();
+    return;
+  }
+
+  const stickyTop = resolveCustomerOverviewStickyTop();
+  const overviewRect = overviewElement.getBoundingClientRect();
+  const navWidth = navShell.offsetWidth;
+  const navHeight = navShell.offsetHeight;
+
+  if (!navWidth || !navHeight || overviewRect.top > stickyTop || overviewRect.height <= navHeight) {
+    resetCustomerOverviewNavFloating();
+    return;
+  }
+
+  const maxHeight = `calc(100vh - ${Math.round(stickyTop)}px - 1rem)`;
+  if (overviewRect.bottom <= stickyTop + navHeight) {
+    customerOverviewNavFloatingMode.value = "pinned";
+    customerOverviewNavFloatingStyle.value = {
+      left: "0px",
+      maxHeight,
+      top: `${Math.max(0, overviewElement.offsetHeight - navHeight)}px`,
+      width: `${navWidth}px`,
+    };
+    return;
+  }
+
+  customerOverviewNavFloatingMode.value = "fixed";
+  customerOverviewNavFloatingStyle.value = {
+    left: `${overviewRect.left}px`,
+    maxHeight,
+    top: `${stickyTop}px`,
+    width: `${navWidth}px`,
+  };
+}
+
+function scheduleCustomerOverviewNavFloatingUpdate() {
+  if (customerOverviewNavFloatingRaf !== null) {
+    return;
+  }
+  customerOverviewNavFloatingRaf = window.requestAnimationFrame(updateCustomerOverviewNavFloating);
+}
+
+function teardownCustomerOverviewNavFloating() {
+  cancelCustomerOverviewNavFloatingFrame();
+  customerOverviewNavScrollTargets.forEach((target) => target.removeEventListener("scroll", scheduleCustomerOverviewNavFloatingUpdate));
+  window.removeEventListener("resize", scheduleCustomerOverviewNavFloatingUpdate);
+  customerOverviewNavScrollTargets = [];
+  resetCustomerOverviewNavFloating();
+}
+
+function setupCustomerOverviewNavFloating() {
+  teardownCustomerOverviewNavFloating();
+
+  if (
+    activeDetailTab.value !== "overview" ||
+    !customerOverviewOnePageRef.value ||
+    !customerOverviewNavShellRef.value ||
+    !isCustomerOverviewInstanceVisible()
+  ) {
+    return;
+  }
+
+  customerOverviewNavScrollTargets = [window, ...findCustomerOverviewScrollContainers()];
+  customerOverviewNavScrollTargets.forEach((target) =>
+    target.addEventListener("scroll", scheduleCustomerOverviewNavFloatingUpdate, { passive: true }),
+  );
+  window.addEventListener("resize", scheduleCustomerOverviewNavFloatingUpdate, { passive: true });
+  scheduleCustomerOverviewNavFloatingUpdate();
+}
+
+function setupCustomerOverviewSectionObserver() {
+  disconnectCustomerOverviewSectionObserver();
+
+  if (
+    activeDetailTab.value !== "overview" ||
+    typeof window.IntersectionObserver === "undefined" ||
+    !isCustomerOverviewInstanceVisible()
+  ) {
+    return;
+  }
+
+  const sectionElements = [...customerOverviewVisibleSectionIds.value]
+    .map((sectionId) => resolveCustomerOverviewSectionElement(sectionId))
+    .filter((element): element is HTMLElement => !!element);
+
+  if (!sectionElements.length) {
+    return;
+  }
+
+  const stickyTop = resolveCustomerOverviewStickyTop();
+  customerOverviewSectionObserver = new IntersectionObserver(
+    (entries) => {
+      if (!isCustomerOverviewInstanceVisible()) {
+        return;
+      }
+      if (window.performance.now() < suppressCustomerOverviewScrollSpyUntil) {
+        return;
+      }
+
+      entries.forEach((entry) => {
+        const sectionId = resolveCustomerOverviewSectionIdFromElement(entry.target);
+        if (!sectionId) {
+          return;
+        }
+        if (entry.isIntersecting) {
+          customerOverviewVisibleEntries.set(sectionId, entry);
+          return;
+        }
+        customerOverviewVisibleEntries.delete(sectionId);
+      });
+
+      const sectionId = resolveActiveCustomerOverviewSection(sectionElements);
+      if (sectionId) {
+        activeOverviewSection.value = sectionId;
+        expandGroupsForCustomerOverviewSection(sectionId);
+      }
+    },
+    {
+      root: resolveCustomerOverviewIntersectionRoot(),
+      rootMargin: `-${Math.round(stickyTop)}px 0px -55% 0px`,
+      threshold: [0, 0.1, 0.25, 0.5, 0.75, 1],
+    },
+  );
+
+  sectionElements.forEach((element) => customerOverviewSectionObserver?.observe(element));
+}
+
+function handleCustomerOverviewVisibilityChange() {
+  if (activeDetailTab.value !== "overview") {
+    return;
+  }
+
+  if (!isCustomerOverviewInstanceVisible()) {
+    disconnectCustomerOverviewSectionObserver();
+    teardownCustomerOverviewNavFloating();
+    return;
+  }
+
+  void nextTick(() => {
+    setupCustomerOverviewSectionObserver();
+    setupCustomerOverviewNavFloating();
+    scrollToCustomerOverviewSectionWithBehavior(activeOverviewSection.value as CustomerOverviewSectionId, "auto");
+  });
+}
+
+function setupCustomerOverviewVisibilityObserver() {
+  disconnectCustomerOverviewVisibilityObserver();
+
+  if (typeof window.MutationObserver === "undefined" || !customerAdminPageRef.value) {
+    return;
+  }
+
+  customerOverviewVisibilityObserver = new MutationObserver(() => {
+    handleCustomerOverviewVisibilityChange();
+  });
+  customerOverviewVisibilityObserver.observe(customerAdminPageRef.value, {
+    attributeFilter: ["class", "style"],
+    attributes: true,
+  });
 }
 
 function customerOverviewSectionVisible(sectionId: string) {
@@ -6155,6 +6450,23 @@ watch(
 );
 
 watch(
+  () => [activeDetailTab.value, activeOverviewSection.value, selectedCustomer.value?.id ?? ""] as const,
+  async () => {
+    if (activeDetailTab.value !== "overview") {
+      disconnectCustomerOverviewSectionObserver();
+      disconnectCustomerOverviewVisibilityObserver();
+      teardownCustomerOverviewNavFloating();
+      return;
+    }
+    await nextTick();
+    setupCustomerOverviewVisibilityObserver();
+    setupCustomerOverviewNavFloating();
+    setupCustomerOverviewSectionObserver();
+  },
+  { immediate: true },
+);
+
+watch(
   () => [selectedCustomer.value?.id ?? "", isCreatingCustomer.value, canReadCommercial.value, canReadCustomerOrders.value],
   () => {
     activeDetailTab.value = normalizeCustomerDetailTab(activeDetailTab.value, {
@@ -6345,6 +6657,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleCustomerSearchWindowKeydown);
+  disconnectCustomerOverviewVisibilityObserver();
+  disconnectCustomerOverviewSectionObserver();
+  teardownCustomerOverviewNavFloating();
   disconnectCustomerContactAccessVisibilityObserver();
   disconnectCustomerContactAccessSectionObserver();
   teardownContactAccessNavFloating();
@@ -6677,6 +6992,14 @@ onBeforeUnmount(() => {
   max-height: calc(100vh - var(--customer-overview-sticky-top, 6.5rem) - 1rem);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.customer-admin-overview-nav-shell--fixed {
+  position: fixed;
+}
+
+.customer-admin-overview-nav-shell--pinned {
+  position: absolute;
 }
 
 .customer-admin-overview-nav {

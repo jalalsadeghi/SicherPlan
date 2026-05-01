@@ -21,6 +21,8 @@ test("overview workspace is rendered as a grouped local-nav one-page layout", ()
   assert.match(source, /data-testid="customer-overview-section-nav"/);
   assert.match(source, /class="customer-admin-overview-layout"/);
   assert.match(source, /class="customer-admin-overview-nav-shell"/);
+  assert.match(source, /ref="customerOverviewNavShellRef"/);
+  assert.match(source, /ref="customerOverviewOnePageRef"/);
   assert.match(source, /class="customer-admin-overview-content"/);
   assert.match(source, /const customerOverviewSections = computed\(/);
   assert.match(source, /const customerOverviewNavGroups = computed\(/);
@@ -38,6 +40,8 @@ test("customer overview nav styling mirrors the employee-style two-column side n
   assert.match(source, /grid-template-columns:\s*minmax\(190px,\s*240px\)\s*minmax\(0,\s*1fr\)/);
   assert.match(source, /\.customer-admin-overview-nav-shell\s*\{/);
   assert.match(source, /position:\s*sticky/);
+  assert.match(source, /\.customer-admin-overview-nav-shell--fixed\s*\{/);
+  assert.match(source, /\.customer-admin-overview-nav-shell--pinned\s*\{/);
   assert.match(source, /\.customer-admin-overview-nav__group-toggle\s*\{/);
   assert.match(source, /\.customer-admin-overview-nav__chevron\s*\{/);
   assert.match(source, /\.customer-admin-overview-nav__group-label\s*\{/);
@@ -50,6 +54,21 @@ test("customer overview nav styling mirrors the employee-style two-column side n
   assert.match(source, /\.customer-admin-overview-nav__icon\s*\{/);
   assert.match(source, /\.customer-admin-overview-content\s*\{/);
   assert.match(source, /\.customer-admin-overview-section\s*\{/);
+});
+
+test("customer overview implements the same floating-nav and scroll-spy shell pattern as employee overview", () => {
+  assert.match(source, /const customerOverviewNavFloatingMode = ref<"fixed" \| "pinned" \| "static">\("static"\)/);
+  assert.match(source, /const customerOverviewNavFloatingStyle = ref<CSSProperties>\(\{\}\)/);
+  assert.match(source, /function setupCustomerOverviewNavFloating\(\)/);
+  assert.match(source, /function teardownCustomerOverviewNavFloating\(\)/);
+  assert.match(source, /function updateCustomerOverviewNavFloating\(\)/);
+  assert.match(source, /function scheduleCustomerOverviewNavFloatingUpdate\(\)/);
+  assert.match(source, /function setupCustomerOverviewSectionObserver\(\)/);
+  assert.match(source, /function setupCustomerOverviewVisibilityObserver\(\)/);
+  assert.match(source, /function isCustomerOverviewInstanceVisible\(\)/);
+  assert.match(source, /customerOverviewSectionObserver = new IntersectionObserver\(/);
+  assert.match(source, /customerOverviewVisibilityObserver = new MutationObserver\(/);
+  assert.match(source, /customerOverviewNavScrollTargets = \[window, \.\.\.findCustomerOverviewScrollContainers\(\)\]/);
 });
 
 test("customer overview route normalization maps legacy tabs into local overview sections", () => {
