@@ -2292,13 +2292,24 @@
           </section>
 
           <CustomerOrdersTab
-            v-if="selectedCustomer && !isCreatingCustomer && canReadCustomerOrders && activeDetailTab === 'orders'"
+            v-if="selectedCustomer && !isCreatingCustomer && canReadCustomerOrders && activeDetailTab === 'orders' && !customerOrderWorkspaceMode"
             :access-token="accessToken"
             :can-start-new-order="canStartCustomerOrderWizard"
             :customer-id="selectedCustomer.id"
+            :reload-token="customerOrdersReloadToken"
             :tenant-id="tenantScopeId"
             @edit-order="handleEditCustomerOrder"
             @start-new-order="handleStartCustomerNewOrder"
+          />
+          <CustomerOrderWorkspacePanel
+            v-else-if="selectedCustomer && !isCreatingCustomer && canReadCustomerOrders && activeDetailTab === 'orders' && customerOrderWorkspaceMode"
+            :customer-id="selectedCustomer.id"
+            :embedded="true"
+            :mode="customerOrderWorkspaceMode"
+            :order-id="customerOrderWorkspaceOrderId"
+            :page-key="currentCustomerDetailPageKey() || buildCustomerDetailPageKey(selectedCustomer.id)"
+            @cancel="handleCustomerOrderWorkspaceCancel"
+            @completed="handleCustomerOrderWorkspaceCompleted"
           />
         </template>
 
@@ -2390,6 +2401,7 @@ import SicherPlanLoadingOverlay from "@/components/SicherPlanLoadingOverlay.vue"
 import StatusBadge from "@/components/StatusBadge.vue";
 import CustomerDashboardTab from "@/components/customers/CustomerDashboardTab.vue";
 import CustomerOrdersTab from "@/components/customers/CustomerOrdersTab.vue";
+import CustomerOrderWorkspacePanel from "#/views/sicherplan/customers/customer-order-workspace-panel.vue";
 import {
   applySurchargeAmountMode,
   buildWeekdayMask,
@@ -2535,6 +2547,7 @@ const customerWorkspaceInitialLoadComplete = ref(false);
 const routeCustomerNotFound = ref(false);
 const activeContactAccessSection = ref<CustomerContactAccessSectionId>("contacts");
 const activeOverviewSection = ref("master_data");
+const customerOrdersReloadToken = ref(0);
 const billingProfileErrorState = reactive<{
   summaryTitle: string;
   summaryBody: string;
@@ -2749,6 +2762,20 @@ const canReadCustomerOrders = computed(() => hasPlanningOrderPermission(authStor
 const canStartCustomerOrderWizard = computed(() => authStore.effectiveRole === "tenant_admin");
 const tenantScopeId = computed(() => authStore.effectiveTenantScopeId);
 const accessToken = computed(() => authStore.effectiveAccessToken || authStore.accessToken);
+const customerOrderWorkspaceMode = computed<"" | "create" | "edit">(() => {
+  if (activeDetailTab.value !== "orders" || !selectedCustomer.value?.id) {
+    return "";
+  }
+  const workspaceMode = normalizeCustomerOrderWorkspaceMode(normalizeRouteQueryValue(route.query.orderWorkspace));
+  if (workspaceMode === "create") {
+    return "create";
+  }
+  if (workspaceMode === "edit" && normalizeRouteQueryValue(route.query.order_id)) {
+    return "edit";
+  }
+  return "";
+});
+const customerOrderWorkspaceOrderId = computed(() => normalizeRouteQueryValue(route.query.order_id));
 const isCustomerSessionResolving = computed(() => authStore.isSessionResolving);
 const customerWorkspaceHasStableContent = computed(() =>
   customerWorkspaceInitialLoadComplete.value
@@ -2806,6 +2833,19 @@ const customerPageContextFullTitle = computed(() =>
 const customerPageContextLabel = computed(() => truncateCustomerContextLabel(customerPageContextFullTitle.value));
 const CUSTOMER_ADMIN_ROUTE_PATH = "/admin/customers";
 const CUSTOMER_DETAIL_PAGE_KEY_PREFIX = "customers:detail:";
+const CUSTOMER_ORDER_WORKSPACE_QUERY_KEYS = [
+  "orderWorkspace",
+  "order_id",
+  "order_mode",
+  "planning_id",
+  "planning_entity_id",
+  "planning_entity_type",
+  "planning_mode_code",
+  "planning_record_id",
+  "series_id",
+  "shift_plan_id",
+  "step",
+] as const;
 type CustomerContactAccessSectionId = "addresses" | "contacts" | "portal";
 type CustomerContactAccessSection = {
   id: CustomerContactAccessSectionId;
@@ -2843,6 +2883,7 @@ let customerContactAccessVisibilityObserver: MutationObserver | null = null;
 let customerOverviewVisibilityObserver: MutationObserver | null = null;
 const customerContactAccessVisibleEntries = new Map<CustomerContactAccessSectionId, IntersectionObserverEntry>();
 const customerOverviewVisibleEntries = new Map<CustomerOverviewSectionId, IntersectionObserverEntry>();
+const pendingCustomerOverviewScrollSection = ref<CustomerOverviewSectionId | "">("");
 const detailTabLabelKeys = {
   dashboard: "customerAdmin.tabs.dashboard",
   overview: "customerAdmin.tabs.overview",
@@ -3294,6 +3335,59 @@ function currentCustomerDetailPageKey() {
   return pageKey.startsWith(CUSTOMER_DETAIL_PAGE_KEY_PREFIX) ? pageKey : "";
 }
 
+function normalizeCustomerOrderWorkspaceMode(value: string) {
+  return value === "create" || value === "edit" ? value : "";
+}
+
+function buildCustomerOrdersWorkspaceQuery(
+  customerId: string,
+  options: {
+    mode?: "" | "create" | "edit";
+    orderId?: string;
+    preserveWizardState?: boolean;
+    step?: string;
+  } = {},
+) {
+  const nextQuery: Record<string, string> = {
+    ...Object.fromEntries(
+      Object.entries(route.query)
+        .map(([key, value]) => [key, normalizeRouteQueryValue(value)])
+        .filter(([, value]) => Boolean(value)),
+    ),
+    customer_id: customerId,
+    pageKey: currentCustomerDetailPageKey() || buildCustomerDetailPageKey(customerId),
+    tab: "orders",
+  };
+
+  if (!options.preserveWizardState) {
+    for (const key of CUSTOMER_ORDER_WORKSPACE_QUERY_KEYS) {
+      delete nextQuery[key];
+    }
+  }
+
+  if (options.mode) {
+    nextQuery.orderWorkspace = options.mode;
+  } else {
+    delete nextQuery.orderWorkspace;
+  }
+
+  if (options.orderId) {
+    nextQuery.order_id = options.orderId;
+  } else if (!options.preserveWizardState) {
+    delete nextQuery.order_id;
+  }
+
+  if (options.step) {
+    nextQuery.step = options.step;
+  } else if (!options.preserveWizardState) {
+    delete nextQuery.step;
+  }
+
+  delete nextQuery.order_mode;
+
+  return nextQuery;
+}
+
 function isCustomerDetailQuery(customerId: string, pageKey = normalizeRouteQueryValue(route.query.pageKey)) {
   return !!customerId && pageKey === buildCustomerDetailPageKey(customerId);
 }
@@ -3358,8 +3452,9 @@ function syncOverviewSectionFromDetailTab(detailTab: string) {
     });
   }
   if (activeDetailTab.value === "overview") {
+    queueCustomerOverviewScroll(nextSection);
     suppressCustomerOverviewScrollSpy();
-    scrollToCustomerOverviewSectionWithBehavior(nextSection, "auto");
+    void scrollToCustomerOverviewSectionWithBehavior(nextSection, "auto");
   }
 }
 
@@ -3383,7 +3478,72 @@ function resolveCustomerOverviewSectionElement(sectionId: string) {
   return customerOverviewSectionRefs[sectionId] ?? null;
 }
 
+function nextAnimationFrame() {
+  if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
+function resolveCustomerOverviewScrollTarget() {
+  if (routeCacheScrollTarget.value instanceof HTMLElement) {
+    return routeCacheScrollTarget.value;
+  }
+  return resolveCustomerOverviewIntersectionRoot() ?? window;
+}
+
+function readCustomerOverviewScrollTop(target: HTMLElement | Window) {
+  if (target === window) {
+    return (
+      window.scrollY
+      || window.pageYOffset
+      || document.documentElement.scrollTop
+      || document.body.scrollTop
+      || 0
+    );
+  }
+  return target.scrollTop;
+}
+
+function resolveCustomerOverviewScrollTop(sectionId: CustomerOverviewSectionId) {
+  const target = resolveCustomerOverviewSectionElement(sectionId);
+  if (!target) {
+    return null;
+  }
+  const scrollTarget = resolveCustomerOverviewScrollTarget();
+  const stickyTop = resolveCustomerOverviewStickyTop();
+  const extraOffset = 16;
+  const targetRect = target.getBoundingClientRect();
+  const currentScrollTop = readCustomerOverviewScrollTop(scrollTarget);
+
+  if (scrollTarget === window) {
+    return Math.max(0, currentScrollTop + targetRect.top - stickyTop - extraOffset);
+  }
+
+  const scrollTargetRect = scrollTarget.getBoundingClientRect();
+  return Math.max(0, currentScrollTop + targetRect.top - scrollTargetRect.top - stickyTop - extraOffset);
+}
+
+function writeCustomerOverviewScrollTop(target: HTMLElement | Window, scrollTop: number, behavior: ScrollBehavior) {
+  if (target === window) {
+    window.scrollTo({ top: scrollTop, behavior });
+    return;
+  }
+  if (typeof target.scrollTo === "function") {
+    target.scrollTo({ top: scrollTop, behavior });
+    return;
+  }
+  target.scrollTop = scrollTop;
+}
+
+function queueCustomerOverviewScroll(sectionId: CustomerOverviewSectionId) {
+  pendingCustomerOverviewScrollSection.value = sectionId;
+}
+
 function scrollToCustomerOverviewSection(sectionId: CustomerOverviewSectionId) {
+  queueCustomerOverviewScroll(sectionId);
   return scrollToCustomerOverviewSectionWithBehavior(sectionId, "smooth");
 }
 
@@ -3391,11 +3551,25 @@ async function scrollToCustomerOverviewSectionWithBehavior(
   sectionId: CustomerOverviewSectionId,
   behavior: ScrollBehavior,
 ) {
-  await nextTick();
-  resolveCustomerOverviewSectionElement(sectionId)?.scrollIntoView({
-    behavior,
-    block: "start",
-  });
+  queueCustomerOverviewScroll(sectionId);
+  const normalizedSectionId = normalizeCustomerOverviewSectionId(sectionId);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await nextTick();
+    await nextAnimationFrame();
+
+    const scrollTop = resolveCustomerOverviewScrollTop(normalizedSectionId);
+    if (scrollTop == null) {
+      continue;
+    }
+
+    suppressCustomerOverviewScrollSpy();
+    writeCustomerOverviewScrollTop(resolveCustomerOverviewScrollTarget(), scrollTop, behavior);
+    pendingCustomerOverviewScrollSection.value = "";
+    return true;
+  }
+
+  return false;
 }
 
 async function selectCustomerOverviewSection(sectionId: string) {
@@ -3414,6 +3588,7 @@ async function selectCustomerOverviewSection(sectionId: string) {
       hasRateCards: !!commercialProfile.value?.rate_cards.length,
     });
   }
+  queueCustomerOverviewScroll(normalizedSectionId);
   suppressCustomerOverviewScrollSpy();
   if (selectedCustomer.value?.id) {
     await router.replace({
@@ -3691,7 +3866,8 @@ function handleCustomerOverviewVisibilityChange() {
   void nextTick(() => {
     setupCustomerOverviewSectionObserver();
     setupCustomerOverviewNavFloating();
-    scrollToCustomerOverviewSectionWithBehavior(activeOverviewSection.value as CustomerOverviewSectionId, "auto");
+    const pendingSection = pendingCustomerOverviewScrollSection.value || (activeOverviewSection.value as CustomerOverviewSectionId);
+    void scrollToCustomerOverviewSectionWithBehavior(pendingSection as CustomerOverviewSectionId, "auto");
   });
 }
 
@@ -4700,10 +4876,10 @@ function selectCustomerDetailTab(tabId: string) {
   syncOverviewSectionFromDetailTab(tabId);
   if (selectedCustomer.value?.id) {
     const nextQuery = {
-      ...route.query,
-      customer_id: selectedCustomer.value.id,
+      ...buildCustomerOrdersWorkspaceQuery(selectedCustomer.value.id, {
+        preserveWizardState: activeDetailTab.value === "orders",
+      }),
       tab: resolveCustomerRouteTabForDetailSelection(tabId, activeDetailTab.value),
-      pageKey: currentCustomerDetailPageKey() ?? buildCustomerDetailPageKey(selectedCustomer.value.id),
     };
     void router.replace({ query: nextQuery });
   }
@@ -4837,11 +5013,11 @@ function handleStartCustomerNewOrder() {
   if (!selectedCustomer.value || !canStartCustomerOrderWizard.value) {
     return;
   }
-  void router.push({
-    name: "SicherPlanCustomerOrderWorkspace",
-    query: {
-      customer_id: selectedCustomer.value.id,
-    },
+  activeDetailTab.value = "orders";
+  void router.replace({
+    query: buildCustomerOrdersWorkspaceQuery(selectedCustomer.value.id, {
+      mode: "create",
+    }),
   });
 }
 
@@ -4849,14 +5025,32 @@ function handleEditCustomerOrder(orderId: string) {
   if (!selectedCustomer.value || !canStartCustomerOrderWizard.value || !orderId) {
     return;
   }
-  void router.push({
-    name: "SicherPlanCustomerOrderWorkspace",
-    query: {
-      customer_id: selectedCustomer.value.id,
-      order_id: orderId,
-      order_mode: "edit",
+  activeDetailTab.value = "orders";
+  void router.replace({
+    query: buildCustomerOrdersWorkspaceQuery(selectedCustomer.value.id, {
+      mode: "edit",
+      orderId,
       step: "order-details",
-    },
+    }),
+  });
+}
+
+function handleCustomerOrderWorkspaceCancel() {
+  if (!selectedCustomer.value) {
+    return;
+  }
+  void router.replace({
+    query: buildCustomerOrdersWorkspaceQuery(selectedCustomer.value.id),
+  });
+}
+
+function handleCustomerOrderWorkspaceCompleted() {
+  if (!selectedCustomer.value) {
+    return;
+  }
+  customerOrdersReloadToken.value += 1;
+  void router.replace({
+    query: buildCustomerOrdersWorkspaceQuery(selectedCustomer.value.id),
   });
 }
 

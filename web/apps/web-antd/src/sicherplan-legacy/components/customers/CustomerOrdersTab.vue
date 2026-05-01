@@ -35,6 +35,7 @@ const props = defineProps<{
   accessToken: string;
   canStartNewOrder?: boolean;
   customerId: string;
+  reloadToken?: number;
   tenantId: string;
 }>();
 
@@ -450,7 +451,7 @@ watch(
 );
 
 watch(
-  () => [props.customerId, props.tenantId, props.accessToken],
+  () => [props.customerId, props.tenantId, props.accessToken, props.reloadToken],
   () => {
     searchInput.value = "";
     activeSearch.value = "";

@@ -31,6 +31,9 @@ test("overview workspace is rendered as a grouped local-nav one-page layout", ()
   assert.match(source, /function setCustomerOverviewSectionRef\(sectionId: string, element: Element \| null\)/);
   assert.match(source, /function resolveCustomerOverviewSectionElement\(sectionId: string\)/);
   assert.match(source, /function scrollToCustomerOverviewSection\(sectionId: CustomerOverviewSectionId\)/);
+  assert.match(source, /function resolveCustomerOverviewScrollTarget\(\)/);
+  assert.match(source, /function resolveCustomerOverviewScrollTop\(sectionId: CustomerOverviewSectionId\)/);
+  assert.match(source, /const pendingCustomerOverviewScrollSection = ref<CustomerOverviewSectionId \| \"\">\(\"\"\)/);
   assert.match(source, /function selectCustomerOverviewSection\(sectionId: string\)/);
   assert.match(source, /v-if="activeDetailTab === 'overview'"/);
 });
@@ -97,7 +100,8 @@ test("customer overview contains contacts, commercial, history, and employee blo
   assert.match(source, /data-testid="customer-overview-section-rate-cards"/);
   assert.match(source, /data-testid="customer-overview-section-history"/);
   assert.match(source, /data-testid="customer-overview-section-employee-blocks"/);
-  assert.match(source, /v-if="selectedCustomer && !isCreatingCustomer && canReadCustomerOrders && activeDetailTab === 'orders'"/);
+  assert.match(source, /activeDetailTab === 'orders' && !customerOrderWorkspaceMode/);
+  assert.match(source, /activeDetailTab === 'orders' && customerOrderWorkspaceMode/);
   assert.doesNotMatch(source, /data-testid="customer-overview-section-orders"/);
 });
 
@@ -136,6 +140,7 @@ test("top-tab title and pageKey behavior remain customer-detail targeted", () =>
 
 test("dashboard and orders remain outside the overview side-navigation workspace", () => {
   assert.match(source, /v-if="selectedCustomer && !isCreatingCustomer && activeDetailTab === 'dashboard'"/);
-  assert.match(source, /v-if="selectedCustomer && !isCreatingCustomer && canReadCustomerOrders && activeDetailTab === 'orders'"/);
+  assert.match(source, /canReadCustomerOrders && activeDetailTab === 'orders' && !customerOrderWorkspaceMode/);
+  assert.match(source, /canReadCustomerOrders && activeDetailTab === 'orders' && customerOrderWorkspaceMode/);
   assert.match(source, /v-if="activeDetailTab === 'overview'"/);
 });

@@ -297,6 +297,7 @@ const CustomerOrdersTabStub = defineComponent({
   name: "CustomerOrdersTabStub",
   props: {
     canStartNewOrder: { type: Boolean, default: false },
+    reloadToken: { type: Number, default: 0 },
   },
   emits: ["edit-order", "start-new-order"],
   template: `
@@ -315,6 +316,43 @@ const CustomerOrdersTabStub = defineComponent({
         @click="$emit('edit-order', 'order-1')"
       >
         Edit order
+      </button>
+    </div>
+  `,
+});
+
+const CustomerOrderWorkspacePanelStub = defineComponent({
+  name: "CustomerOrderWorkspacePanelStub",
+  props: {
+    customerId: { type: String, default: "" },
+    embedded: { type: Boolean, default: false },
+    mode: { type: String, default: "create" },
+    orderId: { type: String, default: "" },
+    pageKey: { type: String, default: "" },
+  },
+  emits: ["cancel", "completed"],
+  template: `
+    <div
+      data-testid="customer-order-workspace-panel-stub"
+      :data-customer-id="customerId"
+      :data-embedded="embedded ? 'true' : 'false'"
+      :data-mode="mode"
+      :data-order-id="orderId"
+      :data-page-key="pageKey"
+    >
+      <button
+        data-testid="customer-order-workspace-cancel"
+        type="button"
+        @click="$emit('cancel')"
+      >
+        Cancel workspace
+      </button>
+      <button
+        data-testid="customer-order-workspace-complete"
+        type="button"
+        @click="$emit('completed', { customerId, orderId: orderId || 'order-created-1' })"
+      >
+        Complete workspace
       </button>
     </div>
   `,
@@ -476,6 +514,7 @@ async function mountCustomerAdmin() {
       stubs: {
         CustomerDashboardTab: CustomerDashboardTabStub,
         CustomerOrdersTab: CustomerOrdersTabStub,
+        CustomerOrderWorkspacePanel: CustomerOrderWorkspacePanelStub,
         SicherPlanLoadingOverlay: SicherPlanLoadingOverlayStub,
         StatusBadge: StatusBadgeStub,
       },
@@ -492,6 +531,7 @@ function mountCustomerAdminWithoutSettling() {
       stubs: {
         CustomerDashboardTab: CustomerDashboardTabStub,
         CustomerOrdersTab: CustomerOrdersTabStub,
+        CustomerOrderWorkspacePanel: CustomerOrderWorkspacePanelStub,
         SicherPlanLoadingOverlay: SicherPlanLoadingOverlayStub,
         StatusBadge: StatusBadgeStub,
       },
@@ -501,10 +541,11 @@ function mountCustomerAdminWithoutSettling() {
   return wrapper;
 }
 
-async function mountSelectedCustomer(tab = "dashboard") {
+async function mountSelectedCustomer(tab = "dashboard", query: Record<string, unknown> = {}) {
   routeState.query = {
     customer_id: "customer-default",
     tab,
+    ...query,
   };
   return mountCustomerAdmin();
 }
@@ -1386,7 +1427,7 @@ describe("CustomerAdminView search dialog", () => {
     expect(wrapper.get('[data-testid="customer-overview-nav-addresses"]').attributes("aria-current")).toBe("true");
   });
 
-  it("uses local section refs and section scrolling for overview nav clicks", async () => {
+  it("uses the overview scroll target for nav clicks after updating the query tab", async () => {
     apiMocks.getCustomerCommercialProfileMock.mockResolvedValue(buildCommercialProfile({
       rate_cards: [{ id: "rate-card-1", effective_from: "2026-04-01", effective_to: null, currency_code: "EUR", rate_kind: "service", notes: null, rate_lines: [], surcharge_rules: [] }],
     }));
@@ -1405,7 +1446,7 @@ describe("CustomerAdminView search dialog", () => {
     expect(routerReplaceMock).toHaveBeenCalledWith(expect.objectContaining({
       query: expect.objectContaining({ tab: "rate_lines" }),
     }));
-    expect(scrollIntoViewMock).toHaveBeenCalled();
+    expect(scrollToMock).toHaveBeenCalled();
   });
 
   it("keeps Overview as a single standalone nav item with no duplicate child", async () => {
@@ -1474,7 +1515,7 @@ describe("CustomerAdminView search dialog", () => {
 
     expect(rheinWrapper.find('[data-testid="customer-overview-section-addresses"]').exists()).toBe(true);
     expect(hafenWrapper.find('[data-testid="customer-overview-section-portal-access"]').exists()).toBe(true);
-    expect(scrollIntoViewMock).toHaveBeenCalled();
+    expect(scrollToMock).toHaveBeenCalled();
   });
 
   it("renders Orders as a separate main tab and no longer shows a Plans tab", async () => {
@@ -1489,44 +1530,112 @@ describe("CustomerAdminView search dialog", () => {
     expect(wrapper.text()).not.toContain("Plans");
   });
 
-  it("routes the Orders tab New order CTA to the customer order workspace with customer context", async () => {
+  it("opens the embedded create workspace inside the Orders tab and keeps the customer detail pageKey", async () => {
     const wrapper = await mountSelectedCustomer("orders");
 
     await wrapper.get('[data-testid="customer-orders-new-order"]').trigger("click");
     await settle();
 
-    expect(routerPushMock).toHaveBeenCalledWith({
-      name: "SicherPlanCustomerOrderWorkspace",
+    expect(routerReplaceMock).toHaveBeenCalledWith({
       query: {
         customer_id: "customer-default",
+        pageKey: "customers:detail:customer-default",
+        tab: "orders",
+        orderWorkspace: "create",
       },
     });
-    expect(routerPushMock.mock.calls.at(-1)?.[0]).not.toMatchObject({
-      path: "/admin/customers/new-plan",
-    });
-    expect(routerPushMock.mock.calls.at(-1)?.[0]?.query).not.toHaveProperty("order_id");
-    expect(wrapper.text()).toContain("New order");
-    expect(wrapper.text()).not.toContain("New plan");
+    expect(routerPushMock).not.toHaveBeenCalledWith(expect.objectContaining({
+      name: "SicherPlanCustomerOrderWorkspace",
+    }));
+    const workspace = wrapper.get('[data-testid="customer-order-workspace-panel-stub"]');
+    expect(workspace.attributes("data-mode")).toBe("create");
+    expect(workspace.attributes("data-embedded")).toBe("true");
+    expect(workspace.attributes("data-page-key")).toBe("customers:detail:customer-default");
   });
 
-  it("routes explicit order edits to the customer order workspace with order context", async () => {
+  it("opens the embedded edit workspace inside the Orders tab and preserves the customer detail pageKey", async () => {
     const wrapper = await mountSelectedCustomer("orders");
 
     await wrapper.get('[data-testid="customer-orders-edit-order"]').trigger("click");
     await settle();
 
-    expect(routerPushMock).toHaveBeenCalledWith({
-      name: "SicherPlanCustomerOrderWorkspace",
+    expect(routerReplaceMock).toHaveBeenCalledWith({
       query: {
         customer_id: "customer-default",
+        pageKey: "customers:detail:customer-default",
+        tab: "orders",
+        orderWorkspace: "edit",
         order_id: "order-1",
-        order_mode: "edit",
         step: "order-details",
       },
     });
-    expect(routerPushMock.mock.calls.at(-1)?.[0]).not.toMatchObject({
-      path: "/admin/customers/new-plan",
+    const workspace = wrapper.get('[data-testid="customer-order-workspace-panel-stub"]');
+    expect(workspace.attributes("data-order-id")).toBe("order-1");
+    expect(workspace.attributes("data-mode")).toBe("edit");
+  });
+
+  it("returns from the embedded workspace to the orders list inside the same customer detail tab", async () => {
+    const wrapper = await mountSelectedCustomer("orders", {
+      orderWorkspace: "edit",
+      order_id: "order-1",
+      pageKey: "customers:detail:customer-default",
     });
+
+    await wrapper.get('[data-testid="customer-order-workspace-cancel"]').trigger("click");
+    await settle();
+
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      query: {
+        customer_id: "customer-default",
+        pageKey: "customers:detail:customer-default",
+        tab: "orders",
+      },
+    });
+    expect(wrapper.find('[data-testid="customer-orders-tab-stub"]').exists()).toBe(true);
+  });
+
+  it("refreshes the orders list and stays in the same customer detail tab after embedded workspace completion", async () => {
+    const wrapper = await mountSelectedCustomer("orders", {
+      orderWorkspace: "edit",
+      order_id: "order-1",
+      pageKey: "customers:detail:customer-default",
+    });
+
+    await wrapper.get('[data-testid="customer-order-workspace-complete"]').trigger("click");
+    await settle();
+
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      query: {
+        customer_id: "customer-default",
+        pageKey: "customers:detail:customer-default",
+        tab: "orders",
+      },
+    });
+    const ordersTab = wrapper.getComponent(CustomerOrdersTabStub);
+    expect(ordersTab.props("reloadToken")).toBe(1);
+  });
+
+  it("renders the embedded create workspace directly from the customer detail query", async () => {
+    const wrapper = await mountSelectedCustomer("orders", {
+      orderWorkspace: "create",
+      pageKey: "customers:detail:customer-default",
+    });
+
+    const workspace = wrapper.get('[data-testid="customer-order-workspace-panel-stub"]');
+    expect(workspace.attributes("data-mode")).toBe("create");
+    expect(wrapper.find('[data-testid="customer-orders-tab-stub"]').exists()).toBe(false);
+  });
+
+  it("renders the embedded edit workspace directly from the customer detail query", async () => {
+    const wrapper = await mountSelectedCustomer("orders", {
+      orderWorkspace: "edit",
+      order_id: "order-1",
+      pageKey: "customers:detail:customer-default",
+    });
+
+    const workspace = wrapper.get('[data-testid="customer-order-workspace-panel-stub"]');
+    expect(workspace.attributes("data-mode")).toBe("edit");
+    expect(workspace.attributes("data-order-id")).toBe("order-1");
   });
 
   it("keeps contact creation working from the merged contact access tab", async () => {
