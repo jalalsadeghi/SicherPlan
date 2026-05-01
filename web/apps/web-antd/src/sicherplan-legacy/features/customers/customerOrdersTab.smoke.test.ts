@@ -16,8 +16,15 @@ const planningAdminMocks = vi.hoisted(() => ({
 
 const planningOrdersMocks = vi.hoisted(() => ({
   getCustomerOrderMock: vi.fn(),
+  listOrderPlanningRecordsMock: vi.fn(),
   listCustomerOrdersMock: vi.fn(),
   listServiceCategoryOptionsMock: vi.fn(),
+}));
+
+const planningShiftsMocks = vi.hoisted(() => ({
+  getShiftPlanMock: vi.fn(),
+  getShiftSeriesMock: vi.fn(),
+  listShiftPlansMock: vi.fn(),
 }));
 
 const translations: Record<string, string> = {
@@ -31,6 +38,36 @@ const translations: Record<string, string> = {
   "customerAdmin.orders.errorBody": "Customer orders are currently unavailable.",
   "customerAdmin.orders.errorTitle": "Orders could not be loaded",
   "customerAdmin.orders.rawReleaseState": "Release state",
+  "customerAdmin.actions.edit": "Edit",
+  "customerAdmin.orders.structure.action": "Structure",
+  "customerAdmin.orders.structure.close": "Close",
+  "customerAdmin.orders.structure.eyebrow": "Structure",
+  "customerAdmin.orders.structure.emptyBody": "No downstream planning structure available.",
+  "customerAdmin.orders.structure.emptyTitle": "No structure available",
+  "customerAdmin.orders.structure.errorBody": "The planning structure could not be loaded.",
+  "customerAdmin.orders.structure.errorTitle": "Structure unavailable",
+  "customerAdmin.orders.structure.exceptions": "Exceptions",
+  "customerAdmin.orders.structure.generatedShifts": "Generated shifts",
+  "customerAdmin.orders.structure.loadingBody": "Loading planning structure...",
+  "customerAdmin.orders.structure.loadingTitle": "Loading structure",
+  "customerAdmin.orders.structure.noPlanningRecordsBody": "No planning record created yet.",
+  "customerAdmin.orders.structure.noPlanningRecordsTitle": "No planning records",
+  "customerAdmin.orders.structure.noSeriesBody": "No series created yet.",
+  "customerAdmin.orders.structure.noSeriesTitle": "No series",
+  "customerAdmin.orders.structure.noShiftPlansBody": "No shift plan created yet.",
+  "customerAdmin.orders.structure.noShiftPlansTitle": "No shift plans",
+  "customerAdmin.orders.structure.openOrderStep": "Open order step",
+  "customerAdmin.orders.structure.openPlanningRecordStep": "Open planning record step",
+  "customerAdmin.orders.structure.openSeriesStep": "Open series & exceptions step",
+  "customerAdmin.orders.structure.openShiftPlanStep": "Open shift plan step",
+  "customerAdmin.orders.structure.orderNode": "Order",
+  "customerAdmin.orders.structure.orderScopeDocuments": "Order scope & documents",
+  "customerAdmin.orders.structure.planningRecord": "Planning record",
+  "customerAdmin.orders.structure.planningRecordDocuments": "Planning record documents",
+  "customerAdmin.orders.structure.refresh": "Refresh",
+  "customerAdmin.orders.structure.series": "Series",
+  "customerAdmin.orders.structure.shiftPlan": "Shift plan",
+  "customerAdmin.orders.structure.title": "Planning tree",
   "customerAdmin.orders.detail.attachments": "Attachments",
   "customerAdmin.orders.detail.close": "Close",
   "customerAdmin.orders.detail.createdAt": "Created",
@@ -77,8 +114,19 @@ vi.mock("@/api/planningOrders", async () => {
   return {
     ...actual,
     getCustomerOrder: planningOrdersMocks.getCustomerOrderMock,
+    listPlanningRecords: planningOrdersMocks.listOrderPlanningRecordsMock,
     listCustomerOrders: planningOrdersMocks.listCustomerOrdersMock,
     listServiceCategoryOptions: planningOrdersMocks.listServiceCategoryOptionsMock,
+  };
+});
+
+vi.mock("@/api/planningShifts", async () => {
+  const actual = await vi.importActual<typeof import("@/api/planningShifts")>("@/api/planningShifts");
+  return {
+    ...actual,
+    getShiftPlan: planningShiftsMocks.getShiftPlanMock,
+    getShiftSeries: planningShiftsMocks.getShiftSeriesMock,
+    listShiftPlans: planningShiftsMocks.listShiftPlansMock,
   };
 });
 
@@ -188,6 +236,8 @@ describe("CustomerOrdersTab", () => {
     });
     planningOrdersMocks.getCustomerOrderMock.mockReset();
     planningOrdersMocks.getCustomerOrderMock.mockResolvedValue(buildOrder());
+    planningOrdersMocks.listOrderPlanningRecordsMock.mockReset();
+    planningOrdersMocks.listOrderPlanningRecordsMock.mockResolvedValue([]);
     planningOrdersMocks.listCustomerOrdersMock.mockReset();
     planningOrdersMocks.listCustomerOrdersMock.mockResolvedValue([]);
     planningOrdersMocks.listServiceCategoryOptionsMock.mockReset();
@@ -195,6 +245,43 @@ describe("CustomerOrdersTab", () => {
       { code: "guarding", label: "Guarding", description: null, sort_order: 1 },
       { code: "event_security", label: "Event security", description: null, sort_order: 2 },
     ]);
+    planningShiftsMocks.listShiftPlansMock.mockReset();
+    planningShiftsMocks.listShiftPlansMock.mockResolvedValue([]);
+    planningShiftsMocks.getShiftPlanMock.mockReset();
+    planningShiftsMocks.getShiftPlanMock.mockResolvedValue({
+      id: "shift-plan-1",
+      tenant_id: "tenant-1",
+      planning_record_id: "planning-record-1",
+      name: "Main shift plan",
+      workforce_scope_code: "internal",
+      planning_from: "2026-05-10",
+      planning_to: "2026-05-12",
+      status: "active",
+      version_no: 1,
+      series_rows: [],
+      shifts: [],
+    });
+    planningShiftsMocks.getShiftSeriesMock.mockReset();
+    planningShiftsMocks.getShiftSeriesMock.mockResolvedValue({
+      id: "series-1",
+      tenant_id: "tenant-1",
+      shift_plan_id: "shift-plan-1",
+      shift_template_id: "template-1",
+      label: "Day shift",
+      recurrence_code: "weekly",
+      interval_count: 1,
+      weekday_mask: "1111100",
+      timezone: "Europe/Berlin",
+      date_from: "2026-05-10",
+      date_to: "2026-05-12",
+      release_state: "draft",
+      customer_visible_flag: true,
+      subcontractor_visible_flag: false,
+      stealth_mode_flag: false,
+      status: "active",
+      version_no: 1,
+      exceptions: [],
+    });
   });
 
   afterEach(() => {
@@ -441,6 +528,188 @@ describe("CustomerOrdersTab", () => {
     expect(wrapper.emitted("edit-order")).toEqual([["order-edit-1"]]);
     expect(planningOrdersMocks.getCustomerOrderMock).not.toHaveBeenCalled();
     expect(wrapper.find('[data-testid="customer-orders-detail-modal"]').exists()).toBe(false);
+  });
+
+  it("opens a structure modal from the explicit Structure button before Edit", async () => {
+    planningOrdersMocks.listCustomerOrdersMock.mockResolvedValue([buildOrder({ id: "order-structure-1" })]);
+    planningOrdersMocks.getCustomerOrderMock.mockResolvedValue(buildOrder({ id: "order-structure-1" }));
+    planningOrdersMocks.listOrderPlanningRecordsMock.mockResolvedValue([
+      {
+        id: "planning-record-1",
+        tenant_id: "tenant-1",
+        order_id: "order-structure-1",
+        parent_planning_record_id: null,
+        dispatcher_user_id: null,
+        planning_mode_code: "site",
+        name: "Nordtor Juli 2026",
+        planning_from: "2026-05-10",
+        planning_to: "2026-05-12",
+        release_state: "draft",
+        released_at: null,
+        created_at: "2026-05-01T08:00:00Z",
+        status: "active",
+        version_no: 1,
+      },
+    ]);
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    const actionButtons = wrapper.findAll(".customer-orders-tab__row-actions button").map((node) => node.text());
+    expect(actionButtons).toEqual(["Structure", "Edit"]);
+
+    await wrapper.get('[data-testid="customer-orders-card-structure"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-order-structure-modal"]').exists()).toBe(true);
+    expect(planningOrdersMocks.getCustomerOrderMock).toHaveBeenCalledWith("tenant-1", "order-structure-1", "token-1");
+    expect(planningOrdersMocks.listOrderPlanningRecordsMock).toHaveBeenCalledWith(
+      "tenant-1",
+      "token-1",
+      expect.objectContaining({
+        customer_id: "customer-1",
+        order_id: "order-structure-1",
+      }),
+    );
+  });
+
+  it("navigates from a structure node to the embedded wizard step through open-order-step", async () => {
+    planningOrdersMocks.listCustomerOrdersMock.mockResolvedValue([buildOrder({ id: "order-structure-1" })]);
+    planningOrdersMocks.getCustomerOrderMock.mockResolvedValue(buildOrder({ id: "order-structure-1" }));
+    planningOrdersMocks.listOrderPlanningRecordsMock.mockResolvedValue([
+      {
+        id: "planning-record-1",
+        tenant_id: "tenant-1",
+        order_id: "order-structure-1",
+        parent_planning_record_id: null,
+        dispatcher_user_id: null,
+        planning_mode_code: "site",
+        name: "Nordtor Juli 2026",
+        planning_from: "2026-05-10",
+        planning_to: "2026-05-12",
+        release_state: "draft",
+        released_at: null,
+        created_at: "2026-05-01T08:00:00Z",
+        status: "active",
+        version_no: 1,
+      },
+    ]);
+    planningShiftsMocks.listShiftPlansMock.mockResolvedValue([
+      {
+        id: "shift-plan-1",
+        tenant_id: "tenant-1",
+        planning_record_id: "planning-record-1",
+        name: "Main shift plan",
+        workforce_scope_code: "internal",
+        planning_from: "2026-05-10",
+        planning_to: "2026-05-12",
+        status: "active",
+        version_no: 1,
+      },
+    ]);
+    planningShiftsMocks.getShiftPlanMock.mockResolvedValue({
+      id: "shift-plan-1",
+      tenant_id: "tenant-1",
+      planning_record_id: "planning-record-1",
+      name: "Main shift plan",
+      workforce_scope_code: "internal",
+      planning_from: "2026-05-10",
+      planning_to: "2026-05-12",
+      status: "active",
+      version_no: 1,
+      series_rows: [
+        {
+          id: "series-1",
+          tenant_id: "tenant-1",
+          shift_plan_id: "shift-plan-1",
+          shift_template_id: "template-1",
+          label: "Day shift",
+          recurrence_code: "weekly",
+          interval_count: 1,
+          weekday_mask: "1111100",
+          timezone: "Europe/Berlin",
+          date_from: "2026-05-10",
+          date_to: "2026-05-12",
+          release_state: "draft",
+          customer_visible_flag: true,
+          subcontractor_visible_flag: false,
+          stealth_mode_flag: false,
+          status: "active",
+          version_no: 1,
+        },
+      ],
+      shifts: [
+        {
+          id: "shift-1",
+          tenant_id: "tenant-1",
+          shift_plan_id: "shift-plan-1",
+          shift_series_id: "series-1",
+          occurrence_date: "2026-05-10",
+          starts_at: "2026-05-10T08:00:00Z",
+          ends_at: "2026-05-10T16:00:00Z",
+          break_minutes: 30,
+          shift_type_code: "day",
+          location_text: null,
+          meeting_point: null,
+          release_state: "draft",
+          customer_visible_flag: true,
+          subcontractor_visible_flag: false,
+          stealth_mode_flag: false,
+          source_kind_code: "series_generated",
+          status: "active",
+          version_no: 1,
+        },
+      ],
+    });
+    planningShiftsMocks.getShiftSeriesMock.mockResolvedValue({
+      id: "series-1",
+      tenant_id: "tenant-1",
+      shift_plan_id: "shift-plan-1",
+      shift_template_id: "template-1",
+      label: "Day shift",
+      recurrence_code: "weekly",
+      interval_count: 1,
+      weekday_mask: "1111100",
+      timezone: "Europe/Berlin",
+      date_from: "2026-05-10",
+      date_to: "2026-05-12",
+      release_state: "draft",
+      customer_visible_flag: true,
+      subcontractor_visible_flag: false,
+      stealth_mode_flag: false,
+      status: "active",
+      version_no: 1,
+      exceptions: [
+        {
+          id: "exception-1",
+          tenant_id: "tenant-1",
+          shift_series_id: "series-1",
+          exception_date: "2026-05-11",
+          action_code: "cancel",
+        },
+      ],
+    });
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-orders-card-structure"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-order-structure-planning-toggle"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-order-structure-shift-plan-toggle"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="customer-order-structure-series-open"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.emitted("open-order-step")).toEqual([[
+      {
+        orderId: "order-structure-1",
+        planningRecordId: "planning-record-1",
+        shiftPlanId: "shift-plan-1",
+        seriesId: "series-1",
+        step: "series-exceptions",
+      },
+    ]]);
+    expect(wrapper.find('[data-testid="customer-order-structure-modal"]').exists()).toBe(false);
   });
 
   it("keeps search and sort behavior working before opening a filtered order preview", async () => {

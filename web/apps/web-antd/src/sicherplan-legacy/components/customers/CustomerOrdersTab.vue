@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { Card, Tag } from "ant-design-vue";
 
 import EmptyState from "#/components/sicherplan/empty-state.vue";
+import CustomerOrderStructureModal from "@/components/customers/CustomerOrderStructureModal.vue";
 import { listCustomers, type CustomerListItem } from "@/api/customers";
 import { listPlanningRecords, type PlanningListItem } from "@/api/planningAdmin";
 import {
@@ -41,6 +42,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: "edit-order", orderId: string): void;
+  (event: "open-order-step", payload: { orderId: string; planningRecordId?: string; seriesId?: string; shiftPlanId?: string; step: string }): void;
   (event: "start-new-order"): void;
 }>();
 
@@ -60,6 +62,8 @@ const orderPreviewLoading = ref(false);
 const orderPreviewError = ref("");
 const orderPreviewModalOpen = ref(false);
 const orderPreviewRequestVersion = ref(0);
+const structureModalOpen = ref(false);
+const structureOrderId = ref("");
 const ORDER_PREVIEW_TOP_OFFSET = 25;
 const customerOptions = ref<CustomerListItem[]>([]);
 const serviceCategoryOptions = ref<PlanningReferenceOptionRead[]>([]);
@@ -362,6 +366,23 @@ function openOrderWorkspace(orderId: string) {
   emit("edit-order", orderId);
 }
 
+function openOrderStructure(orderId: string) {
+  if (!orderId) {
+    return;
+  }
+  structureOrderId.value = orderId;
+  structureModalOpen.value = true;
+}
+
+function closeOrderStructure() {
+  structureModalOpen.value = false;
+}
+
+function openOrderWorkspaceStep(payload: { orderId: string; planningRecordId?: string; seriesId?: string; shiftPlanId?: string; step: string }) {
+  structureModalOpen.value = false;
+  emit("open-order-step", payload);
+}
+
 function handlePreviewKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") {
     closeOrderDetail();
@@ -570,6 +591,14 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="cta-button cta-secondary"
+            data-testid="customer-orders-card-structure"
+            @click.stop="openOrderStructure(order.id)"
+          >
+            {{ t("customerAdmin.orders.structure.action") }}
+          </button>
+          <button
+            type="button"
+            class="cta-button cta-secondary"
             data-testid="customer-orders-card-edit"
             @click.stop="openOrderWorkspace(order.id)"
           >
@@ -583,6 +612,16 @@ onBeforeUnmount(() => {
       v-else
       :title="t('customerAdmin.orders.emptyTitle')"
       :description="t('customerAdmin.orders.emptyBody')"
+    />
+
+    <CustomerOrderStructureModal
+      :access-token="accessToken"
+      :customer-id="customerId"
+      :open="structureModalOpen"
+      :order-id="structureOrderId"
+      :tenant-id="tenantId"
+      @close="closeOrderStructure"
+      @open-node="openOrderWorkspaceStep"
     />
 
     <div

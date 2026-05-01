@@ -1360,6 +1360,35 @@ export type MessageKey =
   | "customerAdmin.orders.registrationDate"
   | "customerAdmin.orders.releaseDate"
   | "customerAdmin.orders.rawReleaseState"
+  | "customerAdmin.orders.structure.action"
+  | "customerAdmin.orders.structure.close"
+  | "customerAdmin.orders.structure.emptyBody"
+  | "customerAdmin.orders.structure.emptyTitle"
+  | "customerAdmin.orders.structure.errorBody"
+  | "customerAdmin.orders.structure.errorTitle"
+  | "customerAdmin.orders.structure.exceptions"
+  | "customerAdmin.orders.structure.eyebrow"
+  | "customerAdmin.orders.structure.generatedShifts"
+  | "customerAdmin.orders.structure.loadingBody"
+  | "customerAdmin.orders.structure.loadingTitle"
+  | "customerAdmin.orders.structure.noPlanningRecordsBody"
+  | "customerAdmin.orders.structure.noPlanningRecordsTitle"
+  | "customerAdmin.orders.structure.noSeriesBody"
+  | "customerAdmin.orders.structure.noSeriesTitle"
+  | "customerAdmin.orders.structure.noShiftPlansBody"
+  | "customerAdmin.orders.structure.noShiftPlansTitle"
+  | "customerAdmin.orders.structure.openOrderStep"
+  | "customerAdmin.orders.structure.openPlanningRecordStep"
+  | "customerAdmin.orders.structure.openSeriesStep"
+  | "customerAdmin.orders.structure.openShiftPlanStep"
+  | "customerAdmin.orders.structure.orderNode"
+  | "customerAdmin.orders.structure.orderScopeDocuments"
+  | "customerAdmin.orders.structure.planningRecord"
+  | "customerAdmin.orders.structure.planningRecordDocuments"
+  | "customerAdmin.orders.structure.refresh"
+  | "customerAdmin.orders.structure.series"
+  | "customerAdmin.orders.structure.shiftPlan"
+  | "customerAdmin.orders.structure.title"
   | "customerAdmin.orders.detail.attachments"
   | "customerAdmin.orders.detail.close"
   | "customerAdmin.orders.detail.createdAt"
@@ -3544,6 +3573,35 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.orders.registrationDate": "Registriert",
     "customerAdmin.orders.releaseDate": "Freigegeben",
     "customerAdmin.orders.rawReleaseState": "Release-Status",
+    "customerAdmin.orders.structure.action": "Struktur",
+    "customerAdmin.orders.structure.close": "Schließen",
+    "customerAdmin.orders.structure.emptyBody": "Für diesen Auftrag liegt noch keine nachgelagerte Planungsstruktur vor.",
+    "customerAdmin.orders.structure.emptyTitle": "Keine Struktur verfügbar",
+    "customerAdmin.orders.structure.errorBody": "Die Planungsstruktur konnte nicht geladen werden.",
+    "customerAdmin.orders.structure.errorTitle": "Struktur nicht verfügbar",
+    "customerAdmin.orders.structure.exceptions": "Ausnahmen",
+    "customerAdmin.orders.structure.eyebrow": "Struktur",
+    "customerAdmin.orders.structure.generatedShifts": "Generierte Schichten",
+    "customerAdmin.orders.structure.loadingBody": "Planungsstruktur wird geladen...",
+    "customerAdmin.orders.structure.loadingTitle": "Struktur wird geladen",
+    "customerAdmin.orders.structure.noPlanningRecordsBody": "Für diesen Auftrag wurde noch kein Planungsdatensatz angelegt.",
+    "customerAdmin.orders.structure.noPlanningRecordsTitle": "Keine Planungsdatensätze",
+    "customerAdmin.orders.structure.noSeriesBody": "Für diesen Schichtplan wurden noch keine Serien angelegt.",
+    "customerAdmin.orders.structure.noSeriesTitle": "Keine Serien",
+    "customerAdmin.orders.structure.noShiftPlansBody": "Für diesen Planungsdatensatz wurde noch kein Schichtplan angelegt.",
+    "customerAdmin.orders.structure.noShiftPlansTitle": "Keine Schichtpläne",
+    "customerAdmin.orders.structure.openOrderStep": "Auftragsstufe öffnen",
+    "customerAdmin.orders.structure.openPlanningRecordStep": "Planungsdatensatz öffnen",
+    "customerAdmin.orders.structure.openSeriesStep": "Serien & Ausnahmen öffnen",
+    "customerAdmin.orders.structure.openShiftPlanStep": "Schichtplan öffnen",
+    "customerAdmin.orders.structure.orderNode": "Auftrag",
+    "customerAdmin.orders.structure.orderScopeDocuments": "Auftragsumfang & Dokumente",
+    "customerAdmin.orders.structure.planningRecord": "Planungsdatensatz",
+    "customerAdmin.orders.structure.planningRecordDocuments": "Planungsdokumente",
+    "customerAdmin.orders.structure.refresh": "Aktualisieren",
+    "customerAdmin.orders.structure.series": "Serie",
+    "customerAdmin.orders.structure.shiftPlan": "Schichtplan",
+    "customerAdmin.orders.structure.title": "Planungsbaum",
     "customerAdmin.orders.detail.attachments": "Anhänge",
     "customerAdmin.orders.detail.close": "Schließen",
     "customerAdmin.orders.detail.createdAt": "Angelegt",
@@ -5801,6 +5859,35 @@ export const messages: Record<AppLocale, MessageCatalog> = {
     "customerAdmin.orders.registrationDate": "Registered",
     "customerAdmin.orders.releaseDate": "Released",
     "customerAdmin.orders.rawReleaseState": "Release state",
+    "customerAdmin.orders.structure.action": "Structure",
+    "customerAdmin.orders.structure.close": "Close",
+    "customerAdmin.orders.structure.emptyBody": "No downstream planning structure is available for this order yet.",
+    "customerAdmin.orders.structure.emptyTitle": "No structure available",
+    "customerAdmin.orders.structure.errorBody": "The planning structure could not be loaded.",
+    "customerAdmin.orders.structure.errorTitle": "Structure unavailable",
+    "customerAdmin.orders.structure.exceptions": "Exceptions",
+    "customerAdmin.orders.structure.eyebrow": "Structure",
+    "customerAdmin.orders.structure.generatedShifts": "Generated shifts",
+    "customerAdmin.orders.structure.loadingBody": "Loading planning structure...",
+    "customerAdmin.orders.structure.loadingTitle": "Loading structure",
+    "customerAdmin.orders.structure.noPlanningRecordsBody": "No planning record has been created for this order yet.",
+    "customerAdmin.orders.structure.noPlanningRecordsTitle": "No planning records",
+    "customerAdmin.orders.structure.noSeriesBody": "No series have been created for this shift plan yet.",
+    "customerAdmin.orders.structure.noSeriesTitle": "No series",
+    "customerAdmin.orders.structure.noShiftPlansBody": "No shift plan has been created for this planning record yet.",
+    "customerAdmin.orders.structure.noShiftPlansTitle": "No shift plans",
+    "customerAdmin.orders.structure.openOrderStep": "Open order step",
+    "customerAdmin.orders.structure.openPlanningRecordStep": "Open planning record step",
+    "customerAdmin.orders.structure.openSeriesStep": "Open series & exceptions step",
+    "customerAdmin.orders.structure.openShiftPlanStep": "Open shift plan step",
+    "customerAdmin.orders.structure.orderNode": "Order",
+    "customerAdmin.orders.structure.orderScopeDocuments": "Order scope & documents",
+    "customerAdmin.orders.structure.planningRecord": "Planning record",
+    "customerAdmin.orders.structure.planningRecordDocuments": "Planning record documents",
+    "customerAdmin.orders.structure.refresh": "Refresh",
+    "customerAdmin.orders.structure.series": "Series",
+    "customerAdmin.orders.structure.shiftPlan": "Shift plan",
+    "customerAdmin.orders.structure.title": "Planning tree",
     "customerAdmin.orders.detail.attachments": "Attachments",
     "customerAdmin.orders.detail.close": "Close",
     "customerAdmin.orders.detail.createdAt": "Created",

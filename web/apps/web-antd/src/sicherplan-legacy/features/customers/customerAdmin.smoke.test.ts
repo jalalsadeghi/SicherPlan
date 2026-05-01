@@ -299,7 +299,7 @@ const CustomerOrdersTabStub = defineComponent({
     canStartNewOrder: { type: Boolean, default: false },
     reloadToken: { type: Number, default: 0 },
   },
-  emits: ["edit-order", "start-new-order"],
+  emits: ["edit-order", "open-order-step", "start-new-order"],
   template: `
     <div data-testid="customer-orders-tab-stub">
       <button
@@ -316,6 +316,13 @@ const CustomerOrdersTabStub = defineComponent({
         @click="$emit('edit-order', 'order-1')"
       >
         Edit order
+      </button>
+      <button
+        data-testid="customer-orders-open-structure-step"
+        type="button"
+        @click="$emit('open-order-step', { orderId: 'order-1', planningRecordId: 'planning-1', shiftPlanId: 'shift-plan-1', seriesId: 'series-1', step: 'series-exceptions' })"
+      >
+        Open structure step
       </button>
     </div>
   `,
@@ -1572,6 +1579,27 @@ describe("CustomerAdminView search dialog", () => {
     const workspace = wrapper.get('[data-testid="customer-order-workspace-panel-stub"]');
     expect(workspace.attributes("data-order-id")).toBe("order-1");
     expect(workspace.attributes("data-mode")).toBe("edit");
+  });
+
+  it("opens a structure node target inside the embedded order workspace without leaving the customer tab", async () => {
+    const wrapper = await mountSelectedCustomer("orders");
+
+    await wrapper.get('[data-testid="customer-orders-open-structure-step"]').trigger("click");
+    await settle();
+
+    expect(routerReplaceMock).toHaveBeenCalledWith({
+      query: {
+        customer_id: "customer-default",
+        pageKey: "customers:detail:customer-default",
+        tab: "orders",
+        orderWorkspace: "edit",
+        order_id: "order-1",
+        planning_record_id: "planning-1",
+        shift_plan_id: "shift-plan-1",
+        series_id: "series-1",
+        step: "series-exceptions",
+      },
+    });
   });
 
   it("returns from the embedded workspace to the orders list inside the same customer detail tab", async () => {

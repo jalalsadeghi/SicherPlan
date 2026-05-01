@@ -2299,6 +2299,7 @@
             :reload-token="customerOrdersReloadToken"
             :tenant-id="tenantScopeId"
             @edit-order="handleEditCustomerOrder"
+            @open-order-step="handleOpenCustomerOrderStep"
             @start-new-order="handleStartCustomerNewOrder"
           />
           <CustomerOrderWorkspacePanel
@@ -3344,7 +3345,10 @@ function buildCustomerOrdersWorkspaceQuery(
   options: {
     mode?: "" | "create" | "edit";
     orderId?: string;
+    planningRecordId?: string;
     preserveWizardState?: boolean;
+    seriesId?: string;
+    shiftPlanId?: string;
     step?: string;
   } = {},
 ) {
@@ -3375,6 +3379,24 @@ function buildCustomerOrdersWorkspaceQuery(
     nextQuery.order_id = options.orderId;
   } else if (!options.preserveWizardState) {
     delete nextQuery.order_id;
+  }
+
+  if (options.planningRecordId) {
+    nextQuery.planning_record_id = options.planningRecordId;
+  } else if (!options.preserveWizardState) {
+    delete nextQuery.planning_record_id;
+  }
+
+  if (options.shiftPlanId) {
+    nextQuery.shift_plan_id = options.shiftPlanId;
+  } else if (!options.preserveWizardState) {
+    delete nextQuery.shift_plan_id;
+  }
+
+  if (options.seriesId) {
+    nextQuery.series_id = options.seriesId;
+  } else if (!options.preserveWizardState) {
+    delete nextQuery.series_id;
   }
 
   if (options.step) {
@@ -5031,6 +5053,29 @@ function handleEditCustomerOrder(orderId: string) {
       mode: "edit",
       orderId,
       step: "order-details",
+    }),
+  });
+}
+
+function handleOpenCustomerOrderStep(payload: {
+  orderId: string;
+  planningRecordId?: string;
+  seriesId?: string;
+  shiftPlanId?: string;
+  step: string;
+}) {
+  if (!selectedCustomer.value || !canStartCustomerOrderWizard.value || !payload.orderId || !payload.step) {
+    return;
+  }
+  activeDetailTab.value = "orders";
+  void router.replace({
+    query: buildCustomerOrdersWorkspaceQuery(selectedCustomer.value.id, {
+      mode: "edit",
+      orderId: payload.orderId,
+      planningRecordId: payload.planningRecordId,
+      seriesId: payload.seriesId,
+      shiftPlanId: payload.shiftPlanId,
+      step: payload.step,
     }),
   });
 }
