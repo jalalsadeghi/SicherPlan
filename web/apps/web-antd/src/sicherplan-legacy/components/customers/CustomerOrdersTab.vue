@@ -936,6 +936,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .customer-orders-tab__modal-backdrop {

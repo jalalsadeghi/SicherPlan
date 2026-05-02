@@ -560,7 +560,12 @@ describe("CustomerOrdersTab", () => {
     await wrapper.get('[data-testid="customer-orders-card-structure"]').trigger("click");
     await flushPromises();
 
-    expect(wrapper.get('[data-testid="customer-order-structure-modal"]').exists()).toBe(true);
+    const backdrop = document.body.querySelector('[data-testid="customer-order-structure-modal-backdrop"]');
+    const modal = document.body.querySelector('[data-testid="customer-order-structure-modal"]');
+    expect(backdrop).not.toBeNull();
+    expect(backdrop?.className).toContain("customer-order-structure-modal-backdrop");
+    expect(modal).not.toBeNull();
+    expect(wrapper.find('[data-testid="customer-order-structure-modal"]').exists()).toBe(false);
     expect(planningOrdersMocks.getCustomerOrderMock).toHaveBeenCalledWith("tenant-1", "order-structure-1", "token-1");
     expect(planningOrdersMocks.listOrderPlanningRecordsMock).toHaveBeenCalledWith(
       "tenant-1",
@@ -570,6 +575,41 @@ describe("CustomerOrdersTab", () => {
         order_id: "order-structure-1",
       }),
     );
+
+    wrapper.unmount();
+  });
+
+  it("closes the teleported structure modal by close button, outside click, and Escape", async () => {
+    planningOrdersMocks.listCustomerOrdersMock.mockResolvedValue([buildOrder({ id: "order-structure-2" })]);
+    planningOrdersMocks.getCustomerOrderMock.mockResolvedValue(buildOrder({ id: "order-structure-2" }));
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-orders-card-structure"]').trigger("click");
+    await flushPromises();
+    expect(document.body.querySelector('[data-testid="customer-order-structure-modal"]')).not.toBeNull();
+
+    const closeButton = document.body.querySelector('[data-testid="customer-order-structure-close"]');
+    expect(closeButton).not.toBeNull();
+    (closeButton as HTMLButtonElement).click();
+    await flushPromises();
+    expect(document.body.querySelector('[data-testid="customer-order-structure-modal"]')).toBeNull();
+
+    await wrapper.get('[data-testid="customer-orders-card-structure"]').trigger("click");
+    await flushPromises();
+    const backdrop = document.body.querySelector('[data-testid="customer-order-structure-modal-backdrop"]');
+    expect(backdrop).not.toBeNull();
+    backdrop?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushPromises();
+    expect(document.body.querySelector('[data-testid="customer-order-structure-modal"]')).toBeNull();
+
+    await wrapper.get('[data-testid="customer-orders-card-structure"]').trigger("click");
+    await flushPromises();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await flushPromises();
+    expect(document.body.querySelector('[data-testid="customer-order-structure-modal"]')).toBeNull();
+
+    wrapper.unmount();
   });
 
   it("navigates from a structure node to the embedded wizard step through open-order-step", async () => {
@@ -693,11 +733,11 @@ describe("CustomerOrdersTab", () => {
 
     await wrapper.get('[data-testid="customer-orders-card-structure"]').trigger("click");
     await flushPromises();
-    await wrapper.get('[data-testid="customer-order-structure-planning-toggle"]').trigger("click");
+    (document.body.querySelector('[data-testid="customer-order-structure-planning-toggle"]') as HTMLButtonElement).click();
     await flushPromises();
-    await wrapper.get('[data-testid="customer-order-structure-shift-plan-toggle"]').trigger("click");
+    (document.body.querySelector('[data-testid="customer-order-structure-shift-plan-toggle"]') as HTMLButtonElement).click();
     await flushPromises();
-    await wrapper.get('[data-testid="customer-order-structure-series-open"]').trigger("click");
+    (document.body.querySelector('[data-testid="customer-order-structure-series-open"]') as HTMLButtonElement).click();
     await flushPromises();
 
     expect(wrapper.emitted("open-order-step")).toEqual([[
@@ -709,7 +749,9 @@ describe("CustomerOrdersTab", () => {
         step: "series-exceptions",
       },
     ]]);
-    expect(wrapper.find('[data-testid="customer-order-structure-modal"]').exists()).toBe(false);
+    expect(document.body.querySelector('[data-testid="customer-order-structure-modal"]')).toBeNull();
+
+    wrapper.unmount();
   });
 
   it("keeps search and sort behavior working before opening a filtered order preview", async () => {

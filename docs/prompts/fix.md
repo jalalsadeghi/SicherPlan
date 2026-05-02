@@ -1,91 +1,62 @@
-We need one small UX refinement in the Customer Orders tab.
+We need a small, UI-only refinement in the Order Workspace step navigation.
 
-Current status:
-- Customer detail > Orders tab is working.
-- Each order row shows:
-  - Structure
-  - Edit
-- The Structure action exists and the structure content/box itself is suitable.
-- The only requested change: the Structure view should open in a dialog/modal on top of the current Orders page, instead of changing the page layout or inline state.
+Context:
+In the Customer detail > Orders flow, when the user enters the embedded order workspace (the 6-step flow shown at the top of the order workspace), the current step navigation renders as 6 separate step buttons/cards, each with a visible step number above the label.
 
-Desired behavior:
-When the user clicks "Structure" on an order row:
-- Open the existing order structure content inside a modal/dialog overlay.
-- Keep the user on the same page:
-  /admin/customers?customer_id=<id>&tab=orders&pageKey=customers:detail:<id>
-- Do not navigate to another route.
-- Do not change the Orders list layout.
-- Do not open a new top app tab.
-- Do not change the existing Structure content except wrapping it in a dialog.
+Requested changes:
+1. Remove the visible step number from every step.
+   - Example: remove the small “1”, “2”, “3”, etc. shown above each step label.
+   - Keep the step labels themselves unchanged:
+     - Order details
+     - Order scope & documents
+     - Planning record
+     - Planning documents
+     - Shift plan
+     - Series & exceptions
 
-Relevant files:
-- web/apps/web-antd/src/sicherplan-legacy/components/customers/CustomerOrdersTab.vue
-- any newly created order structure component/modal files
-- CustomerAdminView.vue only if it currently owns the structure state
+2. Change only the visual surface shape of the 6 step items so they look like connected/integrated arrow steps (chevron / interlocked breadcrumb-style arrows), similar to the provided visual reference.
+   - Important: this is only a shape/layout styling change.
+   - Do NOT change the current color system.
+   - Do NOT change active/inactive/hover/selected color behavior.
+   - Do NOT change click behavior, routing, step activation logic, disabled logic, or any workflow behavior.
+   - Do NOT change the order of steps.
+   - Do NOT change the text labels.
+   - Do NOT change any backend/API/state contract.
 
-Task:
-Wrap the existing Structure view in a modal/dialog.
+Very important constraints:
+- Keep the current interaction behavior exactly as-is.
+- Keep current colors exactly as-is.
+- Keep the current active-step logic exactly as-is.
+- Keep responsiveness clean.
+- Prefer a CSS-first solution with minimal template changes.
+- If the step number is generated from data, remove it only from visible UI, without breaking internal logic.
+- If needed, preserve accessibility with aria-labels, but do not show the visible step number in the UI.
 
-Requirements:
-1. Reuse the existing structure content/component.
-   Do not redesign the tree.
-   Do not change hierarchy logic.
-   Do not change API calls unless required for modal lifecycle.
+Implementation guidance:
+1. First identify the exact frontend component(s) responsible for rendering the order workspace step navigation.
+2. Inspect whether the step items are rendered from a shared stepper component or a local order-workspace component.
+3. Apply the smallest safe change.
+4. Prefer using CSS and/or pseudo-elements (::before / ::after) or clip-path to create the arrow/chevron connected shape.
+5. The shape should visually read as sequential connected steps, like a horizontal arrow-step progress strip.
+6. Preserve current spacing, alignment, focus behavior, and responsive wrapping/fallback behavior.
+7. Do not introduce visual regressions in the surrounding order workspace layout.
 
-2. Add a modal/dialog overlay similar to existing customer/order preview modals:
-   - backdrop
-   - centered or wide modal card
-   - clear title, for example "Order structure" / "Planning tree"
-   - close button
-   - Escape key closes
-   - clicking outside closes if consistent with existing modal behavior
-   - modal max-height with internal scroll if content is tall
-
-3. Modal content:
-   - show selected order title/order number in the modal header
-   - show the existing order structure/tree inside the modal body
-   - keep existing node actions/links working
-   - if node click opens embedded order workspace, close the modal first or keep behavior consistent and clear
-
-4. Route/query behavior:
-   - Clicking Structure may optionally set a query like structureOrderId=<orderId>, but it is not required.
-   - If query is used, closing modal should remove it.
-   - customer_id, tab=orders, and pageKey must remain unchanged.
-   - No navigation to /admin/customers/order-workspace.
-
-5. State:
-   - Only one structure modal open at a time.
-   - Opening structure for another order replaces the modal content.
-   - Closing modal clears selected structure order state.
-   - Keep cached/lazy-loaded hierarchy data if already implemented.
-
-6. Do not change:
-   - Edit button behavior
-   - New order behavior
-   - order preview card click behavior
-   - Customer main tabs Dashboard / Overview / Orders
-   - Customer list tab
-   - backend/API files
-
-Tests:
-Add/update tests:
-1. Clicking Structure opens a modal/dialog.
-2. The Orders list remains visible behind the modal.
-3. The modal contains the selected order structure content.
-4. Close button closes the modal.
-5. Escape closes the modal.
-6. Clicking outside closes the modal if that is the project’s existing modal convention.
-7. Clicking Edit still works unchanged.
-8. No route navigation to /admin/customers/order-workspace occurs.
-9. customer_id, tab=orders, and pageKey remain unchanged.
+Please do the following before coding:
+- Briefly state which file(s) you believe are impacted.
+- Briefly explain the smallest safe implementation approach.
+- Mention any risk of shared-component side effects.
 
 Acceptance criteria:
-- Structure opens as a modal/dialog overlay.
-- Existing structure content remains unchanged.
-- Orders list page does not change layout.
-- No new top tab opens.
-- No backend/API changes.
-- Existing Structure/Edit/New order behavior remains intact.
+- The visible step numbers are gone.
+- The 6 steps visually look like connected arrow/chevron steps.
+- The colors remain unchanged from the current implementation.
+- Active/inactive visual state logic remains unchanged except for the new shape.
+- Clicking a step behaves exactly as before.
+- No route/state/API/backend changes.
+- No unrelated UI changes.
 
-Before coding:
-Please first identify where the Structure view is currently rendered and explain the smallest safe change to move/wrap it into a modal.
+After implementation:
+- List changed files.
+- Summarize exactly what changed.
+- Run the most relevant frontend tests if available.
+- If no exact test exists, at least perform a focused sanity check on the order workspace UI code path.

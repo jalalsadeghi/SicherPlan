@@ -796,7 +796,6 @@ defineExpose({
             :disabled="!canEnterStep(step.id)"
             @click="selectStep(step.id)"
           >
-            <span class="sp-customer-plan-wizard__step-index">{{ index + 1 }}</span>
             <span class="sp-customer-plan-wizard__step-label">{{ step.label }}</span>
           </button>
         </li>
@@ -932,38 +931,51 @@ defineExpose({
 }
 
 .sp-customer-plan-wizard__steps {
-  display: grid;
-  gap: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  //gap: -0.75rem -1rem;
+  
   padding: 0;
   margin: 0;
   list-style: none;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
 }
 
 .sp-customer-plan-wizard__step {
+  position: relative;
+  isolation: isolate;
+  flex: 1 1 13rem;
   min-width: 0;
-  padding: 0.95rem 1rem;
-  border: 1px solid var(--sp-color-border-soft);
-  border-radius: 1rem;
-  background: var(--sp-color-surface-card);
+  padding: 0;
+  //border: 1px solid var(--sp-color-border-soft);
+  border-radius: 0.95rem;
+  //background: var(--sp-color-primary-muted);
+  background: var(--sp-color-border-soft);
+  clip-path: polygon(0 0, calc(100% - 1.2rem) 0, 100% 50%, calc(100% - 1.2rem) 100%, 0 100%, 1.2rem 50%);
+  margin-left: -0.75rem;
 }
 
 .sp-customer-plan-wizard__step[data-state='current'] {
   border-color: rgb(40 170 170 / 48%);
   box-shadow: 0 0 0 3px rgb(40 170 170 / 12%);
+  background: var(--sp-color-primary);
+}
+
+.sp-customer-plan-wizard__step[data-state='current']>.sp-customer-plan-wizard__step-button>.sp-customer-plan-wizard__step-label {
+  color: white;
 }
 
 .sp-customer-plan-wizard__step[data-state='complete'] {
   border-color: color-mix(in srgb, var(--sp-color-success) 28%, var(--sp-color-border-soft));
+  background: var(--sp-color-primary-muted);
 }
 
 .sp-customer-plan-wizard__step-button {
   display: grid;
-  gap: 0.3rem;
-  align-content: start;
+  align-content: center;
   width: 100%;
   min-width: 0;
-  padding: 0;
+  min-height: 4rem;
+  padding: 0.9rem 1.5rem 0.9rem 2rem;
   border: 0;
   background: transparent;
   color: inherit;
@@ -975,14 +987,44 @@ defineExpose({
   opacity: 0.72;
 }
 
-.sp-customer-plan-wizard__step-index {
-  color: var(--sp-color-text-secondary);
-  font-size: 0.82rem;
-}
-
 .sp-customer-plan-wizard__step-label {
   color: var(--sp-color-text-primary);
   font-weight: 600;
+  line-height: 1.3;
+}
+
+
+.sp-customer-plan-wizard__step:first-child {
+  clip-path: polygon(0 0, calc(100% - 1.2rem) 0, 100% 50%, calc(100% - 1.2rem) 100%, 0 100%);
+  margin-left: 0;
+}
+
+.sp-customer-plan-wizard__step:last-child {
+  //clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 1.2rem 50%);
+}
+
+.sp-customer-plan-wizard__step:first-child:last-child {
+  clip-path: none;
+  border-radius: 0.95rem;
+}
+
+@media (max-width: 760px) {
+  .sp-customer-plan-wizard__steps {
+    gap: 0.6rem;
+  }
+
+  .sp-customer-plan-wizard__step,
+  .sp-customer-plan-wizard__step:first-child,
+  .sp-customer-plan-wizard__step:last-child,
+  .sp-customer-plan-wizard__step:first-child:last-child {
+    clip-path: none;
+    border-radius: 0.95rem;
+  }
+
+  .sp-customer-plan-wizard__step-button {
+    min-height: 3.6rem;
+    padding: 0.85rem 1rem;
+  }
 }
 
 .sp-customer-plan-wizard__content {

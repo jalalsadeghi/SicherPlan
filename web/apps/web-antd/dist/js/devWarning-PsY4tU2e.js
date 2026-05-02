@@ -1,1 +1,0 @@
-import{I as e}from"./useConfigInject-Du5-_XR2.js";var t=((t,n,r)=>{e(t,`[ant-design-vue: ${n}] ${r}`)});export{t};

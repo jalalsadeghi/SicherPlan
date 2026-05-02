@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 
 import EmptyState from "#/components/sicherplan/empty-state.vue";
 import {
@@ -267,6 +267,16 @@ function openStep(payload: StructureNavigationPayload) {
   emit("open-node", payload);
 }
 
+function closeModal() {
+  emit("close");
+}
+
+function handleWindowKeydown(event: KeyboardEvent) {
+  if (visible.value && event.key === "Escape") {
+    closeModal();
+  }
+}
+
 function generatedShiftCount(shiftPlanId: string, shiftSeriesId: string) {
   const detail = shiftPlanDetailsById[shiftPlanId];
   if (!detail) {
@@ -295,21 +305,38 @@ watch(
   },
   { immediate: true },
 );
+
+watch(
+  () => visible.value,
+  (isVisible) => {
+    if (isVisible) {
+      window.addEventListener("keydown", handleWindowKeydown);
+      return;
+    }
+    window.removeEventListener("keydown", handleWindowKeydown);
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", handleWindowKeydown);
+});
 </script>
 
 <template>
-  <div
-    v-if="open"
-    class="customer-admin-modal-backdrop"
-    data-testid="customer-order-structure-modal-backdrop"
-    @click.self="emit('close')"
-  >
-    <section
-      class="module-card customer-admin-modal customer-order-structure-modal"
-      data-testid="customer-order-structure-modal"
-      role="dialog"
-      aria-modal="true"
+  <Teleport to="body">
+    <div
+      v-if="open"
+      class="customer-admin-modal-backdrop customer-order-structure-modal-backdrop"
+      data-testid="customer-order-structure-modal-backdrop"
+      @click.self="closeModal"
     >
+      <section
+        class="module-card customer-admin-modal customer-order-structure-modal"
+        data-testid="customer-order-structure-modal"
+        role="dialog"
+        aria-modal="true"
+      >
       <header class="customer-order-structure-modal__header">
         <div>
           <p class="eyebrow">{{ t("customerAdmin.orders.structure.eyebrow") }}</p>
@@ -328,7 +355,7 @@ watch(
             type="button"
             class="cta-button cta-secondary"
             data-testid="customer-order-structure-close"
-            @click="emit('close')"
+            @click="closeModal"
           >
             {{ t("customerAdmin.orders.structure.close") }}
           </button>
@@ -384,20 +411,22 @@ watch(
                   data-testid="customer-order-structure-planning-record"
                 >
                   <div class="customer-order-structure-node__summary">
-                    <button
-                      type="button"
-                      class="customer-order-structure-node__toggle"
-                      data-testid="customer-order-structure-planning-toggle"
-                      @click="togglePlanningRecord(planningRecord.id)"
-                    >
-                      {{ expandedPlanningRecords[planningRecord.id] ? "−" : "+" }}
-                    </button>
-                    <div class="customer-order-structure-node__content">
-                      <p class="eyebrow">{{ t("customerAdmin.orders.structure.planningRecord") }}</p>
-                      <strong>{{ planningRecord.name }}</strong>
-                      <div class="customer-order-structure-node__meta">
-                        <span>{{ formatDateRange(planningRecord.planning_from, planningRecord.planning_to) }}</span>
-                        <span>{{ formatReleaseStateLabel(planningRecord.release_state) }}</span>
+                    <div style="display: flex;">
+                      <button
+                        type="button"
+                        class="customer-order-structure-node__toggle"
+                        data-testid="customer-order-structure-planning-toggle"
+                        @click="togglePlanningRecord(planningRecord.id)"
+                      >
+                        {{ expandedPlanningRecords[planningRecord.id] ? "−" : "+" }}
+                      </button>
+                      <div class="customer-order-structure-node__content">
+                        <p class="eyebrow">{{ t("customerAdmin.orders.structure.planningRecord") }}</p>
+                        <strong>{{ planningRecord.name }}</strong>
+                        <div class="customer-order-structure-node__meta">
+                          <span>{{ formatDateRange(planningRecord.planning_from, planningRecord.planning_to) }}</span>
+                          <span>{{ formatReleaseStateLabel(planningRecord.release_state) }}</span>
+                        </div>
                       </div>
                     </div>
                     <div class="customer-order-structure-node__actions">
@@ -435,20 +464,22 @@ watch(
                         data-testid="customer-order-structure-shift-plan"
                       >
                         <div class="customer-order-structure-node__summary">
-                          <button
-                            type="button"
-                            class="customer-order-structure-node__toggle"
-                            data-testid="customer-order-structure-shift-plan-toggle"
-                            @click="toggleShiftPlan(shiftPlan.id)"
-                          >
-                            {{ expandedShiftPlans[shiftPlan.id] ? "−" : "+" }}
-                          </button>
-                          <div class="customer-order-structure-node__content">
-                            <p class="eyebrow">{{ t("customerAdmin.orders.structure.shiftPlan") }}</p>
-                            <strong>{{ shiftPlan.name }}</strong>
-                            <div class="customer-order-structure-node__meta">
-                              <span>{{ formatDateRange(shiftPlan.planning_from, shiftPlan.planning_to) }}</span>
-                              <span>{{ formatReadableValue(shiftPlan.workforce_scope_code) }}</span>
+                          <div style="display: flex;">
+                            <button
+                              type="button"
+                              class="customer-order-structure-node__toggle"
+                              data-testid="customer-order-structure-shift-plan-toggle"
+                              @click="toggleShiftPlan(shiftPlan.id)"
+                            >
+                              {{ expandedShiftPlans[shiftPlan.id] ? "−" : "+" }}
+                            </button>
+                            <div class="customer-order-structure-node__content">
+                              <p class="eyebrow">{{ t("customerAdmin.orders.structure.shiftPlan") }}</p>
+                              <strong>{{ shiftPlan.name }}</strong>
+                              <div class="customer-order-structure-node__meta">
+                                <span>{{ formatDateRange(shiftPlan.planning_from, shiftPlan.planning_to) }}</span>
+                                <span>{{ formatReadableValue(shiftPlan.workforce_scope_code) }}</span>
+                              </div>
                             </div>
                           </div>
                           <div class="customer-order-structure-node__actions">
@@ -542,11 +573,23 @@ watch(
         :title="t('customerAdmin.orders.structure.emptyTitle')"
         :description="t('customerAdmin.orders.structure.emptyBody')"
       />
-    </section>
-  </div>
+      </section>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
+.customer-order-structure-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: rgb(15 23 42 / 35%);
+  overflow-y: auto;
+}
+
 .customer-order-structure-modal {
   width: min(100%, 980px);
   max-height: min(88vh, 980px);
@@ -572,6 +615,10 @@ watch(
 .customer-order-structure-modal__header-actions,
 .customer-order-structure-node__actions,
 .customer-order-structure-node__badges {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
@@ -615,6 +662,7 @@ watch(
   display: grid;
   gap: 0.35rem;
   min-width: 0;
+  margin-left: 15px;
 }
 
 .customer-order-structure-node__content strong,
@@ -649,6 +697,10 @@ watch(
 }
 
 @media (max-width: 860px) {
+  .customer-order-structure-modal-backdrop {
+    padding: 1rem;
+  }
+
   .customer-order-structure-modal__header,
   .customer-order-structure-node__summary {
     flex-direction: column;
