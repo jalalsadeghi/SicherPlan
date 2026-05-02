@@ -45723,7 +45723,7 @@
   "schema_version": 1,
   "source_hashes": {
     "backend_schema_fields": "e79428d09156359d65cc7977d1fa0f617f1e48735ab506e869b40fdd7758d78d",
-    "locale_labels": "ffef1143342bf31b91cd02ad4c2a485a851fa33b4a345dd180bd5aae42a2adbe",
+    "locale_labels": "0b72f556ef85c84eb8b665fb3c0c455c168069086230d012704727cc7aee7a33",
     "page_help_seed_data": "f5dfd6a3ee268268020855336f57ba526ec9e245620feda137812602f24aa0de",
     "typescript_interfaces": "f4c60df1524f976e1f41511a3d113e3bf4cd90c1a9d49bf85c69d97debff89c7",
     "vue_field_bindings": "8606e1e5527c4a1ca4fbea8c5866b4517bbbfdb2f41f3d2516b4aa899f0e9918"

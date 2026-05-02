@@ -3,86 +3,113 @@ You are working in the SicherPlan repository.
 Repository:
 https://github.com/jalalsadeghi/SicherPlan
 
-Current local state:
-- Dependencies are now installed.
-- Node is v22.22.2 through nvm.
-- The repository `.nvmrc` expects Node 22.x.
-- `pnpm build` starts and many packages build successfully.
-- The previous missing dependency error (`cross-env: not found`) is no longer the main issue.
-- The previous Vite missing module error may have been caused by incomplete node_modules, but now the current blocking problem is different.
+GitHub Actions failure to investigate:
+https://github.com/jalalsadeghi/SicherPlan/actions/runs/25249512519/job/74039297911
 
-Current build error summary:
+Current failing job:
+Build Backend Stage Image
 
-`pnpm build` runs root turbo build.
-Several packages build successfully, including `@vben/web-antdv-next`.
+Current failing step:
+Verify committed field/lookup corpus artifact is current
 
-Warnings appear during `@vben/web-antdv-next` build:
+Observed CI output:
+- field_count=219
+- lookup_count=10
+- term_count=512
+- field_counts_by_module={'planning': 38, 'customers': 106, 'platform_services': 6, 'employees': 69}
+- lookup_counts_by_module={'customers': 6, 'planning': 4}
+- term_counts_by_module={'planning': 282, 'unknown': 230}
+- warnings=['fa_locale_missing']
 
-Big integer literals are not available in the configured target environment.
+The CI diff shows:
 
-But `@vben/web-antdv-next` finishes successfully with:
+--- app/modules/assistant/generated/field_lookup_corpus.json
++++ /tmp/tmp...
+@@
+ "source_hashes": {
+   "backend_schema_fields": "e79428d09156359d65cc7977d1fa0f617f1e48735ab506e869b40fdd7758d78d",
+-  "locale_labels": "ffef1143342bf31b91cd02ad4c2a485a851fa33b4a345dd180bd5aae42a2adbe",
++  "locale_labels": "0b72f556ef85c84eb8b665fb3c0c455c168069086230d012704727cc7aee7a33",
+   "page_help_seed_data": "f5dfd6a3ee268268020855336f57ba526ec9e245620feda137812602f24aa0de",
+   "typescript_interfaces": "f4c60df1524f976e1f41511a3d113e3bf4cd90c1a9d49bf85c69d97debff89c7",
+   "vue_field_bindings": "8606e1e5527c4a1ca4fbea8c5866b4517bbbfdb2f41f3d2516b4aa899f0e9918"
+ }
 
-✓ built in 1m 12s
-
-The final failure is:
-
-ERROR @vben/web-antd#build: command (/home/jey/Projects/SicherPlan/web/apps/web-antd) /home/jey/.nvm/versions/node/v22.22.2/bin/pnpm run build exited (1)
-
-Tasks: 13 successful, 18 total
-Failed: @vben/web-antd#build
+CI error:
+Generated field/lookup corpus artifact is stale. Regenerate backend/app/modules/assistant/generated/field_lookup_corpus.json.
 
 Important interpretation to validate:
-The BigInt warnings from `@vben/web-antdv-next` are probably not the root cause because that package completes successfully. The real failure is inside the main app package `@vben/web-antd`, but the root turbo output does not show the complete error.
+This looks like a stale generated artifact, not a Docker build failure and not a backend business-logic failure. The generator appears deterministic because CI generated tmp1 and tmp2 before comparing with the committed artifact, and no nondeterminism diff was reported. The only visible diff is the locale_labels source hash. The warning `fa_locale_missing` is non-blocking unless you prove otherwise.
 
-Repository facts:
-- `web/package.json` root build script runs `cross-env NODE_OPTIONS=--max-old-space-size=8192 turbo build`.
-- `web/package.json` also has `build:antd`.
-- `web/apps/web-antd/package.json` has build script: `pnpm vite build --mode production`.
-- `web/apps/web-antd/vite.config.ts` defines alias `@` to `./src/sicherplan-legacy` and proxies only `/api` to `http://localhost:8000`.
+Relevant files to inspect:
+- .github/workflows/stage-deploy.yml
+- docs/assistant/stage-field-dictionary-verification.md
+- docs/prompts/AI-70.md
+- docs/prompts/AI-71.md
+- backend/app/modules/assistant/field_dictionary.py
+- backend/app/modules/assistant/field_dictionary_export.py
+- backend/app/modules/assistant/generated/field_lookup_corpus.json
+- web/apps/web-antd/src/sicherplan-legacy/i18n/messages.ts
+- web/apps/web-antd/src/locales/langs/de-DE/sicherplan.json
+- web/apps/web-antd/src/locales/langs/en-US/sicherplan.json
+- web/apps/web-antd/src/locales/langs/fa-IR/sicherplan.json if it exists
 
 Task:
-1. Do not change product/business code yet.
-2. Do not change backend APIs, tenant logic, customer/planning domain logic, or database logic.
-3. First isolate the real `@vben/web-antd` build error.
-4. Run:
-   - `cd ~/Projects/SicherPlan/web`
-   - `node -v`
-   - `pnpm -v`
-   - `pnpm -F @vben/web-antd run build 2>&1 | tee /tmp/web-antd-build.log`
-   - `tail -n 160 /tmp/web-antd-build.log`
-5. If the direct package build still hides the error, run:
-   - `pnpm turbo build --filter=@vben/web-antd --force --output-logs=full 2>&1 | tee /tmp/web-antd-turbo-build.log`
-   - `tail -n 200 /tmp/web-antd-turbo-build.log`
-6. Identify the first real error line inside `@vben/web-antd`.
-7. Classify the failure:
-   - dependency/tooling issue
-   - TypeScript/typecheck issue
-   - Vite/Rollup build issue
-   - unresolved import or alias issue
-   - asset/path issue
-   - app-specific SicherPlan customization issue under `src/sicherplan-legacy`
-8. Only after identifying the exact root cause, propose the smallest possible fix.
-9. If a fix is needed:
-   - keep the changes narrowly scoped to `@vben/web-antd`
-   - preserve Vben Admin conventions
-   - preserve SicherPlan theme/i18n rules
-   - avoid unrelated formatting or refactoring
-10. Run verification after the fix:
-   - `pnpm -F @vben/web-antd run build`
-   - if that passes, `pnpm build`
-11. Report:
-   - root cause
-   - evidence
-   - exact file(s) changed
-   - whether product code was touched
-   - verification result
-   - any remaining warnings, especially BigInt warnings, and whether they are blocking or non-blocking
+1. Reproduce the CI check locally from `backend/`.
+2. Run the exporter twice and verify byte-identical output:
+   cd backend
+   python -m pip install -e .
+   tmp1="$(mktemp)"
+   tmp2="$(mktemp)"
+   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp1"
+   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp2"
+   diff -u "$tmp1" "$tmp2"
+3. Compare generated output with the committed artifact:
+   diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp1"
+4. Classify the failure:
+   - stale committed artifact only
+   - nondeterministic exporter
+   - meaningful source/content change
+   - source hash calculation issue
+   - missing locale issue
+5. If the exporter is deterministic and the only issue is stale artifact, regenerate the committed artifact:
+   python -m app.modules.assistant.field_dictionary_export \
+     --repo-root .. \
+     --output app/modules/assistant/generated/field_lookup_corpus.json
+6. Inspect `git diff` carefully. Confirm whether the diff is only `source_hashes.locale_labels` or whether field/lookup/term content changed too.
+7. Run smoke checks:
+   python - <<'PY'
+   from app.modules.assistant.field_dictionary import detect_field_or_lookup_signal
 
-Output format:
-- Root cause
-- Evidence from logs
-- Files inspected
-- Files changed
-- Verification commands
-- Result
-- Remaining risk
+   assert detect_field_or_lookup_signal("was bedeutet Vertragsreferenz") is not None
+   assert detect_field_or_lookup_signal("was bedeutet Rechtlicher Name") is not None
+   assert detect_field_or_lookup_signal("was bedeutet Apfelkuchen") is None
+   print("field dictionary smoke test ok")
+   PY
+8. Run the same freshness check as CI:
+   tmp1="$(mktemp)"
+   tmp2="$(mktemp)"
+   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp1"
+   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp2"
+   diff -u "$tmp1" "$tmp2"
+   diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp1"
+9. Do not remove the CI check.
+10. Do not ignore the diff.
+11. Do not change Docker, deployment, customer/planning business code, or unrelated frontend code.
+12. Only change generator code if you prove regeneration alone is not enough.
+
+Expected minimal fix:
+Most likely only this file should change:
+backend/app/modules/assistant/generated/field_lookup_corpus.json
+
+But you must validate this before deciding.
+
+Report:
+- root cause
+- evidence from CI and local reproduction
+- whether exporter was deterministic
+- whether `fa_locale_missing` is blocking or non-blocking
+- exact files changed
+- summary of artifact diff
+- smoke test result
+- final CI-equivalent freshness check result
