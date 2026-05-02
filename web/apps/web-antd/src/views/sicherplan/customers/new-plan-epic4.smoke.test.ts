@@ -3500,6 +3500,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await wrapper.get('[data-testid="customer-new-plan-series-from"]').setValue('2026-06-01');
     await wrapper.get('[data-testid="customer-new-plan-series-to"]').setValue('2026-06-10');
     await flushPromises();
+    await settleLoadingRender();
 
     expect(await (wrapper.vm as any).submitCurrentStep()).toBe(false);
     expect(apiMocks.createShiftSeriesMock).not.toHaveBeenCalled();
@@ -3596,6 +3597,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     await wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-start-time"]').setValue('17:00');
     await wrapper.get('[data-order-workspace-testid="customer-order-workspace-series-end-time"]').setValue('09:00');
+    await flushPromises();
     await saveCurrentSeries(wrapper);
     expect(apiMocks.createShiftSeriesMock).not.toHaveBeenCalled();
     expect(notificationMocks.error).toHaveBeenCalledWith(expect.objectContaining({
@@ -4845,10 +4847,24 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     expect(wrapper.find('[data-testid="customer-new-plan-step-panel-demand-groups"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-new-plan-demand-groups-empty"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-demand-group-new"]').exists()).toBe(true);
     expect((wrapper.get('[data-testid="customer-new-plan-demand-groups-generated-count"]').element as HTMLElement).textContent).toContain('0');
+
+    await wrapper.get('[data-testid="customer-new-plan-demand-group-new"]').trigger('click');
+    await flushPromises();
+    const demandGroupDialog = (wrapper.vm as any).$?.setupState.demandGroupDialog;
+    demandGroupDialog.function_type_id = 'function-1';
+    (wrapper.vm as any).$?.setupState.submitDemandGroupDialog();
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-testid="customer-new-plan-demand-group-row"]')).toHaveLength(1);
+    expect(await (wrapper.vm as any).submitCurrentStep()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-demand-groups-validation"]').text()).toContain(
+      'sicherplan.customerPlansWizard.errors.demandGroupsNoGeneratedShifts',
+    );
   });
 
-  it('blocks demand-groups submit when min_qty exceeds target_qty', async () => {
+  it('opens a demand-group modal from the demand-groups step', async () => {
     apiMocks.listShiftsMock.mockResolvedValue([
       {
         id: 'shift-1',
@@ -4880,16 +4896,156 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     });
     await settleLoadingRender();
 
-    const validationRows = (wrapper.vm as any).$?.setupState.demandGroupDraftRows;
-    validationRows[0].function_type_id = 'function-1';
-    await wrapper.get('[data-testid="customer-new-plan-demand-group-min-qty-0"]').setValue('3');
-    await wrapper.get('[data-testid="customer-new-plan-demand-group-target-qty-0"]').setValue('2');
+    (wrapper.vm as any).$?.setupState.openNewDemandGroupDialog();
+    await nextTick();
+    await flushPromises();
+    expect((wrapper.vm as any).$?.setupState.demandGroupDialog.open).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-demand-group-modal"]').exists()).toBe(true);
+  });
+
+  it('blocks demand-group modal save when function type is missing', async () => {
+    apiMocks.listShiftsMock.mockResolvedValue([
+      {
+        id: 'shift-1',
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: 'series-1',
+        occurrence_date: '2026-07-02',
+        starts_at: '2026-07-02T08:00:00Z',
+        ends_at: '2026-07-02T16:00:00Z',
+        break_minutes: 30,
+        shift_type_code: 'day',
+        location_text: null,
+        meeting_point: null,
+        release_state: 'draft',
+        customer_visible_flag: false,
+        subcontractor_visible_flag: false,
+        stealth_mode_flag: false,
+        source_kind_code: 'generated',
+        status: 'active',
+        version_no: 1,
+      },
+    ]);
+
+    const wrapper = mountStep('demand-groups', {
+      current_step: 'demand-groups',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: 'series-1',
+    });
+    await settleLoadingRender();
+
+    await wrapper.get('[data-testid="customer-new-plan-demand-group-new"]').trigger('click');
+    await flushPromises();
+    (wrapper.vm as any).$?.setupState.submitDemandGroupDialog();
     await flushPromises();
 
-    expect(await (wrapper.vm as any).submitCurrentStep()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-demand-groups-validation"]').text()).toContain(
+      'sicherplan.customerPlansWizard.errors.demandGroupsFunctionTypeRequired',
+    );
+  });
+
+  it('blocks demand-group modal save when target_qty is below min_qty', async () => {
+    apiMocks.listShiftsMock.mockResolvedValue([
+      {
+        id: 'shift-1',
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: 'series-1',
+        occurrence_date: '2026-07-02',
+        starts_at: '2026-07-02T08:00:00Z',
+        ends_at: '2026-07-02T16:00:00Z',
+        break_minutes: 30,
+        shift_type_code: 'day',
+        location_text: null,
+        meeting_point: null,
+        release_state: 'draft',
+        customer_visible_flag: false,
+        subcontractor_visible_flag: false,
+        stealth_mode_flag: false,
+        source_kind_code: 'generated',
+        status: 'active',
+        version_no: 1,
+      },
+    ]);
+
+    const wrapper = mountStep('demand-groups', {
+      current_step: 'demand-groups',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: 'series-1',
+    });
+    await settleLoadingRender();
+
+    await wrapper.get('[data-testid="customer-new-plan-demand-group-new"]').trigger('click');
+    await flushPromises();
+    const invalidDialog = (wrapper.vm as any).$?.setupState.demandGroupDialog;
+    invalidDialog.function_type_id = 'function-1';
+    invalidDialog.min_qty = 3;
+    invalidDialog.target_qty = 2;
+    (wrapper.vm as any).$?.setupState.submitDemandGroupDialog();
+    await flushPromises();
+
     expect(wrapper.get('[data-testid="customer-new-plan-demand-groups-validation"]').text()).toContain(
       'sicherplan.customerPlansWizard.errors.demandGroupsMinExceedsTarget',
     );
+  });
+
+  it('adds, edits, and removes a demand-group template row', async () => {
+    apiMocks.listShiftsMock.mockResolvedValue([
+      {
+        id: 'shift-1',
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: 'series-1',
+        occurrence_date: '2026-07-02',
+        starts_at: '2026-07-02T08:00:00Z',
+        ends_at: '2026-07-02T16:00:00Z',
+        break_minutes: 30,
+        shift_type_code: 'day',
+        location_text: null,
+        meeting_point: null,
+        release_state: 'draft',
+        customer_visible_flag: false,
+        subcontractor_visible_flag: false,
+        stealth_mode_flag: false,
+        source_kind_code: 'generated',
+        status: 'active',
+        version_no: 1,
+      },
+    ]);
+
+    const wrapper = mountStep('demand-groups', {
+      current_step: 'demand-groups',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: 'series-1',
+    });
+    await settleLoadingRender();
+
+    await wrapper.get('[data-testid="customer-new-plan-demand-group-new"]').trigger('click');
+    await flushPromises();
+    const createDialog = (wrapper.vm as any).$?.setupState.demandGroupDialog;
+    createDialog.function_type_id = 'function-1';
+    createDialog.target_qty = 2;
+    (wrapper.vm as any).$?.setupState.submitDemandGroupDialog();
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-testid="customer-new-plan-demand-group-row"]')).toHaveLength(1);
+
+    await wrapper.get('[data-testid="customer-new-plan-demand-group-edit-0"]').trigger('click');
+    await flushPromises();
+    const editDialog = (wrapper.vm as any).$?.setupState.demandGroupDialog;
+    editDialog.remark = 'night gate';
+    (wrapper.vm as any).$?.setupState.submitDemandGroupDialog();
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('night gate');
+
+    await wrapper.get('[data-testid="customer-new-plan-demand-group-remove-0"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-testid="customer-new-plan-demand-group-row"]')).toHaveLength(0);
   });
 
   it('applies demand groups successfully and marks the step complete', async () => {
@@ -4944,10 +5100,13 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     });
     await settleLoadingRender();
 
-    const appliedRows = (wrapper.vm as any).$?.setupState.demandGroupDraftRows;
-    appliedRows[0].function_type_id = 'function-1';
-    await wrapper.get('[data-testid="customer-new-plan-demand-group-target-qty-0"]').setValue('2');
-    await wrapper.get('[data-testid="customer-new-plan-demand-group-sort-order-0"]').setValue('1');
+    await wrapper.get('[data-testid="customer-new-plan-demand-group-new"]').trigger('click');
+    await flushPromises();
+    const applyDialog = (wrapper.vm as any).$?.setupState.demandGroupDialog;
+    applyDialog.function_type_id = 'function-1';
+    applyDialog.target_qty = 2;
+    applyDialog.sort_order = 1;
+    (wrapper.vm as any).$?.setupState.submitDemandGroupDialog();
     await flushPromises();
 
     const saved = await (wrapper.vm as any).submitCurrentStep();
@@ -4962,7 +5121,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       shift_series_id: 'series-1',
     }));
     expect(wrapper.emitted('step-completion')).toContainEqual(['demand-groups', true]);
-    expect(wrapper.get('[data-testid="customer-new-plan-demand-groups-summary"]').text()).toContain(
+    await nextTick();
+    await flushPromises();
+    expect((wrapper.vm as any).$?.setupState.demandGroupSummaryMessage).toContain(
       'sicherplan.customerPlansWizard.messages.demandGroupsAppliedSummary',
     );
   });

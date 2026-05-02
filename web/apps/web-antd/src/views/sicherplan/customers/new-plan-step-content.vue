@@ -166,6 +166,10 @@ interface DemandGroupDraftRow {
   target_qty: number;
 }
 
+type DemandGroupsDraftPersistence = {
+  rows: Array<Omit<DemandGroupDraftRow, 'id'>>;
+};
+
 const route = useRoute();
 
 const props = defineProps<{
@@ -527,6 +531,18 @@ const demandGroupGeneratedShifts = ref<ShiftListItem[]>([]);
 const demandGroupApplyResult = ref<DemandGroupBulkApplyResult | null>(null);
 const demandGroupValidationError = ref('');
 const demandGroupSummaryMessage = ref('');
+const demandGroupDraftWatchMuted = ref(false);
+const demandGroupDialog = reactive({
+  function_type_id: '',
+  mandatory_flag: true,
+  min_qty: 1,
+  open: false,
+  qualification_type_id: '',
+  remark: '',
+  sort_order: 1,
+  target_qty: 1,
+});
+const editingDemandGroupDraftId = ref('');
 let demandGroupDraftRowSequence = 0;
 
 const { showFeedbackToast } = useSicherPlanFeedback();
@@ -754,6 +770,18 @@ const qualificationTypeSelectOptions = computed(() =>
   qualificationTypeOptions.value.map((row) => ({
     label: row.label,
     value: row.id,
+  })),
+);
+const demandGroupDraftRowsDisplay = computed(() =>
+  demandGroupDraftRows.value.map((row, index) => ({
+    ...row,
+    function_type_label:
+      functionTypeSelectOptions.value.find((option) => option.value === row.function_type_id)?.label || row.function_type_id,
+    index,
+    qualification_type_label:
+      qualificationTypeSelectOptions.value.find((option) => option.value === row.qualification_type_id)?.label ||
+      row.qualification_type_id ||
+      $t('sicherplan.customerPlansWizard.forms.none'),
   })),
 );
 const requirementLineDuplicateActive = computed(() =>
@@ -2352,6 +2380,36 @@ function persistSeriesDraft() {
   );
 }
 
+function hasDemandGroupDraftContent() {
+  return demandGroupDraftRows.value.some((row) =>
+    Boolean(
+      row.function_type_id.trim() ||
+        row.qualification_type_id.trim() ||
+        row.min_qty !== 1 ||
+        row.target_qty !== 1 ||
+        row.sort_order !== 1 ||
+        !row.mandatory_flag ||
+        row.remark.trim(),
+    ),
+  );
+}
+
+function persistDemandGroupsDraft() {
+  saveStepDraft<DemandGroupsDraftPersistence>(
+    'demand-groups',
+    hasDemandGroupDraftContent()
+      ? {
+          rows: demandGroupDraftRows.value.map(({ id: _id, ...row }) => ({
+            ...row,
+            function_type_id: row.function_type_id.trim(),
+            qualification_type_id: row.qualification_type_id.trim(),
+            remark: row.remark.trim(),
+          })),
+        }
+      : null,
+  );
+}
+
 function persistAllUnsavedDrafts() {
   if (draftSyncPaused.value) {
     return;
@@ -2364,6 +2422,7 @@ function persistAllUnsavedDrafts() {
   persistPlanningRecordDocumentsDraft();
   persistShiftPlanDraft();
   persistSeriesDraft();
+  persistDemandGroupsDraft();
 }
 
 function handleBeforeUnload() {
@@ -3844,22 +3903,105 @@ function createDemandGroupDraftRow(overrides: Partial<DemandGroupDraftRow> = {})
   };
 }
 
-function ensureDemandGroupDraftRow() {
-  if (!demandGroupDraftRows.value.length) {
-    demandGroupDraftRows.value = [createDemandGroupDraftRow()];
-  }
+function resetDemandGroupDialogDraft() {
+  demandGroupDialog.function_type_id = '';
+  demandGroupDialog.mandatory_flag = true;
+  demandGroupDialog.min_qty = 1;
+  demandGroupDialog.qualification_type_id = '';
+  demandGroupDialog.remark = '';
+  demandGroupDialog.sort_order = Math.max(1, demandGroupDraftRows.value.length + 1);
+  demandGroupDialog.target_qty = 1;
 }
 
-function addDemandGroupDraftRow() {
-  demandGroupDraftRows.value = [
-    ...demandGroupDraftRows.value,
-    createDemandGroupDraftRow({ sort_order: demandGroupDraftRows.value.length + 1 }),
-  ];
+function openNewDemandGroupDialog() {
+  editingDemandGroupDraftId.value = '';
+  resetDemandGroupDialogDraft();
+  demandGroupValidationError.value = '';
+  demandGroupDialog.open = true;
+}
+
+function openEditDemandGroupDialog(rowId: string) {
+  const row = demandGroupDraftRows.value.find((entry) => entry.id === rowId);
+  if (!row) {
+    return;
+  }
+  editingDemandGroupDraftId.value = row.id;
+  demandGroupDialog.function_type_id = row.function_type_id;
+  demandGroupDialog.mandatory_flag = row.mandatory_flag;
+  demandGroupDialog.min_qty = row.min_qty;
+  demandGroupDialog.qualification_type_id = row.qualification_type_id;
+  demandGroupDialog.remark = row.remark;
+  demandGroupDialog.sort_order = row.sort_order;
+  demandGroupDialog.target_qty = row.target_qty;
+  demandGroupValidationError.value = '';
+  demandGroupDialog.open = true;
+}
+
+function closeDemandGroupDialog() {
+  demandGroupDialog.open = false;
+  editingDemandGroupDraftId.value = '';
+  resetDemandGroupDialogDraft();
+}
+
+function buildDemandGroupCompositeKey(row: Pick<DemandGroupDraftRow, 'function_type_id' | 'qualification_type_id' | 'sort_order'>) {
+  return [
+    row.function_type_id.trim(),
+    row.qualification_type_id.trim(),
+    String(row.sort_order),
+  ].join('|');
+}
+
+function submitDemandGroupDialog() {
+  const candidate = {
+    function_type_id: demandGroupDialog.function_type_id.trim(),
+    mandatory_flag: demandGroupDialog.mandatory_flag,
+    min_qty: Number(demandGroupDialog.min_qty),
+    qualification_type_id: demandGroupDialog.qualification_type_id.trim(),
+    remark: demandGroupDialog.remark.trim(),
+    sort_order: Number(demandGroupDialog.sort_order),
+    target_qty: Number(demandGroupDialog.target_qty),
+  };
+  if (!candidate.function_type_id) {
+    demandGroupValidationError.value = $t('sicherplan.customerPlansWizard.errors.demandGroupsFunctionTypeRequired');
+    return;
+  }
+  if (
+    !Number.isInteger(candidate.sort_order) ||
+    candidate.sort_order < 1 ||
+    candidate.min_qty < 0 ||
+    candidate.target_qty < 0
+  ) {
+    demandGroupValidationError.value = $t('sicherplan.customerPlansWizard.errors.demandGroupsInvalid');
+    return;
+  }
+  if (candidate.target_qty < candidate.min_qty) {
+    demandGroupValidationError.value = $t('sicherplan.customerPlansWizard.errors.demandGroupsMinExceedsTarget');
+    return;
+  }
+  const candidateKey = buildDemandGroupCompositeKey(candidate);
+  const duplicate = demandGroupDraftRows.value.some(
+    (row) => row.id !== editingDemandGroupDraftId.value && buildDemandGroupCompositeKey(row) === candidateKey,
+  );
+  if (duplicate) {
+    demandGroupValidationError.value = $t('sicherplan.customerPlansWizard.errors.demandGroupsDuplicateTemplate');
+    return;
+  }
+  if (editingDemandGroupDraftId.value) {
+    demandGroupDraftRows.value = demandGroupDraftRows.value.map((row) =>
+      row.id === editingDemandGroupDraftId.value ? { ...row, ...candidate } : row,
+    );
+  } else {
+    demandGroupDraftRows.value = [
+      ...demandGroupDraftRows.value,
+      createDemandGroupDraftRow(candidate),
+    ];
+  }
+  closeDemandGroupDialog();
+  demandGroupValidationError.value = '';
 }
 
 function removeDemandGroupDraftRow(rowId: string) {
   demandGroupDraftRows.value = demandGroupDraftRows.value.filter((row) => row.id !== rowId);
-  ensureDemandGroupDraftRow();
 }
 
 function buildDemandGroupTemplates(): DemandGroupBulkTemplate[] | null {
@@ -3875,6 +4017,7 @@ function buildDemandGroupTemplates(): DemandGroupBulkTemplate[] | null {
   }
   const duplicateSortOrders = new Set<number>();
   const seenSortOrders = new Set<number>();
+  const compositeKeys = new Set<string>();
   for (const row of normalizedRows) {
     if (!row.function_type_id || row.min_qty < 0 || row.target_qty < 0 || row.sort_order < 1) {
       demandGroupValidationError.value = $t('sicherplan.customerPlansWizard.errors.demandGroupsInvalid');
@@ -3888,6 +4031,12 @@ function buildDemandGroupTemplates(): DemandGroupBulkTemplate[] | null {
       duplicateSortOrders.add(row.sort_order);
     }
     seenSortOrders.add(row.sort_order);
+    const compositeKey = buildDemandGroupCompositeKey(row);
+    if (compositeKeys.has(compositeKey)) {
+      demandGroupValidationError.value = $t('sicherplan.customerPlansWizard.errors.demandGroupsDuplicateTemplate');
+      return null;
+    }
+    compositeKeys.add(compositeKey);
   }
   if (duplicateSortOrders.size) {
     demandGroupValidationError.value = $t('sicherplan.customerPlansWizard.errors.demandGroupsDuplicateSortOrder');
@@ -4557,11 +4706,17 @@ async function loadSeriesState(isCurrent = () => true) {
 async function loadDemandGroupsState(isCurrent = () => true) {
   stepLoadError.demandGroups = '';
   demandGroupValidationError.value = '';
+  const persistedDemandGroupsDraft = loadStepDraft<DemandGroupsDraftPersistence>('demand-groups');
   if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
     demandGroupGeneratedShifts.value = [];
     demandGroupApplyResult.value = null;
     demandGroupSummaryMessage.value = '';
-    ensureDemandGroupDraftRow();
+    demandGroupDraftRows.value = persistedDemandGroupsDraft?.rows?.length
+      ? persistedDemandGroupsDraft.rows.map((row) => createDemandGroupDraftRow(row))
+      : [];
+    if (persistedDemandGroupsDraft?.rows?.length) {
+      restoreDraftMessage();
+    }
     emit('step-completion', 'demand-groups', false);
     return;
   }
@@ -4577,7 +4732,12 @@ async function loadDemandGroupsState(isCurrent = () => true) {
     demandGroupGeneratedShifts.value = shifts.filter((row) => row.source_kind_code === 'generated');
     demandGroupApplyResult.value = null;
     demandGroupSummaryMessage.value = '';
-    ensureDemandGroupDraftRow();
+    demandGroupDraftRows.value = persistedDemandGroupsDraft?.rows?.length
+      ? persistedDemandGroupsDraft.rows.map((row) => createDemandGroupDraftRow(row))
+      : [];
+    if (persistedDemandGroupsDraft?.rows?.length) {
+      restoreDraftMessage();
+    }
     emit('step-completion', 'demand-groups', false);
   } finally {
     finishStepLoads(loadVersions, isCurrent);
@@ -6383,6 +6543,10 @@ async function submitDemandGroupsStep(): Promise<CustomerNewPlanStepSubmitResult
       skipped: result.skipped_count,
       updated: result.updated_count,
     } as never);
+    demandGroupDraftWatchMuted.value = true;
+    demandGroupDraftRows.value = [];
+    clearStepDraft('demand-groups');
+    clearDraftRestoreMessage();
     emit('step-completion', 'demand-groups', true);
     emit('step-ui-state', 'demand-groups', { dirty: false, error: '' });
     return {
@@ -6716,11 +6880,16 @@ watch(
     if (!demandGroupsStepActive.value || stepLoading.value) {
       return;
     }
+    if (demandGroupDraftWatchMuted.value) {
+      demandGroupDraftWatchMuted.value = false;
+      return;
+    }
     demandGroupApplyResult.value = null;
     demandGroupSummaryMessage.value = '';
     demandGroupValidationError.value = '';
     emit('step-completion', 'demand-groups', false);
     emit('step-ui-state', 'demand-groups', { dirty: true, error: '' });
+    persistDemandGroupsDraft();
   },
   { deep: true },
 );
@@ -8595,6 +8764,17 @@ onBeforeUnmount(() => {
           <strong data-testid="customer-new-plan-demand-groups-generated-count">{{ generatedDemandGroupShiftCount }}</strong>
         </p>
       </div>
+      <div class="cta-row">
+        <button
+          type="button"
+          class="cta-button cta-secondary"
+          data-testid="customer-new-plan-demand-group-new"
+          :disabled="stepLoading || !props.wizardState.shift_plan_id"
+          @click="openNewDemandGroupDialog"
+        >
+          {{ $t('sicherplan.customerPlansWizard.actions.newDemandGroup') }}
+        </button>
+      </div>
       <div
         v-if="!generatedDemandGroupShiftCount"
         class="sp-customer-plan-wizard-step__empty-state"
@@ -8603,100 +8783,154 @@ onBeforeUnmount(() => {
         <p><strong>{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsEmptyTitle') }}</strong></p>
         <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsEmptyBody') }}</p>
       </div>
-      <template v-else>
-        <div class="cta-row">
-          <button
-            type="button"
-            class="cta-button cta-secondary"
-            data-testid="customer-new-plan-demand-group-add"
-            :disabled="stepLoading"
-            @click="addDemandGroupDraftRow"
-          >
-            {{ $t('sicherplan.customerPlansWizard.actions.addDemandGroup') }}
-          </button>
-        </div>
-        <p
-          v-if="demandGroupValidationError"
-          class="field-error"
-          data-testid="customer-new-plan-demand-groups-validation"
-        >
-          {{ demandGroupValidationError }}
-        </p>
-        <p
-          v-if="demandGroupSummaryMessage"
-          class="field-help"
-          data-testid="customer-new-plan-demand-groups-summary"
-        >
-          {{ demandGroupSummaryMessage }}
-        </p>
-        <div
-          v-for="(row, index) in demandGroupDraftRows"
+      <p
+        v-if="demandGroupValidationError"
+        class="field-error"
+        data-testid="customer-new-plan-demand-groups-validation"
+      >
+        {{ demandGroupValidationError }}
+      </p>
+      <p
+        v-if="demandGroupSummaryMessage"
+        class="field-help"
+        data-testid="customer-new-plan-demand-groups-summary"
+      >
+        {{ demandGroupSummaryMessage }}
+      </p>
+      <div
+        v-if="demandGroupDraftRowsDisplay.length"
+        class="sp-customer-plan-wizard-step__list"
+        data-testid="customer-new-plan-demand-group-list"
+      >
+        <article
+          v-for="row in demandGroupDraftRowsDisplay"
           :key="row.id"
           class="sp-customer-plan-wizard-step__document-subsection"
           data-testid="customer-new-plan-demand-group-row"
         >
           <header class="sp-customer-plan-wizard-step__document-subsection-header">
-            <h5>{{ $t('sicherplan.customerPlansWizard.forms.demandGroupRowLabel', { index: index + 1 }) }}</h5>
+            <h5>{{ $t('sicherplan.customerPlansWizard.forms.demandGroupRowLabel', { index: row.index + 1 }) }}</h5>
           </header>
-          <div class="sp-customer-plan-wizard-step__grid">
-            <label class="field-stack">
-              <span>{{ $t('sicherplan.customerPlansWizard.forms.functionType') }}</span>
-              <select v-model="row.function_type_id" :data-testid="`customer-new-plan-demand-group-function-type-${index}`">
-                <option value="">{{ $t('sicherplan.customerPlansWizard.forms.functionTypePlaceholder') }}</option>
-                <option v-for="option in functionTypeSelectOptions" :key="option.value" :value="option.value">
-                  {{ option.label }}
-                </option>
-              </select>
-            </label>
-            <label class="field-stack">
-              <span>{{ $t('sicherplan.customerPlansWizard.forms.qualificationType') }}</span>
-              <select v-model="row.qualification_type_id" :data-testid="`customer-new-plan-demand-group-qualification-type-${index}`">
-                <option value="">{{ $t('sicherplan.customerPlansWizard.forms.qualificationTypePlaceholder') }}</option>
-                <option v-for="option in qualificationTypeSelectOptions" :key="option.value" :value="option.value">
-                  {{ option.label }}
-                </option>
-              </select>
-            </label>
-            <label class="field-stack">
-              <span>{{ $t('sicherplan.customerPlansWizard.forms.minQty') }}</span>
-              <input v-model.number="row.min_qty" :data-testid="`customer-new-plan-demand-group-min-qty-${index}`" min="0" type="number" />
-            </label>
-            <label class="field-stack">
-              <span>{{ $t('sicherplan.customerPlansWizard.forms.targetQty') }}</span>
-              <input v-model.number="row.target_qty" :data-testid="`customer-new-plan-demand-group-target-qty-${index}`" min="0" type="number" />
-            </label>
-            <label class="planning-admin-checkbox planning-admin-checkbox--centered">
-              <input v-model="row.mandatory_flag" :data-testid="`customer-new-plan-demand-group-mandatory-${index}`" type="checkbox" />
-              <span>{{ $t('sicherplan.customerPlansWizard.forms.mandatoryFlag') }}</span>
-            </label>
-            <label class="field-stack">
-              <span>{{ $t('sicherplan.customerPlansWizard.forms.sortOrder') }}</span>
-              <input v-model.number="row.sort_order" :data-testid="`customer-new-plan-demand-group-sort-order-${index}`" min="1" type="number" />
-            </label>
-            <label class="field-stack field-stack--wide">
-              <span>{{ $t('sicherplan.customerPlansWizard.forms.remark') }}</span>
-              <textarea v-model="row.remark" :data-testid="`customer-new-plan-demand-group-remark-${index}`" rows="2" />
-            </label>
+          <div class="sp-customer-plan-wizard-step__info-summary">
+            <strong>{{ row.function_type_label }}</strong>
+            <span>{{ row.qualification_type_label }}</span>
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.minQty') }}: {{ row.min_qty }}</span>
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.targetQty') }}: {{ row.target_qty }}</span>
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.sortOrder') }}: {{ row.sort_order }}</span>
+            <span>{{ row.mandatory_flag ? $t('sicherplan.customerPlansWizard.forms.mandatoryFlag') : $t('sicherplan.customerPlansWizard.forms.optionalFlag') }}</span>
+            <span v-if="row.remark">{{ row.remark }}</span>
           </div>
           <div class="cta-row">
             <button
               type="button"
               class="cta-button cta-secondary"
-              :data-testid="`customer-new-plan-demand-group-remove-${index}`"
-              :disabled="stepLoading || demandGroupDraftRows.length === 1"
+              :data-testid="`customer-new-plan-demand-group-edit-${row.index}`"
+              :disabled="stepLoading"
+              @click="openEditDemandGroupDialog(row.id)"
+            >
+              {{ $t('sicherplan.customerPlansWizard.actions.editDemandGroup') }}
+            </button>
+            <button
+              type="button"
+              class="cta-button cta-secondary"
+              :data-testid="`customer-new-plan-demand-group-remove-${row.index}`"
+              :disabled="stepLoading"
               @click="removeDemandGroupDraftRow(row.id)"
             >
               {{ $t('sicherplan.customerPlansWizard.actions.removeDemandGroup') }}
             </button>
           </div>
-        </div>
-      </template>
+        </article>
+      </div>
+      <p
+        v-else
+        class="field-help"
+        data-testid="customer-new-plan-demand-group-list-empty"
+      >
+        {{ $t('sicherplan.customerPlansWizard.forms.demandGroupsDraftEmpty') }}
+      </p>
     </section>
 
     <section v-else class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-placeholder">
       <p>{{ $t('sicherplan.customerPlansWizard.stepLead') }}</p>
       <p>{{ $t('sicherplan.customerPlansWizard.stepContentBody') }}</p>
     </section>
+
+    <Modal
+      v-model:open="demandGroupDialog.open"
+      :footer="null"
+      :title="
+        editingDemandGroupDraftId
+          ? $t('sicherplan.customerPlansWizard.dialogs.demandGroupEditTitle')
+          : $t('sicherplan.customerPlansWizard.dialogs.demandGroupCreateTitle')
+      "
+      wrap-class-name="sp-customer-plan-wizard-modal"
+      @cancel="closeDemandGroupDialog"
+    >
+      <form
+        class="sp-customer-plan-wizard-step__modal"
+        data-testid="customer-new-plan-demand-group-modal"
+        @submit.prevent="submitDemandGroupDialog"
+      >
+        <div class="sp-customer-plan-wizard-step__grid">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.functionType') }}</span>
+            <select v-model="demandGroupDialog.function_type_id" data-testid="customer-new-plan-demand-group-modal-function-type">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.functionTypePlaceholder') }}</option>
+              <option v-for="option in functionTypeSelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.qualificationType') }}</span>
+            <select v-model="demandGroupDialog.qualification_type_id" data-testid="customer-new-plan-demand-group-modal-qualification-type">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.qualificationTypePlaceholder') }}</option>
+              <option v-for="option in qualificationTypeSelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.minQty') }}</span>
+            <input v-model.number="demandGroupDialog.min_qty" data-testid="customer-new-plan-demand-group-modal-min-qty" min="0" type="number" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.targetQty') }}</span>
+            <input v-model.number="demandGroupDialog.target_qty" data-testid="customer-new-plan-demand-group-modal-target-qty" min="0" type="number" />
+          </label>
+          <label class="planning-admin-checkbox planning-admin-checkbox--centered">
+            <input v-model="demandGroupDialog.mandatory_flag" data-testid="customer-new-plan-demand-group-modal-mandatory" type="checkbox" />
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.mandatoryFlag') }}</span>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.sortOrder') }}</span>
+            <input v-model.number="demandGroupDialog.sort_order" data-testid="customer-new-plan-demand-group-modal-sort-order" min="1" type="number" />
+          </label>
+          <label class="field-stack field-stack--wide">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.remark') }}</span>
+            <textarea v-model="demandGroupDialog.remark" data-testid="customer-new-plan-demand-group-modal-remark" rows="2" />
+          </label>
+        </div>
+        <div class="cta-row">
+          <button class="cta-button" data-testid="customer-new-plan-demand-group-modal-save" type="submit">
+            {{
+              editingDemandGroupDraftId
+                ? $t('sicherplan.customerPlansWizard.actions.updateDemandGroup')
+                : $t('sicherplan.customerPlansWizard.actions.saveDemandGroup')
+            }}
+          </button>
+          <button
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-demand-group-modal-cancel"
+            type="button"
+            @click="closeDemandGroupDialog"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.cancelDemandGroup') }}
+          </button>
+        </div>
+      </form>
+    </Modal>
 
     <Modal
       v-model:open="documentPicker.open"
