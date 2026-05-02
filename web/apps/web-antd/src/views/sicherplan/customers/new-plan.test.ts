@@ -121,6 +121,32 @@ vi.mock('./new-plan-step-content.vue', () => ({
             error: '',
           };
         }
+        if (this.currentStepId === 'series-exceptions') {
+          return {
+            success: true,
+            completedStepId: 'series-exceptions',
+            dirty: false,
+            error: '',
+            savedContext: {
+              order_id: this.wizardState.order_id,
+              shift_plan_id: this.wizardState.shift_plan_id,
+              series_id: this.wizardState.series_id || 'series-1',
+            },
+          };
+        }
+        if (this.currentStepId === 'demand-groups') {
+          return {
+            success: true,
+            completedStepId: 'demand-groups',
+            dirty: false,
+            error: '',
+            savedContext: {
+              order_id: this.wizardState.order_id,
+              shift_plan_id: this.wizardState.shift_plan_id,
+              series_id: this.wizardState.series_id || 'series-1',
+            },
+          };
+        }
         return true;
       },
       selectExistingShiftPlan() {
@@ -294,7 +320,7 @@ describe('CustomerNewPlanWizardView', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
     expect(wrapper.find('[data-testid="customer-new-plan-step-content-stub"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-new-plan-action-bar"]').exists()).toBe(true);
-    expect(wrapper.findAll('.sp-customer-plan-wizard__step')).toHaveLength(6);
+    expect(wrapper.findAll('.sp-customer-plan-wizard__step')).toHaveLength(7);
     expect(wrapper.find('[data-testid="customer-new-plan-step-equipment-lines"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="customer-new-plan-step-requirement-lines"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="customer-new-plan-step-order-documents"]').exists()).toBe(false);
@@ -392,6 +418,41 @@ describe('CustomerNewPlanWizardView', () => {
     await flushPromises();
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('series-exceptions');
+    expect((wrapper.vm as any).wizardState.shift_plan_id).toBe('shift-plan-1');
+  });
+
+  it('falls back from a direct demand-groups URL without shift_plan_id to shift-plan', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+      step: 'demand-groups',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('shift-plan');
+  });
+
+  it('restores a direct valid demand-groups URL when shift_plan_id is present', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'shift-plan-1',
+      series_id: 'series-1',
+      step: 'demand-groups',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('demand-groups');
     expect((wrapper.vm as any).wizardState.shift_plan_id).toBe('shift-plan-1');
   });
 
@@ -964,6 +1025,63 @@ describe('CustomerNewPlanWizardView', () => {
 
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
     expect(routerReplaceMock).not.toHaveBeenCalled();
+  });
+
+  it('advances from series-exceptions to demand-groups after a successful series submission', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'shift-plan-1',
+      series_id: 'series-1',
+      step: 'series-exceptions',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-generate-continue"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('demand-groups');
+    expect(routerReplaceMock).toHaveBeenLastCalledWith({
+      path: '/admin/customers/order-workspace',
+      query: {
+        customer_id: 'customer-1',
+        order_id: 'order-1',
+        planning_entity_id: 'site-1',
+        planning_entity_type: 'site',
+        planning_mode_code: 'site',
+        planning_record_id: 'record-1',
+        shift_plan_id: 'shift-plan-1',
+        series_id: 'series-1',
+        step: 'demand-groups',
+      },
+    });
+  });
+
+  it('keeps the final demand-groups route stable after a successful apply', async () => {
+    routeState.query = {
+      customer_id: 'customer-1',
+      order_id: 'order-1',
+      planning_entity_id: 'site-1',
+      planning_entity_type: 'site',
+      planning_mode_code: 'site',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'shift-plan-1',
+      series_id: 'series-1',
+      step: 'demand-groups',
+    };
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    await wrapper.get('[data-testid="customer-new-plan-complete-demand-groups"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('demand-groups');
+    expect(routeState.query.step).toBe('demand-groups');
   });
 
   it('does not reset from order-details when only the access token changes for the same customer', async () => {

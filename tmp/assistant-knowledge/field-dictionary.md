@@ -43,10 +43,10 @@
   - [page_help_manifest] Assistant Page Help Manifest: P-04 manifest section planning_staffing.filters_and_scope includes field date_from labeled Von.
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field date_from.
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_from.
+  - [typescript_api_interface] DemandGroupBulkApplyRequest: DemandGroupBulkApplyRequest includes field date_from.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_from.
   - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_from.
   - [backend_schema] AssistantFieldReleasedScheduleVisibilityInput: AssistantFieldReleasedScheduleVisibilityInput includes field date_from.
-  - [backend_schema] AssistantShiftVisibilityDiagnosticInput: AssistantShiftVisibilityDiagnosticInput includes field date_from.
 
 ## assignment.date_to
 
@@ -70,10 +70,10 @@
   - [page_help_manifest] Assistant Page Help Manifest: P-04 manifest section planning_staffing.filters_and_scope includes field date_to labeled Bis.
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field date_to.
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_to.
+  - [typescript_api_interface] DemandGroupBulkApplyRequest: DemandGroupBulkApplyRequest includes field date_to.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_to.
   - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_to.
   - [backend_schema] AssistantFieldReleasedScheduleVisibilityInput: AssistantFieldReleasedScheduleVisibilityInput includes field date_to.
-  - [backend_schema] AssistantShiftVisibilityDiagnosticInput: AssistantShiftVisibilityDiagnosticInput includes field date_to.
 
 ## assignment.demand_group_id
 
@@ -2583,10 +2583,10 @@
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.series_exceptions includes field date_from labeled Datum von.
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field date_from.
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_from.
+  - [typescript_api_interface] DemandGroupBulkApplyRequest: DemandGroupBulkApplyRequest includes field date_from.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_from.
   - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_from.
   - [backend_schema] AssistantFieldReleasedScheduleVisibilityInput: AssistantFieldReleasedScheduleVisibilityInput includes field date_from.
-  - [backend_schema] AssistantShiftVisibilityDiagnosticInput: AssistantShiftVisibilityDiagnosticInput includes field date_from.
 
 ## customer_order.date_to
 
@@ -2610,10 +2610,10 @@
   - [page_help_manifest] Assistant Page Help Manifest: C-02 manifest section customer_order_workspace.series_exceptions includes field date_to labeled Datum bis.
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field date_to.
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_to.
+  - [typescript_api_interface] DemandGroupBulkApplyRequest: DemandGroupBulkApplyRequest includes field date_to.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_to.
   - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_to.
   - [backend_schema] AssistantFieldReleasedScheduleVisibilityInput: AssistantFieldReleasedScheduleVisibilityInput includes field date_to.
-  - [backend_schema] AssistantShiftVisibilityDiagnosticInput: AssistantShiftVisibilityDiagnosticInput includes field date_to.
 
 ## customer_order.equipment_lines
 

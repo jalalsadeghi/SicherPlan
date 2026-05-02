@@ -174,6 +174,7 @@ export function useCustomerNewPlanWizard() {
     const orderChanged = nextState.order_id !== state.value.order_id;
     const planningRecordChanged = nextState.planning_record_id !== state.value.planning_record_id;
     const shiftPlanChanged = nextState.shift_plan_id !== state.value.shift_plan_id;
+    const seriesChanged = nextState.series_id !== state.value.series_id;
     const shouldPreservePlanningRecordForPlanningContextChange =
       Boolean(explicitPlanningRecordId && hasExplicitPlanningContext);
     const shouldPreservePlanningRecordForOrderChange =
@@ -214,6 +215,7 @@ export function useCustomerNewPlanWizard() {
         'planning-record-documents',
         'shift-plan',
         'series-exceptions',
+        'demand-groups',
       ]);
       if (!shouldPreservePlanningRecordForPlanningContextChange) {
         invalidateSteps(nextState, ['planning-record-overview']);
@@ -236,6 +238,7 @@ export function useCustomerNewPlanWizard() {
         'planning-record-documents',
         'shift-plan',
         'series-exceptions',
+        'demand-groups',
       ]);
       if (!shouldPreservePlanningRecordForOrderChange) {
         invalidateSteps(nextState, ['planning-record-overview']);
@@ -256,12 +259,17 @@ export function useCustomerNewPlanWizard() {
         'planning-record-documents',
         'shift-plan',
         'series-exceptions',
+        'demand-groups',
       ]);
     }
 
     if (shiftPlanChanged) {
       nextState.series_id = shouldPreserveSeriesForShiftPlanChange ? explicitSeriesId : '';
-      invalidateSteps(nextState, ['series-exceptions']);
+      invalidateSteps(nextState, ['series-exceptions', 'demand-groups']);
+    }
+
+    if (seriesChanged) {
+      invalidateSteps(nextState, ['demand-groups']);
     }
 
     state.value = nextState;

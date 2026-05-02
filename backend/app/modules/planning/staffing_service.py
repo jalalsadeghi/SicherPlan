@@ -27,6 +27,10 @@ from app.modules.planning.schemas import (
     CoverageDemandGroupItem,
     CoverageFilter,
     CoverageShiftItem,
+    DemandGroupBulkApplyRequest,
+    DemandGroupBulkApplyResult,
+    DemandGroupBulkApplyShiftResult,
+    DemandGroupBulkTemplate,
     DemandGroupCreate,
     DemandGroupRead,
     DemandGroupUpdate,
@@ -50,6 +54,7 @@ from app.modules.planning.schemas import (
     TeamMemberUpdate,
     TeamRead,
     TeamUpdate,
+    ShiftListFilter,
     ShiftReleaseValidationRead,
 )
 from app.modules.planning.validation_service import PlanningValidationService
@@ -58,6 +63,7 @@ from app.modules.planning.validation_service import PlanningValidationService
 class StaffingRepository(Protocol):
     def get_shift(self, tenant_id: str, row_id: str) -> Shift | None: ...
     def get_shift_plan(self, tenant_id: str, row_id: str): ...
+    def list_shifts(self, tenant_id: str, filters: ShiftListFilter) -> list[Shift]: ...
     def list_board_shifts(self, tenant_id: str, filters: StaffingBoardFilter) -> list[dict[str, object]]: ...
     def get_function_type(self, tenant_id: str, function_type_id: str): ...
     def get_qualification_type(self, tenant_id: str, qualification_type_id: str): ...
@@ -133,6 +139,155 @@ class StaffingService:
         row = self.repository.create_demand_group(tenant_id, payload, actor.user_id)
         self._record_event(actor, "planning.demand_group.created", "ops.demand_group", row.id, tenant_id, after_json=self._snapshot(row) | {"shift_plan_id": shift.shift_plan_id})
         return DemandGroupRead.model_validate(row)
+
+    def bulk_apply_demand_groups(
+        self,
+        tenant_id: str,
+        payload: DemandGroupBulkApplyRequest,
+        actor: RequestAuthorizationContext,
+    ) -> DemandGroupBulkApplyResult:
+        self._require_tenant_scope(tenant_id, payload.tenant_id)
+        if payload.apply_mode not in {"create_missing", "upsert_matching"}:
+            raise ApiException(400, "planning.demand_group.bulk_apply.invalid_mode", "errors.planning.demand_group.bulk_apply.invalid_mode")
+        if payload.date_from is not None and payload.date_to is not None and payload.date_to < payload.date_from:
+            raise ApiException(400, "planning.demand_group.bulk_apply.invalid_date_window", "errors.planning.demand_group.bulk_apply.invalid_date_window")
+
+        shift_plan = self._require_shift_plan(tenant_id, payload.shift_plan_id)
+        if payload.shift_series_id is not None and all(series.id != payload.shift_series_id for series in getattr(shift_plan, "series_rows", [])):
+            raise ApiException(404, "planning.shift_series.not_found", "errors.planning.shift_series.not_found")
+
+        normalized_templates = self._normalize_bulk_templates(payload.demand_groups)
+        for template in normalized_templates:
+            self._validate_demand_group(template.min_qty, template.target_qty)
+            self._require_function(tenant_id, template.function_type_id)
+            if template.qualification_type_id is not None:
+                self._require_qualification(tenant_id, template.qualification_type_id)
+
+        candidate_shifts = self.repository.list_shifts(
+            tenant_id,
+            ShiftListFilter(shift_plan_id=payload.shift_plan_id, include_archived=False),
+        )
+        target_shifts = [
+            shift
+            for shift in candidate_shifts
+            if shift.source_kind_code == "generated"
+            and (payload.shift_series_id is None or shift.shift_series_id == payload.shift_series_id)
+            and self._shift_in_bulk_date_window(shift, payload.date_from, payload.date_to)
+        ]
+        if not target_shifts:
+            raise ApiException(
+                404,
+                "planning.demand_group.bulk_apply.no_target_shifts",
+                "errors.planning.demand_group.bulk_apply.no_target_shifts",
+            )
+
+        created_count = 0
+        updated_count = 0
+        skipped_count = 0
+        affected_ids: list[str] = []
+        shift_results: list[DemandGroupBulkApplyShiftResult] = []
+
+        for shift in target_shifts:
+            shift_created_count = 0
+            shift_updated_count = 0
+            shift_skipped_count = 0
+            existing_groups = self.repository.list_demand_groups(
+                tenant_id,
+                StaffingFilter(shift_id=shift.id, include_archived=True),
+            )
+            existing_by_sort = {group.sort_order: group for group in existing_groups}
+            for template in normalized_templates:
+                matching_group = existing_by_sort.get(template.sort_order)
+                if matching_group is None:
+                    row = self.repository.create_demand_group(
+                        tenant_id,
+                        DemandGroupCreate(
+                            tenant_id=tenant_id,
+                            shift_id=shift.id,
+                            function_type_id=template.function_type_id,
+                            qualification_type_id=template.qualification_type_id,
+                            min_qty=template.min_qty,
+                            target_qty=template.target_qty,
+                            mandatory_flag=template.mandatory_flag,
+                            sort_order=template.sort_order,
+                            remark=template.remark,
+                        ),
+                        actor.user_id,
+                    )
+                    created_count += 1
+                    shift_created_count += 1
+                    affected_ids.append(row.id)
+                    existing_by_sort[row.sort_order] = row
+                    self._record_event(
+                        actor,
+                        "planning.demand_group.created",
+                        "ops.demand_group",
+                        row.id,
+                        tenant_id,
+                        after_json=self._snapshot(row) | {"shift_plan_id": shift.shift_plan_id},
+                    )
+                    continue
+
+                if payload.apply_mode == "create_missing":
+                    skipped_count += 1
+                    shift_skipped_count += 1
+                    continue
+
+                before_json = self._snapshot(matching_group)
+                row = self.repository.update_demand_group(
+                    tenant_id,
+                    matching_group.id,
+                    DemandGroupUpdate(
+                        function_type_id=template.function_type_id,
+                        qualification_type_id=template.qualification_type_id,
+                        min_qty=template.min_qty,
+                        target_qty=template.target_qty,
+                        mandatory_flag=template.mandatory_flag,
+                        sort_order=template.sort_order,
+                        remark=template.remark,
+                        status="active",
+                        archived_at=None,
+                        version_no=matching_group.version_no,
+                    ),
+                    actor.user_id,
+                )
+                if row is None:
+                    raise self._not_found("demand_group")
+                updated_count += 1
+                shift_updated_count += 1
+                affected_ids.append(row.id)
+                existing_by_sort[row.sort_order] = row
+                self._record_event(
+                    actor,
+                    "planning.demand_group.updated",
+                    "ops.demand_group",
+                    row.id,
+                    tenant_id,
+                    before_json=before_json,
+                    after_json=self._snapshot(row) | {"shift_plan_id": shift.shift_plan_id},
+                )
+            shift_results.append(
+                DemandGroupBulkApplyShiftResult(
+                    shift_id=shift.id,
+                    created_count=shift_created_count,
+                    updated_count=shift_updated_count,
+                    skipped_count=shift_skipped_count,
+                )
+            )
+
+        return DemandGroupBulkApplyResult(
+            tenant_id=tenant_id,
+            shift_plan_id=payload.shift_plan_id,
+            shift_series_id=payload.shift_series_id,
+            apply_mode=payload.apply_mode,
+            target_shift_count=len(target_shifts),
+            template_count=len(normalized_templates),
+            created_count=created_count,
+            updated_count=updated_count,
+            skipped_count=skipped_count,
+            affected_demand_group_ids=affected_ids,
+            results=shift_results,
+        )
 
     def update_demand_group(self, tenant_id: str, demand_group_id: str, payload: DemandGroupUpdate, actor: RequestAuthorizationContext) -> DemandGroupRead:
         current = self._require_demand_group(tenant_id, demand_group_id)
@@ -627,6 +782,27 @@ class StaffingService:
         if target_qty < min_qty:
             raise ApiException(400, "planning.demand_group.invalid_qty_window", "errors.planning.demand_group.invalid_qty_window")
 
+    def _normalize_bulk_templates(self, demand_groups: list[DemandGroupBulkTemplate]) -> list[DemandGroupBulkTemplate]:
+        normalized: list[DemandGroupBulkTemplate] = []
+        used_sort_orders: set[int] = set()
+        next_sort_order = 10
+        for template in demand_groups:
+            sort_order = template.sort_order
+            if sort_order is None:
+                while next_sort_order in used_sort_orders:
+                    next_sort_order += 10
+                sort_order = next_sort_order
+                next_sort_order += 10
+            if sort_order in used_sort_orders:
+                raise ApiException(
+                    409,
+                    "planning.demand_group.bulk_apply.duplicate_sort_order",
+                    "errors.planning.demand_group.bulk_apply.duplicate_sort_order",
+                )
+            used_sort_orders.add(sort_order)
+            normalized.append(template.model_copy(update={"sort_order": sort_order}))
+        return normalized
+
     def _validate_team_scope(self, tenant_id: str, planning_record_id: str | None, shift_id: str | None) -> None:
         if planning_record_id is None and shift_id is None:
             raise ApiException(400, "planning.team.invalid_scope", "errors.planning.team.invalid_scope")
@@ -764,10 +940,25 @@ class StaffingService:
     def _read_team(self, row: Team) -> TeamRead:
         return TeamRead.model_validate(row)
 
+    @staticmethod
+    def _shift_in_bulk_date_window(shift: Shift, date_from: date | None, date_to: date | None) -> bool:
+        shift_date = shift.occurrence_date or shift.starts_at.date()
+        if date_from is not None and shift_date < date_from:
+            return False
+        if date_to is not None and shift_date > date_to:
+            return False
+        return True
+
     def _require_shift(self, tenant_id: str, shift_id: str) -> Shift:
         row = self.repository.get_shift(tenant_id, shift_id)
         if row is None:
             raise self._not_found("shift")
+        return row
+
+    def _require_shift_plan(self, tenant_id: str, shift_plan_id: str):
+        row = self.repository.get_shift_plan(tenant_id, shift_plan_id)
+        if row is None:
+            raise self._not_found("shift_plan")
         return row
 
     def _require_demand_group(self, tenant_id: str, demand_group_id: str) -> DemandGroup:

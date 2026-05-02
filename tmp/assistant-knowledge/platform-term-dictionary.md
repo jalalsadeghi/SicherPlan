@@ -3037,7 +3037,7 @@
 - labels_en: Demand group, Demand groups, No demand groups exist for this shift., This shift is visible in coverage, but it cannot be staffed until at least one demand group is created., Select demand group, Demand group setup, Create demand group, Edit demand group, Create the staffing slots required for this shift here. Assign/Substitute becomes meaningfully available afterwards., New demand group, Edit selected demand group, Save demand group, Update demand group, Function type, Qualification, Minimum quantity, Target quantity, Sort order, Controls the ordering of demand groups in staffing views and derived outputs., Mark demand group as mandatory, Mandatory demand groups feed directly into the staffing and release expectation for this shift., Remark, Staffing actions are blocked until this shift has at least one demand group.
 - definition_de: Demand Groups sind Bedarfsgruppen bzw. Staffing-Slots fuer eine Schicht. Sie definieren benoetigten Funktionstyp, optionale Qualifikation, Mindest- und Zielmenge, Sortierung und Pflichtstatus. Eine Schicht kann erst sinnvoll staffed werden, wenn mindestens eine Demand Group angelegt wurde.
 - definition_en: Demand groups are staffing requirement groups for a shift. They define which function type is needed, which qualification may be required, the minimum and target quantity, ordering, and whether the group is mandatory. A shift cannot be staffed meaningfully until at least one demand group exists.
-- related_terms: assignment, function type, mandatory demand group, minimum quantity, qualification, shift coverage, staffing actions, target quantity
+- related_terms: assignment, function type, mandatory demand group, minimum quantity, qualification, shift coverage, target quantity
 - aliases: Ausgewaehlte Demand Group bearbeiten, Bemerkung, Controls the ordering of demand groups in staffing views and derived outputs., Create demand group, Create the staffing slots required for this shift here. Assign/Substitute becomes meaningfully available afterwards., Demand Group, Demand Group aktualisieren, Demand Group als verpflichtend markieren, Demand Group anlegen, Demand Group auswaehlen, Demand Group bearbeiten, Demand Group speichern, Demand Groups, Demand group, Demand group setup, Demand groups, Demand-Group-Setup, Diese Schicht ist im Coverage sichtbar, kann aber erst staffed werden, nachdem mindestens eine Demand Group angelegt wurde., Edit demand group, Edit selected demand group, Fuer diese Schicht gibt es keine Demand Groups., Function type, Funktionstyp, Legen Sie hier die benoetigten Staffing-Slots fuer diese Schicht an. Danach werden Assign/Substitute wieder sinnvoll nutzbar., Mandatory demand groups feed directly into the staffing and release expectation for this shift., Mark demand group as mandatory, Mindestmenge, Minimum quantity, Neue Demand Group, New demand group, No demand groups exist for this shift., Qualification, Qualifikation, Remark, Save demand group, Select demand group, Sort order, Sortierung, Staffing actions are blocked until this shift has at least one demand group., Staffing-Aktionen sind blockiert, bis die Schicht mindestens eine Demand Group hat., Steuert die Reihenfolge der Demand Groups in Staffing-Ansichten und abgeleiteten Outputs., Target quantity, This shift is visible in coverage, but it cannot be staffed until at least one demand group is created., Update demand group, Verpflichtende Demand Groups zaehlen direkt in die Staffing- und Release-Erwartung dieser Schicht., Zielmenge, demand group, demand group setup, demand groups, demand-group, demandGroupCreateAction, demandGroupCreateTitle, demandGroupEditSelectedAction, demandGroupEditTitle, demandGroupEditorTitle, demandGroupFunctionType, demandGroupMandatoryFlag, demandGroupMandatoryHint, demandGroupMinQty, demandGroupPlaceholder, demandGroupQualificationType, demandGroupRemark, demandGroupSaveAction, demandGroupSetupLead, demandGroupSortOrder, demandGroupSortOrderHint, demandGroupTargetQty, demandGroupUpdateAction, demandGroupsEmpty, demandGroupsSetupRequired, demandGroupsTitle, fieldsDemandGroup, staffingActionsDemandGroupRequired
 - source_basis:
   - [backend_schema] schemas.py: Planning schemas define demand groups with function_type_id, qualification_type_id, min_qty, target_qty, sort_order, mandatory_flag, and remark.
@@ -3048,6 +3048,162 @@
   - [frontend_i18n_label] planningStaffing.messages.ts: demandGroupCreateAction defines the visible UI term in planningStaffing.messages.ts.
   - [frontend_i18n_label] planningStaffing.messages.ts: demandGroupCreateTitle defines the visible UI term in planningStaffing.messages.ts.
   - [frontend_i18n_label] planningStaffing.messages.ts: demandGroupEditSelectedAction defines the visible UI term in planningStaffing.messages.ts.
+
+## planning.staffing.dispatch_messages
+
+- canonical_name: dispatch_messages
+- module_key: planning
+- page_id: P-04
+- concept_type: staffing_concept
+- ui_term_type: domain_concept
+- route_names: SicherPlanPlanningStaffing
+- ui_contexts: Message preview, Outputs Dispatch, Outputs and dispatch, Recipient queueing, dispatch Audience Employees, dispatch Audience Subcontractors, dispatch No Recipients, dispatch Preview Action, dispatch Queue Action, dispatch Queued Success, dispatch Recipients, dispatch Title
+- labels_de: Dispatch Nachrichten, Dispatch-Nachrichten, Outputs und Dispatch, Vorschau laden, Nachricht queueen, Zugewiesene Mitarbeiter, Freigegebene Partner, Empfaenger, Die Dispatch-Nachricht wurde an die Outbox uebergeben., Fuer die gewaehlte Nachricht wurden keine zulaessigen Empfaenger gefunden.
+- labels_en: Dispatch messages, Outputs and dispatch, Load preview, Queue message, Assigned employees, Released partners, Recipients, The dispatch message was handed off to the outbox., No permitted recipients were found for the selected message.
+- definition_de: Dispatch-Nachrichten sind die verifizierten ausgehenden Staffing-Nachrichten fuer die ausgewaehlte Schicht. Sie zeigen Vorschau und Queueing fuer zugewiesene Mitarbeiter oder freigegebene Partner, sobald Freigabevoraussetzungen und Empfaenger passen.
+- definition_en: Dispatch messages are the verified outbound staffing messages for the selected shift. They preview and queue messages to assigned employees or released partners after release requirements and permitted recipients are satisfied.
+- related_terms: dispatch, outputs, recipients, release
+- aliases: Assigned employees, Die Dispatch-Nachricht wurde an die Outbox uebergeben., Dispatch messages, Dispatch-Nachrichten, Empfaenger, Freigegebene Partner, Fuer die gewaehlte Nachricht wurden keine zulaessigen Empfaenger gefunden., Load preview, Nachricht queueen, No permitted recipients were found for the selected message., Outputs and dispatch, Outputs und Dispatch, Queue message, Recipients, Released partners, The dispatch message was handed off to the outbox., Vorschau laden, Zugewiesene Mitarbeiter, detailTabOutputsDispatch, dispatch message, dispatch messages, dispatch nachrichten, dispatch-nachrichten, dispatchAudienceEmployees, dispatchAudienceSubcontractors, dispatchNoRecipients, dispatchPreviewAction, dispatchQueueAction, dispatchQueuedSuccess, dispatchRecipients, dispatchTitle
+- source_basis:
+  - [frontend_i18n_label] planningStaffing.messages.ts: detailTabOutputsDispatch defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: dispatchAudienceEmployees defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: dispatchAudienceSubcontractors defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: dispatchNoRecipients defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: dispatchPreviewAction defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: dispatchQueueAction defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: dispatchQueuedSuccess defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: dispatchRecipients defines the visible UI term in planningStaffing.messages.ts.
+
+## planning.staffing.mandatory_proofs
+
+- canonical_name: mandatory_proofs
+- module_key: planning
+- page_id: P-04
+- concept_type: staffing_concept
+- ui_term_type: domain_concept
+- route_names: SicherPlanPlanningStaffing
+- ui_contexts: Assignment validations, Mandatory Documents, Release validations
+- labels_de: Pflichtnachweise, Pflichtnachweise fehlen
+- labels_en: Mandatory documents, Mandatory proofs, Mandatory proofs are missing
+- definition_de: Pflichtnachweise sind die erforderlichen Qualifikations- oder Dokumentnachweise fuer den Staffing-Ablauf. Wenn sie fehlen oder zum Schichtzeitpunkt nicht gueltig sind, koennen Validierungen Zuweisung, Freigabe oder Folge-Sichtbarkeit blockieren.
+- definition_en: Mandatory proofs are the required qualification or document evidences for the staffing flow. If they are missing or not valid at the shift time, validations can block assignment, release, or downstream visibility.
+- related_terms: assignment validations, documents, qualification, release gates
+- aliases: Mandatory proofs are missing, Pflichtnachweise fehlen, mandatory documents, mandatory proof, mandatory proofs, pflichtnachweise, ruleMandatoryDocuments
+- source_basis:
+  - [frontend_i18n_label] planningStaffing.messages.ts: ruleMandatoryDocuments defines the visible UI term in planningStaffing.messages.ts.
+
+## planning.staffing.minimum_staffing
+
+- canonical_name: minimum_staffing
+- module_key: planning
+- page_id: P-04
+- concept_type: staffing_concept
+- ui_term_type: domain_concept
+- route_names: SicherPlanPlanningStaffing
+- ui_contexts: Coverage validations, Minimum Staffing, Release validations
+- labels_de: Mindestbesetzung, Mindestbesetzung nicht erreicht
+- labels_en: Minimum staffing, Minimum staffing not reached
+- definition_de: Mindestbesetzung ist die untere Besetzungsschwelle einer Schicht. Wenn das geforderte Minimum nicht erreicht ist, koennen Validierungen die Freigabe blockieren oder anzeigen, dass die Schicht operativ noch unterdeckt ist.
+- definition_en: Minimum staffing is the lower staffing threshold for the shift. If the required minimum is not met, validations can block release or indicate that the shift is still operationally under-covered.
+- related_terms: assigned, confirmed, demand groups, target quantity
+- aliases: Mindestbesetzung nicht erreicht, Minimum staffing not reached, mindestbesetzung, minimum staffing, minimum staffing not reached, ruleMinimumStaffing
+- source_basis:
+  - [frontend_i18n_label] planningStaffing.messages.ts: ruleMinimumStaffing defines the visible UI term in planningStaffing.messages.ts.
+
+## planning.staffing.override_evidence
+
+- canonical_name: override_evidence
+- module_key: planning
+- page_id: P-04
+- concept_type: staffing_concept
+- ui_term_type: domain_concept
+- route_names: SicherPlanPlanningStaffing
+- ui_contexts: Append-only evidence, Assignment validations, Override recording, assignment Overrides Empty, assignment Overrides Title, override Action, override Hint, override Reason Label, override Reason Placeholder, override Title, override Unavailable, workspace Loading Override
+- labels_de: Override Nachweise, Override-Nachweise, Override wird gespeichert., Fuer diese Zuweisung wurden noch keine Overrides erfasst., Override erfassen, Begruendung, Begruendung fuer den zugelassenen Override erfassen, Override speichern, Overrides bleiben append-only und duerfen nur fuer backend-freigegebene Blocker erfasst werden., Diese Regel darf nicht uebersteuert werden.
+- labels_en: Override evidence, Saving override., No overrides have been recorded for this assignment yet., Record override, Reason, Capture the reason for the permitted override, Save override, Overrides remain append-only and may only be recorded for backend-approved blockers., This rule cannot be overridden.
+- definition_de: Override-Nachweise sind die append-only Nachweise dafuer, warum ein backend-freigegebener Staffing-Blocker uebersteuert wurde. Sie dokumentieren die Begruendung, halten den Override revisionssicher fest und loeschen das urspruengliche Validierungsergebnis nicht.
+- definition_en: Override evidence is the append-only record explaining why a backend-approved staffing blocker was overridden. It documents the reason, keeps the override auditable, and does not delete the original validation result.
+- related_terms: assignment validations, backend-approved blocker, override, reason
+- aliases: Begruendung, Begruendung fuer den zugelassenen Override erfassen, Capture the reason for the permitted override, Diese Regel darf nicht uebersteuert werden., Fuer diese Zuweisung wurden noch keine Overrides erfasst., No overrides have been recorded for this assignment yet., Override erfassen, Override evidence, Override speichern, Override wird gespeichert., Override-Nachweise, Overrides bleiben append-only und duerfen nur fuer backend-freigegebene Blocker erfasst werden., Overrides remain append-only and may only be recorded for backend-approved blockers., Reason, Record override, Save override, Saving override., This rule cannot be overridden., assignmentOverridesEmpty, assignmentOverridesTitle, override evidence, override nachweise, override proof, override proofs, override-nachweise, overrideAction, overrideHint, overrideReasonLabel, overrideReasonPlaceholder, overrideTitle, overrideUnavailable, workspaceLoadingOverride
+- source_basis:
+  - [frontend_i18n_label] planningStaffing.messages.ts: assignmentOverridesEmpty defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: assignmentOverridesTitle defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: overrideAction defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: overrideHint defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: overrideReasonLabel defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: overrideReasonPlaceholder defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: overrideTitle defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: overrideUnavailable defines the visible UI term in planningStaffing.messages.ts.
+
+## planning.staffing.partner_releases
+
+- canonical_name: partner_releases
+- module_key: planning
+- page_id: P-04
+- concept_type: staffing_concept
+- ui_term_type: domain_concept
+- route_names: SicherPlanPlanningStaffing
+- ui_contexts: Released, Released partners, Staffing Coverage, Teams Releases, Teams and partner releases, assignment Source Subcontractor Release, subcontractor Releases Empty, subcontractor Releases Title, team Release Title
+- labels_de: Partnerfreigaben, Teams und Partnerfreigaben, Partnerfreigabe, Fuer diese Schicht wurden noch keine Partnerfreigaben gefunden.
+- labels_en: Partner releases, Subcontractor releases, Teams and partner releases, Partner release, Subcontractor release, Teams and subcontractor releases, No subcontractor releases were found for this shift yet.
+- definition_de: Partnerfreigaben sind die verifizierten Subunternehmer-Freigaben fuer eine Schicht. Sie zeigen, welcher Partner oder welcher Partner-Mitarbeiter in den Staffing-Ablauf freigegeben wurde und ob die Partnerfolgeprozesse weiterlaufen duerfen.
+- definition_en: Partner releases are the verified subcontractor-release records for a shift. They show which partner or partner worker has been released into the staffing flow and whether partner-side follow-up can proceed.
+- related_terms: released partners, subcontractor releases, team releases, visibility
+- aliases: Fuer diese Schicht wurden noch keine Partnerfreigaben gefunden., No subcontractor releases were found for this shift yet., Partner release, Partnerfreigabe, Partnerfreigaben, Subcontractor release, Subcontractor releases, Teams and partner releases, Teams and subcontractor releases, Teams und Partnerfreigaben, assignmentSourceSubcontractorRelease, columnReleased, detailTabTeamsReleases, partner freigaben, partner releases, partnerfreigaben, subcontractor releases, subcontractorReleasesEmpty, subcontractorReleasesTitle, teamReleaseTitle
+- source_basis:
+  - [frontend_i18n_label] planningStaffing.messages.ts: assignmentSourceSubcontractorRelease defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: columnReleased defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: detailTabTeamsReleases defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: subcontractorReleasesEmpty defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: subcontractorReleasesTitle defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: teamReleaseTitle defines the visible UI term in planningStaffing.messages.ts.
+
+## planning.staffing.release_gates
+
+- canonical_name: release_gates
+- module_key: planning
+- page_id: P-04
+- concept_type: staffing_concept
+- ui_term_type: domain_concept
+- route_names: SicherPlanPlanningStaffing
+- ui_contexts: Release state and visibility, Release validations, Staffing Coverage, dispatch Release Required, output Release Required, release Action, release Blocked, release State Title, validation Title, visibility Requires Release
+- labels_de: Release Gates, Release-Gates, Kunden- oder Subunternehmer-Sichtbarkeit ist erst nach Freigabe erlaubt., Release-Validierungen, Freigabestatus und Sichtbarkeit, Freigeben, Kunden- oder Partneransicht setzt eine freigegebene Schicht voraus., Dokumente koennen erst nach Freigabe erzeugt werden., Dispatch-Nachrichten koennen erst nach Freigabe versendet werden., Die Freigabe ist durch Validierungen blockiert.
+- labels_en: Release gates, Release-Gates, Customer or subcontractor visibility requires a released shift., Release validations, Release state and visibility, Release, Customer or partner visibility requires a released shift., Outputs can only be generated after release., Dispatch messages can only be sent after release., The release is blocked by validation issues.
+- definition_de: Release-Gates sind die freigabeabhaengigen Pruefungen in Staffing Coverage. Sie steuern, ob eine Schicht freigegeben, sichtbar gemacht, fuer Outputs verwendet oder fuer Dispatch genutzt werden darf. Solange ein Gate blockiert, bleiben Folgeaktionen gesperrt.
+- definition_en: Release gates are the release-dependent checks in Staffing Coverage. They determine whether a shift may be released, made visible, used for outputs, or used for dispatch. If a gate is still failing, downstream actions stay blocked.
+- related_terms: dispatch messages, outputs, release, validations, visibility
+- aliases: Customer or partner visibility requires a released shift., Customer or subcontractor visibility requires a released shift., Die Freigabe ist durch Validierungen blockiert., Dispatch messages can only be sent after release., Dispatch-Nachrichten koennen erst nach Freigabe versendet werden., Dokumente koennen erst nach Freigabe erzeugt werden., Freigabestatus und Sichtbarkeit, Freigeben, Kunden- oder Partneransicht setzt eine freigegebene Schicht voraus., Kunden- oder Subunternehmer-Sichtbarkeit ist erst nach Freigabe erlaubt., Outputs can only be generated after release., Release, Release state and visibility, Release validations, Release-Validierungen, The release is blocked by validation issues., dispatchReleaseRequired, freigabegates, freigabesperren, outputReleaseRequired, release gates, release-gates, releaseAction, releaseBlocked, releaseStateTitle, validationTitle, visibilityRequiresRelease
+- source_basis:
+  - [frontend_i18n_label] planningShifts.messages.ts: visibilityRequiresRelease defines the visible UI term in planningShifts.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: dispatchReleaseRequired defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: outputReleaseRequired defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: releaseAction defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: releaseBlocked defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: releaseStateTitle defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: validationTitle defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: visibilityRequiresRelease defines the visible UI term in planningStaffing.messages.ts.
+
+## planning.staffing.staffing_actions
+
+- canonical_name: staffing_actions
+- module_key: planning
+- page_id: P-04
+- concept_type: staffing_concept
+- ui_term_type: domain_concept
+- route_names: SicherPlanPlanningStaffing
+- ui_contexts: Assignment actions, Demand and staffing tab, Staffing Coverage, assign Action, staffing Actions Hint, staffing Actions Title, substitute Action, unassign Action
+- labels_de: Staffing Aktionen, Staffing-Aktionen, Zuweisung, Ersatz und Entfernen nutzen die echten Staffing-Board-Kommandos und laden Coverage danach neu., Zuweisen, Ersetzen, Entfernen
+- labels_en: Staffing actions, Assign, substitute, and remove use the real staffing-board commands and refresh coverage afterwards., Assign, Substitute, Remove
+- definition_de: Staffing-Aktionen sind die verifizierten Besetzungsaktionen in Staffing Coverage. Damit kann der Nutzer fuer die ausgewaehlte Schicht und Demand Group zuweisen, ersetzen oder entfernen, sobald Setup und Validierungen passen.
+- definition_en: Staffing actions are the verified assignment commands in Staffing Coverage. They let the user assign, substitute, or remove staffing for the selected shift and demand group after the required setup and validations are satisfied.
+- related_terms: assignment, demand groups, shift coverage, substitute, unassign
+- aliases: Assign, Assign, substitute, and remove use the real staffing-board commands and refresh coverage afterwards., Entfernen, Ersetzen, Remove, Staffing actions, Staffing-Aktionen, Substitute, Zuweisen, Zuweisung, Ersatz und Entfernen nutzen die echten Staffing-Board-Kommandos und laden Coverage danach neu., assign, assignAction, staffing actions, staffing aktionen, staffing-aktionen, staffingActionsHint, staffingActionsTitle, substitute, substituteAction, unassign, unassignAction
+- source_basis:
+  - [frontend_i18n_label] planningStaffing.messages.ts: assignAction defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: staffingActionsHint defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: staffingActionsTitle defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: substituteAction defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_i18n_label] planningStaffing.messages.ts: unassignAction defines the visible UI term in planningStaffing.messages.ts.
 
 ## planning.staffing_workspace.
 
@@ -3084,24 +3240,6 @@
 - aliases: Actor kind, Aktor-Typ, fieldsActorKind
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: fieldsActorKind defines the visible UI term in planningStaffing.messages.ts.
-
-## planning.staffing_workspace.assign
-
-- canonical_name: assign
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: action_label
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: assign Action
-- labels_de: Zuweisen
-- labels_en: Assign
-- definition_de: Zuweisen ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Assign is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Assign, Zuweisen, assignAction
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: assignAction defines the visible UI term in planningStaffing.messages.ts.
 
 ## planning.staffing_workspace.assignment
 
@@ -3249,25 +3387,6 @@
 - aliases: Open validations, Validierungen anzeigen, assignmentOpenValidationsAction
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: assignmentOpenValidationsAction defines the visible UI term in planningStaffing.messages.ts.
-
-## planning.staffing_workspace.assignment_override
-
-- canonical_name: assignment_override
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: section_title
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: assignment Overrides Empty, assignment Overrides Title
-- labels_de: Override-Nachweise, Fuer diese Zuweisung wurden noch keine Overrides erfasst.
-- labels_en: Override evidence, No overrides have been recorded for this assignment yet.
-- definition_de: Override-Nachweise ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Override evidence is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Fuer diese Zuweisung wurden noch keine Overrides erfasst., No overrides have been recorded for this assignment yet., Override evidence, Override-Nachweise, assignmentOverridesEmpty, assignmentOverridesTitle
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: assignmentOverridesEmpty defines the visible UI term in planningStaffing.messages.ts.
-  - [frontend_i18n_label] planningStaffing.messages.ts: assignmentOverridesTitle defines the visible UI term in planningStaffing.messages.ts.
 
 ## planning.staffing_workspace.assignment_reset
 
@@ -3506,24 +3625,6 @@
 - aliases: Planning, Planung, columnPlanning
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: columnPlanning defines the visible UI term in planningStaffing.messages.ts.
-
-## planning.staffing_workspace.column_released
-
-- canonical_name: column_released
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: column_label
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: Released
-- labels_de: Partnerfreigabe
-- labels_en: Partner release
-- definition_de: Partnerfreigabe ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Partner release is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Partner release, Partnerfreigabe, columnReleased
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: columnReleased defines the visible UI term in planningStaffing.messages.ts.
 
 ## planning.staffing_workspace.column_target
 
@@ -3797,60 +3898,23 @@
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: detailTitle defines the visible UI term in planningStaffing.messages.ts.
 
-## planning.staffing_workspace.dispatch
-
-- canonical_name: dispatch
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: section_title
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: dispatch Title
-- labels_de: Dispatch-Nachrichten
-- labels_en: Dispatch messages
-- definition_de: Dispatch-Nachrichten ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Dispatch messages is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Dispatch messages, Dispatch-Nachrichten, dispatchTitle
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: dispatchTitle defines the visible UI term in planningStaffing.messages.ts.
-
 ## planning.staffing_workspace.dispatch_preview
 
 - canonical_name: dispatch_preview
 - module_key: planning
 - page_id: P-04
-- concept_type: ui_term
-- ui_term_type: action_label
+- concept_type: domain_concept
+- ui_term_type: empty_state
 - route_names: SicherPlanPlanningStaffing
-- ui_contexts: dispatch Preview Action, dispatch Preview Empty
-- labels_de: Vorschau laden, Noch keine Vorschau geladen.
-- labels_en: Load preview, No preview loaded yet.
-- definition_de: Vorschau laden ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Load preview is a verified visible SicherPlan UI term in the staffing_workspace context.
+- ui_contexts: dispatch Preview Empty
+- labels_de: Noch keine Vorschau geladen.
+- labels_en: No preview loaded yet.
+- definition_de: Noch keine Vorschau geladen. ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
+- definition_en: No preview loaded yet. is a verified visible SicherPlan UI term in the staffing_workspace context.
 - related_terms: none
-- aliases: Load preview, No preview loaded yet., Noch keine Vorschau geladen., Vorschau laden, dispatchPreviewAction, dispatchPreviewEmpty
+- aliases: No preview loaded yet., Noch keine Vorschau geladen., dispatchPreviewEmpty
 - source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: dispatchPreviewAction defines the visible UI term in planningStaffing.messages.ts.
   - [frontend_i18n_label] planningStaffing.messages.ts: dispatchPreviewEmpty defines the visible UI term in planningStaffing.messages.ts.
-
-## planning.staffing_workspace.dispatch_queue
-
-- canonical_name: dispatch_queue
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: action_label
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: dispatch Queue Action
-- labels_de: Nachricht queueen
-- labels_en: Queue message
-- definition_de: Nachricht queueen ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Queue message is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Nachricht queueen, Queue message, dispatchQueueAction
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: dispatchQueueAction defines the visible UI term in planningStaffing.messages.ts.
 
 ## planning.staffing_workspace.edit_team
 
@@ -3997,63 +4061,6 @@
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: outputsEmpty defines the visible UI term in planningStaffing.messages.ts.
   - [frontend_i18n_label] planningStaffing.messages.ts: outputsTitle defines the visible UI term in planningStaffing.messages.ts.
-
-## planning.staffing_workspace.outputs_dispatch
-
-- canonical_name: outputs_dispatch
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: tab_title
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: Outputs Dispatch
-- labels_de: Outputs und Dispatch
-- labels_en: Outputs and dispatch
-- definition_de: Outputs und Dispatch ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Outputs and dispatch is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Outputs and dispatch, Outputs und Dispatch, detailTabOutputsDispatch
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: detailTabOutputsDispatch defines the visible UI term in planningStaffing.messages.ts.
-
-## planning.staffing_workspace.override
-
-- canonical_name: override
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: section_title
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: override Action, override Hint, override Title
-- labels_de: Override erfassen, Override speichern, Overrides bleiben append-only und duerfen nur fuer backend-freigegebene Blocker erfasst werden.
-- labels_en: Record override, Save override, Overrides remain append-only and may only be recorded for backend-approved blockers.
-- definition_de: Override erfassen ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Record override is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Override erfassen, Override speichern, Overrides bleiben append-only und duerfen nur fuer backend-freigegebene Blocker erfasst werden., Overrides remain append-only and may only be recorded for backend-approved blockers., Record override, Save override, overrideAction, overrideHint, overrideTitle
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: overrideAction defines the visible UI term in planningStaffing.messages.ts.
-  - [frontend_i18n_label] planningStaffing.messages.ts: overrideHint defines the visible UI term in planningStaffing.messages.ts.
-  - [frontend_i18n_label] planningStaffing.messages.ts: overrideTitle defines the visible UI term in planningStaffing.messages.ts.
-
-## planning.staffing_workspace.override_reason
-
-- canonical_name: override_reason
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: field_label
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: override Reason Label, override Reason Placeholder
-- labels_de: Begruendung, Begruendung fuer den zugelassenen Override erfassen
-- labels_en: Reason, Capture the reason for the permitted override
-- definition_de: Begruendung ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Reason is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Begruendung, Begruendung fuer den zugelassenen Override erfassen, Capture the reason for the permitted override, Reason, overrideReasonLabel, overrideReasonPlaceholder
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: overrideReasonLabel defines the visible UI term in planningStaffing.messages.ts.
-  - [frontend_i18n_label] planningStaffing.messages.ts: overrideReasonPlaceholder defines the visible UI term in planningStaffing.messages.ts.
 
 ## planning.staffing_workspace.planning_context
 
@@ -4239,42 +4246,6 @@
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: filtersPlanningRecordNoMatchShort defines the visible UI term in planningStaffing.messages.ts.
 
-## planning.staffing_workspace.release
-
-- canonical_name: release
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: action_label
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: release Action
-- labels_de: Freigeben
-- labels_en: Release
-- definition_de: Freigeben ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Release is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Freigeben, Release, releaseAction
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: releaseAction defines the visible UI term in planningStaffing.messages.ts.
-
-## planning.staffing_workspace.release_state
-
-- canonical_name: release_state
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: section_title
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: release State Title
-- labels_de: Freigabestatus und Sichtbarkeit
-- labels_en: Release state and visibility
-- definition_de: Freigabestatus und Sichtbarkeit ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Release state and visibility is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Freigabestatus und Sichtbarkeit, Release state and visibility, releaseStateTitle
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: releaseStateTitle defines the visible UI term in planningStaffing.messages.ts.
-
 ## planning.staffing_workspace.remark
 
 - canonical_name: remark
@@ -4401,24 +4372,6 @@
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: ruleFunctionMatch defines the visible UI term in planningStaffing.messages.ts.
 
-## planning.staffing_workspace.rule_mandatory_document
-
-- canonical_name: rule_mandatory_document
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: validation_rule
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: Mandatory Documents
-- labels_de: Pflichtnachweise fehlen
-- labels_en: Mandatory proofs are missing
-- definition_de: Pflichtnachweise fehlen ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Mandatory proofs are missing is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Mandatory proofs are missing, Pflichtnachweise fehlen, ruleMandatoryDocuments
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: ruleMandatoryDocuments defines the visible UI term in planningStaffing.messages.ts.
-
 ## planning.staffing_workspace.rule_max_hour
 
 - canonical_name: rule_max_hour
@@ -4436,24 +4389,6 @@
 - aliases: Maximalstunden ueberschritten, Maximum hours exceeded, ruleMaxHours
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: ruleMaxHours defines the visible UI term in planningStaffing.messages.ts.
-
-## planning.staffing_workspace.rule_minimum_staffing
-
-- canonical_name: rule_minimum_staffing
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: validation_rule
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: Minimum Staffing
-- labels_de: Mindestbesetzung nicht erreicht
-- labels_en: Minimum staffing not reached
-- definition_de: Mindestbesetzung nicht erreicht ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Minimum staffing not reached is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Mindestbesetzung nicht erreicht, Minimum staffing not reached, ruleMinimumStaffing
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: ruleMinimumStaffing defines the visible UI term in planningStaffing.messages.ts.
 
 ## planning.staffing_workspace.rule_not_found
 
@@ -4546,25 +4481,6 @@
   - [frontend_i18n_label] planningStaffing.messages.ts: sessionHint defines the visible UI term in planningStaffing.messages.ts.
   - [frontend_i18n_label] planningStaffing.messages.ts: sessionTitle defines the visible UI term in planningStaffing.messages.ts.
 
-## planning.staffing_workspace.staffing_action
-
-- canonical_name: staffing_action
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: section_title
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: staffing Actions Hint, staffing Actions Title
-- labels_de: Staffing-Aktionen, Zuweisung, Ersatz und Entfernen nutzen die echten Staffing-Board-Kommandos und laden Coverage danach neu.
-- labels_en: Staffing actions, Assign, substitute, and remove use the real staffing-board commands and refresh coverage afterwards.
-- definition_de: Staffing-Aktionen ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Staffing actions is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Assign, substitute, and remove use the real staffing-board commands and refresh coverage afterwards., Staffing actions, Staffing-Aktionen, Zuweisung, Ersatz und Entfernen nutzen die echten Staffing-Board-Kommandos und laden Coverage danach neu., staffingActionsHint, staffingActionsTitle
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: staffingActionsHint defines the visible UI term in planningStaffing.messages.ts.
-  - [frontend_i18n_label] planningStaffing.messages.ts: staffingActionsTitle defines the visible UI term in planningStaffing.messages.ts.
-
 ## planning.staffing_workspace.status_green
 
 - canonical_name: status_green
@@ -4637,25 +4553,6 @@
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: statusYellow defines the visible UI term in planningStaffing.messages.ts.
 
-## planning.staffing_workspace.subcontractor_release
-
-- canonical_name: subcontractor_release
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: section_title
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: subcontractor Releases Empty, subcontractor Releases Title
-- labels_de: Partnerfreigaben, Fuer diese Schicht wurden noch keine Partnerfreigaben gefunden.
-- labels_en: Subcontractor releases, No subcontractor releases were found for this shift yet.
-- definition_de: Partnerfreigaben ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Subcontractor releases is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Fuer diese Schicht wurden noch keine Partnerfreigaben gefunden., No subcontractor releases were found for this shift yet., Partnerfreigaben, Subcontractor releases, subcontractorReleasesEmpty, subcontractorReleasesTitle
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: subcontractorReleasesEmpty defines the visible UI term in planningStaffing.messages.ts.
-  - [frontend_i18n_label] planningStaffing.messages.ts: subcontractorReleasesTitle defines the visible UI term in planningStaffing.messages.ts.
-
 ## planning.staffing_workspace.subcontractor_visibility
 
 - canonical_name: subcontractor_visibility
@@ -4691,24 +4588,6 @@
 - aliases: Subcontractor worker, Subunternehmer-Mitarbeiter, fieldsSubcontractorWorker
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: fieldsSubcontractorWorker defines the visible UI term in planningStaffing.messages.ts.
-
-## planning.staffing_workspace.substitute
-
-- canonical_name: substitute
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: action_label
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: substitute Action
-- labels_de: Ersetzen
-- labels_en: Substitute
-- definition_de: Ersetzen ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Substitute is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Ersetzen, Substitute, substituteAction
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: substituteAction defines the visible UI term in planningStaffing.messages.ts.
 
 ## planning.staffing_workspace.team
 
@@ -5077,24 +4956,6 @@
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: teamPlanningRecordIdHint defines the visible UI term in planningStaffing.messages.ts.
 
-## planning.staffing_workspace.team_release
-
-- canonical_name: team_release
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: section_title
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: team Release Title
-- labels_de: Teams und Partnerfreigaben
-- labels_en: Teams and subcontractor releases
-- definition_de: Teams und Partnerfreigaben ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Teams and subcontractor releases is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Teams and subcontractor releases, Teams und Partnerfreigaben, teamReleaseTitle
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: teamReleaseTitle defines the visible UI term in planningStaffing.messages.ts.
-
 ## planning.staffing_workspace.team_role
 
 - canonical_name: team_role
@@ -5167,24 +5028,6 @@
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: teamUpdateAction defines the visible UI term in planningStaffing.messages.ts.
 
-## planning.staffing_workspace.teams_release
-
-- canonical_name: teams_release
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: tab_title
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: Teams Releases
-- labels_de: Teams und Partnerfreigaben
-- labels_en: Teams and partner releases
-- definition_de: Teams und Partnerfreigaben ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Teams and partner releases is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Teams and partner releases, Teams und Partnerfreigaben, detailTabTeamsReleases
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: detailTabTeamsReleases defines the visible UI term in planningStaffing.messages.ts.
-
 ## planning.staffing_workspace.tenant_scope
 
 - canonical_name: tenant_scope
@@ -5202,24 +5045,6 @@
 - aliases: Mandant, Tenant, tenantScopeLabel
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: tenantScopeLabel defines the visible UI term in planningStaffing.messages.ts.
-
-## planning.staffing_workspace.unassign
-
-- canonical_name: unassign
-- module_key: planning
-- page_id: P-04
-- concept_type: ui_term
-- ui_term_type: action_label
-- route_names: SicherPlanPlanningStaffing
-- ui_contexts: unassign Action
-- labels_de: Entfernen
-- labels_en: Remove
-- definition_de: Entfernen ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
-- definition_en: Remove is a verified visible SicherPlan UI term in the staffing_workspace context.
-- related_terms: none
-- aliases: Entfernen, Remove, unassignAction
-- source_basis:
-  - [frontend_i18n_label] planningStaffing.messages.ts: unassignAction defines the visible UI term in planningStaffing.messages.ts.
 
 ## planning.staffing_workspace.unassigned
 
@@ -5265,17 +5090,16 @@
 - concept_type: ui_term
 - ui_term_type: tab_title
 - route_names: SicherPlanPlanningStaffing
-- ui_contexts: Validations, validation Empty, validation Title
-- labels_de: Validierungen, Release-Validierungen, Fuer die ausgewaehlte Schicht liegen keine Validierungsprobleme vor.
-- labels_en: Validations, Release validations, No validation issues exist for the selected shift.
+- ui_contexts: Validations, validation Empty
+- labels_de: Validierungen, Fuer die ausgewaehlte Schicht liegen keine Validierungsprobleme vor.
+- labels_en: Validations, No validation issues exist for the selected shift.
 - definition_de: Validierungen ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext staffing_workspace.
 - definition_en: Validations is a verified visible SicherPlan UI term in the staffing_workspace context.
 - related_terms: none
-- aliases: Fuer die ausgewaehlte Schicht liegen keine Validierungsprobleme vor., No validation issues exist for the selected shift., Release validations, Release-Validierungen, Validations, Validierungen, detailTabValidations, validationEmpty, validationTitle
+- aliases: Fuer die ausgewaehlte Schicht liegen keine Validierungsprobleme vor., No validation issues exist for the selected shift., Validations, Validierungen, detailTabValidations, validationEmpty
 - source_basis:
   - [frontend_i18n_label] planningStaffing.messages.ts: detailTabValidations defines the visible UI term in planningStaffing.messages.ts.
   - [frontend_i18n_label] planningStaffing.messages.ts: validationEmpty defines the visible UI term in planningStaffing.messages.ts.
-  - [frontend_i18n_label] planningStaffing.messages.ts: validationTitle defines the visible UI term in planningStaffing.messages.ts.
 
 ## planning.staffing_workspace.version
 

@@ -14,10 +14,12 @@ from app.modules.planning.schemas import (
     AssignmentCreate,
     AssignmentUpdate,
     CoverageFilter,
+    DemandGroupBulkApplyRequest,
     DemandGroupCreate,
     DemandGroupUpdate,
     ShiftCreate,
     ShiftPlanCreate,
+    ShiftSeriesCreate,
     ShiftTemplateCreate,
     StaffingAssignCommand,
     StaffingBoardFilter,
@@ -698,6 +700,48 @@ class StaffingServiceTests(unittest.TestCase):
         self.shift_id = shift.id
         self.planning_record_id = planning_record.id
         self.shift_plan_id = shift_plan.id
+        self.shift_template_id = template.id
+
+    def _create_shift_series(self, *, label: str, date_from: date, date_to: date):
+        return self.shift_service.create_shift_series(
+            "tenant-1",
+            ShiftSeriesCreate(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_template_id=self.shift_template_id,
+                label=label,
+                recurrence_code="daily",
+                interval_count=1,
+                timezone="Europe/Berlin",
+                date_from=date_from,
+                date_to=date_to,
+            ),
+            _context("planning.shift.write"),
+        )
+
+    def _create_generated_shift(
+        self,
+        *,
+        occurrence_date: date,
+        shift_series_id: str | None = None,
+        start_hour: int = 8,
+        end_hour: int = 16,
+    ) -> Shift:
+        return self.shift_service.create_shift(
+            "tenant-1",
+            ShiftCreate(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=shift_series_id,
+                occurrence_date=occurrence_date,
+                starts_at=datetime.combine(occurrence_date, time(start_hour, 0), tzinfo=UTC),
+                ends_at=datetime.combine(occurrence_date, time(end_hour, 0), tzinfo=UTC),
+                break_minutes=30,
+                shift_type_code="site_day",
+                source_kind_code="generated",
+            ),
+            _context("planning.shift.write"),
+        )
 
     def test_demand_group_requires_target_ge_min(self) -> None:
         with self.assertRaises(ApiException) as caught:
@@ -711,8 +755,245 @@ class StaffingServiceTests(unittest.TestCase):
                     target_qty=1,
                 ),
                 _context("planning.staffing.write"),
-            )
+        )
         self.assertEqual(caught.exception.code, "planning.demand_group.invalid_qty_window")
+
+    def test_bulk_apply_demand_groups_creates_missing_for_generated_shifts_only(self) -> None:
+        series = self._create_shift_series(label="Series A", date_from=date(2026, 4, 7), date_to=date(2026, 4, 8))
+        generated_shift_a = self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+        generated_shift_b = self._create_generated_shift(occurrence_date=date(2026, 4, 8), shift_series_id=series.id)
+
+        result = self.service.bulk_apply_demand_groups(
+            "tenant-1",
+            DemandGroupBulkApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                demand_groups=[
+                    {
+                        "function_type_id": "function-1",
+                        "qualification_type_id": "qualification-1",
+                        "min_qty": 1,
+                        "target_qty": 2,
+                    },
+                    {
+                        "function_type_id": "function-2",
+                        "min_qty": 0,
+                        "target_qty": 1,
+                        "sort_order": 30,
+                    },
+                ],
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        self.assertEqual(result.target_shift_count, 2)
+        self.assertEqual(result.template_count, 2)
+        self.assertEqual(result.created_count, 4)
+        self.assertEqual(result.updated_count, 0)
+        self.assertEqual(result.skipped_count, 0)
+        self.assertEqual(len(result.affected_demand_group_ids), 4)
+        self.assertEqual(len(result.results), 2)
+        self.assertTrue(all(item.created_count == 2 for item in result.results))
+
+        manual_shift_groups = self.repository.list_demand_groups("tenant-1", StaffingFilter(shift_id=self.shift_id, include_archived=True))
+        groups_a = self.repository.list_demand_groups("tenant-1", StaffingFilter(shift_id=generated_shift_a.id, include_archived=True))
+        groups_b = self.repository.list_demand_groups("tenant-1", StaffingFilter(shift_id=generated_shift_b.id, include_archived=True))
+        self.assertEqual(manual_shift_groups, [])
+        self.assertEqual([group.sort_order for group in groups_a], [10, 30])
+        self.assertEqual([group.sort_order for group in groups_b], [10, 30])
+
+    def test_bulk_apply_demand_groups_upserts_matching_group_and_revives_archived(self) -> None:
+        series = self._create_shift_series(label="Series A", date_from=date(2026, 4, 7), date_to=date(2026, 4, 7))
+        generated_shift = self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+        existing = self.repository.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(
+                tenant_id="tenant-1",
+                shift_id=generated_shift.id,
+                function_type_id="function-1",
+                min_qty=1,
+                target_qty=1,
+                sort_order=10,
+                remark="Old",
+            ),
+            "user-1",
+        )
+        existing.status = "archived"
+        existing.archived_at = datetime(2026, 4, 1, 12, 0, tzinfo=UTC)
+
+        result = self.service.bulk_apply_demand_groups(
+            "tenant-1",
+            DemandGroupBulkApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                apply_mode="upsert_matching",
+                demand_groups=[
+                    {
+                        "function_type_id": "function-2",
+                        "qualification_type_id": "qualification-1",
+                        "min_qty": 2,
+                        "target_qty": 3,
+                        "sort_order": 10,
+                        "remark": "Updated",
+                    }
+                ],
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        updated = self.repository.get_demand_group("tenant-1", existing.id)
+        assert updated is not None
+        self.assertEqual(result.target_shift_count, 1)
+        self.assertEqual(result.template_count, 1)
+        self.assertEqual(result.created_count, 0)
+        self.assertEqual(result.updated_count, 1)
+        self.assertEqual(result.skipped_count, 0)
+        self.assertEqual(result.results[0].updated_count, 1)
+        self.assertEqual(updated.function_type_id, "function-2")
+        self.assertEqual(updated.qualification_type_id, "qualification-1")
+        self.assertEqual(updated.target_qty, 3)
+        self.assertEqual(updated.status, "active")
+        self.assertIsNone(updated.archived_at)
+
+    def test_bulk_apply_demand_groups_respects_series_and_date_filters(self) -> None:
+        series_a = self._create_shift_series(label="Series A", date_from=date(2026, 4, 7), date_to=date(2026, 4, 9))
+        series_b = self._create_shift_series(label="Series B", date_from=date(2026, 4, 7), date_to=date(2026, 4, 7))
+        included_shift = self._create_generated_shift(occurrence_date=date(2026, 4, 8), shift_series_id=series_a.id)
+        excluded_by_date = self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series_a.id)
+        excluded_by_series = self._create_generated_shift(
+            occurrence_date=date(2026, 4, 8),
+            shift_series_id=series_b.id,
+            start_hour=18,
+            end_hour=23,
+        )
+
+        result = self.service.bulk_apply_demand_groups(
+            "tenant-1",
+            DemandGroupBulkApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series_a.id,
+                date_from=date(2026, 4, 8),
+                date_to=date(2026, 4, 8),
+                demand_groups=[
+                    {
+                        "function_type_id": "function-1",
+                        "min_qty": 1,
+                        "target_qty": 1,
+                    }
+                ],
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        self.assertEqual(result.target_shift_count, 1)
+        self.assertEqual(result.template_count, 1)
+        self.assertEqual(result.created_count, 1)
+        self.assertEqual(len(self.repository.list_demand_groups("tenant-1", StaffingFilter(shift_id=included_shift.id, include_archived=True))), 1)
+        self.assertEqual(self.repository.list_demand_groups("tenant-1", StaffingFilter(shift_id=excluded_by_date.id, include_archived=True)), [])
+        self.assertEqual(self.repository.list_demand_groups("tenant-1", StaffingFilter(shift_id=excluded_by_series.id, include_archived=True)), [])
+
+    def test_bulk_apply_demand_groups_rejects_duplicate_sort_orders(self) -> None:
+        series = self._create_shift_series(label="Series A", date_from=date(2026, 4, 7), date_to=date(2026, 4, 7))
+        self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+
+        with self.assertRaises(ApiException) as caught:
+            self.service.bulk_apply_demand_groups(
+                "tenant-1",
+                DemandGroupBulkApplyRequest(
+                    tenant_id="tenant-1",
+                    shift_plan_id=self.shift_plan_id,
+                    demand_groups=[
+                        {
+                            "function_type_id": "function-1",
+                            "min_qty": 1,
+                            "target_qty": 1,
+                            "sort_order": 10,
+                        },
+                        {
+                            "function_type_id": "function-2",
+                            "min_qty": 0,
+                            "target_qty": 1,
+                            "sort_order": 10,
+                        },
+                    ],
+                ),
+                _context("planning.staffing.write"),
+            )
+
+        self.assertEqual(caught.exception.code, "planning.demand_group.bulk_apply.duplicate_sort_order")
+
+    def test_bulk_apply_demand_groups_validates_function_and_qualification(self) -> None:
+        series = self._create_shift_series(label="Series A", date_from=date(2026, 4, 7), date_to=date(2026, 4, 7))
+        self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+
+        with self.assertRaises(ApiException) as caught:
+            self.service.bulk_apply_demand_groups(
+                "tenant-1",
+                DemandGroupBulkApplyRequest(
+                    tenant_id="tenant-1",
+                    shift_plan_id=self.shift_plan_id,
+                    demand_groups=[
+                        {
+                            "function_type_id": "function-1",
+                            "qualification_type_id": "qualification-missing",
+                            "min_qty": 1,
+                            "target_qty": 1,
+                        }
+                    ],
+                ),
+                _context("planning.staffing.write"),
+            )
+
+        self.assertEqual(caught.exception.code, "planning.demand_group.qualification_type_not_found")
+
+    def test_bulk_apply_demand_groups_rejects_tenant_scope_mismatch(self) -> None:
+        series = self._create_shift_series(label="Series A", date_from=date(2026, 4, 7), date_to=date(2026, 4, 7))
+        self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+
+        with self.assertRaises(ApiException) as caught:
+            self.service.bulk_apply_demand_groups(
+                "tenant-1",
+                DemandGroupBulkApplyRequest(
+                    tenant_id="tenant-2",
+                    shift_plan_id=self.shift_plan_id,
+                    demand_groups=[
+                        {
+                            "function_type_id": "function-1",
+                            "min_qty": 1,
+                            "target_qty": 1,
+                        }
+                    ],
+                ),
+                _context("planning.staffing.write"),
+            )
+
+        self.assertEqual(caught.exception.code, "planning.staffing.scope_mismatch")
+
+    def test_bulk_apply_demand_groups_rejects_when_no_target_shift_exists(self) -> None:
+        series = self._create_shift_series(label="Series A", date_from=date(2026, 4, 7), date_to=date(2026, 4, 7))
+        self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+
+        with self.assertRaises(ApiException) as caught:
+            self.service.bulk_apply_demand_groups(
+                "tenant-1",
+                DemandGroupBulkApplyRequest(
+                    tenant_id="tenant-1",
+                    shift_plan_id=self.shift_plan_id,
+                    date_from=date(2026, 4, 8),
+                    date_to=date(2026, 4, 8),
+                    demand_groups=[
+                        {
+                            "function_type_id": "function-1",
+                            "min_qty": 1,
+                            "target_qty": 1,
+                        }
+                    ],
+                ),
+                _context("planning.staffing.write"),
+            )
+
+        self.assertEqual(caught.exception.code, "planning.demand_group.bulk_apply.no_target_shifts")
 
     def test_create_demand_group_records_json_safe_audit_event(self) -> None:
         demand = self.service.create_demand_group(

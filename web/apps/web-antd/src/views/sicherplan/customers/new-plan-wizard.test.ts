@@ -4,7 +4,7 @@ import { CUSTOMER_NEW_PLAN_WIZARD_STEP_IDS, CUSTOMER_NEW_PLAN_WIZARD_STEPS } fro
 import { useCustomerNewPlanWizard } from './use-customer-new-plan-wizard';
 
 describe('useCustomerNewPlanWizard', () => {
-  it('exposes only the six visible step ids in display order', () => {
+  it('exposes only the seven visible step ids in display order', () => {
     expect(CUSTOMER_NEW_PLAN_WIZARD_STEP_IDS).toEqual([
       'order-details',
       'order-scope-documents',
@@ -12,6 +12,7 @@ describe('useCustomerNewPlanWizard', () => {
       'planning-record-documents',
       'shift-plan',
       'series-exceptions',
+      'demand-groups',
     ]);
     expect(CUSTOMER_NEW_PLAN_WIZARD_STEP_IDS).not.toContain('equipment-lines');
     expect(CUSTOMER_NEW_PLAN_WIZARD_STEP_IDS).not.toContain('requirement-lines');
@@ -253,6 +254,21 @@ describe('useCustomerNewPlanWizard', () => {
     expect(wizard.state.value.current_step).toBe('series-exceptions');
   });
 
+  it('allows demand-groups only when shift-plan context exists', () => {
+    const wizard = useCustomerNewPlanWizard();
+
+    wizard.resetForCustomer('customer-1', 'order-details');
+    expect(wizard.applyRequestedStep('demand-groups')).toBe('order-details');
+
+    wizard.setSavedContext({
+      order_id: 'order-1',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'shift-plan-1',
+    });
+
+    expect(wizard.applyRequestedStep('demand-groups')).toBe('demand-groups');
+  });
+
   it('preserves a newly saved planning_record_id when the planning context changes in the same patch', () => {
     const wizard = useCustomerNewPlanWizard();
 
@@ -449,6 +465,9 @@ describe('useCustomerNewPlanWizard', () => {
 
     wizard.setStepCompletion('series-exceptions', true);
 
+    expect(wizard.isWizardCompleteEnoughForHandoff.value).toBe(false);
+
+    wizard.setStepCompletion('demand-groups', true);
     expect(wizard.isWizardCompleteEnoughForHandoff.value).toBe(true);
   });
 });

@@ -9,25 +9,16 @@ const source = fs.readFileSync(
 );
 
 test("wizard shell keeps customer order workspace route behavior and controlled states", () => {
-  assert.match(source, /path: '\/admin\/customers'/);
-  assert.match(source, /path: '\/admin\/customers\/order-workspace'/);
-  assert.match(source, /contextState\.value = 'missing'/);
-  assert.match(source, /contextState\.value = 'not_found'/);
-  assert.match(source, /<ForbiddenView v-if="!isAuthorized" \/>/);
-  assert.match(source, /window\.confirm\(\$t\('sicherplan\.customerPlansWizard\.confirmDiscard'\)\)/);
+  assert.match(source, /import CustomerOrderWorkspacePanel from '\.\/customer-order-workspace-panel\.vue'/);
+  assert.match(source, /const panelRef = ref<InstanceType<typeof CustomerOrderWorkspacePanel> \| null>\(null\)/);
+  assert.match(source, /return panelRef\.value\?\.wizardState/);
+  assert.match(source, /<CustomerOrderWorkspacePanel ref="panelRef" \/>/);
 });
 
 test("wizard shell uses i18n keys for breadcrumb, invalid states, and final action labels", () => {
   assert.match(source, /\$t\('sicherplan\.customerPlansWizard\.title'\)/);
   assert.match(source, /\$t\('sicherplan\.customerPlansWizard\.description'\)/);
-  assert.match(source, /\$t\('sicherplan\.customerPlansWizard\.breadcrumbCustomers'\)/);
-  assert.match(source, /\$t\('sicherplan\.customerPlansWizard\.breadcrumbPlans'\)/);
-  assert.match(source, /\$t\('sicherplan\.customerPlansWizard\.loadingTitle'\)/);
-  assert.match(source, /\$t\('sicherplan\.customerPlansWizard\.missingCustomerTitle'\)/);
-  assert.match(source, /\$t\('sicherplan\.customerPlansWizard\.unknownCustomerTitle'\)/);
-  assert.match(source, /\$t\('sicherplan\.customerPlansWizard\.errorTitle'\)/);
-  assert.match(source, /\$t\('sicherplan\.customerPlansWizard\.actions\.cancel'\)/);
-  assert.match(source, /\$t\('sicherplan\.customerPlansWizard\.actions\.previous'\)/);
-  assert.match(source, /\$t\('sicherplan\.customerPlansWizard\.actions\.next'\)/);
-  assert.match(source, /\$t\('sicherplan\.customerPlansWizard\.actions\.generateContinue'\)/);
+  assert.match(source, /\$t\('sicherplan\.admin\.customers'\)/);
+  assert.match(source, /<ModuleWorkspacePage/);
+  assert.match(source, /<SectionBlock :show-header="false" title="">/);
 });

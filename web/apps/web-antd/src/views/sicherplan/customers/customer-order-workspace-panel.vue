@@ -167,11 +167,15 @@ const handledSubmitStepIds = new Set<CustomerNewPlanWizardStepId>([
   'planning-record-documents',
   'shift-plan',
   'series-exceptions',
+  'demand-groups',
 ]);
+const isSeriesGenerationStep = computed(() => wizardState.value.current_step === 'series-exceptions');
 const isFinalStep = computed(() => wizardState.value.current_step === CUSTOMER_NEW_PLAN_WIZARD_LAST_STEP_ID);
 const nextActionLabel = computed(() =>
-  isFinalStep.value
+  isSeriesGenerationStep.value
     ? $t('sicherplan.customerPlansWizard.actions.generateContinue')
+    : isFinalStep.value
+      ? $t('sicherplan.customerPlansWizard.actions.applyDemandGroups')
     : $t('sicherplan.customerPlansWizard.actions.next'),
 );
 const canSubmitCurrentStep = computed(() => handledSubmitStepIds.has(wizardState.value.current_step));
@@ -271,13 +275,19 @@ function isSameUpstreamScope(routeState: ReturnType<typeof readWizardRouteState>
 }
 
 function isStaleShiftPlanRollbackRoute(routeState: ReturnType<typeof readWizardRouteState>) {
-  return (
+  const staleShiftPlanRollback =
     wizardState.value.current_step === 'series-exceptions' &&
     Boolean(wizardState.value.shift_plan_id) &&
     isSameUpstreamScope(routeState) &&
     (routeState.step === 'shift-plan' || !routeState.step) &&
-    routeState.shift_plan_id !== wizardState.value.shift_plan_id
-  );
+    routeState.shift_plan_id !== wizardState.value.shift_plan_id;
+  const staleSeriesRollback =
+    wizardState.value.current_step === 'demand-groups' &&
+    Boolean(wizardState.value.shift_plan_id) &&
+    isSameUpstreamScope(routeState) &&
+    routeState.shift_plan_id === wizardState.value.shift_plan_id &&
+    (routeState.step === 'series-exceptions' || !routeState.step);
+  return staleShiftPlanRollback || staleSeriesRollback;
 }
 
 function syncWizardFromRoute() {
@@ -845,7 +855,13 @@ defineExpose({
           <button
             type="button"
             class="cta-button"
-            :data-testid="isFinalStep ? 'customer-new-plan-generate-continue' : 'customer-new-plan-next'"
+            :data-testid="
+              isSeriesGenerationStep
+                ? 'customer-new-plan-generate-continue'
+                : isFinalStep
+                  ? 'customer-new-plan-complete-demand-groups'
+                  : 'customer-new-plan-next'
+            "
             :disabled="stepSubmitting || (!canSubmitCurrentStep && !canMoveNext)"
             @click="goToNextStep"
           >

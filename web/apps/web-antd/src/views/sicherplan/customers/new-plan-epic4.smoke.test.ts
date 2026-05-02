@@ -46,6 +46,7 @@ const apiMocks = vi.hoisted(() => ({
   createShiftTemplateMock: vi.fn(),
   deleteShiftSeriesExceptionMock: vi.fn(),
   generateShiftSeriesMock: vi.fn(),
+  bulkApplyDemandGroupsMock: vi.fn(),
   getCustomerOrderMock: vi.fn(),
   getPlanningRecordMock: vi.fn(),
   getShiftPlanMock: vi.fn(),
@@ -63,6 +64,7 @@ const apiMocks = vi.hoisted(() => ({
   listPlanningSetupRecordsMock: vi.fn(),
   listTradeFairZonesMock: vi.fn(),
   listShiftPlansMock: vi.fn(),
+  listShiftsMock: vi.fn(),
   listShiftSeriesExceptionsMock: vi.fn(),
   listShiftSeriesMock: vi.fn(),
   listShiftTemplatesMock: vi.fn(),
@@ -137,6 +139,7 @@ vi.mock('#/sicherplan-legacy/api/planningShifts', () => ({
   getShiftSeries: apiMocks.getShiftSeriesMock,
   getShiftTemplate: apiMocks.getShiftTemplateMock,
   listShiftPlans: apiMocks.listShiftPlansMock,
+  listShifts: apiMocks.listShiftsMock,
   listShiftSeries: apiMocks.listShiftSeriesMock,
   listShiftSeriesExceptions: apiMocks.listShiftSeriesExceptionsMock,
   listShiftTemplates: apiMocks.listShiftTemplatesMock,
@@ -144,6 +147,10 @@ vi.mock('#/sicherplan-legacy/api/planningShifts', () => ({
   updateShiftPlan: apiMocks.updateShiftPlanMock,
   updateShiftSeries: apiMocks.updateShiftSeriesMock,
   updateShiftSeriesException: apiMocks.updateShiftSeriesExceptionMock,
+}));
+
+vi.mock('#/sicherplan-legacy/api/planningStaffing', () => ({
+  bulkApplyDemandGroups: apiMocks.bulkApplyDemandGroupsMock,
 }));
 
 vi.mock('ant-design-vue', () => ({
@@ -365,6 +372,7 @@ function baseWizardState(): CustomerNewPlanWizardState {
       'planning-record-documents': { completed: false, dirty: false, error: '', loading: false },
       'shift-plan': { completed: false, dirty: false, error: '', loading: false },
       'series-exceptions': { completed: false, dirty: false, error: '', loading: false },
+      'demand-groups': { completed: false, dirty: false, error: '', loading: false },
     },
   };
 }
@@ -431,6 +439,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.createShiftTemplateMock.mockReset();
     apiMocks.deleteShiftSeriesExceptionMock.mockReset();
     apiMocks.generateShiftSeriesMock.mockReset();
+    apiMocks.bulkApplyDemandGroupsMock.mockReset();
     apiMocks.getCustomerOrderMock.mockReset();
     apiMocks.getPlanningRecordMock.mockReset();
     apiMocks.getShiftPlanMock.mockReset();
@@ -448,6 +457,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listPlanningSetupRecordsMock.mockReset();
     apiMocks.listTradeFairZonesMock.mockReset();
     apiMocks.listShiftPlansMock.mockReset();
+    apiMocks.listShiftsMock.mockReset();
     apiMocks.listShiftSeriesExceptionsMock.mockReset();
     apiMocks.listShiftSeriesMock.mockReset();
     apiMocks.listShiftTemplatesMock.mockReset();
@@ -496,6 +506,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listPlanningRecordAttachmentsMock.mockResolvedValue([]);
     apiMocks.listPlanningRecordsMock.mockResolvedValue([]);
     apiMocks.listShiftPlansMock.mockResolvedValue([]);
+    apiMocks.listShiftsMock.mockResolvedValue([]);
     apiMocks.listShiftTemplatesMock.mockResolvedValue([{ id: 'template-1', tenant_id: 'tenant-1', code: 'TPL-1', label: 'Tagdienst Vorlage', local_start_time: '08:00', local_end_time: '16:00', default_break_minutes: 30, shift_type_code: 'day', status: 'active', version_no: 1 }]);
     apiMocks.listShiftTypeOptionsMock.mockResolvedValue([{ code: 'day', label: 'Day shift' }]);
     apiMocks.listShiftSeriesMock.mockResolvedValue([]);
@@ -503,6 +514,19 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.getPlanningRecordMock.mockResolvedValue(buildPlanningRecord());
     apiMocks.getShiftPlanMock.mockResolvedValue(buildShiftPlan());
     apiMocks.getShiftSeriesMock.mockResolvedValue(buildSeries());
+    apiMocks.bulkApplyDemandGroupsMock.mockResolvedValue({
+      tenant_id: 'tenant-1',
+      shift_plan_id: 'plan-1',
+      shift_series_id: 'series-1',
+      apply_mode: 'upsert_matching',
+      target_shift_count: 2,
+      template_count: 1,
+      created_count: 1,
+      updated_count: 1,
+      skipped_count: 0,
+      affected_demand_group_ids: ['dg-1'],
+      results: [],
+    });
     apiMocks.getShiftTemplateMock.mockImplementation((_, templateId: string) =>
       Promise.resolve({
         id: templateId,
@@ -3348,7 +3372,10 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     ]);
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
-    expect(saved).toBe(true);
+    expect(saved).toMatchObject({
+      completedStepId: 'series-exceptions',
+      success: true,
+    });
     expect(apiMocks.createShiftSeriesMock).toHaveBeenCalledWith(
       'tenant-1',
       'plan-1',
@@ -3364,23 +3391,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       regenerate_existing: false,
       to_date: '2026-06-10',
     });
-    expect(routerPushMock).toHaveBeenCalledWith(
-      '/admin/planning-staffing?date_from=2026-06-01T00%3A00&date_to=2026-06-02T00%3A00&planning_record_id=record-1&shift_id=shift-1',
-    );
-    const redirectTarget = routerPushMock.mock.calls.at(-1)?.[0];
-    const redirectUrl = new URL(`https://example.test${redirectTarget}`);
-    expect(redirectUrl.pathname).toBe('/admin/planning-staffing');
-    expect(redirectUrl.searchParams.get('planning_record_id')).toBe('record-1');
-    expect(redirectUrl.searchParams.get('date_from')).toBe('2026-06-01T00:00');
-    expect(redirectUrl.searchParams.get('date_to')).toBe('2026-06-02T00:00');
-    expect(redirectUrl.searchParams.get('shift_id')).toBe('shift-1');
-    expect(redirectUrl.searchParams.get('planning_mode_code')).toBeNull();
-    expect([...redirectUrl.searchParams.keys()].sort()).toEqual([
-      'date_from',
-      'date_to',
-      'planning_record_id',
-      'shift_id',
-    ]);
+    expect(routerPushMock).not.toHaveBeenCalled();
   });
 
   it('loads the Series step with read-only upstream hydration and keeps the series form visible after all loaders finish', async () => {
@@ -3821,7 +3832,10 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await flushPromises();
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
-    expect(saved).toBe(true);
+    expect(saved).toMatchObject({
+      completedStepId: 'series-exceptions',
+      success: true,
+    });
     expect(apiMocks.createShiftSeriesMock).toHaveBeenCalledWith(
       'tenant-1',
       'plan-1',
@@ -3842,9 +3856,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       regenerate_existing: false,
       to_date: '2026-07-31',
     });
-    expect(routerPushMock).toHaveBeenCalledWith(
-      '/admin/planning-staffing?date_from=2026-07-01T00%3A00&date_to=2026-07-02T00%3A00&shift_id=shift-1',
-    );
+    expect(routerPushMock).not.toHaveBeenCalled();
   });
 
   it('accepts the full RheinForum Nordtor weekly series data and reflects the exact form state', async () => {
@@ -4398,7 +4410,10 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await saveCurrentSeries(wrapper);
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
-    expect(saved).toBe(true);
+    expect(saved).toMatchObject({
+      completedStepId: 'series-exceptions',
+      success: true,
+    });
     expect(apiMocks.createShiftSeriesMock).toHaveBeenLastCalledWith(
       'tenant-1',
       'plan-1',
@@ -4649,7 +4664,10 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
 
     const saved = await (wrapper.vm as any).submitCurrentStep();
 
-    expect(saved).toBe(true);
+    expect(saved).toMatchObject({
+      completedStepId: 'series-exceptions',
+      success: true,
+    });
     const createOrder = apiMocks.createShiftSeriesMock.mock.invocationCallOrder[0];
     const exceptionOrder = apiMocks.createShiftSeriesExceptionMock.mock.invocationCallOrder[0];
     const generateOrder = apiMocks.generateShiftSeriesMock.mock.invocationCallOrder[0];
@@ -4665,7 +4683,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     });
     expect(apiMocks.generateShiftSeriesMock.mock.results[0]?.type).toBe('return');
     expect(window.sessionStorage.getItem(draftKey)).toBeNull();
-    expect(routerPushMock).toHaveBeenCalled();
+    expect(routerPushMock).not.toHaveBeenCalled();
   });
 
   it('keeps the user on the final step with clear feedback when series generation fails', async () => {
@@ -4812,5 +4830,140 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     const afterSkip = occurrences.filter((date) => date !== '2026-07-03');
     expect(afterSkip).toHaveLength(22);
     expect(afterSkip).not.toContain('2026-07-03');
+  });
+
+  it('shows a demand-groups empty state when no generated shifts exist yet', async () => {
+    apiMocks.listShiftsMock.mockResolvedValue([]);
+
+    const wrapper = mountStep('demand-groups', {
+      current_step: 'demand-groups',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: 'series-1',
+    });
+    await settleLoadingRender();
+
+    expect(wrapper.find('[data-testid="customer-new-plan-step-panel-demand-groups"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="customer-new-plan-demand-groups-empty"]').exists()).toBe(true);
+    expect((wrapper.get('[data-testid="customer-new-plan-demand-groups-generated-count"]').element as HTMLElement).textContent).toContain('0');
+  });
+
+  it('blocks demand-groups submit when min_qty exceeds target_qty', async () => {
+    apiMocks.listShiftsMock.mockResolvedValue([
+      {
+        id: 'shift-1',
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: 'series-1',
+        occurrence_date: '2026-07-02',
+        starts_at: '2026-07-02T08:00:00Z',
+        ends_at: '2026-07-02T16:00:00Z',
+        break_minutes: 30,
+        shift_type_code: 'day',
+        location_text: null,
+        meeting_point: null,
+        release_state: 'draft',
+        customer_visible_flag: false,
+        subcontractor_visible_flag: false,
+        stealth_mode_flag: false,
+        source_kind_code: 'generated',
+        status: 'active',
+        version_no: 1,
+      },
+    ]);
+
+    const wrapper = mountStep('demand-groups', {
+      current_step: 'demand-groups',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: 'series-1',
+    });
+    await settleLoadingRender();
+
+    const validationRows = (wrapper.vm as any).$?.setupState.demandGroupDraftRows;
+    validationRows[0].function_type_id = 'function-1';
+    await wrapper.get('[data-testid="customer-new-plan-demand-group-min-qty-0"]').setValue('3');
+    await wrapper.get('[data-testid="customer-new-plan-demand-group-target-qty-0"]').setValue('2');
+    await flushPromises();
+
+    expect(await (wrapper.vm as any).submitCurrentStep()).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-demand-groups-validation"]').text()).toContain(
+      'sicherplan.customerPlansWizard.errors.demandGroupsMinExceedsTarget',
+    );
+  });
+
+  it('applies demand groups successfully and marks the step complete', async () => {
+    apiMocks.listShiftsMock.mockResolvedValue([
+      {
+        id: 'shift-1',
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: 'series-1',
+        occurrence_date: '2026-07-02',
+        starts_at: '2026-07-02T08:00:00Z',
+        ends_at: '2026-07-02T16:00:00Z',
+        break_minutes: 30,
+        shift_type_code: 'day',
+        location_text: null,
+        meeting_point: null,
+        release_state: 'draft',
+        customer_visible_flag: false,
+        subcontractor_visible_flag: false,
+        stealth_mode_flag: false,
+        source_kind_code: 'generated',
+        status: 'active',
+        version_no: 1,
+      },
+      {
+        id: 'shift-2',
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: 'series-1',
+        occurrence_date: '2026-07-03',
+        starts_at: '2026-07-03T08:00:00Z',
+        ends_at: '2026-07-03T16:00:00Z',
+        break_minutes: 30,
+        shift_type_code: 'day',
+        location_text: null,
+        meeting_point: null,
+        release_state: 'draft',
+        customer_visible_flag: false,
+        subcontractor_visible_flag: false,
+        stealth_mode_flag: false,
+        source_kind_code: 'generated',
+        status: 'active',
+        version_no: 1,
+      },
+    ]);
+
+    const wrapper = mountStep('demand-groups', {
+      current_step: 'demand-groups',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: 'series-1',
+    });
+    await settleLoadingRender();
+
+    const appliedRows = (wrapper.vm as any).$?.setupState.demandGroupDraftRows;
+    appliedRows[0].function_type_id = 'function-1';
+    await wrapper.get('[data-testid="customer-new-plan-demand-group-target-qty-0"]').setValue('2');
+    await wrapper.get('[data-testid="customer-new-plan-demand-group-sort-order-0"]').setValue('1');
+    await flushPromises();
+
+    const saved = await (wrapper.vm as any).submitCurrentStep();
+
+    expect(saved).toMatchObject({
+      completedStepId: 'demand-groups',
+      success: true,
+    });
+    expect(apiMocks.bulkApplyDemandGroupsMock).toHaveBeenCalledWith('tenant-1', 'token-1', expect.objectContaining({
+      apply_mode: 'upsert_matching',
+      shift_plan_id: 'plan-1',
+      shift_series_id: 'series-1',
+    }));
+    expect(wrapper.emitted('step-completion')).toContainEqual(['demand-groups', true]);
+    expect(wrapper.get('[data-testid="customer-new-plan-demand-groups-summary"]').text()).toContain(
+      'sicherplan.customerPlansWizard.messages.demandGroupsAppliedSummary',
+    );
   });
 });

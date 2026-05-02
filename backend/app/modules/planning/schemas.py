@@ -1551,6 +1551,48 @@ class DemandGroupCreate(BaseModel):
     remark: str | None = None
 
 
+class DemandGroupBulkTemplate(BaseModel):
+    function_type_id: str
+    qualification_type_id: str | None = None
+    min_qty: int = Field(ge=0)
+    target_qty: int = Field(ge=0)
+    mandatory_flag: bool = True
+    sort_order: int | None = None
+    remark: str | None = None
+
+
+class DemandGroupBulkApplyRequest(BaseModel):
+    tenant_id: str
+    shift_plan_id: str
+    shift_series_id: str | None = None
+    date_from: date | None = None
+    date_to: date | None = None
+    apply_mode: str = "create_missing"
+    demand_groups: list[DemandGroupBulkTemplate] = Field(min_length=1)
+
+
+class DemandGroupBulkApplyShiftResult(BaseModel):
+    shift_id: str
+    created_count: int
+    updated_count: int
+    skipped_count: int
+    errors: list[str] = Field(default_factory=list)
+
+
+class DemandGroupBulkApplyResult(BaseModel):
+    tenant_id: str
+    shift_plan_id: str
+    shift_series_id: str | None
+    apply_mode: str
+    target_shift_count: int
+    template_count: int
+    created_count: int
+    updated_count: int
+    skipped_count: int
+    affected_demand_group_ids: list[str] = Field(default_factory=list)
+    results: list[DemandGroupBulkApplyShiftResult] = Field(default_factory=list)
+
+
 class DemandGroupUpdate(BaseModel):
     function_type_id: str | None = None
     qualification_type_id: str | None = None

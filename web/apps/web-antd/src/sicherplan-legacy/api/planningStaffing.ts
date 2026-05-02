@@ -127,6 +127,48 @@ export interface DemandGroupCreate {
   remark?: null | string;
 }
 
+export interface DemandGroupBulkTemplate {
+  function_type_id: string;
+  qualification_type_id?: null | string;
+  min_qty: number;
+  target_qty: number;
+  mandatory_flag?: boolean;
+  sort_order?: null | number;
+  remark?: null | string;
+}
+
+export interface DemandGroupBulkApplyRequest {
+  tenant_id: string;
+  shift_plan_id: string;
+  shift_series_id?: null | string;
+  date_from?: null | string;
+  date_to?: null | string;
+  apply_mode?: "create_missing" | "upsert_matching";
+  demand_groups: DemandGroupBulkTemplate[];
+}
+
+export interface DemandGroupBulkApplyShiftResult {
+  shift_id: string;
+  created_count: number;
+  updated_count: number;
+  skipped_count: number;
+  errors: string[];
+}
+
+export interface DemandGroupBulkApplyResult {
+  tenant_id: string;
+  shift_plan_id: string;
+  shift_series_id: null | string;
+  apply_mode: "create_missing" | "upsert_matching";
+  target_shift_count: number;
+  template_count: number;
+  created_count: number;
+  updated_count: number;
+  skipped_count: number;
+  affected_demand_group_ids: string[];
+  results: DemandGroupBulkApplyShiftResult[];
+}
+
 export interface DemandGroupUpdate {
   function_type_id?: null | string;
   qualification_type_id?: null | string;
@@ -546,6 +588,14 @@ export function listDemandGroups(tenantId: string, accessToken: string, filters:
 export function createDemandGroup(tenantId: string, accessToken: string, payload: DemandGroupCreate) {
   return request<DemandGroupRead>(
     `/api/planning/tenants/${tenantId}/ops/demand-groups`,
+    accessToken,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function bulkApplyDemandGroups(tenantId: string, accessToken: string, payload: DemandGroupBulkApplyRequest) {
+  return request<DemandGroupBulkApplyResult>(
+    `/api/planning/tenants/${tenantId}/ops/demand-groups/bulk-apply`,
     accessToken,
     { method: "POST", body: JSON.stringify(payload) },
   );
