@@ -169,6 +169,58 @@ export interface DemandGroupBulkApplyResult {
   results: DemandGroupBulkApplyShiftResult[];
 }
 
+export interface DemandGroupBulkUpdateMatch {
+  function_type_id: string;
+  qualification_type_id?: null | string;
+  min_qty?: null | number;
+  target_qty?: null | number;
+  mandatory_flag?: null | boolean;
+  sort_order?: null | number;
+  remark?: null | string;
+}
+
+export interface DemandGroupBulkUpdatePatch {
+  function_type_id?: null | string;
+  qualification_type_id?: null | string;
+  min_qty?: null | number;
+  target_qty?: null | number;
+  mandatory_flag?: null | boolean;
+  sort_order?: null | number;
+  remark?: null | string;
+  status?: null | string;
+}
+
+export interface DemandGroupBulkUpdateRequest {
+  tenant_id: string;
+  shift_plan_id: string;
+  shift_series_id?: null | string;
+  date_from?: null | string;
+  date_to?: null | string;
+  match: DemandGroupBulkUpdateMatch;
+  patch: DemandGroupBulkUpdatePatch;
+  expected_demand_group_ids?: string[];
+  expected_target_shift_count?: null | number;
+}
+
+export interface DemandGroupBulkUpdateItemResult {
+  demand_group_id: string;
+  shift_id: string;
+  outcome_code: "updated" | "skipped" | "conflict";
+  reason_codes: string[];
+}
+
+export interface DemandGroupBulkUpdateResult {
+  tenant_id: string;
+  shift_plan_id: string;
+  shift_series_id: null | string;
+  matched_count: number;
+  updated_count: number;
+  skipped_count: number;
+  conflict_count: number;
+  updated_demand_group_ids: string[];
+  results: DemandGroupBulkUpdateItemResult[];
+}
+
 export interface DemandGroupUpdate {
   function_type_id?: null | string;
   qualification_type_id?: null | string;
@@ -598,6 +650,14 @@ export function bulkApplyDemandGroups(tenantId: string, accessToken: string, pay
     `/api/planning/tenants/${tenantId}/ops/demand-groups/bulk-apply`,
     accessToken,
     { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function bulkUpdateDemandGroups(tenantId: string, accessToken: string, payload: DemandGroupBulkUpdateRequest) {
+  return request<DemandGroupBulkUpdateResult>(
+    `/api/planning/tenants/${tenantId}/ops/demand-groups/bulk-update`,
+    accessToken,
+    { method: "PATCH", body: JSON.stringify(payload) },
   );
 }
 

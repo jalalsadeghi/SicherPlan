@@ -194,7 +194,7 @@ describe('SicherPlanAssistantWidget', () => {
     expect(mocked.storeState!.loadCapabilities).toHaveBeenCalled();
     expect(wrapper.find('[data-testid="assistant-widget"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('assistant.widget.launcherLabel');
-    expect(wrapper.find('button[aria-label="assistant.widget.launcherLabel"]').exists()).toBe(true);
+    expect(wrapper.find('button[aria-label="assistant.widget.launcherLabel. assistant.widget.dragHint"]').exists()).toBe(true);
   });
 
   it('loads capabilities on authenticated routes even when the primary access token is initially empty', async () => {

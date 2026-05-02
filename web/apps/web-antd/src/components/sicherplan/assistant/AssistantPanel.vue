@@ -40,6 +40,7 @@ defineProps<{
   providerWarning?: null | string;
   nextStepsTitle: string;
   processingLabel: string;
+  resetPositionLabel: string;
   sourcesTitle: string;
   sendingMessage?: boolean;
   sendingLabel?: string;
@@ -52,6 +53,7 @@ defineProps<{
 const emit = defineEmits<{
   (event: 'close'): void;
   (event: 'open-link', link: AssistantLink): void;
+  (event: 'reset-position'): void;
   (
     event: 'submit-feedback',
     payload: { comment?: null | string; messageId: string; rating: AssistantFeedbackRating },
@@ -81,14 +83,25 @@ defineExpose({ focusInput });
         <strong class="sp-assistant-panel__title">{{ title }}</strong>
         <p class="sp-assistant-panel__description">{{ description }}</p>
       </div>
-      <button
-        :aria-label="closeLabel"
-        class="sp-assistant-panel__close"
-        type="button"
-        @click="$emit('close')"
-      >
-        <IconifyIcon icon="lucide:x" />
-      </button>
+      <div class="sp-assistant-panel__header-actions">
+        <button
+          :aria-label="resetPositionLabel"
+          class="sp-assistant-panel__header-button"
+          data-testid="assistant-reset-position"
+          type="button"
+          @click="$emit('reset-position')"
+        >
+          <IconifyIcon icon="lucide:rotate-ccw" />
+        </button>
+        <button
+          :aria-label="closeLabel"
+          class="sp-assistant-panel__header-button sp-assistant-panel__close"
+          type="button"
+          @click="$emit('close')"
+        >
+          <IconifyIcon icon="lucide:x" />
+        </button>
+      </div>
     </header>
 
     <div v-if="errorVisible" class="sp-assistant-panel__error" data-testid="assistant-error-state">
@@ -170,6 +183,13 @@ defineExpose({ focusInput });
   gap: 0.9rem;
 }
 
+.sp-assistant-panel__header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 0 0 auto;
+}
+
 .sp-assistant-panel__title-block {
   min-width: 0;
   display: grid;
@@ -188,7 +208,7 @@ defineExpose({ focusInput });
   line-height: 1.45;
 }
 
-.sp-assistant-panel__close {
+.sp-assistant-panel__header-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;

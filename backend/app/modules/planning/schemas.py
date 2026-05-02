@@ -1593,6 +1593,58 @@ class DemandGroupBulkApplyResult(BaseModel):
     results: list[DemandGroupBulkApplyShiftResult] = Field(default_factory=list)
 
 
+class DemandGroupBulkUpdateMatch(BaseModel):
+    function_type_id: str
+    qualification_type_id: str | None = None
+    min_qty: int | None = Field(default=None, ge=0)
+    target_qty: int | None = Field(default=None, ge=0)
+    mandatory_flag: bool | None = None
+    sort_order: int | None = None
+    remark: str | None = None
+
+
+class DemandGroupBulkUpdatePatch(BaseModel):
+    function_type_id: str | None = None
+    qualification_type_id: str | None = None
+    min_qty: int | None = Field(default=None, ge=0)
+    target_qty: int | None = Field(default=None, ge=0)
+    mandatory_flag: bool | None = None
+    sort_order: int | None = None
+    remark: str | None = None
+    status: str | None = None
+
+
+class DemandGroupBulkUpdateRequest(BaseModel):
+    tenant_id: str
+    shift_plan_id: str
+    shift_series_id: str | None = None
+    date_from: date | None = None
+    date_to: date | None = None
+    match: DemandGroupBulkUpdateMatch
+    patch: DemandGroupBulkUpdatePatch
+    expected_demand_group_ids: list[str] | None = None
+    expected_target_shift_count: int | None = Field(default=None, ge=0)
+
+
+class DemandGroupBulkUpdateItemResult(BaseModel):
+    demand_group_id: str
+    shift_id: str
+    outcome_code: str
+    reason_codes: list[str] = Field(default_factory=list)
+
+
+class DemandGroupBulkUpdateResult(BaseModel):
+    tenant_id: str
+    shift_plan_id: str
+    shift_series_id: str | None
+    matched_count: int
+    updated_count: int
+    skipped_count: int
+    conflict_count: int
+    updated_demand_group_ids: list[str] = Field(default_factory=list)
+    results: list[DemandGroupBulkUpdateItemResult] = Field(default_factory=list)
+
+
 class DemandGroupUpdate(BaseModel):
     function_type_id: str | None = None
     qualification_type_id: str | None = None

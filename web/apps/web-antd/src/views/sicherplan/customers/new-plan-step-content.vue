@@ -106,9 +106,13 @@ import {
   type ShiftTypeOption,
 } from '#/sicherplan-legacy/api/planningShifts';
 import {
+  bulkUpdateDemandGroups,
+  listDemandGroups,
   bulkApplyDemandGroups,
+  type DemandGroupRead,
   type DemandGroupBulkApplyResult,
   type DemandGroupBulkTemplate,
+  updateDemandGroup,
 } from '#/sicherplan-legacy/api/planningStaffing';
 import type {
   CustomerNewPlanStepSubmitResult,
@@ -528,6 +532,7 @@ const seriesFieldErrors = reactive({
 });
 const demandGroupDraftRows = ref<DemandGroupDraftRow[]>([]);
 const demandGroupGeneratedShifts = ref<ShiftListItem[]>([]);
+const persistedDemandGroups = ref<DemandGroupRead[]>([]);
 const demandGroupApplyResult = ref<DemandGroupBulkApplyResult | null>(null);
 const demandGroupValidationError = ref('');
 const demandGroupSummaryMessage = ref('');
@@ -543,6 +548,34 @@ const demandGroupDialog = reactive({
   target_qty: 1,
 });
 const editingDemandGroupDraftId = ref('');
+const aggregateDemandGroupDialog = reactive({
+  function_type_id: '',
+  mandatory_flag: true,
+  min_qty: 1,
+  open: false,
+  qualification_type_id: '',
+  remark: '',
+  sort_order: 1,
+  target_qty: 1,
+});
+const shiftDemandGroupDialog = reactive({
+  open: false,
+});
+const selectedAggregateDemandGroupSignature = ref('');
+const selectedShiftDemandGroupId = ref('');
+const aggregateDemandGroupSaving = ref(false);
+const shiftDemandGroupSaving = ref(false);
+const aggregateDemandGroupValidationError = ref('');
+const shiftDemandGroupValidationError = ref('');
+const shiftDemandGroupDialogDraft = reactive({
+  function_type_id: '',
+  mandatory_flag: true,
+  min_qty: 1,
+  qualification_type_id: '',
+  remark: '',
+  sort_order: 1,
+  target_qty: 1,
+});
 let demandGroupDraftRowSequence = 0;
 
 const { showFeedbackToast } = useSicherPlanFeedback();
@@ -673,6 +706,55 @@ type SeriesExceptionsDraftPersistence = {
   series: typeof seriesDraft;
 };
 
+type PersistedDemandGroupSummaryRow = {
+  applied_shift_count: number;
+  demand_group_ids: string[];
+  function_type_id: string;
+  function_type_label: string;
+  has_locked_rows: boolean;
+  all_rows_locked: boolean;
+  missing_shift_count: number;
+  missing_shift_labels: string[];
+  mandatory_flag: boolean;
+  qualification_type_id: string;
+  qualification_type_label: string;
+  remark: string;
+  shift_labels: string[];
+  signature_key: string;
+  sort_order: number;
+  status: 'complete' | 'mixed' | 'partial';
+  target_qty: number;
+  total_shift_count: number;
+  variant_count: number;
+  min_qty: number;
+  shift_rows: PersistedDemandGroupShiftRow[];
+};
+
+type PersistedDemandGroupShiftRow = {
+  customer_visible_flag: boolean;
+  demand_group_id: string;
+  function_type_id: string;
+  function_type_label: string;
+  location_text: string;
+  locked: boolean;
+  lock_reason: string;
+  mandatory_flag: boolean;
+  meeting_point: string;
+  min_qty: number;
+  qualification_type_id: string;
+  qualification_type_label: string;
+  release_state: string;
+  remark: string;
+  shift_id: string;
+  shift_label: string;
+  shift_type_code: string;
+  sort_order: number;
+  starts_at: string;
+  subcontractor_visible_flag: boolean;
+  target_qty: number;
+  version_no: number;
+};
+
 const planningFamilyOptions = computed(() => [
   { label: $t('sicherplan.customerPlansWizard.forms.planningFamilies.site'), value: 'site' },
   { label: $t('sicherplan.customerPlansWizard.forms.planningFamilies.eventVenue'), value: 'event_venue' },
@@ -783,6 +865,149 @@ const demandGroupDraftRowsDisplay = computed(() =>
       row.qualification_type_id ||
       $t('sicherplan.customerPlansWizard.forms.none'),
   })),
+);
+const generatedDemandGroupShiftMeta = computed(() =>
+  demandGroupGeneratedShifts.value.map((shift) => ({
+    customer_visible_flag: shift.customer_visible_flag,
+    id: shift.id,
+    label: shift.occurrence_date || shift.starts_at,
+    location_text: shift.location_text || '',
+    meeting_point: shift.meeting_point || '',
+    release_state: shift.release_state,
+    shift_type_code: shift.shift_type_code,
+    starts_at: shift.starts_at,
+    subcontractor_visible_flag: shift.subcontractor_visible_flag,
+  })),
+);
+const persistedDemandGroupSummaryRows = computed<PersistedDemandGroupSummaryRow[]>(() => {
+  if (!persistedDemandGroups.value.length || !generatedDemandGroupShiftMeta.value.length) {
+    return [];
+  }
+  const shiftMetaById = new Map(generatedDemandGroupShiftMeta.value.map((entry) => [entry.id, entry]));
+  const targetShiftIds = new Set(generatedDemandGroupShiftMeta.value.map((entry) => entry.id));
+  const normalizeRemark = (value: null | string | undefined) => value?.trim() || '';
+  const buildBaseKey = (row: Pick<DemandGroupRead, 'function_type_id' | 'qualification_type_id'>) =>
+    [row.function_type_id, row.qualification_type_id || ''].join('|');
+  const buildSignatureKey = (row: Pick<DemandGroupRead, 'function_type_id' | 'qualification_type_id' | 'min_qty' | 'target_qty' | 'mandatory_flag' | 'sort_order' | 'remark'>) =>
+    [
+      row.function_type_id,
+      row.qualification_type_id || '',
+      String(row.min_qty),
+      String(row.target_qty),
+      row.mandatory_flag ? '1' : '0',
+      String(row.sort_order),
+      normalizeRemark(row.remark),
+    ].join('|');
+
+  const baseVariantCounts = new Map<string, number>();
+  const signatures = new Map<string, { row: DemandGroupRead; shiftIds: Set<string>; rows: DemandGroupRead[] }>();
+
+  for (const row of persistedDemandGroups.value) {
+    if (!targetShiftIds.has(row.shift_id) || row.archived_at != null || row.status !== 'active') {
+      continue;
+    }
+    const signatureKey = buildSignatureKey(row);
+    const baseKey = buildBaseKey(row);
+    const existing = signatures.get(signatureKey);
+    if (existing) {
+      existing.shiftIds.add(row.shift_id);
+      existing.rows.push(row);
+    } else {
+      signatures.set(signatureKey, { row, shiftIds: new Set([row.shift_id]), rows: [row] });
+      baseVariantCounts.set(baseKey, (baseVariantCounts.get(baseKey) || 0) + 1);
+    }
+  }
+
+  return Array.from(signatures.entries())
+    .map(([signatureKey, entry]) => {
+      const functionTypeLabel = functionTypeSelectOptions.value.find((option) => option.value === entry.row.function_type_id)?.label || entry.row.function_type_id;
+      const qualificationTypeLabel = qualificationTypeSelectOptions.value.find((option) => option.value === (entry.row.qualification_type_id || ''))?.label
+        || (entry.row.qualification_type_id || '')
+        || $t('sicherplan.customerPlansWizard.forms.none');
+      const shiftIds = Array.from(entry.shiftIds);
+      const shiftRows = entry.rows
+        .map((row) => {
+          const shiftMeta = shiftMetaById.get(row.shift_id);
+          const rowLocked = !shiftMeta || shiftMeta.release_state !== 'draft' || shiftMeta.customer_visible_flag || shiftMeta.subcontractor_visible_flag;
+          return {
+            customer_visible_flag: shiftMeta?.customer_visible_flag ?? false,
+            demand_group_id: row.id,
+            function_type_id: row.function_type_id,
+            function_type_label: functionTypeLabel,
+            location_text: shiftMeta?.location_text ?? '',
+            locked: rowLocked,
+            lock_reason: rowLocked ? $t('sicherplan.customerPlansWizard.messages.demandGroupsRowLocked') : '',
+            mandatory_flag: row.mandatory_flag,
+            meeting_point: shiftMeta?.meeting_point ?? '',
+            min_qty: row.min_qty,
+            qualification_type_id: row.qualification_type_id || '',
+            qualification_type_label: qualificationTypeLabel,
+            release_state: shiftMeta?.release_state ?? '',
+            remark: normalizeRemark(row.remark),
+            shift_id: row.shift_id,
+            shift_label: shiftMeta?.label || row.shift_id,
+            shift_type_code: shiftMeta?.shift_type_code ?? '',
+            sort_order: row.sort_order,
+            starts_at: shiftMeta?.starts_at || '',
+            subcontractor_visible_flag: shiftMeta?.subcontractor_visible_flag ?? false,
+            target_qty: row.target_qty,
+            version_no: row.version_no,
+          } satisfies PersistedDemandGroupShiftRow;
+        })
+        .sort((left, right) => left.starts_at.localeCompare(right.starts_at) || left.shift_label.localeCompare(right.shift_label));
+      const missingShiftLabels = generatedDemandGroupShiftMeta.value
+        .filter((shift) => !entry.shiftIds.has(shift.id))
+        .map((shift) => shift.label);
+      const baseKey = buildBaseKey(entry.row);
+      const variantCount = baseVariantCounts.get(baseKey) || 1;
+      const appliedShiftCount = shiftIds.length;
+      const totalShiftCount = generatedDemandGroupShiftMeta.value.length;
+      return {
+        applied_shift_count: appliedShiftCount,
+        all_rows_locked: shiftRows.length > 0 && shiftRows.every((row) => row.locked),
+        demand_group_ids: entry.rows.map((row) => row.id),
+        function_type_id: entry.row.function_type_id,
+        function_type_label: functionTypeLabel,
+        has_locked_rows: shiftRows.some((row) => row.locked),
+        min_qty: entry.row.min_qty,
+        missing_shift_count: missingShiftLabels.length,
+        missing_shift_labels: missingShiftLabels,
+        mandatory_flag: entry.row.mandatory_flag,
+        qualification_type_id: entry.row.qualification_type_id || '',
+        qualification_type_label: qualificationTypeLabel,
+        remark: normalizeRemark(entry.row.remark),
+        shift_rows: shiftRows,
+        shift_labels: shiftIds.map((shiftId) => shiftMetaById.get(shiftId)?.label || shiftId),
+        signature_key: signatureKey,
+        sort_order: entry.row.sort_order,
+        status: variantCount > 1 ? 'mixed' : appliedShiftCount === totalShiftCount ? 'complete' : 'partial',
+        target_qty: entry.row.target_qty,
+        total_shift_count: totalShiftCount,
+        variant_count: variantCount,
+      } satisfies PersistedDemandGroupSummaryRow;
+    })
+    .sort((left, right) => left.sort_order - right.sort_order || left.function_type_label.localeCompare(right.function_type_label));
+});
+const persistedDemandGroupsCoverageComplete = computed(
+  () =>
+    generatedDemandGroupShiftMeta.value.length > 0
+    && generatedDemandGroupShiftMeta.value.every((shift) => persistedDemandGroups.value.some((row) => row.shift_id === shift.id && row.archived_at == null && row.status === 'active')),
+);
+const persistedDemandGroupsSummaryMessage = computed(() => {
+  if (!persistedDemandGroupSummaryRows.value.length) {
+    return '';
+  }
+  return $t('sicherplan.customerPlansWizard.messages.demandGroupsPersistedSummary', {
+    groups: persistedDemandGroupSummaryRows.value.length,
+    shifts: generatedDemandGroupShiftMeta.value.length,
+  } as never);
+});
+const selectedAggregateDemandGroupRow = computed(
+  () => persistedDemandGroupSummaryRows.value.find((row) => row.signature_key === selectedAggregateDemandGroupSignature.value) || null,
+);
+const selectedShiftDemandGroupRows = computed(() => selectedAggregateDemandGroupRow.value?.shift_rows || []);
+const selectedShiftDemandGroupRow = computed(
+  () => selectedShiftDemandGroupRows.value.find((row) => row.demand_group_id === selectedShiftDemandGroupId.value) || null,
 );
 const requirementLineDuplicateActive = computed(() =>
   hasDuplicateActiveRequirementLine(
@@ -3945,6 +4170,85 @@ function closeDemandGroupDialog() {
   resetDemandGroupDialogDraft();
 }
 
+function resetAggregateDemandGroupDialogDraft() {
+  aggregateDemandGroupDialog.function_type_id = '';
+  aggregateDemandGroupDialog.mandatory_flag = true;
+  aggregateDemandGroupDialog.min_qty = 1;
+  aggregateDemandGroupDialog.qualification_type_id = '';
+  aggregateDemandGroupDialog.remark = '';
+  aggregateDemandGroupDialog.sort_order = 1;
+  aggregateDemandGroupDialog.target_qty = 1;
+}
+
+function resetShiftDemandGroupDialogDraft() {
+  shiftDemandGroupDialogDraft.function_type_id = '';
+  shiftDemandGroupDialogDraft.mandatory_flag = true;
+  shiftDemandGroupDialogDraft.min_qty = 1;
+  shiftDemandGroupDialogDraft.qualification_type_id = '';
+  shiftDemandGroupDialogDraft.remark = '';
+  shiftDemandGroupDialogDraft.sort_order = 1;
+  shiftDemandGroupDialogDraft.target_qty = 1;
+}
+
+function openAggregateDemandGroupEditDialog(signatureKey: string) {
+  const row = persistedDemandGroupSummaryRows.value.find((entry) => entry.signature_key === signatureKey);
+  if (!row || row.has_locked_rows) {
+    return;
+  }
+  selectedAggregateDemandGroupSignature.value = signatureKey;
+  aggregateDemandGroupDialog.function_type_id = row.function_type_id;
+  aggregateDemandGroupDialog.mandatory_flag = row.mandatory_flag;
+  aggregateDemandGroupDialog.min_qty = row.min_qty;
+  aggregateDemandGroupDialog.qualification_type_id = row.qualification_type_id;
+  aggregateDemandGroupDialog.remark = row.remark;
+  aggregateDemandGroupDialog.sort_order = row.sort_order;
+  aggregateDemandGroupDialog.target_qty = row.target_qty;
+  aggregateDemandGroupValidationError.value = '';
+  aggregateDemandGroupDialog.open = true;
+}
+
+function closeAggregateDemandGroupEditDialog() {
+  aggregateDemandGroupDialog.open = false;
+  selectedAggregateDemandGroupSignature.value = '';
+  aggregateDemandGroupValidationError.value = '';
+  resetAggregateDemandGroupDialogDraft();
+}
+
+function openShiftDemandGroupEditDialog(signatureKey: string) {
+  const row = persistedDemandGroupSummaryRows.value.find((entry) => entry.signature_key === signatureKey);
+  if (!row) {
+    return;
+  }
+  selectedAggregateDemandGroupSignature.value = signatureKey;
+  selectedShiftDemandGroupId.value = row.shift_rows[0]?.demand_group_id || '';
+  hydrateShiftDemandGroupDialogDraft();
+  shiftDemandGroupValidationError.value = '';
+  shiftDemandGroupDialog.open = true;
+}
+
+function closeShiftDemandGroupEditDialog() {
+  shiftDemandGroupDialog.open = false;
+  selectedShiftDemandGroupId.value = '';
+  shiftDemandGroupValidationError.value = '';
+  resetShiftDemandGroupDialogDraft();
+  selectedAggregateDemandGroupSignature.value = '';
+}
+
+function hydrateShiftDemandGroupDialogDraft() {
+  const row = selectedShiftDemandGroupRow.value;
+  if (!row) {
+    resetShiftDemandGroupDialogDraft();
+    return;
+  }
+  shiftDemandGroupDialogDraft.function_type_id = row.function_type_id;
+  shiftDemandGroupDialogDraft.mandatory_flag = row.mandatory_flag;
+  shiftDemandGroupDialogDraft.min_qty = row.min_qty;
+  shiftDemandGroupDialogDraft.qualification_type_id = row.qualification_type_id;
+  shiftDemandGroupDialogDraft.remark = row.remark;
+  shiftDemandGroupDialogDraft.sort_order = row.sort_order;
+  shiftDemandGroupDialogDraft.target_qty = row.target_qty;
+}
+
 function buildDemandGroupCompositeKey(row: Pick<DemandGroupDraftRow, 'function_type_id' | 'qualification_type_id' | 'sort_order'>) {
   return [
     row.function_type_id.trim(),
@@ -4054,6 +4358,150 @@ function buildDemandGroupTemplates(): DemandGroupBulkTemplate[] | null {
     sort_order: row.sort_order,
     target_qty: row.target_qty,
   }));
+}
+
+function validateDemandGroupValues(
+  candidate: {
+    function_type_id: string;
+    min_qty: number;
+    sort_order: number;
+    target_qty: number;
+  },
+  errorTarget: 'aggregate' | 'row',
+) {
+  const setError = (message: string) => {
+    if (errorTarget === 'aggregate') {
+      aggregateDemandGroupValidationError.value = message;
+    } else {
+      shiftDemandGroupValidationError.value = message;
+    }
+  };
+  if (!candidate.function_type_id.trim()) {
+    setError($t('sicherplan.customerPlansWizard.errors.demandGroupsFunctionTypeRequired'));
+    return false;
+  }
+  if (!Number.isInteger(candidate.sort_order) || candidate.sort_order < 1 || candidate.min_qty < 0 || candidate.target_qty < 0) {
+    setError($t('sicherplan.customerPlansWizard.errors.demandGroupsInvalid'));
+    return false;
+  }
+  if (candidate.target_qty < candidate.min_qty) {
+    setError($t('sicherplan.customerPlansWizard.errors.demandGroupsMinExceedsTarget'));
+    return false;
+  }
+  setError('');
+  return true;
+}
+
+async function reloadPersistedDemandGroups() {
+  if (!props.tenantId || !props.accessToken) {
+    persistedDemandGroups.value = [];
+    return;
+  }
+  if (!demandGroupGeneratedShifts.value.length) {
+    persistedDemandGroups.value = [];
+    return;
+  }
+  const persistedRows = await Promise.all(
+    demandGroupGeneratedShifts.value.map((shift) =>
+      listDemandGroups(props.tenantId, props.accessToken, { shift_id: shift.id }),
+    ),
+  );
+  persistedDemandGroups.value = persistedRows.flat();
+}
+
+async function submitAggregateDemandGroupDialog() {
+  const summaryRow = selectedAggregateDemandGroupRow.value;
+  if (!summaryRow || !props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id || summaryRow.has_locked_rows) {
+    return;
+  }
+  const candidate = {
+    function_type_id: aggregateDemandGroupDialog.function_type_id.trim(),
+    min_qty: Number(aggregateDemandGroupDialog.min_qty),
+    sort_order: Number(aggregateDemandGroupDialog.sort_order),
+    target_qty: Number(aggregateDemandGroupDialog.target_qty),
+  };
+  if (!validateDemandGroupValues(candidate, 'aggregate')) {
+    return;
+  }
+  aggregateDemandGroupSaving.value = true;
+  try {
+    const result = await bulkUpdateDemandGroups(props.tenantId, props.accessToken, {
+      tenant_id: props.tenantId,
+      shift_plan_id: props.wizardState.shift_plan_id,
+      shift_series_id: props.wizardState.series_id || null,
+      match: {
+        function_type_id: summaryRow.function_type_id,
+        qualification_type_id: summaryRow.qualification_type_id || null,
+        min_qty: summaryRow.min_qty,
+        target_qty: summaryRow.target_qty,
+        mandatory_flag: summaryRow.mandatory_flag,
+        sort_order: summaryRow.sort_order,
+        remark: summaryRow.remark || null,
+      },
+      patch: {
+        function_type_id: candidate.function_type_id,
+        qualification_type_id: aggregateDemandGroupDialog.qualification_type_id.trim() || null,
+        mandatory_flag: aggregateDemandGroupDialog.mandatory_flag,
+        min_qty: candidate.min_qty,
+        remark: aggregateDemandGroupDialog.remark.trim() || null,
+        sort_order: candidate.sort_order,
+        target_qty: candidate.target_qty,
+      },
+      expected_demand_group_ids: summaryRow.demand_group_ids,
+      expected_target_shift_count: summaryRow.total_shift_count,
+    });
+    demandGroupSummaryMessage.value = $t('sicherplan.customerPlansWizard.messages.demandGroupsBulkUpdatedSummary', {
+      conflicts: result.conflict_count,
+      matched: result.matched_count,
+      updated: result.updated_count,
+    } as never);
+    await reloadPersistedDemandGroups();
+    emit('step-completion', 'demand-groups', persistedDemandGroupsCoverageComplete.value && demandGroupDraftRows.value.length === 0);
+    closeAggregateDemandGroupEditDialog();
+  } catch (error) {
+    aggregateDemandGroupValidationError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    aggregateDemandGroupSaving.value = false;
+  }
+}
+
+async function submitShiftDemandGroupDialog() {
+  const row = selectedShiftDemandGroupRow.value;
+  if (!row || row.locked || !props.tenantId || !props.accessToken) {
+    return;
+  }
+  const candidate = {
+    function_type_id: shiftDemandGroupDialogDraft.function_type_id.trim(),
+    min_qty: Number(shiftDemandGroupDialogDraft.min_qty),
+    sort_order: Number(shiftDemandGroupDialogDraft.sort_order),
+    target_qty: Number(shiftDemandGroupDialogDraft.target_qty),
+  };
+  if (!validateDemandGroupValues(candidate, 'row')) {
+    return;
+  }
+  shiftDemandGroupSaving.value = true;
+  try {
+    await updateDemandGroup(props.tenantId, props.accessToken, row.demand_group_id, {
+      function_type_id: candidate.function_type_id,
+      qualification_type_id: shiftDemandGroupDialogDraft.qualification_type_id.trim() || null,
+      mandatory_flag: shiftDemandGroupDialogDraft.mandatory_flag,
+      min_qty: candidate.min_qty,
+      remark: shiftDemandGroupDialogDraft.remark.trim() || null,
+      sort_order: candidate.sort_order,
+      target_qty: candidate.target_qty,
+      version_no: row.version_no,
+    });
+    demandGroupSummaryMessage.value = $t('sicherplan.customerPlansWizard.messages.demandGroupsShiftUpdatedSummary', {
+      shift: row.shift_label,
+    } as never);
+    await reloadPersistedDemandGroups();
+    emit('step-completion', 'demand-groups', persistedDemandGroupsCoverageComplete.value && demandGroupDraftRows.value.length === 0);
+    closeShiftDemandGroupEditDialog();
+  } catch (error) {
+    shiftDemandGroupValidationError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    shiftDemandGroupSaving.value = false;
+  }
 }
 
 function cancelExistingOrderEdit() {
@@ -4711,6 +5159,7 @@ async function loadDemandGroupsState(isCurrent = () => true) {
   const persistedDemandGroupsDraft = loadStepDraft<DemandGroupsDraftPersistence>('demand-groups');
   if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
     demandGroupGeneratedShifts.value = [];
+    persistedDemandGroups.value = [];
     demandGroupApplyResult.value = null;
     demandGroupSummaryMessage.value = '';
     demandGroupDraftRows.value = persistedDemandGroupsDraft?.rows?.length
@@ -4732,6 +5181,14 @@ async function loadDemandGroupsState(isCurrent = () => true) {
       return;
     }
     demandGroupGeneratedShifts.value = shifts.filter((row) => row.source_kind_code === 'generated');
+    if (demandGroupGeneratedShifts.value.length) {
+      await reloadPersistedDemandGroups();
+      if (!isCurrent()) {
+        return;
+      }
+    } else {
+      persistedDemandGroups.value = [];
+    }
     demandGroupApplyResult.value = null;
     demandGroupSummaryMessage.value = '';
     demandGroupDraftRows.value = persistedDemandGroupsDraft?.rows?.length
@@ -4740,7 +5197,11 @@ async function loadDemandGroupsState(isCurrent = () => true) {
     if (persistedDemandGroupsDraft?.rows?.length) {
       restoreDraftMessage();
     }
-    emit('step-completion', 'demand-groups', false);
+    emit(
+      'step-completion',
+      'demand-groups',
+      persistedDemandGroupsCoverageComplete.value && demandGroupDraftRows.value.length === 0,
+    );
   } finally {
     finishStepLoads(loadVersions, isCurrent);
   }
@@ -6520,6 +6981,13 @@ async function submitDemandGroupsStep(): Promise<CustomerNewPlanStepSubmitResult
     emit('step-ui-state', 'demand-groups', { error: 'missing_shift_plan' });
     return false;
   }
+  if (!demandGroupDraftRows.value.length) {
+    demandGroupValidationError.value = persistedDemandGroupSummaryRows.value.length
+      ? $t('sicherplan.customerPlansWizard.errors.demandGroupsNoPendingTemplates')
+      : $t('sicherplan.customerPlansWizard.errors.demandGroupsEmpty');
+    emit('step-ui-state', 'demand-groups', { error: 'validation_failed' });
+    return false;
+  }
   if (!demandGroupsCanApply.value) {
     demandGroupValidationError.value = $t('sicherplan.customerPlansWizard.errors.demandGroupsNoGeneratedShifts');
     emit('step-ui-state', 'demand-groups', { error: 'no_generated_shifts' });
@@ -6550,6 +7018,7 @@ async function submitDemandGroupsStep(): Promise<CustomerNewPlanStepSubmitResult
     demandGroupDraftRows.value = [];
     clearStepDraft('demand-groups');
     clearDraftRestoreMessage();
+    await reloadPersistedDemandGroups();
     emit('step-completion', 'demand-groups', true);
     emit('step-ui-state', 'demand-groups', { dirty: false, error: '' });
     return {
@@ -6896,6 +7365,12 @@ watch(
   },
   { deep: true },
 );
+
+watch(selectedShiftDemandGroupId, () => {
+  if (shiftDemandGroupDialog.open) {
+    hydrateShiftDemandGroupDialogDraft();
+  }
+});
 
 watch(
   () => seriesDraft.recurrence_code,
@@ -8800,6 +9275,86 @@ onBeforeUnmount(() => {
       >
         {{ demandGroupSummaryMessage }}
       </p>
+      <section class="sp-customer-plan-wizard-step__document-subsection" data-testid="customer-new-plan-demand-group-persisted-section">
+        <header class="sp-customer-plan-wizard-step__document-subsection-header">
+          <h5>{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsAppliedTitle') }}</h5>
+          <p class="field-help">{{ persistedDemandGroupsSummaryMessage || $t('sicherplan.customerPlansWizard.forms.demandGroupsAppliedEmpty') }}</p>
+        </header>
+        <div
+          v-if="persistedDemandGroupSummaryRows.length"
+          class="sp-customer-plan-wizard-step__list sp-customer-plan-wizard-step__list--compact"
+          data-testid="customer-new-plan-demand-group-persisted-list"
+        >
+          <article
+            v-for="row in persistedDemandGroupSummaryRows"
+            :key="row.signature_key"
+            class="sp-customer-plan-wizard-step__document-subsection sp-customer-plan-wizard-step__document-subsection--compact"
+            data-testid="customer-new-plan-demand-group-persisted-row"
+          >
+            <div class="sp-customer-plan-wizard-step__demand-group-card">
+              <div class="sp-customer-plan-wizard-step__demand-group-card-actions">
+                <button
+                  type="button"
+                  class="cta-button cta-secondary"
+                  :data-testid="`customer-new-plan-demand-group-persisted-days-${row.signature_key}`"
+                  :disabled="stepLoading || row.all_rows_locked"
+                  @click="openShiftDemandGroupEditDialog(row.signature_key)"
+                >
+                  {{ $t('sicherplan.customerPlansWizard.actions.editDemandGroupDays') }}
+                </button>
+                <button
+                  type="button"
+                  class="cta-button cta-secondary"
+                  :data-testid="`customer-new-plan-demand-group-persisted-edit-${row.signature_key}`"
+                  :disabled="stepLoading || row.has_locked_rows"
+                  @click="openAggregateDemandGroupEditDialog(row.signature_key)"
+                >
+                  {{ $t('sicherplan.customerPlansWizard.actions.editDemandGroupAggregate') }}
+                </button>
+              </div>
+              <div class="sp-customer-plan-wizard-step__demand-group-card-body">
+                <header class="sp-customer-plan-wizard-step__document-subsection-header sp-customer-plan-wizard-step__document-subsection-header--compact">
+                  <div>
+                    <h5>{{ row.function_type_label }}</h5>
+                    <p class="field-help">{{ row.qualification_type_label }}</p>
+                  </div>
+                  <span
+                    class="sp-customer-plan-wizard-step__status-badge"
+                    :class="`sp-customer-plan-wizard-step__status-badge--${row.status}`"
+                    :data-testid="`customer-new-plan-demand-group-persisted-status-${row.signature_key}`"
+                  >
+                    {{
+                      row.status === 'complete'
+                        ? $t('sicherplan.customerPlansWizard.forms.demandGroupsStatusComplete')
+                        : row.status === 'mixed'
+                          ? $t('sicherplan.customerPlansWizard.forms.demandGroupsStatusMixed')
+                          : $t('sicherplan.customerPlansWizard.forms.demandGroupsStatusPartial')
+                    }}
+                  </span>
+                </header>
+                <div class="sp-customer-plan-wizard-step__info-summary sp-customer-plan-wizard-step__info-summary--compact">
+                  <span>{{ $t('sicherplan.customerPlansWizard.forms.minQty') }}: {{ row.min_qty }}</span>
+                  <span>{{ $t('sicherplan.customerPlansWizard.forms.targetQty') }}: {{ row.target_qty }}</span>
+                  <span>{{ $t('sicherplan.customerPlansWizard.forms.sortOrder') }}: {{ row.sort_order }}</span>
+                  <span>{{ row.mandatory_flag ? $t('sicherplan.customerPlansWizard.forms.mandatoryFlag') : $t('sicherplan.customerPlansWizard.forms.optionalFlag') }}</span>
+                  <span>{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsAppliedShiftCount', { applied: row.applied_shift_count, total: row.total_shift_count }) }}</span>
+                  <span v-if="row.missing_shift_count">{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsMissingShiftCount', { count: row.missing_shift_count }) }}</span>
+                  <span v-if="row.variant_count > 1">{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsVariantCount', { count: row.variant_count }) }}</span>
+                  <span v-if="row.remark">{{ row.remark }}</span>
+                  <span v-if="row.has_locked_rows" class="sp-customer-plan-wizard-step__lock-chip">
+                    {{ $t('sicherplan.customerPlansWizard.messages.demandGroupsLockedHint') }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section class="sp-customer-plan-wizard-step__document-subsection" data-testid="customer-new-plan-demand-group-draft-section">
+        <header class="sp-customer-plan-wizard-step__document-subsection-header">
+          <h5>{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsDraftTitle') }}</h5>
+          <p class="field-help">{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsDraftHelp') }}</p>
+        </header>
       <div
         v-if="demandGroupDraftRowsDisplay.length"
         class="sp-customer-plan-wizard-step__list"
@@ -8852,6 +9407,7 @@ onBeforeUnmount(() => {
       >
         {{ $t('sicherplan.customerPlansWizard.forms.demandGroupsDraftEmpty') }}
       </p>
+      </section>
     </section>
 
     <section v-else class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-placeholder">
@@ -8933,6 +9489,171 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </form>
+    </Modal>
+
+    <Modal
+      v-model:open="aggregateDemandGroupDialog.open"
+      :footer="null"
+      :title="$t('sicherplan.customerPlansWizard.dialogs.demandGroupAggregateEditTitle')"
+      wrap-class-name="sp-customer-plan-wizard-modal"
+      @cancel="closeAggregateDemandGroupEditDialog"
+    >
+      <form
+        class="sp-customer-plan-wizard-step__modal"
+        data-testid="customer-new-plan-demand-group-aggregate-modal"
+        @submit.prevent="submitAggregateDemandGroupDialog"
+      >
+        <p
+          v-if="selectedAggregateDemandGroupRow?.status === 'mixed'"
+          class="field-help"
+          data-testid="customer-new-plan-demand-group-aggregate-warning"
+        >
+          {{ $t('sicherplan.customerPlansWizard.messages.demandGroupsMixedWarning') }}
+        </p>
+        <div class="sp-customer-plan-wizard-step__grid">
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.functionType') }}</span>
+            <select v-model="aggregateDemandGroupDialog.function_type_id" data-testid="customer-new-plan-demand-group-aggregate-function-type">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.functionTypePlaceholder') }}</option>
+              <option v-for="option in functionTypeSelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.qualificationType') }}</span>
+            <select v-model="aggregateDemandGroupDialog.qualification_type_id" data-testid="customer-new-plan-demand-group-aggregate-qualification-type">
+              <option value="">{{ $t('sicherplan.customerPlansWizard.forms.qualificationTypePlaceholder') }}</option>
+              <option v-for="option in qualificationTypeSelectOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.minQty') }}</span>
+            <input v-model.number="aggregateDemandGroupDialog.min_qty" data-testid="customer-new-plan-demand-group-aggregate-min-qty" min="0" type="number" />
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.targetQty') }}</span>
+            <input v-model.number="aggregateDemandGroupDialog.target_qty" data-testid="customer-new-plan-demand-group-aggregate-target-qty" min="0" type="number" />
+          </label>
+          <label class="planning-admin-checkbox planning-admin-checkbox--centered">
+            <input v-model="aggregateDemandGroupDialog.mandatory_flag" data-testid="customer-new-plan-demand-group-aggregate-mandatory" type="checkbox" />
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.mandatoryFlag') }}</span>
+          </label>
+          <label class="field-stack">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.sortOrder') }}</span>
+            <input v-model.number="aggregateDemandGroupDialog.sort_order" data-testid="customer-new-plan-demand-group-aggregate-sort-order" min="1" type="number" />
+          </label>
+          <label class="field-stack field-stack--wide">
+            <span>{{ $t('sicherplan.customerPlansWizard.forms.remark') }}</span>
+            <textarea v-model="aggregateDemandGroupDialog.remark" data-testid="customer-new-plan-demand-group-aggregate-remark" rows="2" />
+          </label>
+        </div>
+        <p v-if="aggregateDemandGroupValidationError" class="field-help" data-testid="customer-new-plan-demand-group-aggregate-validation">
+          {{ aggregateDemandGroupValidationError }}
+        </p>
+        <div class="cta-row">
+          <button class="cta-button" data-testid="customer-new-plan-demand-group-aggregate-save" :disabled="aggregateDemandGroupSaving" type="submit">
+            {{ $t('sicherplan.customerPlansWizard.actions.saveDemandGroupAggregate') }}
+          </button>
+          <button
+            class="cta-button cta-secondary"
+            data-testid="customer-new-plan-demand-group-aggregate-cancel"
+            :disabled="aggregateDemandGroupSaving"
+            type="button"
+            @click="closeAggregateDemandGroupEditDialog"
+          >
+            {{ $t('sicherplan.customerPlansWizard.actions.cancelDemandGroup') }}
+          </button>
+        </div>
+      </form>
+    </Modal>
+
+    <Modal
+      v-model:open="shiftDemandGroupDialog.open"
+      :footer="null"
+      :title="$t('sicherplan.customerPlansWizard.dialogs.demandGroupShiftEditTitle')"
+      wrap-class-name="sp-customer-plan-wizard-modal"
+      @cancel="closeShiftDemandGroupEditDialog"
+    >
+      <div class="sp-customer-plan-wizard-step__modal" data-testid="customer-new-plan-demand-group-shift-modal">
+        <div class="sp-customer-plan-wizard-step__demand-group-shift-list">
+          <button
+            v-for="row in selectedShiftDemandGroupRows"
+            :key="row.demand_group_id"
+            type="button"
+            class="sp-customer-plan-wizard-step__demand-group-shift-list-row"
+            :class="{ 'is-selected': row.demand_group_id === selectedShiftDemandGroupId }"
+            :data-testid="`customer-new-plan-demand-group-shift-row-${row.demand_group_id}`"
+            @click="selectedShiftDemandGroupId = row.demand_group_id"
+          >
+            <strong>{{ row.shift_label }}</strong>
+            <span>{{ row.shift_type_code }}</span>
+            <span v-if="row.location_text">{{ row.location_text }}</span>
+            <span v-if="row.locked" class="sp-customer-plan-wizard-step__lock-chip">{{ row.lock_reason }}</span>
+          </button>
+        </div>
+        <form class="sp-customer-plan-wizard-step__modal" @submit.prevent="submitShiftDemandGroupDialog">
+          <div class="sp-customer-plan-wizard-step__grid">
+            <label class="field-stack">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.functionType') }}</span>
+              <select v-model="shiftDemandGroupDialogDraft.function_type_id" data-testid="customer-new-plan-demand-group-shift-function-type" :disabled="selectedShiftDemandGroupRow?.locked || shiftDemandGroupSaving">
+                <option value="">{{ $t('sicherplan.customerPlansWizard.forms.functionTypePlaceholder') }}</option>
+                <option v-for="option in functionTypeSelectOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+            <label class="field-stack">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.qualificationType') }}</span>
+              <select v-model="shiftDemandGroupDialogDraft.qualification_type_id" data-testid="customer-new-plan-demand-group-shift-qualification-type" :disabled="selectedShiftDemandGroupRow?.locked || shiftDemandGroupSaving">
+                <option value="">{{ $t('sicherplan.customerPlansWizard.forms.qualificationTypePlaceholder') }}</option>
+                <option v-for="option in qualificationTypeSelectOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+            <label class="field-stack">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.minQty') }}</span>
+              <input v-model.number="shiftDemandGroupDialogDraft.min_qty" data-testid="customer-new-plan-demand-group-shift-min-qty" min="0" type="number" :disabled="selectedShiftDemandGroupRow?.locked || shiftDemandGroupSaving" />
+            </label>
+            <label class="field-stack">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.targetQty') }}</span>
+              <input v-model.number="shiftDemandGroupDialogDraft.target_qty" data-testid="customer-new-plan-demand-group-shift-target-qty" min="0" type="number" :disabled="selectedShiftDemandGroupRow?.locked || shiftDemandGroupSaving" />
+            </label>
+            <label class="planning-admin-checkbox planning-admin-checkbox--centered">
+              <input v-model="shiftDemandGroupDialogDraft.mandatory_flag" data-testid="customer-new-plan-demand-group-shift-mandatory" type="checkbox" :disabled="selectedShiftDemandGroupRow?.locked || shiftDemandGroupSaving" />
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.mandatoryFlag') }}</span>
+            </label>
+            <label class="field-stack">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.sortOrder') }}</span>
+              <input v-model.number="shiftDemandGroupDialogDraft.sort_order" data-testid="customer-new-plan-demand-group-shift-sort-order" min="1" type="number" :disabled="selectedShiftDemandGroupRow?.locked || shiftDemandGroupSaving" />
+            </label>
+            <label class="field-stack field-stack--wide">
+              <span>{{ $t('sicherplan.customerPlansWizard.forms.remark') }}</span>
+              <textarea v-model="shiftDemandGroupDialogDraft.remark" data-testid="customer-new-plan-demand-group-shift-remark" rows="2" :disabled="selectedShiftDemandGroupRow?.locked || shiftDemandGroupSaving" />
+            </label>
+          </div>
+          <p v-if="shiftDemandGroupValidationError" class="field-help" data-testid="customer-new-plan-demand-group-shift-validation">
+            {{ shiftDemandGroupValidationError }}
+          </p>
+          <div class="cta-row">
+            <button class="cta-button" data-testid="customer-new-plan-demand-group-shift-save" :disabled="!selectedShiftDemandGroupRow || selectedShiftDemandGroupRow.locked || shiftDemandGroupSaving" type="submit">
+              {{ $t('sicherplan.customerPlansWizard.actions.saveDemandGroupShift') }}
+            </button>
+            <button
+              class="cta-button cta-secondary"
+              data-testid="customer-new-plan-demand-group-shift-cancel"
+              :disabled="shiftDemandGroupSaving"
+              type="button"
+              @click="closeShiftDemandGroupEditDialog"
+            >
+              {{ $t('sicherplan.customerPlansWizard.actions.cancelDemandGroup') }}
+            </button>
+          </div>
+        </form>
+      </div>
     </Modal>
 
     <Modal
@@ -10277,6 +10998,99 @@ onBeforeUnmount(() => {
   word-break: break-word;
 }
 
+.sp-customer-plan-wizard-step__list--compact {
+  gap: 0.75rem;
+}
+
+.sp-customer-plan-wizard-step__document-subsection--compact {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--sp-color-border-soft);
+  background: color-mix(in srgb, var(--sp-color-surface-page) 84%, white);
+}
+
+.sp-customer-plan-wizard-step__document-subsection-header--compact {
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.sp-customer-plan-wizard-step__demand-group-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.sp-customer-plan-wizard-step__demand-group-card-actions {
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+}
+
+.sp-customer-plan-wizard-step__demand-group-card-body {
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.sp-customer-plan-wizard-step__info-summary--compact {
+  gap: 0.35rem 0.6rem;
+}
+
+.sp-customer-plan-wizard-step__status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.6rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid var(--sp-color-border-soft);
+}
+
+.sp-customer-plan-wizard-step__status-badge--complete {
+  background: rgb(40 170 170 / 10%);
+  color: rgb(22 118 118);
+}
+
+.sp-customer-plan-wizard-step__status-badge--partial {
+  background: rgb(210 140 40 / 12%);
+  color: rgb(145 96 21);
+}
+
+.sp-customer-plan-wizard-step__status-badge--mixed {
+  background: rgb(114 93 198 / 10%);
+  color: rgb(82 63 158);
+}
+
+.sp-customer-plan-wizard-step__lock-chip {
+  color: rgb(145 96 21);
+}
+
+.sp-customer-plan-wizard-step__demand-group-shift-list {
+  display: grid;
+  gap: 0.5rem;
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.sp-customer-plan-wizard-step__demand-group-shift-list-row {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--sp-color-border-soft);
+  background: var(--sp-color-surface-page);
+  text-align: left;
+  color: var(--sp-color-text-primary);
+}
+
+.sp-customer-plan-wizard-step__demand-group-shift-list-row.is-selected {
+  border-color: rgb(40 170 170 / 45%);
+  box-shadow: 0 0 0 2px rgb(40 170 170 / 12%);
+}
+
 :deep(.sp-customer-plan-wizard-modal .field-stack) {
   display: grid;
   gap: 0.42rem;
@@ -10382,6 +11196,14 @@ onBeforeUnmount(() => {
 
   .sp-customer-plan-wizard-step__grid {
     grid-template-columns: 1fr;
+  }
+
+  .sp-customer-plan-wizard-step__demand-group-card {
+    grid-template-columns: 1fr;
+  }
+
+  .sp-customer-plan-wizard-step__demand-group-card-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .field-stack--wide {

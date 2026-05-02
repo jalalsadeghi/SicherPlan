@@ -1,1 +1,0 @@
-import{Tr as e,Vn as t,hr as n,nr as r}from"../jse/index-index-wrCfOYcT.js";import{i}from"./en_US-a65vmgC_.js";function a(a){let o=Symbol(`contextKey`);return{useProvide:(t,a)=>{let s=e({});return r(o,s),n(()=>{i(s,t,a||{})}),s},useInject:()=>t(o,a)||{}}}export{a as t};

@@ -31,6 +31,10 @@ from app.modules.planning.schemas import (
     DemandGroupBulkApplyResult,
     DemandGroupBulkApplyShiftResult,
     DemandGroupBulkTemplate,
+    DemandGroupBulkUpdateItemResult,
+    DemandGroupBulkUpdatePatch,
+    DemandGroupBulkUpdateRequest,
+    DemandGroupBulkUpdateResult,
     DemandGroupCreate,
     DemandGroupRead,
     DemandGroupUpdate,
@@ -75,6 +79,7 @@ class StaffingRepository(Protocol):
     def get_demand_group(self, tenant_id: str, row_id: str) -> DemandGroup | None: ...
     def create_demand_group(self, tenant_id: str, payload: DemandGroupCreate, actor_user_id: str | None) -> DemandGroup: ...
     def update_demand_group(self, tenant_id: str, row_id: str, payload: DemandGroupUpdate, actor_user_id: str | None) -> DemandGroup | None: ...
+    def bulk_update_demand_groups(self, tenant_id: str, updates: list[tuple[str, DemandGroupUpdate]], actor_user_id: str | None) -> list[DemandGroup]: ...
     def list_teams(self, tenant_id: str, filters: StaffingFilter) -> list[Team]: ...
     def get_team(self, tenant_id: str, row_id: str) -> Team | None: ...
     def create_team(self, tenant_id: str, payload: TeamCreate, actor_user_id: str | None) -> Team: ...
@@ -289,9 +294,133 @@ class StaffingService:
             results=shift_results,
         )
 
+    def bulk_update_demand_groups(
+        self,
+        tenant_id: str,
+        payload: DemandGroupBulkUpdateRequest,
+        actor: RequestAuthorizationContext,
+    ) -> DemandGroupBulkUpdateResult:
+        self._require_tenant_scope(tenant_id, payload.tenant_id)
+        if payload.date_from is not None and payload.date_to is not None and payload.date_to < payload.date_from:
+            raise ApiException(400, "planning.demand_group.bulk_update.invalid_date_window", "errors.planning.demand_group.bulk_update.invalid_date_window")
+        if not payload.patch.model_fields_set:
+            raise ApiException(
+                400,
+                "planning.demand_group.bulk_update.empty_patch",
+                "errors.planning.demand_group.bulk_update.empty_patch",
+                details={"reason_codes": ["empty_patch"]},
+            )
+
+        shift_plan = self._require_shift_plan(tenant_id, payload.shift_plan_id)
+        if payload.shift_series_id is not None and all(series.id != payload.shift_series_id for series in getattr(shift_plan, "series_rows", [])):
+            raise ApiException(404, "planning.shift_series.not_found", "errors.planning.shift_series.not_found")
+
+        if payload.match.target_qty is not None:
+            self._validate_demand_group(payload.match.min_qty or 0, payload.match.target_qty)
+        self._validate_bulk_update_patch(tenant_id, payload.patch)
+
+        target_shifts = self._resolve_bulk_target_shifts(
+            tenant_id,
+            shift_plan_id=payload.shift_plan_id,
+            shift_series_id=payload.shift_series_id,
+            date_from=payload.date_from,
+            date_to=payload.date_to,
+        )
+        if payload.expected_target_shift_count is not None and payload.expected_target_shift_count != len(target_shifts):
+            raise ApiException(
+                409,
+                "planning.demand_group.bulk_update.target_shift_mismatch",
+                "errors.planning.demand_group.bulk_update.target_shift_mismatch",
+                details={
+                    "reason_codes": ["target_shift_mismatch"],
+                    "expected_target_shift_count": payload.expected_target_shift_count,
+                    "current_target_shift_count": len(target_shifts),
+                },
+            )
+
+        matched_groups = self._collect_matching_demand_groups(tenant_id, target_shifts, payload.match)
+        if not matched_groups:
+            raise ApiException(
+                404,
+                "planning.demand_group.bulk_update.no_matching_demand_groups",
+                "errors.planning.demand_group.bulk_update.no_matching_demand_groups",
+                details={"reason_codes": ["no_matching_demand_groups"]},
+            )
+
+        if payload.expected_demand_group_ids is not None:
+            expected_ids = sorted(payload.expected_demand_group_ids)
+            current_ids = sorted(group.id for group in matched_groups)
+            if current_ids != expected_ids:
+                raise ApiException(
+                    409,
+                    "planning.demand_group.bulk_update.expected_set_mismatch",
+                    "errors.planning.demand_group.bulk_update.expected_set_mismatch",
+                    details={
+                        "reason_codes": ["expected_demand_group_ids_mismatch"],
+                        "expected_demand_group_ids": expected_ids,
+                        "current_demand_group_ids": current_ids,
+                    },
+                )
+
+        self._assert_demand_group_groups_editable(tenant_id, matched_groups)
+        self._validate_bulk_update_sort_order_conflicts(tenant_id, matched_groups, payload.patch)
+
+        updates: list[tuple[str, DemandGroupUpdate]] = []
+        item_results: list[DemandGroupBulkUpdateItemResult] = []
+        before_snapshots: dict[str, dict[str, object]] = {}
+        shift_plan_ids: dict[str, str] = {}
+        for group in matched_groups:
+            before_snapshots[group.id] = self._snapshot(group)
+            shift = self._require_shift(tenant_id, group.shift_id)
+            shift_plan_ids[group.id] = shift.shift_plan_id
+            next_min_qty = self._field_value(payload.patch, "min_qty", group.min_qty)
+            next_target_qty = self._field_value(payload.patch, "target_qty", group.target_qty)
+            self._validate_demand_group(next_min_qty, next_target_qty)
+            update_payload = payload.patch.model_dump(exclude_unset=True)
+            update_payload["version_no"] = group.version_no
+            updates.append(
+                (
+                    group.id,
+                    DemandGroupUpdate(**update_payload),
+                )
+            )
+            item_results.append(
+                DemandGroupBulkUpdateItemResult(
+                    demand_group_id=group.id,
+                    shift_id=group.shift_id,
+                    outcome_code="updated",
+                )
+            )
+
+        rows = self.repository.bulk_update_demand_groups(tenant_id, updates, actor.user_id)
+        updated_ids = [row.id for row in rows]
+        for row in rows:
+            self._record_event(
+                actor,
+                "planning.demand_group.bulk_updated",
+                "ops.demand_group",
+                row.id,
+                tenant_id,
+                before_json=before_snapshots[row.id],
+                after_json=self._snapshot(row) | {"shift_plan_id": shift_plan_ids[row.id]},
+            )
+
+        return DemandGroupBulkUpdateResult(
+            tenant_id=tenant_id,
+            shift_plan_id=payload.shift_plan_id,
+            shift_series_id=payload.shift_series_id,
+            matched_count=len(matched_groups),
+            updated_count=len(rows),
+            skipped_count=0,
+            conflict_count=0,
+            updated_demand_group_ids=updated_ids,
+            results=item_results,
+        )
+
     def update_demand_group(self, tenant_id: str, demand_group_id: str, payload: DemandGroupUpdate, actor: RequestAuthorizationContext) -> DemandGroupRead:
         current = self._require_demand_group(tenant_id, demand_group_id)
         before_json = self._snapshot(current)
+        self._assert_demand_group_groups_editable(tenant_id, [current])
         min_qty = self._field_value(payload, "min_qty", current.min_qty)
         target_qty = self._field_value(payload, "target_qty", current.target_qty)
         self._validate_demand_group(min_qty, target_qty)
@@ -802,6 +931,186 @@ class StaffingService:
             used_sort_orders.add(sort_order)
             normalized.append(template.model_copy(update={"sort_order": sort_order}))
         return normalized
+
+    def _validate_bulk_update_patch(self, tenant_id: str, patch: DemandGroupBulkUpdatePatch) -> None:
+        if "function_type_id" in patch.model_fields_set and patch.function_type_id is None:
+            raise ApiException(
+                400,
+                "planning.demand_group.bulk_update.function_type_required",
+                "errors.planning.demand_group.bulk_update.function_type_required",
+                details={"reason_codes": ["function_type_required"]},
+            )
+        function_type_id = patch.function_type_id
+        if function_type_id is not None:
+            self._require_function(tenant_id, function_type_id)
+        qualification_type_id = patch.qualification_type_id
+        if qualification_type_id is not None:
+            self._require_qualification(tenant_id, qualification_type_id)
+        if "status" in patch.model_fields_set and patch.status not in {None, "active", "archived"}:
+            raise ApiException(
+                400,
+                "planning.demand_group.bulk_update.invalid_status",
+                "errors.planning.demand_group.bulk_update.invalid_status",
+                details={"reason_codes": ["invalid_status"]},
+            )
+
+    def _resolve_bulk_target_shifts(
+        self,
+        tenant_id: str,
+        *,
+        shift_plan_id: str,
+        shift_series_id: str | None,
+        date_from: date | None,
+        date_to: date | None,
+    ) -> list[Shift]:
+        candidate_shifts = self.repository.list_shifts(
+            tenant_id,
+            ShiftListFilter(shift_plan_id=shift_plan_id, include_archived=False),
+        )
+        target_shifts = [
+            shift
+            for shift in candidate_shifts
+            if shift.source_kind_code == "generated"
+            and (shift_series_id is None or shift.shift_series_id == shift_series_id)
+            and self._shift_in_bulk_date_window(shift, date_from, date_to)
+        ]
+        if not target_shifts:
+            raise ApiException(
+                404,
+                "planning.demand_group.bulk_update.no_target_shifts",
+                "errors.planning.demand_group.bulk_update.no_target_shifts",
+                details={"reason_codes": ["no_target_shifts"]},
+            )
+        return target_shifts
+
+    def _collect_matching_demand_groups(self, tenant_id: str, target_shifts: list[Shift], match) -> list[DemandGroup]:  # noqa: ANN001
+        matched: list[DemandGroup] = []
+        for shift in target_shifts:
+            for group in self.repository.list_demand_groups(tenant_id, StaffingFilter(shift_id=shift.id, include_archived=False)):
+                if group.status != "active":
+                    continue
+                if self._demand_group_matches_signature(group, match):
+                    matched.append(group)
+        return matched
+
+    @staticmethod
+    def _demand_group_matches_signature(group: DemandGroup, match) -> bool:  # noqa: ANN001
+        if group.function_type_id != match.function_type_id:
+            return False
+        if "qualification_type_id" in match.model_fields_set and group.qualification_type_id != match.qualification_type_id:
+            return False
+        if "min_qty" in match.model_fields_set and group.min_qty != match.min_qty:
+            return False
+        if "target_qty" in match.model_fields_set and group.target_qty != match.target_qty:
+            return False
+        if "mandatory_flag" in match.model_fields_set and group.mandatory_flag != match.mandatory_flag:
+            return False
+        if "sort_order" in match.model_fields_set and group.sort_order != match.sort_order:
+            return False
+        if "remark" in match.model_fields_set and (group.remark or None) != (match.remark or None):
+            return False
+        return True
+
+    def _validate_bulk_update_sort_order_conflicts(
+        self,
+        tenant_id: str,
+        matched_groups: list[DemandGroup],
+        patch: DemandGroupBulkUpdatePatch,
+    ) -> None:
+        desired_by_shift: dict[str, set[int]] = defaultdict(set)
+        matched_ids = {group.id for group in matched_groups}
+        sort_order_changed = "sort_order" in patch.model_fields_set
+        for group in matched_groups:
+            desired_sort_order = self._field_value(patch, "sort_order", group.sort_order)
+            if desired_sort_order in desired_by_shift[group.shift_id]:
+                raise ApiException(
+                    409,
+                    "planning.demand_group.bulk_update.sort_order_conflict",
+                    "errors.planning.demand_group.bulk_update.sort_order_conflict",
+                    details={"reason_codes": ["duplicate_sort_order_in_shift"]},
+                )
+            desired_by_shift[group.shift_id].add(desired_sort_order)
+            if not sort_order_changed:
+                continue
+            for row in self.repository.list_demand_groups(tenant_id, StaffingFilter(shift_id=group.shift_id, include_archived=False)):
+                if row.id in matched_ids:
+                    continue
+                if row.sort_order == desired_sort_order:
+                    raise ApiException(
+                        409,
+                        "planning.demand_group.bulk_update.sort_order_conflict",
+                        "errors.planning.demand_group.bulk_update.sort_order_conflict",
+                        details={
+                            "reason_codes": ["sort_order_conflict"],
+                            "shift_id": group.shift_id,
+                            "conflict_demand_group_id": row.id,
+                        },
+                    )
+
+    def _assert_demand_group_groups_editable(self, tenant_id: str, demand_groups: list[DemandGroup]) -> None:
+        reason_codes: set[str] = set()
+        downstream_counts = {
+            "assignment_count": 0,
+            "subcontractor_release_count": 0,
+            "released_shift_count": 0,
+            "customer_visible_shift_count": 0,
+            "subcontractor_visible_shift_count": 0,
+            "deployment_output_count": 0,
+        }
+        seen_shift_ids: set[str] = set()
+
+        for demand_group in demand_groups:
+            active_assignments = [
+                row
+                for row in getattr(demand_group, "assignments", [])
+                if getattr(row, "archived_at", None) is None and getattr(row, "assignment_status_code", None) != "removed"
+            ]
+            if active_assignments:
+                reason_codes.add("assignments_exist")
+                downstream_counts["assignment_count"] += len(active_assignments)
+
+            active_releases = [
+                row
+                for row in getattr(demand_group, "subcontractor_releases", [])
+                if getattr(row, "archived_at", None) is None and getattr(row, "release_status_code", None) != "revoked"
+            ]
+            if active_releases:
+                reason_codes.add("subcontractor_releases_exist")
+                downstream_counts["subcontractor_release_count"] += len(active_releases)
+
+            if demand_group.shift_id in seen_shift_ids:
+                continue
+            seen_shift_ids.add(demand_group.shift_id)
+            shift = self._require_shift(tenant_id, demand_group.shift_id)
+            if shift.release_state != "draft":
+                reason_codes.add("shift_released")
+                downstream_counts["released_shift_count"] += 1
+            if shift.customer_visible_flag:
+                reason_codes.add("customer_visible")
+                downstream_counts["customer_visible_shift_count"] += 1
+            if shift.subcontractor_visible_flag:
+                reason_codes.add("subcontractor_visible")
+                downstream_counts["subcontractor_visible_shift_count"] += 1
+
+            output_documents = [
+                row
+                for row in self.repository.list_documents_for_owner(tenant_id, "ops.shift", shift.id)
+                if getattr(row, "metadata", {}).get("generated_kind") == "planning_output"
+            ]
+            if output_documents:
+                reason_codes.add("deployment_outputs_exist")
+                downstream_counts["deployment_output_count"] += len(output_documents)
+
+        if reason_codes:
+            raise ApiException(
+                409,
+                "planning.demand_group.edit_blocked",
+                "errors.planning.demand_group.edit_blocked",
+                details={
+                    "reason_codes": sorted(reason_codes),
+                    "downstream_counts": downstream_counts,
+                },
+            )
 
     def _validate_team_scope(self, tenant_id: str, planning_record_id: str | None, shift_id: str | None) -> None:
         if planning_record_id is None and shift_id is None:

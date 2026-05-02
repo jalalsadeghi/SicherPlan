@@ -47,6 +47,8 @@ from app.modules.planning.schemas import (
     EventVenueLocationProjectionRead,
     DemandGroupBulkApplyRequest,
     DemandGroupBulkApplyResult,
+    DemandGroupBulkUpdateRequest,
+    DemandGroupBulkUpdateResult,
     DemandGroupCreate,
     DemandGroupRead,
     DemandGroupUpdate,
@@ -1614,6 +1616,16 @@ def bulk_apply_demand_groups(
     service: Annotated[StaffingService, Depends(get_staffing_service)],
 ) -> DemandGroupBulkApplyResult:
     return service.bulk_apply_demand_groups(str(tenant_id), payload, context)
+
+
+@router.patch("/demand-groups/bulk-update", response_model=DemandGroupBulkUpdateResult, status_code=status.HTTP_200_OK)
+def bulk_update_demand_groups(
+    tenant_id: UUID,
+    payload: DemandGroupBulkUpdateRequest,
+    context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.staffing.write", scope="tenant"))],
+    service: Annotated[StaffingService, Depends(get_staffing_service)],
+) -> DemandGroupBulkUpdateResult:
+    return service.bulk_update_demand_groups(str(tenant_id), payload, context)
 
 
 @router.get("/demand-groups/{demand_group_id}", response_model=DemandGroupRead)

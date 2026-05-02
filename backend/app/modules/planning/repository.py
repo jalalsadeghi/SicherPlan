@@ -1632,6 +1632,21 @@ class SqlAlchemyPlanningRepository:
     def update_demand_group(self, tenant_id: str, row_id: str, payload: DemandGroupUpdate, actor_user_id: str | None) -> DemandGroup | None:
         return self._update_row(DemandGroup, tenant_id, row_id, payload, actor_user_id)
 
+    def bulk_update_demand_groups(self, tenant_id: str, updates: list[tuple[str, DemandGroupUpdate]], actor_user_id: str | None) -> list[DemandGroup]:
+        rows: list[DemandGroup] = []
+        for row_id, payload in updates:
+            row = self._get_row(DemandGroup, tenant_id, row_id)
+            if row is None:
+                raise ApiException(404, "planning.demand_group.not_found", "errors.planning.demand_group.not_found")
+            self._assert_version(row.version_no, payload.version_no, DemandGroup.__name__)
+            for key, value in payload.model_dump(exclude_unset=True, exclude={"version_no"}).items():
+                setattr(row, key, value)
+            row.updated_by_user_id = actor_user_id
+            row.version_no += 1
+            rows.append(row)
+        self._commit_or_raise()
+        return [self._get_row(DemandGroup, tenant_id, row.id) or row for row in rows]
+
     def list_teams(self, tenant_id: str, filters: StaffingFilter) -> list[Team]:
         statement = (
             select(Team)

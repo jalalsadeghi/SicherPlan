@@ -833,7 +833,11 @@ defineExpose({
         />
       </section>
 
-      <footer class="sp-customer-plan-wizard__actions" data-testid="customer-new-plan-action-bar">
+      <footer
+        class="sp-customer-plan-wizard__actions sp-assistant-avoid"
+        data-assistant-avoid
+        data-testid="customer-new-plan-action-bar"
+      >
         <button
           type="button"
           class="cta-button cta-secondary"
