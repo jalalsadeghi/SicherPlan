@@ -933,7 +933,7 @@ defineExpose({
 .sp-customer-plan-wizard__steps {
   display: flex;
   flex-wrap: wrap;
-  //gap: -0.75rem -1rem;
+  /* gap: -0.75rem -1rem; */
   
   padding: 0;
   margin: 0;
@@ -946,9 +946,9 @@ defineExpose({
   flex: 1 1 13rem;
   min-width: 0;
   padding: 0;
-  //border: 1px solid var(--sp-color-border-soft);
+  /* border: 1px solid var(--sp-color-border-soft); */
   border-radius: 0.95rem;
-  //background: var(--sp-color-primary-muted);
+  /* background: var(--sp-color-primary-muted); */
   background: var(--sp-color-border-soft);
   clip-path: polygon(0 0, calc(100% - 1.2rem) 0, 100% 50%, calc(100% - 1.2rem) 100%, 0 100%, 1.2rem 50%);
   margin-left: -0.75rem;
@@ -1000,7 +1000,7 @@ defineExpose({
 }
 
 .sp-customer-plan-wizard__step:last-child {
-  //clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 1.2rem 50%);
+  /* clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 1.2rem 50%); */
 }
 
 .sp-customer-plan-wizard__step:first-child:last-child {

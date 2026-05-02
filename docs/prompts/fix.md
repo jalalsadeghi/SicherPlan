@@ -1,62 +1,88 @@
-We need a small, UI-only refinement in the Order Workspace step navigation.
+You are working in the SicherPlan repository.
 
-Context:
-In the Customer detail > Orders flow, when the user enters the embedded order workspace (the 6-step flow shown at the top of the order workspace), the current step navigation renders as 6 separate step buttons/cards, each with a visible step number above the label.
+Repository:
+https://github.com/jalalsadeghi/SicherPlan
 
-Requested changes:
-1. Remove the visible step number from every step.
-   - Example: remove the small “1”, “2”, “3”, etc. shown above each step label.
-   - Keep the step labels themselves unchanged:
-     - Order details
-     - Order scope & documents
-     - Planning record
-     - Planning documents
-     - Shift plan
-     - Series & exceptions
+Current local state:
+- Dependencies are now installed.
+- Node is v22.22.2 through nvm.
+- The repository `.nvmrc` expects Node 22.x.
+- `pnpm build` starts and many packages build successfully.
+- The previous missing dependency error (`cross-env: not found`) is no longer the main issue.
+- The previous Vite missing module error may have been caused by incomplete node_modules, but now the current blocking problem is different.
 
-2. Change only the visual surface shape of the 6 step items so they look like connected/integrated arrow steps (chevron / interlocked breadcrumb-style arrows), similar to the provided visual reference.
-   - Important: this is only a shape/layout styling change.
-   - Do NOT change the current color system.
-   - Do NOT change active/inactive/hover/selected color behavior.
-   - Do NOT change click behavior, routing, step activation logic, disabled logic, or any workflow behavior.
-   - Do NOT change the order of steps.
-   - Do NOT change the text labels.
-   - Do NOT change any backend/API/state contract.
+Current build error summary:
 
-Very important constraints:
-- Keep the current interaction behavior exactly as-is.
-- Keep current colors exactly as-is.
-- Keep the current active-step logic exactly as-is.
-- Keep responsiveness clean.
-- Prefer a CSS-first solution with minimal template changes.
-- If the step number is generated from data, remove it only from visible UI, without breaking internal logic.
-- If needed, preserve accessibility with aria-labels, but do not show the visible step number in the UI.
+`pnpm build` runs root turbo build.
+Several packages build successfully, including `@vben/web-antdv-next`.
 
-Implementation guidance:
-1. First identify the exact frontend component(s) responsible for rendering the order workspace step navigation.
-2. Inspect whether the step items are rendered from a shared stepper component or a local order-workspace component.
-3. Apply the smallest safe change.
-4. Prefer using CSS and/or pseudo-elements (::before / ::after) or clip-path to create the arrow/chevron connected shape.
-5. The shape should visually read as sequential connected steps, like a horizontal arrow-step progress strip.
-6. Preserve current spacing, alignment, focus behavior, and responsive wrapping/fallback behavior.
-7. Do not introduce visual regressions in the surrounding order workspace layout.
+Warnings appear during `@vben/web-antdv-next` build:
 
-Please do the following before coding:
-- Briefly state which file(s) you believe are impacted.
-- Briefly explain the smallest safe implementation approach.
-- Mention any risk of shared-component side effects.
+Big integer literals are not available in the configured target environment.
 
-Acceptance criteria:
-- The visible step numbers are gone.
-- The 6 steps visually look like connected arrow/chevron steps.
-- The colors remain unchanged from the current implementation.
-- Active/inactive visual state logic remains unchanged except for the new shape.
-- Clicking a step behaves exactly as before.
-- No route/state/API/backend changes.
-- No unrelated UI changes.
+But `@vben/web-antdv-next` finishes successfully with:
 
-After implementation:
-- List changed files.
-- Summarize exactly what changed.
-- Run the most relevant frontend tests if available.
-- If no exact test exists, at least perform a focused sanity check on the order workspace UI code path.
+✓ built in 1m 12s
+
+The final failure is:
+
+ERROR @vben/web-antd#build: command (/home/jey/Projects/SicherPlan/web/apps/web-antd) /home/jey/.nvm/versions/node/v22.22.2/bin/pnpm run build exited (1)
+
+Tasks: 13 successful, 18 total
+Failed: @vben/web-antd#build
+
+Important interpretation to validate:
+The BigInt warnings from `@vben/web-antdv-next` are probably not the root cause because that package completes successfully. The real failure is inside the main app package `@vben/web-antd`, but the root turbo output does not show the complete error.
+
+Repository facts:
+- `web/package.json` root build script runs `cross-env NODE_OPTIONS=--max-old-space-size=8192 turbo build`.
+- `web/package.json` also has `build:antd`.
+- `web/apps/web-antd/package.json` has build script: `pnpm vite build --mode production`.
+- `web/apps/web-antd/vite.config.ts` defines alias `@` to `./src/sicherplan-legacy` and proxies only `/api` to `http://localhost:8000`.
+
+Task:
+1. Do not change product/business code yet.
+2. Do not change backend APIs, tenant logic, customer/planning domain logic, or database logic.
+3. First isolate the real `@vben/web-antd` build error.
+4. Run:
+   - `cd ~/Projects/SicherPlan/web`
+   - `node -v`
+   - `pnpm -v`
+   - `pnpm -F @vben/web-antd run build 2>&1 | tee /tmp/web-antd-build.log`
+   - `tail -n 160 /tmp/web-antd-build.log`
+5. If the direct package build still hides the error, run:
+   - `pnpm turbo build --filter=@vben/web-antd --force --output-logs=full 2>&1 | tee /tmp/web-antd-turbo-build.log`
+   - `tail -n 200 /tmp/web-antd-turbo-build.log`
+6. Identify the first real error line inside `@vben/web-antd`.
+7. Classify the failure:
+   - dependency/tooling issue
+   - TypeScript/typecheck issue
+   - Vite/Rollup build issue
+   - unresolved import or alias issue
+   - asset/path issue
+   - app-specific SicherPlan customization issue under `src/sicherplan-legacy`
+8. Only after identifying the exact root cause, propose the smallest possible fix.
+9. If a fix is needed:
+   - keep the changes narrowly scoped to `@vben/web-antd`
+   - preserve Vben Admin conventions
+   - preserve SicherPlan theme/i18n rules
+   - avoid unrelated formatting or refactoring
+10. Run verification after the fix:
+   - `pnpm -F @vben/web-antd run build`
+   - if that passes, `pnpm build`
+11. Report:
+   - root cause
+   - evidence
+   - exact file(s) changed
+   - whether product code was touched
+   - verification result
+   - any remaining warnings, especially BigInt warnings, and whether they are blocking or non-blocking
+
+Output format:
+- Root cause
+- Evidence from logs
+- Files inspected
+- Files changed
+- Verification commands
+- Result
+- Remaining risk
