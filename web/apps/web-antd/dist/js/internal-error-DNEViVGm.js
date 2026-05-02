@@ -1,0 +1,1 @@
+import{Ir as e,Ln as t,kn as n,on as r,tr as i}from"../jse/index-index-B3b_uP6l.js";import{t as a}from"./fallback-tgKIdfH_.js";var o=t(r(r({},{name:`Fallback500Demo`}),{},{__name:`internal-error`,setup(t){return(t,r)=>(i(),n(e(a),{status:`500`}))}}));export{o as default};

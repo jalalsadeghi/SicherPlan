@@ -9292,32 +9292,18 @@ onBeforeUnmount(() => {
             data-testid="customer-new-plan-demand-group-persisted-row"
           >
             <div class="sp-customer-plan-wizard-step__demand-group-card">
-              <div class="sp-customer-plan-wizard-step__demand-group-card-actions">
-                <button
-                  type="button"
-                  class="cta-button cta-secondary"
-                  :data-testid="`customer-new-plan-demand-group-persisted-days-${row.signature_key}`"
-                  :disabled="stepLoading || row.all_rows_locked"
-                  @click="openShiftDemandGroupEditDialog(row.signature_key)"
-                >
-                  {{ $t('sicherplan.customerPlansWizard.actions.editDemandGroupDays') }}
-                </button>
-                <button
-                  type="button"
-                  class="cta-button cta-secondary"
-                  :data-testid="`customer-new-plan-demand-group-persisted-edit-${row.signature_key}`"
-                  :disabled="stepLoading || row.has_locked_rows"
-                  @click="openAggregateDemandGroupEditDialog(row.signature_key)"
-                >
-                  {{ $t('sicherplan.customerPlansWizard.actions.editDemandGroupAggregate') }}
-                </button>
-              </div>
               <div class="sp-customer-plan-wizard-step__demand-group-card-body">
-                <header class="sp-customer-plan-wizard-step__document-subsection-header sp-customer-plan-wizard-step__document-subsection-header--compact">
-                  <div>
+                <header
+                  class="sp-customer-plan-wizard-step__document-subsection-header sp-customer-plan-wizard-step__document-subsection-header--compact sp-customer-plan-wizard-step__demand-group-card-header"
+                  :data-testid="`customer-new-plan-demand-group-persisted-header-${row.signature_key}`"
+                >
+                  <div class="sp-customer-plan-wizard-step__demand-group-card-title">
                     <h5>{{ row.function_type_label }}</h5>
                     <p class="field-help">{{ row.qualification_type_label }}</p>
                   </div>
+                  
+                </header>
+                <div class="sp-customer-plan-wizard-step__demand-group-card-status-row sp-customer-plan-wizard-step__demand-group-card-header">
                   <span
                     class="sp-customer-plan-wizard-step__status-badge"
                     :class="`sp-customer-plan-wizard-step__status-badge--${row.status}`"
@@ -9331,19 +9317,41 @@ onBeforeUnmount(() => {
                           : $t('sicherplan.customerPlansWizard.forms.demandGroupsStatusPartial')
                     }}
                   </span>
-                </header>
-                <div class="sp-customer-plan-wizard-step__info-summary sp-customer-plan-wizard-step__info-summary--compact">
-                  <span>{{ $t('sicherplan.customerPlansWizard.forms.minQty') }}: {{ row.min_qty }}</span>
-                  <span>{{ $t('sicherplan.customerPlansWizard.forms.targetQty') }}: {{ row.target_qty }}</span>
-                  <span>{{ $t('sicherplan.customerPlansWizard.forms.sortOrder') }}: {{ row.sort_order }}</span>
-                  <span>{{ row.mandatory_flag ? $t('sicherplan.customerPlansWizard.forms.mandatoryFlag') : $t('sicherplan.customerPlansWizard.forms.optionalFlag') }}</span>
-                  <span>{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsAppliedShiftCount', { applied: row.applied_shift_count, total: row.total_shift_count }) }}</span>
-                  <span v-if="row.missing_shift_count">{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsMissingShiftCount', { count: row.missing_shift_count }) }}</span>
-                  <span v-if="row.variant_count > 1">{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsVariantCount', { count: row.variant_count }) }}</span>
-                  <span v-if="row.remark">{{ row.remark }}</span>
-                  <span v-if="row.has_locked_rows" class="sp-customer-plan-wizard-step__lock-chip">
-                    {{ $t('sicherplan.customerPlansWizard.messages.demandGroupsLockedHint') }}
-                  </span>
+                  <div class="sp-customer-plan-wizard-step__demand-group-card-actions">
+                    <button
+                      type="button"
+                      class="cta-button cta-secondary"
+                      :data-testid="`customer-new-plan-demand-group-persisted-days-${row.signature_key}`"
+                      :disabled="stepLoading || row.all_rows_locked"
+                      @click="openShiftDemandGroupEditDialog(row.signature_key)"
+                    >
+                      {{ $t('sicherplan.customerPlansWizard.actions.editDemandGroupDays') }}
+                    </button>
+                    <button
+                      type="button"
+                      class="cta-button cta-secondary"
+                      :data-testid="`customer-new-plan-demand-group-persisted-edit-${row.signature_key}`"
+                      :disabled="stepLoading || row.has_locked_rows"
+                      @click="openAggregateDemandGroupEditDialog(row.signature_key)"
+                    >
+                      {{ $t('sicherplan.customerPlansWizard.actions.editDemandGroupAggregate') }}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <div class="sp-customer-plan-wizard-step__info-summary sp-customer-plan-wizard-step__info-summary--compact">
+                    <span><b>{{ $t('sicherplan.customerPlansWizard.forms.minQty') }}:</b> {{ row.min_qty }}</span>
+                    <span><b>{{ $t('sicherplan.customerPlansWizard.forms.targetQty') }}:</b> {{ row.target_qty }}</span>
+                    <span><b>{{ $t('sicherplan.customerPlansWizard.forms.sortOrder') }}:</b> {{ row.sort_order }}</span>
+                    <span><b>{{ row.mandatory_flag ? $t('sicherplan.customerPlansWizard.forms.mandatoryFlag') : $t('sicherplan.customerPlansWizard.forms.optionalFlag') }}</b></span>
+                    <span>{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsAppliedShiftCount', { applied: row.applied_shift_count, total: row.total_shift_count }) }}</span>
+                    <span v-if="row.missing_shift_count">{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsMissingShiftCount', { count: row.missing_shift_count }) }}</span>
+                    <span v-if="row.variant_count > 1">{{ $t('sicherplan.customerPlansWizard.forms.demandGroupsVariantCount', { count: row.variant_count }) }}</span>
+                    <span v-if="row.remark">{{ row.remark }}</span>
+                    <span v-if="row.has_locked_rows" class="sp-customer-plan-wizard-step__lock-chip">
+                      {{ $t('sicherplan.customerPlansWizard.messages.demandGroupsLockedHint') }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -10668,7 +10676,7 @@ onBeforeUnmount(() => {
 }
 
 .sp-customer-plan-wizard-step__info-summary {
-  display: grid;
+  display: flex;
   gap: 0.3rem;
   padding: 0.95rem 1rem;
   border: 1px solid var(--sp-color-border-soft);
@@ -11015,21 +11023,39 @@ onBeforeUnmount(() => {
 
 .sp-customer-plan-wizard-step__demand-group-card {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.sp-customer-plan-wizard-step__demand-group-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 0.85rem;
-  align-items: start;
+}
+
+.sp-customer-plan-wizard-step__demand-group-card-title {
+  min-width: 0;
 }
 
 .sp-customer-plan-wizard-step__demand-group-card-actions {
-  display: grid;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
   gap: 0.5rem;
-  align-content: start;
+  justify-content: flex-end;
 }
 
 .sp-customer-plan-wizard-step__demand-group-card-body {
   display: grid;
   gap: 0.6rem;
   min-width: 0;
+}
+
+.sp-customer-plan-wizard-step__demand-group-card-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .sp-customer-plan-wizard-step__info-summary--compact {
@@ -11199,11 +11225,15 @@ onBeforeUnmount(() => {
   }
 
   .sp-customer-plan-wizard-step__demand-group-card {
-    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .sp-customer-plan-wizard-step__demand-group-card-header {
+    flex-direction: column;
   }
 
   .sp-customer-plan-wizard-step__demand-group-card-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: flex-start;
   }
 
   .field-stack--wide {

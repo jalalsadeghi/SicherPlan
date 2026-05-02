@@ -5400,6 +5400,12 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     const rowVm = (wrapper.vm as any).$?.setupState.persistedDemandGroupSummaryRows[0];
     expect(wrapper.find(`[data-testid="customer-new-plan-demand-group-persisted-days-${rowVm.signature_key}"]`).exists()).toBe(true);
     expect(wrapper.find(`[data-testid="customer-new-plan-demand-group-persisted-edit-${rowVm.signature_key}"]`).exists()).toBe(true);
+    const header = wrapper.get(`[data-testid="customer-new-plan-demand-group-persisted-header-${rowVm.signature_key}"]`);
+    const headerButtons = header.findAll('button');
+    expect(headerButtons).toHaveLength(2);
+    expect(headerButtons[0]?.attributes('data-testid')).toBe(`customer-new-plan-demand-group-persisted-days-${rowVm.signature_key}`);
+    expect(headerButtons[1]?.attributes('data-testid')).toBe(`customer-new-plan-demand-group-persisted-edit-${rowVm.signature_key}`);
+    expect(wrapper.get(`[data-testid="customer-new-plan-demand-group-persisted-status-${rowVm.signature_key}"]`).exists()).toBe(true);
 
     await wrapper.get(`[data-testid="customer-new-plan-demand-group-persisted-edit-${rowVm.signature_key}"]`).trigger('click');
     await flushPromises();

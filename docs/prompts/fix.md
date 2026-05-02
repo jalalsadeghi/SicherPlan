@@ -1,66 +1,153 @@
-/review Please review the implementation for compact applied demand-group cards and edit flows in the customer order wizard `demand-groups` step.
+You are working in the SicherPlan repository.
 
-Business requirement:
-The `demand-groups` step must show already-applied demand groups in compact, clear cards. Each applied aggregate card must provide:
-1. an aggregate Edit action that edits the demand-group definition across all matching generated shifts
-2. a per-shift/day edit action that lists individual shifts and allows editing each persisted demand group separately
+Repository:
+https://github.com/jalalsadeghi/SicherPlan
 
-Review against:
-- AGENTS.md
+Task:
+Move the `Edit shifts` and `Edit` actions for applied demand-group summary cards into the card header/title row on the right side.
+
+Observed UI problem:
+In `/admin/customers?tab=orders&customer_id=...&orderWorkspace=edit&...&step=demand-groups`, the applied demand-group cards now show persisted demand groups correctly, but the action buttons are displayed in a separate left-side column:
+- `Edit shifts`
+- `Edit`
+
+This creates an awkward layout and wastes vertical/horizontal space. The requested layout is:
+- each applied demand-group card should have its title/summary row
+- `Edit shifts` and `Edit` should appear together on the right side of that same header/title row
+- `Edit shifts` should appear before `Edit`
+- the `Complete` status indicator should remain below the title/action row, not behind or mixed with the buttons
+
+Current repo facts to validate:
+- `web/apps/web-antd/src/views/sicherplan/customers/new-plan-step-content.vue` contains the customer order wizard Demand groups step.
+- This component imports and uses planning staffing APIs such as `bulkUpdateDemandGroups`, `listDemandGroups`, `bulkApplyDemandGroups`, and `updateDemandGroup`.
+- The current applied demand-group summary UI is in this component.
+- The current layout has action buttons positioned on the left side of each applied summary card.
+- The `Edit shifts` action opens the per-shift/day edit flow.
+- The `Edit` action opens the aggregate edit flow.
+- The underlying edit behavior should not change in this task.
+
+Goal:
+Make a layout-only UI refinement:
+1. Move `Edit shifts` and `Edit` into the applied demand-group card header.
+2. Place them on the far right of the header row.
+3. Keep `Edit shifts` before `Edit`.
+4. Keep the demand-group title/function type and qualification label on the left of the header row.
+5. Keep the status indicator such as `Complete`, `Partial`, or `Mixed` in a clear row below the header, or as a separate compact badge that does not collide with the buttons.
+6. Keep the card compact and visually clean.
+
+Files to inspect:
 - `web/apps/web-antd/src/views/sicherplan/customers/new-plan-step-content.vue`
-- `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
-- `web/apps/web-antd/src/sicherplan-legacy/api/planningShifts.ts`
-- `/admin/planning-staffing` behavior
-- German default / English secondary localization rules
-- existing demand-group bulk apply and applied summary behavior
+- `web/apps/web-antd/src/views/sicherplan/customers/new-plan-epic4.smoke.test.ts`
+- locale files under:
+  - `web/apps/web-antd/src/locales/langs/de-DE`
+  - `web/apps/web-antd/src/locales/langs/en-US`
 
-Review focus:
-1. Compact card UI
-   - Cards are significantly more compact than before.
-   - Fields are readable and not overly tall.
-   - Status and applied shift count are visible.
-   - Buttons are on the left side as requested.
-   - UI follows SicherPlan/Vben/Ant style and does not hardcode one-off colors.
+Implementation requirements:
+1. Do not change business logic.
+2. Do not change backend APIs.
+3. Do not change `bulkUpdateDemandGroups`, `bulkApplyDemandGroups`, `listDemandGroups`, or `updateDemandGroup` behavior.
+4. Do not change how applied demand groups are aggregated.
+5. Do not change how aggregate edit and per-shift edit modals work.
+6. Only adjust markup/CSS/tests as needed for the requested layout.
+7. The card header layout should be responsive:
+   - desktop: title/qualification on the left, actions on the right
+   - narrow widths: actions may wrap below the title but should remain grouped and aligned cleanly
+8. Preserve accessibility:
+   - buttons remain real buttons
+   - labels remain localized
+   - existing data-testid values should be preserved if possible
+   - if test IDs are missing, add stable test IDs
+9. Preserve existing visual theme:
+   - do not hardcode unrelated colors
+   - use existing SicherPlan/Vben card/button classes or local scoped CSS consistent with the existing component
+10. Keep the visual hierarchy:
+   - header row: title + actions
+   - status row: Complete / Partial / Mixed indicator
+   - detail row: min/target/sort/mandatory/applied shift count
+11. Ensure the `Complete` status does not appear behind, above, or visually mixed with the action buttons.
 
-2. Aggregate Edit
-   - Opens a modal with correct prefilled values.
-   - Updates all matching persisted demand groups safely.
-   - Uses a backend aggregate update if available, or a justified safe alternative.
-   - Avoids partial-update risks or reports them clearly.
-   - Reloads persisted summary after save.
-   - Handles mixed/variant aggregates safely.
+Suggested DOM structure:
+```vue
+<div class="sp-customer-plan-wizard-step__demand-summary-card">
+  <div class="sp-customer-plan-wizard-step__demand-summary-header">
+    <div class="sp-customer-plan-wizard-step__demand-summary-title">
+      <strong>Schichtleiter</strong>
+      <span>Sachkunde §34a GewO</span>
+    </div>
 
-3. Per-shift/day edit
-   - Opens a modal listing all matching shifts/days sorted by start date/time.
-   - Shows useful shift context.
-   - Allows editing individual rows.
-   - Uses the correct single-demand-group update API.
-   - Reloads summary after a row edit.
-   - Handles locked rows safely.
+    <div class="sp-customer-plan-wizard-step__demand-summary-actions">
+      <button ...>Edit shifts</button>
+      <button ...>Edit</button>
+    </div>
+  </div>
 
-4. Data correctness
-   - Persisted demand groups remain normalized per concrete shift.
-   - No shadow persisted template model is introduced.
-   - The summary keeps enough underlying row ids and shift metadata.
-   - Repeated visits do not duplicate demand groups.
-   - Applying new templates still works.
+  <div class="sp-customer-plan-wizard-step__demand-summary-status">
+    Complete
+  </div>
 
-5. Editability / locking
-   - Edit actions are disabled or read-only when downstream assignments/releases/field/actual/finance locks exist.
-   - If full backend mutation guards are missing, this is called out as follow-up.
-   - Previous wizard steps remain navigable for review.
+  <div class="sp-customer-plan-wizard-step__demand-summary-details">
+    ...
+  </div>
+</div>
+```
 
-6. Localization and tests
-   - New strings are localized in German and English.
-   - No hardcoded user-facing strings.
-   - Tests cover compact cards, aggregate edit, per-shift edit, validation, lock state, and no regression in New/Apply demand group flows.
-   - Build/tests pass.
+Suggested CSS intent:
+```css
+.sp-customer-plan-wizard-step__demand-summary-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
 
-Required review output:
-- Blocking issues
-- Major issues
-- Minor issues
-- Nice-to-have improvements
-- Final verdict: approved / approved with minor issues / changes required
+.sp-customer-plan-wizard-step__demand-summary-title {
+  min-width: 0;
+}
 
-Do not invent issues. If the implementation is sound, say so clearly.
+.sp-customer-plan-wizard-step__demand-summary-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+@media (max-width: ... ) {
+  .sp-customer-plan-wizard-step__demand-summary-header {
+    flex-direction: column;
+  }
+
+  .sp-customer-plan-wizard-step__demand-summary-actions {
+    justify-content: flex-start;
+  }
+}
+```
+
+Testing requirements:
+Update or add tests for:
+1. Applied demand-group card renders action buttons inside the card header.
+2. `Edit shifts` appears before `Edit`.
+3. Both buttons remain clickable and call/open the existing flows.
+4. The status label such as `Complete` remains visible and separate from the button group.
+5. Existing aggregate edit tests still pass.
+6. Existing per-shift edit tests still pass.
+7. Existing New demand group and Apply demand groups tests still pass.
+
+Verification:
+Run and report exact results:
+```bash
+cd web
+nvm use 22
+pnpm -F @vben/web-antd run build
+pnpm test:unit -- --runInBand
+```
+
+If the repo uses a different test command, use the existing command and report it.
+
+Output format:
+- Design validation: accepted / adjusted / rejected
+- Root layout issue
+- Files changed
+- Markup/CSS changes
+- Tests added/updated
+- Verification commands and results
+- Remaining risks or follow-ups
