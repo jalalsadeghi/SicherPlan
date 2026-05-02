@@ -100,6 +100,7 @@
         "AssistantShiftVisibilityDiagnosticInput.date_from",
         "CoverageFilter.date_from",
         "CoverageFilterParams.date_from",
+        "DemandGroupBulkApplyRequest.date_from",
         "PlanningBoardFilter.date_from",
         "ReportingFilterBase.date_from",
         "ShiftListFilter.date_from",
@@ -144,6 +145,13 @@
           "module_key": "planning",
           "page_id": "P-04",
           "source_name": "CoverageFilter",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "DemandGroupBulkApplyRequest includes field date_from.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "DemandGroupBulkApplyRequest",
           "source_type": "backend_schema"
         },
         {
@@ -224,6 +232,13 @@
           "source_type": "typescript_api_interface"
         },
         {
+          "evidence": "DemandGroupBulkApplyRequest includes field date_from.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "DemandGroupBulkApplyRequest",
+          "source_type": "typescript_api_interface"
+        },
+        {
           "evidence": "ShiftSeriesListItem includes field date_from.",
           "module_key": "planning",
           "page_id": "P-04",
@@ -276,6 +291,7 @@
         "AssistantShiftVisibilityDiagnosticInput.date_to",
         "CoverageFilter.date_to",
         "CoverageFilterParams.date_to",
+        "DemandGroupBulkApplyRequest.date_to",
         "PlanningBoardFilter.date_to",
         "ReportingFilterBase.date_to",
         "ShiftListFilter.date_to",
@@ -320,6 +336,13 @@
           "module_key": "planning",
           "page_id": "P-04",
           "source_name": "CoverageFilter",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "DemandGroupBulkApplyRequest includes field date_to.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "DemandGroupBulkApplyRequest",
           "source_type": "backend_schema"
         },
         {
@@ -397,6 +420,13 @@
           "module_key": "planning",
           "page_id": "P-04",
           "source_name": "CoverageFilterParams",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "DemandGroupBulkApplyRequest includes field date_to.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "DemandGroupBulkApplyRequest",
           "source_type": "typescript_api_interface"
         },
         {
@@ -9295,6 +9325,7 @@
         "CustomerRateLineRead.function_type_id",
         "CustomerRateLineUpdate.function_type_id",
         "DemandGroup.function_type_id",
+        "DemandGroupBulkTemplate.function_type_id",
         "DemandGroupCreate.function_type_id",
         "DemandGroupListItem.function_type_id",
         "DemandGroupRead.function_type_id",
@@ -9373,6 +9404,13 @@
           "module_key": "customers",
           "page_id": "C-01",
           "source_name": "DemandGroup",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "DemandGroupBulkTemplate includes field function_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "DemandGroupBulkTemplate",
           "source_type": "backend_schema"
         },
         {
@@ -9576,6 +9614,13 @@
           "module_key": "customers",
           "page_id": "C-01",
           "source_name": "CustomerRateLineRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "DemandGroupBulkTemplate includes field function_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "DemandGroupBulkTemplate",
           "source_type": "typescript_api_interface"
         },
         {
@@ -17317,6 +17362,7 @@
         "CustomerRateLineRead.qualification_type_id",
         "CustomerRateLineUpdate.qualification_type_id",
         "DemandGroup.qualification_type_id",
+        "DemandGroupBulkTemplate.qualification_type_id",
         "DemandGroupCreate.qualification_type_id",
         "DemandGroupListItem.qualification_type_id",
         "DemandGroupRead.qualification_type_id",
@@ -17399,6 +17445,13 @@
           "module_key": "customers",
           "page_id": "C-01",
           "source_name": "DemandGroup",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "DemandGroupBulkTemplate includes field qualification_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "DemandGroupBulkTemplate",
           "source_type": "backend_schema"
         },
         {
@@ -17630,6 +17683,13 @@
           "module_key": "customers",
           "page_id": "C-01",
           "source_name": "CustomerRateLineRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "DemandGroupBulkTemplate includes field qualification_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "DemandGroupBulkTemplate",
           "source_type": "typescript_api_interface"
         },
         {
@@ -18588,6 +18648,7 @@
         "CustomerSurchargeRuleRead.sort_order",
         "CustomerSurchargeRuleUpdate.sort_order",
         "DemandGroup.sort_order",
+        "DemandGroupBulkTemplate.sort_order",
         "DemandGroupCreate.sort_order",
         "DemandGroupListItem.sort_order",
         "DemandGroupRead.sort_order",
@@ -18701,6 +18762,13 @@
           "module_key": "customers",
           "page_id": "C-01",
           "source_name": "DemandGroup",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "DemandGroupBulkTemplate includes field sort_order.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "DemandGroupBulkTemplate",
           "source_type": "backend_schema"
         },
         {
@@ -18855,6 +18923,13 @@
           "module_key": "customers",
           "page_id": "C-01",
           "source_name": "CustomerSurchargeRuleRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "DemandGroupBulkTemplate includes field sort_order.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "DemandGroupBulkTemplate",
           "source_type": "typescript_api_interface"
         },
         {
@@ -21107,6 +21182,7 @@
         "AssistantShiftVisibilityDiagnosticInput.date_from",
         "CoverageFilter.date_from",
         "CoverageFilterParams.date_from",
+        "DemandGroupBulkApplyRequest.date_from",
         "PlanningBoardFilter.date_from",
         "ReportingFilterBase.date_from",
         "ShiftListFilter.date_from",
@@ -21151,6 +21227,13 @@
           "module_key": "customers",
           "page_id": "C-02",
           "source_name": "CoverageFilter",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "DemandGroupBulkApplyRequest includes field date_from.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "DemandGroupBulkApplyRequest",
           "source_type": "backend_schema"
         },
         {
@@ -21231,6 +21314,13 @@
           "source_type": "typescript_api_interface"
         },
         {
+          "evidence": "DemandGroupBulkApplyRequest includes field date_from.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "DemandGroupBulkApplyRequest",
+          "source_type": "typescript_api_interface"
+        },
+        {
           "evidence": "ShiftSeriesListItem includes field date_from.",
           "module_key": "customers",
           "page_id": "C-02",
@@ -21284,6 +21374,7 @@
         "AssistantShiftVisibilityDiagnosticInput.date_to",
         "CoverageFilter.date_to",
         "CoverageFilterParams.date_to",
+        "DemandGroupBulkApplyRequest.date_to",
         "PlanningBoardFilter.date_to",
         "ReportingFilterBase.date_to",
         "ShiftListFilter.date_to",
@@ -21328,6 +21419,13 @@
           "module_key": "customers",
           "page_id": "C-02",
           "source_name": "CoverageFilter",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "DemandGroupBulkApplyRequest includes field date_to.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "DemandGroupBulkApplyRequest",
           "source_type": "backend_schema"
         },
         {
@@ -21405,6 +21503,13 @@
           "module_key": "customers",
           "page_id": "C-02",
           "source_name": "CoverageFilterParams",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "DemandGroupBulkApplyRequest includes field date_to.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "DemandGroupBulkApplyRequest",
           "source_type": "typescript_api_interface"
         },
         {
@@ -45722,10 +45827,10 @@
   ],
   "schema_version": 1,
   "source_hashes": {
-    "backend_schema_fields": "e79428d09156359d65cc7977d1fa0f617f1e48735ab506e869b40fdd7758d78d",
-    "locale_labels": "0b72f556ef85c84eb8b665fb3c0c455c168069086230d012704727cc7aee7a33",
+    "backend_schema_fields": "aa6abc4f53cc8b4afe497cfbbba2b0f70ea9c8d24e02f37b40fa2741b180378b",
+    "locale_labels": "227939c5cfd5d3023f5b1d181b55d4038593739bf8cd9658fc2d7c18cea7a383",
     "page_help_seed_data": "f5dfd6a3ee268268020855336f57ba526ec9e245620feda137812602f24aa0de",
-    "typescript_interfaces": "f4c60df1524f976e1f41511a3d113e3bf4cd90c1a9d49bf85c69d97debff89c7",
+    "typescript_interfaces": "f5bae6fb3a19bfc3702ed95e229ccdebfc12f5c696373f6d07b99590a2687d45",
     "vue_field_bindings": "8606e1e5527c4a1ca4fbea8c5866b4517bbbfdb2f41f3d2516b4aa899f0e9918"
   },
   "terms": [
@@ -52789,7 +52894,9 @@
     },
     {
       "aliases": [
+        "Add at least one demand group before continuing.",
         "Ausgewaehlte Demand Group bearbeiten",
+        "Bedarfsgruppe bearbeiten",
         "Bemerkung",
         "Controls the ordering of demand groups in staffing views and derived outputs.",
         "Create demand group",
@@ -52812,11 +52919,13 @@
         "Fuer diese Schicht gibt es keine Demand Groups.",
         "Function type",
         "Funktionstyp",
+        "Fügen Sie mindestens eine Bedarfsgruppe hinzu, bevor Sie fortfahren.",
         "Legen Sie hier die benoetigten Staffing-Slots fuer diese Schicht an. Danach werden Assign/Substitute wieder sinnvoll nutzbar.",
         "Mandatory demand groups feed directly into the staffing and release expectation for this shift.",
         "Mark demand group as mandatory",
         "Mindestmenge",
         "Minimum quantity",
+        "Neue Bedarfsgruppe",
         "Neue Demand Group",
         "New demand group",
         "No demand groups exist for this shift.",
@@ -52871,6 +52980,7 @@
       "labels": {
         "de": [
           "Ausgewaehlte Demand Group bearbeiten",
+          "Bedarfsgruppe bearbeiten",
           "Bemerkung",
           "Demand Group",
           "Demand Group aktualisieren",
@@ -52884,8 +52994,10 @@
           "Diese Schicht ist im Coverage sichtbar, kann aber erst staffed werden, nachdem mindestens eine Demand Group angelegt wurde.",
           "Fuer diese Schicht gibt es keine Demand Groups.",
           "Funktionstyp",
+          "Fügen Sie mindestens eine Bedarfsgruppe hinzu, bevor Sie fortfahren.",
           "Legen Sie hier die benoetigten Staffing-Slots fuer diese Schicht an. Danach werden Assign/Substitute wieder sinnvoll nutzbar.",
           "Mindestmenge",
+          "Neue Bedarfsgruppe",
           "Neue Demand Group",
           "Qualifikation",
           "Sortierung",
@@ -52895,6 +53007,7 @@
           "Zielmenge"
         ],
         "en": [
+          "Add at least one demand group before continuing.",
           "Controls the ordering of demand groups in staffing views and derived outputs.",
           "Create demand group",
           "Create the staffing slots required for this shift here. Assign/Substitute becomes meaningfully available afterwards.",
@@ -53130,6 +53243,27 @@
           "page_id": "P-04",
           "source_name": "planningStaffing.messages.ts",
           "source_type": "frontend_i18n_label"
+        },
+        {
+          "evidence": "customerPlansWizard.dialogs.demandGroupCreateTitle defines a visible localized UI term in sicherplan.json.",
+          "module_key": null,
+          "page_id": null,
+          "source_name": "sicherplan.json",
+          "source_type": "frontend_locale"
+        },
+        {
+          "evidence": "customerPlansWizard.dialogs.demandGroupEditTitle defines a visible localized UI term in sicherplan.json.",
+          "module_key": null,
+          "page_id": null,
+          "source_name": "sicherplan.json",
+          "source_type": "frontend_locale"
+        },
+        {
+          "evidence": "customerPlansWizard.errors.demandGroupsEmpty defines a visible localized UI term in sicherplan.json.",
+          "module_key": null,
+          "page_id": null,
+          "source_name": "sicherplan.json",
+          "source_type": "frontend_locale"
         }
       ],
       "term_key": "planning.staffing.demand_groups",
@@ -61359,6 +61493,120 @@
       "term_key": "platform.locale_catalog.delivery",
       "ui_contexts": [
         "delivery Title"
+      ],
+      "ui_term_type": "section_title"
+    },
+    {
+      "aliases": [
+        "Bedarfsgruppe {index}",
+        "Demand group {index}",
+        "demandGroupRowLabel"
+      ],
+      "canonical_name": "demand_group_row",
+      "concept_type": "ui_term",
+      "confidence": "medium",
+      "definition_de": "Bedarfsgruppe {index} ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.",
+      "definition_en": "demand_group_row is a verified visible SicherPlan UI term in the locale_catalog context.",
+      "labels": {
+        "de": [
+          "Bedarfsgruppe {index}"
+        ],
+        "en": [
+          "Demand group {index}"
+        ]
+      },
+      "module_key": null,
+      "page_id": null,
+      "related_terms": [],
+      "route_names": [],
+      "source_basis": [
+        {
+          "evidence": "customerPlansWizard.forms.demandGroupRowLabel defines a visible localized UI term in sicherplan.json.",
+          "module_key": null,
+          "page_id": null,
+          "source_name": "sicherplan.json",
+          "source_type": "frontend_locale"
+        }
+      ],
+      "term_key": "platform.locale_catalog.demand_group_row",
+      "ui_contexts": [
+        "demand Group Row Label"
+      ],
+      "ui_term_type": "field_label"
+    },
+    {
+      "aliases": [
+        "Es wurden noch keine Bedarfsgruppen-Vorlagen erfasst.",
+        "No demand-group templates have been added yet.",
+        "demandGroupsDraftEmpty"
+      ],
+      "canonical_name": "demand_groups_draft",
+      "concept_type": "domain_concept",
+      "confidence": "medium",
+      "definition_de": "Es wurden noch keine Bedarfsgruppen-Vorlagen erfasst. ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.",
+      "definition_en": "demand_groups_draft is a verified visible SicherPlan UI term in the locale_catalog context.",
+      "labels": {
+        "de": [
+          "Es wurden noch keine Bedarfsgruppen-Vorlagen erfasst."
+        ],
+        "en": [
+          "No demand-group templates have been added yet."
+        ]
+      },
+      "module_key": null,
+      "page_id": null,
+      "related_terms": [],
+      "route_names": [],
+      "source_basis": [
+        {
+          "evidence": "customerPlansWizard.forms.demandGroupsDraftEmpty defines a visible localized UI term in sicherplan.json.",
+          "module_key": null,
+          "page_id": null,
+          "source_name": "sicherplan.json",
+          "source_type": "frontend_locale"
+        }
+      ],
+      "term_key": "platform.locale_catalog.demand_groups_draft",
+      "ui_contexts": [
+        "demand Groups Draft Empty"
+      ],
+      "ui_term_type": "empty_state"
+    },
+    {
+      "aliases": [
+        "Keine erzeugten Schichten vorhanden",
+        "No generated shifts available",
+        "demandGroupsEmptyTitle"
+      ],
+      "canonical_name": "demand_groups_empty",
+      "concept_type": "ui_term",
+      "confidence": "medium",
+      "definition_de": "Keine erzeugten Schichten vorhanden ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.",
+      "definition_en": "demand_groups_empty is a verified visible SicherPlan UI term in the locale_catalog context.",
+      "labels": {
+        "de": [
+          "Keine erzeugten Schichten vorhanden"
+        ],
+        "en": [
+          "No generated shifts available"
+        ]
+      },
+      "module_key": null,
+      "page_id": null,
+      "related_terms": [],
+      "route_names": [],
+      "source_basis": [
+        {
+          "evidence": "customerPlansWizard.forms.demandGroupsEmptyTitle defines a visible localized UI term in sicherplan.json.",
+          "module_key": null,
+          "page_id": null,
+          "source_name": "sicherplan.json",
+          "source_type": "frontend_locale"
+        }
+      ],
+      "term_key": "platform.locale_catalog.demand_groups_empty",
+      "ui_contexts": [
+        "demand Groups Empty Title"
       ],
       "ui_term_type": "section_title"
     },

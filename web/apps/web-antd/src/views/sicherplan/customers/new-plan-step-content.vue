@@ -3700,17 +3700,19 @@ async function loadOrderReferenceOptions(isCurrent = () => true) {
         listPlanningSetupRecords('equipment_item', props.tenantId, props.accessToken, { customer_id: props.customer.id }),
         listFunctionTypes(props.tenantId, props.accessToken),
         listQualificationTypes(props.tenantId, props.accessToken),
-      ]);
+    ]);
 
     if (!isCurrent()) {
       return;
     }
+    const activeFunctionTypes = functionTypes.filter((row) => row.status === 'active' && row.archived_at == null);
+    const activeQualificationTypes = qualificationTypes.filter((row) => row.status === 'active' && row.archived_at == null);
     serviceCategoryOptions.value = serviceCategories;
     requirementTypeOptions.value = requirementTypes as PlanningListItem[];
     patrolRouteOptions.value = patrolRoutes as PlanningListItem[];
     equipmentItemOptions.value = equipmentItems as PlanningCatalogRecordRead[];
-    functionTypeOptions.value = functionTypes;
-    qualificationTypeOptions.value = qualificationTypes;
+    functionTypeOptions.value = activeFunctionTypes;
+    qualificationTypeOptions.value = activeQualificationTypes;
   } finally {
     finishStepLoads(loadVersions, isCurrent);
   }
@@ -4776,6 +4778,7 @@ async function refreshStepData() {
       await hydrateSeriesStepContext(isCurrent);
       await loadSeriesState(isCurrent);
     } else if (demandGroupsStepActive.value) {
+      await loadOrderReferenceOptions(isCurrent);
       await hydrateSeriesStepContext(isCurrent);
       await loadSeriesState(isCurrent);
       await loadDemandGroupsState(isCurrent);

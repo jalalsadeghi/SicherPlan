@@ -75,6 +75,10 @@ const apiMocks = vi.hoisted(() => ({
   updateShiftSeriesMock: vi.fn(),
   unlinkPlanningRecordAttachmentMock: vi.fn(),
 }));
+const employeeAdminMocks = vi.hoisted(() => ({
+  listFunctionTypesMock: vi.fn(),
+  listQualificationTypesMock: vi.fn(),
+}));
 
 vi.mock('#/locales', () => ({
   $t: (key: string) => key,
@@ -97,8 +101,8 @@ vi.mock('#/sicherplan-legacy/api/planningAdmin', () => ({
 }));
 
 vi.mock('#/sicherplan-legacy/api/employeeAdmin', () => ({
-  listFunctionTypes: vi.fn().mockResolvedValue([]),
-  listQualificationTypes: vi.fn().mockResolvedValue([]),
+  listFunctionTypes: employeeAdminMocks.listFunctionTypesMock,
+  listQualificationTypes: employeeAdminMocks.listQualificationTypesMock,
 }));
 
 vi.mock('#/sicherplan-legacy/api/planningOrders', () => ({
@@ -462,6 +466,8 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listShiftSeriesMock.mockReset();
     apiMocks.listShiftTemplatesMock.mockReset();
     apiMocks.listShiftTypeOptionsMock.mockReset();
+    employeeAdminMocks.listFunctionTypesMock.mockReset();
+    employeeAdminMocks.listQualificationTypesMock.mockReset();
     apiMocks.updatePlanningRecordMock.mockReset();
     apiMocks.updateShiftPlanMock.mockReset();
     apiMocks.updateShiftSeriesExceptionMock.mockReset();
@@ -509,6 +515,8 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listShiftsMock.mockResolvedValue([]);
     apiMocks.listShiftTemplatesMock.mockResolvedValue([{ id: 'template-1', tenant_id: 'tenant-1', code: 'TPL-1', label: 'Tagdienst Vorlage', local_start_time: '08:00', local_end_time: '16:00', default_break_minutes: 30, shift_type_code: 'day', status: 'active', version_no: 1 }]);
     apiMocks.listShiftTypeOptionsMock.mockResolvedValue([{ code: 'day', label: 'Day shift' }]);
+    employeeAdminMocks.listFunctionTypesMock.mockResolvedValue([]);
+    employeeAdminMocks.listQualificationTypesMock.mockResolvedValue([]);
     apiMocks.listShiftSeriesMock.mockResolvedValue([]);
     apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
     apiMocks.getPlanningRecordMock.mockResolvedValue(buildPlanningRecord());
@@ -4862,6 +4870,50 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-demand-groups-validation"]').text()).toContain(
       'sicherplan.customerPlansWizard.errors.demandGroupsNoGeneratedShifts',
     );
+  });
+
+  it('loads active function and qualification options for the demand-group modal', async () => {
+    employeeAdminMocks.listFunctionTypesMock.mockResolvedValue([
+      { id: 'function-1', tenant_id: 'tenant-1', label: 'Dispatch support', status: 'active', version_no: 1, archived_at: null },
+      { id: 'function-archived', tenant_id: 'tenant-1', label: 'Archived function', status: 'active', version_no: 1, archived_at: '2026-01-01T00:00:00Z' },
+      { id: 'function-inactive', tenant_id: 'tenant-1', label: 'Inactive function', status: 'inactive', version_no: 1, archived_at: null },
+    ]);
+    employeeAdminMocks.listQualificationTypesMock.mockResolvedValue([
+      { id: 'qualification-1', tenant_id: 'tenant-1', label: 'Crowd control', status: 'active', version_no: 1, archived_at: null },
+      { id: 'qualification-archived', tenant_id: 'tenant-1', label: 'Archived qualification', status: 'active', version_no: 1, archived_at: '2026-01-01T00:00:00Z' },
+      { id: 'qualification-inactive', tenant_id: 'tenant-1', label: 'Inactive qualification', status: 'inactive', version_no: 1, archived_at: null },
+    ]);
+
+    const wrapper = mountStep('demand-groups', {
+      current_step: 'demand-groups',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: 'series-1',
+    });
+    await settleLoadingRender();
+
+    expect(employeeAdminMocks.listFunctionTypesMock).toHaveBeenCalledWith('tenant-1', 'token-1');
+    expect(employeeAdminMocks.listQualificationTypesMock).toHaveBeenCalledWith('tenant-1', 'token-1');
+
+    (wrapper.vm as any).$?.setupState.openNewDemandGroupDialog();
+    await nextTick();
+    await flushPromises();
+
+    const functionOptions = wrapper
+      .get('[data-testid="customer-new-plan-demand-group-modal-function-type"]')
+      .findAll('option')
+      .map((option) => option.text());
+    const qualificationOptions = wrapper
+      .get('[data-testid="customer-new-plan-demand-group-modal-qualification-type"]')
+      .findAll('option')
+      .map((option) => option.text());
+
+    expect(functionOptions).toContain('Dispatch support');
+    expect(functionOptions).not.toContain('Archived function');
+    expect(functionOptions).not.toContain('Inactive function');
+    expect(qualificationOptions).toContain('Crowd control');
+    expect(qualificationOptions).not.toContain('Archived qualification');
+    expect(qualificationOptions).not.toContain('Inactive qualification');
   });
 
   it('opens a demand-group modal from the demand-groups step', async () => {
