@@ -3,151 +3,188 @@ You are working in the SicherPlan repository.
 Repository:
 https://github.com/jalalsadeghi/SicherPlan
 
-Task:
-Move the `Edit shifts` and `Edit` actions for applied demand-group summary cards into the card header/title row on the right side.
+Investigate and fix the GitHub Actions failure:
+https://github.com/jalalsadeghi/SicherPlan/actions/runs/25260687651/job/74067348307
 
-Observed UI problem:
-In `/admin/customers?tab=orders&customer_id=...&orderWorkspace=edit&...&step=demand-groups`, the applied demand-group cards now show persisted demand groups correctly, but the action buttons are displayed in a separate left-side column:
-- `Edit shifts`
-- `Edit`
+Current failing job:
+Build Backend Stage Image
 
-This creates an awkward layout and wastes vertical/horizontal space. The requested layout is:
-- each applied demand-group card should have its title/summary row
-- `Edit shifts` and `Edit` should appear together on the right side of that same header/title row
-- `Edit shifts` should appear before `Edit`
-- the `Complete` status indicator should remain below the title/action row, not behind or mixed with the buttons
+Current failing step:
+Verify committed field/lookup corpus artifact is current
 
-Current repo facts to validate:
-- `web/apps/web-antd/src/views/sicherplan/customers/new-plan-step-content.vue` contains the customer order wizard Demand groups step.
-- This component imports and uses planning staffing APIs such as `bulkUpdateDemandGroups`, `listDemandGroups`, `bulkApplyDemandGroups`, and `updateDemandGroup`.
-- The current applied demand-group summary UI is in this component.
-- The current layout has action buttons positioned on the left side of each applied summary card.
-- The `Edit shifts` action opens the per-shift/day edit flow.
-- The `Edit` action opens the aggregate edit flow.
-- The underlying edit behavior should not change in this task.
+Observed CI behavior:
+The workflow installs backend dependencies successfully and imports `field_dictionary_export` successfully.
 
-Goal:
-Make a layout-only UI refinement:
-1. Move `Edit shifts` and `Edit` into the applied demand-group card header.
-2. Place them on the far right of the header row.
-3. Keep `Edit shifts` before `Edit`.
-4. Keep the demand-group title/function type and qualification label on the left of the header row.
-5. Keep the status indicator such as `Complete`, `Partial`, or `Mixed` in a clear row below the header, or as a separate compact badge that does not collide with the buttons.
-6. Keep the card compact and visually clean.
+The failing workflow step runs the field/lookup corpus exporter twice and then compares:
+1. generated tmp1 vs generated tmp2
+2. committed `backend/app/modules/assistant/generated/field_lookup_corpus.json` vs generated tmp1
+
+The two generated files appear deterministic because CI does not fail on the tmp1/tmp2 comparison. The failure happens when CI compares the committed artifact against the freshly generated artifact.
+
+CI output summary:
+- field_count=219
+- lookup_count=10
+- term_count=519
+- field_counts_by_module={'planning': 38, 'customers': 106, 'platform_services': 6, 'employees': 69}
+- lookup_counts_by_module={'customers': 6, 'planning': 4}
+- term_counts_by_module={'planning': 282, 'unknown': 237}
+- warnings=['fa_locale_missing']
+
+Visible diff examples:
+- New source references for `DemandGroupBulkUpdateRequest.date_from`
+- New source references for `DemandGroupBulkUpdateRequest.date_to`
+- New source references for `DemandGroupBulkUpdateItemResult.demand_group_id`
+- New source references for `DemandGroupBulkUpdateMatch.function_type_id`
+- New source references for `DemandGroupBulkUpdatePatch.function_type_id`
+- New source references for `DemandGroupBulkUpdateMatch.qualification_type_id`
+- New source references for `DemandGroupBulkUpdatePatch.qualification_type_id`
+- New source references for `DemandGroupBulkUpdateMatch.sort_order`
+- New source references for `DemandGroupBulkUpdatePatch.sort_order`
+- New source references for `DemandGroupBulkUpdatePatch.status`
+- Changed source hashes:
+  - `backend_schema_fields`
+  - `locale_labels`
+  - `typescript_interfaces`
+- New localized UI terms related to demand-group aggregate/per-shift editing:
+  - `Edit applied demand group`
+  - `Angewendete Bedarfsgruppe bearbeiten`
+  - `Edit demand group by shift`
+  - `Bedarfsgruppe je Schicht bearbeiten`
+  - `Applied demand groups`
+  - `Angewendete Bedarfsgruppen`
+  - `Pending templates`
+  - `Ausstehende Vorlagen`
+  - `Editing is blocked for at least one applied shift row.`
+  - `Die Bearbeitung ist für mindestens eine angewendete Schichtzeile gesperrt.`
+
+Likely root cause:
+Recent changes added demand-group bulk-update interfaces and new localized labels for the demand-group aggregate/per-shift edit UI, but the committed generated artifact was not regenerated and committed.
+
+This is most likely a stale generated artifact, not:
+- a Docker build failure
+- a Python dependency failure
+- a nondeterministic exporter failure
+- a backend runtime failure
+
+Important:
+Do not remove the CI check.
+Do not make CI ignore the artifact diff.
+Do not hardcode only the visible diff lines.
+Do not alter Docker deployment logic.
+Do not change unrelated business logic.
+Treat `fa_locale_missing` as a warning unless you prove it is the cause of this job failure.
 
 Files to inspect:
+- `.github/workflows/stage-deploy.yml`
+- `backend/app/modules/assistant/field_dictionary.py`
+- `backend/app/modules/assistant/field_dictionary_export.py`
+- `backend/app/modules/assistant/generated/field_lookup_corpus.json`
+- `backend/tests/modules/assistant/test_field_lookup_source_hashes_stable.py`
+- `docs/assistant/stage-field-dictionary-verification.md`
+- `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
 - `web/apps/web-antd/src/views/sicherplan/customers/new-plan-step-content.vue`
-- `web/apps/web-antd/src/views/sicherplan/customers/new-plan-epic4.smoke.test.ts`
-- locale files under:
-  - `web/apps/web-antd/src/locales/langs/de-DE`
-  - `web/apps/web-antd/src/locales/langs/en-US`
+- `web/apps/web-antd/src/locales/langs/de-DE/sicherplan.json`
+- `web/apps/web-antd/src/locales/langs/en-US/sicherplan.json`
 
-Implementation requirements:
-1. Do not change business logic.
-2. Do not change backend APIs.
-3. Do not change `bulkUpdateDemandGroups`, `bulkApplyDemandGroups`, `listDemandGroups`, or `updateDemandGroup` behavior.
-4. Do not change how applied demand groups are aggregated.
-5. Do not change how aggregate edit and per-shift edit modals work.
-6. Only adjust markup/CSS/tests as needed for the requested layout.
-7. The card header layout should be responsive:
-   - desktop: title/qualification on the left, actions on the right
-   - narrow widths: actions may wrap below the title but should remain grouped and aligned cleanly
-8. Preserve accessibility:
-   - buttons remain real buttons
-   - labels remain localized
-   - existing data-testid values should be preserved if possible
-   - if test IDs are missing, add stable test IDs
-9. Preserve existing visual theme:
-   - do not hardcode unrelated colors
-   - use existing SicherPlan/Vben card/button classes or local scoped CSS consistent with the existing component
-10. Keep the visual hierarchy:
-   - header row: title + actions
-   - status row: Complete / Partial / Mixed indicator
-   - detail row: min/target/sort/mandatory/applied shift count
-11. Ensure the `Complete` status does not appear behind, above, or visually mixed with the action buttons.
+Task:
+1. Reproduce the CI check locally from the `backend/` directory.
+2. Confirm whether the exporter is deterministic:
+   ```bash
+   cd backend
+   python -m pip install -e .
+   tmp1="$(mktemp)"
+   tmp2="$(mktemp)"
+   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp1"
+   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp2"
+   diff -u "$tmp1" "$tmp2"
+   ```
+3. Compare the committed artifact with the fresh output:
+   ```bash
+   diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp1"
+   ```
+4. Classify the failure:
+   - stale generated artifact only
+   - nondeterministic generator
+   - source hash calculation bug
+   - meaningful but expected source/content change
+   - unexpected source/content change
+5. If the exporter is deterministic and the diff is expected, regenerate the committed artifact:
+   ```bash
+   python -m app.modules.assistant.field_dictionary_export      --repo-root ..      --output app/modules/assistant/generated/field_lookup_corpus.json
+   ```
+6. Inspect `git diff` carefully.
+7. Confirm whether the regenerated artifact includes:
+   - DemandGroupBulkUpdateRequest fields
+   - DemandGroupBulkUpdateMatch/Patch fields
+   - DemandGroupBulkUpdateItemResult fields
+   - demand-group aggregate edit locale terms
+   - demand-group per-shift edit locale terms
+8. Run smoke checks:
+   ```bash
+   python - <<'PY'
+   from app.modules.assistant.field_dictionary import detect_field_or_lookup_signal
 
-Suggested DOM structure:
-```vue
-<div class="sp-customer-plan-wizard-step__demand-summary-card">
-  <div class="sp-customer-plan-wizard-step__demand-summary-header">
-    <div class="sp-customer-plan-wizard-step__demand-summary-title">
-      <strong>Schichtleiter</strong>
-      <span>Sachkunde §34a GewO</span>
-    </div>
+   assert detect_field_or_lookup_signal("was bedeutet Vertragsreferenz") is not None
+   assert detect_field_or_lookup_signal("was bedeutet Rechtlicher Name") is not None
+   assert detect_field_or_lookup_signal("was bedeutet Apfelkuchen") is None
+   print("field dictionary smoke test ok")
+   PY
+   ```
+9. Run the CI-equivalent freshness check after regeneration:
+   ```bash
+   tmp1="$(mktemp)"
+   tmp2="$(mktemp)"
+   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp1"
+   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp2"
+   diff -u "$tmp1" "$tmp2"
+   diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp1"
+   ```
+10. If simple regeneration is not enough, inspect and fix the generator:
+    - sorted file traversal
+    - stable JSON serialization
+    - source hash exclusions
+    - exclusion of generated artifact from its own hash
+    - deterministic source_basis sorting
+    - duplicate handling
+11. If generator logic changes are needed, add/update tests under `backend/tests/modules/assistant/`.
+12. If only artifact regeneration is needed, do not change generator code.
+13. Commit the refreshed generated artifact and any necessary tests/code changes.
 
-    <div class="sp-customer-plan-wizard-step__demand-summary-actions">
-      <button ...>Edit shifts</button>
-      <button ...>Edit</button>
-    </div>
-  </div>
+Expected minimal fix:
+Most likely only this file should change:
+`backend/app/modules/assistant/generated/field_lookup_corpus.json`
 
-  <div class="sp-customer-plan-wizard-step__demand-summary-status">
-    Complete
-  </div>
-
-  <div class="sp-customer-plan-wizard-step__demand-summary-details">
-    ...
-  </div>
-</div>
-```
-
-Suggested CSS intent:
-```css
-.sp-customer-plan-wizard-step__demand-summary-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.sp-customer-plan-wizard-step__demand-summary-title {
-  min-width: 0;
-}
-
-.sp-customer-plan-wizard-step__demand-summary-actions {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 0.5rem;
-  justify-content: flex-end;
-}
-
-@media (max-width: ... ) {
-  .sp-customer-plan-wizard-step__demand-summary-header {
-    flex-direction: column;
-  }
-
-  .sp-customer-plan-wizard-step__demand-summary-actions {
-    justify-content: flex-start;
-  }
-}
-```
-
-Testing requirements:
-Update or add tests for:
-1. Applied demand-group card renders action buttons inside the card header.
-2. `Edit shifts` appears before `Edit`.
-3. Both buttons remain clickable and call/open the existing flows.
-4. The status label such as `Complete` remains visible and separate from the button group.
-5. Existing aggregate edit tests still pass.
-6. Existing per-shift edit tests still pass.
-7. Existing New demand group and Apply demand groups tests still pass.
+But validate this before deciding.
 
 Verification:
 Run and report exact results:
 ```bash
-cd web
-nvm use 22
-pnpm -F @vben/web-antd run build
-pnpm test:unit -- --runInBand
+cd backend
+python -m pip install -e .
+python -m app.modules.assistant.field_dictionary_export --repo-root .. --output /tmp/field_lookup_corpus.json
+python - <<'PY'
+from app.modules.assistant.field_dictionary import detect_field_or_lookup_signal
+assert detect_field_or_lookup_signal("was bedeutet Vertragsreferenz") is not None
+assert detect_field_or_lookup_signal("was bedeutet Rechtlicher Name") is not None
+assert detect_field_or_lookup_signal("was bedeutet Apfelkuchen") is None
+print("field dictionary smoke test ok")
+PY
+tmp1="$(mktemp)"
+tmp2="$(mktemp)"
+python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp1"
+python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp2"
+diff -u "$tmp1" "$tmp2"
+diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp1"
 ```
 
-If the repo uses a different test command, use the existing command and report it.
-
 Output format:
-- Design validation: accepted / adjusted / rejected
-- Root layout issue
+- Root cause
+- Evidence from CI and local reproduction
+- Exporter deterministic: yes/no
+- Failure classification
 - Files changed
-- Markup/CSS changes
-- Tests added/updated
-- Verification commands and results
+- Artifact diff summary
+- Whether `fa_locale_missing` is blocking or non-blocking
+- Smoke test result
+- CI-equivalent freshness check result
 - Remaining risks or follow-ups
