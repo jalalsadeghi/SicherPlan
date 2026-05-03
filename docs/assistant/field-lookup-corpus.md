@@ -16,9 +16,18 @@ The artifact is generated from the full repository checkout and then shipped wit
 
 ```bash
 cd backend
-PYTHONPATH=. python3 -m app.modules.assistant.field_dictionary_export \
-  --repo-root .. \
-  --output app/modules/assistant/generated/field_lookup_corpus.json
+python -m app.modules.assistant.field_lookup_corpus_artifact \
+  ensure-current \
+  --repo-root ..
+```
+
+## Check committed freshness
+
+```bash
+cd backend
+python -m app.modules.assistant.field_lookup_corpus_artifact \
+  check-committed \
+  --repo-root ..
 ```
 
 The command:
@@ -61,7 +70,8 @@ The check should return a non-`None` field signal even when `/app/web/...` does 
 If field labels, form bindings, or lookup labels change in the frontend:
 
 1. regenerate the artifact
-2. run the field/lookup assistant tests
-3. rebuild the backend image so the new artifact is included
+2. verify committed freshness locally
+3. run the field/lookup assistant tests
+4. rebuild the backend image so the new artifact is included
 
 Do not patch single keywords into the classifier. The artifact should stay source-grounded. 

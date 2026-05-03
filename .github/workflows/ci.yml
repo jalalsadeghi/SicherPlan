@@ -30,6 +30,39 @@ jobs:
       - name: Run backend checks
         run: ./infra/scripts/check_backend_ci.sh
 
+  assistant_generated_artifact:
+    name: Assistant Generated Artifact Freshness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Verify field/lookup corpus export is deterministic
+        working-directory: backend
+        run: |
+          python -m app.modules.assistant.field_lookup_corpus_artifact \
+            check-deterministic \
+            --repo-root ..
+
+      - name: Verify committed field/lookup corpus artifact is current
+        working-directory: backend
+        run: |
+          python -m app.modules.assistant.field_lookup_corpus_artifact \
+            check-committed \
+            --repo-root ..
+
   migration:
     name: Migration Check
     runs-on: ubuntu-latest

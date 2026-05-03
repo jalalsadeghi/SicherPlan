@@ -67,24 +67,27 @@ jobs:
           print("field_dictionary_export import ok")
           PY
 
-      - name: Verify committed field/lookup corpus artifact is current
+      - name: Verify field/lookup corpus export is deterministic
         working-directory: backend
         run: |
-          tmp1="$(mktemp)"
-          tmp2="$(mktemp)"
-          python -m app.modules.assistant.field_dictionary_export \
-            --repo-root .. \
-            --output "$tmp1"
-          python -m app.modules.assistant.field_dictionary_export \
-            --repo-root .. \
-            --output "$tmp2"
-          if ! diff -u "$tmp1" "$tmp2"; then
-            echo "Field/lookup corpus export is nondeterministic." >&2
-            exit 1
-          fi
-          if ! diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp1"; then
-            echo "Generated field/lookup corpus artifact is stale. Regenerate backend/app/modules/assistant/generated/field_lookup_corpus.json." >&2
-            exit 1
+          python -m app.modules.assistant.field_lookup_corpus_artifact \
+            check-deterministic \
+            --repo-root ..
+
+      - name: Generate current field/lookup corpus artifact for stage image
+        working-directory: backend
+        run: |
+          python -m app.modules.assistant.field_lookup_corpus_artifact \
+            ensure-current \
+            --repo-root ..
+
+      - name: Summarize regenerated field/lookup corpus artifact
+        run: |
+          if ! git diff --quiet -- backend/app/modules/assistant/generated/field_lookup_corpus.json; then
+            echo "Stage deploy refreshed backend/app/modules/assistant/generated/field_lookup_corpus.json for the image build."
+            git diff --stat -- backend/app/modules/assistant/generated/field_lookup_corpus.json
+          else
+            echo "Committed field/lookup corpus artifact was already current."
           fi
 
       - name: Normalize image namespace for GHCR

@@ -233,6 +233,28 @@ Use integration endpoints, jobs, and an outbox/event worker pattern for:
 4. Confirm whether any upstream prompt file already exists under `docs/prompts/`.
 5. Keep the change set narrow to the requested task unless an explicit dependency forces a small prerequisite fix.
 
+### Generated artifacts
+
+Some repository artifacts are derived from multiple source areas and must be refreshed when those inputs change.
+
+The assistant field/lookup corpus depends on:
+
+- backend schema fields
+- TypeScript API interfaces
+- Vue field bindings
+- locale labels
+- page help seed data
+
+If you change any of those inputs, refresh and verify the artifact locally:
+
+```bash
+cd backend
+python -m app.modules.assistant.field_lookup_corpus_artifact ensure-current --repo-root ..
+python -m app.modules.assistant.field_lookup_corpus_artifact check-committed --repo-root ..
+```
+
+Stage Deploy regenerates this artifact before building the backend image, but determinism is still enforced and PR CI still checks committed freshness.
+
 ### What each task-level prompt should produce
 
 A good task prompt should tell Codex to return or implement:

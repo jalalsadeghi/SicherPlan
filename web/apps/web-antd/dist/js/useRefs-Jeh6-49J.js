@@ -1,1 +1,0 @@
-import{Dr as e,Xn as t}from"../jse/index-index-D-1wn8K2.js";var n=()=>{let n=e(new Map);return t(()=>{n.value=new Map}),[e=>t=>{n.value.set(e,t)},n]};export{n as t};

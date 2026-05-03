@@ -3,34 +3,28 @@ You are working in the SicherPlan repository.
 Repository:
 https://github.com/jalalsadeghi/SicherPlan
 
-Task:
-Fix the recurring GitHub Actions failure around `field_lookup_corpus.json` permanently.
-
-Failing GitHub Actions job to investigate:
-https://github.com/jalalsadeghi/SicherPlan/actions/runs/25273602415/job/74099838117
+Investigate and permanently fix the recurring GitHub Actions failure:
+https://github.com/jalalsadeghi/SicherPlan/actions/runs/25275884953/job/74105665196
 
 Current failing job:
 Build Backend Stage Image
 
+Current failing workflow:
+`.github/workflows/stage-deploy.yml`
+
 Current failing step:
-Verify committed field/lookup corpus artifact is current
+`Verify committed field/lookup corpus artifact is current`
 
 Observed CI behavior:
-The CI job installs backend dependencies successfully and imports `field_dictionary_export` successfully.
+The workflow installs backend dependencies successfully and imports `field_dictionary_export` successfully.
 
-Then the workflow runs the field/lookup corpus exporter twice:
-1. `tmp1`
-2. `tmp2`
+The failing step currently:
+1. runs `field_dictionary_export` twice into two temp files
+2. checks that temp output 1 and temp output 2 are identical
+3. compares the committed file `backend/app/modules/assistant/generated/field_lookup_corpus.json` against the fresh output
+4. fails if the committed artifact is stale
 
-The two generated outputs are deterministic because CI does not fail on `diff -u "$tmp1" "$tmp2"`.
-
-The failure happens when CI compares the committed artifact against the freshly generated output:
-
-```bash
-diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp1"
-```
-
-CI output summary from the failing run:
+Current CI output shows:
 - field_count=219
 - lookup_count=10
 - term_count=525
@@ -39,251 +33,244 @@ CI output summary from the failing run:
 - term_counts_by_module={'planning': 282, 'unknown': 243}
 - warnings=['fa_locale_missing']
 
-Visible diff examples:
-- `actor_kind` confidence changes from low to medium.
-- New backend schema and TypeScript interface sources are added for:
-  - AssignmentStepApplyResult.actor_kind
-  - AssignmentStepCandidateRead.actor_kind
-  - AssignmentStepExistingAssignmentRead.actor_kind
-  - AssignmentStepScopeRequest.actor_kind
-  - AssignmentStepScopeRequest.date_from/date_to/search/team_id
-  - AssignmentStepApplyRequest.employee_id/team_id
-  - AssignmentStepCellRead.demand_group_id/function_type_id/qualification_type_id/starts_at/ends_at
-  - AssignmentStepDemandGroupMatch.function_type_id/qualification_type_id/sort_order
-  - AssignmentStepDemandGroupSummaryRead.function_type_id/qualification_type_id/sort_order
-  - AssignmentStepOrderSummaryRead.planning_mode_code/planning_record_id/order_no
-  - AssignmentStepShiftPlanSummaryRead.planning_from/planning_to/workforce_scope_code
-- New localized UI terms are added from the new Assignments step, such as:
-  - Calendar & staffing workspace
-  - Candidates
-  - No candidates found
-  - No demand groups available
-  - No generated shifts
-  - Assignments locked
-- Source hashes change for:
-  - backend_schema_fields
-  - locale_labels
-  - typescript_interfaces
+The temp1/temp2 deterministic comparison does not appear to fail.
+The failure happens when the committed artifact is compared against the freshly generated output.
 
-Recurring root problem:
-Every time frontend labels, TypeScript interfaces, backend schemas, or assistant page-help seeds change, the generated artifact changes. The current stage-deploy workflow fails unless the developer also regenerates and commits:
+Visible stale-artifact diff includes new source references and locale terms for the Assignment step, such as:
+- `AssignmentStepApplyResult.actor_kind`
+- `AssignmentStepCandidateRead.actor_kind`
+- `AssignmentStepExistingAssignmentRead.actor_kind`
+- `AssignmentStepScopeRequest.actor_kind`
+- `AssignmentStepScopeRequest.date_from`
+- `AssignmentStepScopeRequest.date_to`
+- `AssignmentStepApplyItemResult.demand_group_id`
+- `AssignmentStepCandidateDayStatusRead.demand_group_id`
+- `AssignmentStepCellRead.demand_group_id`
+- `AssignmentStepOrderSummaryRead.planning_mode_code`
+- `AssignmentStepShiftPlanSummaryRead.planning_from`
+- new localized UI terms such as:
+  - `Calendar & staffing workspace`
+  - `Candidates`
+  - `No candidates found`
+  - `No demand groups available`
+  - `No generated shifts`
+  - `Assignments locked`
 
-`backend/app/modules/assistant/generated/field_lookup_corpus.json`
+Likely root cause:
+This is a recurring generated-artifact workflow problem. Every time Codex or a developer changes backend schemas, TypeScript API interfaces, Vue bindings, page help seeds, or locale labels, the generated assistant field/lookup corpus changes. The code changes are valid, but `backend/app/modules/assistant/generated/field_lookup_corpus.json` is not regenerated and committed. The Stage Deploy workflow then fails.
 
-This is why the same problem keeps recurring. Simply regenerating the artifact again is not a permanent fix.
-
-Current repo facts to validate:
-- `.github/workflows/stage-deploy.yml` has a step named `Verify committed field/lookup corpus artifact is current`, and that step fails when the committed artifact differs from freshly generated output.
-- `backend/Dockerfile.stage` currently copies only `backend/` into the backend image.
-- `docs/assistant/field-lookup-corpus.md` says the backend image needs a packaged corpus artifact because the stage backend image does not include frontend source files.
-- `docs/assistant/stage-field-dictionary-verification.md` says CI enforces regeneration and failure when the committed artifact differs.
-- `backend/pyproject.toml` includes package-data for:
-  `app.modules.assistant.generated = ["field_lookup_corpus.json"]`
-- `infra/scripts/check_backend_ci.sh` also checks that the generated artifact matches the committed file.
-- `backend/tests/modules/assistant/test_field_lookup_artifact_freshness_behavior.py` has a test named `test_committed_artifact_matches_regenerated_output`, which enforces the same recurring failure pattern.
-- `field_dictionary.py` currently loads the packaged generated artifact first, then live-source extraction if present, then empty corpus.
-
-Important product/runtime constraint:
-The backend stage image still must contain a valid field/lookup corpus artifact, because frontend source files are not present in the backend image. The fix must preserve the runtime behavior that short field-label questions work in the backend container, for example:
-- `was bedeutet Vertragsreferenz`
-- `was bedeutet Rechtlicher Name`
-and irrelevant terms like:
-- `was bedeutet Apfelkuchen`
-must not produce a false positive.
-
-Main goal:
-Change the CI/build strategy so the backend image always receives a fresh generated corpus artifact automatically, while still verifying that the exporter is deterministic and that the runtime assistant smoke tests pass.
-
-This should prevent future source changes from repeatedly breaking stage deploy merely because the committed generated file was not manually refreshed.
-
-Do not just regenerate `field_lookup_corpus.json`.
-Do not only patch the current diff.
-Do not remove the assistant smoke tests.
-Do not make the backend image lose the generated artifact.
+Important:
+Do not merely regenerate `backend/app/modules/assistant/generated/field_lookup_corpus.json` again and stop. That only fixes the current run and the same failure will recur.
+Do not remove deterministic checking.
 Do not hide nondeterminism.
-Do not loosen tenant/security/business logic.
+Do not hardcode only the currently visible diff lines.
+Do not break the backend image smoke test.
+Do not change unrelated product/business logic.
+Treat `fa_locale_missing` as non-blocking unless you prove it is the cause of this failure.
 
-Recommended permanent direction to validate:
-Treat `field_lookup_corpus.json` as a generated build artifact for the stage backend image rather than a manually maintained source-of-truth file.
+Goal:
+Implement a durable solution so Stage Deploy does not repeatedly fail just because this generated artifact is stale after valid source changes.
 
-A robust approach is:
-1. Keep deterministic generation checks.
-2. In CI/stage deploy, generate the artifact into:
-   `backend/app/modules/assistant/generated/field_lookup_corpus.json`
-   before building the backend Docker image.
-3. Build the backend Docker image after generation, so Docker copies the fresh artifact into the image.
-4. Smoke-test the backend image exactly as today.
-5. Stop failing stage deploy only because the committed artifact is stale.
-6. Update local CI script/tests/docs so they verify deterministic generation and runtime behavior, not manual artifact freshness.
-7. Optionally keep the committed artifact as a fallback, but do not require it to be manually fresh for stage deploy if CI generates a fresh one before image build.
-8. If you decide the artifact should remain committed and freshness should still be enforced somewhere, implement an explicit non-deploy helper workflow or developer script that is separate from stage deploy, not a recurring blocker for stage image builds.
+You must validate the best durable strategy before coding. The preferred direction is:
+1. Keep the exporter deterministic check.
+2. Generate the field/lookup corpus artifact automatically in CI before the backend Docker build.
+3. Build the backend stage image with the freshly generated artifact from the workflow workspace.
+4. Stop blocking Stage Deploy solely because the committed generated artifact is stale.
+5. Preserve a developer-facing check or script so the artifact can still be regenerated and checked locally.
+6. Add clear documentation and Codex/developer guidance so future changes know when and how to regenerate/check the artifact.
 
-Before coding:
-1. Reproduce the failure locally:
-   ```bash
-   cd backend
-   python -m pip install -e .
-   tmp1="$(mktemp)"
-   tmp2="$(mktemp)"
-   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp1"
-   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp2"
-   diff -u "$tmp1" "$tmp2"
-   diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp1"
-   ```
-2. Confirm that the exporter is deterministic.
-3. Confirm that the failure is stale committed artifact, not nondeterminism.
-4. Inspect:
-   - `.github/workflows/stage-deploy.yml`
-   - `backend/Dockerfile.stage`
-   - `backend/pyproject.toml`
-   - `backend/app/modules/assistant/field_dictionary.py`
-   - `backend/app/modules/assistant/field_dictionary_export.py`
-   - `infra/scripts/check_backend_ci.sh`
-   - `backend/tests/modules/assistant/test_field_lookup_artifact_freshness_behavior.py`
-   - `backend/tests/modules/assistant/test_field_lookup_source_hashes_stable.py`
-   - `backend/tests/modules/assistant/test_field_lookup_corpus_artifact.py`
-   - `docs/assistant/field-lookup-corpus.md`
-   - `docs/assistant/stage-field-dictionary-verification.md`
+Files to inspect:
+- `.github/workflows/stage-deploy.yml`
+- `backend/app/modules/assistant/field_dictionary.py`
+- `backend/app/modules/assistant/field_dictionary_export.py`
+- `backend/app/modules/assistant/generated/field_lookup_corpus.json`
+- `backend/tests/modules/assistant/test_field_lookup_source_hashes_stable.py`
+- `docs/assistant/stage-field-dictionary-verification.md`
+- `AGENTS.md`
+- `backend/Dockerfile.stage`
+- any existing scripts/Makefile/pyproject tool entry points
+- current frontend/backend files that changed Assignment-step schemas/locales
 
-Implementation requirements:
-1. Modify `.github/workflows/stage-deploy.yml`.
-   - Replace the current failing freshness check with a deterministic generation step.
-   - The new step should:
-     a. Generate `tmp1`.
-     b. Generate `tmp2`.
-     c. Fail if `tmp1` and `tmp2` differ.
-     d. Copy or write the deterministic generated output to:
-        `backend/app/modules/assistant/generated/field_lookup_corpus.json`
-        in the checked-out workspace.
-     e. Print a concise summary and optionally `git diff --stat` for observability, but do not fail only because the committed file was stale.
-   - Keep the backend Docker build after this step so the image includes the fresh generated artifact.
-   - Keep the backend image smoke test.
-
-2. Update `infra/scripts/check_backend_ci.sh`.
-   - It should still verify deterministic generation.
-   - It should no longer fail only because the committed artifact differs from generated output.
-   - It should generate or refresh the artifact in the local working tree before checking package-resource availability.
-   - It should keep the smoke checks and compile/ruff checks.
-
-3. Update backend tests.
-   - Replace or adjust `test_committed_artifact_matches_regenerated_output`.
-   - Do not keep a test that permanently requires manual committed artifact freshness if stage deploy no longer requires it.
-   - Add tests that verify:
-     a. exporter is deterministic;
-     b. generated artifact shape has schema_version 1;
-     c. runtime detection still works for the important smoke terms;
-     d. package resource loading works when the generated artifact exists.
-   - If possible, add a test for build-time generation behavior using a temporary generated output rather than the committed file.
-
-4. Update runtime/local behavior if necessary.
-   - If the committed artifact can now be stale, make sure local development with a full repo checkout does not prefer a stale packaged artifact over current live sources in a harmful way.
-   - Consider changing runtime load order or adding a source-hash freshness check:
-     - In backend container/stage image: use packaged generated artifact.
-     - In local full repository checkout: use live-source extraction or a freshness-aware artifact preference.
-   - Do this only if needed and keep it cached; do not make normal assistant calls expensive.
-
-5. Update documentation.
-   - `docs/assistant/field-lookup-corpus.md`
-   - `docs/assistant/stage-field-dictionary-verification.md`
-   Explain the new policy clearly:
-   - The stage backend image receives a freshly generated artifact during CI before Docker build.
-   - Determinism is still enforced.
-   - Backend image smoke tests still verify that the artifact is present and useful.
-   - Developers may still regenerate locally when desired, but forgetting to commit the generated JSON should not break stage deploy if CI generates it.
-   - If the committed artifact is intentionally kept, document whether it is a fallback/reference artifact, not the stage deploy source of truth.
-
-6. Decide whether to keep tracking `backend/app/modules/assistant/generated/field_lookup_corpus.json`.
-   - Validate the safest choice.
-   - If keeping it tracked, explain why and ensure CI generation overwrites it before build.
-   - If untracking/removing it, ensure:
-     - package-data still works when CI generates the file before build;
-     - local tests/scripts generate it before package-resource checks;
-     - docs are updated;
-     - no import or package-data failure occurs when the file is absent before generation.
-   - Do not remove it unless you prove the build/test/runtime paths remain correct.
-
-7. Do not remove or weaken these checks:
-   - deterministic generation check;
-   - backend image smoke test;
-   - `detect_field_or_lookup_signal("was bedeutet Vertragsreferenz") is not None`;
-   - `detect_field_or_lookup_signal("was bedeutet Rechtlicher Name") is not None`;
-   - `detect_field_or_lookup_signal("was bedeutet Apfelkuchen") is None`.
-
-8. Treat `fa_locale_missing` as non-blocking unless you prove it is the cause of the failure.
-   - Do not make this warning block deploy in this task.
-
-Verification commands:
-Run and report exact results.
-
-Backend local verification:
+Current behavior to reproduce:
+From `backend/`:
 ```bash
-cd backend
-python -m pip install -e .
 tmp1="$(mktemp)"
 tmp2="$(mktemp)"
 python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp1"
 python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp2"
 diff -u "$tmp1" "$tmp2"
-cp "$tmp1" app/modules/assistant/generated/field_lookup_corpus.json
-python - <<'PY'
-from importlib.resources import files
-from app.modules.assistant.field_dictionary import detect_field_or_lookup_signal, field_definition_counts_by_module
+diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp1"
+```
 
-path = files("app.modules.assistant.generated").joinpath("field_lookup_corpus.json")
-print(path)
-print(path.is_file())
-print(field_definition_counts_by_module())
+Task 1 — Confirm current failure:
+1. Reproduce the CI check locally.
+2. Confirm whether exporter output is deterministic.
+3. Confirm the committed artifact is stale.
+4. Confirm this is not a Docker failure, not a Python dependency failure, and not a backend runtime failure.
+
+Task 2 — Add a single reusable generated-artifact helper:
+Create a small maintainable helper script or module, for example:
+- `backend/scripts/field_lookup_corpus_artifact.py`
+or, if project conventions prefer module paths:
+- `backend/app/modules/assistant/field_lookup_corpus_artifact.py`
+
+The helper should support at least:
+1. `generate`
+   - generates `backend/app/modules/assistant/generated/field_lookup_corpus.json`
+2. `check-deterministic`
+   - runs the exporter twice into temp files and fails if they differ
+3. `check-committed`
+   - compares committed artifact with fresh output and fails if stale
+4. `ensure-current`
+   - runs deterministic check and then writes the fresh generated artifact to the committed artifact path
+
+The script should:
+- accept `--repo-root`
+- accept `--output` where relevant
+- produce clear messages
+- never include volatile paths in output
+- keep temp files clean
+- return meaningful exit codes
+- be usable both locally and in GitHub Actions
+
+If adding a separate helper is unnecessary because an existing script already supports this cleanly, reuse and improve the existing script instead.
+
+Task 3 — Update Stage Deploy workflow for permanent stability:
+Update `.github/workflows/stage-deploy.yml` so `build_backend` no longer fails solely because the committed artifact is stale.
+
+Preferred workflow shape:
+1. Install backend dependencies.
+2. Smoke-test importer.
+3. Run deterministic check:
+   ```bash
+   python <helper> check-deterministic --repo-root ..
+   ```
+4. Generate the current artifact into the working tree:
+   ```bash
+   python <helper> ensure-current --repo-root ..
+   ```
+5. Optionally print a concise diff summary if the working tree artifact changed, but do not fail Stage Deploy only for that stale-committed-file condition.
+6. Build backend Docker image from the workspace containing the freshly generated artifact.
+7. Keep the backend image smoke test that verifies the corpus file exists and detection works.
+
+Important workflow decision:
+- Stage Deploy is a deployment pipeline from `main`. It should produce a correct backend image from the current source.
+- It should not repeatedly fail because a derived generated JSON file was not refreshed before merge.
+- Nondeterministic exporter output should still fail the workflow.
+- Actual smoke-test failures should still fail the workflow.
+
+Task 4 — Keep or add a stricter developer/PR check:
+Add a separate developer-facing check so stale artifacts can still be caught intentionally without breaking deployment stability.
+
+Choose the best repo-appropriate option:
+A. Add a separate workflow/job named something like `Verify Generated Artifacts` on `pull_request` that runs `check-committed`.
+B. Add a `workflow_dispatch` input to Stage Deploy to enforce committed artifact freshness.
+C. Add a local command documented for developers and Codex, but do not add a blocking deploy check.
+D. Another better option if the repo already has a generated-artifact check pattern.
+
+Whatever you choose, explain why.
+
+If you add a PR-only check:
+- It may fail PRs if the artifact is stale, but Stage Deploy from `main` should generate the artifact for image build.
+- If no PR workflow exists, add a minimal targeted workflow rather than mixing it into deployment.
+- Keep permissions minimal.
+
+Task 5 — Update developer/Codex guidance:
+Update documentation so this stops recurring.
+
+Update or add:
+- `docs/assistant/stage-field-dictionary-verification.md`
+- `AGENTS.md`
+- optionally a short `docs/engineering/generated-artifacts.md`
+
+The guidance must state:
+1. The generated corpus depends on:
+   - backend schema fields
+   - TypeScript API interfaces
+   - Vue field bindings
+   - locale labels
+   - page help seed data
+2. When those inputs change, the corpus may change.
+3. Local command to refresh:
+   ```bash
+   cd backend
+   python <helper> ensure-current --repo-root ..
+   ```
+4. Local command to check committed freshness:
+   ```bash
+   cd backend
+   python <helper> check-committed --repo-root ..
+   ```
+5. Stage Deploy generates the artifact before building the image, so deployment remains stable.
+6. Determinism is still enforced.
+
+Task 6 — Regenerate the current artifact:
+After implementing the durable workflow/script/docs:
+1. Regenerate `backend/app/modules/assistant/generated/field_lookup_corpus.json`.
+2. Inspect the diff.
+3. Confirm it contains the current Assignment-step schema and locale additions.
+4. Do not manually edit the generated JSON.
+
+Task 7 — Tests and verification:
+Run the following and report exact results:
+
+```bash
+cd backend
+python -m pip install -e .
+
+python <helper> check-deterministic --repo-root ..
+python <helper> ensure-current --repo-root ..
+python <helper> check-committed --repo-root ..
+
+python - <<'PY'
+from app.modules.assistant.field_dictionary import detect_field_or_lookup_signal
+
 assert detect_field_or_lookup_signal("was bedeutet Vertragsreferenz") is not None
 assert detect_field_or_lookup_signal("was bedeutet Rechtlicher Name") is not None
 assert detect_field_or_lookup_signal("was bedeutet Apfelkuchen") is None
-print("field lookup smoke ok")
+print("field dictionary smoke test ok")
 PY
+
 pytest backend/tests/modules/assistant -q
 ```
 
-If the repo expects running tests from `backend/`, adjust paths accordingly and report the exact commands used.
+If the exact paths or pytest command differ, use the repo-correct command and report it.
 
-Workflow-equivalent verification:
-- Run the updated generation step manually or through a dry-run script.
-- Confirm it no longer fails only because committed artifact was stale.
-- Confirm it still fails if `tmp1` and `tmp2` differ.
-- Confirm Docker image build still includes the generated artifact.
-- Confirm Docker smoke test still passes.
+Also validate the updated workflow logic by mentally or locally simulating:
+- exporter deterministic -> pass
+- committed artifact stale -> Stage Deploy regenerates -> backend Docker build uses fresh artifact -> pass
+- exporter nondeterministic -> fail
+- generated image missing corpus -> image smoke test fails
 
-Optional Docker verification:
-```bash
-docker build -f backend/Dockerfile.stage -t sicherplan-backend-smoke:field-corpus .
-docker run --rm sicherplan-backend-smoke:field-corpus python - <<'PY'
-from importlib.resources import files
-from app.modules.assistant.field_dictionary import detect_field_or_lookup_signal
-path = files("app.modules.assistant.generated").joinpath("field_lookup_corpus.json")
-print(path)
-print(path.is_file())
-assert detect_field_or_lookup_signal("was bedeutet Vertragsreferenz") is not None
-assert detect_field_or_lookup_signal("was bedeutet Rechtlicher Name") is not None
-assert detect_field_or_lookup_signal("was bedeutet Apfelkuchen") is None
-print("docker field lookup smoke ok")
-PY
-```
+Expected files likely to change:
+- `.github/workflows/stage-deploy.yml`
+- new helper script/module under `backend/scripts/` or `backend/app/modules/assistant/`
+- `backend/app/modules/assistant/generated/field_lookup_corpus.json`
+- `docs/assistant/stage-field-dictionary-verification.md`
+- `AGENTS.md`
+- maybe a new generated-artifact PR workflow if you choose that option
+- tests if helper logic is testable
 
 Output format:
 - Root cause
-- Why previous fixes were temporary
+- Why the old fix kept recurring
 - Permanent strategy chosen
-- Whether the artifact remains tracked or becomes build-generated only
+- Workflow changes
+- Helper script usage
+- Whether Stage Deploy still enforces determinism
+- Whether Stage Deploy still fails on real corpus/runtime failures
+- Whether stale committed artifact still blocks deployment: yes/no and why
 - Files changed
-- CI workflow changes
-- Script/test changes
-- Runtime/package-data impact
-- Documentation changes
-- Verification commands and results
+- Artifact diff summary
+- Tests/verification results
 - Remaining risks or follow-ups
 
-Final self-check:
-Before finishing, explicitly answer:
-1. Will a future frontend label/interface/schema change still break stage deploy just because the developer forgot to commit `field_lookup_corpus.json`?
-2. Will CI still catch nondeterministic generation?
-3. Will the backend stage image still include a valid generated corpus?
-4. Will the existing assistant field/lookup smoke checks still pass inside the backend image?
+Self-validation requirement:
+Before final response, explicitly challenge the proposed fix:
+- Could this hide a real generator bug?
+- Could this build a Docker image with an uncommitted generated file correctly?
+- Could this make local development worse?
+- Could this break the assistant field dictionary runtime?
+- Does this actually stop the recurring GitHub Actions failure pattern?
 
-If any answer is not clearly yes/no as expected, continue fixing until the permanent strategy is coherent.
+If any answer reveals a risk, adjust the implementation before finalizing.

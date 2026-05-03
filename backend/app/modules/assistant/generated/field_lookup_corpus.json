@@ -9,7 +9,7 @@
       ],
       "binding_paths": [],
       "canonical_name": "actor_kind",
-      "confidence": "low",
+      "confidence": "medium",
       "definition_de": "Feld Aktor-Typ im Kontext von Assignment.",
       "definition_en": "Actor kind field used in the Assignment context.",
       "entity_type": "Assignment",
@@ -37,9 +37,42 @@
       "route_names": [
         "SicherPlanPlanningStaffing"
       ],
-      "schema_fields": [],
+      "schema_fields": [
+        "AssignmentStepApplyResult.actor_kind",
+        "AssignmentStepCandidateRead.actor_kind",
+        "AssignmentStepExistingAssignmentRead.actor_kind",
+        "AssignmentStepScopeRequest.actor_kind"
+      ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepApplyResult includes field actor_kind.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepApplyResult",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepCandidateRead includes field actor_kind.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepCandidateRead",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepExistingAssignmentRead includes field actor_kind.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepExistingAssignmentRead",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepScopeRequest includes field actor_kind.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepScopeRequest",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "P-04 manifest section planning_staffing.demand_and_assignment includes field actor_kind labeled Actor kind.",
           "module_key": "planning",
@@ -53,6 +86,34 @@
           "page_id": "P-04",
           "source_name": "Assistant Page Help Manifest",
           "source_type": "page_help_manifest"
+        },
+        {
+          "evidence": "AssignmentStepApplyResult includes field actor_kind.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepApplyResult",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepCandidateRead includes field actor_kind.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepCandidateRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepExistingAssignmentRead includes field actor_kind.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepExistingAssignmentRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepScopeRequest includes field actor_kind.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepScopeRequest",
+          "source_type": "typescript_api_interface"
         }
       ]
     },
@@ -94,6 +155,7 @@
         "SicherPlanPlanningStaffing"
       ],
       "schema_fields": [
+        "AssignmentStepScopeRequest.date_from",
         "AssistantFieldReleasedScheduleVisibilityInput.date_from",
         "AssistantPlanningAssignmentSearchInput.date_from",
         "AssistantPlanningShiftSearchInput.date_from",
@@ -113,6 +175,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepScopeRequest includes field date_from.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepScopeRequest",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "AssistantFieldReleasedScheduleVisibilityInput includes field date_from.",
           "module_key": "planning",
@@ -233,6 +302,13 @@
           "source_type": "page_help_manifest"
         },
         {
+          "evidence": "AssignmentStepScopeRequest includes field date_from.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepScopeRequest",
+          "source_type": "typescript_api_interface"
+        },
+        {
           "evidence": "CoverageFilterParams includes field date_from.",
           "module_key": "planning",
           "page_id": "P-04",
@@ -300,6 +376,7 @@
         "SicherPlanPlanningStaffing"
       ],
       "schema_fields": [
+        "AssignmentStepScopeRequest.date_to",
         "AssistantFieldReleasedScheduleVisibilityInput.date_to",
         "AssistantPlanningAssignmentSearchInput.date_to",
         "AssistantPlanningShiftSearchInput.date_to",
@@ -319,6 +396,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepScopeRequest includes field date_to.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepScopeRequest",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "AssistantFieldReleasedScheduleVisibilityInput includes field date_to.",
           "module_key": "planning",
@@ -439,6 +523,13 @@
           "source_type": "page_help_manifest"
         },
         {
+          "evidence": "AssignmentStepScopeRequest includes field date_to.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepScopeRequest",
+          "source_type": "typescript_api_interface"
+        },
+        {
           "evidence": "CoverageFilterParams includes field date_to.",
           "module_key": "planning",
           "page_id": "P-04",
@@ -510,6 +601,10 @@
         "AssignmentCreate.demand_group_id",
         "AssignmentListItem.demand_group_id",
         "AssignmentRead.demand_group_id",
+        "AssignmentStepApplyItemResult.demand_group_id",
+        "AssignmentStepCandidateDayStatusRead.demand_group_id",
+        "AssignmentStepCellRead.demand_group_id",
+        "AssignmentStepExistingAssignmentRead.demand_group_id",
         "CoverageDemandGroupItem.demand_group_id",
         "DemandGroupBulkUpdateItemResult.demand_group_id",
         "PlanningValidationResult.demand_group_id",
@@ -543,6 +638,34 @@
           "module_key": "planning",
           "page_id": "P-04",
           "source_name": "AssignmentListItem",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepApplyItemResult includes field demand_group_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepApplyItemResult",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepCandidateDayStatusRead includes field demand_group_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepCandidateDayStatusRead",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepCellRead includes field demand_group_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepExistingAssignmentRead includes field demand_group_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepExistingAssignmentRead",
           "source_type": "backend_schema"
         },
         {
@@ -641,6 +764,34 @@
           "module_key": "planning",
           "page_id": "P-04",
           "source_name": "AssignmentRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepApplyItemResult includes field demand_group_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepApplyItemResult",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepCandidateDayStatusRead includes field demand_group_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepCandidateDayStatusRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepCellRead includes field demand_group_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepExistingAssignmentRead includes field demand_group_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepExistingAssignmentRead",
           "source_type": "typescript_api_interface"
         },
         {
@@ -781,6 +932,7 @@
         "SicherPlanPlanningStaffing"
       ],
       "schema_fields": [
+        "AssignmentStepOrderSummaryRead.planning_mode_code",
         "CoverageFilter.planning_mode_code",
         "CoverageFilterParams.planning_mode_code",
         "CoverageShiftItem.planning_mode_code",
@@ -808,6 +960,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepOrderSummaryRead includes field planning_mode_code.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepOrderSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "CoverageFilter includes field planning_mode_code.",
           "module_key": "planning",
@@ -956,6 +1115,13 @@
           "source_type": "page_help_manifest"
         },
         {
+          "evidence": "AssignmentStepOrderSummaryRead includes field planning_mode_code.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepOrderSummaryRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
           "evidence": "CoverageFilterParams includes field planning_mode_code.",
           "module_key": "planning",
           "page_id": "P-04",
@@ -1072,6 +1238,7 @@
         "SicherPlanPlanningStaffing"
       ],
       "schema_fields": [
+        "AssignmentStepOrderSummaryRead.planning_record_id",
         "AssistantNavigationEntityContextInput.planning_record_id",
         "CoverageFilter.planning_record_id",
         "CoverageFilterParams.planning_record_id",
@@ -1134,6 +1301,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepOrderSummaryRead includes field planning_record_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepOrderSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "AssistantNavigationEntityContextInput includes field planning_record_id.",
           "module_key": "planning",
@@ -1527,6 +1701,13 @@
           "source_type": "page_help_manifest"
         },
         {
+          "evidence": "AssignmentStepOrderSummaryRead includes field planning_record_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepOrderSummaryRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
           "evidence": "CoverageFilterParams includes field planning_record_id.",
           "module_key": "planning",
           "page_id": "P-04",
@@ -1725,6 +1906,9 @@
         "AssignmentCreate.team_id",
         "AssignmentListItem.team_id",
         "AssignmentRead.team_id",
+        "AssignmentStepApplyRequest.team_id",
+        "AssignmentStepExistingAssignmentRead.team_id",
+        "AssignmentStepScopeRequest.team_id",
         "AssignmentUpdate.team_id",
         "StaffingAssignCommand.team_id",
         "StaffingBoardAssignmentItem.team_id",
@@ -1755,6 +1939,27 @@
           "module_key": "planning",
           "page_id": "P-04",
           "source_name": "AssignmentListItem",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepApplyRequest includes field team_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepApplyRequest",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepExistingAssignmentRead includes field team_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepExistingAssignmentRead",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepScopeRequest includes field team_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepScopeRequest",
           "source_type": "backend_schema"
         },
         {
@@ -1825,6 +2030,27 @@
           "module_key": "planning",
           "page_id": "P-04",
           "source_name": "AssignmentRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepApplyRequest includes field team_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepApplyRequest",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepExistingAssignmentRead includes field team_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepExistingAssignmentRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepScopeRequest includes field team_id.",
+          "module_key": "planning",
+          "page_id": "P-04",
+          "source_name": "AssignmentStepScopeRequest",
           "source_type": "typescript_api_interface"
         },
         {
@@ -7440,6 +7666,7 @@
         "AssignmentCreate.employee_id",
         "AssignmentListItem.employee_id",
         "AssignmentRead.employee_id",
+        "AssignmentStepApplyRequest.employee_id",
         "AssignmentUpdate.employee_id",
         "AssistantNavigationEntityContextInput.employee_id",
         "AttendanceRecord.employee_id",
@@ -7598,6 +7825,13 @@
           "module_key": "customers",
           "page_id": "C-01",
           "source_name": "AssignmentListItem",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepApplyRequest includes field employee_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepApplyRequest",
           "source_type": "backend_schema"
         },
         {
@@ -8235,6 +8469,13 @@
           "module_key": "customers",
           "page_id": "C-01",
           "source_name": "AssignmentRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepApplyRequest includes field employee_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepApplyRequest",
           "source_type": "typescript_api_interface"
         },
         {
@@ -9361,6 +9602,9 @@
       "required": null,
       "route_names": [],
       "schema_fields": [
+        "AssignmentStepCellRead.function_type_id",
+        "AssignmentStepDemandGroupMatch.function_type_id",
+        "AssignmentStepDemandGroupSummaryRead.function_type_id",
         "CoverageDemandGroupItem.function_type_id",
         "CoverageFilter.function_type_id",
         "CoverageFilterParams.function_type_id",
@@ -9404,6 +9648,27 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepCellRead includes field function_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepDemandGroupMatch includes field function_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepDemandGroupMatch",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepDemandGroupSummaryRead includes field function_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepDemandGroupSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "CoverageDemandGroupItem includes field function_type_id.",
           "module_key": "customers",
@@ -9648,6 +9913,27 @@
           "page_id": "C-01",
           "source_name": "messages.ts / sicherplan.json",
           "source_type": "frontend_locale"
+        },
+        {
+          "evidence": "AssignmentStepCellRead includes field function_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepDemandGroupMatch includes field function_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepDemandGroupMatch",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepDemandGroupSummaryRead includes field function_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepDemandGroupSummaryRead",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CoverageDemandGroupItem includes field function_type_id.",
@@ -17016,6 +17302,7 @@
       "required": null,
       "route_names": [],
       "schema_fields": [
+        "AssignmentStepOrderSummaryRead.planning_mode_code",
         "CoverageFilter.planning_mode_code",
         "CoverageFilterParams.planning_mode_code",
         "CoverageShiftItem.planning_mode_code",
@@ -17043,6 +17330,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepOrderSummaryRead includes field planning_mode_code.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepOrderSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "CoverageFilter includes field planning_mode_code.",
           "module_key": "customers",
@@ -17189,6 +17483,13 @@
           "page_id": "C-01",
           "source_name": "messages.ts / sicherplan.json",
           "source_type": "frontend_locale"
+        },
+        {
+          "evidence": "AssignmentStepOrderSummaryRead includes field planning_mode_code.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepOrderSummaryRead",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CoverageFilterParams includes field planning_mode_code.",
@@ -17428,6 +17729,9 @@
       "required": null,
       "route_names": [],
       "schema_fields": [
+        "AssignmentStepCellRead.qualification_type_id",
+        "AssignmentStepDemandGroupMatch.qualification_type_id",
+        "AssignmentStepDemandGroupSummaryRead.qualification_type_id",
         "CoverageDemandGroupItem.qualification_type_id",
         "CoverageFilter.qualification_type_id",
         "CoverageFilterParams.qualification_type_id",
@@ -17475,6 +17779,27 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepCellRead includes field qualification_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepDemandGroupMatch includes field qualification_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepDemandGroupMatch",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepDemandGroupSummaryRead includes field qualification_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepDemandGroupSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "CoverageDemandGroupItem includes field qualification_type_id.",
           "module_key": "customers",
@@ -17747,6 +18072,27 @@
           "page_id": "C-01",
           "source_name": "messages.ts / sicherplan.json",
           "source_type": "frontend_locale"
+        },
+        {
+          "evidence": "AssignmentStepCellRead includes field qualification_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepDemandGroupMatch includes field qualification_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepDemandGroupMatch",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepDemandGroupSummaryRead includes field qualification_type_id.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepDemandGroupSummaryRead",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CoverageDemandGroupItem includes field qualification_type_id.",
@@ -18410,6 +18756,7 @@
         "SicherPlanCustomers"
       ],
       "schema_fields": [
+        "AssignmentStepScopeRequest.search",
         "CustomerExportPayload.search",
         "CustomerExportRequest.search",
         "CustomerFilter.search",
@@ -18432,6 +18779,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepScopeRequest includes field search.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepScopeRequest",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "CustomerExportRequest includes field search.",
           "module_key": "customers",
@@ -18522,6 +18876,13 @@
           "page_id": "C-01",
           "source_name": "Assistant Page Help Manifest",
           "source_type": "page_help_manifest"
+        },
+        {
+          "evidence": "AssignmentStepScopeRequest includes field search.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepScopeRequest",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CustomerExportPayload includes field search.",
@@ -18738,6 +19099,8 @@
       "required": null,
       "route_names": [],
       "schema_fields": [
+        "AssignmentStepDemandGroupMatch.sort_order",
+        "AssignmentStepDemandGroupSummaryRead.sort_order",
         "CustomerHistoryEntry.sort_order",
         "CustomerHistoryEntryRead.sort_order",
         "CustomerInvoiceLine.sort_order",
@@ -18780,6 +19143,20 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepDemandGroupMatch includes field sort_order.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepDemandGroupMatch",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepDemandGroupSummaryRead includes field sort_order.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepDemandGroupSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "CustomerHistoryEntry includes field sort_order.",
           "module_key": "customers",
@@ -19003,6 +19380,20 @@
           "page_id": "C-01",
           "source_name": "messages.ts / sicherplan.json",
           "source_type": "frontend_locale"
+        },
+        {
+          "evidence": "AssignmentStepDemandGroupMatch includes field sort_order.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepDemandGroupMatch",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepDemandGroupSummaryRead includes field sort_order.",
+          "module_key": "customers",
+          "page_id": "C-01",
+          "source_name": "AssignmentStepDemandGroupSummaryRead",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CustomerHistoryEntryRead includes field sort_order.",
@@ -21311,6 +21702,7 @@
         "SicherPlanCustomerOrderWorkspace"
       ],
       "schema_fields": [
+        "AssignmentStepScopeRequest.date_from",
         "AssistantFieldReleasedScheduleVisibilityInput.date_from",
         "AssistantPlanningAssignmentSearchInput.date_from",
         "AssistantPlanningShiftSearchInput.date_from",
@@ -21330,6 +21722,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepScopeRequest includes field date_from.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepScopeRequest",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "AssistantFieldReleasedScheduleVisibilityInput includes field date_from.",
           "module_key": "customers",
@@ -21450,6 +21849,13 @@
           "source_type": "page_help_manifest"
         },
         {
+          "evidence": "AssignmentStepScopeRequest includes field date_from.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepScopeRequest",
+          "source_type": "typescript_api_interface"
+        },
+        {
           "evidence": "CoverageFilterParams includes field date_from.",
           "module_key": "customers",
           "page_id": "C-02",
@@ -21518,6 +21924,7 @@
         "SicherPlanCustomerOrderWorkspace"
       ],
       "schema_fields": [
+        "AssignmentStepScopeRequest.date_to",
         "AssistantFieldReleasedScheduleVisibilityInput.date_to",
         "AssistantPlanningAssignmentSearchInput.date_to",
         "AssistantPlanningShiftSearchInput.date_to",
@@ -21537,6 +21944,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepScopeRequest includes field date_to.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepScopeRequest",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "AssistantFieldReleasedScheduleVisibilityInput includes field date_to.",
           "module_key": "customers",
@@ -21655,6 +22069,13 @@
           "page_id": "C-02",
           "source_name": "Assistant Page Help Manifest",
           "source_type": "page_help_manifest"
+        },
+        {
+          "evidence": "AssignmentStepScopeRequest includes field date_to.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepScopeRequest",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CoverageFilterParams includes field date_to.",
@@ -22569,6 +22990,7 @@
         "SicherPlanCustomerOrderWorkspace"
       ],
       "schema_fields": [
+        "AssignmentStepOrderSummaryRead.order_no",
         "CoverageShiftItem.order_no",
         "CustomerDashboardPlanItemRead.order_no",
         "CustomerOrder.order_no",
@@ -22585,6 +23007,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepOrderSummaryRead includes field order_no.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepOrderSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "CoverageShiftItem includes field order_no.",
           "module_key": "customers",
@@ -22675,6 +23104,13 @@
           "page_id": "C-02",
           "source_name": "Assistant Page Help Manifest",
           "source_type": "page_help_manifest"
+        },
+        {
+          "evidence": "AssignmentStepOrderSummaryRead includes field order_no.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepOrderSummaryRead",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CoverageShiftItem includes field order_no.",
@@ -22823,6 +23259,7 @@
         "SicherPlanCustomerOrderWorkspace"
       ],
       "schema_fields": [
+        "AssignmentStepShiftPlanSummaryRead.planning_from",
         "CustomerDashboardPlanItemRead.planning_from",
         "PlanningRecord.planning_from",
         "PlanningRecordCreate.planning_from",
@@ -22837,6 +23274,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepShiftPlanSummaryRead includes field planning_from.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepShiftPlanSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "CustomerDashboardPlanItemRead includes field planning_from.",
           "module_key": "customers",
@@ -22922,6 +23366,13 @@
           "source_type": "page_help_manifest"
         },
         {
+          "evidence": "AssignmentStepShiftPlanSummaryRead includes field planning_from.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepShiftPlanSummaryRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
           "evidence": "CustomerDashboardPlanItemRead includes field planning_from.",
           "module_key": "customers",
           "page_id": "C-02",
@@ -22990,6 +23441,7 @@
         "SicherPlanCustomerOrderWorkspace"
       ],
       "schema_fields": [
+        "AssignmentStepOrderSummaryRead.planning_mode_code",
         "CoverageFilter.planning_mode_code",
         "CoverageFilterParams.planning_mode_code",
         "CoverageShiftItem.planning_mode_code",
@@ -23017,6 +23469,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepOrderSummaryRead includes field planning_mode_code.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepOrderSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "CoverageFilter includes field planning_mode_code.",
           "module_key": "customers",
@@ -23165,6 +23624,13 @@
           "source_type": "page_help_manifest"
         },
         {
+          "evidence": "AssignmentStepOrderSummaryRead includes field planning_mode_code.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepOrderSummaryRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
           "evidence": "CoverageFilterParams includes field planning_mode_code.",
           "module_key": "customers",
           "page_id": "C-02",
@@ -23282,6 +23748,7 @@
         "SicherPlanCustomerOrderWorkspace"
       ],
       "schema_fields": [
+        "AssignmentStepShiftPlanSummaryRead.planning_to",
         "CustomerDashboardPlanItemRead.planning_to",
         "PlanningRecord.planning_to",
         "PlanningRecordCreate.planning_to",
@@ -23296,6 +23763,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepShiftPlanSummaryRead includes field planning_to.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepShiftPlanSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "CustomerDashboardPlanItemRead includes field planning_to.",
           "module_key": "customers",
@@ -23379,6 +23853,13 @@
           "page_id": "C-02",
           "source_name": "Assistant Page Help Manifest",
           "source_type": "page_help_manifest"
+        },
+        {
+          "evidence": "AssignmentStepShiftPlanSummaryRead includes field planning_to.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepShiftPlanSummaryRead",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CustomerDashboardPlanItemRead includes field planning_to.",
@@ -25034,6 +25515,7 @@
         "SicherPlanCustomerOrderWorkspace"
       ],
       "schema_fields": [
+        "AssignmentStepShiftPlanSummaryRead.workforce_scope_code",
         "CoverageFilter.workforce_scope_code",
         "CoverageFilterParams.workforce_scope_code",
         "CoverageShiftItem.workforce_scope_code",
@@ -25049,6 +25531,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepShiftPlanSummaryRead includes field workforce_scope_code.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepShiftPlanSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "CoverageFilter includes field workforce_scope_code.",
           "module_key": "customers",
@@ -25139,6 +25628,13 @@
           "page_id": "C-02",
           "source_name": "Assistant Page Help Manifest",
           "source_type": "page_help_manifest"
+        },
+        {
+          "evidence": "AssignmentStepShiftPlanSummaryRead includes field workforce_scope_code.",
+          "module_key": "customers",
+          "page_id": "C-02",
+          "source_name": "AssignmentStepShiftPlanSummaryRead",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CoverageFilterParams includes field workforce_scope_code.",
@@ -29692,6 +30188,7 @@
       "required": null,
       "route_names": [],
       "schema_fields": [
+        "AssignmentStepCellRead.ends_at",
         "AssistantFieldScheduleWindowRead.ends_at",
         "AssistantPlanningAssignmentMatchRead.ends_at",
         "AssistantPlanningShiftMatchRead.ends_at",
@@ -29717,6 +30214,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepCellRead includes field ends_at.",
+          "module_key": "employees",
+          "page_id": "E-01",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "AssistantFieldScheduleWindowRead includes field ends_at.",
           "module_key": "employees",
@@ -29863,6 +30367,13 @@
           "page_id": "E-01",
           "source_name": "messages.ts / sicherplan.json",
           "source_type": "frontend_locale"
+        },
+        {
+          "evidence": "AssignmentStepCellRead includes field ends_at.",
+          "module_key": "employees",
+          "page_id": "E-01",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CoverageShiftItem includes field ends_at.",
@@ -30094,6 +30605,7 @@
         "Applicant.first_name",
         "ApplicantListItem.first_name",
         "ApplicantRead.first_name",
+        "AssignmentStepCandidateRead.first_name",
         "Employee.first_name",
         "EmployeeListItem.first_name",
         "EmployeeOperationalCreate.first_name",
@@ -30131,6 +30643,13 @@
           "module_key": "employees",
           "page_id": "E-01",
           "source_name": "ApplicantRead",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepCandidateRead includes field first_name.",
+          "module_key": "employees",
+          "page_id": "E-01",
+          "source_name": "AssignmentStepCandidateRead",
           "source_type": "backend_schema"
         },
         {
@@ -30264,6 +30783,13 @@
           "module_key": "employees",
           "page_id": "E-01",
           "source_name": "ApplicantListItem",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepCandidateRead includes field first_name.",
+          "module_key": "employees",
+          "page_id": "E-01",
+          "source_name": "AssignmentStepCandidateRead",
           "source_type": "typescript_api_interface"
         },
         {
@@ -31351,6 +31877,7 @@
         "Applicant.last_name",
         "ApplicantListItem.last_name",
         "ApplicantRead.last_name",
+        "AssignmentStepCandidateRead.last_name",
         "Employee.last_name",
         "EmployeeListItem.last_name",
         "EmployeeOperationalCreate.last_name",
@@ -31388,6 +31915,13 @@
           "module_key": "employees",
           "page_id": "E-01",
           "source_name": "ApplicantRead",
+          "source_type": "backend_schema"
+        },
+        {
+          "evidence": "AssignmentStepCandidateRead includes field last_name.",
+          "module_key": "employees",
+          "page_id": "E-01",
+          "source_name": "AssignmentStepCandidateRead",
           "source_type": "backend_schema"
         },
         {
@@ -31521,6 +32055,13 @@
           "module_key": "employees",
           "page_id": "E-01",
           "source_name": "ApplicantListItem",
+          "source_type": "typescript_api_interface"
+        },
+        {
+          "evidence": "AssignmentStepCandidateRead includes field last_name.",
+          "module_key": "employees",
+          "page_id": "E-01",
+          "source_name": "AssignmentStepCandidateRead",
           "source_type": "typescript_api_interface"
         },
         {
@@ -35722,6 +36263,7 @@
       "required": null,
       "route_names": [],
       "schema_fields": [
+        "AssignmentStepCellRead.starts_at",
         "AssistantFieldScheduleWindowRead.starts_at",
         "AssistantPlanningAssignmentMatchRead.starts_at",
         "AssistantPlanningShiftMatchRead.starts_at",
@@ -35747,6 +36289,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepCellRead includes field starts_at.",
+          "module_key": "employees",
+          "page_id": "E-01",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "AssistantFieldScheduleWindowRead includes field starts_at.",
           "module_key": "employees",
@@ -35893,6 +36442,13 @@
           "page_id": "E-01",
           "source_name": "messages.ts / sicherplan.json",
           "source_type": "frontend_locale"
+        },
+        {
+          "evidence": "AssignmentStepCellRead includes field starts_at.",
+          "module_key": "employees",
+          "page_id": "E-01",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CoverageShiftItem includes field starts_at.",
@@ -42136,6 +42692,7 @@
         "SicherPlanPlanningShifts"
       ],
       "schema_fields": [
+        "AssignmentStepCellRead.ends_at",
         "AssistantFieldScheduleWindowRead.ends_at",
         "AssistantPlanningAssignmentMatchRead.ends_at",
         "AssistantPlanningShiftMatchRead.ends_at",
@@ -42161,6 +42718,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepCellRead includes field ends_at.",
+          "module_key": "planning",
+          "page_id": "P-03",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "AssistantFieldScheduleWindowRead includes field ends_at.",
           "module_key": "planning",
@@ -42307,6 +42871,13 @@
           "page_id": "P-03",
           "source_name": "Assistant Page Help Manifest",
           "source_type": "page_help_manifest"
+        },
+        {
+          "evidence": "AssignmentStepCellRead includes field ends_at.",
+          "module_key": "planning",
+          "page_id": "P-03",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CoverageShiftItem includes field ends_at.",
@@ -43648,6 +44219,7 @@
         "SicherPlanPlanningShifts"
       ],
       "schema_fields": [
+        "AssignmentStepShiftPlanSummaryRead.planning_from",
         "CustomerDashboardPlanItemRead.planning_from",
         "PlanningRecord.planning_from",
         "PlanningRecordCreate.planning_from",
@@ -43662,6 +44234,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepShiftPlanSummaryRead includes field planning_from.",
+          "module_key": "planning",
+          "page_id": "P-03",
+          "source_name": "AssignmentStepShiftPlanSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "CustomerDashboardPlanItemRead includes field planning_from.",
           "module_key": "planning",
@@ -43747,6 +44326,13 @@
           "source_type": "page_help_manifest"
         },
         {
+          "evidence": "AssignmentStepShiftPlanSummaryRead includes field planning_from.",
+          "module_key": "planning",
+          "page_id": "P-03",
+          "source_name": "AssignmentStepShiftPlanSummaryRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
           "evidence": "CustomerDashboardPlanItemRead includes field planning_from.",
           "module_key": "planning",
           "page_id": "P-03",
@@ -43815,6 +44401,7 @@
         "SicherPlanPlanningShifts"
       ],
       "schema_fields": [
+        "AssignmentStepOrderSummaryRead.planning_record_id",
         "AssistantNavigationEntityContextInput.planning_record_id",
         "CoverageFilter.planning_record_id",
         "CoverageFilterParams.planning_record_id",
@@ -43877,6 +44464,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepOrderSummaryRead includes field planning_record_id.",
+          "module_key": "planning",
+          "page_id": "P-03",
+          "source_name": "AssignmentStepOrderSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "AssistantNavigationEntityContextInput includes field planning_record_id.",
           "module_key": "planning",
@@ -44270,6 +44864,13 @@
           "source_type": "page_help_manifest"
         },
         {
+          "evidence": "AssignmentStepOrderSummaryRead includes field planning_record_id.",
+          "module_key": "planning",
+          "page_id": "P-03",
+          "source_name": "AssignmentStepOrderSummaryRead",
+          "source_type": "typescript_api_interface"
+        },
+        {
           "evidence": "CoverageFilterParams includes field planning_record_id.",
           "module_key": "planning",
           "page_id": "P-03",
@@ -44401,6 +45002,7 @@
         "SicherPlanPlanningShifts"
       ],
       "schema_fields": [
+        "AssignmentStepShiftPlanSummaryRead.planning_to",
         "CustomerDashboardPlanItemRead.planning_to",
         "PlanningRecord.planning_to",
         "PlanningRecordCreate.planning_to",
@@ -44415,6 +45017,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepShiftPlanSummaryRead includes field planning_to.",
+          "module_key": "planning",
+          "page_id": "P-03",
+          "source_name": "AssignmentStepShiftPlanSummaryRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "CustomerDashboardPlanItemRead includes field planning_to.",
           "module_key": "planning",
@@ -44498,6 +45107,13 @@
           "page_id": "P-03",
           "source_name": "Assistant Page Help Manifest",
           "source_type": "page_help_manifest"
+        },
+        {
+          "evidence": "AssignmentStepShiftPlanSummaryRead includes field planning_to.",
+          "module_key": "planning",
+          "page_id": "P-03",
+          "source_name": "AssignmentStepShiftPlanSummaryRead",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CustomerDashboardPlanItemRead includes field planning_to.",
@@ -45036,6 +45652,7 @@
         "SicherPlanPlanningShifts"
       ],
       "schema_fields": [
+        "AssignmentStepCellRead.starts_at",
         "AssistantFieldScheduleWindowRead.starts_at",
         "AssistantPlanningAssignmentMatchRead.starts_at",
         "AssistantPlanningShiftMatchRead.starts_at",
@@ -45061,6 +45678,13 @@
       ],
       "sensitive": false,
       "source_basis": [
+        {
+          "evidence": "AssignmentStepCellRead includes field starts_at.",
+          "module_key": "planning",
+          "page_id": "P-03",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "backend_schema"
+        },
         {
           "evidence": "AssistantFieldScheduleWindowRead includes field starts_at.",
           "module_key": "planning",
@@ -45207,6 +45831,13 @@
           "page_id": "P-03",
           "source_name": "Assistant Page Help Manifest",
           "source_type": "page_help_manifest"
+        },
+        {
+          "evidence": "AssignmentStepCellRead includes field starts_at.",
+          "module_key": "planning",
+          "page_id": "P-03",
+          "source_name": "AssignmentStepCellRead",
+          "source_type": "typescript_api_interface"
         },
         {
           "evidence": "CoverageShiftItem includes field starts_at.",
@@ -46007,10 +46638,10 @@
   ],
   "schema_version": 1,
   "source_hashes": {
-    "backend_schema_fields": "d1cce064e127daf5a83528c9ef5cc3ae5ab2687fcc338e1aa50081f1b1f2fe17",
-    "locale_labels": "86601b5fe95ec19ade21ee857ed1034984fe1898364eff54c0cb8469f5d48a5c",
+    "backend_schema_fields": "b6fdf391ffd67d50d98445e2f10f1ae450bb6d1550d07db186832b5d9b7a35a6",
+    "locale_labels": "16d20113bf6ef59a81ed99c77e063975a70e43ee878db24b698a717e5a4eb3d2",
     "page_help_seed_data": "f5dfd6a3ee268268020855336f57ba526ec9e245620feda137812602f24aa0de",
-    "typescript_interfaces": "92f587ca7f6e6c156f29e26d1d816e107af2aab8c3757d62bcbcc0d62a09a8a5",
+    "typescript_interfaces": "a1773382386c97e0c772c77e4faddb6fa7516c688891a4932b02b6d7967c54ca",
     "vue_field_bindings": "8606e1e5527c4a1ca4fbea8c5866b4517bbbfdb2f41f3d2516b4aa899f0e9918"
   },
   "terms": [
@@ -54252,6 +54883,13 @@
           "page_id": "P-04",
           "source_name": "planningStaffing.messages.ts",
           "source_type": "frontend_i18n_label"
+        },
+        {
+          "evidence": "customerPlansWizard.assignments.assignAction defines a visible localized UI term in sicherplan.json.",
+          "module_key": null,
+          "page_id": null,
+          "source_name": "sicherplan.json",
+          "source_type": "frontend_locale"
         }
       ],
       "term_key": "planning.staffing.staffing_actions",
@@ -61412,6 +62050,82 @@
     },
     {
       "aliases": [
+        "Calendar & staffing workspace",
+        "Kalender & Staffing-Fläche",
+        "calendarTitle"
+      ],
+      "canonical_name": "calendar",
+      "concept_type": "ui_term",
+      "confidence": "medium",
+      "definition_de": "Kalender & Staffing-Fläche ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.",
+      "definition_en": "calendar is a verified visible SicherPlan UI term in the locale_catalog context.",
+      "labels": {
+        "de": [
+          "Kalender & Staffing-Fläche"
+        ],
+        "en": [
+          "Calendar & staffing workspace"
+        ]
+      },
+      "module_key": null,
+      "page_id": null,
+      "related_terms": [],
+      "route_names": [],
+      "source_basis": [
+        {
+          "evidence": "customerPlansWizard.assignments.calendarTitle defines a visible localized UI term in sicherplan.json.",
+          "module_key": null,
+          "page_id": null,
+          "source_name": "sicherplan.json",
+          "source_type": "frontend_locale"
+        }
+      ],
+      "term_key": "platform.locale_catalog.calendar",
+      "ui_contexts": [
+        "calendar Title"
+      ],
+      "ui_term_type": "section_title"
+    },
+    {
+      "aliases": [
+        "Candidates",
+        "Kandidaten",
+        "candidatesTitle"
+      ],
+      "canonical_name": "candidate",
+      "concept_type": "ui_term",
+      "confidence": "medium",
+      "definition_de": "Kandidaten ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.",
+      "definition_en": "candidate is a verified visible SicherPlan UI term in the locale_catalog context.",
+      "labels": {
+        "de": [
+          "Kandidaten"
+        ],
+        "en": [
+          "Candidates"
+        ]
+      },
+      "module_key": null,
+      "page_id": null,
+      "related_terms": [],
+      "route_names": [],
+      "source_basis": [
+        {
+          "evidence": "customerPlansWizard.assignments.candidatesTitle defines a visible localized UI term in sicherplan.json.",
+          "module_key": null,
+          "page_id": null,
+          "source_name": "sicherplan.json",
+          "source_type": "frontend_locale"
+        }
+      ],
+      "term_key": "platform.locale_catalog.candidate",
+      "ui_contexts": [
+        "candidates Title"
+      ],
+      "ui_term_type": "section_title"
+    },
+    {
+      "aliases": [
         "Titel",
         "Title",
         "contactTitle"
@@ -62250,6 +62964,120 @@
     },
     {
       "aliases": [
+        "Keine Kandidaten gefunden",
+        "No candidates found",
+        "emptyNoCandidatesTitle"
+      ],
+      "canonical_name": "empty_no_candidate",
+      "concept_type": "ui_term",
+      "confidence": "medium",
+      "definition_de": "Keine Kandidaten gefunden ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.",
+      "definition_en": "empty_no_candidate is a verified visible SicherPlan UI term in the locale_catalog context.",
+      "labels": {
+        "de": [
+          "Keine Kandidaten gefunden"
+        ],
+        "en": [
+          "No candidates found"
+        ]
+      },
+      "module_key": null,
+      "page_id": null,
+      "related_terms": [],
+      "route_names": [],
+      "source_basis": [
+        {
+          "evidence": "customerPlansWizard.assignments.emptyNoCandidatesTitle defines a visible localized UI term in sicherplan.json.",
+          "module_key": null,
+          "page_id": null,
+          "source_name": "sicherplan.json",
+          "source_type": "frontend_locale"
+        }
+      ],
+      "term_key": "platform.locale_catalog.empty_no_candidate",
+      "ui_contexts": [
+        "empty No Candidates Title"
+      ],
+      "ui_term_type": "section_title"
+    },
+    {
+      "aliases": [
+        "Keine Bedarfsgruppen vorhanden",
+        "No demand groups available",
+        "emptyNoDemandGroupsTitle"
+      ],
+      "canonical_name": "empty_no_demand_group",
+      "concept_type": "ui_term",
+      "confidence": "medium",
+      "definition_de": "Keine Bedarfsgruppen vorhanden ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.",
+      "definition_en": "empty_no_demand_group is a verified visible SicherPlan UI term in the locale_catalog context.",
+      "labels": {
+        "de": [
+          "Keine Bedarfsgruppen vorhanden"
+        ],
+        "en": [
+          "No demand groups available"
+        ]
+      },
+      "module_key": null,
+      "page_id": null,
+      "related_terms": [],
+      "route_names": [],
+      "source_basis": [
+        {
+          "evidence": "customerPlansWizard.assignments.emptyNoDemandGroupsTitle defines a visible localized UI term in sicherplan.json.",
+          "module_key": null,
+          "page_id": null,
+          "source_name": "sicherplan.json",
+          "source_type": "frontend_locale"
+        }
+      ],
+      "term_key": "platform.locale_catalog.empty_no_demand_group",
+      "ui_contexts": [
+        "empty No Demand Groups Title"
+      ],
+      "ui_term_type": "section_title"
+    },
+    {
+      "aliases": [
+        "Keine erzeugten Schichten",
+        "No generated shifts",
+        "emptyNoShiftsTitle"
+      ],
+      "canonical_name": "empty_no_shift",
+      "concept_type": "ui_term",
+      "confidence": "medium",
+      "definition_de": "Keine erzeugten Schichten ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.",
+      "definition_en": "empty_no_shift is a verified visible SicherPlan UI term in the locale_catalog context.",
+      "labels": {
+        "de": [
+          "Keine erzeugten Schichten"
+        ],
+        "en": [
+          "No generated shifts"
+        ]
+      },
+      "module_key": null,
+      "page_id": null,
+      "related_terms": [],
+      "route_names": [],
+      "source_basis": [
+        {
+          "evidence": "customerPlansWizard.assignments.emptyNoShiftsTitle defines a visible localized UI term in sicherplan.json.",
+          "module_key": null,
+          "page_id": null,
+          "source_name": "sicherplan.json",
+          "source_type": "frontend_locale"
+        }
+      ],
+      "term_key": "platform.locale_catalog.empty_no_shift",
+      "ui_contexts": [
+        "empty No Shifts Title"
+      ],
+      "ui_term_type": "section_title"
+    },
+    {
+      "aliases": [
         "Ausrüstung",
         "Create equipment",
         "Equipment",
@@ -62886,6 +63714,44 @@
       "term_key": "platform.locale_catalog.loading",
       "ui_contexts": [
         "loading Title"
+      ],
+      "ui_term_type": "section_title"
+    },
+    {
+      "aliases": [
+        "Assignments locked",
+        "Zuweisungen gesperrt",
+        "lockedTitle"
+      ],
+      "canonical_name": "locked",
+      "concept_type": "ui_term",
+      "confidence": "medium",
+      "definition_de": "Zuweisungen gesperrt ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.",
+      "definition_en": "locked is a verified visible SicherPlan UI term in the locale_catalog context.",
+      "labels": {
+        "de": [
+          "Zuweisungen gesperrt"
+        ],
+        "en": [
+          "Assignments locked"
+        ]
+      },
+      "module_key": null,
+      "page_id": null,
+      "related_terms": [],
+      "route_names": [],
+      "source_basis": [
+        {
+          "evidence": "customerPlansWizard.assignments.lockedTitle defines a visible localized UI term in sicherplan.json.",
+          "module_key": null,
+          "page_id": null,
+          "source_name": "sicherplan.json",
+          "source_type": "frontend_locale"
+        }
+      ],
+      "term_key": "platform.locale_catalog.locked",
+      "ui_contexts": [
+        "locked Title"
       ],
       "ui_term_type": "section_title"
     },

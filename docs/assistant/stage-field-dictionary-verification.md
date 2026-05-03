@@ -10,20 +10,57 @@ Stage does not copy frontend source files into the backend image. The backend im
 
 ```bash
 cd backend
-PYTHONPATH=. python3 -m app.modules.assistant.field_dictionary_export \
-  --repo-root .. \
-  --output app/modules/assistant/generated/field_lookup_corpus.json
+python -m app.modules.assistant.field_lookup_corpus_artifact \
+  ensure-current \
+  --repo-root ..
+```
+
+## Local checks
+
+The generated corpus depends on:
+
+- backend schema fields
+- TypeScript API interfaces
+- Vue field bindings
+- locale labels
+- page help seed data
+
+If any of those inputs change, regenerate or recheck the artifact locally.
+
+Check determinism:
+
+```bash
+cd backend
+python -m app.modules.assistant.field_lookup_corpus_artifact \
+  check-deterministic \
+  --repo-root ..
+```
+
+Check committed freshness:
+
+```bash
+cd backend
+python -m app.modules.assistant.field_lookup_corpus_artifact \
+  check-committed \
+  --repo-root ..
 ```
 
 ## CI behavior
 
-CI and stage deploy now enforce two checks:
+CI and Stage Deploy have different responsibilities now:
 
-1. regenerate the artifact and fail if it differs from the committed file
-2. build a backend Docker image and smoke-test:
+1. pull request CI enforces:
+   - deterministic export
+   - committed artifact freshness
+2. Stage Deploy enforces:
+   - deterministic export
+   - regeneration of the artifact into the workflow workspace before backend image build
+   - backend image smoke-test:
    - `was bedeutet Vertragsreferenz`
    - `was bedeutet Rechtlicher Name`
    - `was bedeutet Apfelkuchen`
+
+That keeps deployment stable on `main` while still catching stale generated artifacts in developer-facing CI.
 
 ## Stage verification command
 
@@ -69,4 +106,4 @@ If stage still refuses field-label questions:
    ```
 2. rerun the verification script above
 3. if the artifact is missing, regenerate it locally, commit it, and redeploy
-4. if the artifact is present but stale, rerun the export command and check the diff against current frontend labels and page-help seeds
+4. if the artifact is present but stale, rerun the helper and check the diff against current backend schemas, TypeScript interfaces, Vue bindings, locale labels, and page-help seeds
