@@ -68,6 +68,7 @@ const apiMocks = vi.hoisted(() => ({
   listPlanningRecordsMock: vi.fn(),
   listPlanningRecordAttachmentsMock: vi.fn(),
   listPlanningSetupRecordsMock: vi.fn(),
+  listServiceCategoryOptionsMock: vi.fn(),
   listTradeFairZonesMock: vi.fn(),
   listShiftPlansMock: vi.fn(),
   listShiftsMock: vi.fn(),
@@ -133,7 +134,7 @@ vi.mock('#/sicherplan-legacy/api/planningOrders', () => ({
   listOrderRequirementLines: apiMocks.listOrderRequirementLinesMock,
   listPlanningRecords: apiMocks.listPlanningRecordsMock,
   listPlanningRecordAttachments: apiMocks.listPlanningRecordAttachmentsMock,
-  listServiceCategoryOptions: vi.fn().mockResolvedValue([]),
+  listServiceCategoryOptions: apiMocks.listServiceCategoryOptionsMock,
   updatePlanningRecord: apiMocks.updatePlanningRecordMock,
   updateCustomerOrder: vi.fn(),
   updateOrderEquipmentLine: vi.fn(),
@@ -524,6 +525,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listPlanningRecordsMock.mockReset();
     apiMocks.listPlanningRecordAttachmentsMock.mockReset();
     apiMocks.listPlanningSetupRecordsMock.mockReset();
+    apiMocks.listServiceCategoryOptionsMock.mockReset();
     apiMocks.listTradeFairZonesMock.mockReset();
     apiMocks.listShiftPlansMock.mockReset();
     apiMocks.listShiftsMock.mockReset();
@@ -579,6 +581,7 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     ]);
     apiMocks.listPlanningRecordAttachmentsMock.mockResolvedValue([]);
     apiMocks.listPlanningRecordsMock.mockResolvedValue([]);
+    apiMocks.listServiceCategoryOptionsMock.mockResolvedValue([]);
     apiMocks.listShiftPlansMock.mockResolvedValue([]);
     apiMocks.listShiftsMock.mockResolvedValue([]);
     apiMocks.listShiftTemplatesMock.mockResolvedValue([{ id: 'template-1', tenant_id: 'tenant-1', code: 'TPL-1', label: 'Tagdienst Vorlage', local_start_time: '08:00', local_end_time: '16:00', default_break_minutes: 30, shift_type_code: 'day', status: 'active', version_no: 1 }]);
@@ -5315,85 +5318,76 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     employeeAdminMocks.listQualificationTypesMock.mockResolvedValue([
       { id: 'qualification-1', tenant_id: 'tenant-1', label: 'Crowd control', status: 'active', version_no: 1, archived_at: null },
     ]);
-    apiMocks.listDemandGroupsMock.mockImplementation(async (_tenantId: string, _token: string, filters: Record<string, unknown>) => {
-      if (filters.shift_id === 'shift-1') {
-        return [
-          {
-            id: 'dg-1',
-            tenant_id: 'tenant-1',
-            shift_id: 'shift-1',
-            function_type_id: 'function-1',
-            qualification_type_id: 'qualification-1',
-            min_qty: 1,
-            target_qty: 2,
-            mandatory_flag: true,
-            sort_order: 1,
-            remark: 'Front gate',
-            status: 'active',
-            version_no: 1,
-            created_at: '2026-07-01T08:00:00Z',
-            updated_at: '2026-07-01T08:00:00Z',
-            archived_at: null,
-          },
-          {
-            id: 'dg-2',
-            tenant_id: 'tenant-1',
-            shift_id: 'shift-1',
-            function_type_id: 'function-2',
-            qualification_type_id: null,
-            min_qty: 1,
-            target_qty: 1,
-            mandatory_flag: false,
-            sort_order: 2,
-            remark: null,
-            status: 'active',
-            version_no: 1,
-            created_at: '2026-07-01T08:00:00Z',
-            updated_at: '2026-07-01T08:00:00Z',
-            archived_at: null,
-          },
-        ];
-      }
-      if (filters.shift_id === 'shift-2') {
-        return [
-          {
-            id: 'dg-3',
-            tenant_id: 'tenant-1',
-            shift_id: 'shift-2',
-            function_type_id: 'function-1',
-            qualification_type_id: 'qualification-1',
-            min_qty: 1,
-            target_qty: 2,
-            mandatory_flag: true,
-            sort_order: 1,
-            remark: 'Front gate',
-            status: 'active',
-            version_no: 1,
-            created_at: '2026-07-01T08:00:00Z',
-            updated_at: '2026-07-01T08:00:00Z',
-            archived_at: null,
-          },
-          {
-            id: 'dg-4',
-            tenant_id: 'tenant-1',
-            shift_id: 'shift-2',
-            function_type_id: 'function-2',
-            qualification_type_id: null,
-            min_qty: 1,
-            target_qty: 1,
-            mandatory_flag: false,
-            sort_order: 2,
-            remark: null,
-            status: 'active',
-            version_no: 1,
-            created_at: '2026-07-01T08:00:00Z',
-            updated_at: '2026-07-01T08:00:00Z',
-            archived_at: null,
-          },
-        ];
-      }
-      return [];
-    });
+    apiMocks.listDemandGroupsMock.mockResolvedValue([
+      {
+        id: 'dg-1',
+        tenant_id: 'tenant-1',
+        shift_id: 'shift-1',
+        function_type_id: 'function-1',
+        qualification_type_id: 'qualification-1',
+        min_qty: 1,
+        target_qty: 2,
+        mandatory_flag: true,
+        sort_order: 1,
+        remark: 'Front gate',
+        status: 'active',
+        version_no: 1,
+        created_at: '2026-07-01T08:00:00Z',
+        updated_at: '2026-07-01T08:00:00Z',
+        archived_at: null,
+      },
+      {
+        id: 'dg-2',
+        tenant_id: 'tenant-1',
+        shift_id: 'shift-1',
+        function_type_id: 'function-2',
+        qualification_type_id: null,
+        min_qty: 1,
+        target_qty: 1,
+        mandatory_flag: false,
+        sort_order: 2,
+        remark: null,
+        status: 'active',
+        version_no: 1,
+        created_at: '2026-07-01T08:00:00Z',
+        updated_at: '2026-07-01T08:00:00Z',
+        archived_at: null,
+      },
+      {
+        id: 'dg-3',
+        tenant_id: 'tenant-1',
+        shift_id: 'shift-2',
+        function_type_id: 'function-1',
+        qualification_type_id: 'qualification-1',
+        min_qty: 1,
+        target_qty: 2,
+        mandatory_flag: true,
+        sort_order: 1,
+        remark: 'Front gate',
+        status: 'active',
+        version_no: 1,
+        created_at: '2026-07-01T08:00:00Z',
+        updated_at: '2026-07-01T08:00:00Z',
+        archived_at: null,
+      },
+      {
+        id: 'dg-4',
+        tenant_id: 'tenant-1',
+        shift_id: 'shift-2',
+        function_type_id: 'function-2',
+        qualification_type_id: null,
+        min_qty: 1,
+        target_qty: 1,
+        mandatory_flag: false,
+        sort_order: 2,
+        remark: null,
+        status: 'active',
+        version_no: 1,
+        created_at: '2026-07-01T08:00:00Z',
+        updated_at: '2026-07-01T08:00:00Z',
+        archived_at: null,
+      },
+    ]);
 
     const wrapper = mountStep('demand-groups', {
       current_step: 'demand-groups',
@@ -5407,6 +5401,11 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-demand-group-persisted-list"]').findAll('[data-testid="customer-new-plan-demand-group-persisted-row"]')).toHaveLength(2);
     expect(wrapper.text()).toContain('Dispatch support');
     expect(wrapper.text()).toContain('Fire watch');
+    expect(apiMocks.listDemandGroupsMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listDemandGroupsMock).toHaveBeenCalledWith('tenant-1', 'token-1', {
+      include_archived: false,
+      shift_plan_id: 'plan-1',
+    });
     expect((wrapper.vm as any).$?.setupState.persistedDemandGroupSummaryRows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -5422,6 +5421,128 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
       ]),
     );
     expect(wrapper.emitted('step-completion')).toContainEqual(['demand-groups', true]);
+  });
+
+  it('loads demand-groups with one scoped demand-group request and without unrelated reference calls', async () => {
+    apiMocks.listShiftsMock.mockResolvedValue(
+      Array.from({ length: 23 }, (_, index) => ({
+        id: `shift-${index + 1}`,
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: 'series-1',
+        occurrence_date: `2026-07-${String(index + 1).padStart(2, '0')}`,
+        starts_at: `2026-07-${String(index + 1).padStart(2, '0')}T08:00:00Z`,
+        ends_at: `2026-07-${String(index + 1).padStart(2, '0')}T16:00:00Z`,
+        break_minutes: 30,
+        shift_type_code: 'day',
+        location_text: null,
+        meeting_point: null,
+        release_state: 'draft',
+        customer_visible_flag: false,
+        subcontractor_visible_flag: false,
+        stealth_mode_flag: false,
+        source_kind_code: 'generated',
+        status: 'active',
+        version_no: 1,
+      })),
+    );
+    employeeAdminMocks.listFunctionTypesMock.mockResolvedValue([
+      { id: 'function-1', tenant_id: 'tenant-1', label: 'Dispatch support', status: 'active', version_no: 1, archived_at: null },
+    ]);
+    employeeAdminMocks.listQualificationTypesMock.mockResolvedValue([
+      { id: 'qualification-1', tenant_id: 'tenant-1', label: 'Crowd control', status: 'active', version_no: 1, archived_at: null },
+    ]);
+    apiMocks.listDemandGroupsMock.mockResolvedValue([
+      {
+        id: 'dg-1',
+        tenant_id: 'tenant-1',
+        shift_id: 'shift-1',
+        function_type_id: 'function-1',
+        qualification_type_id: 'qualification-1',
+        min_qty: 1,
+        target_qty: 2,
+        mandatory_flag: true,
+        sort_order: 1,
+        remark: 'Front gate',
+        status: 'active',
+        version_no: 1,
+        created_at: '2026-07-01T08:00:00Z',
+        updated_at: '2026-07-01T08:00:00Z',
+        archived_at: null,
+      },
+    ]);
+
+    const wrapper = mountStep('demand-groups', {
+      current_step: 'demand-groups',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: 'series-1',
+    });
+    await waitForDemandGroupsStepReady(wrapper, 23);
+
+    expect(apiMocks.listDemandGroupsMock).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listDemandGroupsMock).toHaveBeenCalledWith('tenant-1', 'token-1', {
+      include_archived: false,
+      shift_plan_id: 'plan-1',
+    });
+    expect(apiMocks.listPlanningSetupRecordsMock).not.toHaveBeenCalled();
+    expect(apiMocks.listServiceCategoryOptionsMock).not.toHaveBeenCalled();
+    expect(apiMocks.listTradeFairZonesMock).not.toHaveBeenCalled();
+    expect(apiMocks.listShiftTemplatesMock).not.toHaveBeenCalled();
+    expect(apiMocks.listShiftTypeOptionsMock).not.toHaveBeenCalled();
+    expect(apiMocks.listShiftSeriesExceptionsMock).not.toHaveBeenCalled();
+    expect(apiMocks.getPlanningRecordMock).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="customer-new-plan-demand-groups-generated-count"]').text()).toBe('23');
+  });
+
+  it('does not refetch demand-groups for the same step context', async () => {
+    apiMocks.listShiftsMock.mockResolvedValue([
+      {
+        id: 'shift-1',
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: 'series-1',
+        occurrence_date: '2026-07-02',
+        starts_at: '2026-07-02T08:00:00Z',
+        ends_at: '2026-07-02T16:00:00Z',
+        break_minutes: 30,
+        shift_type_code: 'day',
+        location_text: null,
+        meeting_point: null,
+        release_state: 'draft',
+        customer_visible_flag: false,
+        subcontractor_visible_flag: false,
+        stealth_mode_flag: false,
+        source_kind_code: 'generated',
+        status: 'active',
+        version_no: 1,
+      },
+    ]);
+    apiMocks.listDemandGroupsMock.mockResolvedValue([]);
+
+    const wrapper = mountStep('demand-groups', {
+      current_step: 'demand-groups',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: 'series-1',
+    });
+    await waitForDemandGroupsStepReady(wrapper, 1);
+
+    expect(apiMocks.listDemandGroupsMock).toHaveBeenCalledTimes(1);
+
+    await wrapper.setProps({
+      wizardState: {
+        ...baseWizardState(),
+        current_step: 'demand-groups',
+        planning_record_id: 'record-1',
+        shift_plan_id: 'plan-1',
+        series_id: 'series-1',
+      },
+    });
+    await flushPromises();
+    await settleLoadingRender();
+
+    expect(apiMocks.listDemandGroupsMock).toHaveBeenCalledTimes(1);
   });
 
   it('renders applied demand-group actions and prefills the aggregate edit dialog', async () => {
@@ -5570,8 +5691,6 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
           updated_at: '2026-07-01T08:00:00Z',
           archived_at: null,
         },
-      ])
-      .mockResolvedValueOnce([
         {
           id: 'dg-2',
           tenant_id: 'tenant-1',
@@ -5608,8 +5727,6 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
           updated_at: '2026-07-01T08:00:00Z',
           archived_at: null,
         },
-      ])
-      .mockResolvedValueOnce([
         {
           id: 'dg-2',
           tenant_id: 'tenant-1',
@@ -5707,6 +5824,23 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listDemandGroupsMock
       .mockResolvedValueOnce([
         {
+          id: 'dg-1',
+          tenant_id: 'tenant-1',
+          shift_id: 'shift-1',
+          function_type_id: 'function-1',
+          qualification_type_id: null,
+          min_qty: 1,
+          target_qty: 2,
+          mandatory_flag: true,
+          sort_order: 1,
+          remark: 'Shared',
+          status: 'active',
+          version_no: 1,
+          created_at: '2026-07-01T08:00:00Z',
+          updated_at: '2026-07-01T08:00:00Z',
+          archived_at: null,
+        },
+        {
           id: 'dg-2',
           tenant_id: 'tenant-1',
           shift_id: 'shift-2',
@@ -5742,8 +5876,6 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
           updated_at: '2026-07-01T08:00:00Z',
           archived_at: null,
         },
-      ])
-      .mockResolvedValueOnce([
         {
           id: 'dg-2',
           tenant_id: 'tenant-1',
@@ -5761,8 +5893,6 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
           updated_at: '2026-07-01T08:00:00Z',
           archived_at: null,
         },
-      ])
-      .mockResolvedValueOnce([
         {
           id: 'dg-1',
           tenant_id: 'tenant-1',
@@ -5979,51 +6109,42 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
         version_no: 1,
       },
     ]);
-    apiMocks.listDemandGroupsMock.mockImplementation(async (_tenantId: string, _token: string, filters: Record<string, unknown>) => {
-      if (filters.shift_id === 'shift-1') {
-        return [
-          {
-            id: 'dg-1',
-            tenant_id: 'tenant-1',
-            shift_id: 'shift-1',
-            function_type_id: 'function-1',
-            qualification_type_id: null,
-            min_qty: 1,
-            target_qty: 2,
-            mandatory_flag: true,
-            sort_order: 1,
-            remark: null,
-            status: 'active',
-            version_no: 1,
-            created_at: '2026-07-01T08:00:00Z',
-            updated_at: '2026-07-01T08:00:00Z',
-            archived_at: null,
-          },
-        ];
-      }
-      if (filters.shift_id === 'shift-2') {
-        return [
-          {
-            id: 'dg-2',
-            tenant_id: 'tenant-1',
-            shift_id: 'shift-2',
-            function_type_id: 'function-1',
-            qualification_type_id: null,
-            min_qty: 1,
-            target_qty: 2,
-            mandatory_flag: true,
-            sort_order: 1,
-            remark: null,
-            status: 'active',
-            version_no: 1,
-            created_at: '2026-07-01T08:00:00Z',
-            updated_at: '2026-07-01T08:00:00Z',
-            archived_at: null,
-          },
-        ];
-      }
-      return [];
-    });
+    apiMocks.listDemandGroupsMock.mockResolvedValue([
+      {
+        id: 'dg-1',
+        tenant_id: 'tenant-1',
+        shift_id: 'shift-1',
+        function_type_id: 'function-1',
+        qualification_type_id: null,
+        min_qty: 1,
+        target_qty: 2,
+        mandatory_flag: true,
+        sort_order: 1,
+        remark: null,
+        status: 'active',
+        version_no: 1,
+        created_at: '2026-07-01T08:00:00Z',
+        updated_at: '2026-07-01T08:00:00Z',
+        archived_at: null,
+      },
+      {
+        id: 'dg-2',
+        tenant_id: 'tenant-1',
+        shift_id: 'shift-2',
+        function_type_id: 'function-1',
+        qualification_type_id: null,
+        min_qty: 1,
+        target_qty: 2,
+        mandatory_flag: true,
+        sort_order: 1,
+        remark: null,
+        status: 'active',
+        version_no: 1,
+        created_at: '2026-07-01T08:00:00Z',
+        updated_at: '2026-07-01T08:00:00Z',
+        archived_at: null,
+      },
+    ]);
 
     const wrapper = mountStep('demand-groups', {
       current_step: 'demand-groups',

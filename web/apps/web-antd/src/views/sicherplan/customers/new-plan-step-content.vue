@@ -514,6 +514,13 @@ const tradeFairZoneOptions = ref<TradeFairZoneRead[]>([]);
 const tradeFairZoneLookupLoading = ref(false);
 const tradeFairZoneLookupError = ref('');
 const shiftTemplateDetailCache = reactive<Record<string, ShiftTemplateRead>>({});
+const demandGroupsScopedRequestCache = new Map<string, Promise<unknown>>();
+const demandGroupsFunctionTypeCache = new Map<string, FunctionTypeRead[]>();
+const demandGroupsQualificationTypeCache = new Map<string, QualificationTypeRead[]>();
+const demandGroupsShiftPlanCache = new Map<string, null | ShiftPlanRead>();
+const demandGroupsSeriesCache = new Map<string, null | ShiftSeriesRead>();
+const demandGroupsGeneratedShiftCache = new Map<string, ShiftListItem[]>();
+const demandGroupsPersistedCache = new Map<string, DemandGroupRead[]>();
 const seriesTemplateFieldTouched = reactive({
   default_break_minutes: false,
   location_text: false,
@@ -1753,6 +1760,60 @@ function buildStepExternalContextKey(
     seriesId: overrides.seriesId ?? props.wizardState.series_id,
     tenantId: overrides.tenantId ?? props.tenantId,
   });
+}
+
+function buildDemandGroupsStepContextKey(
+  overrides: Partial<{
+    currentStepId: CustomerNewPlanWizardStepId;
+    customerId: string;
+    orderId: string;
+    planningRecordId: string;
+    shiftPlanId: string;
+    seriesId: string;
+    tenantId: string;
+  }> = {},
+) {
+  return JSON.stringify({
+    currentStepId: overrides.currentStepId ?? 'demand-groups',
+    customerId: overrides.customerId ?? props.customer.id,
+    orderId: overrides.orderId ?? props.wizardState.order_id,
+    planningRecordId: overrides.planningRecordId ?? props.wizardState.planning_record_id,
+    shiftPlanId: overrides.shiftPlanId ?? props.wizardState.shift_plan_id,
+    seriesId: overrides.seriesId ?? props.wizardState.series_id,
+    tenantId: overrides.tenantId ?? props.tenantId,
+  });
+}
+
+function clearDemandGroupsRequestCaches() {
+  demandGroupsScopedRequestCache.clear();
+  demandGroupsFunctionTypeCache.clear();
+  demandGroupsQualificationTypeCache.clear();
+  demandGroupsShiftPlanCache.clear();
+  demandGroupsSeriesCache.clear();
+  demandGroupsGeneratedShiftCache.clear();
+  demandGroupsPersistedCache.clear();
+}
+
+async function resolveDemandGroupsScopedRequest<T>(cacheKey: string, loader: () => Promise<T>) {
+  if (demandGroupsScopedRequestCache.has(cacheKey)) {
+    return demandGroupsScopedRequestCache.get(cacheKey) as Promise<T>;
+  }
+  const request = loader()
+    .finally(() => {
+      demandGroupsScopedRequestCache.delete(cacheKey);
+    });
+  demandGroupsScopedRequestCache.set(cacheKey, request);
+  return request;
+}
+
+function invalidateDemandGroupsScopedCache(prefix: 'persisted' | 'shifts', contextKey: string) {
+  if (prefix === 'persisted') {
+    demandGroupsPersistedCache.delete(contextKey);
+    demandGroupsScopedRequestCache.delete(`persisted:${contextKey}`);
+    return;
+  }
+  demandGroupsGeneratedShiftCache.delete(contextKey);
+  demandGroupsScopedRequestCache.delete(`shifts:${contextKey}`);
 }
 
 function loadStepDraft<T>(stepId: CustomerNewPlanWizardDraftStepId) {
@@ -4397,20 +4458,116 @@ function validateDemandGroupValues(
 }
 
 async function reloadPersistedDemandGroups() {
+  persistedDemandGroups.value = await loadPersistedDemandGroupsForCurrentScope({ forceReload: true });
+}
+
+async function loadDemandGroupFunctionTypeOptions() {
   if (!props.tenantId || !props.accessToken) {
-    persistedDemandGroups.value = [];
-    return;
+    return [] as FunctionTypeRead[];
   }
-  if (!demandGroupGeneratedShifts.value.length) {
-    persistedDemandGroups.value = [];
-    return;
+  const cacheKey = props.tenantId;
+  const cached = demandGroupsFunctionTypeCache.get(cacheKey);
+  if (cached) {
+    return cached;
   }
-  const persistedRows = await Promise.all(
-    demandGroupGeneratedShifts.value.map((shift) =>
-      listDemandGroups(props.tenantId, props.accessToken, { shift_id: shift.id }),
-    ),
+  const rows = await resolveDemandGroupsScopedRequest(`function-types:${cacheKey}`, async () => {
+    const functionTypes = await listFunctionTypes(props.tenantId, props.accessToken);
+    return functionTypes.filter((row) => row.status === 'active' && row.archived_at == null);
+  });
+  demandGroupsFunctionTypeCache.set(cacheKey, rows);
+  return rows;
+}
+
+async function loadDemandGroupQualificationTypeOptions() {
+  if (!props.tenantId || !props.accessToken) {
+    return [] as QualificationTypeRead[];
+  }
+  const cacheKey = props.tenantId;
+  const cached = demandGroupsQualificationTypeCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  const rows = await resolveDemandGroupsScopedRequest(`qualification-types:${cacheKey}`, async () => {
+    const qualificationTypes = await listQualificationTypes(props.tenantId, props.accessToken);
+    return qualificationTypes.filter((row) => row.status === 'active' && row.archived_at == null);
+  });
+  demandGroupsQualificationTypeCache.set(cacheKey, rows);
+  return rows;
+}
+
+async function loadDemandGroupShiftPlanSummary() {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
+    return null;
+  }
+  const cacheKey = `${props.tenantId}:${props.wizardState.shift_plan_id}`;
+  if (demandGroupsShiftPlanCache.has(cacheKey)) {
+    return demandGroupsShiftPlanCache.get(cacheKey) ?? null;
+  }
+  const detail = await resolveDemandGroupsScopedRequest(
+    `shift-plan:${cacheKey}`,
+    () => getShiftPlan(props.tenantId, props.wizardState.shift_plan_id, props.accessToken),
   );
-  persistedDemandGroups.value = persistedRows.flat();
+  demandGroupsShiftPlanCache.set(cacheKey, detail);
+  return detail;
+}
+
+async function loadDemandGroupSeriesSummary() {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.series_id) {
+    return null;
+  }
+  const cacheKey = `${props.tenantId}:${props.wizardState.series_id}`;
+  if (demandGroupsSeriesCache.has(cacheKey)) {
+    return demandGroupsSeriesCache.get(cacheKey) ?? null;
+  }
+  const detail = await resolveDemandGroupsScopedRequest(
+    `series:${cacheKey}`,
+    () => getShiftSeries(props.tenantId, props.wizardState.series_id, props.accessToken),
+  );
+  demandGroupsSeriesCache.set(cacheKey, detail);
+  return detail;
+}
+
+async function loadDemandGroupGeneratedShifts(contextKey: string) {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
+    return [] as ShiftListItem[];
+  }
+  const cached = demandGroupsGeneratedShiftCache.get(contextKey);
+  if (cached) {
+    return cached;
+  }
+  const rows = await resolveDemandGroupsScopedRequest(`shifts:${contextKey}`, async () => {
+    const shifts = await listShifts(props.tenantId, props.accessToken, {
+      shift_plan_id: props.wizardState.shift_plan_id,
+      shift_series_id: props.wizardState.series_id || undefined,
+    });
+    return shifts.filter((row) => row.source_kind_code === 'generated');
+  });
+  demandGroupsGeneratedShiftCache.set(contextKey, rows);
+  return rows;
+}
+
+async function loadPersistedDemandGroupsForCurrentScope(options: { forceReload?: boolean } = {}) {
+  if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id || !demandGroupGeneratedShifts.value.length) {
+    return [] as DemandGroupRead[];
+  }
+  const contextKey = buildDemandGroupsStepContextKey();
+  if (options.forceReload) {
+    invalidateDemandGroupsScopedCache('persisted', contextKey);
+  }
+  const cached = demandGroupsPersistedCache.get(contextKey);
+  if (cached) {
+    return cached;
+  }
+  const rows = await resolveDemandGroupsScopedRequest(`persisted:${contextKey}`, async () => {
+    const targetShiftIds = new Set(demandGroupGeneratedShifts.value.map((shift) => shift.id));
+    const persistedRows = await listDemandGroups(props.tenantId, props.accessToken, {
+      include_archived: false,
+      shift_plan_id: props.wizardState.shift_plan_id,
+    });
+    return persistedRows.filter((row) => targetShiftIds.has(row.shift_id));
+  });
+  demandGroupsPersistedCache.set(contextKey, rows);
+  return rows;
 }
 
 async function submitAggregateDemandGroupDialog() {
@@ -4459,6 +4616,7 @@ async function submitAggregateDemandGroupDialog() {
       matched: result.matched_count,
       updated: result.updated_count,
     } as never);
+    invalidateDemandGroupsScopedCache('persisted', buildDemandGroupsStepContextKey());
     await reloadPersistedDemandGroups();
     emit('step-completion', 'demand-groups', persistedDemandGroupsCoverageComplete.value && demandGroupDraftRows.value.length === 0);
     closeAggregateDemandGroupEditDialog();
@@ -4498,6 +4656,7 @@ async function submitShiftDemandGroupDialog() {
     demandGroupSummaryMessage.value = $t('sicherplan.customerPlansWizard.messages.demandGroupsShiftUpdatedSummary', {
       shift: row.shift_label,
     } as never);
+    invalidateDemandGroupsScopedCache('persisted', buildDemandGroupsStepContextKey());
     await reloadPersistedDemandGroups();
     emit('step-completion', 'demand-groups', persistedDemandGroupsCoverageComplete.value && demandGroupDraftRows.value.length === 0);
     closeShiftDemandGroupEditDialog();
@@ -5162,6 +5321,8 @@ async function loadDemandGroupsState(isCurrent = () => true) {
   demandGroupValidationError.value = '';
   const persistedDemandGroupsDraft = loadStepDraft<DemandGroupsDraftPersistence>('demand-groups');
   if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
+    selectedShiftPlan.value = null;
+    selectedSeries.value = null;
     demandGroupGeneratedShifts.value = [];
     persistedDemandGroups.value = [];
     demandGroupApplyResult.value = null;
@@ -5177,16 +5338,24 @@ async function loadDemandGroupsState(isCurrent = () => true) {
   }
   const loadVersions = beginStepLoads('demandGroups');
   try {
-    const shifts = await listShifts(props.tenantId, props.accessToken, {
-      shift_plan_id: props.wizardState.shift_plan_id,
-      shift_series_id: props.wizardState.series_id || undefined,
-    });
+    const contextKey = buildDemandGroupsStepContextKey();
+    const [functionTypes, qualificationTypes, shiftPlan, series, generatedShifts] = await Promise.all([
+      loadDemandGroupFunctionTypeOptions(),
+      loadDemandGroupQualificationTypeOptions(),
+      loadDemandGroupShiftPlanSummary(),
+      loadDemandGroupSeriesSummary(),
+      loadDemandGroupGeneratedShifts(contextKey),
+    ]);
     if (!isCurrent()) {
       return;
     }
-    demandGroupGeneratedShifts.value = shifts.filter((row) => row.source_kind_code === 'generated');
+    functionTypeOptions.value = functionTypes;
+    qualificationTypeOptions.value = qualificationTypes;
+    selectedShiftPlan.value = shiftPlan;
+    selectedSeries.value = series;
+    demandGroupGeneratedShifts.value = generatedShifts;
     if (demandGroupGeneratedShifts.value.length) {
-      await reloadPersistedDemandGroups();
+      persistedDemandGroups.value = await loadPersistedDemandGroupsForCurrentScope();
       if (!isCurrent()) {
         return;
       }
@@ -5243,9 +5412,6 @@ async function refreshStepData() {
       await hydrateSeriesStepContext(isCurrent);
       await loadSeriesState(isCurrent);
     } else if (demandGroupsStepActive.value) {
-      await loadOrderReferenceOptions(isCurrent);
-      await hydrateSeriesStepContext(isCurrent);
-      await loadSeriesState(isCurrent);
       await loadDemandGroupsState(isCurrent);
     }
   } catch {
@@ -6551,6 +6717,7 @@ async function submitShiftPlanStep(): Promise<CustomerNewPlanStepSubmitResult> {
       ? await updateShiftPlan(props.tenantId, selectedShiftPlan.value.id, props.accessToken, payload)
       : await createShiftPlan(props.tenantId, props.accessToken, payload);
     syncShiftPlanDraft(saved);
+    clearDemandGroupsRequestCaches();
     clearStepDraft('shift-plan');
     clearDraftRestoreMessage();
     shiftPlanRows.value = await listShiftPlans(props.tenantId, props.accessToken, { planning_record_id: props.wizardState.planning_record_id });
@@ -6808,6 +6975,7 @@ async function saveSeriesDraft() {
       ? await updateShiftSeries(props.tenantId, selectedSeries.value!.id, props.accessToken, buildSeriesPayload())
       : await createShiftSeries(props.tenantId, props.wizardState.shift_plan_id, props.accessToken, buildSeriesPayload());
     syncSeriesDraft(savedSeries);
+    clearDemandGroupsRequestCaches();
     emit('saved-context', { series_id: savedSeries.id });
     seriesRows.value = await listShiftSeries(props.tenantId, props.wizardState.shift_plan_id, props.accessToken);
     seriesExceptions.value = await listShiftSeriesExceptions(props.tenantId, savedSeries.id, props.accessToken);
@@ -6841,6 +7009,7 @@ async function saveExceptionDraft() {
     const savedException = selectedExceptionId.value
       ? await updateShiftSeriesException(props.tenantId, selectedExceptionId.value, props.accessToken, buildExceptionPayload())
       : await createShiftSeriesException(props.tenantId, selectedSeries.value.id, props.accessToken, buildExceptionPayload());
+    clearDemandGroupsRequestCaches();
     seriesExceptions.value = await listShiftSeriesExceptions(props.tenantId, savedException.shift_series_id, props.accessToken);
     closeExceptionModal();
     clearStepDraft('series-exceptions');
@@ -6876,6 +7045,7 @@ async function deleteExceptionRow(row: ShiftSeriesExceptionRead) {
   emit('step-ui-state', 'series-exceptions', { loading: true, error: '' });
   try {
     await deleteShiftSeriesException(props.tenantId, row.id, props.accessToken);
+    clearDemandGroupsRequestCaches();
     seriesExceptions.value = await listShiftSeriesExceptions(props.tenantId, row.shift_series_id, props.accessToken);
     if (selectedExceptionId.value === row.id) {
       closeExceptionModal();
@@ -6961,6 +7131,7 @@ async function submitSeriesStep() {
       regenerate_existing: seriesGenerationDraft.regenerate_existing,
       to_date: generationTo,
     });
+    clearDemandGroupsRequestCaches();
     emit('step-completion', 'series-exceptions', true);
     emit('step-ui-state', 'series-exceptions', { dirty: false, error: '' });
     return {
@@ -7022,6 +7193,7 @@ async function submitDemandGroupsStep(): Promise<CustomerNewPlanStepSubmitResult
     demandGroupDraftRows.value = [];
     clearStepDraft('demand-groups');
     clearDraftRestoreMessage();
+    invalidateDemandGroupsScopedCache('persisted', buildDemandGroupsStepContextKey());
     await reloadPersistedDemandGroups();
     emit('step-completion', 'demand-groups', true);
     emit('step-ui-state', 'demand-groups', { dirty: false, error: '' });
@@ -7490,6 +7662,7 @@ watch(
 watch(
   () => [props.customer.id, props.wizardState.customer_id] as const,
   () => {
+    clearDemandGroupsRequestCaches();
     planningCreateStagedAddresses.value = [];
     closePlanningAddressCreateModal();
     planningLocationPickerOpen.value = false;

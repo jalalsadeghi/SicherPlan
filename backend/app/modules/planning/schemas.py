@@ -2254,6 +2254,8 @@ class AssignmentStepSnapshotRead(BaseModel):
     shift_plan: AssignmentStepShiftPlanSummaryRead
     generated_shift_count: int
     demand_group_summary_count: int
+    default_demand_group_signature: str | None = None
+    candidates_included: bool = False
     editable_flag: bool
     lock_reason_codes: list[str] = Field(default_factory=list)
     demand_group_summaries: list[AssignmentStepDemandGroupSummaryRead] = Field(default_factory=list)

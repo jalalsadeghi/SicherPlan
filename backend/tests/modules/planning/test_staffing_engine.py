@@ -281,12 +281,29 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
             rows = [row for row in rows if row.archived_at is None]
         if filters.shift_id is not None:
             rows = [row for row in rows if row.shift_id == filters.shift_id]
+        if filters.shift_plan_id is not None:
+            rows = [row for row in rows if self.shifts[row.shift_id].shift_plan_id == filters.shift_plan_id]
+        if filters.planning_record_id is not None:
+            rows = [
+                row
+                for row in rows
+                if self.shift_plans[self.shifts[row.shift_id].shift_plan_id].planning_record_id == filters.planning_record_id
+            ]
         if filters.demand_group_id is not None:
             rows = [row for row in rows if row.id == filters.demand_group_id]
         for row in rows:
             row.assignments = [item for item in self.assignments.values() if item.demand_group_id == row.id]
             row.subcontractor_releases = [item for item in self.subcontractor_releases.values() if item.demand_group_id == row.id]
-        return sorted(rows, key=lambda row: (row.sort_order, row.id))
+        return sorted(rows, key=lambda row: (self.shifts[row.shift_id].starts_at, row.shift_id, row.sort_order, row.id))
+
+    def list_demand_groups_for_shifts(self, tenant_id: str, shift_ids: list[str], *, include_archived: bool = False):
+        rows = [row for row in self.demand_groups.values() if row.tenant_id == tenant_id and row.shift_id in set(shift_ids)]
+        if not include_archived:
+            rows = [row for row in rows if row.archived_at is None]
+        for row in rows:
+            row.assignments = [item for item in self.assignments.values() if item.demand_group_id == row.id]
+            row.subcontractor_releases = [item for item in self.subcontractor_releases.values() if item.demand_group_id == row.id]
+        return sorted(rows, key=lambda row: (row.shift_id, row.sort_order, row.id))
 
     def get_demand_group(self, tenant_id: str, row_id: str):
         rows = [row for row in self.list_demand_groups(tenant_id, StaffingFilter(include_archived=True)) if row.id == row_id]
@@ -966,6 +983,182 @@ class StaffingServiceTests(unittest.TestCase):
         self.assertEqual(len(self.repository.list_demand_groups("tenant-1", StaffingFilter(shift_id=included_shift.id, include_archived=True))), 1)
         self.assertEqual(self.repository.list_demand_groups("tenant-1", StaffingFilter(shift_id=excluded_by_date.id, include_archived=True)), [])
         self.assertEqual(self.repository.list_demand_groups("tenant-1", StaffingFilter(shift_id=excluded_by_series.id, include_archived=True)), [])
+
+    def test_list_demand_groups_by_shift_plan_returns_rows_across_matching_shifts(self) -> None:
+        first_shift = self._create_generated_shift(occurrence_date=date(2026, 4, 7))
+        second_shift = self._create_generated_shift(occurrence_date=date(2026, 4, 8))
+        second_plan = self.shift_service.create_shift_plan(
+            "tenant-1",
+            ShiftPlanCreate(
+                tenant_id="tenant-1",
+                planning_record_id=self.planning_record_id,
+                name="Objektschutz Zusatz",
+                workforce_scope_code="mixed",
+                planning_from=date(2026, 4, 1),
+                planning_to=date(2026, 4, 30),
+            ),
+            _context("planning.shift.write"),
+        )
+        other_shift = self.shift_service.create_shift(
+            "tenant-1",
+            ShiftCreate(
+                tenant_id="tenant-1",
+                shift_plan_id=second_plan.id,
+                starts_at=datetime(2026, 4, 9, 8, 0, tzinfo=UTC),
+                ends_at=datetime(2026, 4, 9, 16, 0, tzinfo=UTC),
+                break_minutes=30,
+                shift_type_code="site_day",
+                source_kind_code="generated",
+            ),
+            _context("planning.shift.write"),
+        )
+        first_group = self.service.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(tenant_id="tenant-1", shift_id=first_shift.id, function_type_id="function-1", min_qty=1, target_qty=1, sort_order=20),
+            _context("planning.staffing.write"),
+        )
+        second_group = self.service.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(tenant_id="tenant-1", shift_id=second_shift.id, function_type_id="function-1", min_qty=1, target_qty=1, sort_order=10),
+            _context("planning.staffing.write"),
+        )
+        self.service.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(tenant_id="tenant-1", shift_id=other_shift.id, function_type_id="function-2", min_qty=1, target_qty=1, sort_order=5),
+            _context("planning.staffing.write"),
+        )
+
+        rows = self.service.list_demand_groups(
+            "tenant-1",
+            StaffingFilter(shift_plan_id=self.shift_plan_id),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual([row.id for row in rows], [first_group.id, second_group.id])
+        self.assertEqual([row.shift_id for row in rows], [first_shift.id, second_shift.id])
+
+    def test_list_demand_groups_by_planning_record_includes_multiple_shift_plans(self) -> None:
+        first_shift = self._create_generated_shift(occurrence_date=date(2026, 4, 7))
+        second_plan = self.shift_service.create_shift_plan(
+            "tenant-1",
+            ShiftPlanCreate(
+                tenant_id="tenant-1",
+                planning_record_id=self.planning_record_id,
+                name="Objektschutz Zusatz",
+                workforce_scope_code="mixed",
+                planning_from=date(2026, 4, 1),
+                planning_to=date(2026, 4, 30),
+            ),
+            _context("planning.shift.write"),
+        )
+        second_shift = self.shift_service.create_shift(
+            "tenant-1",
+            ShiftCreate(
+                tenant_id="tenant-1",
+                shift_plan_id=second_plan.id,
+                starts_at=datetime(2026, 4, 9, 8, 0, tzinfo=UTC),
+                ends_at=datetime(2026, 4, 9, 16, 0, tzinfo=UTC),
+                break_minutes=30,
+                shift_type_code="site_day",
+                source_kind_code="generated",
+            ),
+            _context("planning.shift.write"),
+        )
+        other_record = self.repository.create_planning_record(
+            "tenant-1",
+            type(
+                "RecordPayload",
+                (),
+                {
+                    "order_id": self.repository.orders[next(iter(self.repository.orders))].id,
+                    "parent_planning_record_id": None,
+                    "dispatcher_user_id": "dispatcher-1",
+                    "planning_mode_code": "site",
+                    "name": "Fremder Datensatz",
+                    "planning_from": date(2026, 4, 1),
+                    "planning_to": date(2026, 4, 30),
+                    "release_state": "draft",
+                    "notes": None,
+                },
+            )(),
+            "user-1",
+        )
+        other_plan = self.shift_service.create_shift_plan(
+            "tenant-1",
+            ShiftPlanCreate(
+                tenant_id="tenant-1",
+                planning_record_id=other_record.id,
+                name="Andere Planung",
+                workforce_scope_code="mixed",
+                planning_from=date(2026, 4, 1),
+                planning_to=date(2026, 4, 30),
+            ),
+            _context("planning.shift.write"),
+        )
+        other_shift = self.shift_service.create_shift(
+            "tenant-1",
+            ShiftCreate(
+                tenant_id="tenant-1",
+                shift_plan_id=other_plan.id,
+                starts_at=datetime(2026, 4, 10, 8, 0, tzinfo=UTC),
+                ends_at=datetime(2026, 4, 10, 16, 0, tzinfo=UTC),
+                break_minutes=30,
+                shift_type_code="site_day",
+                source_kind_code="generated",
+            ),
+            _context("planning.shift.write"),
+        )
+        first_group = self.service.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(tenant_id="tenant-1", shift_id=first_shift.id, function_type_id="function-1", min_qty=1, target_qty=1, sort_order=10),
+            _context("planning.staffing.write"),
+        )
+        second_group = self.service.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(tenant_id="tenant-1", shift_id=second_shift.id, function_type_id="function-1", min_qty=1, target_qty=1, sort_order=20),
+            _context("planning.staffing.write"),
+        )
+        self.service.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(tenant_id="tenant-1", shift_id=other_shift.id, function_type_id="function-2", min_qty=1, target_qty=1, sort_order=5),
+            _context("planning.staffing.write"),
+        )
+
+        rows = self.service.list_demand_groups(
+            "tenant-1",
+            StaffingFilter(planning_record_id=self.planning_record_id),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual([row.id for row in rows], [first_group.id, second_group.id])
+
+    def test_list_demand_groups_excludes_archived_by_default(self) -> None:
+        active = self.service.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(tenant_id="tenant-1", shift_id=self.shift_id, function_type_id="function-1", min_qty=1, target_qty=1, sort_order=10),
+            _context("planning.staffing.write"),
+        )
+        archived = self.repository.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(tenant_id="tenant-1", shift_id=self.shift_id, function_type_id="function-2", min_qty=1, target_qty=1, sort_order=20),
+            "user-1",
+        )
+        archived.status = "archived"
+        archived.archived_at = datetime(2026, 4, 1, 12, 0, tzinfo=UTC)
+
+        default_rows = self.service.list_demand_groups(
+            "tenant-1",
+            StaffingFilter(shift_id=self.shift_id),
+            _context("planning.staffing.read"),
+        )
+        included_rows = self.service.list_demand_groups(
+            "tenant-1",
+            StaffingFilter(shift_id=self.shift_id, include_archived=True),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual([row.id for row in default_rows], [active.id])
+        self.assertEqual([row.id for row in included_rows], [active.id, archived.id])
 
     def test_bulk_apply_demand_groups_rejects_duplicate_sort_orders(self) -> None:
         series = self._create_shift_series(label="Series A", date_from=date(2026, 4, 7), date_to=date(2026, 4, 7))
@@ -1828,6 +2021,8 @@ class StaffingServiceTests(unittest.TestCase):
         self.assertEqual(snapshot.generated_shift_count, 2)
         self.assertEqual(snapshot.shift_plan.project_start, date(2026, 4, 7))
         self.assertEqual(snapshot.shift_plan.project_end, date(2026, 4, 8))
+        self.assertEqual(snapshot.default_demand_group_signature, "function-1||1|1|1|10|")
+        self.assertFalse(snapshot.candidates_included)
         self.assertEqual(len(snapshot.day_summaries), 2)
         states = {row.occurrence_date: row.overall_state for row in snapshot.day_summaries}
         self.assertEqual(states[date(2026, 4, 7)], "fully_covered")
@@ -1961,6 +2156,7 @@ class StaffingServiceTests(unittest.TestCase):
             _context("planning.staffing.read"),
         )
         self.assertFalse(snapshot.editable_flag)
+        self.assertTrue(snapshot.candidates_included)
         self.assertIn("shift_released", snapshot.lock_reason_codes)
 
         result = self.service.preview_assignment_step_apply(

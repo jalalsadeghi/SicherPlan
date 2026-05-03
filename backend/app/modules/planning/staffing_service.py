@@ -94,6 +94,7 @@ class StaffingRepository(Protocol):
     def get_subcontractor(self, tenant_id: str, subcontractor_id: str): ...
     def get_subcontractor_worker(self, tenant_id: str, worker_id: str): ...
     def list_demand_groups(self, tenant_id: str, filters: StaffingFilter) -> list[DemandGroup]: ...
+    def list_demand_groups_for_shifts(self, tenant_id: str, shift_ids: list[str], *, include_archived: bool = False) -> list[DemandGroup]: ...
     def get_demand_group(self, tenant_id: str, row_id: str) -> DemandGroup | None: ...
     def create_demand_group(self, tenant_id: str, payload: DemandGroupCreate, actor_user_id: str | None) -> DemandGroup: ...
     def update_demand_group(self, tenant_id: str, row_id: str, payload: DemandGroupUpdate, actor_user_id: str | None) -> DemandGroup | None: ...
@@ -141,6 +142,121 @@ class _ActorChoice:
 class _AssignmentStepTarget:
     shift: Shift
     demand_group: DemandGroup
+
+
+class _CachedAssignmentStepRepository:
+    def __init__(self, base: StaffingRepository) -> None:
+        self._base = base
+        self._cache: dict[tuple[object, ...], object] = {}
+
+    def _memoize_call(self, key: tuple[object, ...], fn):
+        if key not in self._cache:
+            self._cache[key] = fn()
+        return self._cache[key]
+
+    def get_shift(self, tenant_id: str, row_id: str):
+        key = ("get_shift", tenant_id, row_id)
+        return self._memoize_call(key, lambda: self._base.get_shift(tenant_id, row_id))
+
+    def list_demand_groups(self, tenant_id: str, filters: StaffingFilter):
+        key = ("list_demand_groups", tenant_id, filters.model_dump_json())
+        return self._memoize_call(key, lambda: self._base.list_demand_groups(tenant_id, filters))
+
+    def list_employee_qualifications(self, tenant_id: str, employee_id: str):
+        key = ("list_employee_qualifications", tenant_id, employee_id)
+        return self._memoize_call(key, lambda: self._base.list_employee_qualifications(tenant_id, employee_id))
+
+    def list_employee_absences(self, tenant_id: str, employee_id: str):
+        key = ("list_employee_absences", tenant_id, employee_id)
+        return self._memoize_call(key, lambda: self._base.list_employee_absences(tenant_id, employee_id))
+
+    def list_employee_availability_rules(self, tenant_id: str, employee_id: str):
+        key = ("list_employee_availability_rules", tenant_id, employee_id)
+        return self._memoize_call(key, lambda: self._base.list_employee_availability_rules(tenant_id, employee_id))
+
+    def list_worker_qualifications(self, tenant_id: str, worker_id: str):
+        key = ("list_worker_qualifications", tenant_id, worker_id)
+        return self._memoize_call(key, lambda: self._base.list_worker_qualifications(tenant_id, worker_id))
+
+    def list_documents_for_owner(self, tenant_id: str, owner_type: str, owner_id: str):
+        key = ("list_documents_for_owner", tenant_id, owner_type, owner_id)
+        return self._memoize_call(key, lambda: self._base.list_documents_for_owner(tenant_id, owner_type, owner_id))
+
+    def list_customer_employee_blocks(self, tenant_id: str, customer_id: str, employee_id: str, on_date):
+        key = ("list_customer_employee_blocks", tenant_id, customer_id, employee_id, on_date)
+        return self._memoize_call(
+            key,
+            lambda: self._base.list_customer_employee_blocks(tenant_id, customer_id, employee_id, on_date),
+        )
+
+    def list_overlapping_assignments(
+        self,
+        tenant_id: str,
+        *,
+        starts_at: datetime,
+        ends_at: datetime,
+        employee_id: str | None,
+        subcontractor_worker_id: str | None,
+        exclude_assignment_id: str | None = None,
+    ):
+        key = (
+            "list_overlapping_assignments",
+            tenant_id,
+            starts_at,
+            ends_at,
+            employee_id,
+            subcontractor_worker_id,
+            exclude_assignment_id,
+        )
+        return self._memoize_call(
+            key,
+            lambda: self._base.list_overlapping_assignments(
+                tenant_id,
+                starts_at=starts_at,
+                ends_at=ends_at,
+                employee_id=employee_id,
+                subcontractor_worker_id=subcontractor_worker_id,
+                exclude_assignment_id=exclude_assignment_id,
+            ),
+        )
+
+    def list_assignments_for_actor_in_window(
+        self,
+        tenant_id: str,
+        *,
+        employee_id: str | None,
+        subcontractor_worker_id: str | None,
+        window_start: datetime,
+        window_end: datetime,
+        exclude_assignment_id: str | None = None,
+    ):
+        key = (
+            "list_assignments_for_actor_in_window",
+            tenant_id,
+            employee_id,
+            subcontractor_worker_id,
+            window_start,
+            window_end,
+            exclude_assignment_id,
+        )
+        return self._memoize_call(
+            key,
+            lambda: self._base.list_assignments_for_actor_in_window(
+                tenant_id,
+                employee_id=employee_id,
+                subcontractor_worker_id=subcontractor_worker_id,
+                window_start=window_start,
+                window_end=window_end,
+                exclude_assignment_id=exclude_assignment_id,
+            ),
+        )
+
+    def list_team_members(self, tenant_id: str, filters: StaffingFilter):
+        key = ("list_team_members", tenant_id, filters.model_dump_json())
+        return self._memoize_call(key, lambda: self._base.list_team_members(tenant_id, filters))
+
+    def __getattr__(self, name: str):
+        return getattr(self._base, name)
 
 
 class StaffingService:
@@ -918,26 +1034,33 @@ class StaffingService:
             date_from=payload.date_from,
             date_to=payload.date_to,
         )
+        groups_by_shift = self._assignment_step_groups_by_shift(tenant_id, target_shifts)
         order_summary = self._build_assignment_step_order_summary(shift_plan)
-        demand_group_summaries = self._build_assignment_step_demand_group_summaries(tenant_id, target_shifts)
-        day_summaries = self._build_assignment_step_day_summaries(tenant_id, target_shifts)
-        cells = self._build_assignment_step_cells(tenant_id, target_shifts, payload.demand_group_match)
+        demand_group_summaries = self._build_assignment_step_demand_group_summaries(target_shifts, groups_by_shift)
+        day_summaries = self._build_assignment_step_day_summaries(target_shifts, groups_by_shift)
+        cells = self._build_assignment_step_cells(tenant_id, target_shifts, groups_by_shift, payload.demand_group_match)
         candidates: list[AssignmentStepCandidateRead] = []
+        default_signature = demand_group_summaries[0].signature_key if demand_group_summaries else None
+        candidates_included = False
         if payload.demand_group_match is not None and target_shifts:
+            caching_repository = _CachedAssignmentStepRepository(self.repository)
             candidates = self._list_assignment_step_candidates(
                 tenant_id,
                 shift_plan=shift_plan,
                 target_shifts=target_shifts,
+                groups_by_shift=groups_by_shift,
                 demand_group_match=payload.demand_group_match,
                 actor_kind=payload.actor_kind,
                 team_id=payload.team_id,
                 employee_group_id=payload.employee_group_id,
                 search=payload.search,
+                repository=caching_repository,
             )
+            candidates_included = True
         lock_reason_codes = sorted({
             reason
             for shift in target_shifts
-            for reason in self._assignment_step_lock_reason_codes(tenant_id, shift)
+            for reason in self._assignment_step_lock_reason_codes(tenant_id, shift, repository=self.repository)
         })
         default_month = self._normalize_month_start(payload.active_month or project_start)
         return AssignmentStepSnapshotRead(
@@ -958,6 +1081,8 @@ class StaffingService:
             ),
             generated_shift_count=len(target_shifts),
             demand_group_summary_count=len(demand_group_summaries),
+            default_demand_group_signature=default_signature,
+            candidates_included=candidates_included,
             editable_flag=not bool(lock_reason_codes),
             lock_reason_codes=lock_reason_codes,
             demand_group_summaries=demand_group_summaries,
@@ -988,6 +1113,8 @@ class StaffingService:
                 generated_shift_count=len(target_shifts),
                 candidates=[],
             )
+        groups_by_shift = self._assignment_step_groups_by_shift(tenant_id, target_shifts)
+        caching_repository = _CachedAssignmentStepRepository(self.repository)
         return AssignmentStepCandidateQueryResult(
             tenant_id=tenant_id,
             shift_plan_id=payload.shift_plan_id,
@@ -997,11 +1124,13 @@ class StaffingService:
                 tenant_id,
                 shift_plan=shift_plan,
                 target_shifts=target_shifts,
+                groups_by_shift=groups_by_shift,
                 demand_group_match=payload.demand_group_match,
                 actor_kind=payload.actor_kind,
                 team_id=payload.team_id,
                 employee_group_id=payload.employee_group_id,
                 search=payload.search,
+                repository=caching_repository,
             ),
         )
 
@@ -1042,6 +1171,8 @@ class StaffingService:
         actor_id = choice.employee_id or choice.subcontractor_worker_id or ""
         target_shift_set = set(payload.target_shift_ids)
         scoped_shift_ids = {shift.id for shift in target_shifts}
+        groups_by_shift = self._assignment_step_groups_by_shift(tenant_id, target_shifts)
+        caching_repository = _CachedAssignmentStepRepository(self.repository)
         unknown_shift_ids = sorted(target_shift_set - scoped_shift_ids)
         if unknown_shift_ids:
             raise ApiException(
@@ -1057,7 +1188,7 @@ class StaffingService:
         rejected_count = 0
         demand_group_match = payload.demand_group_match
         for shift in [row for row in target_shifts if row.id in target_shift_set]:
-            matched_group = self._find_matching_demand_group_for_shift(tenant_id, shift, demand_group_match)
+            matched_group = self._find_matching_demand_group_for_shift(shift, demand_group_match, groups_by_shift)
             if matched_group is None:
                 results.append(
                     AssignmentStepApplyItemResult(
@@ -1071,7 +1202,7 @@ class StaffingService:
                 if payload.stop_on_first_rejection and not preview_only:
                     break
                 continue
-            lock_reason_codes = self._assignment_step_lock_reason_codes(tenant_id, shift)
+            lock_reason_codes = self._assignment_step_lock_reason_codes(tenant_id, shift, repository=caching_repository)
             if lock_reason_codes:
                 results.append(
                     AssignmentStepApplyItemResult(
@@ -1100,7 +1231,13 @@ class StaffingService:
                 confirmed_at=payload.confirmed_at,
                 remarks=payload.remarks,
             )
-            outcome = self._evaluate_assignment_step_payload(tenant_id, shift, matched_group, candidate_payload)
+            outcome = self._evaluate_assignment_step_payload(
+                tenant_id,
+                shift,
+                matched_group,
+                candidate_payload,
+                repository=caching_repository,
+            )
             if not outcome["eligible_flag"]:
                 results.append(
                     AssignmentStepApplyItemResult(
@@ -1204,14 +1341,37 @@ class StaffingService:
             planning_mode_code=planning_record.planning_mode_code,
         )
 
-    def _build_assignment_step_demand_group_summaries(
+    def _assignment_step_groups_by_shift(
         self,
         tenant_id: str,
         target_shifts: list[Shift],
+    ) -> dict[str, list[DemandGroup]]:
+        shift_ids = [shift.id for shift in target_shifts]
+        list_for_shifts = getattr(self.repository, "list_demand_groups_for_shifts", None)
+        if callable(list_for_shifts):
+            groups = list_for_shifts(tenant_id, shift_ids, include_archived=False)
+        else:
+            groups = [
+                group
+                for shift in target_shifts
+                for group in self.repository.list_demand_groups(
+                    tenant_id,
+                    StaffingFilter(shift_id=shift.id, include_archived=False),
+                )
+            ]
+        grouped: dict[str, list[DemandGroup]] = defaultdict(list)
+        for group in groups:
+            grouped[group.shift_id].append(group)
+        return grouped
+
+    def _build_assignment_step_demand_group_summaries(
+        self,
+        target_shifts: list[Shift],
+        groups_by_shift: dict[str, list[DemandGroup]],
     ) -> list[AssignmentStepDemandGroupSummaryRead]:
         grouped: dict[str, dict[str, object]] = {}
         for shift in target_shifts:
-            for group in self.repository.list_demand_groups(tenant_id, StaffingFilter(shift_id=shift.id, include_archived=False)):
+            for group in groups_by_shift.get(shift.id, []):
                 key = self._assignment_step_signature_key(group)
                 assigned_count = sum(1 for row in getattr(group, "assignments", []) if row.assignment_status_code != "removed")
                 confirmed_count = sum(1 for row in getattr(group, "assignments", []) if row.assignment_status_code == "confirmed")
@@ -1268,11 +1428,15 @@ class StaffingService:
             )
         return sorted(rows, key=lambda row: (row.sort_order, row.signature_key))
 
-    def _build_assignment_step_day_summaries(self, tenant_id: str, target_shifts: list[Shift]) -> list[AssignmentStepDaySummaryRead]:
+    def _build_assignment_step_day_summaries(
+        self,
+        target_shifts: list[Shift],
+        groups_by_shift: dict[str, list[DemandGroup]],
+    ) -> list[AssignmentStepDaySummaryRead]:
         buckets: dict[date, list[str]] = defaultdict(list)
         for shift in target_shifts:
             states = []
-            for group in self.repository.list_demand_groups(tenant_id, StaffingFilter(shift_id=shift.id, include_archived=False)):
+            for group in groups_by_shift.get(shift.id, []):
                 assigned_count = sum(1 for row in getattr(group, "assignments", []) if row.assignment_status_code != "removed")
                 confirmed_count = sum(1 for row in getattr(group, "assignments", []) if row.assignment_status_code == "confirmed")
                 released_partner_qty = sum(
@@ -1306,12 +1470,13 @@ class StaffingService:
         self,
         tenant_id: str,
         target_shifts: list[Shift],
+        groups_by_shift: dict[str, list[DemandGroup]],
         demand_group_match: AssignmentStepDemandGroupMatch | None,
     ) -> list[AssignmentStepCellRead]:
         cells: list[AssignmentStepCellRead] = []
         for shift in target_shifts:
-            lock_reason_codes = self._assignment_step_lock_reason_codes(tenant_id, shift)
-            demand_groups = self.repository.list_demand_groups(tenant_id, StaffingFilter(shift_id=shift.id, include_archived=False))
+            lock_reason_codes = self._assignment_step_lock_reason_codes(tenant_id, shift, repository=self.repository)
+            demand_groups = groups_by_shift.get(shift.id, [])
             if demand_group_match is not None:
                 demand_groups = [row for row in demand_groups if self._demand_group_matches_signature(row, demand_group_match)]
             for group in demand_groups:
@@ -1365,38 +1530,61 @@ class StaffingService:
         *,
         shift_plan,
         target_shifts: list[Shift],
+        groups_by_shift: dict[str, list[DemandGroup]],
         demand_group_match: AssignmentStepDemandGroupMatch,
         actor_kind: str | None,
         team_id: str | None,
         employee_group_id: str | None,
         search: str | None,
+        repository: StaffingRepository,
     ) -> list[AssignmentStepCandidateRead]:
         candidates: list[AssignmentStepCandidateRead] = []
         search_term = (search or "").strip().lower()
         include_employees = shift_plan.workforce_scope_code in {"internal", "mixed"} and actor_kind in {None, "employee"}
         include_workers = shift_plan.workforce_scope_code in {"subcontractor", "mixed"} and actor_kind in {None, "subcontractor_worker"}
         if include_employees:
-            for employee in self.repository.list_employees(tenant_id):
+            for employee in repository.list_employees(tenant_id):
                 if not self._candidate_matches_common_filters(
                     actor_kind="employee",
                     actor=employee,
                     team_id=team_id,
                     employee_group_id=employee_group_id,
                     search_term=search_term,
+                    repository=repository,
                 ):
                     continue
-                candidates.append(self._build_assignment_step_candidate_read(tenant_id, target_shifts, demand_group_match, employee=employee))
+                candidates.append(
+                    self._build_assignment_step_candidate_read(
+                        tenant_id,
+                        target_shifts,
+                        groups_by_shift,
+                        demand_group_match,
+                        repository=repository,
+                        employee=employee,
+                    )
+                )
         if include_workers:
-            for worker in self.repository.list_subcontractor_workers(tenant_id):
+            for worker in repository.list_subcontractor_workers(tenant_id):
                 if not self._candidate_matches_common_filters(
                     actor_kind="subcontractor_worker",
                     actor=worker,
                     team_id=team_id,
                     employee_group_id=employee_group_id,
                     search_term=search_term,
+                    repository=repository,
                 ):
                     continue
-                candidates.append(self._build_assignment_step_candidate_read(tenant_id, target_shifts, demand_group_match, worker=worker))
+                candidates.append(
+                    self._build_assignment_step_candidate_read(
+                        tenant_id,
+                        target_shifts,
+                        groups_by_shift,
+                        demand_group_match,
+                        repository=repository,
+                        worker=worker,
+                    )
+                )
+        # rerank candidates after request-scoped caches were applied during evaluation
         return sorted(
             candidates,
             key=lambda row: (
@@ -1413,8 +1601,10 @@ class StaffingService:
         self,
         tenant_id: str,
         target_shifts: list[Shift],
+        groups_by_shift: dict[str, list[DemandGroup]],
         demand_group_match: AssignmentStepDemandGroupMatch,
         *,
+        repository: StaffingRepository,
         employee=None,  # noqa: ANN001
         worker=None,  # noqa: ANN001
     ) -> AssignmentStepCandidateRead:
@@ -1424,7 +1614,7 @@ class StaffingService:
         first_name = employee.first_name if employee is not None else worker.first_name
         last_name = employee.last_name if employee is not None else worker.last_name
         display_name = f"{first_name} {last_name}".strip()
-        team_ids = self._candidate_team_ids(tenant_id, actor_kind, actor_id)
+        team_ids = self._candidate_team_ids(tenant_id, actor_kind, actor_id, repository=repository)
         employee_group_ids = self._employee_group_ids(employee) if employee is not None else []
         day_statuses: list[AssignmentStepCandidateDayStatusRead] = []
         eligible_day_count = 0
@@ -1436,7 +1626,7 @@ class StaffingService:
         function_match_flag = False
         qualification_match_flag = False
         for shift in target_shifts:
-            matched_group = self._find_matching_demand_group_for_shift(tenant_id, shift, demand_group_match)
+            matched_group = self._find_matching_demand_group_for_shift(shift, demand_group_match, groups_by_shift)
             if matched_group is None:
                 continue
             candidate_payload = AssignmentCreate(
@@ -1447,7 +1637,7 @@ class StaffingService:
                 subcontractor_worker_id=worker.id if worker is not None else None,
                 assignment_source_code="dispatcher",
             )
-            outcome = self._evaluate_assignment_step_payload(tenant_id, shift, matched_group, candidate_payload, employee=employee)
+            outcome = self._evaluate_assignment_step_payload(tenant_id, shift, matched_group, candidate_payload, repository=repository, employee=employee)
             reason_codes = outcome["reason_codes"]
             warning_codes = outcome["warning_codes"]
             for code in reason_codes:
@@ -1506,6 +1696,7 @@ class StaffingService:
         demand_group: DemandGroup,
         payload: AssignmentCreate,
         *,
+        repository: StaffingRepository,
         employee=None,  # noqa: ANN001
     ) -> dict[str, object]:
         reason_codes: list[str] = []
@@ -1533,9 +1724,16 @@ class StaffingService:
 
         employee_id = getattr(employee, "id", None) or payload.employee_id
         if employee_id is not None:
-            reason_codes.extend(self._employee_unavailability_reason_codes(tenant_id, employee_id, shift))
+            reason_codes.extend(self._employee_unavailability_reason_codes(tenant_id, employee_id, shift, repository=repository))
 
-        validation_results = self._validate_assignment_payload(tenant_id, payload)
+        validation_results = PlanningValidationService(repository).validate_assignment(
+            tenant_id,
+            shift_id=payload.shift_id,
+            demand_group_id=payload.demand_group_id,
+            employee_id=payload.employee_id,
+            subcontractor_worker_id=payload.subcontractor_worker_id,
+            assignment_id=None,
+        )
         blocking = [issue.rule_code for issue in validation_results if issue.severity == "block"]
         warnings = [issue.rule_code for issue in validation_results if issue.severity == "warn"]
         reason_codes.extend(blocking)
@@ -1555,6 +1753,7 @@ class StaffingService:
         team_id: str | None,
         employee_group_id: str | None,
         search_term: str,
+        repository: StaffingRepository,
     ) -> bool:
         if search_term:
             haystack = " ".join(
@@ -1573,12 +1772,12 @@ class StaffingService:
         if actor_kind == "employee" and employee_group_id is not None:
             if employee_group_id not in self._employee_group_ids(actor):
                 return False
-        if team_id is not None and team_id not in self._candidate_team_ids(getattr(actor, "tenant_id", ""), actor_kind, actor.id):
+        if team_id is not None and team_id not in self._candidate_team_ids(getattr(actor, "tenant_id", ""), actor_kind, actor.id, repository=repository):
             return False
         return True
 
-    def _candidate_team_ids(self, tenant_id: str, actor_kind: str, actor_id: str) -> list[str]:
-        rows = self.repository.list_team_members(
+    def _candidate_team_ids(self, tenant_id: str, actor_kind: str, actor_id: str, *, repository: StaffingRepository) -> list[str]:
+        rows = repository.list_team_members(
             tenant_id,
             StaffingFilter(
                 employee_id=actor_id if actor_kind == "employee" else None,
@@ -1599,25 +1798,25 @@ class StaffingService:
 
     def _find_matching_demand_group_for_shift(
         self,
-        tenant_id: str,
         shift: Shift,
         match: AssignmentStepDemandGroupMatch,
+        groups_by_shift: dict[str, list[DemandGroup]],
     ) -> DemandGroup | None:
-        for group in self.repository.list_demand_groups(tenant_id, StaffingFilter(shift_id=shift.id, include_archived=False)):
+        for group in groups_by_shift.get(shift.id, []):
             if self._demand_group_matches_signature(group, match):
                 return group
         return None
 
-    def _employee_unavailability_reason_codes(self, tenant_id: str, employee_id: str, shift: Shift) -> list[str]:
+    def _employee_unavailability_reason_codes(self, tenant_id: str, employee_id: str, shift: Shift, *, repository: StaffingRepository) -> list[str]:
         reason_codes: list[str] = []
         shift_date = self._shift_occurrence_date(shift)
-        for absence in self.repository.list_employee_absences(tenant_id, employee_id):
+        for absence in repository.list_employee_absences(tenant_id, employee_id):
             if absence.archived_at is not None or absence.status not in {"pending", "approved"}:
                 continue
             if absence.starts_on <= shift_date <= absence.ends_on:
                 reason_codes.append("employee_absence")
                 break
-        for rule in self.repository.list_employee_availability_rules(tenant_id, employee_id):
+        for rule in repository.list_employee_availability_rules(tenant_id, employee_id):
             if getattr(rule, "archived_at", None) is not None or getattr(rule, "status", "active") != "active":
                 continue
             if getattr(rule, "rule_kind", None) != "unavailable":
@@ -1640,7 +1839,13 @@ class StaffingService:
             return rule.starts_at.time() <= shift_end and rule.ends_at.time() >= shift_start
         return rule.starts_at < shift.ends_at and rule.ends_at > shift.starts_at
 
-    def _assignment_step_lock_reason_codes(self, tenant_id: str, shift: Shift) -> list[str]:
+    def _assignment_step_lock_reason_codes(
+        self,
+        tenant_id: str,
+        shift: Shift,
+        *,
+        repository: StaffingRepository,
+    ) -> list[str]:
         reason_codes: list[str] = []
         if shift.release_state != "draft":
             reason_codes.append("shift_released")
@@ -1650,7 +1855,7 @@ class StaffingService:
             reason_codes.append("subcontractor_visible")
         output_documents = [
             row
-            for row in self.repository.list_documents_for_owner(tenant_id, "ops.shift", shift.id)
+            for row in repository.list_documents_for_owner(tenant_id, "ops.shift", shift.id)
             if getattr(row, "metadata", {}).get("generated_kind") == "planning_output"
         ]
         if output_documents:

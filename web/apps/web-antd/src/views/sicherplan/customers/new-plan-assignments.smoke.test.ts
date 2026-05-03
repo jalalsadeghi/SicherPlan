@@ -248,22 +248,100 @@ describe('CustomerNewPlanAssignmentsStep', () => {
   });
 
   it('renders the left candidate rail and right calendar from the backend snapshot', async () => {
-    staffingMocks.getAssignmentStepSnapshotMock
-      .mockResolvedValueOnce(buildSnapshot())
-      .mockResolvedValueOnce(buildSnapshot());
+    staffingMocks.getAssignmentStepSnapshotMock.mockResolvedValueOnce(buildSnapshot());
 
     const wrapper = await mountStep();
 
+    expect(wrapper.get('[data-testid="customer-new-plan-assignments-filters"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="customer-new-plan-assignments-candidate-rail"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="customer-new-plan-assignments-calendar"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="customer-new-plan-assignments-candidate-employee-1"]').text()).toContain('Eva Meyer');
     expect(wrapper.get('[data-testid="customer-new-plan-assignments-day-2026-06-01"]').text()).toContain('0/2');
-    expect(staffingMocks.getAssignmentStepSnapshotMock).toHaveBeenCalledTimes(2);
+    expect(staffingMocks.getAssignmentStepSnapshotMock).toHaveBeenCalledTimes(1);
+    expect(staffingMocks.listAssignmentStepCandidatesMock).not.toHaveBeenCalled();
+  });
+
+  it('loads candidates once after the first snapshot when the backend does not include them yet', async () => {
+    staffingMocks.getAssignmentStepSnapshotMock.mockResolvedValueOnce(buildSnapshot({ candidates: [] }));
+    staffingMocks.listAssignmentStepCandidatesMock.mockResolvedValueOnce({
+      tenant_id: 'tenant-1',
+      shift_plan_id: 'plan-1',
+      shift_series_id: 'series-1',
+      generated_shift_count: 2,
+      candidates: buildSnapshot().candidates,
+    });
+
+    const wrapper = await mountStep();
+
+    expect(staffingMocks.getAssignmentStepSnapshotMock).toHaveBeenCalledTimes(1);
+    expect(staffingMocks.listAssignmentStepCandidatesMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.get('[data-testid="customer-new-plan-assignments-candidate-employee-1"]').text()).toContain('Eva Meyer');
+  });
+
+  it('uses the candidate endpoint for filter-only changes instead of reloading the snapshot', async () => {
+    staffingMocks.getAssignmentStepSnapshotMock.mockResolvedValueOnce(buildSnapshot());
+    staffingMocks.listAssignmentStepCandidatesMock.mockResolvedValue({
+      tenant_id: 'tenant-1',
+      shift_plan_id: 'plan-1',
+      shift_series_id: 'series-1',
+      generated_shift_count: 2,
+      candidates: buildSnapshot().candidates,
+    });
+
+    const wrapper = await mountStep();
+    await wrapper.get('[data-testid="customer-new-plan-assignments-team"]').setValue('team-1');
+    await flushPromises();
+
+    expect(staffingMocks.getAssignmentStepSnapshotMock).toHaveBeenCalledTimes(1);
+    expect(staffingMocks.listAssignmentStepCandidatesMock).toHaveBeenCalledTimes(1);
+    expect(staffingMocks.listAssignmentStepCandidatesMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'token-1',
+      expect.objectContaining({
+        demand_group_match: expect.objectContaining({ function_type_id: 'fn-1' }),
+        team_id: 'team-1',
+      }),
+    );
+  });
+
+  it('switches demand-group context without reloading the full snapshot', async () => {
+    staffingMocks.getAssignmentStepSnapshotMock.mockResolvedValueOnce(buildSnapshot({
+      demand_group_summaries: [
+        buildSnapshot().demand_group_summaries[0],
+        {
+          ...buildSnapshot().demand_group_summaries[0],
+          signature_key: 'dg-2',
+          function_type_id: 'fn-2',
+          qualification_type_id: null,
+          sort_order: 2,
+        },
+      ],
+    }));
+    staffingMocks.listAssignmentStepCandidatesMock.mockResolvedValue({
+      tenant_id: 'tenant-1',
+      shift_plan_id: 'plan-1',
+      shift_series_id: 'series-1',
+      generated_shift_count: 2,
+      candidates: [],
+    });
+
+    const wrapper = await mountStep();
+    await wrapper.get('[data-testid="customer-new-plan-assignments-demand-group"]').setValue('dg-2');
+    await flushPromises();
+
+    expect(staffingMocks.getAssignmentStepSnapshotMock).toHaveBeenCalledTimes(1);
+    expect(staffingMocks.listAssignmentStepCandidatesMock).toHaveBeenCalledTimes(1);
+    expect(staffingMocks.listAssignmentStepCandidatesMock).toHaveBeenCalledWith(
+      'tenant-1',
+      'token-1',
+      expect.objectContaining({
+        demand_group_match: expect.objectContaining({ function_type_id: 'fn-2', sort_order: 2 }),
+      }),
+    );
   });
 
   it('assigns a candidate through preview + apply and reloads the snapshot', async () => {
     staffingMocks.getAssignmentStepSnapshotMock
-      .mockResolvedValueOnce(buildSnapshot())
       .mockResolvedValueOnce(buildSnapshot())
       .mockResolvedValueOnce(buildSnapshot({
         demand_group_summaries: [

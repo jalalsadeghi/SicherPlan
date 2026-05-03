@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue';
 
 import { $t } from '#/locales';
 import LocalLoadingIndicator from '#/components/sicherplan/local-loading-indicator.vue';
@@ -51,6 +51,16 @@ interface DayAggregate {
   targetCount: number;
 }
 
+interface AssignmentReferenceData {
+  employeeGroups: EmployeeGroupRead[];
+  functionTypes: FunctionTypeRead[];
+  qualificationTypes: QualificationTypeRead[];
+  teams: TeamRead[];
+}
+
+const assignmentReferenceCache = new Map<string, AssignmentReferenceData>();
+const assignmentReferenceCacheInFlight = new Map<string, Promise<AssignmentReferenceData>>();
+
 const props = defineProps<{
   accessToken: string;
   tenantId: string;
@@ -79,7 +89,11 @@ const activeMonth = ref('');
 const selectedCandidateId = ref('');
 const dragCandidateId = ref('');
 const calendarDropActive = ref(false);
-const reloadSequence = ref(0);
+const snapshotReloadSequence = ref(0);
+const candidateReloadSequence = ref(0);
+const snapshotRequestInFlight = new Map<string, Promise<AssignmentStepSnapshotRead>>();
+const candidateRequestInFlight = new Map<string, Promise<Awaited<ReturnType<typeof listAssignmentStepCandidates>>>>();
+let searchReloadTimer: ReturnType<typeof setTimeout> | null = null;
 
 const filters = reactive<{
   actor_kind: CandidateActorKind;
@@ -94,6 +108,15 @@ const filters = reactive<{
   team_id: '',
   unfilled_only: true,
 });
+
+const controlIds = {
+  actorKind: 'customer-new-plan-assignments-actor-kind-input',
+  demandGroup: 'customer-new-plan-assignments-demand-group-input',
+  employeeGroup: 'customer-new-plan-assignments-group-input',
+  search: 'customer-new-plan-assignments-search-input',
+  team: 'customer-new-plan-assignments-team-input',
+  unfilledOnly: 'customer-new-plan-assignments-unfilled-only-input',
+} as const;
 
 function normalizeDateKey(value: Date | string) {
   if (value instanceof Date) {
@@ -404,16 +427,36 @@ async function loadReferenceData() {
   }
   referenceLoading.value = true;
   try {
-    const [teams, employeeGroups, functionTypes, qualificationTypes] = await Promise.all([
-      listTeams(props.tenantId, props.accessToken, {}),
-      listEmployeeGroups(props.tenantId, props.accessToken),
-      listFunctionTypes(props.tenantId, props.accessToken),
-      listQualificationTypes(props.tenantId, props.accessToken),
-    ]);
-    teamRows.value = teams.filter((row) => row.status === 'active');
-    employeeGroupRows.value = employeeGroups.filter((row) => row.status === 'active' && !row.archived_at);
-    functionTypeRows.value = functionTypes.filter((row) => row.status === 'active' && !row.archived_at);
-    qualificationTypeRows.value = qualificationTypes.filter((row) => row.status === 'active' && !row.archived_at);
+    const cacheKey = props.tenantId;
+    let cached = assignmentReferenceCache.get(cacheKey);
+    if (!cached) {
+      let inFlight = assignmentReferenceCacheInFlight.get(cacheKey);
+      if (!inFlight) {
+        inFlight = Promise.all([
+          listTeams(props.tenantId, props.accessToken, {}),
+          listEmployeeGroups(props.tenantId, props.accessToken),
+          listFunctionTypes(props.tenantId, props.accessToken),
+          listQualificationTypes(props.tenantId, props.accessToken),
+        ]).then(([teams, employeeGroups, functionTypes, qualificationTypes]) => {
+          const nextValue = {
+            employeeGroups: employeeGroups.filter((row) => row.status === 'active' && !row.archived_at),
+            functionTypes: functionTypes.filter((row) => row.status === 'active' && !row.archived_at),
+            qualificationTypes: qualificationTypes.filter((row) => row.status === 'active' && !row.archived_at),
+            teams: teams.filter((row) => row.status === 'active'),
+          };
+          assignmentReferenceCache.set(cacheKey, nextValue);
+          return nextValue;
+        }).finally(() => {
+          assignmentReferenceCacheInFlight.delete(cacheKey);
+        });
+        assignmentReferenceCacheInFlight.set(cacheKey, inFlight);
+      }
+      cached = await inFlight;
+    }
+    teamRows.value = cached.teams;
+    employeeGroupRows.value = cached.employeeGroups;
+    functionTypeRows.value = cached.functionTypes;
+    qualificationTypeRows.value = cached.qualificationTypes;
   } finally {
     referenceLoading.value = false;
   }
@@ -429,7 +472,7 @@ async function loadSnapshot(options: { preserveSummaryMessage?: boolean } = {}) 
     setStepError('missing_shift_plan', $t('sicherplan.customerPlansWizard.errors.assignmentsMissingShiftPlan'));
     return;
   }
-  const requestId = ++reloadSequence.value;
+  const requestId = ++snapshotReloadSequence.value;
   snapshotLoading.value = true;
   beginLoad();
   if (options.preserveSummaryMessage) {
@@ -440,74 +483,99 @@ async function loadSnapshot(options: { preserveSummaryMessage?: boolean } = {}) 
     clearStepMessages();
   }
   try {
-    let nextSnapshot = await getAssignmentStepSnapshot(
-      props.tenantId,
-      props.accessToken,
-      buildScopePayload(Boolean(selectedDemandGroupSignature.value)),
-    );
+    const requestedWithDemandGroup = Boolean(selectedDemandGroupSignature.value);
+    const payload = buildScopePayload(requestedWithDemandGroup);
+    const requestKey = JSON.stringify(payload);
+    let inFlight = snapshotRequestInFlight.get(requestKey);
+    if (!inFlight) {
+      inFlight = getAssignmentStepSnapshot(props.tenantId, props.accessToken, payload).finally(() => {
+        snapshotRequestInFlight.delete(requestKey);
+      });
+      snapshotRequestInFlight.set(requestKey, inFlight);
+    }
+    const nextSnapshot = await inFlight;
     if (!activeMonth.value) {
       activeMonth.value = nextSnapshot.shift_plan.default_month;
     }
-    if (!selectedDemandGroupSignature.value && nextSnapshot.demand_group_summaries.length) {
-      selectedDemandGroupSignature.value = nextSnapshot.demand_group_summaries[0]!.signature_key;
-      nextSnapshot = await getAssignmentStepSnapshot(props.tenantId, props.accessToken, buildScopePayload(true));
+    let nextSelection = selectedDemandGroupSignature.value;
+    if (!nextSelection && nextSnapshot.demand_group_summaries.length) {
+      nextSelection = nextSnapshot.demand_group_summaries[0]!.signature_key;
     } else if (
       selectedDemandGroupSignature.value &&
       !nextSnapshot.demand_group_summaries.some((row) => row.signature_key === selectedDemandGroupSignature.value)
     ) {
-      selectedDemandGroupSignature.value = nextSnapshot.demand_group_summaries[0]?.signature_key ?? '';
-      nextSnapshot = await getAssignmentStepSnapshot(
-        props.tenantId,
-        props.accessToken,
-        buildScopePayload(Boolean(selectedDemandGroupSignature.value)),
-      );
+      nextSelection = nextSnapshot.demand_group_summaries[0]?.signature_key ?? '';
     }
-    if (requestId !== reloadSequence.value) {
+    if (requestId !== snapshotReloadSequence.value) {
       return;
     }
+    selectedDemandGroupSignature.value = nextSelection;
     snapshot.value = nextSnapshot;
-    candidates.value = nextSnapshot.candidates;
+    if (requestedWithDemandGroup && nextSnapshot.candidates.length) {
+      candidates.value = nextSnapshot.candidates;
+    } else if (!nextSelection) {
+      candidates.value = [];
+    } else if (!requestedWithDemandGroup && nextSnapshot.candidates.length) {
+      candidates.value = nextSnapshot.candidates;
+    } else {
+      await reloadCandidates({ preserveSummaryMessage: true });
+    }
     if (!activeMonth.value) {
       activeMonth.value = nextSnapshot.shift_plan.default_month;
     }
     syncStepCompletion();
   } catch {
-    if (requestId !== reloadSequence.value) {
+    if (requestId !== snapshotReloadSequence.value) {
       return;
     }
     loadError.value = $t('sicherplan.customerPlansWizard.errors.assignmentsLoadFailed');
     emit('step-ui-state', 'assignments', { error: 'load_failed' });
   } finally {
-    if (requestId === reloadSequence.value) {
+    if (requestId === snapshotReloadSequence.value) {
       snapshotLoading.value = false;
       endLoad();
     }
   }
 }
 
-async function reloadCandidates() {
+async function reloadCandidates(options: { preserveSummaryMessage?: boolean } = {}) {
   if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id || !currentDemandGroupMatch.value) {
     candidates.value = [];
     return;
   }
-  const requestId = ++reloadSequence.value;
+  const requestId = ++candidateReloadSequence.value;
   snapshotLoading.value = true;
   beginLoad();
-  clearStepMessages();
+  if (options.preserveSummaryMessage) {
+    inlineError.value = '';
+    loadError.value = '';
+    emit('step-ui-state', 'assignments', { error: '' });
+  } else {
+    clearStepMessages();
+  }
   try {
-    const result = await listAssignmentStepCandidates(props.tenantId, props.accessToken, buildScopePayload(true));
-    if (requestId !== reloadSequence.value) {
+    const payload = buildScopePayload(true);
+    const requestKey = JSON.stringify(payload);
+    let inFlight = candidateRequestInFlight.get(requestKey);
+    if (!inFlight) {
+      inFlight = listAssignmentStepCandidates(props.tenantId, props.accessToken, payload).finally(() => {
+        candidateRequestInFlight.delete(requestKey);
+      });
+      candidateRequestInFlight.set(requestKey, inFlight);
+    }
+    const result = await inFlight;
+    if (requestId !== candidateReloadSequence.value) {
       return;
     }
     candidates.value = result.candidates;
   } catch {
-    if (requestId !== reloadSequence.value) {
+    if (requestId !== candidateReloadSequence.value) {
       return;
     }
     loadError.value = $t('sicherplan.customerPlansWizard.errors.assignmentsCandidatesFailed');
     emit('step-ui-state', 'assignments', { error: 'load_failed' });
   } finally {
-    if (requestId === reloadSequence.value) {
+    if (requestId === candidateReloadSequence.value) {
       snapshotLoading.value = false;
       endLoad();
     }
@@ -586,11 +654,12 @@ function handleDemandGroupSelection(event: Event) {
   const value = (event.target as HTMLSelectElement).value;
   selectedDemandGroupSignature.value = value;
   selectedCandidateId.value = '';
-  void loadSnapshot();
+  void reloadCandidates();
 }
 
 function handleMonthSelection(value: string) {
   activeMonth.value = value;
+  void loadSnapshot({ preserveSummaryMessage: true });
 }
 
 function moveMonth(direction: -1 | 1) {
@@ -702,6 +771,24 @@ async function submitCurrentStep(): Promise<CustomerNewPlanStepSubmitResult> {
   return false;
 }
 
+function scheduleSearchCandidateReload() {
+  if (searchReloadTimer) {
+    clearTimeout(searchReloadTimer);
+  }
+  searchReloadTimer = setTimeout(() => {
+    searchReloadTimer = null;
+    void reloadCandidates({ preserveSummaryMessage: true });
+  }, 250);
+}
+
+function handleSearchCommit() {
+  if (searchReloadTimer) {
+    clearTimeout(searchReloadTimer);
+    searchReloadTimer = null;
+  }
+  void reloadCandidates({ preserveSummaryMessage: true });
+}
+
 watch(
   () => [
     props.tenantId,
@@ -709,17 +796,33 @@ watch(
     props.wizardState.shift_plan_id,
     props.wizardState.series_id,
   ].join('|'),
-  () => {
+  async () => {
     selectedCandidateId.value = '';
     selectedDemandGroupSignature.value = '';
     activeMonth.value = '';
-    void loadSnapshot();
+    await Promise.all([
+      loadReferenceData(),
+      loadSnapshot(),
+    ]);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => filters.search,
+  () => {
+    if (!currentDemandGroupMatch.value) {
+      return;
+    }
+    scheduleSearchCandidateReload();
   },
 );
 
-onMounted(async () => {
-  await loadReferenceData();
-  await loadSnapshot();
+onBeforeUnmount(() => {
+  if (searchReloadTimer) {
+    clearTimeout(searchReloadTimer);
+    searchReloadTimer = null;
+  }
 });
 
 defineExpose({
@@ -796,10 +899,15 @@ defineExpose({
       {{ inlineError }}
     </div>
 
-    <div v-if="snapshot" class="sp-customer-plan-assignments__filters">
-      <label class="field-stack">
-        <span>{{ $t('sicherplan.customerPlansWizard.assignments.demandGroup') }}</span>
+    <div
+      v-if="snapshot"
+      class="sp-customer-plan-assignments__filters"
+      data-testid="customer-new-plan-assignments-filters"
+    >
+      <label class="field-stack sp-customer-plan-assignments__control sp-customer-plan-assignments__control--demand-group">
+        <span class="sp-customer-plan-assignments__control-label">{{ $t('sicherplan.customerPlansWizard.assignments.demandGroup') }}</span>
         <select
+          :id="controlIds.demandGroup"
           :value="selectedDemandGroupSignature"
           data-testid="customer-new-plan-assignments-demand-group"
           @change="handleDemandGroupSelection"
@@ -813,9 +921,13 @@ defineExpose({
           </option>
         </select>
       </label>
-      <label v-if="snapshot.shift_plan.workforce_scope_code === 'mixed'" class="field-stack">
-        <span>{{ $t('sicherplan.customerPlansWizard.assignments.actorKind') }}</span>
+      <label
+        v-if="snapshot.shift_plan.workforce_scope_code === 'mixed'"
+        class="field-stack sp-customer-plan-assignments__control sp-customer-plan-assignments__control--actor-kind"
+      >
+        <span class="sp-customer-plan-assignments__control-label">{{ $t('sicherplan.customerPlansWizard.assignments.actorKind') }}</span>
         <select
+          :id="controlIds.actorKind"
           v-model="filters.actor_kind"
           data-testid="customer-new-plan-assignments-actor-kind"
           @change="reloadCandidates"
@@ -825,9 +937,10 @@ defineExpose({
           <option value="subcontractor_worker">{{ $t('sicherplan.customerPlansWizard.assignments.actorSubcontractor') }}</option>
         </select>
       </label>
-      <label class="field-stack">
-        <span>{{ $t('sicherplan.customerPlansWizard.assignments.teamFilter') }}</span>
+      <label class="field-stack sp-customer-plan-assignments__control sp-customer-plan-assignments__control--team">
+        <span class="sp-customer-plan-assignments__control-label">{{ $t('sicherplan.customerPlansWizard.assignments.teamFilter') }}</span>
         <select
+          :id="controlIds.team"
           v-model="filters.team_id"
           data-testid="customer-new-plan-assignments-team"
           @change="reloadCandidates"
@@ -836,9 +949,10 @@ defineExpose({
           <option v-for="team in teamRows" :key="team.id" :value="team.id">{{ team.name }}</option>
         </select>
       </label>
-      <label class="field-stack">
-        <span>{{ $t('sicherplan.customerPlansWizard.assignments.employeeGroupFilter') }}</span>
+      <label class="field-stack sp-customer-plan-assignments__control sp-customer-plan-assignments__control--employee-group">
+        <span class="sp-customer-plan-assignments__control-label">{{ $t('sicherplan.customerPlansWizard.assignments.employeeGroupFilter') }}</span>
         <select
+          :id="controlIds.employeeGroup"
           v-model="filters.employee_group_id"
           data-testid="customer-new-plan-assignments-group"
           @change="reloadCandidates"
@@ -847,25 +961,29 @@ defineExpose({
           <option v-for="group in employeeGroupRows" :key="group.id" :value="group.id">{{ group.name }}</option>
         </select>
       </label>
-      <label class="field-stack">
-        <span>{{ $t('sicherplan.customerPlansWizard.assignments.search') }}</span>
+      <label class="field-stack sp-customer-plan-assignments__control sp-customer-plan-assignments__control--search">
+        <span class="sp-customer-plan-assignments__control-label">{{ $t('sicherplan.customerPlansWizard.assignments.search') }}</span>
         <input
+          :id="controlIds.search"
           v-model="filters.search"
+          class="sp-customer-plan-assignments__search-input"
           data-testid="customer-new-plan-assignments-search"
           type="search"
-          @change="reloadCandidates"
-          @keyup.enter="reloadCandidates"
+          @keydown.enter.prevent="handleSearchCommit"
         />
       </label>
-      <label class="planning-admin-checkbox planning-admin-checkbox--centered sp-customer-plan-assignments__checkbox">
-        <input
-          v-model="filters.unfilled_only"
-          data-testid="customer-new-plan-assignments-unfilled-only"
-          type="checkbox"
-          @change="reloadCandidates"
-        />
-        <span>{{ $t('sicherplan.customerPlansWizard.assignments.unfilledOnly') }}</span>
-      </label>
+      <div class="sp-customer-plan-assignments__control sp-customer-plan-assignments__control--toggle">
+        <label class="planning-admin-checkbox planning-admin-checkbox--centered sp-customer-plan-assignments__checkbox">
+          <input
+            :id="controlIds.unfilledOnly"
+            v-model="filters.unfilled_only"
+            data-testid="customer-new-plan-assignments-unfilled-only"
+            type="checkbox"
+            @change="reloadCandidates"
+          />
+          <span>{{ $t('sicherplan.customerPlansWizard.assignments.unfilledOnly') }}</span>
+        </label>
+      </div>
     </div>
 
     <div
@@ -1138,13 +1256,53 @@ defineExpose({
 
 .sp-customer-plan-assignments__filters {
   display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  align-items: end;
+  gap: 0.875rem 0.75rem;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.sp-customer-plan-assignments__control {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.sp-customer-plan-assignments__control-label {
+  color: #516074;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.sp-customer-plan-assignments__control--demand-group {
+  grid-column: span 3;
+}
+
+.sp-customer-plan-assignments__control--actor-kind,
+.sp-customer-plan-assignments__control--team,
+.sp-customer-plan-assignments__control--employee-group {
+  grid-column: span 2;
+}
+
+.sp-customer-plan-assignments__control--search {
+  grid-column: span 2;
+}
+
+.sp-customer-plan-assignments__control--toggle {
+  grid-column: span 1;
+  align-content: end;
+}
+
+.sp-customer-plan-assignments__search-input {
+  width: 100%;
 }
 
 .sp-customer-plan-assignments__checkbox {
   min-height: 2.5rem;
+  height: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #d7deea;
+  border-radius: 8px;
+  background: #f8fafc;
 }
 
 .sp-customer-plan-assignments__workspace {
@@ -1357,13 +1515,33 @@ defineExpose({
 
 @media (max-width: 1200px) {
   .sp-customer-plan-assignments__summary,
-  .sp-customer-plan-assignments__filters,
   .sp-customer-plan-assignments__workspace {
     grid-template-columns: 1fr;
   }
 
   .sp-customer-plan-assignments__summary-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sp-customer-plan-assignments__filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sp-customer-plan-assignments__control,
+  .sp-customer-plan-assignments__control--demand-group,
+  .sp-customer-plan-assignments__control--actor-kind,
+  .sp-customer-plan-assignments__control--team,
+  .sp-customer-plan-assignments__control--employee-group,
+  .sp-customer-plan-assignments__control--search,
+  .sp-customer-plan-assignments__control--toggle {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .sp-customer-plan-assignments__filters,
+  .sp-customer-plan-assignments__summary-cards {
+    grid-template-columns: 1fr;
   }
 }
 </style>

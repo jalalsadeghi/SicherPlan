@@ -1637,21 +1637,55 @@ class SqlAlchemyPlanningRepository:
     def list_demand_groups(self, tenant_id: str, filters: StaffingFilter) -> list[DemandGroup]:
         statement = (
             select(DemandGroup)
+            .join(
+                Shift,
+                and_(Shift.tenant_id == DemandGroup.tenant_id, Shift.id == DemandGroup.shift_id),
+            )
             .where(DemandGroup.tenant_id == tenant_id)
             .options(
                 selectinload(DemandGroup.assignments).selectinload(Assignment.employee),
                 selectinload(DemandGroup.assignments).selectinload(Assignment.subcontractor_worker),
                 selectinload(DemandGroup.subcontractor_releases),
             )
-            .order_by(DemandGroup.sort_order, DemandGroup.id)
+            .order_by(Shift.starts_at, Shift.id, DemandGroup.sort_order, DemandGroup.id)
         )
         if not filters.include_archived:
             statement = statement.where(DemandGroup.archived_at.is_(None))
         if filters.shift_id is not None:
             statement = statement.where(DemandGroup.shift_id == filters.shift_id)
+        if filters.shift_plan_id is not None:
+            statement = statement.where(Shift.shift_plan_id == filters.shift_plan_id)
+        if filters.planning_record_id is not None:
+            statement = statement.join(
+                ShiftPlan,
+                and_(ShiftPlan.tenant_id == Shift.tenant_id, ShiftPlan.id == Shift.shift_plan_id),
+            ).where(ShiftPlan.planning_record_id == filters.planning_record_id)
         if filters.demand_group_id is not None:
             statement = statement.where(DemandGroup.id == filters.demand_group_id)
         return list(self.session.scalars(statement).all())
+
+    def list_demand_groups_for_shifts(
+        self,
+        tenant_id: str,
+        shift_ids: Sequence[str],
+        *,
+        include_archived: bool = False,
+    ) -> list[DemandGroup]:
+        if not shift_ids:
+            return []
+        statement = (
+            select(DemandGroup)
+            .where(DemandGroup.tenant_id == tenant_id, DemandGroup.shift_id.in_(list(shift_ids)))
+            .options(
+                selectinload(DemandGroup.assignments).selectinload(Assignment.employee),
+                selectinload(DemandGroup.assignments).selectinload(Assignment.subcontractor_worker),
+                selectinload(DemandGroup.subcontractor_releases),
+            )
+            .order_by(DemandGroup.shift_id, DemandGroup.sort_order, DemandGroup.id)
+        )
+        if not include_archived:
+            statement = statement.where(DemandGroup.archived_at.is_(None))
+        return list(self.session.scalars(statement).unique().all())
 
     def list_demand_groups_in_shift(self, tenant_id: str, shift_id: str) -> list[DemandGroup]:
         return self.list_demand_groups(tenant_id, StaffingFilter(shift_id=shift_id, include_archived=False))
