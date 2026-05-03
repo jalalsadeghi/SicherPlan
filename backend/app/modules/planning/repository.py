@@ -332,14 +332,57 @@ class SqlAlchemyPlanningRepository:
         )
         return list(self.session.scalars(statement).all())
 
+    def list_employee_qualifications_for_employees(
+        self,
+        tenant_id: str,
+        employee_ids: Sequence[str],
+    ) -> list[EmployeeQualification]:
+        if not employee_ids:
+            return []
+        statement = (
+            select(EmployeeQualification)
+            .where(EmployeeQualification.tenant_id == tenant_id, EmployeeQualification.employee_id.in_(list(employee_ids)))
+            .options(
+                selectinload(EmployeeQualification.qualification_type),
+                selectinload(EmployeeQualification.function_type),
+            )
+        )
+        return list(self.session.scalars(statement).all())
+
     def list_employee_absences(self, tenant_id: str, employee_id: str) -> list[EmployeeAbsence]:
         statement = select(EmployeeAbsence).where(EmployeeAbsence.tenant_id == tenant_id, EmployeeAbsence.employee_id == employee_id)
+        return list(self.session.scalars(statement).all())
+
+    def list_employee_absences_for_employees(
+        self,
+        tenant_id: str,
+        employee_ids: Sequence[str],
+    ) -> list[EmployeeAbsence]:
+        if not employee_ids:
+            return []
+        statement = select(EmployeeAbsence).where(
+            EmployeeAbsence.tenant_id == tenant_id,
+            EmployeeAbsence.employee_id.in_(list(employee_ids)),
+        )
         return list(self.session.scalars(statement).all())
 
     def list_employee_availability_rules(self, tenant_id: str, employee_id: str) -> list[EmployeeAvailabilityRule]:
         statement = select(EmployeeAvailabilityRule).where(
             EmployeeAvailabilityRule.tenant_id == tenant_id,
             EmployeeAvailabilityRule.employee_id == employee_id,
+        )
+        return list(self.session.scalars(statement).all())
+
+    def list_employee_availability_rules_for_employees(
+        self,
+        tenant_id: str,
+        employee_ids: Sequence[str],
+    ) -> list[EmployeeAvailabilityRule]:
+        if not employee_ids:
+            return []
+        statement = select(EmployeeAvailabilityRule).where(
+            EmployeeAvailabilityRule.tenant_id == tenant_id,
+            EmployeeAvailabilityRule.employee_id.in_(list(employee_ids)),
         )
         return list(self.session.scalars(statement).all())
 
@@ -351,15 +394,54 @@ class SqlAlchemyPlanningRepository:
         )
         return list(self.session.scalars(statement).all())
 
+    def list_worker_qualifications_for_workers(
+        self,
+        tenant_id: str,
+        worker_ids: Sequence[str],
+    ) -> list[SubcontractorWorkerQualification]:
+        if not worker_ids:
+            return []
+        statement = (
+            select(SubcontractorWorkerQualification)
+            .where(
+                SubcontractorWorkerQualification.tenant_id == tenant_id,
+                SubcontractorWorkerQualification.worker_id.in_(list(worker_ids)),
+            )
+            .options(selectinload(SubcontractorWorkerQualification.qualification_type))
+        )
+        return list(self.session.scalars(statement).all())
+
     def list_documents_for_owner(self, tenant_id: str, owner_type: str, owner_id: str) -> list[Document]:
         statement = (
             select(Document)
             .join(DocumentLink, DocumentLink.document_id == Document.id)
+            .options(selectinload(Document.links))
             .where(
                 Document.tenant_id == tenant_id,
                 DocumentLink.tenant_id == tenant_id,
                 DocumentLink.owner_type == owner_type,
                 DocumentLink.owner_id == owner_id,
+            )
+        )
+        return list(self.session.scalars(statement).unique().all())
+
+    def list_documents_for_owners(
+        self,
+        tenant_id: str,
+        owner_type: str,
+        owner_ids: Sequence[str],
+    ) -> list[Document]:
+        if not owner_ids:
+            return []
+        statement = (
+            select(Document)
+            .join(DocumentLink, DocumentLink.document_id == Document.id)
+            .options(selectinload(Document.links))
+            .where(
+                Document.tenant_id == tenant_id,
+                DocumentLink.tenant_id == tenant_id,
+                DocumentLink.owner_type == owner_type,
+                DocumentLink.owner_id.in_(list(owner_ids)),
             )
         )
         return list(self.session.scalars(statement).unique().all())
@@ -372,6 +454,27 @@ class SqlAlchemyPlanningRepository:
             CustomerEmployeeBlock.archived_at.is_(None),
             CustomerEmployeeBlock.effective_from <= on_date,
             or_(CustomerEmployeeBlock.effective_to.is_(None), CustomerEmployeeBlock.effective_to >= on_date),
+        )
+        return list(self.session.scalars(statement).all())
+
+    def list_customer_employee_blocks_for_customer(
+        self,
+        tenant_id: str,
+        customer_id: str,
+        employee_ids: Sequence[str],
+        *,
+        date_from: date,
+        date_to: date,
+    ) -> list[CustomerEmployeeBlock]:
+        if not employee_ids:
+            return []
+        statement = select(CustomerEmployeeBlock).where(
+            CustomerEmployeeBlock.tenant_id == tenant_id,
+            CustomerEmployeeBlock.customer_id == customer_id,
+            CustomerEmployeeBlock.employee_id.in_(list(employee_ids)),
+            CustomerEmployeeBlock.archived_at.is_(None),
+            CustomerEmployeeBlock.effective_from <= date_to,
+            or_(CustomerEmployeeBlock.effective_to.is_(None), CustomerEmployeeBlock.effective_to >= date_from),
         )
         return list(self.session.scalars(statement).all())
 
@@ -1497,6 +1600,18 @@ class SqlAlchemyPlanningRepository:
         )
         return self.session.scalars(statement).one_or_none()
 
+    def list_shifts_by_ids(self, tenant_id: str, shift_ids: Sequence[str]) -> list[Shift]:
+        if not shift_ids:
+            return []
+        statement = (
+            select(Shift)
+            .where(Shift.tenant_id == tenant_id, Shift.id.in_(list(shift_ids)))
+            .options(
+                selectinload(Shift.shift_plan).selectinload(ShiftPlan.planning_record).selectinload(PlanningRecord.order),
+            )
+        )
+        return list(self.session.scalars(statement).all())
+
     def list_shifts_for_planning_record(self, tenant_id: str, planning_record_id: str) -> list[Shift]:
         return self.list_shifts(
             tenant_id,
@@ -1794,6 +1909,31 @@ class SqlAlchemyPlanningRepository:
             statement = statement.where(TeamMember.subcontractor_worker_id == filters.subcontractor_worker_id)
         return list(self.session.scalars(statement).all())
 
+    def list_team_members_for_actors(
+        self,
+        tenant_id: str,
+        *,
+        employee_ids: Sequence[str],
+        subcontractor_worker_ids: Sequence[str],
+        include_archived: bool = False,
+    ) -> list[TeamMember]:
+        if not employee_ids and not subcontractor_worker_ids:
+            return []
+        actor_filters = []
+        if employee_ids:
+            actor_filters.append(TeamMember.employee_id.in_(list(employee_ids)))
+        if subcontractor_worker_ids:
+            actor_filters.append(TeamMember.subcontractor_worker_id.in_(list(subcontractor_worker_ids)))
+        statement = (
+            select(TeamMember)
+            .where(TeamMember.tenant_id == tenant_id, or_(*actor_filters))
+            .options(selectinload(TeamMember.employee), selectinload(TeamMember.subcontractor_worker))
+            .order_by(TeamMember.valid_from, TeamMember.id)
+        )
+        if not include_archived:
+            statement = statement.where(TeamMember.archived_at.is_(None))
+        return list(self.session.scalars(statement).all())
+
     def get_team_member(self, tenant_id: str, row_id: str) -> TeamMember | None:
         statement = (
             select(TeamMember)
@@ -1930,6 +2070,39 @@ class SqlAlchemyPlanningRepository:
             subcontractor_worker_id=subcontractor_worker_id,
             exclude_assignment_id=exclude_assignment_id,
         )
+
+    def list_assignments_for_actors_in_window(
+        self,
+        tenant_id: str,
+        *,
+        employee_ids: Sequence[str],
+        subcontractor_worker_ids: Sequence[str],
+        window_start: datetime,
+        window_end: datetime,
+    ) -> list[Assignment]:
+        if not employee_ids and not subcontractor_worker_ids:
+            return []
+        actor_filters = []
+        if employee_ids:
+            actor_filters.append(Assignment.employee_id.in_(list(employee_ids)))
+        if subcontractor_worker_ids:
+            actor_filters.append(Assignment.subcontractor_worker_id.in_(list(subcontractor_worker_ids)))
+        statement = (
+            select(Assignment)
+            .join(Shift, and_(Shift.tenant_id == Assignment.tenant_id, Shift.id == Assignment.shift_id))
+            .where(
+                Assignment.tenant_id == tenant_id,
+                Assignment.archived_at.is_(None),
+                Assignment.assignment_status_code != "removed",
+                Shift.archived_at.is_(None),
+                Shift.starts_at < window_end,
+                Shift.ends_at > window_start,
+                or_(*actor_filters),
+            )
+            .options(selectinload(Assignment.employee), selectinload(Assignment.subcontractor_worker))
+            .order_by(Assignment.created_at, Assignment.id)
+        )
+        return list(self.session.scalars(statement).all())
 
     def list_subcontractor_releases(self, tenant_id: str, filters: StaffingFilter) -> list[SubcontractorRelease]:
         statement = (

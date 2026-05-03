@@ -2135,6 +2135,9 @@ class AssignmentStepScopeRequest(BaseModel):
     employee_group_id: str | None = None
     search: str | None = None
     unfilled_only: bool = False
+    candidate_limit: int | None = Field(default=None, ge=1, le=200)
+    candidate_offset: int = Field(default=0, ge=0)
+    include_day_statuses: bool = True
 
 
 class AssignmentStepOrderSummaryRead(BaseModel):
@@ -2273,6 +2276,9 @@ class AssignmentStepCandidateQueryResult(BaseModel):
     shift_plan_id: str
     shift_series_id: str | None = None
     generated_shift_count: int
+    total_candidate_count: int | None = None
+    candidate_limit: int | None = None
+    candidate_offset: int = 0
     candidates: list[AssignmentStepCandidateRead] = Field(default_factory=list)
 
 

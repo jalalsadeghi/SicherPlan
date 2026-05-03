@@ -56,6 +56,7 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
     owner_documents: dict[tuple[str, str, str], list[object]] = field(default_factory=dict)
     customer_employee_blocks: list[object] = field(default_factory=list)
     assignment_validation_overrides: dict[str, list[AssignmentValidationOverride]] = field(default_factory=dict)
+    call_counts: dict[str, int] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -195,6 +196,9 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
         row = self.function_types.get(function_type_id)
         return row if row and row.tenant_id == tenant_id else None
 
+    def _bump(self, key: str) -> None:
+        self.call_counts[key] = self.call_counts.get(key, 0) + 1
+
     def get_qualification_type(self, tenant_id: str, qualification_type_id: str):
         row = self.qualification_types.get(qualification_type_id)
         return row if row and row.tenant_id == tenant_id else None
@@ -222,6 +226,7 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
         ]
 
     def get_shift(self, tenant_id: str, row_id: str):
+        self._bump("get_shift")
         row = super().get_shift(tenant_id, row_id)
         if row is None:
             return None
@@ -235,33 +240,91 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
             planning_record.order = order
         return row
 
+    def list_shifts_by_ids(self, tenant_id: str, shift_ids: list[str]):
+        self._bump("list_shifts_by_ids")
+        rows = []
+        for row_id in shift_ids:
+            row = self.get_shift(tenant_id, row_id)
+            if row is not None:
+                rows.append(row)
+        return rows
+
     def get_tenant_setting_value(self, tenant_id: str, key: str):
         return self.tenant_settings.get((tenant_id, key))
 
     def list_employee_qualifications(self, tenant_id: str, employee_id: str):
+        self._bump("list_employee_qualifications")
         return [
             row
             for row in self.employee_qualifications.get(employee_id, [])
             if getattr(row, "tenant_id", tenant_id) == tenant_id
         ]
 
+    def list_employee_qualifications_for_employees(self, tenant_id: str, employee_ids: list[str]):
+        self._bump("list_employee_qualifications_for_employees")
+        return [
+            row
+            for employee_id in employee_ids
+            for row in self.employee_qualifications.get(employee_id, [])
+            if getattr(row, "tenant_id", tenant_id) == tenant_id
+        ]
+
     def list_employee_absences(self, tenant_id: str, employee_id: str):
+        self._bump("list_employee_absences")
         return list(getattr(self.employees.get(employee_id), "absences", []))
 
+    def list_employee_absences_for_employees(self, tenant_id: str, employee_ids: list[str]):
+        self._bump("list_employee_absences_for_employees")
+        return [
+            row
+            for employee_id in employee_ids
+            for row in getattr(self.employees.get(employee_id), "absences", [])
+        ]
+
     def list_employee_availability_rules(self, tenant_id: str, employee_id: str):
+        self._bump("list_employee_availability_rules")
         return list(getattr(self.employees.get(employee_id), "availability_rules", []))
 
+    def list_employee_availability_rules_for_employees(self, tenant_id: str, employee_ids: list[str]):
+        self._bump("list_employee_availability_rules_for_employees")
+        return [
+            row
+            for employee_id in employee_ids
+            for row in getattr(self.employees.get(employee_id), "availability_rules", [])
+        ]
+
     def list_worker_qualifications(self, tenant_id: str, worker_id: str):
+        self._bump("list_worker_qualifications")
         return [
             row
             for row in self.worker_qualifications.get(worker_id, [])
             if getattr(row, "tenant_id", tenant_id) == tenant_id
         ]
 
+    def list_worker_qualifications_for_workers(self, tenant_id: str, worker_ids: list[str]):
+        self._bump("list_worker_qualifications_for_workers")
+        return [
+            row
+            for worker_id in worker_ids
+            for row in self.worker_qualifications.get(worker_id, [])
+            if getattr(row, "tenant_id", tenant_id) == tenant_id
+        ]
+
     def list_documents_for_owner(self, tenant_id: str, owner_type: str, owner_id: str):
+        self._bump("list_documents_for_owner")
         return list(self.owner_documents.get((tenant_id, owner_type, owner_id), []))
 
+    def list_documents_for_owners(self, tenant_id: str, owner_type: str, owner_ids: list[str]):
+        self._bump("list_documents_for_owners")
+        rows = []
+        for owner_id in owner_ids:
+            for row in self.owner_documents.get((tenant_id, owner_type, owner_id), []):
+                doc_id = getattr(row, "id", owner_id)
+                rows.append(SimpleNamespace(id=doc_id, links=[SimpleNamespace(owner_type=owner_type, owner_id=owner_id)]))
+        return rows
+
     def list_customer_employee_blocks(self, tenant_id: str, customer_id: str, employee_id: str, on_date: date):
+        self._bump("list_customer_employee_blocks")
         result = []
         for row in self.customer_employee_blocks:
             if row.tenant_id != tenant_id or row.customer_id != customer_id or row.employee_id != employee_id:
@@ -274,6 +337,28 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
                 continue
             result.append(row)
         return result
+
+    def list_customer_employee_blocks_for_customer(
+        self,
+        tenant_id: str,
+        customer_id: str,
+        employee_ids: list[str],
+        *,
+        date_from: date,
+        date_to: date,
+    ):
+        self._bump("list_customer_employee_blocks_for_customer")
+        return [
+            row
+            for row in self.customer_employee_blocks
+            if row.tenant_id == tenant_id
+            and row.customer_id == customer_id
+            and row.employee_id in employee_ids
+            and row.archived_at is None
+            and row.status == "active"
+            and row.effective_from <= date_to
+            and (row.effective_to is None or row.effective_to >= date_from)
+        ]
 
     def list_demand_groups(self, tenant_id: str, filters: StaffingFilter):
         rows = [row for row in self.demand_groups.values() if row.tenant_id == tenant_id]
@@ -408,6 +493,7 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
         return row
 
     def list_team_members(self, tenant_id: str, filters: StaffingFilter):
+        self._bump("list_team_members")
         rows = [row for row in self.team_members.values() if row.tenant_id == tenant_id]
         if not filters.include_archived:
             rows = [row for row in rows if row.archived_at is None]
@@ -418,6 +504,25 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
         if filters.subcontractor_worker_id is not None:
             rows = [row for row in rows if row.subcontractor_worker_id == filters.subcontractor_worker_id]
         return sorted(rows, key=lambda row: (row.valid_from, row.id))
+
+    def list_team_members_for_actors(
+        self,
+        tenant_id: str,
+        *,
+        employee_ids: list[str],
+        subcontractor_worker_ids: list[str],
+        include_archived: bool = False,
+    ):
+        self._bump("list_team_members_for_actors")
+        rows = [row for row in self.team_members.values() if row.tenant_id == tenant_id]
+        if not include_archived:
+            rows = [row for row in rows if row.archived_at is None]
+        return [
+            row
+            for row in rows
+            if (row.employee_id is not None and row.employee_id in employee_ids)
+            or (row.subcontractor_worker_id is not None and row.subcontractor_worker_id in subcontractor_worker_ids)
+        ]
 
     def get_team_member(self, tenant_id: str, row_id: str):
         row = self.team_members.get(row_id)
@@ -552,6 +657,7 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
         subcontractor_worker_id: str | None,
         exclude_assignment_id: str | None = None,
     ):
+        self._bump("list_overlapping_assignments")
         rows = []
         for row in self.assignments.values():
             if row.tenant_id != tenant_id or row.assignment_status_code == "removed":
@@ -579,6 +685,7 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
         window_end: datetime,
         exclude_assignment_id: str | None = None,
     ):
+        self._bump("list_assignments_for_actor_in_window")
         return self.list_overlapping_assignments(
             tenant_id,
             starts_at=window_start,
@@ -587,6 +694,28 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
             subcontractor_worker_id=subcontractor_worker_id,
             exclude_assignment_id=exclude_assignment_id,
         )
+
+    def list_assignments_for_actors_in_window(
+        self,
+        tenant_id: str,
+        *,
+        employee_ids: list[str],
+        subcontractor_worker_ids: list[str],
+        window_start: datetime,
+        window_end: datetime,
+    ):
+        self._bump("list_assignments_for_actors_in_window")
+        rows = []
+        for row in self.assignments.values():
+            if row.tenant_id != tenant_id or row.assignment_status_code == "removed":
+                continue
+            if row.employee_id in employee_ids or row.subcontractor_worker_id in subcontractor_worker_ids:
+                other_shift = self.get_shift(tenant_id, row.shift_id)
+                if other_shift is None or other_shift.archived_at is not None:
+                    continue
+                if other_shift.starts_at < window_end and other_shift.ends_at > window_start:
+                    rows.append(row)
+        return sorted(rows, key=lambda row: row.id)
 
     def list_assignments_in_shift(self, tenant_id: str, shift_id: str):
         return [
@@ -1967,6 +2096,159 @@ class StaffingServiceTests(unittest.TestCase):
         employee_two = next(row for row in result.candidates if row.actor_id == "employee-2")
         self.assertEqual(employee_two.eligible_day_count, 0)
         self.assertIn("qualification_match", employee_two.top_reason_codes)
+
+    def test_assignment_step_candidates_respect_team_group_and_search_filters(self) -> None:
+        series = self._create_shift_series(label="Assignments", date_from=date(2026, 4, 7), date_to=date(2026, 4, 7))
+        shift = self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+        self.service.bulk_apply_demand_groups(
+            "tenant-1",
+            DemandGroupBulkApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_groups=[
+                    {
+                        "function_type_id": "function-1",
+                        "qualification_type_id": "qualification-1",
+                        "min_qty": 1,
+                        "target_qty": 1,
+                        "sort_order": 10,
+                    }
+                ],
+            ),
+            _context("planning.staffing.write"),
+        )
+        self.repository.employees["employee-1"].group_memberships = [
+            SimpleNamespace(group_id="group-a", status="active", archived_at=None),
+        ]
+        self.repository.employees["employee-2"].group_memberships = [
+            SimpleNamespace(group_id="group-b", status="active", archived_at=None),
+        ]
+        team_a = self.service.create_team(
+            "tenant-1",
+            TeamCreate(tenant_id="tenant-1", planning_record_id=self.planning_record_id, name="Alpha"),
+            _context("planning.staffing.write"),
+        )
+        team_b = self.service.create_team(
+            "tenant-1",
+            TeamCreate(tenant_id="tenant-1", planning_record_id=self.planning_record_id, name="Beta"),
+            _context("planning.staffing.write"),
+        )
+        self.service.create_team_member(
+            "tenant-1",
+            TeamMemberCreate(tenant_id="tenant-1", team_id=team_a.id, employee_id="employee-1", valid_from=datetime(2026, 4, 1, 0, 0, tzinfo=UTC)),
+            _context("planning.staffing.write"),
+        )
+        self.service.create_team_member(
+            "tenant-1",
+            TeamMemberCreate(tenant_id="tenant-1", team_id=team_b.id, employee_id="employee-2", valid_from=datetime(2026, 4, 1, 0, 0, tzinfo=UTC)),
+            _context("planning.staffing.write"),
+        )
+
+        result = self.service.list_assignment_step_candidates(
+            "tenant-1",
+            AssignmentStepScopeRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_group_match={"function_type_id": "function-1", "qualification_type_id": "qualification-1", "sort_order": 10},
+                team_id=team_a.id,
+                employee_group_id="group-a",
+                search="Erika",
+            ),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual([row.actor_id for row in result.candidates], ["employee-1"])
+
+    def test_assignment_step_candidate_query_supports_limit_offset_and_optional_day_statuses(self) -> None:
+        series = self._create_shift_series(label="Assignments", date_from=date(2026, 4, 7), date_to=date(2026, 4, 8))
+        self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+        self._create_generated_shift(occurrence_date=date(2026, 4, 8), shift_series_id=series.id)
+        self.service.bulk_apply_demand_groups(
+            "tenant-1",
+            DemandGroupBulkApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_groups=[
+                    {
+                        "function_type_id": "function-1",
+                        "qualification_type_id": "qualification-1",
+                        "min_qty": 1,
+                        "target_qty": 1,
+                        "sort_order": 10,
+                    }
+                ],
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        result = self.service.list_assignment_step_candidates(
+            "tenant-1",
+            AssignmentStepScopeRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_group_match={"function_type_id": "function-1", "qualification_type_id": "qualification-1", "sort_order": 10},
+                candidate_limit=1,
+                candidate_offset=1,
+                include_day_statuses=False,
+            ),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual(result.candidate_limit, 1)
+        self.assertEqual(result.candidate_offset, 1)
+        self.assertGreaterEqual(result.total_candidate_count or 0, 2)
+        self.assertEqual(len(result.candidates), 1)
+        self.assertEqual(result.candidates[0].day_statuses, [])
+
+    def test_assignment_step_candidates_use_bulk_preloads_not_single_actor_queries(self) -> None:
+        series = self._create_shift_series(label="Assignments", date_from=date(2026, 4, 7), date_to=date(2026, 4, 8))
+        self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+        self._create_generated_shift(occurrence_date=date(2026, 4, 8), shift_series_id=series.id)
+        self.service.bulk_apply_demand_groups(
+            "tenant-1",
+            DemandGroupBulkApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_groups=[
+                    {
+                        "function_type_id": "function-1",
+                        "qualification_type_id": "qualification-1",
+                        "min_qty": 1,
+                        "target_qty": 1,
+                        "sort_order": 10,
+                    }
+                ],
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        self.service.list_assignment_step_candidates(
+            "tenant-1",
+            AssignmentStepScopeRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_group_match={"function_type_id": "function-1", "qualification_type_id": "qualification-1", "sort_order": 10},
+            ),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual(self.repository.call_counts.get("list_employee_qualifications_for_employees"), 1)
+        self.assertEqual(self.repository.call_counts.get("list_employee_absences_for_employees"), 1)
+        self.assertEqual(self.repository.call_counts.get("list_employee_availability_rules_for_employees"), 1)
+        self.assertEqual(self.repository.call_counts.get("list_customer_employee_blocks_for_customer"), 1)
+        self.assertEqual(self.repository.call_counts.get("list_assignments_for_actors_in_window"), 1)
+        self.assertEqual(self.repository.call_counts.get("list_team_members_for_actors"), 1)
+        self.assertEqual(self.repository.call_counts.get("list_employee_qualifications", 0), 0)
+        self.assertEqual(self.repository.call_counts.get("list_employee_absences", 0), 0)
+        self.assertEqual(self.repository.call_counts.get("list_employee_availability_rules", 0), 0)
+        self.assertEqual(self.repository.call_counts.get("list_customer_employee_blocks", 0), 0)
+        self.assertEqual(self.repository.call_counts.get("list_assignments_for_actor_in_window", 0), 0)
 
     def test_assignment_step_snapshot_builds_calendar_day_states(self) -> None:
         series = self._create_shift_series(label="Assignments", date_from=date(2026, 4, 7), date_to=date(2026, 4, 8))

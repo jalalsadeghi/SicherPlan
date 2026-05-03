@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from enum import Enum
 from typing import Protocol
@@ -81,6 +81,7 @@ from app.modules.planning.validation_service import PlanningValidationService
 
 class StaffingRepository(Protocol):
     def get_shift(self, tenant_id: str, row_id: str) -> Shift | None: ...
+    def list_shifts_by_ids(self, tenant_id: str, shift_ids: list[str]) -> list[Shift]: ...
     def get_shift_plan(self, tenant_id: str, row_id: str): ...
     def get_customer_order(self, tenant_id: str, order_id: str): ...
     def list_shifts(self, tenant_id: str, filters: ShiftListFilter) -> list[Shift]: ...
@@ -119,17 +120,25 @@ class StaffingRepository(Protocol):
     def create_assignment_validation_override(self, row: AssignmentValidationOverride) -> AssignmentValidationOverride: ...
     def get_tenant_setting_value(self, tenant_id: str, key: str) -> dict[str, object] | None: ...
     def list_employee_qualifications(self, tenant_id: str, employee_id: str) -> list[object]: ...
+    def list_employee_qualifications_for_employees(self, tenant_id: str, employee_ids: list[str]) -> list[object]: ...
     def list_employee_absences(self, tenant_id: str, employee_id: str) -> list[object]: ...
+    def list_employee_absences_for_employees(self, tenant_id: str, employee_ids: list[str]) -> list[object]: ...
     def list_employee_availability_rules(self, tenant_id: str, employee_id: str) -> list[object]: ...
+    def list_employee_availability_rules_for_employees(self, tenant_id: str, employee_ids: list[str]) -> list[object]: ...
     def list_worker_qualifications(self, tenant_id: str, worker_id: str) -> list[object]: ...
+    def list_worker_qualifications_for_workers(self, tenant_id: str, worker_ids: list[str]) -> list[object]: ...
     def list_documents_for_owner(self, tenant_id: str, owner_type: str, owner_id: str) -> list[object]: ...
+    def list_documents_for_owners(self, tenant_id: str, owner_type: str, owner_ids: list[str]) -> list[object]: ...
     def list_customer_employee_blocks(self, tenant_id: str, customer_id: str, employee_id: str, on_date): ...  # noqa: ANN001
+    def list_customer_employee_blocks_for_customer(self, tenant_id: str, customer_id: str, employee_ids: list[str], *, date_from: date, date_to: date) -> list[object]: ...
     def list_overlapping_assignments(self, tenant_id: str, *, starts_at: datetime, ends_at: datetime, employee_id: str | None, subcontractor_worker_id: str | None, exclude_assignment_id: str | None = None) -> list[Assignment]: ...
     def list_assignments_for_actor_in_window(self, tenant_id: str, *, employee_id: str | None, subcontractor_worker_id: str | None, window_start: datetime, window_end: datetime, exclude_assignment_id: str | None = None) -> list[Assignment]: ...
+    def list_assignments_for_actors_in_window(self, tenant_id: str, *, employee_ids: list[str], subcontractor_worker_ids: list[str], window_start: datetime, window_end: datetime) -> list[Assignment]: ...
     def list_assignments_in_shift(self, tenant_id: str, shift_id: str) -> list[Assignment]: ...
     def list_demand_groups_in_shift(self, tenant_id: str, shift_id: str) -> list[DemandGroup]: ...
     def list_subcontractor_releases_for_shift(self, tenant_id: str, shift_id: str) -> list[SubcontractorRelease]: ...
     def list_shifts_for_planning_record(self, tenant_id: str, planning_record_id: str) -> list[Shift]: ...
+    def list_team_members_for_actors(self, tenant_id: str, *, employee_ids: list[str], subcontractor_worker_ids: list[str], include_archived: bool = False) -> list[TeamMember]: ...
 
 
 @dataclass(frozen=True)
@@ -148,41 +157,181 @@ class _CachedAssignmentStepRepository:
     def __init__(self, base: StaffingRepository) -> None:
         self._base = base
         self._cache: dict[tuple[object, ...], object] = {}
+        self._preloaded_shifts: dict[str, Shift] = {}
+        self._preloaded_team_members: dict[tuple[str, str], list[TeamMember]] = {}
+        self._preloaded_employee_qualifications: dict[str, list[object]] = {}
+        self._preloaded_employee_absences: dict[str, list[object]] = {}
+        self._preloaded_employee_availability_rules: dict[str, list[object]] = {}
+        self._preloaded_worker_qualifications: dict[str, list[object]] = {}
+        self._preloaded_documents: dict[tuple[str, str], list[object]] = {}
+        self._preloaded_customer_blocks: dict[tuple[str, str], list[object]] = {}
+        self._preloaded_actor_assignments: dict[tuple[str, str], list[Assignment]] = {}
 
     def _memoize_call(self, key: tuple[object, ...], fn):
         if key not in self._cache:
             self._cache[key] = fn()
         return self._cache[key]
 
+    def prime_candidate_context(
+        self,
+        tenant_id: str,
+        *,
+        employee_ids: list[str],
+        worker_ids: list[str],
+        customer_id: str | None,
+        window_start: datetime,
+        window_end: datetime,
+        known_shifts: list[Shift],
+    ) -> None:
+        for shift in known_shifts:
+            self._preloaded_shifts[shift.id] = shift
+        for employee_id in employee_ids:
+            self._preloaded_employee_qualifications.setdefault(employee_id, [])
+            self._preloaded_employee_absences.setdefault(employee_id, [])
+            self._preloaded_employee_availability_rules.setdefault(employee_id, [])
+            self._preloaded_customer_blocks.setdefault((customer_id or "", employee_id), [])
+            self._preloaded_actor_assignments.setdefault(("employee", employee_id), [])
+        for worker_id in worker_ids:
+            self._preloaded_worker_qualifications.setdefault(worker_id, [])
+            self._preloaded_actor_assignments.setdefault(("subcontractor_worker", worker_id), [])
+
+        for row in self._base.list_employee_qualifications_for_employees(tenant_id, employee_ids):
+            self._preloaded_employee_qualifications.setdefault(row.employee_id, []).append(row)
+
+        for row in self._base.list_employee_absences_for_employees(tenant_id, employee_ids):
+            self._preloaded_employee_absences.setdefault(row.employee_id, []).append(row)
+
+        for row in self._base.list_employee_availability_rules_for_employees(tenant_id, employee_ids):
+            self._preloaded_employee_availability_rules.setdefault(row.employee_id, []).append(row)
+
+        for row in self._base.list_worker_qualifications_for_workers(tenant_id, worker_ids):
+            worker_id = getattr(row, "worker_id", None) or getattr(row, "subcontractor_worker_id", None)
+            if worker_id is not None:
+                self._preloaded_worker_qualifications.setdefault(worker_id, []).append(row)
+
+        employee_owner_ids = [
+            row.id
+            for rows in self._preloaded_employee_qualifications.values()
+            for row in rows
+            if getattr(row, "record_kind", None) == "qualification"
+        ]
+        for document in self._base.list_documents_for_owners(
+            tenant_id,
+            "hr.employee_qualification",
+            employee_owner_ids,
+        ):
+            for link in getattr(document, "links", []) or []:
+                if getattr(link, "owner_type", None) == "hr.employee_qualification":
+                    self._preloaded_documents.setdefault(("hr.employee_qualification", link.owner_id), []).append(document)
+
+        worker_owner_ids = [
+            row.id
+            for rows in self._preloaded_worker_qualifications.values()
+            for row in rows
+        ]
+        for document in self._base.list_documents_for_owners(
+            tenant_id,
+            "partner.subcontractor_worker_qualification",
+            worker_owner_ids,
+        ):
+            for link in getattr(document, "links", []) or []:
+                if getattr(link, "owner_type", None) == "partner.subcontractor_worker_qualification":
+                    self._preloaded_documents.setdefault(("partner.subcontractor_worker_qualification", link.owner_id), []).append(document)
+
+        if customer_id is not None and employee_ids:
+            for row in self._base.list_customer_employee_blocks_for_customer(
+                tenant_id,
+                customer_id,
+                employee_ids,
+                date_from=window_start.date(),
+                date_to=window_end.date(),
+            ):
+                self._preloaded_customer_blocks.setdefault((customer_id, row.employee_id), []).append(row)
+
+        actor_assignments = self._base.list_assignments_for_actors_in_window(
+            tenant_id,
+            employee_ids=employee_ids,
+            subcontractor_worker_ids=worker_ids,
+            window_start=window_start,
+            window_end=window_end,
+        )
+        extra_shift_ids: set[str] = set()
+        for row in actor_assignments:
+            if row.employee_id is not None:
+                self._preloaded_actor_assignments.setdefault(("employee", row.employee_id), []).append(row)
+            if row.subcontractor_worker_id is not None:
+                self._preloaded_actor_assignments.setdefault(("subcontractor_worker", row.subcontractor_worker_id), []).append(row)
+            if row.shift_id not in self._preloaded_shifts:
+                extra_shift_ids.add(row.shift_id)
+        for shift in self._base.list_shifts_by_ids(tenant_id, sorted(extra_shift_ids)):
+            self._preloaded_shifts[shift.id] = shift
+
     def get_shift(self, tenant_id: str, row_id: str):
+        if row_id in self._preloaded_shifts:
+            return self._preloaded_shifts[row_id]
         key = ("get_shift", tenant_id, row_id)
         return self._memoize_call(key, lambda: self._base.get_shift(tenant_id, row_id))
+
+    def get_employee(self, tenant_id: str, employee_id: str):
+        key = ("get_employee", tenant_id, employee_id)
+        return self._memoize_call(key, lambda: self._base.get_employee(tenant_id, employee_id))
+
+    def get_subcontractor_worker(self, tenant_id: str, worker_id: str):
+        key = ("get_subcontractor_worker", tenant_id, worker_id)
+        return self._memoize_call(key, lambda: self._base.get_subcontractor_worker(tenant_id, worker_id))
+
+    def get_demand_group(self, tenant_id: str, row_id: str):
+        key = ("get_demand_group", tenant_id, row_id)
+        return self._memoize_call(key, lambda: self._base.get_demand_group(tenant_id, row_id))
+
+    def get_tenant_setting_value(self, tenant_id: str, key_name: str):
+        key = ("get_tenant_setting_value", tenant_id, key_name)
+        return self._memoize_call(key, lambda: self._base.get_tenant_setting_value(tenant_id, key_name))
 
     def list_demand_groups(self, tenant_id: str, filters: StaffingFilter):
         key = ("list_demand_groups", tenant_id, filters.model_dump_json())
         return self._memoize_call(key, lambda: self._base.list_demand_groups(tenant_id, filters))
 
     def list_employee_qualifications(self, tenant_id: str, employee_id: str):
+        if employee_id in self._preloaded_employee_qualifications:
+            return self._preloaded_employee_qualifications[employee_id]
         key = ("list_employee_qualifications", tenant_id, employee_id)
         return self._memoize_call(key, lambda: self._base.list_employee_qualifications(tenant_id, employee_id))
 
     def list_employee_absences(self, tenant_id: str, employee_id: str):
+        if employee_id in self._preloaded_employee_absences:
+            return self._preloaded_employee_absences[employee_id]
         key = ("list_employee_absences", tenant_id, employee_id)
         return self._memoize_call(key, lambda: self._base.list_employee_absences(tenant_id, employee_id))
 
     def list_employee_availability_rules(self, tenant_id: str, employee_id: str):
+        if employee_id in self._preloaded_employee_availability_rules:
+            return self._preloaded_employee_availability_rules[employee_id]
         key = ("list_employee_availability_rules", tenant_id, employee_id)
         return self._memoize_call(key, lambda: self._base.list_employee_availability_rules(tenant_id, employee_id))
 
     def list_worker_qualifications(self, tenant_id: str, worker_id: str):
+        if worker_id in self._preloaded_worker_qualifications:
+            return self._preloaded_worker_qualifications[worker_id]
         key = ("list_worker_qualifications", tenant_id, worker_id)
         return self._memoize_call(key, lambda: self._base.list_worker_qualifications(tenant_id, worker_id))
 
     def list_documents_for_owner(self, tenant_id: str, owner_type: str, owner_id: str):
+        preloaded_key = (owner_type, owner_id)
+        if preloaded_key in self._preloaded_documents:
+            return self._preloaded_documents[preloaded_key]
         key = ("list_documents_for_owner", tenant_id, owner_type, owner_id)
         return self._memoize_call(key, lambda: self._base.list_documents_for_owner(tenant_id, owner_type, owner_id))
 
     def list_customer_employee_blocks(self, tenant_id: str, customer_id: str, employee_id: str, on_date):
+        preloaded_key = (customer_id, employee_id)
+        if preloaded_key in self._preloaded_customer_blocks:
+            return [
+                row
+                for row in self._preloaded_customer_blocks[preloaded_key]
+                if getattr(row, "effective_from", on_date) <= on_date
+                and (getattr(row, "effective_to", None) is None or getattr(row, "effective_to", None) >= on_date)
+            ]
         key = ("list_customer_employee_blocks", tenant_id, customer_id, employee_id, on_date)
         return self._memoize_call(
             key,
@@ -208,6 +357,17 @@ class _CachedAssignmentStepRepository:
             subcontractor_worker_id,
             exclude_assignment_id,
         )
+        actor_key = ("employee", employee_id) if employee_id is not None else ("subcontractor_worker", subcontractor_worker_id or "")
+        if actor_key in self._preloaded_actor_assignments:
+            return [
+                row
+                for row in self._preloaded_actor_assignments[actor_key]
+                if (exclude_assignment_id is None or row.id != exclude_assignment_id)
+                and (shift := self.get_shift(tenant_id, row.shift_id)) is not None
+                and getattr(shift, "archived_at", None) is None
+                and shift.starts_at < ends_at
+                and shift.ends_at > starts_at
+            ]
         return self._memoize_call(
             key,
             lambda: self._base.list_overlapping_assignments(
@@ -239,6 +399,17 @@ class _CachedAssignmentStepRepository:
             window_end,
             exclude_assignment_id,
         )
+        actor_key = ("employee", employee_id) if employee_id is not None else ("subcontractor_worker", subcontractor_worker_id or "")
+        if actor_key in self._preloaded_actor_assignments:
+            return [
+                row
+                for row in self._preloaded_actor_assignments[actor_key]
+                if (exclude_assignment_id is None or row.id != exclude_assignment_id)
+                and (shift := self.get_shift(tenant_id, row.shift_id)) is not None
+                and getattr(shift, "archived_at", None) is None
+                and shift.starts_at < window_end
+                and shift.ends_at > window_start
+            ]
         return self._memoize_call(
             key,
             lambda: self._base.list_assignments_for_actor_in_window(
@@ -252,6 +423,20 @@ class _CachedAssignmentStepRepository:
         )
 
     def list_team_members(self, tenant_id: str, filters: StaffingFilter):
+        if filters.employee_id is not None:
+            return [
+                row
+                for row in self._preloaded_team_members.get(("employee", filters.employee_id), [])
+                if filters.include_archived or getattr(row, "archived_at", None) is None
+                if filters.team_id is None or row.team_id == filters.team_id
+            ]
+        if filters.subcontractor_worker_id is not None:
+            return [
+                row
+                for row in self._preloaded_team_members.get(("subcontractor_worker", filters.subcontractor_worker_id), [])
+                if filters.include_archived or getattr(row, "archived_at", None) is None
+                if filters.team_id is None or row.team_id == filters.team_id
+            ]
         key = ("list_team_members", tenant_id, filters.model_dump_json())
         return self._memoize_call(key, lambda: self._base.list_team_members(tenant_id, filters))
 
@@ -1055,6 +1240,9 @@ class StaffingService:
                 employee_group_id=payload.employee_group_id,
                 search=payload.search,
                 repository=caching_repository,
+                candidate_limit=payload.candidate_limit,
+                candidate_offset=payload.candidate_offset,
+                include_day_statuses=payload.include_day_statuses,
             )
             candidates_included = True
         lock_reason_codes = sorted({
@@ -1115,12 +1303,8 @@ class StaffingService:
             )
         groups_by_shift = self._assignment_step_groups_by_shift(tenant_id, target_shifts)
         caching_repository = _CachedAssignmentStepRepository(self.repository)
-        return AssignmentStepCandidateQueryResult(
-            tenant_id=tenant_id,
-            shift_plan_id=payload.shift_plan_id,
-            shift_series_id=payload.shift_series_id,
-            generated_shift_count=len(target_shifts),
-            candidates=self._list_assignment_step_candidates(
+        if payload.candidate_limit is None and payload.candidate_offset == 0:
+            paged_candidates = self._list_assignment_step_candidates(
                 tenant_id,
                 shift_plan=shift_plan,
                 target_shifts=target_shifts,
@@ -1131,7 +1315,52 @@ class StaffingService:
                 employee_group_id=payload.employee_group_id,
                 search=payload.search,
                 repository=caching_repository,
-            ),
+                candidate_limit=None,
+                candidate_offset=0,
+                include_day_statuses=payload.include_day_statuses,
+            )
+            total_candidate_count = len(paged_candidates)
+        else:
+            all_candidates = self._list_assignment_step_candidates(
+                tenant_id,
+                shift_plan=shift_plan,
+                target_shifts=target_shifts,
+                groups_by_shift=groups_by_shift,
+                demand_group_match=payload.demand_group_match,
+                actor_kind=payload.actor_kind,
+                team_id=payload.team_id,
+                employee_group_id=payload.employee_group_id,
+                search=payload.search,
+                repository=caching_repository,
+                candidate_limit=None,
+                candidate_offset=0,
+                include_day_statuses=False,
+            )
+            total_candidate_count = len(all_candidates)
+            paged_candidates = self._list_assignment_step_candidates(
+                tenant_id,
+                shift_plan=shift_plan,
+                target_shifts=target_shifts,
+                groups_by_shift=groups_by_shift,
+                demand_group_match=payload.demand_group_match,
+                actor_kind=payload.actor_kind,
+                team_id=payload.team_id,
+                employee_group_id=payload.employee_group_id,
+                search=payload.search,
+                repository=caching_repository,
+                candidate_limit=payload.candidate_limit,
+                candidate_offset=payload.candidate_offset,
+                include_day_statuses=payload.include_day_statuses,
+            )
+        return AssignmentStepCandidateQueryResult(
+            tenant_id=tenant_id,
+            shift_plan_id=payload.shift_plan_id,
+            shift_series_id=payload.shift_series_id,
+            generated_shift_count=len(target_shifts),
+            total_candidate_count=total_candidate_count,
+            candidate_limit=payload.candidate_limit,
+            candidate_offset=payload.candidate_offset,
+            candidates=paged_candidates,
         )
 
     def preview_assignment_step_apply(
@@ -1537,56 +1766,94 @@ class StaffingService:
         employee_group_id: str | None,
         search: str | None,
         repository: StaffingRepository,
+        candidate_limit: int | None = None,
+        candidate_offset: int = 0,
+        include_day_statuses: bool = True,
     ) -> list[AssignmentStepCandidateRead]:
-        candidates: list[AssignmentStepCandidateRead] = []
         search_term = (search or "").strip().lower()
         include_employees = shift_plan.workforce_scope_code in {"internal", "mixed"} and actor_kind in {None, "employee"}
         include_workers = shift_plan.workforce_scope_code in {"subcontractor", "mixed"} and actor_kind in {None, "subcontractor_worker"}
+        employees = repository.list_employees(tenant_id) if include_employees else []
+        workers = repository.list_subcontractor_workers(tenant_id) if include_workers else []
+        team_members = repository.list_team_members_for_actors(
+            tenant_id,
+            employee_ids=[row.id for row in employees],
+            subcontractor_worker_ids=[row.id for row in workers],
+            include_archived=False,
+        )
+        team_ids_by_actor: dict[tuple[str, str], list[str]] = defaultdict(list)
+        for row in team_members:
+            if row.employee_id is not None:
+                team_ids_by_actor[("employee", row.employee_id)].append(row.team_id)
+            if row.subcontractor_worker_id is not None:
+                team_ids_by_actor[("subcontractor_worker", row.subcontractor_worker_id)].append(row.team_id)
+
+        filtered_employees = [
+            employee
+            for employee in employees
+            if self._candidate_matches_common_filters(
+                actor_kind="employee",
+                actor=employee,
+                team_id=team_id,
+                employee_group_id=employee_group_id,
+                search_term=search_term,
+                repository=repository,
+                preloaded_team_ids=team_ids_by_actor.get(("employee", employee.id), []),
+            )
+        ]
+        filtered_workers = [
+            worker
+            for worker in workers
+            if self._candidate_matches_common_filters(
+                actor_kind="subcontractor_worker",
+                actor=worker,
+                team_id=team_id,
+                employee_group_id=employee_group_id,
+                search_term=search_term,
+                repository=repository,
+                preloaded_team_ids=team_ids_by_actor.get(("subcontractor_worker", worker.id), []),
+            )
+        ]
+        targets = self._build_assignment_step_targets(target_shifts, groups_by_shift, demand_group_match)
+        if not targets:
+            return []
+        if isinstance(repository, _CachedAssignmentStepRepository):
+            order_summary = self._build_assignment_step_order_summary(shift_plan)
+            repository.prime_candidate_context(
+                tenant_id,
+                employee_ids=[row.id for row in filtered_employees],
+                worker_ids=[row.id for row in filtered_workers],
+                customer_id=order_summary.customer_id,
+                window_start=min(target.shift.starts_at for target in targets) - timedelta(hours=24),
+                window_end=max(target.shift.ends_at for target in targets) + timedelta(hours=11),
+                known_shifts=target_shifts,
+            )
+
+        summaries: list[tuple[str, str, object]] = []
         if include_employees:
-            for employee in repository.list_employees(tenant_id):
-                if not self._candidate_matches_common_filters(
-                    actor_kind="employee",
-                    actor=employee,
-                    team_id=team_id,
-                    employee_group_id=employee_group_id,
-                    search_term=search_term,
+            for employee in filtered_employees:
+                candidate = self._build_assignment_step_candidate_read(
+                    tenant_id,
+                    targets,
                     repository=repository,
-                ):
-                    continue
-                candidates.append(
-                    self._build_assignment_step_candidate_read(
-                        tenant_id,
-                        target_shifts,
-                        groups_by_shift,
-                        demand_group_match,
-                        repository=repository,
-                        employee=employee,
-                    )
+                    include_day_statuses=False,
+                    team_ids=team_ids_by_actor.get(("employee", employee.id), []),
+                    employee=employee,
                 )
+                summaries.append(("employee", employee.id, candidate))
         if include_workers:
-            for worker in repository.list_subcontractor_workers(tenant_id):
-                if not self._candidate_matches_common_filters(
-                    actor_kind="subcontractor_worker",
-                    actor=worker,
-                    team_id=team_id,
-                    employee_group_id=employee_group_id,
-                    search_term=search_term,
+            for worker in filtered_workers:
+                candidate = self._build_assignment_step_candidate_read(
+                    tenant_id,
+                    targets,
                     repository=repository,
-                ):
-                    continue
-                candidates.append(
-                    self._build_assignment_step_candidate_read(
-                        tenant_id,
-                        target_shifts,
-                        groups_by_shift,
-                        demand_group_match,
-                        repository=repository,
-                        worker=worker,
-                    )
+                    include_day_statuses=False,
+                    team_ids=team_ids_by_actor.get(("subcontractor_worker", worker.id), []),
+                    worker=worker,
                 )
-        # rerank candidates after request-scoped caches were applied during evaluation
-        return sorted(
-            candidates,
+                summaries.append(("subcontractor_worker", worker.id, candidate))
+        ranked = sorted(
+            [row for _, _, row in summaries],
             key=lambda row: (
                 -row.eligible_day_count,
                 -row.suitability_score,
@@ -1596,15 +1863,49 @@ class StaffingService:
                 row.personnel_ref.lower(),
             ),
         )
+        if candidate_offset:
+            ranked = ranked[candidate_offset:]
+        if candidate_limit is not None:
+            ranked = ranked[:candidate_limit]
+        if not include_day_statuses:
+            return ranked
+
+        employees_by_id = {row.id: row for row in filtered_employees}
+        workers_by_id = {row.id: row for row in filtered_workers}
+        return [
+            self._build_assignment_step_candidate_read(
+                tenant_id,
+                targets,
+                repository=repository,
+                include_day_statuses=True,
+                team_ids=candidate.team_ids,
+                employee=employees_by_id.get(candidate.actor_id) if candidate.actor_kind == "employee" else None,
+                worker=workers_by_id.get(candidate.actor_id) if candidate.actor_kind == "subcontractor_worker" else None,
+            )
+            for candidate in ranked
+        ]
+
+    def _build_assignment_step_targets(
+        self,
+        target_shifts: list[Shift],
+        groups_by_shift: dict[str, list[DemandGroup]],
+        demand_group_match: AssignmentStepDemandGroupMatch,
+    ) -> list[_AssignmentStepTarget]:
+        targets: list[_AssignmentStepTarget] = []
+        for shift in target_shifts:
+            matched_group = self._find_matching_demand_group_for_shift(shift, demand_group_match, groups_by_shift)
+            if matched_group is not None:
+                targets.append(_AssignmentStepTarget(shift=shift, demand_group=matched_group))
+        return targets
 
     def _build_assignment_step_candidate_read(
         self,
         tenant_id: str,
-        target_shifts: list[Shift],
-        groups_by_shift: dict[str, list[DemandGroup]],
-        demand_group_match: AssignmentStepDemandGroupMatch,
+        targets: list[_AssignmentStepTarget],
         *,
         repository: StaffingRepository,
+        include_day_statuses: bool,
+        team_ids: list[str],
         employee=None,  # noqa: ANN001
         worker=None,  # noqa: ANN001
     ) -> AssignmentStepCandidateRead:
@@ -1614,7 +1915,6 @@ class StaffingService:
         first_name = employee.first_name if employee is not None else worker.first_name
         last_name = employee.last_name if employee is not None else worker.last_name
         display_name = f"{first_name} {last_name}".strip()
-        team_ids = self._candidate_team_ids(tenant_id, actor_kind, actor_id, repository=repository)
         employee_group_ids = self._employee_group_ids(employee) if employee is not None else []
         day_statuses: list[AssignmentStepCandidateDayStatusRead] = []
         eligible_day_count = 0
@@ -1625,10 +1925,9 @@ class StaffingService:
         top_reason_counter: dict[str, int] = defaultdict(int)
         function_match_flag = False
         qualification_match_flag = False
-        for shift in target_shifts:
-            matched_group = self._find_matching_demand_group_for_shift(shift, demand_group_match, groups_by_shift)
-            if matched_group is None:
-                continue
+        for target in targets:
+            shift = target.shift
+            matched_group = target.demand_group
             candidate_payload = AssignmentCreate(
                 tenant_id=tenant_id,
                 shift_id=shift.id,
@@ -1654,18 +1953,19 @@ class StaffingService:
                 blocked_day_count += 1
                 if any(code in {"employee_absence", "employee_unavailable", "double_booking", "rest_period"} for code in reason_codes):
                     conflict_day_count += 1
-            day_statuses.append(
-                AssignmentStepCandidateDayStatusRead(
-                    shift_id=shift.id,
-                    demand_group_id=matched_group.id,
-                    occurrence_date=self._shift_occurrence_date(shift),
-                    eligible_flag=outcome["eligible_flag"],
-                    warning_flag=bool(warning_codes),
-                    reason_codes=reason_codes,
-                    warning_codes=warning_codes,
-                    validation_results=outcome["validation_results"],
+            if include_day_statuses:
+                day_statuses.append(
+                    AssignmentStepCandidateDayStatusRead(
+                        shift_id=shift.id,
+                        demand_group_id=matched_group.id,
+                        occurrence_date=self._shift_occurrence_date(shift),
+                        eligible_flag=outcome["eligible_flag"],
+                        warning_flag=bool(warning_codes),
+                        reason_codes=reason_codes,
+                        warning_codes=warning_codes,
+                        validation_results=outcome["validation_results"],
+                    )
                 )
-            )
         suitability_score = (eligible_day_count * 100) - (blocked_day_count * 20) - (conflict_day_count * 10) + (10 if qualification_match_flag else 0) + (5 if function_match_flag else 0)
         return AssignmentStepCandidateRead(
             actor_kind=actor_kind,
@@ -1754,6 +2054,7 @@ class StaffingService:
         employee_group_id: str | None,
         search_term: str,
         repository: StaffingRepository,
+        preloaded_team_ids: list[str] | None = None,
     ) -> bool:
         if search_term:
             haystack = " ".join(
@@ -1772,7 +2073,10 @@ class StaffingService:
         if actor_kind == "employee" and employee_group_id is not None:
             if employee_group_id not in self._employee_group_ids(actor):
                 return False
-        if team_id is not None and team_id not in self._candidate_team_ids(getattr(actor, "tenant_id", ""), actor_kind, actor.id, repository=repository):
+        candidate_team_ids = preloaded_team_ids
+        if candidate_team_ids is None:
+            candidate_team_ids = self._candidate_team_ids(getattr(actor, "tenant_id", ""), actor_kind, actor.id, repository=repository)
+        if team_id is not None and team_id not in candidate_team_ids:
             return False
         return True
 

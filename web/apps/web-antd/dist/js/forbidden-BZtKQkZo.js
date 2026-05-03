@@ -1,0 +1,1 @@
+import{r as e}from"./chunk-CrjmscNJ.js";import{Ir as t,Ln as n,kn as r,on as i,tr as a}from"../jse/index-index-CUYJbLaE.js";import{t as o}from"./fallback-_XZxkfNA.js";var s=n(i(i({},{name:`Fallback403Demo`}),{},{__name:`forbidden`,setup(e){return(e,n)=>(a(),r(t(o),{status:`403`}))}})),c=e({default:()=>l}),l=s;export{c as n,l as t};

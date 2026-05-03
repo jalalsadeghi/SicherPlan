@@ -1,0 +1,1 @@
+import{Ar as e,Qn as t}from"../jse/index-index-CUYJbLaE.js";import{n}from"./styleChecker-DOcnXLJ7.js";var r=(()=>{let r=e(!1);return t(()=>{r.value=n()}),r});export{r as t};
