@@ -346,6 +346,7 @@ export interface AssignmentStepCandidateDayStatusRead {
 export interface AssignmentStepCandidateRead {
   actor_kind: string;
   actor_id: string;
+  avatar_url?: null | string;
   personnel_ref: string;
   first_name: string;
   last_name: string;
@@ -373,6 +374,8 @@ export interface AssignmentStepSnapshotRead {
   demand_group_summary_count: number;
   editable_flag: boolean;
   lock_reason_codes: string[];
+  default_demand_group_signature?: null | string;
+  candidates_included?: boolean;
   demand_group_summaries: AssignmentStepDemandGroupSummaryRead[];
   day_summaries: AssignmentStepDaySummaryRead[];
   calendar_cells: AssignmentStepCellRead[];

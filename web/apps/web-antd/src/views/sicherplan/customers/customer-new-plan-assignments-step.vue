@@ -22,7 +22,6 @@ import {
   type AssignmentStepCellRead,
   type AssignmentStepDemandGroupMatch,
   type AssignmentStepDemandGroupSummaryRead,
-  type AssignmentStepDaySummaryRead,
   type AssignmentStepSnapshotRead,
   type TeamRead,
 } from '#/sicherplan-legacy/api/planningStaffing';
@@ -39,6 +38,13 @@ interface CalendarDayCell {
   dateKey: string;
   inCurrentMonth: boolean;
 }
+
+type CalendarDayKind =
+  | 'outside_project_range'
+  | 'no_shift_day'
+  | 'open_uncovered_day'
+  | 'warning_day'
+  | 'covered_day';
 
 interface DayAggregate {
   assignedCount: number;
@@ -93,6 +99,7 @@ const snapshotReloadSequence = ref(0);
 const candidateReloadSequence = ref(0);
 const snapshotRequestInFlight = new Map<string, Promise<AssignmentStepSnapshotRead>>();
 const candidateRequestInFlight = new Map<string, Promise<Awaited<ReturnType<typeof listAssignmentStepCandidates>>>>();
+const candidateAvatarFailures = ref(new Set<string>());
 let searchReloadTimer: ReturnType<typeof setTimeout> | null = null;
 
 const filters = reactive<{
@@ -216,6 +223,15 @@ const currentMonthValue = computed(() => activeMonth.value || snapshot.value?.sh
 const projectStart = computed(() => snapshot.value?.shift_plan.project_start ?? '');
 const projectEnd = computed(() => snapshot.value?.shift_plan.project_end ?? '');
 const activeMonths = computed(() => snapshot.value?.shift_plan.active_months ?? []);
+const weekdayLabels = computed(() => [
+  $t('sicherplan.customerPlansWizard.assignments.weekdayMon'),
+  $t('sicherplan.customerPlansWizard.assignments.weekdayTue'),
+  $t('sicherplan.customerPlansWizard.assignments.weekdayWed'),
+  $t('sicherplan.customerPlansWizard.assignments.weekdayThu'),
+  $t('sicherplan.customerPlansWizard.assignments.weekdayFri'),
+  $t('sicherplan.customerPlansWizard.assignments.weekdaySat'),
+  $t('sicherplan.customerPlansWizard.assignments.weekdaySun'),
+]);
 const monthIndex = computed(() => activeMonths.value.indexOf(currentMonthValue.value));
 const hasPreviousMonth = computed(() => monthIndex.value > 0);
 const hasNextMonth = computed(() => monthIndex.value >= 0 && monthIndex.value < activeMonths.value.length - 1);
@@ -267,14 +283,6 @@ const candidateStatusByDate = computed(() => {
     dayStatus.reason_codes.forEach((code) => entry.reasons.add(code));
     dayStatus.warning_codes.forEach((code) => entry.warnings.add(code));
     map.set(key, entry);
-  }
-  return map;
-});
-
-const daySummaryByDate = computed(() => {
-  const map = new Map<string, AssignmentStepDaySummaryRead>();
-  for (const row of snapshot.value?.day_summaries ?? []) {
-    map.set(row.occurrence_date, row);
   }
   return map;
 });
@@ -345,14 +353,17 @@ const demandGroupEmpty = computed(() => snapshot.value && snapshot.value.generat
 const noGeneratedShifts = computed(() => snapshot.value?.generated_shift_count === 0);
 const noCandidates = computed(() => !snapshotBusy.value && !!selectedDemandGroupSummary.value && !candidates.value.length);
 
-function resolveCoverageTone(state: string) {
-  if (state === 'green') {
+function resolveCoverageTone(dayKind: CalendarDayKind) {
+  if (dayKind === 'covered_day') {
     return 'good';
   }
-  if (state === 'yellow') {
+  if (dayKind === 'warning_day') {
     return 'warn';
   }
-  return 'bad';
+  if (dayKind === 'open_uncovered_day') {
+    return 'bad';
+  }
+  return 'neutral';
 }
 
 function resolveWorseCoverageState(current: string, next: string) {
@@ -402,6 +413,33 @@ function resolveActorKindLabel(actorKind: string) {
   return actorKind === 'subcontractor_worker'
     ? $t('sicherplan.customerPlansWizard.assignments.actorSubcontractor')
     : $t('sicherplan.customerPlansWizard.assignments.actorEmployee');
+}
+
+function resolveCandidateFitTone(candidate: AssignmentStepCandidateRead) {
+  if (candidate.eligible_day_count <= 0) {
+    return 'blocked';
+  }
+  if (candidate.blocked_day_count > 0) {
+    return 'limited';
+  }
+  if (candidate.warning_day_count > 0) {
+    return 'good';
+  }
+  return 'best';
+}
+
+function resolveCandidateFitLabel(candidate: AssignmentStepCandidateRead) {
+  const fitTone = resolveCandidateFitTone(candidate);
+  if (fitTone === 'blocked') {
+    return $t('sicherplan.customerPlansWizard.assignments.fitBlocked');
+  }
+  if (fitTone === 'limited') {
+    return $t('sicherplan.customerPlansWizard.assignments.fitLimited');
+  }
+  if (fitTone === 'good') {
+    return $t('sicherplan.customerPlansWizard.assignments.fitGood');
+  }
+  return $t('sicherplan.customerPlansWizard.assignments.fitBest');
 }
 
 function isDateWithinProjectRange(date: Date) {
@@ -505,7 +543,8 @@ async function loadSnapshot(options: { preserveSummaryMessage?: boolean } = {}) 
     }
     let nextSelection = selectedDemandGroupSignature.value;
     if (!nextSelection && nextSnapshot.demand_group_summaries.length) {
-      nextSelection = nextSnapshot.demand_group_summaries[0]!.signature_key;
+      nextSelection = nextSnapshot.default_demand_group_signature
+        ?? nextSnapshot.demand_group_summaries[0]!.signature_key;
     } else if (
       selectedDemandGroupSignature.value &&
       !nextSnapshot.demand_group_summaries.some((row) => row.signature_key === selectedDemandGroupSignature.value)
@@ -517,11 +556,11 @@ async function loadSnapshot(options: { preserveSummaryMessage?: boolean } = {}) 
     }
     selectedDemandGroupSignature.value = nextSelection;
     snapshot.value = nextSnapshot;
-    if (requestedWithDemandGroup && nextSnapshot.candidates.length) {
+    if (requestedWithDemandGroup && nextSnapshot.candidates_included) {
       candidates.value = nextSnapshot.candidates;
     } else if (!nextSelection) {
       candidates.value = [];
-    } else if (!requestedWithDemandGroup && nextSnapshot.candidates.length) {
+    } else if (!requestedWithDemandGroup && nextSnapshot.candidates_included) {
       candidates.value = nextSnapshot.candidates;
     } else {
       await reloadCandidates({ preserveSummaryMessage: true });
@@ -622,7 +661,6 @@ function buildAssignmentPayload(candidate: AssignmentStepCandidateRead): Assignm
     stop_on_first_rejection: false,
     subcontractor_worker_id: candidate.actor_kind === 'subcontractor_worker' ? candidate.actor_id : null,
     target_shift_ids: eligibleTargetShiftIds,
-    team_id: filters.team_id || null,
     tenant_id: props.tenantId,
   };
 }
@@ -731,9 +769,34 @@ function resolveCandidateInitials(candidate: AssignmentStepCandidateRead) {
     .slice(0, 2);
 }
 
+function candidateHasAvatar(candidate: AssignmentStepCandidateRead & { avatar_url?: null | string }) {
+  return Boolean(candidate.avatar_url) && !candidateAvatarFailures.value.has(candidate.actor_id);
+}
+
+function handleCandidateAvatarError(actorId: string) {
+  const next = new Set(candidateAvatarFailures.value);
+  next.add(actorId);
+  candidateAvatarFailures.value = next;
+}
+
+function resolveCandidateTooltip(candidate: AssignmentStepCandidateRead) {
+  const details = [
+    resolveActorKindLabel(candidate.actor_kind),
+    resolveTeamLabels(candidate)[0] || '',
+    resolveEmployeeGroupLabels(candidate)[0] || '',
+    $t('sicherplan.customerPlansWizard.assignments.eligibleDays', { count: candidate.eligible_day_count } as never),
+    $t('sicherplan.customerPlansWizard.assignments.blockedDays', { count: candidate.blocked_day_count } as never),
+  ].filter(Boolean);
+  return details.join(' · ');
+}
+
 function resolveDayTitle(day: CalendarDayCell) {
-  if (!day.active) {
+  const dayKind = resolveCalendarDayKind(day);
+  if (dayKind === 'outside_project_range') {
     return $t('sicherplan.customerPlansWizard.assignments.outsideProjectRange');
+  }
+  if (dayKind === 'no_shift_day') {
+    return $t('sicherplan.customerPlansWizard.assignments.noShiftDay');
   }
   const candidateStatus = candidateStatusByDate.value.get(day.dateKey);
   if (candidateStatus) {
@@ -750,12 +813,21 @@ function resolveDayAggregate(dayKey: string) {
   return cellAggregateByDate.value.get(dayKey) ?? null;
 }
 
-function resolveDayState(dayKey: string) {
-  const cellAggregate = resolveDayAggregate(dayKey);
-  if (cellAggregate) {
-    return cellAggregate.state;
+function resolveCalendarDayKind(day: CalendarDayCell): CalendarDayKind {
+  if (!day.active) {
+    return 'outside_project_range';
   }
-  return daySummaryByDate.value.get(dayKey)?.overall_state ?? 'setup_required';
+  const cellAggregate = resolveDayAggregate(day.dateKey);
+  if (cellAggregate) {
+    if (cellAggregate.state === 'green') {
+      return 'covered_day';
+    }
+    if (cellAggregate.state === 'yellow') {
+      return 'warning_day';
+    }
+    return 'open_uncovered_day';
+  }
+  return 'no_shift_day';
 }
 
 function resolveCandidateDayState(dayKey: string) {
@@ -1042,34 +1114,41 @@ defineExpose({
               { 'sp-customer-plan-assignments__candidate--selected': selectedCandidateId === candidate.actor_id },
             ]"
             :data-testid="`customer-new-plan-assignments-candidate-${candidate.actor_id}`"
+            :title="resolveCandidateTooltip(candidate)"
             draggable="true"
             @click="selectCandidate(candidate)"
             @dragend="handleCandidateDragEnd"
             @dragstart="handleCandidateDragStart(candidate)"
           >
-            <div class="sp-customer-plan-assignments__candidate-avatar">{{ resolveCandidateInitials(candidate) }}</div>
+            <div class="sp-customer-plan-assignments__candidate-avatar">
+              <img
+                v-if="candidateHasAvatar(candidate)"
+                :src="candidate.avatar_url || undefined"
+                :alt="candidate.display_name"
+                class="sp-customer-plan-assignments__candidate-avatar-image"
+                :data-testid="`customer-new-plan-assignments-candidate-avatar-${candidate.actor_id}`"
+                @error="handleCandidateAvatarError(candidate.actor_id)"
+              />
+              <span v-else>{{ resolveCandidateInitials(candidate) }}</span>
+            </div>
             <div class="sp-customer-plan-assignments__candidate-body">
               <header class="sp-customer-plan-assignments__candidate-header">
-                <strong>{{ candidate.display_name }}</strong>
-                <span class="sp-customer-plan-assignments__candidate-score">{{ candidate.suitability_score }}</span>
+                <div class="sp-customer-plan-assignments__candidate-identity">
+                  <strong>{{ candidate.display_name }}</strong>
+                  <p v-if="candidate.personnel_ref" class="sp-customer-plan-assignments__candidate-subline">
+                    {{ candidate.personnel_ref }}
+                  </p>
+                </div>
+                <span
+                  class="sp-customer-plan-assignments__candidate-fit"
+                  :data-tone="resolveCandidateFitTone(candidate)"
+                >
+                  {{ resolveCandidateFitLabel(candidate) }}
+                </span>
               </header>
-              <p class="field-help">{{ candidate.personnel_ref }}</p>
-              <div class="sp-customer-plan-assignments__candidate-tags">
-                <span class="sp-customer-plan-assignments__tag">{{ resolveActorKindLabel(candidate.actor_kind) }}</span>
-                <span v-if="resolveTeamLabels(candidate)[0]" class="sp-customer-plan-assignments__tag">
-                  {{ resolveTeamLabels(candidate)[0] }}
-                </span>
-                <span v-if="resolveEmployeeGroupLabels(candidate)[0]" class="sp-customer-plan-assignments__tag">
-                  {{ resolveEmployeeGroupLabels(candidate)[0] }}
-                </span>
-              </div>
-              <div class="sp-customer-plan-assignments__candidate-stats">
-                <span>{{ $t('sicherplan.customerPlansWizard.assignments.eligibleDays', { count: candidate.eligible_day_count } as never) }}</span>
-                <span>{{ $t('sicherplan.customerPlansWizard.assignments.blockedDays', { count: candidate.blocked_day_count } as never) }}</span>
-              </div>
               <button
                 type="button"
-                class="cta-button cta-secondary"
+                class="cta-button cta-secondary sp-customer-plan-assignments__candidate-assign"
                 :disabled="assignmentRunning || !assignmentStepEditable"
                 :data-testid="`customer-new-plan-assignments-assign-${candidate.actor_id}`"
                 @click.stop="applyForCandidate(candidate)"
@@ -1127,6 +1206,9 @@ defineExpose({
         </header>
 
         <div class="sp-customer-plan-assignments__legend">
+          <span class="sp-customer-plan-assignments__legend-chip sp-customer-plan-assignments__legend-chip--grey">
+            {{ $t('sicherplan.customerPlansWizard.assignments.legendNoShift') }}
+          </span>
           <span class="sp-customer-plan-assignments__legend-chip sp-customer-plan-assignments__legend-chip--green">
             {{ $t('sicherplan.customerPlansWizard.assignments.legendCovered') }}
           </span>
@@ -1139,7 +1221,7 @@ defineExpose({
         </div>
 
         <div class="sp-customer-plan-assignments__weekday-row">
-          <span v-for="weekday in ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']" :key="weekday">{{ weekday }}</span>
+          <span v-for="weekday in weekdayLabels" :key="weekday">{{ weekday }}</span>
         </div>
         <div class="sp-customer-plan-assignments__calendar-grid">
           <article
@@ -1147,7 +1229,7 @@ defineExpose({
             :key="day.dateKey"
             :class="[
               'sp-customer-plan-assignments__day',
-              `sp-customer-plan-assignments__day--${resolveCoverageTone(resolveDayState(day.dateKey))}`,
+              `sp-customer-plan-assignments__day--${resolveCoverageTone(resolveCalendarDayKind(day))}`,
               {
                 'sp-customer-plan-assignments__day--inactive': !day.active,
                 'sp-customer-plan-assignments__day--outside': !day.inCurrentMonth,
@@ -1169,8 +1251,11 @@ defineExpose({
               <span v-if="resolveDayAggregate(day.dateKey)">
                 {{ resolveDayAggregate(day.dateKey)?.assignedCount }}/{{ resolveDayAggregate(day.dateKey)?.targetCount }}
               </span>
-              <span v-else-if="daySummaryByDate.get(day.dateKey)">
-                {{ daySummaryByDate.get(day.dateKey)?.total_shifts }}
+              <span
+                v-else-if="resolveCalendarDayKind(day) === 'no_shift_day'"
+                class="sp-customer-plan-assignments__day-empty"
+              >
+                {{ $t('sicherplan.customerPlansWizard.assignments.noShiftDay') }}
               </span>
               <span
                 v-if="resolveCandidateDayState(day.dateKey) === 'blocked'"
@@ -1350,9 +1435,10 @@ defineExpose({
 
 .sp-customer-plan-assignments__candidate {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.625rem;
   grid-template-columns: auto minmax(0, 1fr);
-  padding: 0.875rem;
+  align-items: center;
+  padding: 0.75rem;
   border: 1px solid #d7deea;
   border-radius: 8px;
   background: #f8fafc;
@@ -1373,38 +1459,77 @@ defineExpose({
   background: rgba(40, 170, 170, 0.14);
   color: rgb(26, 102, 102);
   font-weight: 700;
+  overflow: hidden;
 }
 
-.sp-customer-plan-assignments__candidate-body,
-.sp-customer-plan-assignments__candidate-header,
-.sp-customer-plan-assignments__candidate-stats,
-.sp-customer-plan-assignments__candidate-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+.sp-customer-plan-assignments__candidate-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .sp-customer-plan-assignments__candidate-body {
-  flex-direction: column;
+  display: grid;
+  gap: 0.5rem;
 }
 
 .sp-customer-plan-assignments__candidate-header {
+  display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
 }
 
-.sp-customer-plan-assignments__candidate-score {
-  font-size: 0.8125rem;
+.sp-customer-plan-assignments__candidate-identity {
+  min-width: 0;
+}
+
+.sp-customer-plan-assignments__candidate-identity strong {
+  display: block;
+  line-height: 1.3;
+}
+
+.sp-customer-plan-assignments__candidate-subline {
+  margin: 0.15rem 0 0;
   color: #516074;
+  font-size: 0.8125rem;
 }
 
-.sp-customer-plan-assignments__tag {
+.sp-customer-plan-assignments__candidate-fit {
   display: inline-flex;
   align-items: center;
-  padding: 0.2rem 0.45rem;
+  flex-shrink: 0;
   border-radius: 999px;
-  background: #edf2f7;
+  padding: 0.2rem 0.45rem;
   font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sp-customer-plan-assignments__candidate-fit[data-tone='best'] {
+  background: rgba(46, 160, 67, 0.12);
+  color: #1f6b31;
+}
+
+.sp-customer-plan-assignments__candidate-fit[data-tone='good'] {
+  background: rgba(40, 170, 170, 0.14);
+  color: rgb(26, 102, 102);
+}
+
+.sp-customer-plan-assignments__candidate-fit[data-tone='limited'] {
+  background: rgba(251, 188, 5, 0.16);
+  color: #8a6200;
+}
+
+.sp-customer-plan-assignments__candidate-fit[data-tone='blocked'] {
+  background: rgba(217, 48, 37, 0.12);
+  color: #a5281c;
+}
+
+.sp-customer-plan-assignments__candidate-assign {
+  justify-self: flex-start;
+  min-height: 2rem;
+  padding: 0.35rem 0.65rem;
 }
 
 .sp-customer-plan-assignments__calendar {
@@ -1442,6 +1567,11 @@ defineExpose({
 .sp-customer-plan-assignments__legend-chip--green,
 .sp-customer-plan-assignments__day--good {
   background: rgba(46, 160, 67, 0.12);
+}
+
+.sp-customer-plan-assignments__legend-chip--grey,
+.sp-customer-plan-assignments__day--neutral {
+  background: #eef2f6;
 }
 
 .sp-customer-plan-assignments__legend-chip--yellow,
@@ -1509,6 +1639,11 @@ defineExpose({
   font-size: 0.8125rem;
 }
 
+.sp-customer-plan-assignments__day-empty {
+  color: #516074;
+  font-size: 0.75rem;
+}
+
 .sp-customer-plan-assignments__day-indicator--eligible {
   background: rgba(46, 160, 67, 0.14);
 }
@@ -1559,6 +1694,11 @@ defineExpose({
   .sp-customer-plan-assignments__filters,
   .sp-customer-plan-assignments__summary-cards {
     grid-template-columns: 1fr;
+  }
+
+  .sp-customer-plan-assignments__candidate-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

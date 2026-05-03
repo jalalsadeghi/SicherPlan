@@ -91,6 +91,8 @@ function buildSnapshot(overrides: Record<string, unknown> = {}) {
     demand_group_summary_count: 1,
     editable_flag: true,
     lock_reason_codes: [],
+    default_demand_group_signature: 'dg-1',
+    candidates_included: true,
     demand_group_summaries: [
       {
         signature_key: 'dg-1',
@@ -173,6 +175,7 @@ function buildSnapshot(overrides: Record<string, unknown> = {}) {
       {
         actor_kind: 'employee',
         actor_id: 'employee-1',
+        avatar_url: null,
         personnel_ref: 'E-100',
         first_name: 'Eva',
         last_name: 'Meyer',
@@ -261,8 +264,34 @@ describe('CustomerNewPlanAssignmentsStep', () => {
     expect(staffingMocks.listAssignmentStepCandidatesMock).not.toHaveBeenCalled();
   });
 
+  it('renders project-range no-shift days as neutral instead of blocked', async () => {
+    staffingMocks.getAssignmentStepSnapshotMock.mockResolvedValueOnce(buildSnapshot());
+
+    const wrapper = await mountStep();
+    const day = wrapper.get('[data-testid="customer-new-plan-assignments-day-2026-06-07"]');
+
+    expect(day.classes()).toContain('sp-customer-plan-assignments__day--neutral');
+    expect(day.classes()).not.toContain('sp-customer-plan-assignments__day--bad');
+    expect(day.text()).toContain('sicherplan.customerPlansWizard.assignments.noShiftDay');
+  });
+
+  it('keeps uncovered shift days red and outside-project days disabled grey', async () => {
+    staffingMocks.getAssignmentStepSnapshotMock.mockResolvedValueOnce(buildSnapshot());
+
+    const wrapper = await mountStep();
+    const uncoveredDay = wrapper.get('[data-testid="customer-new-plan-assignments-day-2026-06-02"]');
+    const outsideDay = wrapper.get('[data-testid="customer-new-plan-assignments-day-2026-07-01"]');
+
+    expect(uncoveredDay.classes()).toContain('sp-customer-plan-assignments__day--bad');
+    expect(outsideDay.classes()).toContain('sp-customer-plan-assignments__day--neutral');
+    expect(outsideDay.classes()).toContain('sp-customer-plan-assignments__day--inactive');
+  });
+
   it('loads candidates once after the first snapshot when the backend does not include them yet', async () => {
-    staffingMocks.getAssignmentStepSnapshotMock.mockResolvedValueOnce(buildSnapshot({ candidates: [] }));
+    staffingMocks.getAssignmentStepSnapshotMock.mockResolvedValueOnce(buildSnapshot({
+      candidates: [],
+      candidates_included: false,
+    }));
     staffingMocks.listAssignmentStepCandidatesMock.mockResolvedValueOnce({
       tenant_id: 'tenant-1',
       shift_plan_id: 'plan-1',
@@ -302,6 +331,43 @@ describe('CustomerNewPlanAssignmentsStep', () => {
         team_id: 'team-1',
       }),
     );
+  });
+
+  it('renders compact candidate cards without raw suitability scores', async () => {
+    staffingMocks.getAssignmentStepSnapshotMock.mockResolvedValueOnce(buildSnapshot());
+
+    const wrapper = await mountStep();
+    const card = wrapper.get('[data-testid="customer-new-plan-assignments-candidate-employee-1"]');
+
+    expect(card.text()).toContain('Eva Meyer');
+    expect(card.text()).toContain('E-100');
+    expect(card.text()).not.toContain('88');
+    expect(wrapper.find('.sp-customer-plan-assignments__candidate-score').exists()).toBe(false);
+    expect(wrapper.find('.sp-customer-plan-assignments__candidate-tags').exists()).toBe(false);
+    expect(wrapper.find('.sp-customer-plan-assignments__candidate-stats').exists()).toBe(false);
+    expect(card.text()).toContain('sicherplan.customerPlansWizard.assignments.fitLimited');
+  });
+
+  it('renders a candidate avatar image when the DTO provides one and falls back to initials otherwise', async () => {
+    staffingMocks.getAssignmentStepSnapshotMock.mockResolvedValueOnce(buildSnapshot({
+      candidates: [
+        {
+          ...buildSnapshot().candidates[0],
+          actor_id: 'employee-2',
+          avatar_url: 'https://example.invalid/avatar.png',
+          display_name: 'Mia Kern',
+          first_name: 'Mia',
+          last_name: 'Kern',
+          personnel_ref: 'E-200',
+        },
+        buildSnapshot().candidates[0],
+      ],
+    }));
+
+    const wrapper = await mountStep();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-assignments-candidate-avatar-employee-2"]').attributes('src')).toBe('https://example.invalid/avatar.png');
+    expect(wrapper.get('[data-testid="customer-new-plan-assignments-candidate-employee-1"]').text()).toContain('EM');
   });
 
   it('switches demand-group context without reloading the full snapshot', async () => {

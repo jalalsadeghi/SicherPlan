@@ -1,0 +1,1 @@
+import{Ir as e,Ln as t,kn as n,on as r,tr as i}from"../jse/index-index-CvtHTmwz.js";import{t as a}from"./fallback-CiRbvk0u.js";var o=t(r(r({},{name:`FallbackOfflineDemo`}),{},{__name:`offline`,setup(t){return(t,r)=>(i(),n(e(a),{status:`offline`}))}}));export{o as default};
