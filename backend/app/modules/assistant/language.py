@@ -45,6 +45,26 @@ _ENGLISH_HINTS = {
     "stored",
 }
 
+_TECHNICAL_UI_LOCALE_ENGLISH_TERMS = _ENGLISH_HINTS | {
+    "api",
+    "app",
+    "assignment",
+    "catalog",
+    "customer",
+    "customers",
+    "dispatch",
+    "login",
+    "password",
+    "planning",
+    "portal",
+    "registry",
+    "route",
+    "sdk",
+    "staffing",
+    "status",
+    "tool",
+}
+
 _PERSIAN_RESPONSE = (
     "پیام شما ذخیره شد و ساختار پاسخ Assistant فعال است. "
     "موتور کامل پاسخ‌دهی در تسک‌های بعدی متصل می‌شود."
@@ -110,6 +130,9 @@ def detect_message_language(text: str, ui_locale: str | None = None) -> str:
     cleaned = text.strip()
     if not cleaned:
         return choose_response_language("unknown", ui_locale)
+    normalized_ui = normalize_language_code(ui_locale)
+    latin_words = _LATIN_WORD_RE.findall(cleaned)
+    normalized_latin_words = {word.lower() for word in latin_words}
 
     persian_chars = len(_PERSIAN_CHAR_RE.findall(cleaned))
     persian_word_hits = sum(1 for word in _PERSIAN_WORDS if word in cleaned)
@@ -120,10 +143,16 @@ def detect_message_language(text: str, ui_locale: str | None = None) -> str:
     german_score = 0
     if any(char in lower_text for char in ("ä", "ö", "ü", "ß")):
         german_score += 3
-    german_score += sum(1 for word in _GERMAN_WORDS if word in lower_text)
+    german_score += sum(1 for word in _GERMAN_WORDS if word in normalized_latin_words)
 
-    english_score = sum(1 for word in _ENGLISH_HINTS if word in lower_text)
-    latin_words = _LATIN_WORD_RE.findall(cleaned)
+    english_score = sum(1 for word in _ENGLISH_HINTS if word in normalized_latin_words)
+    if (
+        normalized_ui in {"fa", "de"}
+        and normalized_latin_words
+        and len(normalized_latin_words) <= 6
+        and normalized_latin_words.issubset(_TECHNICAL_UI_LOCALE_ENGLISH_TERMS)
+    ):
+        return normalized_ui
     if german_score > english_score and german_score > 0:
         return "de"
     if latin_words:

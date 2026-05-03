@@ -3,188 +3,119 @@ You are working in the SicherPlan repository.
 Repository:
 https://github.com/jalalsadeghi/SicherPlan
 
-Investigate and fix the GitHub Actions failure:
-https://github.com/jalalsadeghi/SicherPlan/actions/runs/25260687651/job/74067348307
+You must investigate and design a new 8th step for the customer order workspace wizard:
+`Assignments`
 
-Current failing job:
-Build Backend Stage Image
+Context:
+- The customer detail page at `admin/customers?customer_id=...` has an order workspace wizard used to create/edit orders.
+- The wizard currently has 7 steps:
+  1. Order details
+  2. Order scope & documents
+  3. Planning record
+  4. Planning documents
+  5. Shift plan
+  6. Series & exceptions
+  7. Demand groups
+- A new step must be added after `Demand groups`:
+  8. Assignments
+- This new step should be inspired by the existing staffing logic in `admin/planning-staffing`, but it is not a copy-paste of that page.
+- The goal is to let the user prepare staffing assignments for the generated shifts of the order in a much more user-friendly, calendar-first workflow.
 
-Current failing step:
-Verify committed field/lookup corpus artifact is current
+High-level UX target:
+- Left side: a narrow, scrollable candidate list of workers.
+- Right side: a calendar grid that covers the project execution dates.
+- Users should be able to assign a candidate very easily, ideally via drag-and-drop from the left list into the calendar area.
+- The left list must show only suitable candidates for the currently selected demand-group context and other active filters.
+- The calendar must visually communicate daily staffing state using the same business meaning as `Total shifts`, `Fully covered`, `Warning state`, and `Blocked` from `admin/planning-staffing`.
 
-Observed CI behavior:
-The workflow installs backend dependencies successfully and imports `field_dictionary_export` successfully.
+Your first task is investigation and solution design only. Do not immediately implement before validating the architecture and dependencies.
 
-The failing workflow step runs the field/lookup corpus exporter twice and then compares:
-1. generated tmp1 vs generated tmp2
-2. committed `backend/app/modules/assistant/generated/field_lookup_corpus.json` vs generated tmp1
+You must inspect at least these areas:
+- Existing order workspace / customer order wizard UI and step infrastructure.
+- Existing demand-groups step implementation.
+- Existing staffing-coverage / planning-staffing screens, APIs, models, and assignment logic.
+- Existing concepts for:
+  - demand groups
+  - staffing actions / assignments
+  - actor kind
+  - workforce scope
+  - employee qualifications / function types
+  - availability / leave / absences
+  - partner releases / subcontractor handling
+  - project execution date ranges
+  - editability / locking rules after later workflow steps
+- Existing API contracts and DTOs related to planning staffing and assignments.
+- Existing localization keys and reusable UI components.
 
-The two generated files appear deterministic because CI does not fail on the tmp1/tmp2 comparison. The failure happens when CI compares the committed artifact against the freshly generated artifact.
+Business requirements for the new Assignments step:
+1. Add a new wizard step `Assignments` after `Demand groups`.
+2. The step works on generated shifts that belong to the current order / selected shift plan / selected series scope.
+3. Left candidate rail:
+   - narrow width
+   - vertically scrollable
+   - each row shows at least profile/avatar, personnel number, first name + last name
+   - may also show badges such as actor kind, team/group, qualification match, availability quality, and suitability score if helpful
+4. Candidate filtering and ranking logic:
+   - candidates must be filtered by suitability for the selected demand group
+   - they must satisfy required qualifications / permissions / function-type compatibility
+   - they must respect actor kind and workforce scope
+   - if a user selects a group/team filter, only candidates in that group/team should be shown
+   - ranking must prefer workers who can cover more of the project’s required dates
+   - ranking must also consider other relevant priorities from project logic, such as fewer conflicts, better qualification fit, availability, and similar factors you find in the codebase
+5. Right calendar area:
+   - default visible month = project start month
+   - previous/next month navigation
+   - only the dates inside the project execution window are active; all other dates are visually disabled
+   - days must be color-coded based on staffing state derived from the same semantics as planning-staffing summary states
+   - calendar cells should present assignment-related information in a compact and elegant way
+6. Assignment interaction:
+   - the user can drag a candidate onto the calendar / day cells to create assignments for eligible days
+   - the system should only place the candidate on days where they are eligible and available
+   - days where the worker is on leave, unavailable, already booked on conflicting work, or otherwise ineligible must not accept the drop, or must clearly block it
+   - this should be as simple and user-friendly as possible
+7. Because the user described only the core idea, you must identify missing details and propose the most standard, scalable, and beautiful solution.
+8. The design must be consistent with the project’s existing patterns, not a disconnected one-off screen.
 
-CI output summary:
-- field_count=219
-- lookup_count=10
-- term_count=519
-- field_counts_by_module={'planning': 38, 'customers': 106, 'platform_services': 6, 'employees': 69}
-- lookup_counts_by_module={'customers': 6, 'planning': 4}
-- term_counts_by_module={'planning': 282, 'unknown': 237}
-- warnings=['fa_locale_missing']
+You must produce a discovery report before implementation covering:
+A. Current relevant files/modules/components/routes/apis.
+B. Reusable existing backend logic and frontend components that should be leveraged.
+C. Gaps that require new backend endpoints / DTOs / services.
+D. Gaps that require new frontend components / composables / stores.
+E. Recommended UX structure for the Assignments step.
+F. Recommended data model / API contract for candidate list, calendar summary, and drag-drop assignment mutations.
+G. Suggested editability/locking rules for the new step relative to previous steps.
+H. Suggested validations, conflict handling, and empty states.
+I. Suggested test plan.
+J. Whether implementation should be split into multiple tasks/commits.
 
-Visible diff examples:
-- New source references for `DemandGroupBulkUpdateRequest.date_from`
-- New source references for `DemandGroupBulkUpdateRequest.date_to`
-- New source references for `DemandGroupBulkUpdateItemResult.demand_group_id`
-- New source references for `DemandGroupBulkUpdateMatch.function_type_id`
-- New source references for `DemandGroupBulkUpdatePatch.function_type_id`
-- New source references for `DemandGroupBulkUpdateMatch.qualification_type_id`
-- New source references for `DemandGroupBulkUpdatePatch.qualification_type_id`
-- New source references for `DemandGroupBulkUpdateMatch.sort_order`
-- New source references for `DemandGroupBulkUpdatePatch.sort_order`
-- New source references for `DemandGroupBulkUpdatePatch.status`
-- Changed source hashes:
-  - `backend_schema_fields`
-  - `locale_labels`
-  - `typescript_interfaces`
-- New localized UI terms related to demand-group aggregate/per-shift editing:
-  - `Edit applied demand group`
-  - `Angewendete Bedarfsgruppe bearbeiten`
-  - `Edit demand group by shift`
-  - `Bedarfsgruppe je Schicht bearbeiten`
-  - `Applied demand groups`
-  - `Angewendete Bedarfsgruppen`
-  - `Pending templates`
-  - `Ausstehende Vorlagen`
-  - `Editing is blocked for at least one applied shift row.`
-  - `Die Bearbeitung ist für mindestens eine angewendete Schichtzeile gesperrt.`
+Important design expectations:
+- Prefer reuse of existing staffing domain logic rather than inventing a second staffing system.
+- Reuse existing summary semantics and assignment concepts from `admin/planning-staffing` whenever reasonable.
+- Keep the UI compact and professional.
+- Make the calendar understandable at a glance.
+- Make candidate suitability explainable.
+- Avoid heavy or fragile interactions if the codebase already has a simpler robust pattern.
+- If direct drag-and-drop should be complemented by click-based assignment for accessibility or reliability, propose that too.
 
-Likely root cause:
-Recent changes added demand-group bulk-update interfaces and new localized labels for the demand-group aggregate/per-shift edit UI, but the committed generated artifact was not regenerated and committed.
-
-This is most likely a stale generated artifact, not:
-- a Docker build failure
-- a Python dependency failure
-- a nondeterministic exporter failure
-- a backend runtime failure
-
-Important:
-Do not remove the CI check.
-Do not make CI ignore the artifact diff.
-Do not hardcode only the visible diff lines.
-Do not alter Docker deployment logic.
-Do not change unrelated business logic.
-Treat `fa_locale_missing` as a warning unless you prove it is the cause of this job failure.
-
-Files to inspect:
-- `.github/workflows/stage-deploy.yml`
-- `backend/app/modules/assistant/field_dictionary.py`
-- `backend/app/modules/assistant/field_dictionary_export.py`
-- `backend/app/modules/assistant/generated/field_lookup_corpus.json`
-- `backend/tests/modules/assistant/test_field_lookup_source_hashes_stable.py`
-- `docs/assistant/stage-field-dictionary-verification.md`
-- `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
-- `web/apps/web-antd/src/views/sicherplan/customers/new-plan-step-content.vue`
-- `web/apps/web-antd/src/locales/langs/de-DE/sicherplan.json`
-- `web/apps/web-antd/src/locales/langs/en-US/sicherplan.json`
-
-Task:
-1. Reproduce the CI check locally from the `backend/` directory.
-2. Confirm whether the exporter is deterministic:
-   ```bash
-   cd backend
-   python -m pip install -e .
-   tmp1="$(mktemp)"
-   tmp2="$(mktemp)"
-   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp1"
-   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp2"
-   diff -u "$tmp1" "$tmp2"
-   ```
-3. Compare the committed artifact with the fresh output:
-   ```bash
-   diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp1"
-   ```
-4. Classify the failure:
-   - stale generated artifact only
-   - nondeterministic generator
-   - source hash calculation bug
-   - meaningful but expected source/content change
-   - unexpected source/content change
-5. If the exporter is deterministic and the diff is expected, regenerate the committed artifact:
-   ```bash
-   python -m app.modules.assistant.field_dictionary_export      --repo-root ..      --output app/modules/assistant/generated/field_lookup_corpus.json
-   ```
-6. Inspect `git diff` carefully.
-7. Confirm whether the regenerated artifact includes:
-   - DemandGroupBulkUpdateRequest fields
-   - DemandGroupBulkUpdateMatch/Patch fields
-   - DemandGroupBulkUpdateItemResult fields
-   - demand-group aggregate edit locale terms
-   - demand-group per-shift edit locale terms
-8. Run smoke checks:
-   ```bash
-   python - <<'PY'
-   from app.modules.assistant.field_dictionary import detect_field_or_lookup_signal
-
-   assert detect_field_or_lookup_signal("was bedeutet Vertragsreferenz") is not None
-   assert detect_field_or_lookup_signal("was bedeutet Rechtlicher Name") is not None
-   assert detect_field_or_lookup_signal("was bedeutet Apfelkuchen") is None
-   print("field dictionary smoke test ok")
-   PY
-   ```
-9. Run the CI-equivalent freshness check after regeneration:
-   ```bash
-   tmp1="$(mktemp)"
-   tmp2="$(mktemp)"
-   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp1"
-   python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp2"
-   diff -u "$tmp1" "$tmp2"
-   diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp1"
-   ```
-10. If simple regeneration is not enough, inspect and fix the generator:
-    - sorted file traversal
-    - stable JSON serialization
-    - source hash exclusions
-    - exclusion of generated artifact from its own hash
-    - deterministic source_basis sorting
-    - duplicate handling
-11. If generator logic changes are needed, add/update tests under `backend/tests/modules/assistant/`.
-12. If only artifact regeneration is needed, do not change generator code.
-13. Commit the refreshed generated artifact and any necessary tests/code changes.
-
-Expected minimal fix:
-Most likely only this file should change:
-`backend/app/modules/assistant/generated/field_lookup_corpus.json`
-
-But validate this before deciding.
-
-Verification:
-Run and report exact results:
-```bash
-cd backend
-python -m pip install -e .
-python -m app.modules.assistant.field_dictionary_export --repo-root .. --output /tmp/field_lookup_corpus.json
-python - <<'PY'
-from app.modules.assistant.field_dictionary import detect_field_or_lookup_signal
-assert detect_field_or_lookup_signal("was bedeutet Vertragsreferenz") is not None
-assert detect_field_or_lookup_signal("was bedeutet Rechtlicher Name") is not None
-assert detect_field_or_lookup_signal("was bedeutet Apfelkuchen") is None
-print("field dictionary smoke test ok")
-PY
-tmp1="$(mktemp)"
-tmp2="$(mktemp)"
-python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp1"
-python -m app.modules.assistant.field_dictionary_export --repo-root .. --output "$tmp2"
-diff -u "$tmp1" "$tmp2"
-diff -u app/modules/assistant/generated/field_lookup_corpus.json "$tmp1"
-```
+Deliverable for this task:
+1. A concise but concrete implementation plan.
+2. A list of files likely to change.
+3. Proposed API additions/changes.
+4. Proposed UI structure.
+5. Risks and assumptions.
+6. A recommended split into the next implementation tasks.
 
 Output format:
-- Root cause
-- Evidence from CI and local reproduction
-- Exporter deterministic: yes/no
-- Failure classification
-- Files changed
-- Artifact diff summary
-- Whether `fa_locale_missing` is blocking or non-blocking
-- Smoke test result
-- CI-equivalent freshness check result
-- Remaining risks or follow-ups
+- Rooted findings
+- Current reusable building blocks
+- Missing pieces
+- Proposed solution architecture
+- Proposed UX behavior
+- Proposed editability / lock behavior
+- Proposed API contract
+- Proposed task split
+- Files likely to change
+- Risks / open questions
+- Recommendation on whether to proceed exactly as proposed or adjust the design
+
+Do not make product-code changes in this task until the investigation is complete and the proposal is self-validated.

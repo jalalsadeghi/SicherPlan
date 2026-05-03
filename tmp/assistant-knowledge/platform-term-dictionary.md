@@ -3033,12 +3033,12 @@
 - ui_term_type: domain_concept
 - route_names: SicherPlanPlanningStaffing
 - ui_contexts: Demand Group, Demand Group setup, Demand and staffing tab, Shift Coverage, Staffing actions, demand Group Create Action, demand Group Create Title, demand Group Edit Selected Action, demand Group Edit Title, demand Group Editor Title, demand Group Function Type, demand Group Mandatory Flag, demand Group Mandatory Hint, demand Group Min Qty, demand Group Placeholder, demand Group Qualification Type, demand Group Remark, demand Group Save Action, demand Group Setup Lead, demand Group Sort Order, demand Group Sort Order Hint, demand Group Target Qty, demand Group Update Action, demand Groups Empty, demand Groups Setup Required, demand Groups Title, staffing Actions Demand Group Required
-- labels_de: Demand Group, Demand Groups, Fuer diese Schicht gibt es keine Demand Groups., Diese Schicht ist im Coverage sichtbar, kann aber erst staffed werden, nachdem mindestens eine Demand Group angelegt wurde., Demand Group auswaehlen, Demand-Group-Setup, Demand Group anlegen, Demand Group bearbeiten, Legen Sie hier die benoetigten Staffing-Slots fuer diese Schicht an. Danach werden Assign/Substitute wieder sinnvoll nutzbar., Neue Demand Group, Ausgewaehlte Demand Group bearbeiten, Demand Group speichern, Demand Group aktualisieren, Funktionstyp, Qualifikation, Mindestmenge, Zielmenge, Sortierung, Steuert die Reihenfolge der Demand Groups in Staffing-Ansichten und abgeleiteten Outputs., Demand Group als verpflichtend markieren, Verpflichtende Demand Groups zaehlen direkt in die Staffing- und Release-Erwartung dieser Schicht., Bemerkung, Staffing-Aktionen sind blockiert, bis die Schicht mindestens eine Demand Group hat.
-- labels_en: Demand group, Demand groups, No demand groups exist for this shift., This shift is visible in coverage, but it cannot be staffed until at least one demand group is created., Select demand group, Demand group setup, Create demand group, Edit demand group, Create the staffing slots required for this shift here. Assign/Substitute becomes meaningfully available afterwards., New demand group, Edit selected demand group, Save demand group, Update demand group, Function type, Qualification, Minimum quantity, Target quantity, Sort order, Controls the ordering of demand groups in staffing views and derived outputs., Mark demand group as mandatory, Mandatory demand groups feed directly into the staffing and release expectation for this shift., Remark, Staffing actions are blocked until this shift has at least one demand group.
+- labels_de: Demand Group, Demand Groups, Fuer diese Schicht gibt es keine Demand Groups., Diese Schicht ist im Coverage sichtbar, kann aber erst staffed werden, nachdem mindestens eine Demand Group angelegt wurde., Demand Group auswaehlen, Demand-Group-Setup, Demand Group anlegen, Demand Group bearbeiten, Legen Sie hier die benoetigten Staffing-Slots fuer diese Schicht an. Danach werden Assign/Substitute wieder sinnvoll nutzbar., Neue Demand Group, Ausgewaehlte Demand Group bearbeiten, Demand Group speichern, Demand Group aktualisieren, Funktionstyp, Qualifikation, Mindestmenge, Zielmenge, Sortierung, Steuert die Reihenfolge der Demand Groups in Staffing-Ansichten und abgeleiteten Outputs., Demand Group als verpflichtend markieren, Verpflichtende Demand Groups zaehlen direkt in die Staffing- und Release-Erwartung dieser Schicht., Bemerkung, Staffing-Aktionen sind blockiert, bis die Schicht mindestens eine Demand Group hat., Neue Bedarfsgruppe, Bedarfsgruppe bearbeiten, Fügen Sie mindestens eine Bedarfsgruppe hinzu, bevor Sie fortfahren.
+- labels_en: Demand group, Demand groups, No demand groups exist for this shift., This shift is visible in coverage, but it cannot be staffed until at least one demand group is created., Select demand group, Demand group setup, Create demand group, Edit demand group, Create the staffing slots required for this shift here. Assign/Substitute becomes meaningfully available afterwards., New demand group, Edit selected demand group, Save demand group, Update demand group, Function type, Qualification, Minimum quantity, Target quantity, Sort order, Controls the ordering of demand groups in staffing views and derived outputs., Mark demand group as mandatory, Mandatory demand groups feed directly into the staffing and release expectation for this shift., Remark, Staffing actions are blocked until this shift has at least one demand group., Add at least one demand group before continuing.
 - definition_de: Demand Groups sind Bedarfsgruppen bzw. Staffing-Slots fuer eine Schicht. Sie definieren benoetigten Funktionstyp, optionale Qualifikation, Mindest- und Zielmenge, Sortierung und Pflichtstatus. Eine Schicht kann erst sinnvoll staffed werden, wenn mindestens eine Demand Group angelegt wurde.
 - definition_en: Demand groups are staffing requirement groups for a shift. They define which function type is needed, which qualification may be required, the minimum and target quantity, ordering, and whether the group is mandatory. A shift cannot be staffed meaningfully until at least one demand group exists.
 - related_terms: assignment, function type, mandatory demand group, minimum quantity, qualification, shift coverage, target quantity
-- aliases: Ausgewaehlte Demand Group bearbeiten, Bemerkung, Controls the ordering of demand groups in staffing views and derived outputs., Create demand group, Create the staffing slots required for this shift here. Assign/Substitute becomes meaningfully available afterwards., Demand Group, Demand Group aktualisieren, Demand Group als verpflichtend markieren, Demand Group anlegen, Demand Group auswaehlen, Demand Group bearbeiten, Demand Group speichern, Demand Groups, Demand group, Demand group setup, Demand groups, Demand-Group-Setup, Diese Schicht ist im Coverage sichtbar, kann aber erst staffed werden, nachdem mindestens eine Demand Group angelegt wurde., Edit demand group, Edit selected demand group, Fuer diese Schicht gibt es keine Demand Groups., Function type, Funktionstyp, Legen Sie hier die benoetigten Staffing-Slots fuer diese Schicht an. Danach werden Assign/Substitute wieder sinnvoll nutzbar., Mandatory demand groups feed directly into the staffing and release expectation for this shift., Mark demand group as mandatory, Mindestmenge, Minimum quantity, Neue Demand Group, New demand group, No demand groups exist for this shift., Qualification, Qualifikation, Remark, Save demand group, Select demand group, Sort order, Sortierung, Staffing actions are blocked until this shift has at least one demand group., Staffing-Aktionen sind blockiert, bis die Schicht mindestens eine Demand Group hat., Steuert die Reihenfolge der Demand Groups in Staffing-Ansichten und abgeleiteten Outputs., Target quantity, This shift is visible in coverage, but it cannot be staffed until at least one demand group is created., Update demand group, Verpflichtende Demand Groups zaehlen direkt in die Staffing- und Release-Erwartung dieser Schicht., Zielmenge, demand group, demand group setup, demand groups, demand-group, demandGroupCreateAction, demandGroupCreateTitle, demandGroupEditSelectedAction, demandGroupEditTitle, demandGroupEditorTitle, demandGroupFunctionType, demandGroupMandatoryFlag, demandGroupMandatoryHint, demandGroupMinQty, demandGroupPlaceholder, demandGroupQualificationType, demandGroupRemark, demandGroupSaveAction, demandGroupSetupLead, demandGroupSortOrder, demandGroupSortOrderHint, demandGroupTargetQty, demandGroupUpdateAction, demandGroupsEmpty, demandGroupsSetupRequired, demandGroupsTitle, fieldsDemandGroup, staffingActionsDemandGroupRequired
+- aliases: Add at least one demand group before continuing., Ausgewaehlte Demand Group bearbeiten, Bedarfsgruppe bearbeiten, Bemerkung, Controls the ordering of demand groups in staffing views and derived outputs., Create demand group, Create the staffing slots required for this shift here. Assign/Substitute becomes meaningfully available afterwards., Demand Group, Demand Group aktualisieren, Demand Group als verpflichtend markieren, Demand Group anlegen, Demand Group auswaehlen, Demand Group bearbeiten, Demand Group speichern, Demand Groups, Demand group, Demand group setup, Demand groups, Demand-Group-Setup, Diese Schicht ist im Coverage sichtbar, kann aber erst staffed werden, nachdem mindestens eine Demand Group angelegt wurde., Edit demand group, Edit selected demand group, Fuer diese Schicht gibt es keine Demand Groups., Function type, Funktionstyp, Fügen Sie mindestens eine Bedarfsgruppe hinzu, bevor Sie fortfahren., Legen Sie hier die benoetigten Staffing-Slots fuer diese Schicht an. Danach werden Assign/Substitute wieder sinnvoll nutzbar., Mandatory demand groups feed directly into the staffing and release expectation for this shift., Mark demand group as mandatory, Mindestmenge, Minimum quantity, Neue Bedarfsgruppe, Neue Demand Group, New demand group, No demand groups exist for this shift., Qualification, Qualifikation, Remark, Save demand group, Select demand group, Sort order, Sortierung, Staffing actions are blocked until this shift has at least one demand group., Staffing-Aktionen sind blockiert, bis die Schicht mindestens eine Demand Group hat., Steuert die Reihenfolge der Demand Groups in Staffing-Ansichten und abgeleiteten Outputs., Target quantity, This shift is visible in coverage, but it cannot be staffed until at least one demand group is created., Update demand group, Verpflichtende Demand Groups zaehlen direkt in die Staffing- und Release-Erwartung dieser Schicht., Zielmenge, demand group, demand group setup, demand groups, demand-group, demandGroupCreateAction, demandGroupCreateTitle, demandGroupEditSelectedAction, demandGroupEditTitle, demandGroupEditorTitle, demandGroupFunctionType, demandGroupMandatoryFlag, demandGroupMandatoryHint, demandGroupMinQty, demandGroupPlaceholder, demandGroupQualificationType, demandGroupRemark, demandGroupSaveAction, demandGroupSetupLead, demandGroupSortOrder, demandGroupSortOrderHint, demandGroupTargetQty, demandGroupUpdateAction, demandGroupsEmpty, demandGroupsSetupRequired, demandGroupsTitle, fieldsDemandGroup, staffingActionsDemandGroupRequired
 - source_basis:
   - [backend_schema] schemas.py: Planning schemas define demand groups with function_type_id, qualification_type_id, min_qty, target_qty, sort_order, mandatory_flag, and remark.
   - [backend_service] staffing_service.py: Planning staffing service enforces demand-group-backed staffing operations before shift staffing can proceed meaningfully.
@@ -6352,6 +6352,134 @@
 - aliases: Auslieferungsfokus, Delivery focus, deliveryTitle
 - source_basis:
   - [frontend_locale] sicherplan.json: ui.deliveryTitle defines a visible localized UI term in sicherplan.json.
+
+## platform.locale_catalog.demand_group_aggregate_edit
+
+- canonical_name: demand_group_aggregate_edit
+- module_key: unknown
+- page_id: unknown
+- concept_type: ui_term
+- ui_term_type: section_title
+- route_names: none
+- ui_contexts: demand Group Aggregate Edit Title
+- labels_de: Angewendete Bedarfsgruppe bearbeiten
+- labels_en: Edit applied demand group
+- definition_de: Angewendete Bedarfsgruppe bearbeiten ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.
+- definition_en: demand_group_aggregate_edit is a verified visible SicherPlan UI term in the locale_catalog context.
+- related_terms: none
+- aliases: Angewendete Bedarfsgruppe bearbeiten, Edit applied demand group, demandGroupAggregateEditTitle
+- source_basis:
+  - [frontend_locale] sicherplan.json: customerPlansWizard.dialogs.demandGroupAggregateEditTitle defines a visible localized UI term in sicherplan.json.
+
+## platform.locale_catalog.demand_group_row
+
+- canonical_name: demand_group_row
+- module_key: unknown
+- page_id: unknown
+- concept_type: ui_term
+- ui_term_type: field_label
+- route_names: none
+- ui_contexts: demand Group Row Label
+- labels_de: Bedarfsgruppe {index}
+- labels_en: Demand group {index}
+- definition_de: Bedarfsgruppe {index} ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.
+- definition_en: demand_group_row is a verified visible SicherPlan UI term in the locale_catalog context.
+- related_terms: none
+- aliases: Bedarfsgruppe {index}, Demand group {index}, demandGroupRowLabel
+- source_basis:
+  - [frontend_locale] sicherplan.json: customerPlansWizard.forms.demandGroupRowLabel defines a visible localized UI term in sicherplan.json.
+
+## platform.locale_catalog.demand_group_shift_edit
+
+- canonical_name: demand_group_shift_edit
+- module_key: unknown
+- page_id: unknown
+- concept_type: ui_term
+- ui_term_type: section_title
+- route_names: none
+- ui_contexts: demand Group Shift Edit Title
+- labels_de: Bedarfsgruppe je Schicht bearbeiten
+- labels_en: Edit demand group by shift
+- definition_de: Bedarfsgruppe je Schicht bearbeiten ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.
+- definition_en: demand_group_shift_edit is a verified visible SicherPlan UI term in the locale_catalog context.
+- related_terms: none
+- aliases: Bedarfsgruppe je Schicht bearbeiten, Edit demand group by shift, demandGroupShiftEditTitle
+- source_basis:
+  - [frontend_locale] sicherplan.json: customerPlansWizard.dialogs.demandGroupShiftEditTitle defines a visible localized UI term in sicherplan.json.
+
+## platform.locale_catalog.demand_groups_applied
+
+- canonical_name: demand_groups_applied
+- module_key: unknown
+- page_id: unknown
+- concept_type: ui_term
+- ui_term_type: section_title
+- route_names: none
+- ui_contexts: demand Groups Applied Empty, demand Groups Applied Title
+- labels_de: Angewendete Bedarfsgruppen, Es wurden noch keine Bedarfsgruppen auf die erzeugten Schichten angewendet.
+- labels_en: Applied demand groups, No demand groups have been applied to the generated shifts yet.
+- definition_de: Angewendete Bedarfsgruppen ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.
+- definition_en: demand_groups_applied is a verified visible SicherPlan UI term in the locale_catalog context.
+- related_terms: none
+- aliases: Angewendete Bedarfsgruppen, Applied demand groups, Es wurden noch keine Bedarfsgruppen auf die erzeugten Schichten angewendet., No demand groups have been applied to the generated shifts yet., demandGroupsAppliedEmpty, demandGroupsAppliedTitle
+- source_basis:
+  - [frontend_locale] sicherplan.json: customerPlansWizard.forms.demandGroupsAppliedEmpty defines a visible localized UI term in sicherplan.json.
+  - [frontend_locale] sicherplan.json: customerPlansWizard.forms.demandGroupsAppliedTitle defines a visible localized UI term in sicherplan.json.
+
+## platform.locale_catalog.demand_groups_draft
+
+- canonical_name: demand_groups_draft
+- module_key: unknown
+- page_id: unknown
+- concept_type: ui_term
+- ui_term_type: section_title
+- route_names: none
+- ui_contexts: demand Groups Draft Empty, demand Groups Draft Title
+- labels_de: Ausstehende Vorlagen, Es wurden noch keine Bedarfsgruppen-Vorlagen erfasst.
+- labels_en: Pending templates, No demand-group templates have been added yet.
+- definition_de: Ausstehende Vorlagen ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.
+- definition_en: demand_groups_draft is a verified visible SicherPlan UI term in the locale_catalog context.
+- related_terms: none
+- aliases: Ausstehende Vorlagen, Es wurden noch keine Bedarfsgruppen-Vorlagen erfasst., No demand-group templates have been added yet., Pending templates, demandGroupsDraftEmpty, demandGroupsDraftTitle
+- source_basis:
+  - [frontend_locale] sicherplan.json: customerPlansWizard.forms.demandGroupsDraftEmpty defines a visible localized UI term in sicherplan.json.
+  - [frontend_locale] sicherplan.json: customerPlansWizard.forms.demandGroupsDraftTitle defines a visible localized UI term in sicherplan.json.
+
+## platform.locale_catalog.demand_groups_empty
+
+- canonical_name: demand_groups_empty
+- module_key: unknown
+- page_id: unknown
+- concept_type: ui_term
+- ui_term_type: section_title
+- route_names: none
+- ui_contexts: demand Groups Empty Title
+- labels_de: Keine erzeugten Schichten vorhanden
+- labels_en: No generated shifts available
+- definition_de: Keine erzeugten Schichten vorhanden ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.
+- definition_en: demand_groups_empty is a verified visible SicherPlan UI term in the locale_catalog context.
+- related_terms: none
+- aliases: Keine erzeugten Schichten vorhanden, No generated shifts available, demandGroupsEmptyTitle
+- source_basis:
+  - [frontend_locale] sicherplan.json: customerPlansWizard.forms.demandGroupsEmptyTitle defines a visible localized UI term in sicherplan.json.
+
+## platform.locale_catalog.demand_groups_locked
+
+- canonical_name: demand_groups_locked
+- module_key: unknown
+- page_id: unknown
+- concept_type: domain_concept
+- ui_term_type: hint_text
+- route_names: none
+- ui_contexts: demand Groups Locked Hint
+- labels_de: Die Bearbeitung ist für mindestens eine angewendete Schichtzeile gesperrt.
+- labels_en: Editing is blocked for at least one applied shift row.
+- definition_de: Die Bearbeitung ist für mindestens eine angewendete Schichtzeile gesperrt. ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.
+- definition_en: demand_groups_locked is a verified visible SicherPlan UI term in the locale_catalog context.
+- related_terms: none
+- aliases: Die Bearbeitung ist für mindestens eine angewendete Schichtzeile gesperrt., Editing is blocked for at least one applied shift row., demandGroupsLockedHint
+- source_basis:
+  - [frontend_locale] sicherplan.json: customerPlansWizard.messages.demandGroupsLockedHint defines a visible localized UI term in sicherplan.json.
 
 ## platform.locale_catalog.description
 

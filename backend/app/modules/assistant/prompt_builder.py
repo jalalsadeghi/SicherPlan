@@ -358,6 +358,19 @@ def _build_tool_policy_section(available_tools: list[AssistantToolDefinition]) -
 def _build_grounding_context_section(grounding_context: AssistantGroundingContext | None) -> str:
     if grounding_context is None:
         return "Grounding context\n- grounding_sources: []"
+    compact_sources = [
+        {
+            "source_id": source.source_id,
+            "source_type": source.source_type,
+            "source_name": source.source_name,
+            "page_id": source.page_id,
+            "module_key": source.module_key,
+            "title": source.title,
+            "verified": source.verified,
+            "why_selected": list(source.why_selected or [])[:4],
+        }
+        for source in grounding_context.sources[:4]
+    ]
     payload = {
         "detected_language": grounding_context.detected_language,
         "response_language": grounding_context.response_language,
@@ -365,6 +378,7 @@ def _build_grounding_context_section(grounding_context: AssistantGroundingContex
         "query_expansion": grounding_context.query_expansion,
         "grounding_source_count": len(grounding_context.sources),
         "source_ids": [source.source_id for source in grounding_context.sources[:8] if source.source_id],
+        "sources": compact_sources,
         "missing_context": list(grounding_context.missing_context),
         "grounding_trimmed": grounding_context.grounding_trimmed,
         "trim_reason": grounding_context.trim_reason,

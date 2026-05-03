@@ -285,6 +285,7 @@ class AssistantService:
         if self.runtime_config.provider_mode == "mock":
             features.append("mock_provider")
             if self.runtime_config.mock_provider_allowed:
+                features.append("mock_provider_ready")
                 features.append("mock_provider_allowed")
             else:
                 features.append("mock_provider_blocked")
@@ -962,10 +963,14 @@ class AssistantService:
         ):
             confidence = AssistantConfidence.LOW
         answer_text = str(provider_payload.get("answer", "")).casefold()
-        if self._mentions_precise_ui_claim(answer_text) and not any(
-            item.source_type == "page_help_manifest" for item in source_basis
-        ):
-            confidence = AssistantConfidence.LOW
+        if self._mentions_precise_ui_claim(answer_text):
+            has_verified_ui_action_basis = any(item.source_type == "ui_action" for item in source_basis)
+            if not has_verified_ui_action_basis:
+                source_basis = [
+                    item for item in source_basis
+                    if item.source_type != "page_help_manifest"
+                ]
+                confidence = AssistantConfidence.LOW
         return AssistantStructuredResponse(
             conversation_id=conversation.id,
             message_id=assistant_message.id,
@@ -1821,6 +1826,9 @@ class AssistantService:
         total_chars = 0
         max_sources = max(self.runtime_config.max_grounding_sources, 1)
         guaranteed_source_types = self._guaranteed_grounding_source_types(intent_category=intent_category)
+        guaranteed_navigation_page_ids: tuple[str, ...] = ()
+        if workflow_intent == "customer_scoped_order_create":
+            guaranteed_navigation_page_ids = ("C-01", "C-02")
         selected_ids: set[str | None] = set()
 
         for guaranteed_type in guaranteed_source_types:
@@ -1845,7 +1853,88 @@ class AssistantService:
                 continue
             selected.append(prepared)
             selected_ids.add(prepared.source_id)
-            total_chars += len(prepared.content or "") + len(json.dumps(prepared.facts, ensure_ascii=False))
+            total_chars += self._grounding_source_char_size(prepared)
+
+        for page_id in guaranteed_navigation_page_ids:
+            guaranteed_candidate = next(
+                (
+                    (score, source, reasons)
+                    for score, source, reasons in ranked
+                    if source.source_type == "allowed_navigation_link"
+                    and source.page_id == page_id
+                    and source.source_id not in selected_ids
+                ),
+                None,
+            )
+            if guaranteed_candidate is None or len(selected) >= max_sources:
+                continue
+            score, source, reasons = guaranteed_candidate
+            prepared = self._prepare_grounding_source_for_prompt(
+                source=source,
+                score=score,
+                reasons=reasons,
+                remaining_chars=min(self.runtime_config.max_grounding_chars_per_source, 280),
+            )
+            if prepared is None:
+                continue
+            selected.append(prepared)
+            selected_ids.add(prepared.source_id)
+            total_chars += self._grounding_source_char_size(prepared)
+
+        for page_id in likely_page_ids:
+            guaranteed_candidate = next(
+                (
+                    (score, source, reasons)
+                    for score, source, reasons in ranked
+                    if source.source_type == "page_help_manifest"
+                    and source.page_id == page_id
+                    and source.source_id not in selected_ids
+                ),
+                None,
+            )
+            if guaranteed_candidate is None or len(selected) >= max_sources:
+                continue
+            score, source, reasons = guaranteed_candidate
+            prepared = self._prepare_grounding_source_for_prompt(
+                source=source,
+                score=score,
+                reasons=reasons,
+                remaining_chars=min(self.runtime_config.max_grounding_chars_per_source, 320),
+            )
+            if prepared is None:
+                continue
+            selected.append(prepared)
+            selected_ids.add(prepared.source_id)
+            total_chars += self._grounding_source_char_size(prepared)
+
+        if workflow_intent:
+            guaranteed_candidate = next(
+                (
+                    (score, source, reasons)
+                    for score, source, reasons in ranked
+                    if source.source_type == "knowledge_chunk"
+                    and isinstance(source.facts, dict)
+                    and workflow_intent in {
+                        str(item).strip()
+                        for item in (source.facts.get("workflow_keys") or [])
+                        if str(item).strip()
+                    }
+                    and source.source_id not in selected_ids
+                ),
+                None,
+            )
+            if guaranteed_candidate is not None and len(selected) < max_sources:
+                score, source, reasons = guaranteed_candidate
+                prepared = self._prepare_grounding_source_for_prompt(
+                    source=source,
+                    score=score,
+                    reasons=reasons,
+                    remaining_chars=min(self.runtime_config.max_grounding_chars_per_source, 280),
+                )
+                if prepared is not None:
+                    selected.append(prepared)
+                    selected_ids.add(prepared.source_id)
+                    total_chars += self._grounding_source_char_size(prepared)
 
         for score, source, reasons in ranked:
             if source.source_id in selected_ids:
@@ -1862,7 +1951,7 @@ class AssistantService:
                 continue
             selected.append(prepared)
             selected_ids.add(prepared.source_id)
-            total_chars += len(prepared.content or "") + len(json.dumps(prepared.facts, ensure_ascii=False))
+            total_chars += self._grounding_source_char_size(prepared)
             if total_chars >= self.runtime_config.max_total_grounding_chars:
                 break
         for score, source, reasons in ranked:
@@ -1878,7 +1967,7 @@ class AssistantService:
                 continue
             selected.append(prepared)
             selected_ids.add(prepared.source_id)
-            total_chars += len(prepared.content or "") + len(json.dumps(prepared.facts, ensure_ascii=False))
+            total_chars += self._grounding_source_char_size(prepared)
         return selected
 
     @staticmethod
@@ -2003,10 +2092,12 @@ class AssistantService:
         max_source_chars = min(self.runtime_config.max_grounding_chars_per_source, max(remaining_chars, 0))
         if max_source_chars <= 0:
             return None
-        content = self._truncate_grounding_text(source.content, max_source_chars)
+        preferred_content_budget = min(max_source_chars, max(int(max_source_chars * 0.55), 160))
+        content = self._truncate_grounding_text(source.content, preferred_content_budget)
+        remaining_fact_budget = max(max_source_chars - len(content or ""), 0)
         trimmed_facts = self._trim_grounding_facts(
             facts=source.facts,
-            max_chars=max_source_chars,
+            max_chars=remaining_fact_budget,
         )
         if not content and not trimmed_facts:
             return None
@@ -2019,6 +2110,12 @@ class AssistantService:
                 "content_bearing": self._is_content_bearing_source(source),
             }
         )
+
+    @staticmethod
+    def _grounding_source_char_size(source: AssistantGroundingSource) -> int:
+        facts_json = json.dumps(source.facts, ensure_ascii=False)
+        facts_repr = str(source.facts)
+        return len(source.content or "") + max(len(facts_json), len(facts_repr))
 
     def _generate_in_scope_response(
         self,
@@ -2033,6 +2130,38 @@ class AssistantService:
         initial_tool_results: list[AssistantToolResultSummary],
     ) -> dict[str, Any]:
         tool_results = list(initial_tool_results)
+        retrieval_plan = grounding_context.retrieval_plan if isinstance(grounding_context.retrieval_plan, dict) else {}
+        missing_permissions = self._collect_missing_permissions_from_summaries(tool_results)
+        diagnostic_missing_inputs = retrieval_plan.get("diagnostic_missing_inputs")
+        has_diagnostic_missing_inputs = isinstance(diagnostic_missing_inputs, list) and any(
+            str(item).strip() for item in diagnostic_missing_inputs
+        )
+        if (
+            str(retrieval_plan.get("intent_category") or "").strip() == "operational_diagnostic"
+            and self.tool_registry is not None
+            and (
+                self.runtime_config.provider_mode == "mock"
+                or not has_diagnostic_missing_inputs
+            )
+            and "assistant.diagnostics.read" not in actor.permission_keys
+        ):
+            if not any(
+                str(row.get("permission") or "").strip() == "assistant.diagnostics.read"
+                for row in missing_permissions
+                if isinstance(row, dict)
+            ):
+                missing_permissions = [
+                    *missing_permissions,
+                    {
+                        "permission": "assistant.diagnostics.read",
+                        "reason": "required for operational diagnostics",
+                    },
+                ]
+            return self._build_missing_diagnostics_permission_response(
+                response_language=response_language,
+                tool_results=tool_results,
+                missing_permissions=missing_permissions,
+            )
         provider_tool_results: list[dict[str, Any]] = []
         previous_response_id: str | None = None
         previous_output_items: list[dict[str, Any]] = []
@@ -2162,6 +2291,7 @@ class AssistantService:
                     self._tool_result_to_provider_output(
                         requested_call=requested_call,
                         tool_result=tool_result,
+                        compact_summary=False,
                     )
                 )
                 if call_id:
@@ -2215,13 +2345,47 @@ class AssistantService:
                 output_tokens=provider_result.usage.output_tokens if provider_result.usage else None,
             )
             previous_response_id = provider_result.response_id
-            previous_output_items = list(provider_result.output_items or [])
-            requested_tool_calls = provider_result.requested_tool_calls or []
-            if not requested_tool_calls:
-                return self._merge_provider_payload_with_tool_results(
-                    provider_result.final_response,
-                    tool_results,
-                )
+
+    def _build_missing_diagnostics_permission_response(
+        self,
+        *,
+        response_language: str,
+        tool_results: list[AssistantToolResultSummary],
+        missing_permissions: list[dict[str, str]],
+    ) -> dict[str, Any]:
+        del tool_results
+        if response_language == "de":
+            answer = "Ich kann die genaue Ursache nicht sicher prüfen, weil mir die Berechtigung assistant.diagnostics.read fehlt."
+            finding = "Die vertiefte Diagnose ist wegen fehlender Berechtigung eingeschränkt."
+            evidence = "Für diese Analyse fehlt assistant.diagnostics.read."
+            next_step = "Bitten Sie eine berechtigte interne Person, die Diagnose mit assistant.diagnostics.read auszuführen."
+        elif response_language == "fa":
+            answer = "من نمی‌توانم علت دقیق را با اطمینان بررسی کنم، چون مجوز assistant.diagnostics.read در دسترس نیست."
+            finding = "تشخیص عمیق به دلیل نبود مجوز لازم محدود شده است."
+            evidence = "برای این بررسی مجوز assistant.diagnostics.read وجود ندارد."
+            next_step = "از یک کاربر داخلی دارای مجوز assistant.diagnostics.read بخواهید این تشخیص را اجرا کند."
+        else:
+            answer = "I cannot safely verify the exact cause because the assistant.diagnostics.read permission is missing."
+            finding = "Deep diagnostics are limited because a required permission is missing."
+            evidence = "assistant.diagnostics.read is required for this diagnostic check."
+            next_step = "Ask an internal user with assistant.diagnostics.read to run the diagnostic."
+        return {
+            "answer": answer,
+            "confidence": AssistantConfidence.LOW.value,
+            "out_of_scope": False,
+            "diagnosis": [
+                {
+                    "finding": finding,
+                    "severity": "warning",
+                    "evidence": evidence,
+                }
+            ],
+            "links": [],
+            "missing_permissions": missing_permissions,
+            "next_steps": [next_step],
+            "tool_trace_id": "diagnostic_permission_limited",
+            "source_basis": [],
+        }
 
     def _build_provider_request(
         self,
@@ -2460,13 +2624,15 @@ class AssistantService:
             sources=sources,
             char_budget=self.runtime_config.max_total_grounding_chars,
         )
-        trimmed = len(kept_sources) < len(sources)
+        original_payloads = [source.model_dump(mode="json") for source in sources]
+        kept_payloads = [source.model_dump(mode="json") for source in kept_sources]
+        trimmed_context.sources = kept_sources
+        trimmed = kept_payloads != original_payloads
         if trimmed:
             grounding_context.grounding_trimmed = True
             grounding_context.trim_reason = "token_budget"
             trimmed_context.grounding_trimmed = True
             trimmed_context.trim_reason = "token_budget"
-            trimmed_context.sources = kept_sources
         return trimmed_context
 
     def _trim_sources_by_char_budget(
@@ -2493,15 +2659,29 @@ class AssistantService:
         prepared = [
             source.model_copy(
                 update={
-                    "content": self._truncate_grounding_text(source.content, min(self.runtime_config.max_grounding_chars_per_source, 280)),
-                    "facts": self._trim_grounding_facts(facts=source.facts, max_chars=220),
+                    "content": self._truncate_grounding_text(
+                        source.content,
+                        min(self.runtime_config.max_grounding_chars_per_source, 180),
+                    ),
+                    "facts": self._trim_grounding_facts(facts=source.facts, max_chars=140),
                 }
             )
             for source in sources
         ]
         protected_source_ids: set[str | None] = set()
+        protected_source_ids.update(
+            source.source_id
+            for source in prepared
+            if source.source_type == "allowed_navigation_link"
+        )
+        protected_source_ids.update(
+            source.source_id
+            for source in prepared
+            if source.source_type == "knowledge_chunk"
+            and isinstance(source.facts, dict)
+            and any(str(item).strip() for item in (source.facts.get("workflow_keys") or []))
+        )
         for protected_type in (
-            "allowed_navigation_link",
             "ui_action",
             "diagnostic",
             "diagnostic_fact",
@@ -2514,10 +2694,7 @@ class AssistantService:
             first_match = next((source for source in prepared if source.source_type == protected_type), None)
             if first_match is not None:
                 protected_source_ids.add(first_match.source_id)
-        total = sum(
-            len(source.content or "") + len(json.dumps(source.facts, ensure_ascii=False))
-            for source in prepared
-        )
+        total = sum(self._grounding_source_char_size(source) for source in prepared)
         if total <= char_budget:
             return prepared
         ordered = sorted(
@@ -2541,10 +2718,7 @@ class AssistantService:
             if not next_kept:
                 break
             kept = next_kept
-            total = sum(
-                len(source.content or "") + len(json.dumps(source.facts, ensure_ascii=False))
-                for source in kept
-            )
+            total = sum(self._grounding_source_char_size(source) for source in kept)
         return kept
 
     def _enforce_provider_token_budget(
@@ -2571,6 +2745,17 @@ class AssistantService:
                 adjusted = replace(adjusted, recent_messages=adjusted.recent_messages[1:])
                 grounding_context.grounding_trimmed = True
                 grounding_context.trim_reason = "token_budget"
+            elif adjusted.system_instructions:
+                excess_tokens = max(metrics["estimated_input_tokens"] - budget, 1)
+                reduce_chars = max(excess_tokens * 4, 240)
+                next_max_chars = max(len(adjusted.system_instructions) - reduce_chars, 1200)
+                trimmed_instructions = self._truncate_system_instructions_for_budget(
+                    adjusted.system_instructions,
+                    max_chars=next_max_chars,
+                )
+                if trimmed_instructions == adjusted.system_instructions:
+                    break
+                adjusted = replace(adjusted, system_instructions=trimmed_instructions)
             elif continuation_mode != "initial" and adjusted.previous_output_items:
                 adjusted = replace(adjusted, previous_output_items=adjusted.previous_output_items[-1:])
             elif adjusted.grounding_context and isinstance(adjusted.grounding_context.get("sources"), list):
@@ -2611,6 +2796,16 @@ class AssistantService:
         adjusted.metadata.update(metrics)
         self._log_provider_token_budget(adjusted, metrics)
         return adjusted
+
+    @staticmethod
+    def _truncate_system_instructions_for_budget(value: str, *, max_chars: int) -> str:
+        if len(value) <= max_chars:
+            return value
+        if max_chars <= 80:
+            return value[:max_chars]
+        head = max(int(max_chars * 0.7), 40)
+        tail = max(max_chars - head - 5, 20)
+        return f"{value[:head].rstrip()}\n...\n{value[-tail:].lstrip()}"
 
     def _estimate_request_token_budget(
         self,
@@ -4433,9 +4628,43 @@ class AssistantService:
     ) -> dict[str, Any]:
         if not isinstance(facts, dict) or not facts:
             return {}
+        priority_keys = (
+            "workflow_keys",
+            "link",
+            "action",
+            "form_sections",
+            "actions",
+            "post_create_steps",
+            "sidebar_path",
+            "summary",
+            "findings",
+            "value_resolution",
+            "value_source_kind",
+            "matched_values",
+            "values",
+            "matched_by",
+            "rank",
+            "source_type",
+            "source_path",
+            "source_language",
+            "content_preview",
+            "api_families",
+            "domain_terms",
+            "language_aliases",
+        )
+        ordered_items: list[tuple[str, Any]] = []
+        seen_keys: set[str] = set()
+        for key in priority_keys:
+            if key in facts:
+                ordered_items.append((key, facts[key]))
+                seen_keys.add(key)
+        for key, value in facts.items():
+            if key in seen_keys:
+                continue
+            ordered_items.append((key, value))
         trimmed: dict[str, Any] = {}
         used = 0
-        for key, value in facts.items():
+        for key, value in ordered_items:
             if used >= max_chars:
                 break
             if isinstance(value, str):
@@ -4528,6 +4757,16 @@ class AssistantService:
                     preview = " ".join(part for part in [label, result] if part)
                     if preview:
                         return preview[:160]
+            form_sections = facts.get("form_sections")
+            if isinstance(form_sections, list) and form_sections:
+                first_section = form_sections[0]
+                if isinstance(first_section, dict):
+                    label = str(first_section.get("label") or first_section.get("section") or "").strip()
+                    if label:
+                        return label[:160]
+            fallback = str(source.title or source.source_name or source.page_id or "").strip()
+            if fallback:
+                return fallback[:160]
         for key in ("safe_note", "summary"):
             value = str(facts.get(key) or "").strip()
             if value:
@@ -4593,12 +4832,14 @@ class AssistantService:
 
         matched: list[AssistantSourceBasisItem] = []
         seen_keys: set[tuple[str, str | None, str | None, str | None]] = set()
+        requested_source_types: set[str] = set()
         for item in requested:
             if not isinstance(item, dict):
                 continue
             match_key = self._requested_source_basis_key(item)
             if match_key is None:
                 continue
+            requested_source_types.add(match_key[0])
             allowed = next(
                 (candidate for candidate in allowed_items if self._source_basis_key(candidate) == match_key),
                 None,
@@ -4611,6 +4852,19 @@ class AssistantService:
             matched.append(allowed)
             seen_keys.add(allowed_key)
         if matched:
+            for allowed in allowed_items:
+                allowed_key = self._source_basis_key(allowed)
+                if allowed_key in seen_keys:
+                    continue
+                if (
+                    allowed.source_type == "page_help_manifest"
+                    and "page_help_manifest" not in requested_source_types
+                ):
+                    continue
+                matched.append(allowed)
+                seen_keys.add(allowed_key)
+                if len(matched) >= 4:
+                    break
             return matched[:4]
         return allowed_items[:4]
 
@@ -5175,12 +5429,21 @@ class AssistantService:
         *,
         requested_call: dict[str, Any],
         tool_result: Any,
+        compact_summary: bool = True,
     ) -> dict[str, Any]:
-        payload = AssistantService._tool_result_to_summary(tool_result).summary
+        payload: Any
+        if compact_summary:
+            payload = AssistantService._tool_result_to_summary(tool_result).summary
+        else:
+            payload = tool_result.redacted_output
+            if payload is None:
+                payload = tool_result.data
+            if not isinstance(payload, (dict, list, str, int, float, bool)) and payload is not None:
+                payload = AssistantService._tool_result_to_summary(tool_result).summary
         result = {
             "type": "function_call_output",
             "tool_name": str(tool_result.tool_name),
-            "output": json.dumps(payload, ensure_ascii=False, sort_keys=True),
+            "output": json.dumps(payload, ensure_ascii=False),
         }
         call_id = str(requested_call.get("call_id") or "").strip()
         if call_id:

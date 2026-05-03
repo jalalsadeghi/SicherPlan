@@ -146,7 +146,10 @@ def build_retrieval_plan(
         if field_lookup_signal.intent_category not in {"lookup_meaning_question", "status_meaning_question"}:
             field_top_score = field_lookup_signal.field_matches[0].score if field_lookup_signal.field_matches else -1.0
             term_top_score = platform_term_signal.term_matches[0].score if platform_term_signal.term_matches else -1.0
-            if term_top_score >= field_top_score:
+            if not (
+                field_lookup_signal.intent_category == "field_meaning_question"
+                and term_top_score - field_top_score <= 10.0
+            ) and term_top_score > field_top_score:
                 use_field_lookup_signal = False
     needs_diagnostics = diagnostic_prefetch is not None or is_shift_visibility_question(message, route_context)
     expanded_query = expand_assistant_query(

@@ -212,6 +212,10 @@ class OpenAIResponsesProvider(AssistantProvider):
         return messages
 
     @classmethod
+    def _build_input(cls, request: AssistantProviderRequest) -> list[dict[str, Any]]:
+        return cls._build_initial_input(request)
+
+    @classmethod
     def _build_previous_response_continuation_input(
         cls,
         request: AssistantProviderRequest,

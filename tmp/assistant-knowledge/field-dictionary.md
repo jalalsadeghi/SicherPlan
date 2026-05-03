@@ -44,9 +44,9 @@
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field date_from.
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_from.
   - [typescript_api_interface] DemandGroupBulkApplyRequest: DemandGroupBulkApplyRequest includes field date_from.
+  - [typescript_api_interface] DemandGroupBulkUpdateRequest: DemandGroupBulkUpdateRequest includes field date_from.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_from.
   - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_from.
-  - [backend_schema] AssistantFieldReleasedScheduleVisibilityInput: AssistantFieldReleasedScheduleVisibilityInput includes field date_from.
 
 ## assignment.date_to
 
@@ -71,9 +71,9 @@
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field date_to.
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_to.
   - [typescript_api_interface] DemandGroupBulkApplyRequest: DemandGroupBulkApplyRequest includes field date_to.
+  - [typescript_api_interface] DemandGroupBulkUpdateRequest: DemandGroupBulkUpdateRequest includes field date_to.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_to.
   - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_to.
-  - [backend_schema] AssistantFieldReleasedScheduleVisibilityInput: AssistantFieldReleasedScheduleVisibilityInput includes field date_to.
 
 ## assignment.demand_group_id
 
@@ -98,9 +98,9 @@
   - [typescript_api_interface] CoverageDemandGroupItem: CoverageDemandGroupItem includes field demand_group_id.
   - [typescript_api_interface] StaffingBoardAssignmentItem: StaffingBoardAssignmentItem includes field demand_group_id.
   - [typescript_api_interface] AssignmentRead: AssignmentRead includes field demand_group_id.
+  - [typescript_api_interface] DemandGroupBulkUpdateItemResult: DemandGroupBulkUpdateItemResult includes field demand_group_id.
   - [typescript_api_interface] SubcontractorReleaseRead: SubcontractorReleaseRead includes field demand_group_id.
   - [typescript_api_interface] StaffingAssignCommand: StaffingAssignCommand includes field demand_group_id.
-  - [typescript_api_interface] AssignmentCreate: AssignmentCreate includes field demand_group_id.
 
 ## assignment.member_ref
 
@@ -2584,9 +2584,9 @@
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field date_from.
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_from.
   - [typescript_api_interface] DemandGroupBulkApplyRequest: DemandGroupBulkApplyRequest includes field date_from.
+  - [typescript_api_interface] DemandGroupBulkUpdateRequest: DemandGroupBulkUpdateRequest includes field date_from.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_from.
   - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_from.
-  - [backend_schema] AssistantFieldReleasedScheduleVisibilityInput: AssistantFieldReleasedScheduleVisibilityInput includes field date_from.
 
 ## customer_order.date_to
 
@@ -2611,9 +2611,9 @@
   - [typescript_api_interface] ShiftSeriesListItem: ShiftSeriesListItem includes field date_to.
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_to.
   - [typescript_api_interface] DemandGroupBulkApplyRequest: DemandGroupBulkApplyRequest includes field date_to.
+  - [typescript_api_interface] DemandGroupBulkUpdateRequest: DemandGroupBulkUpdateRequest includes field date_to.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_to.
   - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_to.
-  - [backend_schema] AssistantFieldReleasedScheduleVisibilityInput: AssistantFieldReleasedScheduleVisibilityInput includes field date_to.
 
 ## customer_order.equipment_lines
 

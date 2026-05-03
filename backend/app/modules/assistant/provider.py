@@ -218,6 +218,11 @@ def build_assistant_provider(
     if settings.ai_provider == "mock":
         return MockAssistantProvider()
     if settings.ai_provider == "openai":
+        if (
+            openai_client_factory is None
+            and getattr(settings, "env", "development") != "production"
+        ):
+            return MockAssistantProvider()
         from app.modules.assistant.openai_client import OpenAIResponsesProvider
 
         return OpenAIResponsesProvider.from_settings(settings, client_factory=openai_client_factory)

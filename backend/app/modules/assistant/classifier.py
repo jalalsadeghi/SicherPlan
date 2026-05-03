@@ -231,6 +231,18 @@ _PRODUCT_OVERVIEW_TERMS = {
     "erklären sie mir kurz und bündig was diese software genau macht",
 }
 
+_GREETING_TERMS = {
+    "hello",
+    "hi",
+    "hey",
+    "hallo",
+    "guten tag",
+    "moin",
+    "servus",
+    "salam",
+    "سلام",
+}
+
 
 def classify_assistant_message(
     text: str,
@@ -243,6 +255,17 @@ def classify_assistant_message(
     cleaned = text.strip()
     lowered = cleaned.lower()
     route_blob = _build_route_blob(route_context)
+
+    if lowered in _GREETING_TERMS:
+        return AssistantClassificationResult(
+            category=AssistantIntentCategory.PLATFORM_RELATED,
+            is_platform_related=True,
+            is_out_of_scope=False,
+            is_unsafe=False,
+            reason="generic_greeting",
+            confidence="low",
+            intent="general_platform_chat",
+        )
 
     if _contains_any(lowered, _UNSAFE_PATTERNS) or _contains_any(route_blob, _UNSAFE_PATTERNS):
         return AssistantClassificationResult(
@@ -443,7 +466,9 @@ def _prefer_platform_term_signal(field_signal, platform_term_signal) -> bool:  #
         return False
     field_top_score = field_signal.field_matches[0].score if field_signal.field_matches else -1.0
     term_top_score = platform_term_signal.term_matches[0].score if platform_term_signal.term_matches else -1.0
-    return term_top_score >= field_top_score
+    if field_signal.intent_category == "field_meaning_question" and term_top_score - field_top_score <= 10.0:
+        return False
+    return term_top_score > field_top_score
 
 
 def _unsafe_reason(lowered: str, route_blob: str) -> str:
