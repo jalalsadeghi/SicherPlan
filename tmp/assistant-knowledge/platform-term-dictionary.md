@@ -3204,6 +3204,7 @@
   - [frontend_i18n_label] planningStaffing.messages.ts: staffingActionsTitle defines the visible UI term in planningStaffing.messages.ts.
   - [frontend_i18n_label] planningStaffing.messages.ts: substituteAction defines the visible UI term in planningStaffing.messages.ts.
   - [frontend_i18n_label] planningStaffing.messages.ts: unassignAction defines the visible UI term in planningStaffing.messages.ts.
+  - [frontend_locale] sicherplan.json: customerPlansWizard.assignments.assignAction defines a visible localized UI term in sicherplan.json.
 
 ## planning.staffing_workspace.
 
@@ -6227,6 +6228,42 @@
 - source_basis:
   - [frontend_locale] sicherplan.json: subcontractors.fields.branchUnavailablePlaceholder defines a visible localized UI term in sicherplan.json.
 
+## platform.locale_catalog.calendar
+
+- canonical_name: calendar
+- module_key: unknown
+- page_id: unknown
+- concept_type: ui_term
+- ui_term_type: section_title
+- route_names: none
+- ui_contexts: calendar Title
+- labels_de: Kalender & Staffing-Fläche
+- labels_en: Calendar & staffing workspace
+- definition_de: Kalender & Staffing-Fläche ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.
+- definition_en: calendar is a verified visible SicherPlan UI term in the locale_catalog context.
+- related_terms: none
+- aliases: Calendar & staffing workspace, Kalender & Staffing-Fläche, calendarTitle
+- source_basis:
+  - [frontend_locale] sicherplan.json: customerPlansWizard.assignments.calendarTitle defines a visible localized UI term in sicherplan.json.
+
+## platform.locale_catalog.candidate
+
+- canonical_name: candidate
+- module_key: unknown
+- page_id: unknown
+- concept_type: ui_term
+- ui_term_type: section_title
+- route_names: none
+- ui_contexts: candidates Title
+- labels_de: Kandidaten
+- labels_en: Candidates
+- definition_de: Kandidaten ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.
+- definition_en: candidate is a verified visible SicherPlan UI term in the locale_catalog context.
+- related_terms: none
+- aliases: Candidates, Kandidaten, candidatesTitle
+- source_basis:
+  - [frontend_locale] sicherplan.json: customerPlansWizard.assignments.candidatesTitle defines a visible localized UI term in sicherplan.json.
+
 ## platform.locale_catalog.contact
 
 - canonical_name: contact
@@ -6593,6 +6630,60 @@
 - source_basis:
   - [frontend_locale] sicherplan.json: subcontractors.detail.emptyTitle defines a visible localized UI term in sicherplan.json.
 
+## platform.locale_catalog.empty_no_candidate
+
+- canonical_name: empty_no_candidate
+- module_key: unknown
+- page_id: unknown
+- concept_type: ui_term
+- ui_term_type: section_title
+- route_names: none
+- ui_contexts: empty No Candidates Title
+- labels_de: Keine Kandidaten gefunden
+- labels_en: No candidates found
+- definition_de: Keine Kandidaten gefunden ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.
+- definition_en: empty_no_candidate is a verified visible SicherPlan UI term in the locale_catalog context.
+- related_terms: none
+- aliases: Keine Kandidaten gefunden, No candidates found, emptyNoCandidatesTitle
+- source_basis:
+  - [frontend_locale] sicherplan.json: customerPlansWizard.assignments.emptyNoCandidatesTitle defines a visible localized UI term in sicherplan.json.
+
+## platform.locale_catalog.empty_no_demand_group
+
+- canonical_name: empty_no_demand_group
+- module_key: unknown
+- page_id: unknown
+- concept_type: ui_term
+- ui_term_type: section_title
+- route_names: none
+- ui_contexts: empty No Demand Groups Title
+- labels_de: Keine Bedarfsgruppen vorhanden
+- labels_en: No demand groups available
+- definition_de: Keine Bedarfsgruppen vorhanden ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.
+- definition_en: empty_no_demand_group is a verified visible SicherPlan UI term in the locale_catalog context.
+- related_terms: none
+- aliases: Keine Bedarfsgruppen vorhanden, No demand groups available, emptyNoDemandGroupsTitle
+- source_basis:
+  - [frontend_locale] sicherplan.json: customerPlansWizard.assignments.emptyNoDemandGroupsTitle defines a visible localized UI term in sicherplan.json.
+
+## platform.locale_catalog.empty_no_shift
+
+- canonical_name: empty_no_shift
+- module_key: unknown
+- page_id: unknown
+- concept_type: ui_term
+- ui_term_type: section_title
+- route_names: none
+- ui_contexts: empty No Shifts Title
+- labels_de: Keine erzeugten Schichten
+- labels_en: No generated shifts
+- definition_de: Keine erzeugten Schichten ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.
+- definition_en: empty_no_shift is a verified visible SicherPlan UI term in the locale_catalog context.
+- related_terms: none
+- aliases: Keine erzeugten Schichten, No generated shifts, emptyNoShiftsTitle
+- source_basis:
+  - [frontend_locale] sicherplan.json: customerPlansWizard.assignments.emptyNoShiftsTitle defines a visible localized UI term in sicherplan.json.
+
 ## platform.locale_catalog.equipment
 
 - canonical_name: equipment
@@ -6883,6 +6974,24 @@
 - aliases: Kundenkontext wird geladen, Loading customer context, loadingTitle
 - source_basis:
   - [frontend_locale] sicherplan.json: customerPlansWizard.loadingTitle defines a visible localized UI term in sicherplan.json.
+
+## platform.locale_catalog.locked
+
+- canonical_name: locked
+- module_key: unknown
+- page_id: unknown
+- concept_type: ui_term
+- ui_term_type: section_title
+- route_names: none
+- ui_contexts: locked Title
+- labels_de: Zuweisungen gesperrt
+- labels_en: Assignments locked
+- definition_de: Zuweisungen gesperrt ist ein verifizierter sichtbarer SicherPlan-Begriff im Kontext locale_catalog.
+- definition_en: locked is a verified visible SicherPlan UI term in the locale_catalog context.
+- related_terms: none
+- aliases: Assignments locked, Zuweisungen gesperrt, lockedTitle
+- source_basis:
+  - [frontend_locale] sicherplan.json: customerPlansWizard.assignments.lockedTitle defines a visible localized UI term in sicherplan.json.
 
 ## platform.locale_catalog.mandate
 

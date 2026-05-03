@@ -22,6 +22,7 @@ app/modules/assistant/diagnostic_prefetch.py
 app/modules/assistant/expert_knowledge_pack.py
 app/modules/assistant/field_dictionary.py
 app/modules/assistant/field_dictionary_export.py
+app/modules/assistant/field_lookup_corpus_artifact.py
 app/modules/assistant/grounding.py
 app/modules/assistant/language.py
 app/modules/assistant/lexicon.py

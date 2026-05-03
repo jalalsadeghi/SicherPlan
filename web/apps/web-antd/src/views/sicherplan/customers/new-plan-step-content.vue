@@ -172,6 +172,12 @@ interface DemandGroupDraftRow {
 }
 
 type DemandGroupsDraftPersistence = {
+  context: {
+    order_id: string;
+    planning_record_id: string;
+    series_id: string;
+    shift_plan_id: string;
+  };
   rows: Array<Omit<DemandGroupDraftRow, 'id'>>;
 };
 
@@ -739,8 +745,11 @@ type PersistedDemandGroupSummaryRow = {
 };
 
 type PersistedDemandGroupShiftRow = {
+  active_assignment_count: number;
+  active_subcontractor_release_count: number;
   customer_visible_flag: boolean;
   demand_group_id: string;
+  edit_block_reason_codes: string[];
   function_type_id: string;
   function_type_label: string;
   location_text: string;
@@ -936,10 +945,19 @@ const persistedDemandGroupSummaryRows = computed<PersistedDemandGroupSummaryRow[
       const shiftRows = entry.rows
         .map((row) => {
           const shiftMeta = shiftMetaById.get(row.shift_id);
-          const rowLocked = !shiftMeta || shiftMeta.release_state !== 'draft' || shiftMeta.customer_visible_flag || shiftMeta.subcontractor_visible_flag;
+          const editBlockReasonCodes = Array.isArray(row.edit_block_reason_codes) ? row.edit_block_reason_codes : [];
+          const rowLocked = !shiftMeta
+            || row.editable_flag === false
+            || editBlockReasonCodes.length > 0
+            || shiftMeta.release_state !== 'draft'
+            || shiftMeta.customer_visible_flag
+            || shiftMeta.subcontractor_visible_flag;
           return {
+            active_assignment_count: row.active_assignment_count ?? 0,
+            active_subcontractor_release_count: row.active_subcontractor_release_count ?? 0,
             customer_visible_flag: shiftMeta?.customer_visible_flag ?? false,
             demand_group_id: row.id,
+            edit_block_reason_codes: editBlockReasonCodes,
             function_type_id: row.function_type_id,
             function_type_label: functionTypeLabel,
             location_text: shiftMeta?.location_text ?? '',
@@ -2689,6 +2707,12 @@ function persistDemandGroupsDraft() {
     'demand-groups',
     hasDemandGroupDraftContent()
       ? {
+          context: {
+            order_id: props.wizardState.order_id || '',
+            planning_record_id: props.wizardState.planning_record_id || '',
+            series_id: props.wizardState.series_id || '',
+            shift_plan_id: props.wizardState.shift_plan_id || '',
+          },
           rows: demandGroupDraftRows.value.map(({ id: _id, ...row }) => ({
             ...row,
             function_type_id: row.function_type_id.trim(),
@@ -2698,6 +2722,25 @@ function persistDemandGroupsDraft() {
         }
       : null,
   );
+}
+
+function demandGroupsDraftContextMatches(payload: null | DemandGroupsDraftPersistence | undefined) {
+  if (!payload?.context) {
+    return false;
+  }
+  return (
+    payload.context.order_id === (props.wizardState.order_id || '')
+    && payload.context.planning_record_id === (props.wizardState.planning_record_id || '')
+    && payload.context.shift_plan_id === (props.wizardState.shift_plan_id || '')
+    && payload.context.series_id === (props.wizardState.series_id || '')
+  );
+}
+
+function extractMatchedDemandGroupsDraftRows(payload: null | DemandGroupsDraftPersistence | undefined) {
+  if (!payload?.rows?.length || !demandGroupsDraftContextMatches(payload)) {
+    return [] as DemandGroupsDraftPersistence['rows'];
+  }
+  return payload.rows;
 }
 
 function persistAllUnsavedDrafts() {
@@ -5320,6 +5363,8 @@ async function loadDemandGroupsState(isCurrent = () => true) {
   stepLoadError.demandGroups = '';
   demandGroupValidationError.value = '';
   const persistedDemandGroupsDraft = loadStepDraft<DemandGroupsDraftPersistence>('demand-groups');
+  const matchedDemandGroupsDraftRows = extractMatchedDemandGroupsDraftRows(persistedDemandGroupsDraft);
+  const hadStaleDemandGroupsDraft = Boolean(persistedDemandGroupsDraft?.rows?.length && !matchedDemandGroupsDraftRows.length);
   if (!props.tenantId || !props.accessToken || !props.wizardState.shift_plan_id) {
     selectedShiftPlan.value = null;
     selectedSeries.value = null;
@@ -5327,10 +5372,12 @@ async function loadDemandGroupsState(isCurrent = () => true) {
     persistedDemandGroups.value = [];
     demandGroupApplyResult.value = null;
     demandGroupSummaryMessage.value = '';
-    demandGroupDraftRows.value = persistedDemandGroupsDraft?.rows?.length
-      ? persistedDemandGroupsDraft.rows.map((row) => createDemandGroupDraftRow(row))
+    demandGroupDraftRows.value = matchedDemandGroupsDraftRows.length
+      ? matchedDemandGroupsDraftRows.map((row) => createDemandGroupDraftRow(row))
       : [];
-    if (persistedDemandGroupsDraft?.rows?.length) {
+    if (hadStaleDemandGroupsDraft) {
+      clearStepDraft('demand-groups');
+    } else if (matchedDemandGroupsDraftRows.length) {
       restoreDraftMessage();
     }
     emit('step-completion', 'demand-groups', false);
@@ -5364,10 +5411,12 @@ async function loadDemandGroupsState(isCurrent = () => true) {
     }
     demandGroupApplyResult.value = null;
     demandGroupSummaryMessage.value = '';
-    demandGroupDraftRows.value = persistedDemandGroupsDraft?.rows?.length
-      ? persistedDemandGroupsDraft.rows.map((row) => createDemandGroupDraftRow(row))
+    demandGroupDraftRows.value = matchedDemandGroupsDraftRows.length
+      ? matchedDemandGroupsDraftRows.map((row) => createDemandGroupDraftRow(row))
       : [];
-    if (persistedDemandGroupsDraft?.rows?.length) {
+    if (hadStaleDemandGroupsDraft) {
+      clearStepDraft('demand-groups');
+    } else if (matchedDemandGroupsDraftRows.length) {
       restoreDraftMessage();
     }
     emit(

@@ -10,7 +10,7 @@
 - form_contexts: planning_staffing.demand_and_assignment, employee_assign_to_shift, shift_release_to_employee_app
 - input_type: input
 - required: False
-- confidence: low
+- confidence: medium
 - labels_de: Aktor-Typ
 - labels_en: Actor kind
 - definition_de: Feld Aktor-Typ im Kontext von Assignment.
@@ -20,6 +20,12 @@
 - source_basis:
   - [page_help_manifest] Assistant Page Help Manifest: P-04 manifest section planning_staffing.demand_and_assignment includes field actor_kind labeled Actor kind.
   - [page_help_manifest] Assistant Page Help Manifest: P-04 manifest section planning_staffing.demand_and_assignment includes field actor_kind labeled Aktor-Typ.
+  - [typescript_api_interface] AssignmentStepScopeRequest: AssignmentStepScopeRequest includes field actor_kind.
+  - [typescript_api_interface] AssignmentStepExistingAssignmentRead: AssignmentStepExistingAssignmentRead includes field actor_kind.
+  - [typescript_api_interface] AssignmentStepCandidateRead: AssignmentStepCandidateRead includes field actor_kind.
+  - [typescript_api_interface] AssignmentStepApplyResult: AssignmentStepApplyResult includes field actor_kind.
+  - [backend_schema] AssignmentStepScopeRequest: AssignmentStepScopeRequest includes field actor_kind.
+  - [backend_schema] AssignmentStepExistingAssignmentRead: AssignmentStepExistingAssignmentRead includes field actor_kind.
 
 ## assignment.date_from
 
@@ -45,8 +51,8 @@
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_from.
   - [typescript_api_interface] DemandGroupBulkApplyRequest: DemandGroupBulkApplyRequest includes field date_from.
   - [typescript_api_interface] DemandGroupBulkUpdateRequest: DemandGroupBulkUpdateRequest includes field date_from.
+  - [typescript_api_interface] AssignmentStepScopeRequest: AssignmentStepScopeRequest includes field date_from.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_from.
-  - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_from.
 
 ## assignment.date_to
 
@@ -72,8 +78,8 @@
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_to.
   - [typescript_api_interface] DemandGroupBulkApplyRequest: DemandGroupBulkApplyRequest includes field date_to.
   - [typescript_api_interface] DemandGroupBulkUpdateRequest: DemandGroupBulkUpdateRequest includes field date_to.
+  - [typescript_api_interface] AssignmentStepScopeRequest: AssignmentStepScopeRequest includes field date_to.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_to.
-  - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_to.
 
 ## assignment.demand_group_id
 
@@ -99,8 +105,8 @@
   - [typescript_api_interface] StaffingBoardAssignmentItem: StaffingBoardAssignmentItem includes field demand_group_id.
   - [typescript_api_interface] AssignmentRead: AssignmentRead includes field demand_group_id.
   - [typescript_api_interface] DemandGroupBulkUpdateItemResult: DemandGroupBulkUpdateItemResult includes field demand_group_id.
-  - [typescript_api_interface] SubcontractorReleaseRead: SubcontractorReleaseRead includes field demand_group_id.
-  - [typescript_api_interface] StaffingAssignCommand: StaffingAssignCommand includes field demand_group_id.
+  - [typescript_api_interface] AssignmentStepExistingAssignmentRead: AssignmentStepExistingAssignmentRead includes field demand_group_id.
+  - [typescript_api_interface] AssignmentStepCellRead: AssignmentStepCellRead includes field demand_group_id.
 
 ## assignment.member_ref
 
@@ -221,10 +227,10 @@
   - [page_help_manifest] Assistant Page Help Manifest: P-04 manifest section planning_staffing.demand_and_assignment includes field team_id labeled Team.
   - [typescript_api_interface] StaffingBoardAssignmentItem: StaffingBoardAssignmentItem includes field team_id.
   - [typescript_api_interface] AssignmentRead: AssignmentRead includes field team_id.
+  - [typescript_api_interface] AssignmentStepScopeRequest: AssignmentStepScopeRequest includes field team_id.
+  - [typescript_api_interface] AssignmentStepExistingAssignmentRead: AssignmentStepExistingAssignmentRead includes field team_id.
+  - [typescript_api_interface] AssignmentStepApplyRequest: AssignmentStepApplyRequest includes field team_id.
   - [typescript_api_interface] TeamMemberRead: TeamMemberRead includes field team_id.
-  - [typescript_api_interface] TeamMemberCreate: TeamMemberCreate includes field team_id.
-  - [typescript_api_interface] StaffingAssignCommand: StaffingAssignCommand includes field team_id.
-  - [typescript_api_interface] AssignmentCreate: AssignmentCreate includes field team_id.
 
 ## assignment.team_name
 
@@ -2093,7 +2099,7 @@
   - [typescript_api_interface] EmployeeListFilters: EmployeeListFilters includes field search.
   - [typescript_api_interface] CustomerOrderListFilters: CustomerOrderListFilters includes field search.
   - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field search.
-  - [typescript_api_interface] RecruitingApplicantFilterParams: RecruitingApplicantFilterParams includes field search.
+  - [typescript_api_interface] AssignmentStepScopeRequest: AssignmentStepScopeRequest includes field search.
 
 ## customer.shipping_method_code
 
@@ -2585,8 +2591,8 @@
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_from.
   - [typescript_api_interface] DemandGroupBulkApplyRequest: DemandGroupBulkApplyRequest includes field date_from.
   - [typescript_api_interface] DemandGroupBulkUpdateRequest: DemandGroupBulkUpdateRequest includes field date_from.
+  - [typescript_api_interface] AssignmentStepScopeRequest: AssignmentStepScopeRequest includes field date_from.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_from.
-  - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_from.
 
 ## customer_order.date_to
 
@@ -2612,8 +2618,8 @@
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field date_to.
   - [typescript_api_interface] DemandGroupBulkApplyRequest: DemandGroupBulkApplyRequest includes field date_to.
   - [typescript_api_interface] DemandGroupBulkUpdateRequest: DemandGroupBulkUpdateRequest includes field date_to.
+  - [typescript_api_interface] AssignmentStepScopeRequest: AssignmentStepScopeRequest includes field date_to.
   - [backend_schema] AssistantPlanningShiftSearchInput: AssistantPlanningShiftSearchInput includes field date_to.
-  - [backend_schema] AssistantPlanningAssignmentSearchInput: AssistantPlanningAssignmentSearchInput includes field date_to.
 
 ## customer_order.equipment_lines
 
@@ -2710,8 +2716,8 @@
   - [typescript_api_interface] CustomerOrderListItem: CustomerOrderListItem includes field order_no.
   - [typescript_api_interface] PlanningBoardShiftListItem: PlanningBoardShiftListItem includes field order_no.
   - [typescript_api_interface] CoverageShiftItem: CoverageShiftItem includes field order_no.
+  - [typescript_api_interface] AssignmentStepOrderSummaryRead: AssignmentStepOrderSummaryRead includes field order_no.
   - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field order_no.
-  - [typescript_api_interface] EmployeeProjectContext: EmployeeProjectContext includes field order_no.
 
 ## customer_order.planning_documents
 
@@ -2758,8 +2764,8 @@
   - [typescript_api_interface] PlanningRecordListItem: PlanningRecordListItem includes field planning_from.
   - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field planning_from.
   - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_from.
+  - [typescript_api_interface] AssignmentStepShiftPlanSummaryRead: AssignmentStepShiftPlanSummaryRead includes field planning_from.
   - [backend_schema] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_from.
-  - [backend_schema] PlanningRecord: PlanningRecord includes field planning_from.
 
 ## customer_order.planning_mode_code
 
@@ -2812,8 +2818,8 @@
   - [typescript_api_interface] PlanningRecordListItem: PlanningRecordListItem includes field planning_to.
   - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field planning_to.
   - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_to.
+  - [typescript_api_interface] AssignmentStepShiftPlanSummaryRead: AssignmentStepShiftPlanSummaryRead includes field planning_to.
   - [backend_schema] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_to.
-  - [backend_schema] PlanningRecord: PlanningRecord includes field planning_to.
 
 ## customer_order.recurrence_code
 
@@ -3048,8 +3054,8 @@
   - [typescript_api_interface] PlanningBoardShiftListItem: PlanningBoardShiftListItem includes field workforce_scope_code.
   - [typescript_api_interface] CoverageShiftItem: CoverageShiftItem includes field workforce_scope_code.
   - [typescript_api_interface] CoverageFilterParams: CoverageFilterParams includes field workforce_scope_code.
+  - [typescript_api_interface] AssignmentStepShiftPlanSummaryRead: AssignmentStepShiftPlanSummaryRead includes field workforce_scope_code.
   - [typescript_api_interface] StaffingBoardShiftItem: StaffingBoardShiftItem includes field workforce_scope_code.
-  - [backend_schema] ShiftPlan: ShiftPlan includes field workforce_scope_code.
 
 ## dispatch.audience_code
 
@@ -4011,9 +4017,9 @@
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.firstName defines labels First name, Vorname.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds employeeDraft.first_name next to employeeAdmin.fields.firstName.
   - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field first_name.
+  - [typescript_api_interface] AssignmentStepCandidateRead: AssignmentStepCandidateRead includes field first_name.
   - [typescript_api_interface] ApplicantListItem: ApplicantListItem includes field first_name.
   - [typescript_api_interface] RecruitingApplicantSubmissionPayload: RecruitingApplicantSubmissionPayload includes field first_name.
-  - [typescript_api_interface] SubcontractorWorkerListItem: SubcontractorWorkerListItem includes field first_name.
 
 ## employee.function_type
 
@@ -4236,9 +4242,9 @@
   - [frontend_locale] messages.ts / sicherplan.json: employeeAdmin.fields.lastName defines labels Last name, Nachname.
   - [frontend_component] EmployeeAdminView.vue: EmployeeAdminView.vue binds employeeDraft.last_name next to employeeAdmin.fields.lastName.
   - [typescript_api_interface] EmployeeListItem: EmployeeListItem includes field last_name.
+  - [typescript_api_interface] AssignmentStepCandidateRead: AssignmentStepCandidateRead includes field last_name.
   - [typescript_api_interface] ApplicantListItem: ApplicantListItem includes field last_name.
   - [typescript_api_interface] RecruitingApplicantSubmissionPayload: RecruitingApplicantSubmissionPayload includes field last_name.
-  - [typescript_api_interface] SubcontractorWorkerListItem: SubcontractorWorkerListItem includes field last_name.
 
 ## employee.marital_status
 
@@ -5446,8 +5452,8 @@
   - [typescript_api_interface] PlanningRecordListItem: PlanningRecordListItem includes field planning_from.
   - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field planning_from.
   - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_from.
+  - [typescript_api_interface] AssignmentStepShiftPlanSummaryRead: AssignmentStepShiftPlanSummaryRead includes field planning_from.
   - [backend_schema] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_from.
-  - [backend_schema] PlanningRecord: PlanningRecord includes field planning_from.
 
 ## shift_plan.planning_record_id
 
@@ -5500,8 +5506,8 @@
   - [typescript_api_interface] PlanningRecordListItem: PlanningRecordListItem includes field planning_to.
   - [typescript_api_interface] PlanningRecordListFilters: PlanningRecordListFilters includes field planning_to.
   - [typescript_api_interface] ShiftPlanListItem: ShiftPlanListItem includes field planning_to.
+  - [typescript_api_interface] AssignmentStepShiftPlanSummaryRead: AssignmentStepShiftPlanSummaryRead includes field planning_to.
   - [backend_schema] CustomerDashboardPlanItemRead: CustomerDashboardPlanItemRead includes field planning_to.
-  - [backend_schema] PlanningRecord: PlanningRecord includes field planning_to.
 
 ## shift_plan.recurrence_code
 

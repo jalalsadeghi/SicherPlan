@@ -271,10 +271,10 @@ class StaffingService:
         self.validation_service = PlanningValidationService(repository)
 
     def list_demand_groups(self, tenant_id: str, filters: StaffingFilter, _actor: RequestAuthorizationContext) -> list[DemandGroupRead]:
-        return [DemandGroupRead.model_validate(row) for row in self.repository.list_demand_groups(tenant_id, filters)]
+        return [self._read_demand_group(tenant_id, row) for row in self.repository.list_demand_groups(tenant_id, filters)]
 
     def get_demand_group(self, tenant_id: str, demand_group_id: str, _actor: RequestAuthorizationContext) -> DemandGroupRead:
-        return DemandGroupRead.model_validate(self._require_demand_group(tenant_id, demand_group_id))
+        return self._read_demand_group(tenant_id, self._require_demand_group(tenant_id, demand_group_id))
 
     def create_demand_group(self, tenant_id: str, payload: DemandGroupCreate, actor: RequestAuthorizationContext) -> DemandGroupRead:
         self._require_tenant_scope(tenant_id, payload.tenant_id)
@@ -285,7 +285,7 @@ class StaffingService:
             self._require_qualification(tenant_id, payload.qualification_type_id)
         row = self.repository.create_demand_group(tenant_id, payload, actor.user_id)
         self._record_event(actor, "planning.demand_group.created", "ops.demand_group", row.id, tenant_id, after_json=self._snapshot(row) | {"shift_plan_id": shift.shift_plan_id})
-        return DemandGroupRead.model_validate(row)
+        return self._read_demand_group(tenant_id, row)
 
     def bulk_apply_demand_groups(
         self,
@@ -575,7 +575,7 @@ class StaffingService:
         if row is None:
             raise self._not_found("demand_group")
         self._record_event(actor, "planning.demand_group.updated", "ops.demand_group", row.id, tenant_id, before_json=before_json, after_json=self._snapshot(row))
-        return DemandGroupRead.model_validate(row)
+        return self._read_demand_group(tenant_id, row)
 
     def list_teams(self, tenant_id: str, filters: StaffingFilter, _actor: RequestAuthorizationContext) -> list[TeamRead]:
         return [self._read_team(row) for row in self.repository.list_teams(tenant_id, filters)]
@@ -2089,6 +2089,28 @@ class StaffingService:
                     )
 
     def _assert_demand_group_groups_editable(self, tenant_id: str, demand_groups: list[DemandGroup]) -> None:
+        state = self._collect_demand_group_editability_state(tenant_id, demand_groups, include_deployment_outputs=True)
+        reason_codes = state["reason_codes"]
+        downstream_counts = state["downstream_counts"]
+
+        if reason_codes:
+            raise ApiException(
+                409,
+                "planning.demand_group.edit_blocked",
+                "errors.planning.demand_group.edit_blocked",
+                details={
+                    "reason_codes": sorted(reason_codes),
+                    "downstream_counts": downstream_counts,
+                },
+            )
+
+    def _collect_demand_group_editability_state(
+        self,
+        tenant_id: str,
+        demand_groups: list[DemandGroup],
+        *,
+        include_deployment_outputs: bool,
+    ) -> dict[str, object]:
         reason_codes: set[str] = set()
         downstream_counts = {
             "assignment_count": 0,
@@ -2122,7 +2144,7 @@ class StaffingService:
             if demand_group.shift_id in seen_shift_ids:
                 continue
             seen_shift_ids.add(demand_group.shift_id)
-            shift = self._require_shift(tenant_id, demand_group.shift_id)
+            shift = getattr(demand_group, "shift", None) or self._require_shift(tenant_id, demand_group.shift_id)
             if shift.release_state != "draft":
                 reason_codes.add("shift_released")
                 downstream_counts["released_shift_count"] += 1
@@ -2132,6 +2154,8 @@ class StaffingService:
             if shift.subcontractor_visible_flag:
                 reason_codes.add("subcontractor_visible")
                 downstream_counts["subcontractor_visible_shift_count"] += 1
+            if not include_deployment_outputs:
+                continue
 
             output_documents = [
                 row
@@ -2142,16 +2166,28 @@ class StaffingService:
                 reason_codes.add("deployment_outputs_exist")
                 downstream_counts["deployment_output_count"] += len(output_documents)
 
-        if reason_codes:
-            raise ApiException(
-                409,
-                "planning.demand_group.edit_blocked",
-                "errors.planning.demand_group.edit_blocked",
-                details={
-                    "reason_codes": sorted(reason_codes),
-                    "downstream_counts": downstream_counts,
-                },
-            )
+        return {
+            "downstream_counts": downstream_counts,
+            "reason_codes": sorted(reason_codes),
+        }
+
+    def _read_demand_group(self, tenant_id: str, row: DemandGroup) -> DemandGroupRead:
+        base = DemandGroupRead.model_validate(row)
+        state = self._collect_demand_group_editability_state(
+            tenant_id,
+            [row],
+            include_deployment_outputs=False,
+        )
+        downstream_counts = state["downstream_counts"]
+        reason_codes = state["reason_codes"]
+        return base.model_copy(
+            update={
+                "active_assignment_count": downstream_counts["assignment_count"],
+                "active_subcontractor_release_count": downstream_counts["subcontractor_release_count"],
+                "edit_block_reason_codes": reason_codes,
+                "editable_flag": not bool(reason_codes),
+            }
+        )
 
     def _validate_team_scope(self, tenant_id: str, planning_record_id: str | None, shift_id: str | None) -> None:
         if planning_record_id is None and shift_id is None:

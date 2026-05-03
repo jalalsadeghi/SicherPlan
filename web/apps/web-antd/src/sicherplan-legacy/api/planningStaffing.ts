@@ -113,6 +113,10 @@ export interface DemandGroupRead {
   created_at: string;
   updated_at: string;
   archived_at: null | string;
+  editable_flag?: boolean;
+  edit_block_reason_codes?: string[];
+  active_assignment_count?: number;
+  active_subcontractor_release_count?: number;
 }
 
 export interface DemandGroupCreate {

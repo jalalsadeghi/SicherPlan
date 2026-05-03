@@ -1789,6 +1789,10 @@ class DemandGroupRead(DemandGroupListItem):
     created_by_user_id: str | None
     updated_by_user_id: str | None
     archived_at: datetime | None
+    editable_flag: bool = True
+    edit_block_reason_codes: list[str] = Field(default_factory=list)
+    active_assignment_count: int = 0
+    active_subcontractor_release_count: int = 0
 
 
 class TeamMemberListItem(BaseModel):

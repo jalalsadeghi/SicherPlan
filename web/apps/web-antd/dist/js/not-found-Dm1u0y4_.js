@@ -1,0 +1,1 @@
+import{Ir as e,Ln as t,kn as n,on as r,tr as i}from"../jse/index-index-lfBveg5k.js";import{t as a}from"./fallback-B-W7Y9OW.js";var o=t(r(r({},{name:`Fallback404Demo`}),{},{__name:`not-found`,setup(t){return(t,r)=>(i(),n(e(a),{status:`404`}))}}));export{o as default};

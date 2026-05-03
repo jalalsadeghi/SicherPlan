@@ -262,6 +262,18 @@ function buildPlanningRecordDraftKey(planningEntityId: string, planningEntityTyp
   );
 }
 
+function buildDemandGroupsDraftKey(planningEntityId = 'site-1', planningEntityType = 'site') {
+  return buildWizardDraftStorageKey(
+    {
+      customerId: 'customer-1',
+      planningEntityId,
+      planningEntityType,
+      tenantId: 'tenant-1',
+    },
+    'demand-groups',
+  );
+}
+
 function buildShiftPlan(overrides: Record<string, unknown> = {}) {
   return {
     id: 'plan-1',
@@ -5545,6 +5557,66 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     expect(apiMocks.listDemandGroupsMock).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores and clears a persisted demand-groups draft from a different plan context', async () => {
+    window.sessionStorage.setItem(
+      buildDemandGroupsDraftKey(),
+      JSON.stringify({
+        context: {
+          order_id: 'order-1',
+          planning_record_id: 'record-1',
+          shift_plan_id: 'plan-other',
+          series_id: 'series-other',
+        },
+        rows: [
+          {
+            function_type_id: 'function-1',
+            qualification_type_id: '',
+            min_qty: 1,
+            target_qty: 2,
+            mandatory_flag: true,
+            sort_order: 1,
+            remark: 'stale',
+          },
+        ],
+      }),
+    );
+    apiMocks.listShiftsMock.mockResolvedValue([
+      {
+        id: 'shift-1',
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: 'series-1',
+        occurrence_date: '2026-07-02',
+        starts_at: '2026-07-02T08:00:00Z',
+        ends_at: '2026-07-02T16:00:00Z',
+        break_minutes: 30,
+        shift_type_code: 'day',
+        location_text: null,
+        meeting_point: null,
+        release_state: 'draft',
+        customer_visible_flag: false,
+        subcontractor_visible_flag: false,
+        stealth_mode_flag: false,
+        source_kind_code: 'generated',
+        status: 'active',
+        version_no: 1,
+      },
+    ]);
+    apiMocks.listDemandGroupsMock.mockResolvedValue([]);
+
+    const wrapper = mountStep('demand-groups', {
+      current_step: 'demand-groups',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: 'series-1',
+    });
+    await waitForDemandGroupsStepReady(wrapper, 1);
+
+    expect((wrapper.vm as any).$?.setupState.demandGroupDraftRows).toHaveLength(0);
+    expect(wrapper.find('[data-testid="customer-new-plan-draft-restored"]').exists()).toBe(false);
+    expect(window.sessionStorage.getItem(buildDemandGroupsDraftKey())).toBeNull();
+  });
+
   it('renders applied demand-group actions and prefills the aggregate edit dialog', async () => {
     apiMocks.listShiftsMock.mockResolvedValue([
       {
@@ -6003,6 +6075,69 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     await waitForDemandGroupsStepReady(wrapper, 1);
 
     const rowVm = (wrapper.vm as any).$?.setupState.persistedDemandGroupSummaryRows[0];
+    expect(wrapper.get(`[data-testid="customer-new-plan-demand-group-persisted-edit-${rowVm.signature_key}"]`).attributes('disabled')).toBeDefined();
+    expect(wrapper.get(`[data-testid="customer-new-plan-demand-group-persisted-days-${rowVm.signature_key}"]`).attributes('disabled')).toBeDefined();
+  });
+
+  it('disables applied edit actions when the backend marks persisted demand groups as blocked', async () => {
+    apiMocks.listShiftsMock.mockResolvedValue([
+      {
+        id: 'shift-1',
+        tenant_id: 'tenant-1',
+        shift_plan_id: 'plan-1',
+        shift_series_id: 'series-1',
+        occurrence_date: '2026-07-02',
+        starts_at: '2026-07-02T08:00:00Z',
+        ends_at: '2026-07-02T16:00:00Z',
+        break_minutes: 30,
+        shift_type_code: 'day',
+        location_text: null,
+        meeting_point: null,
+        release_state: 'draft',
+        customer_visible_flag: false,
+        subcontractor_visible_flag: false,
+        stealth_mode_flag: false,
+        source_kind_code: 'generated',
+        status: 'active',
+        version_no: 1,
+      },
+    ]);
+    apiMocks.listDemandGroupsMock.mockResolvedValue([
+      {
+        id: 'dg-1',
+        tenant_id: 'tenant-1',
+        shift_id: 'shift-1',
+        function_type_id: 'function-1',
+        qualification_type_id: null,
+        min_qty: 1,
+        target_qty: 1,
+        mandatory_flag: true,
+        sort_order: 1,
+        remark: null,
+        status: 'active',
+        version_no: 1,
+        created_at: '2026-07-01T08:00:00Z',
+        updated_at: '2026-07-01T08:00:00Z',
+        archived_at: null,
+        editable_flag: false,
+        edit_block_reason_codes: ['assignments_exist'],
+        active_assignment_count: 2,
+        active_subcontractor_release_count: 0,
+      },
+    ]);
+
+    const wrapper = mountStep('demand-groups', {
+      current_step: 'demand-groups',
+      planning_record_id: 'record-1',
+      shift_plan_id: 'plan-1',
+      series_id: 'series-1',
+    });
+    await waitForDemandGroupsStepReady(wrapper, 1);
+
+    const rowVm = (wrapper.vm as any).$?.setupState.persistedDemandGroupSummaryRows[0];
+    expect(rowVm.has_locked_rows).toBe(true);
+    expect(rowVm.shift_rows[0].edit_block_reason_codes).toEqual(['assignments_exist']);
+    expect(rowVm.shift_rows[0].active_assignment_count).toBe(2);
     expect(wrapper.get(`[data-testid="customer-new-plan-demand-group-persisted-edit-${rowVm.signature_key}"]`).attributes('disabled')).toBeDefined();
     expect(wrapper.get(`[data-testid="customer-new-plan-demand-group-persisted-days-${rowVm.signature_key}"]`).attributes('disabled')).toBeDefined();
   });

@@ -1,0 +1,1 @@
+import{u as e}from"../jse/index-index-lfBveg5k.js";var t=e(`core-user`,{actions:{setUserInfo(e){var t;this.userInfo=e;let n=(t=e==null?void 0:e.roles)==null?[]:t;this.setUserRoles(n)},setUserRoles(e){this.userRoles=e}},state:()=>({userInfo:null,userRoles:[]})});export{t};
