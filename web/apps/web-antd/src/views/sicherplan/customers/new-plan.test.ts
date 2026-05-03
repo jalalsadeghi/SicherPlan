@@ -320,7 +320,7 @@ describe('CustomerNewPlanWizardView', () => {
     expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('order-details');
     expect(wrapper.find('[data-testid="customer-new-plan-step-content-stub"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="customer-new-plan-action-bar"]').exists()).toBe(true);
-    expect(wrapper.findAll('.sp-customer-plan-wizard__step')).toHaveLength(7);
+    expect(wrapper.findAll('.sp-customer-plan-wizard__step')).toHaveLength(8);
     expect(wrapper.find('[data-testid="customer-new-plan-step-equipment-lines"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="customer-new-plan-step-requirement-lines"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="customer-new-plan-step-order-documents"]').exists()).toBe(false);
@@ -1062,7 +1062,7 @@ describe('CustomerNewPlanWizardView', () => {
     });
   });
 
-  it('keeps the final demand-groups route stable after a successful apply', async () => {
+  it('advances from demand-groups to assignments after a successful apply', async () => {
     routeState.query = {
       customer_id: 'customer-1',
       order_id: 'order-1',
@@ -1077,11 +1077,15 @@ describe('CustomerNewPlanWizardView', () => {
     const wrapper = mountComponent();
     await flushPromises();
 
-    await wrapper.get('[data-testid="customer-new-plan-complete-demand-groups"]').trigger('click');
+    await wrapper.get('[data-testid="customer-new-plan-next"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('demand-groups');
-    expect(routeState.query.step).toBe('demand-groups');
+    expect(wrapper.get('[data-testid="customer-new-plan-step-content"]').attributes('data-step-id')).toBe('assignments');
+    expect(routerReplaceMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      query: expect.objectContaining({
+        step: 'assignments',
+      }),
+    }));
   });
 
   it('does not reset from order-details when only the access token changes for the same customer', async () => {

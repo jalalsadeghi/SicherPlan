@@ -37,6 +37,8 @@ const planningShiftsApiErrorExports = vi.hoisted(() => {
 });
 
 const apiMocks = vi.hoisted(() => ({
+  applyAssignmentStepMock: vi.fn(),
+  getAssignmentStepSnapshotMock: vi.fn(),
   createPlanningSetupRecordMock: vi.fn(),
   createPlanningRecordAttachmentMock: vi.fn(),
   createPlanningRecordMock: vi.fn(),
@@ -53,7 +55,9 @@ const apiMocks = vi.hoisted(() => ({
   getShiftPlanMock: vi.fn(),
   getShiftSeriesMock: vi.fn(),
   getShiftTemplateMock: vi.fn(),
+  listAssignmentStepCandidatesMock: vi.fn(),
   listDemandGroupsMock: vi.fn(),
+  listTeamsMock: vi.fn(),
   linkOrderAttachmentMock: vi.fn(),
   linkPlanningRecordAttachmentMock: vi.fn(),
   listCustomerOrdersMock: vi.fn(),
@@ -71,6 +75,7 @@ const apiMocks = vi.hoisted(() => ({
   listShiftSeriesMock: vi.fn(),
   listShiftTemplatesMock: vi.fn(),
   listShiftTypeOptionsMock: vi.fn(),
+  previewAssignmentStepApplyMock: vi.fn(),
   updateDemandGroupMock: vi.fn(),
   updatePlanningRecordMock: vi.fn(),
   updateShiftPlanMock: vi.fn(),
@@ -79,6 +84,7 @@ const apiMocks = vi.hoisted(() => ({
   unlinkPlanningRecordAttachmentMock: vi.fn(),
 }));
 const employeeAdminMocks = vi.hoisted(() => ({
+  listEmployeeGroupsMock: vi.fn(),
   listFunctionTypesMock: vi.fn(),
   listQualificationTypesMock: vi.fn(),
 }));
@@ -104,6 +110,7 @@ vi.mock('#/sicherplan-legacy/api/planningAdmin', () => ({
 }));
 
 vi.mock('#/sicherplan-legacy/api/employeeAdmin', () => ({
+  listEmployeeGroups: employeeAdminMocks.listEmployeeGroupsMock,
   listFunctionTypes: employeeAdminMocks.listFunctionTypesMock,
   listQualificationTypes: employeeAdminMocks.listQualificationTypesMock,
 }));
@@ -157,9 +164,14 @@ vi.mock('#/sicherplan-legacy/api/planningShifts', () => ({
 }));
 
 vi.mock('#/sicherplan-legacy/api/planningStaffing', () => ({
+  applyAssignmentStep: apiMocks.applyAssignmentStepMock,
   bulkApplyDemandGroups: apiMocks.bulkApplyDemandGroupsMock,
   bulkUpdateDemandGroups: apiMocks.bulkUpdateDemandGroupsMock,
+  getAssignmentStepSnapshot: apiMocks.getAssignmentStepSnapshotMock,
+  listAssignmentStepCandidates: apiMocks.listAssignmentStepCandidatesMock,
   listDemandGroups: apiMocks.listDemandGroupsMock,
+  listTeams: apiMocks.listTeamsMock,
+  previewAssignmentStepApply: apiMocks.previewAssignmentStepApplyMock,
   updateDemandGroup: apiMocks.updateDemandGroupMock,
 }));
 
@@ -423,6 +435,7 @@ function baseWizardState(): CustomerNewPlanWizardState {
       'shift-plan': { completed: false, dirty: false, error: '', loading: false },
       'series-exceptions': { completed: false, dirty: false, error: '', loading: false },
       'demand-groups': { completed: false, dirty: false, error: '', loading: false },
+      'assignments': { completed: false, dirty: false, error: '', loading: false },
     },
   };
 }
@@ -491,12 +504,16 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.generateShiftSeriesMock.mockReset();
     apiMocks.bulkApplyDemandGroupsMock.mockReset();
     apiMocks.bulkUpdateDemandGroupsMock.mockReset();
+    apiMocks.applyAssignmentStepMock.mockReset();
+    apiMocks.getAssignmentStepSnapshotMock.mockReset();
     apiMocks.getCustomerOrderMock.mockReset();
     apiMocks.getPlanningRecordMock.mockReset();
     apiMocks.getShiftPlanMock.mockReset();
     apiMocks.getShiftSeriesMock.mockReset();
     apiMocks.getShiftTemplateMock.mockReset();
+    apiMocks.listAssignmentStepCandidatesMock.mockReset();
     apiMocks.listDemandGroupsMock.mockReset();
+    apiMocks.listTeamsMock.mockReset();
     apiMocks.linkOrderAttachmentMock.mockReset();
     apiMocks.linkPlanningRecordAttachmentMock.mockReset();
     apiMocks.listCustomerOrdersMock.mockReset();
@@ -514,7 +531,9 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listShiftSeriesMock.mockReset();
     apiMocks.listShiftTemplatesMock.mockReset();
     apiMocks.listShiftTypeOptionsMock.mockReset();
+    apiMocks.previewAssignmentStepApplyMock.mockReset();
     apiMocks.updateDemandGroupMock.mockReset();
+    employeeAdminMocks.listEmployeeGroupsMock.mockReset();
     employeeAdminMocks.listFunctionTypesMock.mockReset();
     employeeAdminMocks.listQualificationTypesMock.mockReset();
     apiMocks.updatePlanningRecordMock.mockReset();
@@ -564,9 +583,74 @@ describe('CustomerNewPlanStepContent EPIC 4', () => {
     apiMocks.listShiftsMock.mockResolvedValue([]);
     apiMocks.listShiftTemplatesMock.mockResolvedValue([{ id: 'template-1', tenant_id: 'tenant-1', code: 'TPL-1', label: 'Tagdienst Vorlage', local_start_time: '08:00', local_end_time: '16:00', default_break_minutes: 30, shift_type_code: 'day', status: 'active', version_no: 1 }]);
     apiMocks.listShiftTypeOptionsMock.mockResolvedValue([{ code: 'day', label: 'Day shift' }]);
+    apiMocks.listTeamsMock.mockResolvedValue([]);
+    employeeAdminMocks.listEmployeeGroupsMock.mockResolvedValue([]);
     employeeAdminMocks.listFunctionTypesMock.mockResolvedValue([]);
     employeeAdminMocks.listQualificationTypesMock.mockResolvedValue([]);
     apiMocks.listDemandGroupsMock.mockResolvedValue([]);
+    apiMocks.getAssignmentStepSnapshotMock.mockResolvedValue({
+      tenant_id: 'tenant-1',
+      order: {
+        order_id: 'order-1',
+        order_no: 'ORD-1000',
+        customer_id: 'customer-1',
+        planning_record_id: 'record-1',
+        planning_record_name: 'Werk Nord Sommer',
+        planning_mode_code: 'site',
+      },
+      shift_plan: {
+        shift_plan_id: 'plan-1',
+        shift_plan_name: 'Werk Nord / Schichtplan',
+        shift_series_id: 'series-1',
+        shift_series_label: 'Tagdienst',
+        workforce_scope_code: 'internal',
+        planning_from: '2026-06-01',
+        planning_to: '2026-06-10',
+        project_start: '2026-06-01',
+        project_end: '2026-06-10',
+        default_month: '2026-06-01',
+        active_months: ['2026-06-01'],
+      },
+      generated_shift_count: 0,
+      demand_group_summary_count: 0,
+      editable_flag: true,
+      lock_reason_codes: [],
+      demand_group_summaries: [],
+      day_summaries: [],
+      calendar_cells: [],
+      candidates: [],
+    });
+    apiMocks.listAssignmentStepCandidatesMock.mockResolvedValue({
+      tenant_id: 'tenant-1',
+      shift_plan_id: 'plan-1',
+      shift_series_id: 'series-1',
+      generated_shift_count: 0,
+      candidates: [],
+    });
+    apiMocks.previewAssignmentStepApplyMock.mockResolvedValue({
+      tenant_id: 'tenant-1',
+      shift_plan_id: 'plan-1',
+      shift_series_id: 'series-1',
+      actor_kind: 'employee',
+      actor_id: 'employee-1',
+      requested_count: 0,
+      accepted_count: 0,
+      rejected_count: 0,
+      created_assignment_ids: [],
+      results: [],
+    });
+    apiMocks.applyAssignmentStepMock.mockResolvedValue({
+      tenant_id: 'tenant-1',
+      shift_plan_id: 'plan-1',
+      shift_series_id: 'series-1',
+      actor_kind: 'employee',
+      actor_id: 'employee-1',
+      requested_count: 0,
+      accepted_count: 0,
+      rejected_count: 0,
+      created_assignment_ids: [],
+      results: [],
+    });
     apiMocks.listShiftSeriesMock.mockResolvedValue([]);
     apiMocks.listShiftSeriesExceptionsMock.mockResolvedValue([]);
     apiMocks.getPlanningRecordMock.mockResolvedValue(buildPlanningRecord());

@@ -75,6 +75,15 @@ export const CUSTOMER_NEW_PLAN_WIZARD_STEPS: CustomerNewPlanWizardStepDefinition
     saveHandlerKey: 'saveDemandGroupsStep',
     nextStepResolverKey: 'resolveDemandGroupsStepNext',
   },
+  {
+    id: 'assignments',
+    labelKey: 'sicherplan.customerPlansWizard.steps.assignments',
+    requiredContextFields: ['customer_id', 'shift_plan_id'],
+    loadHandlerKey: 'loadAssignmentsStep',
+    validateHandlerKey: 'validateAssignmentsStep',
+    saveHandlerKey: 'saveAssignmentsStep',
+    nextStepResolverKey: 'resolveAssignmentsStepNext',
+  },
 ];
 
 export const CUSTOMER_NEW_PLAN_WIZARD_STEP_IDS = CUSTOMER_NEW_PLAN_WIZARD_STEPS.map((step) => step.id);

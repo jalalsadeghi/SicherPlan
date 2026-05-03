@@ -11,6 +11,8 @@ from app.errors import ApiException
 from app.modules.iam.audit_service import AuditService
 from app.modules.planning.models import Assignment, AssignmentValidationOverride, DemandGroup, Shift, ShiftPlan, ShiftTemplate, SubcontractorRelease, Team, TeamMember
 from app.modules.planning.schemas import (
+    AssignmentStepApplyRequest,
+    AssignmentStepScopeRequest,
     AssignmentCreate,
     AssignmentUpdate,
     CoverageFilter,
@@ -67,15 +69,44 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
             expiry_required=True,
             proof_required=True,
         )
-        self.employees["employee-1"] = SimpleNamespace(id="employee-1", tenant_id=self.tenant_id, status="active")
-        self.employees["employee-2"] = SimpleNamespace(id="employee-2", tenant_id=self.tenant_id, status="active")
+        self.employees["employee-1"] = SimpleNamespace(
+            id="employee-1",
+            tenant_id=self.tenant_id,
+            personnel_no="E-001",
+            first_name="Erika",
+            last_name="Eins",
+            preferred_name=None,
+            status="active",
+            archived_at=None,
+            group_memberships=[],
+            absences=[],
+            availability_rules=[],
+        )
+        self.employees["employee-2"] = SimpleNamespace(
+            id="employee-2",
+            tenant_id=self.tenant_id,
+            personnel_no="E-002",
+            first_name="Boris",
+            last_name="Zwei",
+            preferred_name=None,
+            status="active",
+            archived_at=None,
+            group_memberships=[],
+            absences=[],
+            availability_rules=[],
+        )
         self.subcontractors["sub-1"] = SimpleNamespace(id="sub-1", tenant_id=self.tenant_id, status="active")
         self.subcontractors["sub-2"] = SimpleNamespace(id="sub-2", tenant_id=self.tenant_id, status="active")
         self.subcontractor_workers["worker-1"] = SimpleNamespace(
             id="worker-1",
             tenant_id=self.tenant_id,
             subcontractor_id="sub-1",
+            worker_no="W-001",
+            first_name="Sam",
+            last_name="Worker",
+            preferred_name=None,
             status="active",
+            archived_at=None,
             created_at=now,
             updated_at=now,
         )
@@ -137,7 +168,12 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
             id="worker-2",
             tenant_id=self.tenant_id,
             subcontractor_id="sub-1",
+            worker_no="W-002",
+            first_name="Pat",
+            last_name="Worker",
+            preferred_name=None,
             status="active",
+            archived_at=None,
             created_at=now,
             updated_at=now,
         )
@@ -145,7 +181,12 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
             id="worker-3",
             tenant_id=self.tenant_id,
             subcontractor_id="sub-2",
+            worker_no="W-003",
+            first_name="Alex",
+            last_name="Worker",
+            preferred_name=None,
             status="active",
+            archived_at=None,
             created_at=now,
             updated_at=now,
         )
@@ -162,6 +203,9 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
         row = self.employees.get(employee_id)
         return row if row and row.tenant_id == tenant_id else None
 
+    def list_employees(self, tenant_id: str):
+        return [row for row in self.employees.values() if row.tenant_id == tenant_id and row.status == "active" and row.archived_at is None]
+
     def get_subcontractor(self, tenant_id: str, subcontractor_id: str):
         row = self.subcontractors.get(subcontractor_id)
         return row if row and row.tenant_id == tenant_id else None
@@ -169,6 +213,13 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
     def get_subcontractor_worker(self, tenant_id: str, worker_id: str):
         row = self.subcontractor_workers.get(worker_id)
         return row if row and row.tenant_id == tenant_id else None
+
+    def list_subcontractor_workers(self, tenant_id: str):
+        return [
+            row
+            for row in self.subcontractor_workers.values()
+            if row.tenant_id == tenant_id and row.status == "active" and row.archived_at is None
+        ]
 
     def get_shift(self, tenant_id: str, row_id: str):
         row = super().get_shift(tenant_id, row_id)
@@ -193,6 +244,12 @@ class FakeStaffingRepository(FakeShiftPlanningRepository):
             for row in self.employee_qualifications.get(employee_id, [])
             if getattr(row, "tenant_id", tenant_id) == tenant_id
         ]
+
+    def list_employee_absences(self, tenant_id: str, employee_id: str):
+        return list(getattr(self.employees.get(employee_id), "absences", []))
+
+    def list_employee_availability_rules(self, tenant_id: str, employee_id: str):
+        return list(getattr(self.employees.get(employee_id), "availability_rules", []))
 
     def list_worker_qualifications(self, tenant_id: str, worker_id: str):
         return [
@@ -1657,6 +1714,305 @@ class StaffingServiceTests(unittest.TestCase):
         self.assertEqual(demand_states[red.id], "red")
         self.assertEqual(demand_states[yellow.id], "yellow")
         self.assertEqual(demand_states[green.id], "green")
+
+    def test_assignment_step_candidate_ranking_prefers_more_eligible_days(self) -> None:
+        series = self._create_shift_series(label="Assignments", date_from=date(2026, 4, 7), date_to=date(2026, 4, 8))
+        shift_a = self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+        shift_b = self._create_generated_shift(occurrence_date=date(2026, 4, 8), shift_series_id=series.id)
+        self.service.bulk_apply_demand_groups(
+            "tenant-1",
+            DemandGroupBulkApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_groups=[
+                    {
+                        "function_type_id": "function-1",
+                        "qualification_type_id": "qualification-1",
+                        "min_qty": 1,
+                        "target_qty": 1,
+                        "sort_order": 10,
+                    }
+                ],
+            ),
+            _context("planning.staffing.write"),
+        )
+        self.repository.employees["employee-1"].group_memberships = [
+            SimpleNamespace(group_id="group-a", status="active", archived_at=None),
+        ]
+        self.repository.employees["employee-1"].absences = []
+        self.repository.employees["employee-2"].group_memberships = [
+            SimpleNamespace(group_id="group-b", status="active", archived_at=None),
+        ]
+        self.repository.employees["employee-2"].absences = [
+            SimpleNamespace(
+                tenant_id="tenant-1",
+                employee_id="employee-2",
+                starts_on=date(2026, 4, 8),
+                ends_on=date(2026, 4, 8),
+                status="approved",
+                archived_at=None,
+            )
+        ]
+
+        result = self.service.list_assignment_step_candidates(
+            "tenant-1",
+            AssignmentStepScopeRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_group_match={"function_type_id": "function-1", "qualification_type_id": "qualification-1", "sort_order": 10},
+            ),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual(result.generated_shift_count, 2)
+        self.assertGreaterEqual(len(result.candidates), 2)
+        self.assertEqual(result.candidates[0].actor_id, "employee-1")
+        self.assertEqual(result.candidates[0].eligible_day_count, 2)
+        self.assertEqual(result.candidates[0].blocked_day_count, 0)
+        employee_two = next(row for row in result.candidates if row.actor_id == "employee-2")
+        self.assertEqual(employee_two.eligible_day_count, 0)
+        self.assertIn("qualification_match", employee_two.top_reason_codes)
+
+    def test_assignment_step_snapshot_builds_calendar_day_states(self) -> None:
+        series = self._create_shift_series(label="Assignments", date_from=date(2026, 4, 7), date_to=date(2026, 4, 8))
+        shift_a = self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+        shift_b = self._create_generated_shift(occurrence_date=date(2026, 4, 8), shift_series_id=series.id)
+        group_a = self.service.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(
+                tenant_id="tenant-1",
+                shift_id=shift_a.id,
+                function_type_id="function-1",
+                min_qty=1,
+                target_qty=1,
+                sort_order=10,
+            ),
+            _context("planning.staffing.write"),
+        )
+        group_b = self.service.create_demand_group(
+            "tenant-1",
+            DemandGroupCreate(
+                tenant_id="tenant-1",
+                shift_id=shift_b.id,
+                function_type_id="function-1",
+                min_qty=2,
+                target_qty=2,
+                sort_order=10,
+            ),
+            _context("planning.staffing.write"),
+        )
+        self.service.assign(
+            "tenant-1",
+            StaffingAssignCommand(
+                tenant_id="tenant-1",
+                shift_id=shift_a.id,
+                demand_group_id=group_a.id,
+                employee_id="employee-1",
+                confirmed_at=datetime(2026, 4, 7, 6, 0, tzinfo=UTC),
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        snapshot = self.service.get_assignment_step_snapshot(
+            "tenant-1",
+            AssignmentStepScopeRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+            ),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual(snapshot.generated_shift_count, 2)
+        self.assertEqual(snapshot.shift_plan.project_start, date(2026, 4, 7))
+        self.assertEqual(snapshot.shift_plan.project_end, date(2026, 4, 8))
+        self.assertEqual(len(snapshot.day_summaries), 2)
+        states = {row.occurrence_date: row.overall_state for row in snapshot.day_summaries}
+        self.assertEqual(states[date(2026, 4, 7)], "fully_covered")
+        self.assertEqual(states[date(2026, 4, 8)], "blocked")
+
+    def test_assignment_step_apply_creates_assignments_for_eligible_days(self) -> None:
+        series = self._create_shift_series(label="Assignments", date_from=date(2026, 4, 7), date_to=date(2026, 4, 8))
+        shift_a = self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+        shift_b = self._create_generated_shift(occurrence_date=date(2026, 4, 8), shift_series_id=series.id)
+        self.service.bulk_apply_demand_groups(
+            "tenant-1",
+            DemandGroupBulkApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_groups=[
+                    {
+                        "function_type_id": "function-1",
+                        "qualification_type_id": "qualification-1",
+                        "min_qty": 1,
+                        "target_qty": 1,
+                        "sort_order": 10,
+                    }
+                ],
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        result = self.service.apply_assignment_step(
+            "tenant-1",
+            AssignmentStepApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_group_match={"function_type_id": "function-1", "qualification_type_id": "qualification-1", "sort_order": 10},
+                target_shift_ids=[shift_a.id, shift_b.id],
+                employee_id="employee-1",
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        self.assertEqual(result.accepted_count, 2)
+        self.assertEqual(result.rejected_count, 0)
+        self.assertEqual(len(result.created_assignment_ids), 2)
+        self.assertTrue(all(item.outcome_code == "created" for item in result.results))
+
+    def test_assignment_step_apply_partially_rejects_ineligible_dates(self) -> None:
+        series = self._create_shift_series(label="Assignments", date_from=date(2026, 4, 7), date_to=date(2026, 4, 8))
+        shift_a = self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+        shift_b = self._create_generated_shift(occurrence_date=date(2026, 4, 8), shift_series_id=series.id)
+        self.service.bulk_apply_demand_groups(
+            "tenant-1",
+            DemandGroupBulkApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_groups=[
+                    {
+                        "function_type_id": "function-1",
+                        "qualification_type_id": "qualification-1",
+                        "min_qty": 1,
+                        "target_qty": 1,
+                        "sort_order": 10,
+                    }
+                ],
+            ),
+            _context("planning.staffing.write"),
+        )
+        self.repository.employees["employee-1"].absences = [
+            SimpleNamespace(
+                tenant_id="tenant-1",
+                employee_id="employee-1",
+                starts_on=date(2026, 4, 8),
+                ends_on=date(2026, 4, 8),
+                status="approved",
+                archived_at=None,
+            )
+        ]
+
+        result = self.service.apply_assignment_step(
+            "tenant-1",
+            AssignmentStepApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_group_match={"function_type_id": "function-1", "qualification_type_id": "qualification-1", "sort_order": 10},
+                target_shift_ids=[shift_a.id, shift_b.id],
+                employee_id="employee-1",
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        self.assertEqual(result.accepted_count, 1)
+        self.assertEqual(result.rejected_count, 1)
+        rejected = next(item for item in result.results if item.outcome_code == "rejected")
+        self.assertIn("employee_absence", rejected.reason_codes)
+
+    def test_assignment_step_apply_blocks_locked_shift_days(self) -> None:
+        series = self._create_shift_series(label="Assignments", date_from=date(2026, 4, 7), date_to=date(2026, 4, 7))
+        shift = self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+        locked_shift = self.repository.get_shift("tenant-1", shift.id)
+        assert locked_shift is not None
+        locked_shift.release_state = "released"
+        self.service.bulk_apply_demand_groups(
+            "tenant-1",
+            DemandGroupBulkApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_groups=[
+                    {
+                        "function_type_id": "function-1",
+                        "qualification_type_id": "qualification-1",
+                        "min_qty": 1,
+                        "target_qty": 1,
+                        "sort_order": 10,
+                    }
+                ],
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        snapshot = self.service.get_assignment_step_snapshot(
+            "tenant-1",
+            AssignmentStepScopeRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_group_match={"function_type_id": "function-1", "qualification_type_id": "qualification-1", "sort_order": 10},
+            ),
+            _context("planning.staffing.read"),
+        )
+        self.assertFalse(snapshot.editable_flag)
+        self.assertIn("shift_released", snapshot.lock_reason_codes)
+
+        result = self.service.preview_assignment_step_apply(
+            "tenant-1",
+            AssignmentStepApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_group_match={"function_type_id": "function-1", "qualification_type_id": "qualification-1", "sort_order": 10},
+                target_shift_ids=[shift.id],
+                employee_id="employee-1",
+            ),
+            _context("planning.staffing.write"),
+        )
+        self.assertEqual(result.accepted_count, 0)
+        self.assertEqual(result.rejected_count, 1)
+        self.assertIn("shift_released", result.results[0].reason_codes)
+
+    def test_assignment_step_snapshot_handles_no_generated_shifts(self) -> None:
+        snapshot = self.service.get_assignment_step_snapshot(
+            "tenant-1",
+            AssignmentStepScopeRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+            ),
+            _context("planning.staffing.read"),
+        )
+
+        self.assertEqual(snapshot.generated_shift_count, 0)
+        self.assertEqual(snapshot.demand_group_summary_count, 0)
+        self.assertEqual(snapshot.day_summaries, [])
+
+    def test_assignment_step_apply_rejects_missing_demand_group_context(self) -> None:
+        series = self._create_shift_series(label="Assignments", date_from=date(2026, 4, 7), date_to=date(2026, 4, 7))
+        shift = self._create_generated_shift(occurrence_date=date(2026, 4, 7), shift_series_id=series.id)
+
+        result = self.service.preview_assignment_step_apply(
+            "tenant-1",
+            AssignmentStepApplyRequest(
+                tenant_id="tenant-1",
+                shift_plan_id=self.shift_plan_id,
+                shift_series_id=series.id,
+                demand_group_match={"function_type_id": "function-1", "sort_order": 10},
+                target_shift_ids=[shift.id],
+                employee_id="employee-1",
+            ),
+            _context("planning.staffing.write"),
+        )
+
+        self.assertEqual(result.accepted_count, 0)
+        self.assertEqual(result.rejected_count, 1)
+        self.assertIn("demand_group_not_found", result.results[0].reason_codes)
 
     def test_staffing_board_without_visibility_state_does_not_crash(self) -> None:
         rows = self.service.staffing_board(

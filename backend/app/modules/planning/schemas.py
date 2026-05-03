@@ -2106,3 +2106,206 @@ class CoverageFilter(BaseModel):
     release_state: str | None = None
     visibility_state: str | None = None
     confirmation_state: str | None = None
+
+
+class AssignmentStepDemandGroupMatch(BaseModel):
+    function_type_id: str
+    qualification_type_id: str | None = None
+    min_qty: int | None = Field(default=None, ge=0)
+    target_qty: int | None = Field(default=None, ge=0)
+    mandatory_flag: bool | None = None
+    sort_order: int | None = Field(default=None, ge=1)
+    remark: str | None = None
+
+
+class AssignmentStepScopeRequest(BaseModel):
+    tenant_id: str
+    shift_plan_id: str
+    shift_series_id: str | None = None
+    date_from: date | None = None
+    date_to: date | None = None
+    active_month: date | None = None
+    demand_group_match: AssignmentStepDemandGroupMatch | None = None
+    actor_kind: str | None = None
+    team_id: str | None = None
+    employee_group_id: str | None = None
+    search: str | None = None
+    unfilled_only: bool = False
+
+
+class AssignmentStepOrderSummaryRead(BaseModel):
+    order_id: str
+    order_no: str
+    customer_id: str
+    planning_record_id: str
+    planning_record_name: str
+    planning_mode_code: str
+
+
+class AssignmentStepShiftPlanSummaryRead(BaseModel):
+    shift_plan_id: str
+    shift_plan_name: str
+    shift_series_id: str | None = None
+    shift_series_label: str | None = None
+    workforce_scope_code: str
+    planning_from: date
+    planning_to: date
+    project_start: date
+    project_end: date
+    default_month: date
+    active_months: list[date] = Field(default_factory=list)
+
+
+class AssignmentStepDemandGroupSummaryRead(BaseModel):
+    signature_key: str
+    function_type_id: str
+    qualification_type_id: str | None = None
+    min_qty: int
+    target_qty: int
+    mandatory_flag: bool
+    sort_order: int
+    remark: str | None = None
+    matched_shift_count: int
+    assigned_count: int
+    confirmed_count: int
+    released_partner_qty: int
+    remaining_open_qty: int
+    coverage_state: str
+
+
+class AssignmentStepExistingAssignmentRead(BaseModel):
+    assignment_id: str
+    shift_id: str
+    demand_group_id: str
+    assignment_status_code: str
+    actor_kind: str
+    actor_id: str
+    personnel_ref: str
+    display_name: str
+    team_id: str | None = None
+
+
+class AssignmentStepCellRead(BaseModel):
+    shift_id: str
+    demand_group_id: str
+    occurrence_date: date
+    starts_at: datetime
+    ends_at: datetime
+    shift_type_code: str
+    function_type_id: str
+    qualification_type_id: str | None = None
+    min_qty: int
+    target_qty: int
+    assigned_count: int
+    confirmed_count: int
+    released_partner_qty: int
+    remaining_open_qty: int
+    coverage_state: str
+    editable_flag: bool
+    existing_assignments: list[AssignmentStepExistingAssignmentRead] = Field(default_factory=list)
+
+
+class AssignmentStepDaySummaryRead(BaseModel):
+    occurrence_date: date
+    total_shifts: int
+    fully_covered_count: int
+    warning_count: int
+    blocked_count: int
+    overall_state: str
+    active_flag: bool
+
+
+class AssignmentStepCandidateDayStatusRead(BaseModel):
+    shift_id: str
+    demand_group_id: str | None = None
+    occurrence_date: date
+    eligible_flag: bool
+    warning_flag: bool = False
+    reason_codes: list[str] = Field(default_factory=list)
+    warning_codes: list[str] = Field(default_factory=list)
+    validation_results: list[PlanningValidationResult] = Field(default_factory=list)
+
+
+class AssignmentStepCandidateRead(BaseModel):
+    actor_kind: str
+    actor_id: str
+    personnel_ref: str
+    first_name: str
+    last_name: str
+    display_name: str
+    subcontractor_id: str | None = None
+    team_ids: list[str] = Field(default_factory=list)
+    employee_group_ids: list[str] = Field(default_factory=list)
+    qualification_match_flag: bool
+    function_match_flag: bool
+    eligible_day_count: int
+    warning_day_count: int
+    blocked_day_count: int
+    availability_day_count: int
+    conflict_day_count: int
+    suitability_score: int
+    top_reason_codes: list[str] = Field(default_factory=list)
+    day_statuses: list[AssignmentStepCandidateDayStatusRead] = Field(default_factory=list)
+
+
+class AssignmentStepSnapshotRead(BaseModel):
+    tenant_id: str
+    order: AssignmentStepOrderSummaryRead
+    shift_plan: AssignmentStepShiftPlanSummaryRead
+    generated_shift_count: int
+    demand_group_summary_count: int
+    editable_flag: bool
+    lock_reason_codes: list[str] = Field(default_factory=list)
+    demand_group_summaries: list[AssignmentStepDemandGroupSummaryRead] = Field(default_factory=list)
+    day_summaries: list[AssignmentStepDaySummaryRead] = Field(default_factory=list)
+    calendar_cells: list[AssignmentStepCellRead] = Field(default_factory=list)
+    candidates: list[AssignmentStepCandidateRead] = Field(default_factory=list)
+
+
+class AssignmentStepCandidateQueryResult(BaseModel):
+    tenant_id: str
+    shift_plan_id: str
+    shift_series_id: str | None = None
+    generated_shift_count: int
+    candidates: list[AssignmentStepCandidateRead] = Field(default_factory=list)
+
+
+class AssignmentStepApplyRequest(BaseModel):
+    tenant_id: str
+    shift_plan_id: str
+    shift_series_id: str | None = None
+    demand_group_match: AssignmentStepDemandGroupMatch
+    target_shift_ids: list[str] = Field(min_length=1)
+    team_id: str | None = None
+    employee_id: str | None = None
+    subcontractor_worker_id: str | None = None
+    assignment_source_code: str = "dispatcher"
+    confirmed_at: datetime | None = None
+    offered_at: datetime | None = None
+    remarks: str | None = None
+    stop_on_first_rejection: bool = False
+
+
+class AssignmentStepApplyItemResult(BaseModel):
+    shift_id: str
+    demand_group_id: str | None = None
+    occurrence_date: date | None = None
+    outcome_code: str
+    assignment_id: str | None = None
+    reason_codes: list[str] = Field(default_factory=list)
+    warning_codes: list[str] = Field(default_factory=list)
+    validation_results: list[PlanningValidationResult] = Field(default_factory=list)
+    assignment: AssignmentRead | None = None
+
+
+class AssignmentStepApplyResult(BaseModel):
+    tenant_id: str
+    shift_plan_id: str
+    shift_series_id: str | None = None
+    actor_kind: str
+    actor_id: str
+    requested_count: int
+    accepted_count: int
+    rejected_count: int
+    created_assignment_ids: list[str] = Field(default_factory=list)
+    results: list[AssignmentStepApplyItemResult] = Field(default_factory=list)

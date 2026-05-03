@@ -131,6 +131,7 @@ import {
   saveWizardDraft,
   type CustomerNewPlanWizardDraftContext,
 } from './new-plan-wizard-drafts';
+import CustomerNewPlanAssignmentsStep from './customer-new-plan-assignments-step.vue';
 
 type PlanningEntityType = 'event_venue' | 'patrol_route' | 'site' | 'trade_fair';
 type PlanningSelectionMode = 'create_new' | 'use_existing';
@@ -1122,6 +1123,8 @@ const planningRecordDocumentsStepActive = computed(() => props.currentStepId ===
 const shiftPlanStepActive = computed(() => props.currentStepId === 'shift-plan');
 const seriesStepActive = computed(() => props.currentStepId === 'series-exceptions');
 const demandGroupsStepActive = computed(() => props.currentStepId === 'demand-groups');
+const assignmentsStepActive = computed(() => props.currentStepId === 'assignments');
+const assignmentsStepRef = ref<InstanceType<typeof CustomerNewPlanAssignmentsStep> | null>(null);
 const orderScopeSections = computed(() => [
   {
     id: 'equipment' as const,
@@ -1169,7 +1172,8 @@ const handledStepActive = computed(
     planningRecordDocumentsStepActive.value ||
     shiftPlanStepActive.value ||
     seriesStepActive.value ||
-    demandGroupsStepActive.value,
+    demandGroupsStepActive.value ||
+    assignmentsStepActive.value,
 );
 const orderModeUsesExisting = computed(() => orderSelectionMode.value === 'use_existing');
 const planningModeUsesExisting = computed(() => planningSelectionMode.value === 'use_existing');
@@ -7060,6 +7064,9 @@ async function submitCurrentStep(): Promise<CustomerNewPlanStepSubmitResult> {
   if (demandGroupsStepActive.value) {
     return submitDemandGroupsStep();
   }
+  if (assignmentsStepActive.value) {
+    return assignmentsStepRef.value?.submitCurrentStep?.() ?? false;
+  }
   return true;
 }
 
@@ -9301,22 +9308,6 @@ onBeforeUnmount(() => {
                     <h5>{{ row.function_type_label }}</h5>
                     <p class="field-help">{{ row.qualification_type_label }}</p>
                   </div>
-                  
-                </header>
-                <div class="sp-customer-plan-wizard-step__demand-group-card-status-row sp-customer-plan-wizard-step__demand-group-card-header">
-                  <span
-                    class="sp-customer-plan-wizard-step__status-badge"
-                    :class="`sp-customer-plan-wizard-step__status-badge--${row.status}`"
-                    :data-testid="`customer-new-plan-demand-group-persisted-status-${row.signature_key}`"
-                  >
-                    {{
-                      row.status === 'complete'
-                        ? $t('sicherplan.customerPlansWizard.forms.demandGroupsStatusComplete')
-                        : row.status === 'mixed'
-                          ? $t('sicherplan.customerPlansWizard.forms.demandGroupsStatusMixed')
-                          : $t('sicherplan.customerPlansWizard.forms.demandGroupsStatusPartial')
-                    }}
-                  </span>
                   <div class="sp-customer-plan-wizard-step__demand-group-card-actions">
                     <button
                       type="button"
@@ -9337,6 +9328,21 @@ onBeforeUnmount(() => {
                       {{ $t('sicherplan.customerPlansWizard.actions.editDemandGroupAggregate') }}
                     </button>
                   </div>
+                </header>
+                <div class="sp-customer-plan-wizard-step__demand-group-card-status-row">
+                  <span
+                    class="sp-customer-plan-wizard-step__status-badge"
+                    :class="`sp-customer-plan-wizard-step__status-badge--${row.status}`"
+                    :data-testid="`customer-new-plan-demand-group-persisted-status-${row.signature_key}`"
+                  >
+                    {{
+                      row.status === 'complete'
+                        ? $t('sicherplan.customerPlansWizard.forms.demandGroupsStatusComplete')
+                        : row.status === 'mixed'
+                          ? $t('sicherplan.customerPlansWizard.forms.demandGroupsStatusMixed')
+                        : $t('sicherplan.customerPlansWizard.forms.demandGroupsStatusPartial')
+                    }}
+                  </span>
                 </div>
                 <div>
                   <div class="sp-customer-plan-wizard-step__info-summary sp-customer-plan-wizard-step__info-summary--compact">
@@ -9417,6 +9423,16 @@ onBeforeUnmount(() => {
       </p>
       </section>
     </section>
+
+    <CustomerNewPlanAssignmentsStep
+      v-else-if="assignmentsStepActive"
+      ref="assignmentsStepRef"
+      :access-token="props.accessToken"
+      :tenant-id="props.tenantId"
+      :wizard-state="props.wizardState"
+      @step-completion="(stepId, completed) => emit('step-completion', stepId, completed)"
+      @step-ui-state="(stepId, patch) => emit('step-ui-state', stepId, patch)"
+    />
 
     <section v-else class="sp-customer-plan-wizard-step__panel" data-testid="customer-new-plan-step-panel-placeholder">
       <p>{{ $t('sicherplan.customerPlansWizard.stepLead') }}</p>

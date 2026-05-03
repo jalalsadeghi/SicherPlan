@@ -5,7 +5,8 @@ export type CustomerNewPlanWizardStepId =
   | 'planning-record-documents'
   | 'shift-plan'
   | 'series-exceptions'
-  | 'demand-groups';
+  | 'demand-groups'
+  | 'assignments';
 
 export type CustomerNewPlanWizardOrderScopeSubsectionId =
   | 'equipment-lines'

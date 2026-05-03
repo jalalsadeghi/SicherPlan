@@ -13,7 +13,18 @@ from app.errors import ApiException
 from app.modules.core.models import Address, LookupValue, TenantSetting
 from app.modules.customers.models import Customer, CustomerBillingProfile, CustomerInvoiceParty, CustomerRateCard
 from app.modules.customers.models import CustomerEmployeeBlock
-from app.modules.employees.models import EmployeeAbsence, EmployeeQualification, EmployeeTimeAccount, EmployeeTimeAccountTxn, FunctionType, QualificationType
+from app.modules.employees.models import (
+    Employee,
+    EmployeeAbsence,
+    EmployeeAvailabilityRule,
+    EmployeeGroup,
+    EmployeeGroupMember,
+    EmployeeQualification,
+    EmployeeTimeAccount,
+    EmployeeTimeAccountTxn,
+    FunctionType,
+    QualificationType,
+)
 from app.modules.iam.models import Role, UserAccount, UserRoleAssignment
 from app.modules.platform_services.docs_models import Document, DocumentLink
 from app.modules.platform_services.integration_models import ImportExportJob
@@ -264,10 +275,23 @@ class SqlAlchemyPlanningRepository:
         return row.value_json if row is not None else None
 
     def get_employee(self, tenant_id: str, employee_id: str):
-        from app.modules.employees.models import Employee
-
         statement = select(Employee).where(Employee.tenant_id == tenant_id, Employee.id == employee_id)
         return self.session.scalars(statement).one_or_none()
+
+    def list_employees(self, tenant_id: str) -> list[Employee]:
+        statement = (
+            select(Employee)
+            .where(Employee.tenant_id == tenant_id, Employee.archived_at.is_(None), Employee.status == "active")
+            .options(
+                selectinload(Employee.group_memberships).selectinload(EmployeeGroupMember.group),
+                selectinload(Employee.qualifications).selectinload(EmployeeQualification.qualification_type),
+                selectinload(Employee.qualifications).selectinload(EmployeeQualification.function_type),
+                selectinload(Employee.absences),
+                selectinload(Employee.availability_rules),
+            )
+            .order_by(func.lower(Employee.personnel_no), func.lower(Employee.last_name), func.lower(Employee.first_name))
+        )
+        return list(self.session.scalars(statement).all())
 
     def find_employee_by_user_id(self, tenant_id: str, user_id: str, *, exclude_id: str | None = None):
         from app.modules.employees.models import Employee
@@ -288,11 +312,34 @@ class SqlAlchemyPlanningRepository:
         )
         return self.session.scalars(statement).one_or_none()
 
+    def list_subcontractor_workers(self, tenant_id: str) -> list[SubcontractorWorker]:
+        statement = (
+            select(SubcontractorWorker)
+            .where(SubcontractorWorker.tenant_id == tenant_id, SubcontractorWorker.archived_at.is_(None), SubcontractorWorker.status == "active")
+            .options(
+                selectinload(SubcontractorWorker.subcontractor),
+                selectinload(SubcontractorWorker.qualifications).selectinload(SubcontractorWorkerQualification.qualification_type),
+            )
+            .order_by(func.lower(SubcontractorWorker.worker_no), func.lower(SubcontractorWorker.last_name), func.lower(SubcontractorWorker.first_name))
+        )
+        return list(self.session.scalars(statement).all())
+
     def list_employee_qualifications(self, tenant_id: str, employee_id: str) -> list[EmployeeQualification]:
         statement = (
             select(EmployeeQualification)
             .where(EmployeeQualification.tenant_id == tenant_id, EmployeeQualification.employee_id == employee_id)
             .options(selectinload(EmployeeQualification.qualification_type))
+        )
+        return list(self.session.scalars(statement).all())
+
+    def list_employee_absences(self, tenant_id: str, employee_id: str) -> list[EmployeeAbsence]:
+        statement = select(EmployeeAbsence).where(EmployeeAbsence.tenant_id == tenant_id, EmployeeAbsence.employee_id == employee_id)
+        return list(self.session.scalars(statement).all())
+
+    def list_employee_availability_rules(self, tenant_id: str, employee_id: str) -> list[EmployeeAvailabilityRule]:
+        statement = select(EmployeeAvailabilityRule).where(
+            EmployeeAvailabilityRule.tenant_id == tenant_id,
+            EmployeeAvailabilityRule.employee_id == employee_id,
         )
         return list(self.session.scalars(statement).all())
 
@@ -1591,7 +1638,11 @@ class SqlAlchemyPlanningRepository:
         statement = (
             select(DemandGroup)
             .where(DemandGroup.tenant_id == tenant_id)
-            .options(selectinload(DemandGroup.assignments), selectinload(DemandGroup.subcontractor_releases))
+            .options(
+                selectinload(DemandGroup.assignments).selectinload(Assignment.employee),
+                selectinload(DemandGroup.assignments).selectinload(Assignment.subcontractor_worker),
+                selectinload(DemandGroup.subcontractor_releases),
+            )
             .order_by(DemandGroup.sort_order, DemandGroup.id)
         )
         if not filters.include_archived:
@@ -1609,7 +1660,11 @@ class SqlAlchemyPlanningRepository:
         statement = (
             select(DemandGroup)
             .where(DemandGroup.tenant_id == tenant_id, DemandGroup.id == row_id)
-            .options(selectinload(DemandGroup.assignments), selectinload(DemandGroup.subcontractor_releases))
+            .options(
+                selectinload(DemandGroup.assignments).selectinload(Assignment.employee),
+                selectinload(DemandGroup.assignments).selectinload(Assignment.subcontractor_worker),
+                selectinload(DemandGroup.subcontractor_releases),
+            )
         )
         return self.session.scalars(statement).one_or_none()
 

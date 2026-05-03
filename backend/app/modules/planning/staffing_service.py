@@ -18,6 +18,21 @@ from app.modules.iam.audit_service import AuditActor, AuditService
 from app.modules.iam.authz import RequestAuthorizationContext
 from app.modules.planning.models import Assignment, AssignmentValidationOverride, DemandGroup, Shift, SubcontractorRelease, Team, TeamMember
 from app.modules.planning.schemas import (
+    AssignmentStepApplyItemResult,
+    AssignmentStepApplyRequest,
+    AssignmentStepApplyResult,
+    AssignmentStepCandidateDayStatusRead,
+    AssignmentStepCandidateQueryResult,
+    AssignmentStepCandidateRead,
+    AssignmentStepCellRead,
+    AssignmentStepDaySummaryRead,
+    AssignmentStepDemandGroupMatch,
+    AssignmentStepDemandGroupSummaryRead,
+    AssignmentStepExistingAssignmentRead,
+    AssignmentStepOrderSummaryRead,
+    AssignmentStepScopeRequest,
+    AssignmentStepShiftPlanSummaryRead,
+    AssignmentStepSnapshotRead,
     AssignmentValidationOverrideCreate,
     AssignmentValidationOverrideRead,
     AssignmentValidationRead,
@@ -67,7 +82,10 @@ from app.modules.planning.validation_service import PlanningValidationService
 class StaffingRepository(Protocol):
     def get_shift(self, tenant_id: str, row_id: str) -> Shift | None: ...
     def get_shift_plan(self, tenant_id: str, row_id: str): ...
+    def get_customer_order(self, tenant_id: str, order_id: str): ...
     def list_shifts(self, tenant_id: str, filters: ShiftListFilter) -> list[Shift]: ...
+    def list_employees(self, tenant_id: str) -> list[object]: ...
+    def list_subcontractor_workers(self, tenant_id: str) -> list[object]: ...
     def list_board_shifts(self, tenant_id: str, filters: StaffingBoardFilter) -> list[dict[str, object]]: ...
     def get_function_type(self, tenant_id: str, function_type_id: str): ...
     def get_qualification_type(self, tenant_id: str, qualification_type_id: str): ...
@@ -100,6 +118,8 @@ class StaffingRepository(Protocol):
     def create_assignment_validation_override(self, row: AssignmentValidationOverride) -> AssignmentValidationOverride: ...
     def get_tenant_setting_value(self, tenant_id: str, key: str) -> dict[str, object] | None: ...
     def list_employee_qualifications(self, tenant_id: str, employee_id: str) -> list[object]: ...
+    def list_employee_absences(self, tenant_id: str, employee_id: str) -> list[object]: ...
+    def list_employee_availability_rules(self, tenant_id: str, employee_id: str) -> list[object]: ...
     def list_worker_qualifications(self, tenant_id: str, worker_id: str) -> list[object]: ...
     def list_documents_for_owner(self, tenant_id: str, owner_type: str, owner_id: str) -> list[object]: ...
     def list_customer_employee_blocks(self, tenant_id: str, customer_id: str, employee_id: str, on_date): ...  # noqa: ANN001
@@ -115,6 +135,12 @@ class StaffingRepository(Protocol):
 class _ActorChoice:
     employee_id: str | None
     subcontractor_worker_id: str | None
+
+
+@dataclass(frozen=True)
+class _AssignmentStepTarget:
+    shift: Shift
+    demand_group: DemandGroup
 
 
 class StaffingService:
@@ -878,6 +904,816 @@ class StaffingService:
             )
         return result
 
+    def get_assignment_step_snapshot(
+        self,
+        tenant_id: str,
+        payload: AssignmentStepScopeRequest,
+        actor: RequestAuthorizationContext,
+    ) -> AssignmentStepSnapshotRead:
+        self._require_tenant_scope(tenant_id, payload.tenant_id)
+        shift_plan, target_shifts, project_start, project_end, active_months, selected_series = self._resolve_assignment_step_scope(
+            tenant_id,
+            shift_plan_id=payload.shift_plan_id,
+            shift_series_id=payload.shift_series_id,
+            date_from=payload.date_from,
+            date_to=payload.date_to,
+        )
+        order_summary = self._build_assignment_step_order_summary(shift_plan)
+        demand_group_summaries = self._build_assignment_step_demand_group_summaries(tenant_id, target_shifts)
+        day_summaries = self._build_assignment_step_day_summaries(tenant_id, target_shifts)
+        cells = self._build_assignment_step_cells(tenant_id, target_shifts, payload.demand_group_match)
+        candidates: list[AssignmentStepCandidateRead] = []
+        if payload.demand_group_match is not None and target_shifts:
+            candidates = self._list_assignment_step_candidates(
+                tenant_id,
+                shift_plan=shift_plan,
+                target_shifts=target_shifts,
+                demand_group_match=payload.demand_group_match,
+                actor_kind=payload.actor_kind,
+                team_id=payload.team_id,
+                employee_group_id=payload.employee_group_id,
+                search=payload.search,
+            )
+        lock_reason_codes = sorted({
+            reason
+            for shift in target_shifts
+            for reason in self._assignment_step_lock_reason_codes(tenant_id, shift)
+        })
+        default_month = self._normalize_month_start(payload.active_month or project_start)
+        return AssignmentStepSnapshotRead(
+            tenant_id=tenant_id,
+            order=order_summary,
+            shift_plan=AssignmentStepShiftPlanSummaryRead(
+                shift_plan_id=shift_plan.id,
+                shift_plan_name=shift_plan.name,
+                shift_series_id=getattr(selected_series, "id", None),
+                shift_series_label=getattr(selected_series, "label", None),
+                workforce_scope_code=shift_plan.workforce_scope_code,
+                planning_from=shift_plan.planning_from,
+                planning_to=shift_plan.planning_to,
+                project_start=project_start,
+                project_end=project_end,
+                default_month=default_month,
+                active_months=active_months,
+            ),
+            generated_shift_count=len(target_shifts),
+            demand_group_summary_count=len(demand_group_summaries),
+            editable_flag=not bool(lock_reason_codes),
+            lock_reason_codes=lock_reason_codes,
+            demand_group_summaries=demand_group_summaries,
+            day_summaries=day_summaries,
+            calendar_cells=cells,
+            candidates=candidates,
+        )
+
+    def list_assignment_step_candidates(
+        self,
+        tenant_id: str,
+        payload: AssignmentStepScopeRequest,
+        actor: RequestAuthorizationContext,
+    ) -> AssignmentStepCandidateQueryResult:
+        self._require_tenant_scope(tenant_id, payload.tenant_id)
+        shift_plan, target_shifts, _, _, _, _ = self._resolve_assignment_step_scope(
+            tenant_id,
+            shift_plan_id=payload.shift_plan_id,
+            shift_series_id=payload.shift_series_id,
+            date_from=payload.date_from,
+            date_to=payload.date_to,
+        )
+        if payload.demand_group_match is None or not target_shifts:
+            return AssignmentStepCandidateQueryResult(
+                tenant_id=tenant_id,
+                shift_plan_id=payload.shift_plan_id,
+                shift_series_id=payload.shift_series_id,
+                generated_shift_count=len(target_shifts),
+                candidates=[],
+            )
+        return AssignmentStepCandidateQueryResult(
+            tenant_id=tenant_id,
+            shift_plan_id=payload.shift_plan_id,
+            shift_series_id=payload.shift_series_id,
+            generated_shift_count=len(target_shifts),
+            candidates=self._list_assignment_step_candidates(
+                tenant_id,
+                shift_plan=shift_plan,
+                target_shifts=target_shifts,
+                demand_group_match=payload.demand_group_match,
+                actor_kind=payload.actor_kind,
+                team_id=payload.team_id,
+                employee_group_id=payload.employee_group_id,
+                search=payload.search,
+            ),
+        )
+
+    def preview_assignment_step_apply(
+        self,
+        tenant_id: str,
+        payload: AssignmentStepApplyRequest,
+        actor: RequestAuthorizationContext,
+    ) -> AssignmentStepApplyResult:
+        return self._assignment_step_apply(tenant_id, payload, actor, preview_only=True)
+
+    def apply_assignment_step(
+        self,
+        tenant_id: str,
+        payload: AssignmentStepApplyRequest,
+        actor: RequestAuthorizationContext,
+    ) -> AssignmentStepApplyResult:
+        return self._assignment_step_apply(tenant_id, payload, actor, preview_only=False)
+
+    def _assignment_step_apply(
+        self,
+        tenant_id: str,
+        payload: AssignmentStepApplyRequest,
+        actor: RequestAuthorizationContext,
+        *,
+        preview_only: bool,
+    ) -> AssignmentStepApplyResult:
+        self._require_tenant_scope(tenant_id, payload.tenant_id)
+        shift_plan, target_shifts, _, _, _, _ = self._resolve_assignment_step_scope(
+            tenant_id,
+            shift_plan_id=payload.shift_plan_id,
+            shift_series_id=payload.shift_series_id,
+            date_from=None,
+            date_to=None,
+        )
+        choice = self._validate_actor_choice(payload.employee_id, payload.subcontractor_worker_id, code_prefix="planning.assignment_step")
+        actor_kind = "employee" if choice.employee_id is not None else "subcontractor_worker"
+        actor_id = choice.employee_id or choice.subcontractor_worker_id or ""
+        target_shift_set = set(payload.target_shift_ids)
+        scoped_shift_ids = {shift.id for shift in target_shifts}
+        unknown_shift_ids = sorted(target_shift_set - scoped_shift_ids)
+        if unknown_shift_ids:
+            raise ApiException(
+                400,
+                "planning.assignment_step.invalid_target_shifts",
+                "errors.planning.assignment_step.invalid_target_shifts",
+                details={"reason_codes": ["invalid_target_shift_ids"], "target_shift_ids": unknown_shift_ids},
+            )
+
+        results: list[AssignmentStepApplyItemResult] = []
+        created_ids: list[str] = []
+        accepted_count = 0
+        rejected_count = 0
+        demand_group_match = payload.demand_group_match
+        for shift in [row for row in target_shifts if row.id in target_shift_set]:
+            matched_group = self._find_matching_demand_group_for_shift(tenant_id, shift, demand_group_match)
+            if matched_group is None:
+                results.append(
+                    AssignmentStepApplyItemResult(
+                        shift_id=shift.id,
+                        occurrence_date=self._shift_occurrence_date(shift),
+                        outcome_code="rejected",
+                        reason_codes=["demand_group_not_found"],
+                    )
+                )
+                rejected_count += 1
+                if payload.stop_on_first_rejection and not preview_only:
+                    break
+                continue
+            lock_reason_codes = self._assignment_step_lock_reason_codes(tenant_id, shift)
+            if lock_reason_codes:
+                results.append(
+                    AssignmentStepApplyItemResult(
+                        shift_id=shift.id,
+                        demand_group_id=matched_group.id,
+                        occurrence_date=self._shift_occurrence_date(shift),
+                        outcome_code="rejected",
+                        reason_codes=lock_reason_codes,
+                    )
+                )
+                rejected_count += 1
+                if payload.stop_on_first_rejection and not preview_only:
+                    break
+                continue
+
+            candidate_payload = AssignmentCreate(
+                tenant_id=tenant_id,
+                shift_id=shift.id,
+                demand_group_id=matched_group.id,
+                team_id=payload.team_id,
+                employee_id=choice.employee_id,
+                subcontractor_worker_id=choice.subcontractor_worker_id,
+                assignment_status_code="confirmed" if payload.confirmed_at else "assigned",
+                assignment_source_code=payload.assignment_source_code,
+                offered_at=payload.offered_at,
+                confirmed_at=payload.confirmed_at,
+                remarks=payload.remarks,
+            )
+            outcome = self._evaluate_assignment_step_payload(tenant_id, shift, matched_group, candidate_payload)
+            if not outcome["eligible_flag"]:
+                results.append(
+                    AssignmentStepApplyItemResult(
+                        shift_id=shift.id,
+                        demand_group_id=matched_group.id,
+                        occurrence_date=self._shift_occurrence_date(shift),
+                        outcome_code="rejected",
+                        reason_codes=outcome["reason_codes"],
+                        warning_codes=outcome["warning_codes"],
+                        validation_results=outcome["validation_results"],
+                    )
+                )
+                rejected_count += 1
+                if payload.stop_on_first_rejection and not preview_only:
+                    break
+                continue
+
+            assignment_read: AssignmentRead | None = None
+            assignment_id: str | None = None
+            if not preview_only:
+                row = self._create_assignment_row(tenant_id, candidate_payload, actor)
+                assignment_read = AssignmentRead.model_validate(row)
+                assignment_id = row.id
+                created_ids.append(row.id)
+            accepted_count += 1
+            results.append(
+                AssignmentStepApplyItemResult(
+                    shift_id=shift.id,
+                    demand_group_id=matched_group.id,
+                    occurrence_date=self._shift_occurrence_date(shift),
+                    outcome_code="accepted" if preview_only else "created",
+                    assignment_id=assignment_id,
+                    warning_codes=outcome["warning_codes"],
+                    validation_results=outcome["validation_results"],
+                    assignment=assignment_read,
+                )
+            )
+
+        return AssignmentStepApplyResult(
+            tenant_id=tenant_id,
+            shift_plan_id=shift_plan.id,
+            shift_series_id=payload.shift_series_id,
+            actor_kind=actor_kind,
+            actor_id=actor_id,
+            requested_count=len(payload.target_shift_ids),
+            accepted_count=accepted_count,
+            rejected_count=rejected_count,
+            created_assignment_ids=created_ids,
+            results=results,
+        )
+
+    def _resolve_assignment_step_scope(
+        self,
+        tenant_id: str,
+        *,
+        shift_plan_id: str,
+        shift_series_id: str | None,
+        date_from: date | None,
+        date_to: date | None,
+    ) -> tuple[object, list[Shift], date, date, list[date], object | None]:
+        shift_plan = self._require_shift_plan(tenant_id, shift_plan_id)
+        selected_series = None
+        if shift_series_id is not None:
+            selected_series = next((row for row in getattr(shift_plan, "series_rows", []) if row.id == shift_series_id), None)
+            if selected_series is None:
+                raise ApiException(404, "planning.shift_series.not_found", "errors.planning.shift_series.not_found")
+        target_shifts = [
+            shift
+            for shift in self.repository.list_shifts(tenant_id, ShiftListFilter(shift_plan_id=shift_plan_id, include_archived=False))
+            if shift.source_kind_code == "generated"
+            and (shift_series_id is None or shift.shift_series_id == shift_series_id)
+            and self._shift_in_bulk_date_window(shift, date_from, date_to)
+        ]
+        if target_shifts:
+            project_start = min(self._shift_occurrence_date(shift) for shift in target_shifts)
+            project_end = max(self._shift_occurrence_date(shift) for shift in target_shifts)
+        elif selected_series is not None:
+            project_start = selected_series.date_from
+            project_end = selected_series.date_to
+        else:
+            project_start = shift_plan.planning_from
+            project_end = shift_plan.planning_to
+        active_months = self._month_range(project_start, project_end)
+        return shift_plan, target_shifts, project_start, project_end, active_months, selected_series
+
+    def _build_assignment_step_order_summary(self, shift_plan) -> AssignmentStepOrderSummaryRead:  # noqa: ANN001
+        planning_record = getattr(shift_plan, "planning_record", None)
+        order = getattr(planning_record, "order", None)
+        if planning_record is None:
+            planning_record = self.repository.get_planning_record(shift_plan.tenant_id, shift_plan.planning_record_id)
+        if order is None and planning_record is not None:
+            order = getattr(planning_record, "order", None) or self.repository.get_customer_order(shift_plan.tenant_id, planning_record.order_id)
+        if planning_record is None or order is None:
+            raise ApiException(404, "planning.shift_plan.context_missing", "errors.planning.shift_plan.context_missing")
+        return AssignmentStepOrderSummaryRead(
+            order_id=order.id,
+            order_no=order.order_no,
+            customer_id=order.customer_id,
+            planning_record_id=planning_record.id,
+            planning_record_name=planning_record.name,
+            planning_mode_code=planning_record.planning_mode_code,
+        )
+
+    def _build_assignment_step_demand_group_summaries(
+        self,
+        tenant_id: str,
+        target_shifts: list[Shift],
+    ) -> list[AssignmentStepDemandGroupSummaryRead]:
+        grouped: dict[str, dict[str, object]] = {}
+        for shift in target_shifts:
+            for group in self.repository.list_demand_groups(tenant_id, StaffingFilter(shift_id=shift.id, include_archived=False)):
+                key = self._assignment_step_signature_key(group)
+                assigned_count = sum(1 for row in getattr(group, "assignments", []) if row.assignment_status_code != "removed")
+                confirmed_count = sum(1 for row in getattr(group, "assignments", []) if row.assignment_status_code == "confirmed")
+                released_partner_qty = sum(
+                    row.released_qty
+                    for row in getattr(group, "subcontractor_releases", [])
+                    if row.release_status_code != "revoked"
+                )
+                bucket = grouped.setdefault(
+                    key,
+                    {
+                        "group": group,
+                        "matched_shift_count": 0,
+                        "assigned_count": 0,
+                        "confirmed_count": 0,
+                        "released_partner_qty": 0,
+                        "min_qty": 0,
+                        "target_qty": 0,
+                    },
+                )
+                bucket["matched_shift_count"] += 1
+                bucket["assigned_count"] += assigned_count
+                bucket["confirmed_count"] += confirmed_count
+                bucket["released_partner_qty"] += released_partner_qty
+                bucket["min_qty"] += group.min_qty
+                bucket["target_qty"] += group.target_qty
+        rows: list[AssignmentStepDemandGroupSummaryRead] = []
+        for key, bucket in grouped.items():
+            group = bucket["group"]
+            remaining_open_qty = max(0, bucket["target_qty"] - bucket["assigned_count"])
+            rows.append(
+                AssignmentStepDemandGroupSummaryRead(
+                    signature_key=key,
+                    function_type_id=group.function_type_id,
+                    qualification_type_id=group.qualification_type_id,
+                    min_qty=group.min_qty,
+                    target_qty=group.target_qty,
+                    mandatory_flag=group.mandatory_flag,
+                    sort_order=group.sort_order,
+                    remark=group.remark,
+                    matched_shift_count=bucket["matched_shift_count"],
+                    assigned_count=bucket["assigned_count"],
+                    confirmed_count=bucket["confirmed_count"],
+                    released_partner_qty=bucket["released_partner_qty"],
+                    remaining_open_qty=remaining_open_qty,
+                    coverage_state=self._coverage_state(
+                        bucket["min_qty"],
+                        bucket["target_qty"],
+                        bucket["assigned_count"],
+                        bucket["confirmed_count"],
+                        bucket["released_partner_qty"],
+                    ),
+                )
+            )
+        return sorted(rows, key=lambda row: (row.sort_order, row.signature_key))
+
+    def _build_assignment_step_day_summaries(self, tenant_id: str, target_shifts: list[Shift]) -> list[AssignmentStepDaySummaryRead]:
+        buckets: dict[date, list[str]] = defaultdict(list)
+        for shift in target_shifts:
+            states = []
+            for group in self.repository.list_demand_groups(tenant_id, StaffingFilter(shift_id=shift.id, include_archived=False)):
+                assigned_count = sum(1 for row in getattr(group, "assignments", []) if row.assignment_status_code != "removed")
+                confirmed_count = sum(1 for row in getattr(group, "assignments", []) if row.assignment_status_code == "confirmed")
+                released_partner_qty = sum(
+                    row.released_qty
+                    for row in getattr(group, "subcontractor_releases", [])
+                    if row.release_status_code != "revoked"
+                )
+                states.append(self._coverage_state(group.min_qty, group.target_qty, assigned_count, confirmed_count, released_partner_qty))
+            buckets[self._shift_occurrence_date(shift)].append("red" if "red" in states else "yellow" if "yellow" in states else "green")
+        result: list[AssignmentStepDaySummaryRead] = []
+        for occurrence_date in sorted(buckets):
+            day_states = buckets[occurrence_date]
+            fully_covered_count = sum(1 for state in day_states if state == "green")
+            warning_count = sum(1 for state in day_states if state == "yellow")
+            blocked_count = sum(1 for state in day_states if state == "red")
+            overall_state = "blocked" if blocked_count else "warning" if warning_count else "fully_covered"
+            result.append(
+                AssignmentStepDaySummaryRead(
+                    occurrence_date=occurrence_date,
+                    total_shifts=len(day_states),
+                    fully_covered_count=fully_covered_count,
+                    warning_count=warning_count,
+                    blocked_count=blocked_count,
+                    overall_state=overall_state,
+                    active_flag=True,
+                )
+            )
+        return result
+
+    def _build_assignment_step_cells(
+        self,
+        tenant_id: str,
+        target_shifts: list[Shift],
+        demand_group_match: AssignmentStepDemandGroupMatch | None,
+    ) -> list[AssignmentStepCellRead]:
+        cells: list[AssignmentStepCellRead] = []
+        for shift in target_shifts:
+            lock_reason_codes = self._assignment_step_lock_reason_codes(tenant_id, shift)
+            demand_groups = self.repository.list_demand_groups(tenant_id, StaffingFilter(shift_id=shift.id, include_archived=False))
+            if demand_group_match is not None:
+                demand_groups = [row for row in demand_groups if self._demand_group_matches_signature(row, demand_group_match)]
+            for group in demand_groups:
+                assigned_rows = [row for row in getattr(group, "assignments", []) if row.assignment_status_code != "removed"]
+                confirmed_count = sum(1 for row in assigned_rows if row.assignment_status_code == "confirmed")
+                released_partner_qty = sum(
+                    row.released_qty
+                    for row in getattr(group, "subcontractor_releases", [])
+                    if row.release_status_code != "revoked"
+                )
+                existing_assignments = [
+                    AssignmentStepExistingAssignmentRead(
+                        assignment_id=row.id,
+                        shift_id=row.shift_id,
+                        demand_group_id=row.demand_group_id,
+                        assignment_status_code=row.assignment_status_code,
+                        actor_kind="employee" if row.employee_id is not None else "subcontractor_worker",
+                        actor_id=row.employee_id or row.subcontractor_worker_id or "",
+                        personnel_ref=self._assignment_actor_ref(row),
+                        display_name=self._assignment_actor_name(row),
+                        team_id=row.team_id,
+                    )
+                    for row in assigned_rows
+                ]
+                cells.append(
+                    AssignmentStepCellRead(
+                        shift_id=shift.id,
+                        demand_group_id=group.id,
+                        occurrence_date=self._shift_occurrence_date(shift),
+                        starts_at=shift.starts_at,
+                        ends_at=shift.ends_at,
+                        shift_type_code=shift.shift_type_code,
+                        function_type_id=group.function_type_id,
+                        qualification_type_id=group.qualification_type_id,
+                        min_qty=group.min_qty,
+                        target_qty=group.target_qty,
+                        assigned_count=len(assigned_rows),
+                        confirmed_count=confirmed_count,
+                        released_partner_qty=released_partner_qty,
+                        remaining_open_qty=max(0, group.target_qty - len(assigned_rows)),
+                        coverage_state=self._coverage_state(group.min_qty, group.target_qty, len(assigned_rows), confirmed_count, released_partner_qty),
+                        editable_flag=not bool(lock_reason_codes),
+                        existing_assignments=existing_assignments,
+                    )
+                )
+        return sorted(cells, key=lambda row: (row.occurrence_date, row.starts_at, row.demand_group_id))
+
+    def _list_assignment_step_candidates(
+        self,
+        tenant_id: str,
+        *,
+        shift_plan,
+        target_shifts: list[Shift],
+        demand_group_match: AssignmentStepDemandGroupMatch,
+        actor_kind: str | None,
+        team_id: str | None,
+        employee_group_id: str | None,
+        search: str | None,
+    ) -> list[AssignmentStepCandidateRead]:
+        candidates: list[AssignmentStepCandidateRead] = []
+        search_term = (search or "").strip().lower()
+        include_employees = shift_plan.workforce_scope_code in {"internal", "mixed"} and actor_kind in {None, "employee"}
+        include_workers = shift_plan.workforce_scope_code in {"subcontractor", "mixed"} and actor_kind in {None, "subcontractor_worker"}
+        if include_employees:
+            for employee in self.repository.list_employees(tenant_id):
+                if not self._candidate_matches_common_filters(
+                    actor_kind="employee",
+                    actor=employee,
+                    team_id=team_id,
+                    employee_group_id=employee_group_id,
+                    search_term=search_term,
+                ):
+                    continue
+                candidates.append(self._build_assignment_step_candidate_read(tenant_id, target_shifts, demand_group_match, employee=employee))
+        if include_workers:
+            for worker in self.repository.list_subcontractor_workers(tenant_id):
+                if not self._candidate_matches_common_filters(
+                    actor_kind="subcontractor_worker",
+                    actor=worker,
+                    team_id=team_id,
+                    employee_group_id=employee_group_id,
+                    search_term=search_term,
+                ):
+                    continue
+                candidates.append(self._build_assignment_step_candidate_read(tenant_id, target_shifts, demand_group_match, worker=worker))
+        return sorted(
+            candidates,
+            key=lambda row: (
+                -row.eligible_day_count,
+                -row.suitability_score,
+                row.blocked_day_count,
+                row.last_name.lower(),
+                row.first_name.lower(),
+                row.personnel_ref.lower(),
+            ),
+        )
+
+    def _build_assignment_step_candidate_read(
+        self,
+        tenant_id: str,
+        target_shifts: list[Shift],
+        demand_group_match: AssignmentStepDemandGroupMatch,
+        *,
+        employee=None,  # noqa: ANN001
+        worker=None,  # noqa: ANN001
+    ) -> AssignmentStepCandidateRead:
+        actor_kind = "employee" if employee is not None else "subcontractor_worker"
+        actor_id = employee.id if employee is not None else worker.id
+        personnel_ref = employee.personnel_no if employee is not None else worker.worker_no
+        first_name = employee.first_name if employee is not None else worker.first_name
+        last_name = employee.last_name if employee is not None else worker.last_name
+        display_name = f"{first_name} {last_name}".strip()
+        team_ids = self._candidate_team_ids(tenant_id, actor_kind, actor_id)
+        employee_group_ids = self._employee_group_ids(employee) if employee is not None else []
+        day_statuses: list[AssignmentStepCandidateDayStatusRead] = []
+        eligible_day_count = 0
+        warning_day_count = 0
+        blocked_day_count = 0
+        availability_day_count = 0
+        conflict_day_count = 0
+        top_reason_counter: dict[str, int] = defaultdict(int)
+        function_match_flag = False
+        qualification_match_flag = False
+        for shift in target_shifts:
+            matched_group = self._find_matching_demand_group_for_shift(tenant_id, shift, demand_group_match)
+            if matched_group is None:
+                continue
+            candidate_payload = AssignmentCreate(
+                tenant_id=tenant_id,
+                shift_id=shift.id,
+                demand_group_id=matched_group.id,
+                employee_id=employee.id if employee is not None else None,
+                subcontractor_worker_id=worker.id if worker is not None else None,
+                assignment_source_code="dispatcher",
+            )
+            outcome = self._evaluate_assignment_step_payload(tenant_id, shift, matched_group, candidate_payload, employee=employee)
+            reason_codes = outcome["reason_codes"]
+            warning_codes = outcome["warning_codes"]
+            for code in reason_codes:
+                top_reason_counter[code] += 1
+            function_match_flag = function_match_flag or "function_match" not in reason_codes
+            qualification_match_flag = qualification_match_flag or "qualification_match" not in reason_codes
+            if outcome["eligible_flag"]:
+                eligible_day_count += 1
+                if warning_codes:
+                    warning_day_count += 1
+                else:
+                    availability_day_count += 1
+            else:
+                blocked_day_count += 1
+                if any(code in {"employee_absence", "employee_unavailable", "double_booking", "rest_period"} for code in reason_codes):
+                    conflict_day_count += 1
+            day_statuses.append(
+                AssignmentStepCandidateDayStatusRead(
+                    shift_id=shift.id,
+                    demand_group_id=matched_group.id,
+                    occurrence_date=self._shift_occurrence_date(shift),
+                    eligible_flag=outcome["eligible_flag"],
+                    warning_flag=bool(warning_codes),
+                    reason_codes=reason_codes,
+                    warning_codes=warning_codes,
+                    validation_results=outcome["validation_results"],
+                )
+            )
+        suitability_score = (eligible_day_count * 100) - (blocked_day_count * 20) - (conflict_day_count * 10) + (10 if qualification_match_flag else 0) + (5 if function_match_flag else 0)
+        return AssignmentStepCandidateRead(
+            actor_kind=actor_kind,
+            actor_id=actor_id,
+            personnel_ref=personnel_ref,
+            first_name=first_name,
+            last_name=last_name,
+            display_name=display_name,
+            subcontractor_id=getattr(worker, "subcontractor_id", None),
+            team_ids=team_ids,
+            employee_group_ids=employee_group_ids,
+            qualification_match_flag=qualification_match_flag,
+            function_match_flag=function_match_flag,
+            eligible_day_count=eligible_day_count,
+            warning_day_count=warning_day_count,
+            blocked_day_count=blocked_day_count,
+            availability_day_count=availability_day_count,
+            conflict_day_count=conflict_day_count,
+            suitability_score=suitability_score,
+            top_reason_codes=[code for code, _ in sorted(top_reason_counter.items(), key=lambda item: (-item[1], item[0]))[:5]],
+            day_statuses=day_statuses,
+        )
+
+    def _evaluate_assignment_step_payload(
+        self,
+        tenant_id: str,
+        shift: Shift,
+        demand_group: DemandGroup,
+        payload: AssignmentCreate,
+        *,
+        employee=None,  # noqa: ANN001
+    ) -> dict[str, object]:
+        reason_codes: list[str] = []
+        warning_codes: list[str] = []
+        validation_results: list[PlanningValidationResult] = []
+        try:
+            choice = self._validate_actor_choice(payload.employee_id, payload.subcontractor_worker_id, code_prefix="planning.assignment")
+            self._validate_assignment_shape(
+                tenant_id,
+                shift=shift,
+                demand_group=demand_group,
+                team_id=payload.team_id,
+                actor_choice=choice,
+                assignment_status_code=payload.assignment_status_code,
+                assignment_source_code=payload.assignment_source_code,
+            )
+        except ApiException as exc:
+            reason_codes.extend(self._reason_codes_from_exception(exc))
+            return {
+                "eligible_flag": False,
+                "reason_codes": sorted(set(reason_codes)),
+                "warning_codes": [],
+                "validation_results": [],
+            }
+
+        employee_id = getattr(employee, "id", None) or payload.employee_id
+        if employee_id is not None:
+            reason_codes.extend(self._employee_unavailability_reason_codes(tenant_id, employee_id, shift))
+
+        validation_results = self._validate_assignment_payload(tenant_id, payload)
+        blocking = [issue.rule_code for issue in validation_results if issue.severity == "block"]
+        warnings = [issue.rule_code for issue in validation_results if issue.severity == "warn"]
+        reason_codes.extend(blocking)
+        warning_codes.extend(warnings)
+        return {
+            "eligible_flag": not bool(blocking or reason_codes),
+            "reason_codes": sorted(set(reason_codes)),
+            "warning_codes": sorted(set(warning_codes)),
+            "validation_results": validation_results,
+        }
+
+    def _candidate_matches_common_filters(
+        self,
+        *,
+        actor_kind: str,
+        actor,  # noqa: ANN001
+        team_id: str | None,
+        employee_group_id: str | None,
+        search_term: str,
+    ) -> bool:
+        if search_term:
+            haystack = " ".join(
+                value
+                for value in (
+                    getattr(actor, "personnel_no", None),
+                    getattr(actor, "worker_no", None),
+                    getattr(actor, "first_name", None),
+                    getattr(actor, "last_name", None),
+                    getattr(actor, "preferred_name", None),
+                )
+                if value
+            ).lower()
+            if search_term not in haystack:
+                return False
+        if actor_kind == "employee" and employee_group_id is not None:
+            if employee_group_id not in self._employee_group_ids(actor):
+                return False
+        if team_id is not None and team_id not in self._candidate_team_ids(getattr(actor, "tenant_id", ""), actor_kind, actor.id):
+            return False
+        return True
+
+    def _candidate_team_ids(self, tenant_id: str, actor_kind: str, actor_id: str) -> list[str]:
+        rows = self.repository.list_team_members(
+            tenant_id,
+            StaffingFilter(
+                employee_id=actor_id if actor_kind == "employee" else None,
+                subcontractor_worker_id=actor_id if actor_kind == "subcontractor_worker" else None,
+                include_archived=False,
+            ),
+        )
+        return [row.team_id for row in rows if row.archived_at is None]
+
+    @staticmethod
+    def _employee_group_ids(employee) -> list[str]:  # noqa: ANN001
+        result: list[str] = []
+        for membership in getattr(employee, "group_memberships", []) or []:
+            if getattr(membership, "archived_at", None) is not None or getattr(membership, "status", None) != "active":
+                continue
+            result.append(membership.group_id)
+        return result
+
+    def _find_matching_demand_group_for_shift(
+        self,
+        tenant_id: str,
+        shift: Shift,
+        match: AssignmentStepDemandGroupMatch,
+    ) -> DemandGroup | None:
+        for group in self.repository.list_demand_groups(tenant_id, StaffingFilter(shift_id=shift.id, include_archived=False)):
+            if self._demand_group_matches_signature(group, match):
+                return group
+        return None
+
+    def _employee_unavailability_reason_codes(self, tenant_id: str, employee_id: str, shift: Shift) -> list[str]:
+        reason_codes: list[str] = []
+        shift_date = self._shift_occurrence_date(shift)
+        for absence in self.repository.list_employee_absences(tenant_id, employee_id):
+            if absence.archived_at is not None or absence.status not in {"pending", "approved"}:
+                continue
+            if absence.starts_on <= shift_date <= absence.ends_on:
+                reason_codes.append("employee_absence")
+                break
+        for rule in self.repository.list_employee_availability_rules(tenant_id, employee_id):
+            if getattr(rule, "archived_at", None) is not None or getattr(rule, "status", "active") != "active":
+                continue
+            if getattr(rule, "rule_kind", None) != "unavailable":
+                continue
+            if self._availability_rule_matches_shift(rule, shift):
+                reason_codes.append("employee_unavailable")
+                break
+        return reason_codes
+
+    @staticmethod
+    def _availability_rule_matches_shift(rule, shift: Shift) -> bool:  # noqa: ANN001
+        recurrence_type = getattr(rule, "recurrence_type", "none")
+        if recurrence_type == "weekly":
+            weekday_mask = getattr(rule, "weekday_mask", None) or ""
+            weekday_index = shift.starts_at.weekday()
+            if len(weekday_mask) <= weekday_index or weekday_mask[weekday_index] != "1":
+                return False
+            shift_start = shift.starts_at.timetz().replace(tzinfo=None)
+            shift_end = shift.ends_at.timetz().replace(tzinfo=None)
+            return rule.starts_at.time() <= shift_end and rule.ends_at.time() >= shift_start
+        return rule.starts_at < shift.ends_at and rule.ends_at > shift.starts_at
+
+    def _assignment_step_lock_reason_codes(self, tenant_id: str, shift: Shift) -> list[str]:
+        reason_codes: list[str] = []
+        if shift.release_state != "draft":
+            reason_codes.append("shift_released")
+        if shift.customer_visible_flag:
+            reason_codes.append("customer_visible")
+        if shift.subcontractor_visible_flag:
+            reason_codes.append("subcontractor_visible")
+        output_documents = [
+            row
+            for row in self.repository.list_documents_for_owner(tenant_id, "ops.shift", shift.id)
+            if getattr(row, "metadata", {}).get("generated_kind") == "planning_output"
+        ]
+        if output_documents:
+            reason_codes.append("deployment_outputs_exist")
+        return sorted(set(reason_codes))
+
+    @staticmethod
+    def _reason_codes_from_exception(exc: ApiException) -> list[str]:
+        detail_codes = exc.details.get("reason_codes") if isinstance(exc.details.get("reason_codes"), list) else None
+        if detail_codes:
+            return [str(code) for code in detail_codes]
+        return [exc.code]
+
+    @staticmethod
+    def _shift_occurrence_date(shift: Shift) -> date:
+        return shift.occurrence_date or shift.starts_at.date()
+
+    @staticmethod
+    def _normalize_month_start(value: date) -> date:
+        return date(value.year, value.month, 1)
+
+    def _month_range(self, start_date: date, end_date: date) -> list[date]:
+        months: list[date] = []
+        current = self._normalize_month_start(start_date)
+        last = self._normalize_month_start(end_date)
+        while current <= last:
+            months.append(current)
+            if current.month == 12:
+                current = date(current.year + 1, 1, 1)
+            else:
+                current = date(current.year, current.month + 1, 1)
+        return months
+
+    @staticmethod
+    def _assignment_step_signature_key(group: DemandGroup) -> str:
+        remark = (group.remark or "").strip()
+        return "|".join(
+            [
+                group.function_type_id,
+                group.qualification_type_id or "",
+                str(group.min_qty),
+                str(group.target_qty),
+                "1" if group.mandatory_flag else "0",
+                str(group.sort_order),
+                remark,
+            ]
+        )
+
+    @staticmethod
+    def _assignment_actor_ref(row: Assignment) -> str:
+        if row.employee is not None:
+            return getattr(row.employee, "personnel_no", row.employee_id or "")
+        if row.subcontractor_worker is not None:
+            return getattr(row.subcontractor_worker, "worker_no", row.subcontractor_worker_id or "")
+        return row.employee_id or row.subcontractor_worker_id or ""
+
+    @staticmethod
+    def _assignment_actor_name(row: Assignment) -> str:
+        actor = row.employee or row.subcontractor_worker
+        if actor is None:
+            return ""
+        return f"{getattr(actor, 'first_name', '')} {getattr(actor, 'last_name', '')}".strip()
+
     def _validate_assignment_payload(self, tenant_id: str, payload: AssignmentCreate, assignment_id: str | None = None) -> list[PlanningValidationResult]:
         return self.validation_service.validate_assignment(
             tenant_id,
@@ -1150,11 +1986,26 @@ class StaffingService:
             raise ApiException(400, "planning.assignment.invalid_status", "errors.planning.assignment.invalid_status")
         if assignment_source_code not in self.ASSIGNMENT_SOURCES:
             raise ApiException(400, "planning.assignment.invalid_source", "errors.planning.assignment.invalid_source")
+        shift_plan = self.repository.get_shift_plan(tenant_id, shift.shift_plan_id)
+        workforce_scope_code = getattr(shift_plan, "workforce_scope_code", None)
+        if workforce_scope_code == "internal" and actor_choice.subcontractor_worker_id is not None:
+            raise ApiException(
+                409,
+                "planning.assignment.actor_kind_scope_mismatch",
+                "errors.planning.assignment.actor_kind_scope_mismatch",
+                details={"reason_codes": ["actor_kind_scope_mismatch"]},
+            )
+        if workforce_scope_code == "subcontractor" and actor_choice.employee_id is not None:
+            raise ApiException(
+                409,
+                "planning.assignment.actor_kind_scope_mismatch",
+                "errors.planning.assignment.actor_kind_scope_mismatch",
+                details={"reason_codes": ["actor_kind_scope_mismatch"]},
+            )
         if team_id is not None:
             team = self._require_team(tenant_id, team_id)
             if team.shift_id is not None and team.shift_id != shift.id:
                 raise ApiException(400, "planning.assignment.team_scope_mismatch", "errors.planning.assignment.team_scope_mismatch")
-            shift_plan = self.repository.get_shift_plan(tenant_id, shift.shift_plan_id)
             if team.planning_record_id is not None and shift_plan and team.planning_record_id != shift_plan.planning_record_id:
                 raise ApiException(400, "planning.assignment.team_scope_mismatch", "errors.planning.assignment.team_scope_mismatch")
         if actor_choice.employee_id is not None:

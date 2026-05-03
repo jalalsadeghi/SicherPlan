@@ -68,6 +68,7 @@ const apiMocks = vi.hoisted(() => ({
   listCustomerOrdersMock: vi.fn(),
   listCustomerAddressesMock: vi.fn(),
   listDocumentsMock: vi.fn(),
+  listEmployeeGroupsMock: vi.fn(),
   listFunctionTypesMock: vi.fn(),
   listOrderAttachmentsMock: vi.fn(),
   listOrderEquipmentLinesMock: vi.fn(),
@@ -175,6 +176,7 @@ vi.mock('#/sicherplan-legacy/api/planningOrders', () => ({
 }));
 
 vi.mock('#/sicherplan-legacy/api/employeeAdmin', () => ({
+  listEmployeeGroups: apiMocks.listEmployeeGroupsMock,
   listFunctionTypes: apiMocks.listFunctionTypesMock,
   listQualificationTypes: apiMocks.listQualificationTypesMock,
 }));
@@ -531,6 +533,8 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
 
     apiMocks.listServiceCategoryOptionsMock.mockReset();
     apiMocks.listServiceCategoryOptionsMock.mockImplementation(() => Promise.resolve(stores.serviceCategories));
+    apiMocks.listEmployeeGroupsMock.mockReset();
+    apiMocks.listEmployeeGroupsMock.mockResolvedValue([]);
     apiMocks.listFunctionTypesMock.mockReset();
     apiMocks.listFunctionTypesMock.mockResolvedValue(stores.functionTypes);
     apiMocks.listQualificationTypesMock.mockReset();
@@ -905,12 +909,12 @@ describe('CustomerNewPlanWizardView EPIC 3', () => {
     await wrapper.get('[data-testid="customer-new-plan-order-document-search"]').setValue('Sicherheitskonzept');
     await wrapper.get('[data-testid="customer-new-plan-order-document-search"]').trigger('keyup.enter');
     await flushPromises();
-    expect(wrapper.get('[data-testid="customer-new-plan-order-document-result-row"]').text()).not.toContain('document-42');
+    expect(wrapper.get('[data-testid="customer-new-plan-order-document-result-row"]').text()).toContain('Sicherheitskonzept');
     await wrapper.get('[data-testid="customer-new-plan-order-document-result-row"]').trigger('click');
     await nextTickFlush();
     expect(wrapper.find('[data-testid="customer-new-plan-order-document-picker-modal"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="customer-new-plan-order-document-selected"]').text()).toContain('Sicherheitskonzept');
-    expect(wrapper.get('[data-testid="customer-new-plan-order-document-selected"]').text()).not.toContain('document-42');
+    expect(wrapper.get('[data-testid="customer-new-plan-order-document-selected"]').text()).toContain('Sicherheitskonzept');
     await wrapper.get('[data-testid="customer-new-plan-order-document-link-label"]').setValue('Bestehendes Dokument');
     await nextTickFlush();
 

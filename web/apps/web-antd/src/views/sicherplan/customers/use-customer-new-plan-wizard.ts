@@ -216,6 +216,7 @@ export function useCustomerNewPlanWizard() {
         'shift-plan',
         'series-exceptions',
         'demand-groups',
+        'assignments',
       ]);
       if (!shouldPreservePlanningRecordForPlanningContextChange) {
         invalidateSteps(nextState, ['planning-record-overview']);
@@ -239,6 +240,7 @@ export function useCustomerNewPlanWizard() {
         'shift-plan',
         'series-exceptions',
         'demand-groups',
+        'assignments',
       ]);
       if (!shouldPreservePlanningRecordForOrderChange) {
         invalidateSteps(nextState, ['planning-record-overview']);
@@ -260,16 +262,17 @@ export function useCustomerNewPlanWizard() {
         'shift-plan',
         'series-exceptions',
         'demand-groups',
+        'assignments',
       ]);
     }
 
     if (shiftPlanChanged) {
       nextState.series_id = shouldPreserveSeriesForShiftPlanChange ? explicitSeriesId : '';
-      invalidateSteps(nextState, ['series-exceptions', 'demand-groups']);
+      invalidateSteps(nextState, ['series-exceptions', 'demand-groups', 'assignments']);
     }
 
     if (seriesChanged) {
-      invalidateSteps(nextState, ['demand-groups']);
+      invalidateSteps(nextState, ['demand-groups', 'assignments']);
     }
 
     state.value = nextState;

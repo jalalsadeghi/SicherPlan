@@ -221,6 +221,209 @@ export interface DemandGroupBulkUpdateResult {
   results: DemandGroupBulkUpdateItemResult[];
 }
 
+export interface AssignmentStepDemandGroupMatch {
+  function_type_id: string;
+  qualification_type_id?: null | string;
+  min_qty?: null | number;
+  target_qty?: null | number;
+  mandatory_flag?: null | boolean;
+  sort_order?: null | number;
+  remark?: null | string;
+}
+
+export interface AssignmentStepScopeRequest {
+  tenant_id: string;
+  shift_plan_id: string;
+  shift_series_id?: null | string;
+  date_from?: null | string;
+  date_to?: null | string;
+  active_month?: null | string;
+  demand_group_match?: AssignmentStepDemandGroupMatch | null;
+  actor_kind?: null | string;
+  team_id?: null | string;
+  employee_group_id?: null | string;
+  search?: null | string;
+  unfilled_only?: boolean;
+}
+
+export interface AssignmentStepOrderSummaryRead {
+  order_id: string;
+  order_no: string;
+  customer_id: string;
+  planning_record_id: string;
+  planning_record_name: string;
+  planning_mode_code: string;
+}
+
+export interface AssignmentStepShiftPlanSummaryRead {
+  shift_plan_id: string;
+  shift_plan_name: string;
+  shift_series_id: null | string;
+  shift_series_label: null | string;
+  workforce_scope_code: string;
+  planning_from: string;
+  planning_to: string;
+  project_start: string;
+  project_end: string;
+  default_month: string;
+  active_months: string[];
+}
+
+export interface AssignmentStepDemandGroupSummaryRead {
+  signature_key: string;
+  function_type_id: string;
+  qualification_type_id: null | string;
+  min_qty: number;
+  target_qty: number;
+  mandatory_flag: boolean;
+  sort_order: number;
+  remark: null | string;
+  matched_shift_count: number;
+  assigned_count: number;
+  confirmed_count: number;
+  released_partner_qty: number;
+  remaining_open_qty: number;
+  coverage_state: string;
+}
+
+export interface AssignmentStepExistingAssignmentRead {
+  assignment_id: string;
+  shift_id: string;
+  demand_group_id: string;
+  assignment_status_code: string;
+  actor_kind: string;
+  actor_id: string;
+  personnel_ref: string;
+  display_name: string;
+  team_id: null | string;
+}
+
+export interface AssignmentStepCellRead {
+  shift_id: string;
+  demand_group_id: string;
+  occurrence_date: string;
+  starts_at: string;
+  ends_at: string;
+  shift_type_code: string;
+  function_type_id: string;
+  qualification_type_id: null | string;
+  min_qty: number;
+  target_qty: number;
+  assigned_count: number;
+  confirmed_count: number;
+  released_partner_qty: number;
+  remaining_open_qty: number;
+  coverage_state: string;
+  editable_flag: boolean;
+  existing_assignments: AssignmentStepExistingAssignmentRead[];
+}
+
+export interface AssignmentStepDaySummaryRead {
+  occurrence_date: string;
+  total_shifts: number;
+  fully_covered_count: number;
+  warning_count: number;
+  blocked_count: number;
+  overall_state: string;
+  active_flag: boolean;
+}
+
+export interface AssignmentStepCandidateDayStatusRead {
+  shift_id: string;
+  demand_group_id: null | string;
+  occurrence_date: string;
+  eligible_flag: boolean;
+  warning_flag: boolean;
+  reason_codes: string[];
+  warning_codes: string[];
+  validation_results: Array<Record<string, unknown>>;
+}
+
+export interface AssignmentStepCandidateRead {
+  actor_kind: string;
+  actor_id: string;
+  personnel_ref: string;
+  first_name: string;
+  last_name: string;
+  display_name: string;
+  subcontractor_id: null | string;
+  team_ids: string[];
+  employee_group_ids: string[];
+  qualification_match_flag: boolean;
+  function_match_flag: boolean;
+  eligible_day_count: number;
+  warning_day_count: number;
+  blocked_day_count: number;
+  availability_day_count: number;
+  conflict_day_count: number;
+  suitability_score: number;
+  top_reason_codes: string[];
+  day_statuses: AssignmentStepCandidateDayStatusRead[];
+}
+
+export interface AssignmentStepSnapshotRead {
+  tenant_id: string;
+  order: AssignmentStepOrderSummaryRead;
+  shift_plan: AssignmentStepShiftPlanSummaryRead;
+  generated_shift_count: number;
+  demand_group_summary_count: number;
+  editable_flag: boolean;
+  lock_reason_codes: string[];
+  demand_group_summaries: AssignmentStepDemandGroupSummaryRead[];
+  day_summaries: AssignmentStepDaySummaryRead[];
+  calendar_cells: AssignmentStepCellRead[];
+  candidates: AssignmentStepCandidateRead[];
+}
+
+export interface AssignmentStepCandidateQueryResult {
+  tenant_id: string;
+  shift_plan_id: string;
+  shift_series_id: null | string;
+  generated_shift_count: number;
+  candidates: AssignmentStepCandidateRead[];
+}
+
+export interface AssignmentStepApplyRequest {
+  tenant_id: string;
+  shift_plan_id: string;
+  shift_series_id?: null | string;
+  demand_group_match: AssignmentStepDemandGroupMatch;
+  target_shift_ids: string[];
+  team_id?: null | string;
+  employee_id?: null | string;
+  subcontractor_worker_id?: null | string;
+  assignment_source_code?: string;
+  confirmed_at?: null | string;
+  offered_at?: null | string;
+  remarks?: null | string;
+  stop_on_first_rejection?: boolean;
+}
+
+export interface AssignmentStepApplyItemResult {
+  shift_id: string;
+  demand_group_id: null | string;
+  occurrence_date: null | string;
+  outcome_code: string;
+  assignment_id: null | string;
+  reason_codes: string[];
+  warning_codes: string[];
+  validation_results: Array<Record<string, unknown>>;
+  assignment: AssignmentRead | null;
+}
+
+export interface AssignmentStepApplyResult {
+  tenant_id: string;
+  shift_plan_id: string;
+  shift_series_id: null | string;
+  actor_kind: string;
+  actor_id: string;
+  requested_count: number;
+  accepted_count: number;
+  rejected_count: number;
+  created_assignment_ids: string[];
+  results: AssignmentStepApplyItemResult[];
+}
+
 export interface DemandGroupUpdate {
   function_type_id?: null | string;
   qualification_type_id?: null | string;
@@ -658,6 +861,54 @@ export function bulkUpdateDemandGroups(tenantId: string, accessToken: string, pa
     `/api/planning/tenants/${tenantId}/ops/demand-groups/bulk-update`,
     accessToken,
     { method: "PATCH", body: JSON.stringify(payload) },
+  );
+}
+
+export function getAssignmentStepSnapshot(
+  tenantId: string,
+  accessToken: string,
+  payload: AssignmentStepScopeRequest,
+) {
+  return request<AssignmentStepSnapshotRead>(
+    `/api/planning/tenants/${tenantId}/ops/assignment-step/snapshot`,
+    accessToken,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function listAssignmentStepCandidates(
+  tenantId: string,
+  accessToken: string,
+  payload: AssignmentStepScopeRequest,
+) {
+  return request<AssignmentStepCandidateQueryResult>(
+    `/api/planning/tenants/${tenantId}/ops/assignment-step/candidates`,
+    accessToken,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function previewAssignmentStepApply(
+  tenantId: string,
+  accessToken: string,
+  payload: AssignmentStepApplyRequest,
+) {
+  return request<AssignmentStepApplyResult>(
+    `/api/planning/tenants/${tenantId}/ops/assignment-step/preview-apply`,
+    accessToken,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function applyAssignmentStep(
+  tenantId: string,
+  accessToken: string,
+  payload: AssignmentStepApplyRequest,
+) {
+  return request<AssignmentStepApplyResult>(
+    `/api/planning/tenants/${tenantId}/ops/assignment-step/apply`,
+    accessToken,
+    { method: "POST", body: JSON.stringify(payload) },
   );
 }
 

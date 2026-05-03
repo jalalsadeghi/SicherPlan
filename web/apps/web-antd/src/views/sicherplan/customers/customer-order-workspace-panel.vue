@@ -168,6 +168,7 @@ const handledSubmitStepIds = new Set<CustomerNewPlanWizardStepId>([
   'shift-plan',
   'series-exceptions',
   'demand-groups',
+  'assignments',
 ]);
 const isSeriesGenerationStep = computed(() => wizardState.value.current_step === 'series-exceptions');
 const isFinalStep = computed(() => wizardState.value.current_step === CUSTOMER_NEW_PLAN_WIZARD_LAST_STEP_ID);
@@ -175,7 +176,7 @@ const nextActionLabel = computed(() =>
   isSeriesGenerationStep.value
     ? $t('sicherplan.customerPlansWizard.actions.generateContinue')
     : isFinalStep.value
-      ? $t('sicherplan.customerPlansWizard.actions.applyDemandGroups')
+      ? $t('sicherplan.customerPlansWizard.actions.applyAssignments')
     : $t('sicherplan.customerPlansWizard.actions.next'),
 );
 const canSubmitCurrentStep = computed(() => handledSubmitStepIds.has(wizardState.value.current_step));

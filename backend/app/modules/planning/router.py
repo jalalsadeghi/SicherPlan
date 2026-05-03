@@ -26,6 +26,11 @@ from app.modules.planning.output_service import PlanningOutputService
 from app.modules.planning.released_schedule_service import ReleasedScheduleService
 from app.modules.planning.repository import SqlAlchemyPlanningRepository
 from app.modules.planning.schemas import (
+    AssignmentStepApplyRequest,
+    AssignmentStepApplyResult,
+    AssignmentStepCandidateQueryResult,
+    AssignmentStepScopeRequest,
+    AssignmentStepSnapshotRead,
     AssignmentValidationOverrideCreate,
     AssignmentValidationOverrideRead,
     AssignmentValidationRead,
@@ -1872,6 +1877,46 @@ def get_staffing_coverage(
     service: Annotated[StaffingService, Depends(get_staffing_service)],
 ) -> list[CoverageShiftItem]:
     return service.coverage(str(tenant_id), filters, context)
+
+
+@router.post("/assignment-step/snapshot", response_model=AssignmentStepSnapshotRead)
+def get_assignment_step_snapshot(
+    tenant_id: UUID,
+    payload: AssignmentStepScopeRequest,
+    context: Annotated[RequestAuthorizationContext, Depends(require_permission_only("planning.staffing.read"))],
+    service: Annotated[StaffingService, Depends(get_staffing_service)],
+) -> AssignmentStepSnapshotRead:
+    return service.get_assignment_step_snapshot(str(tenant_id), payload, context)
+
+
+@router.post("/assignment-step/candidates", response_model=AssignmentStepCandidateQueryResult)
+def list_assignment_step_candidates(
+    tenant_id: UUID,
+    payload: AssignmentStepScopeRequest,
+    context: Annotated[RequestAuthorizationContext, Depends(require_permission_only("planning.staffing.read"))],
+    service: Annotated[StaffingService, Depends(get_staffing_service)],
+) -> AssignmentStepCandidateQueryResult:
+    return service.list_assignment_step_candidates(str(tenant_id), payload, context)
+
+
+@router.post("/assignment-step/preview-apply", response_model=AssignmentStepApplyResult)
+def preview_assignment_step_apply(
+    tenant_id: UUID,
+    payload: AssignmentStepApplyRequest,
+    context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.staffing.write", scope="tenant"))],
+    service: Annotated[StaffingService, Depends(get_staffing_service)],
+) -> AssignmentStepApplyResult:
+    return service.preview_assignment_step_apply(str(tenant_id), payload, context)
+
+
+@router.post("/assignment-step/apply", response_model=AssignmentStepApplyResult)
+def apply_assignment_step(
+    tenant_id: UUID,
+    payload: AssignmentStepApplyRequest,
+    context: Annotated[RequestAuthorizationContext, Depends(require_authorization("planning.staffing.write", scope="tenant"))],
+    service: Annotated[StaffingService, Depends(get_staffing_service)],
+) -> AssignmentStepApplyResult:
+    return service.apply_assignment_step(str(tenant_id), payload, context)
 
 
 @router.get("/shifts/{shift_id}/release-validations", response_model=ShiftReleaseValidationRead)
