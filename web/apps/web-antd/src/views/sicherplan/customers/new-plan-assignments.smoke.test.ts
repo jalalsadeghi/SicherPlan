@@ -408,7 +408,7 @@ describe('CustomerNewPlanAssignmentsStep', () => {
       'token-1',
       expect.objectContaining({
         employee_id: 'employee-1',
-        target_shift_ids: ['shift-1', 'shift-2'],
+        target_shift_ids: ['shift-1'],
       }),
     );
     expect(staffingMocks.applyAssignmentStepMock).toHaveBeenCalled();
@@ -444,5 +444,58 @@ describe('CustomerNewPlanAssignmentsStep', () => {
       completedStepId: 'assignments',
       success: true,
     });
+  });
+
+  it('does not complete when assignments exist but mandatory coverage is still blocked', async () => {
+    staffingMocks.getAssignmentStepSnapshotMock.mockResolvedValueOnce(buildSnapshot({
+      demand_group_summaries: [
+        {
+          ...buildSnapshot().demand_group_summaries[0],
+          assigned_count: 1,
+          remaining_open_qty: 3,
+          coverage_state: 'red',
+        },
+      ],
+    }));
+
+    const wrapper = await mountStep();
+    const result = await (wrapper.vm as unknown as { submitCurrentStep: () => Promise<unknown> }).submitCurrentStep();
+
+    expect(result).toBe(false);
+    expect(wrapper.get('[data-testid="customer-new-plan-assignments-error"]').text()).toContain('assignmentsRequired');
+  });
+
+  it('allows completion once mandatory coverage is satisfied even if target coverage is still warning', async () => {
+    staffingMocks.getAssignmentStepSnapshotMock.mockResolvedValueOnce(buildSnapshot({
+      demand_group_summaries: [
+        {
+          ...buildSnapshot().demand_group_summaries[0],
+          assigned_count: 1,
+          remaining_open_qty: 1,
+          coverage_state: 'yellow',
+        },
+      ],
+    }));
+
+    const wrapper = await mountStep();
+    const result = await (wrapper.vm as unknown as { submitCurrentStep: () => Promise<unknown> }).submitCurrentStep();
+
+    expect(result).toMatchObject({
+      completedStepId: 'assignments',
+      success: true,
+    });
+  });
+
+  it('shows the no-demand-groups empty state when generated shifts exist but no demand groups are available', async () => {
+    staffingMocks.getAssignmentStepSnapshotMock.mockResolvedValueOnce(buildSnapshot({
+      demand_group_summary_count: 0,
+      demand_group_summaries: [],
+      calendar_cells: [],
+      candidates: [],
+    }));
+
+    const wrapper = await mountStep();
+
+    expect(wrapper.get('[data-testid="customer-new-plan-assignments-no-demand-groups"]').exists()).toBe(true);
   });
 });

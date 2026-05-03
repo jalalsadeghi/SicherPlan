@@ -1,71 +1,78 @@
-/review Please review the customer order wizard `Demand groups` step for correctness, workflow fit, performance, and regression risk.
+/review Please review the customer order wizard `Assignments` step for correctness, workflow fit, editability, performance, and regression risk.
 
 Business context:
-The customer order wizard currently has 8 steps. `Demand groups` is step 7 and `Assignments` is step 8. The `Demand groups` step should define staffing demand across generated shifts for the selected shift plan / series. It should show aggregate applied demand-group summaries and allow controlled creation/editing before assignments start.
+The customer order wizard currently has 8 steps. `Assignments` is step 8 after `Demand groups`. The step should assign suitable workers to generated shifts for the selected shift plan / series and selected demand-group context.
 
 Review against:
 - `web/apps/web-antd/src/views/sicherplan/customers/new-plan-wizard.steps.ts`
-- `web/apps/web-antd/src/views/sicherplan/customers/new-plan-step-content.vue`
-- `web/apps/web-antd/src/views/sicherplan/customers/customer-order-workspace-panel.vue`
+- `web/apps/web-antd/src/views/sicherplan/customers/customer-new-plan-assignments-step.vue`
+- `web/apps/web-antd/src/views/sicherplan/customers/new-plan-assignments.smoke.test.ts`
 - `web/apps/web-antd/src/sicherplan-legacy/api/planningStaffing.ts`
 - `backend/app/modules/planning/router.py`
 - `backend/app/modules/planning/staffing_service.py`
+- `backend/app/modules/planning/schemas.py`
 - `backend/tests/modules/planning/test_staffing_engine.py`
-- existing 8-step wizard behavior
-- `admin/planning-staffing` behavior
+- existing admin/planning-staffing semantics
 - German default / English secondary localization rules
 
 Review focus:
-1. Step sequence and completion
-   - `Demand groups` is before `Assignments`.
-   - Completion is based on persisted applied demand groups, not only pending templates.
-   - `Assignments` is not allowed/ready when no demand groups exist.
-   - Returning to the step does not lose applied state.
+1. Step and prerequisite correctness
+   - Assignments is step 8 after Demand groups.
+   - It requires generated shifts and demand groups.
+   - Empty states are correct for no shifts, no demand groups, no candidates.
+   - It does not silently assign without demand-group context.
 
-2. Applied summary correctness
-   - Persisted per-shift demand groups are loaded and aggregated correctly.
-   - Complete/Partial/Mixed statuses are accurate.
-   - `23 / 23 shifts` or similar counts are accurate.
-   - Mixed or variant data is not silently collapsed.
-   - Empty-state messages are not misleading.
+2. Candidate correctness
+   - Candidate list is tenant-scoped.
+   - Candidate list is demand-group scoped.
+   - Qualification/function/actor/workforce/team/group/search filters are correct.
+   - Ranking prefers workers who can cover more eligible project days.
+   - Candidate reasons/empty state are understandable.
 
-3. Pending template behavior
-   - Pending templates are separate from applied groups.
-   - New templates do not create real per-shift rows before Apply.
-   - Draft restore is context-safe.
-   - Duplicate templates are prevented or clearly handled.
+3. Calendar correctness
+   - Default month is project start month.
+   - Non-project dates are disabled.
+   - Project dates are color-coded with planning-staffing semantics.
+   - Assigned/target counts are accurate for the selected demand group.
+   - Existing assignments are reflected.
 
-4. Apply behavior
-   - Apply is blocked or disabled when no pending templates exist.
-   - Apply calls `bulkApplyDemandGroups` once when templates exist.
-   - Success reloads persisted summaries.
-   - Repeated apply does not create duplicates.
+4. Assignment behavior
+   - Target shift ids are correct.
+   - Ineligible days are not silently assigned.
+   - Preview/apply behavior is correct.
+   - Partial accepted/rejected results are communicated.
+   - Repeated assignment does not create duplicates.
+   - `unfilled_only` is respected.
+   - Non-drag fallback remains available.
 
-5. Edit behavior
-   - Aggregate `Edit` uses `bulkUpdateDemandGroups` or a safe equivalent.
-   - `Edit shifts` uses individual `updateDemandGroup`.
-   - Edits reload summaries.
-   - Edits are blocked/readonly after assignments or later downstream state exists.
+5. Completion logic
+   - Completion is not triggered by just one assignment if other mandatory coverage is missing.
+   - Completion rule matches the product/business rule.
+   - Submit gives a clear reason if incomplete.
 
-6. Performance
-   - The page avoids one demand-group request per generated shift.
-   - The page uses efficient filters or a backend aggregate endpoint.
-   - Reference data is not repeatedly fetched unnecessarily.
-   - No new N+1 backend pattern was introduced.
+6. Editability and backend guards
+   - Locked downstream state disables unsafe assignment actions.
+   - Backend rejects unsafe mutations when locked.
+   - UI read-only state matches backend rules.
 
-7. UX and localization
-   - Applied cards are compact and clear.
-   - Action buttons are aligned and usable.
-   - Labels/messages are localized in German and English.
-   - No hardcoded user-facing text was introduced.
-   - SicherPlan/Vben visual consistency is preserved.
+7. Performance
+   - Initial load does not duplicate full snapshot calls.
+   - Reference data caching is safe.
+   - Filter/search changes use candidate endpoint where possible.
+   - Backend avoids obvious N+1 behavior.
 
-8. Regression risk
-   - `admin/planning-staffing` still works.
-   - `Assignments` step still works.
-   - Demand group bulk apply/update APIs still work.
-   - Existing wizard tests pass.
-   - Backend tests pass if backend changed.
+8. UX and localization
+   - Filter row is clean and responsive.
+   - Candidate rail is compact and scrollable.
+   - Calendar is legible.
+   - User-facing strings are localized.
+   - Visual style follows SicherPlan/Vben.
+
+9. Regression risk
+   - Demand groups step still works.
+   - admin/planning-staffing still works.
+   - Assignment APIs still work.
+   - Existing tests pass.
 
 Required output:
 - Blocking issues

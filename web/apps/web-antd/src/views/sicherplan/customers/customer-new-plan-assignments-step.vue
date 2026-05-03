@@ -200,9 +200,15 @@ const currentDemandGroupMatch = computed(() =>
   selectedDemandGroupSummary.value ? buildDemandGroupMatch(selectedDemandGroupSummary.value) : null,
 );
 
-const hasPersistedAssignments = computed(() =>
-  (snapshot.value?.demand_group_summaries ?? []).some((row) => row.assigned_count > 0 || row.confirmed_count > 0),
-);
+const assignmentStepCoverageComplete = computed(() => {
+  const demandGroups = snapshot.value?.demand_group_summaries ?? [];
+  if (!snapshot.value?.generated_shift_count || !demandGroups.length) {
+    return false;
+  }
+  const mandatoryDemandGroups = demandGroups.filter((row) => row.mandatory_flag);
+  const targetDemandGroups = mandatoryDemandGroups.length ? mandatoryDemandGroups : demandGroups;
+  return targetDemandGroups.every((row) => row.coverage_state !== 'red');
+});
 
 const assignmentStepEditable = computed(() => snapshot.value?.editable_flag !== false);
 const snapshotBusy = computed(() => snapshotLoading.value || referenceLoading.value);
@@ -463,7 +469,7 @@ async function loadReferenceData() {
 }
 
 function syncStepCompletion() {
-  emit('step-completion', 'assignments', hasPersistedAssignments.value);
+  emit('step-completion', 'assignments', assignmentStepCoverageComplete.value);
   emit('step-ui-state', 'assignments', { dirty: false, error: '' });
 }
 
@@ -586,12 +592,23 @@ function findCandidateByActorId(actorId: string) {
   return candidates.value.find((row) => row.actor_id === actorId) ?? null;
 }
 
+function buildEligibleTargetShiftIds(candidate: AssignmentStepCandidateRead) {
+  const editableIds = new Set(editableTargetShiftIds.value);
+  const eligibleIds = new Set(
+    candidate.day_statuses
+      .filter((row) => row.eligible_flag)
+      .map((row) => row.shift_id),
+  );
+  return editableTargetShiftIds.value.filter((shiftId) => editableIds.has(shiftId) && eligibleIds.has(shiftId));
+}
+
 function buildAssignmentPayload(candidate: AssignmentStepCandidateRead): AssignmentStepApplyRequest | null {
   if (!currentDemandGroupMatch.value) {
     setStepError('missing_demand_group', $t('sicherplan.customerPlansWizard.errors.assignmentsMissingDemandGroup'));
     return null;
   }
-  if (!editableTargetShiftIds.value.length) {
+  const eligibleTargetShiftIds = buildEligibleTargetShiftIds(candidate);
+  if (!eligibleTargetShiftIds.length) {
     setStepError('no_targets', $t('sicherplan.customerPlansWizard.errors.assignmentsNoEligibleDays'));
     return null;
   }
@@ -604,7 +621,7 @@ function buildAssignmentPayload(candidate: AssignmentStepCandidateRead): Assignm
     shift_series_id: props.wizardState.series_id || null,
     stop_on_first_rejection: false,
     subcontractor_worker_id: candidate.actor_kind === 'subcontractor_worker' ? candidate.actor_id : null,
-    target_shift_ids: editableTargetShiftIds.value,
+    target_shift_ids: eligibleTargetShiftIds,
     team_id: filters.team_id || null,
     tenant_id: props.tenantId,
   };
@@ -757,7 +774,7 @@ async function submitCurrentStep(): Promise<CustomerNewPlanStepSubmitResult> {
     setStepError('missing_shift_plan', $t('sicherplan.customerPlansWizard.errors.assignmentsMissingShiftPlan'));
     return false;
   }
-  if (hasPersistedAssignments.value) {
+  if (assignmentStepCoverageComplete.value) {
     emit('step-completion', 'assignments', true);
     emit('step-ui-state', 'assignments', { dirty: false, error: '' });
     return {
